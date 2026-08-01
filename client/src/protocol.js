@@ -163,6 +163,7 @@ export const msg = Object.freeze({
     if (id != null) payload.id = id;
     return payload;
   },
+  chatSend: (channel, text) => ({ t: C.CHAT_SEND, channel, text }),
   command: (cmd, clientSeq) => ({ t: C.COMMAND, clientSeq, cmd }),
   giveUp: () => ({ t: C.GIVE_UP }),
   pauseGame: () => ({ t: C.PAUSE_GAME }),

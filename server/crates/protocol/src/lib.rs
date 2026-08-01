@@ -5,7 +5,7 @@
 //! Tag conventions: top-level messages use `"t"`, commands use `"c"`, events use `"e"`.
 //! Coordinates are world pixels (floats) unless the field name ends in `Tile`.
 use serde::{Deserialize, Serialize};
-
+pub mod chat;
 mod client_net_report;
 mod compact_snapshot;
 mod contract_metadata;
@@ -15,6 +15,7 @@ mod lab_scenario;
 mod messagepack_frame;
 mod observer_analysis;
 mod server_message;
+pub use chat::{ChatChannel, ChatScope, ChatSendPayload, ChatText};
 pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
@@ -114,6 +115,8 @@ pub enum ClientMessage {
         #[serde(default)]
         id: Option<u32>,
     },
+    /// Send room chat; the room validates and routes its authoritative audience.
+    ChatSend(ChatSendPayload),
     /// Issue a gameplay command (ignored unless in-game).
     Command {
         #[serde(rename = "clientSeq")]

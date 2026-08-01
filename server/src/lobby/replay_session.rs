@@ -7,10 +7,12 @@ use crate::protocol::{
 };
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
-use rts_sim::game::replay::{ReplayArtifactV1, ReplayValidationError};
+use rts_sim::game::replay::{ChatLogEntry, ReplayArtifactV1, ReplayValidationError};
 use rts_sim::game::Game;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant as StdInstant};
+
+pub(super) const MAX_CHAT_LOG_ENTRIES: usize = 10_000;
 
 pub(super) fn validate_vision_selection_request(
     vision: &VisionSelectionRequest,
@@ -56,6 +58,7 @@ pub(super) struct ReplaySession {
     pub(super) artifact: ReplayArtifactV1,
     pub(super) game: Box<Game>,
     pub(super) next_command: usize,
+    next_chat: usize,
     pub(super) keyframes: Vec<ReplayKeyframe>,
     start_tick: u32,
     pub(super) duration_ticks: u32,
@@ -111,6 +114,7 @@ impl ReplaySession {
     pub(super) const MAX_SPEED: f32 = 8.0;
     pub(super) const MAX_DURATION_TICKS: u32 = 30 * 60 * 60;
     const MAX_COMMAND_LOG_ENTRIES: usize = 200_000;
+    const MAX_CHAT_NAME_CHARS: usize = 24;
     const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
     const KEYFRAME_INTERVAL_TICKS: u32 = 2_000;
 
@@ -143,6 +147,7 @@ impl ReplaySession {
             artifact,
             game,
             next_command: 0,
+            next_chat: 0,
             keyframes,
             start_tick,
             duration_ticks,
@@ -188,6 +193,13 @@ impl ReplaySession {
                 Self::MAX_COMMAND_LOG_ENTRIES
             ));
         }
+        if artifact.chat_log.len() > MAX_CHAT_LOG_ENTRIES {
+            return Err(format!(
+                "replay chat log has {} entries; maximum is {}",
+                artifact.chat_log.len(),
+                MAX_CHAT_LOG_ENTRIES
+            ));
+        }
         Ok(())
     }
 
@@ -227,6 +239,35 @@ impl ReplaySession {
                     "replay command {index} is out of order: tick {} before {}",
                     entry.tick, previous_tick
                 ));
+            }
+            previous_tick = entry.tick;
+        }
+        previous_tick = start_tick;
+        for (index, entry) in artifact.chat_log.iter().enumerate() {
+            if entry.tick < start_tick {
+                return Err(format!(
+                    "replay chat {index} tick {} is before start tick {}",
+                    entry.tick, start_tick
+                ));
+            }
+            if entry.tick > artifact.duration_ticks {
+                return Err(format!(
+                    "replay chat {index} tick {} exceeds duration {}",
+                    entry.tick, artifact.duration_ticks
+                ));
+            }
+            if entry.tick < previous_tick {
+                return Err(format!(
+                    "replay chat {index} is out of order: tick {} before {}",
+                    entry.tick, previous_tick
+                ));
+            }
+            if entry.sender_name.is_empty()
+                || entry.sender_name.chars().count() > Self::MAX_CHAT_NAME_CHARS
+                || entry.text.is_empty()
+                || entry.text.chars().count() > crate::protocol::chat::MAX_CHAT_CHARS
+            {
+                return Err(format!("replay chat {index} has invalid bounded text"));
             }
             previous_tick = entry.tick;
         }
@@ -409,6 +450,20 @@ impl ReplaySession {
         self.game.tick_with_perf(perf).into_iter().collect()
     }
 
+    pub(super) fn take_chat_through_current_tick(&mut self) -> Vec<ChatLogEntry> {
+        let current_tick = self.current_tick();
+        let start = self.next_chat;
+        while self
+            .artifact
+            .chat_log
+            .get(self.next_chat)
+            .is_some_and(|entry| entry.tick <= current_tick)
+        {
+            self.next_chat += 1;
+        }
+        self.artifact.chat_log[start..self.next_chat].to_vec()
+    }
+
     pub(super) fn record_keyframe_if_due(&mut self) {
         let tick = self.current_tick();
         if tick == 0 || !tick.is_multiple_of(Self::KEYFRAME_INTERVAL_TICKS) {
@@ -456,6 +511,13 @@ impl ReplaySession {
 
         *self.game = game;
         self.next_command = next_command;
+        // A seek presents the target state without replaying its earlier transient chat. Position
+        // the independent chat cursor at the target immediately; rewinding before an entry still
+        // re-arms it when ordinary playback resumes.
+        self.next_chat = self
+            .artifact
+            .chat_log
+            .partition_point(|entry| entry.tick <= plan.target_tick);
         self.last_seek_at = Some(StdInstant::now());
         self.last_controller_id = Some(controller_id);
         self.next_seek_id = self.next_seek_id.wrapping_add(1).max(1);
@@ -1080,6 +1142,37 @@ mod tests {
     }
 
     #[test]
+    fn replay_chat_is_emitted_once_at_its_tick_and_rearmed_after_seek() {
+        use crate::protocol::ChatChannel;
+        use rts_sim::game::replay::ChatLogEntry;
+
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 4);
+        artifact.chat_log.push(ChatLogEntry {
+            tick: 2,
+            sender_id: 1,
+            sender_name: "Player 1".to_string(),
+            channel: ChatChannel::All,
+            text: "advance".to_string(),
+        });
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+        assert!(replay.take_chat_through_current_tick().is_empty());
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+        assert_eq!(replay.take_chat_through_current_tick().len(), 1);
+        assert!(replay.take_chat_through_current_tick().is_empty());
+
+        replay.seek_back("test", 1, 42, 2).unwrap();
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+        assert_eq!(replay.take_chat_through_current_tick().len(), 1);
+    }
+
+    #[test]
     fn observer_analysis_restores_from_keyframe_without_accumulating_extra_losses() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 1);
@@ -1146,6 +1239,31 @@ mod tests {
         };
         assert!(
             err.contains("exceeds duration"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_malformed_chat_logs() {
+        use crate::protocol::ChatChannel;
+        use rts_sim::game::replay::ChatLogEntry;
+
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 2);
+        artifact.chat_log.push(ChatLogEntry {
+            tick: artifact.duration_ticks + 1,
+            sender_id: players[0].id,
+            sender_name: players[0].name.clone(),
+            channel: ChatChannel::All,
+            text: "late".to_string(),
+        });
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("malformed replay chat should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("replay chat 0 tick") && err.contains("exceeds duration"),
             "unexpected artifact reject: {err}"
         );
     }

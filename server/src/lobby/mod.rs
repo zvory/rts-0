@@ -224,6 +224,18 @@ pub async fn send_command_room_event(
     }
 }
 
+/// Forward an ordinary event to the connection's joined room, if any.
+pub async fn send_room_event(player_id: u32, current_room: &Option<RoomHandle>, event: RoomEvent) {
+    match current_room {
+        Some(handle) => {
+            if handle.event_tx.send(event).await.is_err() {
+                crate::log_warn!(player_id, "room task gone; dropping event");
+            }
+        }
+        None => crate::log_debug!(player_id, "ignoring event before join"),
+    }
+}
+
 fn current_unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -433,6 +445,12 @@ pub enum RoomEvent {
         player_id: u32,
         target: u32,
         spectator: bool,
+    },
+    /// A connected human submitted bounded room chat.
+    ChatSend {
+        player_id: u32,
+        channel: crate::protocol::ChatChannel,
+        text: String,
     },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
     Command {

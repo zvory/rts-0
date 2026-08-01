@@ -319,6 +319,11 @@ export class Net {
     this._send(msg.setSpectator(spectator, id));
   }
 
+  /** Send room chat; the server validates phase, channel, sender, and audience. */
+  chatSend(channel, text) {
+    return this._send(msg.chatSend(channel, text));
+  }
+
   /**
    * Issue a gameplay command.
    * @param {object} cmd a command object built via protocol.js `cmd.*`.

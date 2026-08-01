@@ -69,6 +69,7 @@ src/
   hotkey_profiles.js # Local hotkey presets, custom profile storage, import/export
   hotkey_editor.js # Settings Hotkeys tab editor
   tab_menu.js # hold-Tab Auto-Build controls with optimistic state through authoritative acknowledgement
+  chat_overlay.js # App-owned lobby/game direct-text chat, channel hotkeys, fading presentation
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
@@ -167,6 +168,7 @@ export class Net {
   setAiProfile(id, aiProfileId)          // AI profile id
   removeAi(id)
   setSpectator(spectator, id?)
+  chatSend(channel, text)
   command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope
   giveUp()
   pauseGame()
@@ -200,6 +202,16 @@ optionally mirrored to diagnostics. Each instance retains at most 32 signatures;
 failure emits one fixed saturation report and all later new signatures are suppressed. Reports
 never inspect thrown-value properties or message payloads, survive reconnects for the lifetime of
 the `Net`, and cannot prevent delivery to later subscribers even if console or diagnostics throws.
+
+`App` owns one `ChatOverlay` for the lifetime of the socket and switches it between joined-lobby
+and game context. Enter opens a transparent single-line composer over the current screen; Enter
+sends and closes it, Escape cancels, and Tab cycles team/all only when the local active player has
+at least one teammate. Singleton-team 1v1/FFA players and spectators use all-chat. While the
+composer is focused, its capture listener consumes those keys and marks the match input surface
+interactive so gameplay hotkeys, the hold-Tab menu, camera input, and desktop cursor recapture do
+not compete with typing. Reliable deliveries render with `textContent`, keep at most six visible
+lines, and fade after eight wall-clock seconds. Replay context is read-only; replay seeks clear the
+transient lines before tick-timed messages resume.
 
 `prediction_controller.js`
 ```js

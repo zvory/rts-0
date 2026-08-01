@@ -32,13 +32,15 @@ mod interact_lab_artifacts;
 mod main_replay_tests;
 mod map_handoffs;
 mod player_activity;
+mod player_name;
 mod stress_tests;
 mod wiki;
 
 use player_activity::is_player_activity;
+use player_name::sanitize_name;
 use rts_server::db::Db;
 use rts_server::lab_scenarios::{catalog_handler, MAX_LAB_SCENARIO_IMPORT_JSON_BYTES};
-use rts_server::lobby::{self, Lobby, RoomEvent};
+use rts_server::lobby::{self, send_room_event, Lobby, RoomEvent};
 use rts_server::protocol::{ClientMessage, ServerMessage};
 use rts_server::structured_log;
 use rts_sim::game::map::{Map, CURRENT_MAP_VERSION};
@@ -747,11 +749,6 @@ mod tests {
         assert!(is_player_activity(&ClientMessage::Ready { ready: true }));
     }
 
-    #[test]
-    fn sanitize_name_uses_commander_for_blank_names() {
-        assert_eq!(sanitize_name(" \n\t ".to_string()), "Commander");
-    }
-
     async fn start_one_player_test_match(lobby: &Lobby, room: &str) -> lobby::RoomHandle {
         let handle = lobby.get_or_create(room).await;
         let (msg_tx, _writer) = lobby::ConnectionSink::new();
@@ -1401,6 +1398,18 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::ChatSend(chat) => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::ChatSend {
+                    player_id,
+                    channel: chat.channel,
+                    text: chat.text.into_inner(),
+                },
+            )
+            .await;
+        }
         ClientMessage::Command { client_seq, cmd } => {
             lobby::send_command_room_event(
                 player_id,
@@ -1611,35 +1620,6 @@ async fn request_branch_from_tick(
             source_tick,
             seats,
         });
-    }
-}
-
-/// Forward a [`RoomEvent`] to the connection's room, if it has joined one. Logs and ignores the
-/// message otherwise (a client acting before `join`).
-async fn send_room_event(
-    player_id: u32,
-    current_room: &Option<lobby::RoomHandle>,
-    event: RoomEvent,
-) {
-    match current_room {
-        Some(handle) => {
-            if handle.event_tx.send(event).await.is_err() {
-                rts_server::log_warn!(player_id, "room task gone; dropping event");
-            }
-        }
-        None => rts_server::log_debug!(player_id, "ignoring event before join"),
-    }
-}
-
-/// Trim and bound a player-supplied display name so it stays sane in lobby UIs and logs.
-fn sanitize_name(name: String) -> String {
-    const MAX_NAME_LEN: usize = 24;
-    let trimmed = name.trim();
-    let cleaned: String = trimmed.chars().take(MAX_NAME_LEN).collect();
-    if cleaned.is_empty() {
-        "Commander".to_string()
-    } else {
-        cleaned
     }
 }
 

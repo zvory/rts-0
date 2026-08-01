@@ -334,6 +334,11 @@ export const dom = {
   devBanner: document.getElementById("dev-banner"),
   devLinks: document.getElementById("dev-links"),
   roomTimeControls: document.getElementById("room-time-controls"),
+  chatOverlay: document.getElementById("chat-overlay"),
+  chatMessages: document.getElementById("chat-messages"),
+  chatComposer: document.getElementById("chat-composer"),
+  chatChannel: document.getElementById("chat-channel"),
+  chatInput: document.getElementById("chat-input"),
 };
 
 export function formatScore(value) {

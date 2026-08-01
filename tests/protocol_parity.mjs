@@ -190,6 +190,14 @@ function assertNoDuplicateCodes(label, codes) {
   }
 }
 
+function assertDeepChatBuilder() {
+  assert(
+    JSON.stringify(msg.chatSend("team", "hold")) ===
+      JSON.stringify({ t: "chatSend", channel: "team", text: "hold" }),
+    "chatSend builder preserves channel and text",
+  );
+}
+
 function extractMarkdownCodeRow(label) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const row = protocolDoc.match(new RegExp(`^\\| \`${escaped}\` \\| ([^|]+) \\|$`, "m"));
@@ -208,6 +216,7 @@ function camelToSnake(name) {
 }
 
 assert(protocolContract.schemaVersion === 1, "protocol contract schema version must be 1");
+assertDeepChatBuilder();
 assertExportsPresent("client protocol public surface", protocolExports, STABLE_JS_PROTOCOL_EXPORTS);
 assert(protocolContract.unknownCodeSentinel === 255, "unknown compact code sentinel must stay 255");
 assertSameMap("server message tags", protocolContract.messageTags.server, S);

@@ -61,6 +61,17 @@ pub enum ServerMessage {
         occupants: Vec<BranchStagingOccupant>,
         can_start: bool,
     },
+    /// One reliable, server-authored chat delivery. `tick` is present only for live/replay game
+    /// chat and is the authoritative replay presentation time.
+    Chat {
+        scope: ChatScope,
+        channel: ChatChannel,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tick: Option<u32>,
+        sender_id: u32,
+        sender_name: String,
+        text: String,
+    },
     /// Reliable lab control-plane state. World state still travels through `snapshot`.
     LabState(LabState),
     /// Reliable result for one lab request.

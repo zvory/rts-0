@@ -19,8 +19,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
 
 ## Code map
 - `server/crates/protocol/src/lib.rs` — authoritative Rust wire DTOs and compact transport
-- `server/crates/contract/src/lib.rs` — shared semantic DTOs re-exported by protocol, including
-  start/snapshot contract records and `DEFAULT_FACTION_ID`
+- `server/crates/contract/src/lib.rs` — shared semantic DTOs re-exported by protocol
 - `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports
 - `server/crates/sim/src/protocol.rs` — sim-facing adapter for typed kind conversion
 - `client/src/protocol.js` — mirror; must agree on every tag, field name, and shape
@@ -32,28 +31,27 @@ Use when adding, removing, or changing any field on a client↔server message, s
 ## Current lobby fields to remember
 - `setName { name }` updates the sender's sanitized name during the lobby
   phase; countdown and in-game requests are ignored.
+- `chatSend` is server-routed; lobby chat is ephemeral and game chat is replayed from `chatLog[]`.
 - `selectMap { map }` is the host-only map selector command.
 - `lobby` carries `map` (selected stable map name) and `maps[]`
   (`{name, description, minPlayers, maxPlayers}` catalog rows). Replay start metadata separately
   uses `mapName`.
-- Lab start metadata carries room/role identity, compatibility vision, initial camera, dirty state,
-  and operation count.
+- Lab start metadata carries room/role identity, vision, camera, dirty state, and operation count.
 - Start `capabilities` declares room-time, vision, and command affordances; never infer them from
   room modes. Privileged viewers select union, omniscient, or player vision per connection.
+- Lab timeline controls use neutral room-time messages rather than `LabClientOp`.
 - Replay seeks reset timeline-derived client state in place and expose sampled incremental
   progress through coalescing `roomTimeState.seek`; they do not rebuild `Match`.
 - Privileged start payloads also carry the authoritative initial `observerView` selector. Use it
   to render the shared controls; do not reconstruct it from legacy Lab metadata.
-- Start payloads carry recipient-scoped `diagnostics` metadata when projection policy enables
-  movement-path overlays or observer analysis. Do not infer those affordances from room mode names.
+- Start payloads carry recipient-scoped `diagnostics`; do not infer them from room mode names.
 - Resolved AI matches send `observationReady` (replay/log lookup).
 - The active protocol has no quickstart/debug lobby command or start-payload flag. Normal live
   countdown skipping for rooms with one or zero active humans is not a debug preset.
 - `LobbyPlayer` carries `teamId`, `factionId`, `aiProfileId?` (canonical AI profile id), and
   `isSpectator`; spectators are lobby members but not active match players.
-- Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`; legacy setup
-  JSON is rejected. `validateScenario` previews catalog/path/payload/map bounds without mutating
-  the room or accepting client-controlled server paths.
+- Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`.
+  `validateScenario` previews bounds without mutating the room or accepting client server paths.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
 - `/api/map-handoffs` validates map data, caps records at 64, expires them after two minutes, and
   consumes each id once. Lab `exportMap` returns only `LabMapDraft` in reverse.

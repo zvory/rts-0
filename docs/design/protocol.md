@@ -77,6 +77,7 @@ lobby/config dump replaces the source scrape.
 | `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects a supported profile for an existing AI lobby seat (lobby phase only, host-only). Player lobbies support only `ai_2_1`; unknown AI ids and unsupported or internal-only profile ids are ignored. Observer-only internal sessions may select `ai_turtle`. Any internal profile is replaced with `ai_2_1` if a human takes an active seat and again at match start. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
+| `chatSend` | `channel: "all" or "team"`, `text: string` | Send room chat. The server collapses whitespace, drops empty text, caps it at 200 Unicode scalar values, and admits at most five messages per sender in a rolling ten-second window. Lobby and branch-staging chat is always all-chat and ephemeral. Live match all-chat reaches every connected player and spectator; team chat reaches only active human connections on the sender's authoritative team. Spectators are forced to all-chat. Replay viewers cannot send chat. |
 | `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation and diagnostics-only command receipts. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `pauseGame` | — | Pause a live match. Honored only from live recipients with `matchControls.pause` while the room is unpaused and that active seat or spectator connection has successful pause starts remaining. |
@@ -389,6 +390,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
 | `branchFromTickCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
 | `branchStaging` | `room: string`, `sourceTick: u32`, `hostId: u32`, `seats: BranchStagingSeat[]`, `occupants: BranchStagingOccupant[]`, `canStart: bool` — reliable current state for a replay branch staging room. Sent after joins, leaves, claims, and releases. |
+| `chat` | `scope: "lobby" or "game"`, `channel: "all" or "team"`, `tick?: u32`, `senderId: u32`, `senderName: string`, `text: string` — reliable server-authored chat delivery. Lobby deliveries omit `tick`; live and replay deliveries carry the authoritative presentation tick. Clients render all fields as text, never HTML. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `observationReady` | `matchRunId: string` — a watched all-AI match has resolved; this id retrieves its saved replay and joins its structured server logs. |
 | `gameOver` | `winnerId: u32 | null`, `winnerTeamId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
@@ -615,7 +617,13 @@ and a tick-zero `GameCheckpointV1` text payload, plus ordered `players[]` with e
 `team_id` and required `faction_id`, plus `playerLoadouts[]` with one `{ playerId, factionId,
 loadoutId, startingSteel, startingOil }` record per player. Replay reconstruction restores the
 start `Game` from the checkpoint payload and then applies the authoritative `commandLog[]` on the
-recorded ticks. The compatibility `winnerId`, optional `winnerTeamId`, `durationTicks`, and
+recorded ticks. Its bounded ordered `chatLog[]` stores `{tick, senderId, senderName, channel, text}`
+for accepted in-game chat only; replay playback reliably emits each entry when the shared cursor
+reaches that tick. Seeking clears the client's transient chat presentation and positions the chat
+cursor after the target tick, so already-passed messages do not flood the screen and appear again
+only after rewinding before them and resuming. Both all-chat and formerly private team-chat are part
+of the completed replay's historical record and are visible to replay spectators. The compatibility
+`winnerId`, optional `winnerTeamId`, `durationTicks`, and
 `finalScores[]` with each row's `teamId` remain part of the artifact. Artifact schema 2 and older
 payloads are rejected with the unsupported-schema error; new captures always include explicit
 nonzero player and score team ids, required player faction ids, required player loadout records,

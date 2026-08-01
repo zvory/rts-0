@@ -62,7 +62,7 @@ Replay artifacts live in `match_replays`, keyed one-to-one by `match_id`:
 `matches.score_screen` remains score data only. Replay playback never reads replay payloads from
 `score_screen`. New replay rows write `artifactSchemaVersion: 3`, whose `startState` carries the
 launch map binding and an embedded tick-zero `GameCheckpointV1` text payload. The authoritative
-command stream, `durationTicks`, `winnerId`, `winnerTeamId`, and `finalScores` are attached when
+command stream, bounded tick-timed in-game `chatLog`, `durationTicks`, `winnerId`, `winnerTeamId`, and `finalScores` are attached when
 the artifact is finalized at match end. Schema 2 rows have no `startState` and are intentionally
 rejected by current replay compatibility checks. The replay `artifact_json` carries
 `players[].teamId`, `winnerId`, `winnerTeamId`, and `finalScores[].teamId`; `winner_name` remains
@@ -127,7 +127,7 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   room tasks after the natural deploy-drain window expires.
 - `server/src/lobby/room_task.rs` — captures `match_started_at`, `match_map_name`,
   `match_participants`, and the launch-time replay start composition at `start_match`; finalizes
-  `ReplayArtifactV1` from that stored start plus the ending command log/scores; writes the match
+  `ReplayArtifactV1` from that stored start plus the ending command log/chat log/scores; writes the match
   row and optional replay row in `end_match` via a tracked **detached** task.
   Normal match completion writes explicit `win` or `draw` outcomes; deploy-drain abort
   finalization captures the current active `Game`, writes `aborted`, marks the room's drain

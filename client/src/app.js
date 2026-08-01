@@ -79,6 +79,7 @@ import {
 import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 import { StressTestRunner } from "./stress_test.js";
 import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
+import { ChatOverlay } from "./chat_overlay.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -177,6 +178,14 @@ export class App {
       menu: dom.settingsMenu,
       onOpenChange: (open) => this.match?.handleInteractiveMenuStateChange?.(open),
     });
+    this.chat = new ChatOverlay({
+      net: this.net,
+      root: dom.chatOverlay,
+      messages: dom.chatMessages,
+      composer: dom.chatComposer,
+      channelLabel: dom.chatChannel,
+      input: dom.chatInput,
+    });
     this.rendererPreparationSlot = new RendererPreparationSlot({
       onCountdownReady: (countdownId) => this.net.matchLoadReady(countdownId),
       onFailure: (error) => {
@@ -237,6 +246,7 @@ export class App {
     this.onOpen = this.onOpen.bind(this);
     this.onClose = this.onClose.bind(this);
     this.onLobbyForMatchLaunch = this.onLobbyForMatchLaunch.bind(this);
+    this.onBranchStagingForChat = this.onBranchStagingForChat.bind(this);
     this.onBranchFromTickCreated = this.onBranchFromTickCreated.bind(this);
     this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.onVisibilityChange = this.onVisibilityChange.bind(this);
@@ -277,6 +287,7 @@ export class App {
     this.net.on(S.ROOM_TIME_SEEK_STARTED, this.onRoomTimeSeekStarted);
     this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.on(S.LOBBY, this.onLobbyForMatchLaunch);
+    this.net.on(S.BRANCH_STAGING, this.onBranchStagingForChat);
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
     dom.gameOverButton.addEventListener("click", this.onBackToLobby);
@@ -480,9 +491,14 @@ export class App {
   }
 
   onLobbyForMatchLaunch(payload) {
+    this.chat?.setLobbyContext(payload);
     if (!this.matchLaunch || this.matchLaunchDone || this.matchLaunchFailed) return;
     const action = nextMatchLaunchAction(this.matchLaunch, payload, this.net.playerId);
     this.applyMatchLaunchAction(action);
+  }
+
+  onBranchStagingForChat(payload) {
+    this.chat?.setLobbyContext(payload);
   }
 
   applyMatchLaunchAction(action) {
@@ -606,6 +622,7 @@ export class App {
   }
 
   onRoomTimeSeekStarted(m) {
+    this.chat?.clearMessages();
     const notice = formatReplaySeekNotice(m);
     if (!notice) return;
     this.match?.prepareReplaySeek?.(m);
@@ -638,6 +655,7 @@ export class App {
   onClose() {
     this.stopHeartbeat();
     this.socketOpen = false;
+    this.chat?.disable();
     this.rendererPreparationSlot?.discard?.();
     if (this.intentionalIdleDisconnect) {
       this.intentionalIdleDisconnect = false;
@@ -669,6 +687,9 @@ export class App {
    * @param {object} payload §2.3 start payload
    */
   onStart(payload) {
+    this.chat?.setGameContext(payload, {
+      onOpenChange: (open) => this.match?.handleInteractiveMenuStateChange?.(open),
+    });
     const generation = ++this.matchStartGeneration;
     const startPromise = this.startMatch(payload, generation);
     this.matchStartPromise = startPromise;
@@ -1054,6 +1075,7 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
+    this.chat?.disable();
     // Renderer creation is asynchronous. Make any in-flight start stale before changing
     // screens so it can only destroy its completed Match, never attach it to the lobby.
     this.invalidatePendingMatchStart();

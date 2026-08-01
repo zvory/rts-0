@@ -1,5 +1,10 @@
 use super::support::*;
 
+fn next_chat(writer: &mut ConnectionWriter) -> Option<ServerMessage> {
+    std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+        .find(|message| matches!(message, ServerMessage::Chat { .. }))
+}
+
 fn ai_slot_names(task: &RoomTask) -> Vec<String> {
     task.ai_slot_display_names()
 }
@@ -30,6 +35,131 @@ fn paused_replay_viewer_does_not_advance_on_scheduled_tick() {
     task.on_set_room_time_speed(99, 1.0);
     task.on_tick(TokioInstant::now());
     assert_eq!(in_game_tick(&task), 1);
+}
+
+#[test]
+fn live_chat_routes_team_privately_and_is_captured_for_replay() {
+    use crate::protocol::{ChatChannel, ChatScope};
+
+    let mut task = RoomTask::new(
+        "live-team-chat-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    task.selected_map = "Chokes".to_string();
+    let mut writer_a = add_test_room_player(&mut task, 1, true);
+    let mut writer_b = add_test_room_player(&mut task, 2, true);
+    let mut writer_enemy = add_test_room_player(&mut task, 3, true);
+    let mut writer_spectator = add_test_room_spectator(&mut task, 99);
+    task.human_team_assignments.insert(1, 1);
+    task.human_team_assignments.insert(2, 1);
+    task.human_team_assignments.insert(3, 2);
+    task.start_match();
+    for writer in [
+        &mut writer_a,
+        &mut writer_b,
+        &mut writer_enemy,
+        &mut writer_spectator,
+    ] {
+        while writer.reliable_rx.try_recv().is_ok() {}
+    }
+
+    task.on_chat_send(1, ChatChannel::Team, "  hold\nthis line  ".to_string());
+
+    for writer in [&mut writer_a, &mut writer_b] {
+        assert!(matches!(
+            next_chat(writer),
+            Some(ServerMessage::Chat {
+                scope: ChatScope::Game,
+                channel: ChatChannel::Team,
+                ref text,
+                ..
+            }) if text == "hold this line"
+        ));
+    }
+    assert!(next_chat(&mut writer_enemy).is_none());
+    assert!(next_chat(&mut writer_spectator).is_none());
+    assert_eq!(task.match_chat_log.len(), 1);
+
+    let Phase::InGame(game) = &task.phase else {
+        panic!("expected live game");
+    };
+    let artifact = task
+        .finalize_replay_artifact(game, None, game.scores())
+        .expect("replay artifact");
+    assert_eq!(artifact.chat_log, task.match_chat_log);
+}
+
+#[test]
+fn lobby_and_spectator_chat_are_forced_to_all_chat() {
+    use crate::protocol::{ChatChannel, ChatScope};
+
+    let mut task = RoomTask::new(
+        "lobby-chat-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer_a = add_test_room_player(&mut task, 1, false);
+    let mut writer_b = add_test_room_spectator(&mut task, 99);
+    task.on_chat_send(99, ChatChannel::Team, "hello lobby".to_string());
+
+    for writer in [&mut writer_a, &mut writer_b] {
+        assert!(matches!(
+            next_chat(writer),
+            Some(ServerMessage::Chat {
+                scope: ChatScope::Lobby,
+                channel: ChatChannel::All,
+                tick: None,
+                ..
+            })
+        ));
+    }
+    assert!(task.match_chat_log.is_empty());
+}
+
+#[test]
+fn replay_capture_cap_does_not_disable_live_chat() {
+    use crate::lobby::replay_session::MAX_CHAT_LOG_ENTRIES;
+    use crate::protocol::{ChatChannel, ChatScope};
+    use rts_sim::game::replay::ChatLogEntry;
+
+    let mut task = RoomTask::new(
+        "live-chat-cap-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    task.selected_map = "Chokes".to_string();
+    let mut writer = add_test_room_player(&mut task, 1, true);
+    task.start_match();
+    while writer.reliable_rx.try_recv().is_ok() {}
+
+    task.match_chat_log = vec![
+        ChatLogEntry {
+            tick: 0,
+            sender_id: 1,
+            sender_name: "Player 1".to_string(),
+            channel: ChatChannel::All,
+            text: "earlier".to_string(),
+        };
+        MAX_CHAT_LOG_ENTRIES
+    ];
+    task.on_chat_send(1, ChatChannel::All, "still live".to_string());
+
+    assert!(matches!(
+        next_chat(&mut writer),
+        Some(ServerMessage::Chat {
+            scope: ChatScope::Game,
+            ref text,
+            ..
+        }) if text == "still live"
+    ));
+    assert_eq!(task.match_chat_log.len(), MAX_CHAT_LOG_ENTRIES);
 }
 
 #[test]
