@@ -1,0 +1,68 @@
+/* Ephemeral lobby/game chat: direct text without panel chrome. */
+.chat-overlay {
+  position: fixed;
+  z-index: calc(var(--hud-z) + 4);
+  left: 50%;
+  bottom: calc(var(--bottom-hud-height) + 28px);
+  transform: translateX(-50%);
+  width: clamp(280px, 42vw, 640px);
+  max-width: calc(100vw - 24px);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.35;
+  pointer-events: none;
+  text-shadow: 0 1px 2px #000, 1px 1px 0 #000;
+}
+
+.chat-overlay[data-scope="lobby"] { bottom: 28px; }
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 3px;
+  min-height: 1.35em;
+  margin-bottom: 5px;
+}
+
+.chat-message {
+  overflow-wrap: anywhere;
+  transition: opacity 0.45s ease;
+}
+
+.chat-message-team,
+.chat-channel { color: #b7d7a8; }
+
+.chat-message.is-fading { opacity: 0; }
+
+.chat-composer {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  pointer-events: auto;
+}
+
+.chat-composer[hidden] { display: none; }
+
+.chat-channel {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+#chat-input {
+  appearance: none;
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-shadow: inherit;
+  caret-color: var(--accent);
+}
+
+#chat-input::placeholder { color: var(--ink-faint); }

@@ -38,7 +38,7 @@ mod wiki;
 use player_activity::is_player_activity;
 use rts_server::db::Db;
 use rts_server::lab_scenarios::{catalog_handler, MAX_LAB_SCENARIO_IMPORT_JSON_BYTES};
-use rts_server::lobby::{self, Lobby, RoomEvent};
+use rts_server::lobby::{self, send_room_event, Lobby, RoomEvent};
 use rts_server::protocol::{ClientMessage, ServerMessage};
 use rts_server::structured_log;
 use rts_sim::game::map::{Map, CURRENT_MAP_VERSION};
@@ -1623,23 +1623,6 @@ async fn request_branch_from_tick(
             source_tick,
             seats,
         });
-    }
-}
-
-/// Forward a [`RoomEvent`] to the connection's room, if it has joined one. Logs and ignores the
-/// message otherwise (a client acting before `join`).
-async fn send_room_event(
-    player_id: u32,
-    current_room: &Option<lobby::RoomHandle>,
-    event: RoomEvent,
-) {
-    match current_room {
-        Some(handle) => {
-            if handle.event_tx.send(event).await.is_err() {
-                rts_server::log_warn!(player_id, "room task gone; dropping event");
-            }
-        }
-        None => rts_server::log_debug!(player_id, "ignoring event before join"),
     }
 }
 

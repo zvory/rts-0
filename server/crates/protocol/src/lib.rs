@@ -5,7 +5,7 @@
 //! Tag conventions: top-level messages use `"t"`, commands use `"c"`, events use `"e"`.
 //! Coordinates are world pixels (floats) unless the field name ends in `Tile`.
 use serde::{Deserialize, Serialize};
-
+mod chat;
 mod client_net_report;
 mod compact_snapshot;
 mod contract_metadata;
@@ -15,6 +15,7 @@ mod lab_scenario;
 mod messagepack_frame;
 mod observer_analysis;
 mod server_message;
+pub use chat::{ChatChannel, ChatScope};
 pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
@@ -46,21 +47,6 @@ pub use rts_contract::{
     VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
-
-/// Audience selected for one chat message. The room remains authoritative for recipient routing.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum ChatChannel {
-    All,
-    Team,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum ChatScope {
-    Lobby,
-    Game,
-}
 
 // ---------------------------------------------------------------------------
 // Client -> Server
@@ -129,8 +115,7 @@ pub enum ClientMessage {
         #[serde(default)]
         id: Option<u32>,
     },
-    /// Send a bounded room chat message. Lobby chat is always all-chat; live matches validate and
-    /// route the requested audience against the sender's authoritative seat/team.
+    /// Send room chat; the room validates and routes its authoritative audience.
     ChatSend { channel: ChatChannel, text: String },
     /// Issue a gameplay command (ignored unless in-game).
     Command {
