@@ -10,7 +10,6 @@
 import { cmd } from "./protocol.js";
 import {
   ABILITY,
-  EVENT,
   KIND,
   ORDER_STAGE,
   PASSABLE,
@@ -44,17 +43,16 @@ import {
   resourceRallyTargetAt,
   supportWeaponSetupPreviewEntity,
 } from "./minimap_targeting.js";
+import {
+  MINIMAP_BORDER_PULSE_MS,
+  drawMinimapPings,
+  resolveUnderAttackTargetId,
+  underAttackFlashEntityIds,
+} from "./minimap_alerts.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
-const DEFAULT_PING_MS = 900;
-const UNDER_ATTACK_PING_MS = 2200;
-const UNDER_ATTACK_STROBE_PHASE_MS = 300;
 const UNDER_ATTACK_STROBE_COLOR = "#ffffff";
-const UNDER_ATTACK_TARGET_RADIUS_TILES = 2;
-const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
-const ALERT_PING_INNER_RIM_INSET_PX = 2;
-const BORDER_PULSE_MS = 700;
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const IMPASSABLE_FOG_SCALE = 0.56;
 const ARTILLERY_MINIMAP_MARKER_MS = 2200;
@@ -381,7 +379,19 @@ export class Minimap {
       this.pulseBorder();
       return;
     }
-    this._pings.push({ x, y, severity, isUnderAttack, startedAt: performance.now() });
+    const ping = { x, y, severity, isUnderAttack, startedAt: performance.now() };
+    if (isUnderAttack) {
+      const entities = this.state.entitiesInterpolated?.(1) || [];
+      ping.targetEntityId = resolveUnderAttackTargetId({
+        entities,
+        events: this.state.events,
+        x,
+        y,
+        tileSize: this._renderMap()?.tileSize,
+        isOwnOwner: (owner) => ownOwner(this.state, owner, this.controlPolicy),
+      });
+    }
+    this._pings.push(ping);
   }
 
   /** Add a globally visible short-lived artillery firing marker. */
@@ -399,7 +409,7 @@ export class Minimap {
 
   /** Pulse the minimap border when an alert has no resolvable world position. */
   pulseBorder() {
-    this._borderPulseUntil = Math.max(this._borderPulseUntil, performance.now() + BORDER_PULSE_MS);
+    this._borderPulseUntil = Math.max(this._borderPulseUntil, performance.now() + MINIMAP_BORDER_PULSE_MS);
   }
 
   /** Fill one minimap cell per tile with its terrain color. */
@@ -730,59 +740,12 @@ export class Minimap {
   }
 
   _underAttackFlashEntityIds(entities, now) {
-    const flashing = new Set();
-    if (!Array.isArray(entities) || this._pings.length === 0) return flashing;
-
-    for (const ping of this._pings) {
-      const age = now - ping.startedAt;
-      if (!ping.isUnderAttack || age < 0 || age >= UNDER_ATTACK_PING_MS) continue;
-      if (!Object.prototype.hasOwnProperty.call(ping, "targetEntityId")) {
-        ping.targetEntityId = this._underAttackDeathAt(ping.x, ping.y)
-          ? null
-          : this._nearestUnderAttackEntityId(entities, ping.x, ping.y);
-      }
-      const target = entities.find((entity) => entity?.id === ping.targetEntityId);
-      if (
-        this._isUnderAttackTargetEntity(target) &&
-        Math.floor(age / UNDER_ATTACK_STROBE_PHASE_MS) % 2 === 0
-      ) {
-        flashing.add(ping.targetEntityId);
-      }
-    }
-    return flashing;
-  }
-
-  _nearestUnderAttackEntityId(entities, x, y) {
-    const tileSize = Math.max(1, Number(this._renderMap()?.tileSize) || 32);
-    const maxDistance2 = (tileSize * UNDER_ATTACK_TARGET_RADIUS_TILES) ** 2;
-    let nearestId = null;
-    let nearestDistance2 = maxDistance2;
-
-    for (const entity of entities) {
-      if (!this._isUnderAttackTargetEntity(entity)) continue;
-      const dx = Number(entity.x) - x;
-      const dy = Number(entity.y) - y;
-      const distance2 = dx * dx + dy * dy;
-      if (!Number.isFinite(distance2) || distance2 > nearestDistance2) continue;
-      nearestId = entity.id;
-      nearestDistance2 = distance2;
-    }
-    return nearestId;
-  }
-
-  _isUnderAttackTargetEntity(entity) {
-    return entity?.id != null &&
-      !entity.visionOnly &&
-      ownOwner(this.state, entity.owner, this.controlPolicy) &&
-      (isUnit(entity.kind) || isBuilding(entity.kind));
-  }
-
-  _underAttackDeathAt(x, y) {
-    return (this.state.events || []).some((event) =>
-      event?.e === EVENT.DEATH &&
-      Math.abs(Number(event.x) - x) <= 0.01 &&
-      Math.abs(Number(event.y) - y) <= 0.01
-    );
+    return underAttackFlashEntityIds({
+      pings: this._pings,
+      entities,
+      now,
+      isOwnOwner: (owner) => ownOwner(this.state, owner, this.controlPolicy),
+    });
   }
 
   _isPlayerOwnedMinimapEntity(e) {
@@ -929,42 +892,14 @@ export class Minimap {
   _drawPings(now) {
     const ctx = this.ctx;
     if (!ctx) return;
-    this._pings = this._pings.filter(
-      (ping) => now - ping.startedAt < this._pingDurationMs(ping),
-    );
-    for (const ping of this._pings) {
-      const t = (now - ping.startedAt) / this._pingDurationMs(ping);
-      const p = this._worldToCanvas(ping.x, ping.y);
-      const radius = 4 + 15 * t;
-      ctx.save();
-      ctx.globalAlpha = 1 - t;
-      ctx.strokeStyle = ping.severity === "warn" ? "#ffd166" : "#ff4d4d";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-      if (ping.isUnderAttack) {
-        ctx.strokeStyle = ALERT_PING_INNER_RIM_COLOR;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, Math.max(1, radius - ALERT_PING_INNER_RIM_INSET_PX), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    if (now < this._borderPulseUntil) {
-      const t = 1 - (this._borderPulseUntil - now) / BORDER_PULSE_MS;
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, 1 - t);
-      ctx.strokeStyle = "#ff4d4d";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(1.5, 1.5, this.size - 3, this.size - 3);
-      ctx.restore();
-    }
-  }
-
-  _pingDurationMs(ping) {
-    return ping.isUnderAttack ? UNDER_ATTACK_PING_MS : DEFAULT_PING_MS;
+    this._pings = drawMinimapPings({
+      ctx,
+      pings: this._pings,
+      now,
+      worldToCanvas: (x, y) => this._worldToCanvas(x, y),
+      borderPulseUntil: this._borderPulseUntil,
+      size: this.size,
+    });
   }
 
   _drawArtilleryFiringMarkers(now) {
