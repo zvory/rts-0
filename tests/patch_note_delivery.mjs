@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import {
+  DESTINATION_STATUS_CONTEXTS,
   DELIVERY_STATUS_CONTEXT,
   deliverMergedPullRequest,
   parseCliArgs,
@@ -105,12 +106,38 @@ for (const args of [["--pr"], ["--pr", ""], ["--pr", "nope"], ["--pr", "0"], ["-
     { destination: "https://discord.invalid/hook", message: "• Enemy arcs are now visible." },
     { destination: "https://discord.invalid/other-hook", message: "• Enemy arcs are now visible." },
   ]);
-  const statusCall = calls.find((call) => call.pathname === "/statuses/head-17");
+  const destinationStatuses = calls
+    .filter((call) => call.pathname === "/statuses/head-17")
+    .map((call) => call.options.body.context);
+  assert.deepEqual(destinationStatuses, [...DESTINATION_STATUS_CONTEXTS, DELIVERY_STATUS_CONTEXT]);
+  const statusCall = calls.find((call) =>
+    call.pathname === "/statuses/head-17" && call.options.body.context === DELIVERY_STATUS_CONTEXT);
   assert.deepEqual(statusCall?.options?.body, {
     state: "success",
     context: DELIVERY_STATUS_CONTEXT,
     description: "Gameplay patch note sent to both Discord webhooks",
   });
+}
+
+{
+  const { api, calls } = fixtureApi({
+    statuses: [{ context: DESTINATION_STATUS_CONTEXTS[0], state: "success" }],
+  });
+  const delivered = [];
+  const result = await deliverMergedPullRequest({
+    api,
+    pull: mergedPull(),
+    webhookUrl: "https://discord.invalid/hook",
+    secondaryWebhookUrl: "https://discord.invalid/other-hook",
+    postDiscord: async ({ webhookUrl }) => delivered.push(webhookUrl),
+  });
+  assert.equal(result.status, "sent");
+  assert.deepEqual(delivered, ["https://discord.invalid/other-hook"]);
+  assert.deepEqual(
+    calls.filter((call) => call.pathname === "/statuses/head-17").map((call) => call.options.body.context),
+    [DESTINATION_STATUS_CONTEXTS[1], DELIVERY_STATUS_CONTEXT],
+    "reconciliation must resume at the destination that has not accepted the note",
+  );
 }
 
 {

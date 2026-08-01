@@ -277,8 +277,9 @@ canary runs own a private server; the browser shard passes its existing loopback
   deletes, or commits and restores a fragment.
   `.github/workflows/patch-note-delivery.yml` sends only a merged PR fragment's `## Changes`
   bullets to both configured Discord webhooks. It checks out trusted `main`, uses no LLM, retries
-  transient webhook errors, and records `patch-note-delivery` success on the immutable PR head only
-  after both destinations accept the message. Hourly reconciliation and
+  transient webhook errors, records per-destination success to make partial retries idempotent, and
+  records `patch-note-delivery` success on the immutable PR head only after both destinations accept
+  the message. Hourly reconciliation and
   manual dispatch recover missed merge events; the success status suppresses ordinary reruns.
   `scripts/wait-pr.sh` does not deliver notes, avoiding a race between local and GitHub delivery.
   The workflow omits the fragment title, date, playtest-watch section, and PR metadata.

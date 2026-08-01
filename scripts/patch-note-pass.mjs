@@ -164,21 +164,19 @@ export function sendDiscordPatchNote({ branch, decision, env = process.env, post
   const message = renderDiscordMessage(decision);
   if (!message) return { status: "empty" };
   const stateDir = path.join(gitCommonDir(repoRoot), "rts-patch-notes-discord");
-  const statePath = path.join(stateDir, `${branchSlug(branch)}.sha256`);
-  // Hashing the destinations keeps both secrets out of the state file. Including both URLs means
-  // adding or replacing either destination causes the current note to be delivered again.
-  const digest = crypto.createHash("sha256")
-    .update(webhookUrls.join("\0"))
-    .update("\0")
-    .update(message)
-    .digest("hex");
-  if (fs.existsSync(statePath) && fs.readFileSync(statePath, "utf8").trim() === digest) {
-    return { status: "unchanged", message };
+  let sent = 0;
+  for (const [index, webhookUrl] of webhookUrls.entries()) {
+    // Track each destination independently so retrying a partial failure cannot duplicate the
+    // note at a webhook that already accepted it. Hashing keeps the secret out of the state file.
+    const statePath = path.join(stateDir, `${branchSlug(branch)}-${index + 1}.sha256`);
+    const digest = crypto.createHash("sha256").update(webhookUrl).update("\0").update(message).digest("hex");
+    if (fs.existsSync(statePath) && fs.readFileSync(statePath, "utf8").trim() === digest) continue;
+    post(webhookUrl, message);
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(statePath, `${digest}\n`, { mode: 0o600 });
+    sent += 1;
   }
-  for (const webhookUrl of webhookUrls) post(webhookUrl, message);
-  fs.mkdirSync(stateDir, { recursive: true });
-  fs.writeFileSync(statePath, `${digest}\n`, { mode: 0o600 });
-  return { status: "sent", message };
+  return { status: sent > 0 ? "sent" : "unchanged", message };
 }
 
 export function branchSlug(branch) {
