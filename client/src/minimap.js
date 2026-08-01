@@ -47,7 +47,10 @@ import {
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
 const DEFAULT_PING_MS = 900;
-const UNDER_ATTACK_PING_MS = 1100;
+const UNDER_ATTACK_PING_MS = 2200;
+const UNDER_ATTACK_STROBE_PHASE_MS = 300;
+const UNDER_ATTACK_STROBE_COLOR = "#ffffff";
+const UNDER_ATTACK_TARGET_RADIUS_TILES = 2;
 const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
 const ALERT_PING_INNER_RIM_INSET_PX = 2;
 const BORDER_PULSE_MS = 700;
@@ -352,13 +355,14 @@ export class Minimap {
     if (!this._ensureTransform()) return;
 
     const entities = this._minimapEntities(frameViews);
+    const now = performance.now();
+    const attackFlashIds = this._underAttackFlashEntityIds(entities, now);
     this._drawTerrainLayer();
-    this._drawEntities(entities, { deferForegroundPlayer: true });
+    this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
     this._drawFog();
     this._drawResourceLayer();
     this._drawPlayerOwnedEntityOutline(entities);
-    this._drawEntities(entities, { foregroundPlayerOnly: true });
-    const now = performance.now();
+    this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
     this._drawArtilleryFiringMarkers(now);
     this._drawViewport();
     this._drawPings(now);
@@ -708,7 +712,10 @@ export class Minimap {
   }
 
   /** Draw colored blips for visible entities. Foreground player blips draw last over resources. */
-  _drawEntities(entities, { deferForegroundPlayer = false, foregroundPlayerOnly = false } = {}) {
+  _drawEntities(
+    entities,
+    { deferForegroundPlayer = false, foregroundPlayerOnly = false, attackFlashIds = null } = {},
+  ) {
     const ctx = this.ctx;
     if (!Array.isArray(entities)) return;
     for (const e of entities) {
@@ -716,9 +723,54 @@ export class Minimap {
       const foregroundPlayer = this._isForegroundPlayerMinimapEntity(e);
       if (foregroundPlayerOnly && !foregroundPlayer) continue;
       if (deferForegroundPlayer && foregroundPlayer) continue;
-      const color = this._blipColor(e);
+      const color = attackFlashIds?.has(e.id) ? UNDER_ATTACK_STROBE_COLOR : this._blipColor(e);
       this._drawEntityBlip(ctx, e, color, playerOwned);
     }
+  }
+
+  _underAttackFlashEntityIds(entities, now) {
+    const flashing = new Set();
+    if (!Array.isArray(entities)) return flashing;
+
+    for (const ping of this._pings) {
+      const age = now - ping.startedAt;
+      if (!ping.isUnderAttack || age < 0 || age >= UNDER_ATTACK_PING_MS) continue;
+      if (ping.targetEntityId == null) {
+        ping.targetEntityId = this._nearestUnderAttackEntityId(entities, ping.x, ping.y);
+      }
+      if (
+        ping.targetEntityId != null &&
+        Math.floor(age / UNDER_ATTACK_STROBE_PHASE_MS) % 2 === 0
+      ) {
+        flashing.add(ping.targetEntityId);
+      }
+    }
+    return flashing;
+  }
+
+  _nearestUnderAttackEntityId(entities, x, y) {
+    const tileSize = Math.max(1, Number(this._renderMap()?.tileSize) || 32);
+    const maxDistance2 = (tileSize * UNDER_ATTACK_TARGET_RADIUS_TILES) ** 2;
+    let nearestId = null;
+    let nearestDistance2 = maxDistance2;
+
+    for (const entity of entities) {
+      if (
+        entity?.id == null ||
+        entity.visionOnly ||
+        !ownOwner(this.state, entity.owner, this.controlPolicy) ||
+        (!isUnit(entity.kind) && !isBuilding(entity.kind))
+      ) {
+        continue;
+      }
+      const dx = Number(entity.x) - x;
+      const dy = Number(entity.y) - y;
+      const distance2 = dx * dx + dy * dy;
+      if (!Number.isFinite(distance2) || distance2 > nearestDistance2) continue;
+      nearestId = entity.id;
+      nearestDistance2 = distance2;
+    }
+    return nearestId;
   }
 
   _isPlayerOwnedMinimapEntity(e) {

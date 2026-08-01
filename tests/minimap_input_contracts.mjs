@@ -1501,7 +1501,7 @@ function pointerEvent(canvas, clientX, clientY, {
   assert(!h.router.pointerDown(lockedEvent(150, 250, 0)), "minimap zone is unregistered after destroy");
 }
 
-// Positional attack alerts use a slower red pulse with a crisp white inner rim.
+// Positional attack alerts use a slower red pulse, a crisp white inner rim, and strobe the victim.
 {
   installWindowStub();
   const canvas = fakeRenderableCanvas({ width: 220, height: 220 });
@@ -1514,12 +1514,12 @@ function pointerEvent(canvas, clientX, clientY, {
   );
   minimap.ping(40, 60, "alert", true);
   minimap._pings[0].startedAt = 100;
-  minimap._drawPings(650);
+  minimap._drawPings(1200);
 
   const arcs = canvas.context.calls.filter((call) => call.op === "arc");
   const strokes = canvas.context.calls.filter((call) => call.op === "stroke");
   assert(arcs.length === 2, "attack alert draws both the red ring and its inner rim");
-  assertApprox(arcs[0].args[2], 11.5, 0.001, "attack alert advances halfway through its 1.1 second pulse");
+  assertApprox(arcs[0].args[2], 11.5, 0.001, "attack alert advances halfway through its 2.2 second pulse");
   assertApprox(arcs[1].args[2], 9.5, 0.001, "attack alert inner rim stays two pixels inside the red ring");
   assert(
     strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 2,
@@ -1529,6 +1529,52 @@ function pointerEvent(canvas, clientX, clientY, {
     strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 1,
     "attack alert draws a crisp white inner stroke",
   );
+
+  const entities = [
+    { id: 11, kind: KIND.RIFLEMAN, owner: 1, x: 42, y: 60 },
+    { id: 12, kind: KIND.CITY_CENTRE, owner: 1, x: 160, y: 160 },
+    { id: 13, kind: KIND.RIFLEMAN, owner: 2, x: 40, y: 60 },
+  ];
+  minimap.state.playerId = 1;
+  minimap.state.map = { tileSize: 32 };
+  let flashing = minimap._underAttackFlashEntityIds(entities, 250);
+  assert(flashing.has(11), "attack alert resolves the nearest local owned unit instead of an enemy");
+  assert(!flashing.has(13), "attack alert never strobes an enemy icon");
+  canvas.context.calls.length = 0;
+  minimap._drawEntities([entities[0]], { attackFlashIds: flashing });
+  assert(
+    canvas.context.calls.some((call) => call.op === "fillRect" && call.fillStyle === "#ffffff"),
+    "attack alert paints the affected unit icon interior white",
+  );
+  entities[0].x = 180;
+  flashing = minimap._underAttackFlashEntityIds(entities, 450);
+  assert(!flashing.has(11), "attack alert restores the team color for the second 300 ms phase");
+  canvas.context.calls.length = 0;
+  minimap._drawEntities([entities[0]], { attackFlashIds: flashing });
+  assert(
+    canvas.context.calls.some(
+      (call) => call.op === "fillRect" && call.fillStyle === minimap._blipColor(entities[0]),
+    ),
+    "attack alert paints the affected unit icon interior with its normal team color phase",
+  );
+  flashing = minimap._underAttackFlashEntityIds(entities, 750);
+  assert(flashing.has(11), "attack alert resumes white after 600 ms even after the unit moves");
+
+  minimap._pings.length = 0;
+  minimap.ping(160, 160, "alert", true);
+  minimap._pings[0].startedAt = 100;
+  flashing = minimap._underAttackFlashEntityIds(entities, 250);
+  assert(flashing.has(12), "attack alert strobes local owned building icons too");
+  flashing = minimap._underAttackFlashEntityIds(entities, 2300);
+  assert(flashing.size === 0, "attack icon strobe ends after the 2.2 second alert window");
+
+  minimap._pings.length = 0;
+  minimap.ping(40, 60, "alert", true);
+  minimap._pings[0].startedAt = 100;
+  minimap._drawPings(2200);
+  assert(minimap._pings.length === 1, "attack alert remains visible after the former 1.1 second lifetime");
+  minimap._drawPings(2300);
+  assert(minimap._pings.length === 0, "attack alert expires after 2.2 seconds");
 
   canvas.context.calls.length = 0;
   minimap._pings.length = 0;
