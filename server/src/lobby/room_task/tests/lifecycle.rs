@@ -321,18 +321,28 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
     assert!(a_messages.iter().any(|msg| {
         matches!(msg, ServerMessage::Start(payload) if payload.replay.is_some() && payload.tick == 0)
     }));
-    assert!(a_messages
-        .iter()
-        .any(|msg| matches!(msg, ServerMessage::RoomTimeState(state) if state.current_tick == 0)));
+    assert_eq!(
+        writer_a
+            .room_time_state
+            .take()
+            .expect("player A replay room-time state")
+            .current_tick,
+        0
+    );
     assert!(!b_messages
         .iter()
         .any(|msg| matches!(msg, ServerMessage::GameOver { .. })));
     assert!(b_messages.iter().any(|msg| {
         matches!(msg, ServerMessage::Start(payload) if payload.replay.is_some() && payload.tick == 0)
     }));
-    assert!(b_messages
-        .iter()
-        .any(|msg| matches!(msg, ServerMessage::RoomTimeState(state) if state.current_tick == 0)));
+    assert_eq!(
+        writer_b
+            .room_time_state
+            .take()
+            .expect("player B replay room-time state")
+            .current_tick,
+        0
+    );
 }
 
 #[test]

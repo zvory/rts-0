@@ -226,12 +226,7 @@ pub(super) fn lab_results(writer: &mut ConnectionWriter) -> Vec<LabResult> {
 }
 
 pub(super) fn room_time_states(writer: &mut ConnectionWriter) -> Vec<RoomTimeState> {
-    std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
-        .filter_map(|msg| match msg {
-            ServerMessage::RoomTimeState(state) => Some(state),
-            _ => None,
-        })
-        .collect()
+    writer.room_time_state.take().into_iter().collect()
 }
 
 pub(super) fn take_observer_analysis(

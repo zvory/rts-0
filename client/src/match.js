@@ -35,9 +35,9 @@ import { EVENT, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
 
-const MAX_PENDING_MATCH_START_EVENTS = 64;
 import { MatchCombatAudio, worldCombatBedAllowed } from "./match_combat_audio.js";
 import { MatchNoticePresenter } from "./match_notice_presenter.js";
+import { createMatchStartupInbox } from "./match_startup_inbox.js";
 import { recordPointerLockDiagnostic } from "./match_pointer_lock_diagnostics.js";
 import {
   applyLivePauseState as applyLivePauseStateModel,
@@ -100,39 +100,7 @@ function desktopCursorAggressiveLockEnabled(root = globalThis) {
 export class Match {
   static async create(net, payload, toast, devWatch, audio, statusBadge, diagnostics = null, options = {}) {
     const backendBundle = options.rendererBackendBundle || createPixiBackendBundle();
-    const pendingEvents = [];
-    let reportedPendingEventDrop = false;
-    const pendingHandlers = [
-      S.SNAPSHOT,
-      S.COMMAND_RECEIPT,
-      S.ROOM_TIME_STATE,
-      S.LIVE_PAUSE_STATE,
-      S.OBSERVER_ANALYSIS,
-    ].map((type) => {
-      const handler = (message) => {
-        let dropped = false;
-        let shouldBuffer = true;
-        if (pendingEvents.length >= MAX_PENDING_MATCH_START_EVENTS) {
-          // Snapshot traffic is the only startup event frequent enough to fill this
-          // buffer. Prefer losing an older snapshot over one-shot control state that
-          // may not be sent again until it changes.
-          const snapshotIndex = pendingEvents.findIndex(([pendingType]) => pendingType === S.SNAPSHOT);
-          if (snapshotIndex >= 0) pendingEvents.splice(snapshotIndex, 1);
-          else if (type === S.SNAPSHOT) {
-            dropped = true;
-            shouldBuffer = false;
-          } else pendingEvents.shift();
-          dropped = true;
-        }
-        if (shouldBuffer) pendingEvents.push([type, message]);
-        if (dropped && !reportedPendingEventDrop) {
-          diagnostics?.mark?.("match.create.pendingEventsDropped");
-          reportedPendingEventDrop = true;
-        }
-      };
-      net.on(type, handler);
-      return [type, handler];
-    });
+    const startupInbox = createMatchStartupInbox(net, diagnostics);
     let match = null;
     let renderer = null;
     let rendererPreparation = options.rendererPreparation || null;
@@ -157,17 +125,10 @@ export class Match {
       rendererPreparation?.destroy?.();
       throw error;
     } finally {
-      for (const [type, handler] of pendingHandlers) net.off(type, handler);
+      startupInbox.stop();
     }
 
-    const eventHandlers = new Map([
-      [S.SNAPSHOT, match.onSnapshot],
-      [S.COMMAND_RECEIPT, match.onCommandReceipt],
-      [S.ROOM_TIME_STATE, match.onRoomTimeState],
-      [S.LIVE_PAUSE_STATE, match.onLivePauseState],
-      [S.OBSERVER_ANALYSIS, match.onObserverAnalysis],
-    ]);
-    for (const [type, message] of pendingEvents) eventHandlers.get(type)?.(message);
+    startupInbox.flush(match);
     return match;
   }
 
@@ -1266,6 +1227,21 @@ export class Match {
     if (state?.paused === true || (Number.isFinite(speed) && speed <= 0) || ended) {
       this.combatAudio?.updateWorldCombatBed(false);
     }
+  }
+
+  /** Reset timeline-derived client presentation before a replay seek streams replacement state. */
+  prepareReplaySeek(seek = null) {
+    if (!this.replayViewer) return false;
+    this.stopAllMachineGunSounds();
+    this.combatAudio?.updateWorldCombatBed(false);
+    this.state?.resetForReplaySeek?.();
+    this.clientIntent?.clearPlannedOrders?.();
+    this.fog?.resetMap?.(this.state.map.width, this.state.map.height, this.state.map.terrain);
+    this.fog?.setRevealAll?.(!!this.devWatch?.noFog);
+    this.presentationAssembler?.reset?.({ map: this.state.map });
+    this.presentationFrame = null;
+    this.roomTimeControls?.noteRoomTimeSeekStarted?.(seek);
+    return true;
   }
 
   /**

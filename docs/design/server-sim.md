@@ -653,7 +653,10 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
-- Each **connection** is a task with an `mpsc::Sender<ServerMessage>` for reliable server messages and a dedicated latest-only slot for observer-analysis payloads sent to its socket.
+- Each **connection** is a task with an `mpsc::Sender<ServerMessage>` for reliable server messages
+  and dedicated latest-only slots for room-time state, snapshots, and observer-analysis payloads.
+  Full room-time state coalesces because newer cursor/control state supersedes unsent older state;
+  the writer drains a bounded reliable batch before the latest room-time state and world snapshot.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `SetFaction`,
   `Command`, `GiveUp`, `PauseGame`, `UnpauseGame`, `SetRoomTimeSpeed`, `StepRoomTime`,
@@ -768,15 +771,20 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   artifacts reject before playback. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
   so viewers see authoritative union-fog or single-player fog, selected-player resource rows, and
   selected-player remembered building memory, never full-world state.
-- Replay and Lab reconstruction are commit-on-success room operations. Ordinary replay seek clones
-  the selected keyframe into a candidate `Game`, command cursor, and keyframe list, replays entirely
-  against that candidate, and replaces the active session fields only after reaching the requested
-  tick. Lab timeline seek retains its existing candidate `Game` and commits seek/cooldown metadata
+- Replay seek is an incremental room-owned state machine. It restores the nearest retained keyframe
+  immediately, clears timeline-derived client presentation through `roomTimeSeekStarted`, and
+  advances the authoritative `Game`/command cursor in bounded CPU slices. The actor yields between
+  slices so room controls and membership remain responsive, records exact 2,000-tick keyframes, and
+  publishes coalesced room-time state plus complete fog-scoped snapshots at a sampled wall-clock
+  cadence rather than once per simulated tick. No seek-time `start` rebuild is required. Lab
+  timeline seek retains its existing candidate `Game` and commits seek/cooldown metadata
   only after reconstruction succeeds; Lab replay import prepares one replacement bundle containing
   the duration-tick game, timeline, cleared scenario driver, imported operator/default vision,
   initial camera, clean flag, and cleared operation log before its first active-room assignment.
-  `lobby::reconstruction::contain_reconstruction` is the deliberately bounded panic-containment
-  seam for these three workflows: it converts ordinary errors and unwind payloads into contextual
+  A progressive replay error cancels the active seek at its last valid authoritative state and
+  re-sends matching room-time state, snapshots, and analysis. `lobby::reconstruction::contain_reconstruction` remains the
+  deliberately bounded panic-containment seam for the two candidate-based Lab workflows: it
+  converts ordinary errors and unwind payloads into contextual
   internal failures for room logging and client errors, while discarded candidates leave the prior
   authoritative game and all room/session metadata usable. It is not a general room transaction or
   rollback mechanism; successful reconstruction and unrelated room operations retain their existing

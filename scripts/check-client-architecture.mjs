@@ -11,6 +11,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "main.js": "app-shell",
   "app.js": "app-shell",
   "match.js": "app-shell",
+  "match_startup_inbox.js": "app-shell",
   "match_cursor_capture.js": "app-shell",
   "match_hud.js": "app-shell",
   "match_lab_tools.js": "app-shell",
@@ -64,6 +65,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "map_editor_terrain_preview.js": "app-shell",
 
   "state.js": "model",
+  "state_runtime_reset.js": "model",
   "state_auto_build.js": "model",
   "state_firing_reveal.js": "model",
   "state_control_groups.js": "model",

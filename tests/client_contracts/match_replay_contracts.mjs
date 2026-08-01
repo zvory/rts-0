@@ -138,8 +138,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     finishRenderer();
     const created = await creating;
     assert(created.received.length === 2 &&
-      created.received[0][0] === S.SNAPSHOT && created.received[0][1] === 7 &&
-      created.received[1][0] === S.COMMAND_RECEIPT && created.received[1][1] === 9,
+      created.received[0][0] === S.COMMAND_RECEIPT && created.received[0][1] === 9 &&
+      created.received[1][0] === S.SNAPSHOT && created.received[1][1] === 7,
       "Match.create replays opening events that arrive while Pixi initializes");
     assert(installedClock === created.renderClock,
       "Match.create installs the match clock through the renderer contract");
@@ -180,10 +180,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       constructor() {
         this.renderClock = { now: () => 456 };
         this.onSnapshot = (message) => protectedControlEvents.push([S.SNAPSHOT, message.tick]);
-        this.onCommandReceipt = () => {};
+        this.onCommandReceipt = (message) => protectedControlEvents.push([S.COMMAND_RECEIPT, message.clientSeq]);
         this.onRoomTimeState = (message) => protectedControlEvents.push([S.ROOM_TIME_STATE, message.cursor]);
         this.onLivePauseState = () => {};
-        this.onObserverAnalysis = () => {};
+        this.onObserverAnalysis = (message) => protectedControlEvents.push([S.OBSERVER_ANALYSIS, message.tick]);
       }
     }
     const slowCreating = Match.create.call(
@@ -198,13 +198,26 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       { rendererBackendBundle: backend },
     );
     net.emit(S.ROOM_TIME_STATE, { cursor: 11 });
-    for (let tick = 1; tick <= 80; tick += 1) net.emit(S.SNAPSHOT, { tick });
+    for (let tick = 1; tick <= 80; tick += 1) {
+      net.emit(S.SNAPSHOT, { tick });
+      net.emit(S.OBSERVER_ANALYSIS, { tick });
+    }
+    for (let clientSeq = 1; clientSeq <= 70; clientSeq += 1) {
+      net.emit(S.COMMAND_RECEIPT, { clientSeq });
+    }
     finishRenderer();
     await slowCreating;
     assert(protectedControlEvents.some(([type, cursor]) => type === S.ROOM_TIME_STATE && cursor === 11),
       "snapshot traffic cannot evict one-shot room state during slow renderer startup");
-    assert(protectedControlEvents.at(-1)?.[1] === 80,
-      "startup overflow retains the newest authoritative snapshot");
+    assert(protectedControlEvents.filter(([type]) => type === S.SNAPSHOT).length === 1 &&
+      protectedControlEvents.find(([type]) => type === S.SNAPSHOT)?.[1] === 80,
+    "startup snapshot buffering is latest-only");
+    assert(protectedControlEvents.filter(([type]) => type === S.OBSERVER_ANALYSIS).length === 1 &&
+      protectedControlEvents.at(-1)?.[1] === 80,
+    "startup observer-analysis buffering is latest-only and cannot evict control state");
+    const startupReceipts = protectedControlEvents.filter(([type]) => type === S.COMMAND_RECEIPT);
+    assert(startupReceipts.length === 64 && startupReceipts[0][1] === 7 && startupReceipts.at(-1)[1] === 70,
+      "startup command receipts retain bounded ordering independently of latest-only state lanes");
 
     let staleRendererDestroyed = false;
     let staleMatchConstructed = false;
@@ -692,6 +705,51 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(app.matchStartPromise !== firstPromise,
       "the app observes the newest async match-start promise instead of returning it to Net dispatch");
     await app.matchStartPromise;
+  }
+  {
+    const app = Object.create(App.prototype);
+    let resetPayload = null;
+    let toast = null;
+    let hiddenToast = null;
+    app.match = { prepareReplaySeek(payload) { resetPayload = payload; } };
+    app.showToast = (message) => { toast = message; };
+    app.hideToast = (message) => { hiddenToast = message; return true; };
+    app.onRoomTimeSeekStarted({ controllerId: 7, fromTick: 30, targetTick: 330 });
+    assert(resetPayload?.targetTick === 330,
+      "accepted replay seek resets the current Match in place before replacement snapshots arrive");
+    assert(toast === "Seeking forward 10 seconds…",
+      "in-place replay seek keeps the immediate authoritative seek notice");
+    app.onRoomTimeState({ currentTick: 120, seek: { id: 1, controllerId: 7, fromTick: 30, targetTick: 330 } });
+    assert(app.replaySeekNotice === toast && hiddenToast === null,
+      "progress room-time state keeps the seek notice visible without a replacement Start");
+    app.onRoomTimeState({ currentTick: 330 });
+    assert(app.replaySeekNotice === "" && hiddenToast === toast,
+      "completed room-time state clears the sticky seek notice without a replacement Start");
+  }
+  {
+    const match = Object.create(Match.prototype);
+    const calls = [];
+    match.replayViewer = true;
+    match.devWatch = null;
+    match.state = {
+      map: { width: 8, height: 6, terrain: [] },
+      resetForReplaySeek() { calls.push("state"); },
+    };
+    match.clientIntent = { clearPlannedOrders() { calls.push("intent"); } };
+    match.fog = {
+      resetMap(width, height) { calls.push(`fog:${width}x${height}`); },
+      setRevealAll() {},
+    };
+    match.presentationAssembler = { reset({ map }) { calls.push(`presentation:${map.width}`); } };
+    match.roomTimeControls = { noteRoomTimeSeekStarted(seek) { calls.push(`controls:${seek.targetTick}`); } };
+    match.stopAllMachineGunSounds = () => calls.push("audio");
+    match.combatAudio = { updateWorldCombatBed() {} };
+    match.presentationFrame = {};
+    assert(match.prepareReplaySeek({ fromTick: 10, targetTick: 500 }),
+      "replay Match accepts an in-place authoritative seek reset");
+    assert(calls.join(",") === "audio,state,intent,fog:8x6,presentation:8,controls:500",
+      "in-place replay seek clears transient state, fog, durable presentation, and controls together");
+    assert(match.presentationFrame === null, "in-place replay seek drops the stale assembled frame");
   }
   {
     const app = Object.create(App.prototype);
