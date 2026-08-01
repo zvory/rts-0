@@ -242,7 +242,7 @@ impl ReplaySession {
             if entry.sender_name.is_empty()
                 || entry.sender_name.chars().count() > Self::MAX_CHAT_NAME_CHARS
                 || entry.text.is_empty()
-                || entry.text.chars().count() > crate::protocol::MAX_CHAT_CHARS
+                || entry.text.chars().count() > crate::protocol::chat::MAX_CHAT_CHARS
             {
                 return Err(format!("replay chat {index} has invalid bounded text"));
             }

@@ -1408,7 +1408,7 @@ async fn handle_client_message(
                 RoomEvent::ChatSend {
                     player_id,
                     channel,
-                    text,
+                    text: text.into_inner(),
                 },
             )
             .await;

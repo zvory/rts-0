@@ -9,13 +9,13 @@ fn chat_send_deserializes_with_typed_channel() {
         ClientMessage::ChatSend {
             channel: ChatChannel::Team,
             ref text,
-        } if text == "Hold here"
+        } if text.as_str() == "Hold here"
     ));
 }
 
 #[test]
 fn chat_send_rejects_text_too_large_for_the_room_queue() {
-    let oversized = "x".repeat(MAX_CHAT_INPUT_BYTES + 1);
+    let oversized = "x".repeat(crate::chat::MAX_CHAT_INPUT_BYTES + 1);
     let wire = serde_json::json!({
         "t": "chatSend",
         "channel": "all",

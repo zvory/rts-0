@@ -3,9 +3,8 @@ use std::time::{Duration, Instant as StdInstant};
 use super::types::Phase;
 use super::RoomTask;
 use crate::lobby::replay_session::MAX_CHAT_LOG_ENTRIES;
-use crate::protocol::{
-    ChatChannel, ChatScope, ServerMessage, MAX_CHAT_CHARS, MAX_CHAT_INPUT_CHARS,
-};
+use crate::protocol::chat::{MAX_CHAT_CHARS, MAX_CHAT_INPUT_CHARS};
+use crate::protocol::{ChatChannel, ChatScope, ServerMessage};
 use rts_sim::game::replay::ChatLogEntry;
 
 // Chat shares the larger Lab-capable WebSocket frame allowance. Bound the amount of player text
