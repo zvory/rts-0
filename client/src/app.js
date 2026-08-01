@@ -683,6 +683,10 @@ export class App {
   }
 
   warmMatchRenderer() {
+    // Lab starts intentionally construct their renderer from Lab metadata and cannot adopt a
+    // lobby preparation. Starting one here would make Lab wait for an unusable renderer to finish
+    // initializing and tear down before it can construct the real renderer.
+    if (this.labLaunch || this.labCatalogLaunch || this.labHandoffLaunch) return null;
     if (this.rendererPreparationSlot.current) return this.rendererPreparationSlot.current;
     const rendererBackendBundle = rendererBackendBundleForMatch(this.rendererBackendBundle, {
       spectator: this.lobby?.isSpectator?.() === true,
