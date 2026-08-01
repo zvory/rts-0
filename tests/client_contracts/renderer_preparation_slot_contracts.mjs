@@ -154,9 +154,9 @@ import {
     reuseDecisions,
     [
       { reuse: true, compatibilityKey: "pixi" },
-      { reuse: false, compatibilityKey: "pixi" },
+      { reuse: true, compatibilityKey: "pixi" },
       { reuse: false, compatibilityKey: "babylon" },
     ],
-    "every start settles the slot; only ordinary matches may adopt its renderer",
+    "every start settles the slot; compatible live and replay matches may adopt its renderer",
   );
 }

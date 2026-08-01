@@ -266,9 +266,9 @@ does not classify as a worker stall.
 
 The production `PixiWorkerPresentationAdapter` transfers the sole visible canvas during
 construction. Before a match owns that adapter, App's exclusive renderer-preparation slot owns its
-canvas and worker. Every match start must either transfer that preparation to one compatible
-normal match or await its destruction before constructing another renderer; replay/Lab starts
-cannot strand a prewarmed surface. It admits one in-flight frame plus one latest pending frame. Replacing the pending
+canvas and worker. Every match start must either transfer that preparation to one compatible live
+or replay match or await its destruction before constructing another renderer; Lab starts cannot
+strand a prewarmed surface. It admits one in-flight frame plus one latest pending frame. Replacing the pending
 frame settles its exact id as `superseded`; durable decal messages have an independent retained
 lifetime. Only a current-generation `presented` acknowledgment publishes that frame's stored
 `SelectionSceneV1`. Fixed capture cancels ordinary pending work, waits for its exact frame, and

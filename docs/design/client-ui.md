@@ -1743,13 +1743,13 @@ The replay lobby UI is group-watch only: future playable resume work needs separ
 controls and must not infer playable seats from replay lobby occupants or hidden active rows.
 
 `main.js` starts `App`; `app.js` owns the on-demand `Net` and persistent `Audio`, derives the ws url
-from `window.location`, and shows `Lobby`; when a seated player in a normal lobby becomes ready it
-prepares the selected renderer behind the still-visible lobby. Replay-viewer readiness is not a
-renderer-warmup signal. During a normal multiplayer `matchCountdown` it sends `matchLoadReady` only
+from `window.location`, and shows `Lobby`; after the server confirms entry into a live or replay
+lobby it prepares the compatible renderer behind the still-visible lobby. During a normal
+multiplayer `matchCountdown` it sends `matchLoadReady` only
 after renderer initialization and required assets complete. One exclusive renderer-preparation
 slot owns that pre-match resource. Every `start` settles the slot before creating another renderer:
-a compatible normal match atomically adopts it, while replay, Lab, failed, unready, or superseded
-paths destroy it and await teardown. Ownership then transfers to `Match`, which remains responsible
+a compatible live or replay match atomically adopts it, while Lab, failed, or superseded paths
+destroy it and await teardown. Ownership then transfers to `Match`, which remains responsible
 for renderer teardown. This preserves the invariant that `#viewport` never retains an abandoned
 preparation alongside the active renderer. Warmup failures are logged to the browser console. On
 `start` App creates `Match` or `ReplayViewer`. A bounded

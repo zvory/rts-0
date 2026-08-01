@@ -123,7 +123,7 @@ export class Lobby {
    * @param {HTMLElement} rootEl the `#lobby-screen` section.
    * @param {import("./net.js").Net} net network seam (join/ready/start + event bus).
    * @param {import("./audio.js").Audio|null} [audio] shared app audio engine.
-   * @param {{ensureConnected?: Function, disconnectWhenIdle?: Function, autoRefreshLobbies?: boolean, onReadyChange?: Function}} [options]
+   * @param {{ensureConnected?: Function, disconnectWhenIdle?: Function, autoRefreshLobbies?: boolean, onJoined?: Function}} [options]
    */
   constructor(rootEl, net, audio = null, options = {}) {
     this.root = rootEl;
@@ -187,7 +187,7 @@ export class Lobby {
     this._browserActionPending = false;
     this._pendingBrowserJoinRoom = "";
     this._browserAutoRefreshEnabled = options.autoRefreshLobbies !== false;
-    this._onReadyChange = typeof options.onReadyChange === "function" ? options.onReadyChange : () => {};
+    this._onJoined = typeof options.onJoined === "function" ? options.onJoined : () => {};
     this._browserActivityTracking = false;
     this._browserAutoRefreshTimer = undefined;
     this._nameUpdateTimer = undefined;
@@ -615,6 +615,7 @@ export class Lobby {
     this._reflectTeamPreset();
 
     this.setStatus("");
+    this._onJoined?.();
   }
 
   /** Rebuild the player list: color swatch, name, (host) tag, ready check. */
@@ -721,14 +722,7 @@ export class Lobby {
   }
 
   _setReadyState(ready) {
-    const next = !!ready;
-    if (next === this._ready) return;
-    this._ready = next;
-    this._onReadyChange?.(next, {
-      rendererEligible: !this._spectator && !this._isReplayLobby(),
-      roomKind: this._roomKind,
-      spectator: this._spectator,
-    });
+    this._ready = !!ready;
   }
 
   // --- Status / errors -------------------------------------------------------

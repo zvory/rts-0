@@ -662,18 +662,6 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   }
   {
     const app = Object.create(App.prototype);
-    let warmed = 0;
-    let discarded = 0;
-    app.warmMatchRenderer = () => { warmed += 1; };
-    app.discardCountdownRendererPreparation = () => { discarded += 1; };
-    app.onLobbyReadyChange(true);
-    app.onLobbyReadyChange(true, { rendererEligible: false });
-    app.onLobbyReadyChange(false);
-    assert(warmed === 1 && discarded === 2,
-      "only eligible ready state warms; replay-ready and unready discard preparation");
-  }
-  {
-    const app = Object.create(App.prototype);
     const starts = [];
     app.matchStartGeneration = 0;
     app.matchEndedGeneration = 0;

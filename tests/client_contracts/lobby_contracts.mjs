@@ -40,28 +40,15 @@ import { AI_PROFILES, LobbyRosterView } from "../../client/src/lobby_view.js";
 import { textWithin } from "./dom_text.mjs";
 
 {
-  const changes = [];
   const lobby = Object.assign(Object.create(Lobby.prototype), {
     _ready: false,
     _roomKind: "normal",
     _spectator: false,
-    _onReadyChange: (ready, context) => changes.push({ ready, context }),
   });
   lobby._setReadyState(true);
   lobby._setReadyState(true);
   lobby._setReadyState(false);
-  assertDeepEqual(
-    changes.map((change) => change.ready),
-    [true, false],
-    "lobby reports each local ready transition once",
-  );
-  assert(changes[0].context.rendererEligible,
-    "seated normal-lobby readiness is eligible for renderer preparation");
-  lobby._roomKind = "replay";
-  lobby._spectator = true;
-  lobby._setReadyState(true);
-  assert(!changes.at(-1).context.rendererEligible,
-    "replay-viewer readiness cannot authorize renderer preparation");
+  assert(!lobby._ready, "ready transitions remain local state only");
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +366,7 @@ import { textWithin } from "./dom_text.mjs";
 
 {
   let rosterArgs = null;
+  let joined = 0;
   let cancelledRefreshes = 0;
   let statusText = "old";
   const root = { hidden: false, classList: fakeClassList() };
@@ -426,6 +414,9 @@ import { textWithin } from "./dom_text.mjs";
     _betaFactionSelectEnabled() {
       return false;
     },
+    _onJoined() {
+      joined += 1;
+    },
     setStatus(text) {
       statusText = text;
     },
@@ -452,6 +443,7 @@ import { textWithin } from "./dom_text.mjs";
   assert(lobby.btnReady.hidden, "joined replay lobbies hide the Ready button");
   assert(!lobby.btnStart.disabled && lobby.btnStart.textContent === "Start replay",
     "replay lobby hosts can start whenever the server says canStart");
+  assert(joined === 1, "server-confirmed replay lobby entry triggers renderer preparation");
   assert(lobby.selMap.hidden && lobby.selMap.disabled, "joined replay lobbies hide map selection");
   assert(seatsCell.hidden && lobby.elSeatsSummary.textContent === "",
     "joined replay lobbies hide active-seat counts");
