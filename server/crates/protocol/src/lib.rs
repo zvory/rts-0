@@ -15,7 +15,7 @@ mod lab_scenario;
 mod messagepack_frame;
 mod observer_analysis;
 mod server_message;
-pub use chat::{ChatChannel, ChatScope, ChatText};
+pub use chat::{ChatChannel, ChatScope, ChatSendPayload, ChatText};
 pub use client_net_report::{
     ClientFramePhaseReport, ClientNetReport, ClientRenderCounterReport, CommandLifecycleExemplar,
 };
@@ -116,10 +116,7 @@ pub enum ClientMessage {
         id: Option<u32>,
     },
     /// Send room chat; the room validates and routes its authoritative audience.
-    ChatSend {
-        channel: ChatChannel,
-        text: ChatText,
-    },
+    ChatSend(ChatSendPayload),
     /// Issue a gameplay command (ignored unless in-game).
     Command {
         #[serde(rename = "clientSeq")]

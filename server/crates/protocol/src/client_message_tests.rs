@@ -6,10 +6,10 @@ fn chat_send_deserializes_with_typed_channel() {
         serde_json::from_str(r#"{"t":"chatSend","channel":"team","text":"Hold here"}"#).unwrap();
     assert!(matches!(
         msg,
-        ClientMessage::ChatSend {
+        ClientMessage::ChatSend(ChatSendPayload {
             channel: ChatChannel::Team,
             ref text,
-        } if text.as_str() == "Hold here"
+        }) if text.as_str() == "Hold here"
     ));
 }
 

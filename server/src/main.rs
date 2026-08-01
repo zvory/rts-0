@@ -1401,14 +1401,14 @@ async fn handle_client_message(
             )
             .await;
         }
-        ClientMessage::ChatSend { channel, text } => {
+        ClientMessage::ChatSend(chat) => {
             send_room_event(
                 player_id,
                 current_room,
                 RoomEvent::ChatSend {
                     player_id,
-                    channel,
-                    text: text.into_inner(),
+                    channel: chat.channel,
+                    text: chat.text.into_inner(),
                 },
             )
             .await;

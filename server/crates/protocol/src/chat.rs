@@ -35,6 +35,13 @@ impl ChatText {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSendPayload {
+    pub channel: ChatChannel,
+    pub text: ChatText,
+}
+
 /// Audience selected for one chat message. The room remains authoritative for recipient routing.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
