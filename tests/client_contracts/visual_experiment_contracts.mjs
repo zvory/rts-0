@@ -79,6 +79,17 @@ const NOOP_RENDERER_OVERLAYS = [
 }
 
 {
+  const profile = getVisualProfile("terrain-blend-showcase");
+  assert(profile?.terrainPreviewReveal === true, "terrain showcase requests a fog-free Lab-only review");
+  assert(
+    profile.initialCamera?.focus?.x === 2016 &&
+      profile.initialCamera?.focus?.y === 2016 &&
+      profile.initialCamera?.framingScale === 0.58,
+    "terrain showcase uses the 1v1 terrain-matrix framing",
+  );
+}
+
+{
   const profile = getVisualProfile("unit-rig-overrides-1");
   assert(profile, "real-unit visual override profile is registered");
   assert(profile.unitOverrides.length >= 3, "unit override profile compares multiple same-kind units");

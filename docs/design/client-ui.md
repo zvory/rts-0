@@ -2194,8 +2194,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   frosted ground, rock, water, and deep charcoal-brown road tiles use deterministic coarse detail
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel. Gravel
   uses chips, dirt uses flecks, mud uses broken churn/pool marks, and frost uses sparse cold wisps;
-  all ten are edge-free visual Open terrain. Every road side exposed to non-road terrain has a narrow brown earth shoulder with
-  deterministic chips that break up the boundary without softening it into a modern blur. Road uses
+  all ten keep edge-free interiors. Distinct passable surfaces share deterministic low-resolution
+  transition bands: the higher-ranked material creeps into the lower-ranked material, with the normal
+  production style using five-band stochastic opaque-pixel dither. The stable visual order is road, grass, gravel,
+  dirt, mud, then frost; road marking variants are one surface and never seam against each other.
+  A checked-in Lab showcase profile suppresses fog presentation over a dedicated authoritative terrain matrix for
+  side-by-side material review without changing authoritative terrain or recipient state. Rock and water never blend;
+  they retain dark navigation outlines, including one single-width separator where rock meets water. Road uses
   one bare tile plus horizontal, vertical, NW-SE diagonal, and NE-SW diagonal tiles with a simple
   yellow center-line segment. Authors intersperse marked tiles among bare centerline tiles to form
   dashed markings while bare road tiles fill the surrounding surface.

@@ -2,9 +2,9 @@ import { COLORS } from "../config.js";
 import { hash2 } from "./shared.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
 import {
-  isImpassableAt,
+  groundTransitionEdges,
+  impassableEdgeDirections,
   isImpassableTerrain,
-  roadEdgeDirections,
   roadMarkingOrientation,
   terrainColor,
   terrainOverlayColor,
@@ -12,6 +12,7 @@ import {
 } from "./terrain_palette.js";
 
 const TERRAIN_TEXTURE_DOWNSAMPLE = 4;
+const GROUND_TRANSITION_DEPTH = 0.56;
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
@@ -28,10 +29,11 @@ function fillImpassableEdge(ctx, map, tx, ty, code, ts) {
   const x = tx * ts;
   const y = ty * ts;
   ctx.fillStyle = colorCss(color, 0.72);
-  if (!isImpassableAt(map, tx, ty - 1)) ctx.fillRect(x, y, ts, edge);
-  if (!isImpassableAt(map, tx, ty + 1)) ctx.fillRect(x, y + ts - edge, ts, edge);
-  if (!isImpassableAt(map, tx - 1, ty)) ctx.fillRect(x, y, edge, ts);
-  if (!isImpassableAt(map, tx + 1, ty)) ctx.fillRect(x + ts - edge, y, edge, ts);
+  const edges = impassableEdgeDirections(map, tx, ty, code);
+  if (edges.includes("north")) ctx.fillRect(x, y, ts, edge);
+  if (edges.includes("south")) ctx.fillRect(x, y + ts - edge, ts, edge);
+  if (edges.includes("west")) ctx.fillRect(x, y, edge, ts);
+  if (edges.includes("east")) ctx.fillRect(x + ts - edge, y, edge, ts);
 }
 
 export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
@@ -46,21 +48,21 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   const variant = terrainVariantPalette(code);
   if (variant) {
     drawTerrainVariantDetails(ctx, variant, tx, ty, x, y, textureTileSize);
-    return;
-  }
-
-  const blocks = textureTileSize >= 4 ? 4 : 2;
-  const block = textureTileSize / blocks;
-  for (let by = 0; by < blocks; by++) {
-    for (let bx = 0; bx < blocks; bx++) {
-      const n = hash2(tx * 17 + bx, ty * 17 + by);
-      if (n < 0.42) continue;
-      const overlay = terrainOverlayColor(code, n);
-      ctx.fillStyle = colorCss(overlay, code === 2 ? 0.22 : 0.16);
-      ctx.fillRect(x + bx * block, y + by * block, Math.ceil(block), Math.ceil(block));
+  } else {
+    const blocks = textureTileSize >= 4 ? 4 : 2;
+    const block = textureTileSize / blocks;
+    for (let by = 0; by < blocks; by++) {
+      for (let bx = 0; bx < blocks; bx++) {
+        const n = hash2(tx * 17 + bx, ty * 17 + by);
+        if (n < 0.42) continue;
+        const overlay = terrainOverlayColor(code, n);
+        ctx.fillStyle = colorCss(overlay, code === 2 ? 0.22 : 0.16);
+        ctx.fillRect(x + bx * block, y + by * block, Math.ceil(block), Math.ceil(block));
+      }
     }
   }
-  drawRoadShoulder(ctx, map, tx, ty, code, textureTileSize);
+  drawGroundTransitions(ctx, map, tx, ty, code, textureTileSize);
+  // Markings belong to the road surface and must remain legible above edge dither.
   drawRoadMarking(ctx, code, x, y, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
 }
@@ -137,35 +139,52 @@ function drawBrokenMudMarks(ctx, variant, tx, ty, x, y, pixel, cells) {
   }
 }
 
-function drawRoadShoulder(ctx, map, tx, ty, code, size) {
-  const edges = roadEdgeDirections(map, tx, ty, code);
+function drawGroundTransitions(ctx, map, tx, ty, code, size) {
+  const edges = groundTransitionEdges(map, tx, ty, code);
   if (!edges.length) return;
-
   const x = tx * size;
   const y = ty * size;
-  const edgeWidth = Math.max(1, Math.floor(size * 0.14));
-  const chipSize = Math.max(1, Math.floor(size * 0.1));
   for (const edge of edges) {
-    ctx.fillStyle = colorCss(COLORS.roadShoulderDark, 0.94);
-    if (edge === "north") ctx.fillRect(x, y, size, edgeWidth);
-    if (edge === "south") ctx.fillRect(x, y + size - edgeWidth, size, edgeWidth);
-    if (edge === "west") ctx.fillRect(x, y, edgeWidth, size);
-    if (edge === "east") ctx.fillRect(x + size - edgeWidth, y, edgeWidth, size);
+    drawStochasticTransition(ctx, edge, x, y, size, tx, ty);
+  }
+}
 
-    for (let offset = 0; offset < size; offset += chipSize) {
-      const horizontal = edge === "north" || edge === "south";
-      const sampleX = horizontal ? tx * 41 + offset : tx * 41 + (edge === "east" ? 17 : 5);
-      const sampleY = horizontal ? ty * 43 + (edge === "south" ? 19 : 7) : ty * 43 + offset;
-      const n = hash2(sampleX, sampleY);
-      if (n < 0.48) continue;
-      const depth = n > 0.82 ? edgeWidth + chipSize : edgeWidth;
-      ctx.fillStyle = colorCss(COLORS.roadShoulder, n > 0.82 ? 0.88 : 0.68);
-      if (edge === "north") ctx.fillRect(x + offset, y, chipSize, depth);
-      if (edge === "south") ctx.fillRect(x + offset, y + size - depth, chipSize, depth);
-      if (edge === "west") ctx.fillRect(x, y + offset, depth, chipSize);
-      if (edge === "east") ctx.fillRect(x + size - depth, y + offset, depth, chipSize);
+function drawStochasticTransition(ctx, edge, x, y, size, tx, ty) {
+  const depth = Math.min(size, Math.max(1, Math.ceil(size * GROUND_TRANSITION_DEPTH)));
+  for (let inward = 0; inward < depth; inward += 1) {
+    const progress = depth <= 1 ? 0 : inward / (depth - 1);
+    const coverage = 0.92 - progress * 0.76;
+    for (let along = 0; along < size; along += 1) {
+      if (transitionNoise(edge, tx, ty, along, inward) >= coverage) continue;
+      fillTransitionPixel(ctx, edge, x, y, size, along, inward, transitionPixelColor(edge, along, inward));
     }
   }
+}
+
+function transitionNoise(edge, tx, ty, along, inward) {
+  const directionSeed = edge.direction === "north" ? 11 : edge.direction === "south" ? 23 : edge.direction === "west" ? 37 : 53;
+  return hash2(tx * 97 + edge.tx * 31 + along * 7 + directionSeed, ty * 101 + edge.ty * 43 + inward * 13 + edge.code * 17);
+}
+
+function transitionPixelColor(edge, along, inward) {
+  const n = hash2(edge.tx * 59 + along * 11, edge.ty * 61 + inward * 17 + edge.code * 19);
+  return n > 0.78 ? terrainOverlayColor(edge.code, n) : terrainColor(edge.code, edge.tx, edge.ty);
+}
+
+function fillTransitionPixel(ctx, edge, x, y, size, along, inward, color) {
+  let px = x + along;
+  let py = y + inward;
+  if (edge.direction === "south") py = y + size - 1 - inward;
+  if (edge.direction === "west") {
+    px = x + inward;
+    py = y + along;
+  }
+  if (edge.direction === "east") {
+    px = x + size - 1 - inward;
+    py = y + along;
+  }
+  ctx.fillStyle = colorCss(color);
+  ctx.fillRect(px, py, 1, 1);
 }
 
 function drawRoadMarking(ctx, code, x, y, size) {
@@ -187,7 +206,9 @@ function drawRoadMarking(ctx, code, x, y, size) {
   }
 }
 
-export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
+export function buildStaticMap(map, {
+  preserveMapLayers = false,
+} = {}) {
   this._map = {
     width: map.width,
     height: map.height,
@@ -209,7 +230,6 @@ export function buildStaticMap(map, { preserveMapLayers = false } = {}) {
   this._terrainCanvas = canvas;
   this._terrainContext = ctx;
   this._terrainTextureTileSize = textureTileSize;
-
   for (let ty = 0; ty < map.height; ty++) {
     for (let tx = 0; tx < map.width; tx++) {
       drawTerrainTile(ctx, this._map, tx, ty, textureTileSize);

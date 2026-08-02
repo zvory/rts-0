@@ -14,6 +14,7 @@ export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
   Object.freeze({ id: "match.frameProfiler", reviewTrigger: "measurement needs backend-neutral metrics" }),
   Object.freeze({ id: "match.visualProfile.unitOverrides", reviewTrigger: "a playtest needs representative visuals" }),
   Object.freeze({ id: "match.visualProfile.frameStripOverrides", reviewTrigger: "a playtest needs representative visuals" }),
+  Object.freeze({ id: "match.visualProfile.terrainPreviewReveal", reviewTrigger: "a terrain matrix needs fog-free material review" }),
   Object.freeze({ id: "match.presentationAssembler.staticMap", reviewTrigger: "Babylon staging needs a shared static-map DTO" }),
 ]);
 
@@ -238,7 +239,7 @@ export class PixiPresentationAdapter {
     return {
       state,
       camera: buildCameraFacade(frame.projection),
-      fog: buildFogFacade(frame),
+      fog: visualProfile?.terrainPreviewReveal ? null : buildFogFacade(frame),
       alpha: frame.diagnosticsContext.interpolationAlpha,
       frameViews: Object.freeze({
         interpolatedEntities: entities,
