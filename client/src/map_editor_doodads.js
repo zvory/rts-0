@@ -1,21 +1,8 @@
+import { DOODAD_TYPE, DOODAD_TYPE_IDS } from "./config.js";
+
 export const MAP_EDITOR_MAX_DOODADS = 4096;
 export const MAP_EDITOR_DEFAULT_FLOWER_COLOR = "#e8b84a";
-export const MAP_EDITOR_DOODAD_TYPES = Object.freeze({
-  TREE_OAK: "tree.oak",
-  TREE_PINE: "tree.pine",
-  TREE_BIRCH: "tree.birch",
-  TREE_SPRUCE: "tree.spruce",
-  TREE_ASPEN: "tree.aspen",
-  TREE_ALDER: "tree.alder",
-  TREE_OAK_TOPDOWN: "tree.oak.topdown",
-  TREE_PINE_TOPDOWN: "tree.pine.topdown",
-  TREE_BIRCH_TOPDOWN: "tree.birch.topdown",
-  TREE_SPRUCE_TOPDOWN: "tree.spruce.topdown",
-  TREE_ASPEN_TOPDOWN: "tree.aspen.topdown",
-  TREE_ALDER_TOPDOWN: "tree.alder.topdown",
-  WILDFLOWER_SINGLE: "wildflower.single",
-  WILDFLOWER_CLUSTER: "wildflower.cluster",
-});
+export const MAP_EDITOR_DOODAD_TYPES = DOODAD_TYPE;
 export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, label: "Oak", kind: "tree", perspective: "threeQuarter" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, label: "Pine", kind: "tree", perspective: "threeQuarter" }),
@@ -33,7 +20,7 @@ export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_CLUSTER, label: "Flower cluster", kind: "wildflower" }),
 ]);
 
-const TYPE_IDS = new Set(MAP_EDITOR_DOODAD_CATALOG.map((entry) => entry.typeId));
+const TYPE_IDS = new Set(DOODAD_TYPE_IDS);
 
 export function isMapEditorDoodadType(typeId) {
   return TYPE_IDS.has(typeId);

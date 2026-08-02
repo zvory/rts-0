@@ -1041,3 +1041,20 @@ assert(
     removedIds: [1],
   }, "pending doodad patches coalesce by stable id without resurrecting removals");
 }
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.beginDoodadStroke("Placed tree");
+  const updates = [];
+  const viewport = {
+    session,
+    tool: { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, color: null, symmetry: MAP_EDITOR_SYMMETRY.NONE },
+    queueDoodadPatch(update) { updates.push(structuredClone(update)); },
+  };
+  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 64, y: 96 }]);
+  assert.deepEqual(updates, [{
+    upserts: [{ id: 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 64, y: 96 }],
+  }], "an active doodad stroke streams its compact visual patch before pointer-up");
+  assert.equal(session.undoStack.length, 0, "live stroke feedback does not split the undo transaction");
+}

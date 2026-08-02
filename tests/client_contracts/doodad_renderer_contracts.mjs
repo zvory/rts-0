@@ -64,6 +64,7 @@ try {
   assert.equal(layer.instances.get(2).display.tint, 0xd95f8d, "wildflower colors tint the authored white-petal asset");
 
   const nearCamera = {
+    projectedExtent: (_point, width, height) => ({ width: width * 2, height: height * 2 }),
     containsProjected: ({ x, y, heightPx }) => {
       assert.equal(heightPx, 0, "doodad culling projects static vegetation on the finite ground plane");
       return x < 300 && y < 300;
@@ -74,6 +75,18 @@ try {
   layer.update(1000, nearCamera);
   assert.equal(layer.instances.get(1).display.rotation, firstRotation, "sway is deterministic for stable id and visual time");
   assert.equal(visible, 3, "viewport culling retains nearby doodads");
+  let tallTreeMargin = 0;
+  layer.update(1000, {
+    projectedExtent: (_point, width, height) => ({ width: width * 2, height: height * 2 }),
+    containsProjected: (_point, margin) => {
+      tallTreeMargin = Math.max(tallTreeMargin, margin);
+      return true;
+    },
+  });
+  assert(
+    tallTreeMargin >= layer.instances.get(1).display.height * 2,
+    "culling keeps a tall tree until its full zoomed canopy leaves the viewport",
+  );
 
   layer.patch({
     upserts: [{ id: 2, typeId: "wildflower.cluster", x: 1000, y: 1000, color: "#44AA66" }],

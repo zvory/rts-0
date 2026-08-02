@@ -454,10 +454,11 @@ export class MapEditorViewport {
 
   continueDoodadPointer(world) {
     if (this.doodadPointerMode === "move" && this.selectedDoodadId) {
-      this.session.moveDoodad(this.selectedDoodadId, {
+      const moved = this.session.moveDoodad(this.selectedDoodadId, {
         x: world.x + (this.doodadDragOffset?.x || 0),
         y: world.y + (this.doodadDragOffset?.y || 0),
       });
+      if (moved) this.queueDoodadPatch({ upserts: [moved] });
     } else if (this.doodadPointerMode === "spray" && this.doodadSprayStroke) {
       this.placeDoodadPoints(extendDoodadSprayStroke(this.doodadSprayStroke, world));
     } else if (this.doodadPointerMode === "erase") {
@@ -470,7 +471,11 @@ export class MapEditorViewport {
   placeDoodadPoints(points) {
     const worldSize = (this.session.draft?.terrain?.length || 0) * TILE_SIZE;
     const placements = symmetricDoodadPlacements(worldSize, points, this.tool?.symmetry);
-    this.session.placeDoodads(placements, { typeId: this.tool?.typeId, color: this.tool?.color });
+    const added = this.session.placeDoodads(placements, {
+      typeId: this.tool?.typeId,
+      color: this.tool?.color,
+    });
+    if (added.length) this.queueDoodadPatch({ upserts: added });
   }
 
   eraseDoodadsAt(world) {
@@ -480,6 +485,7 @@ export class MapEditorViewport {
       Math.max(4, Number(this.tool?.radius) || 48),
     );
     const removed = this.session.removeDoodads(ids);
+    if (removed.length) this.queueDoodadPatch({ removedIds: removed });
     if (removed.includes(this.selectedDoodadId)) this.selectedDoodadId = null;
   }
 

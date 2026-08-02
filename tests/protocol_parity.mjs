@@ -51,7 +51,7 @@ import {
   msg,
 } from "../client/src/protocol.js";
 import * as protocolExports from "../client/src/protocol.js";
-import { PLAYER_PALETTE } from "../client/src/config.js";
+import { DOODAD_TYPE, DOODAD_TYPE_IDS, PLAYER_PALETTE } from "../client/src/config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -222,6 +222,14 @@ assert(protocolContract.unknownCodeSentinel === 255, "unknown compact code senti
 assertSameMap("server message tags", protocolContract.messageTags.server, S);
 assertSameMap("client message tags", protocolContract.messageTags.client, C);
 assertSameMap("command tags", protocolContract.commandTags, CMD);
+assert(
+  JSON.stringify(protocolContract.vocabularies.doodadTypes) === JSON.stringify(DOODAD_TYPE_IDS),
+  `doodad type vocabulary mismatch\nRust: ${JSON.stringify(protocolContract.vocabularies.doodadTypes)}\nJS:   ${JSON.stringify(DOODAD_TYPE_IDS)}`,
+);
+assert(
+  JSON.stringify(Object.values(DOODAD_TYPE)) === JSON.stringify(DOODAD_TYPE_IDS),
+  "named client doodad types must retain canonical protocol order",
+);
 assertSameMap("kind vocabulary", protocolContract.vocabularies.kinds, KIND);
 assertSameMap("state vocabulary", protocolContract.vocabularies.states, STATE);
 assertSameMap("setup vocabulary", protocolContract.vocabularies.setupStates, SETUP);

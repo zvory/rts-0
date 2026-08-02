@@ -18,6 +18,8 @@ export {
 
 export { PLAYER_PALETTE } from "./config/player_palette_mirror.js";
 
+export { DOODAD_TYPE, DOODAD_TYPE_IDS } from "./config/doodads.js";
+
 export {
   ABILITIES,
   ANTI_TANK_GUN_BODY,

@@ -3,7 +3,7 @@
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-use rts_contract::{NoticeSeverity, DEFAULT_FACTION_ID};
+use rts_contract::{NoticeSeverity, DEFAULT_FACTION_ID, MAP_DOODAD_TYPE_IDS};
 
 // ---------------------------------------------------------------------------
 // Shared string vocabularies (kept as constants so the simulation never sprays
@@ -204,6 +204,7 @@ pub struct ProtocolMessageTags {
 #[serde(rename_all = "camelCase")]
 pub struct ProtocolVocabularies {
     terrain: BTreeMap<&'static str, u8>,
+    doodad_types: Vec<&'static str>,
     kinds: BTreeMap<&'static str, &'static str>,
     states: BTreeMap<&'static str, &'static str>,
     setup_states: BTreeMap<&'static str, &'static str>,
@@ -564,6 +565,7 @@ pub fn protocol_contract() -> ProtocolContract {
         ]),
         vocabularies: ProtocolVocabularies {
             terrain: terrain_codes(),
+            doodad_types: MAP_DOODAD_TYPE_IDS.to_vec(),
             kinds: kind_vocabulary(),
             states: string_map(&[
                 ("IDLE", states::IDLE),

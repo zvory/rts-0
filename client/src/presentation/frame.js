@@ -5,27 +5,13 @@ import {
   preparedPresentationEntityRecord,
 } from "./entity_snapshot.js";
 import { createRendererProjectionRecord } from "./projection_record.js";
+import { DOODAD_TYPE_IDS } from "../config.js";
 
 export const PRESENTATION_FRAME_VERSION = 2;
 export const STATIC_MAP_PRESENTATION_VERSION = 2;
 export const MAX_PRESENTED_DOODADS = 4096;
 
-const STATIC_DOODAD_TYPES = new Set([
-  "tree.oak",
-  "tree.oak.topdown",
-  "tree.pine",
-  "tree.pine.topdown",
-  "tree.birch",
-  "tree.birch.topdown",
-  "tree.spruce",
-  "tree.spruce.topdown",
-  "tree.aspen",
-  "tree.aspen.topdown",
-  "tree.alder",
-  "tree.alder.topdown",
-  "wildflower.single",
-  "wildflower.cluster",
-]);
+const STATIC_DOODAD_TYPES = new Set(DOODAD_TYPE_IDS);
 const DOODAD_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 const FEEDBACK_ARRAYS = Object.freeze([

@@ -1,3 +1,5 @@
+import { DOODAD_TYPE, DOODAD_TYPE_IDS as CONFIG_DOODAD_TYPE_IDS } from "../config.js";
+
 export const MAX_DOODADS = 4096;
 
 const TREE_SPECS = Object.freeze({
@@ -40,8 +42,8 @@ for (const [species, spec] of Object.entries(TREE_SPECS)) {
   });
 }
 
-entries["wildflower.single"] = Object.freeze({
-  typeId: "wildflower.single",
+entries[DOODAD_TYPE.WILDFLOWER_SINGLE] = Object.freeze({
+  typeId: DOODAD_TYPE.WILDFLOWER_SINGLE,
   image: "/assets/doodads/wildflower-single.png",
   layer: "understory",
   widthPx: 15,
@@ -51,8 +53,8 @@ entries["wildflower.single"] = Object.freeze({
   windAmplitude: 0.065,
   windRate: 0.0018,
 });
-entries["wildflower.cluster"] = Object.freeze({
-  typeId: "wildflower.cluster",
+entries[DOODAD_TYPE.WILDFLOWER_CLUSTER] = Object.freeze({
+  typeId: DOODAD_TYPE.WILDFLOWER_CLUSTER,
   image: "/assets/doodads/wildflower-cluster.png",
   layer: "understory",
   widthPx: 31,
@@ -64,7 +66,7 @@ entries["wildflower.cluster"] = Object.freeze({
 });
 
 export const DOODAD_MANIFEST = Object.freeze(entries);
-export const DOODAD_TYPE_IDS = Object.freeze(Object.keys(DOODAD_MANIFEST));
+export const DOODAD_TYPE_IDS = CONFIG_DOODAD_TYPE_IDS;
 
 export function doodadManifestEntry(typeId) {
   return DOODAD_MANIFEST[typeId] || null;

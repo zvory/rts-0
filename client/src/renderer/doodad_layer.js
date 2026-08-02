@@ -8,7 +8,12 @@ import {
 import { gfxEllipse, gfxFill } from "./native_graphics.js";
 
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
-const CULL_MARGIN_PX = 140;
+const MIN_CULL_MARGIN_CSS_PX = 140;
+const MAX_SIZE_VARIATION = 1.08;
+const MAX_DOODAD_WIDTH_PX = Math.max(...Object.values(DOODAD_MANIFEST).map((entry) => entry.widthPx))
+  * MAX_SIZE_VARIATION;
+const MAX_DOODAD_HEIGHT_PX = Math.max(...Object.values(DOODAD_MANIFEST).map((entry) => entry.heightPx))
+  * MAX_SIZE_VARIATION;
 
 /** Worker-owned static vegetation sprites shared by live matches and the Map Editor. */
 export class DoodadLayer {
@@ -96,6 +101,16 @@ export class DoodadLayer {
   update(visualTimeMs, camera = null) {
     if (this.destroyed) return 0;
     const now = Number.isFinite(visualTimeMs) && visualTimeMs >= 0 ? visualTimeMs : 0;
+    const projectedExtent = camera?.projectedExtent?.(
+      { x: 0, y: 0, heightPx: 0 },
+      MAX_DOODAD_WIDTH_PX,
+      MAX_DOODAD_HEIGHT_PX,
+    );
+    const cullMargin = Math.max(
+      MIN_CULL_MARGIN_CSS_PX,
+      finiteNonNegative(projectedExtent?.width),
+      finiteNonNegative(projectedExtent?.height),
+    );
     let visible = 0;
     for (const instance of this.instances.values()) {
       const inView = typeof camera?.containsProjected !== "function"
@@ -103,7 +118,7 @@ export class DoodadLayer {
           x: instance.record.x,
           y: instance.record.y,
           heightPx: 0,
-        }, CULL_MARGIN_PX);
+        }, cullMargin);
       instance.display.visible = inView;
       if (instance.shadow) instance.shadow.visible = inView;
       if (!inView) continue;
@@ -231,6 +246,10 @@ function stableNoise(id, salt) {
   value = Math.imul(value ^ (value >>> 16), 0x45d9f3b) >>> 0;
   value ^= value >>> 16;
   return value / 0xffffffff;
+}
+
+function finiteNonNegative(value) {
+  return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
 function destroyTexture(texture) {
