@@ -23,6 +23,7 @@ export const LAYERS = [
   "visualSampleLabels",
   "shotRevealShadows",
   "shotReveals",
+  "aboveFogHpBars",
   "feedback",
   "placement",
 ];
@@ -65,7 +66,7 @@ export function _sweep() {
       if (seen.has(id)) continue;
       if (evict.has(id)) {
         this.layers[key].removeChild(g);
-        g.destroy(key === "hpBars" ? { children: true } : undefined);
+        g.destroy(key === "hpBars" || key === "aboveFogHpBars" ? { children: true } : undefined);
         pool.delete(id);
         this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.destroyed.${key}`);
       } else {

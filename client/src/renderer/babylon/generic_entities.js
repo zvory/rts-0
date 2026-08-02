@@ -116,7 +116,13 @@ export class BabylonGenericEntities {
     visual.selection.isVisible = category === "current" && !!record.selected;
 
     const hpRatio = finiteRatio(record.hp, record.maxHp);
-    const showHp = category === "current" && hpRatio != null && (record.selected || hpRatio < 0.999);
+    const damaged = hpRatio != null && hpRatio < 0.999;
+    const showHp = hpRatio != null && (
+      (category === "current" && (record.selected || damaged))
+      || (category === "reveal" && record.aboveFogReveal === true && damaged)
+    );
+    visual.hpBack.renderingGroupId = CATEGORY_SPECS[category].renderingGroupId;
+    visual.hpFill.renderingGroupId = CATEGORY_SPECS[category].renderingGroupId;
     const hpHeight = worldScaleToScene(record.anchors?.hp?.heightPx || bounds.heightPx) + worldScaleToScene(4);
     syncBar(visual.hpBack, point, hpHeight, width, 1, showHp, B);
     syncBar(visual.hpFill, point, hpHeight + worldScaleToScene(0.5), width, hpRatio ?? 0, showHp, B);
