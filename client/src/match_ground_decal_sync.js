@@ -50,7 +50,12 @@ export class GroundDecalSync {
     this.outstandingRequestId = null;
     this.retryIndex = 0;
     this._cancelRetry();
-    this.targetRevision = Math.max(this.targetRevision, message.revision);
+    // A correlated response was projected after this request reached the room actor, so its
+    // revision supersedes the snapshot that prompted the request. This matters across observer
+    // perspective changes: an old-perspective snapshot may already be in the browser's inbound
+    // queue when the local cache resets, while the replacement perspective can legitimately have
+    // a lower (including zero) discovery revision.
+    this.targetRevision = message.revision;
     this._ensureRequest();
     return true;
   }

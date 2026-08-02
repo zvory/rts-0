@@ -28,7 +28,7 @@ export class GroundDecalBuffer {
     if (!Number.isInteger(revision) || revision < 0 || revision > 0xffffffff) {
       return { accepted: false, queued: 0 };
     }
-    if (revision <= this.authoritativeRevision) return { accepted: false, queued: 0 };
+    if (revision < this.authoritativeRevision) return { accepted: false, queued: 0 };
 
     let queued = 0;
     for (const record of Array.isArray(decals) ? decals : []) {

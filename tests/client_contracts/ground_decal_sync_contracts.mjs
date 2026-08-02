@@ -61,16 +61,20 @@ assert(
   assert(sync.applyResponse({
     t: "groundDecals",
     requestId: 1,
-    revision: 2,
+    revision: 3,
     decals: [
       { id: 10, decalClass: "infantry", sourceKind: KIND.RIFLEMAN, x: 32, y: 48, owner: 1, seed: 5 },
       { id: 10, decalClass: "infantry", sourceKind: KIND.RIFLEMAN, x: 32, y: 48, owner: 1, seed: 5 },
     ],
   }), "a valid authoritative delta advances applied state");
-  assert(buffer.authoritativeRevision === 2 && buffer.pendingCount === 1,
+  assert(buffer.authoritativeRevision === 3 && buffer.pendingCount === 1,
     "authoritative application advances only from the response and deduplicates decal ids");
-  assert(requests.at(-1).requestId === 2 && requests.at(-1).afterRevision === 2,
-    "a partial response immediately requests the remainder with a new correlation id");
+  assert(requests.length === 2,
+    "a correlated response supersedes the snapshot target that prompted it");
+
+  sync.observeSnapshot(4);
+  assert(requests.at(-1).requestId === 2 && requests.at(-1).afterRevision === 3,
+    "a later snapshot starts a new request after the applied revision");
 
   sync.applyResponse({
     t: "groundDecals",
@@ -94,18 +98,26 @@ assert(
     "Lab perspective changes clear local decal records, pixels, and applied revision");
   assert(!sync.applyResponse({ requestId: 2, revision: 4, decals: [] }),
     "a response from the old perspective is ignored until its replacement snapshot arrives");
-  sync.observeSnapshot(4);
+  sync.observeSnapshot(9);
   assert(requests.at(-1).requestId === 3 && requests.at(-1).afterRevision === 0,
-    "the first replacement-perspective snapshot requests full history with a fresh id");
+    "the first post-reset snapshot requests full history with a fresh id");
+  assert(sync.applyResponse({ requestId: 3, revision: 0, decals: [] }),
+    "the correlated replacement response can settle below a stale old-perspective snapshot");
+  assert(buffer.authoritativeRevision === 0 && sync.targetRevision === 0,
+    "an empty replacement perspective does not keep chasing the stale snapshot revision");
+  const requestCountAfterEmptyReplacement = requests.length;
+  sync.observeSnapshot(0);
+  assert(requests.length === requestCountAfterEmptyReplacement,
+    "the replacement perspective's zero revision remains fully reconciled");
   assert(!sync.applyResponse({
-    requestId: 2,
+    requestId: 3,
     revision: 4,
     decals: [{
       id: 99, decalClass: "infantry", sourceKind: KIND.RIFLEMAN,
       x: 16, y: 16, owner: 1, seed: 9,
     }],
   }) && buffer.authoritativeRevision === 0,
-  "a delayed response from the old perspective is rejected after the replacement snapshot");
+  "a delayed duplicate response is rejected after the replacement request settles");
   sync.destroy();
   assert(cleared.size > 0 && labUnsubscribed === 1,
     "destroy cancels outstanding repair work and its Lab result subscription");
