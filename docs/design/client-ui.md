@@ -944,7 +944,9 @@ texture per tile.
 
 The doodad palette exposes oak, pine, spruce, and alder. Trees are placed singly and share one
 mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed singly or sprayed
-with a chosen tint. Symmetry, move, delete, and undo/redo apply to doodads. Trees do not yet change
+with a chosen tint. Doodads cannot be picked up or moved: the removal tool box-selects any number of
+doodads for deletion, and a separate erase brush removes doodads continuously. Symmetry applies when
+creating doodads, while delete and undo/redo apply to authored doodads. Trees do not yet change
 line of sight, cover, or combat damage, and wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.

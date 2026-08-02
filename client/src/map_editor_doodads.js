@@ -92,25 +92,9 @@ export function createMapEditorDoodads(draft, placements, {
   return added;
 }
 
-export function moveMapEditorDoodad(draft, id, point) {
-  const doodadId = positiveSafeInteger(id);
-  const record = draft?.doodads?.find((candidate) => candidate.id === doodadId);
-  const dimensions = draftWorldDimensions(draft);
-  const x = Math.round(Number(point?.x));
-  const y = Math.round(Number(point?.y));
-  if (
-    !record || !dimensions || !Number.isFinite(x) || !Number.isFinite(y)
-    || x < 0 || y < 0 || x >= dimensions.width || y >= dimensions.height
-  ) return null;
-  if (record.x === x && record.y === y) return record;
-  record.x = x;
-  record.y = y;
-  return record;
-}
-
 export function removeMapEditorDoodads(draft, ids) {
   if (!Array.isArray(draft?.doodads)) return [];
-  const removed = new Set((ids || []).map(positiveSafeInteger).filter(Boolean));
+  const removed = new Set(Array.from(ids || [], positiveSafeInteger).filter(Boolean));
   if (!removed.size) return [];
   const existing = new Set(draft.doodads.map((record) => record.id));
   const actual = [...removed].filter((id) => existing.has(id));
@@ -132,19 +116,19 @@ export function doodadIdsWithinRadius(records, point, radius) {
   }).map((record) => record.id);
 }
 
-export function nearestMapEditorDoodad(records, point, radius = 24) {
-  const candidates = doodadIdsWithinRadius(records, point, radius);
-  let nearest = null;
-  let nearestDistance = Infinity;
-  for (const id of candidates) {
-    const record = records.find((candidate) => candidate.id === id);
-    const distance = (record.x - point.x) ** 2 + (record.y - point.y) ** 2;
-    if (distance < nearestDistance || (distance === nearestDistance && id < nearest.id)) {
-      nearest = record;
-      nearestDistance = distance;
-    }
-  }
-  return nearest || null;
+export function doodadIdsWithinRect(records, from, to) {
+  const x0 = Number(from?.x);
+  const y0 = Number(from?.y);
+  const x1 = Number(to?.x);
+  const y1 = Number(to?.y);
+  if (![x0, y0, x1, y1].every(Number.isFinite)) return [];
+  const minX = Math.min(x0, x1);
+  const maxX = Math.max(x0, x1);
+  const minY = Math.min(y0, y1);
+  const maxY = Math.max(y0, y1);
+  return (records || [])
+    .filter((record) => record.x >= minX && record.x <= maxX && record.y >= minY && record.y <= maxY)
+    .map((record) => record.id);
 }
 
 export function symmetricDoodadPlacements(worldDimensions, points, symmetry = "none") {
