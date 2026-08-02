@@ -220,12 +220,26 @@ fn validate_materialized_binding(
     if authored.doodads != materialized.doodads {
         return Err("Authored and materialized doodads do not match.".to_string());
     }
+    if !tiles_match(&authored.stealth_tiles, &materialized.stealth_tiles) {
+        return Err("Authored and materialized stealth tiles do not match.".to_string());
+    }
+    if !tiles_match(&authored.no_vehicle_tiles, &materialized.no_vehicle_tiles) {
+        return Err("Authored and materialized no-vehicle tiles do not match.".to_string());
+    }
     if !locations_match(&authored.starts, &materialized.starts)
         || !base_sites_match(authored, &materialized.base_sites)
     {
         return Err("Authored map locations do not match the materialized map.".to_string());
     }
     Ok(())
+}
+
+fn tiles_match(authored: &[(u32, u32)], materialized: &[rts_server::protocol::MapTile]) -> bool {
+    authored.len() == materialized.len()
+        && authored
+            .iter()
+            .zip(materialized)
+            .all(|(&(x, y), tile)| x == tile.x && y == tile.y)
 }
 
 fn base_sites_match(
@@ -308,6 +322,8 @@ mod tests {
                 starts,
                 base_sites,
                 doodads: Vec::new(),
+                stealth_tiles: Vec::new(),
+                no_vehicle_tiles: Vec::new(),
             },
         }
     }
@@ -460,6 +476,8 @@ mod tests {
                 })
                 .collect(),
             doodads: Vec::new(),
+            stealth_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
         };
 
         assert_eq!(validate_request(&request), Ok(()));

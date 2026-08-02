@@ -548,6 +548,20 @@ impl Game {
                     reason,
                 }
             })?;
+        let stealth_tiles = map_draft::canonical_tiles(
+            &draft.stealth_tiles,
+            draft.width,
+            draft.height,
+            "stealthTiles",
+            name,
+        )?;
+        let no_vehicle_tiles = map_draft::canonical_tiles(
+            &draft.no_vehicle_tiles,
+            draft.width,
+            draft.height,
+            "noVehicleTiles",
+            name,
+        )?;
         let mut occupied_sites = std::collections::HashSet::new();
         for &(x, y) in &starts {
             validate_lab_map_site(
@@ -583,6 +597,8 @@ impl Game {
             base_sites,
             base_resource_counts,
             doodads,
+            stealth_tiles,
+            no_vehicle_tiles,
         };
         let map_metadata = MapMetadata {
             name: name.to_string(),

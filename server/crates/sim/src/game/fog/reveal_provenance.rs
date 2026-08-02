@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::game::entity::{EntityStore, FiringRevealEpisode};
 use crate::game::firing_reveal::FiringRevealSource;
+use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 
@@ -24,6 +25,7 @@ impl Fog {
         &mut self,
         sources: &[FiringRevealSource],
         store: &EntityStore,
+        map: &Map,
         smokes: &SmokeCloudStore,
     ) {
         self.firing_reveal_visibility.clear();
@@ -58,12 +60,13 @@ impl Fog {
                 continue;
             };
             visibility.revealed_tile = Some(tile);
-            visibility.reveal_only = !self
-                .grids
-                .get(&source.viewer())
-                .and_then(|grid| grid.get(tile as usize))
-                .copied()
-                .unwrap_or(false);
+            visibility.reveal_only = map.world_point_is_stealth(entity.pos_x, entity.pos_y)
+                || !self
+                    .grids
+                    .get(&source.viewer())
+                    .and_then(|grid| grid.get(tile as usize))
+                    .copied()
+                    .unwrap_or(false);
         }
 
         let width = self.width;
@@ -83,11 +86,7 @@ impl Fog {
     }
 
     /// The active reveal episode for `entity_id`, whether or not ordinary sight also sees it.
-    pub(in crate::game) fn active_firing_reveal_episode(
-        &self,
-        viewer: u32,
-        entity_id: u32,
-    ) -> Option<u32> {
+    pub(crate) fn active_firing_reveal_episode(&self, viewer: u32, entity_id: u32) -> Option<u32> {
         self.firing_reveal_visibility
             .get(&viewer)?
             .get(&entity_id)

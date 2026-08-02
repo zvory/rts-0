@@ -29,6 +29,8 @@ impl Default for Map {
             base_sites: Vec::new(),
             base_resource_counts: HashMap::new(),
             doodads: Vec::new(),
+            stealth_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
         }
     }
 }

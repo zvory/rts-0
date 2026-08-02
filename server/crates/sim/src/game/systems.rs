@@ -359,6 +359,7 @@ pub(crate) fn run_tick(
             entities,
             &teams,
             fog,
+            map,
             events,
             firing_reveals,
             tick,
@@ -381,6 +382,7 @@ pub(crate) fn run_tick(
     crate::perf::timed(perf.as_deref_mut(), "death", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         services::death::death_system(
+            map,
             entities,
             fog,
             smokes,

@@ -296,7 +296,7 @@ pub(in crate::game) fn apply_commands(
                     continue;
                 };
                 let target_valid =
-                    attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
+                    attack_target_valid(map, entities, &teams, fog, smokes, player, &units, target);
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -325,7 +325,9 @@ pub(in crate::game) fn apply_commands(
                 let targets =
                     tank_trap_cluster_targets(entities, &teams, fog, smokes, player, target);
                 let target_valid = !targets.is_empty()
-                    && attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
+                    && attack_target_valid(
+                        map, entities, &teams, fog, smokes, player, &units, target,
+                    );
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -874,6 +876,7 @@ mod planned_actions {
                     planner::OrderIntent::AttackTarget(target) => {
                         if immediate_unit_can_replace(entities, player, unit)
                             && attack_target_valid(
+                                map,
                                 entities,
                                 teams,
                                 fog,
@@ -893,7 +896,7 @@ mod planned_actions {
                     planner::OrderIntent::AttackCluster(targets) => {
                         if immediate_unit_can_replace(entities, player, unit) {
                             let targets = attack_cluster_targets_for_unit(
-                                entities, teams, fog, smokes, player, unit, &targets,
+                                map, entities, teams, fog, smokes, player, unit, &targets,
                             );
                             if !targets.is_empty() {
                                 if let Some(e) = entities.get_mut(unit) {
@@ -1058,6 +1061,7 @@ mod planned_actions {
                         match &intent {
                             OrderIntent::Attack(attack)
                                 if !attack_target_valid(
+                                    map,
                                     entities,
                                     teams,
                                     fog,
@@ -1180,6 +1184,7 @@ mod planned_actions {
     }
 }
 fn attack_target_valid(
+    map: &Map,
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -1190,6 +1195,7 @@ fn attack_target_valid(
 ) -> bool {
     units.iter().copied().any(|unit| {
         world_query::unit_explicit_attack_target_valid(
+            map,
             entities,
             teams,
             fog,
@@ -1258,6 +1264,7 @@ fn tank_trap_cluster_targets(
 }
 
 fn attack_cluster_targets_for_unit(
+    map: &Map,
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -1271,6 +1278,7 @@ fn attack_cluster_targets_for_unit(
         .copied()
         .filter(|target| {
             world_query::unit_explicit_attack_target_valid(
+                map,
                 entities,
                 teams,
                 fog,

@@ -534,7 +534,9 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // Static map doodads, canonicalized by ascending nonzero id. Tree records have
     // authoritative tiny trunk collision; wildflowers are inert. Coordinates are integer
     // world pixels. color is allowed only on wildflowers.
-    doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ]
+    doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ],
+    stealthTiles: [ { x: u32, y: u32 } ],
+    noVehicleTiles: [ { x: u32, y: u32 } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
 }
@@ -1384,7 +1386,7 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV5,
+  authoredMap: AuthoredMapV6,
   materializedMap: {
     name: string,
     width: u32,
@@ -1392,18 +1394,21 @@ POST /api/map-handoffs
     terrain: u8[],
     starts: LabMapTile[],
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
-    doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[]
+    doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[],
+    stealthTiles: LabMapTile[],
+    noVehicleTiles: LabMapTile[]
   }
 }
 -> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV5 }
+ | { destination: "editor", authoredMap: AuthoredMapV6 }
 ```
-`AuthoredMapV5` declares independent `width` and `height` tile dimensions, whose product must
+`AuthoredMapV6` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
-`doodads` arrays.
+`doodads`, `stealthTiles`, and `noVehicleTiles` arrays. Overlay records are bounded, unique,
+in-bounds tile-coordinate pairs; the layers remain independent.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
@@ -1415,7 +1420,7 @@ presentation only. Tree color
 is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
 `#rrggbb`. Tree trunks participate in unit standability and add a finite tile-path avoidance cost,
 while leaving the rest of their tile traversable. Wildflowers have no collision or pathing effect.
-Doodads have no fog, vision, cover, or combat behavior in schema v5.
+Doodads themselves have no fog, vision, cover, or combat behavior; map overlays supply those rules.
 Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
 count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
 doodads to `materializedMap`. Records are capped at 64, expire after two
@@ -1446,7 +1451,9 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       terrain: u8[],
       starts: [{ x: u32, y: u32 }],
       baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }],
-      doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }]
+      doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }],
+      stealthTiles: [{ x: u32, y: u32 }],
+      noVehicleTiles: [{ x: u32, y: u32 }]
     }
   },
   metadata: {

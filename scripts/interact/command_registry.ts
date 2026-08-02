@@ -112,6 +112,12 @@ const COMMAND_RECORDS = Object.freeze({
     defaults: ["resume.speed=1", "step.ticks=1"], bounds: ["speed 0-16 (resume >0)", "step 1-100 ticks", "seek tick 0-1000000"],
     example: { sessionId: "<lab-session-id>", control: { action: "step", ticks: 3 } },
   }),
+  vision: descriptor("Switch the Lab recipient between full-map and one team's fog-filtered view.", "{sessionId:string,vision:{mode:\"all\"}|{mode:\"team\",teamId:u32}}", {
+    sceneMutation: true,
+    variants: ["all shows the full authoritative world", "team shows only that team's normal fog-filtered snapshot"],
+    bounds: ["teamId must identify a team in the current Lab scene"],
+    example: { sessionId: "<lab-session-id>", vision: { mode: "team", teamId: 1 } },
+  }),
   inspect: descriptor("Inspect bounded authoritative entity, player, room, and semantic camera/viewport/bounds facts.", "{sessionId:string,refs?:(alias|u32)[],kinds?:token[],owners?:u32[],cameraViewport?:boolean,limit?:int}", {
     defaults: ["refs/kinds/owners=unfiltered", "cameraViewport=false", "limit=25"], bounds: ["0-400 refs", "0-32 kinds", "0-16 owners", "limit 1-400"],
     example: { sessionId: "<lab-session-id>", refs: ["subject"], limit: 1 },

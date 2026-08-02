@@ -154,7 +154,7 @@ export class MapEditorPanel {
     if (!this.session.draft) {
       body.appendChild(readout("Preparing editor…"));
     } else {
-      body.append(this.renderTerrain(), this.renderDoodads(), this.renderLocations());
+      body.append(this.renderTerrain(), this.renderMapOverlays(), this.renderDoodads(), this.renderLocations());
     }
     this.toolsEl.append(header, body, this.toolsWindowChrome.renderResizeHandle());
     restorePanelScroll(body, scroll);
@@ -282,6 +282,35 @@ export class MapEditorPanel {
       palette,
       field("Paint shape", shapes),
       field("Symmetry", symmetry),
+    );
+    return section;
+  }
+
+  renderMapOverlays() {
+    const section = group("Gameplay overlays");
+    const palette = document.createElement("div");
+    palette.className = "map-editor-palette";
+    const tools = [
+      ["Forest", { stealth: true, noVehicle: true }, "forest tiles"],
+      ["Stealth only", { stealth: true }, "stealth tiles"],
+      ["No vehicles only", { noVehicle: true }, "no-vehicle tiles"],
+      ["Erase stealth", { stealth: false }, "stealth erasure"],
+      ["Erase no vehicles", { noVehicle: false }, "no-vehicle erasure"],
+      ["Erase both", { stealth: false, noVehicle: false }, "overlay erasure"],
+    ];
+    for (const [label, edit, status] of tools) {
+      palette.appendChild(button(label, () => {
+        this.armOverlay(edit, status);
+        this.setStatus(`${this.paintShape === "box" ? "Drag to fill a box with" : "Painting"} ${status}.`);
+      }, {
+        active: this.viewport.tool?.kind === "overlay"
+          && JSON.stringify(this.viewport.tool.edit) === JSON.stringify(edit),
+      }));
+    }
+    section.append(
+      readout(`${this.session.draft.stealthTiles.length} stealth tiles; ${this.session.draft.noVehicleTiles.length} no-vehicle tiles.`),
+      readout("Forest paints both layers. Long grass or other future cover can use stealth alone."),
+      palette,
     );
     return section;
   }
@@ -494,6 +523,17 @@ export class MapEditorPanel {
     });
   }
 
+  armOverlay(edit, label) {
+    this.viewport.armTool({
+      kind: "overlay",
+      edit: { ...edit },
+      label,
+      shape: this.paintShape,
+      symmetry: this.symmetry,
+    });
+    this.render();
+  }
+
   armDoodad(mode) {
     this.doodadMode = ["place", "spray", "select", "erase"].includes(mode) ? mode : "place";
     this.viewport.armTool({
@@ -511,6 +551,9 @@ export class MapEditorPanel {
   setPaintShape(shape) {
     this.paintShape = shape === "box" ? "box" : "brush";
     if (this.viewport.tool?.kind === "terrain") this.armTerrain();
+    else if (this.viewport.tool?.kind === "overlay") {
+      this.viewport.armTool({ ...this.viewport.tool, shape: this.paintShape });
+    }
     this.render();
   }
 

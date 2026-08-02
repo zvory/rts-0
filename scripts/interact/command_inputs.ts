@@ -117,6 +117,13 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
   } else if (command === "time") {
     exact(value, ["sessionId", "control"], command);
     validateTime(value.control);
+  } else if (command === "vision") {
+    exact(value, ["sessionId", "vision"], command);
+    record(value.vision, "vision.vision");
+    exact(value.vision, ["mode", "teamId"], "vision mode");
+    if (value.vision.mode === "team") u32(value.vision.teamId, "vision.teamId");
+    else if (value.vision.mode !== "all") invalid("vision.mode", "must be all or team");
+    if (value.vision.mode === "all" && value.vision.teamId != null) invalid("vision.teamId", "is only valid for team vision");
   } else if (command === "inspect") {
     exact(value, ["sessionId", "refs", "kinds", "owners", "cameraViewport", "limit"], command);
     if (value.refs != null) refs(value.refs, "inspect.refs", 0, INTERACT_LIMITS.maxInspectRefs);

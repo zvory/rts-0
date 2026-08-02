@@ -103,6 +103,7 @@ export class MapEditorSession {
     this.lastAction = "";
     this.savedFingerprint = "";
     this.terrainStroke = null;
+    this.overlayStroke = null;
     this.doodadStroke = null;
   }
 
@@ -123,6 +124,8 @@ export class MapEditorSession {
       starts: (startPayload?.players || []).map((player) => ({ x: Number(player.startTileX), y: Number(player.startTileY) })),
       baseSites: [],
       doodads: map.doodads,
+      stealthTiles: map.stealthTiles,
+      noVehicleTiles: map.noVehicleTiles,
     });
     this.markSaved({ notify: false });
     this.notify("initialized");
@@ -142,6 +145,8 @@ export class MapEditorSession {
       starts: data.starts,
       baseSites: data.baseSites || data.expansionSites,
       doodads: data.doodads,
+      stealthTiles: data.stealthTiles,
+      noVehicleTiles: data.noVehicleTiles,
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -173,6 +178,8 @@ export class MapEditorSession {
       starts,
       baseSites: starts,
       doodads: [],
+      stealthTiles: [],
+      noVehicleTiles: [],
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -346,6 +353,56 @@ export class MapEditorSession {
     return true;
   }
 
+  beginOverlayStroke(label = "Painted map overlay") {
+    if (!this.draft || this.overlayStroke) return false;
+    this.overlayStroke = { label, before: clone(this.draft), dirty: new Map() };
+    return true;
+  }
+
+  paintOverlayTiles(tiles, edit = {}) {
+    if (!this.draft || !this.overlayStroke || !Array.isArray(tiles)) return [];
+    const dimensions = draftDimensions(this.draft);
+    const stealth = new Map(this.draft.stealthTiles.map((tile) => [locationKey(tile), tile]));
+    const noVehicle = new Map(this.draft.noVehicleTiles.map((tile) => [locationKey(tile), tile]));
+    const changed = [];
+    for (const candidate of tiles) {
+      const tile = validMapTile(candidate, dimensions);
+      if (!tile) continue;
+      const key = locationKey(tile);
+      const before = `${stealth.has(key)}:${noVehicle.has(key)}`;
+      applyOverlayEdit(stealth, key, tile, edit.stealth);
+      applyOverlayEdit(noVehicle, key, tile, edit.noVehicle);
+      if (before === `${stealth.has(key)}:${noVehicle.has(key)}`) continue;
+      this.overlayStroke.dirty.set(key, tile);
+      changed.push(tile);
+    }
+    this.draft.stealthTiles = [...stealth.values()];
+    this.draft.noVehicleTiles = [...noVehicle.values()];
+    return changed;
+  }
+
+  commitOverlayStroke() {
+    const stroke = this.overlayStroke;
+    this.overlayStroke = null;
+    if (!stroke || stroke.dirty.size === 0) return false;
+    normalizeDraft(this.draft);
+    this.undoStack.push(stroke.before);
+    if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
+    this.redoStack = [];
+    this.lastAction = stroke.label;
+    this.notify("overlayStroke", { dirtyTiles: [...stroke.dirty.values()] });
+    return true;
+  }
+
+  cancelOverlayStroke() {
+    const stroke = this.overlayStroke;
+    this.overlayStroke = null;
+    if (!stroke) return false;
+    this.draft = stroke.before;
+    this.notify("changed");
+    return true;
+  }
+
   beginDoodadStroke(label = "Edited doodads") {
     if (!this.draft || this.doodadStroke) return false;
     this.doodadStroke = {
@@ -425,7 +482,7 @@ export class MapEditorSession {
 
   saveLocal(key) {
     if (!this.draft || !this.storage?.setItem) return false;
-    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 5, draft: this.draft })); } catch { return false; }
+    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 6, draft: this.draft })); } catch { return false; }
     this.lastAction = "Saved local map";
     this.markSaved();
     return true;
@@ -436,6 +493,7 @@ export class MapEditorSession {
     let parsed;
     try {
       const text = this.storage.getItem(storageKey(key))
+        || this.storage.getItem(legacyV5StorageKey(key))
         || this.storage.getItem(legacyV4StorageKey(key))
         || this.storage.getItem(legacyV3StorageKey(key))
         || this.storage.getItem(legacyStorageKey(key));
@@ -468,6 +526,8 @@ export class MapEditorSession {
       starts: draft.startLocations.map(copyLocation),
       baseSites: draft.baseSites.map(copyBaseSite),
       doodads: draft.doodads.map(copyDoodad),
+      stealthTiles: draft.stealthTiles.map(copyLocation),
+      noVehicleTiles: draft.noVehicleTiles.map(copyLocation),
     };
   }
 
@@ -681,6 +741,8 @@ export function authoredMapFromMaterialized({
   starts,
   baseSites,
   doodads = [],
+  stealthTiles = [],
+  noVehicleTiles = [],
 }) {
   const mapWidth = Math.max(1, Math.trunc(Number(width)) || 1);
   const mapHeight = Math.max(1, Math.trunc(Number(height)) || 1);
@@ -693,7 +755,7 @@ export function authoredMapFromMaterialized({
   const bases = normalizeBaseSiteRecords(baseSites, dimensions);
   for (const start of startLocations) if (!bases.some((site) => sameLocation(site, start))) bases.push(newBaseSite(start));
   const draft = {
-    version: 5,
+    version: 6,
     name: String(name || "Map").trim() || "Map",
     description: String(description || ""),
     _design: "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
@@ -703,6 +765,8 @@ export function authoredMapFromMaterialized({
     startLocations,
     baseSites: bases,
     doodads: normalizeDraftDoodads(doodads, dimensions),
+    stealthTiles: normalizeOverlayTiles(stealthTiles, dimensions),
+    noVehicleTiles: normalizeOverlayTiles(noVehicleTiles, dimensions),
   };
   normalizeDraft(draft);
   return draft;
@@ -713,12 +777,14 @@ export function materializedMapsEqual(left, right) {
   if (!sameFlatArray(left.terrain, right.terrain)) return false;
   return sameLocationSet(left.starts, right.starts)
     && sameBaseSiteSet(left.baseSites, right.baseSites)
-    && sameDoodadSet(left.doodads, right.doodads);
+    && sameDoodadSet(left.doodads, right.doodads)
+    && sameLocationSet(left.stealthTiles, right.stealthTiles)
+    && sameLocationSet(left.noVehicleTiles, right.noVehicleTiles);
 }
 
 function normalizeDraft(draft) {
   if (!draft || typeof draft !== "object") throw new Error("Map data is invalid.");
-  if (Number(draft.version) !== 5) replaceObject(draft, migrateLegacyDraft(draft));
+  if (Number(draft.version) !== 6) replaceObject(draft, migrateLegacyDraft(draft));
   if (!positiveInteger(draft.width) || !positiveInteger(draft.height)) {
     const inferred = inferredDraftDimensions(draft);
     draft.width = inferred.width;
@@ -729,7 +795,7 @@ function normalizeDraft(draft) {
   if (!width || !height || !Array.isArray(draft.terrain) || draft.terrain.length !== height || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== width)) {
     throw new Error("Map terrain rows must match its width and height.");
   }
-  draft.version = 5;
+  draft.version = 6;
   draft.name = String(draft.name || "Map").trim() || "Map";
   draft.description = String(draft.description || "");
   draft._design = String(draft._design || "Flat map locations.");
@@ -740,18 +806,22 @@ function normalizeDraft(draft) {
   draft.startLocations = normalizeLocations(draft.startLocations, dimensions).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
   draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, dimensions);
   draft.doodads = normalizeDraftDoodads(draft.doodads, dimensions);
+  draft.stealthTiles = normalizeOverlayTiles(draft.stealthTiles, dimensions);
+  draft.noVehicleTiles = normalizeOverlayTiles(draft.noVehicleTiles, dimensions);
   protectDraftBaseTerrain(draft);
 }
 
 function migrateLegacyDraft(source) {
-  if (Number(source?.version) === 4) {
+  if ([4, 5].includes(Number(source?.version))) {
     const dimensions = inferredDraftDimensions(source);
     return {
       ...clone(source),
-      version: 5,
+      version: 6,
       width: dimensions.width,
       height: dimensions.height,
       doodads: Array.isArray(source?.doodads) ? source.doodads : [],
+      stealthTiles: Array.isArray(source?.stealthTiles) ? source.stealthTiles : [],
+      noVehicleTiles: Array.isArray(source?.noVehicleTiles) ? source.noVehicleTiles : [],
     };
   }
   const sites = Array.isArray(source?.sites) ? source.sites : [];
@@ -764,7 +834,7 @@ function migrateLegacyDraft(source) {
   }
   if (!starts.length) for (const site of sites.filter((site) => site.kind === "main")) starts.push(copyLocation(site));
   return {
-    version: 5,
+    version: 6,
     name: source?.name || "Map",
     description: source?.description || "",
     _design: "Migrated map data. Flat locations and per-base resource counts are authoritative.",
@@ -774,6 +844,8 @@ function migrateLegacyDraft(source) {
     startLocations: starts,
     baseSites: (source?.baseSites || sites).map(copyBaseSite),
     doodads: [],
+    stealthTiles: [],
+    noVehicleTiles: [],
   };
 }
 
@@ -799,6 +871,7 @@ function resizeDraftCentered(source, width, height) {
     x: doodad.x + offsetX * 32,
     y: doodad.y + offsetY * 32,
   }));
+  const shiftTile = (tile) => ({ x: tile.x + offsetX, y: tile.y + offsetY });
   const draft = {
     ...clone(source),
     width,
@@ -807,6 +880,8 @@ function resizeDraftCentered(source, width, height) {
     startLocations,
     baseSites,
     doodads,
+    stealthTiles: (source.stealthTiles || []).map(shiftTile),
+    noVehicleTiles: (source.noVehicleTiles || []).map(shiftTile),
   };
   if (startLocations.some((location) => !draftLocationTileWithinClearance(draft, location, MAP_EDITOR_MAIN_CLEARANCE_TILES))) {
     return draftEditError("Resize would move a start location inside the map edge clearance.");
@@ -838,6 +913,16 @@ function normalizeLocations(locations, dimensions) {
     if (valid && !seen.has(locationKey(valid))) { seen.add(locationKey(valid)); out.push(valid); }
   }
   return out;
+}
+
+function normalizeOverlayTiles(locations, dimensions) {
+  return normalizeLocations(locations, dimensions)
+    .sort((left, right) => left.x - right.x || left.y - right.y);
+}
+
+function applyOverlayEdit(collection, key, tile, value) {
+  if (value === true) collection.set(key, copyLocation(tile));
+  else if (value === false) collection.delete(key);
 }
 function normalizeBaseSites(baseSites, startLocations, dimensions) {
   const normalized = normalizeBaseSiteRecords(baseSites, dimensions);
@@ -1115,7 +1200,8 @@ function normalizeDimensions(value) {
 }
 function clampTile(value, size) { return Math.max(0, Math.min(size - 1, Math.trunc(value))); }
 function draftEditError(error) { return { ok: false, error }; }
-function storageKey(key) { return `rts.map-editor.v5.${String(key || "default")}`; }
+function storageKey(key) { return `rts.map-editor.v6.${String(key || "default")}`; }
+function legacyV5StorageKey(key) { return `rts.map-editor.v5.${String(key || "default")}`; }
 function legacyV4StorageKey(key) { return `rts.map-editor.v4.${String(key || "default")}`; }
 function legacyV3StorageKey(key) { return `rts.map-editor.v3.${String(key || "default")}`; }
 function legacyStorageKey(key) { return `rts.mapEditor.${String(key || "default")}.v2`; }

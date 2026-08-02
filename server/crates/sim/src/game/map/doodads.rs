@@ -30,7 +30,7 @@ pub(crate) fn canonicalize(
 
 pub(super) fn hash_materialized(mut hash: u64, doodads: &[MapDoodad]) -> u64 {
     // Preserve the materialized hash of legacy maps with no static decorations. Absence and an
-    // explicit empty schema-v5 doodad list are the same materialized map.
+    // explicit empty doodad list are the same materialized map.
     if doodads.is_empty() {
         return hash;
     }

@@ -41,13 +41,13 @@ pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, AutoBuildSettingsSnapshot, CommandCapabilities, DebugPathPoint, DebugPathView,
     DiagnosticCapabilities, EntityView, Event, GroundDecalView, InitialCamera, LabStartMetadata,
-    LabStartRole, LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope,
-    NoticeSeverity, ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
-    PlayerStart, RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata,
-    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeSeekState,
-    RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
-    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID, MAP_DOODAD_TYPE_IDS,
-    MAP_TILE_SIZE_PX,
+    LabStartRole, LabVisionMode, MapInfo, MapTile, MatchControlCapabilities,
+    MovementPathDiagnosticScope, NoticeSeverity, ObserverViewSelection, OrderPlanMarker,
+    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedAntiTankGunView,
+    RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
+    RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState, ScoutPlaneStateView, SmokeCloudView,
+    Snapshot, SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
+    DEFAULT_FACTION_ID, MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX,
 };
 pub use server_message::ServerMessage;
 

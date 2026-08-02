@@ -883,6 +883,7 @@ export class MapEditorSession {
   loadAuthoredMap(source, options?)
   mutate(label, mutation), undo(), redo()
   beginTerrainStroke(label?), paintTerrainTiles(tiles, terrain), commitTerrainStroke()
+  beginOverlayStroke(label?), paintOverlayTiles(tiles, edit), commitOverlayStroke()
   materialized(), exportMap(), saveLocal(key), loadLocal(key)
   mapOverlay()
 }
@@ -912,7 +913,7 @@ Options loads bundled JSON from `/maps/catalog` and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
 base locations, and provides undo/redo, local save/load, centered resize, and JSON export. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
-shifts start/base locations with the centered source map. Authored v5 maps and materialized Lab
+shifts start/base locations with the centered source map. Authored v6 maps and materialized Lab
 handoffs carry explicit `width` and `height`; loading bundled or locally saved older square maps
 derives those axes from their terrain rows. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
@@ -942,10 +943,16 @@ edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
+The Gameplay overlays palette paints Forest (stealth plus no-vehicle), Stealth only, No vehicles
+only, or erases either/both layers. The viewport shows stealth in green and vehicle exclusion in
+orange, including overlap; overlay strokes use the same brush/box, symmetry, undo/redo, resize,
+local-save, export, and Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
+
 The doodad palette exposes oak, pine, spruce, and alder. Trees are placed singly and share one
 mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed singly or sprayed
-with a chosen tint. Symmetry, move, delete, and undo/redo apply to doodads. Trees do not yet change
-line of sight, cover, or combat damage, and wildflowers remain mechanically inert.
+with a chosen tint. Symmetry, move, delete, and undo/redo apply to doodads. Trees remain visual/trunk
+doodads; a forest's stealth and vehicle exclusion come from independent gameplay overlays.
+Wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
 The bounded server record expires after two minutes and is consumed once. Lab consumption creates a

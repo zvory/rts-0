@@ -435,7 +435,16 @@ fn pop_next_valid_intent(
                 let mut targets = std::iter::once(attack.target)
                     .chain(attack.remaining_targets)
                     .filter(|target| {
-                        attack_intent_valid(entities, teams, fog, Some(smokes), owner, id, *target)
+                        attack_intent_valid(
+                            map,
+                            entities,
+                            teams,
+                            fog,
+                            Some(smokes),
+                            owner,
+                            id,
+                            *target,
+                        )
                     })
                     .collect::<Vec<_>>();
                 if !targets.is_empty() {
@@ -556,6 +565,7 @@ fn setup_anti_tank_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: 
 }
 
 fn attack_intent_valid(
+    map: &Map,
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -571,12 +581,12 @@ fn attack_intent_valid(
         return false;
     }
     world_query::unit_explicit_attack_target_valid(
-        entities, teams, fog, smokes, owner, attacker, target,
+        map, entities, teams, fog, smokes, owner, attacker, target,
     )
 }
 
 fn attack_order_complete(
-    _map: &Map,
+    map: &Map,
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -585,6 +595,7 @@ fn attack_order_complete(
     target: u32,
 ) -> bool {
     if !attack_intent_valid(
+        map,
         entities,
         teams,
         fog,

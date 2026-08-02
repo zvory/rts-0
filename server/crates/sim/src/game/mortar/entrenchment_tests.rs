@@ -57,6 +57,7 @@ fn mortar_outer_area_damage_is_reduced_against_entrenched_infantry() {
         &mut entities,
         &teams,
         &fog,
+        &map,
         &mut events,
         &mut firing_reveals,
         &shell,

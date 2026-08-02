@@ -532,7 +532,7 @@ store a separate authoritative command stream, but they must not infer live stat
 Map policy:
 
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  permanent base sites, and tree-trunk collision/path cost on every tick, while start/export
+  permanent base sites, sparse stealth/no-vehicle tiles, and tree-trunk collision/path cost on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
 - `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, base-site bodies, or doodad bodies. It
@@ -546,10 +546,19 @@ Map policy:
   a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `width`, `height`,
   `playerCount`, and `materializedMapHash` against the supplied map. `materializedMapHash` is a
   stable hash over the materialized live `Map` fields (`width`, `height`, row-major terrain,
-  selected starts, base sites/resource counts, and canonical doodads). An explicit empty schema-v5
-  doodad list has the same materialized hash as the equivalent no-doodad map. If any binding fact
+  selected starts, base sites/resource counts, canonical doodads, and both sparse gameplay overlays).
+  Explicit empty doodad and overlay lists preserve the equivalent legacy materialized hash. Populated
+  stealth and no-vehicle layers use distinct hash tags. If any binding fact
   differs, the importer rejects the payload; it must not fall back to regenerating a map from seed
   or silently accepting a nearby map.
+
+Stealth applies to units, not buildings or doodads. Owners and allies always receive their units;
+enemy projection, auto-acquisition, explicit attack validation, and retained targets reject a unit
+standing on a stealth tile until that unit fires. Firing creates the existing entity-scoped reveal
+episode, above-fog presentation, and one-second counterfire reaction delay even when the underlying
+ground is ordinarily visible. Concealed deaths do not publish positional death events or global
+death decals. No-vehicle tiles seed vehicle-body occupancy only, so vehicles path around them while
+infantry can traverse the same tile.
 
 Field map for Phase 2 DTO conversion:
 

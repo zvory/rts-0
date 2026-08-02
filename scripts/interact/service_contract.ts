@@ -33,6 +33,7 @@ export interface ServiceInput extends JsonObject {
   update?: JsonObject; updates?: JsonObject[]; refs?: EntityRef[]; ids?: number[];
   playerId?: number; command?: JsonObject; ignoreCommandLimits?: boolean;
   control?: JsonObject;
+  vision?: JsonObject;
   kinds?: string[]; owners?: number[]; cameraViewport?: boolean; limit?: number;
   camera?: JsonObject;
   button?: "left" | "right";

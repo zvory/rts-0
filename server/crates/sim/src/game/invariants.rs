@@ -401,11 +401,25 @@ impl Game {
                     continue;
                 }
                 let live_visible = live_fog.is_visible_world(pid, v.x, v.y);
+                let stealth_concealment =
+                    self.state.entities.get(v.id).is_some_and(Entity::is_unit)
+                        && self.state.map.world_point_is_stealth(v.x, v.y);
+                let stealth_reveal = stealth_concealment
+                    && self
+                        .team_relations()
+                        .same_team_player_ids(pid)
+                        .into_iter()
+                        .any(|player| {
+                            self.state
+                                .fog
+                                .active_firing_reveal_episode(player, v.id)
+                                .is_some()
+                        });
                 // Fog-gated entities must either be live-visible or explicitly marked as
                 // legacy/special render-only intel.
                 if v.vision_only {
                     assert!(
-                        !live_visible,
+                        !live_visible || stealth_reveal,
                         "invariant: tick {} snapshot for player {} marks live-visible enemy entity {} as vision-only at {}",
                         self.state.tick,
                         pid,
@@ -414,7 +428,7 @@ impl Game {
                     );
                 } else {
                     assert!(
-                        live_visible,
+                        live_visible && !stealth_concealment,
                         "invariant: tick {} snapshot for player {} exposes hidden enemy entity {} at {}",
                         self.state.tick,
                         pid,

@@ -385,6 +385,7 @@ export class InteractDriver {
   async tabMenu(input: JsonObject) { return this.call("tabMenu", input); }
 
   async time(control: JsonObject) { return this.call("time", control); }
+  async vision(vision: JsonObject) { return this.call("vision", { vision }); }
 
   async inspect(query: JsonObject = {}) { return this.call("inspect", query); }
   async select(entityIds: number[]) { return this.call("select", { entityIds }); }

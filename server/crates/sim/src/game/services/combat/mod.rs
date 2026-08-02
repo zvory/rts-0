@@ -490,6 +490,7 @@ pub(in crate::game) fn combat_system(
                                 firing_reveals,
                                 player_ids,
                                 fog,
+                                map,
                                 teams,
                                 shot.victim_owner,
                                 owner,

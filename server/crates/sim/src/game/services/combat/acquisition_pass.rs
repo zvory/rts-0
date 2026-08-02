@@ -181,6 +181,7 @@ fn retained_target(
     if mode == CombatMode::Ordered {
         if let Some(target) = attacker.order().attack_target() {
             if crate::game::services::world_query::unit_explicit_attack_target_valid(
+                map,
                 entities,
                 teams,
                 fog,

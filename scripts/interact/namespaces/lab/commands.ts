@@ -35,6 +35,7 @@ export async function executeLabCommand(
   }
   if (command === "order") return order(session, input);
   if (command === "time") return { sessionId, result: await session.driver.time(input.control || {}) };
+  if (command === "vision") return { sessionId, result: await session.driver.vision(input.vision || {}) };
   if (command === "inspect") return inspect(session, input);
   if (command === "select") return select(session, input);
   if (command === "drag") return drag(session, input);

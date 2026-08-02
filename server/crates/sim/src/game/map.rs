@@ -22,7 +22,7 @@ mod team_assignment_tests;
 use crate::rules::terrain as terrain_rules;
 use crate::{
     config,
-    protocol::{terrain, MapDoodad},
+    protocol::{terrain, MapDoodad, MapTile},
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +30,7 @@ pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
 /// The only map schema version this server accepts. Bump when the schema changes incompatibly.
-pub const CURRENT_MAP_VERSION: u32 = 5;
+pub const CURRENT_MAP_VERSION: u32 = 6;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -70,6 +70,10 @@ pub struct Map {
     /// defaults so existing test helpers remain concise.
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
     pub doodads: Vec<MapDoodad>,
+    /// Canonical sparse tile coordinates granting unit concealment.
+    pub stealth_tiles: Vec<(u32, u32)>,
+    /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
+    pub no_vehicle_tiles: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -193,6 +197,8 @@ impl Map {
             hash = fnv_bytes(hash, &counts.oil_patches.to_le_bytes());
         }
         hash = doodads::hash_materialized(hash, &self.doodads);
+        hash = hash_tiles(hash, b"stealth", &self.stealth_tiles);
+        hash = hash_tiles(hash, b"no-vehicle", &self.no_vehicle_tiles);
         format!("{hash:016x}")
     }
 
@@ -281,6 +287,38 @@ impl Map {
         } else {
             terrain::ROCK
         }
+    }
+
+    #[inline]
+    pub fn is_stealth_tile(&self, x: u32, y: u32) -> bool {
+        self.stealth_tiles.binary_search(&(x, y)).is_ok()
+    }
+
+    #[inline]
+    pub fn is_no_vehicle_tile(&self, x: u32, y: u32) -> bool {
+        self.no_vehicle_tiles.binary_search(&(x, y)).is_ok()
+    }
+
+    #[inline]
+    pub fn world_point_is_stealth(&self, x: f32, y: f32) -> bool {
+        self.contains_world_point(x, y) && {
+            let (tx, ty) = self.tile_of(x, y);
+            self.is_stealth_tile(tx, ty)
+        }
+    }
+
+    pub(crate) fn protocol_stealth_tiles(&self) -> Vec<MapTile> {
+        self.stealth_tiles
+            .iter()
+            .map(|&(x, y)| MapTile { x, y })
+            .collect()
+    }
+
+    pub(crate) fn protocol_no_vehicle_tiles(&self) -> Vec<MapTile> {
+        self.no_vehicle_tiles
+            .iter()
+            .map(|&(x, y)| MapTile { x, y })
+            .collect()
     }
 
     /// Whether a tile is passable terrain. Out-of-bounds is impassable. This does NOT
@@ -376,6 +414,22 @@ fn fnv_usize(hash: u64, value: usize) -> u64 {
     fnv_bytes(hash, &(value as u64).to_le_bytes())
 }
 
+fn hash_tiles(mut hash: u64, layer_tag: &[u8], tiles: &[(u32, u32)]) -> u64 {
+    // Preserve materialized hashes for maps without gameplay overlays, while keeping the two
+    // sparse layers distinct when either is populated.
+    if tiles.is_empty() {
+        return hash;
+    }
+    hash = fnv_usize(hash, layer_tag.len());
+    hash = fnv_bytes(hash, layer_tag);
+    hash = fnv_usize(hash, tiles.len());
+    for &(x, y) in tiles {
+        hash = fnv_bytes(hash, &x.to_le_bytes());
+        hash = fnv_bytes(hash, &y.to_le_bytes());
+    }
+    hash
+}
+
 fn fnv_bytes(mut hash: u64, bytes: &[u8]) -> u64 {
     for byte in bytes {
         hash = (hash ^ u64::from(*byte)).wrapping_mul(FNV_PRIME);
@@ -411,6 +465,7 @@ mod tests {
     mod base_limits;
     mod doodads;
     mod four_player;
+    mod overlays;
     mod schone_tage;
     mod terrain_variants;
 
@@ -675,7 +730,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 5,
+              "version": 6,
               "name": "bad",
               "width": 2,
               "height": 2,
@@ -700,7 +755,7 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 5,
+              "version": 6,
               "name": "bad-base",
               "width": 32,
               "height": 32,
@@ -726,7 +781,7 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 5,
+              "version": 6,
               "name": "road-base",
               "width": 32,
               "height": 32,
@@ -746,10 +801,10 @@ mod tests {
     }
 
     #[test]
-    fn version_five_authored_map_materializes_rectangular_dimensions() {
+    fn current_authored_map_materializes_rectangular_dimensions() {
         let rows = vec![".".repeat(30); 20];
         let json = serde_json::json!({
-            "version": 5,
+            "version": 6,
             "name": "wide-test",
             "width": 30,
             "height": 20,
@@ -766,7 +821,7 @@ mod tests {
         });
 
         let map = Map::from_authored_json(1, &json.to_string(), 0)
-            .expect("rectangular v5 map should materialize");
+            .expect("rectangular map should materialize");
         assert_eq!((map.width, map.height), (30, 20));
         assert_eq!(map.terrain.len(), 600);
         assert_eq!(map.index(29, 19), 599);
@@ -780,10 +835,10 @@ mod tests {
     }
 
     #[test]
-    fn version_five_dimensions_must_match_terrain_shape() {
+    fn current_dimensions_must_match_terrain_shape() {
         let rows = vec![".".repeat(30); 20];
         let json = serde_json::json!({
-            "version": 5,
+            "version": 6,
             "name": "mismatched-test",
             "width": 20,
             "height": 30,

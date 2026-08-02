@@ -48,6 +48,11 @@ impl OccupancyData {
         let mut tank_trap_tiles = vec![false; cells];
         let mut tree_path_cost = vec![false; cells];
         let mut tree_trunks_by_tile = vec![Vec::new(); cells];
+        for &(tx, ty) in &map.no_vehicle_tiles {
+            if tx < map.width && ty < map.height {
+                vehicle_body_blocked[(ty * map.width + tx) as usize] = true;
+            }
+        }
         for doodad in &map.doodads {
             if !crate::game::map::doodads::is_tree(doodad) {
                 continue;
@@ -525,6 +530,20 @@ mod tests {
             before.static_fingerprint_for_kind(EntityKind::Tank),
             after.static_fingerprint_for_kind(EntityKind::Tank),
             "vehicle-body fingerprint should include Tank Trap blockers"
+        );
+    }
+
+    #[test]
+    fn authored_no_vehicle_tiles_block_vehicle_bodies_but_not_infantry() {
+        let mut map = flat_test_map(16);
+        map.no_vehicle_tiles = vec![(7, 8)];
+        let occupancy = Occupancy::build(&map, &EntityStore::new());
+
+        assert!(occupancy.passable_for_kind(7, 8, EntityKind::Rifleman));
+        assert!(!occupancy.passable_for_kind(7, 8, EntityKind::ScoutCar));
+        assert_eq!(
+            occupancy.clearance_at_tile_for_movement_body(7, 8, MovementBodyClass::VehicleBody),
+            0,
         );
     }
 

@@ -155,6 +155,7 @@ fn visibility_combat_checkpoint_preserves_fog_memory_trenches_and_reveals() {
         &mut baseline.state.firing_reveals,
         reveal_players,
         &baseline.state.fog,
+        &baseline.state.map,
         &teams,
         1,
         2,

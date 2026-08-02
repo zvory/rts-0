@@ -5,6 +5,7 @@ use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::entrenchment_combat;
 use crate::game::firing_reveal::{record_mortar_impact_firing_reveals, FiringRevealSource};
 use crate::game::fog::Fog;
+use crate::game::map::Map;
 use crate::game::mortar_scatter::scattered_mortar_impact;
 use crate::game::services::dist2;
 use crate::game::teams::TeamRelations;
@@ -204,6 +205,7 @@ impl MortarShellStore {
         entities: &mut EntityStore,
         teams: &TeamRelations,
         fog: &Fog,
+        map: &Map,
         events: &mut HashMap<u32, Vec<Event>>,
         firing_reveals: &mut Vec<FiringRevealSource>,
         tick: u32,
@@ -214,7 +216,16 @@ impl MortarShellStore {
         for shell in due {
             if shell.impact_tick <= tick {
                 on_impact(shell.x, shell.y);
-                resolve(entities, teams, fog, events, firing_reveals, &shell, tick);
+                resolve(
+                    entities,
+                    teams,
+                    fog,
+                    map,
+                    events,
+                    firing_reveals,
+                    &shell,
+                    tick,
+                );
             } else {
                 pending.push(shell);
             }
@@ -261,6 +272,7 @@ fn resolve(
     entities: &mut EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
+    map: &Map,
     events: &mut HashMap<u32, Vec<Event>>,
     firing_reveals: &mut Vec<FiringRevealSource>,
     shell: &MortarShell,
@@ -327,6 +339,7 @@ fn resolve(
         firing_reveals,
         events,
         fog,
+        map,
         teams,
         &reveal_recipients,
         shell.owner,

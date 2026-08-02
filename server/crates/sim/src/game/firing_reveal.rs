@@ -5,6 +5,7 @@ use crate::protocol::{AttackReveal, Event};
 use serde::{Deserialize, Serialize};
 
 use super::fog::Fog;
+use super::map::Map;
 use super::teams::TeamRelations;
 
 /// Temporary actionable sight granted to a recipient when a hostile unit exposes itself by firing.
@@ -91,6 +92,7 @@ pub(in crate::game) fn record_firing_reveals_for_victim_team(
     firing_reveals: &mut Vec<FiringRevealSource>,
     player_ids: impl IntoIterator<Item = u32>,
     fog: &Fog,
+    map: &Map,
     teams: &TeamRelations,
     victim_owner: u32,
     attacker_owner: u32,
@@ -111,7 +113,9 @@ pub(in crate::game) fn record_firing_reveals_for_victim_team(
         }
         let already_visible_without_reveal =
             fog.is_visible_without_firing_reveal_world(viewer, attacker_pos.0, attacker_pos.1);
-        if already_visible_without_reveal {
+        if already_visible_without_reveal
+            && !map.world_point_is_stealth(attacker_pos.0, attacker_pos.1)
+        {
             continue;
         }
         FiringRevealSource::upsert(
@@ -129,6 +133,7 @@ pub(in crate::game) fn record_firing_reveals_for_victim_teams(
     firing_reveals: &mut Vec<FiringRevealSource>,
     player_ids: &[u32],
     fog: &Fog,
+    map: &Map,
     teams: &TeamRelations,
     victim_owners: &[u32],
     attacker_owner: u32,
@@ -142,6 +147,7 @@ pub(in crate::game) fn record_firing_reveals_for_victim_teams(
             firing_reveals,
             player_ids.iter().copied(),
             fog,
+            map,
             teams,
             victim_owner,
             attacker_owner,
@@ -186,6 +192,7 @@ pub(in crate::game) fn record_mortar_impact_firing_reveals(
     firing_reveals: &mut Vec<FiringRevealSource>,
     events: &HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    map: &Map,
     teams: &TeamRelations,
     victim_owners: &[u32],
     attacker_owner: u32,
@@ -202,6 +209,7 @@ pub(in crate::game) fn record_mortar_impact_firing_reveals(
         firing_reveals,
         &player_ids,
         fog,
+        map,
         teams,
         victim_owners,
         attacker_owner,

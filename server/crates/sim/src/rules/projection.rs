@@ -24,6 +24,7 @@ use super::projection_abilities::{
     active_ability_object_expires_in, active_return_object_id, return_available_tick,
 };
 use super::projection_panzerfaust::project_panzerfaust_state;
+pub(crate) use super::projection_visibility::entity_hidden_by_stealth_from_team;
 pub(crate) use super::projection_visibility::shot_reveals_attacker;
 #[allow(unused_imports)]
 pub use super::projection_visibility::{
@@ -37,9 +38,12 @@ const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
 const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
 
 pub struct EntityProjectionContext<'a> {
+    pub map: Option<&'a crate::game::map::Map>,
     pub fog: &'a Fog,
     pub actionable_fog: Option<&'a Fog>,
     pub private_detail_fog: Option<&'a Fog>,
+    /// Raw per-player fog retains firing-reveal provenance that team union views flatten.
+    pub concealment_fog: Option<&'a Fog>,
     pub private_detail_projection: PrivateDetailProjection<'a>,
     pub smokes: Option<&'a SmokeCloudStore>,
     pub fogged: bool,
@@ -167,22 +171,32 @@ pub fn project_entity(
     let selected_owner = context
         .private_detail_projection
         .includes_owner(viewer, entity.owner);
+    let owner_or_ally = context.private_detail_projection.includes_owner_or_ally(
+        viewer,
+        entity.owner,
+        context.teams,
+    );
+    let concealment_fog = context.concealment_fog.unwrap_or(context.fog);
+    let hidden_by_stealth = context.map.zip(context.teams).is_some_and(|(map, teams)| {
+        entity_hidden_by_stealth_from_team(viewer, entity, map, concealment_fog, teams)
+    });
     if context.fogged
         && !selected_owner
-        && !context
-            .smokes
-            .map(|smokes| {
-                entity_visible_to_with_smoke_melee(
-                    viewer,
-                    entity,
-                    context.fog,
-                    smokes,
-                    context.entities,
-                    context.teams,
-                    context.private_detail_projection,
-                )
-            })
-            .unwrap_or_else(|| entity_visible_to(viewer, entity, context.fog))
+        && (hidden_by_stealth
+            || !context
+                .smokes
+                .map(|smokes| {
+                    entity_visible_to_with_smoke_melee(
+                        viewer,
+                        entity,
+                        context.fog,
+                        smokes,
+                        context.entities,
+                        context.teams,
+                        context.private_detail_projection,
+                    )
+                })
+                .unwrap_or_else(|| entity_visible_to(viewer, entity, context.fog)))
     {
         return None;
     }
@@ -201,29 +215,31 @@ pub fn project_entity(
     let private_detail_fog = context.private_detail_fog.unwrap_or(actionable_fog);
     let private_detail_viewer = context.private_detail_projection.viewer_for(viewer, entity);
     let private_detail_owner = private_detail_viewer.is_some();
-    let owner_or_ally = context.private_detail_projection.includes_owner_or_ally(
-        viewer,
-        entity.owner,
-        context.teams,
-    );
     let exact_owner = private_detail_owner;
-    let vision_only = context.fogged
+    let stealth_reveal_only = context.fogged
         && !owner_or_ally
-        && !entity.is_node()
-        && !context
-            .smokes
-            .map(|smokes| {
-                entity_visible_to_with_smoke_melee(
-                    viewer,
-                    entity,
-                    actionable_fog,
-                    smokes,
-                    context.entities,
-                    context.teams,
-                    context.private_detail_projection,
-                )
-            })
-            .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog));
+        && entity.is_unit()
+        && context
+            .map
+            .is_some_and(|map| map.world_point_is_stealth(entity.pos_x, entity.pos_y));
+    let vision_only = stealth_reveal_only
+        || (context.fogged
+            && !owner_or_ally
+            && !entity.is_node()
+            && !context
+                .smokes
+                .map(|smokes| {
+                    entity_visible_to_with_smoke_melee(
+                        viewer,
+                        entity,
+                        actionable_fog,
+                        smokes,
+                        context.entities,
+                        context.teams,
+                        context.private_detail_projection,
+                    )
+                })
+                .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog)));
     view.vision_only = vision_only;
 
     if entity.kind == EntityKind::PumpJack && !entity.under_construction() {
@@ -254,6 +270,15 @@ pub fn project_entity(
                 exact_owner
                     || !context.fogged
                     || (!vision_only
+                        && !context.map.zip(context.teams).is_some_and(|(map, teams)| {
+                            entity_hidden_by_stealth_from_team(
+                                viewer,
+                                target,
+                                map,
+                                concealment_fog,
+                                teams,
+                            )
+                        })
                         && context
                             .smokes
                             .map(|smokes| {
@@ -784,9 +809,11 @@ mod tests {
             viewer,
             entity,
             EntityProjectionContext {
+                map: None,
                 fog,
                 actionable_fog: Some(fog),
                 private_detail_fog: Some(fog),
+                concealment_fog: None,
                 private_detail_projection: PrivateDetailProjection::ExactViewer,
                 smokes: None,
                 fogged,
@@ -817,9 +844,11 @@ mod tests {
                 viewer,
                 pump,
                 EntityProjectionContext {
+                    map: None,
                     fog: &fog,
                     actionable_fog: Some(&fog),
                     private_detail_fog: Some(&fog),
+                    concealment_fog: None,
                     private_detail_projection: PrivateDetailProjection::ExactViewer,
                     smokes: None,
                     fogged: false,

@@ -384,6 +384,8 @@ impl Game {
             terrain: self.state.map.terrain.clone(),
             resources,
             doodads: self.state.map.doodads.clone(),
+            stealth_tiles: self.state.map.protocol_stealth_tiles(),
+            no_vehicle_tiles: self.state.map.protocol_no_vehicle_tiles(),
         };
         let players = self
             .state

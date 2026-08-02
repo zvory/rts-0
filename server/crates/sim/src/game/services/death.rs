@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::fog::{Fog, LingeringSightSource};
 use crate::game::ground_decal::GroundDecalStore;
+use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
@@ -18,6 +19,7 @@ use crate::rules::{economy, projection};
 /// queues are removed. Workers building a since-removed site are reset elsewhere.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn death_system(
+    map: &Map,
     entities: &mut EntityStore,
     fog: &Fog,
     smokes: &SmokeCloudStore,
@@ -75,14 +77,18 @@ pub(crate) fn death_system(
         entities.release_miner(dead.id);
         entities.remove(dead.id);
         record_score_death(players, dead.owner, dead.kind, dead.killer);
-        ground_decals.create_death(
-            dead.kind,
-            dead.x,
-            dead.y,
-            dead.owner,
-            Some(dead.facing),
-            dead.weapon_facing,
-        );
+        let concealed_unit =
+            config::unit_stats(dead.kind).is_some() && map.world_point_is_stealth(dead.x, dead.y);
+        if !concealed_unit {
+            ground_decals.create_death(
+                dead.kind,
+                dead.x,
+                dead.y,
+                dead.owner,
+                Some(dead.facing),
+                dead.weapon_facing,
+            );
+        }
         if let Some(source) = LingeringSightSource::new(
             dead.owner,
             dead.x,
@@ -96,6 +102,15 @@ pub(crate) fn death_system(
         // so a death poof never reveals an entity hidden in a player's fog.
         let pids: Vec<u32> = events.keys().copied().collect();
         for pid in pids {
+            let hidden_from_team = concealed_unit
+                && !teams.same_team_or_same_owner(pid, dead.owner)
+                && !teams
+                    .same_team_player_ids(pid)
+                    .into_iter()
+                    .any(|player| fog.active_firing_reveal_episode(player, dead.id).is_some());
+            if hidden_from_team {
+                continue;
+            }
             if !projection::event_visible_to_team_with_smoke(
                 pid, dead.x, dead.y, dead.owner, fog, teams, smokes,
             ) {

@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "name": "Terrain Blend Showcase",
   "width": 126,
   "height": 126,
@@ -156,5 +156,8 @@
       "steelPatches": 0,
       "oilPatches": 0
     }
-  ]
+  ],
+  "stealthTiles": [],
+  "noVehicleTiles": [],
+  "doodads": []
 }

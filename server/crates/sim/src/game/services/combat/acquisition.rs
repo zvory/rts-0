@@ -145,6 +145,7 @@ pub(super) fn resolve_target_for_weapon(
         if let Some(e) = entities.get(self_id) {
             if let Some(target) = e.order().attack_target() {
                 if world_query::unit_explicit_attack_target_valid(
+                    map,
                     entities,
                     teams,
                     fog,

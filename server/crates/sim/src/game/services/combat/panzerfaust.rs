@@ -192,7 +192,7 @@ fn resolve_panzerfaust_target(
             .get(id)
             .and_then(|attacker| attacker.order().attack_target())
             .filter(|target| {
-                panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, *target)
+                panzerfaust_target_valid(map, entities, teams, fog, smokes, owner, id, *target)
             });
     }
     resolve_target_for_weapon(
@@ -213,11 +213,14 @@ fn resolve_panzerfaust_target(
         false,
         crate::rules::defs::WeaponClass::AntiTank,
         range_px,
-        &|target_id| panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, target_id),
+        &|target_id| {
+            panzerfaust_target_valid(map, entities, teams, fog, smokes, owner, id, target_id)
+        },
     )
 }
 
 fn panzerfaust_target_valid(
+    map: &Map,
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -229,6 +232,7 @@ fn panzerfaust_target_valid(
     entities.get(target).is_some_and(|target_entity| {
         crate::rules::combat::is_panzerfaust_loaded_shot_target(target_entity.kind)
     }) && world_query::unit_explicit_attack_target_valid(
+        map,
         entities,
         teams,
         fog,

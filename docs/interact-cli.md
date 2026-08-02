@@ -27,6 +27,7 @@ node scripts/interact/cli.mjs lab catalog '{"sessionId":"<id>","categories":["pl
 node scripts/interact/cli.mjs lab spawn '{"sessionId":"<id>","spawns":[{"owner":1,"kind":"rifleman","x":960,"y":960,"alias":"subject"}]}'
 node scripts/interact/cli.mjs lab update '{"sessionId":"<id>","updates":[{"operation":"move","entity":"subject","x":1100,"y":960}]}'
 node scripts/interact/cli.mjs lab remove '{"sessionId":"<id>","refs":["subject"]}'
+node scripts/interact/cli.mjs lab vision '{"sessionId":"<id>","vision":{"mode":"team","teamId":1}}'
 node scripts/interact/cli.mjs lab inspect '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/interact/cli.mjs lab select '{"sessionId":"<id>","refs":["subject"]}'
 node scripts/interact/cli.mjs lab drag '{"sessionId":"<id>","button":"left","from":{"x":420,"y":360},"to":{"x":760,"y":520},"steps":90,"durationMs":3000,"holdKeys":["attack"]}'
@@ -87,11 +88,15 @@ node scripts/interact/cli.mjs dev-scenario shutdown
 ```
 
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
-`time`, `inspect`, `select`, `drag`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
+`time`, `vision`, `inspect`, `select`, `drag`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
 `import`, `artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success
 writes exactly one JSON envelope to stdout. Failure writes a concise JSON error to stderr and exits
 nonzero. Every command has an exact, bounded input shape; arbitrary state patches, protocol
 messages, browser evaluation, and caller-selected artifact paths are not accepted.
+
+`lab vision` switches the operator's ordinary server-authored recipient view between `all` and one
+team's fog-filtered snapshot. This is the capture path for reviewing concealment and reveal behavior
+without granting the capture omniscient state.
 
 `lab drag` drives one real browser mouse gesture through the normal viewport listeners. Its points
 are viewport-local CSS pixels and must lie inside the current rendered viewport. The button is

@@ -92,7 +92,7 @@ fn tick_windup(
         cancel_windup(entities, id);
         return;
     };
-    if !panzerfaust_target_valid(entities, teams, fog, smokes, owner, id, target)
+    if !panzerfaust_target_valid(map, entities, teams, fog, smokes, owner, id, target)
         || !panzerfaust_target_in_range(map, entities, id, target)
         || !panzerfaust_target_fireable(
             &PanzerfaustFireContext::new(map, entities, blockers, teams, los, fog, smokes),

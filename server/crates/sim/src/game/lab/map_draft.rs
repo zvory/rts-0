@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::game::map::{BaseResourceCounts, Map};
-use crate::protocol::{LabBaseSite, LabMapDraft, LabMapTile};
+use crate::protocol::{LabBaseSite, LabMapDraft, LabMapTile, MapTile};
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 use super::LabError;
@@ -31,6 +31,8 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
             })
             .collect(),
         doodads: map.doodads.clone(),
+        stealth_tiles: map.protocol_stealth_tiles(),
+        no_vehicle_tiles: map.protocol_no_vehicle_tiles(),
     }
 }
 
@@ -65,4 +67,31 @@ pub(super) fn resource_counts(
         }
     }
     Ok(counts)
+}
+
+pub(super) fn canonical_tiles(
+    tiles: &[MapTile],
+    width: u32,
+    height: u32,
+    field: &str,
+    name: &str,
+) -> Result<Vec<(u32, u32)>, LabError> {
+    let mut out = Vec::with_capacity(tiles.len());
+    for (index, tile) in tiles.iter().enumerate() {
+        if tile.x >= width || tile.y >= height {
+            return Err(LabError::InvalidMap {
+                name: name.to_string(),
+                reason: format!("{field}[{index}] is outside the map"),
+            });
+        }
+        out.push((tile.x, tile.y));
+    }
+    out.sort_unstable();
+    if out.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(LabError::InvalidMap {
+            name: name.to_string(),
+            reason: format!("{field} contains duplicate tiles"),
+        });
+    }
+    Ok(out)
 }

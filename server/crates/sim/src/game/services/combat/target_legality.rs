@@ -54,6 +54,15 @@ pub(super) fn direct_fire_target_legal(
     if !targetable {
         return false;
     }
+    if crate::rules::projection::entity_hidden_by_stealth_from_team(
+        attacker_owner,
+        target_entity,
+        map,
+        fog,
+        teams,
+    ) {
+        return false;
+    }
     let end = (target_entity.pos_x, target_entity.pos_y);
     let target_team_visible =
         crate::rules::projection::team_visible_world(attacker_owner, end.0, end.1, fog, teams);

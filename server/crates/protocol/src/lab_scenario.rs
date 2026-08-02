@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub use rts_contract::{validate_map_doodads, MapDoodad};
+pub use rts_contract::{validate_map_doodads, MapDoodad, MapTile};
 use rts_contract::{InitialCamera, LabVisionMode};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -14,6 +14,10 @@ pub struct LabMapDraft {
     pub base_sites: Vec<LabBaseSite>,
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
+    #[serde(default)]
+    pub stealth_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub no_vehicle_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -85,6 +89,10 @@ pub struct LabCheckpointScenarioMapData {
     pub base_sites: Vec<LabScenarioBaseSite>,
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
+    #[serde(default)]
+    pub stealth_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub no_vehicle_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]

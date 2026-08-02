@@ -665,6 +665,7 @@ impl Game {
         self.state.fog.stamp_firing_reveal_sources_with_smoke(
             &self.state.firing_reveals,
             &self.state.entities,
+            &self.state.map,
             &self.state.smokes,
         );
         let viewer_sources = player_ids
