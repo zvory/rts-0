@@ -883,7 +883,10 @@ export class App {
       return false;
     }
     this.match = nextMatch;
-    if (this.matchEndedGeneration === generation) nextMatch.stop();
+    // A live match that resolves while its renderer is still starting must attach frozen behind
+    // the score screen. Replay viewers remain interactive after their result is shown: stopping
+    // one here would leave timeline seeks visually frozen after the score screen is dismissed.
+    if (this.matchEndedGeneration === generation && !nextMatch.replayViewer) nextMatch.stop();
     return true;
   }
 
@@ -972,8 +975,9 @@ export class App {
     );
     this.renderObservationId(this.lastObservationRunId);
     dom.gameOver.hidden = false;
-    // Freeze the loop but keep the final frame visible behind the overlay.
-    if (this.match) this.match.stop();
+    // Freeze a resolved live match behind the overlay. A replay result is only a timeline
+    // milestone; its viewer and seek controls remain usable after the score screen is dismissed.
+    if (this.match && !this.match.replayViewer) this.match.stop();
   }
 
   invalidatePendingMatchStart() {

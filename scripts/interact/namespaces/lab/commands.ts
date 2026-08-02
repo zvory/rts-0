@@ -208,6 +208,7 @@ async function exportArtifact(workspaceRoot: string, session: InteractSession, {
   if (bytes.length > INTERACT_LIMITS.maxArtifactBytes) {
     throw new InteractError("artifactTooLarge", "Artifact exceeds the 8 MiB local file bound.");
   }
+  fs.mkdirSync(directory, { recursive: true });
   const artifactPath = path.join(directory, `${artifactId}.${kind}.json`);
   const sidecarPath = path.join(directory, `${artifactId}.aliases.json`);
   const aliases = [...session.aliases].map(([alias, id]) => ({ alias, id }));

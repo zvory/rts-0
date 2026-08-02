@@ -81,7 +81,7 @@ pub(super) struct RoomTask {
     match_player_count: usize,
     /// Number of human (non-AI) players the in-progress match started with. `0` outside a match.
     match_human_count: usize,
-    /// Connected human players who already received a terminal score screen for the active match.
+    /// Connections that already received the terminal score screen for the active match or replay.
     outcome_sent: HashSet<u32>,
     /// In replay branch live matches, connected ids differ from original replay player ids.
     branch_live_seat_by_connection: HashMap<u32, u32>,

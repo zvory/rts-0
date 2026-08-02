@@ -767,8 +767,15 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     const endedMatch = { stop() { stopped += 1; }, destroy() { destroyed += 1; } };
     assert(app.completeMatchStart(endedMatch, 3) && app.match === endedMatch && stopped === 1,
       "a match that ends during renderer startup attaches in a stopped state");
+    const endedReplay = {
+      replayViewer: true,
+      stop() { stopped += 1; },
+      destroy() { destroyed += 1; },
+    };
+    assert(app.completeMatchStart(endedReplay, 3) && app.match === endedReplay && stopped === 1,
+      "an ended replay stays interactive when its renderer finishes starting");
     const staleMatch = { stop() { stopped += 1; }, destroy() { destroyed += 1; } };
-    assert(!app.completeMatchStart(staleMatch, 2) && destroyed === 1 && app.match === endedMatch,
+    assert(!app.completeMatchStart(staleMatch, 2) && destroyed === 1 && app.match === endedReplay,
       "a stale renderer startup destroys its match without replacing the current match");
   }
   {
@@ -781,7 +788,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     // The server sends gameOver before the replay start message flips this state.
     app.inReplayPlayback = false;
     app.audio = { play() {} };
-    app.match = { stop() {} };
+    let stopped = 0;
+    app.match = { stop() { stopped += 1; } };
     app.lastObservationRunId = "";
     app.renderScoreboard = () => {};
     app.renderObservationId = () => {};
@@ -796,6 +804,16 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     });
     assert(dom.gameOverText.textContent === "Alex has won",
       "a spectator result names the winner before the replay start message arrives");
+    assert(stopped === 1, "a resolved live match freezes behind its score screen");
+    app.match = { replayViewer: true, stop() { stopped += 1; } };
+    app.onGameOver({
+      you: "draw",
+      winnerId: 7,
+      winnerTeamId: 1,
+      scores: [{ id: 7, teamId: 1, name: "Alex" }],
+    });
+    assert(stopped === 1,
+      "an end-of-replay result leaves playback rendering active for later timeline seeks");
     dom.gameOver = previousGameOver;
     dom.gameOverText = previousGameOverText;
   }

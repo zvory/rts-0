@@ -148,7 +148,7 @@ pub(super) fn fanout_replay_snapshots(
     projection_policy: ProjectionPolicy,
     session: &ReplaySession,
     recipients: impl IntoIterator<Item = u32>,
-    per_player_events: &mut HashMap<u32, Vec<Event>>,
+    per_player_events: &HashMap<u32, Vec<Event>>,
     scheduler_lag: Duration,
     tick_budget: Duration,
     tick_start: StdInstant,

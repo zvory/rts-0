@@ -84,7 +84,7 @@ impl SnapshotProjection {
     pub(super) fn snapshot_with_events(
         &self,
         game: &Game,
-        per_player_events: &mut HashMap<u32, Vec<Event>>,
+        per_player_events: &HashMap<u32, Vec<Event>>,
         full_vision_events: &[Event],
     ) -> Snapshot {
         let mut snapshot = match &self.body {
@@ -98,8 +98,8 @@ impl SnapshotProjection {
 
         match &self.events {
             EventProjection::PlayerOnly { player_id } => {
-                if let Some(mut events) = per_player_events.remove(player_id) {
-                    snapshot.events.append(&mut events);
+                if let Some(events) = per_player_events.get(player_id) {
+                    snapshot.events.extend(events.iter().cloned());
                 }
             }
             EventProjection::FullVision {
@@ -318,6 +318,7 @@ pub(super) fn selection_from_observer_view(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rts_sim::game::PlayerInit;
 
     #[test]
     fn all_selection_maps_to_player_union_and_omniscient_remains_distinct() {
@@ -456,6 +457,58 @@ mod tests {
         assert_eq!(
             lab.observer_analysis_audience(),
             ObserverAnalysisAudience::None
+        );
+    }
+
+    #[test]
+    fn combat_events_survive_active_player_projection_for_later_spectators() {
+        let players = [
+            PlayerInit {
+                id: 1,
+                team_id: 1,
+                faction_id: "kriegsia".to_string(),
+                name: "One".to_string(),
+                color: "#cc1111".to_string(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                team_id: 2,
+                faction_id: "kriegsia".to_string(),
+                name: "Two".to_string(),
+                color: "#1133bb".to_string(),
+                is_ai: false,
+            },
+        ];
+        let game = Game::new(&players, 0x5150_3006);
+        let attack = Event::Attack {
+            from: 10,
+            to: 20,
+            reveal: None,
+            to_pos: None,
+            weapon_kind: None,
+        };
+        let per_player_events = HashMap::from([(1, vec![attack.clone()])]);
+        let full_vision_events = union_events(per_player_events.values());
+
+        let player = SnapshotProjection::player_fog(1, SnapshotOptions::default())
+            .snapshot_with_events(&game, &per_player_events, &full_vision_events);
+        let spectator = SnapshotProjection::observer(
+            ObserverView::Players(vec![1, 2]),
+            SnapshotOptions::default(),
+            false,
+        )
+        .snapshot_with_events(&game, &per_player_events, &full_vision_events);
+
+        assert!(player.events.contains(&attack));
+        assert_eq!(
+            spectator
+                .events
+                .iter()
+                .filter(|event| **event == attack)
+                .count(),
+            1,
+            "spectator should receive player one's attack after active-player delivery"
         );
     }
 }

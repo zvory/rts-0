@@ -56,6 +56,14 @@ or the PR helper classified the branch as pure Markdown (`.md`) and intentionall
 not a substitute for the full test gate. The owned PR body keeps the pass or skip summary, issues
 found, changes made, verification, and remaining concerns for post-merge audit.
 
+CI requires the `adversarial-quality-pass` status on the final PR head. The normal source is
+`scripts/adversarial-quality-pass.mjs`, run by `scripts/agent-pr.sh`, which requires Codex for
+non-Markdown branches. Manual verification is only a fallback when that helper cannot own the
+branch/status flow. In that case, inspect `origin/main..HEAD`, run focused checks, check for local
+state that could mask CI behavior, fix blockers, post the status, and record the evidence in the PR
+body. PR #1283 used this fallback after manual review found a Schone Tage map/test mismatch hidden by
+an untracked duplicate map asset.
+
 When the Rust job is slow, use the ordinary job log first: the Rust context lines show
 `CARGO_TARGET_DIR`, Rust/cargo/nextest versions, and the Actions Cargo cache exact-hit result,
 while the `tests/run-all.sh` timing summary and nextest output show whether time was spent

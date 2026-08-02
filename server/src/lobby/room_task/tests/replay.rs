@@ -819,6 +819,96 @@ fn persisted_replay_room_join_waits_in_spectator_lobby() {
 }
 
 #[test]
+fn replay_end_sends_frozen_score_result_once() {
+    let players = replay_test_players(2);
+    let (game, mut artifact) = replay_test_artifact(&players, 1);
+    artifact.winner_id = Some(players[0].id);
+    artifact.winner_team_id = Some(players[0].team_id);
+    artifact.final_scores = game.scores();
+    let replay = ReplaySession::new(artifact).unwrap();
+    let mut task = RoomTask::new(
+        "replay-score-screen-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_spectator(&mut task, 99);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    task.on_tick_replay_viewer(TokioInstant::now());
+
+    let results: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+        .filter(|message| matches!(message, ServerMessage::GameOver { .. }))
+        .collect();
+    assert!(matches!(
+        results.as_slice(),
+        [ServerMessage::GameOver {
+            winner_id: Some(winner_id),
+            winner_team_id: Some(winner_team_id),
+            you,
+            scores,
+        }] if *winner_id == players[0].id
+            && *winner_team_id == players[0].team_id
+            && you == "draw"
+            && scores == &game.scores()
+    ));
+
+    task.on_tick_replay_viewer(TokioInstant::now());
+    assert!(
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .all(|message| !matches!(message, ServerMessage::GameOver { .. })),
+        "an ended replay should not resend its result every room tick"
+    );
+
+    task.on_seek_room_time_to(99, 0);
+    while matches!(&task.phase, Phase::ReplayViewer(session) if session.is_seeking()) {
+        task.on_tick_replay_viewer(TokioInstant::now());
+    }
+    task.on_tick_replay_viewer(TokioInstant::now());
+    assert!(
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .all(|message| !matches!(message, ServerMessage::GameOver { .. })),
+        "replaying the final tick after a seek should not resend the result to existing viewers"
+    );
+}
+
+#[test]
+fn replay_that_starts_at_its_final_tick_sends_frozen_score_result() {
+    let players = replay_test_players(2);
+    let (game, mut artifact) = replay_test_artifact(&players, 0);
+    artifact.winner_id = Some(players[0].id);
+    artifact.winner_team_id = Some(players[0].team_id);
+    artifact.final_scores = game.scores();
+    let replay = ReplaySession::new(artifact).unwrap();
+    let mut task = RoomTask::new(
+        "already-ended-replay-score-screen-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_spectator(&mut task, 99);
+
+    task.transition_to_replay_viewer(replay);
+
+    assert!(
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).any(|message| matches!(
+            message,
+            ServerMessage::GameOver {
+                winner_id: Some(winner_id),
+                winner_team_id: Some(winner_team_id),
+                you,
+                scores,
+            } if winner_id == players[0].id
+                && winner_team_id == players[0].team_id
+                && you == "draw"
+                && scores == game.scores()
+        ))
+    );
+}
+
+#[test]
 fn persisted_replay_room_host_start_begins_replay_viewer() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 3);
@@ -1027,6 +1117,7 @@ fn post_match_replay_join_prompts_before_attaching_viewer() {
 fn confirmed_late_replay_join_receives_current_ended_state_immediately() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 3);
+    let expected_scores = artifact.final_scores.clone();
     let mut replay = ReplaySession::new(artifact).unwrap();
     let end_tick = replay.duration_ticks;
     replay.rebuild_to(end_tick).unwrap();
@@ -1061,6 +1152,14 @@ fn confirmed_late_replay_join_receives_current_ended_state_immediately() {
     assert_eq!(snapshot.tick, end_tick);
     let analysis = take_observer_analysis(&writer, "late ended replay join");
     assert_eq!(analysis.tick, end_tick);
+    assert!(matches!(
+        writer.reliable_rx.try_recv().unwrap(),
+        ServerMessage::GameOver {
+            you,
+            scores,
+            ..
+        } if you == "draw" && scores == expected_scores
+    ));
 }
 
 #[test]

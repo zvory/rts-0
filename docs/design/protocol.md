@@ -638,6 +638,10 @@ lobby browser as an active replay. New viewers join the existing shared cursor a
 current start metadata, room-time state, snapshot, and observer analysis immediately, including
 when playback is already at its final tick.
 
+When replay playback first reaches its final tick, including through a seek, the server sends the
+artifact's frozen `gameOver` result to every viewer with the neutral spectator verdict `draw`.
+Late viewers joining an already-ended replay receive that result with the current replay state.
+
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload
 at tick 0 plus `roomTimeState`. Post-match replay defaults every viewer to all active players'

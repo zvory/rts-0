@@ -2,7 +2,7 @@ use super::reconstruction::contain_reconstruction;
 use super::replay_validation;
 use super::{normalize_start_team_id, ReplayBranchSeed, MAX_PLAYERS};
 use crate::protocol::{
-    Event, ReplayBranchSeat, ReplayStartMetadata, RoomTimeSeekState, RoomTimeState,
+    Event, ReplayBranchSeat, ReplayStartMetadata, RoomTimeSeekState, RoomTimeState, ServerMessage,
     VisionSelectionRequest,
 };
 use rts_sim::game::command::SimCommand;
@@ -373,6 +373,15 @@ impl ReplaySession {
 
     pub(super) fn has_remaining_ticks(&self) -> bool {
         self.current_tick() < self.duration_ticks
+    }
+
+    pub(super) fn result_message(&self) -> ServerMessage {
+        ServerMessage::GameOver {
+            winner_id: self.artifact.winner_id,
+            winner_team_id: self.artifact.winner_team_id,
+            you: "draw".to_string(),
+            scores: self.artifact.final_scores.clone(),
+        }
     }
 
     pub(super) fn current_tick(&self) -> u32 {
