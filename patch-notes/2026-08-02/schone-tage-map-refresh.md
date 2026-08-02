@@ -6,5 +6,5 @@ _2026-08-02_
 
 ## Changes
 
-- Schone Tage's third bases moved farther out and central/lower expansions were reduced.
-- The lower half and starting bases now have more road coverage.
+- Schone Tage's third bases moved farther out, with total bases reduced from 10 to 8.
+- The lower half and starting bases now have more road coverage, increasing lower-half passable area by roughly 25%.
