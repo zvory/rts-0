@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "status": "unapproved concept exploration",
+  "runtime": {
+    "enabled": false,
+    "references": []
+  },
+  "generation": {
+    "provenanceStatus": "incomplete",
+    "generator": null,
+    "model": null,
+    "settings": null,
+    "exactPrompt": null,
+    "sourceInputs": [],
+    "promptSummary": "client/assets/rigs/command-car-concepts-pass-01/metadata/prompt-summary.md"
+  },
+  "concepts": [
+    {
+      "id": "open-staff-car",
+      "silhouette": "compact open staff car",
+      "asset": "client/assets/rigs/command-car-concepts-pass-01/generated/command-car-concept-a-open-staff-car.png"
+    },
+    {
+      "id": "radio-roadster",
+      "silhouette": "compact radio roadster",
+      "asset": "client/assets/rigs/command-car-concepts-pass-01/generated/command-car-concept-b-radio-roadster.png"
+    },
+    {
+      "id": "officer-sidecar",
+      "silhouette": "officer motorcycle with sidecar",
+      "asset": "client/assets/rigs/command-car-concepts-pass-01/generated/command-car-concept-c-officer-sidecar.png"
+    },
+    {
+      "id": "signals-sidecar",
+      "silhouette": "signals motorcycle with sidecar",
+      "asset": "client/assets/rigs/command-car-concepts-pass-01/generated/command-car-concept-d-signals-sidecar.png"
+    }
+  ]
+}
