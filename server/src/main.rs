@@ -43,7 +43,7 @@ use rts_server::lab_scenarios::{catalog_handler, MAX_LAB_SCENARIO_IMPORT_JSON_BY
 use rts_server::lobby::{self, send_room_event, Lobby, RoomEvent};
 use rts_server::protocol::{ClientMessage, ServerMessage};
 use rts_server::structured_log;
-use rts_sim::game::map::Map;
+use rts_sim::game::map::{Map, CURRENT_MAP_VERSION};
 use rts_sim::game::replay::{self, ReplayArtifactV1};
 use rts_sim::perf;
 
@@ -1639,11 +1639,11 @@ struct MapCatalogResponse {
 
 fn map_catalog_entry(file: String, json: &str) -> Option<MapCatalogEntry> {
     let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
-    if !value
+    if value
         .get("version")
         .and_then(|v| v.as_u64())
         .and_then(|v| u32::try_from(v).ok())
-        .is_some_and(Map::supports_authored_schema_version)
+        != Some(CURRENT_MAP_VERSION)
     {
         return None;
     }

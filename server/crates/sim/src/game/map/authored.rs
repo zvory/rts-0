@@ -6,7 +6,7 @@ mod assignment;
 
 use super::{
     AuthoredMapData, BaseResourceCounts, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES,
-    BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION, LEGACY_SQUARE_MAP_VERSION,
+    BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
@@ -26,7 +26,7 @@ pub(super) fn schema_version(json: &str) -> Result<u32, String> {
 pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
     let authored: AuthoredMap =
         serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
-    if !supported_schema_version(authored.version) {
+    if authored.version != CURRENT_MAP_VERSION {
         return Err(format!(
             "map schema version {} is not supported; server requires version {CURRENT_MAP_VERSION}",
             authored.version
@@ -72,27 +72,17 @@ pub(super) fn load_for_players(
 pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMapData, String> {
     let authored: AuthoredMap =
         serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
-    if !supported_schema_version(authored.version) {
+    if authored.version != CURRENT_MAP_VERSION {
         return Err(format!(
             "map schema version {} is not supported; server requires version {CURRENT_MAP_VERSION}",
             authored.version
         ));
     }
     let (width, height, terrain) = parse_terrain(&authored.terrain)?;
-    match authored.version {
-        CURRENT_MAP_VERSION => {
-            if authored.width != Some(width) || authored.height != Some(height) {
-                return Err(format!(
-                    "map width/height must match the {width}x{height} terrain grid"
-                ));
-            }
-        }
-        LEGACY_SQUARE_MAP_VERSION => {
-            if width != height {
-                return Err("legacy version 4 terrain must be square".to_string());
-            }
-        }
-        _ => unreachable!("schema version was checked above"),
+    if authored.width != width || authored.height != height {
+        return Err(format!(
+            "map width/height must match the {width}x{height} terrain grid"
+        ));
     }
     let start_locations =
         parse_locations(width, height, &authored.start_locations, "startLocations")?;
@@ -158,10 +148,8 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
 struct AuthoredMap {
     version: u32,
     name: String,
-    #[serde(default)]
-    width: Option<u32>,
-    #[serde(default)]
-    height: Option<u32>,
+    width: u32,
+    height: u32,
     #[allow(dead_code)]
     description: String,
     #[allow(dead_code)]
@@ -170,10 +158,6 @@ struct AuthoredMap {
     terrain: Vec<String>,
     start_locations: Vec<AuthoredLocation>,
     base_sites: Vec<AuthoredBaseSite>,
-}
-
-fn supported_schema_version(version: u32) -> bool {
-    Map::supports_authored_schema_version(version)
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

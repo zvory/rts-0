@@ -30,7 +30,6 @@ pub use rts_protocol::AvailableMap;
 
 /// The only map schema version this server accepts. Bump when the schema changes incompatibly.
 pub const CURRENT_MAP_VERSION: u32 = 5;
-const LEGACY_SQUARE_MAP_VERSION: u32 = 4;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -80,12 +79,6 @@ pub struct MapMetadata {
 }
 
 impl Map {
-    /// Whether the server can parse this authored-map schema version. Version 4 remains a
-    /// temporary square-map compatibility input while bundled maps migrate to version 5.
-    pub fn supports_authored_schema_version(version: u32) -> bool {
-        version == CURRENT_MAP_VERSION || version == LEGACY_SQUARE_MAP_VERSION
-    }
-
     /// Load the deterministic handcrafted map for `player_count` players.
     ///
     /// The `seed` selects and shuffles from fixed authored start locations, so the human/AI
@@ -354,7 +347,7 @@ fn default_available_map() -> AvailableMap {
 fn available_map_from_json(stem: &str, json: &str) -> Option<AvailableMap> {
     let v = serde_json::from_str::<serde_json::Value>(json).ok()?;
     let version = v.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
-    if !u32::try_from(version).is_ok_and(Map::supports_authored_schema_version) {
+    if u32::try_from(version).ok() != Some(CURRENT_MAP_VERSION) {
         return None;
     }
     let name = v
@@ -633,6 +626,8 @@ mod tests {
             r#"{
               "version": 99,
               "name": "future",
+              "width": 2,
+              "height": 1,
               "description": "a future map",
               "_design": "n/a",
               "terrain": [".."],
@@ -647,12 +642,36 @@ mod tests {
     }
 
     #[test]
-    fn authored_map_rejects_unknown_terrain_characters() {
+    fn authored_map_rejects_legacy_square_schema() {
         let err = Map::from_authored_json(
             1,
             r#"{
               "version": 4,
+              "name": "legacy",
+              "width": 2,
+              "height": 2,
+              "description": "legacy square map",
+              "_design": "n/a",
+              "terrain": ["..", ".."],
+              "startLocations": [{"x": 0, "y": 0}],
+              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}]
+            }"#,
+            0,
+        )
+        .expect_err("version 4 should be rejected");
+
+        assert!(err.contains("not supported"), "error was: {err}");
+    }
+
+    #[test]
+    fn authored_map_rejects_unknown_terrain_characters() {
+        let err = Map::from_authored_json(
+            1,
+            r#"{
+              "version": 5,
               "name": "bad",
+              "width": 2,
+              "height": 2,
               "description": "bad map",
               "_design": "n/a",
               "terrain": ["..", ".x"],
@@ -673,8 +692,10 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 4,
+              "version": 5,
               "name": "bad-base",
+              "width": 32,
+              "height": 32,
               "description": "bad base map",
               "_design": "n/a",
               "terrain": {},
@@ -696,8 +717,10 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 4,
+              "version": 5,
               "name": "road-base",
+              "width": 32,
+              "height": 32,
               "description": "road through a base",
               "_design": "n/a",
               "terrain": {},
