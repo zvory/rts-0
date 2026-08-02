@@ -61,8 +61,9 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
       }
     }
   }
-  drawRoadMarking(ctx, code, x, y, textureTileSize);
   drawGroundTransitions(ctx, map, tx, ty, code, textureTileSize);
+  // Markings belong to the road surface and must remain legible above edge dither.
+  drawRoadMarking(ctx, code, x, y, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
 }
 

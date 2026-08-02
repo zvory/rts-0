@@ -19,6 +19,7 @@ export interface ServiceInput extends JsonObject {
   map?: string;
   seed?: string | number;
   scenario?: string;
+  visualProfile?: string;
   id?: string;
   unit?: string;
   count?: number;

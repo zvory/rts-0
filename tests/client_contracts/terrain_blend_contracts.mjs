@@ -59,3 +59,14 @@ drawTerrainTile(repeated, blendMap, 0, 0, 8);
 drawTerrainTile(uniform, { width: 2, height: 1, terrain: [TERRAIN.ROAD_BARE, TERRAIN.ROAD_BARE] }, 0, 0, 8);
 assert(JSON.stringify(first.calls) === JSON.stringify(repeated.calls), "stochastic terrain blending is deterministic");
 assert(first.calls.length > uniform.calls.length, "distinct ground materials receive an opaque stochastic transition mask");
+
+const markedRoad = new TerrainContext();
+drawTerrainTile(markedRoad, {
+  width: 1,
+  height: 2,
+  terrain: [TERRAIN.ROAD_HORIZONTAL, TERRAIN.GRASS],
+}, 0, 0, 8);
+assert(
+  JSON.stringify(markedRoad.calls.at(-1)) === JSON.stringify(["rect", 0, 3, 8, 1]),
+  "road markings remain legible above neighboring terrain transition pixels",
+);

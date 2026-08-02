@@ -121,7 +121,8 @@ interface DriverOptions {
   mode?: "lab" | "game" | "scenario";
   map?: string;
   seed?: string;
-  scenario?: string; visualProfile?: string;
+  scenario?: string;
+  visualProfile?: string;
   devScenario?: { id: string; unit: string; count: number; blocker: string; case: string };
   opponent?: string;
   spectate?: string[] | null; autoSpectator?: boolean;
@@ -199,7 +200,8 @@ export class InteractDriver {
     mode = "lab",
     map,
     seed = "",
-    scenario = "blank", visualProfile = "",
+    scenario = "blank",
+    visualProfile = "",
     devScenario = { id: "", unit: "", count: 1, blocker: "", case: "" },
     opponent = "ai_2_1",
     spectate = null, autoSpectator = false,
