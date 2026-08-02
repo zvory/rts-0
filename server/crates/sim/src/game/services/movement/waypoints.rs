@@ -434,10 +434,11 @@ pub(super) fn advance_moving_units(
         };
 
         if let Some(e) = entities.get_mut(id) {
-            e.pos_x = x.clamp(0.0, map.world_width_px() - 0.01);
-            e.pos_y = y.clamp(0.0, map.world_height_px() - 0.01);
-            e.set_movement_delta(e.pos_x - orig_x, e.pos_y - orig_y);
-            let moved_by_path = distance_between((orig_x, orig_y), (e.pos_x, e.pos_y)) > 0.01;
+            let next_x = x.clamp(0.0, map.world_width_px() - 0.01);
+            let next_y = y.clamp(0.0, map.world_height_px() - 0.01);
+            e.set_position(next_x, next_y);
+            e.set_movement_delta(next_x - orig_x, next_y - orig_y);
+            let moved_by_path = distance_between((orig_x, orig_y), (next_x, next_y)) > 0.01;
             let rotated_by_path = new_facing
                 .map(|facing| angle_delta(original_facing, facing).abs() > 1.0e-4)
                 .unwrap_or(false);

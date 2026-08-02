@@ -246,15 +246,13 @@ pub(crate) fn resolve_collisions(
 
                 if let Some((nax, nay)) = a_push {
                     if let Some(e) = entities.get_mut(a) {
-                        e.pos_x = nax.clamp(0.0, world_max_x);
-                        e.pos_y = nay.clamp(0.0, world_max_y);
+                        e.set_position(nax.clamp(0.0, world_max_x), nay.clamp(0.0, world_max_y));
                         moved_any = true;
                     }
                 }
                 if let Some((nbx, nby)) = b_push {
                     if let Some(e) = entities.get_mut(b) {
-                        e.pos_x = nbx.clamp(0.0, world_max_x);
-                        e.pos_y = nby.clamp(0.0, world_max_y);
+                        e.set_position(nbx.clamp(0.0, world_max_x), nby.clamp(0.0, world_max_y));
                         moved_any = true;
                     }
                 }
