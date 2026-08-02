@@ -12,7 +12,7 @@ const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Ch
 
 export function parseClientFlameGraphArgs(argv) {
   const options = {
-    workload: "supply-300-hellhole-stream",
+    workload: "fixed-roster-hellhole-stream",
     seconds: 15,
     intervalUs: 500,
     outputRoot: DEFAULT_OUTPUT_ROOT,
@@ -79,7 +79,7 @@ Captures a steady-state V8 CPU profile through the client performance harness, w
 JSON summary plus SVG/PNG flame graphs, and optionally publishes the PNG to Tailnet Preview.
 
 Options:
-  --workload <id>       Workload to profile. Default: supply-300-hellhole-stream.
+  --workload <id>       Workload to profile. Default: fixed-roster-hellhole-stream.
   --seconds <n>         Steady-state sample duration. Default: 15.
   --interval-us <n>     V8 sampling interval, 100-100000 microseconds. Default: 500.
   --cpu-throttle <n>    Chrome CPU throttle factor. Default: 1.

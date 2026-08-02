@@ -20,7 +20,7 @@ export function parseClientRenderParityArgs(argv) {
   const options = {
     baselineWorktree: "",
     candidateWorktree: "",
-    workload: "supply-300-hellhole-stream",
+    workload: "fixed-roster-hellhole-stream",
     seed: "framewins-phase-1",
     tickFile: "",
     samples: 16,
@@ -722,7 +722,7 @@ Required:
   --candidate-worktree <path>  Candidate worktree.
 
 Options:
-  --workload <id>              Snapshot-stream workload (default supply-300-hellhole-stream).
+  --workload <id>              Snapshot-stream workload (default fixed-roster-hellhole-stream).
   --seed <text>                Deterministic tick-selection seed.
   --tick-file <json>           Explicit tick array, replacing seeded selection.
   --samples <n>                Unique seeded ticks (default 16).

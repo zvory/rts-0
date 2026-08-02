@@ -21,7 +21,7 @@ RUN ./scripts/build-sim-wasm.sh \
     && test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/vendor/sim-wasm/rts_sim_wasm_bg.wasm
 
-RUN test -s ./client/assets/snapshot-streams/supply-300-hellhole.rtsstream \
+RUN test -s ./client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream \
     && test -s ./client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png \
     && test -s ./client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png \
     && test -s ./client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png \

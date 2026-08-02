@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { collectReviewInputs, excludedRawPaths, renderReviewInputManifest } from "./review-inputs.mjs";
 
 const DEFAULT_BASE_REF = "origin/main";
 const DEFAULT_CONTEXT = "adversarial-quality-pass";
@@ -132,7 +133,8 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
-export function renderPrompt({ baseRef, headRef }) {
+export function renderPrompt({ baseRef, headRef, reviewInputs = [] }) {
+  const exclusions = excludedRawPaths(reviewInputs);
   return `You are the final autonomous quality pass for this branch.
 
 Assume no human will review this and no further agent will clean it up. Your job is to leave the
@@ -141,7 +143,16 @@ best final system you can.
 Use the provided clean branch worktree. The outer helper handles pushing and PR creation after you
 return; do not run PR lifecycle helpers yourself.
 
-Review the diff from ${baseRef} to ${headRef}.
+Review the human-authored parts of the diff from ${baseRef} to ${headRef}. Generated, binary, and
+oversized artifacts are deliberately represented only by bounded metadata below. Do not print,
+decode, cat, git-show, or git-diff their raw contents. Review their generators, source inputs,
+tests, and compact metadata instead.
+
+Changed-path metadata:
+${renderReviewInputManifest(reviewInputs)}
+
+Raw-content exclusions:
+${exclusions.length ? exclusions.join("\n") : "<none>"}
 
 AI behavior is outside your authority: do not create, alter, or approve it. Refactor AI code only
 when behavior is preserved exactly.
@@ -179,7 +190,7 @@ Return JSON with:
 `;
 }
 
-export function buildCodexArgs({ repoRoot, gitCommonDir = "", schemaFile, reportFile, codexModel, prompt }) {
+export function buildCodexArgs({ repoRoot, gitCommonDir = "", schemaFile, reportFile, codexModel }) {
   const args = [
     "exec",
     "--cd",
@@ -202,7 +213,9 @@ export function buildCodexArgs({ repoRoot, gitCommonDir = "", schemaFile, report
   if (codexModel) {
     args.push("--model", codexModel);
   }
-  args.push(prompt);
+  // Keep the prompt and bounded changed-path manifest off the process command line. This avoids
+  // operating-system argument limits on large branches and matches the specialist-pass boundary.
+  args.push("-");
   return args;
 }
 
@@ -360,7 +373,8 @@ class Runner {
     const result = spawnSync(command, args, {
       cwd: options.cwd,
       env: { ...process.env, ...this.env, ...(options.env || {}) },
-      stdio: "inherit",
+      input: options.input,
+      stdio: options.input === undefined ? "inherit" : ["pipe", "inherit", "inherit"],
     });
     if (result.error) throw result.error;
     if (result.status !== 0) {
@@ -458,17 +472,22 @@ class Runner {
     });
     const reportFile = options.reportFile || path.join(os.tmpdir(), `rts-adversarial-quality-pass-${process.pid}.json`);
     const gitCommonDir = this.gitCommonDir(repoRoot);
-    const prompt = renderPrompt({ baseRef: options.baseRef, headRef: "HEAD" });
-    const codexArgs = buildCodexArgs({
-      repoRoot,
-      gitCommonDir,
-      schemaFile: options.schemaFile,
-      reportFile,
-      codexModel: options.codexModel,
-      prompt,
-    });
+    const buildReviewInvocation = () => {
+      const reviewInputs = collectReviewInputs({ repoRoot, baseRef: options.baseRef });
+      return {
+        prompt: renderPrompt({ baseRef: options.baseRef, headRef: "HEAD", reviewInputs }),
+        codexArgs: buildCodexArgs({
+          repoRoot,
+          gitCommonDir,
+          schemaFile: options.schemaFile,
+          reportFile,
+          codexModel: options.codexModel,
+        }),
+      };
+    };
 
     if (options.dryRun) {
+      const { prompt, codexArgs } = buildReviewInvocation();
       this.log(`quality-pass: would run ${options.codexCommand} ${codexArgs.map(shellQuote).join(" ")}`);
       if (options.push) {
         this.log(`quality-pass: would push HEAD to ${options.remote}/${headBranch}`);
@@ -487,10 +506,17 @@ class Runner {
     if (options.fetchBase) {
       this.gitInherit(buildFetchArgs({ remote: options.remote, baseRef: options.baseRef }), repoRoot);
     }
+    // Collect after fetching so metadata, exclusions, and the base ref inspected by Codex all
+    // describe the same repository state.
+    const { prompt, codexArgs } = buildReviewInvocation();
     const beforeHead = this.git(["rev-parse", "HEAD"], repoRoot);
 
     this.log(`quality-pass: running Codex final quality pass for ${headBranch}`);
-    this.runInherit(options.codexCommand, codexArgs, { cwd: repoRoot, env: { [QUALITY_PASS_ENV]: "1" } });
+    this.runInherit(options.codexCommand, codexArgs, {
+      cwd: repoRoot,
+      env: { [QUALITY_PASS_ENV]: "1" },
+      input: prompt,
+    });
     this.assertPatchNotesUnchanged(repoRoot, beforeHead);
     if (!fs.existsSync(reportFile)) {
       throw new Error(`quality pass did not write report file: ${reportFile}`);

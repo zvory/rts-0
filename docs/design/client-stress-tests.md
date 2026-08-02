@@ -5,11 +5,15 @@ This document owns the cross-file contract for the shareable client-only Hellhol
 
 ## Route and workload
 
-`/stress-test` automatically launches the checked-in `supply-300-hellhole.rtsstream` through
+`/stress-test` automatically launches the checked-in `fixed-roster-hellhole.rtsstream` through
 `SnapshotStreamNet`. It uses the normal snapshot decode, `GameState`, `Match`, Pixi module worker, fog, HUD,
 minimap, and animation-frame paths, but never opens a WebSocket or runs a server simulation.
-The canonical recording starts with 420 projected entities: the 300-supply 2v2 armies and structures
+The canonical recording starts with 389 projected entities: the fixed 77-unit-per-player 2v2 armies and structures
 plus Player 1's 120 map-wide, deterministically scattered Tank Traps.
+The roster is an authored mix—1 Worker, 1 Golem, 8 Riflemen, 8 Machine Gunners, 8 Panzerfausts,
+8 Anti-Tank Guns, 8 Mortar Teams, 1 Artillery, 9 Scout Cars, 16 Tanks, and 9 Command Cars per
+player. Supply costs are not an input to composition, so balance changes cannot silently alter the
+unit count or ratio used for performance comparisons.
 `?label=<text>` adds a bounded human label to every artifact. `?seconds=<2..25>` exists for local
 iteration; the shareable default is five seconds after a three-second warmup. The cap keeps the
 measurement inside the finite 30-second recording.

@@ -64,7 +64,7 @@ that are not actually live.
 
 ## Canonical workload findings
 
-Use only `supply-300-hellhole-stream` for supply-scale client renderer comparisons. It exercises the
+Use only `fixed-roster-hellhole-stream` for fixed-roster client renderer comparisons. It exercises the
 ordinary client-only decode, state, presentation, Pixi, fog, HUD, minimap, and animation-frame paths
 without a WebSocket or server simulation.
 

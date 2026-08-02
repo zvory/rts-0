@@ -1,12 +1,9 @@
-//! Canonical constants and deterministic geometry for the Supply 300 Hellhole workload.
+//! Canonical constants and deterministic geometry for the fixed-roster Hellhole workload.
 
-use rts_protocol::DEFAULT_FACTION_ID;
 use rts_rules::balance::{TANK_BODY_CLEARANCE_PX, TANK_BODY_LENGTH_PX, TANK_BODY_WIDTH_PX};
-use rts_rules::economy::supply_cost;
-use rts_rules::faction::catalog_for;
 use rts_sim::game::entity::EntityKind;
 
-pub const SCENARIO_ID: &str = "supply-300-hellhole";
+pub const SCENARIO_ID: &str = "fixed-roster-hellhole";
 pub const SEED: u32 = 0x5a00_0300;
 pub const TILE: f32 = 32.0;
 pub const CENTER_TILE: i32 = 63;
@@ -22,10 +19,28 @@ pub const RESPAWN_CANDIDATE_COLUMNS: usize = 28;
 pub const RESPAWN_CANDIDATE_ROWS: usize = 18;
 pub const RESPAWN_CANDIDATE_LIMIT: usize = RESPAWN_CANDIDATE_COLUMNS * RESPAWN_CANDIDATE_ROWS;
 
-const TARGET_SUPPLY: u32 = 300;
 const RESPAWN_CANDIDATE_GAP_PX: f32 = 2.0;
 
-pub fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
+/// Stable per-army unit mix for performance comparisons.
+///
+/// These authored counts, rather than current balance supply costs, own the benchmark load. A
+/// normal supply rebalance must therefore leave entity count, terrain, checkpoint, and stream
+/// inputs unchanged.
+pub const FIXED_ROSTER_COUNTS: &[(EntityKind, usize)] = &[
+    (EntityKind::Worker, 1),
+    (EntityKind::Golem, 1),
+    (EntityKind::Rifleman, 8),
+    (EntityKind::MachineGunner, 8),
+    (EntityKind::Panzerfaust, 8),
+    (EntityKind::AntiTankGun, 8),
+    (EntityKind::MortarTeam, 8),
+    (EntityKind::Artillery, 1),
+    (EntityKind::ScoutCar, 9),
+    (EntityKind::Tank, 16),
+    (EntityKind::CommandCar, 9),
+];
+
+pub fn fixed_roster_composition() -> Vec<EntityKind> {
     let required = [
         EntityKind::Worker,
         EntityKind::Golem,
@@ -39,7 +54,7 @@ pub fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
         EntityKind::Tank,
         EntityKind::CommandCar,
     ];
-    let filler = [
+    let repeated_mix = [
         EntityKind::Tank,
         EntityKind::Tank,
         EntityKind::ScoutCar,
@@ -50,57 +65,21 @@ pub fn composition_300_supply() -> Result<Vec<EntityKind>, String> {
         EntityKind::Rifleman,
         EntityKind::Panzerfaust,
     ];
-    let catalog = catalog_for(DEFAULT_FACTION_ID)
-        .ok_or_else(|| format!("missing faction catalog {DEFAULT_FACTION_ID}"))?;
-    let supply_of = |kind: EntityKind| -> Result<u32, String> {
-        if !kind.is_unit() {
-            return Err(format!(
-                "Hellhole composition contains non-unit kind {kind}"
-            ));
-        }
-        if catalog.allows_unit(kind) {
-            Ok(supply_cost(kind))
-        } else {
-            Ok(0)
-        }
-    };
-    let mut out = required.to_vec();
-    let mut supply = out
-        .iter()
-        .copied()
-        .map(&supply_of)
-        .sum::<Result<u32, _>>()?;
-    if supply > TARGET_SUPPLY {
-        return Err(format!(
-            "Hellhole required composition uses {supply} supply, above target {TARGET_SUPPLY}"
-        ));
-    }
-    let mut index = 0;
-    let mut attempts_without_progress = 0;
-    while supply < TARGET_SUPPLY {
-        let kind = filler[index % filler.len()];
-        index += 1;
-        let cost = supply_of(kind)?;
-        if cost == 0 || supply + cost > TARGET_SUPPLY {
-            attempts_without_progress += 1;
-            if attempts_without_progress == filler.len() {
-                return Err(format!(
-                    "Hellhole composition cannot reach {TARGET_SUPPLY} supply from {supply} with the configured filler units"
-                ));
-            }
-            continue;
-        }
-        out.push(kind);
-        supply += cost;
-        attempts_without_progress = 0;
-    }
-    if out.len() != SHUTTLE_UNIT_COUNT {
-        return Err(format!(
-            "Hellhole 300-supply composition has {} units, expected {SHUTTLE_UNIT_COUNT}",
-            out.len()
-        ));
-    }
-    Ok(out)
+    let tail = [
+        EntityKind::Tank,
+        EntityKind::ScoutCar,
+        EntityKind::CommandCar,
+    ];
+    required
+        .into_iter()
+        .chain(
+            repeated_mix
+                .into_iter()
+                .cycle()
+                .take(repeated_mix.len() * 7),
+        )
+        .chain(tail)
+        .collect()
 }
 
 pub fn shuttle_endpoint(player_id: u32, phase: u32) -> (i32, i32) {
@@ -172,16 +151,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn canonical_composition_keeps_supply_and_unit_count_contracts() {
-        let composition = composition_300_supply().expect("canonical composition");
-        let catalog = catalog_for(DEFAULT_FACTION_ID).expect("default faction catalog");
-        let supply: u32 = composition
-            .iter()
-            .copied()
-            .filter(|kind| catalog.allows_unit(*kind))
-            .map(supply_cost)
-            .sum();
-        assert_eq!(supply, TARGET_SUPPLY);
+    fn canonical_composition_keeps_authored_unit_count_contract() {
+        let composition = fixed_roster_composition();
         assert_eq!(composition.len(), SHUTTLE_UNIT_COUNT);
+        assert!(composition.iter().all(|kind| kind.is_unit()));
+        assert_eq!(
+            FIXED_ROSTER_COUNTS
+                .iter()
+                .map(|(_, count)| count)
+                .sum::<usize>(),
+            77
+        );
+        for &(kind, expected) in FIXED_ROSTER_COUNTS {
+            assert_eq!(
+                composition
+                    .iter()
+                    .filter(|candidate| **candidate == kind)
+                    .count(),
+                expected,
+                "fixed count for {kind}"
+            );
+        }
     }
 }

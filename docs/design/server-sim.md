@@ -620,7 +620,7 @@ rejected because their unfinished scaffolds cannot be refunded safely. Bundled l
 use schema 2 and contain no in-progress construction that needs a receipt backfill.
 
 The canonical Hellhole server benchmark is a direct `Game`-API harness, not a live room. Running
-`scripts/hellhole-perf-harness.sh` restores `supply-300-hellhole`, issues its deterministic Lab
+`scripts/hellhole-perf-harness.sh` restores `fixed-roster-hellhole`, issues its deterministic Lab
 movement commands through the public Lab command seam, replenishes missing central units through a
 single replayable `SpawnEntities` batch before the next tick, calls `tick()`, and produces one
 full-world snapshot through the normal compaction and MessagePack encoding path for every tick. It starts no

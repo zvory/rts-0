@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { collectReviewInputs, excludedRawPaths, renderReviewInputManifest } from "./review-inputs.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDir, "..");
@@ -65,10 +66,12 @@ function run(command, args, options = {}) {
     encoding: "utf8",
     env: { ...process.env, ...(options.env || {}) },
     input: options.input,
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: options.stdio,
   });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(result.stderr?.trim() || result.stdout?.trim() || `${command} exited ${result.status}`);
-  return result.stdout.trim();
+  return result.stdout?.trim() || "";
 }
 
 function git(repoRoot, args) { return run("git", args, { cwd: repoRoot }); }
@@ -238,11 +241,15 @@ export function renderFragment({ branch, date, decision }) {
   return lines.join("\n");
 }
 
-function renderPrompt({ baseRef, branch, changedPaths, existingFragment, fragmentPath }) {
+export function renderPrompt({ baseRef, branch, existingFragment, fragmentPath, reviewInputs }) {
+  const exclusions = excludedRawPaths(reviewInputs);
   return `You are the player-impact and patch-note pass for an RTS pull request.
 
-Inspect the complete repository diff from ${baseRef} to HEAD with read-only git commands, plus any
-relevant repository files needed to classify it using this scope:
+Inspect the human-authored parts of the repository diff from ${baseRef} to HEAD with read-only git
+commands, plus relevant repository files needed to classify it using this scope. Generated,
+binary, and oversized artifacts are deliberately represented only by bounded metadata below. Do
+not print, decode, cat, git-show, or git-diff their raw contents. Review their generators, source
+inputs, tests, and compact metadata instead.
 
 ${PATCH_NOTE_SCOPE}
 
@@ -261,8 +268,11 @@ into ${fragmentPath}. Do not edit files or run state-changing commands; use read
 inspection only.
 
 Branch: ${branch}
-Changed paths:
-${changedPaths.join("\n")}
+Changed-path metadata:
+${renderReviewInputManifest(reviewInputs)}
+
+Raw-content exclusions:
+${exclusions.length ? exclusions.join("\n") : "<none>"}
 
 Existing fragment, if any:
 ${existingFragment || "<none>"}
@@ -436,8 +446,11 @@ export function execute(options) {
   if (!existing && fs.existsSync(fragmentPath)) {
     throw new Error(`refusing to overwrite base-owned patch-note fragment ${relativePath}`);
   }
+  // Building the manifest performs Git object lookups per changed path. Defer it until after the
+  // cheap opt-out and no-candidate exits so those paths stay cheap.
+  const reviewInputs = collectReviewInputs({ repoRoot: options.repoRoot, baseRef: options.baseRef });
   const prompt = renderPrompt({
-    baseRef: options.baseRef, branch, changedPaths,
+    baseRef: options.baseRef, branch, reviewInputs,
     existingFragment: existing ? fs.readFileSync(existing, "utf8") : "", fragmentPath: relativePath,
   });
   if (options.dryRun) {
@@ -456,7 +469,13 @@ export function execute(options) {
   });
   try {
     process.stdout.write(`patch-note-pass: classifying ${candidates.length} gameplay candidate path(s)\n`);
-    run(options.codexCommand, args, { cwd: options.repoRoot, input: prompt });
+    run(options.codexCommand, args, {
+      cwd: options.repoRoot,
+      input: prompt,
+      // The classifier result is read from outputFile. Streaming CLI diagnostics prevents a
+      // verbose agent run from filling spawnSync's capture buffer before that file is written.
+      stdio: ["pipe", "inherit", "inherit"],
+    });
     const decision = normalizeDecision(JSON.parse(fs.readFileSync(outputFile, "utf8")));
     if (decision.decision === "write_patch_note") {
       fs.mkdirSync(path.dirname(fragmentPath), { recursive: true });

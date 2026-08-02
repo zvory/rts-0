@@ -170,7 +170,7 @@ for (const sourceFile of clientRuntimeSourceFiles) {
   }
 }
 const checkedInRuntimeAssets = [
-  "./client/assets/snapshot-streams/supply-300-hellhole.rtsstream",
+  "./client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream",
   ...Array.from(runtimeRigAssets).sort(),
 ];
 for (const asset of checkedInRuntimeAssets) {

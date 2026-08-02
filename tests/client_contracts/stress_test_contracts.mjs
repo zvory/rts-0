@@ -80,7 +80,7 @@ import {
     pathname: "/stress-test",
     search: "?label=Matt%20%3Cbad%3E%20laptop&seconds=99",
   });
-  assert(config?.id === "supply-300-hellhole", "stress route selects the canonical snapshot stream");
+  assert(config?.id === "fixed-roster-hellhole", "stress route selects the canonical snapshot stream");
   assert(config?.label === "Matt _bad_ laptop", "stress route bounds and sanitizes artifact labels");
   assert(config?.durationSeconds === 25, "stress route bounds the measurement window below stream rollover");
   assert(stressTestLaunchConfig({ pathname: "/stress-test", search: "" })?.durationSeconds === 5,

@@ -262,7 +262,7 @@ Hellhole isolation pair:
 scripts/hellhole-perf-harness.sh --ticks 900
 
 # Client only: checked-in snapshots, no WebSocket or live simulation.
-node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 30
+node scripts/client-perf-harness.mjs --workload fixed-roster-hellhole-stream --seconds 30
 ```
 
 The server command restores the canonical four-player 2v2 scenario (Players 1 and 3 versus Players
@@ -285,7 +285,7 @@ rather than reusing the static fixture's number.
 Regenerate the paired assets after changing the scenario or driver:
 
 ```bash
-cargo run --release --manifest-path server/Cargo.toml --bin generate_supply_300_hellhole
+cargo run --release --manifest-path server/Cargo.toml --bin generate_fixed_roster_hellhole
 cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream
 ```
 
@@ -313,7 +313,7 @@ node scripts/client-perf-harness.mjs --list
 node scripts/client-perf-harness.mjs --render-lag-suite --seconds 10
 node scripts/client-perf-harness.mjs --workload vehicle-wall-stress --seconds 10
 node scripts/client-perf-harness.mjs --workload selected-unit-hud-stress --seconds 10
-node scripts/client-perf-harness.mjs --workload supply-300-hellhole-stream --seconds 10
+node scripts/client-perf-harness.mjs --workload fixed-roster-hellhole-stream --seconds 10
 ```
 
 Canonical client CPU flame graph:
@@ -323,7 +323,7 @@ git fetch origin main
 node scripts/client-flamegraph.mjs --preview
 ```
 
-The flame-graph command runs Player 1's deterministic 2v2 `supply-300-hellhole-stream` projection for 15 seconds
+The flame-graph command runs Player 1's deterministic 2v2 `fixed-roster-hellhole-stream` projection for 15 seconds
 at the default viewport, DPR 1, CPU throttle 1, and a 500 microsecond V8 sampling interval. The
 harness completes workload assertions, resets its local performance window, and observes at least
 30 rendered frames before CPU sampling begins, so module loading and setup do not dominate the
@@ -348,7 +348,7 @@ node scripts/client-flamegraph.mjs --cpu-throttle 4 --viewport 1440x900 --dpr 1 
 Before writing client optimization phases, capture from a clean worktree on current `origin/main`,
 inspect both main and worker ranked self/inclusive functions and their source, and pair the result
 with main `frame.work`, worker update/present, queue outcome, and display-age evidence from the same
-harness summary. Use the snapshot stream as the sole supply-scale client renderer benchmark.
+harness summary. Use the snapshot stream as the sole fixed-roster client renderer benchmark.
 Prediction or production-shaped active-player
 claims require separate evidence rather than a competing checked-in supply fixture. A page cannot
 grant itself V8 Profiler access, so remote playtester function profiles require a later DevTools,
@@ -359,16 +359,16 @@ points at an already-healthy server. It drives headless Chrome with the reposito
 `package.json` `puppeteer-core` dependency and writes one `summary.json` per workload
 under `target/client-perf/<workload>/<timestamp>/`. The checked-in workload set includes the
 `vehicle-wall-stress` and `selected-unit-hud-stress` live dev scenarios and the client-only
-`supply-300-hellhole-stream`. The opt-in `supply-300-hellhole-integrated` workload is not included
-in default or render-lag-suite runs. Hellhole is the sole checked-in supply-scale client renderer
+`fixed-roster-hellhole-stream`. The opt-in `fixed-roster-hellhole-integrated` workload is not included
+in default or render-lag-suite runs. Hellhole is the sole checked-in fixed-roster client renderer
 benchmark.
 
 The snapshot-stream workload is the client-only isolation lane. It fetches the generated
-`client/assets/snapshot-streams/supply-300-hellhole.rtsstream` artifact and feeds its exact compact
+`client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream` artifact and feeds its exact compact
 MessagePack snapshots into the normal decoder and renderer at 30 Hz. The stream is the ordinary
 fog-filtered projection for active Player 1 on the 1+3 team, including the server-authored 126x126
-visibility grid and only Player 1's recipient event bucket. It starts with 420 projected entities
-and retains at least 408 through the deterministic death/respawn churn. Its setup assertion fails
+visibility grid and only Player 1's recipient event bucket. It starts with 389 projected entities
+and retains at least 382 through the deterministic death/respawn churn. Its setup assertion fails
 unless the page reports Player 1, non-spectator mode, team ids `[1,2,1,2]`, the complete visibility
 grid, no WebSocket, and no live simulation. Regenerate the thirty-second, 900-frame artifact
 with `cargo run --release --manifest-path server/Cargo.toml --bin generate_hellhole_snapshot_stream`.
