@@ -1,6 +1,10 @@
 import { assert } from "./assertions.mjs";
 import { TERRAIN } from "../../client/src/protocol.js";
-import { drawTerrainTile, TERRAIN_BLEND_MODES } from "../../client/src/renderer/terrain.js";
+import {
+  drawTerrainTile,
+  TERRAIN_BLEND_MODES,
+  TERRAIN_BLEND_PRESETS,
+} from "../../client/src/renderer/terrain.js";
 import {
   groundTransitionEdges,
   impassableEdgeDirections,
@@ -51,6 +55,15 @@ class TerrainContext {
 }
 
 const blendMap = { width: 2, height: 1, terrain: [TERRAIN.ROAD_BARE, TERRAIN.FROSTED_GROUND] };
+assert(
+  TERRAIN_BLEND_PRESETS["hard-chips-wide"].depth > TERRAIN_BLEND_PRESETS["hard-chips"].depth &&
+    TERRAIN_BLEND_PRESETS["organic-wide"].depth > TERRAIN_BLEND_PRESETS.organic.depth,
+  "wide terrain prototypes isolate transition depth as an explicit factor",
+);
+assert(
+  TERRAIN_BLEND_PRESETS["soft-ramp"].feather && TERRAIN_BLEND_PRESETS["soft-organic"].feather,
+  "soft terrain prototypes opt into color feathering",
+);
 const signatures = TERRAIN_BLEND_MODES.map((terrainBlendMode) => {
   const first = new TerrainContext();
   const repeated = new TerrainContext();
@@ -63,3 +76,8 @@ const signatures = TERRAIN_BLEND_MODES.map((terrainBlendMode) => {
   return JSON.stringify(first.calls);
 });
 assert(new Set(signatures).size === TERRAIN_BLEND_MODES.length, "terrain blend prototypes produce distinct edge masks");
+assert(
+  signatures[TERRAIN_BLEND_MODES.indexOf("soft-ramp")].includes("rgba") &&
+    signatures[TERRAIN_BLEND_MODES.indexOf("soft-organic")].includes("rgba"),
+  "soft terrain prototypes emit translucent source colors for browser-native interpolation",
+);
