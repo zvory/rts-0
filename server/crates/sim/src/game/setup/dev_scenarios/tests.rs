@@ -1055,7 +1055,7 @@ fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
 }
 
 #[test]
-fn replay_238_rifleman_repeatedly_repaths_without_rounding_corner() {
+fn replay_238_rifleman_rounds_corner_and_reaches_goal() {
     let setup = Game::new_dev_scenario(
         "replay_238_rifleman_corner_lock",
         EntityKind::Rifleman,
@@ -1079,17 +1079,16 @@ fn replay_238_rifleman_repeatedly_repaths_without_rounding_corner() {
         .entities
         .get(rifleman)
         .expect("Rifleman should remain present");
-    assert!((entity.pos_x - 2755.293).abs() <= 0.001);
-    assert!((entity.pos_y - 311.360).abs() <= 0.001);
-    let movement = entity
-        .movement
-        .as_ref()
-        .expect("Rifleman should still be trying to move");
-    assert_eq!(movement.path_goal, Some((2640.0, 336.0)));
+    let dx = entity.pos_x - setup.goal.0;
+    let dy = entity.pos_y - setup.goal.1;
     assert!(
-        movement.last_repath_tick >= 150,
-        "Rifleman should repeatedly repath while fixed at the corner"
+        (dx * dx + dy * dy).sqrt() <= 0.001,
+        "Rifleman should reach the exact goal after rounding the rock corner, got ({:.3}, {:.3})",
+        entity.pos_x,
+        entity.pos_y
     );
+    assert!(entity.path_is_empty());
+    assert!(matches!(entity.order(), Order::Idle));
 }
 
 #[test]
