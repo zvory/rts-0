@@ -63,6 +63,20 @@ command -v npm >/dev/null 2>&1 || fail "npm is not installed"
 
 [ -n "$cache_base" ] || fail "refusing unsafe cache directory: <empty>"
 
+# Resolve relative cache arguments before creating anything. A cache nested in the
+# destination node_modules would be removed below when the worktree-local directory
+# is replaced with a symlink, leaving that symlink dangling.
+cache_base="$(node - "$cache_base" <<'NODE'
+const path = require("node:path");
+process.stdout.write(path.resolve(process.argv[2]));
+NODE
+)"
+case "$cache_base" in
+  "$local_node_modules"|"$local_node_modules"/*)
+    fail "cache directory must not be inside $local_node_modules"
+    ;;
+esac
+
 lock_hash="$(node - "$package_json" "$package_lock" <<'NODE'
 const crypto = require("node:crypto");
 const fs = require("node:fs");

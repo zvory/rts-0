@@ -122,6 +122,21 @@ try {
   runHelper(second);
   assert.equal(fs.existsSync(path.join(second, "node_modules", "ownerless-lock-package")), true);
   assert.equal(installCount(), 4, "an interrupted lock handoff without an owner is reclaimed");
+
+  const unsafe = path.join(fixtureRoot, "unsafe");
+  writeManifest(unsafe, dependencies);
+  const unsafeNodeModules = path.join(unsafe, "node_modules");
+  fs.mkdirSync(unsafeNodeModules);
+  fs.writeFileSync(path.join(unsafeNodeModules, "keep.txt"), "keep\n");
+  assert.throws(
+    () => execFileSync("bash", [helper, "--repo", unsafe, "--cache-dir", path.join(unsafeNodeModules, "cache"), "--quiet"], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH}` },
+    }),
+    /cache directory must not be inside/,
+  );
+  assert.equal(fs.readFileSync(path.join(unsafeNodeModules, "keep.txt"), "utf8"), "keep\n");
+  assert.equal(fs.lstatSync(unsafeNodeModules).isDirectory(), true, "unsafe cache placement leaves node_modules intact");
 } finally {
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
