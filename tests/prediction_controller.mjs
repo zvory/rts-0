@@ -137,12 +137,20 @@ function assert(cond, msg) {
 {
   let initialized = 0;
   let resetAdapters = 0;
+  const prediction = new PredictionController({ sendCommand: () => true });
+  prediction.applyAuthoritativeSnapshot({
+    tick: 7,
+    netStatus: { lastSimConsumedClientSeq: 0 },
+    entities: [{ id: 20, owner: 1, kind: "city_centre", prodQueue: 2 }],
+  });
+  prediction.applyAuthoritativeSnapshot({
+    tick: 7,
+    netStatus: { lastSimConsumedClientSeq: 0 },
+    entities: [{ id: 20, owner: 1, kind: "city_centre", prodQueue: 2 }],
+  });
+  prediction.issueCommand({ c: "train", building: 20, unit: "worker" });
   const match = {
-    prediction: {
-      enabled: true,
-      recordReplayBudgetExceeded() {},
-      reset() {},
-    },
+    prediction,
     resetPredictionAdapter() { resetAdapters += 1; },
     initPredictionAdapter() { initialized += 1; },
     applyPredictionDisplayOverlay() {},
@@ -157,6 +165,13 @@ function assert(cond, msg) {
   }) === true, "replay-budget recovery handles an exceeded frame");
   assert(resetAdapters === 1 && initialized === 1,
     "replay-budget recovery immediately initializes the replacement shared runtime");
+  const preserved = prediction.debugSummary();
+  assert(preserved.pendingClientSeqs.join(",") === "1",
+    "replay-budget recovery preserves in-flight command reconciliation state");
+  assert(prediction.optimisticUiState().production[0]?.optimisticQueue === 3,
+    "replay-budget recovery preserves optimistic production state");
+  assert(preserved.latestAuthoritativeTick === 7 && preserved.duplicateSnapshotCount === 1,
+    "replay-budget recovery preserves the authoritative baseline and snapshot diagnostics");
   assert(recoverPredictionRuntimeAfterBudget(match, {
     budgetExceededCount: 1,
     lastReplayBudgetExceeded: true,

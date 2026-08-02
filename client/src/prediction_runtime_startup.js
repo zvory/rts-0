@@ -67,7 +67,9 @@ export function recoverPredictionRuntimeAfterBudget(match, diagnostics) {
     elapsedMs: diagnostics.lastTickMs,
     replayTicks: diagnostics.lastReplayTicks,
   });
-  match.prediction.reset({ enabled: true, preserveClientSeq: true, reason: "replay-budget-exceeded" });
+  // The controller owns durable command and reconciliation state. An over-budget
+  // WASM frame only invalidates the disposable runtime; clearing the controller
+  // here would forget in-flight commands and optimistic UI before the server ack.
   match.resetPredictionAdapter();
   match.applyPredictionDisplayOverlay({ predictionFrame: null });
   match.initPredictionAdapter();
