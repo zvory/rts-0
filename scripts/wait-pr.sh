@@ -186,6 +186,7 @@ while true; do
     if git merge-base --is-ancestor "$head_sha" "$MAIN_REF"; then
       delivery_main_worktree="$(main_worktree_path || true)"
       refresh_main_checkout "$delivery_main_worktree"
+      cd "$delivery_main_worktree"
       deliver_patch_note_best_effort "$head_ref" "$delivery_main_worktree"
       echo "wait-pr: PR #$number merged, $head_sha is reachable from $MAIN_REF, and local main is current"
       exit 0
