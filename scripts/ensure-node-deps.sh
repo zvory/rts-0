@@ -2,7 +2,7 @@
 # Prepare the lockfile-keyed shared npm cache and link it into one repository worktree.
 set -euo pipefail
 
-repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+repo_root=""
 cache_base="${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}"
 wait_seconds="${RTS_NODE_DEPS_WAIT_SECONDS:-180}"
 quiet=0
@@ -39,6 +39,9 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+if [ -z "$repo_root" ]; then
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+fi
 repo_root="$(cd "$repo_root" && pwd)"
 package_json="$repo_root/package.json"
 package_lock="$repo_root/package-lock.json"

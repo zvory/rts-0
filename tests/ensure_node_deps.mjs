@@ -137,6 +137,22 @@ try {
   );
   assert.equal(fs.readFileSync(path.join(unsafeNodeModules, "keep.txt"), "utf8"), "keep\n");
   assert.equal(fs.lstatSync(unsafeNodeModules).isDirectory(), true, "unsafe cache placement leaves node_modules intact");
+
+  const deletedCwd = path.join(fixtureRoot, "deleted-cwd");
+  fs.mkdirSync(deletedCwd);
+  execFileSync("bash", ["-c", `
+cd "$1"
+rmdir "$1"
+exec bash "$2" --repo "$3" --cache-dir "$4" --quiet
+`, "deleted-cwd-test", deletedCwd, helper, first, cacheRoot], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      RTS_FAKE_NPM_COUNTER: installCounter,
+      RTS_NODE_DEPS_WAIT_SECONDS: "5",
+    },
+  });
 } finally {
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
