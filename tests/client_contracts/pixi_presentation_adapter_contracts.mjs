@@ -17,7 +17,6 @@ const EXPECTED_LEGACY_READS = [
   "match.frameProfiler",
   "match.visualProfile.unitOverrides",
   "match.visualProfile.frameStripOverrides",
-  "match.visualProfile.terrainBlendMode",
   "match.visualProfile.terrainPreviewReveal",
   "match.presentationAssembler.staticMap",
 ];
@@ -126,7 +125,6 @@ const engine = fakeEngine();
 let activeVisualProfile = {
   unitOverrides: [{ id: "test" }],
   frameStripOverrides: [],
-  terrainBlendMode: "organic",
 };
 const measuredPhases = [];
 const profiler = {
@@ -154,7 +152,6 @@ assert((await first.settled).status === PRESENTATION_OUTCOME.PRESENTED
 assert((await first.retained)?.groundDecalRevision === 1, "Pixi reports the exact durable revision independently from presentation");
 assert(engine.staticMaps.length === 1, "unchanged static-map revision is materialized once into Pixi-owned staging");
 assert(engine.staticMaps[0].terrain instanceof Uint8Array, "Pixi owns its copied terrain staging buffer");
-assert(engine.staticMapOptions[0].terrainBlendMode === "organic", "Pixi forwards the active terrain blend profile when building the static map");
 assert(engine.renders.length === 2, "repeated render(frame) calls reach the backend without reassembly");
 assert(engine.presents === 2 && engine._renderFrameCount === 2, "each successful adapter call explicitly presents exactly once");
 assert(measuredPhases.filter((label) => label === "renderer.update").length === 2, "Pixi scene update is measured for every adapter call");
@@ -249,7 +246,6 @@ function fakeEngine() {
     _renderFrameCount: 0,
     _map: null,
     staticMaps: [],
-    staticMapOptions: [],
     renders: [],
     marquees: [],
     errors: [],
@@ -259,10 +255,9 @@ function fakeEngine() {
     presents: 0,
     destroyed: 0,
     captureLifecycle: [],
-    buildStaticMap(staticMap, options = {}) {
+    buildStaticMap(staticMap) {
       this._map = staticMap;
       this.staticMaps.push(staticMap);
-      this.staticMapOptions.push(options);
     },
     render(state, camera, fog, alpha, options) {
       if (this.failNext) {

@@ -1,11 +1,6 @@
 import { assert } from "./assertions.mjs";
 import { TERRAIN } from "../../client/src/protocol.js";
-import {
-  DEFAULT_TERRAIN_BLEND_MODE,
-  drawTerrainTile,
-  TERRAIN_BLEND_MODES,
-  TERRAIN_BLEND_PRESETS,
-} from "../../client/src/renderer/terrain.js";
+import { drawTerrainTile } from "../../client/src/renderer/terrain.js";
 import {
   groundTransitionEdges,
   impassableEdgeDirections,
@@ -56,31 +51,11 @@ class TerrainContext {
 }
 
 const blendMap = { width: 2, height: 1, terrain: [TERRAIN.ROAD_BARE, TERRAIN.FROSTED_GROUND] };
-assert(DEFAULT_TERRAIN_BLEND_MODE === "dither-stochastic", "production terrain uses the selected stochastic dither");
-assert(
-  TERRAIN_BLEND_PRESETS["hard-chips-wide"].depth > TERRAIN_BLEND_PRESETS["hard-chips"].depth &&
-    TERRAIN_BLEND_PRESETS["organic-wide"].depth > TERRAIN_BLEND_PRESETS.organic.depth,
-  "wide terrain prototypes isolate transition depth as an explicit factor",
-);
-assert(
-  TERRAIN_BLEND_PRESETS["dither-bayer"].depth > TERRAIN_BLEND_PRESETS.dither.depth &&
-    TERRAIN_BLEND_PRESETS["dither-bayer"].ditherPattern === "bayer" &&
-    TERRAIN_BLEND_PRESETS["dither-stochastic"].ditherPattern === "stochastic" &&
-    TERRAIN_BLEND_PRESETS["dither-clustered"].ditherPattern === "clustered",
-  "graduated dither prototypes isolate three opaque pixel-placement patterns",
-);
-const signatures = TERRAIN_BLEND_MODES.map((terrainBlendMode) => {
-  const first = new TerrainContext();
-  const repeated = new TerrainContext();
-  drawTerrainTile(first, blendMap, 0, 0, 8, { terrainBlendMode });
-  drawTerrainTile(repeated, blendMap, 0, 0, 8, { terrainBlendMode });
-  assert(
-    JSON.stringify(first.calls) === JSON.stringify(repeated.calls),
-    `${terrainBlendMode} terrain blending is deterministic`,
-  );
-  return JSON.stringify(first.calls);
-});
-assert(new Set(signatures).size === TERRAIN_BLEND_MODES.length, "terrain blend prototypes produce distinct edge masks");
-for (const mode of ["dither", "dither-bayer", "dither-stochastic", "dither-clustered"]) {
-  assert(!("feather" in TERRAIN_BLEND_PRESETS[mode]), `${mode} does not enable color feathering`);
-}
+const first = new TerrainContext();
+const repeated = new TerrainContext();
+const uniform = new TerrainContext();
+drawTerrainTile(first, blendMap, 0, 0, 8);
+drawTerrainTile(repeated, blendMap, 0, 0, 8);
+drawTerrainTile(uniform, { width: 2, height: 1, terrain: [TERRAIN.ROAD_BARE, TERRAIN.ROAD_BARE] }, 0, 0, 8);
+assert(JSON.stringify(first.calls) === JSON.stringify(repeated.calls), "stochastic terrain blending is deterministic");
+assert(first.calls.length > uniform.calls.length, "distinct ground materials receive an opaque stochastic transition mask");

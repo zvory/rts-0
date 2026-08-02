@@ -12,18 +12,7 @@ import {
 } from "./terrain_palette.js";
 
 const TERRAIN_TEXTURE_DOWNSAMPLE = 4;
-export const TERRAIN_BLEND_PRESETS = Object.freeze({
-  "hard-chips": Object.freeze({ shape: "hard-chips", depth: 0.34 }),
-  "hard-chips-wide": Object.freeze({ shape: "hard-chips", depth: 0.68 }),
-  dither: Object.freeze({ shape: "dither", depth: 0.34, ditherPattern: "coarse" }),
-  "dither-bayer": Object.freeze({ shape: "dither", depth: 0.56, ditherPattern: "bayer" }),
-  "dither-stochastic": Object.freeze({ shape: "dither", depth: 0.56, ditherPattern: "stochastic" }),
-  "dither-clustered": Object.freeze({ shape: "dither", depth: 0.56, ditherPattern: "clustered" }),
-  organic: Object.freeze({ shape: "organic", depth: 0.38 }),
-  "organic-wide": Object.freeze({ shape: "organic", depth: 0.68 }),
-});
-export const TERRAIN_BLEND_MODES = Object.freeze(Object.keys(TERRAIN_BLEND_PRESETS));
-export const DEFAULT_TERRAIN_BLEND_MODE = "dither-stochastic";
+const GROUND_TRANSITION_DEPTH = 0.56;
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
@@ -47,9 +36,7 @@ function fillImpassableEdge(ctx, map, tx, ty, code, ts) {
   if (edges.includes("east")) ctx.fillRect(x + ts - edge, y, edge, ts);
 }
 
-export function drawTerrainTile(ctx, map, tx, ty, textureTileSize, {
-  terrainBlendMode = DEFAULT_TERRAIN_BLEND_MODE,
-} = {}) {
+export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return;
   const code = map.terrain[ty * map.width + tx];
   const x = tx * textureTileSize;
@@ -75,7 +62,7 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize, {
     }
   }
   drawRoadMarking(ctx, code, x, y, textureTileSize);
-  drawGroundTransitions(ctx, map, tx, ty, code, textureTileSize, terrainBlendMode);
+  drawGroundTransitions(ctx, map, tx, ty, code, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
 }
 
@@ -151,101 +138,24 @@ function drawBrokenMudMarks(ctx, variant, tx, ty, x, y, pixel, cells) {
   }
 }
 
-function drawGroundTransitions(ctx, map, tx, ty, code, size, mode) {
+function drawGroundTransitions(ctx, map, tx, ty, code, size) {
   const edges = groundTransitionEdges(map, tx, ty, code);
   if (!edges.length) return;
-  const preset = TERRAIN_BLEND_PRESETS[mode] || TERRAIN_BLEND_PRESETS[DEFAULT_TERRAIN_BLEND_MODE];
   const x = tx * size;
   const y = ty * size;
   for (const edge of edges) {
-    if (preset.shape === "dither") drawDitherTransition(ctx, edge, x, y, size, tx, ty, preset);
-    else if (preset.shape === "organic") drawOrganicTransition(ctx, edge, x, y, size, tx, ty, preset);
-    else drawHardChipTransition(ctx, edge, x, y, size, tx, ty, preset);
+    drawStochasticTransition(ctx, edge, x, y, size, tx, ty);
   }
 }
 
-function transitionDepth(size, preset) {
-  return Math.min(size, Math.max(1, Math.ceil(size * preset.depth)));
-}
-
-function drawHardChipTransition(ctx, edge, x, y, size, tx, ty, preset) {
-  const maxDepth = transitionDepth(size, preset);
-  for (let along = 0; along < size; along += 1) {
-    const n = transitionNoise(edge, tx, ty, along, 0);
-    if (n < 0.18) continue;
-    const middleDepth = Math.max(2, Math.ceil(maxDepth * 0.67));
-    const depth = Math.min(maxDepth, n > 0.92 ? maxDepth : n > 0.68 ? middleDepth : 1);
-    for (let inward = 0; inward < depth; inward += 1) {
-      fillTransitionPixel(ctx, edge, x, y, size, along, inward, transitionPixelColor(edge, along, inward));
-    }
-  }
-}
-
-function drawDitherTransition(ctx, edge, x, y, size, tx, ty, preset) {
-  if (preset.ditherPattern !== "coarse") {
-    drawGraduatedDitherTransition(ctx, edge, x, y, size, tx, ty, preset);
-    return;
-  }
-  const probabilities = [0.76, 0.4, 0.14];
-  const depth = Math.min(probabilities.length, transitionDepth(size, preset));
-  for (let inward = 0; inward < depth; inward += 1) {
-    for (let along = 0; along < size; along += 1) {
-      const ordered = ((along & 1) * 2 + (inward & 1)) / 4;
-      const jitter = transitionNoise(edge, tx, ty, along, inward) * 0.34;
-      if (ordered * 0.66 + jitter >= probabilities[inward]) continue;
-      fillTransitionPixel(ctx, edge, x, y, size, along, inward, transitionPixelColor(edge, along, inward));
-    }
-  }
-}
-
-const BAYER_4 = Object.freeze([
-  0, 8, 2, 10,
-  12, 4, 14, 6,
-  3, 11, 1, 9,
-  15, 7, 13, 5,
-]);
-
-const CLUSTERED_4 = Object.freeze([
-  12, 5, 6, 13,
-  4, 0, 1, 7,
-  11, 3, 2, 8,
-  15, 10, 9, 14,
-]);
-
-function drawGraduatedDitherTransition(ctx, edge, x, y, size, tx, ty, preset) {
-  const depth = transitionDepth(size, preset);
+function drawStochasticTransition(ctx, edge, x, y, size, tx, ty) {
+  const depth = Math.min(size, Math.max(1, Math.ceil(size * GROUND_TRANSITION_DEPTH)));
   for (let inward = 0; inward < depth; inward += 1) {
     const progress = depth <= 1 ? 0 : inward / (depth - 1);
     const coverage = 0.92 - progress * 0.76;
     for (let along = 0; along < size; along += 1) {
-      const ordered = ditherThreshold(preset.ditherPattern, edge, tx, ty, along, inward);
-      if (ordered >= coverage) continue;
+      if (transitionNoise(edge, tx, ty, along, inward) >= coverage) continue;
       fillTransitionPixel(ctx, edge, x, y, size, along, inward, transitionPixelColor(edge, along, inward));
-    }
-  }
-}
-
-function ditherThreshold(pattern, edge, tx, ty, along, inward) {
-  if (pattern === "stochastic") return transitionNoise(edge, tx, ty, along, inward);
-  const px = (along + edge.tx) & 3;
-  const py = (inward + edge.ty) & 3;
-  const matrix = pattern === "clustered" ? CLUSTERED_4 : BAYER_4;
-  return matrix[py * 4 + px] / 16;
-}
-
-function drawOrganicTransition(ctx, edge, x, y, size, tx, ty, preset) {
-  const maxDepth = transitionDepth(size, preset);
-  const raw = Array.from({ length: size }, (_, along) =>
-    transitionNoise(edge, tx, ty, along, 1) * maxDepth);
-  for (let along = 0; along < size; along += 1) {
-    const before = raw[Math.max(0, along - 1)];
-    const after = raw[Math.min(size - 1, along + 1)];
-    const depth = Math.max(1, Math.min(maxDepth, Math.round(before * 0.25 + raw[along] * 0.5 + after * 0.25)));
-    for (let inward = 0; inward < depth; inward += 1) {
-      fillTransitionPixel(ctx, edge, x, y, size, along, inward, transitionPixelColor(edge, along, inward));
-    }
-    if (depth < maxDepth && transitionNoise(edge, tx, ty, along, 7) > 0.82) {
-      fillTransitionPixel(ctx, edge, x, y, size, along, depth, transitionPixelColor(edge, along, depth));
     }
   }
 }
@@ -297,7 +207,6 @@ function drawRoadMarking(ctx, code, x, y, size) {
 
 export function buildStaticMap(map, {
   preserveMapLayers = false,
-  terrainBlendMode = DEFAULT_TERRAIN_BLEND_MODE,
 } = {}) {
   this._map = {
     width: map.width,
@@ -320,15 +229,9 @@ export function buildStaticMap(map, {
   this._terrainCanvas = canvas;
   this._terrainContext = ctx;
   this._terrainTextureTileSize = textureTileSize;
-  this._terrainBlendMode = TERRAIN_BLEND_MODES.includes(terrainBlendMode)
-    ? terrainBlendMode
-    : DEFAULT_TERRAIN_BLEND_MODE;
-
   for (let ty = 0; ty < map.height; ty++) {
     for (let tx = 0; tx < map.width; tx++) {
-      drawTerrainTile(ctx, this._map, tx, ty, textureTileSize, {
-        terrainBlendMode: this._terrainBlendMode,
-      });
+      drawTerrainTile(ctx, this._map, tx, ty, textureTileSize);
     }
   }
 
@@ -378,9 +281,7 @@ export function updateStaticTerrainTiles(changes) {
   }
   for (const key of dirty) {
     const [x, y] = key.split(",").map(Number);
-    drawTerrainTile(ctx, map, x, y, textureTileSize, {
-      terrainBlendMode: this._terrainBlendMode,
-    });
+    drawTerrainTile(ctx, map, x, y, textureTileSize);
   }
   if (dirty.size) this._terrainSprite.texture.source.update();
   return dirty.size;

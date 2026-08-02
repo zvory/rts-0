@@ -79,22 +79,14 @@ const NOOP_RENDERER_OVERLAYS = [
 }
 
 {
-  const terrainProfiles = [
-    ["terrain-blend-hard-chips", "hard-chips"],
-    ["terrain-blend-dither", "dither"],
-    ["terrain-blend-organic", "organic"],
-  ];
-  for (const [id, terrainBlendMode] of terrainProfiles) {
-    const profile = getVisualProfile(id);
-    assert(profile?.terrainBlendMode === terrainBlendMode, `${id} selects its checked-in terrain prototype`);
-    assert(profile.terrainPreviewReveal === true, `${id} requests a fog-free Lab-only terrain review`);
-    assert(
-      profile.initialCamera?.focus?.x === 2016 &&
-        profile.initialCamera?.focus?.y === 2016 &&
-        profile.initialCamera?.framingScale === 0.58,
-      `${id} uses the shared 1v1 terrain-matrix framing`,
-    );
-  }
+  const profile = getVisualProfile("terrain-blend-showcase");
+  assert(profile?.terrainPreviewReveal === true, "terrain showcase requests a fog-free Lab-only review");
+  assert(
+    profile.initialCamera?.focus?.x === 2016 &&
+      profile.initialCamera?.focus?.y === 2016 &&
+      profile.initialCamera?.framingScale === 0.58,
+    "terrain showcase uses the 1v1 terrain-matrix framing",
+  );
 }
 
 {
