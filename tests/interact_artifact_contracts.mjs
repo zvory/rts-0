@@ -21,9 +21,11 @@ try {
     { owner: 2, kind: "rifleman", x: 200, y: 100, alias: "target" },
   ] });
 
+  process.env.RTS_INTERACT_FAKE_REMOVE_ARTIFACT_DIR_DURING_EXPORT = "1";
   const setup = testArtifacts.ownPortableArtifact(
     await service.execute("export", { sessionId, kind: "setup", name: "Portable setup", reproduction: true }),
   );
+  assert.equal(process.env.RTS_INTERACT_FAKE_REMOVE_ARTIFACT_DIR_DURING_EXPORT, undefined);
   assert.match(setup.artifactId, /^artifact_[a-f0-9]{32}$/);
   assert.equal(setup.entityCount, 2);
   assert.equal(setup.aliasCount, 2);

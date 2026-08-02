@@ -32,6 +32,7 @@ export class MapEditorPanel {
     this.onOpenLab = onOpenLab;
     this.fetchImpl = fetchImpl;
     this.catalog = [];
+    this.catalogSkipped = [];
     this.catalogError = "";
     this.selectedMapFile = "";
     this.selectedStartIndex = 0;
@@ -114,7 +115,7 @@ export class MapEditorPanel {
     for (const entry of this.catalog) {
       const option = document.createElement("option");
       option.value = entry.file;
-      option.textContent = entry.name;
+      option.textContent = entry.label || entry.name;
       select.appendChild(option);
     }
     select.value = this.selectedMapFile;
@@ -134,6 +135,9 @@ export class MapEditorPanel {
       field("Blank map size", blankSize),
       button("New blank map", () => this.newBlankMap(), { disabled: this.pending }),
     );
+    if (this.catalogSkipped.length) {
+      section.appendChild(readout(`Skipped unsupported map filename${this.catalogSkipped.length === 1 ? "" : "s"}: ${this.catalogSkipped.join(", ")}`, true));
+    }
     if (this.catalogError) section.appendChild(readout(this.catalogError, true));
     return section;
   }
@@ -386,7 +390,9 @@ export class MapEditorPanel {
       const response = await this.fetchImpl(MAP_CATALOG_URL, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
-      this.catalog = normalizeCatalog(payload?.maps);
+      const catalog = normalizeCatalog(payload?.maps);
+      this.catalog = catalog.maps;
+      this.catalogSkipped = catalog.skipped;
       this.selectedMapFile ||= this.catalog[0]?.file || "";
       this.catalogError = this.catalog.length ? "" : "No bundled maps are available.";
     } catch (error) {
@@ -402,10 +408,7 @@ export class MapEditorPanel {
     try {
       const response = await this.fetchImpl(`/maps/${encodeURIComponent(this.selectedMapFile)}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      this.session.loadAuthoredMap(await response.json());
-      this.selectedStartIndex = 0;
-      this.selectedBaseIndex = 0;
-      this.viewport.armTool(null);
+      this.loadMapData(await response.json());
       this.setStatus("Bundled map loaded.");
     } catch (error) {
       this.setStatus(`Map load failed: ${error.message || error}`, true);
@@ -413,6 +416,13 @@ export class MapEditorPanel {
       this.pending = false;
       this.render();
     }
+  }
+
+  loadMapData(map) {
+    this.session.loadAuthoredMap(map);
+    this.selectedStartIndex = 0;
+    this.selectedBaseIndex = 0;
+    this.viewport.armTool(null);
   }
 
   undo() {
@@ -572,20 +582,33 @@ function terrainName(code) {
 }
 
 function normalizeCatalog(entries) {
-  if (!Array.isArray(entries)) return [];
-  return entries.flatMap((entry) => {
+  const maps = [];
+  const skipped = [];
+  if (!Array.isArray(entries)) return { maps, skipped };
+  for (const entry of entries) {
     const file = String(entry?.file || "").trim();
-    if (!safeMapFile(file)) return [];
-    return [{
+    if (!safeMapFile(file)) {
+      if (file) skipped.push(file);
+      continue;
+    }
+    maps.push({
       file,
       name: String(entry?.name || file.replace(/\.json$/i, "")),
       description: String(entry?.description || ""),
-    }];
-  });
+    });
+  }
+  const nameCounts = new Map();
+  for (const entry of maps) nameCounts.set(entry.name, (nameCounts.get(entry.name) || 0) + 1);
+  for (const entry of maps) entry.label = nameCounts.get(entry.name) > 1 ? `${entry.name} — ${entry.file}` : entry.name;
+  return { maps, skipped };
 }
 
 function safeMapFile(file) {
-  return /^[a-z0-9][a-z0-9._-]*\.json$/i.test(file) && !file.includes("..");
+  return file.length > 0
+    && file.length <= 128
+    && /\.json$/i.test(file)
+    && !file.includes("..")
+    && !/[\\/\?#\x00-\x1f\x7f]/.test(file);
 }
 
 function slug(value) {

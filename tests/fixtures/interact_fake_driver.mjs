@@ -352,6 +352,10 @@ export async function openInteractDriver(options) {
       return { roomTime: { currentTick: tick, speed: 0, paused: true }, snapshotTick: tick };
     },
     async exportSetup(name = "") {
+      if (process.env.RTS_INTERACT_FAKE_REMOVE_ARTIFACT_DIR_DURING_EXPORT === "1") {
+        delete process.env.RTS_INTERACT_FAKE_REMOVE_ARTIFACT_DIR_DURING_EXPORT;
+        fs.rmSync(path.join(options.workspaceRoot, "target", "interact", "lab", "artifacts"), { recursive: true, force: true });
+      }
       return { scenario: checkpointScenario(name, tick, entities) };
     },
     async importSetup(scenario) {

@@ -197,6 +197,32 @@ assert(
 }
 
 {
+  const panel = {
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return { maps: [
+          { file: "schone-tage.json", name: "Schone Tage", description: "" },
+          { file: "schone-tage(5).json", name: "Schone Tage", description: "" },
+          { file: "../secret.json", name: "Secret", description: "" },
+        ] };
+      },
+    }),
+    selectedMapFile: "",
+    catalog: [],
+    catalogSkipped: [],
+    render() { this.renders = (this.renders || 0) + 1; },
+  };
+  await MapEditorPanel.prototype.loadCatalog.call(panel);
+  assert.deepEqual(panel.catalog.map((entry) => entry.file), ["schone-tage.json", "schone-tage(5).json"]);
+  assert.deepEqual(panel.catalog.map((entry) => entry.label), [
+    "Schone Tage — schone-tage.json",
+    "Schone Tage — schone-tage(5).json",
+  ], "duplicate map names are distinguishable by filename");
+  assert.deepEqual(panel.catalogSkipped, ["../secret.json"], "unsupported map filenames are tracked for visible warnings");
+}
+
+{
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
