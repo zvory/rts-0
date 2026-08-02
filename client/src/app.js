@@ -957,9 +957,11 @@ export class App {
     const scores = Array.isArray(m?.scores) ? m.scores : [];
     const winnerId = m?.winnerId ?? null;
     const winnerTeamId = m?.winnerTeamId ?? null;
-    const text = this.inReplayPlayback
-      ? replayResultHeadline(scores, winnerId, winnerTeamId)
-      : verdict === "won" ? "Victory" : verdict === "lost" ? "Defeat" : "Draw";
+    const text = verdict === "won"
+      ? "Victory"
+      : verdict === "lost"
+        ? "Defeat"
+        : replayResultHeadline(scores, winnerId, winnerTeamId);
     if (verdict === "won") this.audio.play("victory", { category: "ui", priority: 5 });
     else if (verdict === "lost") this.audio.play("defeat", { category: "ui", priority: 5 });
     dom.gameOverText.textContent = text;

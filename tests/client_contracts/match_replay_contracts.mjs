@@ -778,7 +778,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     dom.gameOverText = { textContent: "", dataset: {} };
     const app = Object.create(App.prototype);
     app.matchStartGeneration = 5;
-    app.inReplayPlayback = true;
+    // The server sends gameOver before the replay start message flips this state.
+    app.inReplayPlayback = false;
     app.audio = { play() {} };
     app.match = { stop() {} };
     app.lastObservationRunId = "";
@@ -794,7 +795,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       ],
     });
     assert(dom.gameOverText.textContent === "Alex has won",
-      "replay game over replaces the spectator Draw verdict with the winner's name");
+      "a spectator result names the winner before the replay start message arrives");
     dom.gameOver = previousGameOver;
     dom.gameOverText = previousGameOverText;
   }
