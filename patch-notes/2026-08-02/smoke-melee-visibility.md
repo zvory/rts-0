@@ -6,7 +6,7 @@ _2026-08-02_
 
 ## Changes
 
-- Units inside smoke now reveal and can attack enemies within 1 tile of their body edges; enemies farther away remain concealed.
+- Units inside smoke now reveal and can attack enemies also inside smoke when their body edges are within 1 tile; farther enemies stay concealed.
 
 ## Playtest watch
 
