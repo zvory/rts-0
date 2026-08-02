@@ -63,7 +63,12 @@ try {
   assert.equal(understory.children.length, 3, "flowers and tree shadows share the private below-unit layer");
   assert.equal(layer.instances.get(2).display.tint, 0xd95f8d, "wildflower colors tint the authored white-petal asset");
 
-  const nearCamera = { containsProjected: ({ x, y }) => x < 300 && y < 300 };
+  const nearCamera = {
+    containsProjected: ({ x, y, heightPx }) => {
+      assert.equal(heightPx, 0, "doodad culling projects static vegetation on the finite ground plane");
+      return x < 300 && y < 300;
+    },
+  };
   const visible = layer.update(1000, nearCamera);
   const firstRotation = layer.instances.get(1).display.rotation;
   layer.update(1000, nearCamera);

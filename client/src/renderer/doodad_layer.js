@@ -99,7 +99,11 @@ export class DoodadLayer {
     let visible = 0;
     for (const instance of this.instances.values()) {
       const inView = typeof camera?.containsProjected !== "function"
-        || camera.containsProjected({ x: instance.record.x, y: instance.record.y }, CULL_MARGIN_PX);
+        || camera.containsProjected({
+          x: instance.record.x,
+          y: instance.record.y,
+          heightPx: 0,
+        }, CULL_MARGIN_PX);
       instance.display.visible = inView;
       if (instance.shadow) instance.shadow.visible = inView;
       if (!inView) continue;
