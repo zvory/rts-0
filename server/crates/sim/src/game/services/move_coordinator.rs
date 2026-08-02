@@ -305,6 +305,13 @@ impl<'a> MoveCoordinator<'a> {
                         goal.1,
                         e.facing(),
                     )
+                    && standability::unit_static_segment_standable(
+                        self.map,
+                        self.occ,
+                        e.kind,
+                        (e.pos_x, e.pos_y),
+                        goal,
+                    )
             });
         let goals = if exact_single_vehicle_goal {
             // A single selected vehicle has no formation to preserve when the
