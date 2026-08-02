@@ -690,6 +690,7 @@ export class MapEditorPanel {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
+      this.session.markSaved();
       this.setStatus(`Exported ${anchor.download}.`);
     } catch (error) {
       this.setStatus(error.message || String(error), true);

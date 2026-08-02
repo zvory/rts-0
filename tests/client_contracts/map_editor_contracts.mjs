@@ -253,6 +253,7 @@ assert(
     async text() { return JSON.stringify(oneVOneNoTerrainMap); },
   });
   assert.equal(session.exportMap().name, oneVOneNoTerrainMap.name, "local JSON loads through the authored-map validator");
+  assert.equal(session.hasUnsavedChanges, false, "a freshly imported file is the editor's saved baseline");
   assert.equal(panel.selectedStartIndex, 0);
   assert.equal(panel.selectedBaseIndex, 0);
   assert.equal(panel.viewport.tool, null);
@@ -275,6 +276,28 @@ assert(
     message: "Could not load huge.json: Map JSON files must be 2 MB or smaller.",
     error: true,
   });
+
+  session.mutate("Changed imported map", (draft) => { draft.description = "changed"; });
+  assert.equal(session.hasUnsavedChanges, true);
+  const savedDocument = globalThis.document;
+  const savedCreateObjectURL = URL.createObjectURL;
+  const savedRevokeObjectURL = URL.revokeObjectURL;
+  const anchor = { click() {}, remove() {} };
+  globalThis.document = {
+    body: { appendChild(node) { assert.equal(node, anchor); } },
+    createElement(tag) { assert.equal(tag, "a"); return anchor; },
+  };
+  URL.createObjectURL = () => "blob:map-export";
+  URL.revokeObjectURL = (url) => { assert.equal(url, "blob:map-export"); };
+  try {
+    MapEditorPanel.prototype.exportJson.call(panel);
+  } finally {
+    globalThis.document = savedDocument;
+    URL.createObjectURL = savedCreateObjectURL;
+    URL.revokeObjectURL = savedRevokeObjectURL;
+  }
+  assert.equal(session.hasUnsavedChanges, false, "exporting the current map clears the unsaved-change warning");
+  assert.match(statuses.at(-1).message, /^Exported .+\.json\.$/);
 }
 
 {

@@ -200,6 +200,7 @@ export class MapEditorSession {
     this.undoStack = [];
     this.redoStack = [];
     this.lastAction = `Loaded ${draft.name}`;
+    this.markSaved({ notify: false });
     this.notify("loaded");
     return true;
   }
