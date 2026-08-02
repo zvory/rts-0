@@ -486,9 +486,7 @@ fn lab_outcome_json(outcome: &LabOpOutcome) -> serde_json::Value {
             height,
             battle_reset,
         } => serde_json::json!({
-            "name": name,
-            "width": width,
-            "height": height,
+            "name": name, "width": width, "height": height,
             "battleReset": battle_reset
         }),
         LabOpOutcome::ScenarioRestored(restore) => serde_json::to_value(restore)
@@ -1157,9 +1155,7 @@ impl RoomTask {
                     return lab_result_error(request_id, op_kind, "lab game is not running");
                 };
                 serde_json::json!({
-                    "name": name,
-                    "width": width,
-                    "height": height,
+                    "name": name, "width": width, "height": height,
                     "battleReset": battle_reset,
                     "tick": payload.tick,
                     "map": payload.map,
