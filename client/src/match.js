@@ -26,6 +26,7 @@ import { prepareRenderer } from "./renderer/preparation.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
+import { GroundDecalSync } from "./match_ground_decal_sync.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { RoomTimeControls } from "./replay_controls.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
@@ -266,6 +267,11 @@ export class Match {
 
     // Module graph.
     this.state = this._timeInit("match.state", () => new GameState(payload, { renderClock: this.renderClock }));
+    this.groundDecalSync = new GroundDecalSync({
+      net: this.net,
+      state: this.state,
+      resetPresentation: () => this.resetGroundDecalPresentation(),
+    });
     applyInitialUnitRanges(this.state, options.unitRangesEnabled);
     this.controlPolicy = this._timeInit(
       "match.controlPolicy",
@@ -411,7 +417,9 @@ export class Match {
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);
+      this.groundDecalSync.observeSnapshot(m?.groundDecalRevision);
     };
+    this.onGroundDecals = (m) => this.groundDecalSync.applyResponse(m);
     this.onCommandReceipt = (m) => this.handleCommandReceipt(m);
     this.onRoomTimeState = (m) => this.applyRoomTimeState(m);
     this.onLivePauseState = (m) => this.applyLivePauseState(m);
@@ -437,6 +445,7 @@ export class Match {
     }
     this.desktopCursorAutoLockEnabled = this.shouldUseDesktopCursorAutoLock();
     this.net.on(S.SNAPSHOT, this.onSnapshot);
+    this.net.on(S.GROUND_DECALS, this.onGroundDecals);
     this.net.on(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.on(S.LIVE_PAUSE_STATE, this.onLivePauseState);
@@ -467,6 +476,7 @@ export class Match {
         replayViewer: this.replayViewer,
         capabilities: this.capabilities,
         initialVisionSelection: options.initialVisionSelection,
+        onVisionSelectionChange: () => this.groundDecalSync.reset({ awaitSnapshot: true }),
       });
     }
     this.observerDiagnostics = new MatchObserverDiagnostics({
@@ -1225,6 +1235,7 @@ export class Match {
     this.combatAudio = null;
     this.noticePresenter = null;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
+    this.net.off(S.GROUND_DECALS, this.onGroundDecals);
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.LIVE_PAUSE_STATE, this.onLivePauseState);
@@ -1250,6 +1261,7 @@ export class Match {
       this.input = null;
     }
     this.presentationCoordinator?.destroy?.();
+    this.groundDecalSync?.destroy();
   }
 
   applyRoomTimeState(state) {
@@ -1268,6 +1280,7 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.combatAudio?.updateWorldCombatBed(false);
     this.state?.resetForReplaySeek?.();
+    this.groundDecalSync?.reset({ resetPresentation: false });
     this.clientIntent?.clearPlannedOrders?.();
     this.fog?.resetMap?.(this.state.map.width, this.state.map.height, this.state.map.terrain);
     this.fog?.setRevealAll?.(!!this.devWatch?.noFog);
@@ -1275,6 +1288,12 @@ export class Match {
     this.presentationFrame = null;
     this.roomTimeControls?.noteRoomTimeSeekStarted?.(seek);
     return true;
+  }
+
+  resetGroundDecalPresentation() {
+    this.state?.requeueAuthoritativeGroundDecals?.();
+    this.presentationAssembler?.reset?.({ map: this.state.map });
+    this.presentationFrame = null;
   }
 
   /**
@@ -1293,6 +1312,7 @@ export class Match {
     this.combatAudio = null;
     this.noticePresenter = null;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
+    this.net.off(S.GROUND_DECALS, this.onGroundDecals);
     this.net.off(S.COMMAND_RECEIPT, this.onCommandReceipt);
     this.net.off(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.off(S.LIVE_PAUSE_STATE, this.onLivePauseState);
@@ -1323,6 +1343,7 @@ export class Match {
       this.unregisterDomInputZone = null;
     }
     this.presentationCoordinator?.destroy?.();
+    this.groundDecalSync?.destroy();
     // Let modules release DOM/WebGL resources if they own any.
     for (const m of [this.input, this.minimap, this.hud, this.renderer, this.fog]) {
       if (m && typeof m.destroy === "function") {

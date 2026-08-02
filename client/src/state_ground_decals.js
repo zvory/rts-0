@@ -31,6 +31,7 @@ const TWO_PI = Math.PI * 2;
 const NEUTRAL_DECAL_COLOR = "#9aa0a8";
 const DEFAULT_TILE_SIZE = 32;
 const MAX_TRACKED_IMPACT_KEYS = 4096;
+const AUTHORITATIVE_DECAL_CLASSES = new Set(Object.values(GROUND_DECAL_CLASS));
 
 export function groundDecalClassForKind(kind) {
   if (INFANTRY_DECAL_KINDS.has(kind)) return GROUND_DECAL_CLASS.INFANTRY;
@@ -54,6 +55,26 @@ export class GroundDecalBuffer {
     this._reconciled = null;
     this._reconciledRevision = 0;
     this._nextRevision = 1;
+    this.authoritativeRevision = 0;
+    this.authoritativeDecals = new Map();
+  }
+
+  applyAuthoritativeBatch({ revision, decals } = {}, context = {}) {
+    if (!Number.isInteger(revision) || revision < 0 || revision > 0xffffffff) {
+      return { accepted: false, queued: 0 };
+    }
+    if (revision <= this.authoritativeRevision) return { accepted: false, queued: 0 };
+
+    let queued = 0;
+    for (const record of Array.isArray(decals) ? decals : []) {
+      const decal = normalizeAuthoritativeGroundDecal(record, context);
+      if (!decal || this.authoritativeDecals.has(decal.id)) continue;
+      this.authoritativeDecals.set(decal.id, decal);
+      this._pending.push(decal);
+      queued += 1;
+    }
+    this.authoritativeRevision = revision;
+    return { accepted: true, queued };
   }
 
   applySnapshotEvents(events, context = {}) {
@@ -133,6 +154,15 @@ export class GroundDecalBuffer {
     this._reconciled = null;
     this._reconciledRevision = 0;
     this._nextRevision = 1;
+    this.authoritativeRevision = 0;
+    this.authoritativeDecals.clear();
+  }
+
+  requeueAuthoritative() {
+    this._pending = [...this.authoritativeDecals.values()];
+    this._reconciled = null;
+    this._reconciledRevision = 0;
+    return this._pending.length;
   }
 
   _markImpactPainted(key) {
@@ -143,6 +173,59 @@ export class GroundDecalBuffer {
       if (oldest != null) this.paintedImpactKeys.delete(oldest);
     }
   }
+}
+
+export function normalizeAuthoritativeGroundDecal(record, {
+  players = [],
+  tileSize = DEFAULT_TILE_SIZE,
+} = {}) {
+  if (!record || !Number.isSafeInteger(record.id) || record.id < 0) return null;
+  if (!Number.isFinite(record.x) || !Number.isFinite(record.y)) return null;
+  const decalClass = AUTHORITATIVE_DECAL_CLASSES.has(record.decalClass)
+    && record.decalClass !== GROUND_DECAL_CLASS.NONE
+    ? record.decalClass
+    : GROUND_DECAL_CLASS.NONE;
+  if (decalClass === GROUND_DECAL_CLASS.NONE) return null;
+
+  const kind = typeof record.sourceKind === "string" ? record.sourceKind : record.kind;
+  if (typeof kind !== "string" || kind.length === 0) return null;
+  const seed = Number.isInteger(record.seed) ? record.seed >>> 0 : record.id >>> 0;
+  const owner = Number.isInteger(record.owner) && record.owner >= 0 ? record.owner : 0;
+  const fallbackFacing = angleFromSeed(seed);
+  const facing = normalizeAngle(Number.isFinite(record.facing) ? record.facing : fallbackFacing);
+  const weaponFacing = normalizeAngle(
+    Number.isFinite(record.weaponFacing) ? record.weaponFacing : facing,
+  );
+  const safeTileSize = Number.isFinite(tileSize) && tileSize > 0 ? tileSize : DEFAULT_TILE_SIZE;
+  const radiusTiles = Number.isFinite(record.radiusTiles) && record.radiusTiles > 0
+    ? record.radiusTiles
+    : decalClass === GROUND_DECAL_CLASS.MORTAR_BLAST
+      ? 1.5
+      : decalClass === GROUND_DECAL_CLASS.ARTILLERY_BLAST
+        ? ARTILLERY_OUTER_RADIUS_TILES
+        : null;
+  const footprint = decalClass === GROUND_DECAL_CLASS.BUILDING_SCORCH
+    ? buildingFootprintPixels(kind, safeTileSize)
+    : null;
+
+  return {
+    id: record.id,
+    kind,
+    decalClass,
+    x: record.x,
+    y: record.y,
+    owner,
+    color: playerColor(players, owner),
+    facing,
+    weaponFacing,
+    seed,
+    variant: seed % 4,
+    ...(radiusTiles == null ? {} : {
+      radiusTiles,
+      radiusWorld: radiusTiles * safeTileSize,
+    }),
+    ...(footprint || {}),
+  };
 }
 
 export function normalizeGroundDecalEvent(ev, {

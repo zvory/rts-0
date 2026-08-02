@@ -483,6 +483,14 @@ export class Net {
     this._send(msg.setVisionSelection(selection));
   }
 
+  /** Request fog-safe authoritative ground decals discovered after a local revision. */
+  requestGroundDecals(afterRevision = 0) {
+    if (!Number.isInteger(afterRevision) || afterRevision < 0 || afterRevision > 0xffffffff) {
+      return false;
+    }
+    return this._send(msg.requestGroundDecals(afterRevision));
+  }
+
   /**
    * Send a privileged lab operation envelope. The server replies with labResult.
    * @param {number} requestId positive request id allocated by LabClient

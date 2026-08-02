@@ -177,6 +177,10 @@ export const msg = Object.freeze({
   seekRoomTime: (ticksBack) => ({ t: C.SEEK_ROOM_TIME, ticksBack }),
   seekRoomTimeTo: (tick) => ({ t: C.SEEK_ROOM_TIME_TO, tick }),
   setVisionSelection: (selection) => ({ t: C.SET_VISION_SELECTION, selection }),
+  requestGroundDecals: (afterRevision = 0) => ({
+    t: C.REQUEST_GROUND_DECALS,
+    afterRevision,
+  }),
   lab: (requestId, op) => ({ t: C.LAB, requestId, op }),
   // Compatibility/setup builders. Visible UI labels these as checkpoint setup actions; lab replay
   // save/open must not reuse the legacy scenario operation names.

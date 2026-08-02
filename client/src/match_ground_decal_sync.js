@@ -1,0 +1,92 @@
+const DEFAULT_RETRY_DELAYS_MS = Object.freeze([400, 1000, 2500, 5000]);
+
+/**
+ * Keeps the renderer's local ground-mark cache aligned with the small revision
+ * advertised by snapshots. The server remains the source of truth; repeated
+ * snapshots only coalesce requests and never advance the applied revision.
+ */
+export class GroundDecalSync {
+  constructor({
+    net,
+    state,
+    resetPresentation = null,
+    retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
+    setTimer = (fn, ms) => setTimeout(fn, ms),
+    clearTimer = (id) => clearTimeout(id),
+  } = {}) {
+    this.net = net;
+    this.state = state;
+    this.resetPresentation = resetPresentation;
+    this.retryDelaysMs = retryDelaysMs.length > 0 ? [...retryDelaysMs] : [1000];
+    this.setTimer = setTimer;
+    this.clearTimer = clearTimer;
+    this.targetRevision = 0;
+    this.retryIndex = 0;
+    this.retryTimer = null;
+    this.awaitingPerspectiveSnapshot = false;
+    this.destroyed = false;
+  }
+
+  observeSnapshot(revision) {
+    if (this.destroyed || !isRevision(revision)) return false;
+    if (this.awaitingPerspectiveSnapshot) this.awaitingPerspectiveSnapshot = false;
+    this.targetRevision = Math.max(this.targetRevision, revision);
+    return this._ensureRequest();
+  }
+
+  applyResponse(message) {
+    if (this.destroyed || this.awaitingPerspectiveSnapshot) return false;
+    const result = this.state?.applyAuthoritativeGroundDecals?.(message);
+    if (!result?.accepted) return false;
+    this.retryIndex = 0;
+    this._cancelRetry();
+    this.targetRevision = Math.max(this.targetRevision, message.revision);
+    this._ensureRequest();
+    return true;
+  }
+
+  reset({ awaitSnapshot = false, resetPresentation = true } = {}) {
+    if (this.destroyed) return;
+    this._cancelRetry();
+    this.retryIndex = 0;
+    this.targetRevision = 0;
+    this.awaitingPerspectiveSnapshot = awaitSnapshot;
+    this.state?.resetAuthoritativeGroundDecals?.();
+    if (resetPresentation) this.resetPresentation?.();
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this._cancelRetry();
+  }
+
+  _ensureRequest() {
+    if (this.awaitingPerspectiveSnapshot || this.retryTimer != null) return false;
+    const applied = this.state?.groundDecals?.authoritativeRevision || 0;
+    if (applied >= this.targetRevision) return false;
+    const sent = this.net?.requestGroundDecals?.(applied) === true;
+    this._scheduleRetry();
+    return sent;
+  }
+
+  _scheduleRetry() {
+    if (this.retryTimer != null || this.destroyed) return;
+    const delay = this.retryDelaysMs[Math.min(this.retryIndex, this.retryDelaysMs.length - 1)];
+    this.retryIndex = Math.min(this.retryIndex + 1, this.retryDelaysMs.length - 1);
+    this.retryTimer = this.setTimer(() => {
+      this.retryTimer = null;
+      this._ensureRequest();
+    }, delay);
+  }
+
+  _cancelRetry() {
+    if (this.retryTimer == null) return;
+    this.clearTimer(this.retryTimer);
+    this.retryTimer = null;
+  }
+}
+
+function isRevision(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
+}

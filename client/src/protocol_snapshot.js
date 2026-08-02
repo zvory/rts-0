@@ -56,6 +56,7 @@ export function decodeCompactSnapshot(raw) {
       MAX_COMPACT_ABILITY_OBJECTS,
     ).map(decodeCompactAbilityObject),
     trenches: decodeCompactTrenches(raw.tr),
+    groundDecalRevision: readOptionalU32(raw.gr, "groundDecalRevision"),
     visibleTiles: decodeVisibilityRuns(raw.fg),
     exploredTiles: decodeVisibilityRuns(raw.eg, "exploredTiles"),
     rememberedBuildings: readOptionalArray(
@@ -77,6 +78,10 @@ export function decodeCompactSnapshot(raw) {
     ),
     netStatus: decodeCompactNetStatus(raw.n),
   };
+}
+
+function readOptionalU32(value, field) {
+  return value == null ? 0 : readU32(value, field);
 }
 
 function decodeAutoBuildSettings(record) {

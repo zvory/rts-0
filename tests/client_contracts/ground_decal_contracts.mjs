@@ -8,6 +8,7 @@ import {
   GroundDecalBuffer,
   groundDecalClassForKind,
   groundDecalClassForImpactEvent,
+  normalizeAuthoritativeGroundDecal,
   normalizeGroundDecalEvent,
 } from "../../client/src/state_ground_decals.js";
 import { VisualEffectBuffers } from "../../client/src/state_visual_effects.js";
@@ -226,9 +227,24 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
     events: [{ e: EVENT.DEATH, id: 50, x: 96, y: 96, kind: KIND.SCOUT_CAR }],
   });
   const decals = state.consumePendingGroundDecals();
-  assert(decals.length === 1, "GameState.applySnapshot queues received death decals");
-  assert(decals[0].owner === 2, "GameState decal queue recovers owner from the prior current snapshot");
-  assertApprox(decals[0].facing, 2.2, 0.00001, "GameState decal queue recovers facing from the prior current snapshot");
+  assert(decals.length === 0, "transient death events no longer create permanent decals");
+  state.applyAuthoritativeGroundDecals({
+    revision: 1,
+    decals: [{
+      id: 500,
+      decalClass: "scorch",
+      sourceKind: KIND.SCOUT_CAR,
+      x: 96,
+      y: 96,
+      owner: 2,
+      seed: 7,
+      facing: 2.2,
+    }],
+  });
+  const authoritative = state.consumePendingGroundDecals();
+  assert(authoritative.length === 1, "GameState queues authoritative decal records");
+  assert(authoritative[0].owner === 2, "authoritative decals preserve the server-projected owner");
+  assertApprox(authoritative[0].facing, 2.2, 0.00001, "authoritative decals preserve server facing");
   state.applySnapshot({
     tick: 3,
     steel: 0,
@@ -238,7 +254,11 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
     entities: [],
     events: [{ e: EVENT.DEATH, id: 50, x: 96, y: 96, kind: KIND.SCOUT_CAR }],
   });
-  assert(state.consumePendingGroundDecals().length === 0, "GameState dedupes repeated death events by entity id");
+  state.applyAuthoritativeGroundDecals({
+    revision: 2,
+    decals: [{ id: 500, decalClass: "scorch", sourceKind: KIND.SCOUT_CAR, x: 96, y: 96, owner: 2, seed: 7 }],
+  });
+  assert(state.consumePendingGroundDecals().length === 0, "GameState dedupes authoritative records by decal id");
 }
 
 {
@@ -262,8 +282,13 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
     events: [{ e: EVENT.DEATH, id: 60, x: 80, y: 80, kind: KIND.BARRACKS }],
   });
   const decals = state.consumePendingGroundDecals();
-  assert(decals.length === 1, "GameState queues received building death decals");
-  assert(decals[0].footprintWidth === 96 && decals[0].footprintHeight === 64,
+  assert(decals.length === 0, "building death events do not bypass authoritative ground-mark sync");
+  state.applyAuthoritativeGroundDecals({
+    revision: 1,
+    decals: [{ id: 600, decalClass: "buildingScorch", sourceKind: KIND.BARRACKS, x: 80, y: 80, owner: 2, seed: 8 }],
+  });
+  const authoritative = state.consumePendingGroundDecals();
+  assert(authoritative[0].footprintWidth === 96 && authoritative[0].footprintHeight === 64,
     "GameState supplies the map tile size for building-sized scorch decals");
 }
 
@@ -292,9 +317,17 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
     events: impacts,
   });
   const decals = state.consumePendingGroundDecals();
-  assert(decals.length === 2, "GameState queues only the fog-filtered impact events it received");
-  assert(decals[0].radiusWorld === 48, "GameState supplies its map tile size to mortar decal normalization");
-  assert(decals[1].radiusWorld === 64, "GameState supplies its map tile size to artillery decal normalization");
+  assert(decals.length === 0, "transient impact events remain VFX-only");
+  state.applyAuthoritativeGroundDecals({
+    revision: 2,
+    decals: [
+      { id: 700, decalClass: "mortarBlast", sourceKind: KIND.MORTAR_TEAM, x: 64, y: 96, owner: 0, seed: 9, radiusTiles: 1.5 },
+      { id: 701, decalClass: "artilleryBlast", sourceKind: KIND.ARTILLERY, x: 128, y: 128, owner: 0, seed: 10, radiusTiles: 2 },
+    ],
+  });
+  const authoritative = state.consumePendingGroundDecals();
+  assert(authoritative[0].radiusWorld === 48, "GameState supplies its map tile size to mortar decal normalization");
+  assert(authoritative[1].radiusWorld === 64, "GameState supplies its map tile size to artillery decal normalization");
   state.applySnapshot({
     tick: 2,
     steel: 0,
@@ -304,5 +337,19 @@ assert(groundDecalClassForImpactEvent(EVENT.ATTACK) === GROUND_DECAL_CLASS.NONE,
     entities: [],
     events: impacts,
   });
-  assert(state.consumePendingGroundDecals().length === 0, "GameState does not stamp duplicate impact snapshot events twice");
+  assert(state.consumePendingGroundDecals().length === 0, "repeated transient impacts cannot duplicate authoritative marks");
+}
+
+{
+  const decal = normalizeAuthoritativeGroundDecal({
+    id: 99,
+    decalClass: "infantry",
+    sourceKind: KIND.RIFLEMAN,
+    x: 32,
+    y: 64,
+    owner: 1,
+    seed: 123,
+  }, { players: start.players, tileSize: 32 });
+  assert(decal.kind === KIND.RIFLEMAN && decal.color === "#ff0000",
+    "authoritative wire records normalize sourceKind and owner color for the renderer");
 }

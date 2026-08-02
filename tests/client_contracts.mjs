@@ -34,6 +34,7 @@ await import("./client_contracts/terrain_variant_contracts.mjs");
 await import("./client_contracts/terrain_blend_contracts.mjs");
 await import("./client_contracts/visual_experiment_contracts.mjs");
 await import("./client_contracts/ground_decal_contracts.mjs");
+await import("./client_contracts/ground_decal_sync_contracts.mjs");
 await import("./client_contracts/ground_decal_asset_contracts.mjs");
 await import("./client_contracts/ground_decal_stress_contracts.mjs");
 await import("./client_contracts/client_boundary_contracts.mjs");

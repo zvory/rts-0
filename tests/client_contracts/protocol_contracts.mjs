@@ -58,6 +58,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     v: COMPACT_SNAPSHOT_VERSION,
     s: [42, 100, 25, 3, 10],
     ab: [true, 250, 150],
+    gr: 17,
     n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 7, 42],
     e: [
       [
@@ -389,6 +390,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       decoded.trenches[0].radiusTiles === 0.375,
     "trenches decode",
   );
+  assert(decoded.groundDecalRevision === 17, "ground decal revision decodes from the compact snapshot");
   assert(
     decoded.visibleTiles.join(",") === "1,1,0,0,0,1",
     "compact snapshot decodes server visibility grid",
@@ -414,6 +416,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     weaponEventDecoded.worldCombatPosition === null,
     "missing compact world combat position defaults to null",
   );
+  assert(weaponEventDecoded.groundDecalRevision === 0,
+    "missing compact ground decal revision defaults to zero");
   assert(
     weaponEventDecoded.events[0].weaponKind === WEAPON_KIND.TANK_CANNON,
     "six-slot compact attack event decodes weaponKind",
