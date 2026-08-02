@@ -19,6 +19,7 @@ import {
   finishPredictionRuntimeInit,
   newestPredictionSnapshot,
   recoverPredictionRuntimeAfterBudget,
+  usablePredictionAdapter,
 } from "./prediction_runtime_startup.js";
 import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
 import { prepareRenderer } from "./renderer/preparation.js";
@@ -678,9 +679,8 @@ export class Match {
   }
 
   initPredictionAdapter({ remountSettings = false } = {}) {
-    if (this.predictionAdapter?.disabledReason) this.resetPredictionAdapter();
     const token = ++this.predictionInitToken;
-    const adapter = this.predictionAdapter;
+    const adapter = usablePredictionAdapter(this);
     void adapter.init().then((ready) => {
       finishPredictionRuntimeInit(this, { token, adapter, ready, remountSettings });
     });

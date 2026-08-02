@@ -1127,38 +1127,6 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(progressToggleMatch.state.progressRetained === true, "movement toggle does not clear WASM display progress");
   assert(progressAdapterDestroyed === 0, "movement toggle keeps the compatible progress runtime alive");
 
-  const failedRuntimeMatch = Object.create(Match.prototype);
-  let failedRuntimeDestroyed = 0;
-  let replacementRuntimeInitialized = 0;
-  failedRuntimeMatch.predictionInitToken = 0;
-  failedRuntimeMatch.prediction = { enabled: true, predictor: null };
-  failedRuntimeMatch.predictionAdapter = {
-    disabledReason: "transient load failure",
-    destroy() { failedRuntimeDestroyed += 1; },
-  };
-  failedRuntimeMatch.prediction.predictor = failedRuntimeMatch.predictionAdapter;
-  failedRuntimeMatch.createPredictionAdapter = () => ({
-    disabledReason: null,
-    init: async () => {
-      replacementRuntimeInitialized += 1;
-      return true;
-    },
-    diagnostics: () => ({ ready: true }),
-    destroy() {},
-  });
-  failedRuntimeMatch.predictionRuntimeEnabled = () => true;
-  failedRuntimeMatch.latestPredictionSnapshot = null;
-  failedRuntimeMatch.publishPredictionDebug = () => {};
-  failedRuntimeMatch.logPredictionStatus = () => {};
-  failedRuntimeMatch.mountSettings = () => {};
-  failedRuntimeMatch.initPredictionAdapter();
-  await Promise.resolve();
-  await Promise.resolve();
-  assert(failedRuntimeDestroyed === 1 && replacementRuntimeInitialized === 1,
-    "retrying prediction replaces an adapter poisoned by a transient initialization failure");
-  assert(failedRuntimeMatch.prediction.predictor === failedRuntimeMatch.predictionAdapter,
-    "runtime retry reconnects the prediction controller to the replacement adapter");
-
   const progressReconcileMatch = Object.create(Match.prototype);
   let progressReconciles = 0;
   progressReconcileMatch.progressPredictionEligible = true;

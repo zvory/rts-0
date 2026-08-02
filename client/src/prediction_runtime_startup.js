@@ -6,6 +6,11 @@ export function newestPredictionSnapshot(current, candidate) {
     : current;
 }
 
+export function usablePredictionAdapter(match) {
+  if (match.predictionAdapter?.disabledReason) match.resetPredictionAdapter();
+  return match.predictionAdapter;
+}
+
 export function finishPredictionRuntimeInit(match, { token, adapter, ready, remountSettings }) {
   if (token !== match.predictionInitToken) {
     if (adapter !== match.predictionAdapter) adapter.destroy();

@@ -16,10 +16,28 @@ import { CaptureRenderClock } from "../client/src/visual_clock.js";
 import {
   finishPredictionRuntimeInit,
   recoverPredictionRuntimeAfterBudget,
+  usablePredictionAdapter,
 } from "../client/src/prediction_runtime_startup.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
+}
+
+{
+  const failed = { disabledReason: "transient load failure" };
+  const replacement = { disabledReason: null };
+  let resets = 0;
+  const match = {
+    predictionAdapter: failed,
+    resetPredictionAdapter() {
+      resets += 1;
+      this.predictionAdapter = replacement;
+    },
+  };
+  assert(usablePredictionAdapter(match) === replacement && resets === 1,
+    "retrying prediction replaces an adapter poisoned by a transient initialization failure");
+  assert(usablePredictionAdapter(match) === replacement && resets === 1,
+    "a usable adapter is retained without another reset");
 }
 
 {
