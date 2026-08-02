@@ -113,8 +113,13 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   treat forced-finalization timeouts, match-history write wait timeouts, and `failed to record
   match` logs as validation blockers for any interrupted live match, then confirm Recent Matches
   shows `Aborted` and can launch the captured replay.
-- **Deploy asset hermeticity**: release Docker builds generate browser-loadable prediction WASM
-  assets with `scripts/build-sim-wasm.sh` inside the builder image, then fail if
+- **Deploy asset hermeticity and build isolation**: release Docker builds pin the Rust builder to
+  the version in `rust-toolchain.toml`. Independent stages build only the native `rts-server`
+  executable and browser prediction WASM, allowing BuildKit to run them separately. Runtime client
+  files are copied only after both Rust builds, so client-only changes cannot invalidate Rust
+  compilation. The WASM stage generates browser-loadable assets with `scripts/build-sim-wasm.sh`
+  into a separate build output, then the runtime image copies them into `client/vendor/sim-wasm`
+  and fails if
   `client/vendor/sim-wasm/rts_sim_wasm.js` or `rts_sim_wasm_bg.wasm` is missing or empty. The
   deploy context excludes local development state and rig authoring artifacts while retaining only
   the documentation and build script used by the image; the build also fails if the checked-in
@@ -122,7 +127,9 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   so deploys must not depend on untracked files in a local checkout. Missing static asset requests
   under paths such as `/vendor`, `/src`, `/assets`, or root files with extensions return 404 instead
   of the SPA
-  `index.html`, making packaging mistakes visible to the client and probes.
+  `index.html`, making packaging mistakes visible to the client and probes. GitHub beta deploys
+  stream timestamped `flyctl` output into a step summary covering builder wait, both Rust builds,
+  image export, rollout, and total time, including cache-hit and failed-deploy reporting.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
   visibility. Normal active-player snapshots use the union of current fog from living teammates,

@@ -531,9 +531,11 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ],
-    // Static map doodads, canonicalized by ascending nonzero id. Tree records have
-    // authoritative tiny trunk collision; wildflowers are inert. Coordinates are integer
-    // world pixels. color is allowed only on wildflowers.
+    // Static authored map objects, canonicalized by ascending nonzero id. Tree records have
+    // authoritative tiny trunk collision and wildflowers are inert. Entity-backed authored
+    // objects such as unit.tank_trap are omitted so their positions arrive only through
+    // fog-filtered entity snapshots. Coordinates are integer world pixels. color is allowed only
+    // on wildflowers.
     doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ],
     stealthTiles: [ { x: u32, y: u32 } ],
     noVehicleTiles: [ { x: u32, y: u32 } ]
@@ -711,15 +713,15 @@ expose all active player rows. Each row carries that owner's completed research 
 observer views do not depend on the single-recipient top-level `upgrades` field.
 
 Durable death, mortar-impact, and artillery-impact decals live in an authoritative append-only
-store capped at 4,096 rows per match. A mark becomes known to a player only when its point or blast
-footprint is physically visible in that player's current team fog; firing ownership and transient
-event delivery do not by themselves reveal an impact hidden in fog. `groundDecalRevision` is the
-latest discovery revision for the projected player union (or the global cursor for omniscient
-views). Clients compare it with their cache and send `requestGroundDecals`; the reliable response
-contains only marks first discovered after `afterRevision`, or marks created after that cursor for
-omniscient views. Full requests from zero repair late joins, reconnects, seeks, and view changes.
-The client cache is an optimization: checkpointed server rows and discovery revisions are the
-authority.
+store with compact typed rows and a derived spatial discovery index. A mark becomes known to a
+player only when its point or blast footprint is physically visible in that player's current team
+fog; firing ownership and transient event delivery do not by themselves reveal an impact hidden
+in fog. `groundDecalRevision` is the latest discovery revision for the projected player union (or
+the global cursor for omniscient views). Clients compare it with their cache and send
+`requestGroundDecals`; the reliable response contains only marks first discovered after
+`afterRevision`, or marks created after that cursor for omniscient views. Full requests from zero
+repair late joins, reconnects, seeks, and view changes. The client cache is an optimization:
+checkpointed server rows and discovery revisions are the authority.
 
 For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
 server-authoritative union of current fog grids contributed by living teammates on the recipient's
@@ -1414,13 +1416,16 @@ supported player count; every base site is a permanent resource location, includ
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
 counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
 by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.oak`, `tree.pine`,
-`tree.spruce`, `tree.alder`, `wildflower.single`, and `wildflower.cluster`. Every tree id has the
+`tree.spruce`, `tree.alder`, `wildflower.single`, `wildflower.cluster`, and `unit.tank_trap`. Every tree id has the
 same `Tree` semantic class and authoritative 4.5-world-pixel circular trunk; species affects
 presentation only. Tree color
 is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
 `#rrggbb`. Tree trunks participate in unit standability and add a finite tile-path avoidance cost,
 while leaving the rest of their tile traversable. Wildflowers have no collision or pathing effect.
-Doodads themselves have no fog, vision, cover, or combat behavior; map overlays supply those rules.
+Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
+setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
+rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
+schema-v6 map overlays supply stealth and vehicle exclusion independently.
 Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
 count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
 doodads to `materializedMap`. Records are capped at 64, expire after two

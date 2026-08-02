@@ -20,7 +20,7 @@ Use for tests, CI/hooks, or focused verification.
   documented in `docs/interact-cli.md`.
 - `tests/run-all.sh --only-rust` — architecture policy plus Rust nextest and lint only.
 - `tests/run-all.sh --only-rust-checks` — policy plus lint, without nextest.
-- `RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest` — one CI partition.
+- `RTS_NEXTEST_PARTITION=slice:1/4 tests/run-all.sh --only-nextest` — one CI partition.
 - `tests/run-all.sh --only-live-node` — JS contracts plus live Node API suites only.
 - `tests/run-all.sh --only-browser` — browser smoke plus configured tri-state browser suites only.
 - `tests/run-all.sh --only-browser-scenarios=smoke,phase-0.5` — browser shard.
@@ -48,8 +48,8 @@ Use for tests, CI/hooks, or focused verification.
   `cd server && cargo run` first for individual Node suites.
 - Installed hooks run staged whitespace checks, excluding `playtest_notes.md`, plus docs health.
   They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
-- `agent-pr.sh` skips Codex for pure `.md` diffs; `--skip-patch-notes` skips its patch-note pass.
-  Otherwise it formats touched Rust before push.
+- `agent-pr.sh` skips Codex for pure `.md` diffs and otherwise formats touched Rust.
+  Patch notes use a local outbox, with no extra Codex pass.
 - Root npm supports Node 22.18+ Lab TypeScript and no-emit checks; daemon requests never install.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.

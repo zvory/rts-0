@@ -101,8 +101,12 @@ fi
 repo_root="$(git rev-parse --show-toplevel)"
 deploy_dir="$repo_root"
 cleanup_dir=""
+timing_log=""
 
 cleanup() {
+  if [[ -n "$timing_log" ]]; then
+    rm -f "$timing_log"
+  fi
   if [[ -n "$cleanup_dir" ]]; then
     git -C "$repo_root" worktree remove --force "$cleanup_dir" >/dev/null 2>&1 || true
   fi
@@ -140,5 +144,22 @@ deploy_cmd=(
 )
 
 deploy_cmd+=("$deploy_dir")
+
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  timing_log="$(mktemp "${TMPDIR:-/tmp}/rts-deploy-timing.XXXXXX")"
+  set +e
+  "${deploy_cmd[@]}" 2>&1 | node "$deploy_dir/scripts/deploy-timings.mjs" capture "$timing_log"
+  pipeline_status=("${PIPESTATUS[@]}")
+  set -e
+  deploy_status="${pipeline_status[0]}"
+  if [[ "${pipeline_status[1]}" -ne 0 && "$deploy_status" -eq 0 ]]; then
+    deploy_status="${pipeline_status[1]}"
+  fi
+  if ! node "$deploy_dir/scripts/deploy-timings.mjs" summarize "$timing_log" "$deploy_status" \
+    >> "$GITHUB_STEP_SUMMARY"; then
+    echo "warning: could not write deploy timing summary" >&2
+  fi
+  exit "$deploy_status"
+fi
 
 "${deploy_cmd[@]}"

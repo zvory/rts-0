@@ -907,7 +907,8 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 `MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
 status, local save/load, export, and Lab handoff; Tools owns terrain paint, start/base locations, and
-doodad authoring.
+doodad authoring. The top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
+zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
@@ -948,11 +949,13 @@ only, or erases either/both layers. The viewport shows stealth in green and vehi
 orange, including overlap; overlay strokes use the same brush/box, symmetry, undo/redo, resize,
 local-save, export, and Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
 
-The doodad palette exposes oak, pine, spruce, and alder. Trees are placed singly and share one
-mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed singly or sprayed
-with a chosen tint. Symmetry, move, delete, and undo/redo apply to doodads. Trees remain visual/trunk
-doodads; a forest's stealth and vehicle exclusion come from independent gameplay overlays.
-Wildflowers remain mechanically inert.
+The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Trees are placed singly and
+share one mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed
+singly or sprayed with a chosen tint. Tank Traps snap to tile centres and materialize at match setup
+as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
+deconstruction, and vehicle-pathing behavior. Symmetry, move, delete, and undo/redo apply to all
+authored doodads. Trees remain visual/trunk doodads; a forest's stealth and vehicle exclusion come
+from independent gameplay overlays. Wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
 The bounded server record expires after two minutes and is consumed once. Lab consumption creates a

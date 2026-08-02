@@ -130,7 +130,7 @@ try {
 
   const editorCalls = [];
   const editorRenderer = {
-    layers: { feedback: new PIXI.Container() },
+    layers: { feedback: new PIXI.Container(), buildings: new PIXI.Container() },
     world: {
       position: { set() {} },
       scale: { set() {} },
@@ -149,7 +149,10 @@ try {
     visualTimeMs: 2400,
     camera: { x: 0, y: 0, zoom: 1 },
     terrainUpdate: null,
-    doodadUpdate: { kind: "replace", revision: 1, doodads: [{ id: 8, typeId: "tree.pine", x: 4, y: 5 }] },
+    doodadUpdate: { kind: "replace", revision: 1, doodads: [
+      { id: 8, typeId: "tree.pine", x: 4, y: 5 },
+      { id: 9, typeId: "unit.tank_trap", x: 80, y: 80 },
+    ] },
     overlay: {
       revision: 1,
       gridPaths: [],
@@ -161,10 +164,23 @@ try {
       doodadBrushPreview: { x: 20, y: 20, radius: 12, mode: "spray", typeId: "wildflower.single", color: "#ffffff" },
     },
   });
+  assert.equal(editor.tankTraps.size, 1, "the editor draws authored Tank Traps with the live entity geometry");
+  assert.equal(editorRenderer.layers.buildings.children.length, 1, "Tank Trap previews use the building layer");
   editor._applyDoodads({ kind: "patch", revision: 2, upserts: [], removedIds: [8] });
+  editor._applyDoodads({
+    kind: "patch",
+    revision: 3,
+    upserts: [{ id: 10, typeId: "unit.tank_trap", x: 112, y: 80 }],
+    removedIds: [],
+  });
   editor._applyDoodads({ kind: "replace", revision: 1, doodads: [] });
   assert.equal(editorCalls.filter(([kind]) => kind === "replace").length, 1, "editor applies each monotonic doodad revision once");
-  assert.equal(editorCalls.filter(([kind]) => kind === "patch").length, 1, "editor forwards compact doodad patches");
+  assert.equal(editorCalls.filter(([kind]) => kind === "patch").length, 2, "editor forwards compact doodad patches");
+  assert.deepEqual(
+    editorCalls.filter(([kind]) => kind === "patch").at(-1)[1].removedIds,
+    [10],
+    "entity-backed upserts remove any stale static doodad that reused the same authored id",
+  );
   assert(editorCalls.some(([kind, time]) => kind === "wind" && time === 2400), "editor sway uses its detached visual clock");
   editor.destroy();
   editor.destroy();

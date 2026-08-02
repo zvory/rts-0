@@ -47,11 +47,13 @@ function readPngHeader(filePath) {
 const dockerfile = read("Dockerfile");
 const dockerignore = read(".dockerignore");
 const cargoLock = read("server/Cargo.lock");
+const rustToolchain = read("rust-toolchain.toml");
 const mainTestWorkflow = read(".github/workflows/main-tests.yml");
 const betaDeployWorkflow = read(".github/workflows/deploy-beta.yml");
 const wasmBuildScript = read("scripts/build-sim-wasm.sh");
 const wasmGitignore = read("client/vendor/sim-wasm/.gitignore");
 const deployScript = read("deploy.sh");
+const deployTimingsScript = read("scripts/deploy-timings.mjs");
 const clientIndex = read("client/index.html");
 const mainlineFlyConfig = read("fly.mainline.toml");
 const betaFlyConfig = read("fly.beta.toml");
@@ -60,6 +62,8 @@ const wasmBindgenLockVersion = cargoLock.match(
   /\[\[package\]\]\nname = "wasm-bindgen"\nversion = "([^"]+)"/,
 )?.[1];
 const wasmBindgenDockerVersion = dockerfile.match(/ARG WASM_BINDGEN_CLI_VERSION=([^\s]+)/)?.[1];
+const rustToolchainVersion = rustToolchain.match(/channel\s*=\s*"([^"]+)"/)?.[1];
+const dockerRustVersion = dockerfile.match(/^FROM rust:([^-\s]+)-bookworm AS rust-base$/m)?.[1];
 const dockerignoreEntries = new Set(
   dockerignore
     .split(/\r?\n/)
@@ -118,6 +122,11 @@ if (wasmBindgenDockerVersion !== wasmBindgenLockVersion) {
     `Dockerfile WASM_BINDGEN_CLI_VERSION=${wasmBindgenDockerVersion || "<missing>"} must match Cargo.lock wasm-bindgen ${wasmBindgenLockVersion}`,
   );
 }
+if (!rustToolchainVersion || dockerRustVersion !== rustToolchainVersion) {
+  throw new Error(
+    `Dockerfile Rust ${dockerRustVersion || "<missing>"} must match rust-toolchain.toml ${rustToolchainVersion || "<missing>"}`,
+  );
+}
 
 assertIncludes(
   wasmGitignore,
@@ -139,11 +148,27 @@ assertIncludes(
   "COPY scripts/build-sim-wasm.sh ./scripts/build-sim-wasm.sh",
   "Dockerfile must copy the WASM build script into the build context",
 );
-assertIncludes(
+assertMatches(
   dockerfile,
-  "RUN ./scripts/build-sim-wasm.sh",
+  /RUN [^\n]*\.\/scripts\/build-sim-wasm\.sh/,
   "Dockerfile must generate browser-loadable prediction WASM assets during the image build",
 );
+assertIncludes(
+  dockerfile,
+  "RTS_SIM_WASM_OUT_DIR=/app/sim-wasm-out",
+  "Dockerfile must keep generated WASM outside the runtime client source tree",
+);
+assertIncludes(
+  dockerfile,
+  "RUN cargo build --release --locked -p rts-server --bin rts-server",
+  "Dockerfile must build only the deployed native server binary",
+);
+const nativeBuildIndex = dockerfile.indexOf("RUN cargo build --release --locked -p rts-server --bin rts-server");
+const wasmBuildIndex = dockerfile.indexOf("RTS_SIM_WASM_OUT_DIR=/app/sim-wasm-out");
+const clientCopyIndex = dockerfile.indexOf("COPY client ./client");
+if (clientCopyIndex < nativeBuildIndex || clientCopyIndex < wasmBuildIndex) {
+  throw new Error("Dockerfile must copy runtime client files only after both Rust builds");
+}
 const generatedWasmAssets = [
   "./client/vendor/sim-wasm/rts_sim_wasm.js",
   "./client/vendor/sim-wasm/rts_sim_wasm_bg.wasm",
@@ -230,6 +255,26 @@ assertIncludes(
   betaDeployWorkflow,
   "./deploy.sh beta",
   "beta workflow must select the beta deployment channel",
+);
+assertIncludes(
+  deployScript,
+  "scripts/deploy-timings.mjs",
+  "deploy.sh must capture flyctl output for the GitHub step summary",
+);
+assertIncludes(
+  deployScript,
+  "GITHUB_STEP_SUMMARY",
+  "deploy.sh must publish deploy timings in the GitHub step summary",
+);
+assertIncludes(
+  deployTimingsScript,
+  'phaseRow("Prediction WASM"',
+  "deploy timing summary must report prediction WASM duration",
+);
+assertIncludes(
+  deployTimingsScript,
+  'phaseRow("Native rts-server"',
+  "deploy timing summary must report native server duration",
 );
 assertMatches(mainlineFlyConfig, /^app\s*=\s*"rts-0-zvorygin"/m, "mainline must target the canonical-domain app");
 assertMatches(betaFlyConfig, /^app\s*=\s*"rts-0-zvorygin-beta"/m, "beta must target the beta app");

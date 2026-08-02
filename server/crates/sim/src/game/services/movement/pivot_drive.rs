@@ -322,6 +322,29 @@ pub(super) fn pivot_drive_speed_scale(abs_angle_error: f32) -> f32 {
     }
 }
 
+pub(super) fn close_nudge_hull_axis_motion(
+    path_dir: (f32, f32),
+    body_facing: f32,
+    budget: f32,
+) -> ((f32, f32), f32) {
+    if !body_facing.is_finite() {
+        return (path_dir, budget);
+    }
+    let (fx, fy) = (body_facing.cos(), body_facing.sin());
+    if !fx.is_finite() || !fy.is_finite() {
+        return (path_dir, budget);
+    }
+    let forward = (fx, fy);
+    let dot = path_dir.0 * forward.0 + path_dir.1 * forward.1;
+    let aligned = dot.abs() >= PIVOT_VEHICLE_CRAWL_ANGLE_RAD.cos();
+    let step_budget = if aligned { budget } else { 0.0 };
+    if dot < 0.0 {
+        ((-forward.0, -forward.1), step_budget)
+    } else {
+        (forward, step_budget)
+    }
+}
+
 pub(super) fn distance_between(from: (f32, f32), to: (f32, f32)) -> f32 {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;

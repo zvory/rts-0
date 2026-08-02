@@ -12,6 +12,10 @@ pub(crate) fn is_tree(doodad: &MapDoodad) -> bool {
     doodad.type_id.starts_with("tree.")
 }
 
+pub(crate) fn is_tank_trap(doodad: &MapDoodad) -> bool {
+    doodad.type_id == "unit.tank_trap"
+}
+
 pub(crate) fn canonicalize(
     width: u32,
     height: u32,

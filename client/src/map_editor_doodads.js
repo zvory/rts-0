@@ -10,6 +10,7 @@ export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, label: "Alder", kind: "tree" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, label: "Single flowers", kind: "wildflower" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_CLUSTER, label: "Flower cluster", kind: "wildflower" }),
+  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TANK_TRAP, label: "Tank Trap", kind: "neutral-unit" }),
 ]);
 
 const TYPE_IDS = new Set(DOODAD_TYPE_IDS);
@@ -21,6 +22,10 @@ export function isMapEditorDoodadType(typeId) {
 
 export function isWildflowerDoodadType(typeId) {
   return typeof typeId === "string" && typeId.startsWith("wildflower.") && TYPE_IDS.has(typeId);
+}
+
+export function isTankTrapDoodadType(typeId) {
+  return typeId === MAP_EDITOR_DOODAD_TYPES.TANK_TRAP;
 }
 
 export function canonicalDoodadColor(value, fallback = null) {
@@ -96,8 +101,10 @@ export function moveMapEditorDoodad(draft, id, point) {
   const doodadId = positiveSafeInteger(id);
   const record = draft?.doodads?.find((candidate) => candidate.id === doodadId);
   const dimensions = draftWorldDimensions(draft);
-  const x = Math.round(Number(point?.x));
-  const y = Math.round(Number(point?.y));
+  const rawX = Math.round(Number(point?.x));
+  const rawY = Math.round(Number(point?.y));
+  const x = isTankTrapDoodadType(record?.typeId) ? tileCenter(rawX) : rawX;
+  const y = isTankTrapDoodadType(record?.typeId) ? tileCenter(rawY) : rawY;
   if (
     !record || !dimensions || !Number.isFinite(x) || !Number.isFinite(y)
     || x < 0 || y < 0 || x >= dimensions.width || y >= dimensions.height
@@ -209,8 +216,10 @@ export function extendDoodadSprayStroke(stroke, point) {
 
 function normalizedDoodadFields(source, dimensions) {
   const typeId = String(source?.typeId || "");
-  const x = Number(source?.x);
-  const y = Number(source?.y);
+  const sourceX = Number(source?.x);
+  const sourceY = Number(source?.y);
+  const x = isTankTrapDoodadType(typeId) && Number.isInteger(sourceX) ? tileCenter(sourceX) : sourceX;
+  const y = isTankTrapDoodadType(typeId) && Number.isInteger(sourceY) ? tileCenter(sourceY) : sourceY;
   if (
     !TYPE_IDS.has(typeId) || !Number.isInteger(x) || !Number.isInteger(y)
     || x < 0 || y < 0 || x >= dimensions.width || y >= dimensions.height
@@ -221,6 +230,10 @@ function normalizedDoodadFields(source, dimensions) {
     if (color) record.color = color;
   }
   return record;
+}
+
+function tileCenter(worldCoordinate) {
+  return Math.floor(worldCoordinate / 32) * 32 + 16;
 }
 
 function spraySpacing(radius, density) {

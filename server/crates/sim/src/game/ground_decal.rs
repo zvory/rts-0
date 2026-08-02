@@ -5,19 +5,27 @@ use crate::game::entity::EntityKind;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::protocol::{self, GroundDecalView};
-use crate::rules::{
-    artillery_ground_decal_source_kind, death_ground_decal_class, mortar_ground_decal_source_kind,
-};
+use crate::rules::{artillery_ground_decal_source_kind, mortar_ground_decal_source_kind};
 use serde::{Deserialize, Serialize};
 
-pub(crate) const MAX_GROUND_DECALS: usize = 4_096;
+mod spatial_index;
+mod types;
+
+use spatial_index::GroundDecalSpatialIndex;
+use types::{
+    deserialize_source_kind, serialize_source_kind, valid_class_and_source, GroundDecalClass,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct GroundDecal {
     id: u32,
-    decal_class: String,
-    source_kind: String,
+    decal_class: GroundDecalClass,
+    #[serde(
+        serialize_with = "serialize_source_kind",
+        deserialize_with = "deserialize_source_kind"
+    )]
+    source_kind: EntityKind,
     x: f32,
     y: f32,
     owner: u32,
@@ -32,8 +40,8 @@ impl GroundDecal {
     fn to_view(&self) -> GroundDecalView {
         GroundDecalView {
             id: self.id,
-            decal_class: self.decal_class.clone(),
-            source_kind: self.source_kind.clone(),
+            decal_class: self.decal_class.wire_name().to_string(),
+            source_kind: protocol::kind_to_wire(self.source_kind).to_string(),
             x: self.x,
             y: self.y,
             owner: self.owner,
@@ -46,9 +54,6 @@ impl GroundDecal {
 }
 
 /// Append-only authoritative ground marks plus per-player first-discovery cursors.
-///
-/// The beta cap is intentionally simple: once full, the match stops creating new marks. Existing
-/// marks and revision cursors never shift underneath a client.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct GroundDecalStore {
@@ -56,6 +61,8 @@ pub(crate) struct GroundDecalStore {
     revision: u32,
     decals: Vec<GroundDecal>,
     discovered_by_player: BTreeMap<u32, BTreeMap<u32, u32>>,
+    #[serde(skip)]
+    spatial_index: GroundDecalSpatialIndex,
 }
 
 impl Default for GroundDecalStore {
@@ -71,6 +78,7 @@ impl GroundDecalStore {
             revision: 0,
             decals: Vec::new(),
             discovered_by_player: BTreeMap::new(),
+            spatial_index: GroundDecalSpatialIndex::new(),
         }
     }
 
@@ -83,17 +91,8 @@ impl GroundDecalStore {
         facing: Option<f32>,
         weapon_facing: Option<f32>,
     ) -> Option<u32> {
-        let decal_class = death_ground_decal_class(kind)?;
-        self.create(
-            decal_class,
-            protocol::kind_to_wire(kind),
-            x,
-            y,
-            owner,
-            facing,
-            weapon_facing,
-            None,
-        )
+        let decal_class = GroundDecalClass::from_death_kind(kind)?;
+        self.create(decal_class, kind, x, y, owner, facing, weapon_facing, None)
     }
 
     pub(crate) fn create_mortar_impact(&mut self, map: &Map, x: f32, y: f32) -> Option<u32> {
@@ -102,8 +101,8 @@ impl GroundDecalStore {
             return None;
         }
         self.create(
-            "mortarBlast",
-            protocol::kind_to_wire(mortar_ground_decal_source_kind()),
+            GroundDecalClass::MortarBlast,
+            mortar_ground_decal_source_kind(),
             x,
             y,
             0,
@@ -119,8 +118,8 @@ impl GroundDecalStore {
             return None;
         }
         self.create(
-            "artilleryBlast",
-            protocol::kind_to_wire(artillery_ground_decal_source_kind()),
+            GroundDecalClass::ArtilleryBlast,
+            artillery_ground_decal_source_kind(),
             x,
             y,
             0,
@@ -133,8 +132,8 @@ impl GroundDecalStore {
     #[allow(clippy::too_many_arguments)]
     fn create(
         &mut self,
-        decal_class: &str,
-        source_kind: &str,
+        decal_class: GroundDecalClass,
+        source_kind: EntityKind,
         x: f32,
         y: f32,
         owner: u32,
@@ -142,8 +141,7 @@ impl GroundDecalStore {
         weapon_facing: Option<f32>,
         radius_tiles: Option<f32>,
     ) -> Option<u32> {
-        if self.decals.len() >= MAX_GROUND_DECALS
-            || self.next_id == 0
+        if self.next_id == 0
             || !x.is_finite()
             || !y.is_finite()
             || facing.is_some_and(|value| !value.is_finite())
@@ -152,13 +150,14 @@ impl GroundDecalStore {
         {
             return None;
         }
+        self.spatial_index.ensure(&self.decals);
         let created_revision = self.next_revision()?;
         let id = self.next_id;
         self.next_id = self.next_id.checked_add(1).unwrap_or(0);
         self.decals.push(GroundDecal {
             id,
-            decal_class: decal_class.to_string(),
-            source_kind: source_kind.to_string(),
+            decal_class,
+            source_kind,
             x,
             y,
             owner,
@@ -168,22 +167,45 @@ impl GroundDecalStore {
             radius_tiles,
             created_revision,
         });
+        if let Some(decal) = self.decals.last() {
+            self.spatial_index.add(decal);
+        }
         Some(id)
     }
 
     pub(crate) fn refresh_memory_for_player(&mut self, player: u32, fog: &Fog) {
-        let newly_visible = self
-            .decals
-            .iter()
-            .filter(|decal| {
-                !self
-                    .discovered_by_player
-                    .get(&player)
-                    .is_some_and(|known| known.contains_key(&decal.id))
-                    && decal_visible_to_player(decal, player, fog)
-            })
-            .map(|decal| decal.id)
-            .collect::<Vec<_>>();
+        self.spatial_index.ensure(&self.decals);
+        let mut newly_visible = BTreeSet::new();
+        if let Some((width, visible)) = fog.visible_grid_for(player) {
+            for (index, is_visible) in visible.iter().copied().enumerate() {
+                if !is_visible {
+                    continue;
+                }
+                let Ok(index) = u32::try_from(index) else {
+                    continue;
+                };
+                let tx = index % width;
+                let ty = index / width;
+                let Some(candidates) = self.spatial_index.candidates(tx, ty) else {
+                    continue;
+                };
+                for &id in candidates {
+                    if self
+                        .discovered_by_player
+                        .get(&player)
+                        .is_some_and(|known| known.contains_key(&id))
+                    {
+                        continue;
+                    }
+                    let Some(decal) = decal_for_id(&self.decals, id) else {
+                        continue;
+                    };
+                    if decal_visible_to_player(decal, player, fog) {
+                        newly_visible.insert(id);
+                    }
+                }
+            }
+        }
         for id in newly_visible {
             let Some(revision) = self.next_revision() else {
                 return;
@@ -244,22 +266,22 @@ impl GroundDecalStore {
         )
     }
 
-    pub(in crate::game) fn checkpoint_len(&self) -> usize {
-        self.decals.len()
-    }
-
     pub(in crate::game) fn valid_checkpoint_state(
         &self,
         map: &crate::game::map::Map,
         player_ids: &BTreeSet<u32>,
     ) -> bool {
-        if self.next_id == 0 || self.decals.len() > MAX_GROUND_DECALS {
+        if self.next_id == 0 {
             return false;
         }
         let mut ids = BTreeSet::new();
         let mut used_revisions = BTreeSet::new();
-        for decal in &self.decals {
+        for (index, decal) in self.decals.iter().enumerate() {
+            let expected_id = u32::try_from(index)
+                .ok()
+                .and_then(|index| index.checked_add(1));
             let presentation_valid = decal.id != 0
+                && Some(decal.id) == expected_id
                 && ids.insert(decal.id)
                 && decal.created_revision != 0
                 && decal.created_revision <= self.revision
@@ -307,32 +329,9 @@ impl GroundDecalStore {
     }
 }
 
-fn valid_class_and_source(decal: &GroundDecal) -> bool {
-    let kind = EntityKind::ALL
-        .into_iter()
-        .find(|kind| protocol::kind_to_wire(*kind) == decal.source_kind);
-    match decal.decal_class.as_str() {
-        "mortarBlast" => {
-            kind == Some(mortar_ground_decal_source_kind())
-                && decal
-                    .radius_tiles
-                    .is_some_and(|radius| radius == config::MORTAR_OUTER_RADIUS_TILES)
-                && decal.owner == 0
-        }
-        "artilleryBlast" => {
-            kind == Some(artillery_ground_decal_source_kind())
-                && decal
-                    .radius_tiles
-                    .is_some_and(|radius| radius == config::ARTILLERY_OUTER_RADIUS_TILES)
-                && decal.owner == 0
-        }
-        class => {
-            decal.radius_tiles.is_none()
-                && kind
-                    .and_then(death_ground_decal_class)
-                    .is_some_and(|expected| expected == class)
-        }
-    }
+fn decal_for_id(decals: &[GroundDecal], id: u32) -> Option<&GroundDecal> {
+    let index = usize::try_from(id.checked_sub(1)?).ok()?;
+    decals.get(index).filter(|decal| decal.id == id)
 }
 
 fn decal_position_valid(decal: &GroundDecal, map: &Map) -> bool {
@@ -402,6 +401,7 @@ fn decal_visible_to_player(decal: &GroundDecal, player: u32, fog: &Fog) -> bool 
 mod tests {
     use super::*;
     use crate::game::{Game, ObserverView, PlayerInit};
+    use crate::rules::death_ground_decal_class;
 
     fn one_player_game() -> Game {
         Game::new(
@@ -432,15 +432,19 @@ mod tests {
     }
 
     #[test]
-    fn store_stops_at_cap_without_evicting_or_wrapping_ids() {
+    fn store_keeps_marks_beyond_the_old_beta_cap() {
         let mut store = GroundDecalStore::new();
         let map = one_player_game().state.map;
-        for _ in 0..MAX_GROUND_DECALS {
+        for _ in 0..4_097 {
             assert!(store.create_mortar_impact(&map, 32.0, 32.0).is_some());
         }
-        assert!(store.create_mortar_impact(&map, 64.0, 64.0).is_none());
         assert_eq!(store.decals.first().map(|decal| decal.id), Some(1));
-        assert_eq!(store.decals.last().map(|decal| decal.id), Some(4_096));
+        assert_eq!(store.decals.last().map(|decal| decal.id), Some(4_097));
+    }
+
+    #[test]
+    fn stored_mark_has_no_heap_owned_vocabulary() {
+        assert!(std::mem::size_of::<GroundDecal>() <= 64);
     }
 
     #[test]
@@ -539,6 +543,29 @@ mod tests {
             restored.ground_decals_for_observer(&ObserverView::Omniscient, 0),
             before_full
         );
+    }
+
+    #[test]
+    fn checkpoint_restore_rebuilds_spatial_discovery_index() {
+        let mut game = one_player_game();
+        game.state
+            .ground_decals
+            .create_mortar_impact(&game.state.map, 48.0, 48.0)
+            .unwrap();
+        let payload = game.checkpoint_payload_text_for_test().unwrap();
+        let mut restored = Game::restore_checkpoint_payload_text_for_test(
+            &payload,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        )
+        .unwrap();
+
+        restored
+            .state
+            .ground_decals
+            .refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
+
+        assert_eq!(restored.ground_decals_for_player(1, 0).1.len(), 1);
     }
 
     #[test]
