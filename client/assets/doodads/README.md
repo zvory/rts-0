@@ -6,7 +6,9 @@ with the Codex image-generation skill's `remove_chroma_key.py` helper, then trim
 with ImageMagick. The generated originals remain outside the repository in Codex's generated-image
 store.
 
-All prompts requested an isolated, elevated three-quarter, low-poly/PS1-style RTS sprite
+The accepted tree prompts requested an isolated, high-angle near-orthographic RTS sprite with the
+camera roughly 40–45 degrees from vertical. The flower prompts requested the original elevated
+three-quarter view. Both use a low-poly/PS1-style raster treatment
 with restrained natural colors, crisp edges, no shadow, no text, no watermark, and no scenery.
 The subjects were:
 
