@@ -179,7 +179,8 @@ mod tests {
     fn rifleman_tile_path_routes_around_tree_trunk_tile() {
         let size = 12;
         let mut map = Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             ..Default::default()
         };
@@ -212,7 +213,8 @@ mod tests {
     fn local_visibility_route_crosses_a_tree_tile_without_crossing_its_trunk() {
         let size = 12;
         let mut map = Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             ..Default::default()
         };

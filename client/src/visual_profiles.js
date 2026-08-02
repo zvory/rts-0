@@ -177,6 +177,13 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     staticSamples: TRENCH_VARIANTS_1_STATIC_SAMPLES,
   }),
   Object.freeze({
+    id: "terrain-blend-showcase",
+    label: "Terrain blend showcase",
+    description: "Fog-free Lab framing for the production stochastic terrain transition matrix.",
+    initialCamera: cameraSnapshot(2016, 2016, 0.58),
+    terrainPreviewReveal: true,
+  }),
+  Object.freeze({
     id: "unit-rig-overrides-1",
     label: "Unit rig overrides 1",
     description: "Local checked-in profile for comparing real Tank rig candidates in the render-preview lab scenario.",

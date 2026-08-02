@@ -1,5 +1,7 @@
 {
   "version": 5,
+  "width": 166,
+  "height": 166,
   "name": "Schone Tage",
   "description": "Two-player custom map with central waterways and expanded approach distance.",
   "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",

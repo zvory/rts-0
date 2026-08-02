@@ -386,7 +386,8 @@ mod tests {
 
     fn flat_test_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![(1, 1)],
             ..Default::default()
@@ -413,7 +414,8 @@ mod tests {
             }
         }
         Map {
-            size: size as u32,
+            width: size as u32,
+            height: size as u32,
             terrain,
             starts: vec![],
             ..Default::default()

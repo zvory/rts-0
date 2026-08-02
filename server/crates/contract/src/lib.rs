@@ -331,8 +331,12 @@ pub fn classify_map_doodad(type_id: &str) -> Option<MapDoodadClass> {
     }
 }
 
-/// Validate a canonical doodad list at an already overflow-checked world size.
-pub fn validate_map_doodads(doodads: &[MapDoodad], world_size_px: u32) -> Result<(), String> {
+/// Validate a canonical doodad list at already overflow-checked world dimensions.
+pub fn validate_map_doodads(
+    doodads: &[MapDoodad],
+    world_width_px: u32,
+    world_height_px: u32,
+) -> Result<(), String> {
     if doodads.len() > MAX_MAP_DOODADS {
         return Err(format!(
             "doodads must contain at most {MAX_MAP_DOODADS} entries"
@@ -350,9 +354,9 @@ pub fn validate_map_doodads(doodads: &[MapDoodad], world_size_px: u32) -> Result
             ));
         }
         previous_id = doodad.id;
-        if doodad.x >= world_size_px || doodad.y >= world_size_px {
+        if doodad.x >= world_width_px || doodad.y >= world_height_px {
             return Err(format!(
-                "doodads[{index}] position ({},{}) is outside the {world_size_px}px map",
+                "doodads[{index}] position ({},{}) is outside the {world_width_px}x{world_height_px}px map",
                 doodad.x, doodad.y
             ));
         }
@@ -406,15 +410,34 @@ mod map_doodad_tests {
         let too_many = (1..=(MAX_MAP_DOODADS as u32 + 1))
             .map(flower)
             .collect::<Vec<_>>();
-        assert!(validate_map_doodads(&too_many, 1_024)
+        assert!(validate_map_doodads(&too_many, 1_024, 1_024)
             .expect_err("count cap")
             .contains("at most"));
-        assert!(validate_map_doodads(&[flower(2), flower(1)], 1_024)
+        assert!(validate_map_doodads(&[flower(2), flower(1)], 1_024, 1_024)
             .expect_err("canonical order")
             .contains("ascending unique id"));
-        assert!(validate_map_doodads(&[flower(1), flower(1)], 1_024)
+        assert!(validate_map_doodads(&[flower(1), flower(1)], 1_024, 1_024)
             .expect_err("duplicate ids")
             .contains("ascending unique id"));
+    }
+
+    #[test]
+    fn map_doodad_validator_enforces_rectangular_world_bounds() {
+        let mut doodad = flower(1);
+        doodad.x = 639;
+        doodad.y = 319;
+        validate_map_doodads(&[doodad.clone()], 640, 320).expect("last pixel is in bounds");
+
+        doodad.x = 640;
+        let error = validate_map_doodads(&[doodad.clone()], 640, 320)
+            .expect_err("width bound must be independent");
+        assert!(error.contains("640x320px map"), "error was: {error}");
+
+        doodad.x = 639;
+        doodad.y = 320;
+        let error = validate_map_doodads(&[doodad], 640, 320)
+            .expect_err("height bound must be independent");
+        assert!(error.contains("640x320px map"), "error was: {error}");
     }
 
     #[test]

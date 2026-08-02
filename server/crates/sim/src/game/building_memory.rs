@@ -172,7 +172,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: Vec::new(),
             ..Default::default()
@@ -196,7 +197,7 @@ mod tests {
     fn records_visible_enemy_building_state() {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         let smokes = SmokeCloudStore::new();
         let mut memory = BuildingMemory::default();
         let scout_pos = map.tile_center(8, 8);
@@ -238,7 +239,7 @@ mod tests {
     fn does_not_record_never_scouted_enemy_building() {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         let smokes = SmokeCloudStore::new();
         let mut memory = BuildingMemory::default();
         let scout_pos = map.tile_center(4, 4);
@@ -259,7 +260,7 @@ mod tests {
     fn forgets_scouted_tank_trap_scaffold_when_it_becomes_neutral() {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         let smokes = SmokeCloudStore::new();
         let mut memory = BuildingMemory::default();
         let scout_pos = map.tile_center(8, 8);
@@ -294,7 +295,7 @@ mod tests {
     fn keeps_hidden_destroyed_building_until_location_is_scouted() {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         let smokes = SmokeCloudStore::new();
         let mut memory = BuildingMemory::default();
         let scout_pos = map.tile_center(8, 8);
@@ -335,7 +336,7 @@ mod tests {
     fn does_not_refresh_enemy_building_inside_smoke() {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         let mut smokes = SmokeCloudStore::new();
         let mut memory = BuildingMemory::default();
         let scout_pos = map.tile_center(8, 8);

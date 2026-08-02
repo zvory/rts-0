@@ -616,8 +616,18 @@ try {
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
-      blankMapSize: (() => {
-        const input = document.querySelector("input[aria-label='Blank map size']");
+      blankMapWidth: (() => {
+        const input = document.querySelector("input[aria-label='Map width']");
+        return input && {
+          type: input.type,
+          value: input.value,
+          min: input.min,
+          max: input.max,
+          width: input.getBoundingClientRect().width,
+        };
+      })(),
+      blankMapHeight: (() => {
+        const input = document.querySelector("input[aria-label='Map height']");
         return input && {
           type: input.type,
           value: input.value,
@@ -654,13 +664,18 @@ try {
       editorUi.symmetryOptions.includes("Radial (4-way)") &&
       editorUi.symmetryOptions.includes("Diagonal ↘ (top-left ↔ bottom-right)") &&
       editorUi.symmetryOptions.includes("Diagonal ↙ (top-right ↔ bottom-left)") &&
-      editorUi.blankMapSize?.type === "number" &&
-      editorUi.blankMapSize.value === "126" &&
-      editorUi.blankMapSize.min === "16" &&
-      editorUi.blankMapSize.max === "166" &&
-      editorUi.blankMapSize.width <= 80 &&
+      editorUi.blankMapWidth?.type === "number" &&
+      editorUi.blankMapWidth.value === "126" &&
+      editorUi.blankMapWidth.min === "16" &&
+      editorUi.blankMapWidth.max === "256" &&
+      editorUi.blankMapWidth.width <= 80 &&
+      editorUi.blankMapHeight?.type === "number" &&
+      editorUi.blankMapHeight.value === "126" &&
+      editorUi.blankMapHeight.min === "16" &&
+      editorUi.blankMapHeight.max === "256" &&
+      editorUi.blankMapHeight.width <= 80 &&
       editorUi.clearanceSection === "Start and base locations",
-    "MAP EDITOR: symmetry, custom blank-map size, and grass-clearance controls are presented correctly",
+    "MAP EDITOR: symmetry, independent blank-map dimensions, and grass-clearance controls are presented correctly",
   );
   await editorPage.close();
 

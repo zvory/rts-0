@@ -15,7 +15,7 @@ impl Game {
         validate_tank_launch("Tank under-fire retreat", unit, unit_count, 1)?;
 
         let mut map = flat_dev_map(2);
-        let center_tile = (map.size / 2, map.size / 2);
+        let center_tile = (map.width / 2, map.height / 2);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = center_tile;
         }
@@ -62,7 +62,7 @@ impl Game {
         validate_tank_launch("Tank reverse-traffic", unit, unit_count, 3)?;
 
         let mut map = flat_dev_map(2);
-        let center_tile = (map.size / 2, map.size / 2);
+        let center_tile = (map.width / 2, map.height / 2);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = center_tile;
         }

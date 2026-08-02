@@ -43,7 +43,7 @@ export const MINING_CC_RANGE_TILES = 11.0;
 export const OIL_LOAD = 2;
 export const HARVEST_TICKS = 40;
 export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20;
-export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 35 * Math.PI / 180;
+export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 30 * Math.PI / 180;
 export const ARTILLERY_MIN_RANGE_TILES = 10;
 export const ARTILLERY_MAX_RANGE_TILES = 35;
 export const ARTILLERY_FIELD_OF_FIRE_RAD = 30 * Math.PI / 180;
@@ -135,7 +135,7 @@ export const STATS = Object.freeze({
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
     rangeTiles: 6, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
-    rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 150, oil: 40 }, supply: 3, buildTicks: 440,
+    rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 150, oil: 40 }, supply: 6, buildTicks: 440,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 10,

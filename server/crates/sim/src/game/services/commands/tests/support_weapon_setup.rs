@@ -5,7 +5,7 @@ fn setup_anti_tank_gun_group_fans_authoritatively_from_one_command() {
     let map = flat_map(64);
     let tile = config::TILE_SIZE as f32;
     let mut entities = EntityStore::new();
-    let guns: Vec<u32> = [-10.0_f32, -5.0, 0.0, 5.0, 10.0]
+    let guns: Vec<u32> = [-10.0_f32, -5.0, 5.0, 10.0]
         .into_iter()
         .map(|y_tiles| {
             entities
@@ -35,9 +35,8 @@ fn setup_anti_tank_gun_group_fans_authoritatively_from_one_command() {
 
     let expected = [
         -std::f32::consts::FRAC_PI_4,
-        -std::f32::consts::FRAC_PI_8,
-        0.0,
-        std::f32::consts::FRAC_PI_8,
+        -std::f32::consts::FRAC_PI_4 / 3.0,
+        std::f32::consts::FRAC_PI_4 / 3.0,
         std::f32::consts::FRAC_PI_4,
     ];
     for (id, expected_facing) in guns.into_iter().zip(expected) {

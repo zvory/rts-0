@@ -17,6 +17,7 @@ const EXPECTED_LEGACY_READS = [
   "match.frameProfiler",
   "match.visualProfile.unitOverrides",
   "match.visualProfile.frameStripOverrides",
+  "match.visualProfile.terrainPreviewReveal",
   "match.presentationAssembler.staticMap",
 ];
 
@@ -121,6 +122,10 @@ const sourceState = {
   consumePendingGroundDecals() { destructiveReads += 1; return []; },
 };
 const engine = fakeEngine();
+let activeVisualProfile = {
+  unitOverrides: [{ id: "test" }],
+  frameStripOverrides: [],
+};
 const measuredPhases = [];
 const profiler = {
   recordDiagnosticCounter() {},
@@ -133,7 +138,7 @@ const sources = {
   renderClock: { now: () => 500 },
   state: () => sourceState,
   profiler: () => profiler,
-  visualProfile: () => ({ unitOverrides: [{ id: "test" }], frameStripOverrides: [] }),
+  visualProfile: () => activeVisualProfile,
   staticMap: () => assembler.staticMap,
 };
 const adapter = new PixiPresentationAdapter(null, sources, { renderer: engine });
@@ -161,6 +166,9 @@ assert(engine.renders[0].state._curById.get(7).x === 22, "allowlisted current po
 assert(engine.renders[0].state.weaponRecoil(7) === 0.25, "allowlisted recoil is sampled once at assembly time");
 assert(engine.renders[0].state.weaponRecoilKind(7) === "rifleman_rifle", "weapon-specific recoil art receives the sampled weapon kind");
 assert(engine.renders[0].fog.isVisible(0, 0) && !engine.renders[0].fog.isVisible(1, 0), "Pixi fog facade reads backend-owned grid copies");
+activeVisualProfile = { ...activeVisualProfile, terrainPreviewReveal: true };
+assert((await adapter.render({ ...frame }).settled).status === PRESENTATION_OUTCOME.PRESENTED, "terrain preview profile presents normally");
+assert(engine.renders.at(-1).fog === null, "terrain preview profile suppresses only the Pixi fog presentation");
 assert(engine.marquees[0].w === 10 && engine.marquees[0].h === 12, "screen marquee is drawn from the assembled screenOverlay layer");
 assert(
   engine.renders[0].options.feedbackView.formationMovePreview?.points.length === 2

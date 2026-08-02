@@ -56,7 +56,7 @@ pub(super) fn validate_firing_reveal_visibility(
                 || visibility.episode_started_at_tick > tick
                 || visibility
                     .revealed_tile
-                    .is_some_and(|tile| tile >= fog.size.saturating_mul(fog.size))
+                    .is_some_and(|tile| tile >= fog.width.saturating_mul(fog.height))
             {
                 return Err(CheckpointPayloadError::InvalidValue {
                     field: "fog.firingRevealVisibility",

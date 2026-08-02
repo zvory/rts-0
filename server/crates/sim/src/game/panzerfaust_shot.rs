@@ -219,7 +219,7 @@ mod tests {
             .expect("Rifleman should still exist")
             .set_position(220.0, 100.0);
         let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
-        let fog = Fog::new(24);
+        let fog = Fog::new(24, 24);
         let smokes = SmokeCloudStore::new();
         let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
 

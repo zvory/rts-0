@@ -9,7 +9,8 @@ use super::LabError;
 pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
     LabMapDraft {
         name: name.to_string(),
-        size: map.size,
+        width: map.width,
+        height: map.height,
         terrain: map.terrain.clone(),
         starts: map
             .starts

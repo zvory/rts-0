@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
-    LabScenarioBaseSite, LabScenarioLabMetadata, LabScenarioTile,
+    LabScenarioBaseSite, LabScenarioLabMetadata, LabScenarioTile, MapDoodad,
 };
 use serde_json::json;
 
@@ -22,7 +22,8 @@ fn checkpoint_payload(
             "schemaVersion": 2,
             "contentHash": content_hash,
             "materializedMapHash": materialized_hash,
-            "size": 2,
+            "width": 3,
+            "height": 2,
             "playerCount": players.len(),
         },
         "seed": seed,
@@ -55,8 +56,9 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
             content_hash: content_hash.to_string(),
             materialized_hash: materialized_hash.to_string(),
             data: LabCheckpointScenarioMapData {
-                size: 2,
-                terrain: vec![terrain::GRASS; 4],
+                width: 3,
+                height: 2,
+                terrain: vec![terrain::GRASS; 6],
                 starts: vec![
                     LabScenarioTile { x: 0, y: 0 },
                     LabScenarioTile { x: 1, y: 1 },
@@ -415,6 +417,23 @@ fn lab_replay_artifact_rejects_duplicate_base_resource_records() {
         .expect_err("duplicate base coordinates must not ambiguously bind resource counts");
 
     assert!(error.to_string().contains("duplicate base sites"));
+}
+
+#[test]
+fn lab_replay_artifact_rejects_doodads_outside_rectangular_map_height() {
+    let mut artifact = valid_artifact();
+    artifact.initial_setup.map.data.doodads = vec![MapDoodad {
+        id: 1,
+        type_id: "tree.oak".to_string(),
+        x: 64,
+        y: 64,
+        color: None,
+    }];
+
+    let error = validate_lab_replay_artifact(&artifact)
+        .expect_err("a doodad below the 3x2 map must be rejected");
+
+    assert!(error.to_string().contains("96x64px map"));
 }
 
 #[test]

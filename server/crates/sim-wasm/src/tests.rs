@@ -726,6 +726,31 @@ fn simple_move_command_advances_owned_unit() {
 }
 
 #[test]
+fn rectangular_map_clamps_move_targets_per_axis() {
+    let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
+    let mut start = start_payload();
+    start.map.width = 8;
+    start.map.height = 4;
+    start.map.terrain = vec![0; 8 * 4];
+    let mut predictor = predictor_from_start_payload(start, 1);
+    predictor.import_baseline(baseline).unwrap();
+
+    predictor.enqueue_command(
+        1,
+        Command::Move {
+            units: vec![101],
+            x: 10_000.0,
+            y: 10_000.0,
+            queued: false,
+        },
+    );
+
+    let order = &predictor.local_lane_summary().owned_entities[0].order_plan[0];
+    assert_eq!(order.x, 8.0 * balance::TILE_SIZE as f32 - 0.01);
+    assert_eq!(order.y, 4.0 * balance::TILE_SIZE as f32 - 0.01);
+}
+
+#[test]
 fn queued_move_commands_are_preserved_in_order() {
     let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
     let mut predictor = predictor_from_start_payload(start_payload(), 1);

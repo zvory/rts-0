@@ -19,8 +19,11 @@ pub(crate) mod doodads;
 #[cfg(test)]
 mod team_assignment_tests;
 
-use crate::{config, protocol::{terrain, MapDoodad}};
 use crate::rules::terrain as terrain_rules;
+use crate::{
+    config,
+    protocol::{terrain, MapDoodad},
+};
 use serde::{Deserialize, Serialize};
 
 pub use rts_protocol::AvailableMap;
@@ -52,9 +55,11 @@ pub const BASE_SITE_PROTECTION_RADIUS_TILES: i32 = 4;
 /// The terrain grid, selected player starts, and every authored permanent base site.
 #[derive(Debug, Clone)]
 pub struct Map {
-    /// Side length in tiles (square map).
-    pub size: u32,
-    /// Row-major terrain codes, length `size * size`.
+    /// Map width in tiles.
+    pub width: u32,
+    /// Map height in tiles.
+    pub height: u32,
+    /// Row-major terrain codes, length `width * height`.
     pub terrain: Vec<u8>,
     /// One start tile `(tile_x, tile_y)` per player, in player-index order.
     pub starts: Vec<(u32, u32)>,
@@ -171,7 +176,8 @@ impl Map {
 
     pub(crate) fn materialized_hash(&self) -> String {
         let mut hash = FNV_OFFSET_BASIS;
-        hash = fnv_bytes(hash, &self.size.to_le_bytes());
+        hash = fnv_bytes(hash, &self.width.to_le_bytes());
+        hash = fnv_bytes(hash, &self.height.to_le_bytes());
         hash = fnv_bytes(hash, &self.terrain);
         hash = fnv_usize(hash, self.starts.len());
         for &(x, y) in &self.starts {
@@ -258,19 +264,19 @@ impl Map {
 
     #[inline]
     pub fn index(&self, x: u32, y: u32) -> usize {
-        (y * self.size + x) as usize
+        (y * self.width + x) as usize
     }
 
     /// Whether a tile coordinate is inside the map.
     #[inline]
     pub fn in_bounds(&self, x: i32, y: i32) -> bool {
-        x >= 0 && y >= 0 && (x as u32) < self.size && (y as u32) < self.size
+        x >= 0 && y >= 0 && (x as u32) < self.width && (y as u32) < self.height
     }
 
     /// Terrain code at a tile (GRASS for out-of-bounds, treated impassable elsewhere).
     #[inline]
     pub fn terrain_at(&self, x: u32, y: u32) -> u8 {
-        if x < self.size && y < self.size {
+        if x < self.width && y < self.height {
             self.terrain[self.index(x, y)]
         } else {
             terrain::ROCK
@@ -300,12 +306,31 @@ impl Map {
         let ts = config::TILE_SIZE as f32;
         let tx = (x / ts).floor().max(0.0) as u32;
         let ty = (y / ts).floor().max(0.0) as u32;
-        (tx.min(self.size - 1), ty.min(self.size - 1))
+        (
+            tx.min(self.width.saturating_sub(1)),
+            ty.min(self.height.saturating_sub(1)),
+        )
     }
 
-    /// World size in pixels (square).
-    pub fn world_size_px(&self) -> f32 {
-        self.size as f32 * config::TILE_SIZE as f32
+    /// World width in pixels.
+    pub fn world_width_px(&self) -> f32 {
+        self.width as f32 * config::TILE_SIZE as f32
+    }
+
+    /// World height in pixels.
+    pub fn world_height_px(&self) -> f32 {
+        self.height as f32 * config::TILE_SIZE as f32
+    }
+
+    /// Whether a finite world-pixel point lies inside the playable rectangle.
+    #[inline]
+    pub fn contains_world_point(&self, x: f32, y: f32) -> bool {
+        x.is_finite()
+            && y.is_finite()
+            && x >= 0.0
+            && y >= 0.0
+            && x < self.world_width_px()
+            && y < self.world_height_px()
     }
 }
 
@@ -325,7 +350,7 @@ fn default_available_map() -> AvailableMap {
 fn available_map_from_json(stem: &str, json: &str) -> Option<AvailableMap> {
     let v = serde_json::from_str::<serde_json::Value>(json).ok()?;
     let version = v.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
-    if version != CURRENT_MAP_VERSION as u64 {
+    if u32::try_from(version).ok() != Some(CURRENT_MAP_VERSION) {
         return None;
     }
     let name = v
@@ -393,8 +418,9 @@ mod tests {
     fn hardcoded_map_loads_for_every_supported_player_count() {
         for player_count in 1..=4 {
             let map = Map::generate(player_count, 0x1234_5678);
-            assert_eq!(map.size, 126);
-            assert_eq!(map.terrain.len(), (map.size * map.size) as usize);
+            assert_eq!(map.width, 126);
+            assert_eq!(map.height, 126);
+            assert_eq!(map.terrain.len(), (map.width * map.height) as usize);
             assert_eq!(map.starts.len(), player_count);
             assert!(!map.base_sites.is_empty());
 
@@ -437,7 +463,7 @@ mod tests {
 
         let map = Map::load("Chokes", 2, 0x1234_5678)
             .expect("default handcrafted map should load from bundled assets");
-        assert_eq!(map.size, 126);
+        assert_eq!(map.width, 126);
         assert_eq!(map.starts.len(), 2);
 
         let one_v_one_authored = available
@@ -505,7 +531,7 @@ mod tests {
         for player_count in 1..=4 {
             let map = Map::load("4 Player Map", player_count, 0x1234_5678)
                 .expect("four-player map should load for every supported player count");
-            assert_eq!(map.size, 166);
+            assert_eq!(map.width, 166);
             assert_eq!(map.starts.len(), player_count);
             assert_eq!(map.base_sites.len(), 16);
         }
@@ -514,7 +540,7 @@ mod tests {
     #[test]
     fn one_v_one_map_is_rotationally_symmetric() {
         let map = Map::load("1v1", 2, 0x1234_5678).expect("1v1 should load");
-        let size = map.size as usize;
+        let size = map.width as usize;
 
         for y in 0..size {
             for x in 0..size {
@@ -531,7 +557,7 @@ mod tests {
         let starts: HashSet<_> = map.starts.iter().copied().collect();
         for &(x, y) in &map.starts {
             assert!(
-                starts.contains(&(map.size - 1 - x, map.size - 1 - y)),
+                starts.contains(&(map.width - 1 - x, map.width - 1 - y)),
                 "1v1 start ({x},{y}) has no rotational counterpart"
             );
         }
@@ -539,7 +565,7 @@ mod tests {
         let base_sites: HashSet<_> = map.base_sites.iter().copied().collect();
         for &(x, y) in &map.base_sites {
             assert!(
-                base_sites.contains(&(map.size - 1 - x, map.size - 1 - y)),
+                base_sites.contains(&(map.width - 1 - x, map.width - 1 - y)),
                 "1v1 base site ({x},{y}) has no rotational counterpart"
             );
         }
@@ -550,7 +576,7 @@ mod tests {
         let a = Map::generate(4, 0xdead_beef);
         let b = Map::generate(4, 0xdead_beef);
 
-        assert_eq!(a.size, b.size);
+        assert_eq!(a.width, b.width);
         assert_eq!(a.terrain, b.terrain);
         assert_eq!(a.starts, b.starts);
         assert_eq!(a.base_sites, b.base_sites);
@@ -606,6 +632,8 @@ mod tests {
             r#"{
               "version": 99,
               "name": "future",
+              "width": 2,
+              "height": 1,
               "description": "a future map",
               "_design": "n/a",
               "terrain": [".."],
@@ -621,12 +649,36 @@ mod tests {
     }
 
     #[test]
+    fn authored_map_rejects_legacy_square_schema() {
+        let err = Map::from_authored_json(
+            1,
+            r#"{
+              "version": 4,
+              "name": "legacy",
+              "width": 2,
+              "height": 2,
+              "description": "legacy square map",
+              "_design": "n/a",
+              "terrain": ["..", ".."],
+              "startLocations": [{"x": 0, "y": 0}],
+              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}]
+            }"#,
+            0,
+        )
+        .expect_err("version 4 should be rejected");
+
+        assert!(err.contains("not supported"), "error was: {err}");
+    }
+
+    #[test]
     fn authored_map_rejects_unknown_terrain_characters() {
         let err = Map::from_authored_json(
             1,
             r#"{
               "version": 5,
               "name": "bad",
+              "width": 2,
+              "height": 2,
               "description": "bad map",
               "_design": "n/a",
               "terrain": ["..", ".x"],
@@ -650,6 +702,8 @@ mod tests {
             r#"{{
               "version": 5,
               "name": "bad-base",
+              "width": 32,
+              "height": 32,
               "description": "bad base map",
               "_design": "n/a",
               "terrain": {},
@@ -674,6 +728,8 @@ mod tests {
             r#"{{
               "version": 5,
               "name": "road-base",
+              "width": 32,
+              "height": 32,
               "description": "road through a base",
               "_design": "n/a",
               "terrain": {},
@@ -687,5 +743,64 @@ mod tests {
         let map = Map::from_authored_json(1, &json, 0).expect("road should be passable");
         assert_eq!(map.terrain_at(8, 8), terrain::ROAD_BARE);
         assert!(map.is_passable(8, 8));
+    }
+
+    #[test]
+    fn version_five_authored_map_materializes_rectangular_dimensions() {
+        let rows = vec![".".repeat(30); 20];
+        let json = serde_json::json!({
+            "version": 5,
+            "name": "wide-test",
+            "width": 30,
+            "height": 20,
+            "description": "rectangular test map",
+            "_design": "n/a",
+            "terrain": rows,
+            "startLocations": [{"x": 8, "y": 8}],
+            "baseSites": [{
+                "x": 8,
+                "y": 8,
+                "steelPatches": 12,
+                "oilPatches": 3
+            }]
+        });
+
+        let map = Map::from_authored_json(1, &json.to_string(), 0)
+            .expect("rectangular v5 map should materialize");
+        assert_eq!((map.width, map.height), (30, 20));
+        assert_eq!(map.terrain.len(), 600);
+        assert_eq!(map.index(29, 19), 599);
+        assert!(map.in_bounds(29, 19));
+        assert!(!map.in_bounds(29, 20));
+        assert!(!map.in_bounds(30, 19));
+        assert_eq!(
+            map.tile_of(map.world_width_px() - 0.1, map.world_height_px() - 0.1),
+            (29, 19)
+        );
+    }
+
+    #[test]
+    fn version_five_dimensions_must_match_terrain_shape() {
+        let rows = vec![".".repeat(30); 20];
+        let json = serde_json::json!({
+            "version": 5,
+            "name": "mismatched-test",
+            "width": 20,
+            "height": 30,
+            "description": "bad rectangular test map",
+            "_design": "n/a",
+            "terrain": rows,
+            "startLocations": [{"x": 8, "y": 8}],
+            "baseSites": [{
+                "x": 8,
+                "y": 8,
+                "steelPatches": 12,
+                "oilPatches": 3
+            }]
+        });
+
+        let error = Map::from_authored_json(1, &json.to_string(), 0)
+            .expect_err("declared dimensions must bind the terrain shape");
+        assert!(error.contains("must match the 30x20 terrain grid"));
     }
 }

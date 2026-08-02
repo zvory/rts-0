@@ -26,7 +26,8 @@ fn main() {
     ];
     let size = 64;
     let map = Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(6, 6), (57, 57)],
         base_sites: vec![(6, 6), (57, 57)],

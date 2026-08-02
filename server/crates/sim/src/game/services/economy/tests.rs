@@ -9,7 +9,8 @@ use crate::protocol::terrain;
 
 fn flat_map(size: u32) -> Map {
     Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(4, 4)],
         ..Default::default()

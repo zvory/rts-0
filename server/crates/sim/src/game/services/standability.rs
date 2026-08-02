@@ -423,7 +423,7 @@ fn footprint_in_bounds_and_passable(
     let Some(max_y) = tile_y.checked_add(stats.foot_h) else {
         return false;
     };
-    if max_x > map.size || max_y > map.size {
+    if max_x > map.width || max_y > map.height {
         return false;
     }
 
@@ -439,9 +439,11 @@ fn footprint_in_bounds_and_passable(
 }
 
 fn unit_body_inside_world(map: &Map, body: UnitBody) -> bool {
-    let max = map.world_size_px();
     let aabb = body.aabb();
-    aabb.min_x >= 0.0 && aabb.min_y >= 0.0 && aabb.max_x <= max && aabb.max_y <= max
+    aabb.min_x >= 0.0
+        && aabb.min_y >= 0.0
+        && aabb.max_x <= map.world_width_px()
+        && aabb.max_y <= map.world_height_px()
 }
 
 fn body_tile_range(body: UnitBody) -> impl Iterator<Item = (i32, i32)> {
@@ -1013,7 +1015,7 @@ mod tests {
             &occ,
             EntityKind::Worker,
             map.tile_center(2, 2),
-            (map.world_size_px() + 1.0, map.tile_center(2, 2).1),
+            (map.world_width_px() + 1.0, map.tile_center(2, 2).1),
         ));
     }
 
@@ -1067,7 +1069,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
             starts: vec![],
             ..Default::default()

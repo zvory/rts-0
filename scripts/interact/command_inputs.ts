@@ -71,10 +71,11 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
     return value;
   }
   if (command === "open") {
-    exact(value, ["workspaceRoot", "map", "seed", "scenario", "renderer", "viewport"], "open");
+    exact(value, ["workspaceRoot", "map", "seed", "scenario", "visualProfile", "renderer", "viewport"], "open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) token(value.map, "open.map", 48);
     if (value.scenario != null) token(value.scenario, "open.scenario", 48);
+    if (value.visualProfile != null) token(value.visualProfile, "open.visualProfile", 48);
     if (value.renderer != null && (typeof value.renderer !== "string" || !["pixi", "babylon"].includes(value.renderer))) invalid("open.renderer", "must be pixi or babylon");
     if (value.seed != null && !((typeof value.seed === "string" && value.seed.length <= 64) || isInteger(value.seed, 0, U32_MAX))) invalid("open.seed", "must be a bounded string or unsigned integer");
     if (value.viewport != null) viewport(value.viewport, 4096, "open.viewport");

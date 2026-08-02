@@ -51,6 +51,8 @@ fn authored_doodads_are_validated_canonicalized_and_hashed() {
     let document = serde_json::json!({
         "version": CURRENT_MAP_VERSION,
         "name": "doodad-test",
+        "width": 32,
+        "height": 32,
         "description": "static decoration test",
         "_design": "test",
         "terrain": rows,
@@ -85,6 +87,8 @@ fn authored_doodads_reject_unknown_fields_and_invalid_catalog_data() {
     let base = serde_json::json!({
         "version": CURRENT_MAP_VERSION,
         "name": "bad-doodad",
+        "width": 32,
+        "height": 32,
         "description": "bad static decoration",
         "_design": "test",
         "terrain": rows,
@@ -135,4 +139,25 @@ fn authored_doodads_reject_unknown_fields_and_invalid_catalog_data() {
             "expected {expected:?}, error was: {err}"
         );
     }
+}
+
+#[test]
+fn authored_doodads_respect_rectangular_world_bounds() {
+    let document = serde_json::json!({
+        "version": CURRENT_MAP_VERSION,
+        "name": "rectangular-doodad-test",
+        "width": 32,
+        "height": 16,
+        "description": "rectangular static decoration test",
+        "_design": "test",
+        "terrain": vec![".".repeat(32); 16],
+        "startLocations": [{"x": 8, "y": 8}],
+        "baseSites": [{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}],
+        "doodads": [{"id": 1, "typeId": "tree.oak", "x": 100, "y": 512}]
+    });
+
+    let error = Map::materialize_authored_json(&document.to_string(), 1)
+        .expect_err("doodad below the rectangular map must fail");
+
+    assert!(error.contains("1024x512px map"), "error was: {error}");
 }

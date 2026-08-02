@@ -127,6 +127,7 @@ export class InteractService {
         map,
         seed: input.seed == null ? "" : String(input.seed),
         scenario: input.scenario || "blank",
+        visualProfile: typeof input.visualProfile === "string" ? input.visualProfile : "",
         devScenario: { id: input.id || "", unit: input.unit || "", count: input.count || 1,
           blocker: input.blocker || "", case: input.case || "" },
         opponent: input.opponent || "ai_2_1",
@@ -146,6 +147,7 @@ export class InteractService {
         sessionId, kind, driver, aliases: new Map<string, number>(), sceneRevision: 0,
         sceneIdentity: {
           source: "launch", kind, scenario: kind === "lab" ? input.scenario || "blank" : null,
+          visualProfile: kind === "lab" ? input.visualProfile || null : null,
           map, seed: kind === "lab" ? input.seed ?? null : null,
           opponent: kind === "game" && !input.spectate ? input.opponent || "ai_2_1" : null,
           spectate: kind === "game" ? input.spectate || null : null,

@@ -34,6 +34,7 @@ await import("./client_contracts/rifleman_png_strip_contracts.mjs");
 await import("./client_contracts/launch_url_contracts.mjs");
 await import("./client_contracts/renderer_contracts.mjs");
 await import("./client_contracts/terrain_variant_contracts.mjs");
+await import("./client_contracts/terrain_blend_contracts.mjs");
 await import("./client_contracts/visual_experiment_contracts.mjs");
 await import("./client_contracts/ground_decal_contracts.mjs");
 await import("./client_contracts/ground_decal_asset_contracts.mjs");
@@ -99,5 +100,6 @@ await import("./client_contracts/auto_spectator_contracts.mjs");
 await import("./client_contracts/audio_contracts.mjs");
 await import("./client_contracts/observer_analysis_contracts.mjs");
 await import("./client_contracts/map_editor_contracts.mjs");
+await import("./rectangular_map_asset_contracts.mjs");
 
 console.log("✅ client_contracts.mjs: all contract assertions passed");

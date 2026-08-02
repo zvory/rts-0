@@ -303,7 +303,7 @@ architecture failures.
 | `lab_god_mode_players` | `authoritative/serialized` | Serialize the canonical enabled-player set and resync mirrored entity invulnerability flags after import. | Lab ops mutate the set; `sync_lab_god_mode_flags` mirrors it onto unit/building invulnerability, and damage checks consume those entity flags. |
 | `starting_loadout` | `compatibility metadata` | Serialize until legacy/global-starting-resource compatibility constructors are retired. Checkpoint import should prefer `starting_loadouts` for per-player setup facts. | The field is set by setup constructors and dev scenarios but does not feed the per-tick systems after match creation. |
 | `rng` | `authoritative/serialized` | Serialize the exact current generator state or an equivalent deterministic draw-stream state. Re-seeding from `seed` is not valid after any random draw. | `systems::run_tick` passes `&mut self.state.rng` into combat damage/miss logic; Phase 0.5 probes cloned RNG output as semantic state. |
-| `final_spatial` | `derived/rebuildable` | Do not serialize. Rebuild with `SpatialIndex::build(&entities, map.size)` after import, after lab mutations that change entity positions/existence, and after any derived-state wipe. | `DerivedState` owns the final post-tick spatial index used by snapshots. `tick_inner` stores the final `systems::run_tick` spatial result, and Phase 0.5/2/4 checkpoint proofs compare snapshots after clearing and rebuilding it. |
+| `final_spatial` | `derived/rebuildable` | Do not serialize. Rebuild with `SpatialIndex::build(&entities, map.width, map.height)` after import, after lab mutations that change entity positions/existence, and after any derived-state wipe. | `DerivedState` owns the final post-tick spatial index used by snapshots. `tick_inner` stores the final `systems::run_tick` spatial result, and Phase 0.5/2/4 checkpoint proofs compare snapshots after clearing and rebuilding it. |
 | `pathing` | `derived/rebuildable` | Do not serialize reusable pathing cache/search entries. Recreate `PathingService` with the live default budget, cache capacity, and current tick alignment during import or derived-state rebuild. | `PathingService` cache/search bookkeeping only affects performance. Chosen unit paths, movement phases, waypoints, path goals, and throttling remain serialized on entities. Phase 0.5/2/4 tests prove clearing this cache does not change semantic state or fog-filtered snapshots. |
 
 The Phase 0.5 and Phase 2 derived-state wipe harnesses confirm the current derived boundary: only
@@ -475,7 +475,8 @@ Top-level shape:
     "schemaVersion": 2,
     "contentHash": "...",
     "materializedMapHash": "...",
-    "size": 64,
+    "width": 96,
+    "height": 64,
     "playerCount": 2
   },
   "seed": 1234,
@@ -535,12 +536,13 @@ Map policy:
   frozen materialized map facts; a debug document may include a sibling `map` object next to the
   checkpoint payload for convenience.
 - Import receives `(container metadata, exact supplied Map, GameCheckpointV1)`. Before constructing
-  a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `size`,
+  a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `width`, `height`,
   `playerCount`, and `materializedMapHash` against the supplied map. `materializedMapHash` is a
-  stable hash over the materialized live `Map` fields (`size`, row-major terrain, selected starts,
-  base sites/resource counts, and canonical doodads). An explicit empty schema-v5 doodad list has
-  the same materialized hash as the equivalent legacy no-doodad map. If any binding fact differs, the importer rejects the
-  payload; it must not fall back to regenerating a map from seed or silently accepting a nearby map.
+  stable hash over the materialized live `Map` fields (`width`, `height`, row-major terrain,
+  selected starts, base sites/resource counts, and canonical doodads). An explicit empty schema-v5
+  doodad list has the same materialized hash as the equivalent no-doodad map. If any binding fact
+  differs, the importer rejects the payload; it must not fall back to regenerating a map from seed
+  or silently accepting a nearby map.
 
 Field map for Phase 2 DTO conversion:
 
@@ -571,7 +573,7 @@ Field map for Phase 2 DTO conversion:
 | `lab_god_mode_players` | `labGodModePlayers` player-id set. Import validates players and resyncs mirrored entity invulnerability flags after restore. |
 | `starting_loadout` | `startingLoadout` legacy compatibility object until global-start constructors are retired. Import prefers `startingLoadouts` when both are present and rejects contradictory values. |
 | `rng` | Top-level `rng` draw-stream descriptor with algorithm, seed, and consumed draw count. |
-| `final_spatial` | Omitted. Rebuild with `SpatialIndex::build(&entities, map.size)` after import and after any import repair. |
+| `final_spatial` | Omitted. Rebuild with `SpatialIndex::build(&entities, map.width, map.height)` after import and after any import repair. |
 | `pathing` | Omitted. Recreate `PathingService` with the live default budget, cache capacity, and current tick alignment; selected unit paths and goals are serialized on `entities`. |
 
 Snapshots, compact snapshots, fog-filtered events, observer projections, selected debug-path
@@ -639,14 +641,14 @@ for visual/end-to-end inspection; that mode is not server-isolation evidence.
 
 The churn driver runs before every tick. Players 1 and 2 are mortal; the driver tracks their
 authoritative unit ids and original kinds, preserves spent Panzerfaust kinds, and restores
-each owner's canonical 86-unit roster. A replacement that dies during its first tick is recovered by
+each owner's canonical 77-unit roster. A replacement that dies during its first tick is recovered by
 the owner-count backstop even though the driver never observed its id. Placement considers at most
 504 nearest-center candidates, builds body occupancy once per missing request, accounts for earlier
 planned spawns, and emits at most one spawn batch. Unresolved requests are reported and retried.
 `Game::lab_owned_units` and `Game::lab_plan_unit_spawns` are the typed Lab queries at this seam;
 callers do not inspect simulation stores.
 
-Players 3 and 4 remain invulnerable. At every 30-tick boundary the driver statelessly ranks their 86
+Players 3 and 4 remain invulnerable. At every 30-tick boundary the driver statelessly ranks their 77
 ids from scenario seed, player, epoch, and id, selects exactly 43, and sends one unqueued move to a
 deterministically selected passable integer tile in the active diagonal endpoint corridor. The
 endpoint leg still changes every 900 ticks. Request ids, selection, jitter, and replay operations are

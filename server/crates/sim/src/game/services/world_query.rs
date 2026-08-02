@@ -464,7 +464,7 @@ mod tests {
         let lower_id = s.spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0).unwrap();
         let higher_id = s.spawn_unit(2, EntityKind::Rifleman, 80.0, 100.0).unwrap();
         assert!(lower_id < higher_id);
-        let spatial = SpatialIndex::build(&s, 10);
+        let spatial = SpatialIndex::build(&s, 10, 10);
         let teams = ffa_teams();
 
         assert_eq!(

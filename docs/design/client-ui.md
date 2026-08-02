@@ -899,8 +899,13 @@ independently movable, collapsible, and resizable. Options owns map source, undo
 status, local save/load, export, and Lab handoff; Tools owns terrain paint, start/base locations, and
 doodad authoring.
 Options loads bundled JSON from `/maps/catalog` and
-`/maps/<file>`, creates configurable 16–166-tile square blank maps with a 126-tile default and a compact size field that follows the active draft, edits name/description plus flat start and base
-locations, and provides undo/redo, local save/load, and JSON export. Start locations set map player
+`/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
+separate width/height fields that follow the active draft, edits name/description plus flat start and
+base locations, and provides undo/redo, local save/load, centered resize, and JSON export. Resize
+preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
+shifts start/base locations with the centered source map. Authored v5 maps and materialized Lab
+handoffs carry explicit `width` and `height`; loading bundled or locally saved older square maps
+derives those axes from their terrain rows. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
 player starts there. The selected starting or neutral base exposes integer Steel (0–36) and Oil
 (0–9) patch controls; new and migrated bases default to 12 Steel and 3 Oil.
@@ -909,7 +914,9 @@ layout. Adding symmetric starts reuses any base sites already present at the tar
 active layout, player slot, or per-player natural assignment. The viewport draws blue start
 markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
 and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
-single-diagonal symmetry; grass is the erase material. Symmetry expands every terrain tile before it is
+single-diagonal symmetry; grass is the erase material. Rectangular maps retain axis reflection and
+half-turn symmetry, while three-way, four-way, and diagonal transforms are disabled because they
+would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
 The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
@@ -2198,8 +2205,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   frosted ground, rock, water, and deep charcoal-brown road tiles use deterministic coarse detail
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel. Gravel
   uses chips, dirt uses flecks, mud uses broken churn/pool marks, and frost uses sparse cold wisps;
-  all ten are edge-free visual Open terrain. Every road side exposed to non-road terrain has a narrow brown earth shoulder with
-  deterministic chips that break up the boundary without softening it into a modern blur. Road uses
+  all ten keep edge-free interiors. Distinct passable surfaces share deterministic low-resolution
+  transition bands: the higher-ranked material creeps into the lower-ranked material, with the normal
+  production style using five-band stochastic opaque-pixel dither. The stable visual order is road, grass, gravel,
+  dirt, mud, then frost; road marking variants are one surface and never seam against each other.
+  A checked-in Lab showcase profile suppresses fog presentation over a dedicated authoritative terrain matrix for
+  side-by-side material review without changing authoritative terrain or recipient state. Rock and water never blend;
+  they retain dark navigation outlines, including one single-width separator where rock meets water. Road uses
   one bare tile plus horizontal, vertical, NW-SE diagonal, and NE-SW diagonal tiles with a simple
   yellow center-line segment. Authors intersperse marked tiles among bare centerline tiles to form
   dashed markings while bare road tiles fill the surrounding surface.

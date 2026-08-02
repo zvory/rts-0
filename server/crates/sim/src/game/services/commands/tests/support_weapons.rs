@@ -221,7 +221,7 @@ fn artillery_point_fire_system_rechecks_ammo_affordability() {
     let mut artillery_shells = ArtilleryShellStore::default();
     let mut firing_reveals = Vec::new();
     let mut events: HashMap<u32, Vec<Event>> = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], &entities, &map);
 
     artillery_point_fire_system(
@@ -282,7 +282,7 @@ fn artillery_blanket_fire_system_rechecks_ammo_affordability() {
     let mut artillery_shells = ArtilleryShellStore::default();
     let mut firing_reveals = Vec::new();
     let mut events: HashMap<u32, Vec<Event>> = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], &entities, &map);
 
     artillery_point_fire_system(

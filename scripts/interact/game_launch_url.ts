@@ -11,6 +11,7 @@ export function interactLaunchUrl({
   renderer,
   seed,
   scenario,
+  visualProfile,
   devScenario,
 }: {
   mode: "lab" | "game" | "scenario";
@@ -23,6 +24,7 @@ export function interactLaunchUrl({
   renderer: string;
   seed: string;
   scenario: string;
+  visualProfile?: string;
   devScenario: { id: string; unit: string; count: number; blocker: string; case: string };
 }) {
   if (mode === "lab") {
@@ -31,6 +33,7 @@ export function interactLaunchUrl({
     url.searchParams.set("map", safeToken(map, DEFAULT_LAB_MAP, 48));
     if (seed) url.searchParams.set("seed", seed);
     if (scenario) url.searchParams.set("scenario", safeToken(scenario, "blank", 48));
+    if (visualProfile) url.searchParams.set("visualProfile", safeToken(visualProfile, "", 48));
     if (renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");
     url.searchParams.set("interact", "lab");
     url.searchParams.set("rtsNoAutoPointerLock", "1");

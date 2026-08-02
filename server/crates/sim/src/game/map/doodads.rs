@@ -13,14 +13,18 @@ pub(crate) fn is_tree(doodad: &MapDoodad) -> bool {
 }
 
 pub(crate) fn canonicalize(
-    size: u32,
+    width: u32,
+    height: u32,
     mut doodads: Vec<MapDoodad>,
 ) -> Result<Vec<MapDoodad>, String> {
     doodads.sort_unstable_by_key(|doodad| doodad.id);
-    let world_size_px = size
+    let world_width_px = width
         .checked_mul(config::TILE_SIZE)
-        .ok_or_else(|| "map world-pixel size overflows u32".to_string())?;
-    validate_map_doodads(&doodads, world_size_px)?;
+        .ok_or_else(|| "map world-pixel dimensions overflow u32".to_string())?;
+    let world_height_px = height
+        .checked_mul(config::TILE_SIZE)
+        .ok_or_else(|| "map world-pixel dimensions overflow u32".to_string())?;
+    validate_map_doodads(&doodads, world_width_px, world_height_px)?;
     Ok(doodads)
 }
 

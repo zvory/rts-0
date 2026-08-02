@@ -377,7 +377,7 @@ fn base_steel_patches_split_across_both_sides_of_city_centre() {
     let map = Map::generate_for_players(&players, 9);
     let start = map.starts[0];
     let (hx, hy) = map.tile_center(start.0, start.1);
-    let center = map.world_size_px() * 0.5;
+    let center = map.world_width_px() * 0.5;
     let dir_x = center - hx;
     let dir_y = center - hy;
     let len = (dir_x * dir_x + dir_y * dir_y).sqrt();

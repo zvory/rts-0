@@ -50,12 +50,12 @@ fn apply_with_players_and_smokes(
     smokes: &mut SmokeCloudStore,
     pending: Vec<PendingCommand>,
 ) -> HashMap<u32, Vec<Event>> {
-    let spatial = SpatialIndex::build(entities, map.size);
+    let spatial = SpatialIndex::build(entities, map.width, map.height);
     let occ = Occupancy::build(map, entities);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], entities, map);
     let mut events: HashMap<u32, Vec<Event>> = players
         .iter()
@@ -97,7 +97,8 @@ fn normal_pending(pending: Vec<(u32, SimCommand)>) -> Vec<PendingCommand> {
 
 fn flat_map(size: u32) -> Map {
     Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![],
         ..Default::default()

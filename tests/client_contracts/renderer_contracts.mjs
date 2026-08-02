@@ -8,8 +8,8 @@ import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
+  groundTransitionEdges,
   isImpassableTerrain,
-  roadEdgeDirections,
   roadMarkingOrientation,
   terrainColor,
 } from "../../client/src/renderer/terrain_palette.js";
@@ -149,16 +149,18 @@ assert(
     ],
   };
   assert(
-    roadEdgeDirections(roadMap, 1, 1, TERRAIN.ROAD_HORIZONTAL).join(",") === "south,west",
-    "road shoulders appear only where neighboring terrain is not road",
+    groundTransitionEdges(roadMap, 1, 1, TERRAIN.ROAD_HORIZONTAL)
+      .map(({ direction }) => direction).join(",") === "south,west",
+    "grass transition chips appear on road edges next to grass",
   );
   assert(
-    roadEdgeDirections(roadMap, 1, 0, TERRAIN.ROAD_BARE).join(",") === "north,west,east",
-    "road shoulders include exposed map and terrain boundaries",
+    groundTransitionEdges(roadMap, 1, 0, TERRAIN.ROAD_BARE)
+      .map(({ direction }) => direction).join(",") === "west,east",
+    "terrain transitions skip map boundaries and road-to-road edges",
   );
   assert(
-    roadEdgeDirections(roadMap, 0, 0, TERRAIN.GRASS).length === 0,
-    "non-road terrain never receives a road shoulder",
+    groundTransitionEdges(roadMap, 0, 0, TERRAIN.GRASS).length === 0,
+    "the higher-ranked grass tile does not paint a reverse transition into road",
   );
 }
 

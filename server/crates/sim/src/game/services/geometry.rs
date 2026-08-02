@@ -1360,7 +1360,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
             starts: vec![],
             ..Default::default()

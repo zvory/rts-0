@@ -1372,7 +1372,8 @@ POST /api/map-handoffs
   authoredMap: AuthoredMapV5,
   materializedMap: {
     name: string,
-    size: u32,
+    width: u32,
+    height: u32,
     terrain: u8[],
     starts: LabMapTile[],
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
@@ -1385,7 +1386,10 @@ POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
  | { destination: "editor", authoredMap: AuthoredMapV5 }
 ```
-`AuthoredMapV5` has flat `startLocations`, `baseSites`, and required `doodads` arrays. Start locations determine the
+`AuthoredMapV5` declares independent `width` and `height` tile dimensions, whose product must
+exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
+`doodads` arrays.
+Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
 counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
@@ -1422,7 +1426,8 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
     contentHash: string,
     materializedHash: string,
     data: {
-      size: u32,
+      width: u32,
+      height: u32,
       terrain: u8[],
       starts: [{ x: u32, y: u32 }],
       baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }],

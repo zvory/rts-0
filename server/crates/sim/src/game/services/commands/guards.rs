@@ -118,8 +118,13 @@ pub(super) fn rally_intent_for_map(
     if !x.is_finite() || !y.is_finite() {
         return None;
     }
-    let max = (map.world_size_px() - 1.0).max(0.0);
-    Some(RallyIntent::new(kind, x.clamp(0.0, max), y.clamp(0.0, max)))
+    let max_x = (map.world_width_px() - 1.0).max(0.0);
+    let max_y = (map.world_height_px() - 1.0).max(0.0);
+    Some(RallyIntent::new(
+        kind,
+        x.clamp(0.0, max_x),
+        y.clamp(0.0, max_y),
+    ))
 }
 
 fn command_weight(kind: EntityKind) -> u32 {

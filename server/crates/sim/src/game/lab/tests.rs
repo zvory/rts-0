@@ -35,7 +35,8 @@ fn lab_metadata() -> MapMetadata {
 fn flat_lab_map() -> Map {
     const SIZE: u32 = 64;
     Map {
-        size: SIZE,
+        width: SIZE,
+        height: SIZE,
         terrain: vec![terrain::GRASS; (SIZE * SIZE) as usize],
         starts: vec![(16, 16), (48, 48)],
         ..Default::default()
@@ -51,7 +52,8 @@ fn map_draft() -> LabMapDraft {
     terrain[0] = terrain::WATER;
     LabMapDraft {
         name: "Edited Lab Map".to_string(),
-        size: 64,
+        width: 64,
+        height: 64,
         terrain,
         starts: vec![LabMapTile { x: 12, y: 12 }, LabMapTile { x: 51, y: 51 }],
         base_sites: vec![LabBaseSite {
@@ -94,7 +96,8 @@ fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
         outcome,
         LabOpOutcome::MapDraftApplied {
             name: "Edited Lab Map".to_string(),
-            size: 64,
+            width: 64,
+            height: 64,
             battle_reset: true,
         }
     );
@@ -230,7 +233,8 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
     }
     let draft = LabMapDraft {
         name: "Terrain-only edit".to_string(),
-        size: 64,
+        width: 64,
+        height: 64,
         terrain,
         starts: game
             .state
@@ -251,7 +255,8 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
         outcome,
         LabOpOutcome::MapDraftApplied {
             name: "Terrain-only edit".to_string(),
-            size: 64,
+            width: 64,
+            height: 64,
             battle_reset: true,
         }
     );
@@ -290,8 +295,8 @@ fn assert_angle_close(actual: f32, expected: f32) {
 }
 
 fn free_unit_position(game: &Game, kind: EntityKind) -> (f32, f32) {
-    for ty in 8..game.state.map.size.saturating_sub(8) {
-        for tx in 8..game.state.map.size.saturating_sub(8) {
+    for ty in 8..game.state.map.width.saturating_sub(8) {
+        for tx in 8..game.state.map.width.saturating_sub(8) {
             let (x, y) = game.state.map.tile_center(tx, ty);
             if game
                 .validate_unit_position(&game.state.entities, kind, x, y)
@@ -946,7 +951,8 @@ fn lab_rejects_research_not_in_player_faction_catalog() {
         is_ai: false,
     }];
     let map = Map {
-        size: 32,
+        width: 32,
+        height: 32,
         terrain: vec![terrain::GRASS; 32 * 32],
         starts: vec![(8, 8)],
         ..Default::default()

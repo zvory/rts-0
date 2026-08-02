@@ -36,7 +36,7 @@ fn failed_artillery_reposition_drops_its_terminal_fire_intent() {
 fn close_edge_artillery_target_gets_an_in_range_staging_point() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
-    let target = (8.0, map.world_size_px() * 0.5);
+    let target = (8.0, map.world_width_px() * 0.5);
     let artillery = entities
         .spawn_unit(1, EntityKind::Artillery, 4.0, target.1)
         .expect("artillery should spawn");

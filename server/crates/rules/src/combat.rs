@@ -180,7 +180,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::AntiTankGun,
         range_tiles: 5,
         dmg: 100,
-        cooldown: 72,
+        cooldown: 108,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
         miss_policy: MissPolicy::AntiTankGunVsInfantrySized,

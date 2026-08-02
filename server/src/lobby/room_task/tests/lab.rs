@@ -70,7 +70,8 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
     let mut config = lab_config();
     config.map_draft = Some(crate::protocol::LabMapDraft {
         name: "Room map".to_string(),
-        size,
+        width: size,
+        height: size,
         terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
         starts: vec![
             crate::protocol::LabMapTile { x: 8, y: 8 },

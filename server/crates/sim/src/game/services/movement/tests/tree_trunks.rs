@@ -5,7 +5,8 @@ use crate::protocol::MapDoodad;
 fn rifleman_move_completes_around_preview_tree_trunk() {
     let size = 64;
     let mut map = Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
         ..Default::default()
     };
@@ -34,9 +35,9 @@ fn rifleman_move_completes_around_preview_tree_trunk() {
             coordinator.order_group_move(&mut entities, 1, &[rifleman], clicked_goal, false);
         }
         coordinator.process_awaiting_paths(&mut entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occupancy, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occupancy);
         let unit = entities.get(rifleman).expect("rifleman survives");
         assert!(standability::unit_static_standable(

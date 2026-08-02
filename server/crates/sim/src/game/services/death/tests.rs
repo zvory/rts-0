@@ -101,8 +101,8 @@ fn destroyed_producer_refunds_paid_work_but_not_unpaid_queue_entries() {
 fn destroyed_research_building_refunds_in_progress_research() {
     let mut game =
         Game::new_for_replay_with_starting_resources(&players(), 5_000, 5_000, 0xD1E5_0002);
-    let (tile_x, tile_y) = (0..game.state.map.size)
-        .flat_map(|tile_y| (0..game.state.map.size).map(move |tile_x| (tile_x, tile_y)))
+    let (tile_x, tile_y) = (0..game.state.map.width)
+        .flat_map(|tile_y| (0..game.state.map.width).map(move |tile_x| (tile_x, tile_y)))
         .find(|(tile_x, tile_y)| {
             services::standability::building_site_clear(
                 &game.state.map,

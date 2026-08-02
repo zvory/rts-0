@@ -19,8 +19,8 @@ where
     F: FnMut(ResourceTile, f32, f32) -> bool,
 {
     let mut best: Option<(f32, u32, u32, f32, f32)> = None;
-    for ty in 0..map.size {
-        for tx in 0..map.size {
+    for ty in 0..map.height {
+        for tx in 0..map.width {
             if !map.is_passable(tx as i32, ty as i32) {
                 continue;
             }
@@ -50,9 +50,10 @@ where
 
 pub(crate) fn nearest_tile_center(map: &Map, x: f32, y: f32) -> (f32, f32, ResourceTile) {
     let ts = config::TILE_SIZE as f32;
-    let max_tile = map.size.saturating_sub(1) as f32;
-    let tx = (x / ts - 0.5).round().clamp(0.0, max_tile) as u32;
-    let ty = (y / ts - 0.5).round().clamp(0.0, max_tile) as u32;
+    let max_x = map.width.saturating_sub(1) as f32;
+    let max_y = map.height.saturating_sub(1) as f32;
+    let tx = (x / ts - 0.5).round().clamp(0.0, max_x) as u32;
+    let ty = (y / ts - 0.5).round().clamp(0.0, max_y) as u32;
     let (cx, cy) = map.tile_center(tx, ty);
     (cx, cy, (tx, ty))
 }
@@ -131,7 +132,8 @@ pub(crate) fn resource_blocked_building_tiles(
     }
 
     let ts = config::TILE_SIZE as f32;
-    let max_tile = map.size.saturating_sub(1) as i32;
+    let max_x_tile = map.width.saturating_sub(1) as i32;
+    let max_y_tile = map.height.saturating_sub(1) as i32;
     let foot_w = stats.foot_w as i32;
     let foot_h = stats.foot_h as i32;
 
@@ -143,10 +145,10 @@ pub(crate) fn resource_blocked_building_tiles(
             continue;
         }
         let radius = entity.radius();
-        let min_tx = (((entity.pos_x - radius) / ts).floor() as i32 - foot_w).clamp(0, max_tile);
-        let min_ty = (((entity.pos_y - radius) / ts).floor() as i32 - foot_h).clamp(0, max_tile);
-        let max_tx = (((entity.pos_x + radius) / ts).floor() as i32).clamp(0, max_tile);
-        let max_ty = (((entity.pos_y + radius) / ts).floor() as i32).clamp(0, max_tile);
+        let min_tx = (((entity.pos_x - radius) / ts).floor() as i32 - foot_w).clamp(0, max_x_tile);
+        let min_ty = (((entity.pos_y - radius) / ts).floor() as i32 - foot_h).clamp(0, max_y_tile);
+        let max_tx = (((entity.pos_x + radius) / ts).floor() as i32).clamp(0, max_x_tile);
+        let max_ty = (((entity.pos_y + radius) / ts).floor() as i32).clamp(0, max_y_tile);
         let circle = CircleBody {
             x: entity.pos_x,
             y: entity.pos_y,

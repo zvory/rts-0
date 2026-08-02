@@ -19,8 +19,8 @@ impl Game {
         }
 
         let mut map = flat_dev_map(1);
-        let lake_min_x = map.size / 2 - LAKE_SIZE_TILES / 2;
-        let lake_min_y = map.size / 2 - LAKE_SIZE_TILES / 2;
+        let lake_min_x = map.width / 2 - LAKE_SIZE_TILES / 2;
+        let lake_min_y = map.height / 2 - LAKE_SIZE_TILES / 2;
         let lake_max_x = lake_min_x + LAKE_SIZE_TILES - 1;
         let lake_max_y = lake_min_y + LAKE_SIZE_TILES - 1;
         for ty in lake_min_y..=lake_max_y {
@@ -88,8 +88,8 @@ mod tests {
             Game::new_scout_car_lake_reverse_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_0724)
                 .expect("scenario setup should succeed");
         let map = &setup.game.state.map;
-        let lake_min_x = map.size / 2 - LAKE_SIZE_TILES / 2;
-        let lake_min_y = map.size / 2 - LAKE_SIZE_TILES / 2;
+        let lake_min_x = map.width / 2 - LAKE_SIZE_TILES / 2;
+        let lake_min_y = map.height / 2 - LAKE_SIZE_TILES / 2;
         let lake_max_x = lake_min_x + LAKE_SIZE_TILES - 1;
         let lake_max_y = lake_min_y + LAKE_SIZE_TILES - 1;
         let scout = setup
@@ -167,8 +167,8 @@ mod tests {
                 .expect("scenario scout car should remain");
 
             let body = unit_body_for_entity(scout).expect("scout car should have a body");
-            let lake_min_x = game.state.map.size / 2 - LAKE_SIZE_TILES / 2;
-            let lake_min_y = game.state.map.size / 2 - LAKE_SIZE_TILES / 2;
+            let lake_min_x = game.state.map.width / 2 - LAKE_SIZE_TILES / 2;
+            let lake_min_y = game.state.map.height / 2 - LAKE_SIZE_TILES / 2;
             for ty in lake_min_y..lake_min_y + LAKE_SIZE_TILES {
                 for tx in lake_min_x..lake_min_x + LAKE_SIZE_TILES {
                     assert!(

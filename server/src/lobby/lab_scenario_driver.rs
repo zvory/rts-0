@@ -563,6 +563,11 @@ mod tests {
         let scenario = crate::lab_scenarios::load_lab_scenario_by_id(SCENARIO_ID).unwrap();
         let mut game = scenario.build_game().unwrap();
         let mut driver = LabScenarioDriver::supply_300_hellhole().unwrap();
+        let expected_tanks = composition_300_supply()
+            .unwrap()
+            .into_iter()
+            .filter(|kind| *kind == EntityKind::Tank)
+            .count();
         assert_eq!(driver.actions_for_tick(&game).len(), 2);
         let victim = game
             .snapshot_full_for(1)
@@ -623,7 +628,7 @@ mod tests {
                 .iter()
                 .filter(|entity| entity.owner == 1 && entity.kind == "tank")
                 .count(),
-            17
+            expected_tanks
         );
     }
 

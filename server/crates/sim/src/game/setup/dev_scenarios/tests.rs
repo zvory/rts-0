@@ -969,9 +969,9 @@ fn vehicle_corner_wall_scenario_matches_authored_layout() {
     assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Tank), 5);
 
     let map = &setup.game.state.map;
-    let wall_left_x = map.size / 2;
+    let wall_left_x = map.width / 2;
     let wall_right_x = wall_left_x + 2;
-    let wall_top_y = map.size / 2 - 8;
+    let wall_top_y = map.height / 2 - 8;
     let wall_bottom_y = wall_top_y + 16;
     let wall_tiles = (wall_right_x - wall_left_x + 1) * (wall_bottom_y - wall_top_y + 1);
     let rock_tiles = map

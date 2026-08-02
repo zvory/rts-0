@@ -18,7 +18,7 @@ fn aligned_vehicle_traffic_only_throttles_the_follower() {
         }
         mark_moving(&mut entities, id, (goal_x, y));
     }
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
 
     let follower_adjustment = vehicle_traffic_adjustment(
         &entities,
@@ -72,7 +72,7 @@ fn head_on_vehicle_traffic_keeps_existing_reciprocal_response() {
         entity.set_facing(std::f32::consts::PI);
     }
     mark_moving(&mut entities, westbound, (x - 200.0, y));
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
 
     let eastbound_adjustment = vehicle_traffic_adjustment(
         &entities,
@@ -122,7 +122,7 @@ fn first_reverse_tick_keeps_existing_reciprocal_traffic_response() {
             ),
         );
     }
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
 
     let upper_adjustment = vehicle_traffic_adjustment(
         &entities,
@@ -164,7 +164,7 @@ fn reversing_tank_traffic_throttles_the_rearward_follower() {
         }
         mark_moving(&mut entities, id, (x - 200.0, y));
     }
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
 
     let leader_adjustment = vehicle_traffic_adjustment(
         &entities,
@@ -219,7 +219,7 @@ fn tank_under_fire_reverses_toward_a_far_goal_behind() {
     let mut entities = EntityStore::new();
     let (tank, start) = under_fire_tank_with_far_retreat(&map, &mut entities, 10);
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
 
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 11);
 
@@ -237,7 +237,7 @@ fn expired_under_fire_preference_restores_normal_far_goal_pivot() {
     let mut entities = EntityStore::new();
     let (tank, start) = under_fire_tank_with_far_retreat(&map, &mut entities, 10);
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
 
     movement_system(
         &map,
