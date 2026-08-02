@@ -25,7 +25,8 @@ pub(super) fn validate_snapshot(
     }
 
     let mut ids = HashSet::new();
-    let world = map.width as f32 * map.tile_size as f32;
+    let world_width = map.width as f32 * map.tile_size as f32;
+    let world_height = map.height as f32 * map.tile_size as f32;
     for entity in &snapshot.entities {
         if !ids.insert(entity.id) {
             return Err(SelfPlayFailure::new(format!(
@@ -49,8 +50,8 @@ pub(super) fn validate_snapshot(
             || !entity.y.is_finite()
             || entity.x < 0.0
             || entity.y < 0.0
-            || entity.x >= world
-            || entity.y >= world
+            || entity.x >= world_width
+            || entity.y >= world_height
         {
             return Err(SelfPlayFailure::new(format!(
                 "player {player_id} saw entity {} out of bounds at {},{}",
@@ -103,11 +104,61 @@ fn known_kind(kind: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::known_kind;
-    use rts_sim::protocol::kinds;
+    use super::{known_kind, validate_snapshot};
+    use crate::{config, selfplay::replay::SelfPlayFailure};
+    use rts_sim::protocol::{kinds, EntityView, MapInfo, Snapshot, SnapshotNetStatus};
 
     #[test]
     fn pump_jack_is_a_known_snapshot_entity() {
         assert!(known_kind(kinds::PUMP_JACK));
+    }
+
+    fn validate_entity_on_map(map: MapInfo, x: f32, y: f32) -> Result<(), SelfPlayFailure> {
+        let snapshot = Snapshot {
+            tick: 1,
+            world_combat_position: None,
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: config::PLAYER_SUPPLY_CAP,
+            auto_build: None,
+            entities: vec![EntityView::new(1, 1, kinds::WORKER, x, y, 40, 40, "idle")],
+            resource_deltas: Vec::new(),
+            smokes: Vec::new(),
+            ability_objects: Vec::new(),
+            trenches: Vec::new(),
+            visible_tiles: Vec::new(),
+            explored_tiles: Vec::new(),
+            remembered_buildings: Vec::new(),
+            remembered_anti_tank_guns: Vec::new(),
+            events: Vec::new(),
+            upgrades: Vec::new(),
+            player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
+        };
+        validate_snapshot(1, &map, &snapshot)
+    }
+
+    #[test]
+    fn snapshot_bounds_use_rectangular_map_axes() {
+        let wide = MapInfo {
+            width: 8,
+            height: 4,
+            tile_size: 32,
+            terrain: vec![0; 8 * 4],
+            resources: Vec::new(),
+        };
+        assert!(validate_entity_on_map(wide.clone(), 255.0, 127.0).is_ok());
+        assert!(validate_entity_on_map(wide, 10.0, 128.0).is_err());
+
+        let tall = MapInfo {
+            width: 4,
+            height: 8,
+            tile_size: 32,
+            terrain: vec![0; 4 * 8],
+            resources: Vec::new(),
+        };
+        assert!(validate_entity_on_map(tall.clone(), 10.0, 200.0).is_ok());
+        assert!(validate_entity_on_map(tall, 128.0, 10.0).is_err());
     }
 }

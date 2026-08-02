@@ -436,8 +436,8 @@ impl CorePredictor {
             self.note_disabled("invalidMoveTarget");
             return;
         }
-        let target_x = x.clamp(0.0, self.world_max_px());
-        let target_y = y.clamp(0.0, self.world_max_px());
+        let target_x = x.clamp(0.0, self.world_width_px());
+        let target_y = y.clamp(0.0, self.world_height_px());
         for id in units {
             if let Some(entity) = self.owned.get_mut(id) {
                 let order = MoveOrder {
@@ -490,8 +490,12 @@ impl CorePredictor {
         }
     }
 
-    fn world_max_px(&self) -> f32 {
-        self.map.width.max(self.map.height) as f32 * self.map.tile_size as f32
+    fn world_width_px(&self) -> f32 {
+        self.map.width as f32 * self.map.tile_size as f32
+    }
+
+    fn world_height_px(&self) -> f32 {
+        self.map.height as f32 * self.map.tile_size as f32
     }
 
     fn note_disabled(&mut self, reason: &str) {
@@ -1087,6 +1091,31 @@ mod tests {
         assert_eq!(entity.y, 100.0);
         assert_eq!(entity.state, "move");
         assert_eq!(predictor.diagnostics().pending_commands, 1);
+    }
+
+    #[test]
+    fn rectangular_map_clamps_move_targets_per_axis() {
+        let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
+        let mut start = start_payload();
+        start.map.width = 8;
+        start.map.height = 4;
+        start.map.terrain = vec![0; 8 * 4];
+        let mut predictor = predictor_from_start_payload(start, 1);
+        predictor.import_baseline(baseline).unwrap();
+
+        predictor.enqueue_command(
+            1,
+            Command::Move {
+                units: vec![101],
+                x: 10_000.0,
+                y: 10_000.0,
+                queued: false,
+            },
+        );
+
+        let order = &predictor.local_lane_summary().owned_entities[0].order_plan[0];
+        assert_eq!(order.x, 8.0 * balance::TILE_SIZE as f32);
+        assert_eq!(order.y, 4.0 * balance::TILE_SIZE as f32);
     }
 
     #[test]
