@@ -5,9 +5,7 @@ use crate::game::entity::EntityKind;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::protocol::{self, GroundDecalView};
-use crate::rules::{
-    artillery_ground_decal_source_kind, mortar_ground_decal_source_kind,
-};
+use crate::rules::{artillery_ground_decal_source_kind, mortar_ground_decal_source_kind};
 use serde::{Deserialize, Serialize};
 
 mod spatial_index;
