@@ -438,8 +438,6 @@ export class GroundDecalBuffer {
   clear()
 }
 export function normalizeAuthoritativeGroundDecal(record, context?)
-export function groundDecalClassForKind(kind)
-export function groundDecalClassForImpactEvent(eventKind)
 ```
 Snapshots advertise only the requesting perspective's `groundDecalRevision`. `GroundDecalSync`
 coalesces that signal into one reliable `requestGroundDecals { afterRevision }` repair at a time and
