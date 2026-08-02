@@ -7,3 +7,7 @@ _2026-08-02_
 ## Changes
 
 - Local movement prediction now preserves authoritative gathering, construction, combat, and other unit state.
+
+## Playtest watch
+
+- With Movement Prediction enabled, watch busy workers and combat units while issuing movement commands.
