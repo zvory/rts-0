@@ -7,7 +7,7 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 //
 //   terrain → decals → trenches → visual-samples → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
-//   → units → smokes → selection-rings → hp-bars → fog → visual-sample-labels
+//   → selection-rings → units → smokes → hp-bars → fog → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → feedback/miss-toasts → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
@@ -594,7 +594,8 @@ export class Renderer {
         }
       }
     });
-    // Selection rings + HP bars after shapes are placed so they read on top.
+    // Selection rings are in a layer below units, so selected units stay readable
+    // while the ring remains visible around the silhouette. HP bars stay above.
     time("renderer.selectionHp", () => {
       for (const e of regularEntities) {
         liveIds.add(e.id);

@@ -471,9 +471,9 @@ assert(
     assert(
       unitShadowsIndex < occupantShadowsIndex &&
         occupantShadowsIndex < occupantLipsIndex &&
-        occupantLipsIndex < unitsIndex &&
-        unitsIndex < selectionIndex,
-      "occupied-trench berm layers sit below unit art and selection feedback",
+        occupantLipsIndex < selectionIndex &&
+        selectionIndex < unitsIndex,
+      "occupied-trench berm layers sit below selection feedback, which sits below unit art for readability",
     );
     assert(renderer.layers.trenches.children.length === 1, "renderer owns one persistent trench decal sprite");
     renderer.destroy();
@@ -827,8 +827,8 @@ assert(
     );
     assert(shadowRig?.parts.has("part.shadow"), "Scout Plane frame-strip rendering keeps the separate SVG shadow route");
     assert(
-      ring.rx === 28 && ring.ry === 22 && ring.cy === 2,
-      "Scout Plane selection ring uses the mirrored 48x34 aircraft body",
+      ring.rx === 31 && ring.ry === 24 && ring.cy === 2,
+      "Scout Plane selection ring uses the mirrored 48x34 aircraft body with vehicle-body padding",
     );
     assert(
       renderer.layers.units.children.includes(unitStrip.container) &&

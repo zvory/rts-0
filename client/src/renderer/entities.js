@@ -150,10 +150,11 @@ export function _drawSelectionAndHp(e, selection, state) {
     else if (allyOwner(state, e.owner)) color = COLORS.selectAlly;
     else if (neutralOwner(state, e.owner)) color = COLORS.selectNeutral;
     else color = COLORS.selectEnemy;
-    // Glow + crisp ring.
-    gfxStroke(g, 4, color, 0.25);
+    // Subtle halo + crisp ring. The layer sits below units, so the selected
+    // silhouette stays readable while the colored outline remains distinct.
+    gfxStroke(g, 4, color, 0.16);
     gfxEllipse(g, 0, ring.cy, ring.rx, ring.ry);
-    gfxStroke(g, 2, color, 0.95);
+    gfxStroke(g, 1.5, color, 0.78);
     gfxEllipse(g, 0, ring.cy, ring.rx, ring.ry);
   }
 
@@ -214,10 +215,10 @@ export function _ringRadius(e) {
   }
   if (usesVehicleSelectionBody(e.kind)) {
     const body = tankBodyVisual(stat);
-    return { rx: body.halfLen + 4, ry: body.halfWidth + 5, cy: 2 };
+    return { rx: body.halfLen + 7, ry: body.halfWidth + 7, cy: 2 };
   }
-  const r = (stat.size || 9) + 4;
-  return { rx: r, ry: r * 0.7, cy: r * 0.35 };
+  const r = (stat.size || 9) + 6;
+  return { rx: r, ry: r * 0.68, cy: r * 0.36 };
 }
 
 export function _hpBar(g, e, status = null) {
