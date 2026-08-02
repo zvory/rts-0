@@ -15,7 +15,11 @@ import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import * as matchLabTools from "./match_lab_tools.js";
 import { PredictionController } from "./prediction_controller.js";
-import { finishPredictionRuntimeInit, newestPredictionSnapshot } from "./prediction_runtime_startup.js";
+import {
+  finishPredictionRuntimeInit,
+  newestPredictionSnapshot,
+  recoverPredictionRuntimeAfterBudget,
+} from "./prediction_runtime_startup.js";
 import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
 import { prepareRenderer } from "./renderer/preparation.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
@@ -593,17 +597,7 @@ export class Match {
   }
 
   disablePredictionForReplayBudget(diagnostics) {
-    if (!this.prediction.enabled || !(diagnostics?.budgetExceededCount > 0)) return false;
-    this.prediction.recordReplayBudgetExceeded({
-      elapsedMs: diagnostics.lastTickMs,
-      replayTicks: diagnostics.lastReplayTicks,
-    });
-    this.prediction.reset({ enabled: true, preserveClientSeq: true, reason: "replay-budget-exceeded" });
-    this.resetPredictionAdapter();
-    this.applyPredictionDisplayOverlay({ predictionFrame: null });
-    this.publishPredictionDebug();
-    this.logPredictionStatus("tracking-replay-budget-exceeded");
-    return true;
+    return recoverPredictionRuntimeAfterBudget(this, diagnostics);
   }
 
   publishPredictionDebug() {

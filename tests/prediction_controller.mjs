@@ -13,7 +13,10 @@ import { createRigRenderContext } from "../client/src/renderer/rigs/animation.js
 import { GameState } from "../client/src/state.js";
 import { SimWasmPredictionAdapter } from "../client/src/sim_wasm_adapter.js";
 import { CaptureRenderClock } from "../client/src/visual_clock.js";
-import { finishPredictionRuntimeInit } from "../client/src/prediction_runtime_startup.js";
+import {
+  finishPredictionRuntimeInit,
+  recoverPredictionRuntimeAfterBudget,
+} from "../client/src/prediction_runtime_startup.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -48,6 +51,58 @@ function assert(cond, msg) {
   assert(destroyed === 0, "a stale callback never destroys the still-current loading adapter");
   assert(reconciles === 1, "WASM readiness catches up without waiting for another packet");
   assert(frames === 1, "WASM readiness publishes the caught-up prediction frame immediately");
+}
+
+{
+  let disableReason = null;
+  let cleared = 0;
+  let frames = 0;
+  const match = {
+    predictionInitToken: 1,
+    progressPredictionEligible: true,
+    latestPredictionSnapshot: { tick: 4, entities: [] },
+    prediction: {
+      enabled: false,
+      recordDisableReason(reason) { disableReason = reason; },
+    },
+    predictionAdapter: null,
+    predictionRuntimeEnabled: () => true,
+    state: { clearPredictionFrame() { cleared += 1; } },
+    applyPredictionFrame() { frames += 1; },
+    publishPredictionDebug() {},
+    logPredictionStatus() {},
+    mountSettings() {},
+  };
+  const adapter = { reconcile() { throw new Error("bad baseline"); }, destroy() {} };
+  match.predictionAdapter = adapter;
+  finishPredictionRuntimeInit(match, { token: 1, adapter, ready: true, remountSettings: false });
+  assert(disableReason === "progress-reconcile-failed" && cleared === 1,
+    "progress-only startup baseline failures fall back to authoritative display");
+  assert(frames === 0, "failed startup reconciliation never publishes a stale progress frame");
+}
+
+{
+  let initialized = 0;
+  let resetAdapters = 0;
+  const match = {
+    prediction: {
+      enabled: true,
+      recordReplayBudgetExceeded() {},
+      reset() {},
+    },
+    resetPredictionAdapter() { resetAdapters += 1; },
+    initPredictionAdapter() { initialized += 1; },
+    applyPredictionDisplayOverlay() {},
+    publishPredictionDebug() {},
+    logPredictionStatus() {},
+  };
+  assert(recoverPredictionRuntimeAfterBudget(match, {
+    budgetExceededCount: 1,
+    lastTickMs: 8,
+    lastReplayTicks: 3,
+  }) === true, "replay-budget recovery handles an exceeded frame");
+  assert(resetAdapters === 1 && initialized === 1,
+    "replay-budget recovery immediately initializes the replacement shared runtime");
 }
 
 {

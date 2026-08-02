@@ -21,7 +21,17 @@ export function finishPredictionRuntimeInit(match, { token, adapter, ready, remo
     const snapshot = match.latestPredictionSnapshot;
     if (snapshot) {
       if (match.prediction.enabled) match.prediction.reconcilePredictor(snapshot);
-      else if (match.progressPredictionEligible) adapter.reconcile(snapshot, []);
+      else if (match.progressPredictionEligible) {
+        try {
+          adapter.reconcile(snapshot, []);
+        } catch {
+          match.prediction.recordDisableReason("progress-reconcile-failed");
+          match.state?.clearPredictionFrame?.();
+          match.logPredictionStatus("progress-reconcile-failed");
+          if (remountSettings) match.mountSettings({ keepOpen: true });
+          return;
+        }
+      }
       match.applyPredictionFrame();
     }
     match.logPredictionStatus("ready");
@@ -30,4 +40,19 @@ export function finishPredictionRuntimeInit(match, { token, adapter, ready, remo
     match.logPredictionStatus("disabled");
   }
   if (remountSettings) match.mountSettings({ keepOpen: true });
+}
+
+export function recoverPredictionRuntimeAfterBudget(match, diagnostics) {
+  if (!match.prediction.enabled || !(diagnostics?.budgetExceededCount > 0)) return false;
+  match.prediction.recordReplayBudgetExceeded({
+    elapsedMs: diagnostics.lastTickMs,
+    replayTicks: diagnostics.lastReplayTicks,
+  });
+  match.prediction.reset({ enabled: true, preserveClientSeq: true, reason: "replay-budget-exceeded" });
+  match.resetPredictionAdapter();
+  match.applyPredictionDisplayOverlay({ predictionFrame: null });
+  match.initPredictionAdapter();
+  match.publishPredictionDebug();
+  match.logPredictionStatus("tracking-replay-budget-exceeded");
+  return true;
 }
