@@ -735,11 +735,11 @@ impl CorePredictor {
     }
 
     fn world_max_x_px(&self) -> f32 {
-        self.map.width as f32 * self.map.tile_size as f32
+        (self.map.width as f32 * self.map.tile_size as f32 - 0.01).max(0.0)
     }
 
     fn world_max_y_px(&self) -> f32 {
-        self.map.height as f32 * self.map.tile_size as f32
+        (self.map.height as f32 * self.map.tile_size as f32 - 0.01).max(0.0)
     }
 
     fn note_disabled(&mut self, reason: &str) {

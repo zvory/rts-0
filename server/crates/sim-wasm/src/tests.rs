@@ -745,8 +745,8 @@ fn rectangular_map_clamps_move_targets_per_axis() {
     );
 
     let order = &predictor.local_lane_summary().owned_entities[0].order_plan[0];
-    assert_eq!(order.x, 8.0 * balance::TILE_SIZE as f32);
-    assert_eq!(order.y, 4.0 * balance::TILE_SIZE as f32);
+    assert_eq!(order.x, 8.0 * balance::TILE_SIZE as f32 - 0.01);
+    assert_eq!(order.y, 4.0 * balance::TILE_SIZE as f32 - 0.01);
 }
 
 #[test]
