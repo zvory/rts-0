@@ -123,6 +123,11 @@ const sourceState = {
   consumePendingGroundDecals() { destructiveReads += 1; return []; },
 };
 const engine = fakeEngine();
+let activeVisualProfile = {
+  unitOverrides: [{ id: "test" }],
+  frameStripOverrides: [],
+  terrainBlendMode: "organic",
+};
 const measuredPhases = [];
 const profiler = {
   recordDiagnosticCounter() {},
@@ -135,7 +140,7 @@ const sources = {
   renderClock: { now: () => 500 },
   state: () => sourceState,
   profiler: () => profiler,
-  visualProfile: () => ({ unitOverrides: [{ id: "test" }], frameStripOverrides: [] }),
+  visualProfile: () => activeVisualProfile,
   staticMap: () => assembler.staticMap,
 };
 const adapter = new PixiPresentationAdapter(null, sources, { renderer: engine });
@@ -149,6 +154,7 @@ assert((await first.settled).status === PRESENTATION_OUTCOME.PRESENTED
 assert((await first.retained)?.groundDecalRevision === 1, "Pixi reports the exact durable revision independently from presentation");
 assert(engine.staticMaps.length === 1, "unchanged static-map revision is materialized once into Pixi-owned staging");
 assert(engine.staticMaps[0].terrain instanceof Uint8Array, "Pixi owns its copied terrain staging buffer");
+assert(engine.staticMapOptions[0].terrainBlendMode === "organic", "Pixi forwards the active terrain blend profile when building the static map");
 assert(engine.renders.length === 2, "repeated render(frame) calls reach the backend without reassembly");
 assert(engine.presents === 2 && engine._renderFrameCount === 2, "each successful adapter call explicitly presents exactly once");
 assert(measuredPhases.filter((label) => label === "renderer.update").length === 2, "Pixi scene update is measured for every adapter call");
@@ -163,6 +169,9 @@ assert(engine.renders[0].state._curById.get(7).x === 22, "allowlisted current po
 assert(engine.renders[0].state.weaponRecoil(7) === 0.25, "allowlisted recoil is sampled once at assembly time");
 assert(engine.renders[0].state.weaponRecoilKind(7) === "rifleman_rifle", "weapon-specific recoil art receives the sampled weapon kind");
 assert(engine.renders[0].fog.isVisible(0, 0) && !engine.renders[0].fog.isVisible(1, 0), "Pixi fog facade reads backend-owned grid copies");
+activeVisualProfile = { ...activeVisualProfile, terrainPreviewReveal: true };
+assert((await adapter.render({ ...frame }).settled).status === PRESENTATION_OUTCOME.PRESENTED, "terrain preview profile presents normally");
+assert(engine.renders.at(-1).fog === null, "terrain preview profile suppresses only the Pixi fog presentation");
 assert(engine.marquees[0].w === 10 && engine.marquees[0].h === 12, "screen marquee is drawn from the assembled screenOverlay layer");
 assert(
   engine.renders[0].options.feedbackView.formationMovePreview?.points.length === 2
@@ -240,6 +249,7 @@ function fakeEngine() {
     _renderFrameCount: 0,
     _map: null,
     staticMaps: [],
+    staticMapOptions: [],
     renders: [],
     marquees: [],
     errors: [],
@@ -249,9 +259,10 @@ function fakeEngine() {
     presents: 0,
     destroyed: 0,
     captureLifecycle: [],
-    buildStaticMap(staticMap) {
+    buildStaticMap(staticMap, options = {}) {
       this._map = staticMap;
       this.staticMaps.push(staticMap);
+      this.staticMapOptions.push(options);
     },
     render(state, camera, fog, alpha, options) {
       if (this.failNext) {

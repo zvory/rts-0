@@ -35,22 +35,6 @@ export function terrainVariantPalette(code) {
   return TERRAIN_VARIANT_PALETTES[code] || null;
 }
 
-/** Exposed road sides, including map boundaries, for the cached terrain shoulder pass. */
-export function roadEdgeDirections(map, tx, ty, code) {
-  if (!isRoadTerrain(code)) return [];
-  const roadAt = (x, y) => x >= 0
-    && y >= 0
-    && x < map.width
-    && y < map.height
-    && isRoadTerrain(map.terrain[y * map.width + x]);
-  const edges = [];
-  if (!roadAt(tx, ty - 1)) edges.push("north");
-  if (!roadAt(tx, ty + 1)) edges.push("south");
-  if (!roadAt(tx - 1, ty)) edges.push("west");
-  if (!roadAt(tx + 1, ty)) edges.push("east");
-  return edges;
-}
-
 const CARDINAL_NEIGHBORS = Object.freeze([
   Object.freeze({ direction: "north", dx: 0, dy: -1 }),
   Object.freeze({ direction: "south", dx: 0, dy: 1 }),
