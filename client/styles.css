@@ -5502,8 +5502,6 @@ input[type="text"]:focus {
 .map-editor-panel {
   position: absolute;
   top: 58px;
-  left: 12px;
-  right: auto;
   bottom: auto;
   width: min(390px, calc(100vw - 24px));
   min-width: min(260px, calc(100vw - 24px));
@@ -5511,6 +5509,16 @@ input[type="text"]:focus {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.map-editor-options-window {
+  left: 12px;
+  right: auto;
+}
+
+.map-editor-tools-window {
+  right: 12px;
+  left: auto;
 }
 
 .map-editor-header {
@@ -5707,11 +5715,19 @@ input[type="text"]:focus {
 
 @media (max-width: 720px) {
   .map-editor-panel {
-    top: auto;
     right: 8px;
-    bottom: 8px;
     left: 8px;
     width: auto;
-    max-height: min(70vh, calc(100vh - 16px));
+    max-height: calc(50vh - 12px);
+  }
+
+  .map-editor-options-window {
+    top: auto;
+    bottom: 8px;
+  }
+
+  .map-editor-tools-window {
+    top: 8px;
+    bottom: auto;
   }
 }
