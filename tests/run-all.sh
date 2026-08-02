@@ -722,6 +722,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/tri_state/self_test.mjs"
   run_suite_bg "JS minimap input contracts" \
     node "$SCRIPT_DIR/minimap_input_contracts.mjs"
+  run_suite_bg "JS rectangular map asset contracts" \
+    node "$SCRIPT_DIR/rectangular_map_asset_contracts.mjs"
   run_suite_bg "Interact artifact contracts" \
     node "$SCRIPT_DIR/interact_artifact_contracts.mjs"
   run_suite_bg "Interact bulk contracts" \
@@ -770,6 +772,7 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   run_suite_bg "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
   run_suite_bg "API: faction_integration" node "$SCRIPT_DIR/faction_integration.mjs"
   run_suite_bg "API: team_integration"   node "$SCRIPT_DIR/team_integration.mjs"
+  run_suite_bg "API: rectangular_map_server_integration" node "$SCRIPT_DIR/rectangular_map_server_integration.mjs"
   run_suite_bg "API: lobby_browser_integration" node "$SCRIPT_DIR/lobby_browser_integration.mjs"
   else
     SKIPPED+=("Live Node API suites")
