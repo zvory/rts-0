@@ -349,6 +349,35 @@ assert(pauseReplay?.textContent === "Pause", "replay viewer builds a pause butto
 const branchReplay = replayControls.querySelector(".replay-branch-btn");
 assert(branchReplay?.textContent === "Resume play from here", "replay branch button describes resuming from the current tick");
 replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2, paused: false });
+const hideEndTime = replayControls.querySelector(".replay-hide-end-time");
+const hideEndTimeCheckbox = hideEndTime.children[0];
+assert(hideEndTime?.children[1]?.textContent === "Hide end time", "replay controls label the spoiler toggle clearly");
+assert(
+  hideEndTimeCheckbox.checked === false &&
+    replayControls.querySelector(".room-time-tick-status").textContent === "Replay 120 / 1000 @ 2x" &&
+    replayControls.querySelector(".room-time-timeline").hidden === false,
+  "replay end time and scrubber are visible by default",
+);
+hideEndTimeCheckbox.checked = true;
+hideEndTimeCheckbox._listeners.get("change")({});
+assert(
+  replayControls.querySelector(".room-time-tick-status").textContent === "Replay 120 @ 2x" &&
+    replayControls.querySelector(".room-time-timeline").hidden === true,
+  "hide end time removes the total tick count and replay scrubber together",
+);
+replayUi.applyRoomTimeState({ currentTick: 150, durationTicks: 1_000, speed: 4, paused: false });
+assert(
+  replayControls.querySelector(".room-time-tick-status").textContent === "Replay 150 @ 4x",
+  "hidden replay end time keeps the current tick and playback speed live",
+);
+hideEndTimeCheckbox.checked = false;
+hideEndTimeCheckbox._listeners.get("change")({});
+assert(
+  replayControls.querySelector(".room-time-tick-status").textContent === "Replay 150 / 1000 @ 4x" &&
+    replayControls.querySelector(".room-time-timeline").hidden === false,
+  "unchecking hide end time restores the total tick count and scrubber",
+);
+replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2, paused: false });
 speed2._listeners.get("click")({});
 assert(replayNet.speeds.at(-1) === 2, "speed click sends net.setRoomTimeSpeed");
 assert(speed2.classList.contains("active"), "speed click preserves its authoritative selection while confirmation is pending");
@@ -637,7 +666,9 @@ assert(!replayControls.querySelector(".replay-pause-btn"), "destroy removes gene
 assert(!replayControls.querySelector(".replay-branch-btn"), "destroy removes generated replay branch button");
 assert(!replayControls.querySelector(".vision-selection-controls"), "destroy removes generated vision controls");
 assert(!replayControls.querySelector(".room-time-tick-status"), "destroy removes generated status");
+assert(!replayControls.querySelector(".replay-hide-end-time"), "destroy removes the replay end-time toggle");
 assert(!replayControls.querySelector(".room-time-timeline"), "destroy removes generated timeline");
+assert(!hideEndTimeCheckbox._listeners.has("change"), "destroy removes the replay end-time toggle listener");
 assert(
   !timelineTrack._listeners.has("pointermove") && !timelineTrack._listeners.has("pointerleave"),
   "destroy removes timeline hover listeners",

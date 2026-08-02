@@ -41,6 +41,8 @@ export class RoomTimeControls {
     this.timelineHoverBindings = [];
     this.roomTimeAccessDenied = controlPolicy?.kind === "lab" && controlPolicy.isOperator?.() === false;
     this.lastRoomTimeSpeed = 2;
+    this.hideReplayEndTime = false;
+    this.replayEndTimeToggleBinding = null;
     this.floatingPanel = null;
 
     if (!dom.roomTimeControls || (!this.roomTime.available && !this.visibility.visionSelection)) return;
@@ -71,6 +73,7 @@ export class RoomTimeControls {
     if (this.visibility.visionSelection) this.buildVisionSelectionControls();
     if (this.roomTime.available) {
       this.buildRoomTimeStatus();
+      if (this.replayViewer) this.buildReplayEndTimeToggle();
       if (this.roomTime.timeline && this.roomTime.seekAbsolute) this.buildRoomTimeTimeline();
       this.syncRoomTimePendingPresentation();
       this.updateRoomTimePauseButton();
@@ -476,6 +479,33 @@ export class RoomTimeControls {
     surface.appendChild(status);
   }
 
+  buildReplayEndTimeToggle() {
+    if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".replay-hide-end-time")) return;
+    const surface = this.roomTimeControlSurface();
+    if (!surface) return;
+
+    const label = document.createElement("label");
+    label.className = "replay-hide-end-time";
+    label.title = "Hide the replay's total tick count and timeline while commentating.";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = this.hideReplayEndTime;
+    const onChange = () => {
+      this.hideReplayEndTime = checkbox.checked === true;
+      this.syncReplayEndTimeVisibility();
+      this.updateRoomTimeStatus();
+    };
+    checkbox.addEventListener("change", onChange);
+    this.replayEndTimeToggleBinding = [checkbox, onChange];
+
+    const text = document.createElement("span");
+    text.textContent = "Hide end time";
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    surface.appendChild(label);
+  }
+
   buildRoomTimeTimeline() {
     if (!dom.roomTimeControls || dom.roomTimeControls.querySelector(".room-time-timeline")) return;
     if (!this.roomTime.timeline || !this.roomTime.seekAbsolute) return;
@@ -529,7 +559,14 @@ export class RoomTimeControls {
     wrap.appendChild(track);
     wrap.appendChild(hover);
     surface.appendChild(wrap);
+    this.syncReplayEndTimeVisibility();
     this.updateRoomTimeTimeline();
+  }
+
+  syncReplayEndTimeVisibility() {
+    const timeline = dom.roomTimeControls?.querySelector(".room-time-timeline");
+    if (timeline) timeline.hidden = this.replayViewer && this.hideReplayEndTime;
+    if (this.hideReplayEndTime) this.hideRoomTimeTimelineHover();
   }
 
   roomTimeTimelineTarget(track, clientX) {
@@ -708,7 +745,10 @@ export class RoomTimeControls {
         ? " · Waiting for confirmation..."
         : "";
     const notice = this.roomTimeNotice ? ` · ${this.roomTimeNotice}` : "";
-    status.textContent = `${this.label} ${current} / ${duration} @ ${speed}x${pending}${notice}`;
+    const tickStatus = this.replayViewer && this.hideReplayEndTime
+      ? `${this.label} ${current}`
+      : `${this.label} ${current} / ${duration}`;
+    status.textContent = `${tickStatus} @ ${speed}x${pending}${notice}`;
   }
 
   destroy() {
@@ -718,6 +758,11 @@ export class RoomTimeControls {
     this.roomTimeSeekFromTick = null;
     this.roomTimeSeekTargetTick = null;
     this.roomTimeTimedOutAction = null;
+    if (this.replayEndTimeToggleBinding) {
+      const [checkbox, onChange] = this.replayEndTimeToggleBinding;
+      checkbox.removeEventListener("change", onChange);
+      this.replayEndTimeToggleBinding = null;
+    }
     this.clearRoomTimeActivations();
     for (const [target, type, handler] of this.timelineHoverBindings) {
       target.removeEventListener(type, handler);
@@ -750,6 +795,7 @@ export class RoomTimeControls {
     dom.roomTimeControls.querySelector(".replay-branch-btn")?.remove();
     dom.roomTimeControls.querySelector(".vision-selection-controls")?.remove();
     dom.roomTimeControls.querySelector(".room-time-tick-status")?.remove();
+    dom.roomTimeControls.querySelector(".replay-hide-end-time")?.remove();
     dom.roomTimeControls.querySelector(".room-time-timeline")?.remove();
     this.floatingPanel?.destroy();
     this.floatingPanel = null;
