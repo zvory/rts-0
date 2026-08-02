@@ -860,6 +860,52 @@ fn replay_end_sends_frozen_score_result_once() {
             .all(|message| !matches!(message, ServerMessage::GameOver { .. })),
         "an ended replay should not resend its result every room tick"
     );
+
+    task.on_seek_room_time_to(99, 0);
+    while matches!(&task.phase, Phase::ReplayViewer(session) if session.is_seeking()) {
+        task.on_tick_replay_viewer(TokioInstant::now());
+    }
+    task.on_tick_replay_viewer(TokioInstant::now());
+    assert!(
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .all(|message| !matches!(message, ServerMessage::GameOver { .. })),
+        "replaying the final tick after a seek should not resend the result to existing viewers"
+    );
+}
+
+#[test]
+fn replay_that_starts_at_its_final_tick_sends_frozen_score_result() {
+    let players = replay_test_players(2);
+    let (game, mut artifact) = replay_test_artifact(&players, 0);
+    artifact.winner_id = Some(players[0].id);
+    artifact.winner_team_id = Some(players[0].team_id);
+    artifact.final_scores = game.scores();
+    let replay = ReplaySession::new(artifact).unwrap();
+    let mut task = RoomTask::new(
+        "already-ended-replay-score-screen-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_spectator(&mut task, 99);
+
+    task.transition_to_replay_viewer(replay);
+
+    assert!(
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).any(|message| matches!(
+            message,
+            ServerMessage::GameOver {
+                winner_id: Some(winner_id),
+                winner_team_id: Some(winner_team_id),
+                you,
+                scores,
+            } if winner_id == players[0].id
+                && winner_team_id == players[0].team_id
+                && you == "draw"
+                && scores == game.scores()
+        ))
+    );
 }
 
 #[test]

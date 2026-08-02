@@ -223,19 +223,31 @@ impl RoomTask {
         self.send_room_time_state_to(watcher_id);
         self.send_current_replay_snapshot_to(watcher_id);
         self.send_observer_analysis_to(watcher_id);
-        let Phase::ReplayViewer(session) = &self.phase else {
+        let result = match &self.phase {
+            Phase::ReplayViewer(session) if !session.has_remaining_ticks() => {
+                Some(session.result_message())
+            }
+            _ => None,
+        };
+        if let Some(result) = result {
+            self.send_replay_result_to(watcher_id, &result);
+        }
+    }
+
+    fn send_replay_result_to(&mut self, watcher_id: u32, result: &ServerMessage) {
+        if self.outcome_sent.contains(&watcher_id) {
+            return;
+        }
+        let Some(player) = self.players.get(&watcher_id) else {
             return;
         };
-        if !session.has_remaining_ticks() {
-            let Some(player) = self.players.get(&watcher_id) else {
-                return;
-            };
-            send_or_log(
-                &self.room,
-                watcher_id,
-                &player.msg_tx,
-                session.result_message(),
-            );
+        send_or_log(&self.room, watcher_id, &player.msg_tx, result.clone());
+        self.outcome_sent.insert(watcher_id);
+    }
+
+    fn send_replay_result_to_all(&mut self, result: &ServerMessage) {
+        for watcher_id in self.order.clone() {
+            self.send_replay_result_to(watcher_id, result);
         }
     }
 
@@ -440,7 +452,7 @@ impl RoomTask {
             context.tick_start,
         );
         if !replay_was_ended && !session.has_remaining_ticks() {
-            self.broadcast(&session.result_message());
+            self.send_replay_result_to_all(&session.result_message());
         }
         self.phase = Phase::ReplayViewer(session);
     }
@@ -717,6 +729,7 @@ impl RoomTask {
 
     pub(super) fn transition_to_replay_viewer(&mut self, mut session: ReplaySession) {
         let initial_chat = session.take_chat_through_current_tick();
+        let initial_result = (!session.has_remaining_ticks()).then(|| session.result_message());
         self.phase = Phase::ReplayViewer(Box::new(session));
         self.reset_after_live_match_for_room_phase();
         let recipients = self.order.clone();
@@ -726,6 +739,9 @@ impl RoomTask {
             self.send_observer_analysis_to(id);
         }
         self.broadcast_replay_chat(initial_chat);
+        if let Some(result) = initial_result {
+            self.send_replay_result_to_all(&result);
+        }
         crate::log_info!(
             room = %self.room,
             viewer_count = self.players.len(),

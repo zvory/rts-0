@@ -40,7 +40,7 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/lobby.rs": 950,
   "room_task/match_history.rs": 180,
   "room_task/observer.rs": 160,
-  "room_task/replay.rs": 741,
+  "room_task/replay.rs": 757,
   "room_task/summary.rs": 120,
   "room_task/types.rs": 220,
 }));
@@ -48,7 +48,7 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
 // are intentionally room-owned; keep the aggregate ratchet at the resulting footprint.
 // Chat is a separate room-owned concern with its own bounded module. Replay result delivery reuses
 // the existing gameOver contract at the playback boundary; account for those focused additions.
-const roomTaskTotalLineBudget = 6654;
+const roomTaskTotalLineBudget = 6670;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 
