@@ -164,8 +164,18 @@ export function _drawSelectionAndHp(e, selection, state) {
   }
 }
 
-export function _hpBarSlot(id) {
-  const pool = this._pools.hpBars;
+export function _drawAboveFogHp(e) {
+  const damaged = Number.isFinite(e?.hp)
+    && Number.isFinite(e?.maxHp)
+    && e.maxHp > 0
+    && e.hp < e.maxHp;
+  if (e?.aboveFogReveal !== true || !damaged) return;
+  const g = this._hpBarSlot(e.id, "aboveFogHpBars");
+  this._hpBar(g, e);
+}
+
+export function _hpBarSlot(id, poolName = "hpBars") {
+  const pool = this._pools[poolName];
   let container = pool.get(id);
   if (!container) {
     container = new PIXI.Container();
@@ -173,12 +183,12 @@ export function _hpBarSlot(id) {
     container.rtsFill = new PIXI.Graphics();
     container.addChild(container.rtsBackground, container.rtsFill);
     pool.set(id, container);
-    this.layers.hpBars.addChild(container);
-    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.hpBars");
+    this.layers[poolName].addChild(container);
+    this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.created.${poolName}`);
   } else {
-    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.reused.hpBars");
+    this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.reused.${poolName}`);
   }
-  this._seen.hpBars.add(id);
+  this._seen[poolName].add(id);
   container.visible = true;
   container.alpha = 1;
   return container;

@@ -213,6 +213,8 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
           orderPlan: [{ kind: "move", x: 1200, y: 760 }] },
         { id: 8, kind: "barracks", owner: 2, x: 1500, y: 900, hp: 240, maxHp: 300, visionOnly: true },
         { id: 9, kind: "rifleman", owner: 2, x: 1300, y: 820, hp: 20, maxHp: 40, shotReveal: true },
+        { id: 11, kind: "rifleman", owner: 2, x: 1250, y: 780, hp: 20, maxHp: 40, aboveFogReveal: true },
+        { id: 12, kind: "rifleman", owner: 2, x: 1200, y: 740, hp: 40, maxHp: 40, aboveFogReveal: true },
       ] },
       fog: {
         visibleGrid: [1, 0, 0, 0], exploredGrid: [1, 1, 0, 0],
@@ -247,11 +249,11 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
     const sceneDiagnostics = renderer.sceneDiagnostics();
     assert.deepEqual(
       sceneDiagnostics.genericEntities.categories,
-      { current: 1, remembered: 1, intel: 1, reveal: 1 },
+      { current: 1, remembered: 1, intel: 1, reveal: 3 },
       "Babylon consumes each already-separated visibility category without hidden lookups",
     );
     assert.equal(sceneDiagnostics.genericEntities.selected, 1, "generic placeholders preserve selection state");
-    assert.equal(sceneDiagnostics.genericEntities.hpBars, 4, "generic placeholders preserve received HP data");
+    assert.equal(sceneDiagnostics.genericEntities.hpBars, 6, "generic placeholders preserve received HP data");
     assert.deepEqual(
       sceneDiagnostics.fog,
       { visibleRevision: 4, exploredRevision: 7, visibleTiles: 1, exploredTiles: 1, unknownTiles: 2 },
@@ -263,6 +265,26 @@ assert.ok(Object.isFrozen(projection.perspective), "engine-independent perspecti
       renderer._scene.meshes.find((mesh) => mesh.name === "placeholder-reveal:9")?.renderingGroupId,
       3,
       "shot reveals render above the current-fog group",
+    );
+    assert.equal(
+      renderer._scene.meshes.find((mesh) => mesh.name === "hp-back-reveal:9")?.isVisible,
+      false,
+      "event-only shot-reveal ghosts do not expose HP",
+    );
+    assert.equal(
+      renderer._scene.meshes.find((mesh) => mesh.name === "hp-back-reveal:11")?.isVisible,
+      true,
+      "damaged actionable reveals show HP above fog",
+    );
+    assert.equal(
+      renderer._scene.meshes.find((mesh) => mesh.name === "hp-back-reveal:11")?.renderingGroupId,
+      3,
+      "actionable reveal HP bars share the above-fog render group",
+    );
+    assert.equal(
+      renderer._scene.meshes.find((mesh) => mesh.name === "hp-back-reveal:12")?.isVisible,
+      false,
+      "full-health actionable reveals do not show HP",
     );
     assert.ok(
       renderer._scene.meshes

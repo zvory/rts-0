@@ -9,7 +9,8 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
 //   → selection-rings → world-Y-sorted units/tree-canopies
 //   → post-processed forest-unit-outlines → smokes → hp-bars → fog → visual-sample-labels
-//   → shot-reveal-shadows → shot-reveals → feedback/miss-toasts → placement-ghost → drag-box
+//   → shot-reveal-shadows → shot-reveals → above-fog-hp-bars
+//   → feedback/miss-toasts → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
 // Snapshot-backed ground decals and trench terrain stamp into persistent textures.
@@ -24,6 +25,7 @@ import { COLORS } from "../config.js";
 import { isUnit, isBuilding, isResource } from "../protocol.js";
 import { _drawBuilding } from "./buildings.js";
 import {
+  _drawAboveFogHp,
   _drawSelectionAndHp,
   _hpBar,
   _hpBarSlot,
@@ -267,6 +269,7 @@ export class Renderer {
       hpBars: new Map(),
       shotRevealShadows: new Map(),
       shotReveals: new Map(),
+      aboveFogHpBars: new Map(),
     };
     // Ids touched this frame, per pool, so we can hide stale entries afterwards.
     this._seen = {};
@@ -668,6 +671,7 @@ export class Renderer {
             visualOverride: visualUnitOverrideMap.get(e.id) || null,
             visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
           });
+          this._drawAboveFogHp(e);
         });
       }
     });
@@ -1149,7 +1153,9 @@ export class Renderer {
     // whose two immutable Graphics children must be released with the pool entry.
     for (const key of Object.keys(this._pools)) {
       const pool = this._pools[key];
-      for (const g of pool.values()) g.destroy(key === "hpBars" ? { children: true } : undefined);
+      for (const g of pool.values()) {
+        g.destroy(key === "hpBars" || key === "aboveFogHpBars" ? { children: true } : undefined);
+      }
       pool.clear();
     }
     // Pooled icon Text objects.
@@ -1286,6 +1292,7 @@ Object.assign(Renderer.prototype, {
   _drawTreeOccludedUnitOutlines,
   _rigRenderContextFor,
   _drawShotRevealUnit,
+  _drawAboveFogHp,
   _drawBuilding,
   _drawResource,
   _drawSelectionAndHp,
