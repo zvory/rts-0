@@ -49,7 +49,7 @@ import { createRoomCapabilities } from "./room_capabilities.js";
 import { selectInitialCameraView } from "./camera_view_selection.js";
 import { matchLaunchConfig, nextMatchLaunchAction } from "./launch_url.js";
 import { CAMERA } from "./config.js";
-import { formatTeamLabel, scoreRowIsWinner } from "./scoreboard.js";
+import { formatTeamLabel, replayResultHeadline, scoreRowIsWinner } from "./scoreboard.js";
 import { StatusBadge } from "./status_badge.js";
 import {
   HotkeyProfileService,
@@ -954,16 +954,20 @@ export class App {
   onGameOver(m) {
     this.matchEndedGeneration = this.matchStartGeneration;
     const verdict = m && m.you ? m.you : "draw";
-    const text =
-      verdict === "won" ? "Victory" : verdict === "lost" ? "Defeat" : "Draw";
+    const scores = Array.isArray(m?.scores) ? m.scores : [];
+    const winnerId = m?.winnerId ?? null;
+    const winnerTeamId = m?.winnerTeamId ?? null;
+    const text = this.inReplayPlayback
+      ? replayResultHeadline(scores, winnerId, winnerTeamId)
+      : verdict === "won" ? "Victory" : verdict === "lost" ? "Defeat" : "Draw";
     if (verdict === "won") this.audio.play("victory", { category: "ui", priority: 5 });
     else if (verdict === "lost") this.audio.play("defeat", { category: "ui", priority: 5 });
     dom.gameOverText.textContent = text;
     dom.gameOverText.dataset.verdict = verdict; // lets CSS tint win/lose/draw
     this.renderScoreboard(
-      Array.isArray(m?.scores) ? m.scores : [],
-      m?.winnerId ?? null,
-      m?.winnerTeamId ?? null,
+      scores,
+      winnerId,
+      winnerTeamId,
     );
     this.renderObservationId(this.lastObservationRunId);
     dom.gameOver.hidden = false;

@@ -772,6 +772,33 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       "a stale renderer startup destroys its match without replacing the current match");
   }
   {
+    const previousGameOver = dom.gameOver;
+    const previousGameOverText = dom.gameOverText;
+    dom.gameOver = { hidden: true };
+    dom.gameOverText = { textContent: "", dataset: {} };
+    const app = Object.create(App.prototype);
+    app.matchStartGeneration = 5;
+    app.inReplayPlayback = true;
+    app.audio = { play() {} };
+    app.match = { stop() {} };
+    app.lastObservationRunId = "";
+    app.renderScoreboard = () => {};
+    app.renderObservationId = () => {};
+    app.onGameOver({
+      you: "draw",
+      winnerId: 7,
+      winnerTeamId: 1,
+      scores: [
+        { id: 7, teamId: 1, name: "Alex" },
+        { id: 8, teamId: 2, name: "DV" },
+      ],
+    });
+    assert(dom.gameOverText.textContent === "Alex has won",
+      "replay game over replaces the spectator Draw verdict with the winner's name");
+    dom.gameOver = previousGameOver;
+    dom.gameOverText = previousGameOverText;
+  }
+  {
     const app = Object.create(App.prototype);
     let resetCount = 0;
     let showCount = 0;
