@@ -15,7 +15,7 @@ fn schone_tage_is_selectable_and_loads_for_two_players() {
     let schone_tage = Map::load("Schone Tage", 2, 0x1234_5678)
         .expect("Schone Tage should load for two active players");
     assert_eq!(schone_tage.size, 166);
-    assert_eq!(schone_tage.base_sites.len(), 9);
+    assert_eq!(schone_tage.base_sites.len(), 10);
     let schone_tage_starts: HashSet<_> = schone_tage.starts.into_iter().collect();
     assert_eq!(schone_tage_starts, HashSet::from([(8, 47), (157, 47)]));
     assert!(
