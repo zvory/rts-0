@@ -43,12 +43,28 @@ assert.equal(options.markdownReportFile, "/tmp/adversarial-quality-pass.md");
 
 assert.throws(() => parseArgs(["--unknown"]), /unknown argument/);
 
-const prompt = renderPrompt({ baseRef: "origin/main", headRef: "HEAD" });
+const prompt = renderPrompt({
+  baseRef: "origin/main",
+  headRef: "HEAD",
+  reviewInputs: [{
+    path: "client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream",
+    classification: "binary",
+    oldBytes: 100,
+    newBytes: 101,
+    oldBlob: "old-stream",
+    newBlob: "new-stream",
+    added: null,
+    deleted: null,
+  }],
+});
 assert.match(prompt, /final autonomous quality pass/);
 assert.match(prompt, /Correctness bugs/);
 assert.match(prompt, /Architectural issues/);
 assert.match(prompt, /provided clean branch worktree/);
 assert.match(prompt, /outer helper handles pushing and PR creation/);
+assert.match(prompt, /represented only by bounded metadata/);
+assert.match(prompt, /Do not print,\ndecode, cat, git-show, or git-diff their raw contents/);
+assert.match(prompt, /fixed-roster-hellhole\.rtsstream \| class=binary/);
 assert.match(prompt, /AI behavior is outside your authority: do not create, alter, or approve it/);
 assert.match(prompt, /Refactor AI code only\nwhen behavior is preserved exactly/);
 assert.match(prompt, /Ignore missing documentation updates/);
@@ -197,6 +213,7 @@ function copyWorkflowScripts(targetRepo) {
     "agent-pr-passes.json",
     "patch-note-pass.mjs",
     "patch-note-pass.schema.json",
+    "review-inputs.mjs",
     "archive-completed-plans.mjs",
     "plan-phase-status.mjs",
     "adversarial-quality-pass.mjs",

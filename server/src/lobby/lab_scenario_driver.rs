@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use super::lab_replay_operations::lab_op_to_replay_operation;
 use crate::protocol::{Command, LabReplayOperation, LabReplayOperationEntry};
 use crate::tools::hellhole_spec::{
-    composition_300_supply, hash_words, respawn_candidates, shuttle_endpoint,
+    fixed_roster_composition, hash_words, respawn_candidates, shuttle_endpoint,
     COMMAND_INTERVAL_TICKS, LEG_TICKS, SCENARIO_ID, SHUTTLE_SELECTION_COUNT, TILE,
 };
 use rts_sim::game::entity::EntityKind;
@@ -18,7 +18,7 @@ pub(crate) fn lab_scenario_driver_for(scenario_id: &str) -> Option<LabScenarioDr
     if scenario_id != SCENARIO_ID {
         return None;
     }
-    match LabScenarioDriver::supply_300_hellhole() {
+    match LabScenarioDriver::fixed_roster_hellhole() {
         Ok(driver) => Some(driver),
         Err(err) => {
             eprintln!("Cannot start Lab scenario driver for {scenario_id}: {err}");
@@ -40,13 +40,13 @@ pub(crate) struct LabScenarioDriver {
 }
 
 impl LabScenarioDriver {
-    fn supply_300_hellhole() -> Result<Self, String> {
+    fn fixed_roster_hellhole() -> Result<Self, String> {
         Ok(Self {
             shuttles: vec![
                 DiagonalShuttle { player_id: 3 },
                 DiagonalShuttle { player_id: 4 },
             ],
-            target_composition: composition_300_supply()?,
+            target_composition: fixed_roster_composition(),
             respawn_candidates: respawn_candidates(),
             central_unit_provenance: BTreeMap::new(),
             pending_replacements: Vec::new(),
@@ -432,7 +432,7 @@ mod tests {
 
     #[test]
     fn replay_matching_only_recognizes_the_exact_scripted_shuttle_command() {
-        let driver = LabScenarioDriver::supply_300_hellhole().unwrap();
+        let driver = LabScenarioDriver::fixed_roster_hellhole().unwrap();
         let scenario = crate::lab_scenarios::load_lab_scenario_by_id(SCENARIO_ID).unwrap();
         let game = scenario.build_game().unwrap();
         let scripted_destination = driver.shuttles[0].destination_for_epoch(&game, 30).unwrap();
@@ -496,8 +496,8 @@ mod tests {
     fn shuttle_commands_select_exactly_43_each_second_and_vary_goal_tiles() {
         let scenario = crate::lab_scenarios::load_lab_scenario_by_id(SCENARIO_ID).unwrap();
         let game = scenario.build_game().unwrap();
-        let first_driver = LabScenarioDriver::supply_300_hellhole().unwrap();
-        let second_driver = LabScenarioDriver::supply_300_hellhole().unwrap();
+        let first_driver = LabScenarioDriver::fixed_roster_hellhole().unwrap();
+        let second_driver = LabScenarioDriver::fixed_roster_hellhole().unwrap();
 
         let first: Vec<_> = first_driver
             .shuttles
@@ -562,9 +562,8 @@ mod tests {
     fn central_deficit_has_one_low_snapshot_then_restores_owner_kind_and_supply() {
         let scenario = crate::lab_scenarios::load_lab_scenario_by_id(SCENARIO_ID).unwrap();
         let mut game = scenario.build_game().unwrap();
-        let mut driver = LabScenarioDriver::supply_300_hellhole().unwrap();
-        let expected_tanks = composition_300_supply()
-            .unwrap()
+        let mut driver = LabScenarioDriver::fixed_roster_hellhole().unwrap();
+        let expected_tanks = fixed_roster_composition()
             .into_iter()
             .filter(|kind| *kind == EntityKind::Tank)
             .count();
@@ -643,7 +642,7 @@ mod tests {
             })
             .unwrap();
         }
-        let mut driver = LabScenarioDriver::supply_300_hellhole().unwrap();
+        let mut driver = LabScenarioDriver::fixed_roster_hellhole().unwrap();
         driver.actions_for_tick(&game);
         let canonical_slot_count = driver.central_unit_provenance.len();
 

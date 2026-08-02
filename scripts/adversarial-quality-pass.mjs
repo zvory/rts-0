@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { collectReviewInputs, excludedRawPaths, renderReviewInputManifest } from "./review-inputs.mjs";
 
 const DEFAULT_BASE_REF = "origin/main";
 const DEFAULT_CONTEXT = "adversarial-quality-pass";
@@ -132,7 +133,8 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
-export function renderPrompt({ baseRef, headRef }) {
+export function renderPrompt({ baseRef, headRef, reviewInputs = [] }) {
+  const exclusions = excludedRawPaths(reviewInputs);
   return `You are the final autonomous quality pass for this branch.
 
 Assume no human will review this and no further agent will clean it up. Your job is to leave the
@@ -141,7 +143,16 @@ best final system you can.
 Use the provided clean branch worktree. The outer helper handles pushing and PR creation after you
 return; do not run PR lifecycle helpers yourself.
 
-Review the diff from ${baseRef} to ${headRef}.
+Review the human-authored parts of the diff from ${baseRef} to ${headRef}. Generated, binary, and
+oversized artifacts are deliberately represented only by bounded metadata below. Do not print,
+decode, cat, git-show, or git-diff their raw contents. Review their generators, source inputs,
+tests, and compact metadata instead.
+
+Changed-path metadata:
+${renderReviewInputManifest(reviewInputs)}
+
+Raw-content exclusions:
+${exclusions.length ? exclusions.join("\n") : "<none>"}
 
 AI behavior is outside your authority: do not create, alter, or approve it. Refactor AI code only
 when behavior is preserved exactly.
@@ -458,7 +469,8 @@ class Runner {
     });
     const reportFile = options.reportFile || path.join(os.tmpdir(), `rts-adversarial-quality-pass-${process.pid}.json`);
     const gitCommonDir = this.gitCommonDir(repoRoot);
-    const prompt = renderPrompt({ baseRef: options.baseRef, headRef: "HEAD" });
+    const reviewInputs = collectReviewInputs({ repoRoot, baseRef: options.baseRef });
+    const prompt = renderPrompt({ baseRef: options.baseRef, headRef: "HEAD", reviewInputs });
     const codexArgs = buildCodexArgs({
       repoRoot,
       gitCommonDir,

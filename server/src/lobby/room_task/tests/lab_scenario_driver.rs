@@ -8,9 +8,9 @@ use rts_sim::game::lab::{LabCommandOptions, LabOp, LabSpawnEntity};
 #[test]
 fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
     let mut config = lab_config();
-    config.scenario = Some("supply-300-hellhole".to_string());
+    config.scenario = Some("fixed-roster-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=fixed-roster-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -72,9 +72,9 @@ fn hellhole_scripted_shuttles_are_recorded_once_and_replayable() {
 #[test]
 fn hellhole_respawn_and_partial_commands_seek_and_export_together() {
     let mut config = lab_config();
-    config.scenario = Some("supply-300-hellhole".to_string());
+    config.scenario = Some("fixed-roster-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=fixed-roster-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -144,9 +144,9 @@ fn hellhole_respawn_and_partial_commands_seek_and_export_together() {
 #[test]
 fn scripted_spawn_is_recorded_once_seekable_and_portable() {
     let mut config = lab_config();
-    config.scenario = Some("supply-300-hellhole".to_string());
+    config.scenario = Some("fixed-roster-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=fixed-roster-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -219,9 +219,9 @@ fn scripted_spawn_is_recorded_once_seekable_and_portable() {
 #[test]
 fn scripted_spawn_replaces_retained_future_entry_after_earlier_seek() {
     let mut config = lab_config();
-    config.scenario = Some("supply-300-hellhole".to_string());
+    config.scenario = Some("fixed-roster-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=fixed-roster-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,
@@ -277,9 +277,9 @@ fn scripted_spawn_replaces_retained_future_entry_after_earlier_seek() {
 #[test]
 fn scripted_action_batch_rebases_before_crossing_timeline_cap() {
     let mut config = lab_config();
-    config.scenario = Some("supply-300-hellhole".to_string());
+    config.scenario = Some("fixed-roster-hellhole".to_string());
     let mut task = RoomTask::new(
-        "__lab__:sandbox:map=Chokes:scenario=supply-300-hellhole".to_string(),
+        "__lab__:sandbox:map=Chokes:scenario=fixed-roster-hellhole".to_string(),
         RoomMode::Lab(config),
         None,
         false,

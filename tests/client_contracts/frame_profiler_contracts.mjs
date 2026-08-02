@@ -45,26 +45,26 @@ export function runFrameProfilerContracts() {
     const ids = workloads.map((workload) => workload.id);
     assert(
       ids.filter((id) => id.startsWith("supply-") && !id.includes("hellhole")).length === 0,
-      "Hellhole is the sole supply-scale client renderer benchmark",
+      "Hellhole is the sole fixed-roster client renderer benchmark",
     );
     const defaultIds = defaultClientPerfWorkloads(workloads).map((workload) => workload.id);
-    assert(defaultIds.includes("supply-300-hellhole-stream"), "client-only Hellhole remains in the default renderer workload set");
-    const stream = workloads.find((workload) => workload.id === "supply-300-hellhole-stream");
+    assert(defaultIds.includes("fixed-roster-hellhole-stream"), "client-only Hellhole remains in the default renderer workload set");
+    const stream = workloads.find((workload) => workload.id === "fixed-roster-hellhole-stream");
     assert(
       stream?.setup?.snapshotStreamPlayerId === 1
         && stream?.setup?.snapshotStreamSpectator === false
         && JSON.stringify(stream?.setup?.snapshotStreamTeamIds) === JSON.stringify([1, 2, 1, 2])
         && stream?.setup?.snapshotStreamVisibilityTileCount === 126 * 126
-        && stream?.setup?.waitForMinEntities === 408,
+        && stream?.setup?.waitForMinEntities === 382,
       "client-only Hellhole measures the full-cadence Player 1 2v2 projection",
     );
-    assert(!defaultIds.includes("supply-300-hellhole-integrated"), "live server/client Hellhole is opt-in and cannot contaminate default isolated measurements");
-    const integrated = workloads.find((workload) => workload.id === "supply-300-hellhole-integrated");
+    assert(!defaultIds.includes("fixed-roster-hellhole-integrated"), "live server/client Hellhole is opt-in and cannot contaminate default isolated measurements");
+    const integrated = workloads.find((workload) => workload.id === "fixed-roster-hellhole-integrated");
     assert(
       integrated?.kind === "labScenario"
-        && integrated?.setup?.waitForMinEntities === 487
-        && integrated?.setup?.liveLabScenario?.minimumProjectedEntityCount === 487
-        && integrated?.setup?.liveLabScenario?.projectedEntityCount === 500,
+        && integrated?.setup?.waitForMinEntities === 461
+        && integrated?.setup?.liveLabScenario?.minimumProjectedEntityCount === 461
+        && integrated?.setup?.liveLabScenario?.projectedEntityCount === 468,
       "integrated Hellhole retains the canonical Lab range through deterministic death/respawn churn",
     );
     const expectedLab = integrated.setup.liveLabScenario;

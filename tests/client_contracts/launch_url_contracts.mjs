@@ -64,11 +64,11 @@ async function testDevWatchScenarioConfig() {
     assert(config === null, "dev scenario parser should reject unsafe scenario ids");
 
     globalThis.window.location = new URL(
-      "http://localhost/?snapshotStream=supply-300-hellhole",
+      "http://localhost/?snapshotStream=fixed-roster-hellhole",
     );
     const snapshotStream = snapshotStreamLaunchConfig();
     assert(
-      snapshotStream?.id === "supply-300-hellhole",
+      snapshotStream?.id === "fixed-roster-hellhole",
       "snapshot stream launch recognizes a safe static artifact id",
     );
     globalThis.window.location = new URL("http://localhost/?snapshotStream=bad/path");

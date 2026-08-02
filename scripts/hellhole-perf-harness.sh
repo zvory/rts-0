@@ -17,7 +17,7 @@ case "${1:-}" in
     export RTS_TEST_TICK_MS="${RTS_TEST_TICK_MS:-33}"
     export RTS_CLIENT_PERF_HEADED=1
     exec node "${ROOT}/scripts/client-perf-harness.mjs" \
-      --workload supply-300-hellhole-integrated \
+      --workload fixed-roster-hellhole-integrated \
       --seconds 30 \
       "$@"
     ;;

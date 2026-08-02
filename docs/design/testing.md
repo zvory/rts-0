@@ -175,7 +175,7 @@ Current scenario ids:
 - Panzerfaust inspection is composed in Lab: enable `panzerfausts` research for the owner,
   spawn Panzerfausts plus Scout Car/Tank/Command Car targets, and compare loaded versus spent art,
   cancellable windup, detached impact, exact target filtering, and explicit-Attack pursuit behavior.
-  The bundled `render-preview` and `supply-300-hellhole` scenarios include loaded Panzerfausts for
+  The bundled `render-preview` and `fixed-roster-hellhole` scenarios include loaded Panzerfausts for
   renderer and high-density coverage.
 - `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
   targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,
@@ -271,7 +271,13 @@ canary runs own a private server; the browser shard passes its existing loopback
   classifications use Codex repository review mode against the requested base; classifier
   instructions travel over stdin, and the branch diff is inspected from the checkout rather than
   embedded in a process argument. Regression coverage must keep prompt and diff content out of the
-  spawned command line so large branches remain portable across operating systems. The specialist
+  spawned command line so large branches remain portable across operating systems. Both AI passes
+  share a bounded review-input manifest: human-authored files up to 256 KiB remain available for
+  ordinary diff review, while binary files, generated Lab checkpoint JSON, snapshot streams, and
+  other oversized text are represented only by path, classification, before/after byte size, Git
+  blob id, and diff stat. Prompts prohibit printing or decoding those raw artifacts and direct the
+  reviewer to generators, authored inputs, and tests. Patch-note CLI diagnostics stream instead of
+  accumulating in a synchronous child-process buffer. The specialist
   patch-note pass is the sole owner of that tree: the adversarial pass is instructed not to edit
   `patch-notes/`, and a post-pass tree-and-history check fails before push if it creates, edits,
   deletes, or commits and restores a fragment.

@@ -81,7 +81,7 @@ pub fn generate_hellhole_snapshot_stream(
         "snapshotStream".to_string(),
         json!({
             "id": STREAM_ID,
-            "title": "Supply 300 Hellhole — Player 1 offline snapshot stream",
+            "title": "Fixed Roster Hellhole — Player 1 offline snapshot stream",
             "sourceScenario": STREAM_ID,
             "serverSimulation": false,
             "initialCamera": {

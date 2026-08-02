@@ -6,7 +6,7 @@ use rts_server::tools::hellhole_snapshot_stream::{
 
 const DEFAULT_OUTPUT: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../client/assets/snapshot-streams/supply-300-hellhole.rtsstream"
+    "/../client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream"
 );
 
 fn main() {

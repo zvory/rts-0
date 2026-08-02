@@ -82,8 +82,8 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
 
 {
   assert(
-    snapshotStreamAssetUrl("supply-300-hellhole") ===
-      "/assets/snapshot-streams/supply-300-hellhole.rtsstream",
+    snapshotStreamAssetUrl("fixed-roster-hellhole") ===
+      "/assets/snapshot-streams/fixed-roster-hellhole.rtsstream",
     "snapshot stream ids map to static same-origin artifacts",
   );
   assertThrows(() => snapshotStreamAssetUrl("../secret"), "snapshot stream asset ids reject paths");
@@ -98,7 +98,7 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
   );
 
   const checkedArtifactBytes = new Uint8Array(fs.readFileSync(new URL(
-    "../../client/assets/snapshot-streams/supply-300-hellhole.rtsstream",
+    "../../client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream",
     import.meta.url,
   )));
   const checkedArtifact = parseSnapshotStream(checkedArtifactBytes);
@@ -117,13 +117,13 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
       checkedArtifact.header.start?.map?.width === 126 &&
       checkedArtifact.header.start?.map?.height === 126 &&
       checkedArtifact.header.start.map.terrain.filter((tile) => tile === 1).length === 470 &&
-      checkedArtifact.header.start?.snapshotStream?.sourceScenario === "supply-300-hellhole",
+      checkedArtifact.header.start?.snapshotStream?.sourceScenario === "fixed-roster-hellhole",
     "checked-in Hellhole snapshot stream matches the canonical Player 1 2v2 projection",
   );
 
   const diagnostics = [];
   const checkedNet = new SnapshotStreamNet({
-    id: "supply-300-hellhole",
+    id: "fixed-roster-hellhole",
     autoStart: false,
     diagnostics: {
       mark: (label) => diagnostics.push(label),
@@ -247,11 +247,11 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
   const priorWindow = globalThis.window;
   const priorWebSocket = globalThis.WebSocket;
   const expected = {
-    scenarioId: "supply-300-hellhole",
+    scenarioId: "fixed-roster-hellhole",
     mapWidth: 126,
     mapHeight: 126,
-    projectedEntityCount: 500,
-    minimumProjectedEntityCount: 487,
+    projectedEntityCount: 468,
+    minimumProjectedEntityCount: 461,
   };
   globalThis.WebSocket = { OPEN: 1 };
   globalThis.window = {

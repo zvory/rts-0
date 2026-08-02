@@ -17,8 +17,15 @@ import {
   renderDiscordMessage,
   renderDiscordPayload,
   renderFragment,
+  renderPrompt as renderPatchNotePrompt,
   sendDiscordPatchNote,
 } from "../scripts/patch-note-pass.mjs";
+import {
+  MAX_RAW_REVIEW_BYTES,
+  classifyReviewPath,
+  excludedRawPaths,
+  renderReviewInputManifest,
+} from "../scripts/review-inputs.mjs";
 
 const agentPrScript = fs.readFileSync(new URL("../scripts/agent-pr.sh", import.meta.url), "utf8");
 assert.doesNotMatch(
@@ -101,6 +108,46 @@ assert.equal(isGameplayCandidate("client/styles.css"), true);
 assert.equal(isGameplayCandidate("tests/client_contracts/protocol_contracts.mjs"), false);
 assert.equal(isGameplayCandidate("docs/design/balance.md"), false);
 assert.equal(isGameplayCandidate("scripts/agent-pr.sh"), false);
+
+const boundedReviewInputs = [
+  {
+    path: "server/crates/rules/src/defs.rs", classification: "reviewable",
+    oldBytes: 120, newBytes: 140, oldBlob: "old-source", newBlob: "new-source",
+    added: 3, deleted: 1,
+  },
+  {
+    path: "server/assets/lab-scenarios/fixed-roster-hellhole.json", classification: "generated",
+    oldBytes: 1_000_000, newBytes: 1_000_100, oldBlob: "old-checkpoint", newBlob: "new-checkpoint",
+    added: 1, deleted: 1,
+  },
+  {
+    path: "client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream", classification: "binary",
+    oldBytes: 22_000_000, newBytes: 22_000_001, oldBlob: "old-stream", newBlob: "new-stream",
+    added: null, deleted: null,
+  },
+];
+assert.equal(classifyReviewPath("server/crates/rules/src/defs.rs", { newBytes: 140 }), "reviewable");
+assert.equal(classifyReviewPath("image.png", { binary: true }), "binary");
+assert.equal(classifyReviewPath("server/assets/lab-scenarios/render-preview.json"), "generated");
+assert.equal(classifyReviewPath("notes.txt", { newBytes: MAX_RAW_REVIEW_BYTES + 1 }), "large-text");
+assert.deepEqual(excludedRawPaths(boundedReviewInputs), [
+  "server/assets/lab-scenarios/fixed-roster-hellhole.json",
+  "client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream",
+]);
+const reviewManifest = renderReviewInputManifest(boundedReviewInputs);
+assert.match(reviewManifest, /fixed-roster-hellhole\.rtsstream \| class=binary \| bytes=22000000->22000001/);
+assert.doesNotMatch(reviewManifest, /checkpointPayload|frameTable/, "metadata must not contain artifact bodies");
+const patchPrompt = renderPatchNotePrompt({
+  baseRef: "origin/main",
+  branch: "zvorygin/bounded-review",
+  existingFragment: "",
+  fragmentPath: "patch-notes/example.md",
+  reviewInputs: boundedReviewInputs,
+});
+assert.match(patchPrompt, /represented only by bounded metadata/);
+assert.match(patchPrompt, /Do\s+not print, decode, cat, git-show, or git-diff their raw contents/);
+assert.match(patchPrompt, /fixed-roster-hellhole\.json/);
+assert.doesNotMatch(patchPrompt, /checkpointPayload|frameTable/);
 
 const decision = normalizeDecision({
   decision: "write_patch_note",
@@ -373,7 +420,7 @@ printf '%s\n' '{"decision":"no_patch_note","title":"","changes":[],"playtest_wat
     "the classifier prompt and branch diff must not be passed as command-line arguments",
   );
   const codexPrompt = fs.readFileSync(`${fakeCodex}.stdin`, "utf8");
-  assert.match(codexPrompt, /complete repository diff from origin\/main to HEAD/);
+  assert.match(codexPrompt, /human-authored parts of the repository diff from origin\/main to HEAD/);
   assert.match(codexPrompt, /use read-only repository\s+inspection only/);
   assert.doesNotMatch(codexPrompt, /do not edit files or run commands/);
   assert.match(codexPrompt, /server\/crates\/rules\/src\/fixture\.rs/);
