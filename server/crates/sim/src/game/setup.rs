@@ -340,6 +340,23 @@ impl Game {
             }
         }
 
+        // Authored tank-trap markers become ordinary completed neutral entities. Keeping them
+        // in the map document lets the editor round-trip their placement while the live entity
+        // remains subject to fog, combat, deconstruction, and vehicle pathing.
+        for doodad in map
+            .doodads
+            .iter()
+            .filter(|doodad| crate::game::map::doodads::is_tank_trap(doodad))
+        {
+            let _ = entities.spawn_building(
+                0,
+                EntityKind::TankTrap,
+                doodad.x as f32,
+                doodad.y as f32,
+                true,
+            );
+        }
+
         let derived = live_derived_state(&map, &entities, 0);
         let mut game = Game {
             state: GameState::new(
@@ -383,7 +400,17 @@ impl Game {
             tile_size: config::TILE_SIZE,
             terrain: self.state.map.terrain.clone(),
             resources,
-            doodads: self.state.map.doodads.clone(),
+            // Entity-backed authored objects must not bypass fog through the shared start payload.
+            // They remain in the authoritative map for Lab/editor round-tripping, while clients
+            // learn about their live entities only through recipient-filtered snapshots.
+            doodads: self
+                .state
+                .map
+                .doodads
+                .iter()
+                .filter(|doodad| !crate::game::map::doodads::is_tank_trap(doodad))
+                .cloned()
+                .collect(),
         };
         let players = self
             .state

@@ -1,4 +1,6 @@
 import { validateMapEditorPresentation } from "../map_editor_presentation.js";
+import { DOODAD_TYPE } from "../config.js";
+import { drawTankTrap } from "./buildings.js";
 import { gfxCircle, gfxFill, gfxNoFill, gfxRect, gfxReset, gfxStroke, gfxStrokePaths } from "./native_graphics.js";
 
 export class MapEditorWorkerRenderer {
@@ -7,6 +9,7 @@ export class MapEditorWorkerRenderer {
     this.renderer = renderer;
     this.overlay = new PIXI.Graphics();
     renderer.layers.feedback.addChild(this.overlay);
+    this.tankTraps = new Map();
     this.labels = [];
     this.terrainRevision = 0;
     this.doodadRevision = 0;
@@ -56,16 +59,52 @@ export class MapEditorWorkerRenderer {
   _applyDoodads(update) {
     if (!update || update.revision <= this.doodadRevision) return;
     if (update.kind === "replace") {
-      this.renderer.replaceStaticDoodads(update.doodads || []);
+      this._replaceTankTraps(update.doodads || []);
+      this.renderer.replaceStaticDoodads((update.doodads || []).filter((record) => !isTankTrap(record)));
     } else if (update.kind === "patch") {
+      this._patchTankTraps(update);
+      const tankTrapIds = (update.upserts || []).filter(isTankTrap).map((record) => record.id);
       this.renderer.patchStaticDoodads({
-        upserts: update.upserts || [],
-        removedIds: update.removedIds || [],
+        upserts: (update.upserts || []).filter((record) => !isTankTrap(record)),
+        removedIds: [...new Set([...(update.removedIds || []), ...tankTrapIds])],
       });
     } else {
       throw new TypeError(`Unsupported Map Editor doodad update ${String(update.kind)}.`);
     }
     this.doodadRevision = update.revision;
+  }
+
+  _replaceTankTraps(records) {
+    const next = new Map((records || []).filter(isTankTrap).map((record) => [record.id, record]));
+    for (const id of this.tankTraps.keys()) if (!next.has(id)) this._removeTankTrap(id);
+    for (const record of next.values()) this._upsertTankTrap(record);
+  }
+
+  _patchTankTraps({ upserts = [], removedIds = [] }) {
+    for (const id of removedIds || []) this._removeTankTrap(id);
+    for (const record of upserts || []) {
+      if (isTankTrap(record)) this._upsertTankTrap(record);
+      else this._removeTankTrap(record.id);
+    }
+  }
+
+  _upsertTankTrap(record) {
+    let graphic = this.tankTraps.get(record.id);
+    if (!graphic) {
+      graphic = new PIXI.Graphics();
+      this.renderer.layers.buildings.addChild(graphic);
+      this.tankTraps.set(record.id, graphic);
+    }
+    gfxReset(graphic.clear());
+    drawTankTrap(graphic, record.x, record.y, 32, record.id, 1);
+  }
+
+  _removeTankTrap(id) {
+    const graphic = this.tankTraps.get(id);
+    if (!graphic) return;
+    graphic.parent?.removeChild?.(graphic);
+    graphic.destroy();
+    this.tankTraps.delete(id);
   }
 
   _applyOverlay(overlay) {
@@ -132,7 +171,12 @@ export class MapEditorWorkerRenderer {
     this.destroyed = true;
     for (const label of this.labels) label.destroy();
     this.labels = [];
+    for (const id of [...this.tankTraps.keys()]) this._removeTankTrap(id);
     this.overlay.destroy();
     this.renderer.destroy();
   }
+}
+
+function isTankTrap(record) {
+  return record?.typeId === DOODAD_TYPE.TANK_TRAP;
 }

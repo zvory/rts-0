@@ -25,6 +25,7 @@ import {
 } from "./map_editor_session.js";
 
 const TILE_SIZE = 32;
+const MAP_EDITOR_ZOOM_STEP = 1.25;
 
 export function mapEditorSymmetryGuideLines(dimensions, symmetry) {
   const { width, height } = mapDimensions(dimensions);
@@ -191,6 +192,60 @@ export class MapEditorViewport {
 
   createTerrainPreview(terrain) {
     return createMapEditorTerrainPreview(terrain);
+  }
+
+  setZoomPercent(percent) {
+    const value = Number(percent);
+    if (!Number.isFinite(value)) return this.zoomPercent();
+    this.camera.setZoom(value / 100);
+    return this.zoomPercent();
+  }
+
+  zoomIn() {
+    this.camera.setZoom(this.camera.zoom * MAP_EDITOR_ZOOM_STEP);
+    return this.zoomPercent();
+  }
+
+  zoomOut() {
+    this.camera.setZoom(this.camera.zoom / MAP_EDITOR_ZOOM_STEP);
+    return this.zoomPercent();
+  }
+
+  fitToScreen() {
+    return this.frameMap(false);
+  }
+
+  fillScreen() {
+    return this.frameMap(true);
+  }
+
+  frameMap(fill) {
+    const { worldW, worldH, viewW, viewH } = this.camera;
+    if (!(worldW > 0 && worldH > 0 && viewW > 0 && viewH > 0)) return false;
+    const widthZoom = viewW / worldW;
+    const heightZoom = viewH / worldH;
+    this.camera.setView({
+      centerX: worldW / 2,
+      centerY: worldH / 2,
+      zoom: fill ? Math.max(widthZoom, heightZoom) : Math.min(widthZoom, heightZoom),
+    });
+    return true;
+  }
+
+  zoomPercent() {
+    return Math.round(this.camera.zoom * 100);
+  }
+
+  zoomLimitsPercent() {
+    return {
+      min: Math.round(this.camera.minZoom * 100),
+      max: Math.round(this.camera.maxZoom * 100),
+    };
+  }
+
+  subscribeZoom(listener) {
+    if (typeof listener !== "function") throw new TypeError("zoom listener must be a function");
+    return this.camera.subscribe((snapshot) => listener(Math.round(snapshot.framingScale * 100)));
   }
 
   applySessionSnapshot(snapshot) {

@@ -18,9 +18,11 @@ node scripts/check-crate-boundaries.mjs
 
 No JS build step (plain ES modules + PixiJS from CDN). The client is served from `../client`
 relative to the server crate, so `cargo run` from `server/` is the whole dev loop. Release Docker
-builds do have a prediction-WASM generation step: they run `scripts/build-sim-wasm.sh` inside the
-builder image and fail if `client/vendor/sim-wasm/rts_sim_wasm.js` or
-`rts_sim_wasm_bg.wasm` is missing.
+builds pin the repository Rust toolchain and use independent stages for the native `rts-server`
+binary and prediction WASM. Runtime client files are copied after both stages so client-only edits
+reuse the Rust layers. The WASM stage runs `scripts/build-sim-wasm.sh` into a separate output, and
+the final image fails if `client/vendor/sim-wasm/rts_sim_wasm.js` or
+`rts_sim_wasm_bg.wasm` is missing. Beta workflow summaries report each deploy phase and cache hit.
 
 ## Invariants
 - **Clients are untrusted.** Validate and bound every wire input:
