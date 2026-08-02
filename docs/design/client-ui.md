@@ -869,7 +869,10 @@ save/open uses the bounded lab replay artifact path instead of the legacy `expor
 authoritative map-only payload, creates a server-validated editor handoff, and navigates away; no Lab
 entity, resource, order, timeline, or replay state crosses that boundary.
 
-`MapEditorApp` owns the dedicated editor. The panel loads bundled JSON from `/maps/catalog` and
+`MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
+independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
+status, local save/load, export, and Lab handoff; Tools owns terrain paint and start/base locations.
+Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–166-tile square blank maps with a 126-tile default and a compact size field that follows the active draft, edits name/description plus flat start and base
 locations, and provides undo/redo, local save/load, and JSON export. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
