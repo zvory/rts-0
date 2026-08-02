@@ -10,13 +10,13 @@ const POSITION_GRID_TILES: f32 = 32.0;
 pub(super) fn record_activity(
     events: &HashMap<u32, Vec<Event>>,
     tick: u32,
-    world_width: f32,
-    world_height: f32,
+    world_dimensions: (f32, f32),
     last_activity_tick: &mut Option<u32>,
     last_activity_position: &mut Option<[f32; 2]>,
     active_through_tick: &mut Option<u32>,
     published_position: &mut Option<[f32; 2]>,
 ) {
+    let (world_width, world_height) = world_dimensions;
     if events.values().flatten().any(is_hostile_weapon_activity) {
         *last_activity_tick = Some(tick);
     }
@@ -194,8 +194,7 @@ mod tests {
         record_activity(
             &attack_events(),
             17,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -205,8 +204,7 @@ mod tests {
         record_activity(
             &HashMap::new(),
             30,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -229,8 +227,7 @@ mod tests {
         record_activity(
             &attack_events(),
             17,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -239,8 +236,7 @@ mod tests {
         record_activity(
             &HashMap::new(),
             30,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -251,8 +247,7 @@ mod tests {
         record_activity(
             &attack_events_at([3072.0, 1024.0]),
             31,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -270,8 +265,7 @@ mod tests {
         record_activity(
             &HashMap::new(),
             45,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -305,8 +299,7 @@ mod tests {
         record_activity(
             &attack_events(),
             17,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -318,8 +311,7 @@ mod tests {
         record_activity(
             &HashMap::new(),
             30,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -357,8 +349,7 @@ mod tests {
         record_activity(
             &events,
             15,
-            4096.0,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,

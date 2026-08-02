@@ -282,8 +282,10 @@ impl Game {
         world_combat::record_activity(
             &events,
             self.state.tick,
-            self.state.map.world_width_px(),
-            self.state.map.world_height_px(),
+            (
+                self.state.map.world_width_px(),
+                self.state.map.world_height_px(),
+            ),
             &mut self.state.last_world_combat_tick,
             &mut self.state.last_world_combat_position,
             &mut self.state.world_combat_active_through_tick,

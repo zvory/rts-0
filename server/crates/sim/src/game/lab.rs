@@ -557,8 +557,7 @@ impl Game {
         for &(x, y) in &starts {
             validate_lab_map_site(
                 name,
-                draft.width,
-                draft.height,
+                (draft.width, draft.height),
                 &draft.terrain,
                 x,
                 y,
@@ -572,8 +571,7 @@ impl Game {
             }
             validate_lab_map_site(
                 name,
-                draft.width,
-                draft.height,
+                (draft.width, draft.height),
                 &draft.terrain,
                 x,
                 y,
@@ -1303,14 +1301,14 @@ fn terrain_name(tile: u8) -> &'static str {
 
 fn validate_lab_map_site(
     name: &str,
-    width: u32,
-    height: u32,
+    dimensions: (u32, u32),
     terrain_grid: &[u8],
     x: u32,
     y: u32,
     radius: i32,
     occupied_sites: &mut std::collections::HashSet<(u32, u32)>,
 ) -> Result<(), LabError> {
+    let (width, height) = dimensions;
     if x >= width || y >= height {
         return Err(LabError::InvalidMap {
             name: name.to_string(),
