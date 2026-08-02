@@ -95,7 +95,7 @@ fn checkpoint_lab_scenario_export_matches_direct_state() {
     let mut authored = default_lab_game(0x5150_5001);
     authored.state.map.doodads = vec![MapDoodad {
         id: 1,
-        type_id: "tree.alder.topdown".to_string(),
+        type_id: "tree.alder".to_string(),
         x: 800,
         y: 900,
         color: None,

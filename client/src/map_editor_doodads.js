@@ -10,12 +10,6 @@ export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE, label: "Spruce", kind: "tree", perspective: "threeQuarter" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ASPEN, label: "Aspen", kind: "tree", perspective: "threeQuarter" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, label: "Alder", kind: "tree", perspective: "threeQuarter" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK_TOPDOWN, label: "Oak", kind: "tree", perspective: "topDown" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE_TOPDOWN, label: "Pine", kind: "tree", perspective: "topDown" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_BIRCH_TOPDOWN, label: "Birch", kind: "tree", perspective: "topDown" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE_TOPDOWN, label: "Spruce", kind: "tree", perspective: "topDown" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ASPEN_TOPDOWN, label: "Aspen", kind: "tree", perspective: "topDown" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER_TOPDOWN, label: "Alder", kind: "tree", perspective: "topDown" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, label: "Single flowers", kind: "wildflower" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_CLUSTER, label: "Flower cluster", kind: "wildflower" }),
 ]);

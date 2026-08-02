@@ -7,12 +7,6 @@ export const DOODAD_TYPE = Object.freeze({
   TREE_SPRUCE: "tree.spruce",
   TREE_ASPEN: "tree.aspen",
   TREE_ALDER: "tree.alder",
-  TREE_OAK_TOPDOWN: "tree.oak.topdown",
-  TREE_PINE_TOPDOWN: "tree.pine.topdown",
-  TREE_BIRCH_TOPDOWN: "tree.birch.topdown",
-  TREE_SPRUCE_TOPDOWN: "tree.spruce.topdown",
-  TREE_ASPEN_TOPDOWN: "tree.aspen.topdown",
-  TREE_ALDER_TOPDOWN: "tree.alder.topdown",
   WILDFLOWER_SINGLE: "wildflower.single",
   WILDFLOWER_CLUSTER: "wildflower.cluster",
 });

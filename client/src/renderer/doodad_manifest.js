@@ -11,15 +11,6 @@ const TREE_SPECS = Object.freeze({
   alder: Object.freeze({ widthPx: 82, heightPx: 102, anchorY: 0.94, windAmplitude: 0.027, windRate: 0.0012, shadowX: 24, shadowY: 8 }),
 });
 
-const TOPDOWN_SPECS = Object.freeze({
-  oak: Object.freeze({ widthPx: 96, heightPx: 88, anchorY: 0.54 }),
-  pine: Object.freeze({ widthPx: 84, heightPx: 98, anchorY: 0.56 }),
-  birch: Object.freeze({ widthPx: 78, heightPx: 76, anchorY: 0.53 }),
-  spruce: Object.freeze({ widthPx: 88, heightPx: 104, anchorY: 0.56 }),
-  aspen: Object.freeze({ widthPx: 74, heightPx: 82, anchorY: 0.54 }),
-  alder: Object.freeze({ widthPx: 92, heightPx: 84, anchorY: 0.53 }),
-});
-
 const entries = {};
 for (const [species, spec] of Object.entries(TREE_SPECS)) {
   const typeId = `tree.${species}`;
@@ -27,18 +18,6 @@ for (const [species, spec] of Object.entries(TREE_SPECS)) {
     typeId,
     image: `/assets/doodads/tree-${species}.png`,
     ...spec,
-  });
-  const topdown = TOPDOWN_SPECS[species];
-  const topdownTypeId = `${typeId}.topdown`;
-  entries[topdownTypeId] = treeEntry({
-    typeId: topdownTypeId,
-    image: `/assets/doodads/tree-${species}-topdown.png`,
-    ...topdown,
-    windAmplitude: spec.windAmplitude * 0.45,
-    windRate: spec.windRate,
-    shadowX: Math.round(topdown.widthPx * 0.3),
-    shadowY: Math.round(topdown.heightPx * 0.12),
-    shadowOffsetY: 0,
   });
 }
 

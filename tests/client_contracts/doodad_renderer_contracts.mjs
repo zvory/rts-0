@@ -43,23 +43,21 @@ try {
   for (const species of ["oak", "pine", "birch", "spruce", "aspen", "alder"]) {
     assert.equal(DOODAD_MANIFEST[`tree.${species}`]?.image, `/assets/doodads/tree-${species}.png`,
       `${species} uses its exact worker-safe raster asset path`);
-    assert.equal(DOODAD_MANIFEST[`tree.${species}.topdown`]?.image, `/assets/doodads/tree-${species}-topdown.png`,
-      `${species} top-down variant uses its exact worker-safe raster asset path`);
   }
-  assert.equal(DOODAD_TYPE_IDS.filter((typeId) => typeId.startsWith("tree.")).length, 12,
-    "renderer catalog exposes six tree species in side-view and top-down variants");
+  assert.equal(DOODAD_TYPE_IDS.filter((typeId) => typeId.startsWith("tree.")).length, 6,
+    "renderer catalog exposes the six accepted tree species");
   assert.equal(readiness.size, DOODAD_TYPE_IDS.length, "every allowlisted doodad asset is readiness-tracked");
   assert([...readiness.values()].every((status) => status === "ready"), "doodad readiness requires every texture");
 
   layer.replace([
     { id: 1, typeId: "tree.oak", x: 50, y: 50 },
     { id: 2, typeId: "wildflower.single", x: 70, y: 80, color: "#D95F8D" },
-    { id: 4, typeId: "tree.alder.topdown", x: 90, y: 90 },
+    { id: 4, typeId: "tree.alder", x: 90, y: 90 },
     { id: 3, typeId: "not-a-doodad", x: 10, y: 10 },
     { id: 1, typeId: "tree.pine", x: 90, y: 90 },
   ]);
   assert.equal(layer.instances.size, 3, "replace reconciles only unique allowlisted doodads");
-  assert.equal(canopies.children.length, 2, "side-view and top-down tree art share the canopy layer above unit bodies");
+  assert.equal(canopies.children.length, 2, "tree art shares the canopy layer above unit bodies");
   assert.equal(understory.children.length, 3, "flowers and tree shadows share the private below-unit layer");
   assert.equal(layer.instances.get(2).display.tint, 0xd95f8d, "wildflower colors tint the authored white-petal asset");
 

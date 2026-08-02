@@ -314,19 +314,13 @@ pub enum MapDoodadClass {
 
 pub const MAX_MAP_DOODADS: usize = 4_096;
 pub const MAP_TILE_SIZE_PX: u32 = 32;
-pub const MAP_DOODAD_TYPE_IDS: [&str; 14] = [
+pub const MAP_DOODAD_TYPE_IDS: [&str; 8] = [
     "tree.oak",
     "tree.pine",
     "tree.birch",
     "tree.spruce",
     "tree.aspen",
     "tree.alder",
-    "tree.oak.topdown",
-    "tree.pine.topdown",
-    "tree.birch.topdown",
-    "tree.spruce.topdown",
-    "tree.aspen.topdown",
-    "tree.alder.topdown",
     "wildflower.single",
     "wildflower.cluster",
 ];
@@ -338,13 +332,7 @@ pub fn classify_map_doodad(type_id: &str) -> Option<MapDoodadClass> {
         | "tree.birch"
         | "tree.spruce"
         | "tree.aspen"
-        | "tree.alder"
-        | "tree.oak.topdown"
-        | "tree.pine.topdown"
-        | "tree.birch.topdown"
-        | "tree.spruce.topdown"
-        | "tree.aspen.topdown"
-        | "tree.alder.topdown" => Some(MapDoodadClass::Tree),
+        | "tree.alder" => Some(MapDoodadClass::Tree),
         "wildflower.single" | "wildflower.cluster" => Some(MapDoodadClass::Wildflower),
         _ => None,
     }

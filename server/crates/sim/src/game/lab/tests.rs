@@ -70,7 +70,7 @@ fn map_draft() -> LabMapDraft {
             },
             MapDoodad {
                 id: 3,
-                type_id: "tree.spruce.topdown".to_string(),
+                type_id: "tree.spruce".to_string(),
                 x: 800,
                 y: 820,
                 color: None,

@@ -1389,9 +1389,9 @@ supported player count; every base site is a permanent resource location, includ
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
 counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
 by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.oak`, `tree.pine`,
-`tree.birch`, `tree.spruce`, `tree.aspen`, `tree.alder`, the corresponding
-`tree.<species>.topdown` variants, `wildflower.single`, and `wildflower.cluster`. Every tree id has
-the same inert `Tree` semantic class; species and perspective affect presentation only. Tree color
+`tree.birch`, `tree.spruce`, `tree.aspen`, `tree.alder`, `wildflower.single`, and
+`wildflower.cluster`. Every tree id has the same inert `Tree` semantic class; species affects
+presentation only. Tree color
 is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
 `#rrggbb`. Doodads have no collision, pathing, fog, vision, cover, or combat behavior in schema v5.
 Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,

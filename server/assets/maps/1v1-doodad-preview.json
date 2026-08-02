@@ -212,7 +212,7 @@
     },
     {
       "id": 2,
-      "typeId": "tree.oak.topdown",
+      "typeId": "tree.oak",
       "x": 750,
       "y": 1199
     },
@@ -224,7 +224,7 @@
     },
     {
       "id": 4,
-      "typeId": "tree.oak.topdown",
+      "typeId": "tree.oak",
       "x": 785,
       "y": 1139
     },
@@ -236,7 +236,7 @@
     },
     {
       "id": 6,
-      "typeId": "tree.oak.topdown",
+      "typeId": "tree.oak",
       "x": 852,
       "y": 1068
     },
@@ -248,7 +248,7 @@
     },
     {
       "id": 8,
-      "typeId": "tree.oak.topdown",
+      "typeId": "tree.oak",
       "x": 876,
       "y": 1040
     },
@@ -260,7 +260,7 @@
     },
     {
       "id": 10,
-      "typeId": "tree.oak.topdown",
+      "typeId": "tree.oak",
       "x": 911,
       "y": 1140
     },
@@ -272,7 +272,7 @@
     },
     {
       "id": 12,
-      "typeId": "tree.pine.topdown",
+      "typeId": "tree.pine",
       "x": 3154,
       "y": 2957
     },
@@ -284,7 +284,7 @@
     },
     {
       "id": 14,
-      "typeId": "tree.pine.topdown",
+      "typeId": "tree.pine",
       "x": 3189,
       "y": 2897
     },
@@ -296,7 +296,7 @@
     },
     {
       "id": 16,
-      "typeId": "tree.pine.topdown",
+      "typeId": "tree.pine",
       "x": 3245,
       "y": 2837
     },
@@ -308,7 +308,7 @@
     },
     {
       "id": 18,
-      "typeId": "tree.pine.topdown",
+      "typeId": "tree.pine",
       "x": 3280,
       "y": 2798
     },
@@ -320,7 +320,7 @@
     },
     {
       "id": 20,
-      "typeId": "tree.pine.topdown",
+      "typeId": "tree.pine",
       "x": 3315,
       "y": 2898
     },
@@ -332,7 +332,7 @@
     },
     {
       "id": 22,
-      "typeId": "tree.birch.topdown",
+      "typeId": "tree.birch",
       "x": 1483,
       "y": 1291
     },
@@ -344,7 +344,7 @@
     },
     {
       "id": 24,
-      "typeId": "tree.birch.topdown",
+      "typeId": "tree.birch",
       "x": 1518,
       "y": 1231
     },
@@ -356,7 +356,7 @@
     },
     {
       "id": 26,
-      "typeId": "tree.birch.topdown",
+      "typeId": "tree.birch",
       "x": 1585,
       "y": 1171
     },
@@ -368,7 +368,7 @@
     },
     {
       "id": 28,
-      "typeId": "tree.birch.topdown",
+      "typeId": "tree.birch",
       "x": 1620,
       "y": 1132
     },
@@ -380,7 +380,7 @@
     },
     {
       "id": 30,
-      "typeId": "tree.birch.topdown",
+      "typeId": "tree.birch",
       "x": 1644,
       "y": 1232
     },
@@ -392,7 +392,7 @@
     },
     {
       "id": 32,
-      "typeId": "tree.spruce.topdown",
+      "typeId": "tree.spruce",
       "x": 2415,
       "y": 2868
     },
@@ -404,7 +404,7 @@
     },
     {
       "id": 34,
-      "typeId": "tree.spruce.topdown",
+      "typeId": "tree.spruce",
       "x": 2450,
       "y": 2797
     },
@@ -416,7 +416,7 @@
     },
     {
       "id": 36,
-      "typeId": "tree.spruce.topdown",
+      "typeId": "tree.spruce",
       "x": 2517,
       "y": 2737
     },
@@ -428,7 +428,7 @@
     },
     {
       "id": 38,
-      "typeId": "tree.spruce.topdown",
+      "typeId": "tree.spruce",
       "x": 2541,
       "y": 2709
     },
@@ -440,7 +440,7 @@
     },
     {
       "id": 40,
-      "typeId": "tree.spruce.topdown",
+      "typeId": "tree.spruce",
       "x": 2576,
       "y": 2798
     },
@@ -452,7 +452,7 @@
     },
     {
       "id": 42,
-      "typeId": "tree.aspen.topdown",
+      "typeId": "tree.aspen",
       "x": 3123,
       "y": 2066
     },
@@ -464,7 +464,7 @@
     },
     {
       "id": 44,
-      "typeId": "tree.aspen.topdown",
+      "typeId": "tree.aspen",
       "x": 3147,
       "y": 1995
     },
@@ -476,7 +476,7 @@
     },
     {
       "id": 46,
-      "typeId": "tree.aspen.topdown",
+      "typeId": "tree.aspen",
       "x": 3214,
       "y": 1935
     },
@@ -488,7 +488,7 @@
     },
     {
       "id": 48,
-      "typeId": "tree.aspen.topdown",
+      "typeId": "tree.aspen",
       "x": 3249,
       "y": 1907
     },
@@ -500,7 +500,7 @@
     },
     {
       "id": 50,
-      "typeId": "tree.aspen.topdown",
+      "typeId": "tree.aspen",
       "x": 3284,
       "y": 1996
     },
@@ -512,7 +512,7 @@
     },
     {
       "id": 52,
-      "typeId": "tree.alder.topdown",
+      "typeId": "tree.alder",
       "x": 780,
       "y": 2096
     },
@@ -524,7 +524,7 @@
     },
     {
       "id": 54,
-      "typeId": "tree.alder.topdown",
+      "typeId": "tree.alder",
       "x": 815,
       "y": 2036
     },
@@ -536,7 +536,7 @@
     },
     {
       "id": 56,
-      "typeId": "tree.alder.topdown",
+      "typeId": "tree.alder",
       "x": 882,
       "y": 1965
     },
@@ -548,7 +548,7 @@
     },
     {
       "id": 58,
-      "typeId": "tree.alder.topdown",
+      "typeId": "tree.alder",
       "x": 917,
       "y": 1937
     },
@@ -560,7 +560,7 @@
     },
     {
       "id": 60,
-      "typeId": "tree.alder.topdown",
+      "typeId": "tree.alder",
       "x": 941,
       "y": 2037
     },

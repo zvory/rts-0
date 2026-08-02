@@ -912,10 +912,8 @@ assert(
     MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "tree").map((entry) => entry.typeId),
     [
       "tree.oak", "tree.pine", "tree.birch", "tree.spruce", "tree.aspen", "tree.alder",
-      "tree.oak.topdown", "tree.pine.topdown", "tree.birch.topdown", "tree.spruce.topdown",
-      "tree.aspen.topdown", "tree.alder.topdown",
     ],
-    "the tree palette exposes six inert species in both 3/4 and top-down perspectives",
+    "the tree palette exposes the six accepted inert species",
   );
   assert.equal(canonicalDoodadColor(" #AbC "), "#aabbcc");
   assert.equal(canonicalDoodadColor("not-a-color"), null);
