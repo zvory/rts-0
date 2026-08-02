@@ -3022,7 +3022,7 @@ fn worker_keeps_lateral_waypoint_when_next_segment_reachable() {
 }
 
 #[test]
-fn infantry_route_skip_stops_before_blocked_corner() {
+fn infantry_route_skip_stops_before_nearby_blocked_corner() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
@@ -3034,12 +3034,13 @@ fn infantry_route_skip_stops_before_blocked_corner() {
         .expect("rifleman stats")
         .radius;
 
+    let clearance = infantry_radius + 8.0;
+    let corner = (rect.max_x + clearance, rect.max_y + clearance);
     let start = (
-        rect.min_x - infantry_radius - 8.0,
-        rect.max_y + infantry_radius + 8.0,
+        corner.0 - config::ARRIVE_RADIUS_INTERMEDIATE_PX - 4.0,
+        corner.1,
     );
-    let corner = (rect.max_x + infantry_radius + 8.0, start.1);
-    let after_corner = (corner.0, rect.min_y - infantry_radius - 8.0);
+    let after_corner = (corner.0, rect.min_y - clearance);
     let rifleman = entities
         .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
         .expect("rifleman spawn");
@@ -3049,6 +3050,11 @@ fn infantry_route_skip_stops_before_blocked_corner() {
     set_path_direct(&mut entities, rifleman, vec![corner, after_corner]);
 
     let occ = Occupancy::build(&map, &entities);
+    assert!(
+        moved_distance(start, corner) > config::ARRIVE_RADIUS_INTERMEDIATE_PX
+            && moved_distance(start, corner) <= config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX,
+        "fixture must isolate the vehicle-only acceptance radius"
+    );
     assert!(
         standability::unit_static_segment_standable(
             &map,
