@@ -1798,7 +1798,9 @@ artifact, privacy, API, persistence, and input-limit contract lives in
 (compute `alpha` from snapshot timing, `camera.update`,
 `audio.setListener`, `input.update`, `buildFrameEntityViews`, `fog.update`, `renderer.render`,
 `hud.update`, `minimap.render`); on each snapshot it applies state and triggers transient event
-audio exactly once; on `gameOver` show the victory/defeat overlay with the frozen score table. The score table
+audio exactly once; on `gameOver` show the victory/defeat overlay with the frozen score table. Replay
+spectators instead see a winner headline built from the winning score rows (for example,
+`Alex has won`), while an actual replay draw remains `Draw`. The score table
 includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
 for singleton FFA compatibility.
 For spectator starts without command-surface permission, `match.js` hides the command card and
