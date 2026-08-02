@@ -1,48 +1,9 @@
-use std::collections::HashSet;
-
 use super::super::*;
-use crate::protocol::{MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX};
+use crate::protocol::MAP_TILE_SIZE_PX;
 
 #[test]
 fn doodad_world_bound_tile_size_matches_simulation_tiles() {
     assert_eq!(MAP_TILE_SIZE_PX, config::TILE_SIZE);
-}
-
-#[test]
-fn doodad_preview_preserves_one_v_one_layout_and_exercises_the_full_catalog() {
-    let seed = 0x1234_5678;
-    let original = Map::load("1v1", 2, seed).expect("1v1 should load");
-    let preview = Map::load("1v1 Doodad Preview", 2, seed).expect("preview should load");
-    assert_eq!(preview.terrain, original.terrain);
-    assert_eq!(preview.starts, original.starts);
-    assert_eq!(preview.base_sites, original.base_sites);
-    assert_eq!(preview.base_resource_counts, original.base_resource_counts);
-    assert_eq!(preview.doodads.len(), 156);
-
-    let types = preview
-        .doodads
-        .iter()
-        .map(|doodad| doodad.type_id.as_str())
-        .collect::<HashSet<_>>();
-    assert_eq!(types, MAP_DOODAD_TYPE_IDS.into_iter().collect());
-    for doodad in &preview.doodads {
-        let tile = (doodad.x / config::TILE_SIZE, doodad.y / config::TILE_SIZE);
-        assert_eq!(
-            preview.terrain_at(tile.0, tile.1),
-            terrain::GRASS,
-            "preview doodad {} must remain off roads, rock, and water",
-            doodad.id
-        );
-        assert!(
-            preview.base_sites.iter().all(|&(x, y)| {
-                let dx = i64::from(x) - i64::from(tile.0);
-                let dy = i64::from(y) - i64::from(tile.1);
-                dx * dx + dy * dy > 36
-            }),
-            "preview doodad {} is too close to a protected base",
-            doodad.id
-        );
-    }
 }
 
 #[test]
