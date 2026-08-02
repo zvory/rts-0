@@ -23,6 +23,6 @@
       "cache-bust the runtime atlas URL with pass06-normalized"
     ]
   },
-  "runtimeNotes": "The raw generated pass includes a reference tank and track strip for recordkeeping, but the active runtime alpha sheet exposes only normalized bottom-row hull/body and turret/barrel frames. The track frame is transparent and still covers track source parts, preventing fallback SVG tracks from rendering during this experiment.",
-  "notes": "Recognizable Tiger I low-poly raster direction with separate hull/body and turret/barrel components. The pipeline now removes generated black cell-edge boxes and scales frames against SVG rig bounds. Not final art: the hull has an open turret-ring hole and the active experiment intentionally omits tracks."
+  "runtimeNotes": "The raw generated pass includes a reference tank and track strip for recordkeeping, but the active runtime alpha sheet exposes only normalized bottom-row hull/body and turret/barrel frames. The track frame is transparent and keeps the production track sprites hidden during this experiment.",
+  "notes": "Recognizable Tiger I low-poly raster direction with separate hull/body and turret/barrel components. The pipeline removes generated black cell-edge boxes and records explicit raster world scaling. Not final art: the hull has an open turret-ring hole and the active experiment intentionally omits tracks."
 }

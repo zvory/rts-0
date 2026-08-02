@@ -18,8 +18,8 @@ The selected source sheet is now used without diagnostic framing. Runtime placem
 - each trail moves rearward by half of its rendered length and outward by one
   tenth of its rendered width;
 - the mounting-ring center is the origin for each trail;
-- the SVG Artillery rig remains authoritative for setup visibility, carriage
-  and weapon facing, recoil, muzzle flash, and gameplay anchors.
+- raster-native Artillery metadata remains authoritative for setup visibility,
+  carriage and weapon facing, recoil, muzzle flash, and gameplay anchors.
 
 Generated with the built-in image-generation tool on a removable magenta key,
 then converted locally to alpha with soft matte and despill. The exact prompt

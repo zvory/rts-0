@@ -16,7 +16,8 @@ const ICON_COMPOSITION_STATE = Object.freeze({
 
 /**
  * Return trusted HUD markup backed by the live renderer's preferred production asset.
- * PNG frame strips/atlases win; authored SVG is retained only for units without a PNG route.
+ * PNG frame strips/atlases are authoritative for raster units. SVG portraits are used only for
+ * units that do not yet have a PNG route.
  */
 export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
   const tintColor = normalizeTeamColor(teamColor);

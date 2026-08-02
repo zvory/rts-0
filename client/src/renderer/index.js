@@ -286,8 +286,8 @@ export class Renderer {
     // authoritative or predicted render position is actually changing.
     this._frameStripMotion = new Map();
     this._unitRenderContexts = new Map();
-    // Live SVG rig instances are routed per unit kind. Invalid or missing
-    // definitions fail through the renderer's missing-texture guard.
+    // Unit rig metadata is routed per kind. Raster units have no vector-art fallback;
+    // invalid definitions or missing PNG textures fail through the missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
     this._livePngRigAtlasesByKind = createLivePngRigAtlases();
     this._livePngRigAtlasTextures = new Map();

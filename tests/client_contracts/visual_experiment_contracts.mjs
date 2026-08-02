@@ -18,7 +18,6 @@ import {
 } from "../../client/src/renderer/rigs/live_routing.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_png_strip.js";
 import {
-  VISUAL_UNIT_RIG_CANDIDATE_SOURCES,
   compileVisualUnitRigCandidates,
   visualUnitRigCandidateIds,
 } from "../../client/src/renderer/rigs/visual_override_rigs.js";
@@ -56,6 +55,21 @@ const NOOP_RENDERER_OVERLAYS = [
   "_drawPlacement",
 ];
 
+const TEST_WORKER_SVG = fs.readFileSync(
+  new URL("../fixtures/svg/rig-worker.svg", import.meta.url),
+  "utf8",
+);
+const TEST_WORKER_CANDIDATES = Object.freeze([
+  Object.freeze({ id: "worker-candidate-a", label: "Worker A", kind: KIND.WORKER, svgText: TEST_WORKER_SVG }),
+  Object.freeze({ id: "worker-candidate-b", label: "Worker B", kind: KIND.WORKER, svgText: TEST_WORKER_SVG }),
+  Object.freeze({ id: "worker-candidate-c", label: "Worker C", kind: KIND.WORKER, svgText: TEST_WORKER_SVG }),
+]);
+const TEST_WORKER_OVERRIDES = Object.freeze([
+  Object.freeze({ id: "worker-by-entity", candidateId: "worker-candidate-a", selector: Object.freeze({ entityId: 126 }) }),
+  Object.freeze({ id: "worker-by-ordinal", candidateId: "worker-candidate-b", selector: Object.freeze({ kind: KIND.WORKER, owner: 1, ordinal: 2 }) }),
+  Object.freeze({ id: "worker-by-nearest", candidateId: "worker-candidate-c", selector: Object.freeze({ kind: KIND.WORKER, owner: 1, nearest: Object.freeze({ x: 1884, y: 2032 }), maxDistance: 64 }) }),
+]);
+
 {
   const profile = getVisualProfile("trench-variants-1");
   assert(profile, "trench visual profile is registered");
@@ -90,21 +104,16 @@ const NOOP_RENDERER_OVERLAYS = [
 }
 
 {
-  const profile = getVisualProfile("unit-rig-overrides-1");
-  assert(profile, "real-unit visual override profile is registered");
-  assert(profile.unitOverrides.length >= 3, "unit override profile compares multiple same-kind units");
+  assert(getVisualProfile("unit-rig-overrides-1") === null, "retired Tank SVG override profile is no longer registered");
+  assert(visualUnitRigCandidateIds().length === 0, "raster units do not retain checked-in SVG candidates");
+  const unitOverrides = TEST_WORKER_OVERRIDES;
+  assert(unitOverrides.length >= 3, "test-only unit overrides compare multiple same-kind units");
   assert(
-    profile.unitOverrides.some((rule) => rule.selector?.entityId === 126) &&
-      profile.unitOverrides.some((rule) => rule.selector?.kind === KIND.TANK && rule.selector?.ordinal === 2) &&
-      profile.unitOverrides.some((rule) => rule.selector?.kind === KIND.TANK && rule.selector?.nearest),
+    unitOverrides.some((rule) => rule.selector?.entityId === 126) &&
+      unitOverrides.some((rule) => rule.selector?.kind === KIND.WORKER && rule.selector?.ordinal === 2) &&
+      unitOverrides.some((rule) => rule.selector?.kind === KIND.WORKER && rule.selector?.nearest),
     "unit override profile covers entity id, kind ordinal, and kind nearest selector forms",
   );
-  for (const rule of profile.unitOverrides) {
-    assert(
-      visualUnitRigCandidateIds().includes(rule.candidateId),
-      `unit override candidate ${rule.candidateId} is registered through the checked-in rig registry`,
-    );
-  }
 }
 
 {
@@ -345,32 +354,35 @@ const NOOP_RENDERER_OVERLAYS = [
 {
   const compiled = compileVisualUnitRigCandidates();
   const ids = visualUnitRigCandidateIds();
-  assert(ids.length >= 3, "checked-in visual rig registry exposes multiple tank candidates");
-  for (const id of ids) {
-    const candidate = compiled.definitions.get(id);
-    assert(candidate?.kind === KIND.TANK, `${id} compiles as a Tank candidate`);
+  assert(ids.length === 0, "checked-in visual rig registry has no raster-unit SVG candidates");
+  assert(compiled.definitions.size === 0, "empty checked-in registry compiles to no overrides");
+  assert(compiled.errors.size === 0, "empty checked-in registry has no importer errors");
+
+  const testCompiled = compileVisualUnitRigCandidates(TEST_WORKER_CANDIDATES);
+  for (const id of TEST_WORKER_CANDIDATES.map((entry) => entry.id)) {
+    const candidate = testCompiled.definitions.get(id);
+    assert(candidate?.kind === KIND.WORKER, `${id} compiles as a Worker candidate`);
     assert(candidate.definition?.id === id, `${id} keeps its registered candidate id after import`);
   }
-  assert(compiled.errors.size === 0, "checked-in visual rig candidates compile without importer errors");
+  assert(testCompiled.errors.size === 0, "test-only SVG rig candidates compile without importer errors");
 }
 
 {
-  const profile = getVisualProfile("unit-rig-overrides-1");
-  const compiled = compileVisualUnitRigCandidates();
+  const compiled = compileVisualUnitRigCandidates(TEST_WORKER_CANDIDATES);
   const entities = [
-    { id: 126, owner: 1, kind: KIND.TANK, x: 1887.97, y: 1860.91, facing: 0, weaponFacing: 0 },
-    { id: 127, owner: 1, kind: KIND.TANK, x: 1883.97, y: 1944.91, facing: 0, weaponFacing: 0 },
-    { id: 128, owner: 1, kind: KIND.TANK, x: 1883.97, y: 2031.91, facing: 0, weaponFacing: 0 },
+    { id: 126, owner: 1, kind: KIND.WORKER, x: 1887.97, y: 1860.91, facing: 0, weaponFacing: 0 },
+    { id: 127, owner: 1, kind: KIND.WORKER, x: 1883.97, y: 1944.91, facing: 0, weaponFacing: 0 },
+    { id: 128, owner: 1, kind: KIND.WORKER, x: 1883.97, y: 2031.91, facing: 0, weaponFacing: 0 },
     { id: 140, owner: 1, kind: KIND.RIFLEMAN, x: 2000, y: 1900, facing: 0, weaponFacing: 0 },
   ];
 
-  const resolved = resolveVisualUnitOverrides(profile.unitOverrides, entities, compiled.definitions);
-  assert(resolved.errors.length === 0, "unit override selectors resolve cleanly for render-preview tanks");
-  assert(resolved.overrides.size === 3, "unit override profile assigns three real units");
-  assert(resolved.overrides.get(126)?.candidateId === "tank-low-profile", "entity-id selector targets tank 126");
-  assert(resolved.overrides.get(127)?.candidateId === "tank-wide-turret", "kind ordinal selector targets the second tank");
-  assert(resolved.overrides.get(128)?.candidateId === "tank-long-cannon", "nearest selector targets the intended tank");
-  assert(entities.every((entity) => entity.kind === KIND.TANK || entity.kind === KIND.RIFLEMAN),
+  const resolved = resolveVisualUnitOverrides(TEST_WORKER_OVERRIDES, entities, compiled.definitions);
+  assert(resolved.errors.length === 0, "unit override selectors resolve cleanly for test Workers");
+  assert(resolved.overrides.size === 3, "unit override rules assign three real units");
+  assert(resolved.overrides.get(126)?.candidateId === "worker-candidate-a", "entity-id selector targets Worker 126");
+  assert(resolved.overrides.get(127)?.candidateId === "worker-candidate-b", "kind ordinal selector targets the second Worker");
+  assert(resolved.overrides.get(128)?.candidateId === "worker-candidate-c", "nearest selector targets the intended Worker");
+  assert(entities.every((entity) => entity.kind === KIND.WORKER || entity.kind === KIND.RIFLEMAN),
     "visual override resolution does not mutate real entity kinds");
 }
 
@@ -523,27 +535,27 @@ const NOOP_RENDERER_OVERLAYS = [
 }
 
 {
-  const brokenSvg = `<svg viewBox="-10 -10 20 20" data-rts-rig-kind="${KIND.TANK}" data-rts-rig-version="1" data-rts-origin="center">
+  const brokenSvg = `<svg viewBox="-10 -10 20 20" data-rts-rig-kind="${KIND.WORKER}" data-rts-rig-version="1" data-rts-origin="center">
     <script id="part.bad"></script>
     <circle id="anchor.origin" cx="0" cy="0" r="1" />
     <circle id="anchor.selection" cx="0" cy="0" r="1" />
     <circle id="anchor.hp" cx="0" cy="-8" r="1" />
   </svg>`;
   const compiled = compileVisualUnitRigCandidates([
-    ...VISUAL_UNIT_RIG_CANDIDATE_SOURCES,
-    { id: "broken-tank-candidate", label: "Broken", kind: KIND.TANK, svgText: brokenSvg },
+    ...TEST_WORKER_CANDIDATES,
+    { id: "broken-worker-candidate", label: "Broken", kind: KIND.WORKER, svgText: brokenSvg },
   ]);
   const entities = [
-    { id: 1, owner: 1, kind: KIND.TANK, x: 0, y: 0 },
-    { id: 2, owner: 1, kind: KIND.TANK, x: 20, y: 0 },
+    { id: 1, owner: 1, kind: KIND.WORKER, x: 0, y: 0 },
+    { id: 2, owner: 1, kind: KIND.WORKER, x: 20, y: 0 },
   ];
   const resolved = resolveVisualUnitOverrides([
-    { id: "missing-unit", candidateId: "tank-low-profile", selector: { entityId: 999 } },
-    { id: "ambiguous-tank", candidateId: "tank-low-profile", selector: { kind: KIND.TANK, owner: 1 } },
-    { id: "invalid-candidate", candidateId: "broken-tank-candidate", selector: { entityId: 1 } },
+    { id: "missing-unit", candidateId: "worker-candidate-a", selector: { entityId: 999 } },
+    { id: "ambiguous-worker", candidateId: "worker-candidate-a", selector: { kind: KIND.WORKER, owner: 1 } },
+    { id: "invalid-candidate", candidateId: "broken-worker-candidate", selector: { entityId: 1 } },
   ], entities, compiled.definitions, { candidateErrors: compiled.errors });
 
-  assert(compiled.errors.has("broken-tank-candidate"), "invalid checked-in SVG candidates fail importer validation");
+  assert(compiled.errors.has("broken-worker-candidate"), "invalid test-only SVG candidates fail importer validation");
   assert(resolved.overrides.size === 0, "broken visual override rules do not produce renderer overrides");
   assert(
     resolved.errors.some((error) => error.reason === "selector-no-match") &&
@@ -726,47 +738,47 @@ const NOOP_RENDERER_OVERLAYS = [
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
     renderer._drawGroundDecals = () => 0;
     renderer._drawTrenches = () => 0;
-    const profile = getVisualProfile("unit-rig-overrides-1");
-    const tankA = { id: 126, owner: 1, kind: KIND.TANK, x: 1887.97, y: 1860.91, hp: 180, maxHp: 180, facing: 0, weaponFacing: 0 };
-    const tankB = { id: 127, owner: 1, kind: KIND.TANK, x: 1883.97, y: 1944.91, hp: 180, maxHp: 180, facing: 0.2, weaponFacing: 0.5 };
-    const tankC = { id: 128, owner: 1, kind: KIND.TANK, x: 1883.97, y: 2031.91, hp: 180, maxHp: 180, facing: 0.4, weaponFacing: 0.8 };
+    renderer._visualUnitRigCandidates = compileVisualUnitRigCandidates(TEST_WORKER_CANDIDATES);
+    const workerA = { id: 126, owner: 1, kind: KIND.WORKER, x: 1887.97, y: 1860.91, hp: 100, maxHp: 100, facing: 0, weaponFacing: 0 };
+    const workerB = { id: 127, owner: 1, kind: KIND.WORKER, x: 1883.97, y: 1944.91, hp: 100, maxHp: 100, facing: 0.2, weaponFacing: 0.5 };
+    const workerC = { id: 128, owner: 1, kind: KIND.WORKER, x: 1883.97, y: 2031.91, hp: 100, maxHp: 100, facing: 0.4, weaponFacing: 0.8 };
     const state = {
       playerId: 1,
       players: [{ id: 1, color: "#4878c8" }],
       resources: { oil: 10 },
-      selection: new Set([tankB.id]),
+      selection: new Set([workerB.id]),
       rememberedBuildings: [],
       map: { tileSize: 32 },
       trenches: [],
       entitiesInterpolated() {
-        return [tankA, tankB, tankC];
+        return [workerA, workerB, workerC];
       },
       selectedEntities() {
-        return [tankB];
+        return [workerB];
       },
       weaponRecoil(entityId) {
-        return entityId === tankC.id ? 0.5 : 0;
+        return entityId === workerC.id ? 0.5 : 0;
       },
     };
     const beforeKeys = Object.keys(state).sort().join(",");
 
     renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
-      visualUnitOverrides: profile.unitOverrides,
+      visualUnitOverrides: TEST_WORKER_OVERRIDES,
     });
 
     const diagnostics = renderer.visualUnitOverrideDiagnostics();
     assert(diagnostics.activeOverrides === 3, "renderer resolves three real-unit visual overrides");
     assert(diagnostics.errors === 0, "valid unit override profile has no selector diagnostics");
-    assert(renderer._liveRigPools.liveUnitRigs.get(tankA.id)?.definition.id === "tank-low-profile",
-      "entity-id override routes tank A through the candidate SVG rig");
-    assert(renderer._liveRigPools.liveUnitRigs.get(tankB.id)?.definition.id === "tank-wide-turret",
-      "kind ordinal override routes tank B through the candidate SVG rig");
-    assert(renderer._liveRigPools.liveUnitRigs.get(tankC.id)?.definition.id === "tank-long-cannon",
-      "nearest override routes tank C through the candidate SVG rig");
-    assert(renderer._pools.selectionRings.has(tankB.id), "selection rings still use real selected entity ids");
+    assert(renderer._liveRigPools.liveUnitRigs.get(workerA.id)?.definition.id === "worker-candidate-a",
+      "entity-id override routes Worker A through the candidate SVG rig");
+    assert(renderer._liveRigPools.liveUnitRigs.get(workerB.id)?.definition.id === "worker-candidate-b",
+      "kind ordinal override routes Worker B through the candidate SVG rig");
+    assert(renderer._liveRigPools.liveUnitRigs.get(workerC.id)?.definition.id === "worker-candidate-c",
+      "nearest override routes Worker C through the candidate SVG rig");
+    assert(renderer._pools.selectionRings.has(workerB.id), "selection rings still use real selected entity ids");
     assert(renderer._pools.hpBars.size === 1, "HP overlays still come from real entity state");
     assert(Object.keys(state).sort().join(",") === beforeKeys, "unit override rendering does not add GameState fields");
-    assert(state.selection.has(tankB.id), "unit override rendering does not mutate selection");
+    assert(state.selection.has(workerB.id), "unit override rendering does not mutate selection");
     assert(!globalThis.__rtsVisualUnitOverrideErrors, "valid unit override rendering does not publish errors");
 
     renderer.destroy();
@@ -789,14 +801,14 @@ const NOOP_RENDERER_OVERLAYS = [
     renderer._visualUnitRigCandidateRegistry = () => {
       throw new Error("candidate registry failed");
     };
-    const tank = {
+    const worker = {
       id: 126,
       owner: 1,
-      kind: KIND.TANK,
+      kind: KIND.WORKER,
       x: 1887.97,
       y: 1860.91,
-      hp: 180,
-      maxHp: 180,
+      hp: 100,
+      maxHp: 100,
       facing: 0,
       weaponFacing: 0,
     };
@@ -809,7 +821,7 @@ const NOOP_RENDERER_OVERLAYS = [
       map: { tileSize: 32 },
       trenches: [],
       entitiesInterpolated() {
-        return [tank];
+        return [worker];
       },
       selectedEntities() {
         return [];
@@ -821,7 +833,7 @@ const NOOP_RENDERER_OVERLAYS = [
 
     renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
       visualUnitOverrides: [
-        { id: "registry-fails", candidateId: "tank-low-profile", selector: { entityId: tank.id } },
+        { id: "registry-fails", candidateId: "worker-candidate-a", selector: { entityId: worker.id } },
       ],
     });
 
@@ -832,7 +844,7 @@ const NOOP_RENDERER_OVERLAYS = [
       "unexpected override resolution failures publish local diagnostics");
     assert(globalThis.__rtsRenderErrors?.latest?.label === "visualUnitOverrides",
       "unexpected override resolution failures use renderer error diagnostics");
-    assert(renderer._liveRigPools.liveUnitRigs.get(tank.id)?.definition.id === "tank.authored",
+    assert(renderer._liveRigPools.liveUnitRigs.get(worker.id)?.definition.id === "worker.authored",
       "unit rendering falls back to the normal live rig when override resolution fails");
 
     renderer.destroy();
@@ -851,16 +863,16 @@ const NOOP_RENDERER_OVERLAYS = [
     for (const name of NOOP_RENDERER_OVERLAYS) renderer[name] = () => {};
     renderer._drawGroundDecals = () => 0;
     renderer._drawTrenches = () => 0;
-    const profile = getVisualProfile("unit-rig-overrides-1");
+    renderer._visualUnitRigCandidates = compileVisualUnitRigCandidates(TEST_WORKER_CANDIDATES);
     const now = performance.now();
     const reveal = {
       id: 126,
       owner: 1,
-      kind: KIND.TANK,
+      kind: KIND.WORKER,
       x: 1887.97,
       y: 1860.91,
-      hp: 180,
-      maxHp: 180,
+      hp: 100,
+      maxHp: 100,
       facing: 0,
       weaponFacing: 0,
       shotReveal: true,
@@ -887,12 +899,12 @@ const NOOP_RENDERER_OVERLAYS = [
     };
 
     renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1, {
-      visualUnitOverrides: [profile.unitOverrides[0]],
+      visualUnitOverrides: [TEST_WORKER_OVERRIDES[0]],
     });
 
     assert(renderer.visualUnitOverrideDiagnostics().activeOverrides === 1,
       "shot-reveal-only frame can still resolve an entity-id unit override");
-    assert(renderer._liveRigPools.liveShotRevealRigs.get(reveal.id)?.definition.id === "tank-low-profile",
+    assert(renderer._liveRigPools.liveShotRevealRigs.get(reveal.id)?.definition.id === "worker-candidate-a",
       "shot reveal rendering uses the same visual override candidate when the reveal id matches");
     renderer.destroy();
   } finally {

@@ -100,19 +100,8 @@ const resourceLayoutSignature = (resources) => {
   return signature;
 };
 
-const minimapArtillerySvg = (svgText) => {
-  if (typeof svgText !== "string") return "";
-  const style = [
-    "<style>",
-    "[id$='.packed'],[id^='part.art.flash'],[id^='anchor.'],[id^='bounds.']{display:none}",
-    "</style>",
-  ].join("");
-  return svgText.replace(/<svg\b([^>]*)>/, `<svg$1>${style}`);
-};
-
-const createSvgImage = (svgText, canvas, onReady) => {
-  const svg = minimapArtillerySvg(svgText);
-  if (!svg) return null;
+const createMarkupImage = (markup, canvas, onReady) => {
+  if (typeof markup !== "string" || !markup) return null;
   const doc = canvas?.ownerDocument || globalThis.document || null;
   const image = doc?.createElement
     ? doc.createElement("img")
@@ -121,7 +110,7 @@ const createSvgImage = (svgText, canvas, onReady) => {
       : null;
   if (!image) return null;
   image.onload = () => onReady?.();
-  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
   return image;
 };
 
@@ -214,8 +203,8 @@ export class Minimap {
     this._borderPulseUntil = 0;
     this._artilleryIconImage = options.artilleryIconImage || null;
     this._artilleryIconReady = !!this._artilleryIconImage;
-    if (!this._artilleryIconImage && options.artilleryIconSvg) {
-      this._artilleryIconImage = createSvgImage(options.artilleryIconSvg, canvasEl, () => {
+    if (!this._artilleryIconImage && options.artilleryIconMarkup) {
+      this._artilleryIconImage = createMarkupImage(options.artilleryIconMarkup, canvasEl, () => {
         this._artilleryIconReady = true;
       });
     }

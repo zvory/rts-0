@@ -12,7 +12,7 @@ Runtime review treatment for this pass:
 - both support-arm crop frames include a black rectangular border so their full
   image footprint remains visible during rotation/origin review;
 - the central carriage and barrel/recoil assembly retain the generated white
-  source and use the existing Artillery SVG rig for facing, setup visibility,
-  recoil, muzzle flash, and authoritative anchors.
+  source and use raster-native metadata for facing, setup visibility, recoil,
+  muzzle flash, and authoritative anchors.
 
 This is an active alignment experiment, not final production color treatment.

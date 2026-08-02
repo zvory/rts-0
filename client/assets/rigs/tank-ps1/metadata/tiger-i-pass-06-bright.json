@@ -18,6 +18,6 @@
     "hue": 100,
     "imageVersion": "pass06-bright"
   },
-  "runtimeNotes": "No new image generation. The active atlas is derived from pass-06 lowpoly by blanking reference/track cells, normalizing visible hull/body and turret/barrel bounds, and applying ImageMagick brightness/saturation modulation. The transparent track frame still covers track source parts, so SVG tracks do not render.",
+  "runtimeNotes": "No new image generation. The active atlas is derived from pass-06 lowpoly by blanking reference/track cells, normalizing visible hull/body and turret/barrel bounds, and applying ImageMagick brightness/saturation modulation. The transparent track frame keeps the production track sprites hidden.",
   "notes": "Brighter no-imagegen follow-up intended to improve readability against the map/background while preserving the pass-06 silhouette and component split."
 }
