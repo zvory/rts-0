@@ -35,7 +35,7 @@
 #   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
 #   RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 #   RTS_RUN_WASM_TRI_STATE=0 tests/run-all.sh     # skip WASM-backed tri-state groups even when assets exist
-#   RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest  # run one nextest shard
+#   RTS_NEXTEST_PARTITION=slice:1/4 tests/run-all.sh --only-nextest  # run one nextest shard
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 

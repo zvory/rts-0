@@ -200,14 +200,14 @@ jobs:
         run: ./tests/run-all.sh --only-rust-checks
 
   rust-nextest:
-    name: CI / Rust tests (${{ matrix.shard }}/2)
+    name: CI / Rust tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: changed-files
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/server/target
     steps:
@@ -252,7 +252,7 @@ jobs:
         shell: bash
         env:
           CARGO_CACHE_HIT: ${{ steps.rust-nextest-cargo-cache.outputs.cache-hit }}
-          RTS_NEXTEST_PARTITION: "slice:${{ matrix.shard }}/2"
+          RTS_NEXTEST_PARTITION: "slice:${{ matrix.shard }}/4"
         run: |
           printf 'Rust test context:\n'
           printf '  CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
@@ -266,7 +266,7 @@ jobs:
         if: needs.changed-files.outputs.run_rust == 'true'
         env:
           RTS_NEXTEST_JUNIT_SUMMARY: "1"
-          RTS_NEXTEST_PARTITION: "slice:${{ matrix.shard }}/2"
+          RTS_NEXTEST_PARTITION: "slice:${{ matrix.shard }}/4"
           RTS_SUITE_TIMING_DETAILS: "1"
         run: ./tests/run-all.sh --only-nextest
 
