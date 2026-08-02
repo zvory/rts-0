@@ -4588,9 +4588,6 @@ input[type="text"]:focus {
   order: 10;
   margin-top: 3px;
 }
-.room-time-timeline[hidden] {
-  display: none;
-}
 .room-time-timeline-hover {
   position: absolute;
   left: var(--room-time-hover, 50%);
@@ -4729,27 +4726,6 @@ input[type="text"]:focus {
   border-radius: var(--radius-sm);
   white-space: nowrap;
 }
-.replay-hide-end-time {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--ink-dim);
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.replay-hide-end-time:hover {
-  color: var(--ink);
-}
-.replay-hide-end-time input {
-  accent-color: var(--accent);
-  cursor: pointer;
-  margin: 0;
-}
-
 /* --- Transient toast --- */
 #toast {
   top: 70px;

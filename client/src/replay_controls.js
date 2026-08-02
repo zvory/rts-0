@@ -485,7 +485,7 @@ export class RoomTimeControls {
     if (!surface) return;
 
     const label = document.createElement("label");
-    label.className = "replay-hide-end-time";
+    label.className = "room-time-status replay-hide-end-time";
     label.title = "Hide the replay's total tick count and timeline while commentating.";
 
     const checkbox = document.createElement("input");
