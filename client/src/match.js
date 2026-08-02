@@ -474,7 +474,7 @@ export class Match {
         replayViewer: this.replayViewer,
         capabilities: this.capabilities,
         initialVisionSelection: options.initialVisionSelection,
-        onVisionSelectionChange: () => this.groundDecalSync.reset({ awaitSnapshot: true }),
+        onVisionSelectionChange: () => this.groundDecalSync.reset(),
       });
     }
     this.observerDiagnostics = new MatchObserverDiagnostics({

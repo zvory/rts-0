@@ -79,12 +79,60 @@ assert(
   assert(sync.outstandingRequestId === null && cleared.has(0),
     "catching up through the fast path cancels the obsolete repair retry");
 
-  sync.reset({ awaitSnapshot: true, resetPresentation: false });
+  sync.reset({ resetPresentation: false });
   sync.observeSnapshot(80, { afterRevision: 70, decals: [inlineDecal(24)] });
   assert(buffer.authoritativeRevision === 0 && buffer.pendingCount === 0,
     "the first queued snapshot after a perspective reset cannot inject old-view inline rows");
   assert(requests.at(-1).afterRevision === 0,
     "perspective replacement still uses correlated repair from zero");
+  sync.observeSnapshot(81, { afterRevision: 70, decals: [inlineDecal(25)] });
+  assert(buffer.authoritativeRevision === 0 && buffer.pendingCount === 0,
+    "all queued old-perspective snapshot tails stay blocked until correlated repair");
+  assert(requests.length === 2,
+    "additional queued snapshots coalesce behind the perspective repair");
+  assert(sync.applyResponse({
+    requestId: requests.at(-1).requestId,
+    revision: 1,
+    decals: [inlineDecal(26)],
+  }), "the correlated repair establishes replacement perspective authority");
+  assert(buffer.authoritativeRevision === 1 && buffer.pendingCount === 1 &&
+    buffer.authoritativeDecals.has(26) && !buffer.authoritativeDecals.has(24) &&
+    !buffer.authoritativeDecals.has(25),
+  "old-perspective inline rows never enter the replacement cache");
+  sync.destroy();
+}
+
+{
+  const requests = [];
+  const buffer = new GroundDecalBuffer();
+  const sync = new GroundDecalSync({
+    net: {
+      requestGroundDecals(requestId, afterRevision) {
+        requests.push({ requestId, afterRevision });
+        return true;
+      },
+    },
+    state: {
+      groundDecals: buffer,
+      applyAuthoritativeGroundDecals: (message) => buffer.applyAuthoritativeBatch(message),
+      resetAuthoritativeGroundDecals: () => buffer.clear(),
+    },
+    setTimer() { return 1; },
+    clearTimer() {},
+  });
+
+  sync.reset();
+  sync.observeSnapshot(0);
+  assert(requests.length === 1 && requests[0].afterRevision === 0,
+    "a zero-revision reset still requests correlated perspective authority");
+  sync.observeSnapshot(0);
+  assert(sync.outstandingRequestId === requests[0].requestId,
+    "repeated zero-revision snapshots cannot cancel the establishing repair");
+  sync.observeSnapshot(2, { afterRevision: 0, decals: [inlineDecal(27)] });
+  assert(buffer.pendingCount === 0,
+    "a later queued old snapshot stays blocked after an initial zero-revision snapshot");
+  assert(sync.applyResponse({ requestId: requests[0].requestId, revision: 0, decals: [] }),
+    "a zero-revision correlated response settles the replacement perspective");
   sync.destroy();
 }
 

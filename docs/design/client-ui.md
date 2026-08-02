@@ -448,8 +448,9 @@ rows for immediate display but cannot advance the complete cache cursor. In that
 `requestGroundDecals { requestId, afterRevision }` repair and retries with bounded backoff. A later
 covering snapshot tail cancels an obsolete outstanding repair. The echoed repair request id rejects
 delayed responses from a prior replay tick or vision perspective. Replay seeks and observer-view
-changes clear both the cache and painted presentation, ignore the first possibly pre-reset inline
-tail, then resynchronize from revision zero. Transient combat events still drive short-lived
+changes clear both the cache and painted presentation, block possibly pre-reset inline tails until
+a correlated repair establishes the replacement authority, then resynchronize from revision zero.
+Transient combat events still drive short-lived
 effects and audio, but are not used to create permanent decals.
 
 `renderer/decals.js`

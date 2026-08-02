@@ -34,7 +34,7 @@ impl GroundDecalRevisionLog {
         after_revision: u32,
         revision: u32,
         decals: &[GroundDecal],
-        mut id_for_entry: impl FnMut(&GroundDecalRevisionEntry) -> Option<u32>,
+        id_for_entry: impl FnMut(&GroundDecalRevisionEntry) -> Option<u32>,
     ) -> Vec<GroundDecalView> {
         let start = usize::try_from(after_revision).unwrap_or(self.0.len());
         let end = usize::try_from(revision)
@@ -45,7 +45,7 @@ impl GroundDecalRevisionLog {
             .get(start..end)
             .into_iter()
             .flatten()
-            .filter_map(|entry| id_for_entry(entry))
+            .filter_map(id_for_entry)
             .filter(|id| seen.insert(*id))
             .filter_map(|id| decal_for_id(decals, id))
             .map(GroundDecal::to_view)
