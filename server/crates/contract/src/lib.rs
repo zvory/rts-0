@@ -291,6 +291,7 @@ pub struct MapInfo {
     pub resources: Vec<ResourceNode>,
     /// Static map decoration sent once at match start. Tree records also provide authoritative
     /// trunk collision/pathing inputs; doodads remain outside fog, combat, and snapshots.
+    #[serde(default)]
     pub doodads: Vec<MapDoodad>,
 }
 

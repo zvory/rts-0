@@ -161,6 +161,7 @@ struct AuthoredMap {
     terrain: Vec<String>,
     start_locations: Vec<AuthoredLocation>,
     base_sites: Vec<AuthoredBaseSite>,
+    #[serde(default)]
     doodads: Vec<crate::protocol::MapDoodad>,
 }
 
