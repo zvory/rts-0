@@ -399,6 +399,12 @@ impl Fog {
             .unwrap_or_default()
     }
 
+    pub(in crate::game) fn visible_grid_for(&self, player: u32) -> Option<(u32, &[bool])> {
+        self.grids
+            .get(&player)
+            .map(|grid| (self.width, grid.as_slice()))
+    }
+
     pub(crate) fn explored_tiles_for(&self, player: u32) -> Vec<u8> {
         self.explored_grids
             .get(&player)
