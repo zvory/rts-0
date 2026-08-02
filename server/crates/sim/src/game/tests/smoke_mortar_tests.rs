@@ -193,7 +193,7 @@ fn snapshot_shares_living_teammate_current_vision() {
         "enemies outside every living teammate's current sight should stay hidden"
     );
     let visible_index = ((enemy_pos.1 / config::TILE_SIZE as f32).floor() as u32
-        * game.state.map.size
+        * game.state.map.width
         + (enemy_pos.0 / config::TILE_SIZE as f32).floor() as u32) as usize;
     assert_eq!(
         snapshot.visible_tiles[visible_index], 1,
@@ -1245,7 +1245,7 @@ fn snapshot_reveals_enemy_at_melee_range_inside_smoke() {
 
     let snapshot = game.snapshot_for(1);
     let enemy_tile = game.state.map.tile_of(smoke_pos.0, smoke_pos.1);
-    let enemy_tile_index = (enemy_tile.1 * game.state.map.size + enemy_tile.0) as usize;
+    let enemy_tile_index = (enemy_tile.1 * game.state.map.width + enemy_tile.0) as usize;
 
     assert!(
         snapshot.entities.iter().any(|entity| entity.id == enemy),
@@ -1268,7 +1268,7 @@ fn snapshot_visibility_grid_fogs_tiles_behind_smoke() {
     let (game, _observer, _friendly, _enemy, _smoke_pos) = smoke_projection_fixture();
 
     let snapshot = game.snapshot_for(1);
-    let index = |tx: u32, ty: u32| (ty * game.state.map.size + tx) as usize;
+    let index = |tx: u32, ty: u32| (ty * game.state.map.width + tx) as usize;
 
     assert_eq!(snapshot.visible_tiles[index(7, 4)], 1);
     assert_eq!(

@@ -250,7 +250,7 @@ fn spatial_building_site_clear_matches_full_scan_for_blockers() {
     cases.push(EntityStore::new());
 
     for entities in cases {
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         assert_eq!(
             building_site_clear_spatial(&map, &entities, &spatial, EntityKind::Depot, 4, 4),
             building_site_clear(&map, &entities, EntityKind::Depot, 4, 4)
@@ -264,7 +264,7 @@ fn spatial_building_site_clear_matches_pump_jack_contextual_policy() {
     let (x, y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
 
     let empty = EntityStore::new();
-    let spatial = SpatialIndex::build(&empty, map.size);
+    let spatial = SpatialIndex::build(&empty, map.width, map.height);
     assert_eq!(
         building_site_clear_spatial(&map, &empty, &spatial, EntityKind::PumpJack, 4, 4),
         building_site_clear(&map, &empty, EntityKind::PumpJack, 4, 4)
@@ -274,7 +274,7 @@ fn spatial_building_site_clear_matches_pump_jack_contextual_policy() {
     with_oil
         .spawn_node(EntityKind::Oil, x, y)
         .expect("oil node should spawn");
-    let spatial = SpatialIndex::build(&with_oil, map.size);
+    let spatial = SpatialIndex::build(&with_oil, map.width, map.height);
     assert_eq!(
         building_site_clear_spatial(&map, &with_oil, &spatial, EntityKind::PumpJack, 4, 4),
         building_site_clear(&map, &with_oil, EntityKind::PumpJack, 4, 4)
@@ -283,7 +283,7 @@ fn spatial_building_site_clear_matches_pump_jack_contextual_policy() {
     with_oil
         .spawn_building(1, EntityKind::PumpJack, x, y, false)
         .expect("pump jack scaffold should spawn");
-    let spatial = SpatialIndex::build(&with_oil, map.size);
+    let spatial = SpatialIndex::build(&with_oil, map.width, map.height);
     assert_eq!(
         building_site_clear_spatial(&map, &with_oil, &spatial, EntityKind::PumpJack, 4, 4),
         building_site_clear(&map, &with_oil, EntityKind::PumpJack, 4, 4)
@@ -292,7 +292,8 @@ fn spatial_building_site_clear_matches_pump_jack_contextual_policy() {
 
 fn flat_map(size: u32) -> Map {
     Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
         starts: vec![],
         ..Default::default()

@@ -6,7 +6,8 @@ use crate::game::smoke::SmokeCloudStore;
 
 pub(super) fn stamp_visibility(
     grids: &mut HashMap<u32, Vec<bool>>,
-    size: u32,
+    width: u32,
+    height: u32,
     store: &EntityStore,
     smokes: &SmokeCloudStore,
     map: &Map,
@@ -27,15 +28,16 @@ pub(super) fn stamp_visibility(
             {
                 continue;
             }
-            stamp_entity_tile(grids, size, first.owner, second, map);
-            stamp_entity_tile(grids, size, second.owner, first, map);
+            stamp_entity_tile(grids, width, height, first.owner, second, map);
+            stamp_entity_tile(grids, width, height, second.owner, first, map);
         }
     }
 }
 
 fn stamp_entity_tile(
     grids: &mut HashMap<u32, Vec<bool>>,
-    size: u32,
+    width: u32,
+    height: u32,
     owner: u32,
     entity: &Entity,
     map: &Map,
@@ -44,10 +46,10 @@ fn stamp_entity_tile(
         return;
     };
     let (tx, ty) = map.tile_of(entity.pos_x, entity.pos_y);
-    if tx >= size || ty >= size {
+    if tx >= width || ty >= height {
         return;
     }
-    if let Some(cell) = grid.get_mut((ty * size + tx) as usize) {
+    if let Some(cell) = grid.get_mut((ty * width + tx) as usize) {
         *cell = true;
     }
 }

@@ -5,7 +5,8 @@ use crate::protocol::terrain;
 fn fixture() -> (Map, EntityStore, u32, (f32, f32)) {
     let size = 64;
     let map = Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(4, 4)],
         ..Default::default()

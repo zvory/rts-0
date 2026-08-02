@@ -155,7 +155,7 @@ fn artillery_point_fire_target_from_context(
     let max_px = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     let (target, in_range) = match interpretation {
         FireTargetInterpretation::RawClick => {
-            if !point_inside_playable_map(map.world_size_px(), x, y) {
+            if !point_inside_playable_map(map.world_width_px(), map.world_height_px(), x, y) {
                 return None;
             }
             let facing = (y - context.origin_y).atan2(x - context.origin_x);
@@ -169,7 +169,8 @@ fn artillery_point_fire_target_from_context(
             )
         }
         FireTargetInterpretation::StoredEffectivePoint => stored_artillery_fire_target(
-            map.world_size_px(),
+            map.world_width_px(),
+            map.world_height_px(),
             (context.origin_x, context.origin_y),
             min_px,
             max_px,
@@ -196,13 +197,14 @@ struct LockedArtilleryFireTarget {
 }
 
 fn stored_artillery_fire_target(
-    world_size_px: f32,
+    world_width_px: f32,
+    world_height_px: f32,
     origin: (f32, f32),
     min_range_px: f32,
     max_range_px: f32,
     target: (f32, f32),
 ) -> Option<LockedArtilleryFireTarget> {
-    if !point_inside_playable_map(world_size_px, target.0, target.1)
+    if !point_inside_playable_map(world_width_px, world_height_px, target.0, target.1)
         || !origin.0.is_finite()
         || !origin.1.is_finite()
         || !min_range_px.is_finite()
@@ -235,12 +237,19 @@ fn stored_artillery_fire_target(
     })
 }
 
-fn point_inside_playable_map(world_size_px: f32, x: f32, y: f32) -> bool {
-    if !world_size_px.is_finite() || world_size_px <= 0.0 || !x.is_finite() || !y.is_finite() {
+fn point_inside_playable_map(world_width_px: f32, world_height_px: f32, x: f32, y: f32) -> bool {
+    if !world_width_px.is_finite()
+        || !world_height_px.is_finite()
+        || world_width_px <= 0.0
+        || world_height_px <= 0.0
+        || !x.is_finite()
+        || !y.is_finite()
+    {
         return false;
     }
-    let max = (world_size_px - 1.0).max(0.0);
-    x >= 0.0 && y >= 0.0 && x <= max && y <= max
+    let max_x = (world_width_px - 1.0).max(0.0);
+    let max_y = (world_height_px - 1.0).max(0.0);
+    x >= 0.0 && y >= 0.0 && x <= max_x && y <= max_y
 }
 
 fn angle_delta(a: f32, b: f32) -> f32 {

@@ -179,7 +179,7 @@ fn mortar_autocast_candidates_respect_exact_max_range() {
         &map,
         &entities,
         &default_team_relations(),
-        &SpatialIndex::build(&entities, map.size),
+        &SpatialIndex::build(&entities, map.width, map.height),
         &LineOfSight::new(&map),
         &visible_fog(&map, &entities),
         &SmokeCloudStore::new(),

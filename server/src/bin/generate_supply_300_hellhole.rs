@@ -157,15 +157,15 @@ fn populate_sparse_rock_occluders(
     map: &mut Map,
     composition: &[EntityKind],
 ) -> Result<usize, String> {
-    let occupied = occupied_spawn_tiles(map.size, composition)?;
+    let occupied = occupied_spawn_tiles(map.width, map.height, composition)?;
     let mut candidates = Vec::new();
-    for cell_y in (0..map.size).step_by(ROCK_CELL_TILES as usize) {
-        for cell_x in (0..map.size).step_by(ROCK_CELL_TILES as usize) {
+    for cell_y in (0..map.height).step_by(ROCK_CELL_TILES as usize) {
+        for cell_x in (0..map.width).step_by(ROCK_CELL_TILES as usize) {
             let hash = SEED ^ cell_x.wrapping_mul(0x9e37_79b9) ^ cell_y.wrapping_mul(0x85eb_ca6b);
             let tile_x = cell_x + 1 + hash % (ROCK_CELL_TILES - 2);
             let tile_y = cell_y + 1 + hash.rotate_left(13) % (ROCK_CELL_TILES - 2);
-            if tile_x >= map.size - 1
-                || tile_y >= map.size - 1
+            if tile_x >= map.width - 1
+                || tile_y >= map.height - 1
                 || occupied.contains(&(tile_x, tile_y))
             {
                 continue;
@@ -181,19 +181,20 @@ fn populate_sparse_rock_occluders(
         ));
     }
     for &(_, tile_x, tile_y) in candidates.iter().take(TARGET_ROCK_TILES) {
-        map.terrain[(tile_y * map.size + tile_x) as usize] = MAP_TERRAIN_ROCK;
+        map.terrain[(tile_y * map.width + tile_x) as usize] = MAP_TERRAIN_ROCK;
     }
     Ok(TARGET_ROCK_TILES)
 }
 
 fn occupied_spawn_tiles(
-    map_size: u32,
+    map_width: u32,
+    map_height: u32,
     composition: &[EntityKind],
 ) -> Result<BTreeSet<(u32, u32)>, String> {
     let mut occupied = BTreeSet::new();
     for player_id in [3, 4] {
         for position in shuttle_positions_for_player(player_id, composition.len()) {
-            reserve_world_point(&mut occupied, map_size, position);
+            reserve_world_point(&mut occupied, map_width, map_height, position);
         }
     }
 
@@ -202,7 +203,8 @@ fn occupied_spawn_tiles(
             let stats = building_stats(kind).ok_or_else(|| format!("{kind} is not a building"))?;
             reserve_rect(
                 &mut occupied,
-                map_size,
+                map_width,
+                map_height,
                 origin_x as i32 + dx as i32,
                 origin_y as i32 + dy as i32,
                 origin_x as i32 + dx as i32 + stats.foot_w as i32 - 1,
@@ -213,12 +215,18 @@ fn occupied_spawn_tiles(
     Ok(occupied)
 }
 
-fn reserve_world_point(reserved: &mut BTreeSet<(u32, u32)>, map_size: u32, position: (f32, f32)) {
+fn reserve_world_point(
+    reserved: &mut BTreeSet<(u32, u32)>,
+    map_width: u32,
+    map_height: u32,
+    position: (f32, f32),
+) {
     let tile_x = (position.0 / TILE).floor() as i32;
     let tile_y = (position.1 / TILE).floor() as i32;
     reserve_rect(
         reserved,
-        map_size,
+        map_width,
+        map_height,
         tile_x - UNIT_FOOTPRINT_CLEARANCE_TILES,
         tile_y - UNIT_FOOTPRINT_CLEARANCE_TILES,
         tile_x + UNIT_FOOTPRINT_CLEARANCE_TILES,
@@ -228,14 +236,15 @@ fn reserve_world_point(reserved: &mut BTreeSet<(u32, u32)>, map_size: u32, posit
 
 fn reserve_rect(
     reserved: &mut BTreeSet<(u32, u32)>,
-    map_size: u32,
+    map_width: u32,
+    map_height: u32,
     min_x: i32,
     min_y: i32,
     max_x: i32,
     max_y: i32,
 ) {
-    for tile_y in min_y.max(0)..=max_y.min(map_size as i32 - 1) {
-        for tile_x in min_x.max(0)..=max_x.min(map_size as i32 - 1) {
+    for tile_y in min_y.max(0)..=max_y.min(map_height as i32 - 1) {
+        for tile_x in min_x.max(0)..=max_x.min(map_width as i32 - 1) {
             reserved.insert((tile_x as u32, tile_y as u32));
         }
     }
@@ -324,7 +333,7 @@ fn spawn_dense_central_scrum(
 
 fn spawn_scattered_tank_traps(game: &mut Game, composition: &[EntityKind]) -> Result<(), String> {
     let map = &game.start_payload().map;
-    let occupied = occupied_spawn_tiles(map.width, composition)?;
+    let occupied = occupied_spawn_tiles(map.width, map.height, composition)?;
     let mut candidates = Vec::new();
     for cell_y in (0..map.height).step_by(ROCK_CELL_TILES as usize) {
         for cell_x in (0..map.width).step_by(ROCK_CELL_TILES as usize) {

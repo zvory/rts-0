@@ -22,7 +22,8 @@ impl Default for BaseResourceCounts {
 impl Default for Map {
     fn default() -> Self {
         Self {
-            size: 0,
+            width: 0,
+            height: 0,
             terrain: Vec::new(),
             starts: Vec::new(),
             base_sites: Vec::new(),

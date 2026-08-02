@@ -682,17 +682,19 @@ fn validate_map_container(
         &scenario.map.materialized_hash,
         128,
     )?;
-    let size = scenario.map.data.size;
-    let tile_count = size
-        .checked_mul(size)
+    let width = scenario.map.data.width;
+    let height = scenario.map.data.height;
+    let tile_count = width
+        .checked_mul(height)
         .map(|count| count as usize)
-        .ok_or_else(|| invalid(format!("{label}.map.data.size overflows")))?;
-    if size == 0
+        .ok_or_else(|| invalid(format!("{label}.map.data dimensions overflow")))?;
+    if width == 0
+        || height == 0
         || tile_count != scenario.map.data.terrain.len()
         || tile_count > LAB_REPLAY_MAX_MAP_TILES
     {
         return Err(invalid(format!(
-            "{label}.map.data terrain length must match size*size and fit the cap"
+            "{label}.map.data terrain length must match width*height and fit the cap"
         )));
     }
     for &tile in &scenario.map.data.terrain {
@@ -713,7 +715,7 @@ fn validate_map_container(
         )));
     }
     for site in &scenario.map.data.starts {
-        if site.x >= size || site.y >= size {
+        if site.x >= width || site.y >= height {
             return Err(invalid(format!(
                 "{label}.map.data contains an out-of-bounds site"
             )));
@@ -721,7 +723,7 @@ fn validate_map_container(
     }
     let mut base_sites = HashSet::with_capacity(scenario.map.data.base_sites.len());
     for site in &scenario.map.data.base_sites {
-        if site.x >= size || site.y >= size {
+        if site.x >= width || site.y >= height {
             return Err(invalid(format!(
                 "{label}.map.data contains an out-of-bounds site"
             )));
@@ -773,7 +775,8 @@ fn validate_checkpoint_map_binding(
     let schema_version = required_u32(binding, "schemaVersion", label)?;
     let content_hash = required_str(binding, "contentHash", label)?;
     let materialized_hash = required_str(binding, "materializedMapHash", label)?;
-    let size = required_u32(binding, "size", label)?;
+    let width = required_u32(binding, "width", label)?;
+    let height = required_u32(binding, "height", label)?;
     if name != scenario.map.name {
         return Err(invalid(format!(
             "{label} checkpoint mapBinding.name mismatch"
@@ -794,9 +797,14 @@ fn validate_checkpoint_map_binding(
             "{label} checkpoint mapBinding.materializedMapHash mismatch"
         )));
     }
-    if size != scenario.map.data.size {
+    if width != scenario.map.data.width {
         return Err(invalid(format!(
-            "{label} checkpoint mapBinding.size mismatch"
+            "{label} checkpoint mapBinding.width mismatch"
+        )));
+    }
+    if height != scenario.map.data.height {
+        return Err(invalid(format!(
+            "{label} checkpoint mapBinding.height mismatch"
         )));
     }
     let player_count = required_u32(binding, "playerCount", label)?;

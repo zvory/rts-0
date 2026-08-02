@@ -42,7 +42,8 @@ fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
 }
 fn open_map(size: u32) -> Map {
     Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(4, 4), (size - 5, size - 5)],
         ..Default::default()
@@ -50,11 +51,11 @@ fn open_map(size: u32) -> Map {
 }
 fn map_with_rock_at(tile: (u32, u32)) -> Map {
     let mut map = open_map(12);
-    map.terrain[(tile.1 * map.size + tile.0) as usize] = terrain::ROCK;
+    map.terrain[(tile.1 * map.width + tile.0) as usize] = terrain::ROCK;
     map
 }
 fn visible_fog(map: &Map, entities: &EntityStore) -> Fog {
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], entities, map);
     fog
 }
@@ -66,7 +67,7 @@ fn resolve_test_target(
     acquire_px: f32,
 ) -> Option<u32> {
     let los = LineOfSight::new(map);
-    let spatial = SpatialIndex::build(entities, map.size);
+    let spatial = SpatialIndex::build(entities, map.width, map.height);
     let fog = visible_fog(map, entities);
     let smokes = SmokeCloudStore::new();
     let attacker = entities.get(attacker_id).expect("attacker should exist");
@@ -93,8 +94,8 @@ fn resolve_tank_test_target(
     tank_id: u32,
 ) -> Option<u32> {
     let los = LineOfSight::new(map);
-    let spatial = SpatialIndex::build(entities, map.size);
-    let mut fog = Fog::new(map.size);
+    let spatial = SpatialIndex::build(entities, map.width, map.height);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2, 3], entities, map);
     let smokes = SmokeCloudStore::new();
     let tank = entities.get(tank_id).expect("tank should exist");
@@ -189,12 +190,12 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     smokes: &SmokeCloudStore,
 ) -> HashMap<u32, Vec<Event>> {
     let occ = Occupancy::build(map, entities);
-    let spatial = SpatialIndex::build(entities, map.size);
+    let spatial = SpatialIndex::build(entities, map.width, map.height);
     let mut pathing = PathingService::new(256, 64);
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let mut coordinator =
         MoveCoordinator::new_with_teams(&mut pathing, map, &occ, 10, teams.clone());
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     let player_ids: Vec<u32> = players.iter().map(|player| player.id).collect();
     fog.recompute_with_smoke(&player_ids, entities, map, smokes);
     let mut events: HashMap<u32, Vec<Event>> = player_ids
@@ -246,7 +247,7 @@ fn test_mortar_scattered_impact(
     tick: u32,
 ) -> (f32, f32) {
     let map = Map::generate(2, 0x00C0_FFEE);
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(player_ids, entities, &map);
     let target = entities.get(target).expect("target should exist");
     crate::game::mortar_scatter::scattered_mortar_impact(
@@ -265,7 +266,7 @@ fn run_movement_tick(entities: &mut EntityStore) {
 }
 fn run_movement_tick_on_map(entities: &mut EntityStore, map: &Map, tick: u32) {
     let occ = Occupancy::build(map, entities);
-    let spatial = SpatialIndex::build(entities, map.size);
+    let spatial = SpatialIndex::build(entities, map.width, map.height);
     movement_system(map, entities, &mut [], &occ, &spatial, tick);
 }
 #[allow(clippy::too_many_arguments)]
@@ -317,7 +318,7 @@ fn apply_test_damage_with_teams(
         .and_then(|entity| combat_rules::default_weapon_profile(entity.kind))
         .expect("test attacker should have a default weapon profile");
     let map = Map::generate(2, 0x00C0_FFEE);
-    let fog = Fog::new(map.size);
+    let fog = Fog::new(map.width, map.height);
     let smokes = SmokeCloudStore::new();
     let mut rng = SmallRng::seed_from_u64(0);
     let blockers = ShotBlockerIndex::build(&map, entities);
@@ -349,7 +350,7 @@ fn idle_army_units_auto_acquire_targets() {
     let (entities, self_id, enemy_id) = rifleman_with_enemy();
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker = entities.get(self_id).expect("attacker should exist");
@@ -378,7 +379,7 @@ fn allied_riflemen_do_not_auto_acquire_each_other() {
     let (entities, self_id, ally_id) = rifleman_with_enemy();
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker = entities.get(self_id).expect("attacker should exist");
@@ -408,7 +409,7 @@ fn move_orders_ignore_nearby_enemies() {
     let (mut entities, self_id, _) = rifleman_with_enemy();
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker = entities.get_mut(self_id).expect("attacker should exist");
@@ -438,7 +439,7 @@ fn attack_move_keeps_auto_acquisition() {
     let (mut entities, self_id, enemy_id) = rifleman_with_enemy();
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker = entities.get_mut(self_id).expect("attacker should exist");
@@ -481,7 +482,7 @@ fn attack_move_ignores_allies_and_acquires_enemies() {
         .set_order(Order::attack_move_to(300.0, 100.0));
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
@@ -521,7 +522,7 @@ fn ordered_attackers_do_not_retain_allied_targets() {
         .set_order(Order::attack(ally));
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
@@ -638,7 +639,7 @@ fn acquisition_against_buildings_ignores_allied_buildings() {
         .set_order(Order::attack_move_to(300.0, 100.0));
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
@@ -677,7 +678,7 @@ fn anti_tank_gun_tank_preference_ignores_allied_tanks() {
         .expect("enemy tank should spawn");
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker = entities
@@ -884,7 +885,7 @@ fn stone_blocks_attack_move_auto_acquisition() {
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     entities
@@ -967,8 +968,8 @@ fn smoke_blocks_attack_move_auto_acquisition() {
         .spawn(smoke_pos.0, smoke_pos.1, 1.0, 100, 0)
         .expect("smoke should spawn");
     let los = LineOfSight::with_smoke(&map, &smokes);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    let mut fog = Fog::new(map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute_with_smoke(&[1, 2], &entities, &map, &smokes);
     entities
         .get_mut(self_id)
@@ -1235,10 +1236,10 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
 
     let map = Map::generate(2, 0x00C0_FFEE);
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let mut pathing = PathingService::new(256, 64);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 0);
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1], &entities, &map);
     let smokes = SmokeCloudStore::new();
     let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
@@ -1379,7 +1380,7 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
 
         let map = open_map(8);
         let los = LineOfSight::new(&map);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         let fog = visible_fog(&map, &entities);
         let smokes = SmokeCloudStore::new();
         let attacker = entities
@@ -1433,7 +1434,7 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
 
         let map = open_map(8);
         let los = LineOfSight::new(&map);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         let fog = visible_fog(&map, &entities);
         let smokes = SmokeCloudStore::new();
         let attacker = entities
@@ -1563,7 +1564,7 @@ fn idle_workers_do_not_auto_acquire_targets() {
         .expect("enemy rifleman should spawn");
     let map = open_map(8);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let worker = entities.get(worker_id).expect("worker should exist");
@@ -3206,7 +3207,7 @@ fn attack_move_prefers_clear_target_over_target_behind_friendly_tank() {
         .set_order(Order::attack_move_to(220.0, 100.0));
     let map = open_map(12);
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
     let attacker_entity = entities.get(attacker).expect("attacker should exist");

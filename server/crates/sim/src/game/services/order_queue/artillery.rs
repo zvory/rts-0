@@ -8,7 +8,7 @@ pub(super) fn intent_valid(
     x: f32,
     y: f32,
 ) -> bool {
-    if x < 0.0 || y < 0.0 || x >= map.world_size_px() || y >= map.world_size_px() {
+    if !map.contains_world_point(x, y) {
         return false;
     }
     artillery_point_fire_target(

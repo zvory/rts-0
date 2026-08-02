@@ -123,14 +123,15 @@ where
         known_trenches,
         occupied_trenches,
     };
-    let max = map.world_size_px() - 1.0;
+    let max_x = map.world_width_px() - 1.0;
+    let max_y = map.world_height_px() - 1.0;
     let mut assigned = Vec::new();
     let mut out = Vec::with_capacity(units.len());
     for unit in units {
         let Some((_, requested)) = desired_by_id.iter().find(|(id, _)| *id == unit.id) else {
             continue;
         };
-        let desired = (requested.0.clamp(0.0, max), requested.1.clamp(0.0, max));
+        let desired = (requested.0.clamp(0.0, max_x), requested.1.clamp(0.0, max_y));
         let anchor = map.tile_of(desired.0, desired.1);
         let context = inputs.with_assigned(&assigned);
         if let Some(goal) =

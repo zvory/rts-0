@@ -308,7 +308,8 @@ impl GameCheckpointV1 {
             self.last_world_combat_position,
             self.world_combat_active_through_tick,
             self.world_combat_position,
-            map.world_size_px(),
+            map.world_width_px(),
+            map.world_height_px(),
         ) {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "worldCombatActiveThroughTick",
@@ -421,7 +422,8 @@ impl EntityStoreV1 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct FogStateV1 {
-    size: u32,
+    width: u32,
+    height: u32,
     grids: BTreeMap<u32, Vec<bool>>,
     #[serde(default)]
     explored_grids: BTreeMap<u32, Vec<bool>>,
@@ -430,8 +432,10 @@ struct FogStateV1 {
 
 impl FogStateV1 {
     fn from_fog(fog: &Fog) -> Self {
+        let (width, height) = fog.checkpoint_dimensions();
         Self {
-            size: fog.checkpoint_size(),
+            width,
+            height,
             grids: fog.checkpoint_grids(),
             explored_grids: fog.checkpoint_explored_grids(),
             firing_reveal_visibility: fog.checkpoint_firing_reveal_visibility(),
@@ -440,7 +444,8 @@ impl FogStateV1 {
 
     fn into_fog(self) -> Fog {
         Fog::from_checkpoint_grids(
-            self.size,
+            self.width,
+            self.height,
             self.grids,
             self.explored_grids,
             self.firing_reveal_visibility,

@@ -67,7 +67,7 @@ impl<'a> PreCommandDerivedState<'a> {
     ) -> Self {
         PreCommandDerivedState {
             occupancy: occupancy_cache.snapshot(entities),
-            spatial: SpatialIndex::build(entities, map.size),
+            spatial: SpatialIndex::build(entities, map.width, map.height),
         }
     }
 }
@@ -86,7 +86,7 @@ impl<'a> PostMovementDerivedState<'a> {
     ) -> Self {
         PostMovementDerivedState {
             occupancy: occupancy_cache.snapshot(entities),
-            spatial: SpatialIndex::build(entities, map.size),
+            spatial: SpatialIndex::build(entities, map.width, map.height),
         }
     }
 }
@@ -106,7 +106,7 @@ impl<'a> PreCollisionDerivedState<'a> {
     ) -> Self {
         PreCollisionDerivedState {
             occupancy: occupancy_cache.snapshot(entities),
-            spatial: SpatialIndex::build(entities, map.size),
+            spatial: SpatialIndex::build(entities, map.width, map.height),
         }
     }
 }
@@ -120,7 +120,7 @@ struct FinalDerivedState {
 impl FinalDerivedState {
     fn rebuild(map: &Map, entities: &EntityStore) -> Self {
         FinalDerivedState {
-            spatial: SpatialIndex::build(entities, map.size),
+            spatial: SpatialIndex::build(entities, map.width, map.height),
         }
     }
 }
@@ -440,7 +440,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![(4, 4)],
             ..Default::default()
@@ -471,7 +472,7 @@ mod tests {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let mut players = vec![player_state(1)];
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let mut pathing = PathingService::new(1024, 16);
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
         let mut lingering_sight = Vec::new();

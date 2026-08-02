@@ -93,7 +93,7 @@ pub(in crate::game::setup::dev_scenarios) fn tank_trap_line_build_map(
 ) {
     let mut map = flat_dev_map(1);
     let ts = config::TILE_SIZE as f32;
-    let center = (map.size / 2, map.size / 2);
+    let center = (map.width / 2, map.height / 2);
     let training_pos = services::occupancy::footprint_center(
         &map,
         EntityKind::TrainingCentre,
@@ -153,7 +153,7 @@ pub(in crate::game::setup::dev_scenarios) fn tank_trap_pathing_map(
 ) {
     let mut map = flat_dev_map(2);
     let ts = config::TILE_SIZE as f32;
-    let center = (map.size / 2, map.size / 2);
+    let center = (map.width / 2, map.height / 2);
     if let Some(slot) = map.starts.get_mut(0) {
         *slot = (center.0 - 10, center.1);
     }

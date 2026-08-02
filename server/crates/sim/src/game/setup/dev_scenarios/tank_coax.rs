@@ -14,7 +14,7 @@ impl Game {
         }
 
         let mut map = flat_dev_map(2);
-        let center = (map.size / 2, map.size / 2);
+        let center = (map.width / 2, map.height / 2);
         let start_tile = (center.0 - 8, center.1);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = start_tile;
@@ -139,7 +139,7 @@ fn spawn_static_targets(
 
 fn refresh_projection_after_smoke(game: &mut Game) {
     let player_ids = game.state.player_ids();
-    game.state.fog = Fog::new(game.state.map.size);
+    game.state.fog = Fog::new(game.state.map.width, game.state.map.height);
     game.state.fog.recompute_with_smoke(
         &player_ids,
         &game.state.entities,

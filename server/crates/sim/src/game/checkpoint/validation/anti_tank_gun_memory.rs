@@ -9,7 +9,8 @@ pub(in crate::game::checkpoint) fn validate(
     map: &Map,
     tick: u32,
 ) -> Result<(), CheckpointPayloadError> {
-    let world_size = map.world_size_px();
+    let world_width = map.world_width_px();
+    let world_height = map.world_height_px();
     let mut keys = BTreeSet::new();
     for entry in &memory.entries {
         if !player_ids.contains(&entry.player_id) {
@@ -30,8 +31,8 @@ pub(in crate::game::checkpoint) fn validate(
             || !entry.entry.facing.is_finite()
             || entry.entry.x < 0.0
             || entry.entry.y < 0.0
-            || entry.entry.x >= world_size
-            || entry.entry.y >= world_size
+            || entry.entry.x >= world_width
+            || entry.entry.y >= world_height
             || entry.entry.observed_tick > tick
         {
             return Err(CheckpointPayloadError::InvalidValue {

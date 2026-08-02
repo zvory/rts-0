@@ -37,7 +37,8 @@ fn lab_metadata() -> MapMetadata {
 fn flat_lab_map() -> Map {
     const SIZE: u32 = 64;
     Map {
-        size: SIZE,
+        width: SIZE,
+        height: SIZE,
         terrain: vec![terrain::GRASS; (SIZE * SIZE) as usize],
         starts: vec![(16, 16), (48, 48)],
         ..Default::default()

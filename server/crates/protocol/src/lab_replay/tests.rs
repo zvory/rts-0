@@ -22,7 +22,8 @@ fn checkpoint_payload(
             "schemaVersion": 2,
             "contentHash": content_hash,
             "materializedMapHash": materialized_hash,
-            "size": 2,
+            "width": 3,
+            "height": 2,
             "playerCount": players.len(),
         },
         "seed": seed,
@@ -55,8 +56,9 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
             content_hash: content_hash.to_string(),
             materialized_hash: materialized_hash.to_string(),
             data: LabCheckpointScenarioMapData {
-                size: 2,
-                terrain: vec![terrain::GRASS; 4],
+                width: 3,
+                height: 2,
+                terrain: vec![terrain::GRASS; 6],
                 starts: vec![
                     LabScenarioTile { x: 0, y: 0 },
                     LabScenarioTile { x: 1, y: 1 },

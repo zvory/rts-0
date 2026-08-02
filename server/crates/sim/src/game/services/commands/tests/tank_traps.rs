@@ -78,7 +78,7 @@ fn tank_trap_cluster_attack_captures_visible_traps_inside_four_tiles() {
         .get_mut(anchor)
         .expect("anchor should still exist")
         .apply_damage(u32::MAX, None);
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], &entities, &map);
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     let mut players = vec![player_state(1), player_state(2)];
@@ -233,7 +233,7 @@ fn tank_trap_construction_charges_on_arrival_and_uses_spec_build_time() {
         .iter()
         .map(|player| (player.id, Vec::new()))
         .collect();
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], &entities, &map);
     let mut active_sites = BTreeSet::new();
 
@@ -283,7 +283,7 @@ fn tank_trap_arrival_recheck_waits_on_vehicle_body_then_times_out() {
         .iter()
         .map(|player| (player.id, Vec::new()))
         .collect();
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], &entities, &map);
     let mut active_sites = BTreeSet::new();
 

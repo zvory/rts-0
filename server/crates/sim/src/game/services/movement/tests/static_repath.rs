@@ -27,7 +27,7 @@ fn static_building_blockage_queues_repath_after_debounce() {
 
     for tick in 0..config::STATIC_BLOCKED_REPATH_TICKS as u32 - 1 {
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
         assert_eq!(
             entities.get(unit).and_then(|e| e.move_phase()),
@@ -37,7 +37,7 @@ fn static_building_blockage_queues_repath_after_debounce() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(
         &map,
         &mut entities,
@@ -80,7 +80,7 @@ fn shallow_wall_slide_still_queues_static_repath_after_debounce() {
     for tick in 0..300 {
         let before = pos(&entities, unit);
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
         let after = pos(&entities, unit);
         slid_sideways |= (after.0 - before.0).abs() <= 1e-4 && (after.1 - before.1).abs() > 0.0;

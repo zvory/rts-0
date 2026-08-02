@@ -19,7 +19,7 @@ fn anti_tank_gun_body_uses_pivot_drive_turning_along_path() {
     set_path_direct(&mut entities, anti_tank_gun, vec![(sx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities

@@ -24,7 +24,7 @@ fn gather_command_accepts_live_steel_without_nearby_completed_cc() {
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
         .expect("starting City Centre");
-    let world = game.state.map.world_size_px();
+    let world = game.state.map.world_width_px();
     let far_x = if cc.pos_x < world * 0.5 {
         world - config::TILE_SIZE as f32 * 0.5
     } else {

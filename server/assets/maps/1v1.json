@@ -1,5 +1,7 @@
 {
-  "version": 4,
+  "version": 5,
+  "width": 126,
+  "height": 126,
   "name": "1v1",
   "description": "1v1 map",
   "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",

@@ -242,10 +242,10 @@ fn measure_scout_car_fixture(
             .and_then(|e| e.movement.as_ref())
             .and_then(|m| m.scout_car_reverse_waypoint);
 
-        let spatial = SpatialIndex::build(entities, map.size);
+        let spatial = SpatialIndex::build(entities, map.width, map.height);
         movement_system(map, entities, &mut [], &occ, &spatial, tick);
         let after_movement = pos(entities, scout);
-        let spatial = SpatialIndex::build(entities, map.size);
+        let spatial = SpatialIndex::build(entities, map.width, map.height);
         resolve_collisions(entities, &spatial, map, &occ);
         let after_collision = pos(entities, scout);
 
@@ -354,10 +354,10 @@ fn measure_tank_fixture(
         coordinator.process_awaiting_paths(entities);
 
         let before = pos(entities, tank);
-        let spatial = SpatialIndex::build(entities, map.size);
+        let spatial = SpatialIndex::build(entities, map.width, map.height);
         movement_system(map, entities, &mut players, &occ, &spatial, tick);
         let after_movement = pos(entities, tank);
-        let spatial = SpatialIndex::build(entities, map.size);
+        let spatial = SpatialIndex::build(entities, map.width, map.height);
         resolve_collisions(entities, &spatial, map, &occ);
         let after_collision = pos(entities, tank);
 
@@ -414,7 +414,8 @@ fn two_tile_wide_horizontal_corridor_map() -> Map {
         }
     }
     Map {
-        size: size as u32,
+        width: size as u32,
+        height: size as u32,
         terrain,
         starts: vec![],
         ..Default::default()
@@ -475,7 +476,7 @@ fn expanded_body(body: UnitBody, extra_px: f32) -> UnitBody {
 
 fn body_hits_static_blocker(map: &Map, occ: &Occupancy, body: UnitBody) -> bool {
     let aabb = body.aabb();
-    let world_size = map.world_size_px();
+    let world_size = map.world_width_px();
     if aabb.min_x < 0.0 || aabb.min_y < 0.0 || aabb.max_x > world_size || aabb.max_y > world_size {
         return true;
     }
@@ -539,7 +540,7 @@ fn coincident_units_are_separated_in_one_tick() {
         .unwrap();
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let ra = entities.get(a).unwrap().radius();
@@ -573,7 +574,7 @@ fn soft_units_still_split_push_evenly() {
     let b_before = pos(&entities, b);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let ra = entities.get(a).unwrap().radius();
@@ -621,7 +622,7 @@ fn tank_pushes_soft_infantry_more_than_it_moves() {
     let rifleman_before = pos(&entities, rifleman);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let tank_moved = moved_distance(tank_before, pos(&entities, tank));
@@ -665,7 +666,7 @@ fn tank_infantry_overlap_resolves_from_oriented_hull() {
     let rifleman_before = pos(&entities, rifleman);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let tank_after = pos(&entities, tank);
@@ -716,7 +717,7 @@ fn anti_tank_gun_infantry_overlap_resolves_from_circular_body() {
     let rifleman_before = pos(&entities, rifleman);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let anti_tank_gun_after = pos(&entities, anti_tank_gun);
@@ -765,7 +766,7 @@ fn tank_tank_head_on_conflict_resolves_without_side_slide() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let left_after = pos(&entities, left);
@@ -804,7 +805,7 @@ fn braced_machine_gunner_holds_ground_against_soft_unit() {
     let rifleman_before = pos(&entities, rifleman);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let mg_moved = moved_distance(mg_before, pos(&entities, mg));
@@ -836,7 +837,7 @@ fn firing_rifleman_is_firmer_than_moving_rifleman() {
     let moving_before = pos(&entities, moving);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let firing_moved = moved_distance(firing_before, pos(&entities, firing));
@@ -878,7 +879,7 @@ fn harvesting_worker_is_fully_exempt_from_collision() {
     );
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let worker_after = (
@@ -921,7 +922,7 @@ fn worker_traveling_to_gather_ignores_unit_collision() {
     let blocker_before = pos(&entities, blocker);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     assert_eq!(
@@ -954,7 +955,7 @@ fn worker_traveling_to_build_ignores_unit_collision() {
     let blocker_before = pos(&entities, blocker);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     assert_eq!(
@@ -992,7 +993,7 @@ fn walking_workers_separate_around_anchored_harvester() {
         .unwrap();
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let ra = entities.get(walker_a).unwrap().radius();
@@ -1036,9 +1037,9 @@ fn group_move_to_one_point_settles_without_overlap() {
             coordinator.order_group_move(&mut entities, 1, &ids, (gx, gy), false);
             coordinator.process_awaiting_paths(&mut entities);
         }
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
     }
 
@@ -1098,9 +1099,9 @@ fn clustered_units_make_progress_to_distant_goal() {
         }
         // process_awaiting_paths must be called every tick (mirrors systems.rs).
         coordinator.process_awaiting_paths(&mut entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
     }
 
@@ -1160,9 +1161,9 @@ fn tank_routes_around_diagonal_pinch_between_offset_factories() {
             coordinator.order_group_move(&mut entities, 1, &[tank], goal, false);
         }
         coordinator.process_awaiting_paths(&mut entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
         let e = entities.get(tank).expect("tank should still exist");
@@ -1218,9 +1219,9 @@ fn tank_moves_through_long_two_tile_wide_corridor() {
             coordinator.order_group_move(&mut entities, 1, &[tank], goal, false);
         }
         coordinator.process_awaiting_paths(&mut entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
         let e = entities.get(tank).expect("tank should still exist");
@@ -1515,7 +1516,7 @@ fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
     let middle_lane_y = 64u32;
     let upper_lane_y = 60u32;
 
-    let stone_max_x = map.size - 1;
+    let stone_max_x = map.width - 1;
     block_rect_tiles(&mut map, 0, stone_min_y, stone_max_x, stone_max_y);
 
     carve_vertical_corridor(&mut map, exit_x, lower_lane_y, stone_max_y);
@@ -1575,11 +1576,11 @@ fn scout_car_wall_chokepoint_map(
     unit_count: usize,
 ) -> (Map, f32, Vec<(f32, f32)>, (f32, f32)) {
     let mut map = flat_map(1);
-    let center_x = map.size / 2;
-    let wall_y = map.size - 18;
+    let center_x = map.width / 2;
+    let wall_y = map.width - 18;
     let gap_left_x = center_x - 1;
     let gap_right_x = center_x;
-    let max_tile = map.size - 1;
+    let max_tile = map.width - 1;
 
     block_rect_tiles(&mut map, 0, wall_y, max_tile, wall_y);
     carve_rect_tiles(&mut map, gap_left_x, wall_y, gap_right_x, wall_y);
@@ -1664,9 +1665,9 @@ fn measure_wall_chokepoint_clear_times(
         }
         coordinator.process_awaiting_paths(&mut entities);
 
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
         for (slot, id) in units.iter().copied().enumerate() {
@@ -1851,9 +1852,9 @@ fn measure_snaking_corridor_unit_clear_times(
         }
         coordinator.process_awaiting_paths(&mut entities);
 
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
         for (slot, id) in units.iter().copied().enumerate() {
@@ -1916,9 +1917,9 @@ fn measure_snaking_corridor_clear_time(
         }
         coordinator.process_awaiting_paths(&mut entities);
 
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
         if units_clear_tunnel_exit(&entities, unit, &units, exit_clear_y) {
@@ -2145,9 +2146,9 @@ fn scout_car_wall_chokepoint_five_clear_without_parallel_nose_wedge() {
         }
         coordinator.process_awaiting_paths(&mut entities);
 
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
         for id in &units {
@@ -2552,7 +2553,7 @@ fn tank_with_zero_oil_does_not_move() {
     let mut players = vec![player_with_oil(1, 0)];
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut players, &occ, &spatial, 0);
 
     assert_eq!(pos(&entities, tank), (sx, sy));
@@ -2585,7 +2586,7 @@ fn scout_car_with_zero_oil_does_not_move() {
     let mut players = vec![player_with_oil(1, 0)];
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut players, &occ, &spatial, 0);
 
     assert_eq!(pos(&entities, scout_car), (sx, sy));
@@ -2618,7 +2619,7 @@ fn tank_oil_starvation_pauses_before_retrying() {
             players[0].oil = 1;
         }
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
         assert_eq!(
             pos(&entities, tank),
@@ -2628,7 +2629,7 @@ fn tank_oil_starvation_pauses_before_retrying() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(
         &map,
         &mut entities,
@@ -2662,7 +2663,7 @@ fn tank_oil_starvation_emits_positioned_oil_alert_once_per_pause() {
     let ability_runtime = crate::game::ability_runtime::AbilityRuntime::new();
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system_with_events(
         &map,
         &mut entities,
@@ -2694,7 +2695,7 @@ fn tank_oil_starvation_emits_positioned_oil_alert_once_per_pause() {
 
     events.clear();
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system_with_events(
         &map,
         &mut entities,
@@ -2732,7 +2733,7 @@ fn moving_tank_accrues_lifetime_oil_and_charges_player_stockpile() {
     for tick in 0..300u32 {
         let before = pos(&entities, tank);
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
         let after = pos(&entities, tank);
         total_moved += moved_distance(before, after);
@@ -2776,7 +2777,7 @@ fn moving_scout_car_accrues_lifetime_oil_and_charges_player_stockpile() {
     for tick in 0..400u32 {
         let before = pos(&entities, scout_car);
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
         let after = pos(&entities, scout_car);
         total_moved += moved_distance(before, after);
@@ -2929,7 +2930,7 @@ fn scout_car_route_lookahead_skips_lateral_waypoint_when_next_segment_reachable(
         "scout car should not chase the lateral intermediate waypoint center"
     );
 
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
@@ -2967,7 +2968,7 @@ fn infantry_skips_lateral_waypoint_when_next_segment_reachable() {
         standability::unit_static_segment_standable(&map, &occ, EntityKind::Rifleman, start, goal),
         "fixture requires the infantry body to sweep directly to the next route segment"
     );
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(rifleman).expect("rifleman should exist");
@@ -3005,7 +3006,7 @@ fn worker_keeps_lateral_waypoint_when_next_segment_reachable() {
         standability::unit_static_segment_standable(&map, &occ, EntityKind::Worker, start, goal),
         "fixture requires the worker body to have a legal direct route segment"
     );
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(worker).expect("worker should exist");
@@ -3075,7 +3076,7 @@ fn infantry_route_skip_stops_before_nearby_blocked_corner() {
         ),
         "fixture requires the direct look-through-corner segment to be blocked"
     );
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(rifleman).expect("rifleman should exist");
@@ -3188,7 +3189,7 @@ fn moving_unit_steers_around_braced_unit_when_space_exists() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let after = pos(&entities, mover);
@@ -3230,7 +3231,7 @@ fn moving_infantry_skirting_tank_trap_line_gets_small_lateral_bias() {
     let mut max_lateral = 0.0_f32;
     for tick in 0..120 {
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
         let after = pos(&entities, mover);
         max_lateral = max_lateral.max((after.1 - sy).abs());
@@ -3282,7 +3283,7 @@ fn choke_still_clogs_when_no_space_exists() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let after = pos(&entities, tank);
@@ -3321,7 +3322,7 @@ fn tank_frontal_traffic_slows_without_sidestep_waypoint() {
     set_path_direct(&mut entities, tank, vec![(sx + 200.0, sy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let after = pos(&entities, tank);
@@ -3370,7 +3371,7 @@ fn steering_ignores_ghost_harvester() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let after = pos(&entities, mover);
@@ -3415,7 +3416,7 @@ fn steering_candidate_rejected_when_body_would_clip_building() {
         start.0,
         start.1
     ));
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let after = pos(&entities, mover);
@@ -3472,7 +3473,7 @@ fn steering_neighbor_cap_position() -> (f32, f32) {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
     pos(&entities, mover)
 }
@@ -3530,7 +3531,7 @@ fn movement_rejects_tank_body_clipping_building_corner() {
         "candidate center tile should remain passable so the body check is the blocker"
     );
 
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -3568,7 +3569,7 @@ fn wall_slide_uses_unit_body_clearance() {
     set_path_direct(&mut entities, tank, vec![goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -3603,7 +3604,7 @@ fn collision_push_does_not_move_tank_body_into_building() {
     mark_moving(&mut entities, rifleman, (tank_start.0 + 64.0, tank_start.1));
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let tank_after = pos(&entities, tank);
@@ -3649,7 +3650,7 @@ fn collision_push_does_not_move_tank_body_into_wall() {
 
     let occ = Occupancy::build(&map, &entities);
     assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     assert!(
@@ -3685,7 +3686,7 @@ fn tank_body_locomotion_suppresses_illegal_rotation_when_blocked() {
 
     let occ = Occupancy::build(&map, &entities);
     assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -3795,7 +3796,7 @@ fn tank_body_locomotion_backs_out_when_rotation_corner_is_blocked() {
         "fixture requires the first tank rotation to clip the building corner"
     );
 
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -3856,7 +3857,7 @@ fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
     set_path_direct(&mut entities, scout, vec![goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
@@ -3913,7 +3914,7 @@ fn front_blocked_scout_car_fixture() -> (Map, EntityStore, u32, (f32, f32), (f32
 
 fn run_scout_car_movement_tick(map: &Map, entities: &mut EntityStore, tick: u32) {
     let occ = Occupancy::build(map, entities);
-    let spatial = SpatialIndex::build(entities, map.size);
+    let spatial = SpatialIndex::build(entities, map.width, map.height);
     movement_system(map, entities, &mut [], &occ, &spatial, tick);
 }
 
@@ -4102,7 +4103,7 @@ fn scout_car_consumes_lateral_intermediate_waypoint_inside_car_radius() {
     set_path_direct(&mut entities, scout, vec![intermediate, goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
@@ -4134,7 +4135,7 @@ fn scout_car_lateral_final_goal_settles_inside_final_tolerance() {
     set_path_direct(&mut entities, scout, vec![goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
@@ -4164,7 +4165,7 @@ fn scout_car_attack_move_lateral_final_goal_keeps_attack_move_order() {
     set_path_direct(&mut entities, scout, vec![goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
@@ -4191,7 +4192,7 @@ fn scout_car_turns_by_curvature_while_moving() {
     set_path_direct(&mut entities, scout, vec![(sx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
@@ -4230,7 +4231,7 @@ fn scout_car_does_not_pivot_in_place_for_far_goal_behind() {
     set_path_direct(&mut entities, scout, vec![goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
@@ -4402,7 +4403,7 @@ fn scout_car_reversing_to_nearby_offset_goal_arrives() {
 
     for tick in 0..120 {
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
         if entities
             .get(scout)
@@ -4443,7 +4444,7 @@ fn tank_body_facing_turns_gradually_along_path() {
     set_path_direct(&mut entities, tank, vec![(sx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let facing = entities.get(tank).expect("tank should exist").facing();
@@ -4482,9 +4483,9 @@ fn mixed_tank_infantry_group_movement_stays_body_legal() {
             coordinator.order_group_move(&mut entities, 1, &ids, goal, false);
         }
         coordinator.process_awaiting_paths(&mut entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
         let occ_after = Occupancy::build(&map, &entities);
@@ -4523,7 +4524,7 @@ fn tank_pauses_when_body_badly_misaligned() {
     set_path_direct(&mut entities, tank, vec![(gx, sy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -4554,7 +4555,7 @@ fn tank_reverses_to_nearby_goal_behind() {
     set_path_direct(&mut entities, tank, vec![goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -4588,7 +4589,7 @@ fn tank_still_pivots_for_far_goal_behind() {
     set_path_direct(&mut entities, tank, vec![goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -4620,7 +4621,7 @@ fn tank_does_not_reverse_for_behind_intermediate_waypoint() {
     set_path_direct(&mut entities, tank, vec![behind, goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -4652,7 +4653,7 @@ fn tank_reverse_correction_uses_short_angle_across_wrap() {
     set_path_direct(&mut entities, tank, vec![goal]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
@@ -4683,7 +4684,7 @@ fn tank_facing_remains_finite_after_movement() {
     set_path_direct(&mut entities, tank, vec![(sx + 200.0, sy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let facing = entities.get(tank).expect("tank should exist").facing();
@@ -4708,7 +4709,7 @@ fn rifleman_facing_remains_instant_for_path_segment() {
     set_path_direct(&mut entities, rifleman, vec![(sx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let facing = entities
@@ -4736,7 +4737,7 @@ fn anti_tank_gun_facing_turns_gradually_along_path() {
     set_path_direct(&mut entities, anti_tank_gun, vec![(sx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let facing = entities
@@ -4764,7 +4765,7 @@ fn mortar_team_facing_snaps_along_path() {
     set_path_direct(&mut entities, mortar, vec![(sx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let facing = entities.get(mortar).expect("mortar should exist").facing();
@@ -4791,7 +4792,7 @@ fn intermediate_waypoint_consumed_by_radius() {
     set_path_direct(&mut entities, unit, vec![(iwx, iwy), (gx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(unit).unwrap();
@@ -4832,9 +4833,9 @@ fn two_units_sharing_waypoint_do_not_wedge() {
     // collision slowdown.
     for tick in 0..100u32 {
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
     }
 
@@ -4866,7 +4867,7 @@ fn final_waypoint_still_requires_close_arrival() {
 
     for tick in 0..300u32 {
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
         if entities.get(unit).is_none_or(|e| e.path_is_empty()) {
             break;
@@ -4903,7 +4904,7 @@ fn plain_move_becomes_idle_after_arrival() {
     }
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(unit).unwrap();
@@ -4929,7 +4930,7 @@ fn swept_route_skips_waypoint_after_sideways_overshoot() {
     set_path_direct(&mut entities, unit, vec![(iwx, iwy), (gx, gy)]);
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(unit).unwrap();
@@ -4990,9 +4991,9 @@ fn unit_pressed_against_building_wall_reaches_goal() {
 
     for tick in 0..150u32 {
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
     }
 
@@ -5032,9 +5033,9 @@ fn move_to_occupied_tile_does_not_stack() {
             coordinator.order_group_move(&mut entities, 1, &[mover], (gx, gy), false);
             coordinator.process_awaiting_paths(&mut entities);
         }
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
     }
 
@@ -5082,7 +5083,7 @@ fn head_on_in_one_tile_corridor_does_not_deadlock() {
         .unwrap();
 
     let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let ra = entities.get(a).unwrap().radius();
