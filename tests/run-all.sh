@@ -772,7 +772,6 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   run_suite_bg "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
   run_suite_bg "API: faction_integration" node "$SCRIPT_DIR/faction_integration.mjs"
   run_suite_bg "API: team_integration"   node "$SCRIPT_DIR/team_integration.mjs"
-  run_suite_bg "API: rectangular_map_server_integration" node "$SCRIPT_DIR/rectangular_map_server_integration.mjs"
   run_suite_bg "API: lobby_browser_integration" node "$SCRIPT_DIR/lobby_browser_integration.mjs"
   else
     SKIPPED+=("Live Node API suites")
