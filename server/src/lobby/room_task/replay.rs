@@ -553,6 +553,7 @@ impl RoomTask {
             }
             let view = observer_view_from_selection(selection, &valid_ids);
             self.observer_views.insert(player_id, view);
+            self.ground_decal_request_times.remove(&player_id);
             self.clear_pending_snapshots_for([player_id]);
             self.fanout_current_observer_snapshots_to([player_id]);
             return;
@@ -582,6 +583,7 @@ impl RoomTask {
 
         let view = observer_view_from_selection(selection, &valid_ids);
         self.observer_views.insert(player_id, view.clone());
+        self.ground_decal_request_times.remove(&player_id);
         self.clear_pending_snapshots_for([player_id]);
         self.fanout_replay_snapshots_to(&session, [player_id], HashMap::new(), context, None);
         let analysis = send_analysis
@@ -689,6 +691,7 @@ impl RoomTask {
             });
             session.begin_seek(player_id, plan)
         });
+        self.ground_decal_request_times.clear();
         match seek_result {
             Ok(_) => {
                 let recipients = self.order.clone();

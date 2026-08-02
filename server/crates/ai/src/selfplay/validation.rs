@@ -116,6 +116,7 @@ mod tests {
     fn validate_entity_on_map(map: MapInfo, x: f32, y: f32) -> Result<(), SelfPlayFailure> {
         let snapshot = Snapshot {
             tick: 1,
+            ground_decal_revision: 0,
             world_combat_position: None,
             steel: 0,
             oil: 0,

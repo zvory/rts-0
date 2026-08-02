@@ -224,6 +224,33 @@ pub fn fires_while_moving(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::Tank | EntityKind::ScoutCar)
 }
 
+/// Durable terrain-mark presentation category for an entity death.
+pub fn death_ground_decal_class(kind: EntityKind) -> Option<&'static str> {
+    match kind {
+        EntityKind::Worker
+        | EntityKind::Rifleman
+        | EntityKind::Panzerfaust
+        | EntityKind::MachineGunner
+        | EntityKind::MortarTeam
+        | EntityKind::Ekat => Some("infantry"),
+        EntityKind::ScoutCar
+        | EntityKind::Tank
+        | EntityKind::CommandCar
+        | EntityKind::AntiTankGun
+        | EntityKind::Artillery => Some("scorch"),
+        kind if kind.is_building() => Some("buildingScorch"),
+        _ => None,
+    }
+}
+
+pub fn mortar_ground_decal_source_kind() -> EntityKind {
+    EntityKind::MortarTeam
+}
+
+pub fn artillery_ground_decal_source_kind() -> EntityKind {
+    EntityKind::Artillery
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

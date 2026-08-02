@@ -22,6 +22,7 @@ use tokio::time::Instant as TokioInstant;
 mod branch;
 mod chat;
 mod dev;
+mod ground_decals;
 mod helpers;
 mod lab;
 mod lifecycle;
@@ -114,6 +115,8 @@ pub(super) struct RoomTask {
     /// Per-connection observer perspective. This is read-only projection state and never an
     /// issuer/command capability.
     observer_views: HashMap<u32, ObserverView>,
+    /// Last accepted durable-decal repair request per connection; bounds reliable response spam.
+    ground_decal_request_times: HashMap<u32, std::time::Instant>,
     /// Optional persistence sink for resolved matches. `None` disables match-history writes.
     match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
     /// When true, rows written by this room are hidden from non-localhost match-history reads.
@@ -184,6 +187,7 @@ impl RoomTask {
             match_chat_log: Vec::new(),
             recent_chat_times: HashMap::new(),
             observer_views: HashMap::new(),
+            ground_decal_request_times: HashMap::new(),
             match_history_writer,
             match_history_local_only,
             match_started_at: None,
@@ -450,6 +454,11 @@ impl RoomTask {
                 player_id,
                 selection,
             } => self.on_set_vision_selection(player_id, selection),
+            RoomEvent::RequestGroundDecals {
+                player_id,
+                request_id,
+                after_revision,
+            } => self.on_request_ground_decals(player_id, request_id, after_revision),
             RoomEvent::Lab {
                 player_id,
                 request_id,

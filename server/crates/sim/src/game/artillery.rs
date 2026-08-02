@@ -49,11 +49,13 @@ impl ArtilleryShellStore {
         fog: &Fog,
         events: &mut HashMap<u32, Vec<Event>>,
         tick: u32,
+        mut on_impact: impl FnMut(f32, f32),
     ) {
         let mut pending = Vec::new();
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
+                on_impact(shell.x, shell.y);
                 resolve_shell(entities, teams, fog, events, &shell, tick);
             } else {
                 pending.push(shell);

@@ -302,6 +302,7 @@ fn tank_trap_can_be_damaged_and_removed_by_death_cleanup() {
         &teams,
         &mut game.state.players,
         &mut game.state.lingering_sight,
+        &mut game.state.ground_decals,
         &mut events,
         game.state.tick,
     );

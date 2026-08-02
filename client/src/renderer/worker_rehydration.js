@@ -5,6 +5,7 @@ export function createWorkerPresentationState() {
   let generation = 0;
   const durable = [];
   let lastDurableRevision = 0;
+  let decalEpoch = 0;
 
   return {
     reset(nextGeneration) {
@@ -14,6 +15,7 @@ export function createWorkerPresentationState() {
       explored = null;
       durable.length = 0;
       lastDurableRevision = 0;
+      decalEpoch = 0;
     },
     map(message) {
       ensureGeneration(message.generation, generation);
@@ -32,11 +34,18 @@ export function createWorkerPresentationState() {
     },
     retainDecals(message) {
       ensureGeneration(message.generation, generation);
+      if ((message.payload.decalEpoch ?? 0) !== decalEpoch) return false;
       const revision = message.payload.revision;
       if (revision <= lastDurableRevision) return false;
       lastDurableRevision = revision;
       durable.push({ revision, decals: message.payload.decals });
       return true;
+    },
+    resetDecals(message) {
+      ensureGeneration(message.generation, generation);
+      decalEpoch = message.payload.decalEpoch;
+      durable.length = 0;
+      lastDurableRevision = 0;
     },
     frame(message) {
       ensureGeneration(message.generation, generation);

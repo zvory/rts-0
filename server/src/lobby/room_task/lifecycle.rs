@@ -435,6 +435,7 @@ impl RoomTask {
         self.match_chat_log.clear();
         self.recent_chat_times.clear();
         self.observer_views.clear();
+        self.ground_decal_request_times.clear();
         self.reset_live_pause_state();
         self.reset_room_time_state();
         self.replay_start = None;

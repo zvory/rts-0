@@ -145,6 +145,12 @@ impl Game {
     /// owner-only movement paths. The default `snapshot_for` includes no movement diagnostics.
     pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot;
 
+    /// Request fog-safe durable ground marks learned by one player after a prior cursor.
+    pub fn ground_decals_for_player(&self, player: u32, after_revision: u32) -> (u32, Vec<GroundDecalView>);
+
+    /// Request durable marks for an accepted selected-player union or omniscient observer view.
+    pub fn ground_decals_for_observer(&self, view: &ObserverView, after_revision: u32) -> (u32, Vec<GroundDecalView>);
+
     /// Build a read-only privileged observer projection. `Omniscient` exposes the complete
     /// world/all-owner private detail; `Players` combines selected real-player perspectives.
     /// This value never conveys command authority.
@@ -289,6 +295,7 @@ architecture failures.
 | `firing_reveals` | `authoritative/serialized` | Serialize active firing-reveal sources with stable episode-start and expiry ticks. | Anti-Tank Gun and artillery/mortar reveal logic records temporary actionable sight. Repeated shots extend one continuous episode without changing its start; the next 15 Hz fog sample stamps active sources into viewer fog until a later sample observes expiry. |
 | `smokes` | `authoritative/serialized` | Serialize the full `SmokeCloudStore`, including next id, active clouds, pending clouds, locations, radii, spawn/due/expiry ticks. | Smoke blocks line of sight, combat projection, and the next authoritative fog sample; `tick_inner` retains active smoke and systems may resolve pending smoke. |
 | `trenches` | `authoritative/serialized` | Serialize the full `TrenchStore`, including deterministic trench ids, terrain positions, discovery/memory data, and any store allocator state. | Trenches are persistent neutral terrain outside `EntityStore`; entrenchment services create/discover/update them and snapshots project current plus remembered trench terrain. |
+| `ground_decals` | `authoritative/serialized` | Serialize the capped append-only mark rows, stable id allocator, global revision, and per-player first-discovery revisions. | Death and delayed mortar/artillery impact resolution create deterministic presentation records. Current team fog physically discovers marks; snapshot cursors advertise recipient-scoped repair state and reliable requests return only accepted player/observer projection deltas. At the 4,096-row beta cap, creation stops without eviction. |
 | `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
 | `mortar_shells` | `authoritative/serialized` | Serialize all scheduled mortar impacts with owner, attacker, impact point, and impact tick. | `MortarShellStore::schedule` records delayed impacts; later ticks resolve area damage/events even if the firing mortar dies before impact. |
 | `artillery_shells` | `authoritative/serialized` | Serialize all scheduled artillery impacts with their owners, source data, impact points, and impact ticks. | The artillery store mirrors the delayed-shell contract used by the tick pipeline; dropping it would cancel future area damage and reveal/event output. |
@@ -676,9 +683,10 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   joins, AI seats, spectator returns, and lobby browser slots. Selecting a lower-capacity map removes overflow AI seats first, then
   moves overflow humans to spectators. Live-match handlers live in `room_task/live.rs`,
   replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
-  `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
-  bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
-  authority. Plain `/lab` is a client-side catalog selector. Its Blank Lab entry launches blank startup on
+  `room_task/lab.rs`, durable decal repair lives in `room_task/ground_decals.rs`, dev-watch scenario
+  handling lives in `room_task/dev.rs`, and room lifecycle bookkeeping lives in
+  `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick authority. Plain
+  `/lab` is a client-side catalog selector. Its Blank Lab entry launches blank startup on
   the current default `1v1` map, while catalog setups retain their selected maps. Direct lab URLs keep
   compatibility: `scenario=lategame` requests the bundled catalog setup, `scenario=blank` keeps
   blank lab startup, and custom map or seed lab URLs stay blank unless they set an explicit setup. Bundled
@@ -809,6 +817,10 @@ split into focused room-local modules:
 - `room_task/live.rs` owns live-match room controls: command routing, command receipts, active
   player pause and unpause, speed-only live-game room-time state, give-up, late spectator
   attach, live start-payload glue, pending recipient notices, and live snapshot notice plumbing.
+- `room_task/ground_decals.rs` owns rate-limited decal repair requests and derives each response's
+  player, observer, replay, or full-world projection from server-owned connection state.
+- `room_task/observer.rs` owns current live/replay observer snapshot fanout and scoped replay
+  analysis delivery.
 - `room_task/lab.rs` owns lab sessions: first-join launch, lab role/vision metadata, request
   authorization, mutation and issue-as routing, result delivery, dirty state, operation logging,
   state broadcasts, room-time controls, and scenario export/import/validation.

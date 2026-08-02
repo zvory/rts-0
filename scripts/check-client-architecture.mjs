@@ -26,6 +26,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "match_settings_context.js": "app-shell",
   "match_settings_toggles.js": "app-shell",
   "match_auto_spectator.js": "app-shell",
+  "match_ground_decal_sync.js": "app-shell",
   "spectator_controls_panel.js": "app-shell",
   "auto_spectator.js": "app-shell",
   "match_health.js": "app-shell",
@@ -213,7 +214,7 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Death decals add a narrow browser-local decal queue owned by GameState.
   // WASM display progress replaces the parallel JS calculator with sparse baseline-validated
   // progress patches composed at GameState's existing display-overlay seam.
-  "state.js": 31626,
+  "state.js": 31772,
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
   "input/index.js": 40927,
   // Visual Experimentation Phase 1 injects local lab visual profile state for renderer-only samples.
@@ -224,7 +225,7 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // seam; native display-mode and raw-input ownership remain isolated in the Tauri shell.
   // WASM display progress keeps its runtime alive independently of the pose preference and
   // coordinates authoritative reconcile, pause freezing, and authoritative-only fallback.
-  "match.js": 50059,
+  "match.js": 50441,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.

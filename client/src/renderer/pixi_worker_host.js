@@ -7,6 +7,7 @@ import {
   createInitializeMessage,
   createMapGenerationMessage,
   createRenderWorkerWireState,
+  createResetGroundDecalsMessage,
   createResetGenerationMessage,
   createResizeMessage,
   RENDER_WORKER_MESSAGE,
@@ -77,6 +78,7 @@ export class PixiWorkerPresentationAdapter {
     this._decalWaiters = new Map();
     this._sentDecalRevision = 0;
     this._retainedDecalRevision = 0;
+    this._decalEpoch = 0;
     this._lastPresentedFrameId = 0;
     this._lastCapturedPixels = null;
     this._renderFrameCount = 0;
@@ -215,6 +217,15 @@ export class PixiWorkerPresentationAdapter {
     return this._lastReadiness.groundDecals || { assetStatus: "idle" };
   }
 
+  resetGroundDecals() {
+    if (this._destroyed || this._fatal || this.surface !== "match") return;
+    this._decalEpoch += 1;
+    this._sentDecalRevision = 0;
+    this._retainedDecalRevision = 0;
+    this._settleDecalWaiters(null);
+    this._post(createResetGroundDecalsMessage(this._generation, this._decalEpoch));
+  }
+
   trenchDiagnostics() {
     return this._lastReadiness.trenches || {};
   }
@@ -307,6 +318,7 @@ export class PixiWorkerPresentationAdapter {
     this._wireState = createRenderWorkerWireState();
     this._sentDecalRevision = 0;
     this._retainedDecalRevision = 0;
+    this._decalEpoch = 0;
     this._settleDecalWaiters(null);
     const resetError = new Error("Pixi render worker generation changed during capture.");
     for (const request of this._captureRequests.values()) request.reject(resetError);
@@ -330,7 +342,7 @@ export class PixiWorkerPresentationAdapter {
     waiters.push(job);
     this._decalWaiters.set(revision, waiters);
     if (revision <= this._sentDecalRevision) return;
-    const durable = createDurableDecalMessage(job.frame);
+    const durable = createDurableDecalMessage(job.frame, this._decalEpoch);
     if (!durable) {
       job.retained.resolve(null);
       return;
@@ -455,6 +467,7 @@ export class PixiWorkerPresentationAdapter {
   }
 
   _acceptRetained(message) {
+    if ((message.payload.decalEpoch ?? 0) !== this._decalEpoch) return;
     const revision = message.payload.revision;
     this._retainedDecalRevision = Math.max(this._retainedDecalRevision, revision);
     const waiters = this._decalWaiters.get(revision) || [];

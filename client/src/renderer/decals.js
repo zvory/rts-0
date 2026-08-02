@@ -730,8 +730,7 @@ function drawEllipse(ctx, x, y, rx, ry, rotation, fillStyle) {
 }
 
 function updateTexture(texture) {
-  if (typeof texture?.update === "function") texture.update();
-  else texture?.source?.update?.();
+  texture?.source?.update?.();
 }
 
 function isBlastDecalClass(decalClass) {

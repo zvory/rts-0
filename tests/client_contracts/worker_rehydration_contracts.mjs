@@ -18,6 +18,11 @@ assert(second.layers.persistentGroundMark.some((record) => record.id === 2),
   "acknowledging an older frame retains a newer independently delivered decal revision");
 assert(!second.layers.persistentGroundMark.some((record) => record.id === 1),
   "acknowledging an older frame retires only the durable decals that frame included");
+state.resetDecals(request("resetGroundDecals", { decalEpoch: 1 }));
+assert(!state.retainDecals(request("durableDecals", { decalEpoch: 0, revision: 3, decals: [decal(3)] })),
+  "a decal-only reset rejects durable updates queued for the previous viewpoint epoch");
+assert(state.retainDecals(request("durableDecals", { decalEpoch: 1, revision: 1, decals: [decal(4)] })),
+  "a decal-only reset accepts a lower authoritative revision for the replacement viewpoint");
 
 function request(type, payload) {
   return { generation: 1, type, payload };

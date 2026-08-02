@@ -18,7 +18,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   projection-affecting snapshot fields, events, or observer modes
 
 ## Code map
-- `server/crates/protocol/src/lib.rs` — authoritative Rust wire DTOs and compact transport
+- `server/crates/protocol/src/{client_message,server_message,lib}.rs` — authoritative Rust wire
+  DTOs and compact transport
 - `server/crates/contract/src/lib.rs` — shared semantic DTOs re-exported by protocol
 - `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports
 - `server/crates/sim/src/protocol.rs` — sim-facing adapter for typed kind conversion

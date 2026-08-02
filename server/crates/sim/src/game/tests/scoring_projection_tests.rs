@@ -69,6 +69,7 @@ fn scores_record_kills_and_losses_on_death() {
         &teams,
         &mut game.state.players,
         &mut lingering_sight,
+        &mut game.state.ground_decals,
         &mut events,
         tick,
     );
@@ -153,6 +154,7 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         &teams,
         &mut game.state.players,
         &mut lingering_sight,
+        &mut game.state.ground_decals,
         &mut events,
         tick,
     );

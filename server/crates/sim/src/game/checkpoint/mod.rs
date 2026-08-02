@@ -9,6 +9,7 @@ use super::commands::PendingCommand;
 use super::entity::{Entity, EntityStore};
 use super::firing_reveal::FiringRevealSource;
 use super::fog::{FiringRevealVisibility, Fog, LingeringSightSource};
+use super::ground_decal::{GroundDecalStore, MAX_GROUND_DECALS};
 use super::map::Map;
 use super::mortar::MortarShellStore;
 use super::panzerfaust_shot::PanzerfaustShotStore;
@@ -147,6 +148,8 @@ struct GameCheckpointV1 {
     firing_reveals: Vec<FiringRevealSource>,
     smokes: SmokeCloudStore,
     trenches: TrenchStore,
+    #[serde(default)]
+    ground_decals: GroundDecalStore,
     ability_runtime: AbilityRuntime,
     mortar_shells: MortarShellStore,
     artillery_shells: ArtilleryShellStore,
@@ -200,6 +203,7 @@ impl GameCheckpointV1 {
             firing_reveals: state.firing_reveals.clone(),
             smokes: state.smokes.clone(),
             trenches: state.trenches.clone(),
+            ground_decals: state.ground_decals.clone(),
             ability_runtime: state.ability_runtime.clone(),
             mortar_shells: state.mortar_shells.clone(),
             artillery_shells: state.artillery_shells.clone(),
@@ -264,6 +268,7 @@ impl GameCheckpointV1 {
             firing_reveals: self.firing_reveals,
             smokes: self.smokes,
             trenches: self.trenches,
+            ground_decals: self.ground_decals,
             ability_runtime: self.ability_runtime,
             mortar_shells: self.mortar_shells,
             artillery_shells: self.artillery_shells,
@@ -332,6 +337,11 @@ impl GameCheckpointV1 {
         validate_count("smokes", self.smokes.checkpoint_len(), MAX_SMOKE_CLOUDS)?;
         validate_count("trenches", self.trenches.checkpoint_len(), MAX_TRENCHES)?;
         validate_count(
+            "groundDecals",
+            self.ground_decals.checkpoint_len(),
+            MAX_GROUND_DECALS,
+        )?;
+        validate_count(
             "abilityRuntime",
             self.ability_runtime.instances().count()
                 + self.ability_runtime.world_objects().count()
@@ -355,6 +365,11 @@ impl GameCheckpointV1 {
         )?;
 
         let player_ids = validate_players(&self.players, self.tick)?;
+        if !self.ground_decals.valid_checkpoint_state(map, &player_ids) {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "groundDecals",
+            });
+        }
         let entity_ids = validate_entities(&self.entities, &player_ids, map, self.tick)?;
         validate_player_supply(&self.players, &self.entities)?;
         validate_fog(
