@@ -9,6 +9,7 @@ import {
   MAX_COMPACT_DEBUG_WAYPOINTS,
   MAX_COMPACT_ENTITIES,
   MAX_COMPACT_EVENTS,
+  MAX_COMPACT_GROUND_DECALS,
   MAX_COMPACT_ORDER_PLAN,
   MAX_COMPACT_REMEMBERED_BUILDINGS,
   MAX_COMPACT_REMEMBERED_ANTI_TANK_GUNS,
@@ -31,6 +32,9 @@ export function decodeCompactSnapshot(raw) {
 
   const scalars = readArray(raw.s, "snapshot scalars", 5);
   if (scalars.length !== 5) throw new Error("compact snapshot scalar count mismatch");
+
+  const groundDecalRevision = readOptionalU32(raw.gr, "groundDecalRevision");
+  const groundDecalDelta = decodeCompactGroundDecalDelta(raw.gd, groundDecalRevision);
 
   return {
     t: S.SNAPSHOT,
@@ -56,7 +60,8 @@ export function decodeCompactSnapshot(raw) {
       MAX_COMPACT_ABILITY_OBJECTS,
     ).map(decodeCompactAbilityObject),
     trenches: decodeCompactTrenches(raw.tr),
-    groundDecalRevision: readOptionalU32(raw.gr, "groundDecalRevision"),
+    groundDecalRevision,
+    groundDecalDelta,
     visibleTiles: decodeVisibilityRuns(raw.fg),
     exploredTiles: decodeVisibilityRuns(raw.eg, "exploredTiles"),
     rememberedBuildings: readOptionalArray(
@@ -78,6 +83,44 @@ export function decodeCompactSnapshot(raw) {
     ),
     netStatus: decodeCompactNetStatus(raw.n),
   };
+}
+
+function decodeCompactGroundDecalDelta(record, revision) {
+  if (record == null) return null;
+  const fields = readArray(record, "groundDecalDelta", 2);
+  if (fields.length !== 2) throw new Error("groundDecalDelta field count mismatch");
+  const afterRevision = readU32(fields[0], "groundDecalDelta.afterRevision");
+  if (afterRevision > revision) {
+    throw new Error("groundDecalDelta.afterRevision exceeds groundDecalRevision");
+  }
+  const decals = readArray(
+    fields[1],
+    "groundDecalDelta.decals",
+    MAX_COMPACT_GROUND_DECALS,
+  ).map(decodeCompactGroundDecal);
+  return { afterRevision, decals };
+}
+
+function decodeCompactGroundDecal(record, index) {
+  const fields = readArray(record, `ground decal ${index}`, 10);
+  if (fields.length !== 10) throw new Error(`ground decal ${index} field count mismatch`);
+  const decal = {
+    id: readU32(fields[0], "groundDecal.id"),
+    decalClass: readString(fields[1], "groundDecal.decalClass"),
+    sourceKind: readCode(fields[2], KIND_BY_CODE, "groundDecal.sourceKind"),
+    x: readNumber(fields[3], "groundDecal.x"),
+    y: readNumber(fields[4], "groundDecal.y"),
+    owner: readU32(fields[5], "groundDecal.owner"),
+    seed: readU32(fields[6], "groundDecal.seed"),
+  };
+  if (fields[7] != null) decal.facing = readNumber(fields[7], "groundDecal.facing");
+  if (fields[8] != null) {
+    decal.weaponFacing = readNumber(fields[8], "groundDecal.weaponFacing");
+  }
+  if (fields[9] != null) {
+    decal.radiusTiles = readNumber(fields[9], "groundDecal.radiusTiles");
+  }
+  return decal;
 }
 
 function readOptionalU32(value, field) {
@@ -464,6 +507,13 @@ function readArray(value, name, maxLength) {
 function readNumber(value, name) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(`${name} must be a finite number`);
+  }
+  return value;
+}
+
+function readString(value, name) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 64) {
+    throw new Error(`${name} must be a non-empty bounded string`);
   }
   return value;
 }

@@ -3,7 +3,9 @@
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-use rts_contract::{NoticeSeverity, DEFAULT_FACTION_ID, MAP_DOODAD_TYPE_IDS};
+use rts_contract::{
+    NoticeSeverity, DEFAULT_FACTION_ID, MAP_DOODAD_TYPE_IDS, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
+};
 
 // ---------------------------------------------------------------------------
 // Shared string vocabularies (kept as constants so the simulation never sprays
@@ -193,7 +195,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 49;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 50;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -209,6 +211,7 @@ pub const COMPACT_UNKNOWN_CODE: u8 = 255;
 pub struct ProtocolContract {
     schema_version: u8,
     compact_snapshot_version: u8,
+    max_ground_decals_per_snapshot_delta: usize,
     prediction_protocol_version: u32,
     snapshot_codecs: SnapshotCodecContract,
     default_faction_id: &'static str,
@@ -506,6 +509,7 @@ pub fn protocol_contract() -> ProtocolContract {
     ProtocolContract {
         schema_version: 1,
         compact_snapshot_version: COMPACT_SNAPSHOT_VERSION,
+        max_ground_decals_per_snapshot_delta: MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
         prediction_protocol_version: PREDICTION_PROTOCOL_VERSION,
         snapshot_codecs: SnapshotCodecContract {
             default_codec: SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,

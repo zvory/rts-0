@@ -439,16 +439,19 @@ export class GroundDecalBuffer {
 }
 export function normalizeAuthoritativeGroundDecal(record, context?)
 ```
-Snapshots advertise only the requesting perspective's `groundDecalRevision`. `GroundDecalSync`
-coalesces that signal into one reliable `requestGroundDecals { requestId, afterRevision }` repair at a time and
-retries with bounded backoff until the retained cache reaches the advertised revision. The echoed
-request id rejects delayed responses from a prior replay tick or vision perspective. Responses
-contain only decals first discovered by that perspective after the supplied revision. The buffer
-normalizes and deduplicates those stable server ids, retains their records for renderer rehydration,
-and queues each newly learned mark once. Replay seeks and observer-view changes clear both the
-cache and painted presentation, then resynchronize from revision zero after the replacement
-perspective snapshot arrives. Transient combat events still drive short-lived effects and audio,
-but are not used to create permanent decals.
+Snapshots advertise the requesting perspective's `groundDecalRevision` and repeat a fog-safe,
+64-revision `groundDecalDelta { afterRevision, decals }` tail. `GroundDecalSync` applies a
+contiguous or overlapping tail immediately; stable ids deduplicate repeats, and the buffer retains
+pending rows across skipped or failed presentation frames. A forward gap may queue the entitled
+rows for immediate display but cannot advance the complete cache cursor. In that case
+`GroundDecalSync` coalesces the mismatch into one reliable
+`requestGroundDecals { requestId, afterRevision }` repair and retries with bounded backoff. A later
+covering snapshot tail cancels an obsolete outstanding repair. The echoed repair request id rejects
+delayed responses from a prior replay tick or vision perspective. Replay seeks and observer-view
+changes clear both the cache and painted presentation, block possibly pre-reset inline tails until
+a correlated repair establishes the replacement authority, then resynchronize from revision zero.
+Transient combat events still drive short-lived
+effects and audio, but are not used to create permanent decals.
 
 `renderer/decals.js`
 ```js
@@ -1974,9 +1977,10 @@ overlay container as smoke clouds, below selection rings and HP bars):
 
 Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `decals` between
 terrain and resources):
-- Decals are checkpointed server state. Snapshots expose a fog-safe, perspective-scoped revision;
-  the client requests stable records after its applied revision, so late join, reconnect, and
-  replay seek reconstruct already-discovered battlefield marks without replaying transient events.
+- Decals are checkpointed server state. Snapshots expose a fog-safe, perspective-scoped revision
+  plus a bounded repeated tail for immediate ordinary discovery. Reliable range requests repair
+  late joins, reconnects, replay seeks, perspective changes, missed revisions, and cache recovery
+  without replaying transient events.
 - Infantry deaths stamp translucent player-tinted SVG paint masks. Vehicle and support-weapon
   deaths stamp neutral charcoal hull-shaped scorch masks with smaller, subdued player-colored paint
   fragments. Destroyed buildings stamp neutral charcoal rectangles exactly matching their rendered
@@ -1988,8 +1992,9 @@ terrain and resources):
 - `GameState` retains normalized records keyed by stable server id and queues only newly learned
   records. Match stages the pending batch before presentation assembly and releases it only after a
   successful backend presentation; Pixi stamps detached frame records and never consumes the
-  shared queue. A skipped snapshot merely leaves a revision mismatch that the reliable repair path
-  resolves. The client never infers hidden deaths or impacts.
+  shared queue. Repeated snapshot tails and stable ids make skipped presentation frames harmless;
+  a skipped network range beyond the bounded tail leaves a revision mismatch that the reliable
+  repair path resolves. The client never infers hidden deaths or impacts.
 - The renderer stamps each new-decal batch into one downsampled texture, updates that texture once
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.

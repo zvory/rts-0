@@ -40,14 +40,15 @@ pub use observer_analysis::*;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, AutoBuildSettingsSnapshot, CommandCapabilities, DebugPathPoint, DebugPathView,
-    DiagnosticCapabilities, EntityView, Event, GroundDecalView, InitialCamera, LabStartMetadata,
-    LabStartRole, LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope,
-    NoticeSeverity, ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
-    PlayerStart, RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata,
-    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeSeekState,
-    RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
-    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID, MAP_DOODAD_TYPE_IDS,
-    MAP_TILE_SIZE_PX,
+    DiagnosticCapabilities, EntityView, Event, GroundDecalDelta, GroundDecalView, InitialCamera,
+    LabStartMetadata, LabStartRole, LabVisionMode, MapInfo, MatchControlCapabilities,
+    MovementPathDiagnosticScope, NoticeSeverity, ObserverViewSelection, OrderPlanMarker,
+    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedAntiTankGunView,
+    RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
+    RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState, ScoutPlaneStateView, SmokeCloudView,
+    Snapshot, SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
+    DEFAULT_FACTION_ID, MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX,
+    MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
 pub use server_message::ServerMessage;
 
@@ -1145,6 +1146,7 @@ mod tests {
         Snapshot {
             tick: 42,
             ground_decal_revision: 17,
+            ground_decal_delta: None,
             world_combat_position: Some([1024.0, 2048.0]),
             steel: 100,
             oil: 25,

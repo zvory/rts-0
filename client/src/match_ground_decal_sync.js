@@ -4,8 +4,8 @@ const DEFAULT_RETRY_DELAYS_MS = Object.freeze([600, 1000, 2500, 5000]);
 
 /**
  * Keeps the renderer's local ground-mark cache aligned with the small revision
- * advertised by snapshots. The server remains the source of truth; repeated
- * snapshots only coalesce requests and never advance the applied revision.
+ * advertised by snapshots. Bounded inline deltas handle ordinary discoveries;
+ * the reliable request remains the repair path for gaps and cache recovery.
  */
 export class GroundDecalSync {
   constructor({
@@ -28,24 +28,53 @@ export class GroundDecalSync {
     this.outstandingRequestId = null;
     this.retryIndex = 0;
     this.retryTimer = null;
-    this.awaitingPerspectiveSnapshot = false;
+    this.awaitingResetSnapshot = false;
+    this.blockInlineDeltaUntilRepair = false;
     this.destroyed = false;
     this.unsubscribeLabResults = labClient?.subscribeResult?.((result) => {
       if (result?.ok && (result.op === "setVision" || result.op === "importScenario")) {
-        this.reset({ awaitSnapshot: true });
+        this.reset();
       }
     }) || null;
   }
 
-  observeSnapshot(revision) {
+  observeSnapshot(revision, delta = null) {
     if (this.destroyed || !isRevision(revision)) return false;
-    if (this.awaitingPerspectiveSnapshot) this.awaitingPerspectiveSnapshot = false;
+    if (this.awaitingResetSnapshot) {
+      // Inbound snapshots may already be queued from before a seek or perspective reset. Start a
+      // correlated repair after the first one, but keep every inline tail blocked until that repair
+      // establishes the replacement authority.
+      this.awaitingResetSnapshot = false;
+      this.targetRevision = Math.max(this.targetRevision, revision);
+      return this._ensureRequest();
+    }
+    if (!this.blockInlineDeltaUntilRepair && delta && typeof delta === "object") {
+      this.state?.groundDecals?.applySnapshotDelta?.(
+        {
+          revision,
+          afterRevision: delta.afterRevision,
+          decals: delta.decals,
+        },
+        {
+          players: this.state?.players,
+          tileSize: this.state?.map?.tileSize,
+        },
+      );
+    }
     this.targetRevision = Math.max(this.targetRevision, revision);
+    if (this.blockInlineDeltaUntilRepair) return this._ensureRequest();
+    const applied = this.state?.groundDecals?.authoritativeRevision || 0;
+    if (applied >= this.targetRevision) {
+      this.outstandingRequestId = null;
+      this.retryIndex = 0;
+      this._cancelRetry();
+      return false;
+    }
     return this._ensureRequest();
   }
 
   applyResponse(message) {
-    if (this.destroyed || this.awaitingPerspectiveSnapshot) return false;
+    if (this.destroyed || this.awaitingResetSnapshot) return false;
     if (message?.requestId !== this.outstandingRequestId) return false;
     const result = this.state?.applyAuthoritativeGroundDecals?.(message);
     if (!result?.accepted) return false;
@@ -58,17 +87,21 @@ export class GroundDecalSync {
     // queue when the local cache resets, while the replacement perspective can legitimately have
     // a lower (including zero) discovery revision.
     this.targetRevision = message.revision;
+    this.blockInlineDeltaUntilRepair = false;
     this._ensureRequest();
     return true;
   }
 
-  reset({ awaitSnapshot = false, resetPresentation = true } = {}) {
+  // A cleared cache always re-establishes authority through a correlated response. Snapshot tails
+  // received before that response may belong to the old perspective or replay time.
+  reset({ resetPresentation = true } = {}) {
     if (this.destroyed) return;
     this._cancelRetry();
     this.retryIndex = 0;
     this.targetRevision = 0;
     this.outstandingRequestId = null;
-    this.awaitingPerspectiveSnapshot = awaitSnapshot;
+    this.awaitingResetSnapshot = true;
+    this.blockInlineDeltaUntilRepair = true;
     this.state?.resetAuthoritativeGroundDecals?.();
     if (resetPresentation) this.resetPresentation?.();
   }
@@ -82,9 +115,9 @@ export class GroundDecalSync {
   }
 
   _ensureRequest() {
-    if (this.awaitingPerspectiveSnapshot || this.retryTimer != null) return false;
+    if (this.awaitingResetSnapshot || this.retryTimer != null) return false;
     const applied = this.state?.groundDecals?.authoritativeRevision || 0;
-    if (applied >= this.targetRevision) return false;
+    if (!this.blockInlineDeltaUntilRepair && applied >= this.targetRevision) return false;
     if (this.outstandingRequestId == null) {
       this.outstandingRequestId = this.nextRequestId;
       this.nextRequestId = this.nextRequestId === 0xffffffff ? 1 : this.nextRequestId + 1;

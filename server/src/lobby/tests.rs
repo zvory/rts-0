@@ -206,6 +206,7 @@ fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
     Snapshot {
         tick,
         ground_decal_revision: 0,
+        ground_decal_delta: None,
         world_combat_position: None,
         steel: 75,
         oil: 0,
@@ -1199,6 +1200,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
     let mut snapshot = Snapshot {
         tick: 10,
         ground_decal_revision: 0,
+        ground_decal_delta: None,
         world_combat_position: None,
         steel: 75,
         oil: 0,
@@ -1246,6 +1248,7 @@ fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
     let mut snapshot = Snapshot {
         tick: 10,
         ground_decal_revision: 0,
+        ground_decal_delta: None,
         world_combat_position: None,
         steel: 75,
         oil: 0,

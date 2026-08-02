@@ -415,7 +415,7 @@ export class Match {
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);
-      this.groundDecalSync.observeSnapshot(m?.groundDecalRevision);
+      this.groundDecalSync.observeSnapshot(m?.groundDecalRevision, m?.groundDecalDelta);
     };
     this.onGroundDecals = (m) => this.groundDecalSync.applyResponse(m);
     this.onCommandReceipt = (m) => this.handleCommandReceipt(m);
@@ -474,7 +474,7 @@ export class Match {
         replayViewer: this.replayViewer,
         capabilities: this.capabilities,
         initialVisionSelection: options.initialVisionSelection,
-        onVisionSelectionChange: () => this.groundDecalSync.reset({ awaitSnapshot: true }),
+        onVisionSelectionChange: () => this.groundDecalSync.reset(),
       });
     }
     this.observerDiagnostics = new MatchObserverDiagnostics({
