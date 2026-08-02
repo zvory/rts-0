@@ -151,8 +151,8 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 - Client performance planning: before proposing browser optimization phases, run
   `node scripts/client-flamegraph.mjs --preview` from a clean worktree on current `origin/main`.
   Inspect the returned PNG and ranked JSON together with the harness frame-budget summary, then
-  read the hottest functions before writing phases. Use `supply-300-hellhole-stream` as the sole
-  supply-scale client renderer benchmark. Treat production-hardware claims as separate evidence
+  read the hottest functions before writing phases. Use `fixed-roster-hellhole-stream` as the sole
+  fixed-roster client renderer benchmark. Treat production-hardware claims as separate evidence
   rather than adding a competing checked-in supply fixture. The 240 FPS/4.17 ms reference-machine target is a
   headroom proxy for roughly 60 FPS on hardware with one quarter of the performance, not a license
   to reduce presentation fidelity or cadence. Do not claim progress by reconciling entities, fog,

@@ -22,6 +22,9 @@ The normal agent lifecycle is:
    runs after all specialist edits but does not own
    patch-note generation: every path under `patch-notes/` is protected from that pass, and the
    workflow fails before push if the pass changes one.
+   Both AI passes receive compact metadata instead of raw generated, binary, or oversized artifact
+   bodies; they review the corresponding generator, authored inputs, and tests. This keeps large
+   checkpoint and snapshot-stream refreshes from overflowing the helper or dominating review.
    The helper first classifies the branch diff against `origin/main`. If every changed file ends in
    `.md`, it skips Codex adversarial review, pushes the branch, posts a successful
    `adversarial-quality-pass` status with a docs-only skip description, and writes the skip report

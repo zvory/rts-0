@@ -12,7 +12,7 @@ export function stressTestLaunchConfig(location = window.location) {
     ? Math.min(25, Math.max(2, Math.round(requestedSeconds)))
     : 5;
   return {
-    id: "supply-300-hellhole",
+    id: "fixed-roster-hellhole",
     label,
     durationSeconds,
     warmupSeconds: 3,

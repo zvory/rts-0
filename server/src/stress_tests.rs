@@ -331,7 +331,7 @@ pub async fn flamegraph_handler(
 }
 
 fn validate_submission(submission: &StressTestSubmission) -> Result<(), String> {
-    if submission.schema_version != 1 || submission.workload_id != "supply-300-hellhole" {
+    if submission.schema_version != 1 || submission.workload_id != "fixed-roster-hellhole" {
         return Err("Unsupported stress-test workload or schema.".to_string());
     }
     if submission.user_label.len() > 64
@@ -380,7 +380,7 @@ fn validate_submission(submission: &StressTestSubmission) -> Result<(), String> 
     {
         return Err("The diagnostics sections are invalid or too large.".to_string());
     }
-    if submission.stream.get("id").and_then(Value::as_str) != Some("supply-300-hellhole")
+    if submission.stream.get("id").and_then(Value::as_str) != Some("fixed-roster-hellhole")
         || submission.stream.get("offline").and_then(Value::as_bool) != Some(true)
         || submission.stream.get("websocket").and_then(Value::as_bool) != Some(false)
         || submission
@@ -593,7 +593,7 @@ mod tests {
     fn fixture() -> StressTestSubmission {
         StressTestSubmission {
             schema_version: 1,
-            workload_id: "supply-300-hellhole".to_string(),
+            workload_id: "fixed-roster-hellhole".to_string(),
             user_label: "Matt laptop".to_string(),
             device_id: "0123456789abcdef".to_string(),
             fingerprint: "0123456789abcdef".to_string(),
@@ -603,7 +603,7 @@ mod tests {
             invalid_reasons: vec![],
             environment: json!({"platform": "Windows"}),
             stream: json!({
-                "id": "supply-300-hellhole",
+                "id": "fixed-roster-hellhole",
                 "offline": true,
                 "websocket": false,
                 "serverSimulation": false,

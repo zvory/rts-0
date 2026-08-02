@@ -45,7 +45,7 @@ const syntheticProfile = {
 
 {
   const defaults = parseClientFlameGraphArgs([]);
-  assert.equal(defaults.workload, "supply-300-hellhole-stream");
+  assert.equal(defaults.workload, "fixed-roster-hellhole-stream");
   assert.equal(defaults.seconds, 15);
   assert.equal(defaults.intervalUs, 500);
   assert.equal(defaults.preview, false);

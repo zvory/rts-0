@@ -1,4 +1,4 @@
-import { gfxNoFill, gfxRect, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
+import { gfxNoFill, gfxCircle, gfxRect, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
@@ -75,53 +75,137 @@ export function _drawResource(e, fog) {
   if (g.rtsStaticRedraw === false) return;
 
   if (e.kind === KIND.OIL) {
-    // Fuel drums: utilitarian but faction-neutral.
-    // White outline improves contrast against dark ground and fog.
-    gfxStroke(g, 2.5, 0xffffff, 0.95);
-    gfxRect(g, -r * 0.78, -r * 0.58, r * 0.52, r * 1.09);
-    gfxRect(g, -r * 0.21, -r * 0.71, r * 0.54, r * 1.23);
-    gfxRect(g, r * 0.35, -r * 0.53, r * 0.46, r * 1.06);
-
-    gfxStroke(g, 1.5, 0x1a1712, 0.85);
-    gfxFill(g, COLORS.oil);
-    gfxRect(g, -r * 0.75, -r * 0.55, r * 0.48, r * 1.05);
-    gfxRect(g, -r * 0.18, -r * 0.68, r * 0.5, r * 1.18);
-    gfxRect(g, r * 0.38, -r * 0.5, r * 0.42, r);
-    gfxNoFill(g);
-    gfxStroke(g, 0);
-    gfxFill(g, 0x263225, 0.45);
-    gfxRect(g, -r * 0.72, -r * 0.06, r * 1.48, r * 0.12);
-    gfxRect(g, -r * 0.16, -r * 0.26, r * 0.46, r * 0.12);
-    gfxNoFill(g);
+    drawOilSpring(g, r);
   } else {
-    // Supply crates: replaces sci-fi crystals with wartime materiel.
-    gfxStroke(g, 1.2, 0x1a1712, 0.85);
-    const crates = [
-      { dx: -r * 0.45, dy: -r * 0.25, s: 0.65 },
-      { dx: r * 0.25, dy: -r * 0.2, s: 0.7 },
-      { dx: -r * 0.05, dy: r * 0.35, s: 0.8 },
-    ];
-    for (const c of crates) {
-      const cs = r * c.s;
-      gfxFill(g, COLORS.steel);
-      gfxRect(g, c.dx - cs * 0.45, c.dy - cs * 0.35, cs * 0.9, cs * 0.7);
-      gfxNoFill(g);
+    // Steel stockpile: three staggered bars with top/side faces so the pile reads
+    // as overlapping metal instead of flat crates.
+    drawSteelBarStack(g, r);
+  }
+
+  if (mined) {
+    if (e.kind === KIND.OIL) {
+      const xr = r * 0.45;
       gfxStrokePaths(g, [
-        [[c.dx - cs * 0.38, c.dy], [c.dx + cs * 0.38, c.dy]],
-        [[c.dx, c.dy - cs * 0.3], [c.dx, c.dy + cs * 0.3]],
-      ], 1, 0x5a5134, 0.8);
-      gfxStroke(g, 1.2, 0x1a1712, 0.85);
+        [[-xr, -xr], [xr, xr]],
+        [[xr, -xr], [-xr, xr]],
+      ], 2.5, 0xffffff, 0.95);
+    } else {
+      drawSteelMiningCracks(g, r);
     }
   }
-
-  // X marker over a node that a worker is actively mining.
-  if (mined) {
-    const xr = r * 0.45;
-    const xColor = e.kind === KIND.OIL ? 0xffffff : 0x1a1712;
-    gfxStrokePaths(g, [
-      [[-xr, -xr], [xr, xr]],
-      [[xr, -xr], [-xr, xr]],
-    ], 2.5, xColor, 0.95);
-  }
   g.rtsStaticRenderKey = renderKey;
+}
+
+function drawOilSpring(g, r) {
+  // Original drum fill area was roughly 1.514r². Scale the spring to 125%,
+  // landing near 2.37r² so the gusher reads clearly at gameplay zoom.
+  r *= 1.25;
+  gfxStroke(g, 0);
+  gfxFill(g, 0xffffff, 0.9);
+  gfxCircle(g, -r * 0.32, r * 0.33, r * 0.42);
+  gfxCircle(g, r * 0.18, r * 0.35, r * 0.46);
+  gfxCircle(g, r * 0.5, r * 0.28, r * 0.26);
+  gfxRect(g, -r * 0.55, r * 0.12, r * 1.16, r * 0.36);
+
+  gfxFill(g, 0x0f1512, 0.98);
+  gfxCircle(g, -r * 0.32, r * 0.33, r * 0.38);
+  gfxCircle(g, r * 0.18, r * 0.35, r * 0.42);
+  gfxCircle(g, r * 0.5, r * 0.28, r * 0.22);
+  gfxRect(g, -r * 0.54, r * 0.12, r * 1.14, r * 0.34);
+
+  gfxFill(g, COLORS.oil, 1);
+  gfxRect(g, -r * 0.15, -r * 0.58, r * 0.3, r * 0.95);
+  gfxCircle(g, 0, -r * 0.58, r * 0.15);
+  gfxCircle(g, -r * 0.09, -r * 0.22, r * 0.14);
+  gfxCircle(g, r * 0.11, r * 0.03, r * 0.13);
+
+  gfxFill(g, 0x263225, 0.72);
+  gfxRect(g, r * 0.04, -r * 0.49, r * 0.08, r * 0.76);
+  gfxCircle(g, r * 0.08, -r * 0.54, r * 0.06);
+  gfxRect(g, -r * 0.44, r * 0.26, r * 0.78, r * 0.1);
+
+  gfxFill(g, COLORS.oil, 0.96);
+  gfxCircle(g, -r * 0.42, -r * 0.45, r * 0.12);
+  gfxCircle(g, r * 0.36, -r * 0.36, r * 0.1);
+  gfxCircle(g, -r * 0.26, -r * 0.73, r * 0.09);
+  gfxCircle(g, r * 0.22, -r * 0.78, r * 0.08);
+  gfxCircle(g, r * 0.55, -r * 0.08, r * 0.075);
+
+  gfxFill(g, 0x0a0d0b, 0.58);
+  gfxCircle(g, -r * 0.08, r * 0.38, r * 0.18);
+  gfxCircle(g, r * 0.29, r * 0.31, r * 0.16);
+  gfxNoFill(g);
+}
+
+function drawSteelBarStack(g, r) {
+  // Original crate fill area was 0.63 * (0.65² + 0.70² + 0.80²) = 0.978075r².
+  // These front faces total 0.9886r², keeping the resource footprint in the same visual weight.
+  drawSteelCastShadow(g, -r * 0.18, -r * 0.16, r * 1.2, r * 0.26, r * 0.08, 0.38);
+  drawSteelCastShadow(g, r * 0.13, r * 0.09, r * 1.22, r * 0.27, r * 0.09, 0.44);
+  drawSteelCastShadow(g, -r * 0.05, r * 0.34, r * 1.24, r * 0.28, r * 0.1, 0.5);
+  drawSteelBar(g, -r * 0.18, -r * 0.16, r * 1.2, r * 0.26, r * 0.12, 0.96);
+  drawSteelBar(g, r * 0.13, r * 0.09, r * 1.22, r * 0.27, r * 0.12, 1);
+  drawSteelBar(g, -r * 0.05, r * 0.34, r * 1.24, r * 0.28, r * 0.13, 1);
+
+  gfxStrokePaths(g, [
+    [[-r * 0.72, -r * 0.17], [r * 0.32, -r * 0.17]],
+    [[-r * 0.41, r * 0.08], [r * 0.65, r * 0.08]],
+    [[-r * 0.62, r * 0.33], [r * 0.48, r * 0.33]],
+  ], Math.max(1, r * 0.055), 0xd8d0b0, 0.58);
+}
+
+function drawSteelBar(g, cx, cy, width, height, depth, alpha) {
+  const x = cx - width / 2;
+  const y = cy - height / 2;
+  const top = Math.max(1, height * 0.28);
+  const side = Math.max(1, Math.min(depth, width * 0.12));
+  const bottom = Math.max(1, height * 0.18);
+  const seam = Math.max(0.75, height * 0.08);
+
+  gfxStroke(g, 0);
+  gfxFill(g, COLORS.steel, alpha);
+  gfxRect(g, x, y, width, height);
+
+  gfxFill(g, 0x8f876d, alpha * 0.94);
+  gfxRect(g, x, y, width, top);
+
+  gfxFill(g, 0x3f3d35, alpha * 0.9);
+  gfxRect(g, x + width - side, y + top, side, height - top);
+
+  gfxFill(g, 0x565144, alpha * 0.86);
+  gfxRect(g, x, y + height - bottom, width, bottom);
+
+  gfxFill(g, 0x24231f, alpha * 0.56);
+  gfxRect(g, x, y, width, seam);
+  gfxRect(g, x, y + height - seam, width, seam);
+  gfxRect(g, x + width - seam, y, seam, height);
+
+  gfxNoFill(g);
+}
+
+function drawSteelCastShadow(g, cx, cy, width, height, offset, alpha) {
+  const x = cx - width / 2;
+  const y = cy - height / 2;
+  gfxStroke(g, 0);
+  gfxFill(g, 0x0b0a08, alpha);
+  gfxRect(g, x + offset, y + height, width * 0.9, Math.max(1, height * 0.22));
+  gfxRect(g, x + width, y + offset, Math.max(1, offset * 0.75), height * 0.74);
+  gfxNoFill(g);
+}
+
+function drawSteelMiningCracks(g, r) {
+  const crackShadow = 0x050504;
+  const crackHighlight = 0xb8ae8f;
+  const cracks = [
+    [[-r * 0.66, -r * 0.18], [-r * 0.54, -r * 0.1], [-r * 0.43, -r * 0.16]],
+    [[-r * 0.2, -r * 0.2], [-r * 0.08, -r * 0.12], [r * 0.08, -r * 0.16]],
+    [[-r * 0.28, r * 0.07], [-r * 0.13, r * 0.15], [r * 0.03, r * 0.1]],
+    [[r * 0.23, r * 0.08], [r * 0.38, r * 0.16], [r * 0.55, r * 0.09]],
+    [[-r * 0.48, r * 0.32], [-r * 0.32, r * 0.41], [-r * 0.14, r * 0.34]],
+    [[r * 0.05, r * 0.31], [r * 0.22, r * 0.4], [r * 0.42, r * 0.33]],
+  ];
+  const highlights = cracks.map((path) => path.map(([x, y]) => [x - r * 0.016, y - r * 0.014]));
+
+  gfxStrokePaths(g, cracks, Math.max(1.5, r * 0.085), crackShadow, 0.9);
+  gfxStrokePaths(g, highlights, Math.max(0.75, r * 0.035), crackHighlight, 0.52);
 }

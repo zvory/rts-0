@@ -710,7 +710,8 @@ mod tests {
     use super::*;
     use crate::protocol::Event;
     use crate::tools::hellhole_spec::{
-        composition_300_supply, INITIAL_ENTITY_COUNT, SCATTERED_TANK_TRAP_COUNT, SHUTTLE_UNIT_COUNT,
+        fixed_roster_composition, INITIAL_ENTITY_COUNT, SCATTERED_TANK_TRAP_COUNT,
+        SHUTTLE_UNIT_COUNT,
     };
     use std::collections::BTreeMap;
 
@@ -1000,18 +1001,18 @@ mod tests {
     }
 
     #[test]
-    fn supply_300_hellhole_lab_scenario_is_structurally_stable() {
+    fn fixed_roster_hellhole_lab_scenario_is_structurally_stable() {
         let catalog = load_lab_scenario_catalog().expect("bundled lab catalog should load");
         let hellhole = catalog
             .iter()
-            .find(|entry| entry.id == "supply-300-hellhole")
-            .expect("supply-300-hellhole catalog row");
+            .find(|entry| entry.id == "fixed-roster-hellhole")
+            .expect("fixed-roster-hellhole catalog row");
         assert_eq!(hellhole.map, "Chokes");
         assert_eq!(hellhole.player_count, 4);
-        assert_eq!(hellhole.filename, "supply-300-hellhole.json");
+        assert_eq!(hellhole.filename, "fixed-roster-hellhole.json");
 
-        let loaded = load_lab_scenario_by_id("supply-300-hellhole")
-            .expect("bundled supply-300-hellhole scenario should load");
+        let loaded = load_lab_scenario_by_id("fixed-roster-hellhole")
+            .expect("bundled fixed-roster-hellhole scenario should load");
         assert!(loaded.is_checkpoint_backed());
         lab_scenario_payload_to_lab_op(loaded.scenario.clone())
             .expect("checkpoint scenario should fit import cap");
@@ -1028,7 +1029,7 @@ mod tests {
 
         let game = loaded
             .build_game()
-            .expect("supply-300-hellhole scenario should restore through lab APIs");
+            .expect("fixed-roster-hellhole scenario should restore through lab APIs");
         assert_eq!(game.seed(), 0x5a00_0300);
         assert_eq!(game.start_payload().players.len(), 4);
         assert_eq!(
@@ -1223,7 +1224,7 @@ mod tests {
             ("research_complex".to_string(), 1),
             ("steelworks".to_string(), 1),
         ]);
-        for kind in composition_300_supply().expect("canonical Hellhole composition") {
+        for kind in fixed_roster_composition() {
             *expected_counts
                 .entry(rts_sim::protocol::kind_to_wire(kind).to_string())
                 .or_default() += 1;

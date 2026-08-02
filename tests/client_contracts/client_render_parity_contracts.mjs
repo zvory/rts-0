@@ -19,7 +19,7 @@ import {
 const parsed = parseClientRenderParityArgs([
   "--baseline-worktree", "/tmp/base",
   "--candidate-worktree", "/tmp/candidate",
-  "--workload", "supply-300-hellhole-stream",
+  "--workload", "fixed-roster-hellhole-stream",
   "--seed", "phase-1-seed",
   "--samples", "16",
   "--viewport", "1440x900",

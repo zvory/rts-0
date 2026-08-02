@@ -76,7 +76,7 @@ for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMa
 const bundledScenarioContracts = new Map([
   ["lategame.json", ["9b1ea08eb9074177", "7918f89f6178e9c9"]],
   ["render-preview.json", ["9b1ea08eb9074177", "f82d4bf8967c50c9"]],
-  ["supply-300-hellhole.json", ["e021c05abe9ed2f1", "b8b0dd056c34c92d"]],
+  ["fixed-roster-hellhole.json", ["e021c05abe9ed2f1", "b8b0dd056c34c92d"]],
   ["tank-trap-cluster-clear.json", ["9b1ea08eb9074177", "7918f89f6178e9c9"]],
 ]);
 

@@ -31,7 +31,7 @@ try {
   assert.throws(() => validateCommandInput("capture-fixed", { sessionId, fps: 61 }), (error) => error?.code === "invalidInput");
   assert.throws(() => validateCommandInput("capture-fixed", { sessionId, frameCount: FIXED_CAPTURE_LIMITS.maxFrames + 1 }), (error) => error?.code === "invalidInput");
   assert.doesNotThrow(
-    () => validateCommandInput("open", { scenario: "supply-300-hellhole" }),
+    () => validateCommandInput("open", { scenario: "fixed-roster-hellhole" }),
     "Lab opens accept hyphenated bundled scenario ids",
   );
   const gameSessionId = `game_${"b".repeat(32)}`;
