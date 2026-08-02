@@ -223,6 +223,20 @@ impl RoomTask {
         self.send_room_time_state_to(watcher_id);
         self.send_current_replay_snapshot_to(watcher_id);
         self.send_observer_analysis_to(watcher_id);
+        let Phase::ReplayViewer(session) = &self.phase else {
+            return;
+        };
+        if !session.has_remaining_ticks() {
+            let Some(player) = self.players.get(&watcher_id) else {
+                return;
+            };
+            send_or_log(
+                &self.room,
+                watcher_id,
+                &player.msg_tx,
+                session.result_message(),
+            );
+        }
     }
 
     fn send_current_replay_snapshot_to(&mut self, watcher_id: u32) {
@@ -332,6 +346,7 @@ impl RoomTask {
                 return;
             }
         };
+        let replay_was_ended = !session.has_remaining_ticks();
         let mut perf = rts_sim::perf::TickPerf::maybe_new();
 
         if session.is_seeking() {
@@ -424,6 +439,9 @@ impl RoomTask {
             context.scheduler_lag,
             context.tick_start,
         );
+        if !replay_was_ended && !session.has_remaining_ticks() {
+            self.broadcast(&session.result_message());
+        }
         self.phase = Phase::ReplayViewer(session);
     }
 
