@@ -4,14 +4,39 @@ import {
   PredictionController,
   PREDICTION_STATE,
 } from "../client/src/prediction_controller.js";
-import { predictionCompatibility } from "../client/src/prediction_compatibility.js";
+import {
+  predictionCompatibility,
+  predictionRuntimeCompatibility,
+} from "../client/src/prediction_compatibility.js";
 import { DEFAULT_FACTION_ID, PREDICTION_PROTOCOL_VERSION } from "../client/src/protocol.js";
 import { createRigRenderContext } from "../client/src/renderer/rigs/animation.js";
 import { GameState } from "../client/src/state.js";
 import { SimWasmPredictionAdapter } from "../client/src/sim_wasm_adapter.js";
+import { CaptureRenderClock } from "../client/src/visual_clock.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
+}
+
+{
+  const fractions = [];
+  const captureClock = new CaptureRenderClock(1000);
+  const adapter = new SimWasmPredictionAdapter({ visualNow: () => captureClock.now() });
+  adapter.ready = true;
+  adapter.displayValid = true;
+  adapter.lastAdvanceAt = captureClock.now();
+  adapter.predictor = {
+    advanceTicks() {},
+    renderPredictionFrameJson(fraction) {
+      fractions.push(fraction);
+      return JSON.stringify({ tick: 1, entities: [], progress: [] });
+    },
+  };
+  adapter.renderPredictionFrame();
+  captureClock.advanceTo(1016.6666667);
+  adapter.renderPredictionFrame();
+  assert(fractions[0] === 0 && Math.abs(fractions[1] - 0.5) < 0.0001,
+    "fixed capture samples WASM progress from deterministic visual time");
 }
 
 function sentSeqs(sent) {
@@ -20,10 +45,24 @@ function sentSeqs(sent) {
 
 {
   let fullSnapshotCalled = false;
-  const adapter = new SimWasmPredictionAdapter();
+  let visualNow = 16.6666667;
+  let renderedFraction = null;
+  let advanceTicksCalls = 0;
+  const adapter = new SimWasmPredictionAdapter({ visualNow: () => visualNow });
   adapter.ready = true;
+  adapter.displayValid = true;
+  adapter.lastAdvanceAt = 0;
   adapter.predictor = {
-    renderPredictionFrameJson: () => JSON.stringify({ tick: 7, entities: [{ id: 1, x: 4, y: 5 }] }),
+    renderPredictionFrameJson: (fraction) => {
+      renderedFraction = fraction;
+      return JSON.stringify({
+        tick: 7,
+        entities: [{ id: 1, x: 4, y: 5 }],
+        progress: [{ id: 2, kind: "production", identity: "unit:worker", fraction: 0.3 }],
+      });
+    },
+    enqueueCommandJson() {},
+    advanceTicks() { advanceTicksCalls += 1; },
     renderSnapshotJson: () => {
       fullSnapshotCalled = true;
       throw new Error("legacy full snapshot render must not be used");
@@ -31,7 +70,32 @@ function sentSeqs(sent) {
   };
   const frame = adapter.renderPredictionFrame();
   assert(frame.tick === 7 && frame.entities[0].x === 4, "WASM adapter consumes the sparse prediction-frame API");
+  assert(frame.progress[0].fraction === 0.3, "WASM adapter preserves the separate sparse progress lane");
+  assert(Math.abs(renderedFraction - 0.5) < 0.0001, "WASM render receives a render-clock fractional tick");
   assert(fullSnapshotCalled === false, "WASM adapter never requests a synthetic full snapshot");
+  adapter.enqueueCommand(1, { c: "move", units: [1], x: 8, y: 9 });
+  assert(advanceTicksCalls === 0, "command enqueue does not advance the shared display tick");
+  adapter.pauseVisualClock(visualNow);
+  const frozen = adapter.renderPredictionFrame(5000);
+  assert(frozen === adapter.frozenFrame, "paused WASM display returns the frozen prediction frame");
+  visualNow = 100;
+  adapter.resumeVisualClock(visualNow);
+  adapter.renderPredictionFrame(116.6666667);
+  assert(Math.abs(renderedFraction - 0.5) < 0.0001, "resumed visual clock excludes paused wall time");
+
+  adapter.module = {
+    WasmPredictor: {
+      baselineFromSnapshotJson() { throw new Error("bad baseline"); },
+    },
+  };
+  let reconcileFailed = false;
+  try {
+    adapter.reconcile({ tick: 8, entities: [] }, []);
+  } catch {
+    reconcileFailed = true;
+  }
+  assert(reconcileFailed && adapter.renderPredictionFrame() === null,
+    "failed reconcile invalidates stale pose and progress output for authoritative fallback");
 }
 
 {
@@ -401,6 +465,14 @@ function sentSeqs(sent) {
     compatibility.reason === "unsupported-local-faction",
     "unsupported local faction uses stable diagnostic reason",
   );
+  const runtime = predictionRuntimeCompatibility({
+    playerId: 1,
+    spectator: false,
+    predictionVersion: PREDICTION_PROTOCOL_VERSION,
+    predictionBuildId: "same-build",
+    players: [{ id: 1, factionId: "phase2_empty_fixture" }],
+  }, { clientBuildId: "same-build" });
+  assert(runtime.ok === true, "unsupported pose faction remains eligible for owner-safe display progress");
 }
 
 {

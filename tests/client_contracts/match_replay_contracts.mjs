@@ -1022,6 +1022,12 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   predictionPolicyMatch.replayViewer = false;
   predictionPolicyMatch.state = {
     spectator: false,
+    clearPredictionPose() {
+      this.poseCleared = true;
+    },
+    clearPredictionFrame() {
+      this.predictionFrame = null;
+    },
     applyPredictionDisplayOverlay(overlay) {
       if (Object.prototype.hasOwnProperty.call(overlay || {}, "predictionFrame")) {
         this.predictionFrame = overlay.predictionFrame;
@@ -1039,6 +1045,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     },
   };
   predictionPolicyMatch.predictionInitToken = 0;
+  predictionPolicyMatch.progressPredictionEligible = false;
   let predictionAdapterInit = 0;
   let predictionAdapterDestroy = 0;
   let predictionAdapterId = 0;
@@ -1080,7 +1087,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   predictionPolicyMatch.logPredictionStatus = () => {};
   predictionPolicyMatch.setPredictionEnabled(false);
   assert(!predictionPolicyMatch.prediction.enabled, "prediction setting can disable live prediction");
-  assert(predictionPolicyMatch.state.predictionFrame === null, "disabling prediction clears local predicted overlay");
+  assert(predictionPolicyMatch.state.poseCleared && predictionPolicyMatch.state.predictionFrame === null,
+    "disabling prediction clears local predicted overlay");
   assert(predictionPolicyMatch.state.optimisticCommands === null, "disabling prediction clears optimistic command UI");
   assert(predictionPolicyMatch.prediction.predictor === predictionPolicyMatch.predictionAdapter,
     "disabling prediction replaces the controller predictor with a fresh inactive adapter");
@@ -1091,6 +1099,71 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(predictionPolicyMatch.prediction.enabled, "prediction setting can re-enable live prediction");
   assert(predictionAdapterInit === 1, "re-enabling prediction initializes the WASM adapter");
   assert(predictionPolicyMatch.predictionAdapter.ready, "re-enabled prediction owns a ready fresh adapter");
+
+  const progressToggleMatch = Object.create(Match.prototype);
+  let progressAdapterDestroyed = 0;
+  progressToggleMatch.replayViewer = false;
+  progressToggleMatch.progressPredictionEligible = true;
+  progressToggleMatch.predictionCompatibility = { ok: true };
+  progressToggleMatch.predictionInitToken = 0;
+  progressToggleMatch.prediction = {
+    enabled: true,
+    reset({ enabled }) { this.enabled = enabled; },
+  };
+  progressToggleMatch.predictionAdapter = {
+    ready: true,
+    loading: false,
+    destroy() { progressAdapterDestroyed += 1; },
+    diagnostics: () => ({ ready: true }),
+  };
+  progressToggleMatch.state = {
+    spectator: false,
+    progressRetained: true,
+    clearPredictionPose() { this.poseCleared = true; },
+    applyPredictionDisplayOverlay() {},
+  };
+  progressToggleMatch.publishPredictionDebug = () => {};
+  progressToggleMatch.mountSettings = () => {};
+  progressToggleMatch.setPredictionEnabled(false);
+  assert(progressToggleMatch.state.poseCleared === true, "movement toggle clears pose immediately");
+  assert(progressToggleMatch.state.progressRetained === true, "movement toggle does not clear WASM display progress");
+  assert(progressAdapterDestroyed === 0, "movement toggle keeps the compatible progress runtime alive");
+
+  const progressReconcileMatch = Object.create(Match.prototype);
+  let progressReconciles = 0;
+  progressReconcileMatch.progressPredictionEligible = true;
+  progressReconcileMatch.prediction = {
+    enabled: false,
+    applyAuthoritativeSnapshot: () => ({ mode: "disabled" }),
+    recordDisableReason() {},
+  };
+  progressReconcileMatch.predictionAdapter = {
+    ready: true,
+    reconcile(snapshot, pending) {
+      progressReconciles += 1;
+      assert(snapshot.tick === 4 && pending.length === 0, "progress-only reconcile imports authority without commands");
+    },
+  };
+  progressReconcileMatch.state = { clearPredictionFrame() {} };
+  progressReconcileMatch.applyAuthoritativePredictionSnapshot({ tick: 4 });
+  assert(progressReconciles === 1, "movement-disabled snapshots still reconcile the progress runtime");
+
+  const progressFallbackMatch = Object.create(Match.prototype);
+  const progressFallbackOverlays = [];
+  progressFallbackMatch.progressPredictionEligible = true;
+  progressFallbackMatch.prediction = { enabled: false };
+  progressFallbackMatch.predictionAdapter = { ready: false, loading: true };
+  progressFallbackMatch.state = {
+    applyPredictionDisplayOverlay(overlay) { progressFallbackOverlays.push(overlay); },
+  };
+  progressFallbackMatch.predictionStateCompatible = () => true;
+  progressFallbackMatch.predictionVisualsPaused = () => false;
+  progressFallbackMatch.publishPredictionDebug = () => {};
+  progressFallbackMatch.applyPredictionFrame();
+  assert(
+    progressFallbackOverlays.at(-1)?.predictionFrame === null,
+    "loading or unavailable WASM falls back to authoritative progress without a second calculator",
+  );
 
   const staleInitMatch = Object.create(Match.prototype);
   staleInitMatch.replayViewer = false;
@@ -1176,10 +1249,18 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   pausePredictionMatch.livePauseState = { paused: true };
   pausePredictionMatch.predictionVisualSuspended = false;
   pausePredictionMatch.prediction = { enabled: true };
+  pausePredictionMatch.progressPredictionEligible = true;
   pausePredictionMatch.predictionAdapter = {
     ready: true,
     pauseVisualClock() {
       pauseVisualClockCalls += 1;
+    },
+    renderPredictionFrame() {
+      return {
+        tick: 2,
+        entities: [{ id: 1, x: 10, y: 10 }],
+        progress: [{ id: 20, kind: "production", identity: "unit:worker", fraction: 0.4 }],
+      };
     },
     advanceVisual() {
       advanceVisualCalls += 1;
@@ -1188,6 +1269,9 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     diagnostics: () => ({}),
   };
   pausePredictionMatch.state = {
+    clearPredictionPose() {
+      this.poseCleared = true;
+    },
     applyPredictionDisplayOverlay(overlay) {
       pausePredictionOverlays.push(overlay);
     },
@@ -1199,8 +1283,13 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(advanceVisualCalls === 0, "live pause stops per-frame movement prediction ticks");
   assert(pauseVisualClockCalls === 1, "live pause keeps the prediction visual clock synced to wall time");
   assert(
-    pausePredictionOverlays.at(-1)?.predictionFrame === null,
-    "live pause clears the predicted movement overlay",
+    pausePredictionMatch.state.poseCleared === true,
+    "live pause clears pose while leaving the progress lane intact",
+  );
+  assert(
+    pausePredictionOverlays.at(-1)?.includePose === false &&
+      pausePredictionOverlays.at(-1)?.predictionFrame?.progress?.[0]?.fraction === 0.4,
+    "live pause republishes a frozen progress-only frame",
   );
 
   pausePredictionMatch.livePauseState = { paused: false };
@@ -1218,6 +1307,9 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   livePauseStateMatch.predictionVisualSuspended = false;
   livePauseStateMatch.predictionAdapter = { pauseVisualClock() {} };
   livePauseStateMatch.state = {
+    clearPredictionPose() {
+      this.poseCleared = true;
+    },
     applyPredictionDisplayOverlay(overlay) {
       livePauseOverlays.push(overlay);
     },
@@ -1234,7 +1326,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   };
   livePauseStateMatch.applyLivePauseState({ paused: true, canPause: false, canUnpause: true });
   assert(livePauseStateMatch.predictionVisualSuspended, "entering live pause suspends prediction visuals");
-  assert(livePauseOverlays.at(-1)?.predictionFrame === null, "entering live pause drops any predicted movement frame");
+  assert(livePauseStateMatch.state.poseCleared === true, "entering live pause drops pose without clearing progress");
   assert(progressPauseStates.at(-1) === true, "live pause freezes progress prediction for a non-pausing client");
   assert(worldBedStates.at(-1) === false, "entering live pause fades out the world combat bed");
   livePauseStateMatch.applyLivePauseState({ paused: false, canPause: true, canUnpause: false });

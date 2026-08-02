@@ -3,14 +3,13 @@ import { DEFAULT_FACTION_ID, PREDICTION_PROTOCOL_VERSION } from "./protocol.js";
 const SUPPORTED_PREDICTION_FACTION_IDS = Object.freeze([DEFAULT_FACTION_ID]);
 
 export function predictionCompatibility(payload, { clientBuildId = defaultClientBuildId() } = {}) {
+  const runtime = predictionRuntimeCompatibility(payload, { clientBuildId });
   const localFactionId = localPlayerFactionId(payload);
-  const serverVersion = Number(payload?.predictionVersion) || 0;
-  const serverBuildId = typeof payload?.predictionBuildId === "string" ? payload.predictionBuildId : "";
   const base = {
-    clientVersion: PREDICTION_PROTOCOL_VERSION,
-    serverVersion,
-    clientBuildId: clientBuildId || null,
-    serverBuildId: serverBuildId || null,
+    clientVersion: runtime.clientVersion,
+    serverVersion: runtime.serverVersion,
+    clientBuildId: runtime.clientBuildId,
+    serverBuildId: runtime.serverBuildId,
     localFactionId,
     supportedFactionIds: SUPPORTED_PREDICTION_FACTION_IDS.slice(),
   };
@@ -22,6 +21,26 @@ export function predictionCompatibility(payload, { clientBuildId = defaultClient
       ...base,
     };
   }
+  if (!runtime.ok) return { ...base, ok: false, reason: runtime.reason };
+  return {
+    ok: true,
+    reason: null,
+    ...base,
+  };
+}
+
+/** Protocol/build compatibility for the owner-safe WASM display runtime.
+ * Faction support gates pose/command prediction only; progress uses authoritative owner baselines.
+ */
+export function predictionRuntimeCompatibility(payload, { clientBuildId = defaultClientBuildId() } = {}) {
+  const serverVersion = Number(payload?.predictionVersion) || 0;
+  const serverBuildId = typeof payload?.predictionBuildId === "string" ? payload.predictionBuildId : "";
+  const base = {
+    clientVersion: PREDICTION_PROTOCOL_VERSION,
+    serverVersion,
+    clientBuildId: clientBuildId || null,
+    serverBuildId: serverBuildId || null,
+  };
   if (serverVersion !== PREDICTION_PROTOCOL_VERSION) {
     return {
       ok: false,
@@ -30,17 +49,9 @@ export function predictionCompatibility(payload, { clientBuildId = defaultClient
     };
   }
   if (clientBuildId && serverBuildId && clientBuildId !== serverBuildId) {
-    return {
-      ok: false,
-      reason: "prediction-build-mismatch",
-      ...base,
-    };
+    return { ok: false, reason: "prediction-build-mismatch", ...base };
   }
-  return {
-    ok: true,
-    reason: null,
-    ...base,
-  };
+  return { ok: true, reason: null, ...base };
 }
 
 export function predictionBlockedReason({ enabled, replayViewer, spectator, compatibility }) {

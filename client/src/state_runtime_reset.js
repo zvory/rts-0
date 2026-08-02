@@ -1,4 +1,3 @@
-import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
 import { VisualEffectBuffers } from "./state_visual_effects.js";
 
@@ -27,10 +26,11 @@ export function resetAuthoritativeRuntime(state) {
   state.groundDecals = new GroundDecalBuffer();
   state.visualEffects = new VisualEffectBuffers();
   state.predictionPatchById.clear();
+  state.predictionProgressById.clear();
   state.predictionCorrectionById.clear();
   state.predictionDiagnostics = null;
+  state.predictionProgressPaused = false;
   state.optimisticProduction = [];
   state.optimisticProductionByBuilding.clear();
   state.optimisticRallyByBuilding.clear();
-  state.progressExtrapolator = new ProgressExtrapolator({ playerId: state.playerId });
 }

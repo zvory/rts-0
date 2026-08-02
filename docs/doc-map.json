@@ -198,7 +198,6 @@
     {
       "source": [
         "client/src/prediction_*.js",
-        "client/src/progress_extrapolator.js",
         "client/src/sim_wasm_adapter.js",
         "client/vendor/sim-wasm/**",
         "server/crates/sim-wasm/**",

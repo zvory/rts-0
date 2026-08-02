@@ -6,8 +6,13 @@
 // client-only concept; the server never sees it directly.
 
 import { admitSelectionIds } from "./command_budget.js";
-import { ProgressExtrapolator } from "./progress_extrapolator.js";
-import { composePredictionPatch, normalizePredictionPatch } from "./prediction_frame.js";
+import {
+  composePredictionPatch,
+  composeProgressPatch,
+  normalizePredictionPatch,
+  normalizeProgressPatch,
+  progressPatchMatches,
+} from "./prediction_frame.js";
 import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
 import { admitControlGroupIds } from "./state_control_groups.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
@@ -156,12 +161,14 @@ export class GameState extends VisualEffectBackedState {
     this.groundDecals = new GroundDecalBuffer();
     /** @type {Map<number, object>} owned entity id -> sparse local prediction patch. */
     this.predictionPatchById = new Map();
+    /** @type {Map<number, object>} owned building id -> sparse display-progress patch. */
+    this.predictionProgressById = new Map();
     this.predictionCorrectionById = new Map();
     this.predictionDiagnostics = null;
+    this.predictionProgressPaused = false;
     this.optimisticProduction = [];
     this.optimisticProductionByBuilding = new Map();
     this.optimisticRallyByBuilding = new Map();
-    this.progressExtrapolator = new ProgressExtrapolator({ playerId: this.playerId });
   }
 
   /** World pixels per tile. */
@@ -285,6 +292,9 @@ export class GameState extends VisualEffectBackedState {
     this._prevRecvTime = this._curRecvTime;
     this._prevById = this._curById;
 
+    // A progress patch belongs to exactly one authoritative baseline. Drop it before any
+    // snapshot-time entity lookup can observe a stale production identity or completed build.
+    this.predictionProgressById.clear();
     const events = msg.events || [];
     this._applyResourceDeltas(msg.resourceDeltas || []);
     this._applyResourceDeaths(events);
@@ -299,7 +309,6 @@ export class GameState extends VisualEffectBackedState {
     const entities = wireEntities
       .concat(this._resourceEntityViews())
       .concat(this.visualEffects.shotRevealEntityViews(visualNow, visibleIds));
-    this.progressExtrapolator.updateFromSnapshot(entities, visualNow);
 
     this._cur = { ...msg, entities };
     this._curRecvTime = receivedAt;
@@ -428,11 +437,26 @@ export class GameState extends VisualEffectBackedState {
   }
 
   progressPredictionDebug() {
-    return this.progressExtrapolator.diagnostics();
+    let productionBars = 0;
+    let constructionBars = 0;
+    for (const patch of this.predictionProgressById.values()) {
+      if (patch.kind === "construction") constructionBars += 1;
+      else productionBars += 1;
+    }
+    return {
+      activeBars: this.predictionProgressById.size,
+      paused: this.predictionProgressPaused,
+      productionBars,
+      constructionBars,
+      correctionCount: Number(this.predictionDiagnostics?.progressCorrectionCount) || 0,
+      lastCorrection: Number(this.predictionDiagnostics?.progressLastCorrection) || 0,
+      maxCorrection: Number(this.predictionDiagnostics?.progressMaxCorrection) || 0,
+      averageCorrection: Number(this.predictionDiagnostics?.progressAverageCorrection) || 0,
+    };
   }
 
   setProgressPredictionPaused(paused) {
-    this.progressExtrapolator.setPaused(paused === true, this.visualNow());
+    this.predictionProgressPaused = paused === true;
   }
 
   applyPredictionDisplayOverlay(overlay = null) {
@@ -448,6 +472,7 @@ export class GameState extends VisualEffectBackedState {
       if (overlay.predictionFrame) {
         this._applyPredictionFrameOverlay(overlay.predictionFrame, overlay.diagnostics ?? null, {
           smoothCorrections: !!overlay.smoothCorrections,
+          includePose: overlay.includePose !== false,
         });
       } else {
         this._clearPredictionFrameOverlay();
@@ -479,17 +504,26 @@ export class GameState extends VisualEffectBackedState {
     }
   }
 
-  setPredictionFrame(frame, diagnostics = null, { smoothCorrections = false } = {}) {
-    this.applyPredictionDisplayOverlay({ predictionFrame: frame, diagnostics, smoothCorrections });
+  setPredictionFrame(frame, diagnostics = null, { smoothCorrections = false, includePose = true } = {}) {
+    this.applyPredictionDisplayOverlay({ predictionFrame: frame, diagnostics, smoothCorrections, includePose });
   }
 
-  _applyPredictionFrameOverlay(frame, diagnostics = null, { smoothCorrections = false } = {}) {
+  _applyPredictionFrameOverlay(frame, diagnostics = null, { smoothCorrections = false, includePose = true } = {}) {
     const patches = new Map();
-    for (const candidate of frame?.entities || []) {
+    if (includePose) {
+      for (const candidate of frame?.entities || []) {
+        const authoritative = this._curById.get(candidate?.id);
+        if (!authoritative || authoritative.owner !== this.playerId || !isUnit(authoritative.kind)) continue;
+        const patch = normalizePredictionPatch(candidate);
+        if (patch) patches.set(patch.id, patch);
+      }
+    }
+    const progress = new Map();
+    for (const candidate of frame?.progress || []) {
       const authoritative = this._curById.get(candidate?.id);
-      if (!authoritative || authoritative.owner !== this.playerId || !isUnit(authoritative.kind)) continue;
-      const patch = normalizePredictionPatch(candidate);
-      if (patch) patches.set(patch.id, patch);
+      const patch = normalizeProgressPatch(candidate);
+      if (!patch || !progressPatchMatches(authoritative, patch, this.playerId, { isBuilding })) continue;
+      progress.set(patch.id, patch);
     }
     const now = this.visualNow();
     const corrections = new Map();
@@ -506,6 +540,7 @@ export class GameState extends VisualEffectBackedState {
       }
     }
     this.predictionPatchById = patches;
+    this.predictionProgressById = progress;
     this.predictionCorrectionById = corrections;
     this.predictionDiagnostics = diagnostics;
   }
@@ -514,8 +549,14 @@ export class GameState extends VisualEffectBackedState {
     this.applyPredictionDisplayOverlay({ predictionFrame: null });
   }
 
+  clearPredictionPose() {
+    this.predictionPatchById.clear();
+    this.predictionCorrectionById.clear();
+  }
+
   _clearPredictionFrameOverlay() {
     this.predictionPatchById.clear();
+    this.predictionProgressById.clear();
     this.predictionCorrectionById.clear();
     this.predictionDiagnostics = null;
   }
@@ -539,7 +580,13 @@ export class GameState extends VisualEffectBackedState {
   }
 
   _applyDisplayEntity(entity, now) {
-    return this._applyOptimisticEntity(this.progressExtrapolator.apply(entity, now));
+    return this._applyOptimisticEntity(this._applyPredictedProgress(entity));
+  }
+
+  _applyPredictedProgress(entity) {
+    const patch = this.predictionProgressById.get(entity?.id);
+    if (!patch || !progressPatchMatches(entity, patch, this.playerId, { isBuilding })) return entity;
+    return composeProgressPatch(entity, patch);
   }
 
   setRenderClock(renderClock) {

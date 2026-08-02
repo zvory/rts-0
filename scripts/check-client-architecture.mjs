@@ -77,7 +77,6 @@ const AREA_BY_FILE = new Map(Object.entries({
   "command_interaction.js": "model",
   "command_budget.js": "model",
   "command_composer.js": "model",
-  "progress_extrapolator.js": "model",
   "prediction_controller.js": "model",
   "prediction_compatibility.js": "model",
   "prediction_frame.js": "model",
@@ -210,7 +209,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "hud.js": 44208,
   // Hotspot Cleanup Phase 6 extracted GameState query and visual-effect helpers.
   // Death decals add a narrow browser-local decal queue owned by GameState.
-  "state.js": 30123,
+  // WASM display progress replaces the parallel JS calculator with sparse baseline-validated
+  // progress patches composed at GameState's existing display-overlay seam.
+  "state.js": 31626,
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
   "input/index.js": 40927,
   // Visual Experimentation Phase 1 injects local lab visual profile state for renderer-only samples.
@@ -219,7 +220,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Render3D Phase 4 replaces direct Pixi construction with one injected selected-backend bundle.
   // Windows exclusive fullscreen adds only the injected preference/autolock handoff at the Match
   // seam; native display-mode and raw-input ownership remain isolated in the Tauri shell.
-  "match.js": 49147,
+  // WASM display progress keeps its runtime alive independently of the pose preference and
+  // coordinates authoritative reconcile, pause freezing, and authoritative-only fallback.
+  "match.js": 50059,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.

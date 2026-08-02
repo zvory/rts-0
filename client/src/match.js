@@ -23,7 +23,11 @@ import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { RoomTimeControls } from "./replay_controls.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
-import { predictionBlockedReason, predictionCompatibility } from "./prediction_compatibility.js";
+import {
+  predictionBlockedReason,
+  predictionCompatibility,
+  predictionRuntimeCompatibility,
+} from "./prediction_compatibility.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { createMatchRenderClock, enterFixedCapture, exitFixedCapture, renderFixedCaptureFrame } from "./match_fixed_capture.js";
@@ -193,6 +197,9 @@ export class Match {
     this.predictionPlayerId = payload?.playerId;
     this.matchRunId = typeof payload?.matchRunId === "string" ? payload.matchRunId : "";
     this.predictionCompatibility = predictionCompatibility(payload);
+    this.predictionRuntimeCompatibility = predictionRuntimeCompatibility(payload);
+    this.progressPredictionEligible = !this.replayViewer && !payload?.spectator &&
+      this.predictionRuntimeCompatibility.ok;
     this.predictionAdapter = this.createPredictionAdapter();
     this.predictionInitToken = 0;
     this.prediction = new PredictionController({
@@ -371,7 +378,7 @@ export class Match {
       this.health.noteSnapshotArrival(now, document.hidden, m?.tick);
       recordSnapshotProcessing(
         this.snapshotProcessingReport,
-        () => this.prediction.applyAuthoritativeSnapshot(m),
+        () => this.applyAuthoritativePredictionSnapshot(m),
         () => this.state.applySnapshot(m, this.state.visualNow(), { controlPolicy: this.controlPolicy }),
         () => {
           notePredictionAuthoritativeSnapshot(this);
@@ -439,7 +446,7 @@ export class Match {
     this.startMatchPings();
     this.startNetReports();
     this.health.publish();
-    if (this.prediction.enabled) this.initPredictionAdapter();
+    if (this.predictionRuntimeEnabled()) this.initPredictionAdapter();
 
     if (
       (this.capabilities.roomTime.available || this.capabilities.visibility.visionSelection) &&
@@ -503,6 +510,19 @@ export class Match {
     this.state?.applyPredictionDisplayOverlay?.(overlay);
   }
 
+  applyAuthoritativePredictionSnapshot(snapshot) {
+    const result = this.prediction.applyAuthoritativeSnapshot(snapshot);
+    if (!this.prediction.enabled && this.progressPredictionEligible && this.predictionAdapter.ready) {
+      try {
+        this.predictionAdapter.reconcile(snapshot, []);
+      } catch (error) {
+        this.prediction.recordDisableReason("progress-reconcile-failed");
+        this.state?.clearPredictionFrame?.();
+      }
+    }
+    return result;
+  }
+
   applyPredictionFrame() {
     if (!this.predictionStateCompatible()) {
       this.disablePredictionForStateMismatch();
@@ -511,22 +531,30 @@ export class Match {
     if (this.predictionVisualsPaused()) {
       this.pausePredictionVisualClock();
       clearPredictedMovementOverlay(this);
+      if (this.progressPredictionEligible && this.predictionAdapter.ready) {
+        const frame = this.predictionAdapter.renderPredictionFrame();
+        if (frame) this.applyPredictionDisplayOverlay({ predictionFrame: frame, includePose: false });
+      }
       this.publishPredictionDebug();
       return;
     }
-    if (!this.prediction.enabled || !this.predictionAdapter.ready) {
+    if (!this.predictionRuntimeEnabled() || !this.predictionAdapter.ready) {
       this.applyPredictionDisplayOverlay({ predictionFrame: null });
       this.publishPredictionDebug();
       return;
     }
     const frame = this.predictionAdapter.renderPredictionFrame();
-    if (!frame) return;
+    if (!frame) {
+      this.state?.clearPredictionFrame?.();
+      return;
+    }
     const diagnostics = this.predictionAdapter.diagnostics();
     if (this.disablePredictionForReplayBudget(diagnostics)) return;
     this.applyPredictionDisplayOverlay({
       predictionFrame: frame,
       diagnostics,
       smoothCorrections: true,
+      includePose: this.prediction.enabled,
     });
     this.publishPredictionDebug();
   }
@@ -539,15 +567,25 @@ export class Match {
     if (this.predictionVisualsPaused()) {
       this.pausePredictionVisualClock();
       clearPredictedMovementOverlay(this);
+      if (this.progressPredictionEligible && this.predictionAdapter.ready) {
+        const frame = this.predictionAdapter.renderPredictionFrame();
+        if (frame) this.applyPredictionDisplayOverlay({ predictionFrame: frame, includePose: false });
+      }
       return;
     }
-    if (!this.prediction.enabled || !this.predictionAdapter.ready) return;
+    if (!this.predictionRuntimeEnabled() || !this.predictionAdapter.ready) return;
     const frame = this.predictionAdapter.advanceVisual();
     if (frame) {
       const diagnostics = this.predictionAdapter.diagnostics();
       if (this.disablePredictionForReplayBudget(diagnostics)) return;
-      this.applyPredictionDisplayOverlay({ predictionFrame: frame, diagnostics });
+      this.applyPredictionDisplayOverlay({
+        predictionFrame: frame,
+        diagnostics,
+        includePose: this.prediction.enabled,
+      });
       this.publishPredictionDebug();
+    } else {
+      this.state?.clearPredictionFrame?.();
     }
   }
 
@@ -589,6 +627,10 @@ export class Match {
     return typeof this.state?.applyPredictionDisplayOverlay === "function";
   }
 
+  predictionRuntimeEnabled() {
+    return this.prediction.enabled || this.progressPredictionEligible;
+  }
+
   predictionVisualsPaused() {
     return predictionVisualsPausedModel(this);
   }
@@ -621,9 +663,15 @@ export class Match {
     const allowed = !blockedReason;
     this.prediction.reset({ enabled: allowed, preserveClientSeq: true, reason: blockedReason });
     if (!allowed) {
-      this.predictionInitToken += 1;
-      this.resetPredictionAdapter();
-      this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictionFrame: null });
+      this.applyPredictionDisplayOverlay({ optimisticCommands: null });
+      this.state?.clearPredictionPose?.();
+      if (!this.progressPredictionEligible) {
+        this.predictionInitToken += 1;
+        this.resetPredictionAdapter();
+        this.state?.clearPredictionFrame?.();
+      } else if (!this.predictionAdapter.ready && !this.predictionAdapter.loading) {
+        this.initPredictionAdapter();
+      }
       this.publishPredictionDebug();
       this.mountSettings({ keepOpen: true });
       return;
@@ -639,7 +687,7 @@ export class Match {
         adapter.destroy();
         return;
       }
-      if (!this.prediction.enabled) {
+      if (!this.predictionRuntimeEnabled()) {
         adapter.destroy();
         this.publishPredictionDebug();
         if (remountSettings) this.mountSettings({ keepOpen: true });
@@ -658,6 +706,7 @@ export class Match {
     return new SimWasmPredictionAdapter({
       startInfo: this.predictionStartInfo,
       playerId: this.predictionPlayerId,
+      visualNow: () => this.renderClock.now(),
       replayBudgetMs: PREDICTION_REPLAY_BUDGET_MS,
     });
   }

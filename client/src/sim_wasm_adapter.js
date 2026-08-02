@@ -1,26 +1,32 @@
 const WASM_GLUE_PATH = "../vendor/sim-wasm/rts_sim_wasm.js";
 const SNAP_CORRECTION_PX = 96;
 const DEFAULT_REPLAY_BUDGET_MS = 4;
+const TICK_MS = 1000 / 30;
 
 export class SimWasmPredictionAdapter {
   constructor({
     startInfo,
     playerId,
     now = () => performance.now(),
+    visualNow = now,
     importModule = (path) => import(path),
     replayBudgetMs = DEFAULT_REPLAY_BUDGET_MS,
   } = {}) {
     this.startInfo = startInfo;
     this.playerId = playerId;
     this.now = now;
+    this.visualNow = visualNow;
     this.importModule = importModule;
     this.ready = false;
     this.disabledReason = null;
     this.loading = false;
     this.module = null;
     this.predictor = null;
+    this.displayValid = false;
     this.lastPredictedTick = null;
     this.lastAdvanceAt = null;
+    this.visualPaused = false;
+    this.frozenFrame = null;
     this.maxCorrectionDistance = 0;
     this.snapCorrectionCount = 0;
     this.startupMs = null;
@@ -31,6 +37,10 @@ export class SimWasmPredictionAdapter {
     this.replayBudgetMs = replayBudgetMs;
     this.budgetExceededCount = 0;
     this.memoryBytes = 0;
+    this.progressCorrectionCount = 0;
+    this.progressCorrectionTotal = 0;
+    this.progressLastCorrection = 0;
+    this.progressMaxCorrection = 0;
     this.resetReportStats();
   }
 
@@ -49,7 +59,7 @@ export class SimWasmPredictionAdapter {
       );
       this.ready = true;
       this.startupMs = this.now() - startedAt;
-      this.lastAdvanceAt = this.now();
+      this.lastAdvanceAt = this.visualNow();
       this.refreshMemoryBytes();
       return true;
     } catch (err) {
@@ -66,18 +76,22 @@ export class SimWasmPredictionAdapter {
     }
     this.predictor = null;
     this.ready = false;
+    this.displayValid = false;
+    this.visualPaused = false;
+    this.frozenFrame = null;
+    this.lastAdvanceAt = null;
   }
 
   enqueueCommand(clientSeq, command) {
     if (!this.ready || !this.predictor) return false;
     this.predictor.enqueueCommandJson(clientSeq, JSON.stringify(command));
-    this.measureTicks(() => this.predictor.advanceTicks(1), 1);
     this.lastPredictedTick = this.renderPredictionFrame()?.tick ?? this.lastPredictedTick;
     return true;
   }
 
   reconcile(authoritativeSnapshot, pendingCommands = []) {
     if (!this.ready || !this.predictor || !this.module || !authoritativeSnapshot) return null;
+    this.displayValid = false;
     const replayTicks = Math.max(0, pendingCommands?.length || 0);
     const elapsed = this.measureTicks(() => {
       const baselineJson = this.module.WasmPredictor.baselineFromSnapshotJson(
@@ -89,15 +103,27 @@ export class SimWasmPredictionAdapter {
         this.predictor.enqueueCommandJson(pending.clientSeq, JSON.stringify(pending.cmd));
       }
     }, replayTicks);
+    this.displayValid = true;
     const replayBudgetExceeded = elapsed > this.replayBudgetMs;
     this.recordReplayReport(elapsed, replayTicks, replayBudgetExceeded);
     if (replayBudgetExceeded) this.budgetExceededCount += 1;
-    const diagnostics = this.diagnostics();
+    let diagnostics = this.diagnostics();
     const correction = Number(diagnostics?.correctionMagnitude) || 0;
+    const progressCorrection = Number(diagnostics?.progressCorrectionMagnitude) || 0;
+    this.progressLastCorrection = progressCorrection;
+    if (progressCorrection > 0) {
+      this.progressCorrectionCount += 1;
+      this.progressCorrectionTotal += progressCorrection;
+      this.progressMaxCorrection = Math.max(this.progressMaxCorrection, progressCorrection);
+    }
+    diagnostics = this.diagnostics();
     this.maxCorrectionDistance = Math.max(this.maxCorrectionDistance, correction);
     if (correction > SNAP_CORRECTION_PX) this.snapCorrectionCount += 1;
-    this.lastPredictedTick = this.renderPredictionFrame()?.tick ?? authoritativeSnapshot.tick ?? null;
-    this.lastAdvanceAt = this.now();
+    this.lastAdvanceAt = this.visualNow();
+    this.frozenFrame = null;
+    const frame = this.renderPredictionFrame(this.lastAdvanceAt);
+    if (this.visualPaused) this.frozenFrame = frame;
+    this.lastPredictedTick = frame?.tick ?? authoritativeSnapshot.tick ?? null;
     return {
       diagnostics,
       correctionDistance: correction,
@@ -108,29 +134,44 @@ export class SimWasmPredictionAdapter {
     };
   }
 
-  advanceVisual() {
+  advanceVisual(visualNow = this.visualNow()) {
     if (!this.ready || !this.predictor) return null;
-    const now = this.now();
+    if (this.visualPaused) return this.frozenFrame || this.renderPredictionFrame(visualNow);
+    const now = finiteVisualTime(visualNow, this.visualNow());
     if (this.lastAdvanceAt == null) this.lastAdvanceAt = now;
     const elapsedMs = Math.max(0, now - this.lastAdvanceAt);
-    const ticks = Math.min(8, Math.floor(elapsedMs / (1000 / 30)));
+    const ticks = Math.min(8, Math.floor(elapsedMs / TICK_MS));
     if (ticks > 0) {
       this.measureTicks(() => this.predictor.advanceTicks(ticks), ticks);
-      this.lastAdvanceAt += ticks * (1000 / 30);
+      this.lastAdvanceAt += ticks * TICK_MS;
     }
-    const frame = this.renderPredictionFrame();
+    const frame = this.renderPredictionFrame(now);
     if (frame) this.lastPredictedTick = frame.tick;
     return frame;
   }
 
-  pauseVisualClock() {
-    const now = this.now();
-    if (Number.isFinite(now)) this.lastAdvanceAt = now;
+  pauseVisualClock(visualNow = this.visualNow()) {
+    if (this.visualPaused) return this.frozenFrame;
+    const now = finiteVisualTime(visualNow, this.visualNow());
+    this.frozenFrame = this.advanceVisual(now);
+    this.visualPaused = true;
+    return this.frozenFrame;
   }
 
-  renderPredictionFrame() {
-    if (!this.ready || !this.predictor) return null;
-    return JSON.parse(this.predictor.renderPredictionFrameJson());
+  resumeVisualClock(visualNow = this.visualNow()) {
+    const now = finiteVisualTime(visualNow, this.visualNow());
+    this.visualPaused = false;
+    this.frozenFrame = null;
+    this.lastAdvanceAt = now;
+  }
+
+  renderPredictionFrame(visualNow = this.visualNow()) {
+    if (!this.ready || !this.predictor || !this.displayValid) return null;
+    if (this.visualPaused && this.frozenFrame) return this.frozenFrame;
+    const now = finiteVisualTime(visualNow, this.visualNow());
+    const elapsedMs = this.lastAdvanceAt == null ? 0 : Math.max(0, now - this.lastAdvanceAt);
+    const visualTickFraction = Math.min(0.999999, (elapsedMs % TICK_MS) / TICK_MS);
+    return JSON.parse(this.predictor.renderPredictionFrameJson(visualTickFraction));
   }
 
   diagnostics() {
@@ -154,6 +195,12 @@ export class SimWasmPredictionAdapter {
       replayBudgetMs: this.replayBudgetMs,
       budgetExceededCount: this.budgetExceededCount,
       memoryBytes: this.refreshMemoryBytes(),
+      progressCorrectionCount: this.progressCorrectionCount,
+      progressLastCorrection: this.progressLastCorrection,
+      progressMaxCorrection: this.progressMaxCorrection,
+      progressAverageCorrection: this.progressCorrectionCount > 0
+        ? this.progressCorrectionTotal / this.progressCorrectionCount
+        : 0,
     };
   }
 
@@ -205,6 +252,11 @@ export class SimWasmPredictionAdapter {
     if (Number.isFinite(bytes)) this.memoryBytes = bytes;
     return this.memoryBytes;
   }
+}
+
+function finiteVisualTime(value, fallback) {
+  if (Number.isFinite(value)) return value;
+  return Number.isFinite(fallback) ? fallback : 0;
 }
 
 function errorMessage(err) {
