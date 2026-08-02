@@ -172,6 +172,16 @@ export class MapEditorPanel {
     palette.className = "map-editor-palette";
     for (const [code, label] of [
       [TERRAIN.GRASS, "Grass / erase"],
+      [TERRAIN.GRAVEL_A, "Gravel A — Slate"],
+      [TERRAIN.GRAVEL_B, "Gravel B — Limestone"],
+      [TERRAIN.GRAVEL_C, "Gravel C — Chalk"],
+      [TERRAIN.DIRT_A, "Dirt A — Loam"],
+      [TERRAIN.DIRT_B, "Dirt B — Red Clay"],
+      [TERRAIN.DIRT_C, "Dirt C — Dry Ochre"],
+      [TERRAIN.MUD_A, "Mud A — Churned"],
+      [TERRAIN.MUD_B, "Mud B — Waterlogged"],
+      [TERRAIN.MUD_C, "Mud C — Clay"],
+      [TERRAIN.FROSTED_GROUND, "Frosted Ground"],
       [TERRAIN.ROCK, "Stone"],
       [TERRAIN.WATER, "Water"],
       [TERRAIN.ROAD_BARE, "Road — bare"],
@@ -571,6 +581,16 @@ function readout(text, error = false) {
 }
 
 function terrainName(code) {
+  if (code === TERRAIN.GRAVEL_A) return "gravel-a";
+  if (code === TERRAIN.GRAVEL_B) return "gravel-b";
+  if (code === TERRAIN.GRAVEL_C) return "gravel-c";
+  if (code === TERRAIN.DIRT_A) return "dirt-a";
+  if (code === TERRAIN.DIRT_B) return "dirt-b";
+  if (code === TERRAIN.DIRT_C) return "dirt-c";
+  if (code === TERRAIN.MUD_A) return "mud-a";
+  if (code === TERRAIN.MUD_B) return "mud-b";
+  if (code === TERRAIN.MUD_C) return "mud-c";
+  if (code === TERRAIN.FROSTED_GROUND) return "frosted-ground";
   if (code === TERRAIN.ROCK) return "stone";
   if (code === TERRAIN.WATER) return "water";
   if (code === TERRAIN.ROAD_BARE) return "road-bare";

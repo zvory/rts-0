@@ -102,6 +102,35 @@ fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
 }
 
 #[test]
+fn lab_map_draft_preserves_visual_open_terrain_variants() {
+    let mut game = new_game();
+    let mut draft = map_draft();
+    let variants = [
+        terrain::GRAVEL_A,
+        terrain::GRAVEL_B,
+        terrain::GRAVEL_C,
+        terrain::DIRT_A,
+        terrain::DIRT_B,
+        terrain::DIRT_C,
+        terrain::MUD_A,
+        terrain::MUD_B,
+        terrain::MUD_C,
+        terrain::FROSTED_GROUND,
+    ];
+    draft.terrain[..variants.len()].copy_from_slice(&variants);
+
+    game.apply_lab_op(LabOp::ApplyMapDraft(draft))
+        .expect("visual open terrain draft");
+
+    assert_eq!(&game.state.map.terrain[..variants.len()], &variants);
+    assert_eq!(&game.export_lab_map().terrain[..variants.len()], &variants);
+    assert_eq!(
+        &game.start_payload().map.terrain[..variants.len()],
+        &variants
+    );
+}
+
+#[test]
 fn lab_map_draft_rejects_duplicate_base_resource_records() {
     let mut game = new_game();
     let mut draft = map_draft();

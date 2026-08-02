@@ -535,6 +535,40 @@ assert(
 
 {
   const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const start = session.draft.startLocations[0];
+  const variants = [
+    TERRAIN.GRAVEL_A,
+    TERRAIN.GRAVEL_B,
+    TERRAIN.GRAVEL_C,
+    TERRAIN.DIRT_A,
+    TERRAIN.DIRT_B,
+    TERRAIN.DIRT_C,
+    TERRAIN.MUD_A,
+    TERRAIN.MUD_B,
+    TERRAIN.MUD_C,
+    TERRAIN.FROSTED_GROUND,
+  ];
+  const chars = "0123456789";
+  session.beginTerrainStroke();
+  for (const [index, code] of variants.entries()) {
+    const tile = { x: start.x - 7 + index, y: start.y };
+    assert.deepEqual(session.paintTerrainTiles([tile], code), [{ ...tile, code }]);
+  }
+  assert.equal(session.commitTerrainStroke(), true);
+  const materialized = session.materialized();
+  for (const [index, code] of variants.entries()) {
+    const x = start.x - 7 + index;
+    assert.equal(materialized.terrain[start.y * 32 + x], code, `open terrain ${code} survives materialization`);
+    assert.equal(session.exportMap().terrain[start.y][x], chars[index], `open terrain ${code} keeps its authored character`);
+  }
+  const rebuilt = new MapEditorSession({ storage: null });
+  rebuilt.loadAuthoredMap(session.exportMap());
+  assert.deepEqual(rebuilt.materialized().terrain, materialized.terrain, "visual open terrains survive editor export/import");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 16, playerCount: 4 });
   for (const start of session.draft.startLocations) {
     assert(start.x >= MAP_EDITOR_MAIN_CLEARANCE_TILES && start.x < 16 - MAP_EDITOR_MAIN_CLEARANCE_TILES);

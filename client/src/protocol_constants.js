@@ -118,6 +118,16 @@ export const TERRAIN = Object.freeze({
   ROAD_VERTICAL: 5,
   ROAD_DIAGONAL_NW_SE: 6,
   ROAD_DIAGONAL_NE_SW: 7,
+  GRAVEL_A: 8,
+  GRAVEL_B: 9,
+  GRAVEL_C: 10,
+  DIRT_A: 11,
+  DIRT_B: 12,
+  DIRT_C: 13,
+  MUD_A: 14,
+  MUD_B: 15,
+  MUD_C: 16,
+  FROSTED_GROUND: 17,
 });
 export const ROAD_TERRAIN_CODES = Object.freeze([
   TERRAIN.ROAD_BARE,
@@ -135,6 +145,16 @@ export const PASSABLE = Object.freeze({
   5: true,
   6: true,
   7: true,
+  8: true,
+  9: true,
+  10: true,
+  11: true,
+  12: true,
+  13: true,
+  14: true,
+  15: true,
+  16: true,
+  17: true,
 });
 const ROAD_TERRAIN_CODE_SET = new Set(ROAD_TERRAIN_CODES);
 export function isRoadTerrain(code) { return ROAD_TERRAIN_CODE_SET.has(code); }

@@ -1,10 +1,17 @@
 import { gfxNoFill, gfxRect, gfxFill } from "./native_graphics.js";
-import { COLORS } from "../config.js";
+import { COLORS, TERRAIN_VARIANT_PALETTES } from "../config.js";
 import { PASSABLE, TERRAIN, isRoadTerrain } from "../protocol.js";
 import { hash2 } from "./shared.js";
 
 /** Base color for a terrain tile code. Codes match server terrain constants. */
 export function terrainColor(code, tx, ty) {
+  const variant = terrainVariantPalette(code);
+  if (variant) {
+    if (variant.pattern === "frost") {
+      return hash2(Math.floor(tx / 4), Math.floor(ty / 4)) > 0.5 ? variant.alt : variant.base;
+    }
+    return hash2(tx, ty) > 0.54 ? variant.alt : variant.base;
+  }
   if (code === TERRAIN.ROCK) return COLORS.rock;
   if (code === TERRAIN.WATER) return COLORS.water;
   if (isRoadTerrain(code)) return hash2(tx, ty) > 0.6 ? COLORS.roadAlt : COLORS.road;
@@ -16,10 +23,16 @@ export function terrainColor(code, tx, ty) {
 
 /** Muted overlay tint for blocky terrain texture. */
 export function terrainOverlayColor(code, n) {
+  const variant = terrainVariantPalette(code);
+  if (variant) return n > 0.74 ? variant.details[0] : variant.details[1];
   if (code === TERRAIN.ROCK) return n > 0.74 ? 0x8a8777 : 0x4f4c43;
   if (code === TERRAIN.WATER) return n > 0.74 ? 0x527482 : 0x1d3d48;
   if (isRoadTerrain(code)) return n > 0.74 ? 0x4b4c46 : 0x242522;
   return n > 0.74 ? 0x817555 : 0x343127;
+}
+
+export function terrainVariantPalette(code) {
+  return TERRAIN_VARIANT_PALETTES[code] || null;
 }
 
 /** Exposed road sides, including map boundaries, for the cached terrain shoulder pass. */

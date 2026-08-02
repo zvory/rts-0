@@ -519,12 +519,32 @@ function lineTiles(from, to) {
 }
 
 function terrainLabel(code) {
+  if (code === TERRAIN.GRAVEL_A) return "slate gravel";
+  if (code === TERRAIN.GRAVEL_B) return "limestone gravel";
+  if (code === TERRAIN.GRAVEL_C) return "chalk gravel";
+  if (code === TERRAIN.DIRT_A) return "loam dirt";
+  if (code === TERRAIN.DIRT_B) return "red clay dirt";
+  if (code === TERRAIN.DIRT_C) return "dry ochre dirt";
+  if (code === TERRAIN.MUD_A) return "churned mud";
+  if (code === TERRAIN.MUD_B) return "waterlogged mud";
+  if (code === TERRAIN.MUD_C) return "clay mud";
+  if (code === TERRAIN.FROSTED_GROUND) return "frosted ground";
   if (code === TERRAIN.ROCK) return "stone";
   if (code === TERRAIN.WATER) return "water";
   return "grass";
 }
 
 function terrainPreviewColor(code) {
+  if (code === TERRAIN.GRAVEL_A) return 0x6d6f65;
+  if (code === TERRAIN.GRAVEL_B) return 0x847864;
+  if (code === TERRAIN.GRAVEL_C) return 0x928f7f;
+  if (code === TERRAIN.DIRT_A) return 0x785a42;
+  if (code === TERRAIN.DIRT_B) return 0x825742;
+  if (code === TERRAIN.DIRT_C) return 0x897550;
+  if (code === TERRAIN.MUD_A) return 0x513e31;
+  if (code === TERRAIN.MUD_B) return 0x4c493a;
+  if (code === TERRAIN.MUD_C) return 0x584038;
+  if (code === TERRAIN.FROSTED_GROUND) return 0x6a7164;
   if (code === TERRAIN.ROCK) return 0xa69a82;
   if (code === TERRAIN.WATER) return 0x4b9bd0;
   return 0x6d9f58;
