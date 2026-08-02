@@ -4,6 +4,7 @@ import { ARTILLERY_PNG_RIG_ATLAS } from "./artillery_png_atlas.js";
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "./mortar_team_png_atlas.js";
 import { SCOUT_CAR_PNG_RIG_ATLAS } from "./scout_car_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "./tank_png_atlas.js";
+import { RIG_SCHEMA_VERSION, validateRigDefinition } from "./schema.js";
 
 export const LOADED_RIFLEMAN_RIG_KEY = "rifleman.panzerfaustLoaded";
 
@@ -99,16 +100,20 @@ function atlasSourceParts(atlas) {
 }
 
 function definition({ id, kind, parts, anchors, bounds, animations }) {
-  return deepFreeze({
+  const validation = validateRigDefinition({
     id,
     kind,
-    schemaVersion: 1,
+    schemaVersion: RIG_SCHEMA_VERSION,
     parts,
     anchors,
     bounds,
     animations,
     requiredRuntimeInputs: [...new Set(animations.map((entry) => entry.input))],
   });
+  if (!validation.ok) {
+    throw new TypeError(`Invalid raster rig definition ${id}: ${JSON.stringify(validation.errors)}`);
+  }
+  return deepFreeze(validation.definition);
 }
 
 const SHADOW_FACING = Object.freeze([["facing", "transform.rotation"]]);

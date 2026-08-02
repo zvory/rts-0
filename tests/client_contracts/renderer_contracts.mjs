@@ -5,6 +5,7 @@ import { KIND, STATE, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { createRigRenderContext, rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
 import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
+import { inlineSvgImageSources } from "../../client/src/minimap_icon_image.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
@@ -35,6 +36,22 @@ assert(
   createRigRenderContext({ kind: KIND.WORKER, state: STATE.GATHER }).busy === true,
   "traveling and anchor-waiting gatherers keep the yellow busy indicator without a mining latch",
 );
+
+{
+  const requested = [];
+  const controller = new AbortController();
+  const markup = '<svg><image href="/assets/artillery.png" /><image href="/assets/artillery.png" /></svg>';
+  const inlined = await inlineSvgImageSources(markup, async (href, { signal }) => {
+    requested.push(href);
+    assert(signal === controller.signal, "minimap icon source loading receives the teardown signal");
+    return "data:image/png;base64,cG5n";
+  }, { signal: controller.signal });
+  assert(requested.join(",") === "/assets/artillery.png", "minimap icon source loading is deduplicated");
+  assert(
+    (inlined.match(/data:image\/png;base64,cG5n/g) || []).length === 2 && !inlined.includes('/assets/artillery.png'),
+    "minimap icon markup embeds every raster source before becoming an image",
+  );
+}
 
 {
   const riflemanIcon = liveUnitIconMarkupFor(KIND.RIFLEMAN);

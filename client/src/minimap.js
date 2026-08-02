@@ -48,6 +48,7 @@ import {
   resolveUnderAttackTargetId,
   underAttackFlashEntityIds,
 } from "./minimap_alerts.js";
+import { createInlineSvgImage } from "./minimap_icon_image.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
@@ -98,20 +99,6 @@ const resourceLayoutSignature = (resources) => {
     signature += `|${node.id}:${node.kind}:${node.x}:${node.y}:${node.remaining ?? ""}`;
   }
   return signature;
-};
-
-const createMarkupImage = (markup, canvas, onReady) => {
-  if (typeof markup !== "string" || !markup) return null;
-  const doc = canvas?.ownerDocument || globalThis.document || null;
-  const image = doc?.createElement
-    ? doc.createElement("img")
-    : typeof globalThis.Image === "function"
-      ? new globalThis.Image()
-      : null;
-  if (!image) return null;
-  image.onload = () => onReady?.();
-  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
-  return image;
 };
 
 const staticSignatureChanged = (prev, next) => {
@@ -203,9 +190,15 @@ export class Minimap {
     this._borderPulseUntil = 0;
     this._artilleryIconImage = options.artilleryIconImage || null;
     this._artilleryIconReady = !!this._artilleryIconImage;
+    this._artilleryIconLoadController = null;
     if (!this._artilleryIconImage && options.artilleryIconMarkup) {
-      this._artilleryIconImage = createMarkupImage(options.artilleryIconMarkup, canvasEl, () => {
+      this._artilleryIconLoadController = typeof globalThis.AbortController === "function"
+        ? new globalThis.AbortController()
+        : null;
+      this._artilleryIconImage = createInlineSvgImage(options.artilleryIconMarkup, canvasEl, () => {
         this._artilleryIconReady = true;
+      }, {
+        signal: this._artilleryIconLoadController?.signal || null,
       });
     }
 
@@ -964,6 +957,14 @@ export class Minimap {
     c.removeEventListener("pointerup", this._onCanvasPointerUp);
     c.removeEventListener("pointercancel", this._onCanvasPointerCancel);
     window.removeEventListener("blur", this._onWindowBlur);
+    this._artilleryIconLoadController?.abort?.();
+    this._artilleryIconLoadController = null;
+    if (this._artilleryIconImage) {
+      this._artilleryIconImage.onload = null;
+      this._artilleryIconImage.onerror = null;
+    }
+    this._artilleryIconReady = false;
+    this._artilleryIconImage = null;
     this._clearMinimapSetupPreview();
     this._terrainLayer = null;
     this._terrainLayerCtx = null;
