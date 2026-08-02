@@ -283,7 +283,7 @@ architecture failures.
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
 | `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
-| `fog` | `authoritative/serialized` | Serialize the latest 15 Hz actionable visibility sample and its bounded per-viewer firing-reveal provenance map. | `recompute_live_fog` atomically records whether each sampled revealed entity needed its firing reveal before stamping the actionable tile. Combat, commands, and entity projection consume that held sample; snapshot `visibleTiles` removes reveal-only stamps so presentation fog remains covered. Phase 0.5 compares per-player actionable tiles as semantic state. |
+| `fog` | `authoritative/serialized` | Serialize the latest 15 Hz actionable visibility sample and its bounded per-viewer firing-reveal provenance map. | `recompute_live_fog` separately records whether each sampled entity needs its firing reveal for targeting and whether the stamped terrain tile lacked ordinary sight. Combat consumes the first fact; snapshot `visibleTiles` removes only terrain-reveal-only stamps. Phase 0.5 compares per-player actionable tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered enemy-building entries per player. | `BuildingMemory::refresh` records last-seen enemy building state and only removes hidden destroyed entries after the footprint is scouted again; spectator/player snapshots project remembered buildings while fogged. |
 | `anti_tank_gun_memory` | `authoritative/serialized` | Serialize last-observed deployed enemy Anti-Tank Gun position, facing, owner, and observation tick per player. | `AntiTankGunMemory::refresh` records ordinary team sight and actionable firing reveals, retains stale records through hidden movement/teardown/destruction, and clears them only when that player's team observes the gun changed or the remembered position empty; observer snapshots select the requested players' stores. |
 | `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, completed upgrades, and the paused/Steel-floor/Oil-floor Auto-Build policy. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income, faction-specific tech, automatic-production spending, and snapshot resource/settings rows are all read from `players`. |
@@ -554,11 +554,11 @@ Map policy:
 
 Stealth applies to units, not buildings or doodads. Owners and allies always receive their units;
 enemy projection, auto-acquisition, explicit attack validation, and retained targets reject a unit
-standing on a stealth tile until that unit fires. Firing creates the existing entity-scoped reveal
-episode, above-fog presentation, and one-second counterfire reaction delay even when the underlying
-ground is ordinarily visible. Concealed deaths do not publish positional death events or global
-death decals. No-vehicle tiles seed vehicle-body occupancy only, so vehicles path around them while
-infantry can traverse the same tile.
+standing on a stealth tile until that unit fires. Firing creates the existing entity-scoped reveal,
+outline-only presentation, and one-second counterfire reaction delay. The terrain remains normally
+lit when ordinary sight already covers it; only a tile lacking ordinary sight stays presentation-dark.
+Concealed deaths do not publish positional death events or global death decals. No-vehicle tiles seed
+vehicle-body occupancy only, so vehicles path around them while infantry can traverse the same tile.
 
 Field map for Phase 2 DTO conversion:
 
@@ -1729,14 +1729,15 @@ sources to live fog for players on the victim's team, not for third-party observ
 the combat event. These sources reveal only the firing unit's current tile, are actionable for
 command validation and combat targeting, and expire at
 `fired_at_tick + firing_cycle_cooldown + TICK_HZ / 2` so the duration tracks the weapon's firing
-cycle plus 0.5 seconds. The fog rebuild records each source's stamped tile and whether that tile was
-already visible before any firing reveals were stamped, keeping source provenance attached to the
-authoritative fog result rather than inferred later from the flattened grid. This tile-level record
+cycle plus 0.5 seconds. The fog rebuild records each source's stamped tile, whether targeting needs
+the reveal, and whether the terrain lacked ordinary sight before any firing reveals were stamped,
+keeping provenance attached to the authoritative fog result rather than inferred later. This tile-level record
 also covers colocated entities and does not follow a source that moves to a different tile during
 the next tick. Combatants that first engage a target
 through reveal-only sight spend a one-second response delay before their first counter-shot, so
 firing-reveal counterfire plays out as shot/counter-shot rather than an instant simultaneous chain.
-The actionable tile is removed from snapshot `visibleTiles` and from explored-history accumulation.
+An actionable tile lacking ordinary sight is removed from snapshot `visibleTiles` and explored-history
+accumulation; a stealth reveal on ordinarily visible ground does not darken that terrain.
 The firing unit remains in `entities`; the client recognizes a projected enemy unit whose tile is
 presentation-dark and renders it on the explicit above-fog reveal layer. Thus firing reveals expose
 the unit for counterfire without clearing or exploring the terrain beneath it.

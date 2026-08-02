@@ -2107,12 +2107,12 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   selected. Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values
-  draw first, so a southern tree or unit naturally covers a northern one. When any received unit
-  intersects a tree canopy in front of it, its rig is rendered into a dedicated filter surface
-  above the canopy. A Pixi post-process samples the merged sprite/rig alpha and emits only a white
-  outer silhouette, rather than outlining individual rig parts. Friendly, allied, and visible enemy
-  units use the same treatment. This readability pass uses only already-admitted entities and does
-  not reveal enemies, hidden entities, shadows, status bars, or selection/effect overlays.
+  draw first, so a southern tree or unit naturally covers a northern one. When any received ordinary
+  unit intersects a tree canopy in front of it, a stable white body outline draws above the canopy.
+  Friendly, allied, and visible enemy units use the same treatment. Authoritative `visionOnly`
+  stealth reveals omit their normal rig and draw only the white outline above fog and canopies;
+  damaged reveal HP stays above fog as well. These readability passes use only already-admitted
+  entities and do not reveal hidden enemies.
   When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
   Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
@@ -2194,9 +2194,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   tube/barrel assembly, fixed-color tire overlays, and separate carriage/tube recoil bindings.
   Mortar impact events that include a shooter reveal show the mortar briefly above fog for players
   whose units or buildings were hit by indirect fire.
-  Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
-  the fog overlay and excluded from local fog-source computation and selection/command hit-testing.
-  Current death-vision entities are normal visible entities and do not use this flag.
+  Unit entities marked `visionOnly` by the server omit full unit art and draw only their white
+  outline above fog, with damaged HP above it. They remain excluded from local fog-source
+  computation and selection/command hit-testing. Current death-vision entities are normal visible
+  entities and do not use this flag.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a single HP-layer status bar whose
   fill reflects current HP rather than changing authoritative construction progress;

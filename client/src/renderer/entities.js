@@ -169,7 +169,8 @@ export function _drawAboveFogHp(e) {
     && Number.isFinite(e?.maxHp)
     && e.maxHp > 0
     && e.hp < e.maxHp;
-  if (e?.aboveFogReveal !== true || !damaged) return;
+  if (e?.aboveFogReveal !== true && e?.visionOnly !== true) return;
+  if (!damaged) return;
   const g = this._hpBarSlot(e.id, "aboveFogHpBars");
   this._hpBar(g, e);
 }

@@ -51,20 +51,9 @@ const SHOT_REVEAL_POOL_PROFILE = Object.freeze({
   effects: "shotReveals",
 });
 
-const FOREST_OUTLINE_POOL_PROFILE = Object.freeze({
-  familyKey: "forestUnitOutline",
-  liveRigUnit: "forestUnitOutlineRigs",
-  unit: "forestUnitOutlines",
-  liveRigOverlay: "forestUnitOutlineRigOverlays",
-  overlay: "forestUnitOutlines",
-  omitShadow: true,
-  omitEffects: true,
-});
-
 const ROUTE_PLAN_CACHE = new Map([
   [DEFAULT_POOL_PROFILE, new Map()],
   [SHOT_REVEAL_POOL_PROFILE, new Map()],
-  [FOREST_OUTLINE_POOL_PROFILE, new Map()],
 ]);
 
 const LIVE_RIG_SOURCES = Object.freeze([
@@ -378,9 +367,6 @@ function compileRoutePlan(parts, pools, familyKey) {
 function knownPoolProfile(pools) {
   if (usesProfile(pools, SHOT_REVEAL_POOL_PROFILE) && matchesPoolProfile(pools, SHOT_REVEAL_POOL_PROFILE)) {
     return SHOT_REVEAL_POOL_PROFILE;
-  }
-  if (usesProfile(pools, FOREST_OUTLINE_POOL_PROFILE) && matchesPoolProfile(pools, FOREST_OUTLINE_POOL_PROFILE)) {
-    return FOREST_OUTLINE_POOL_PROFILE;
   }
   if (matchesPoolProfile(pools, DEFAULT_POOL_PROFILE)) return DEFAULT_POOL_PROFILE;
   return null;

@@ -100,8 +100,8 @@ fn scout_car_waits_for_hidden_rifle_fire_and_the_reveal_reaction_delay() {
         .fog
         .active_firing_reveal_episode(1, rifles[0])
         .expect("rifle fire should create an actionable reveal for the scout team");
-    let revealed = game
-        .snapshot_for(1)
+    let scout_snapshot = game.snapshot_for(1);
+    let revealed = scout_snapshot
         .entities
         .into_iter()
         .find(|view| view.id == rifles[0])
@@ -109,6 +109,15 @@ fn scout_car_waits_for_hidden_rifle_fire_and_the_reveal_reaction_delay() {
     assert!(
         revealed.vision_only,
         "a firing unit in stealth should use the transient reveal presentation"
+    );
+    let rifle_tile = game
+        .state
+        .map
+        .tile_of(revealed.x, revealed.y);
+    let rifle_tile_index = (rifle_tile.1 * game.state.map.width + rifle_tile.0) as usize;
+    assert_eq!(
+        scout_snapshot.visible_tiles[rifle_tile_index], 1,
+        "revealing a concealed unit must not darken terrain the scout already sees"
     );
     assert!(
         game.snapshot_for_observer(&ObserverView::Players(vec![1]))

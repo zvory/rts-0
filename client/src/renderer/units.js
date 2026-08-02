@@ -188,7 +188,6 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
       renderContext.frameStripMoving = frameStripMovement.moving;
       renderContext.frameStripMovementActivity = frameStripMovement.activity;
     }
-    rememberRigRenderContext(this, e, pools, renderContext);
     const drawPlan = frameStripDrawPlanFor(routePlan);
     if (drawPlan.shadowRoute) {
       const sampledAnimation = sampleRigAnimationInto(
@@ -219,7 +218,6 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   if (pngAtlas && pngAtlasTexture) {
     const renderContext = pools.renderContext || this._rigRenderContextFor?.(e, colorByOwner, state) || {};
     applyRigAlpha(renderContext, pools.alpha);
-    rememberRigRenderContext(this, e, pools, renderContext);
     const drawPlan = pngDrawPlanFor(definition, pngAtlas, routePlan);
     const sampledAnimation = sampleRigAnimationInto(
       animationStageFor(definition, drawPlan.sampledParts),
@@ -255,7 +253,6 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   reconcileActiveLiveRigPools(this, e.id, routePlan.poolNames);
   const renderContext = pools.renderContext || this._rigRenderContextFor?.(e, colorByOwner, state) || {};
   applyRigAlpha(renderContext, pools.alpha);
-  rememberRigRenderContext(this, e, pools, renderContext);
   const sampledAnimation = sampleRigAnimationInto(
     animationStageFor(definition, routePlan.allParts),
     e,
@@ -272,11 +269,6 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
 
 function applyRigAlpha(renderContext, alpha) {
   if (typeof alpha === "number") renderContext.shotRevealAlpha = alpha;
-}
-
-function rememberRigRenderContext(renderer, entity, pools, renderContext) {
-  if (!pools.rememberRenderContext) return;
-  renderer._unitRenderContexts?.set?.(entity.id, { ...renderContext });
 }
 
 export function _rigRenderContextFor(e, colorByOwner, state) {

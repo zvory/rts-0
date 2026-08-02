@@ -782,6 +782,10 @@ both legality and reaction bypass. Repeated shots extend one stable reveal
 episode, so move orders or transient target switches cannot restart the same episode's reaction
 deadline. Tile-level provenance covers colocated entities and remains tied to the stamped tile when
 the firing entity moves before the next fog rebuild.
+A firing unit concealed by `stealthTiles` is projected with `visionOnly` and rendered as a white
+outline rather than full unit art. Its ordinary damaged-unit HP bar remains visible above fog. Firing
+reveal provenance distinguishes concealment from terrain visibility: if the recipient already sees
+the ground, `visibleTiles` remains clear instead of drawing a dark square over the stealth tile.
 Artillery Fire creates the same kind of actionable temporary live fog for every enemy player,
 subject to normal smoke suppression, when the shell is launched. The reveal exposes the firing gun
 as a normal snapshot entity without exposing the target point, its terrain tile, surrounding
@@ -961,9 +965,10 @@ the current orbit center and source Command Car id; enemy projections that can s
 this state. Scout Plane
 entities are not selectable or commandable by normal clients, and runtime movement is driven by the
 server-side Command Car ability lifecycle.
-`visionOnly` is a legacy/special projection flag for non-owned units/buildings that are sent as
-render-only intel rather than normal visibility. Current lingering death sight is ordinary
-temporary team sight and does not set `visionOnly`. Clients must not select `visionOnly` entities.
+`visionOnly` is a special projection flag for non-owned render-only intel rather than normal
+visibility. Stealth firing reveals use it to select outline-only above-fog presentation. Current
+lingering death sight is ordinary temporary team sight and does not set it. Clients must not select
+`visionOnly` entities.
 In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.

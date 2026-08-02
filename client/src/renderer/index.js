@@ -8,7 +8,7 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 //   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
 //   → selection-rings → world-Y-sorted units/tree-canopies
-//   → post-processed forest-unit-outlines → smokes → hp-bars → fog → visual-sample-labels
+//   → forest-unit-outlines → smokes → hp-bars → fog → stealth-unit-outlines → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → above-fog-hp-bars
 //   → feedback/miss-toasts → placement-ghost → drag-box
 //
@@ -90,8 +90,10 @@ import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { DoodadLayer } from "./doodad_layer.js";
-import { createForestOutlineFilter } from "./forest_outline_filter.js";
-import { _drawTreeOccludedUnitOutlines } from "./tree_unit_occlusion.js";
+import {
+  _drawStealthUnitOutlines,
+  _drawTreeOccludedUnitOutlines,
+} from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
 import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
 import {
@@ -177,8 +179,6 @@ export class Renderer {
       this.world.addChild(c);
     }
     this.layers.units.sortableChildren = true;
-    this._forestOutlineFilter = createForestOutlineFilter(PIXI);
-    this.layers.forestUnitOutlines.filters = [this._forestOutlineFilter];
     this._assetReadiness = new Map();
     this._doodads = new DoodadLayer({
       pixi: PIXI,
@@ -264,9 +264,11 @@ export class Renderer {
       unitShadows: new Map(),
       trenchOccupantShadows: new Map(),
       units: new Map(),
+      forestUnitOutlines: new Map(),
       trenchOccupantLips: new Map(),
       selectionRings: new Map(),
       hpBars: new Map(),
+      stealthUnitOutlines: new Map(),
       shotRevealShadows: new Map(),
       shotReveals: new Map(),
       aboveFogHpBars: new Map(),
@@ -285,7 +287,6 @@ export class Renderer {
     // Local frame-strip motion state. Sprite strips animate only when their
     // authoritative or predicted render position is actually changing.
     this._frameStripMotion = new Map();
-    this._unitRenderContexts = new Map();
     // Live SVG rig instances are routed per unit kind. Invalid or missing
     // definitions fail through the renderer's missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
@@ -311,8 +312,6 @@ export class Renderer {
       liveShotRevealRigs: new Map(),
       liveShotRevealRigOverlays: new Map(),
       liveShotRevealRigEffects: new Map(),
-      forestUnitOutlineRigs: new Map(),
-      forestUnitOutlineRigOverlays: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
@@ -324,8 +323,6 @@ export class Renderer {
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
       liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
       liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
-      forestUnitOutlineRigs: { poolName: "forestUnitOutlineRigs", layerName: "forestUnitOutlines" },
-      forestUnitOutlineRigOverlays: { poolName: "forestUnitOutlineRigOverlays", layerName: "forestUnitOutlines" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
@@ -628,15 +625,13 @@ export class Renderer {
       }
     });
     time("renderer.units", () => {
-      this._unitRenderContexts.clear();
       for (const e of regularEntities) {
         liveIds.add(e.id);
-        if (isUnit(e.kind)) {
+        if (isUnit(e.kind) && !e.visionOnly) {
           this._drawEntitySafely("unit", e, "units", () => {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
               visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
-              rememberRenderContext: true,
             });
           });
         }
@@ -645,11 +640,13 @@ export class Renderer {
     time("renderer.forestUnitOutlines", () => {
       this._drawSafely(
         "forestUnitOutlines",
-        () => this._drawTreeOccludedUnitOutlines(regularEntities, state, colorByOwner, {
-          renderContexts: this._unitRenderContexts,
-          visualUnitOverrides: visualUnitOverrideMap,
-          visualFrameStripOverrides: visualFrameStripOverrideMap,
-        }),
+        () => this._drawTreeOccludedUnitOutlines(regularEntities),
+      );
+    });
+    time("renderer.stealthUnitOutlines", () => {
+      this._drawSafely(
+        "stealthUnitOutlines",
+        () => this._drawStealthUnitOutlines(regularEntities),
       );
     });
     // Selection rings are in a layer below units, so selected units stay readable
@@ -659,7 +656,8 @@ export class Renderer {
       for (const e of regularEntities) {
         liveIds.add(e.id);
         this._drawSafely(`selectionHp:${e.kind || "unknown"}`, () => {
-          this._drawSelectionAndHp(e, selection, feedbackView);
+          if (e.visionOnly) this._drawAboveFogHp(e);
+          else this._drawSelectionAndHp(e, selection, feedbackView);
         });
       }
     });
@@ -1179,16 +1177,12 @@ export class Renderer {
     this._assetReadiness?.clear?.();
     this._missingTextureEntityIds?.clear?.();
     this._tankMotion.clear();
-    this._unitRenderContexts.clear();
     if (this._liveRigPools) {
       for (const pool of Object.values(this._liveRigPools)) {
         for (const instance of pool.values()) instance.destroy();
         pool.clear();
       }
     }
-    this.layers.forestUnitOutlines.filters = null;
-    this._forestOutlineFilter?.destroy?.();
-    this._forestOutlineFilter = null;
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
     destroyRendererTextureMap(this._visualFrameStripTextures);
@@ -1289,6 +1283,7 @@ Object.assign(Renderer.prototype, {
   _tankMotionVisual,
   _frameStripMovementVisual,
   _drawUnit,
+  _drawStealthUnitOutlines,
   _drawTreeOccludedUnitOutlines,
   _rigRenderContextFor,
   _drawShotRevealUnit,
