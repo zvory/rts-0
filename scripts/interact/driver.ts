@@ -122,6 +122,7 @@ interface DriverOptions {
   map?: string;
   seed?: string;
   scenario?: string;
+  visualProfile?: string;
   devScenario?: { id: string; unit: string; count: number; blocker: string; case: string };
   opponent?: string;
   spectate?: string[] | null; autoSpectator?: boolean;
@@ -200,6 +201,7 @@ export class InteractDriver {
     map,
     seed = "",
     scenario = "blank",
+    visualProfile = "",
     devScenario = { id: "", unit: "", count: 1, blocker: "", case: "" },
     opponent = "ai_2_1",
     spectate = null, autoSpectator = false,
@@ -220,6 +222,7 @@ export class InteractDriver {
       map: map || defaultMapForMode(mode),
       seed,
       scenario,
+      visualProfile,
       devScenario,
       opponent,
       spectate, autoSpectator,
@@ -1072,6 +1075,7 @@ export class InteractDriver {
       renderer: this.options.renderer,
       seed: this.options.seed,
       scenario: this.options.scenario,
+      visualProfile: this.options.visualProfile,
       devScenario: this.options.devScenario,
     });
   }

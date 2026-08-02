@@ -19,6 +19,24 @@ const scenarioLaunchUrl = interactLaunchUrl({
   scenario: "",
   devScenario: { id: "direct_reverse_order", unit: "tank", count: 1, blocker: "", case: "" },
 });
+const profiledLabLaunchUrl = interactLaunchUrl({
+  mode: "lab",
+  baseUrl: "http://localhost/",
+  room: "interact-lab-test",
+  map: "terrain-blend-showcase",
+  opponent: "ai_2_1",
+  renderer: "pixi",
+  seed: "424242",
+  scenario: "blank",
+  visualProfile: "terrain-blend-dither",
+  devScenario: { id: "", unit: "", count: 1, blocker: "", case: "" },
+});
+
+assert.equal(
+  new URL(profiledLabLaunchUrl).searchParams.get("visualProfile"),
+  "terrain-blend-dither",
+  "the Interact Lab driver can select one bounded checked-in visual profile",
+);
 
 assert.equal(
   interactGameLaunchEnabled(new URL("http://localhost/?rtsLaunch=match&rtsRoom=interact-game-test&rtsRole=player&interact=game")),

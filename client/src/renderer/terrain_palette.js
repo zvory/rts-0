@@ -51,6 +51,73 @@ export function roadEdgeDirections(map, tx, ty, code) {
   return edges;
 }
 
+const CARDINAL_NEIGHBORS = Object.freeze([
+  Object.freeze({ direction: "north", dx: 0, dy: -1 }),
+  Object.freeze({ direction: "south", dx: 0, dy: 1 }),
+  Object.freeze({ direction: "west", dx: -1, dy: 0 }),
+  Object.freeze({ direction: "east", dx: 1, dy: 0 }),
+]);
+
+/** Stable visual identity for terrain transitions. Road markings share one surface. */
+export function terrainMaterial(code) {
+  if (isImpassableTerrain(code)) return null;
+  return isRoadTerrain(code) ? "road" : `terrain:${code}`;
+}
+
+/**
+ * Higher-ranked passable material creeps into lower-ranked material. Keeping this
+ * directional makes each shared edge one texture band wide instead of painting both tiles.
+ */
+export function terrainBlendRank(code) {
+  if (isRoadTerrain(code)) return 0;
+  if (code === TERRAIN.GRASS) return 1;
+  if (code >= TERRAIN.GRAVEL_A && code <= TERRAIN.FROSTED_GROUND) return code - 6;
+  return -1;
+}
+
+export function groundTransitionEdges(map, tx, ty, code) {
+  const material = terrainMaterial(code);
+  const rank = terrainBlendRank(code);
+  if (material == null || rank < 0) return [];
+  const edges = [];
+  for (const neighbor of CARDINAL_NEIGHBORS) {
+    const nx = tx + neighbor.dx;
+    const ny = ty + neighbor.dy;
+    if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
+    const neighborCode = map.terrain[ny * map.width + nx];
+    const neighborMaterial = terrainMaterial(neighborCode);
+    if (
+      neighborMaterial == null ||
+      neighborMaterial === material ||
+      terrainBlendRank(neighborCode) <= rank
+    ) continue;
+    edges.push({ ...neighbor, code: neighborCode, tx: nx, ty: ny });
+  }
+  return edges;
+}
+
+/**
+ * Blocker perimeter edges. Unlike blockers get one shared separator owned by the
+ * higher terrain code (water today), preventing a double-width rock/water seam.
+ */
+export function impassableEdgeDirections(map, tx, ty, code) {
+  if (!isImpassableTerrain(code)) return [];
+  const edges = [];
+  for (const neighbor of CARDINAL_NEIGHBORS) {
+    const nx = tx + neighbor.dx;
+    const ny = ty + neighbor.dy;
+    if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) {
+      edges.push(neighbor.direction);
+      continue;
+    }
+    const neighborCode = map.terrain[ny * map.width + nx];
+    if (!isImpassableTerrain(neighborCode) || neighborCode < code) {
+      edges.push(neighbor.direction);
+    }
+  }
+  return edges;
+}
+
 /** Draw dark perimeter strips only where impassable terrain borders passable ground. */
 export function drawImpassableEdge(g, map, tx, ty, code, ts) {
   if (!isImpassableTerrain(code)) return;
@@ -61,10 +128,11 @@ export function drawImpassableEdge(g, map, tx, ty, code, ts) {
   const y = ty * ts;
 
   gfxFill(g, color, 0.72);
-  if (!isImpassableAt(map, tx, ty - 1)) gfxRect(g, x, y, ts, edge);
-  if (!isImpassableAt(map, tx, ty + 1)) gfxRect(g, x, y + ts - edge, ts, edge);
-  if (!isImpassableAt(map, tx - 1, ty)) gfxRect(g, x, y, edge, ts);
-  if (!isImpassableAt(map, tx + 1, ty)) gfxRect(g, x + ts - edge, y, edge, ts);
+  const edges = impassableEdgeDirections(map, tx, ty, code);
+  if (edges.includes("north")) gfxRect(g, x, y, ts, edge);
+  if (edges.includes("south")) gfxRect(g, x, y + ts - edge, ts, edge);
+  if (edges.includes("west")) gfxRect(g, x, y, edge, ts);
+  if (edges.includes("east")) gfxRect(g, x + ts - edge, y, edge, ts);
   gfxNoFill(g);
 }
 
