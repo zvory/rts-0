@@ -386,6 +386,7 @@ mod tests {
     mod base_limits;
     mod four_player;
     mod schone_tage;
+    mod terrain_variants;
 
     #[test]
     fn hardcoded_map_loads_for_every_supported_player_count() {
@@ -681,41 +682,5 @@ mod tests {
         let map = Map::from_authored_json(1, &json, 0).expect("road should be passable");
         assert_eq!(map.terrain_at(8, 8), terrain::ROAD_BARE);
         assert!(map.is_passable(8, 8));
-    }
-
-    #[test]
-    fn authored_map_accepts_visual_open_terrain_variants() {
-        let mut rows = vec![".".repeat(32); 32];
-        rows[8].replace_range(3..13, "0123456789");
-        let json = format!(
-            r#"{{
-              "version": 4,
-              "name": "open-variants",
-              "description": "visual open terrain",
-              "_design": "n/a",
-              "terrain": {},
-              "startLocations": [{{"x": 8, "y": 8}}],
-              "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}]
-            }}"#,
-            serde_json::to_string(&rows).unwrap()
-        );
-
-        let map = Map::from_authored_json(1, &json, 0).expect("visual variants should be passable");
-        let expected = [
-            terrain::GRAVEL_A,
-            terrain::GRAVEL_B,
-            terrain::GRAVEL_C,
-            terrain::DIRT_A,
-            terrain::DIRT_B,
-            terrain::DIRT_C,
-            terrain::MUD_A,
-            terrain::MUD_B,
-            terrain::MUD_C,
-            terrain::FROSTED_GROUND,
-        ];
-        for (offset, code) in expected.into_iter().enumerate() {
-            assert_eq!(map.terrain_at(3 + offset as u32, 8), code);
-            assert!(map.is_passable(3 + offset as i32, 8));
-        }
     }
 }
