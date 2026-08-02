@@ -77,6 +77,7 @@ export class MapEditorPanel {
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);
     this.unsubscribe = session.subscribe((snapshot) => this.applySessionSnapshot(snapshot));
+    this.unsubscribeCamera = viewport.subscribeZoom((percent) => this.updateZoomControl(percent));
     void this.loadCatalog();
   }
 
@@ -154,10 +155,51 @@ export class MapEditorPanel {
     if (!this.session.draft) {
       body.appendChild(readout("Preparing editor…"));
     } else {
-      body.append(this.renderTerrain(), this.renderDoodads(), this.renderLocations());
+      body.append(this.renderZoom(), this.renderTerrain(), this.renderDoodads(), this.renderLocations());
     }
     this.toolsEl.append(header, body, this.toolsWindowChrome.renderResizeHandle());
     restorePanelScroll(body, scroll);
+  }
+
+  renderZoom() {
+    const section = group("Zoom");
+    const framing = document.createElement("div");
+    framing.className = "map-editor-zoom-framing";
+    framing.append(
+      button("Fill screen", () => this.viewport.fillScreen()),
+      button("Fit to screen", () => this.viewport.fitToScreen()),
+    );
+
+    const controls = document.createElement("div");
+    controls.className = "map-editor-zoom-controls";
+    const zoomInput = document.createElement("input");
+    const zoomLimits = this.viewport.zoomLimitsPercent();
+    zoomInput.type = "number";
+    zoomInput.min = String(zoomLimits.min);
+    zoomInput.max = String(zoomLimits.max);
+    zoomInput.step = "1";
+    zoomInput.value = String(this.viewport.zoomPercent());
+    zoomInput.setAttribute("aria-label", "Zoom percentage");
+    zoomInput.addEventListener("change", () => {
+      zoomInput.value = String(this.viewport.setZoomPercent(zoomInput.value));
+    });
+    this.zoomInput = zoomInput;
+    const percent = document.createElement("span");
+    percent.className = "map-editor-zoom-percent";
+    percent.textContent = "%";
+    controls.append(
+      button("−", () => this.viewport.zoomOut(), { title: "Zoom out", className: "map-editor-zoom-step" }),
+      zoomInput,
+      percent,
+      button("+", () => this.viewport.zoomIn(), { title: "Zoom in", className: "map-editor-zoom-step" }),
+    );
+    section.append(framing, controls);
+    return section;
+  }
+
+  updateZoomControl(percent = this.viewport.zoomPercent()) {
+    if (!this.zoomInput?.isConnected) return;
+    this.zoomInput.value = String(percent);
   }
 
   renderMapSource() {
@@ -677,6 +719,7 @@ export class MapEditorPanel {
     this.destroyed = true;
     window.removeEventListener("keydown", this.onKeyDown);
     this.unsubscribe?.();
+    this.unsubscribeCamera?.();
     this.optionsWindowChrome.destroy();
     this.toolsWindowChrome.destroy();
     this.optionsEl.remove();
