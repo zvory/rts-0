@@ -15,9 +15,12 @@ impl RoomTask {
         request_id: u32,
         after_revision: u32,
     ) {
-        if request_id == 0 {
+        if request_id == 0 || matches!(&self.phase, Phase::Lobby | Phase::BranchStaging(_)) {
             return;
         }
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
         let now = Instant::now();
         if self
             .ground_decal_request_times
@@ -27,9 +30,6 @@ impl RoomTask {
             return;
         }
         self.ground_decal_request_times.insert(player_id, now);
-        let Some(player) = self.players.get(&player_id) else {
-            return;
-        };
         let explicit_view = self.observer_views.get(&player_id);
         let active_seat = self
             .live_connection_is_player(player_id)

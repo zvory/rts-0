@@ -709,6 +709,7 @@ fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
         &game.state.fog,
         &mut events,
         game.state.tick + config::ARTILLERY_SHELL_DELAY_TICKS,
+        |_, _| {},
     );
 }
 

@@ -30,14 +30,6 @@ impl ArtilleryShellStore {
         self.shells.len()
     }
 
-    pub(in crate::game) fn due_ground_decals(&self, tick: u32) -> Vec<(u32, f32, f32)> {
-        self.shells
-            .iter()
-            .filter(|shell| shell.impact_tick <= tick)
-            .map(|shell| (shell.owner, shell.x, shell.y))
-            .collect()
-    }
-
     pub(crate) fn schedule(&mut self, owner: u32, _attacker: u32, x: f32, y: f32, tick: u32) {
         if !x.is_finite() || !y.is_finite() {
             return;
@@ -57,11 +49,13 @@ impl ArtilleryShellStore {
         fog: &Fog,
         events: &mut HashMap<u32, Vec<Event>>,
         tick: u32,
+        mut on_impact: impl FnMut(f32, f32),
     ) {
         let mut pending = Vec::new();
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
+                on_impact(shell.x, shell.y);
                 resolve_shell(entities, teams, fog, events, &shell, tick);
             } else {
                 pending.push(shell);

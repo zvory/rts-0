@@ -99,14 +99,6 @@ impl MortarShellStore {
         self.shells.len()
     }
 
-    pub(in crate::game) fn due_ground_decals(&self, tick: u32) -> Vec<(u32, f32, f32)> {
-        self.shells
-            .iter()
-            .filter(|shell| shell.impact_tick <= tick)
-            .map(|shell| (shell.owner, shell.x, shell.y))
-            .collect()
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn schedule_manual(
         &mut self,
@@ -206,6 +198,7 @@ impl MortarShellStore {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(in crate::game) fn resolve_due(
         &mut self,
         entities: &mut EntityStore,
@@ -214,11 +207,13 @@ impl MortarShellStore {
         events: &mut HashMap<u32, Vec<Event>>,
         firing_reveals: &mut Vec<FiringRevealSource>,
         tick: u32,
+        mut on_impact: impl FnMut(f32, f32),
     ) {
         let mut pending = Vec::new();
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
+                on_impact(shell.x, shell.y);
                 resolve(entities, teams, fog, events, firing_reveals, &shell, tick);
             } else {
                 pending.push(shell);

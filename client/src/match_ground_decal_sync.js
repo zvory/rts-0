@@ -1,4 +1,6 @@
-const DEFAULT_RETRY_DELAYS_MS = Object.freeze([400, 1000, 2500, 5000]);
+// The room accepts at most one repair response per connection every 500 ms. Keep the first retry
+// beyond that window so a dropped reliable response can be repaired on the very next attempt.
+const DEFAULT_RETRY_DELAYS_MS = Object.freeze([600, 1000, 2500, 5000]);
 
 /**
  * Keeps the renderer's local ground-mark cache aligned with the small revision

@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::config;
 use crate::game::entity::EntityKind;
 use crate::game::fog::Fog;
+use crate::game::map::Map;
 use crate::protocol::{self, GroundDecalView};
 use crate::rules::{
     artillery_ground_decal_source_kind, death_ground_decal_class, mortar_ground_decal_source_kind,
@@ -95,7 +96,11 @@ impl GroundDecalStore {
         )
     }
 
-    pub(crate) fn create_mortar_impact(&mut self, _owner: u32, x: f32, y: f32) -> Option<u32> {
+    pub(crate) fn create_mortar_impact(&mut self, map: &Map, x: f32, y: f32) -> Option<u32> {
+        let radius_tiles = config::MORTAR_OUTER_RADIUS_TILES;
+        if !blast_intersects_map(map, x, y, radius_tiles) {
+            return None;
+        }
         self.create(
             "mortarBlast",
             protocol::kind_to_wire(mortar_ground_decal_source_kind()),
@@ -104,11 +109,15 @@ impl GroundDecalStore {
             0,
             None,
             None,
-            Some(config::MORTAR_OUTER_RADIUS_TILES),
+            Some(radius_tiles),
         )
     }
 
-    pub(crate) fn create_artillery_impact(&mut self, _owner: u32, x: f32, y: f32) -> Option<u32> {
+    pub(crate) fn create_artillery_impact(&mut self, map: &Map, x: f32, y: f32) -> Option<u32> {
+        let radius_tiles = config::ARTILLERY_OUTER_RADIUS_TILES;
+        if !blast_intersects_map(map, x, y, radius_tiles) {
+            return None;
+        }
         self.create(
             "artilleryBlast",
             protocol::kind_to_wire(artillery_ground_decal_source_kind()),
@@ -117,7 +126,7 @@ impl GroundDecalStore {
             0,
             None,
             None,
-            Some(config::ARTILLERY_OUTER_RADIUS_TILES),
+            Some(radius_tiles),
         )
     }
 
@@ -255,7 +264,7 @@ impl GroundDecalStore {
                 && decal.created_revision != 0
                 && decal.created_revision <= self.revision
                 && used_revisions.insert(decal.created_revision)
-                && map.contains_world_point(decal.x, decal.y)
+                && decal_position_valid(decal, map)
                 && decal.facing.is_none_or(f32::is_finite)
                 && decal.weapon_facing.is_none_or(f32::is_finite)
                 && valid_class_and_source(decal)
@@ -326,6 +335,25 @@ fn valid_class_and_source(decal: &GroundDecal) -> bool {
     }
 }
 
+fn decal_position_valid(decal: &GroundDecal, map: &Map) -> bool {
+    decal
+        .radius_tiles
+        .is_some_and(|radius_tiles| blast_intersects_map(map, decal.x, decal.y, radius_tiles))
+        || (decal.radius_tiles.is_none() && map.contains_world_point(decal.x, decal.y))
+}
+
+fn blast_intersects_map(map: &Map, x: f32, y: f32, radius_tiles: f32) -> bool {
+    if !x.is_finite() || !y.is_finite() || !radius_tiles.is_finite() || radius_tiles <= 0.0 {
+        return false;
+    }
+    let closest_x = x.clamp(0.0, map.world_width_px());
+    let closest_y = y.clamp(0.0, map.world_height_px());
+    let dx = x - closest_x;
+    let dy = y - closest_y;
+    let radius = radius_tiles * config::TILE_SIZE as f32;
+    dx * dx + dy * dy <= radius * radius
+}
+
 fn decal_seed(id: u32, x: f32, y: f32) -> u32 {
     let mut hash = 0x811c_9dc5u32;
     for value in [
@@ -375,6 +403,20 @@ mod tests {
     use super::*;
     use crate::game::{Game, ObserverView, PlayerInit};
 
+    fn one_player_game() -> Game {
+        Game::new(
+            &[PlayerInit {
+                id: 1,
+                team_id: 1,
+                faction_id: "kriegsia".to_string(),
+                name: "One".to_string(),
+                color: "#fff".to_string(),
+                is_ai: false,
+            }],
+            7,
+        )
+    }
+
     fn fog_with_visible_tile(player: u32, visible_index: Option<usize>) -> Fog {
         let mut grid = vec![false; 16];
         if let Some(index) = visible_index {
@@ -392,10 +434,11 @@ mod tests {
     #[test]
     fn store_stops_at_cap_without_evicting_or_wrapping_ids() {
         let mut store = GroundDecalStore::new();
+        let map = one_player_game().state.map;
         for _ in 0..MAX_GROUND_DECALS {
-            assert!(store.create_mortar_impact(1, 32.0, 32.0).is_some());
+            assert!(store.create_mortar_impact(&map, 32.0, 32.0).is_some());
         }
-        assert!(store.create_mortar_impact(1, 64.0, 64.0).is_none());
+        assert!(store.create_mortar_impact(&map, 64.0, 64.0).is_none());
         assert_eq!(store.decals.first().map(|decal| decal.id), Some(1));
         assert_eq!(store.decals.last().map(|decal| decal.id), Some(4_096));
     }
@@ -403,7 +446,8 @@ mod tests {
     #[test]
     fn hidden_mark_is_sent_only_after_first_physical_discovery() {
         let mut store = GroundDecalStore::new();
-        store.create_mortar_impact(1, 48.0, 48.0).unwrap();
+        let map = one_player_game().state.map;
+        store.create_mortar_impact(&map, 48.0, 48.0).unwrap();
 
         store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None));
         assert_eq!(store.views_for_players_after(&[2], 0), (0, Vec::new()));
@@ -429,7 +473,8 @@ mod tests {
     #[test]
     fn player_delta_is_fog_safe_while_full_world_gets_created_marks() {
         let mut store = GroundDecalStore::new();
-        store.create_artillery_impact(1, 48.0, 48.0).unwrap();
+        let map = one_player_game().state.map;
+        store.create_artillery_impact(&map, 48.0, 48.0).unwrap();
         store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
         store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None));
 
@@ -498,18 +543,10 @@ mod tests {
 
     #[test]
     fn checkpoint_rejects_noncanonical_blast_radius() {
-        let players = [PlayerInit {
-            id: 1,
-            team_id: 1,
-            faction_id: "kriegsia".to_string(),
-            name: "One".to_string(),
-            color: "#fff".to_string(),
-            is_ai: false,
-        }];
-        let mut game = Game::new(&players, 7);
+        let mut game = one_player_game();
         game.state
             .ground_decals
-            .create_mortar_impact(1, 48.0, 48.0)
+            .create_mortar_impact(&game.state.map, 48.0, 48.0)
             .unwrap();
         let payload = game.checkpoint_payload_text_for_test().unwrap();
         let mut value: serde_json::Value = serde_json::from_str(&payload).unwrap();
@@ -528,18 +565,10 @@ mod tests {
 
     #[test]
     fn checkpoint_rejects_noncanonical_revision_gaps() {
-        let players = [PlayerInit {
-            id: 1,
-            team_id: 1,
-            faction_id: "kriegsia".to_string(),
-            name: "One".to_string(),
-            color: "#fff".to_string(),
-            is_ai: false,
-        }];
-        let mut game = Game::new(&players, 7);
+        let mut game = one_player_game();
         game.state
             .ground_decals
-            .create_mortar_impact(1, 48.0, 48.0)
+            .create_mortar_impact(&game.state.map, 48.0, 48.0)
             .unwrap();
         let payload = game.checkpoint_payload_text_for_test().unwrap();
         let mut value: serde_json::Value = serde_json::from_str(&payload).unwrap();
@@ -551,5 +580,33 @@ mod tests {
             game.map_metadata().clone(),
         );
         assert!(result.is_err(), "revision gaps must reject restore");
+    }
+
+    #[test]
+    fn edge_blasts_keep_checkpoint_state_canonical() {
+        let mut game = one_player_game();
+        game.state
+            .ground_decals
+            .create_mortar_impact(&game.state.map, -16.0, 48.0)
+            .unwrap();
+        assert!(
+            game.state
+                .ground_decals
+                .create_mortar_impact(&game.state.map, -200.0, 48.0)
+                .is_none(),
+            "a fully off-map blast has no visible mark to retain"
+        );
+
+        let payload = game.checkpoint_payload_text_for_test().unwrap();
+        let restored = Game::restore_checkpoint_payload_text_for_test(
+            &payload,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        );
+
+        assert!(
+            restored.is_ok(),
+            "a legal edge impact must not make the server's own checkpoint unrestorable"
+        );
     }
 }

@@ -354,18 +354,24 @@ pub(crate) fn run_tick(
         services::construction::deconstruction_system(entities, players);
     });
     crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
-        for (owner, x, y) in mortar_shells.due_ground_decals(tick) {
-            ground_decals.create_mortar_impact(owner, x, y);
-        }
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-        mortar_shells.resolve_due(entities, &teams, fog, events, firing_reveals, tick);
+        mortar_shells.resolve_due(
+            entities,
+            &teams,
+            fog,
+            events,
+            firing_reveals,
+            tick,
+            |x, y| {
+                ground_decals.create_mortar_impact(map, x, y);
+            },
+        );
     });
     crate::perf::timed(perf.as_deref_mut(), "artillery_impacts", || {
-        for (owner, x, y) in artillery_shells.due_ground_decals(tick) {
-            ground_decals.create_artillery_impact(owner, x, y);
-        }
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-        artillery_shells.resolve_due(entities, &teams, fog, events, tick);
+        artillery_shells.resolve_due(entities, &teams, fog, events, tick, |x, y| {
+            ground_decals.create_artillery_impact(map, x, y);
+        });
     });
     crate::perf::timed(perf.as_deref_mut(), "ability_runtime", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
