@@ -989,6 +989,11 @@ assert(
     ],
     "the tree palette exposes four visual species sharing one authoritative tree/trunk semantic",
   );
+  assert.deepEqual(
+    MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "neutral-unit").map((entry) => entry.typeId),
+    ["unit.tank_trap"],
+    "the doodad palette exposes authored neutral Tank Traps",
+  );
   assert.equal(canonicalDoodadColor(" #AbC "), "#aabbcc");
   assert.equal(canonicalDoodadColor("not-a-color"), null);
   const doodads = normalizeMapEditorDoodads([
@@ -998,12 +1003,14 @@ assert(
     { id: Number.MAX_SAFE_INTEGER, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE, x: 70, y: 80 },
     { id: 9, typeId: "tree.unknown", x: 1, y: 1 },
     { id: 10, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, x: 128, y: 0 },
+    { id: 11, typeId: MAP_EDITOR_DOODAD_TYPES.TANK_TRAP, x: 95, y: 97, color: "#ffffff" },
   ], 128);
   assert.deepEqual(doodads, [
     { typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 30, y: 40, color: "#ff00aa", id: 1 },
     { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 50, y: 60, id: 2 },
     { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE, x: 70, y: 80, id: 3 },
     { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 12, y: 20, id: 7 },
+    { typeId: MAP_EDITOR_DOODAD_TYPES.TANK_TRAP, x: 80, y: 112, id: 11 },
   ], "normalization repairs duplicate, missing, and non-u32 ids, canonicalizes flowers, strips tree color, and rejects invalid records");
 
   assert.deepEqual(normalizeMapEditorDoodads([

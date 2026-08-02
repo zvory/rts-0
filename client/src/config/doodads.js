@@ -7,6 +7,7 @@ export const DOODAD_TYPE = Object.freeze({
   TREE_ALDER: "tree.alder",
   WILDFLOWER_SINGLE: "wildflower.single",
   WILDFLOWER_CLUSTER: "wildflower.cluster",
+  TANK_TRAP: "unit.tank_trap",
 });
 
 export const DOODAD_TYPE_IDS = Object.freeze(Object.values(DOODAD_TYPE));

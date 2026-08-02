@@ -289,13 +289,13 @@ pub struct MapInfo {
     /// Positions of all neutral resource nodes (steel/oil). Included so the
     /// client can render them on the minimap before fog-of-war reveals them.
     pub resources: Vec<ResourceNode>,
-    /// Static map decoration sent once at match start. Tree records also provide authoritative
-    /// trunk collision/pathing inputs; doodads remain outside fog, combat, and snapshots.
+    /// Authored map objects sent once at match start. Tree records also provide authoritative
+    /// trunk collision/pathing inputs; Tank Trap records materialize as ordinary neutral entities.
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
 }
 
-/// A server-validated static decoration authored in integer world pixels.
+/// A server-validated map object authored in integer world pixels.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MapDoodad {
@@ -311,23 +311,26 @@ pub struct MapDoodad {
 pub enum MapDoodadClass {
     Tree,
     Wildflower,
+    TankTrap,
 }
 
 pub const MAX_MAP_DOODADS: usize = 4_096;
 pub const MAP_TILE_SIZE_PX: u32 = 32;
-pub const MAP_DOODAD_TYPE_IDS: [&str; 6] = [
+pub const MAP_DOODAD_TYPE_IDS: [&str; 7] = [
     "tree.oak",
     "tree.pine",
     "tree.spruce",
     "tree.alder",
     "wildflower.single",
     "wildflower.cluster",
+    "unit.tank_trap",
 ];
 
 pub fn classify_map_doodad(type_id: &str) -> Option<MapDoodadClass> {
     match type_id {
         "tree.oak" | "tree.pine" | "tree.spruce" | "tree.alder" => Some(MapDoodadClass::Tree),
         "wildflower.single" | "wildflower.cluster" => Some(MapDoodadClass::Wildflower),
+        "unit.tank_trap" => Some(MapDoodadClass::TankTrap),
         _ => None,
     }
 }
@@ -368,7 +371,7 @@ pub fn validate_map_doodads(
             ));
         };
         match (class, doodad.color.as_deref()) {
-            (MapDoodadClass::Tree, Some(_)) => {
+            (MapDoodadClass::Tree | MapDoodadClass::TankTrap, Some(_)) => {
                 return Err(format!(
                     "doodads[{index}].color is only allowed for wildflowers"
                 ))
@@ -379,6 +382,14 @@ pub fn validate_map_doodads(
                 ))
             }
             _ => {}
+        }
+        if class == MapDoodadClass::TankTrap
+            && (doodad.x % MAP_TILE_SIZE_PX != MAP_TILE_SIZE_PX / 2
+                || doodad.y % MAP_TILE_SIZE_PX != MAP_TILE_SIZE_PX / 2)
+        {
+            return Err(format!(
+                "doodads[{index}] tank trap must be centered on a map tile"
+            ));
         }
     }
     Ok(())
@@ -451,6 +462,8 @@ mod map_doodad_tests {
             let class = classify_map_doodad(type_id).expect("catalog id classifies");
             if type_id.starts_with("tree.") {
                 assert_eq!(class, MapDoodadClass::Tree);
+            } else if *type_id == "unit.tank_trap" {
+                assert_eq!(class, MapDoodadClass::TankTrap);
             } else {
                 assert_eq!(class, MapDoodadClass::Wildflower);
             }

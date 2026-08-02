@@ -531,9 +531,10 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ],
-    // Static map doodads, canonicalized by ascending nonzero id. Tree records have
-    // authoritative tiny trunk collision; wildflowers are inert. Coordinates are integer
-    // world pixels. color is allowed only on wildflowers.
+    // Authored map objects, canonicalized by ascending nonzero id. Tree records have
+    // authoritative tiny trunk collision; wildflowers are inert; unit.tank_trap records spawn
+    // completed neutral Tank Trap entities. Coordinates are integer world pixels. color is
+    // allowed only on wildflowers.
     doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
@@ -1409,13 +1410,15 @@ supported player count; every base site is a permanent resource location, includ
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
 counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
 by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.oak`, `tree.pine`,
-`tree.spruce`, `tree.alder`, `wildflower.single`, and `wildflower.cluster`. Every tree id has the
+`tree.spruce`, `tree.alder`, `wildflower.single`, `wildflower.cluster`, and `unit.tank_trap`. Every tree id has the
 same `Tree` semantic class and authoritative 4.5-world-pixel circular trunk; species affects
 presentation only. Tree color
 is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
 `#rrggbb`. Tree trunks participate in unit standability and add a finite tile-path avoidance cost,
 while leaving the rest of their tile traversable. Wildflowers have no collision or pathing effect.
-Doodads have no fog, vision, cover, or combat behavior in schema v5.
+Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
+setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
+rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior in schema v5.
 Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
 count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
 doodads to `materializedMap`. Records are capped at 64, expire after two

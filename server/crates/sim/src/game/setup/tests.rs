@@ -326,6 +326,39 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
 }
 
 #[test]
+fn authored_tank_trap_doodads_spawn_completed_neutral_entities() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
+        name: "Solo".to_string(),
+        color: "#cc1111".to_string(),
+        is_ai: false,
+    }];
+    let mut map = Map::generate(1, 0x7a4a_7001);
+    let (x, y) = map.tile_center(2, 2);
+    map.doodads.push(crate::protocol::MapDoodad {
+        id: 1,
+        type_id: "unit.tank_trap".to_string(),
+        x: x as u32,
+        y: y as u32,
+        color: None,
+    });
+
+    let game = Game::new_with_random_ai_profiles_and_map(&players, 0x7a4a_7001, map);
+    let trap = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::TankTrap)
+        .expect("authored tank trap should spawn");
+
+    assert_eq!(trap.owner, 0);
+    assert_eq!((trap.pos_x, trap.pos_y), (x, y));
+    assert!(!trap.under_construction());
+}
+
+#[test]
 fn authored_base_resource_counts_control_spawned_patch_totals() {
     let mut map = Map::generate(1, 0x5151_9090);
     let site = map.base_sites[0];

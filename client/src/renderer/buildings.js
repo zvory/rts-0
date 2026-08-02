@@ -199,7 +199,7 @@ function drawInactiveExtractorBadge(g, cx, buildingTop, tileSize) {
   gfxStroke(g, 0);
 }
 
-function drawTankTrap(g, cx, cy, tileSize, id, bodyAlpha) {
+export function drawTankTrap(g, cx, cy, tileSize, id, bodyAlpha) {
   const base = tankTrapRotation(id);
   const visualScale = 1.5;
   const length = tileSize * 0.82 * visualScale;

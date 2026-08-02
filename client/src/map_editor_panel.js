@@ -359,8 +359,10 @@ export class MapEditorPanel {
     const section = group("Doodads");
     const trees = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "tree");
     const flowers = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "wildflower");
+    const neutralUnits = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "neutral-unit");
     const treePalette = this.renderDoodadPalette(trees);
     const flowerPalette = this.renderDoodadPalette(flowers);
+    const neutralUnitPalette = this.renderDoodadPalette(neutralUnits);
 
     const tools = document.createElement("div");
     tools.className = "map-editor-palette";
@@ -403,11 +405,13 @@ export class MapEditorPanel {
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Wildflower spray density");
     section.append(
-      readout(`${this.session.draft.doodads.length}/${MAP_EDITOR_MAX_DOODADS} doodads. Tree species are visual variants of one semantic tree type; each tree has a tiny impassable trunk.`),
+      readout(`${this.session.draft.doodads.length}/${MAP_EDITOR_MAX_DOODADS} doodads. Tree species are visual variants of one semantic tree type; tank traps spawn as completed neutral units.`),
       readout("Trees"),
       treePalette,
       readout("Wildflowers"),
       flowerPalette,
+      readout("Neutral units"),
+      neutralUnitPalette,
       field("Tool", tools),
       field("Flower color", color),
       field("Brush radius (world px)", radius),

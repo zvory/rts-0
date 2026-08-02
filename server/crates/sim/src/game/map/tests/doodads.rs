@@ -21,7 +21,8 @@ fn authored_doodads_are_validated_canonicalized_and_hashed() {
         "baseSites": [{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}],
         "doodads": [
             {"id": 7, "typeId": "wildflower.cluster", "x": 700, "y": 701, "color": "#e05a91"},
-            {"id": 2, "typeId": "tree.alder", "x": 400, "y": 500}
+            {"id": 2, "typeId": "tree.alder", "x": 400, "y": 500},
+            {"id": 9, "typeId": "unit.tank_trap", "x": 80, "y": 80}
         ]
     });
     let json = serde_json::to_string(&document).expect("map JSON");
@@ -32,7 +33,7 @@ fn authored_doodads_are_validated_canonicalized_and_hashed() {
             .iter()
             .map(|doodad| doodad.id)
             .collect::<Vec<_>>(),
-        vec![2, 7]
+        vec![2, 7, 9]
     );
 
     let map = Map::from_authored_json(1, &json, 0).expect("valid authored map");
@@ -89,6 +90,10 @@ fn authored_doodads_reject_unknown_fields_and_invalid_catalog_data() {
         (
             serde_json::json!({"id": 1, "typeId": "tree.pine", "x": 1024, "y": 500}),
             "outside",
+        ),
+        (
+            serde_json::json!({"id": 1, "typeId": "unit.tank_trap", "x": 81, "y": 80}),
+            "centered on a map tile",
         ),
     ] {
         let mut document = base.clone();

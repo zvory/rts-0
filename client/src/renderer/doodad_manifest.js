@@ -1,4 +1,4 @@
-import { DOODAD_TYPE, DOODAD_TYPE_IDS as CONFIG_DOODAD_TYPE_IDS } from "../config.js";
+import { DOODAD_TYPE } from "../config.js";
 
 export const MAX_DOODADS = 4096;
 
@@ -43,7 +43,9 @@ entries[DOODAD_TYPE.WILDFLOWER_CLUSTER] = Object.freeze({
 });
 
 export const DOODAD_MANIFEST = Object.freeze(entries);
-export const DOODAD_TYPE_IDS = CONFIG_DOODAD_TYPE_IDS;
+// Entity-backed authored objects (currently Tank Traps) are intentionally absent: the Map Editor
+// previews them on the building layer and live matches render their authoritative entity snapshot.
+export const DOODAD_TYPE_IDS = Object.freeze(Object.keys(DOODAD_MANIFEST));
 
 export function doodadManifestEntry(typeId) {
   return DOODAD_MANIFEST[typeId] || null;
