@@ -61,8 +61,11 @@ assert(
   "wide terrain prototypes isolate transition depth as an explicit factor",
 );
 assert(
-  TERRAIN_BLEND_PRESETS["soft-ramp"].feather && TERRAIN_BLEND_PRESETS["soft-organic"].feather,
-  "soft terrain prototypes opt into color feathering",
+  TERRAIN_BLEND_PRESETS["dither-bayer"].depth > TERRAIN_BLEND_PRESETS.dither.depth &&
+    TERRAIN_BLEND_PRESETS["dither-bayer"].ditherPattern === "bayer" &&
+    TERRAIN_BLEND_PRESETS["dither-stochastic"].ditherPattern === "stochastic" &&
+    TERRAIN_BLEND_PRESETS["dither-clustered"].ditherPattern === "clustered",
+  "graduated dither prototypes isolate three opaque pixel-placement patterns",
 );
 const signatures = TERRAIN_BLEND_MODES.map((terrainBlendMode) => {
   const first = new TerrainContext();
@@ -76,8 +79,6 @@ const signatures = TERRAIN_BLEND_MODES.map((terrainBlendMode) => {
   return JSON.stringify(first.calls);
 });
 assert(new Set(signatures).size === TERRAIN_BLEND_MODES.length, "terrain blend prototypes produce distinct edge masks");
-assert(
-  signatures[TERRAIN_BLEND_MODES.indexOf("soft-ramp")].includes("rgba") &&
-    signatures[TERRAIN_BLEND_MODES.indexOf("soft-organic")].includes("rgba"),
-  "soft terrain prototypes emit translucent source colors for browser-native interpolation",
-);
+for (const mode of ["dither", "dither-bayer", "dither-stochastic", "dither-clustered"]) {
+  assert(!("feather" in TERRAIN_BLEND_PRESETS[mode]), `${mode} does not enable color feathering`);
+}

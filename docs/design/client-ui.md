@@ -2163,8 +2163,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   transition bands: the higher-ranked material creeps into the lower-ranked material, with the normal
   production style using irregular categorical chips. The stable visual order is road, grass, gravel,
   dirt, mud, then frost; road marking variants are one surface and never seam against each other.
-  Checked-in Lab visual profiles may replace the chip mask with dithered, organic-contour, wider-depth,
-  or color-feathered prototype masks and suppress the fog presentation over a dedicated authoritative terrain matrix for
+  Checked-in Lab visual profiles may replace the chip mask with coarse, Bayer, stochastic, or clustered
+  opaque-pixel dither, organic-contour, or wider-depth prototype masks and suppress the fog presentation over a dedicated authoritative terrain matrix for
   side-by-side material review without changing authoritative terrain or recipient state. Rock and water never blend;
   they retain dark navigation outlines, including one single-width separator where rock meets water. Road uses
   one bare tile plus horizontal, vertical, NW-SE diagonal, and NE-SW diagonal tiles with a simple

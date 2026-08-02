@@ -13,13 +13,14 @@ import {
 
 const TERRAIN_TEXTURE_DOWNSAMPLE = 4;
 export const TERRAIN_BLEND_PRESETS = Object.freeze({
-  "hard-chips": Object.freeze({ shape: "hard-chips", depth: 0.34, feather: false }),
-  "hard-chips-wide": Object.freeze({ shape: "hard-chips", depth: 0.68, feather: false }),
-  dither: Object.freeze({ shape: "dither", depth: 0.34, feather: false }),
-  organic: Object.freeze({ shape: "organic", depth: 0.38, feather: false }),
-  "organic-wide": Object.freeze({ shape: "organic", depth: 0.68, feather: false }),
-  "soft-ramp": Object.freeze({ shape: "ramp", depth: 0.68, feather: true }),
-  "soft-organic": Object.freeze({ shape: "organic", depth: 0.68, feather: true }),
+  "hard-chips": Object.freeze({ shape: "hard-chips", depth: 0.34 }),
+  "hard-chips-wide": Object.freeze({ shape: "hard-chips", depth: 0.68 }),
+  dither: Object.freeze({ shape: "dither", depth: 0.34, ditherPattern: "coarse" }),
+  "dither-bayer": Object.freeze({ shape: "dither", depth: 0.56, ditherPattern: "bayer" }),
+  "dither-stochastic": Object.freeze({ shape: "dither", depth: 0.56, ditherPattern: "stochastic" }),
+  "dither-clustered": Object.freeze({ shape: "dither", depth: 0.56, ditherPattern: "clustered" }),
+  organic: Object.freeze({ shape: "organic", depth: 0.38 }),
+  "organic-wide": Object.freeze({ shape: "organic", depth: 0.68 }),
 });
 export const TERRAIN_BLEND_MODES = Object.freeze(Object.keys(TERRAIN_BLEND_PRESETS));
 export const DEFAULT_TERRAIN_BLEND_MODE = "hard-chips";
@@ -159,19 +160,12 @@ function drawGroundTransitions(ctx, map, tx, ty, code, size, mode) {
   for (const edge of edges) {
     if (preset.shape === "dither") drawDitherTransition(ctx, edge, x, y, size, tx, ty, preset);
     else if (preset.shape === "organic") drawOrganicTransition(ctx, edge, x, y, size, tx, ty, preset);
-    else if (preset.shape === "ramp") drawRampTransition(ctx, edge, x, y, size, preset);
     else drawHardChipTransition(ctx, edge, x, y, size, tx, ty, preset);
   }
 }
 
 function transitionDepth(size, preset) {
   return Math.min(size, Math.max(1, Math.ceil(size * preset.depth)));
-}
-
-function transitionAlpha(inward, maxDepth, feather) {
-  if (!feather) return 1;
-  if (maxDepth <= 1) return 0.82;
-  return 0.86 - (inward / (maxDepth - 1)) * 0.68;
 }
 
 function drawHardChipTransition(ctx, edge, x, y, size, tx, ty, preset) {
@@ -188,6 +182,10 @@ function drawHardChipTransition(ctx, edge, x, y, size, tx, ty, preset) {
 }
 
 function drawDitherTransition(ctx, edge, x, y, size, tx, ty, preset) {
+  if (preset.ditherPattern !== "coarse") {
+    drawGraduatedDitherTransition(ctx, edge, x, y, size, tx, ty, preset);
+    return;
+  }
   const probabilities = [0.76, 0.4, 0.14];
   const depth = Math.min(probabilities.length, transitionDepth(size, preset));
   for (let inward = 0; inward < depth; inward += 1) {
@@ -200,6 +198,41 @@ function drawDitherTransition(ctx, edge, x, y, size, tx, ty, preset) {
   }
 }
 
+const BAYER_4 = Object.freeze([
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5,
+]);
+
+const CLUSTERED_4 = Object.freeze([
+  12, 5, 6, 13,
+  4, 0, 1, 7,
+  11, 3, 2, 8,
+  15, 10, 9, 14,
+]);
+
+function drawGraduatedDitherTransition(ctx, edge, x, y, size, tx, ty, preset) {
+  const depth = transitionDepth(size, preset);
+  for (let inward = 0; inward < depth; inward += 1) {
+    const progress = depth <= 1 ? 0 : inward / (depth - 1);
+    const coverage = 0.92 - progress * 0.76;
+    for (let along = 0; along < size; along += 1) {
+      const ordered = ditherThreshold(preset.ditherPattern, edge, tx, ty, along, inward);
+      if (ordered >= coverage) continue;
+      fillTransitionPixel(ctx, edge, x, y, size, along, inward, transitionPixelColor(edge, along, inward));
+    }
+  }
+}
+
+function ditherThreshold(pattern, edge, tx, ty, along, inward) {
+  if (pattern === "stochastic") return transitionNoise(edge, tx, ty, along, inward);
+  const px = (along + edge.tx) & 3;
+  const py = (inward + edge.ty) & 3;
+  const matrix = pattern === "clustered" ? CLUSTERED_4 : BAYER_4;
+  return matrix[py * 4 + px] / 16;
+}
+
 function drawOrganicTransition(ctx, edge, x, y, size, tx, ty, preset) {
   const maxDepth = transitionDepth(size, preset);
   const raw = Array.from({ length: size }, (_, along) =>
@@ -209,50 +242,10 @@ function drawOrganicTransition(ctx, edge, x, y, size, tx, ty, preset) {
     const after = raw[Math.min(size - 1, along + 1)];
     const depth = Math.max(1, Math.min(maxDepth, Math.round(before * 0.25 + raw[along] * 0.5 + after * 0.25)));
     for (let inward = 0; inward < depth; inward += 1) {
-      fillTransitionPixel(
-        ctx,
-        edge,
-        x,
-        y,
-        size,
-        along,
-        inward,
-        transitionPixelColor(edge, along, inward),
-        transitionAlpha(inward, maxDepth, preset.feather),
-      );
+      fillTransitionPixel(ctx, edge, x, y, size, along, inward, transitionPixelColor(edge, along, inward));
     }
     if (depth < maxDepth && transitionNoise(edge, tx, ty, along, 7) > 0.82) {
-      fillTransitionPixel(
-        ctx,
-        edge,
-        x,
-        y,
-        size,
-        along,
-        depth,
-        transitionPixelColor(edge, along, depth),
-        transitionAlpha(depth, maxDepth, preset.feather),
-      );
-    }
-  }
-}
-
-function drawRampTransition(ctx, edge, x, y, size, preset) {
-  const maxDepth = transitionDepth(size, preset);
-  for (let inward = 0; inward < maxDepth; inward += 1) {
-    const alpha = transitionAlpha(inward, maxDepth, true);
-    for (let along = 0; along < size; along += 1) {
-      fillTransitionPixel(
-        ctx,
-        edge,
-        x,
-        y,
-        size,
-        along,
-        inward,
-        transitionPixelColor(edge, along, inward),
-        alpha,
-      );
+      fillTransitionPixel(ctx, edge, x, y, size, along, depth, transitionPixelColor(edge, along, depth));
     }
   }
 }
@@ -267,7 +260,7 @@ function transitionPixelColor(edge, along, inward) {
   return n > 0.78 ? terrainOverlayColor(edge.code, n) : terrainColor(edge.code, edge.tx, edge.ty);
 }
 
-function fillTransitionPixel(ctx, edge, x, y, size, along, inward, color, alpha = 1) {
+function fillTransitionPixel(ctx, edge, x, y, size, along, inward, color) {
   let px = x + along;
   let py = y + inward;
   if (edge.direction === "south") py = y + size - 1 - inward;
@@ -279,7 +272,7 @@ function fillTransitionPixel(ctx, edge, x, y, size, along, inward, color, alpha 
     px = x + size - 1 - inward;
     py = y + along;
   }
-  ctx.fillStyle = colorCss(color, alpha);
+  ctx.fillStyle = colorCss(color);
   ctx.fillRect(px, py, 1, 1);
 }
 
