@@ -94,12 +94,17 @@ export function branchSlug(branch) {
   return branch.replace(/^zvorygin\//, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "change";
 }
 
+function branchOutboxKey(branch) {
+  const digest = crypto.createHash("sha256").update(branch).digest("hex");
+  return `${branchSlug(branch).slice(0, 80)}-${digest}`;
+}
+
 export function gitCommonDir(repoRoot) {
   return path.resolve(repoRoot, git(repoRoot, ["rev-parse", "--git-common-dir"]));
 }
 
 export function outboxPath(repoRoot, branch) {
-  return path.join(gitCommonDir(repoRoot), "rts-patch-note-outbox", branchSlug(branch));
+  return path.join(gitCommonDir(repoRoot), "rts-patch-note-outbox", branchOutboxKey(branch));
 }
 
 function requireRegularFile(filename, label, maxBytes = MAX_SOURCE_BYTES) {
@@ -294,10 +299,10 @@ function resolveWebhook(repoRoot, name, env = process.env) {
 }
 
 export function resolveWebhooks(repoRoot, env = process.env) {
-  return [
+  return [...new Set([
     resolveWebhook(repoRoot, "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL", env),
     resolveWebhook(repoRoot, "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY", env),
-  ].filter(Boolean);
+  ].filter(Boolean))];
 }
 
 function validateWebhookUrl(value) {
@@ -354,15 +359,16 @@ export async function deliverPatchNote({ repoRoot, branch, env = process.env, po
   const webhooks = resolveWebhooks(repoRoot, env);
   if (webhooks.length === 0) return { status: "not-configured", branch };
   let delivered = 0;
-  for (let index = 0; index < webhooks.length; index += 1) {
+  for (const webhook of webhooks) {
+    const destinationKey = crypto.createHash("sha256").update(webhook).digest("hex");
     const digest = crypto.createHash("sha256")
-      .update(webhooks[index]).update("\0").update(staged.manifest.content).update("\0")
+      .update(webhook).update("\0").update(staged.manifest.content).update("\0")
       .update(staged.manifest.media?.sha256 || "").digest("hex");
-    const receiptPath = path.join(staged.directory, `destination-${index + 1}.receipt`);
+    const receiptPath = path.join(staged.directory, `destination-${destinationKey}.receipt`);
     if (fs.existsSync(receiptPath) && fs.readFileSync(receiptPath, "utf8").trim().split(/\s+/)[0] === digest) continue;
     const response = await post({
       content: staged.manifest.content, mediaPath: staged.mediaPath,
-      mediaDescription: staged.manifest.media?.description || "", webhookUrl: webhooks[index],
+      mediaDescription: staged.manifest.media?.description || "", webhookUrl: webhook,
     });
     fs.writeFileSync(receiptPath, `${digest} ${singleLine(response?.id || "accepted")}\n`, { mode: 0o600 });
     delivered += 1;

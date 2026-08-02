@@ -16,6 +16,7 @@ import {
   parseEnvValue,
   postDiscord,
   renderContent,
+  resolveWebhooks,
   stagePatchNote,
 } from "../scripts/patch-note-outbox.mjs";
 
@@ -51,6 +52,21 @@ assert.deepEqual(
 assert.equal(renderContent({ headline: "Update", changes: ["One.", "Two."] }), "**Update**\n• One.\n• Two.");
 assert.throws(() => renderContent({ changes: ["x".repeat(1_801)] }), /between 1 and 1800/);
 assert.equal(parseEnvValue("A=x\nRTS_PATCH_NOTES_DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/1/token'\n", "RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL"), "https://discord.com/api/webhooks/1/token");
+assert.equal(
+  outboxPath(new URL("..", import.meta.url).pathname, "zvorygin/a/b") ===
+    outboxPath(new URL("..", import.meta.url).pathname, "zvorygin/a-b"),
+  false,
+  "distinct branch names cannot collide in the shared outbox",
+);
+assert(path.basename(outboxPath(new URL("..", import.meta.url).pathname, `zvorygin/${"long-".repeat(100)}`)).length <= 145);
+assert.deepEqual(
+  resolveWebhooks(new URL("..", import.meta.url).pathname, {
+    RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1/token",
+    RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: "https://discord.com/api/webhooks/1/token",
+  }),
+  ["https://discord.com/api/webhooks/1/token"],
+  "the same Discord destination is posted only once",
+);
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-patch-note-outbox-test-"));
 try {
@@ -105,7 +121,11 @@ try {
   };
   await assert.rejects(deliverPatchNote({ repoRoot: root, branch: staged.branch, env, post }), /secondary unavailable/);
   assert.equal(fs.existsSync(outboxPath(root, staged.branch)), true, "partial failure retains outbox");
-  const retried = await deliverPatchNote({ repoRoot: root, branch: staged.branch, env, post });
+  const reorderedEnv = {
+    RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL: env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY,
+    RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY: env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL,
+  };
+  const retried = await deliverPatchNote({ repoRoot: root, branch: staged.branch, env: reorderedEnv, post });
   assert.equal(retried.status, "sent");
   assert.deepEqual(delivered, [env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL, env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY, env.RTS_PATCH_NOTES_DISCORD_WEBHOOK_URL_SECONDARY]);
   assert.equal(fs.existsSync(outboxPath(root, staged.branch)), false, "complete delivery clears outbox");
