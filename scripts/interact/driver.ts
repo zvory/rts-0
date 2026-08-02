@@ -312,7 +312,6 @@ export class InteractDriver {
       throw new InteractDriverError("sessionClosed", "Interact driver was closed during page startup.");
     }
     this.page = page; this.attachPageDiagnostics();
-    if (this.options.autoSpectator) await this.openStep(this.page!.evaluateOnNewDocument(() => localStorage.setItem("rts.autoSpectator.enabled", "1")), "automatic spectator preference");
     await this.openStep(
       this.page!.goto(this.launchUrl(), { waitUntil: "domcontentloaded", timeout: this.options.startupTimeoutMs }),
       "page navigation",
@@ -1069,6 +1068,7 @@ export class InteractDriver {
       map: this.options.map,
       opponent: this.options.opponent,
       spectate: this.options.spectate,
+      autoSpectator: this.options.autoSpectator,
       renderer: this.options.renderer,
       seed: this.options.seed,
       scenario: this.options.scenario,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   InteractGameBridge,
+  interactAutoSpectatorEnabled,
   interactGameLaunchEnabled,
   interactScenarioLaunchEnabled,
 } from "../../client/src/interact_game_bridge.js";
@@ -33,6 +34,16 @@ assert.equal(
   interactGameLaunchEnabled(new URL("http://localhost/?rtsLaunch=match&rtsRoom=interact-game-test&rtsRole=spectator&interact=game")),
   true,
   "the game bridge accepts its isolated AI-vs-AI spectator launch",
+);
+assert.equal(
+  interactAutoSpectatorEnabled(new URL("http://localhost/?rtsLaunch=match&rtsRoom=interact-game-test&rtsRole=spectator&interact=game&rtsAutoSpectator=1")),
+  true,
+  "the isolated spectator launch can explicitly enable fight following",
+);
+assert.equal(
+  interactAutoSpectatorEnabled(new URL("http://localhost/?rtsLaunch=match&rtsRoom=public-room&rtsRole=spectator&interact=game&rtsAutoSpectator=1")),
+  false,
+  "the fight-following override is restricted to a gated Interact spectator launch",
 );
 assert.equal(
   new URL(scenarioLaunchUrl).searchParams.get("interact"),

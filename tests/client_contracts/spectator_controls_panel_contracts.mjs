@@ -59,7 +59,7 @@ try {
 
   withFakeOverlayDocument(() => {
     const host = document.createElement("div");
-    let persistedEnabled = false;
+    let enabledChange = false;
     const match = {
       labMetadata: null,
       replayViewer: false,
@@ -72,14 +72,14 @@ try {
       },
     };
     const autoSpectator = createMatchAutoSpectator(match, { spectator: true }, {
-      onAutoSpectatorEnabledChange: (enabled) => { persistedEnabled = enabled; },
+      onAutoSpectatorEnabledChange: (enabled) => { enabledChange = enabled; },
     }, host);
 
     assert(autoSpectator && host.children.length === 1,
       "match auto spectator mounts its controls into the injected host");
     host.querySelector("#auto-spectator-toggle").listeners.click({ pointerType: "mouse", detail: 1 });
-    assert(autoSpectator.enabled && persistedEnabled,
-      "match auto spectator keeps its director, panel, and persisted preference synchronized");
+    assert(autoSpectator.enabled && enabledChange,
+      "match auto spectator keeps its director and panel synchronized for the current session");
     host.querySelector("#spectator-range-toggle").listeners.click({ pointerType: "mouse", detail: 1 });
     assert(match.state.showAllUnitRangesEnabled,
       "match spectator controls enable ranges for every visible player's units");

@@ -39,7 +39,6 @@ src/
   progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   auto_spectator.js # spectator/replay battle director: tick-paced combat clustering and camera framing
-  auto_spectator_settings.js # persisted opt-in preference for automatic spectator framing
   spectator_controls_panel.js # floating live-spectator/replay camera and all-unit range controls
   match_auto_spectator.js # Match availability, camera-limit, and director-construction wiring
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
@@ -1298,7 +1297,8 @@ export class AutoSpectatorDirector {
 ```
 
 Replay viewers and ordinary live spectators receive a floating, draggable **Spectator Controls**
-panel with one persisted, default-off `Follow active fights` switch. The control is deliberately
+panel with a default-off `Follow active fights` switch. Every spectator or replay session starts
+with the switch off; enabling it lasts only for the current session. The control is deliberately
 kept out of the gear-menu settings. Lab sessions do not mount the director. While enabled, the
 director retains three simulated seconds of attack, death, and positioned-impact activity, groups
 samples within ten tiles, and frames the highest-weight group; deaths count as four attacks,
@@ -2232,7 +2232,6 @@ Current areas:
 - `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` catalog
   route detection, direct launch URL parsing for scenario/map/seed and sanitized lab visual profile
   ids, audio, combat audio, alerts, fog, camera, prediction settings, unit range settings,
-  auto spectator settings,
   `report_window_aggregate.js`.
 
 Import rules:

@@ -84,7 +84,6 @@ const AREA_BY_FILE = new Map(Object.entries({
   "prediction_settings.js": "platform",
   "unit_range_settings.js": "platform",
   "exclusive_fullscreen_settings.js": "platform",
-  "auto_spectator_settings.js": "platform",
 
   "net.js": "transport",
   "snapshot_stream_net.js": "transport",
