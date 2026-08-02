@@ -46,11 +46,12 @@ export function predictionVisualsPaused(match) {
 export function notePredictionAuthoritativeSnapshot(match) {
   if (match.livePauseState.paused) return;
   match.predictionVisualSuspended = false;
+  match.predictionAdapter?.resumeVisualClock?.(match.renderClock?.now?.());
   match.state?.setProgressPredictionPaused?.(false);
 }
 
 export function pausePredictionVisualClock(match) {
-  match.predictionAdapter?.pauseVisualClock?.();
+  match.predictionAdapter?.pauseVisualClock?.(match.renderClock?.now?.());
   match.state?.setProgressPredictionPaused?.(true);
 }
 
@@ -62,7 +63,7 @@ export function suspendPredictionVisuals(match) {
 }
 
 export function clearPredictedMovementOverlay(match) {
-  match.applyPredictionDisplayOverlay({ predictedSnapshot: null });
+  match.state?.clearPredictionPose?.();
 }
 
 export function livePauseActionLabel(match) {

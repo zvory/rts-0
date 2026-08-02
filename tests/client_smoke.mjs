@@ -219,6 +219,8 @@ try {
       x: worker.x + 180,
       y: worker.y,
     });
+    // Emulate three visual ticks without waiting long enough for the server echo.
+    m.predictionAdapter.lastAdvanceAt -= 100;
     m.advancePredictionVisual();
     const predicted = s.entitiesInterpolated(1).find((e) => e.id === worker.id);
     const authoritative = s.entitiesInterpolated(1, { includePrediction: false }).find((e) => e.id === worker.id);
@@ -240,7 +242,7 @@ try {
       predictionSmoke.authoritative?.x === predictionSmoke.before.x
     ),
     predictionSmoke.ready
-      ? `PREDICTION: owned move advances before authoritative echo (before=${predictionSmoke.before?.x}, predicted=${predictionSmoke.predicted?.x}, authoritative=${predictionSmoke.authoritative?.x})`
+      ? `PREDICTION: owned move advances before authoritative echo (before=${predictionSmoke.before?.x}, predicted=${predictionSmoke.predicted?.x}, authoritative=${predictionSmoke.authoritative?.x}, issued=${JSON.stringify(predictionSmoke.issued)}, wasm=${JSON.stringify(predictionSmoke.debug?.wasm)})`
       : `PREDICTION: WASM adapter unavailable for smoke (${predictionSmoke.reason})`,
   );
 

@@ -530,7 +530,7 @@ export function collectMatchFrameContext(match) {
     selectedCount: sizeOf(state.selection),
     rememberedBuildingCount: Array.isArray(state.rememberedBuildings) ? state.rememberedBuildings.length : 0,
     visibleTileCount: countVisibleTiles(state.visibleTiles),
-    predictedEntityCount: sizeOf(state.predictedById),
+    predictedEntityCount: sizeOf(state.predictionPatchById),
     viewportWidth: finiteOrNull(projection?.viewport?.widthCssPx),
     viewportHeight: finiteOrNull(projection?.viewport?.heightCssPx),
     cameraZoom: finiteOrNull(cameraSnapshot?.framingScale),

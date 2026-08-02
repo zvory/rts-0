@@ -5,8 +5,11 @@ import { fileURLToPath } from "node:url";
 import { DEFAULT_FACTION_ID } from "../client/src/protocol.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const gluePath = path.join(repoRoot, "client/vendor/sim-wasm/rts_sim_wasm.js");
-const wasmPath = path.join(repoRoot, "client/vendor/sim-wasm/rts_sim_wasm_bg.wasm");
+const wasmAssetDir = process.env.RTS_SIM_WASM_ASSET_DIR
+  ? path.resolve(process.env.RTS_SIM_WASM_ASSET_DIR)
+  : path.join(repoRoot, "client/vendor/sim-wasm");
+const gluePath = path.join(wasmAssetDir, "rts_sim_wasm.js");
+const wasmPath = path.join(wasmAssetDir, "rts_sim_wasm_bg.wasm");
 const maxHeapDelta = Number(process.env.RTS_SIM_WASM_SMOKE_MAX_HEAP_DELTA || 2_000_000);
 
 function assert(cond, msg) {
@@ -78,6 +81,24 @@ const baseline = {
       maxHp: 40,
       state: "idle",
     },
+    {
+      id: 201,
+      kind: "city_centre",
+      x: 240,
+      y: 240,
+      hp: 1000,
+      maxHp: 1000,
+      state: "idle",
+    },
+  ],
+  progress: [
+    {
+      id: 201,
+      kind: "production",
+      identity: "unit:worker",
+      fraction: 0.25,
+      totalTicks: 495,
+    },
   ],
   visibleObstacles: [
     {
@@ -94,15 +115,32 @@ const before = process.memoryUsage().heapUsed;
 
 const predictor = WasmPredictor.fromStartJson(JSON.stringify(start), 1);
 predictor.importBaselineJson(JSON.stringify(baseline));
+const beforeCommand = JSON.parse(predictor.renderPredictionFrameJson(0.5));
 predictor.enqueueCommandJson(1, JSON.stringify({ c: "move", units: [101], x: 580, y: 100 }));
+const afterCommand = JSON.parse(predictor.renderPredictionFrameJson(0.5));
+assert(afterCommand.tick === beforeCommand.tick, "command enqueue does not advance global prediction time");
+assert(
+  JSON.stringify(afterCommand.progress) === JSON.stringify(beforeCommand.progress),
+  "command enqueue does not advance progress",
+);
 predictor.advanceTicks(300);
 
-const rendered = JSON.parse(predictor.renderSnapshotJson());
+const rendered = JSON.parse(predictor.renderPredictionFrameJson(0.5));
 const diagnostics = JSON.parse(predictor.diagnosticsJson());
 assert(rendered.tick === 300, `expected tick 300, got ${rendered.tick}`);
-assert(rendered.entities.length === 1, "expected one owned entity");
-assert(rendered.entities[0].owner === 1, "prediction render remains scoped to owned entities");
+assert(rendered.entities.length === 1, "expected one owned prediction patch");
+assert(rendered.entities[0].id === 101, "prediction patch identifies the existing owned entity");
 assert(rendered.entities[0].x > 100, "worker advanced along move command");
+assert(
+  Object.keys(rendered.entities[0]).every((key) => ["id", "x", "y", "facing", "motion"].includes(key)),
+  "prediction patch remains capability-scoped to pose and explicit motion",
+);
+assert(rendered.progress.length === 1, "expected one sparse progress patch");
+assert(rendered.progress[0].id === 201, "progress patch identifies an authoritative owned building");
+assert(
+  rendered.progress[0].fraction > 0.25 && rendered.progress[0].fraction <= 0.98001,
+  "progress extrapolation advances without claiming completion",
+);
 assert(diagnostics.pendingCommands === 1, "pending command diagnostics survive smoke");
 
 predictor.free();

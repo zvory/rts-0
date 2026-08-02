@@ -140,7 +140,6 @@ const GROUP_RULES = [
       "client/src/command_budget.js",
       "client/src/command_composer.js",
       "client/src/prediction_controller.js",
-      "client/src/progress_extrapolator.js",
       "client/src/sim_wasm_adapter.js",
     ],
     prefixes: [],
