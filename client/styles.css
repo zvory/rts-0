@@ -4726,6 +4726,7 @@ input[type="text"]:focus {
   border-radius: var(--radius-sm);
   white-space: nowrap;
 }
+
 /* --- Transient toast --- */
 #toast {
   top: 70px;
