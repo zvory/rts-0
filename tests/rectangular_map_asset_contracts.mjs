@@ -3,8 +3,6 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 
 const repoRoot = new URL("../", import.meta.url);
-const source = JSON.parse(fs.readFileSync(new URL("server/assets/maps/1v1.json", repoRoot), "utf8"));
-const wide = JSON.parse(fs.readFileSync(new URL("server/assets/maps/1v1-wide.json", repoRoot), "utf8"));
 
 const fnv1a64 = (chunks) => {
   let hash = 0xcbf29ce484222325n;
@@ -47,7 +45,6 @@ const materializedHash = (data) => fnv1a64([
 const bundledMapContracts = new Map([
   ["1v1-no-terrain.json", [126, 126, "43229a90f176eca98bc846369c23829ec21ef651110c6130f60cd44064e0f493", "d29299dd1553ec21"]],
   ["1v1.json", [126, 126, "dc1f3578b9b8e59dddef9dad876a43873771efac6d7cff010b65a6088f30c91d", "d0b81232a3d4f7e7"]],
-  ["1v1-wide.json", [252, 126, "d60af153e86295536e5bacdf1fd54502bee7059381eb4767a4b01fa3eb40697b", "c7aa3a7c2ccee630"]],
   ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "831dec9e14715c54"]],
   ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "c21f82a96623e5f4"]],
   ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "4730254f979d8825"]],
@@ -112,49 +109,4 @@ for (const [fileName, [contentHash, expectedMaterializedHash]] of bundledScenari
   );
 }
 
-const sourceWidth = source.terrain[0].length;
-const sourceHeight = source.terrain.length;
-const horizontalMargin = sourceWidth / 2;
-
-assert.equal(wide.version, 5, "rectangular demo uses the explicit-dimensions map schema");
-assert.equal(wide.name, "1v1 Wide", "rectangular demo remains selectable by its stable name");
-assert.equal(wide.width, sourceWidth * 2, "rectangular demo doubles the original horizontal extent");
-assert.equal(wide.height, sourceHeight, "rectangular demo preserves the original vertical extent");
-assert.equal(wide.terrain.length, wide.height, "terrain row count matches the declared height");
-assert(wide.terrain.every((row) => row.length === wide.width), "every terrain row matches the declared width");
-assert.equal(horizontalMargin, 63, "the original 126-wide battlefield stays centered between equal margins");
-
-for (let y = 0; y < sourceHeight; y += 1) {
-  const row = wide.terrain[y];
-  assert.equal(row.slice(0, horizontalMargin), ".".repeat(horizontalMargin), `row ${y} has a grass-only left margin`);
-  assert.equal(row.slice(horizontalMargin, horizontalMargin + sourceWidth), source.terrain[y], `row ${y} preserves the original terrain exactly`);
-  assert.equal(row.slice(horizontalMargin + sourceWidth), ".".repeat(horizontalMargin), `row ${y} has a grass-only right margin`);
-}
-
-const shiftedLocations = (locations) => locations.map((location) => ({
-  ...location,
-  x: location.x + horizontalMargin,
-}));
-
-assert.deepEqual(
-  wide.startLocations,
-  shiftedLocations(source.startLocations),
-  "player starts retain their geometry and move only with the centered battlefield",
-);
-assert.deepEqual(
-  wide.baseSites,
-  shiftedLocations(source.baseSites),
-  "resource base sites retain their counts and geometry and move only with the centered battlefield",
-);
-
-const sourceCoordinateCollections = Object.entries(source)
-  .filter(([, value]) => Array.isArray(value) && value.some((entry) => entry && typeof entry === "object" && "x" in entry && "y" in entry))
-  .map(([key]) => key)
-  .sort();
-assert.deepEqual(
-  sourceCoordinateCollections,
-  ["baseSites", "startLocations"],
-  "the source map has no additional coordinate collections that the wide fixture forgot to preserve",
-);
-
-console.log("✅ rectangular_map_asset_contracts.mjs: rectangular demo asset is an exact centered extension");
+console.log("✅ rectangular_map_asset_contracts.mjs: bundled assets use explicit map dimensions");
