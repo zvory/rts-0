@@ -1,6 +1,7 @@
 import { assert } from "./assertions.mjs";
 import { TERRAIN } from "../../client/src/protocol.js";
 import {
+  DEFAULT_TERRAIN_BLEND_MODE,
   drawTerrainTile,
   TERRAIN_BLEND_MODES,
   TERRAIN_BLEND_PRESETS,
@@ -55,6 +56,7 @@ class TerrainContext {
 }
 
 const blendMap = { width: 2, height: 1, terrain: [TERRAIN.ROAD_BARE, TERRAIN.FROSTED_GROUND] };
+assert(DEFAULT_TERRAIN_BLEND_MODE === "dither-stochastic", "production terrain uses the selected stochastic dither");
 assert(
   TERRAIN_BLEND_PRESETS["hard-chips-wide"].depth > TERRAIN_BLEND_PRESETS["hard-chips"].depth &&
     TERRAIN_BLEND_PRESETS["organic-wide"].depth > TERRAIN_BLEND_PRESETS.organic.depth,

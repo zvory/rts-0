@@ -23,7 +23,7 @@ export const TERRAIN_BLEND_PRESETS = Object.freeze({
   "organic-wide": Object.freeze({ shape: "organic", depth: 0.68 }),
 });
 export const TERRAIN_BLEND_MODES = Object.freeze(Object.keys(TERRAIN_BLEND_PRESETS));
-export const DEFAULT_TERRAIN_BLEND_MODE = "hard-chips";
+export const DEFAULT_TERRAIN_BLEND_MODE = "dither-stochastic";
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
