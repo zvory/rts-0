@@ -113,10 +113,10 @@ src/
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   launch_url.js   # Namespaced rtsLaunch URL parsing and pure lobby automation decisions
   map_editor_app.js # Dedicated `/map-editor` lifecycle; never constructs Net, Match, or GameState
-  map_editor_launch.js # Bounded editor route/handoff/workspace query parsing
+  map_editor_launch.js # Bounded editor route/handoff query parsing
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
-  map_editor_session.js # Flat authored-map state, local storage, undo/redo, stroke transactions
-  map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, save/export, and Lab launch
+  map_editor_session.js # Flat authored-map state, undo/redo, and stroke transactions
+  map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, JSON files, and Lab launch
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
@@ -883,7 +883,7 @@ export class MapEditorSession {
   loadAuthoredMap(source, options?)
   mutate(label, mutation), undo(), redo()
   beginTerrainStroke(label?), paintTerrainTiles(tiles, terrain), commitTerrainStroke()
-  materialized(), exportMap(), saveLocal(key), loadLocal(key)
+  materialized(), exportMap()
   mapOverlay()
 }
 ```
@@ -905,16 +905,16 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
-status, local save/load, export, and Lab handoff; Tools owns terrain paint, start/base locations, and
+status, local JSON import/export, and Lab handoff; Tools owns terrain paint, start/base locations, and
 doodad authoring. The top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
 zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
-base locations, and provides undo/redo, local save/load, centered resize, and JSON export. Resize
+base locations, and provides undo/redo, local JSON import/export, and centered resize. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
 shifts start/base locations with the centered source map. Authored v5 maps and materialized Lab
-handoffs carry explicit `width` and `height`; loading bundled or locally saved older square maps
+handoffs carry explicit `width` and `height`; loading bundled or locally imported older square maps
 derives those axes from their terrain rows. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
 player starts there. The selected starting or neutral base exposes integer Steel (0–36) and Oil
@@ -954,8 +954,8 @@ remain mechanically inert.
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
 The bounded server record expires after two minutes and is consumed once. Lab consumption creates a
 private Lab whose first `start` payload already contains the edited map at tick zero; returning through
-`Edit map` transfers only an authoritative exported map. A bounded `workspace` id keeps the editor's
-local map workspace available across the round trip when browser storage is available.
+`Edit map` transfers only an authoritative exported map. The handoff itself carries the current map
+in either direction; the editor does not maintain a separate browser-storage workspace.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.
