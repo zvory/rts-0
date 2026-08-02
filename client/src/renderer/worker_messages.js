@@ -9,6 +9,7 @@ export const RENDER_WORKER_MESSAGE = Object.freeze({
   FRAME: "frame",
   RESIZE: "resize",
   CAPTURE: "capture",
+  RESET_GROUND_DECALS: "resetGroundDecals",
   RESET_GENERATION: "resetGeneration",
   DESTROY: "destroy",
 });
@@ -99,7 +100,7 @@ export function createFrameMessages(frame, state = createRenderWorkerWireState()
   return messages;
 }
 
-export function createDurableDecalMessage(frame) {
+export function createDurableDecalMessage(frame, decalEpoch = 0) {
   validatePresentationFrame(frame);
   const decals = (frame.layers?.persistentGroundMark || [])
     .filter((record) => record?.type === "groundDecal")
@@ -107,7 +108,14 @@ export function createDurableDecalMessage(frame) {
   if (frame.groundDecalRevision <= 0 || decals.length === 0) return null;
   return request(RENDER_WORKER_MESSAGE.DURABLE_DECALS, frame.generation, {
     revision: requireId(frame.groundDecalRevision, "ground decal revision"),
+    decalEpoch: requireId(decalEpoch, "ground decal epoch"),
     decals,
+  });
+}
+
+export function createResetGroundDecalsMessage(generation, decalEpoch) {
+  return request(RENDER_WORKER_MESSAGE.RESET_GROUND_DECALS, generation, {
+    decalEpoch: requireId(decalEpoch, "ground decal epoch"),
   });
 }
 
@@ -171,7 +179,11 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       break;
     case RENDER_WORKER_MESSAGE.DURABLE_DECALS:
       requireId(payload?.revision, "ground decal revision");
+      requireId(payload?.decalEpoch ?? 0, "ground decal epoch");
       if (!Array.isArray(payload?.decals)) throw new TypeError("durableDecals requires records");
+      break;
+    case RENDER_WORKER_MESSAGE.RESET_GROUND_DECALS:
+      requireId(payload?.decalEpoch, "ground decal epoch");
       break;
     case RENDER_WORKER_MESSAGE.FRAME:
       if (payload?.editor) {
@@ -228,6 +240,7 @@ export function validateRenderWorkerResponse(message) {
     }
   }
   if (message.type === RENDER_WORKER_RESPONSE.RETAINED) {
+    requireId(payload?.decalEpoch ?? 0, "ground decal epoch");
     requireId(payload?.revision, "ground decal revision");
   }
   if (message.type === RENDER_WORKER_RESPONSE.FAILED) {

@@ -1289,9 +1289,7 @@ export class Match {
   }
 
   resetGroundDecalPresentation() {
-    this.state?.requeueAuthoritativeGroundDecals?.();
-    this.presentationAssembler?.reset?.({ map: this.state.map });
-    this.presentationFrame = null;
+    this.renderer?.resetGroundDecals?.();
   }
 
   /**

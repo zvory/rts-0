@@ -10,6 +10,7 @@ import {
   createInitializeMessage,
   createMapGenerationMessage,
   createRenderWorkerWireState,
+  createResetGroundDecalsMessage,
   createResetGenerationMessage,
   createResizeMessage,
   RENDER_WORKER_MESSAGE,
@@ -87,6 +88,8 @@ assert(repeat.map((entry) => entry.message.type).join(",") === "durableDecals,fr
   "unchanged large grids are omitted while an unacknowledged durable revision remains explicit");
 assert(createDurableDecalMessage(representative).message.payload.revision === 9,
   "durable decal retention can be sent independently of a supersedable dynamic frame");
+assert(createDurableDecalMessage(representative, 3).message.payload.decalEpoch === 3,
+  "durable decal retention is correlated to the current decal-only reset epoch");
 const editor = createEditorFrameMessage({ version: 1, frameId: 3, terrainUpdate: null, overlay: {} }, 2);
 assert(editor.message.type === RENDER_WORKER_MESSAGE.FRAME && editor.message.payload.editor.frameId === 3,
   "Map Editor records use the same worker frame route and remain detached cloneable data");
@@ -94,6 +97,7 @@ assert(editor.message.type === RENDER_WORKER_MESSAGE.FRAME && editor.message.pay
 for (const control of [
   createResizeMessage({ generation: 1, frameId: 1, widthCssPx: 800, heightCssPx: 600, dpr: 2 }),
   createCaptureMessage({ generation: 1, frameId: 1, captureId: 4, readPixels: true }),
+  createResetGroundDecalsMessage(1, 3),
   createResetGenerationMessage(2),
   createDestroyMessage(2),
 ]) validateRenderWorkerRequest(control);
