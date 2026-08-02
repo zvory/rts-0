@@ -283,6 +283,7 @@ mod tests {
         assert!(html.contains("Scout Car Open-Ground L Path"));
         assert!(html.contains("Scout Car Lake Reverse L Path"));
         assert!(html.contains("Replay 112 Vehicle Lock"));
+        assert!(html.contains("Replay 238 Rifleman Corner Lock"));
         assert!(html.contains("Vehicle Wall Chokepoint"));
         assert!(html.contains("Vehicle Corner Wall"));
         assert!(html.contains("Vehicle Small-Unit Block Baseline"));
@@ -301,6 +302,8 @@ mod tests {
             html.contains("/dev/scenarios?id=scout_car_lake_reverse_l_path&unit=scout_car&count=1")
         );
         assert!(html.contains("/dev/scenarios?id=replay_142_vehicle_lock&unit=scout_car&count=2"));
+        assert!(html
+            .contains("/dev/scenarios?id=replay_238_rifleman_corner_lock&unit=rifleman&count=1"));
         assert!(
             html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=scout_car&count=15")
         );

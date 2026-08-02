@@ -7,6 +7,7 @@ mod dynamic_construction_path_block;
 mod factory_wall_rally_spawn;
 mod layouts;
 mod replay_142_vehicle_lock;
+mod replay_238_rifleman_corner_lock;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_coax;
@@ -17,21 +18,19 @@ use layouts::*;
 impl Game {
     pub fn new_snaking_corridor_scenario(
         unit: EntityKind,
-        unit_count: usize,
+        count: usize,
         seed: u32,
     ) -> Result<DevScenarioSetup, String> {
         if !unit.is_unit() {
             return Err(format!("unsupported snaking-corridor unit {unit}"));
         }
-        if !matches!(unit_count, 1 | 4) {
-            return Err(format!(
-                "unsupported snaking-corridor unit count {unit_count}"
-            ));
+        if !matches!(count, 1 | 4) {
+            return Err(format!("unsupported snaking-corridor unit count {count}"));
         }
 
         let (map, start_tile, start, goal) = scout_car_snaking_corridor_map();
         let mut entities = EntityStore::new();
-        let units = spawn_snaking_corridor_units(&mut entities, unit, unit_count, start)?;
+        let units = spawn_snaking_corridor_units(&mut entities, unit, count, start)?;
         let player_id = 1;
         let game = build_dev_scenario_game(
             map,

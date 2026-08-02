@@ -1,12 +1,16 @@
 use rts_sim::game::entity::EntityKind;
 
 mod command_car_corner;
+mod replay_142_vehicle_lock;
+mod replay_238_rifleman_corner_lock;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_retreat;
 use command_car_corner::{
     COMMAND_CAR_BUILDING_CORNER_SPEC, COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
 };
+use replay_142_vehicle_lock::REPLAY_142_VEHICLE_LOCK_SPEC;
+use replay_238_rifleman_corner_lock::REPLAY_238_RIFLEMAN_CORNER_LOCK_SPEC;
 use scout_car_lake_reverse_l_path::SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC;
 use scout_car_open_ground_l_path::SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC;
 use tank_retreat::{TANK_REVERSE_TRAFFIC_SPEC, TANK_UNDER_FIRE_RETREAT_SPEC};
@@ -166,14 +170,6 @@ const DIRECT_REVERSE_ORDER_LAUNCHES: [DevScenarioLaunch; 3] = [
         case: None,
     },
 ];
-
-const REPLAY_142_VEHICLE_LOCK_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
-    id: "replay_142_vehicle_lock",
-    unit: EntityKind::ScoutCar,
-    count: 2,
-    blocker: None,
-    case: None,
-}];
 
 const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
     DevScenarioLaunch {
@@ -770,7 +766,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 22] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 23] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -792,12 +788,8 @@ const DEV_SCENARIOS: [DevScenarioSpec; 22] = [
     },
     SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC,
     SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC,
-    DevScenarioSpec {
-        id: "replay_142_vehicle_lock",
-        title: "Replay 112 Vehicle Lock",
-        description: "Soupman's two touching Scout/Command Cars, three formation companions, and second-base landmark from match 142. After one second the translated tick-14,176 group order recreates their slow overlapping translation.",
-        launches: &REPLAY_142_VEHICLE_LOCK_LAUNCHES,
-    },
+    REPLAY_142_VEHICLE_LOCK_SPEC,
+    REPLAY_238_RIFLEMAN_CORNER_LOCK_SPEC,
     DevScenarioSpec {
         id: "scout_car_wall_chokepoint",
         title: "Vehicle Wall Chokepoint",

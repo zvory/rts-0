@@ -344,6 +344,9 @@ const approvedCurrentFactionFiles = new Set([
   // Replay-derived vehicle-lock fixture intentionally recreates a current Kriegsia formation and
   // base landmark; public faction admission remains routed through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/replay_142_vehicle_lock.rs",
+  // Replay-derived Rifleman fixture intentionally recreates a current Kriegsia unit at the exact
+  // recorded corner contact; public faction admission remains routed through the dev launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/replay_238_rifleman_corner_lock.rs",
   // The lake reverse-path fixture deliberately isolates current Scout Car movement; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/scout_car_lake_reverse_l_path.rs",
@@ -366,6 +369,10 @@ const approvedCurrentFactionFiles = new Set([
   // This catalog entry is an intentionally Kriegsia-specific Command Car corner fixture; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/command_car_corner.rs",
+  // These catalog entries expose replay-derived current-Kriegsia fixtures; public faction
+  // admission remains routed through the catalog-aware dev scenario launcher.
+  "server/src/dev_scenarios/replay_142_vehicle_lock.rs",
+  "server/src/dev_scenarios/replay_238_rifleman_corner_lock.rs",
   // This catalog entry exposes the intentionally Kriegsia-specific Scout Car lake fixture; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/scout_car_lake_reverse_l_path.rs",

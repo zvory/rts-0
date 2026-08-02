@@ -441,6 +441,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
         Game::new_scout_car_open_ground_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
         Game::new_scout_car_lake_reverse_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
         Game::new_replay_142_vehicle_lock_scenario(EntityKind::ScoutCar, 2, 0x5150_030d),
+        Game::new_replay_238_rifleman_corner_lock_scenario(EntityKind::Rifleman, 1, 0x5150_030d),
         Game::new_scout_car_wall_chokepoint_scenario(EntityKind::ScoutCar, 3, 0x5150_030d),
         Game::new_vehicle_corner_wall_scenario(EntityKind::Tank, 1, 0x5150_030d),
         Game::new_vehicle_small_block_baseline_scenario(
@@ -1051,6 +1052,44 @@ fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
             assert_eq!(owned_kind_count(&setup.game, 1, unit), count);
         }
     }
+}
+
+#[test]
+fn replay_238_rifleman_repeatedly_repaths_without_rounding_corner() {
+    let setup = Game::new_dev_scenario(
+        "replay_238_rifleman_corner_lock",
+        EntityKind::Rifleman,
+        1,
+        None,
+        None,
+        0x5150_0238,
+    )
+    .expect("scenario setup should succeed through the dev-scenario dispatcher");
+    let command = setup.command();
+    let mut game = setup.game;
+    let rifleman = setup.units[0];
+    game.enqueue(setup.player_id, command);
+
+    for _ in 0..180 {
+        game.tick();
+    }
+
+    let entity = game
+        .state
+        .entities
+        .get(rifleman)
+        .expect("Rifleman should remain present");
+    assert!((entity.pos_x - 2755.293).abs() <= 0.001);
+    assert!((entity.pos_y - 311.360).abs() <= 0.001);
+    let movement = entity
+        .movement
+        .as_ref()
+        .expect("Rifleman should still be trying to move");
+    assert_eq!(movement.path_goal, Some((2640.0, 336.0)));
+    assert!(
+        movement.last_repath_tick >= 150,
+        "Rifleman should repeatedly repath while fixed at the corner"
+    );
 }
 
 #[test]
