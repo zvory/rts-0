@@ -43,6 +43,22 @@ fn panzerfaust_movement_locked(e: &Entity) -> bool {
     )
 }
 
+fn pivot_vehicle_step_dir(path_dir: (f32, f32), body_facing: f32) -> (f32, f32) {
+    if !body_facing.is_finite() {
+        return path_dir;
+    }
+    let forward = (body_facing.cos(), body_facing.sin());
+    if !forward.0.is_finite() || !forward.1.is_finite() {
+        return path_dir;
+    }
+    let dot = path_dir.0 * forward.0 + path_dir.1 * forward.1;
+    if dot < 0.0 {
+        (-forward.0, -forward.1)
+    } else {
+        forward
+    }
+}
+
 /// Advance moving units along waypoint paths, preserving passable landings and Move arrival.
 /// Unit overlap is handled later by collision resolution.
 #[allow(clippy::too_many_arguments)]
@@ -298,9 +314,18 @@ pub(super) fn advance_moving_units(
                         e.mark_move_phase(MovePhase::Moving);
                     }
                 } else {
-                    // Partial step toward the waypoint.
+                    // Partial step toward the waypoint. Pivot-drive vehicles translate
+                    // along their hull axis, forward or reverse, so the body facing and motion
+                    // read as one physical action instead of sideways sliding.
                     let path_dir = (dx / dist, dy / dist);
-                    let step_dir = path_dir;
+                    let same_tile_final_vehicle_nudge = is_pivot_vehicle
+                        && path_len == 1
+                        && map.tile_of(x, y) == map.tile_of(wx, wy);
+                    let step_dir = if same_tile_final_vehicle_nudge {
+                        pivot_vehicle_step_dir(path_dir, body_facing)
+                    } else {
+                        path_dir
+                    };
                     let direct_nx = x + step_dir.0 * budget;
                     let direct_ny = y + step_dir.1 * budget;
                     let steered = if can_local_steer {
