@@ -386,6 +386,33 @@ mod tests {
     }
 
     #[test]
+    fn handoff_validation_binds_every_visual_open_terrain_variant() {
+        let mut request = valid_request();
+        let chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        let codes = [
+            terrain::GRAVEL_A,
+            terrain::GRAVEL_B,
+            terrain::GRAVEL_C,
+            terrain::DIRT_A,
+            terrain::DIRT_B,
+            terrain::DIRT_C,
+            terrain::MUD_A,
+            terrain::MUD_B,
+            terrain::MUD_C,
+            terrain::FROSTED_GROUND,
+        ];
+        let first_row = request.authored_map["terrain"][0]
+            .as_str()
+            .expect("terrain row");
+        let mut row = first_row.chars().collect::<Vec<_>>();
+        row[..chars.len()].copy_from_slice(&chars);
+        request.authored_map["terrain"][0] = row.into_iter().collect::<String>().into();
+        request.materialized_map.terrain[..codes.len()].copy_from_slice(&codes);
+
+        assert_eq!(validate_request(&request), Ok(()));
+    }
+
+    #[test]
     fn handoff_validation_accepts_a_non_default_map_size() {
         let size = 48_u32;
         let starts = [LabMapTile { x: 8, y: 8 }, LabMapTile { x: 39, y: 39 }];

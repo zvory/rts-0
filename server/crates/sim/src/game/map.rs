@@ -19,8 +19,7 @@ pub(crate) mod doodads;
 #[cfg(test)]
 mod team_assignment_tests;
 
-use crate::config;
-use crate::protocol::{terrain, MapDoodad};
+use crate::{config, protocol::{terrain, MapDoodad}};
 use crate::rules::terrain as terrain_rules;
 use serde::{Deserialize, Serialize};
 
@@ -388,6 +387,7 @@ mod tests {
     mod doodads;
     mod four_player;
     mod schone_tage;
+    mod terrain_variants;
 
     #[test]
     fn hardcoded_map_loads_for_every_supported_player_count() {

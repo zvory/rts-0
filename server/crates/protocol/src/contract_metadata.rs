@@ -20,6 +20,41 @@ pub mod terrain {
     pub const ROAD_VERTICAL: u8 = 5; // passable road terrain
     pub const ROAD_DIAGONAL_NW_SE: u8 = 6; // passable road terrain
     pub const ROAD_DIAGONAL_NE_SW: u8 = 7; // passable road terrain
+    pub const GRAVEL_A: u8 = 8; // passable open terrain
+    pub const GRAVEL_B: u8 = 9; // passable open terrain
+    pub const GRAVEL_C: u8 = 10; // passable open terrain
+    pub const DIRT_A: u8 = 11; // passable open terrain
+    pub const DIRT_B: u8 = 12; // passable open terrain
+    pub const DIRT_C: u8 = 13; // passable open terrain
+    pub const MUD_A: u8 = 14; // passable open terrain
+    pub const MUD_B: u8 = 15; // passable open terrain
+    pub const MUD_C: u8 = 16; // passable open terrain
+    pub const FROSTED_GROUND: u8 = 17; // passable open terrain
+
+    pub const ALL: &[u8] = &[
+        GRASS,
+        ROCK,
+        WATER,
+        ROAD_BARE,
+        ROAD_HORIZONTAL,
+        ROAD_VERTICAL,
+        ROAD_DIAGONAL_NW_SE,
+        ROAD_DIAGONAL_NE_SW,
+        GRAVEL_A,
+        GRAVEL_B,
+        GRAVEL_C,
+        DIRT_A,
+        DIRT_B,
+        DIRT_C,
+        MUD_A,
+        MUD_B,
+        MUD_C,
+        FROSTED_GROUND,
+    ];
+
+    pub fn is_known(code: u8) -> bool {
+        ALL.contains(&code)
+    }
 }
 
 /// `EntityView.kind` values.
@@ -620,6 +655,16 @@ fn terrain_codes() -> BTreeMap<&'static str, u8> {
         ("ROAD_VERTICAL", terrain::ROAD_VERTICAL),
         ("ROAD_DIAGONAL_NW_SE", terrain::ROAD_DIAGONAL_NW_SE),
         ("ROAD_DIAGONAL_NE_SW", terrain::ROAD_DIAGONAL_NE_SW),
+        ("GRAVEL_A", terrain::GRAVEL_A),
+        ("GRAVEL_B", terrain::GRAVEL_B),
+        ("GRAVEL_C", terrain::GRAVEL_C),
+        ("DIRT_A", terrain::DIRT_A),
+        ("DIRT_B", terrain::DIRT_B),
+        ("DIRT_C", terrain::DIRT_C),
+        ("MUD_A", terrain::MUD_A),
+        ("MUD_B", terrain::MUD_B),
+        ("MUD_C", terrain::MUD_C),
+        ("FROSTED_GROUND", terrain::FROSTED_GROUND),
     ])
 }
 

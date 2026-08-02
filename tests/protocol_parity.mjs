@@ -35,6 +35,7 @@ import {
   STATE,
   STATE_CODE,
   PASSABLE,
+  ROAD_TERRAIN_CODES,
   TERRAIN,
   UPGRADE,
   UPGRADE_CODE,
@@ -258,6 +259,21 @@ for (const road of [
   TERRAIN.ROAD_DIAGONAL_NE_SW,
 ]) {
   assert(PASSABLE[road] === true, `road terrain ${road} must be passable`);
+}
+for (const openVariant of [
+  TERRAIN.GRAVEL_A,
+  TERRAIN.GRAVEL_B,
+  TERRAIN.GRAVEL_C,
+  TERRAIN.DIRT_A,
+  TERRAIN.DIRT_B,
+  TERRAIN.DIRT_C,
+  TERRAIN.MUD_A,
+  TERRAIN.MUD_B,
+  TERRAIN.MUD_C,
+  TERRAIN.FROSTED_GROUND,
+]) {
+  assert(PASSABLE[openVariant] === true, `open terrain ${openVariant} must remain passable`);
+  assert(!ROAD_TERRAIN_CODES.includes(openVariant), `open terrain ${openVariant} must not gain road speed`);
 }
 assertSameCodes("entity kind", protocolContract.compactCodes.kind, KIND_CODE);
 assertSameCodes("entity state", protocolContract.compactCodes.state, STATE_CODE);

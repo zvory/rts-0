@@ -2,9 +2,10 @@
 Kind-specific server balance lives in `server/crates/rules/src/defs.rs`; faction availability,
 buildables, trainables, upgrade ids, and ability carriers live in
 `server/crates/rules/src/faction.rs`; terrain movement/cover/concealment hooks live in
-`server/crates/rules/src/terrain.rs`. Grass, bare road, and all four marked road tiles share open-ground
-passability, cover, concealment, and line-of-sight behavior; road applies a 1.5x movement-speed
-multiplier.
+`server/crates/rules/src/terrain.rs`. Grass, gravel A/B/C, dirt A/B/C, mud A/B/C, frosted ground,
+bare road, and all four marked road tiles share open-ground passability, cover, concealment, and
+line-of-sight behavior. The visual open-ground variants retain grass's 1.0x movement speed; road
+alone applies a 1.5x movement-speed multiplier.
 `server/crates/rules/src/balance.rs` is the stable public re-export surface for timings, tile size,
 starting resources, supply caps, mining amounts, support-weapon constants, body dimensions, upgrade
 and ability scalars, and stat helpers. Its internal `server/crates/rules/src/balance/*.rs` modules
@@ -305,6 +306,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   NE-SW diagonal marked road tiles share this rule. A moving unit samples the terrain under its
   center at the start of each authoritative movement tick; roads otherwise behave like grass,
   including passability, construction, cover, concealment, and line of sight.
+- Gravel A/B/C, Dirt A/B/C, Mud A/B/C, and Frosted Ground are visual Open-terrain variants. They
+  use grass-equivalent 1.0x movement, construction, cover, concealment, and line-of-sight rules.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
 - Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 113` (~3.77s) and

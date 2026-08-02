@@ -1,7 +1,7 @@
 // Client-owned presentation constants: rendering palette, local fog opacity,
 // camera defaults, and command-card layout.
 
-import { KIND } from "../protocol.js";
+import { KIND, TERRAIN } from "../protocol.js";
 
 export const COLORS = Object.freeze({
   bgVoid: 0x11110f, // outside the map
@@ -37,6 +37,19 @@ export const COLORS = Object.freeze({
   trenchRim: 0x3f2919,
   fogUnexplored: 0x11110f,
   fogExplored: 0x000000, // drawn at fogExploredAlpha
+});
+
+export const TERRAIN_VARIANT_PALETTES = Object.freeze({
+  [TERRAIN.GRAVEL_A]: Object.freeze({ base: 0x66685f, alt: 0x74766c, details: [0x939185, 0x494c48], pattern: "gravel" }),
+  [TERRAIN.GRAVEL_B]: Object.freeze({ base: 0x7b705d, alt: 0x8c806a, details: [0xaaa087, 0x5a5246], pattern: "gravel" }),
+  [TERRAIN.GRAVEL_C]: Object.freeze({ base: 0x8a8777, alt: 0x9b9787, details: [0xb9b4a0, 0x666357], pattern: "gravel" }),
+  [TERRAIN.DIRT_A]: Object.freeze({ base: 0x70543b, alt: 0x806148, details: [0x9a7755, 0x4f3c2c], pattern: "dirt" }),
+  [TERRAIN.DIRT_B]: Object.freeze({ base: 0x78503d, alt: 0x8b5e47, details: [0xa97958, 0x55372d], pattern: "dirt" }),
+  [TERRAIN.DIRT_C]: Object.freeze({ base: 0x806d4a, alt: 0x927c55, details: [0xad9465, 0x5e5038], pattern: "dirt" }),
+  [TERRAIN.MUD_A]: Object.freeze({ base: 0x49382c, alt: 0x594536, details: [0x2d241e, 0x6b5542], pattern: "mud", activity: 0.26 }),
+  [TERRAIN.MUD_B]: Object.freeze({ base: 0x454235, alt: 0x534f3e, details: [0x292922, 0x77725b], pattern: "mud", activity: 0.33 }),
+  [TERRAIN.MUD_C]: Object.freeze({ base: 0x503a32, alt: 0x5f463d, details: [0x302621, 0x73574a], pattern: "mud", activity: 0.4 }),
+  [TERRAIN.FROSTED_GROUND]: Object.freeze({ base: 0x646b5e, alt: 0x70766a, details: [0x92978d, 0x4f5749], pattern: "frost" }),
 });
 
 export const FOG_EXPLORED_ALPHA = 0.48;
