@@ -222,7 +222,7 @@ impl RoomTask {
         if let Some(perf) = perf.as_mut() {
             perf.record_phase("game_tick", game_tick_start.elapsed());
         }
-        let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
+        let per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
             Ok(events) => events.into_iter().collect(),
             Err(payload) => {
                 let reason = panic_reason(&payload);
@@ -266,7 +266,7 @@ impl RoomTask {
                 projection_policy.dev_watch_snapshot_for(role, view_player_id)
             };
             let snapshot =
-                projection.snapshot_with_events(&game, &mut per_player_events, &full_vision_events);
+                projection.snapshot_with_events(&game, &per_player_events, &full_vision_events);
             Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
         });
 
