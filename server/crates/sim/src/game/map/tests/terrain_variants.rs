@@ -6,13 +6,14 @@ fn authored_map_accepts_visual_open_terrain_variants() {
     rows[8].replace_range(3..13, "0123456789");
     let json = format!(
         r#"{{
-          "version": 4,
+          "version": 5,
           "name": "open-variants",
           "description": "visual open terrain",
           "_design": "n/a",
           "terrain": {},
           "startLocations": [{{"x": 8, "y": 8}}],
-          "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}]
+          "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
+          "doodads": []
         }}"#,
         serde_json::to_string(&rows).unwrap()
     );
