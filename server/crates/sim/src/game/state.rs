@@ -5,10 +5,10 @@ use rand::{rngs::SmallRng, Error as RngError, RngCore, SeedableRng};
 use super::{
     ability_runtime::AbilityRuntime, anti_tank_gun_memory::AntiTankGunMemory,
     artillery::ArtilleryShellStore, building_memory::BuildingMemory, commands,
-    firing_reveal::FiringRevealSource, fog::Fog, fog::LingeringSightSource, map::Map,
-    mortar::MortarShellStore, replay::CommandLogEntry, setup::StartingLoadout,
-    smoke::SmokeCloudStore, trench::TrenchStore, EntityStore, MapMetadata, PlayerStartingLoadout,
-    PlayerState,
+    firing_reveal::FiringRevealSource, fog::Fog, fog::LingeringSightSource,
+    ground_decal::GroundDecalStore, map::Map, mortar::MortarShellStore, replay::CommandLogEntry,
+    setup::StartingLoadout, smoke::SmokeCloudStore, trench::TrenchStore, EntityStore, MapMetadata,
+    PlayerStartingLoadout, PlayerState,
 };
 
 #[derive(Clone)]
@@ -30,6 +30,7 @@ pub(in crate::game) struct GameState {
     pub(in crate::game) firing_reveals: Vec<FiringRevealSource>,
     pub(in crate::game) smokes: SmokeCloudStore,
     pub(in crate::game) trenches: TrenchStore,
+    pub(in crate::game) ground_decals: GroundDecalStore,
     pub(in crate::game) ability_runtime: AbilityRuntime,
     pub(in crate::game) mortar_shells: MortarShellStore,
     pub(in crate::game) artillery_shells: ArtilleryShellStore,
@@ -135,6 +136,7 @@ impl GameState {
             firing_reveals: Vec::new(),
             smokes: SmokeCloudStore::new(),
             trenches: TrenchStore::new(),
+            ground_decals: GroundDecalStore::new(),
             ability_runtime: AbilityRuntime::new(),
             mortar_shells: MortarShellStore::default(),
             artillery_shells: ArtilleryShellStore::default(),

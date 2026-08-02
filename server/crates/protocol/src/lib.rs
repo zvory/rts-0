@@ -38,13 +38,13 @@ pub use observer_analysis::*;
 pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, AutoBuildSettingsSnapshot, CommandCapabilities, DebugPathPoint, DebugPathView,
-    DiagnosticCapabilities, EntityView, Event, InitialCamera, LabStartMetadata, LabStartRole,
-    LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope, NoticeSeverity,
-    ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
-    RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata, ResourceDelta,
-    ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState,
-    ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
-    TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
+    DiagnosticCapabilities, EntityView, Event, GroundDecalView, InitialCamera, LabStartMetadata,
+    LabStartRole, LabVisionMode, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope,
+    NoticeSeverity, ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore,
+    PlayerStart, RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata,
+    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeSeekState,
+    RoomTimeState, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
+    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
 };
 pub use server_message::ServerMessage;
 
@@ -139,6 +139,11 @@ pub enum ClientMessage {
     /// Throttled notice that the connected browser received human input. This is distinct from
     /// automatic heartbeat and diagnostics traffic so the server can expire abandoned sessions.
     Activity,
+    /// Request durable ground decals learned since this recipient-scoped revision.
+    RequestGroundDecals {
+        #[serde(rename = "afterRevision")]
+        after_revision: u32,
+    },
     /// Set room-controlled time speed. `0` pauses rooms whose clock supports pause.
     SetRoomTimeSpeed { speed: f32 },
     /// Advance room-controlled time by one simulation tick where the clock allows stepping.
@@ -1269,6 +1274,7 @@ mod tests {
 
         Snapshot {
             tick: 42,
+            ground_decal_revision: 17,
             world_combat_position: Some([1024.0, 2048.0]),
             steel: 100,
             oil: 25,

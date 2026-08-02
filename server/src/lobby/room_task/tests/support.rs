@@ -295,6 +295,7 @@ pub(super) fn assert_no_late_spectator_notice(writer: &mut ConnectionWriter, exp
 pub(super) fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
     Snapshot {
         tick,
+        ground_decal_revision: 0,
         world_combat_position: None,
         steel: 75,
         oil: 0,

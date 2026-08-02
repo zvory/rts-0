@@ -1447,6 +1447,7 @@ mod tests {
         assert_eq!(
             sink.try_send_snapshot(Snapshot {
                 tick: 1,
+                ground_decal_revision: 0,
                 world_combat_position: None,
                 steel: 0,
                 oil: 0,

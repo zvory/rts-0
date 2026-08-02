@@ -33,6 +33,7 @@ use crate::game::artillery::ArtilleryShellStore;
 use crate::game::entity::EntityStore;
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::{Fog, LingeringSightSource};
+use crate::game::ground_decal::GroundDecalStore;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::panzerfaust_shot::PanzerfaustShotStore;
@@ -143,6 +144,7 @@ pub(crate) fn run_tick(
     firing_reveals: &mut Vec<FiringRevealSource>,
     smokes: &mut SmokeCloudStore,
     trenches: &mut TrenchStore,
+    ground_decals: &mut GroundDecalStore,
     ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
     artillery_shells: &mut ArtilleryShellStore,
@@ -352,10 +354,16 @@ pub(crate) fn run_tick(
         services::construction::deconstruction_system(entities, players);
     });
     crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
+        for (owner, x, y) in mortar_shells.due_ground_decals(tick) {
+            ground_decals.create_mortar_impact(owner, x, y);
+        }
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         mortar_shells.resolve_due(entities, &teams, fog, events, firing_reveals, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "artillery_impacts", || {
+        for (owner, x, y) in artillery_shells.due_ground_decals(tick) {
+            ground_decals.create_artillery_impact(owner, x, y);
+        }
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         artillery_shells.resolve_due(entities, &teams, fog, events, tick);
     });
@@ -373,6 +381,7 @@ pub(crate) fn run_tick(
             &teams,
             players,
             lingering_sight,
+            ground_decals,
             events,
             tick,
         );
@@ -479,6 +488,7 @@ mod tests {
         let mut firing_reveals = Vec::new();
         let mut smokes = SmokeCloudStore::new();
         let mut trenches = TrenchStore::new();
+        let mut ground_decals = GroundDecalStore::new();
         let mut ability_runtime = AbilityRuntime::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
@@ -514,6 +524,7 @@ mod tests {
             &mut firing_reveals,
             &mut smokes,
             &mut trenches,
+            &mut ground_decals,
             &mut ability_runtime,
             &mut mortar_shells,
             &mut artillery_shells,

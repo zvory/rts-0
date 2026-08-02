@@ -145,6 +145,12 @@ impl Game {
     /// owner-only movement paths. The default `snapshot_for` includes no movement diagnostics.
     pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot;
 
+    /// Request fog-safe durable ground marks learned by one player after a prior cursor.
+    pub fn ground_decals_for_player(&self, player: u32, after_revision: u32) -> (u32, Vec<GroundDecalView>);
+
+    /// Request durable marks for an accepted selected-player union or omniscient observer view.
+    pub fn ground_decals_for_observer(&self, view: &ObserverView, after_revision: u32) -> (u32, Vec<GroundDecalView>);
+
     /// Build a read-only privileged observer projection. `Omniscient` exposes the complete
     /// world/all-owner private detail; `Players` combines selected real-player perspectives.
     /// This value never conveys command authority.
@@ -289,6 +295,7 @@ architecture failures.
 | `firing_reveals` | `authoritative/serialized` | Serialize active firing-reveal sources with stable episode-start and expiry ticks. | Anti-Tank Gun and artillery/mortar reveal logic records temporary actionable sight. Repeated shots extend one continuous episode without changing its start; the next 15 Hz fog sample stamps active sources into viewer fog until a later sample observes expiry. |
 | `smokes` | `authoritative/serialized` | Serialize the full `SmokeCloudStore`, including next id, active clouds, pending clouds, locations, radii, spawn/due/expiry ticks. | Smoke blocks line of sight, combat projection, and the next authoritative fog sample; `tick_inner` retains active smoke and systems may resolve pending smoke. |
 | `trenches` | `authoritative/serialized` | Serialize the full `TrenchStore`, including deterministic trench ids, terrain positions, discovery/memory data, and any store allocator state. | Trenches are persistent neutral terrain outside `EntityStore`; entrenchment services create/discover/update them and snapshots project current plus remembered trench terrain. |
+| `ground_decals` | `authoritative/serialized` | Serialize the capped append-only mark rows, stable id allocator, global revision, and per-player first-discovery revisions. | Death and delayed mortar/artillery impact resolution create deterministic presentation records. Current team fog physically discovers marks; snapshot cursors advertise recipient-scoped repair state and reliable requests return only accepted player/observer projection deltas. At the 4,096-row beta cap, creation stops without eviction. |
 | `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
 | `mortar_shells` | `authoritative/serialized` | Serialize all scheduled mortar impacts with owner, attacker, impact point, and impact tick. | `MortarShellStore::schedule` records delayed impacts; later ticks resolve area damage/events even if the firing mortar dies before impact. |
 | `artillery_shells` | `authoritative/serialized` | Serialize all scheduled artillery impacts with their owners, source data, impact points, and impact ticks. | The artillery store mirrors the delayed-shell contract used by the tick pipeline; dropping it would cancel future area damage and reveal/event output. |

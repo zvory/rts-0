@@ -1,5 +1,5 @@
 {
-  "reason": "rectangular maps require explicit width and height parsing",
+  "reason": "checkpointed fog-discovered ground decals require a bounded store and narrow projection APIs",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -43,7 +43,7 @@
     },
     {
       "path": "checkpoint/mod.rs",
-      "lines": 414
+      "lines": 508
     },
     {
       "path": "checkpoint/player_dto.rs",
@@ -110,6 +110,10 @@
       "lines": 190
     },
     {
+      "path": "ground_decal.rs",
+      "lines": 543
+    },
+    {
       "path": "hero_abilities.rs",
       "lines": 125
     },
@@ -155,7 +159,7 @@
     },
     {
       "path": "mod.rs",
-      "lines": 638
+      "lines": 749
     },
     {
       "path": "mortar.rs",
@@ -1932,6 +1936,10 @@
     {
       "path": "fog.rs",
       "count": 14
+    },
+    {
+      "path": "ground_decal.rs",
+      "count": 12
     },
     {
       "path": "hero_abilities.rs",

@@ -99,6 +99,14 @@ impl MortarShellStore {
         self.shells.len()
     }
 
+    pub(in crate::game) fn due_ground_decals(&self, tick: u32) -> Vec<(u32, f32, f32)> {
+        self.shells
+            .iter()
+            .filter(|shell| shell.impact_tick <= tick)
+            .map(|shell| (shell.owner, shell.x, shell.y))
+            .collect()
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn schedule_manual(
         &mut self,

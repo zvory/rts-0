@@ -1,6 +1,16 @@
 use super::*;
 
 #[test]
+fn parses_ground_decal_delta_request() {
+    let msg: ClientMessage =
+        serde_json::from_str(r#"{"t":"requestGroundDecals","afterRevision":23}"#).unwrap();
+    assert!(matches!(
+        msg,
+        ClientMessage::RequestGroundDecals { after_revision: 23 }
+    ));
+}
+
+#[test]
 fn chat_send_deserializes_with_typed_channel() {
     let msg: ClientMessage =
         serde_json::from_str(r#"{"t":"chatSend","channel":"team","text":"Hold here"}"#).unwrap();
