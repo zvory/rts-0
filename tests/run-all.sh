@@ -666,14 +666,10 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/phase_runner_agents.mjs"
     run_suite_bg "Agent workflow: quality pass helper" \
       node "$SCRIPT_DIR/adversarial_quality_pass.mjs"
-    run_suite_bg "Agent workflow: configurable PR passes" \
-      node "$SCRIPT_DIR/agent_pr_passes.mjs"
     run_suite_bg "Agent workflow: completed plan archival" \
       node "$SCRIPT_DIR/archive_completed_plans.mjs"
     run_suite_bg "Agent workflow: post-merge main refresh" \
       node "$SCRIPT_DIR/wait_pr.mjs"
-    run_suite_bg "Agent workflow: merged patch-note delivery" \
-      node "$SCRIPT_DIR/patch_note_delivery.mjs"
     run_suite_bg "Rust lint (cargo clippy)" \
       cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
@@ -734,6 +730,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/interact_recording_contracts.mjs"
   run_suite_bg "Interact fixed-capture contracts" \
     node "$SCRIPT_DIR/interact_fixed_capture_contracts.mjs"
+  run_suite_bg "Agent workflow: patch-note outbox" \
+    node "$SCRIPT_DIR/patch_note_outbox.mjs"
   run_suite_bg "Interact session coordinator contracts" \
     node "$SCRIPT_DIR/interact_session_coordinator_contracts.mjs"
   run_suite_bg "JS HUD command card" \
