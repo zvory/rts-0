@@ -1054,6 +1054,38 @@ fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
 }
 
 #[test]
+fn replay_238_rifleman_repeatedly_repaths_without_rounding_corner() {
+    let setup =
+        Game::new_replay_238_rifleman_corner_lock_scenario(EntityKind::Rifleman, 1, 0x5150_0238)
+            .expect("scenario setup should succeed");
+    let command = setup.command();
+    let mut game = setup.game;
+    let rifleman = setup.units[0];
+    game.enqueue(setup.player_id, command);
+
+    for _ in 0..180 {
+        game.tick();
+    }
+
+    let entity = game
+        .state
+        .entities
+        .get(rifleman)
+        .expect("Rifleman should remain present");
+    assert!((entity.pos_x - 2755.293).abs() <= 0.001);
+    assert!((entity.pos_y - 311.360).abs() <= 0.001);
+    let movement = entity
+        .movement
+        .as_ref()
+        .expect("Rifleman should still be trying to move");
+    assert_eq!(movement.path_goal, Some((2640.0, 336.0)));
+    assert!(
+        movement.last_repath_tick >= 150,
+        "Rifleman should repeatedly repath while fixed at the corner"
+    );
+}
+
+#[test]
 fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
     for unit in [
         EntityKind::AntiTankGun,

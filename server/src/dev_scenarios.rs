@@ -175,6 +175,14 @@ const REPLAY_142_VEHICLE_LOCK_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLau
     case: None,
 }];
 
+const REPLAY_238_RIFLEMAN_CORNER_LOCK_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "replay_238_rifleman_corner_lock",
+    unit: EntityKind::Rifleman,
+    count: 1,
+    blocker: None,
+    case: None,
+}];
+
 const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
@@ -770,7 +778,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 22] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 23] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -797,6 +805,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 22] = [
         title: "Replay 112 Vehicle Lock",
         description: "Soupman's two touching Scout/Command Cars, three formation companions, and second-base landmark from match 142. After one second the translated tick-14,176 group order recreates their slow overlapping translation.",
         launches: &REPLAY_142_VEHICLE_LOCK_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "replay_238_rifleman_corner_lock",
+        title: "Replay 238 Rifleman Corner Lock",
+        description: "Alex's Rifleman 165 at Schone Tage tick 2,915, fixed at (2755.293, 311.360) while trying to round the northeast rock corner toward (2640, 336).",
+        launches: &REPLAY_238_RIFLEMAN_CORNER_LOCK_LAUNCHES,
     },
     DevScenarioSpec {
         id: "scout_car_wall_chokepoint",

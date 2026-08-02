@@ -189,6 +189,46 @@ impl Game {
         .checkpoint_backed("dev:vehicle_corner_wall")
     }
 
+    pub fn new_replay_238_rifleman_corner_lock_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if unit != EntityKind::Rifleman || unit_count != 1 {
+            return Err(format!(
+                "replay-238 corner lock requires one rifleman, got {unit_count} {unit}"
+            ));
+        }
+
+        let (map, start_tile, start, goal) = replay_238_rifleman_corner_map();
+        let mut entities = EntityStore::new();
+        let rifleman = entities
+            .spawn_unit(1, unit, start.0, start.1)
+            .ok_or_else(|| "failed to spawn replay-238 Rifleman".to_string())?;
+        if let Some(entity) = entities.get_mut(rifleman) {
+            entity.set_facing(2.931_044_8);
+        }
+        let player_id = 1;
+        let game = build_dev_scenario_game(
+            map,
+            entities,
+            player_id,
+            start_tile,
+            seed,
+            "dev:replay_238_rifleman_corner_lock",
+        );
+
+        DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![rifleman],
+            goal,
+            issue_after_ticks: 0,
+            order: DevScenarioOrder::Move,
+        }
+        .checkpoint_backed("dev:replay_238_rifleman_corner_lock")
+    }
+
     pub fn new_vehicle_small_block_baseline_scenario(
         vehicle: EntityKind,
         pair_count: usize,
