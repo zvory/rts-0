@@ -201,6 +201,16 @@ fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
                 '|' => terrain::ROAD_VERTICAL,
                 '\\' => terrain::ROAD_DIAGONAL_NW_SE,
                 '/' => terrain::ROAD_DIAGONAL_NE_SW,
+                '0' => terrain::GRAVEL_A,
+                '1' => terrain::GRAVEL_B,
+                '2' => terrain::GRAVEL_C,
+                '3' => terrain::DIRT_A,
+                '4' => terrain::DIRT_B,
+                '5' => terrain::DIRT_C,
+                '6' => terrain::MUD_A,
+                '7' => terrain::MUD_B,
+                '8' => terrain::MUD_C,
+                '9' => terrain::FROSTED_GROUND,
                 _ => {
                     return Err(format!(
                         "unknown terrain character '{ch}' at tile ({x},{y})"

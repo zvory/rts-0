@@ -884,10 +884,12 @@ single-diagonal symmetry; grass is the erase material. Symmetry expands every te
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
 The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
-Grass, bare road, and the four marked road orientations are passable paint materials; roads may
-cross protected start/base areas while rock and water remain rejected there. Authored map rows
+Grass, Gravel A/B/C, Dirt A/B/C, Mud A/B/C, Frosted Ground, bare road, and the four marked road
+orientations are passable paint materials; all may cross protected start/base areas while rock and
+water remain rejected there. Authored map rows
 encode bare, horizontal-marked, vertical-marked, NW-SE diagonal-marked, and NE-SW diagonal-marked
-roads with `=`, `-`, `|`, `\`, and `/`, respectively.
+roads with `=`, `-`, `|`, `\`, and `/`, respectively. The ten visual Open-terrain variants use
+`0` through `9` in protocol-code order: Gravel A/B/C, Dirt A/B/C, Mud A/B/C, then Frosted Ground.
 Editor status stays above the scrolling controls; failures use a high-contrast alert treatment.
 A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
@@ -2153,9 +2155,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`40.8px` length, `21.6px` width,
   `1px` clearance), matching the authoritative oriented vehicle body used for collision and
   click targeting.
-- Terrain: muted grass/field/mud, rock, water, and deep charcoal-brown road tiles with deterministic
-  coarse dithering so movement is readable and the map has a PlayStation 1-era low-resolution
-  texture feel. Every road side exposed to non-road terrain has a narrow brown earth shoulder with
+- Terrain: muted grass/field, three gravel surfaces, three dirt surfaces, three mud surfaces,
+  frosted ground, rock, water, and deep charcoal-brown road tiles use deterministic coarse detail
+  so movement is readable and the map has a PlayStation 1-era low-resolution texture feel. Gravel
+  uses chips, dirt uses flecks, mud uses broken churn/pool marks, and frost uses sparse cold wisps;
+  all ten are edge-free visual Open terrain. Every road side exposed to non-road terrain has a narrow brown earth shoulder with
   deterministic chips that break up the boundary without softening it into a modern blur. Road uses
   one bare tile plus horizontal, vertical, NW-SE diagonal, and NE-SW diagonal tiles with a simple
   yellow center-line segment. Authors intersperse marked tiles among bare centerline tiles to form

@@ -1,4 +1,4 @@
-import { ROAD_TERRAIN_CODES, TERRAIN, isRoadTerrain } from "./protocol.js";
+import { PASSABLE, TERRAIN, isRoadTerrain } from "./protocol.js";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
@@ -33,6 +33,16 @@ const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.ROAD_VERTICAL]: "|",
   [TERRAIN.ROAD_DIAGONAL_NW_SE]: "\\",
   [TERRAIN.ROAD_DIAGONAL_NE_SW]: "/",
+  [TERRAIN.GRAVEL_A]: "0",
+  [TERRAIN.GRAVEL_B]: "1",
+  [TERRAIN.GRAVEL_C]: "2",
+  [TERRAIN.DIRT_A]: "3",
+  [TERRAIN.DIRT_B]: "4",
+  [TERRAIN.DIRT_C]: "5",
+  [TERRAIN.MUD_A]: "6",
+  [TERRAIN.MUD_B]: "7",
+  [TERRAIN.MUD_C]: "8",
+  [TERRAIN.FROSTED_GROUND]: "9",
 });
 const CHAR_TO_TERRAIN = Object.freeze({
   ".": TERRAIN.GRASS,
@@ -43,8 +53,17 @@ const CHAR_TO_TERRAIN = Object.freeze({
   "|": TERRAIN.ROAD_VERTICAL,
   "\\": TERRAIN.ROAD_DIAGONAL_NW_SE,
   "/": TERRAIN.ROAD_DIAGONAL_NE_SW,
+  "0": TERRAIN.GRAVEL_A,
+  "1": TERRAIN.GRAVEL_B,
+  "2": TERRAIN.GRAVEL_C,
+  "3": TERRAIN.DIRT_A,
+  "4": TERRAIN.DIRT_B,
+  "5": TERRAIN.DIRT_C,
+  "6": TERRAIN.MUD_A,
+  "7": TERRAIN.MUD_B,
+  "8": TERRAIN.MUD_C,
+  "9": TERRAIN.FROSTED_GROUND,
 });
-const ROAD_TERRAIN_CHARS = new Set(ROAD_TERRAIN_CODES.map((code) => TERRAIN_TO_CHAR[code]));
 const ROAD_TERRAIN_ANGLES = new Map([
   [TERRAIN.ROAD_HORIZONTAL, 0],
   [TERRAIN.ROAD_DIAGONAL_NW_SE, 45],
@@ -253,8 +272,7 @@ export class MapEditorSession {
       if (
         !ch || x < 0 || y < 0 || x >= size || y >= size
         || (
-          code !== TERRAIN.GRASS
-          && !isRoadTerrain(code)
+          PASSABLE[code] !== true
           && protectedTerrainTile(this.draft, x, y)
         )
       ) continue;
@@ -540,7 +558,7 @@ export function protectDraftBaseTerrain(draft) {
     for (let y = clampTile(site.y - radius, size); y <= clampTile(site.y + radius, size); y++) {
       const chars = [...draft.terrain[y]];
       for (let x = clampTile(site.x - radius, size); x <= clampTile(site.x + radius, size); x++) {
-        if (!ROAD_TERRAIN_CHARS.has(chars[x])) chars[x] = TERRAIN_TO_CHAR[TERRAIN.GRASS];
+        if (PASSABLE[CHAR_TO_TERRAIN[chars[x]]] !== true) chars[x] = TERRAIN_TO_CHAR[TERRAIN.GRASS];
       }
       draft.terrain[y] = chars.join("");
     }

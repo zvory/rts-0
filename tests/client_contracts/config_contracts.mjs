@@ -166,6 +166,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "TANK_BODY",
   "TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES",
   "TANK_UNLOCK_RESEARCH_TICKS",
+  "TERRAIN_VARIANT_PALETTES",
   "TICK_HZ",
   "UPGRADES",
   "WORKER_BUILDABLE",
@@ -177,7 +178,6 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "trainableUnitsForFaction",
   "workerBuildablesForFaction",
 ]);
-
 // Config
 // ---------------------------------------------------------------------------
 {

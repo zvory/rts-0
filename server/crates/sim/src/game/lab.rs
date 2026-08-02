@@ -509,19 +509,7 @@ impl Game {
                 ),
             });
         }
-        if draft.terrain.iter().any(|tile| {
-            !matches!(
-                *tile,
-                terrain::GRASS
-                    | terrain::ROCK
-                    | terrain::WATER
-                    | terrain::ROAD_BARE
-                    | terrain::ROAD_HORIZONTAL
-                    | terrain::ROAD_VERTICAL
-                    | terrain::ROAD_DIAGONAL_NW_SE
-                    | terrain::ROAD_DIAGONAL_NE_SW
-            )
-        }) {
+        if draft.terrain.iter().any(|tile| !terrain::is_known(*tile)) {
             return Err(LabError::InvalidMap {
                 name: name.to_string(),
                 reason: "terrain contains an unknown code".to_string(),
@@ -1284,6 +1272,16 @@ fn terrain_name(tile: u8) -> &'static str {
         terrain::ROAD_VERTICAL => "road-vertical",
         terrain::ROAD_DIAGONAL_NW_SE => "road-diagonal-nw-se",
         terrain::ROAD_DIAGONAL_NE_SW => "road-diagonal-ne-sw",
+        terrain::GRAVEL_A => "gravel-a",
+        terrain::GRAVEL_B => "gravel-b",
+        terrain::GRAVEL_C => "gravel-c",
+        terrain::DIRT_A => "dirt-a",
+        terrain::DIRT_B => "dirt-b",
+        terrain::DIRT_C => "dirt-c",
+        terrain::MUD_A => "mud-a",
+        terrain::MUD_B => "mud-b",
+        terrain::MUD_C => "mud-c",
+        terrain::FROSTED_GROUND => "frosted-ground",
         _ => "unknown",
     }
 }

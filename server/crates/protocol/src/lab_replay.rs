@@ -696,17 +696,7 @@ fn validate_map_container(
         )));
     }
     for &tile in &scenario.map.data.terrain {
-        if !matches!(
-            tile,
-            terrain::GRASS
-                | terrain::ROCK
-                | terrain::WATER
-                | terrain::ROAD_BARE
-                | terrain::ROAD_HORIZONTAL
-                | terrain::ROAD_VERTICAL
-                | terrain::ROAD_DIAGONAL_NW_SE
-                | terrain::ROAD_DIAGONAL_NE_SW
-        ) {
+        if !terrain::is_known(tile) {
             return Err(invalid(format!(
                 "{label}.map.data.terrain contains an unknown terrain code"
             )));
