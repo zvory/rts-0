@@ -1,4 +1,13 @@
 import { ROAD_TERRAIN_CODES, TERRAIN, isRoadTerrain } from "./protocol.js";
+import {
+  createMapEditorDoodads,
+  MAP_EDITOR_MAX_DOODADS,
+  moveMapEditorDoodad,
+  normalizeMapEditorDoodads,
+  removeMapEditorDoodads,
+} from "./map_editor_doodads.js";
+
+export { MAP_EDITOR_MAX_DOODADS } from "./map_editor_doodads.js";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
@@ -75,6 +84,7 @@ export class MapEditorSession {
     this.lastAction = "";
     this.savedFingerprint = "";
     this.terrainStroke = null;
+    this.doodadStroke = null;
   }
 
   get initialized() { return !!this.draft; }
@@ -91,6 +101,7 @@ export class MapEditorSession {
       terrain: map.terrain,
       starts: (startPayload?.players || []).map((player) => ({ x: Number(player.startTileX), y: Number(player.startTileY) })),
       baseSites: [],
+      doodads: map.doodads,
     });
     this.markSaved({ notify: false });
     this.notify("initialized");
@@ -108,6 +119,7 @@ export class MapEditorSession {
       terrain: data.terrain,
       starts: data.starts,
       baseSites: data.baseSites || data.expansionSites,
+      doodads: data.doodads,
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -139,6 +151,7 @@ export class MapEditorSession {
       terrain: Array(mapSize * mapSize).fill(TERRAIN.GRASS),
       starts,
       baseSites: starts,
+      doodads: [],
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -292,6 +305,72 @@ export class MapEditorSession {
     return true;
   }
 
+  beginDoodadStroke(label = "Edited doodads") {
+    if (!this.draft || this.doodadStroke) return false;
+    this.doodadStroke = {
+      label,
+      before: clone(this.draft),
+      upserts: new Map(),
+      removedIds: new Set(),
+    };
+    return true;
+  }
+
+  placeDoodads(placements, options) {
+    if (!this.draft || !this.doodadStroke) return [];
+    const added = createMapEditorDoodads(this.draft, placements, options);
+    for (const record of added) {
+      this.doodadStroke.removedIds.delete(record.id);
+      this.doodadStroke.upserts.set(record.id, clone(record));
+    }
+    return added;
+  }
+
+  moveDoodad(id, point) {
+    if (!this.draft || !this.doodadStroke) return null;
+    const moved = moveMapEditorDoodad(this.draft, id, point);
+    if (moved) this.doodadStroke.upserts.set(moved.id, clone(moved));
+    return moved;
+  }
+
+  removeDoodads(ids) {
+    if (!this.draft || !this.doodadStroke) return [];
+    const removed = removeMapEditorDoodads(this.draft, ids);
+    for (const id of removed) {
+      this.doodadStroke.upserts.delete(id);
+      this.doodadStroke.removedIds.add(id);
+    }
+    return removed;
+  }
+
+  commitDoodadStroke() {
+    const stroke = this.doodadStroke;
+    this.doodadStroke = null;
+    if (!stroke) return false;
+    normalizeDraft(this.draft);
+    if (JSON.stringify(stroke.before) === JSON.stringify(this.draft)) return false;
+    this.undoStack.push(stroke.before);
+    if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
+    this.redoStack = [];
+    this.lastAction = stroke.label;
+    this.notify("doodadStroke", {
+      doodadPatch: {
+        upserts: [...stroke.upserts.values()].sort((left, right) => left.id - right.id),
+        removedIds: [...stroke.removedIds].sort((left, right) => left - right),
+      },
+    });
+    return true;
+  }
+
+  cancelDoodadStroke() {
+    const stroke = this.doodadStroke;
+    this.doodadStroke = null;
+    if (!stroke) return false;
+    this.draft = stroke.before;
+    this.notify("changed");
+    return true;
+  }
+
   mapOverlay() {
     if (!this.draft) return null;
     const starts = this.draft.startLocations.map((location, index) => ({ ...location, index }));
@@ -304,7 +383,7 @@ export class MapEditorSession {
 
   saveLocal(key) {
     if (!this.draft || !this.storage?.setItem) return false;
-    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 4, draft: this.draft })); } catch { return false; }
+    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 5, draft: this.draft })); } catch { return false; }
     this.lastAction = "Saved local map";
     this.markSaved();
     return true;
@@ -315,6 +394,7 @@ export class MapEditorSession {
     let parsed;
     try {
       const text = this.storage.getItem(storageKey(key))
+        || this.storage.getItem(legacyV4StorageKey(key))
         || this.storage.getItem(legacyV3StorageKey(key))
         || this.storage.getItem(legacyStorageKey(key));
       if (!text) return false;
@@ -344,6 +424,7 @@ export class MapEditorSession {
       terrain: draft.terrain.flatMap((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch])),
       starts: draft.startLocations.map(copyLocation),
       baseSites: draft.baseSites.map(copyBaseSite),
+      doodads: draft.doodads.map(copyDoodad),
     };
   }
 
@@ -547,7 +628,7 @@ export function protectDraftBaseTerrain(draft) {
   }
 }
 
-export function authoredMapFromMaterialized({ name, description, size, terrain, starts, baseSites }) {
+export function authoredMapFromMaterialized({ name, description, size, terrain, starts, baseSites, doodads = [] }) {
   const mapSize = Math.max(1, Math.trunc(Number(size)) || 1);
   const codes = Array.from(terrain || []);
   const terrainRows = Array.from({ length: mapSize }, (_, y) => (
@@ -557,13 +638,14 @@ export function authoredMapFromMaterialized({ name, description, size, terrain, 
   const bases = normalizeBaseSiteRecords(baseSites, mapSize);
   for (const start of startLocations) if (!bases.some((site) => sameLocation(site, start))) bases.push(newBaseSite(start));
   const draft = {
-    version: 4,
+    version: 5,
     name: String(name || "Map").trim() || "Map",
     description: String(description || ""),
     _design: "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
     terrain: terrainRows,
     startLocations,
     baseSites: bases,
+    doodads: normalizeMapEditorDoodads(doodads, mapSize * 32),
   };
   normalizeDraft(draft);
   return draft;
@@ -572,27 +654,37 @@ export function authoredMapFromMaterialized({ name, description, size, terrain, 
 export function materializedMapsEqual(left, right) {
   if (!left || !right || left.name !== right.name || left.size !== right.size) return false;
   if (!sameFlatArray(left.terrain, right.terrain)) return false;
-  return sameLocationSet(left.starts, right.starts) && sameBaseSiteSet(left.baseSites, right.baseSites);
+  return sameLocationSet(left.starts, right.starts)
+    && sameBaseSiteSet(left.baseSites, right.baseSites)
+    && sameDoodadSet(left.doodads, right.doodads);
 }
 
 function normalizeDraft(draft) {
   if (!draft || typeof draft !== "object") throw new Error("Map data is invalid.");
-  if (Number(draft.version) !== 4) replaceObject(draft, migrateLegacyDraft(draft));
+  if (Number(draft.version) !== 5) replaceObject(draft, migrateLegacyDraft(draft));
   const size = draft.terrain?.length;
   if (!positiveInteger(size) || !Array.isArray(draft.terrain) || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== size)) {
     throw new Error("Map terrain must be a square grid.");
   }
-  draft.version = 4;
+  draft.version = 5;
   draft.name = String(draft.name || "Map").trim() || "Map";
   draft.description = String(draft.description || "");
   draft._design = String(draft._design || "Flat map locations.");
   draft.terrain = draft.terrain.map((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch] === undefined ? "." : ch).join(""));
   draft.startLocations = normalizeLocations(draft.startLocations, size).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
   draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, size);
+  draft.doodads = normalizeMapEditorDoodads(draft.doodads, size * 32, { max: MAP_EDITOR_MAX_DOODADS });
   protectDraftBaseTerrain(draft);
 }
 
 function migrateLegacyDraft(source) {
+  if (Number(source?.version) === 4) {
+    return {
+      ...clone(source),
+      version: 5,
+      doodads: Array.isArray(source?.doodads) ? source.doodads : [],
+    };
+  }
   const sites = Array.isArray(source?.sites) ? source.sites : [];
   const byId = new Map(sites.map((site) => [site.id, site]));
   const starts = normalizeLocations(source?.startLocations, source?.terrain?.length || 0);
@@ -602,13 +694,14 @@ function migrateLegacyDraft(source) {
   }
   if (!starts.length) for (const site of sites.filter((site) => site.kind === "main")) starts.push(copyLocation(site));
   return {
-    version: 4,
+    version: 5,
     name: source?.name || "Map",
     description: source?.description || "",
     _design: "Migrated map data. Flat locations and per-base resource counts are authoritative.",
     terrain: source?.terrain || [],
     startLocations: starts,
     baseSites: (source?.baseSites || sites).map(copyBaseSite),
+    doodads: [],
   };
 }
 
@@ -798,6 +891,11 @@ function copyBaseSite(site) {
     oilPatches: boundedPatchCount(site?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, MAP_EDITOR_DEFAULT_OIL_PATCHES),
   };
 }
+function copyDoodad(record) {
+  const copy = { id: record.id, typeId: record.typeId, x: record.x, y: record.y };
+  if (record.color) copy.color = record.color;
+  return copy;
+}
 function newBaseSite(location) {
   return {
     ...copyLocation(location),
@@ -819,6 +917,11 @@ function sameBaseSiteSet(left, right) {
   const a = new Set((left || []).map(record)); const b = new Set((right || []).map(record));
   return a.size === b.size && [...a].every((key) => b.has(key));
 }
+function sameDoodadSet(left, right) {
+  const record = (doodad) => `${doodad?.id}:${doodad?.typeId}:${doodad?.x}:${doodad?.y}:${doodad?.color || ""}`;
+  const a = new Set((left || []).map(record)); const b = new Set((right || []).map(record));
+  return a.size === b.size && [...a].every((key) => b.has(key));
+}
 function sameFlatArray(left, right) { return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((value, index) => value === right[index]); }
 function draftFingerprint(draft) { return JSON.stringify(draft); }
 function clone(value) { return structuredCloneSafe(value); }
@@ -827,7 +930,8 @@ function replaceObject(target, source) { for (const key of Object.keys(target)) 
 function positiveInteger(value) { const number = Math.trunc(Number(value)); return Number.isInteger(number) && number > 0 ? number : 0; }
 function clampTile(value, size) { return Math.max(0, Math.min(size - 1, Math.trunc(value))); }
 function draftEditError(error) { return { ok: false, error }; }
-function storageKey(key) { return `rts.map-editor.v4.${String(key || "default")}`; }
+function storageKey(key) { return `rts.map-editor.v5.${String(key || "default")}`; }
+function legacyV4StorageKey(key) { return `rts.map-editor.v4.${String(key || "default")}`; }
 function legacyV3StorageKey(key) { return `rts.map-editor.v3.${String(key || "default")}`; }
 function legacyStorageKey(key) { return `rts.mapEditor.${String(key || "default")}.v2`; }
 function defaultStorage() { try { return globalThis.localStorage || null; } catch { return null; } }

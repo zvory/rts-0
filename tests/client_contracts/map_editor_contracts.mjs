@@ -102,6 +102,18 @@ import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import {
+  canonicalDoodadColor,
+  createDoodadSprayStroke,
+  createMapEditorDoodads,
+  extendDoodadSprayStroke,
+  MAP_EDITOR_DOODAD_CATALOG,
+  MAP_EDITOR_DOODAD_TYPES,
+  MAP_EDITOR_MAX_DOODADS,
+  normalizeMapEditorDoodads,
+  symmetricDoodadPlacements,
+} from "../../client/src/map_editor_doodads.js";
+import { createMapEditorPresentation } from "../../client/src/map_editor_presentation.js";
+import {
   mapEditorSymmetryGuideCentre,
   mapEditorSymmetryGuideLines,
   MapEditorViewport,
@@ -226,7 +238,7 @@ assert(
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
-  assert.equal(session.exportMap().version, 4);
+  assert.equal(session.exportMap().version, 5);
   assert.equal(session.exportMap().layouts, undefined, "flat map data has no layout matrix");
   assert.equal(materialized.starts.length, 2);
   assert.equal(materialized.baseSites.length, 4, "every authored base is materialized without choosing a player layout");
@@ -436,7 +448,7 @@ assert(
   };
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(legacy);
-  assert.equal(session.exportMap().version, 4, "local v2 maps migrate into current flat map data");
+  assert.equal(session.exportMap().version, 5, "local v2 maps migrate into current flat map data");
   assert.equal(session.exportMap().layouts, undefined);
 }
 
@@ -459,9 +471,33 @@ assert(
     setItem(key, value) { values.set(key, value); },
   };
   const session = new MapEditorSession({ storage });
-  assert.equal(session.loadLocal("legacy-workspace"), true, "v4 sessions recover saved v2 workspaces");
-  assert.equal(session.exportMap().version, 4);
+  assert.equal(session.loadLocal("legacy-workspace"), true, "v5 sessions recover saved v2 workspaces");
+  assert.equal(session.exportMap().version, 5);
   assert.equal(session.materialized().baseSites.length, 2);
+}
+
+{
+  const v4Draft = {
+    version: 4,
+    name: "Saved v4 map",
+    description: "",
+    terrain: Array.from({ length: 16 }, () => ".".repeat(16)),
+    startLocations: [{ x: 7, y: 7 }],
+    baseSites: [{ x: 7, y: 7, steelPatches: 12, oilPatches: 3 }],
+  };
+  const values = new Map([
+    ["rts.map-editor.v4.v4-workspace", JSON.stringify({ schemaVersion: 4, draft: v4Draft })],
+  ]);
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, value); },
+  };
+  const session = new MapEditorSession({ storage });
+  assert.equal(session.loadLocal("v4-workspace"), true);
+  assert.equal(session.exportMap().version, 5);
+  assert.deepEqual(session.exportMap().doodads, [], "v4 local maps migrate to an empty v5 doodad layer");
+  assert.equal(session.saveLocal("v4-workspace"), true);
+  assert(values.has("rts.map-editor.v5.v4-workspace"), "new local saves use the v5 namespace");
 }
 
 {
@@ -799,7 +835,7 @@ assert(
 {
   const request = [];
   await createMapHandoff({
-    destination: "lab", authoredMap: { version: 4 }, materializedMap: { starts: [], baseSites: [] },
+    destination: "lab", authoredMap: { version: 5 }, materializedMap: { starts: [], baseSites: [], doodads: [] },
     fetchImpl: async (_url, init) => {
       request.push(JSON.parse(init.body));
       return { ok: true, json: async () => ({ handoffId: "0123456789abcdef0123456789abcdef" }) };
@@ -834,4 +870,174 @@ assert(
   assert.equal(session.materialized().terrain[0], TERRAIN.GRASS);
   assert.deepEqual(statuses, [{ message: "Terrain paint cancelled.", error: false }]);
   assert.equal(viewport.paintStartTile, null, "pointer cancellation clears the pending box preview");
+}
+
+{
+  assert.equal(MAP_EDITOR_MAX_DOODADS, 4096, "the editor mirrors the authoritative doodad cap");
+  assert.deepEqual(
+    MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "tree").map((entry) => entry.typeId),
+    [
+      "tree.oak", "tree.pine", "tree.birch", "tree.spruce", "tree.aspen", "tree.alder",
+      "tree.oak.topdown", "tree.pine.topdown", "tree.birch.topdown", "tree.spruce.topdown",
+      "tree.aspen.topdown", "tree.alder.topdown",
+    ],
+    "the tree palette exposes six inert species in both 3/4 and top-down perspectives",
+  );
+  assert.equal(canonicalDoodadColor(" #AbC "), "#aabbcc");
+  assert.equal(canonicalDoodadColor("not-a-color"), null);
+  const doodads = normalizeMapEditorDoodads([
+    { id: 7, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 12, y: 20, color: "#ffffff" },
+    { id: 7, typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 30, y: 40, color: "#F0A" },
+    { id: 0, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 50, y: 60 },
+    { id: 9, typeId: "tree.unknown", x: 1, y: 1 },
+    { id: 10, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_BIRCH, x: 128, y: 0 },
+  ], 128);
+  assert.deepEqual(doodads, [
+    { typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 30, y: 40, color: "#ff00aa", id: 1 },
+    { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 50, y: 60, id: 2 },
+    { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 12, y: 20, id: 7 },
+  ], "normalization repairs ids deterministically, canonicalizes flowers, strips tree color, and rejects invalid records");
+}
+
+{
+  const once = createDoodadSprayStroke({ x: 100, y: 100 }, { radius: 24, density: 4, seed: 19 });
+  const oncePlacements = [...once.placements, ...extendDoodadSprayStroke(once.stroke, { x: 180, y: 100 })];
+  const partitioned = createDoodadSprayStroke({ x: 100, y: 100 }, { radius: 24, density: 4, seed: 19 });
+  const partitionedPlacements = [...partitioned.placements];
+  for (const x of [110, 123, 141, 160, 180]) {
+    partitionedPlacements.push(...extendDoodadSprayStroke(partitioned.stroke, { x, y: 100 }));
+  }
+  assert.deepEqual(partitionedPlacements, oncePlacements,
+    "fixed-distance spray output is independent of pointer-event subdivision");
+  assert.deepEqual(symmetricDoodadPlacements(320, [{ x: 17, y: 31 }], MAP_EDITOR_SYMMETRY.HALF_TURN), [
+    { x: 17, y: 31 }, { x: 302, y: 288 },
+  ], "doodad symmetry operates on sub-tile world pixels");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  assert.equal(session.exportMap().version, 5);
+  assert.deepEqual(session.materialized().doodads, []);
+  session.beginDoodadStroke("Sprayed flowers");
+  const added = session.placeDoodads([{ x: 100, y: 120 }, { x: 140, y: 150 }], {
+    typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_CLUSTER,
+    color: "#C58AF9",
+  });
+  assert.deepEqual(added.map((record) => record.id), [1, 2], "new doodads receive stable smallest-free numeric ids");
+  assert.equal(session.commitDoodadStroke(), true);
+  assert.equal(session.undoStack.length, 1, "a complete doodad stroke creates one history entry");
+  assert.deepEqual(session.materialized().doodads.map((record) => record.color), ["#c58af9", "#c58af9"]);
+  session.undo();
+  assert.deepEqual(session.materialized().doodads, []);
+  session.redo();
+  assert.deepEqual(session.materialized().doodads.map((record) => record.id), [1, 2]);
+
+  session.beginDoodadStroke("Cancelled tree");
+  session.placeDoodads([{ x: 200, y: 220 }], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_BIRCH });
+  session.cancelDoodadStroke();
+  assert.deepEqual(session.materialized().doodads.map((record) => record.id), [1, 2],
+    "pointer cancellation can restore the doodad draft atomically");
+}
+
+{
+  const draft = authoredMapFromMaterialized({
+    name: "Doodad round trip", description: "", size: 16,
+    terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [],
+    doodads: [{ id: 4, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 111, y: 222 }],
+  });
+  const session = new MapEditorSession({ storage: null });
+  session.loadAuthoredMap(draft);
+  assert.deepEqual(session.materialized().doodads, draft.doodads);
+  const other = structuredClone(session.materialized());
+  assert.equal(materializedMapsEqual(session.materialized(), other), true);
+  other.doodads[0].x += 1;
+  assert.equal(materializedMapsEqual(session.materialized(), other), false,
+    "handoff equality includes static doodads");
+}
+
+{
+  const record = createMapEditorPresentation({
+    frameId: 1,
+    camera: { x: 0, y: 0, zoom: 1 },
+    visualTimeMs: 1200,
+    doodadUpdate: {
+      kind: "replace", revision: 1,
+      doodads: [{ id: 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 30, y: 40 }],
+    },
+    overlay: {
+      doodadSelection: { id: 1, x: 30, y: 40 },
+      doodadBrushPreview: { x: 40, y: 50, radius: 48, mode: "erase", typeId: null, color: null },
+    },
+  });
+  assert.equal(structuredClone(record).doodadUpdate.doodads[0].id, 1,
+    "the revisioned doodad replacement and editor overlay remain structured-cloneable");
+  assert.throws(() => createMapEditorPresentation({
+    frameId: 1, camera: { x: 0, y: 0, zoom: 1 },
+    doodadUpdate: { kind: "patch", revision: 1, upserts: [], removedIds: [2, 2] },
+  }), /duplicate removed ids/);
+}
+
+{
+  const draft = authoredMapFromMaterialized({
+    name: "Cap", description: "", size: 16,
+    terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [], doodads: [],
+  });
+  draft.doodads = Array.from({ length: MAP_EDITOR_MAX_DOODADS - 1 }, (_, index) => ({
+    id: index + 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: index % 512, y: Math.floor(index / 512),
+  }));
+  const added = createMapEditorDoodads(draft, [{ x: 1, y: 1 }, { x: 2, y: 2 }], {
+    typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE,
+  });
+  assert.equal(added.length, 1);
+  assert.equal(draft.doodads.length, MAP_EDITOR_MAX_DOODADS, "authoring stops exactly at the exported cap");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.beginDoodadStroke("Sprayed flowers");
+  session.placeDoodads([{ x: 50, y: 60 }], {
+    typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE,
+    color: "#ef739d",
+  });
+  const statuses = [];
+  const viewport = {
+    doodadPointerId: 17,
+    doodadPointerMode: "spray",
+    doodadDragOffset: null,
+    doodadSprayStroke: {},
+    doodadLastWorld: { x: 50, y: 60 },
+    paintPointerId: null,
+    panPointerId: null,
+    session,
+    drawOverlay() {},
+    onStatus(message, error) { statuses.push({ message, error }); },
+  };
+  MapEditorViewport.prototype.handlePointerUp.call(viewport, {
+    type: "pointercancel", pointerId: 17, currentTarget: { releasePointerCapture() {} },
+  });
+  assert.deepEqual(session.materialized().doodads, [], "pointercancel rolls back an in-progress doodad stroke");
+  assert.equal(session.undoStack.length, 0, "a cancelled doodad stroke never enters history");
+  assert.deepEqual(statuses, [{ message: "Doodad edit cancelled.", error: false }]);
+}
+
+{
+  const viewport = {
+    doodadRevision: 3,
+    pendingDoodadUpdate: {
+      kind: "patch", revision: 3,
+      upserts: [{ id: 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 10, y: 20 }],
+      removedIds: [2],
+    },
+  };
+  MapEditorViewport.prototype.queueDoodadPatch.call(viewport, {
+    upserts: [{ id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER_TOPDOWN, x: 30, y: 40 }],
+    removedIds: [1],
+  });
+  assert.deepEqual(viewport.pendingDoodadUpdate, {
+    kind: "patch", revision: 4,
+    upserts: [{ id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER_TOPDOWN, x: 30, y: 40 }],
+    removedIds: [1],
+  }, "pending doodad patches coalesce by stable id without resurrecting removals");
 }
