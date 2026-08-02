@@ -164,9 +164,9 @@ impl SmokeCloudStore {
     /// The allowance is measured from body edge so large units receive the same physical gap as
     /// infantry rather than needing their centers to overlap.
     pub(crate) fn units_have_melee_visibility(&self, first: &Entity, second: &Entity) -> bool {
-        self.point_inside(first.pos_x, first.pos_y)
+        Self::units_within_melee_visibility_range(first, second)
+            && self.point_inside(first.pos_x, first.pos_y)
             && self.point_inside(second.pos_x, second.pos_y)
-            && Self::units_within_melee_visibility_range(first, second)
     }
 
     pub(crate) fn units_within_melee_visibility_range(first: &Entity, second: &Entity) -> bool {
