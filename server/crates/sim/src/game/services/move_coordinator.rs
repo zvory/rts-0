@@ -57,6 +57,10 @@ use footprint_pathing::{build_staging_goal, build_staging_goal_in_range};
 /// Tile-path requests per tick; hits count so rebuildable-cache state cannot alter scheduling.
 const MAX_REQUESTS_PER_TICK: usize = 8;
 
+// Mirrors movement::ARRIVE_EPS so same-tile vehicle nudges still move when the
+// body center is visibly away from the exact clicked point.
+const EXACT_GOAL_ARRIVAL_EPS_PX: f32 = 2.0;
+
 /// A completed search at or above this deterministic work threshold consumes the rest of the
 /// tick's request allowance. The search itself still receives the full per-route expansion budget;
 /// only later requests are deferred.
@@ -290,17 +294,24 @@ impl<'a> MoveCoordinator<'a> {
         for trench_id in occupied_trench_ids_for_units(entities, &selected_units) {
             occupied_trenches.remove(&trench_id);
         }
-        let known_trenches = self.known_trenches_for_player(player).to_vec();
-        let mut reachability = formation::FormationReachability::new(self.map, self.occ);
-        let goals = formation::formation_goals_with_known_trenches_and_reachability(
-            self.map,
-            self.occ,
-            &units,
-            goal,
-            &known_trenches,
-            &occupied_trenches,
-            |unit, tile| reachability.can_reach(unit, tile),
-        );
+        let goals = if units.len() == 1 {
+            // A single selected unit has no formation to preserve; keep the player
+            // click as the authoritative body-center goal instead of snapping to
+            // the containing tile center.
+            vec![goal]
+        } else {
+            let known_trenches = self.known_trenches_for_player(player).to_vec();
+            let mut reachability = formation::FormationReachability::new(self.map, self.occ);
+            formation::formation_goals_with_known_trenches_and_reachability(
+                self.map,
+                self.occ,
+                &units,
+                goal,
+                &known_trenches,
+                &occupied_trenches,
+                |unit, tile| reachability.can_reach(unit, tile),
+            )
+        };
 
         for (unit, g) in units.iter().zip(goals.iter()) {
             entities.release_miner(unit.id);
@@ -933,16 +944,31 @@ impl<'a> MoveCoordinator<'a> {
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         if sx == gx && sy == gy && source != PathingRequestSource::DirectAttack {
-            let gather_goal = (source == PathingRequestSource::Gather).then_some(goal);
+            let center_dist =
+                ((goal.0 - start_pos.0).powi(2) + (goal.1 - start_pos.1).powi(2)).sqrt();
+            let same_tile_vehicle_nudge = uses_oriented_vehicle_body(kind)
+                && center_dist.is_finite()
+                && center_dist > EXACT_GOAL_ARRIVAL_EPS_PX;
             if let Some(e) = entities.get_mut(id) {
-                e.set_path(gather_goal.into_iter().collect());
+                let same_tile_path = if same_tile_vehicle_nudge {
+                    Some(goal)
+                } else if source == PathingRequestSource::Gather {
+                    Some(goal)
+                } else {
+                    None
+                };
+                e.set_path(same_tile_path.into_iter().collect());
                 e.set_last_repath_tick(self.tick);
                 e.set_path_goal(Some(goal));
                 match e.order() {
                     Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
-                        e.mark_move_phase(MovePhase::Arrived);
-                        if matches!(e.order(), Order::Move(_)) {
-                            e.set_order(Order::Idle);
+                        if same_tile_vehicle_nudge {
+                            e.mark_move_phase(MovePhase::Moving);
+                        } else {
+                            e.mark_move_phase(MovePhase::Arrived);
+                            if matches!(e.order(), Order::Move(_)) {
+                                e.set_order(Order::Idle);
+                            }
                         }
                     }
                     Order::Attack(_) => e.mark_attack_phase(AttackPhase::Pursuing),
@@ -1402,6 +1428,52 @@ mod tests {
         assert!(matches!(e.order(), Order::Idle));
         assert_eq!(e.move_phase(), None);
         assert!(e.path_is_empty());
+    }
+
+    #[test]
+    fn single_unit_move_preserves_exact_clicked_goal() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (ux, uy) = map.tile_center(10, 10);
+        let id = entities
+            .spawn_unit(1, EntityKind::Tank, ux, uy)
+            .expect("tank should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let click = (ux + 5.25, uy + 3.5);
+
+        coordinator.order_group_move(&mut entities, 1, &[id], click, false);
+
+        let e = entities.get(id).expect("tank should exist");
+        assert_eq!(e.path_goal(), Some(click));
+        assert!(
+            matches!(e.order(), Order::Move(point) if point.intent.x == click.0 && point.intent.y == click.1)
+        );
+    }
+
+    #[test]
+    fn same_tile_vehicle_move_keeps_exact_nudge_active() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (ux, uy) = map.tile_center(10, 10);
+        let id = entities
+            .spawn_unit(1, EntityKind::Tank, ux, uy)
+            .expect("tank should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let click = (ux + 5.25, uy + 3.5);
+
+        coordinator.order_group_move(&mut entities, 1, &[id], click, false);
+        coordinator.process_awaiting_paths(&mut entities);
+
+        let e = entities.get(id).expect("tank should exist");
+        assert!(matches!(e.order(), Order::Move(_)));
+        assert_eq!(e.move_phase(), Some(MovePhase::Moving));
+        assert_eq!(e.next_waypoint(), Some(click));
     }
 
     #[test]
