@@ -254,47 +254,18 @@ canary runs own a private server; the browser shard passes its existing loopback
   `scripts/phase-runner*.mjs` or phased plan path handling, including slash-separated nested plan
   names, sanitized worktree/log slugs, executor model inheritance, and generated `codex exec`
   arguments.
-- Agent PR passes / adversarial quality workflow: run `node tests/agent_pr_passes.mjs` and
-  `node tests/adversarial_quality_pass.mjs` when changing `scripts/agent-pr-passes.mjs`, its
-  configured passes, `scripts/adversarial-quality-pass.mjs`, their schemas, or agent PR wiring.
-  `scripts/agent-pr.sh` runs manifest-ordered specialist passes before the final adversarial review.
-  Each pass may select its own model through the manifest's `modelEnv`; the patch-note pass uses
-  `RTS_PATCH_NOTES_MODEL` when set and otherwise lets Codex choose its default. It cheaply skips
-  branches without runtime paths that may affect players, and qualifying branches receive one
-  fragment at `patch-notes/YYYY-MM-DD/<branch-slug>.md` before final review. A branch may be
-  explicitly opted out when the user asks to skip patch notes for the current PR:
-  `scripts/agent-pr.sh --skip-patch-notes` bypasses Codex classification, removes an existing
-  branch-owned managed fragment, and writes `Patch-Notes: skipped-user-request` to the owned PR
-  metadata. Reruns without an explicit patch-note option inherit that PR-scoped state;
-  `--auto-patch-notes` clears it and returns to automatic classification. The agent must not infer
-  an opt-out merely from the size or perceived importance of a change. Qualifying
-  classifications use Codex repository review mode against the requested base; classifier
-  instructions travel over stdin, and the branch diff is inspected from the checkout rather than
-  embedded in a process argument. Regression coverage must keep prompt and diff content out of the
-  spawned command line so large branches remain portable across operating systems. Both AI passes
-  share a bounded review-input manifest: human-authored files up to 256 KiB remain available for
-  ordinary diff review, while binary files, generated Lab checkpoint JSON, snapshot streams, and
-  other oversized text are represented only by path, classification, before/after byte size, Git
-  blob id, and diff stat. Prompts prohibit printing or decoding those raw artifacts and direct the
-  reviewer to generators, authored inputs, and tests. Patch-note CLI diagnostics stream instead of
-  accumulating in a synchronous child-process buffer. The specialist
-  patch-note pass is the sole owner of that tree: the adversarial pass is instructed not to edit
-  `patch-notes/`, and a post-pass tree-and-history check fails before push if it creates, edits,
-  deletes, or commits and restores a fragment.
-  `.github/workflows/patch-note-delivery.yml` sends only a merged PR fragment's `## Changes`
-  bullets to both configured Discord webhooks. It checks out trusted `main`, uses no LLM, retries
-  transient webhook errors, records per-destination success to make partial retries idempotent, and
-  records `patch-note-delivery` success on the immutable PR head only after both destinations accept
-  the message. Hourly reconciliation and
-  manual dispatch recover missed merge events; the success status suppresses ordinary reruns.
-  `scripts/wait-pr.sh` does not deliver notes, avoiding a race between local and GitHub delivery.
-  The workflow omits the fragment title, date, playtest-watch section, and PR metadata.
-  Review-time and CI-recovery reruns of `scripts/agent-pr.sh` never deliver the webhook. Generated
-  notes use at most three change bullets and must fit the complete
-  Discord post within 240 characters. The classifier favors a general player-facing gist over
-  exhaustive detail; legacy oversized fragments fall back to a short generic notice instead of
-  being cut off mid-sentence. Delivery dry-runs print the exact bounded message without contacting
-  Discord. Webhook payloads disable mention parsing.
+- Agent PR / adversarial quality workflow: run `node tests/adversarial_quality_pass.mjs` when
+  changing `scripts/adversarial-quality-pass.mjs`, its schema, or agent PR wiring. Patch-note copy
+  is authored by the implementing agent rather than a second Codex pass. When useful, the agent
+  stages up to 1,800 characters in the ignored Git-common-dir outbox with
+  `node scripts/patch-note-outbox.mjs stage --change "<change>"`. Supplying both `--before` and
+  `--after` composes equal-sized PNG files or Interact preview URLs into a labeled four-second
+  H.264 MP4, with each frame held for two seconds. The media is probed and capped below Discord's
+  default 10 MiB attachment limit. `scripts/wait-pr.sh` attempts delivery only after proving the PR
+  head is reachable from `origin/main`; webhook errors retain the outbox entry and do not fail the
+  successful merge. Per-destination receipts avoid resending after an ordinary partial failure.
+  Outbox tests cover copy bounds, exact media composition, byte integrity, partial delivery, and
+  no-note/no-webhook behavior. Webhook payloads disable mention parsing.
   Dry-run coverage should keep preview generation non-mutating before clean/fetch checks, and nested
   Codex quality-pass coverage should verify access to linked worktree git common directories while
   marking the environment so `scripts/agent-pr.sh` refuses recursive PR lifecycle calls.
@@ -468,12 +439,7 @@ The `PR ownership` workflow validates owned agent PR metadata for `zvorygin/*` b
 
 `scripts/agent-pr.sh` reuses the changed-file policy before opening or updating an owned PR. A
 supplied `--head` value must match the current branch before the docs-only skip can push or post
-status. Before that final classification, it runs the ordered entries in
-`scripts/agent-pr-passes.json`; mutating passes must commit their work and leave the same branch
-clean so the adversarial review covers their final output. Pass reports are preserved in the PR
-body. The helper resolves a patch-note mode before running those passes: an explicit CLI choice
-wins, otherwise an open PR's `Patch-Notes: skipped-user-request` metadata is inherited, and a new
-PR defaults to automatic classification. When the resulting branch diff against `origin/main`
+status. When the resulting branch diff against `origin/main`
 contains only `.md` files, including Markdown
 files outside `docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts
 a successful `adversarial-quality-pass` status, and writes a docs-only skip report into the PR body.

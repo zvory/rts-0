@@ -68,10 +68,6 @@ assert.match(prompt, /fixed-roster-hellhole\.rtsstream \| class=binary/);
 assert.match(prompt, /AI behavior is outside your authority: do not create, alter, or approve it/);
 assert.match(prompt, /Refactor AI code only\nwhen behavior is preserved exactly/);
 assert.match(prompt, /Ignore missing documentation updates/);
-assert.match(prompt, /Patch-note generation is outside your authority/);
-assert.match(prompt, /sole\nowner of every path under patch-notes\//);
-assert.match(prompt, /Do not create, edit, delete, stage, or commit those paths/);
-assert.doesNotMatch(prompt, /Accuracy and completeness of any player-facing patch-note/);
 assert.match(prompt, /complete, coherent,\nworking state/);
 assert.doesNotMatch(prompt, /fail the gate/i);
 assert.doesNotMatch(prompt, /close the PR/i);
@@ -208,10 +204,6 @@ function copyWorkflowScripts(targetRepo) {
   fs.mkdirSync(targetTests, { recursive: true });
   for (const script of [
     "agent-pr.sh",
-    "agent-pr-passes.mjs",
-    "agent-pr-passes.json",
-    "patch-note-pass.mjs",
-    "patch-note-pass.schema.json",
     "review-inputs.mjs",
     "archive-completed-plans.mjs",
     "plan-phase-status.mjs",
@@ -223,8 +215,6 @@ function copyWorkflowScripts(targetRepo) {
   }
   fs.copyFileSync(path.join(repoRoot, "tests", "select-suites.mjs"), path.join(targetTests, "select-suites.mjs"));
   fs.chmodSync(path.join(targetScripts, "agent-pr.sh"), 0o755);
-  fs.chmodSync(path.join(targetScripts, "agent-pr-passes.mjs"), 0o755);
-  fs.chmodSync(path.join(targetScripts, "patch-note-pass.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "archive-completed-plans.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "adversarial-quality-pass.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "format-touched-rust.sh"), 0o755);
@@ -247,34 +237,16 @@ try {
     `#!/usr/bin/env bash
 set -euo pipefail
 report_file=""
-is_patch_note=0
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "--output-last-message" ]; then
     report_file="$2"
     shift
-  elif [ "$1" = "--output-schema" ]; then
-    if [[ "$2" == */patch-note-pass.schema.json ]]; then
-      is_patch_note=1
-    fi
-    shift
-  fi
+  elif [ "$1" = "--output-schema" ]; then shift; fi
   shift
 done
 if [ -z "$report_file" ]; then
   echo "missing report file" >&2
   exit 1
-fi
-if [ "$is_patch_note" = "1" ]; then
-  cat >"$report_file" <<'JSON'
-{
-  "decision": "no_patch_note",
-  "title": "",
-  "changes": [],
-  "playtest_watch": [],
-  "reason": "The fixture source edit has no player-facing gameplay effect."
-}
-JSON
-  exit 0
 fi
 quality_prompt="$(cat)"
 if [[ "$quality_prompt" != *"final autonomous quality pass"* ]] ||
@@ -291,13 +263,6 @@ if [ "\${RTS_ADVERSARIAL_QUALITY_PASS:-}" != "1" ]; then
 fi
 if [ "\${CODEX_MUTATE_AGENT_PR:-}" = "1" ]; then
   printf '\\n# fixture codex mutation\\n' >> scripts/agent-pr.sh
-fi
-if [ "\${CODEX_MUTATE_AND_RESTORE_PATCH_NOTE:-}" = "1" ]; then
-  printf '\\n- Adversarial rewrite.\\n' >> patch-notes/fixture.md
-  git add patch-notes/fixture.md
-  git commit -m "Illegally rewrite patch note"
-  git checkout HEAD^ -- patch-notes/fixture.md
-  git commit -m "Restore patch note"
 fi
 cat >"$report_file" <<'JSON'
 {
@@ -401,60 +366,12 @@ done
   assert.match(body, /<!-- rts-agent-pr:v1 -->/);
   assert.match(body, /^Focused-Verification: workflow fixture$/m);
   assert.match(body, /## Adversarial quality pass/);
-  assert.match(body, /## Agent PR passes/);
-  assert.match(body, /Decision: no_patch_note/);
   assert.match(body, /Verdict: improved/);
   assert.match(body, /Captured report body\./);
   assert.match(body, /- embedded the quality-pass report/);
   assert.match(fs.readFileSync(codexCalledMarker, "utf8"), /codex called/);
   assert.equal(fs.readFileSync(path.join(workPath, "server", "src", "branch.rs"), "utf8"), "fn main() {}\n");
   assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Run adversarial quality pass/);
-
-  run("git", ["checkout", "main"], { cwd: workPath });
-  run("git", ["checkout", "-b", "zvorygin/patch-note-boundary"], { cwd: workPath });
-  fs.mkdirSync(path.join(workPath, "patch-notes"), { recursive: true });
-  fs.writeFileSync(path.join(workPath, "patch-notes", "fixture.md"), "# Specialist output\n");
-  fs.mkdirSync(path.join(workPath, "server", "src"), { recursive: true });
-  fs.writeFileSync(path.join(workPath, "server", "src", "boundary.rs"), "fn boundary() {}\n");
-  run("git", ["add", "patch-notes/fixture.md", "server/src/boundary.rs"], { cwd: workPath });
-  run("git", ["commit", "-m", "Add specialist output fixture"], { cwd: workPath });
-  const protectedHead = run("git", ["rev-parse", "HEAD"], { cwd: workPath }).stdout.trim();
-  const protectedPass = spawnSync(
-    "scripts/adversarial-quality-pass.mjs",
-    [
-      "--repo", workPath,
-      "--head-branch", "zvorygin/patch-note-boundary",
-      "--codex-command", path.join(binPath, "codex"),
-      "--no-fetch",
-      "--push",
-    ],
-    {
-      cwd: workPath,
-      encoding: "utf8",
-      env: testEnv({
-        CODEX_MUTATE_AND_RESTORE_PATCH_NOTE: "1",
-        PATH: `${binPath}:${process.env.PATH}`,
-      }),
-    },
-  );
-  assert.notEqual(protectedPass.status, 0, "quality pass must reject patch-note mutations");
-  assert.match(protectedPass.stderr, /must not modify specialist-owned patch notes/);
-  assert.match(protectedPass.stderr, /patch-notes\/fixture\.md/);
-  assert.equal(
-    fs.readFileSync(path.join(workPath, "patch-notes", "fixture.md"), "utf8"),
-    "# Specialist output\n",
-    "fixture proves edit-and-restore commits leave the final patch-note tree unchanged",
-  );
-  assert.notEqual(
-    run("git", ["rev-parse", "HEAD"], { cwd: workPath }).stdout.trim(),
-    protectedHead,
-    "fixture proves edit-and-restore Codex commits are detected",
-  );
-  assert.equal(
-    run("git", ["ls-remote", "--heads", "origin", "zvorygin/patch-note-boundary"], { cwd: workPath }).stdout.trim(),
-    "",
-    "a forbidden patch-note mutation must fail before push",
-  );
 
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/docs-only-quality-skip"], { cwd: workPath });

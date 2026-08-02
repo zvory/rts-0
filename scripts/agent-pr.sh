@@ -28,7 +28,6 @@ EXTRA_LABELS=()
 AUTO_MERGE=1
 DRY_RUN=0
 DRAFT_FLAG=0
-PATCH_NOTES_MODE="inherit"
 QUALITY_CONTEXT="adversarial-quality-pass"
 CHANGED_FILES=()
 
@@ -36,9 +35,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/agent-pr.sh [options]
 
-Archives any plan newly completed by this branch, runs the configured specialist
-passes followed by the adversarial quality pass, opens or updates the PR for the
-current agent branch, writes predictable ownership metadata into the body,
+Archives any plan newly completed by this branch, runs the adversarial quality pass,
+opens or updates the PR for the current agent branch, writes predictable ownership metadata,
 applies agent labels, and arms auto-merge.
 
 Options:
@@ -52,8 +50,6 @@ Options:
   --label LABEL              Extra PR label to apply. Repeatable.
   --draft                    Create the PR as a draft when opening it.
   --no-auto-merge            Do not arm auto-merge; marks the PR needs-human.
-  --skip-patch-notes         Skip patch notes for this PR at the user's request.
-  --auto-patch-notes         Restore automatic patch-note classification for this PR.
   --dry-run                  Print actions without changing GitHub state.
   -h, --help                 Show this help.
 
@@ -74,8 +70,6 @@ while [ "$#" -gt 0 ]; do
     --label) EXTRA_LABELS+=("${2:?missing --label value}"); shift ;;
     --draft) DRAFT_FLAG=1 ;;
     --no-auto-merge) AUTO_MERGE=0 ;;
-    --skip-patch-notes) PATCH_NOTES_MODE="skipped-user-request" ;;
-    --auto-patch-notes) PATCH_NOTES_MODE="automatic" ;;
     --dry-run) DRY_RUN=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -114,16 +108,6 @@ if [ "$DRY_RUN" != "1" ]; then
     --json number,url,body \
     --jq '.[0] // empty')"
 fi
-if [ "$PATCH_NOTES_MODE" = "inherit" ]; then
-  PATCH_NOTES_MODE="automatic"
-  if [ -n "$existing_pr_json" ]; then
-    existing_pr_body="$(jq -r '.body // ""' <<<"$existing_pr_json")"
-    if rg -q '^Patch-Notes:[[:space:]]*skipped-user-request[[:space:]]*$' <<<"$existing_pr_body"; then
-      PATCH_NOTES_MODE="skipped-user-request"
-    fi
-  fi
-fi
-
 if [ -z "$TITLE" ]; then
   TITLE="$(git log -1 --format=%s)"
 fi
@@ -145,11 +129,10 @@ fi
 
 quality_report_json="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.json)"
 quality_report_md="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.md)"
-passes_report_md="$(mktemp -t rts-agent-pr-passes.XXXXXX.md)"
 tmp_body="$(mktemp -t rts-agent-pr.XXXXXX)"
 
 cleanup() {
-  rm -f "$quality_report_json" "$quality_report_md" "$passes_report_md" "$tmp_body"
+  rm -f "$quality_report_json" "$quality_report_md" "$tmp_body"
   if [ -n "$STABLE_COPY_PATH" ]; then
     rm -f "$STABLE_COPY_PATH"
   fi
@@ -244,23 +227,6 @@ archive_completed_plans() {
   node scripts/archive-completed-plans.mjs --base "origin/$BASE_BRANCH" --commit
 }
 
-run_configured_passes() {
-  local args=(
-    --base "origin/$BASE_BRANCH"
-    --head-branch "$HEAD_BRANCH"
-    --markdown-report-file "$passes_report_md"
-    --repo "$repo_root"
-  )
-  if [ "$DRY_RUN" = "1" ]; then
-    args+=(--dry-run)
-  fi
-  local patch_notes_user_opt_out=0
-  if [ "$PATCH_NOTES_MODE" = "skipped-user-request" ]; then
-    patch_notes_user_opt_out=1
-  fi
-  RTS_PATCH_NOTES_USER_OPT_OUT="$patch_notes_user_opt_out" node scripts/agent-pr-passes.mjs "${args[@]}"
-}
-
 run_quality_pass() {
   if [ "$DRY_RUN" = "1" ]; then
     if git rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1 && is_docs_only_change; then
@@ -305,7 +271,6 @@ run_quality_pass() {
 }
 
 archive_completed_plans
-run_configured_passes
 run_quality_pass
 
 needs_human="false"
@@ -324,18 +289,12 @@ Agent-Owned: true
 Auto-Merge: $auto_merge_text
 Focused-Verification: $FOCUSED_VERIFICATION
 Needs-Human: $needs_human
-Patch-Notes: $PATCH_NOTES_MODE
 <!-- /rts-agent-pr -->
 
 EOF
 
   if [ -s "$quality_report_md" ]; then
     cat "$quality_report_md"
-    printf '\n'
-  fi
-
-  if [ -s "$passes_report_md" ]; then
-    cat "$passes_report_md"
     printf '\n'
   fi
 

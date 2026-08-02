@@ -166,11 +166,6 @@ Focus on:
 Ignore missing documentation updates and contract-documentation updates unless the omission directly
 creates a correctness or architecture problem.
 
-Patch-note generation is outside your authority. The earlier specialist patch-note pass is the sole
-owner of every path under patch-notes/. Do not create, edit, delete, stage, or commit those paths.
-Do not treat a patch-note concern as authorization to change the branch; leave patch-note content
-untouched.
-
 You may rewrite the branch. Prefer the simplest resulting system, not the smallest diff. If a better
 path is clear and you can complete it coherently, take it. If the ideal rewrite is too large to finish
 well in this pass, make only the improvements that leave the branch in a complete, coherent,
@@ -405,30 +400,6 @@ class Runner {
     }
   }
 
-  assertPatchNotesUnchanged(repoRoot, beforeHead) {
-    const trackedChanges = this.git(
-      ["diff", "--name-only", "--no-renames", beforeHead, "--", "patch-notes"],
-      repoRoot,
-    ).split("\n").filter(Boolean);
-    const committedChanges = this.git(
-      ["log", "--format=", "--name-only", "--no-renames", `${beforeHead}..HEAD`, "--", "patch-notes"],
-      repoRoot,
-    ).split("\n").filter(Boolean);
-    const untrackedChanges = this.git(
-      ["ls-files", "--others", "--exclude-standard", "--", "patch-notes"],
-      repoRoot,
-    ).split("\n").filter(Boolean);
-    const changedPaths = [
-      ...new Set([...trackedChanges, ...committedChanges, ...untrackedChanges]),
-    ].sort();
-    if (changedPaths.length > 0) {
-      throw new Error(
-        "adversarial quality pass must not modify specialist-owned patch notes:\n" +
-        changedPaths.map((pathname) => `- ${pathname}`).join("\n"),
-      );
-    }
-  }
-
   commitDirtyFinalState(repoRoot, report) {
     const status = this.git(["status", "--porcelain=v1"], repoRoot);
     if (!status) return false;
@@ -517,7 +488,6 @@ class Runner {
       env: { [QUALITY_PASS_ENV]: "1" },
       input: prompt,
     });
-    this.assertPatchNotesUnchanged(repoRoot, beforeHead);
     if (!fs.existsSync(reportFile)) {
       throw new Error(`quality pass did not write report file: ${reportFile}`);
     }
