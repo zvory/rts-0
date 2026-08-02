@@ -440,136 +440,10 @@ collect_bg_results() {
   BG_PIDS=(); BG_NAMES=(); BG_RESULT_FILES=()
 }
 
-hash_file() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
-  elif command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$1" | awk '{print $1}'
-  else
-    return 1
-  fi
-}
-
-hydrate_client_deps() {
-  local package_json="$REPO_ROOT/package.json"
-  local package_lock="$REPO_ROOT/package-lock.json"
-  local local_node_modules="$REPO_ROOT/node_modules"
-  local hash cache_dir cache_node_modules ready lock_dir tmp_dir logf
-  local start deadline
-  local lock_acquired=0
-
-  if [ ! -f "$package_json" ] || [ ! -f "$package_lock" ]; then
-    warn "browser dependencies cannot be hydrated: repository package.json or package-lock.json is missing"
-    return 1
-  fi
-  if ! command -v npm >/dev/null 2>&1; then
-    warn "client smoke dependencies cannot be hydrated: npm not found on PATH"
-    return 1
-  fi
-  hash="$(hash_file "$package_lock")" || {
-    warn "client smoke dependencies cannot be hydrated: no SHA-256 tool found"
-    return 1
-  }
-
-  cache_dir="$RTS_NODE_DEPS_CACHE_DIR/$hash"
-  cache_node_modules="$cache_dir/node_modules"
-  ready="$cache_dir/.ready"
-  lock_dir="$cache_dir.lock"
-
-  if [ ! -f "$ready" ] || [ ! -d "$cache_node_modules/puppeteer-core" ] || [ ! -d "$cache_node_modules/typescript" ] || [ ! -d "$cache_node_modules/@types/node" ]; then
-    mkdir -p "$RTS_NODE_DEPS_CACHE_DIR" 2>/dev/null || {
-      warn "client smoke dependencies cannot be hydrated: could not create $RTS_NODE_DEPS_CACHE_DIR"
-      return 1
-    }
-
-    start=$SECONDS
-    deadline=$((SECONDS + 180))
-    while ! mkdir "$lock_dir" 2>/dev/null; do
-      if [ -f "$ready" ] && [ -d "$cache_node_modules/puppeteer-core" ] && [ -d "$cache_node_modules/typescript" ] && [ -d "$cache_node_modules/@types/node" ]; then
-        break
-      fi
-      if [ "$SECONDS" -ge "$deadline" ]; then
-        warn "client smoke dependencies cannot be hydrated: timed out waiting for $lock_dir after $(elapsed_since "$start")"
-        return 1
-      fi
-      info "waiting for client dependency cache lock: $lock_dir"
-      sleep 1
-    done
-    if [ -d "$lock_dir" ] && { [ ! -f "$ready" ] || [ ! -d "$cache_node_modules/puppeteer-core" ] || [ ! -d "$cache_node_modules/typescript" ] || [ ! -d "$cache_node_modules/@types/node" ]; }; then
-      lock_acquired=1
-    fi
-
-    if [ "$lock_acquired" = "1" ]; then
-      tmp_dir="$RTS_NODE_DEPS_CACHE_DIR/.tmp-$hash-$$"
-      logf="$(mktemp -t rts-npm-ci.XXXXXX)"
-      rm -rf "$tmp_dir" 2>/dev/null
-      mkdir -p "$tmp_dir" || {
-        warn "client smoke dependencies cannot be hydrated: could not create $tmp_dir"
-        rmdir "$lock_dir" 2>/dev/null
-        rm -f "$logf" 2>/dev/null
-        return 1
-      }
-      cp "$package_json" "$package_lock" "$tmp_dir/" || {
-        warn "client smoke dependencies cannot be hydrated: could not stage package files"
-        rm -rf "$tmp_dir" 2>/dev/null
-        rmdir "$lock_dir" 2>/dev/null
-        rm -f "$logf" 2>/dev/null
-        return 1
-      }
-
-      info "hydrating client dependency cache: $cache_dir"
-      if (cd "$tmp_dir" && npm ci --ignore-scripts --no-audit --fund=false) >"$logf" 2>&1; then
-        rm -rf "$cache_dir" 2>/dev/null
-        mv "$tmp_dir" "$cache_dir" || {
-          warn "client smoke dependencies cannot be hydrated: could not publish $cache_dir"
-          cat "$logf"
-          rm -rf "$tmp_dir" 2>/dev/null
-          rmdir "$lock_dir" 2>/dev/null
-          rm -f "$logf" 2>/dev/null
-          return 1
-        }
-        touch "$ready"
-        rm -f "$logf"
-      else
-        warn "client smoke dependencies cannot be hydrated: npm ci failed"
-        cat "$logf"
-        rm -rf "$tmp_dir" 2>/dev/null
-        rmdir "$lock_dir" 2>/dev/null
-        rm -f "$logf" 2>/dev/null
-        return 1
-      fi
-      rmdir "$lock_dir" 2>/dev/null
-    fi
-  fi
-
-  if [ ! -d "$cache_node_modules/puppeteer-core" ] || [ ! -d "$cache_node_modules/typescript" ] || [ ! -d "$cache_node_modules/@types/node" ]; then
-    warn "Node dependencies cannot be hydrated: cache is missing puppeteer-core, TypeScript, or Node typings at $cache_node_modules"
-    return 1
-  fi
-
-  if [ -L "$local_node_modules" ]; then
-    local target
-    target="$(readlink "$local_node_modules")"
-    if [ "$target" != "$cache_node_modules" ]; then
-      rm "$local_node_modules" || {
-        warn "client smoke dependencies cannot be linked: could not replace $local_node_modules"
-        return 1
-      }
-    fi
-  elif [ -e "$local_node_modules" ]; then
-    info "replacing local client dependencies with shared cache link: $local_node_modules"
-    rm -rf "$local_node_modules" || {
-      warn "client smoke dependencies cannot be linked: could not replace $local_node_modules"
-      return 1
-    }
-  fi
-
-  if [ ! -e "$local_node_modules" ]; then
-    ln -s "$cache_node_modules" "$local_node_modules" || {
-      warn "client smoke dependencies cannot be linked: could not symlink $local_node_modules -> $cache_node_modules"
-      return 1
-    }
-  fi
+hydrate_node_deps() {
+  local args=(--repo "$REPO_ROOT" --cache-dir "$RTS_NODE_DEPS_CACHE_DIR")
+  [ "$VERBOSE" = "1" ] || args+=(--quiet)
+  "$REPO_ROOT/scripts/ensure-node-deps.sh" "${args[@]}"
 }
 
 run_nextest_tests() {
@@ -672,6 +546,8 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/archive_completed_plans.mjs"
     run_suite_bg "Agent workflow: post-merge main refresh" \
       node "$SCRIPT_DIR/wait_pr.mjs"
+    run_suite_bg "Agent workflow: shared Node dependencies" \
+      node "$SCRIPT_DIR/ensure_node_deps.mjs"
     run_suite_bg "Rust lint (cargo clippy)" \
       cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
@@ -699,7 +575,7 @@ fi
 
 if [ "$RUN_STATIC_JS" = "1" ]; then
   deps_start=$SECONDS
-  if hydrate_client_deps; then
+  if hydrate_node_deps; then
     NODE_DEPS_READY=1
     record_timing "Node dependency hydration" "$((SECONDS - deps_start))" "PASS"
     run_suite_bg "TypeScript: Interact no-emit" \
@@ -809,7 +685,7 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       SKIPPED+=("Tri-state lag scenarios (no Chrome)")
     else
       deps_start=$SECONDS
-      if [ "$NODE_DEPS_READY" = "1" ] || hydrate_client_deps; then
+      if [ "$NODE_DEPS_READY" = "1" ] || hydrate_node_deps; then
         NODE_DEPS_READY=1
         record_timing "Client dependency hydration" "$((SECONDS - deps_start))" "PASS"
       else

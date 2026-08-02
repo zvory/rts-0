@@ -24,7 +24,10 @@ The normal agent lifecycle is:
    merged-worktree cleanup, including when `main` was already current and Git's `post-merge` hook
    therefore did not fire. If the implementing agent staged a local patch note with
    `node scripts/patch-note-outbox.mjs stage --change "<change>"`, the waiter then attempts to send
-   it to the configured Discord webhooks. Optional `--before <png> --after <png>` inputs produce a
+   it to the configured Discord webhooks. Before invoking the npm-backed outbox tool, the waiter
+   runs `scripts/ensure-node-deps.sh` for the refreshed main checkout; the helper reuses the
+   lockfile-keyed shared install and creates that worktree's `node_modules` link. Optional
+   `--before <png> --after <png>` inputs produce a
    labeled four-second comparison. Delivery is deliberately best-effort: failure leaves the local
    outbox entry for manual retry and never changes the successful merge result.
 
