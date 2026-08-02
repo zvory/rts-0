@@ -40,7 +40,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1905,
+      "lines": 1906,
       "reason": "Close vehicle move precision adds focused same-tile exact-goal handling and regression coverage in the oversized coordinator; requires human playtest review and should ratchet down when order-entry policy/tests split."
     },
     {

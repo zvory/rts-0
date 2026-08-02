@@ -294,10 +294,11 @@ impl<'a> MoveCoordinator<'a> {
         for trench_id in occupied_trench_ids_for_units(entities, &selected_units) {
             occupied_trenches.remove(&trench_id);
         }
-        let goals = if units.len() == 1 {
-            // A single selected unit has no formation to preserve; keep the player
+        let goals = if units.len() == 1 && uses_oriented_vehicle_body(units[0].kind) {
+            // A single selected vehicle has no formation to preserve; keep the player
             // click as the authoritative body-center goal instead of snapping to
-            // the containing tile center.
+            // the containing tile center. Infantry still use formation targeting so
+            // trench preference and foot-unit obstacle goals stay intact.
             vec![goal]
         } else {
             let known_trenches = self.known_trenches_for_player(player).to_vec();

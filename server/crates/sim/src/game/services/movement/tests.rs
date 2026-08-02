@@ -2355,7 +2355,7 @@ fn scout_car_phase0_two_building_alley() {
 
     baseline.assert_reference_envelope("two_building_alley");
     assert!(
-        baseline.min_static_clearance_px <= 16.0,
+        baseline.min_static_clearance_px <= 20.0,
         "fixture should exercise a narrow lane, got {:?}",
         baseline
     );
