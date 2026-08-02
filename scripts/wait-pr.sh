@@ -80,6 +80,10 @@ deliver_patch_note_best_effort() {
     return 0
   fi
   echo "wait-pr: attempting best-effort Discord patch-note delivery for $branch"
+  if ! "$main_worktree/scripts/ensure-node-deps.sh" --repo "$main_worktree" --quiet; then
+    echo "wait-pr: patch-note dependencies unavailable; the local outbox entry was retained for manual retry" >&2
+    return 0
+  fi
   if ! node "$main_worktree/scripts/patch-note-outbox.mjs" deliver --repo "$main_worktree" --branch "$branch"; then
     echo "wait-pr: patch-note delivery failed; the local outbox entry was retained for manual retry" >&2
   fi

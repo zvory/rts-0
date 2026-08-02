@@ -105,6 +105,7 @@ import {
   canonicalDoodadColor,
   createDoodadSprayStroke,
   createMapEditorDoodads,
+  doodadIdsWithinRect,
   extendDoodadSprayStroke,
   MAP_EDITOR_DOODAD_CATALOG,
   MAP_EDITOR_DOODAD_TYPES,
@@ -233,6 +234,71 @@ assert(
     "Schone Tage — schone-tage(5).json",
   ], "duplicate map names are distinguishable by filename");
   assert.deepEqual(panel.catalogSkipped, ["../secret.json"], "unsupported map filenames are tracked for visible warnings");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  const statuses = [];
+  const panel = {
+    session,
+    viewport: { armTool(tool) { this.tool = tool; } },
+    selectedStartIndex: 4,
+    selectedBaseIndex: 7,
+    loadMapData: MapEditorPanel.prototype.loadMapData,
+    setStatus(message, error = false) { statuses.push({ message, error }); },
+  };
+  await MapEditorPanel.prototype.loadJsonFile.call(panel, {
+    name: "local-map.json",
+    size: 1024,
+    async text() { return JSON.stringify(oneVOneNoTerrainMap); },
+  });
+  assert.equal(session.exportMap().name, oneVOneNoTerrainMap.name, "local JSON loads through the authored-map validator");
+  assert.equal(session.hasUnsavedChanges, false, "a freshly imported file is the editor's saved baseline");
+  assert.equal(panel.selectedStartIndex, 0);
+  assert.equal(panel.selectedBaseIndex, 0);
+  assert.equal(panel.viewport.tool, null);
+  assert.deepEqual(statuses.pop(), { message: "Loaded local-map.json.", error: false });
+
+  await MapEditorPanel.prototype.loadJsonFile.call(panel, {
+    name: "broken.json",
+    size: 12,
+    async text() { return "{not json"; },
+  });
+  assert.match(statuses.at(-1).message, /^Could not load broken\.json:/);
+  assert.equal(statuses.at(-1).error, true, "invalid local JSON produces a visible error");
+
+  await MapEditorPanel.prototype.loadJsonFile.call(panel, {
+    name: "huge.json",
+    size: 2 * 1024 * 1024 + 1,
+    async text() { throw new Error("oversized files must not be read"); },
+  });
+  assert.deepEqual(statuses.at(-1), {
+    message: "Could not load huge.json: Map JSON files must be 2 MB or smaller.",
+    error: true,
+  });
+
+  session.mutate("Changed imported map", (draft) => { draft.description = "changed"; });
+  assert.equal(session.hasUnsavedChanges, true);
+  const savedDocument = globalThis.document;
+  const savedCreateObjectURL = URL.createObjectURL;
+  const savedRevokeObjectURL = URL.revokeObjectURL;
+  const anchor = { click() {}, remove() {} };
+  globalThis.document = {
+    body: { appendChild(node) { assert.equal(node, anchor); } },
+    createElement(tag) { assert.equal(tag, "a"); return anchor; },
+  };
+  URL.createObjectURL = () => "blob:map-export";
+  URL.revokeObjectURL = (url) => { assert.equal(url, "blob:map-export"); };
+  try {
+    MapEditorPanel.prototype.exportJson.call(panel);
+  } finally {
+    globalThis.document = savedDocument;
+    URL.createObjectURL = savedCreateObjectURL;
+    URL.revokeObjectURL = savedRevokeObjectURL;
+  }
+  assert.equal(session.hasUnsavedChanges, false, "exporting the current map clears the unsaved-change warning");
+  assert.match(statuses.at(-1).message, /^Exported .+\.json\.$/);
 }
 
 {
@@ -511,54 +577,6 @@ assert(
   session.loadAuthoredMap(legacy);
   assert.equal(session.exportMap().version, 5, "local v2 maps migrate into current flat map data");
   assert.equal(session.exportMap().layouts, undefined);
-}
-
-{
-  const legacyWorkspace = {
-    version: 2,
-    name: "Saved legacy map",
-    terrain: Array.from({ length: 32 }, () => ".".repeat(32)),
-    sites: [
-      { id: "main", kind: "main", x: 8, y: 8 },
-      { id: "natural", kind: "natural", x: 22, y: 22 },
-    ],
-    layouts: [{ id: "one", playerCount: 1, slots: [{ main: "main", naturals: ["natural"] }] }],
-  };
-  const values = new Map([
-    ["rts.mapEditor.legacy-workspace.v2", JSON.stringify({ schemaVersion: 2, draft: legacyWorkspace })],
-  ]);
-  const storage = {
-    getItem(key) { return values.get(key) || null; },
-    setItem(key, value) { values.set(key, value); },
-  };
-  const session = new MapEditorSession({ storage });
-  assert.equal(session.loadLocal("legacy-workspace"), true, "v5 sessions recover saved v2 workspaces");
-  assert.equal(session.exportMap().version, 5);
-  assert.equal(session.materialized().baseSites.length, 2);
-}
-
-{
-  const v4Draft = {
-    version: 4,
-    name: "Saved v4 map",
-    description: "",
-    terrain: Array.from({ length: 16 }, () => ".".repeat(16)),
-    startLocations: [{ x: 7, y: 7 }],
-    baseSites: [{ x: 7, y: 7, steelPatches: 12, oilPatches: 3 }],
-  };
-  const values = new Map([
-    ["rts.map-editor.v4.v4-workspace", JSON.stringify({ schemaVersion: 4, draft: v4Draft })],
-  ]);
-  const storage = {
-    getItem(key) { return values.get(key) || null; },
-    setItem(key, value) { values.set(key, value); },
-  };
-  const session = new MapEditorSession({ storage });
-  assert.equal(session.loadLocal("v4-workspace"), true);
-  assert.equal(session.exportMap().version, 5);
-  assert.deepEqual(session.exportMap().doodads, [], "v4 local maps migrate to an empty v5 doodad layer");
-  assert.equal(session.saveLocal("v4-workspace"), true);
-  assert(values.has("rts.map-editor.v5.v4-workspace"), "new local saves use the v5 namespace");
 }
 
 {
@@ -982,7 +1000,10 @@ assert(
 }
 
 {
-  assert.equal(mapEditorLaunchConfig({ search: "?workspace=map-1", pathname: "/map-editor" }).workspaceId, "map-1");
+  assert.deepEqual(mapEditorLaunchConfig({ search: "", pathname: "/map-editor" }), {
+    handoffId: "",
+    error: "",
+  });
   assert.equal(MAP_EDITOR_MAX_BASE_SITES, 32);
   assert.equal(MAP_EDITOR_MAX_STEEL_PATCHES, 36);
   assert.equal(MAP_EDITOR_MAX_OIL_PATCHES, 9);
@@ -1125,7 +1146,8 @@ assert(
       doodads: [{ id: 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 30, y: 40 }],
     },
     overlay: {
-      doodadSelection: { id: 1, x: 30, y: 40 },
+      doodadSelections: [{ id: 1, x: 30, y: 40 }],
+      doodadSelectionBox: { x: 20, y: 20, width: 30, height: 40 },
       doodadBrushPreview: { x: 40, y: 50, radius: 48, mode: "erase", typeId: null, color: null },
     },
   });
@@ -1164,7 +1186,8 @@ assert(
   const viewport = {
     doodadPointerId: 17,
     doodadPointerMode: "spray",
-    doodadDragOffset: null,
+    doodadSelectStart: null,
+    doodadSelectEnd: null,
     doodadSprayStroke: {},
     doodadLastWorld: { x: 50, y: 60 },
     paintPointerId: null,
@@ -1179,6 +1202,69 @@ assert(
   assert.deepEqual(session.materialized().doodads, [], "pointercancel rolls back an in-progress doodad stroke");
   assert.equal(session.undoStack.length, 0, "a cancelled doodad stroke never enters history");
   assert.deepEqual(statuses, [{ message: "Doodad edit cancelled.", error: false }]);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.beginDoodadStroke("Placed selection fixtures");
+  session.placeDoodads([
+    { x: 40, y: 60 },
+    { x: 100, y: 120 },
+    { x: 180, y: 200 },
+  ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
+  session.commitDoodadStroke();
+  const statuses = [];
+  const viewport = {
+    session,
+    selectedDoodadIds: new Set(),
+    doodadSelectStart: { x: 150, y: 150 },
+    doodadSelectEnd: { x: 20, y: 40 },
+    onStatus(message, error) { statuses.push({ message, error }); },
+    drawOverlay() {},
+  };
+  const selected = MapEditorViewport.prototype.finishDoodadBoxSelection.call(viewport);
+  assert.deepEqual(selected, [1, 2], "remove mode selects every doodad inside a drag box in either direction");
+  assert.equal(session.doodadStroke, null, "box selection never starts a move/edit transaction");
+  const changed = MapEditorViewport.prototype.deleteSelectedDoodads.call(viewport);
+  assert.equal(changed, true);
+  assert.deepEqual(session.draft.doodads.map((record) => record.id), [3],
+    "delete selection removes the whole box-selected group without moving surviving doodads");
+  assert.deepEqual(statuses, [
+    { message: "2 doodads selected for removal.", error: false },
+    { message: "2 doodads deleted.", error: false },
+  ]);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.beginDoodadStroke("Placed fixtures");
+  session.placeDoodads([
+    { x: 40, y: 60 },
+    { x: 100, y: 120 },
+  ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
+  session.commitDoodadStroke();
+  session.beginDoodadStroke("Active spray");
+  session.placeDoodads([{ x: 180, y: 200 }], {
+    typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE,
+    color: "#ef739d",
+  });
+  const statuses = [];
+  const viewport = {
+    session,
+    selectedDoodadIds: new Set([1, 2]),
+    onStatus(message, error) { statuses.push({ message, error }); },
+    drawOverlay() {},
+  };
+  assert.equal(MapEditorViewport.prototype.deleteSelectedDoodads.call(viewport), false,
+    "selection deletion refuses to merge into another active doodad edit");
+  assert.deepEqual(session.draft.doodads.map((record) => record.id), [1, 2, 3]);
+  assert(session.doodadStroke, "the active edit remains open for its pointer lifecycle to finish");
+  assert.deepEqual(statuses, [{
+    message: "Finish the current doodad edit before deleting the selection.", error: true,
+  }]);
+  session.cancelDoodadStroke();
 }
 
 {
@@ -1204,7 +1290,7 @@ assert(
 {
   const calls = [];
   const viewport = {
-    selectedDoodadId: null,
+    selectedDoodadIds: new Set(),
     rebuildTerrain() { calls.push("terrain"); },
     rebuildDoodads() { calls.push("doodads"); },
     queueDoodadPatch(update) { calls.push(["patch", update]); },
@@ -1218,6 +1304,24 @@ assert(
   });
   assert.deepEqual(calls, [["patch", patch], "overlay"],
     "a doodad-only commit patches vegetation without rebuilding the static terrain texture");
+}
+
+{
+  const calls = [];
+  const selectedDoodadIds = new Set([1]);
+  const viewport = {
+    selectedDoodadIds,
+    rebuildTerrain() { calls.push("terrain"); },
+    rebuildDoodads() { calls.push("doodads"); },
+    drawOverlay() { calls.push("overlay"); },
+  };
+  MapEditorViewport.prototype.applySessionSnapshot.call(viewport, {
+    reason: "loaded",
+    draft: { doodads: [{ id: 1 }] },
+  });
+  assert.equal(viewport.selectedDoodadIds.size, 0,
+    "loading a different map clears selection even when it reuses a selected doodad id");
+  assert.deepEqual(calls, ["terrain", "doodads", "overlay"]);
 }
 
 {
@@ -1247,10 +1351,8 @@ assert(
   ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
   assert.deepEqual(added.map(({ x, y }) => ({ x, y })), [{ x: 1800, y: 500 }],
     "rectangular doodad placement uses width and height independently");
-  assert.equal(session.moveDoodad(added[0].id, { x: 1900, y: 700 })?.x, 1900,
-    "doodads can move across the full wide-map axis");
-  assert.equal(session.moveDoodad(added[0].id, { x: 1900, y: 800 }), null,
-    "doodad movement rejects points beyond the short rectangular axis");
+  assert.deepEqual(doodadIdsWithinRect(session.draft.doodads, { x: 100, y: 400 }, { x: 1900, y: 700 }), [added[0].id],
+    "box removal selects doodads across the full wide-map axis without moving them");
 
   const updates = [];
   const viewport = {

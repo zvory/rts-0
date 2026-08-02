@@ -613,6 +613,8 @@ try {
       withinViewport: panelRect && panelRect.bottom <= window.innerHeight - 11,
       noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
         .every((node) => node.scrollWidth <= node.clientWidth),
+      actionButtons: [...document.querySelectorAll(".map-editor-options-window button")]
+        .map((control) => control.textContent),
       zoom: (() => {
         const section = [...document.querySelectorAll(".map-editor-group")]
           .find((node) => node.querySelector("legend")?.textContent === "Zoom");
@@ -628,6 +630,9 @@ try {
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
+      doodadToolLabels: [...document.querySelectorAll(".map-editor-palette button")]
+        .map((button) => button.textContent?.trim() || "")
+        .filter((label) => ["Remove doodads", "Erase brush", "Delete selection", "Select / move"].includes(label)),
       blankMapWidth: (() => {
         const input = document.querySelector("input[aria-label='Map width']");
         return input && {
@@ -672,6 +677,13 @@ try {
     `MAP EDITOR: top Tools section exposes bounded framing, step, and percentage zoom controls (${JSON.stringify(editorUi.zoom)})`,
   );
   ok(
+    editorUi.actionButtons.includes("Load map JSON") &&
+      editorUi.actionButtons.includes("Export map JSON") &&
+      !editorUi.actionButtons.includes("Save on this device") &&
+      !editorUi.actionButtons.includes("Load saved map"),
+    `MAP EDITOR: explicit JSON file actions replace browser workspace controls (${editorUi.actionButtons.join("/")})`,
+  );
+  ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,
     `MAP EDITOR: selecting terrain keeps sidebar scroll position (${editorUi.beforeScrollTop} -> ${editorUi.afterScrollTop})`,
   );
@@ -694,6 +706,13 @@ try {
       editorUi.blankMapHeight.width <= 80 &&
       editorUi.clearanceSection === "Start and base locations",
     "MAP EDITOR: symmetry, independent blank-map dimensions, and grass-clearance controls are presented correctly",
+  );
+  ok(
+    editorUi.doodadToolLabels.includes("Remove doodads") &&
+      editorUi.doodadToolLabels.includes("Erase brush") &&
+      editorUi.doodadToolLabels.includes("Delete selection") &&
+      !editorUi.doodadToolLabels.includes("Select / move"),
+    `MAP EDITOR: doodad tools expose box removal and the erase brush without move (${editorUi.doodadToolLabels.join(", ")})`,
   );
   await editorPage.close();
 

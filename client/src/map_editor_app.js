@@ -2,7 +2,7 @@ import { dom } from "./bootstrap.js";
 import { createMapHandoff, consumeMapHandoff } from "./map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "./map_editor_launch.js";
 import { MapEditorPanel } from "./map_editor_panel.js";
-import { MapEditorSession, materializedMapsEqual } from "./map_editor_session.js";
+import { MapEditorSession } from "./map_editor_session.js";
 import { MapEditorViewport } from "./map_editor_viewport.js";
 
 export class MapEditorApp {
@@ -48,17 +48,12 @@ export class MapEditorApp {
         if (handoff?.destination !== "editor" || !handoff?.authoredMap) {
           throw new Error("Map handoff was not addressed to the editor.");
         }
-        const returned = new MapEditorSession({ storage: null });
-        returned.loadAuthoredMap(handoff.authoredMap);
-        const restoredWorkspace = this.session.loadLocal(this.launch.workspaceId);
-        if (!restoredWorkspace || !sessionsHaveSameMap(this.session, returned)) {
-          this.session.loadAuthoredMap(handoff.authoredMap);
-        }
+        this.session.loadAuthoredMap(handoff.authoredMap);
       } catch (error) {
         this.session.initializeBlank();
         this.launch.error = error.message || String(error);
       }
-    } else if (!this.session.loadLocal(this.launch.workspaceId)) {
+    } else {
       this.session.initializeBlank();
     }
 
@@ -72,7 +67,6 @@ export class MapEditorApp {
       root: dom.gameScreen,
       session: this.session,
       viewport: this.viewport,
-      workspaceId: this.launch.workspaceId,
       onOpenLab: (map) => this.openInLab(map),
     });
     this.panel = panel;
@@ -80,8 +74,7 @@ export class MapEditorApp {
     globalThis.__mapEditor = this;
   }
 
-  async openInLab({ authoredMap, materializedMap, workspaceId }) {
-    this.session.saveLocal(workspaceId);
+  async openInLab({ authoredMap, materializedMap }) {
     const handoff = await createMapHandoff({
       destination: "lab",
       authoredMap,
@@ -89,7 +82,6 @@ export class MapEditorApp {
     });
     const url = new URL("/lab", this.locationObj.href);
     url.searchParams.set("handoff", handoff.handoffId);
-    url.searchParams.set("workspace", workspaceId);
     this.allowUnload = true;
     window.location.assign(url.toString());
   }
@@ -99,13 +91,5 @@ export class MapEditorApp {
     this.panel?.destroy();
     this.viewport?.destroy();
     document.body.classList.remove("map-editor-mode");
-  }
-}
-
-function sessionsHaveSameMap(left, right) {
-  try {
-    return materializedMapsEqual(left.materialized(), right.materialized());
-  } catch {
-    return false;
   }
 }

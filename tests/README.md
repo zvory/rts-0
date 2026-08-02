@@ -40,6 +40,7 @@ PORT=8090 tests/run-all.sh       # use a different port
 CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the per-worktree Cargo target dir
 RTS_SERVER_BIN=/tmp/rts-server tests/run-all.sh --only-live-node  # reuse a prebuilt server
 RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh  # override shared Node deps cache
+scripts/ensure-node-deps.sh             # hydrate/link root npm dependencies for this worktree
 RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 CHROME=/path/to/chrome tests/run-all.sh
 ```
