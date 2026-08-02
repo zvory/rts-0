@@ -55,7 +55,7 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1703,
+      "lines": 1718,
       "reason": "Client index generation and analytics configuration moved out of the oversized server shell; keep ratcheting until more connection handling is split."
     },
     {
