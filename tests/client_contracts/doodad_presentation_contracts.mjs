@@ -22,6 +22,7 @@ const assembler = new PresentationFrameAssembler({
       { id: 4, typeId: "tree.birch", x: 72, y: 20 },
       { id: 6, typeId: "tree.aspen", x: 96, y: 20 },
       { id: 5, typeId: "tree.spruce", x: 80, y: 72 },
+      { id: 7, typeId: "tree.alder", x: 128, y: 20 },
     ],
   },
 });

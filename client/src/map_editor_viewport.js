@@ -187,7 +187,9 @@ export class MapEditorViewport {
 
   applySessionSnapshot(snapshot) {
     if (!snapshot?.draft) return;
-    if (snapshot.reason !== "terrainStroke") this.rebuildTerrain();
+    if (snapshot.reason !== "terrainStroke" && snapshot.reason !== "doodadStroke") {
+      this.rebuildTerrain();
+    }
     if (snapshot.reason === "doodadStroke" && snapshot.doodadPatch) {
       this.queueDoodadPatch(snapshot.doodadPatch);
     } else {
@@ -484,7 +486,10 @@ export class MapEditorViewport {
   }
 
   placeDoodadPoints(points) {
-    const placements = symmetricDoodadPlacementsForDraft(this.session.draft, points, this.tool?.symmetry);
+    const placements = symmetricDoodadPlacements({
+      width: (this.session.draft?.width || 0) * TILE_SIZE,
+      height: (this.session.draft?.height || 0) * TILE_SIZE,
+    }, points, this.tool?.symmetry);
     const added = this.session.placeDoodads(placements, {
       typeId: this.tool?.typeId,
       color: this.tool?.color,
@@ -733,43 +738,6 @@ export class MapEditorViewport {
     window.removeEventListener("resize", this.onResize);
     this.presentation.destroy();
   }
-}
-
-function symmetricDoodadPlacementsForDraft(draft, points, symmetry) {
-  const { width, height } = mapDimensions(draft);
-  const worldWidth = width * TILE_SIZE;
-  const worldHeight = height * TILE_SIZE;
-  if (!worldWidth || !worldHeight) return [];
-  if (worldWidth === worldHeight) return symmetricDoodadPlacements(worldWidth, points, symmetry);
-  const transforms = symmetry === MAP_EDITOR_SYMMETRY.HORIZONTAL
-    ? ["identity", "horizontal"]
-    : symmetry === MAP_EDITOR_SYMMETRY.VERTICAL
-      ? ["identity", "vertical"]
-      : symmetry === MAP_EDITOR_SYMMETRY.HALF_TURN
-        ? ["identity", "halfTurn"]
-        : ["identity"];
-  const placements = [];
-  const seen = new Set();
-  for (const source of points || []) {
-    const x = Math.round(Number(source?.x));
-    const y = Math.round(Number(source?.y));
-    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= worldWidth || y >= worldHeight) continue;
-    for (const transform of transforms) {
-      const point = transform === "horizontal"
-        ? { x, y: worldHeight - 1 - y }
-        : transform === "vertical"
-          ? { x: worldWidth - 1 - x, y }
-          : transform === "halfTurn"
-            ? { x: worldWidth - 1 - x, y: worldHeight - 1 - y }
-            : { x, y };
-      const key = `${point.x},${point.y}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        placements.push(point);
-      }
-    }
-  }
-  return placements;
 }
 
 function coalesceTerrainChanges(previous, changes) {

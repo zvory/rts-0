@@ -360,7 +360,7 @@ export class MapEditorSession {
   placeDoodads(placements, options) {
     if (!this.draft || !this.doodadStroke) return [];
     const bounded = (placements || []).filter((point) => draftContainsWorldPoint(this.draft, point));
-    const added = createMapEditorDoodads(doodadHelperDraft(this.draft), bounded, options);
+    const added = createMapEditorDoodads(this.draft, bounded, options);
     for (const record of added) {
       this.doodadStroke.removedIds.delete(record.id);
       this.doodadStroke.upserts.set(record.id, clone(record));
@@ -370,7 +370,7 @@ export class MapEditorSession {
 
   moveDoodad(id, point) {
     if (!this.draft || !this.doodadStroke || !draftContainsWorldPoint(this.draft, point)) return null;
-    const moved = moveMapEditorDoodad(doodadHelperDraft(this.draft), id, point);
+    const moved = moveMapEditorDoodad(this.draft, id, point);
     if (moved) this.doodadStroke.upserts.set(moved.id, clone(moved));
     return moved;
   }
@@ -1092,9 +1092,10 @@ function draftDimensions(draft) { return normalizeDimensions({ width: draft?.wid
 function normalizeDraftDoodads(records, dimensions) {
   const map = normalizeDimensions(dimensions);
   if (!map) return [];
-  const extent = Math.max(map.width, map.height) * 32;
-  return normalizeMapEditorDoodads(records, extent, { max: MAP_EDITOR_MAX_DOODADS })
-    .filter((record) => record.x < map.width * 32 && record.y < map.height * 32);
+  return normalizeMapEditorDoodads(records, {
+    width: map.width * 32,
+    height: map.height * 32,
+  }, { max: MAP_EDITOR_MAX_DOODADS });
 }
 function draftContainsWorldPoint(draft, point) {
   const map = draftDimensions(draft);
@@ -1102,14 +1103,6 @@ function draftContainsWorldPoint(draft, point) {
   const y = Math.round(Number(point?.y));
   return Number.isFinite(x) && Number.isFinite(y)
     && x >= 0 && y >= 0 && x < map.width * 32 && y < map.height * 32;
-}
-function doodadHelperDraft(draft) {
-  const map = draftDimensions(draft);
-  return {
-    ...draft,
-    terrain: Array(Math.max(map.width, map.height)),
-    doodads: draft.doodads,
-  };
 }
 function normalizeDimensions(value) {
   if (typeof value === "number") {

@@ -293,7 +293,7 @@ function normalizeStaticDoodads(values, { widthPx, heightPx }) {
     const y = Number(value?.y);
     if (!Number.isSafeInteger(id) || id <= 0 || ids.has(id)) continue;
     if (!STATIC_DOODAD_TYPES.has(typeId)) continue;
-    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > widthPx || y > heightPx) continue;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= widthPx || y >= heightPx) continue;
     const record = { id, typeId, x, y };
     if (DOODAD_COLOR_RE.test(value?.color || "") && typeId.startsWith("wildflower.")) {
       record.color = value.color.toLowerCase();

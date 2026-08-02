@@ -13,6 +13,7 @@ export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
 ]);
 
 const TYPE_IDS = new Set(DOODAD_TYPE_IDS);
+const MAX_U32 = 0xffff_ffff;
 
 export function isMapEditorDoodadType(typeId) {
   return TYPE_IDS.has(typeId);
@@ -31,15 +32,15 @@ export function canonicalDoodadColor(value, fallback = null) {
 }
 
 /** Normalize imported authoring records and deterministically repair missing/duplicate ids. */
-export function normalizeMapEditorDoodads(records, worldSize, { max = MAP_EDITOR_MAX_DOODADS } = {}) {
+export function normalizeMapEditorDoodads(records, worldDimensions, { max = MAP_EDITOR_MAX_DOODADS } = {}) {
   const limit = Math.max(0, Math.min(MAP_EDITOR_MAX_DOODADS, Math.trunc(Number(max)) || 0));
-  const extent = Math.trunc(Number(worldSize));
-  if (!Array.isArray(records) || extent <= 0 || limit <= 0) return [];
+  const dimensions = normalizedWorldDimensions(worldDimensions);
+  if (!Array.isArray(records) || !dimensions || limit <= 0) return [];
   const retained = [];
   const usedIds = new Set();
   const deferred = [];
   for (const source of records.slice(0, limit)) {
-    const record = normalizedDoodadFields(source, extent);
+    const record = normalizedDoodadFields(source, dimensions);
     if (!record) continue;
     const id = positiveSafeInteger(source?.id);
     if (id && !usedIds.has(id)) {
@@ -61,7 +62,7 @@ export function normalizeMapEditorDoodads(records, worldSize, { max = MAP_EDITOR
 
 export function allocateMapEditorDoodadId(records, existing = null) {
   const used = existing || new Set((records || []).map((record) => positiveSafeInteger(record?.id)).filter(Boolean));
-  for (let id = 1; id <= Number.MAX_SAFE_INTEGER; id += 1) if (!used.has(id)) return id;
+  for (let id = 1; id <= MAX_U32; id += 1) if (!used.has(id)) return id;
   return 0;
 }
 
@@ -71,14 +72,14 @@ export function createMapEditorDoodads(draft, placements, {
   max = MAP_EDITOR_MAX_DOODADS,
 } = {}) {
   if (!Array.isArray(draft?.doodads) || !Array.isArray(placements) || !isMapEditorDoodadType(typeId)) return [];
-  const worldSize = (draft.terrain?.length || 0) * 32;
+  const dimensions = draftWorldDimensions(draft);
   const available = Math.max(0, Math.min(MAP_EDITOR_MAX_DOODADS, max) - draft.doodads.length);
-  if (!worldSize || !available) return [];
+  if (!dimensions || !available) return [];
   const used = new Set(draft.doodads.map((record) => record.id));
   const added = [];
   for (const placement of placements) {
     if (added.length >= available) break;
-    const fields = normalizedDoodadFields({ ...placement, typeId, color }, worldSize);
+    const fields = normalizedDoodadFields({ ...placement, typeId, color }, dimensions);
     if (!fields) continue;
     const id = allocateMapEditorDoodadId(draft.doodads, used);
     if (!id) break;
@@ -94,10 +95,13 @@ export function createMapEditorDoodads(draft, placements, {
 export function moveMapEditorDoodad(draft, id, point) {
   const doodadId = positiveSafeInteger(id);
   const record = draft?.doodads?.find((candidate) => candidate.id === doodadId);
-  const worldSize = (draft?.terrain?.length || 0) * 32;
+  const dimensions = draftWorldDimensions(draft);
   const x = Math.round(Number(point?.x));
   const y = Math.round(Number(point?.y));
-  if (!record || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= worldSize || y >= worldSize) return null;
+  if (
+    !record || !dimensions || !Number.isFinite(x) || !Number.isFinite(y)
+    || x < 0 || y < 0 || x >= dimensions.width || y >= dimensions.height
+  ) return null;
   if (record.x === x && record.y === y) return record;
   record.x = x;
   record.y = y;
@@ -143,17 +147,17 @@ export function nearestMapEditorDoodad(records, point, radius = 24) {
   return nearest || null;
 }
 
-export function symmetricDoodadPlacements(worldSize, points, symmetry = "none") {
-  const extent = Math.trunc(Number(worldSize));
-  if (!extent || !Array.isArray(points)) return [];
+export function symmetricDoodadPlacements(worldDimensions, points, symmetry = "none") {
+  const dimensions = normalizedWorldDimensions(worldDimensions);
+  if (!dimensions || !Array.isArray(points)) return [];
   const transforms = symmetryTransforms(symmetry);
   const placements = [];
   const seen = new Set();
   for (const point of points) {
-    const source = boundedPoint(point, extent);
+    const source = boundedPoint(point, dimensions);
     if (!source) continue;
     for (const transform of transforms) {
-      const next = transformPoint(source, extent, transform);
+      const next = transformPoint(source, dimensions, transform);
       if (!next) continue;
       const key = `${next.x},${next.y}`;
       if (seen.has(key)) continue;
@@ -203,11 +207,14 @@ export function extendDoodadSprayStroke(stroke, point) {
   return placements;
 }
 
-function normalizedDoodadFields(source, worldSize) {
+function normalizedDoodadFields(source, dimensions) {
   const typeId = String(source?.typeId || "");
   const x = Number(source?.x);
   const y = Number(source?.y);
-  if (!TYPE_IDS.has(typeId) || !Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= worldSize || y >= worldSize) return null;
+  if (
+    !TYPE_IDS.has(typeId) || !Number.isInteger(x) || !Number.isInteger(y)
+    || x < 0 || y < 0 || x >= dimensions.width || y >= dimensions.height
+  ) return null;
   const record = { typeId, x, y };
   if (isWildflowerDoodadType(typeId)) {
     const color = canonicalDoodadColor(source?.color);
@@ -251,30 +258,53 @@ function symmetryTransforms(symmetry) {
   return ["identity"];
 }
 
-function transformPoint(point, size, transform) {
-  const max = size - 1;
-  if (transform === "horizontal") return { x: point.x, y: max - point.y };
-  if (transform === "vertical") return { x: max - point.x, y: point.y };
-  if (transform === "rotate90") return { x: max - point.y, y: point.x };
-  if (transform === "rotate180") return { x: max - point.x, y: max - point.y };
-  if (transform === "rotate270") return { x: point.y, y: max - point.x };
+function transformPoint(point, dimensions, transform) {
+  const maxX = dimensions.width - 1;
+  const maxY = dimensions.height - 1;
+  if (transform === "horizontal") return { x: point.x, y: maxY - point.y };
+  if (transform === "vertical") return { x: maxX - point.x, y: point.y };
+  if (transform === "rotate90") return boundedPoint({ x: maxY - point.y, y: point.x }, dimensions);
+  if (transform === "rotate180") return { x: maxX - point.x, y: maxY - point.y };
+  if (transform === "rotate270") return boundedPoint({ x: point.y, y: maxX - point.x }, dimensions);
   if (transform === "diagonalMain") return { x: point.y, y: point.x };
-  if (transform === "diagonalAnti") return { x: max - point.y, y: max - point.x };
+  if (transform === "diagonalAnti") return { x: maxY - point.y, y: maxX - point.x };
   if (transform === "rotate120" || transform === "rotate240") {
-    const centre = max / 2;
+    const centreX = maxX / 2;
+    const centreY = maxY / 2;
     const sine = transform === "rotate120" ? Math.sqrt(3) / 2 : -Math.sqrt(3) / 2;
     return boundedPoint({
-      x: Math.round(centre + (point.x - centre) * -0.5 - (point.y - centre) * sine),
-      y: Math.round(centre + (point.x - centre) * sine + (point.y - centre) * -0.5),
-    }, size);
+      x: Math.round(centreX + (point.x - centreX) * -0.5 - (point.y - centreY) * sine),
+      y: Math.round(centreY + (point.x - centreX) * sine + (point.y - centreY) * -0.5),
+    }, dimensions);
   }
   return { ...point };
 }
 
-function boundedPoint(point, size) {
+function boundedPoint(point, dimensions) {
   const x = Math.round(Number(point?.x));
   const y = Math.round(Number(point?.y));
-  return Number.isFinite(x) && Number.isFinite(y) && x >= 0 && y >= 0 && x < size && y < size ? { x, y } : null;
+  return Number.isFinite(x) && Number.isFinite(y)
+    && x >= 0 && y >= 0 && x < dimensions.width && y < dimensions.height
+    ? { x, y }
+    : null;
+}
+
+function normalizedWorldDimensions(value) {
+  if (typeof value === "number") {
+    const size = Math.trunc(value);
+    return size > 0 ? { width: size, height: size } : null;
+  }
+  const width = Math.trunc(Number(value?.width));
+  const height = Math.trunc(Number(value?.height));
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
+function draftWorldDimensions(draft) {
+  const widthTiles = Math.trunc(Number(draft?.width))
+    || (typeof draft?.terrain?.[0] === "string" ? [...draft.terrain[0]].length : 0);
+  const heightTiles = Math.trunc(Number(draft?.height))
+    || (Array.isArray(draft?.terrain) ? draft.terrain.length : 0);
+  return normalizedWorldDimensions({ width: widthTiles * 32, height: heightTiles * 32 });
 }
 
 function finitePoint(point) {
@@ -285,5 +315,5 @@ function finitePoint(point) {
 
 function positiveSafeInteger(value) {
   const number = Number(value);
-  return Number.isSafeInteger(number) && number > 0 ? number : 0;
+  return Number.isSafeInteger(number) && number > 0 && number <= MAX_U32 ? number : 0;
 }

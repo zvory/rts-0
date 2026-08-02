@@ -4,6 +4,7 @@ import { KIND } from "../../client/src/protocol.js";
 import { DoodadLayer } from "../../client/src/renderer/doodad_layer.js";
 import { createForestOutlineFilter } from "../../client/src/renderer/forest_outline_filter.js";
 import { Renderer } from "../../client/src/renderer/index.js";
+import { liveRigRoutePlanFor } from "../../client/src/renderer/rigs/live_routing.js";
 import { _drawTreeOccludedUnitOutlines } from "../../client/src/renderer/tree_unit_occlusion.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
@@ -83,6 +84,27 @@ try {
   assert.equal(filter.resources.forestOutlineUniforms.uniforms.uThickness.value, 1.65,
     "the outline uses a compact screen-space sampling radius");
   filter.destroy();
+
+  const outlinePools = {
+    omitShadow: true,
+    omitEffects: true,
+    unit: "forestUnitOutlines",
+    overlay: "forestUnitOutlines",
+    liveRigUnit: "forestUnitOutlineRigs",
+    liveRigOverlay: "forestUnitOutlineRigOverlays",
+  };
+  const firstOutlinePlan = liveRigRoutePlanFor(KIND.TANK, outlinePools);
+  const secondOutlinePlan = liveRigRoutePlanFor(KIND.TANK, { ...outlinePools });
+  assert.equal(firstOutlinePlan, secondOutlinePlan,
+    "forest outline rig routes reuse one cached immutable plan across occluded units and frames");
+  assert.deepEqual(firstOutlinePlan.poolNames, [
+    "forestUnitOutlineRigs",
+  ], "the cached forest route omits both shadow and weapon-effect pools");
+  assert.equal(
+    liveRigRoutePlanFor(KIND.TANK, { omitShadow: true }).routes.some((route) => route.parts.includes("part.shadow")),
+    false,
+    "omit flags cannot accidentally reuse the normal cached route profile",
+  );
 
   doodads.destroy();
 

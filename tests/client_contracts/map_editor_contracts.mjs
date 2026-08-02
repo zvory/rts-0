@@ -995,14 +995,24 @@ assert(
     { id: 7, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 12, y: 20, color: "#ffffff" },
     { id: 7, typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 30, y: 40, color: "#F0A" },
     { id: 0, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 50, y: 60 },
+    { id: Number.MAX_SAFE_INTEGER, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE, x: 70, y: 80 },
     { id: 9, typeId: "tree.unknown", x: 1, y: 1 },
     { id: 10, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, x: 128, y: 0 },
   ], 128);
   assert.deepEqual(doodads, [
     { typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 30, y: 40, color: "#ff00aa", id: 1 },
     { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 50, y: 60, id: 2 },
+    { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE, x: 70, y: 80, id: 3 },
     { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 12, y: 20, id: 7 },
-  ], "normalization repairs ids deterministically, canonicalizes flowers, strips tree color, and rejects invalid records");
+  ], "normalization repairs duplicate, missing, and non-u32 ids, canonicalizes flowers, strips tree color, and rejects invalid records");
+
+  assert.deepEqual(normalizeMapEditorDoodads([
+    { id: 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 1535, y: 1023 },
+    { id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 1536, y: 10 },
+    { id: 3, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, x: 10, y: 1024 },
+  ], { width: 1536, height: 1024 }), [
+    { id: 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 1535, y: 1023 },
+  ], "normalization treats rectangular world width and height as one explicit contract");
 }
 
 {
@@ -1018,6 +1028,13 @@ assert(
   assert.deepEqual(symmetricDoodadPlacements(320, [{ x: 17, y: 31 }], MAP_EDITOR_SYMMETRY.HALF_TURN), [
     { x: 17, y: 31 }, { x: 302, y: 288 },
   ], "doodad symmetry operates on sub-tile world pixels");
+  assert.deepEqual(symmetricDoodadPlacements(
+    { width: 640, height: 320 },
+    [{ x: 17, y: 31 }],
+    MAP_EDITOR_SYMMETRY.HALF_TURN,
+  ), [
+    { x: 17, y: 31 }, { x: 622, y: 288 },
+  ], "rectangular doodad symmetry reflects each independent world extent");
 }
 
 {
@@ -1146,6 +1163,25 @@ assert(
     upserts: [{ id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, x: 30, y: 40 }],
     removedIds: [1],
   }, "pending doodad patches coalesce by stable id without resurrecting removals");
+}
+
+{
+  const calls = [];
+  const viewport = {
+    selectedDoodadId: null,
+    rebuildTerrain() { calls.push("terrain"); },
+    rebuildDoodads() { calls.push("doodads"); },
+    queueDoodadPatch(update) { calls.push(["patch", update]); },
+    drawOverlay() { calls.push("overlay"); },
+  };
+  const patch = { upserts: [{ id: 1 }], removedIds: [] };
+  MapEditorViewport.prototype.applySessionSnapshot.call(viewport, {
+    reason: "doodadStroke",
+    draft: { doodads: [{ id: 1 }] },
+    doodadPatch: patch,
+  });
+  assert.deepEqual(calls, [["patch", patch], "overlay"],
+    "a doodad-only commit patches vegetation without rebuilding the static terrain texture");
 }
 
 {
