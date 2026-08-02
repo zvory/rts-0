@@ -31,7 +31,8 @@ fn terrain_blend_showcase_is_a_valid_two_player_map() {
     let json = include_str!("../../../../../../assets/maps/terrain-blend-showcase.json");
     let map = Map::from_authored_json(2, json, 0).expect("terrain blend showcase should load");
 
-    assert_eq!(map.size, 126);
+    assert_eq!(map.width, 126);
+    assert_eq!(map.height, 126);
     assert_eq!(map.starts.len(), 2);
     assert_eq!(map.base_sites.len(), 2);
 }
