@@ -196,12 +196,12 @@ pub const UNITS: &[UnitDef] = &[
             hp: 45,
             dmg: 100,
             range_tiles: 5,
-            cooldown: 72,
+            cooldown: 108,
             speed: 1.52,
             sight_tiles: 9,
             cost_steel: 150,
             cost_oil: 40,
-            supply: 3,
+            supply: 6,
             build_ticks: 440,
             radius: 20.0,
         },
@@ -716,6 +716,16 @@ mod tests {
 
         assert_eq!(anti_tank_gun_speed, 1.52);
         assert_eq!(artillery_speed, 1.6);
+    }
+
+    #[test]
+    fn anti_tank_gun_uses_increased_supply_and_cooldown() {
+        let stats = unit_def(EntityKind::AntiTankGun)
+            .expect("anti-tank gun def")
+            .stats;
+
+        assert_eq!(stats.supply, 6);
+        assert_eq!(stats.cooldown, 108);
     }
 
     #[test]

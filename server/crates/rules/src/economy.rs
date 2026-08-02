@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(cost(EntityKind::TrainingCentre), (100, 25));
         assert_eq!(cost(EntityKind::Depot), (100, 0));
         assert_eq!(cost(EntityKind::AntiTankGun), (150, 40));
-        assert_eq!(supply_cost(EntityKind::AntiTankGun), 3);
+        assert_eq!(supply_cost(EntityKind::AntiTankGun), 6);
         assert_eq!(cost(EntityKind::Artillery), (150, 50));
         assert_eq!(cost(EntityKind::ResearchComplex), (100, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 4);
