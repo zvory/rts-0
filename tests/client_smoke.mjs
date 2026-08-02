@@ -575,7 +575,7 @@ try {
   editorUrl.pathname = "/map-editor";
   editorUrl.search = "";
   await editorPage.goto(editorUrl.href, { waitUntil: "domcontentloaded", timeout: 15000 });
-  await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 8, { timeout: 5000 });
+  await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 18, { timeout: 5000 });
   await editorPage.waitForFunction(() => window.__rtsRenderWorkerStats?.surface === "mapEditor"
     && window.__rtsRenderWorkerStats?.backendInfo?.backend === "webgl", { timeout: 5000 });
   const editorUi = await editorPage.evaluate(() => {
@@ -623,9 +623,9 @@ try {
   });
   ok(
     editorUi.header.includes("Map Editor") &&
-      editorUi.terrainPreviews.length === 8 &&
+      editorUi.terrainPreviews.length === 18 &&
       editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0),
-    `MAP EDITOR: terrain buttons show eight rendered terrain previews (header=${editorUi.header}, previews=${editorUi.terrainPreviews.length})`,
+    `MAP EDITOR: terrain buttons show all 18 rendered terrain previews (header=${editorUi.header}, previews=${editorUi.terrainPreviews.length})`,
   );
   ok(
     editorUi.floatingChrome && editorUi.withinViewport && editorUi.noHorizontalOverflow,
