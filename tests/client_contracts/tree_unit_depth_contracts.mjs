@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 
 import { KIND } from "../../client/src/protocol.js";
 import { DoodadLayer } from "../../client/src/renderer/doodad_layer.js";
+import { createForestOutlineFilter } from "../../client/src/renderer/forest_outline_filter.js";
 import { Renderer } from "../../client/src/renderer/index.js";
-import { _drawTreeOccludedUnitReveals } from "../../client/src/renderer/tree_unit_occlusion.js";
+import { _drawTreeOccludedUnitOutlines } from "../../client/src/renderer/tree_unit_occlusion.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
 const restorePixi = installFakePixi();
@@ -38,49 +39,50 @@ try {
     unit(5, 3, KIND.TANK, 101, 71, 36),
   ];
   const renderContexts = new Map(entities.map((entity) => [entity.id, { facing: entity.id * 0.1 }]));
-  const hatchGraphics = new Map();
-  const revealCalls = [];
-  const revealRenderer = {
+  const outlineCalls = [];
+  const outlineRenderer = {
     _doodads: doodads,
-    _slot(_pool, id) {
-      if (!hatchGraphics.has(id)) hatchGraphics.set(id, new PIXI.Graphics());
-      return hatchGraphics.get(id);
-    },
-    _drawUnit(entity, _colors, _state, pools) { revealCalls.push({ entity, pools }); },
+    _drawUnit(entity, _colors, _state, pools) { outlineCalls.push({ entity, pools }); },
     _recordRenderDiagnostic() {},
     _recordRenderError(_label, error) { throw error; },
   };
   assert.equal(
-    _drawTreeOccludedUnitReveals.call(revealRenderer, entities, {}, new Map(), { renderContexts }),
+    _drawTreeOccludedUnitOutlines.call(outlineRenderer, entities, {}, new Map(), { renderContexts }),
     4,
-    "every already-visible friendly, allied, and enemy unit behind a canopy receives a reveal",
+    "every already-visible friendly, allied, and enemy unit behind a canopy enters the outline surface",
   );
-  assert.deepEqual([...hatchGraphics.keys()], [1, 2, 3, 5],
+  assert.deepEqual(outlineCalls.map((call) => call.entity.id), [1, 2, 3, 5],
     "in-front units remain unchanged while visible enemies are treated like friendly units");
-  for (const call of revealCalls) {
-    assert.equal(call.pools.alpha, 0.58, "forest unit art remains clearly visible but translucent");
-    assert.equal(call.pools.omitShadow, true, "forest reveal does not duplicate the unit shadow");
-    assert.equal(call.pools.omitEffects, true, "forest reveal does not duplicate weapon effects");
+  for (const call of outlineCalls) {
+    assert.equal(call.pools.alpha, undefined, "outline source retains complete merged alpha for the shader");
+    assert.equal(call.pools.omitShadow, true, "forest outline does not duplicate the unit shadow");
+    assert.equal(call.pools.omitEffects, true, "forest outline does not duplicate weapon effects");
+    assert.equal(call.pools.liveRigUnit, "forestUnitOutlineRigs", "unit parts share the filtered outline surface");
+    assert.equal(call.pools.liveRigOverlay, "forestUnitOutlineRigOverlays", "rig overlays use the filtered surface");
   }
-  for (const [id, graphics] of hatchGraphics) {
-    assert(graphics.calls.some((call) => call[0] === "moveTo"), "crosshatch begins bounded line paths");
-    assert(graphics.calls.some((call) => call[0] === "lineTo"), "crosshatch draws clipped diagonal segments");
-    assert(graphics.calls.some((call) => call[0] === "lineStyle" && call[2] === 0xffffff && call[3] === 0.18),
-      "crosshatch uses a translucent white stroke");
-    assert.equal(graphics.rotation, id * 0.1, "crosshatch follows the rendered unit facing");
-  }
-  revealCalls.length = 0;
+  outlineCalls.length = 0;
   assert.equal(
-    _drawTreeOccludedUnitReveals.call(
-      revealRenderer,
+    _drawTreeOccludedUnitOutlines.call(
+      outlineRenderer,
       entities.filter((entity) => entity.owner !== 3),
       {},
       new Map(),
       { renderContexts },
     ),
     2,
-    "the pass cannot reveal an enemy omitted by authoritative visibility filtering",
+    "the pass cannot outline an enemy omitted by authoritative visibility filtering",
   );
+
+  const filter = createForestOutlineFilter(PIXI);
+  const fragment = filter.options.glProgram.options.fragment;
+  assert(fragment.includes("neighborAlpha - centerAlpha"),
+    "the post-process subtracts merged center alpha and emits only the outer edge");
+  assert(fragment.includes("vec4(vec3(outlineAlpha), outlineAlpha)"),
+    "the shader emits premultiplied white without filling transparent filter pixels");
+  assert.equal(filter.padding, 3, "the filter surface leaves room for the expanded silhouette");
+  assert.equal(filter.resources.forestOutlineUniforms.uniforms.uThickness.value, 1.65,
+    "the outline uses a compact screen-space sampling radius");
+  filter.destroy();
 
   doodads.destroy();
 
@@ -95,16 +97,16 @@ try {
     "the production renderer enables strict sorting on the shared unit/canopy layer");
   assert.equal(renderer._doodads.canopyLayer, renderer.layers.units,
     "the production renderer sends tree canopies into the unit body depth layer");
-  assert(renderer.layers.forestUnitReveals && renderer.layers.forestUnitHatches,
-    "the production renderer keeps forest reveals and hatches above canopies in dedicated layers");
+  assert(renderer.layers.forestUnitOutlines,
+    "the production renderer keeps filtered forest outlines above canopies in a dedicated layer");
+  assert.deepEqual(renderer.layers.forestUnitOutlines.filters, [renderer._forestOutlineFilter],
+    "one layer-level filter merges all routed rig parts before deriving the outline");
   renderer._drawMissingTexture({ id: 808, x: 10, y: 83 }, "units");
   assert.equal(renderer._pools.units.get(808).zIndex, 83,
     "Graphics fallback unit bodies use the same world-Y depth key");
-  const retainedReveal = renderer._slot("forestUnitReveals", 999);
-  const retainedHatch = renderer._slot("forestUnitHatches", 999);
+  const retainedFilter = renderer._forestOutlineFilter;
   renderer.destroy();
-  assert.equal(retainedReveal.destroyed, true, "renderer teardown releases retained forest reveal graphics");
-  assert.equal(retainedHatch.destroyed, true, "renderer teardown releases retained forest hatch graphics");
+  assert.equal(retainedFilter.destroyed, true, "renderer teardown releases the forest outline filter");
 } finally {
   restorePixi();
 }
@@ -113,4 +115,4 @@ function unit(id, owner, kind, x, y, widthPx = 28) {
   return { id, owner, kind, x, y, facing: 0, visualBounds: { widthPx } };
 }
 
-console.log("✅ tree_unit_depth_contracts.mjs: strict world-Y depth and visibility-gated forest reveals passed");
+console.log("✅ tree_unit_depth_contracts.mjs: strict world-Y depth and GPU-merged forest outlines passed");

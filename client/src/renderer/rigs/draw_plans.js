@@ -15,8 +15,8 @@ const UNIT_RIG_POOL_FAMILIES = Object.freeze([
     "liveShotRevealRigEffects",
   ]),
   Object.freeze([
-    "forestUnitRevealRigs",
-    "forestUnitRevealRigOverlays",
+    "forestUnitOutlineRigs",
+    "forestUnitOutlineRigOverlays",
   ]),
 ]);
 const UNIT_RIG_POOL_FAMILY_BY_NAME = new Map();
