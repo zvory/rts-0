@@ -11,6 +11,12 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   limits accommodate valid checkpoint-backed scenario round trips, while lab scenario import JSON
   is capped at 4 MiB alongside the embedded checkpoint-payload boundary. Oversized frames are
   rejected before serde, and oversized scenario imports are rejected before checkpoint restore.
+- **Static map doodad bounds** (`rts-contract`, `game/map/authored.rs`, `map_handoffs.rs`, and Lab
+  checkpoint/replay validators): map-bearing boundaries accept at most 4,096 doodads, require
+  ascending unique nonzero ids after authored-map canonicalization, allow only the server catalog,
+  bound integer world-pixel coordinates to the map, reject color on trees, and accept only optional
+  canonical lowercase `#rrggbb` wildflower colors. Authored maps and handoff DTOs deny unknown
+  fields, and the existing 512 KiB authored-map and 4 MiB Lab setup caps apply before mutation.
 - **Client stress-test report caps** (`stress_tests.rs`): the public client-only benchmark POST is
   capped at 2 MiB before JSON extraction and validates its fixed schema/workload, scalar lengths,
   duration/status, bounded profiler tables, and 750 KiB SVG limit. Server-issued unguessable run ids

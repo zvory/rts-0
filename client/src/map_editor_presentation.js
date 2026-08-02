@@ -5,7 +5,9 @@ export function createMapEditorPresentation({
   frameId,
   camera,
   terrainUpdate = null,
+  doodadUpdate = null,
   overlay = null,
+  visualTimeMs = 0,
 }) {
   const record = {
     version: MAP_EDITOR_PRESENTATION_VERSION,
@@ -13,7 +15,9 @@ export function createMapEditorPresentation({
     frameId: positiveInteger(frameId, "frameId"),
     camera: plain(camera),
     terrainUpdate: terrainUpdate == null ? null : plain(terrainUpdate),
+    doodadUpdate: doodadUpdate == null ? null : plain(doodadUpdate),
     overlay: overlay == null ? null : plain(overlay),
+    visualTimeMs: finiteNonNegative(visualTimeMs, "visualTimeMs"),
   };
   validateMapEditorPresentation(record);
   return Object.freeze(record);
@@ -27,6 +31,7 @@ export function validateMapEditorPresentation(record) {
     if (!["x", "y", "zoom"].includes(name) || !Number.isFinite(value)) throw new TypeError("Map Editor camera must be finite plain data");
   }
   if (!(record.camera?.zoom > 0)) throw new RangeError("Map Editor camera zoom must be positive");
+  finiteNonNegative(record.visualTimeMs, "visualTimeMs");
   const update = record.terrainUpdate;
   if (update) {
     positiveInteger(update.revision, "terrain revision");
@@ -41,8 +46,39 @@ export function validateMapEditorPresentation(record) {
       if (!Array.isArray(update.changes)) throw new TypeError("Map Editor terrain patch requires changes");
     } else throw new TypeError("Map Editor terrain update kind is unsupported");
   }
+  const doodadUpdate = record.doodadUpdate;
+  if (doodadUpdate) {
+    positiveInteger(doodadUpdate.revision, "doodad revision");
+    if (doodadUpdate.kind === "replace") {
+      validateDoodads(doodadUpdate.doodads, "replacement doodads");
+    } else if (doodadUpdate.kind === "patch") {
+      validateDoodads(doodadUpdate.upserts, "doodad upserts");
+      if (!Array.isArray(doodadUpdate.removedIds)) throw new TypeError("Map Editor doodad patch requires removedIds");
+      const removed = new Set();
+      for (const id of doodadUpdate.removedIds) {
+        positiveInteger(id, "removed doodad id");
+        if (removed.has(id)) throw new RangeError("Map Editor doodad patch has duplicate removed ids");
+        removed.add(id);
+      }
+    } else throw new TypeError("Map Editor doodad update kind is unsupported");
+  }
   structuredClone(record);
   return record;
+}
+
+function validateDoodads(records, label) {
+  if (!Array.isArray(records)) throw new TypeError(`Map Editor ${label} must be an array`);
+  const ids = new Set();
+  for (const record of records) {
+    positiveInteger(record?.id, "doodad id");
+    if (ids.has(record.id)) throw new RangeError(`Map Editor ${label} has duplicate ids`);
+    ids.add(record.id);
+    if (typeof record.typeId !== "string" || !record.typeId) throw new TypeError("Map Editor doodad typeId is required");
+    if (!Number.isInteger(record.x) || !Number.isInteger(record.y)) throw new TypeError("Map Editor doodad coordinates must be integers");
+    if (record.color !== undefined && !/^#[0-9a-f]{6}$/.test(record.color)) {
+      throw new TypeError("Map Editor doodad color must be canonical lowercase hex");
+    }
+  }
 }
 
 function plain(value) {
@@ -51,5 +87,10 @@ function plain(value) {
 
 function positiveInteger(value, label) {
   if (!Number.isSafeInteger(value) || value <= 0) throw new RangeError(`${label} must be a positive integer`);
+  return value;
+}
+
+function finiteNonNegative(value, label) {
+  if (!Number.isFinite(value) || value < 0) throw new RangeError(`${label} must be finite and non-negative`);
   return value;
 }

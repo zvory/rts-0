@@ -16,6 +16,11 @@ use crate::rules::terrain::{self, TerrainKind};
 
 use cache::{CacheEntry, CacheKey};
 
+mod tree_detours;
+#[cfg(test)]
+mod tree_detours_tests;
+pub(in crate::game::services) use tree_detours::{expand_reverse_waypoints, tree_detour_between};
+
 const VEHICLE_HARD_CLEARANCE_TILES: u16 = 1;
 const VEHICLE_PREFERRED_CLEARANCE_TILES: u16 = 3;
 const VEHICLE_CLEARANCE_COST_SCALE: u32 = 2;
@@ -117,17 +122,7 @@ impl Passability for TerrainPassability<'_> {
     }
 
     fn movement_cost(&self, tx: i32, ty: i32) -> u32 {
-        if self.route_shape != RouteShape::VehicleClearance
-            || !uses_oriented_vehicle_body(self.kind)
-        {
-            return 0;
-        }
-        vehicle_clearance_cost(self.occupancy.clearance_at_tile_for_movement_body(
-            tx,
-            ty,
-            movement_body_class(self.kind),
-        ))
-        .saturating_add(self.vehicle_corner_cost(tx, ty))
+        tree_detours::movement_cost(self, tx, ty)
     }
 }
 

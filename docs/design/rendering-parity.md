@@ -40,7 +40,7 @@ Babylon to reproduce every Pixi feature before pre-alpha play.
 | HUD, minimap, lobby, panels, audio, control groups | shared external | shared external | Existing shared surfaces. |
 | New/re-authored art, full rig/animation parity, cosmetic decals, and observer/debug overlays | complete | deferred | Direct reuse of existing flat art is in scope; broader fidelity work waits unless playtest evidence shows a blocker. |
 | Replay/spectator Babylon routes | complete | deferred | Future product need; these routes stay Pixi and must not load or depend on Babylon. |
-| Benchmarks, pools, vegetation, shadows, quality tiers | n/a | deferred | Add only from measured need. |
+| Benchmarks, pools, Babylon vegetation parity, shadows, quality tiers | n/a | deferred | Static trees and wildflowers currently render only in Pixi; add Babylon parity from measured product need. |
 | Babylon live/Lab default with explicit Pixi rollback | complete | missing | Final step after a real playtest and a no-selector live canary; selector/fallback checks must prove Pixi routes do not load Babylon. |
 | Pixi removal | complete | deferred | Keep Pixi for rollback and replay/spectator until a later product decision. |
 

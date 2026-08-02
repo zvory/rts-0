@@ -1,4 +1,13 @@
 import { PASSABLE, TERRAIN, isRoadTerrain } from "./protocol.js";
+import {
+  createMapEditorDoodads,
+  MAP_EDITOR_MAX_DOODADS,
+  moveMapEditorDoodad,
+  normalizeMapEditorDoodads,
+  removeMapEditorDoodads,
+} from "./map_editor_doodads.js";
+
+export { MAP_EDITOR_MAX_DOODADS } from "./map_editor_doodads.js";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
 export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
@@ -94,6 +103,7 @@ export class MapEditorSession {
     this.lastAction = "";
     this.savedFingerprint = "";
     this.terrainStroke = null;
+    this.doodadStroke = null;
   }
 
   get initialized() { return !!this.draft; }
@@ -112,6 +122,7 @@ export class MapEditorSession {
       terrain: map.terrain,
       starts: (startPayload?.players || []).map((player) => ({ x: Number(player.startTileX), y: Number(player.startTileY) })),
       baseSites: [],
+      doodads: map.doodads,
     });
     this.markSaved({ notify: false });
     this.notify("initialized");
@@ -130,6 +141,7 @@ export class MapEditorSession {
       terrain: data.terrain,
       starts: data.starts,
       baseSites: data.baseSites || data.expansionSites,
+      doodads: data.doodads,
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -160,6 +172,7 @@ export class MapEditorSession {
       terrain: Array(mapWidth * mapHeight).fill(TERRAIN.GRASS),
       starts,
       baseSites: starts,
+      doodads: [],
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -333,6 +346,73 @@ export class MapEditorSession {
     return true;
   }
 
+  beginDoodadStroke(label = "Edited doodads") {
+    if (!this.draft || this.doodadStroke) return false;
+    this.doodadStroke = {
+      label,
+      before: clone(this.draft),
+      upserts: new Map(),
+      removedIds: new Set(),
+    };
+    return true;
+  }
+
+  placeDoodads(placements, options) {
+    if (!this.draft || !this.doodadStroke) return [];
+    const bounded = (placements || []).filter((point) => draftContainsWorldPoint(this.draft, point));
+    const added = createMapEditorDoodads(this.draft, bounded, options);
+    for (const record of added) {
+      this.doodadStroke.removedIds.delete(record.id);
+      this.doodadStroke.upserts.set(record.id, clone(record));
+    }
+    return added;
+  }
+
+  moveDoodad(id, point) {
+    if (!this.draft || !this.doodadStroke || !draftContainsWorldPoint(this.draft, point)) return null;
+    const moved = moveMapEditorDoodad(this.draft, id, point);
+    if (moved) this.doodadStroke.upserts.set(moved.id, clone(moved));
+    return moved;
+  }
+
+  removeDoodads(ids) {
+    if (!this.draft || !this.doodadStroke) return [];
+    const removed = removeMapEditorDoodads(this.draft, ids);
+    for (const id of removed) {
+      this.doodadStroke.upserts.delete(id);
+      this.doodadStroke.removedIds.add(id);
+    }
+    return removed;
+  }
+
+  commitDoodadStroke() {
+    const stroke = this.doodadStroke;
+    this.doodadStroke = null;
+    if (!stroke) return false;
+    normalizeDraft(this.draft);
+    if (JSON.stringify(stroke.before) === JSON.stringify(this.draft)) return false;
+    this.undoStack.push(stroke.before);
+    if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
+    this.redoStack = [];
+    this.lastAction = stroke.label;
+    this.notify("doodadStroke", {
+      doodadPatch: {
+        upserts: [...stroke.upserts.values()].sort((left, right) => left.id - right.id),
+        removedIds: [...stroke.removedIds].sort((left, right) => left - right),
+      },
+    });
+    return true;
+  }
+
+  cancelDoodadStroke() {
+    const stroke = this.doodadStroke;
+    this.doodadStroke = null;
+    if (!stroke) return false;
+    this.draft = stroke.before;
+    this.notify("changed");
+    return true;
+  }
+
   mapOverlay() {
     if (!this.draft) return null;
     const starts = this.draft.startLocations.map((location, index) => ({ ...location, index }));
@@ -387,6 +467,7 @@ export class MapEditorSession {
       terrain: draft.terrain.flatMap((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch])),
       starts: draft.startLocations.map(copyLocation),
       baseSites: draft.baseSites.map(copyBaseSite),
+      doodads: draft.doodads.map(copyDoodad),
     };
   }
 
@@ -590,7 +671,17 @@ export function protectDraftBaseTerrain(draft) {
   }
 }
 
-export function authoredMapFromMaterialized({ name, description, size, width = size, height = size, terrain, starts, baseSites }) {
+export function authoredMapFromMaterialized({
+  name,
+  description,
+  size,
+  width = size,
+  height = size,
+  terrain,
+  starts,
+  baseSites,
+  doodads = [],
+}) {
   const mapWidth = Math.max(1, Math.trunc(Number(width)) || 1);
   const mapHeight = Math.max(1, Math.trunc(Number(height)) || 1);
   const codes = Array.from(terrain || []);
@@ -611,6 +702,7 @@ export function authoredMapFromMaterialized({ name, description, size, width = s
     terrain: terrainRows,
     startLocations,
     baseSites: bases,
+    doodads: normalizeDraftDoodads(doodads, dimensions),
   };
   normalizeDraft(draft);
   return draft;
@@ -619,12 +711,19 @@ export function authoredMapFromMaterialized({ name, description, size, width = s
 export function materializedMapsEqual(left, right) {
   if (!left || !right || left.name !== right.name || left.width !== right.width || left.height !== right.height) return false;
   if (!sameFlatArray(left.terrain, right.terrain)) return false;
-  return sameLocationSet(left.starts, right.starts) && sameBaseSiteSet(left.baseSites, right.baseSites);
+  return sameLocationSet(left.starts, right.starts)
+    && sameBaseSiteSet(left.baseSites, right.baseSites)
+    && sameDoodadSet(left.doodads, right.doodads);
 }
 
 function normalizeDraft(draft) {
   if (!draft || typeof draft !== "object") throw new Error("Map data is invalid.");
   if (Number(draft.version) !== 5) replaceObject(draft, migrateLegacyDraft(draft));
+  if (!positiveInteger(draft.width) || !positiveInteger(draft.height)) {
+    const inferred = inferredDraftDimensions(draft);
+    draft.width = inferred.width;
+    draft.height = inferred.height;
+  }
   const height = positiveInteger(draft.height);
   const width = positiveInteger(draft.width);
   if (!width || !height || !Array.isArray(draft.terrain) || draft.terrain.length !== height || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== width)) {
@@ -640,10 +739,21 @@ function normalizeDraft(draft) {
   draft.height = height;
   draft.startLocations = normalizeLocations(draft.startLocations, dimensions).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
   draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, dimensions);
+  draft.doodads = normalizeDraftDoodads(draft.doodads, dimensions);
   protectDraftBaseTerrain(draft);
 }
 
 function migrateLegacyDraft(source) {
+  if (Number(source?.version) === 4) {
+    const dimensions = inferredDraftDimensions(source);
+    return {
+      ...clone(source),
+      version: 5,
+      width: dimensions.width,
+      height: dimensions.height,
+      doodads: Array.isArray(source?.doodads) ? source.doodads : [],
+    };
+  }
   const sites = Array.isArray(source?.sites) ? source.sites : [];
   const byId = new Map(sites.map((site) => [site.id, site]));
   const dimensions = inferredDraftDimensions(source);
@@ -663,6 +773,7 @@ function migrateLegacyDraft(source) {
     terrain: source?.terrain || [],
     startLocations: starts,
     baseSites: (source?.baseSites || sites).map(copyBaseSite),
+    doodads: [],
   };
 }
 
@@ -683,6 +794,11 @@ function resizeDraftCentered(source, width, height) {
   const shift = (location) => ({ ...location, x: location.x + offsetX, y: location.y + offsetY });
   const startLocations = source.startLocations.map(shift);
   const baseSites = source.baseSites.map(shift);
+  const doodads = (source.doodads || []).map((doodad) => ({
+    ...copyDoodad(doodad),
+    x: doodad.x + offsetX * 32,
+    y: doodad.y + offsetY * 32,
+  }));
   const draft = {
     ...clone(source),
     width,
@@ -690,6 +806,7 @@ function resizeDraftCentered(source, width, height) {
     terrain: terrain.map((row) => row.join("")),
     startLocations,
     baseSites,
+    doodads,
   };
   if (startLocations.some((location) => !draftLocationTileWithinClearance(draft, location, MAP_EDITOR_MAIN_CLEARANCE_TILES))) {
     return draftEditError("Resize would move a start location inside the map edge clearance.");
@@ -920,6 +1037,11 @@ function copyBaseSite(site) {
     oilPatches: boundedPatchCount(site?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, MAP_EDITOR_DEFAULT_OIL_PATCHES),
   };
 }
+function copyDoodad(record) {
+  const copy = { id: record.id, typeId: record.typeId, x: record.x, y: record.y };
+  if (record.color) copy.color = record.color;
+  return copy;
+}
 function newBaseSite(location) {
   return {
     ...copyLocation(location),
@@ -938,6 +1060,11 @@ function sameLocationSet(left, right) {
 }
 function sameBaseSiteSet(left, right) {
   const record = (site) => `${locationKey(site)}:${site?.steelPatches}:${site?.oilPatches}`;
+  const a = new Set((left || []).map(record)); const b = new Set((right || []).map(record));
+  return a.size === b.size && [...a].every((key) => b.has(key));
+}
+function sameDoodadSet(left, right) {
+  const record = (doodad) => `${doodad?.id}:${doodad?.typeId}:${doodad?.x}:${doodad?.y}:${doodad?.color || ""}`;
   const a = new Set((left || []).map(record)); const b = new Set((right || []).map(record));
   return a.size === b.size && [...a].every((key) => b.has(key));
 }
@@ -962,6 +1089,21 @@ function inferredDraftDimensions(draft) {
   };
 }
 function draftDimensions(draft) { return normalizeDimensions({ width: draft?.width, height: draft?.height }) || { width: 0, height: 0 }; }
+function normalizeDraftDoodads(records, dimensions) {
+  const map = normalizeDimensions(dimensions);
+  if (!map) return [];
+  return normalizeMapEditorDoodads(records, {
+    width: map.width * 32,
+    height: map.height * 32,
+  }, { max: MAP_EDITOR_MAX_DOODADS });
+}
+function draftContainsWorldPoint(draft, point) {
+  const map = draftDimensions(draft);
+  const x = Math.round(Number(point?.x));
+  const y = Math.round(Number(point?.y));
+  return Number.isFinite(x) && Number.isFinite(y)
+    && x >= 0 && y >= 0 && x < map.width * 32 && y < map.height * 32;
+}
 function normalizeDimensions(value) {
   if (typeof value === "number") {
     const size = positiveInteger(value);

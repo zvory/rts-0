@@ -5,9 +5,10 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 // positioned/scaled from the Camera each frame, plus a screen-space overlay layer
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
-//   terrain → decals → trenches → visual-samples → resources → building-shadows → buildings
+//   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
-//   → selection-rings → units → smokes → hp-bars → fog → visual-sample-labels
+//   → selection-rings → world-Y-sorted units/tree-canopies
+//   → post-processed forest-unit-outlines → smokes → hp-bars → fog → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → feedback/miss-toasts → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
@@ -86,7 +87,11 @@ import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_rout
 import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
-import { buildStaticMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
+import { DoodadLayer } from "./doodad_layer.js";
+import { createForestOutlineFilter } from "./forest_outline_filter.js";
+import { _drawTreeOccludedUnitOutlines } from "./tree_unit_occlusion.js";
+import { applyWorldYDepth } from "./world_y_depth.js";
+import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
@@ -169,6 +174,16 @@ export class Renderer {
       this.layers[name] = c;
       this.world.addChild(c);
     }
+    this.layers.units.sortableChildren = true;
+    this._forestOutlineFilter = createForestOutlineFilter(PIXI);
+    this.layers.forestUnitOutlines.filters = [this._forestOutlineFilter];
+    this._assetReadiness = new Map();
+    this._doodads = new DoodadLayer({
+      pixi: PIXI,
+      understoryLayer: this.layers.doodadUnderstory,
+      canopyLayer: this.layers.units,
+      trackAsset: (id, promise, metadata) => this._trackVisualAsset(id, promise, metadata),
+    });
     this._groundDecals = new GroundDecalLayer({
       layer: this.layers.decals,
       pixi: PIXI,
@@ -267,12 +282,12 @@ export class Renderer {
     // Local frame-strip motion state. Sprite strips animate only when their
     // authoritative or predicted render position is actually changing.
     this._frameStripMotion = new Map();
+    this._unitRenderContexts = new Map();
     // Live SVG rig instances are routed per unit kind. Invalid or missing
     // definitions fail through the renderer's missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
     this._livePngRigAtlasesByKind = createLivePngRigAtlases();
     this._livePngRigAtlasTextures = new Map();
-    this._assetReadiness = new Map();
     this._missingTextureEntityIds = new Set();
     this._renderFrameCount = 0;
     this._lastRenderErrorFrame = -1;
@@ -293,6 +308,8 @@ export class Renderer {
       liveShotRevealRigs: new Map(),
       liveShotRevealRigOverlays: new Map(),
       liveShotRevealRigEffects: new Map(),
+      forestUnitOutlineRigs: new Map(),
+      forestUnitOutlineRigOverlays: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
@@ -304,6 +321,8 @@ export class Renderer {
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
       liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
       liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
+      forestUnitOutlineRigs: { poolName: "forestUnitOutlineRigs", layerName: "forestUnitOutlines" },
+      forestUnitOutlineRigOverlays: { poolName: "forestUnitOutlineRigOverlays", layerName: "forestUnitOutlines" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
@@ -429,6 +448,29 @@ export class Renderer {
     };
   }
 
+  doodadReadiness() {
+    const assetIds = this._doodads?.assetIds || new Set();
+    const assets = [...this._assetReadiness.values()]
+      .filter((asset) => assetIds.has(asset.id))
+      .map((asset) => ({
+        id: asset.id,
+        kind: asset.kind || null,
+        source: asset.source,
+        status: asset.status,
+        message: asset.message || null,
+      }));
+    return {
+      assets,
+      ready: assets.length === assetIds.size && assets.every((asset) => asset.status === "ready"),
+      failedAssets: assets.filter((asset) => asset.status === "failed"),
+      pendingAssets: assets.filter((asset) => asset.status === "pending"),
+    };
+  }
+
+  waitForDoodadAssets() {
+    return this._doodads?.ready?.() || Promise.resolve(true);
+  }
+
   _storeLoadedTexture(map, key, texture) {
     if (this._destroyed) {
       destroyRendererOwnedTexture(texture);
@@ -480,6 +522,7 @@ export class Renderer {
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
+    time("renderer.doodads", () => this._doodads?.update(this.visualNow(), camera));
 
     // Begin a fresh reconciliation pass.
     for (const key of Object.keys(this._seen)) this._seen[key].clear();
@@ -582,6 +625,7 @@ export class Renderer {
       }
     });
     time("renderer.units", () => {
+      this._unitRenderContexts.clear();
       for (const e of regularEntities) {
         liveIds.add(e.id);
         if (isUnit(e.kind)) {
@@ -589,13 +633,25 @@ export class Renderer {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
               visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
+              rememberRenderContext: true,
             });
           });
         }
       }
     });
+    time("renderer.forestUnitOutlines", () => {
+      this._drawSafely(
+        "forestUnitOutlines",
+        () => this._drawTreeOccludedUnitOutlines(regularEntities, state, colorByOwner, {
+          renderContexts: this._unitRenderContexts,
+          visualUnitOverrides: visualUnitOverrideMap,
+          visualFrameStripOverrides: visualFrameStripOverrideMap,
+        }),
+      );
+    });
     // Selection rings are in a layer below units, so selected units stay readable
-    // while the ring remains visible around the silhouette. HP bars stay above.
+    // while the ring remains visible around the silhouette. Forest outlines and HP
+    // bars stay above the unit layer.
     time("renderer.selectionHp", () => {
       for (const e of regularEntities) {
         liveIds.add(e.id);
@@ -890,6 +946,7 @@ export class Renderer {
     if (!entity || entity.id == null || !this._pools?.[poolName]) return;
     if (Number.isInteger(entity.id)) this._missingTextureEntityIds.add(entity.id);
     const g = this._slot(poolName, entity.id);
+    if (poolName === "units") applyWorldYDepth(g, entity);
     const x = Number.isFinite(entity.x) ? entity.x : 0;
     const y = Number.isFinite(entity.y) ? entity.y : 0;
     const size = MISSING_TEXTURE_SIZE_PX;
@@ -1116,12 +1173,16 @@ export class Renderer {
     this._assetReadiness?.clear?.();
     this._missingTextureEntityIds?.clear?.();
     this._tankMotion.clear();
+    this._unitRenderContexts.clear();
     if (this._liveRigPools) {
       for (const pool of Object.values(this._liveRigPools)) {
         for (const instance of pool.values()) instance.destroy();
         pool.clear();
       }
     }
+    this.layers.forestUnitOutlines.filters = null;
+    this._forestOutlineFilter?.destroy?.();
+    this._forestOutlineFilter = null;
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
     destroyRendererTextureMap(this._visualFrameStripTextures);
@@ -1148,6 +1209,8 @@ export class Renderer {
     this._trenchDecals = null;
     this._visualSamples?.destroy();
     this._visualSamples = null;
+    this._doodads?.destroy();
+    this._doodads = null;
 
     // Cached terrain sprite + its generated texture.
     if (this._terrainSprite) {
@@ -1176,8 +1239,28 @@ function destroyRendererOwnedTexture(texture) {
   texture.source?.destroy?.();
 }
 
+function buildStaticMapWithDoodads(map) {
+  buildStaticTerrainMap.call(this, map);
+  this._doodads?.replace(map?.doodads || []);
+}
+
+function replaceStaticDoodads(records) {
+  return this._doodads?.replace(records) || 0;
+}
+
+function patchStaticDoodads(update) {
+  return this._doodads?.patch(update) || 0;
+}
+
+function updateStaticDoodadWind(visualTimeMs, camera) {
+  return this._doodads?.update(visualTimeMs, camera) || 0;
+}
+
 Object.assign(Renderer.prototype, {
-  buildStaticMap,
+  buildStaticMap: buildStaticMapWithDoodads,
+  replaceStaticDoodads,
+  patchStaticDoodads,
+  updateStaticDoodadWind,
   previewStaticTerrain,
   updateStaticTerrainTiles,
   _initGroundDecalsForMap,
@@ -1200,6 +1283,7 @@ Object.assign(Renderer.prototype, {
   _tankMotionVisual,
   _frameStripMovementVisual,
   _drawUnit,
+  _drawTreeOccludedUnitOutlines,
   _rigRenderContextFor,
   _drawShotRevealUnit,
   _drawBuilding,

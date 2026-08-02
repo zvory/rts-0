@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+pub use rts_contract::{validate_map_doodads, MapDoodad};
 use rts_contract::{InitialCamera, LabVisionMode};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -11,6 +12,8 @@ pub struct LabMapDraft {
     pub terrain: Vec<u8>,
     pub starts: Vec<LabMapTile>,
     pub base_sites: Vec<LabBaseSite>,
+    #[serde(default)]
+    pub doodads: Vec<MapDoodad>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -80,6 +83,8 @@ pub struct LabCheckpointScenarioMapData {
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
     pub base_sites: Vec<LabScenarioBaseSite>,
+    #[serde(default)]
+    pub doodads: Vec<MapDoodad>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -136,6 +141,7 @@ pub struct LabScenarioLabMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MapInfo;
 
     #[test]
     fn checkpoint_map_data_uses_per_base_resource_counts() {
@@ -150,6 +156,7 @@ mod tests {
                 steel_patches: 36,
                 oil_patches: 9,
             }],
+            doodads: Vec::new(),
         };
 
         let serialized = serde_json::to_value(&data).expect("checkpoint map data serializes");
@@ -171,5 +178,35 @@ mod tests {
         let parsed: LabCheckpointScenarioMapData =
             serde_json::from_value(encoded).expect("checkpoint map data parses");
         assert_eq!(parsed.base_sites, data.base_sites);
+        assert!(parsed.doodads.is_empty());
+    }
+
+    #[test]
+    fn legacy_lab_map_draft_without_doodads_deserializes_as_empty() {
+        let draft: LabMapDraft = serde_json::from_value(serde_json::json!({
+            "name": "legacy editor handoff",
+            "width": 2,
+            "height": 1,
+            "terrain": [0, 0],
+            "starts": [{ "x": 0, "y": 0 }],
+            "baseSites": []
+        }))
+        .expect("pre-doodad lab map draft remains readable");
+
+        assert!(draft.doodads.is_empty());
+    }
+
+    #[test]
+    fn legacy_map_info_without_doodads_deserializes_as_empty() {
+        let map: MapInfo = serde_json::from_value(serde_json::json!({
+            "width": 2,
+            "height": 1,
+            "tileSize": rts_contract::MAP_TILE_SIZE_PX,
+            "terrain": [0, 0],
+            "resources": []
+        }))
+        .expect("pre-doodad map info remains readable");
+
+        assert!(map.doodads.is_empty());
     }
 }

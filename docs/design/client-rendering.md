@@ -142,7 +142,8 @@ StaticMapPresentationV2 = {
   version: 2, generation, revision,
   widthPx, heightPx, tileSizePx,
   terrain: GridSnapshotV2,
-  resourceSites: readonly detached records[]
+  resourceSites: readonly detached records[],
+  doodads: readonly detached records[]
 }
 
 PresentationFrameV2 = {
@@ -209,6 +210,13 @@ Back-to-front layer ids are exact:
 
 Each descriptor is `{id, order, space, visibilityPolicy, depthPolicy}`. Later work may add optional
 namespaced metadata but cannot rename/reorder layers or weaken visibility policy.
+Within Pixi's fog-gated world, tree canopies and unit body/overlay/effect containers share
+back-to-front world-Y ordering; tree understory and shadows remain below them, while selection, HP,
+and fog remain above. Any received unit occluded by a tree is rendered into a dedicated filter
+surface above the canopy. One Pixi post-process samples the merged alpha of the unit rigs on that
+surface and emits only a white outer silhouette, avoiding per-part outline geometry. This applies
+equally to friendly, allied, and visible enemy units, but the pass only consumes already-admitted
+entities and therefore cannot reveal an enemy hidden by fog.
 
 `frame_recovery.js` samples one projection and visual time, updates fog, builds feedback, reconciles
 one monotonic ground-decal revision, assembles one frame, and calls `renderer.render(frame)`.
@@ -347,7 +355,8 @@ The Pixi v8 version cutover does not require render groups or shared `GraphicsCo
 both remain follow-up performance experiments that need workload evidence and visual review.
 The current foundations do not require replay/spectator Babylon routes, default rollout, hostile
 asset validation, checksums/decoder policy, retained event history, generalized registries/pools,
-benchmark schemas/budgets, vegetation, required shadows, quality tiers, full rig/animation parity,
+benchmark schemas/budgets, Babylon vegetation parity, required shadows, quality tiers, full
+rig/animation parity,
 new or re-authored faction art, or release certification. Add one through a new evidence-backed
 plan when a playtest, content need, or measurement justifies it.
 

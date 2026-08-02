@@ -10,23 +10,24 @@
 //! dynamically by the simulation (a separate occupancy grid in `systems`/`pathfinding`),
 //! not baked into the map.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 mod authored;
 mod base_resources;
 mod data;
+pub(crate) mod doodads;
 #[cfg(test)]
 mod team_assignment_tests;
 
-use crate::config;
-use crate::protocol::terrain;
 use crate::rules::terrain as terrain_rules;
+use crate::{
+    config,
+    protocol::{terrain, MapDoodad},
+};
 use serde::{Deserialize, Serialize};
 
-pub use base_resources::BaseResourceCounts;
-pub use data::AuthoredMapData;
 pub use rts_protocol::AvailableMap;
+pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
 /// The only map schema version this server accepts. Bump when the schema changes incompatibly.
 pub const CURRENT_MAP_VERSION: u32 = 5;
@@ -68,6 +69,7 @@ pub struct Map {
     /// Per-site resource counts. Hand-authored/dev maps without an entry use the live balance
     /// defaults so existing test helpers remain concise.
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
+    pub doodads: Vec<MapDoodad>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -190,6 +192,7 @@ impl Map {
             hash = fnv_bytes(hash, &counts.steel_patches.to_le_bytes());
             hash = fnv_bytes(hash, &counts.oil_patches.to_le_bytes());
         }
+        hash = doodads::hash_materialized(hash, &self.doodads);
         format!("{hash:016x}")
     }
 
@@ -406,6 +409,7 @@ mod tests {
     use std::collections::HashSet;
 
     mod base_limits;
+    mod doodads;
     mod four_player;
     mod schone_tage;
     mod terrain_variants;
@@ -634,7 +638,8 @@ mod tests {
               "_design": "n/a",
               "terrain": [".."],
               "startLocations": [{"x": 0, "y": 0}],
-              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}]
+              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
+              "doodads": []
             }"#,
             0,
         )
@@ -678,7 +683,8 @@ mod tests {
               "_design": "n/a",
               "terrain": ["..", ".x"],
               "startLocations": [{"x": 0, "y": 0}],
-              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}]
+              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
+              "doodads": []
             }"#,
             0,
         )
@@ -702,7 +708,8 @@ mod tests {
               "_design": "n/a",
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
-              "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}]
+              "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
+              "doodads": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -727,7 +734,8 @@ mod tests {
               "_design": "n/a",
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
-              "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}]
+              "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
+              "doodads": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );

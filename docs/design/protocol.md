@@ -530,7 +530,11 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     terrain: number[],
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
-    resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ]
+    resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ],
+    // Static map doodads, canonicalized by ascending nonzero id. Tree records have
+    // authoritative tiny trunk collision; wildflowers are inert. Coordinates are integer
+    // world pixels. color is allowed only on wildflowers.
+    doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
 }
@@ -1387,7 +1391,8 @@ POST /api/map-handoffs
     height: u32,
     terrain: u8[],
     starts: LabMapTile[],
-    baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[]
+    baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
+    doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[]
   }
 }
 -> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
@@ -1397,12 +1402,23 @@ POST /api/map-handoffs/{handoffId}
  | { destination: "editor", authoredMap: AuthoredMapV5 }
 ```
 `AuthoredMapV5` declares independent `width` and `height` tile dimensions, whose product must
-exactly match the row-major terrain body, and has flat `startLocations` and `baseSites` arrays.
+exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
+`doodads` arrays.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
-counts. Creation validates the complete authored-map schema and binds its terrain, locations, and
-resource counts to `materializedMap` before storing it. Records are capped at 64, expire after two
+counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
+by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.oak`, `tree.pine`,
+`tree.spruce`, `tree.alder`, `wildflower.single`, and `wildflower.cluster`. Every tree id has the
+same `Tree` semantic class and authoritative 4.5-world-pixel circular trunk; species affects
+presentation only. Tree color
+is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
+`#rrggbb`. Tree trunks participate in unit standability and add a finite tile-path avoidance cost,
+while leaving the rest of their tile traversable. Wildflowers have no collision or pathing effect.
+Doodads have no fog, vision, cover, or combat behavior in schema v5.
+Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
+count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
+doodads to `materializedMap`. Records are capped at 64, expire after two
 minutes, and are removed on the first consume; unknown, expired, or already-used ids return HTTP 410.
 The map body never appears in a URL. Consumption uses POST so browser or intermediary prefetching
 cannot burn the one-use record. Consuming a Lab-directed record creates a private Lab from the
@@ -1429,7 +1445,8 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       height: u32,
       terrain: u8[],
       starts: [{ x: u32, y: u32 }],
-      baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }]
+      baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }],
+      doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }]
     }
   },
   metadata: {

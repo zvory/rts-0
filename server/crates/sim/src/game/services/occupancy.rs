@@ -23,6 +23,8 @@ pub(crate) struct Occupancy<'a> {
 struct OccupancyData {
     all_ground_blocked: Vec<bool>,
     vehicle_body_blocked: Vec<bool>,
+    tree_path_cost: Vec<bool>,
+    tree_trunks_by_tile: Vec<Vec<(f32, f32)>>,
     all_ground_clearance_tiles: Vec<u16>,
     vehicle_body_clearance_tiles: Vec<u16>,
     all_ground_static_fingerprint: u64,
@@ -44,6 +46,21 @@ impl OccupancyData {
         let mut all_ground_blocked = vec![false; cells];
         let mut vehicle_body_blocked = vec![false; cells];
         let mut tank_trap_tiles = vec![false; cells];
+        let mut tree_path_cost = vec![false; cells];
+        let mut tree_trunks_by_tile = vec![Vec::new(); cells];
+        for doodad in &map.doodads {
+            if !crate::game::map::doodads::is_tree(doodad) {
+                continue;
+            }
+            let tx = doodad.x / config::TILE_SIZE;
+            let ty = doodad.y / config::TILE_SIZE;
+            if tx >= map.width || ty >= map.height {
+                continue;
+            }
+            let idx = (ty * map.width + tx) as usize;
+            tree_path_cost[idx] = true;
+            tree_trunks_by_tile[idx].push((doodad.x as f32, doodad.y as f32));
+        }
         for e in entities.iter() {
             if !e.is_building() {
                 continue;
@@ -81,14 +98,24 @@ impl OccupancyData {
         }
         let all_ground_clearance_tiles = build_clearance_field(map, &all_ground_static_blocked);
         let vehicle_body_clearance_tiles = build_clearance_field(map, &vehicle_body_static_blocked);
-        let all_ground_static_fingerprint =
-            static_blocked_fingerprint(map.width, map.height, &all_ground_static_blocked);
-        let vehicle_body_static_fingerprint =
-            static_blocked_fingerprint(map.width, map.height, &vehicle_body_static_blocked);
+        let all_ground_static_fingerprint = static_path_fingerprint(
+            map.width,
+            map.height,
+            &all_ground_static_blocked,
+            &tree_path_cost,
+        );
+        let vehicle_body_static_fingerprint = static_path_fingerprint(
+            map.width,
+            map.height,
+            &vehicle_body_static_blocked,
+            &tree_path_cost,
+        );
 
         OccupancyData {
             all_ground_blocked,
             vehicle_body_blocked,
+            tree_path_cost,
+            tree_trunks_by_tile,
             all_ground_clearance_tiles,
             vehicle_body_clearance_tiles,
             all_ground_static_fingerprint,
@@ -197,6 +224,33 @@ impl Occupancy<'_> {
         self.passable_for_movement_body(tx, ty, movement_body_class(kind))
     }
 
+    pub(crate) fn tree_path_avoidance_cost(&self, tx: i32, ty: i32) -> u32 {
+        if !self.map.in_bounds(tx, ty) {
+            return 0;
+        }
+        let idx = (ty as u32 * self.map.width + tx as u32) as usize;
+        u32::from(self.data.tree_path_cost[idx])
+    }
+
+    pub(crate) fn tree_trunks_in_tile_rect(
+        &self,
+        min_tx: i32,
+        min_ty: i32,
+        max_tx: i32,
+        max_ty: i32,
+    ) -> impl Iterator<Item = (f32, f32)> + '_ {
+        let min_tx = min_tx.max(0);
+        let min_ty = min_ty.max(0);
+        let max_tx = max_tx.min(self.map.width as i32 - 1);
+        let max_ty = max_ty.min(self.map.height as i32 - 1);
+        (min_ty..=max_ty).flat_map(move |ty| {
+            (min_tx..=max_tx).flat_map(move |tx| {
+                let idx = (ty as u32 * self.map.width + tx as u32) as usize;
+                self.data.tree_trunks_by_tile[idx].iter().copied()
+            })
+        })
+    }
+
     pub(crate) fn passable_for_movement_body(
         &self,
         tx: i32,
@@ -247,10 +301,10 @@ fn close_tank_trap_vehicle_gaps(
 }
 
 impl Passability for Occupancy<'_> {
-    /// All-ground static blockers only. Movement code should prefer `passable_for_kind` so
-    /// vehicle-body requests include vehicle-only blockers.
+    /// All-ground tile-path blockers. Exact movement should use `passable_for_kind` plus the
+    /// authoritative trunk circles so tree tiles retain their physically open space.
     fn passable(&self, tx: i32, ty: i32) -> bool {
-        self.passable_for_movement_body(tx, ty, MovementBodyClass::InfantryLike)
+        self.passable_for_kind(tx, ty, EntityKind::Rifleman)
     }
 }
 
@@ -316,6 +370,23 @@ fn static_blocked_fingerprint(width: u32, height: u32, static_blocked: &[bool]) 
     hash
 }
 
+fn static_path_fingerprint(
+    width: u32,
+    height: u32,
+    static_blocked: &[bool],
+    tree_path_cost: &[bool],
+) -> u64 {
+    let mut hash = static_blocked_fingerprint(width, height, static_blocked);
+    for (idx, has_tree) in tree_path_cost.iter().enumerate() {
+        if *has_tree {
+            // A separate tag keeps a tree-cost cell distinct from a hard blocker at the same
+            // row-major index while remaining deterministic across processes.
+            hash = fnv_mix(hash, (idx as u64 + 1) | (1_u64 << 63));
+        }
+    }
+    hash
+}
+
 fn fnv_mix(hash: u64, value: u64) -> u64 {
     (hash ^ value).wrapping_mul(FNV_PRIME)
 }
@@ -323,7 +394,7 @@ fn fnv_mix(hash: u64, value: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::terrain;
+    use crate::protocol::{terrain, MapDoodad};
 
     fn flat_test_map(size: u32) -> Map {
         Map {
@@ -359,6 +430,42 @@ mod tests {
         assert_eq!(occ.clearance_at_tile(5, 4), 1);
         assert_eq!(occ.clearance_at_tile(6, 4), 2);
         assert_eq!(occ.clearance_at_tile(7, 4), 3);
+    }
+
+    #[test]
+    fn trees_add_path_cost_without_blocking_sub_tile_space_and_flowers_do_not() {
+        let mut map = flat_test_map(12);
+        let tree = map.tile_center(5, 5);
+        let flower = map.tile_center(7, 5);
+        map.doodads = vec![
+            MapDoodad {
+                id: 1,
+                type_id: "tree.oak".to_string(),
+                x: tree.0 as u32,
+                y: tree.1 as u32,
+                color: None,
+            },
+            MapDoodad {
+                id: 2,
+                type_id: "wildflower.cluster".to_string(),
+                x: flower.0 as u32,
+                y: flower.1 as u32,
+                color: Some("#e05a91".to_string()),
+            },
+        ];
+        let entities = EntityStore::new();
+        let occupied = Occupancy::build(&map, &entities);
+
+        assert!(occupied.passable_for_kind(5, 5, EntityKind::Rifleman));
+        assert!(occupied.clearance_at_tile(5, 5) > 0);
+        assert_eq!(occupied.tree_path_avoidance_cost(5, 5), 1);
+        assert!(occupied.passable_for_kind(7, 5, EntityKind::Rifleman));
+        assert_eq!(occupied.tree_path_avoidance_cost(7, 5), 0);
+        assert_eq!(occupied.tree_trunks_in_tile_rect(7, 5, 7, 5).count(), 0);
+
+        let empty_map = flat_test_map(12);
+        let empty = Occupancy::build(&empty_map, &entities);
+        assert_ne!(occupied.static_fingerprint(), empty.static_fingerprint());
     }
 
     #[test]

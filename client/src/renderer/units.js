@@ -181,13 +181,14 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const frameStrip = visualFrameStrip?.strip || (visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, rigKey));
   const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(rigKey) || null;
   if (frameStrip && frameStripTexture) {
-    const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+    const renderContext = pools.renderContext || this._rigRenderContextFor?.(e, colorByOwner, state) || {};
     applyRigAlpha(renderContext, pools.alpha);
-    const frameStripMovement = this._frameStripMovementVisual?.(e, state);
+    const frameStripMovement = pools.renderContext ? null : this._frameStripMovementVisual?.(e, state);
     if (frameStripMovement) {
       renderContext.frameStripMoving = frameStripMovement.moving;
       renderContext.frameStripMovementActivity = frameStripMovement.activity;
     }
+    rememberRigRenderContext(this, e, pools, renderContext);
     const drawPlan = frameStripDrawPlanFor(routePlan);
     if (drawPlan.shadowRoute) {
       const sampledAnimation = sampleRigAnimationInto(
@@ -216,8 +217,9 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const pngAtlas = visualOverride ? null : livePngRigAtlasFor(this._livePngRigAtlasesByKind, rigKey);
   const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(rigKey) ?? null;
   if (pngAtlas && pngAtlasTexture) {
-    const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+    const renderContext = pools.renderContext || this._rigRenderContextFor?.(e, colorByOwner, state) || {};
     applyRigAlpha(renderContext, pools.alpha);
+    rememberRigRenderContext(this, e, pools, renderContext);
     const drawPlan = pngDrawPlanFor(definition, pngAtlas, routePlan);
     const sampledAnimation = sampleRigAnimationInto(
       animationStageFor(definition, drawPlan.sampledParts),
@@ -251,8 +253,9 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   }
 
   reconcileActiveLiveRigPools(this, e.id, routePlan.poolNames);
-  const renderContext = this._rigRenderContextFor?.(e, colorByOwner, state) ?? {};
+  const renderContext = pools.renderContext || this._rigRenderContextFor?.(e, colorByOwner, state) || {};
   applyRigAlpha(renderContext, pools.alpha);
+  rememberRigRenderContext(this, e, pools, renderContext);
   const sampledAnimation = sampleRigAnimationInto(
     animationStageFor(definition, routePlan.allParts),
     e,
@@ -269,6 +272,11 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
 
 function applyRigAlpha(renderContext, alpha) {
   if (typeof alpha === "number") renderContext.shotRevealAlpha = alpha;
+}
+
+function rememberRigRenderContext(renderer, entity, pools, renderContext) {
+  if (!pools.rememberRenderContext) return;
+  renderer._unitRenderContexts?.set?.(entity.id, { ...renderContext });
 }
 
 export function _rigRenderContextFor(e, colorByOwner, state) {

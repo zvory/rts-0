@@ -1,6 +1,14 @@
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import {
+  canonicalDoodadColor,
+  MAP_EDITOR_DEFAULT_FLOWER_COLOR,
+  MAP_EDITOR_DOODAD_CATALOG,
+  MAP_EDITOR_DOODAD_TYPES,
+  MAP_EDITOR_MAX_DOODADS,
+  isWildflowerDoodadType,
+} from "./map_editor_doodads.js";
+import {
   MAP_EDITOR_DEFAULT_SIZE,
   MAP_EDITOR_HISTORY_LIMIT,
   MAP_EDITOR_MAX_BASE_SITES,
@@ -41,6 +49,11 @@ export class MapEditorPanel {
     this.selectedBaseIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
+    this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.TREE_OAK;
+    this.doodadMode = "place";
+    this.doodadColor = MAP_EDITOR_DEFAULT_FLOWER_COLOR;
+    this.doodadRadius = 48;
+    this.doodadDensity = 4;
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
     this.blankMapWidth = String(MAP_EDITOR_DEFAULT_SIZE);
     this.blankMapHeight = String(MAP_EDITOR_DEFAULT_SIZE);
@@ -141,7 +154,7 @@ export class MapEditorPanel {
     if (!this.session.draft) {
       body.appendChild(readout("Preparing editor…"));
     } else {
-      body.append(this.renderTerrain(), this.renderLocations());
+      body.append(this.renderTerrain(), this.renderDoodads(), this.renderLocations());
     }
     this.toolsEl.append(header, body, this.toolsWindowChrome.renderResizeHandle());
     restorePanelScroll(body, scroll);
@@ -342,6 +355,86 @@ export class MapEditorPanel {
     return section;
   }
 
+  renderDoodads() {
+    const section = group("Doodads");
+    const trees = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "tree");
+    const flowers = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "wildflower");
+    const treePalette = this.renderDoodadPalette(trees);
+    const flowerPalette = this.renderDoodadPalette(flowers);
+
+    const tools = document.createElement("div");
+    tools.className = "map-editor-palette";
+    tools.append(
+      button("Place one", () => this.armDoodad("place"), {
+        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "place",
+      }),
+      button("Spray flowers", () => {
+        if (!isWildflowerDoodadType(this.selectedDoodadType)) {
+          this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE;
+        }
+        this.armDoodad("spray");
+      }, { active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "spray" }),
+      button("Select / move", () => this.armDoodad("select"), {
+        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "select",
+      }),
+      button("Erase brush", () => this.armDoodad("erase"), {
+        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "erase",
+      }),
+      button("Delete selected", () => this.viewport.deleteSelectedDoodad()),
+    );
+
+    const color = document.createElement("input");
+    color.type = "color";
+    color.value = this.doodadColor;
+    color.setAttribute("aria-label", "Wildflower color");
+    color.addEventListener("input", () => {
+      this.doodadColor = canonicalDoodadColor(color.value, MAP_EDITOR_DEFAULT_FLOWER_COLOR);
+      if (this.viewport.tool?.kind === "doodad" && isWildflowerDoodadType(this.selectedDoodadType)) {
+        this.armDoodad(this.doodadMode);
+      }
+    });
+
+    const radius = numericInput(this.doodadRadius, 4, 256, (value) => {
+      this.doodadRadius = value;
+      if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
+    }, "Doodad brush radius");
+    const density = numericInput(this.doodadDensity, 1, 12, (value) => {
+      this.doodadDensity = value;
+      if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
+    }, "Wildflower spray density");
+    section.append(
+      readout(`${this.session.draft.doodads.length}/${MAP_EDITOR_MAX_DOODADS} doodads. Tree species are visual variants of one semantic tree type; each tree has a tiny impassable trunk.`),
+      readout("Trees"),
+      treePalette,
+      readout("Wildflowers"),
+      flowerPalette,
+      field("Tool", tools),
+      field("Flower color", color),
+      field("Brush radius (world px)", radius),
+      field("Spray density", density),
+      readout("Symmetry applies when creating doodads. Drag selected doodads to move them; Delete/Backspace removes the selection."),
+    );
+    return section;
+  }
+
+  renderDoodadPalette(entries) {
+    const palette = document.createElement("div");
+    palette.className = "map-editor-palette map-editor-doodad-palette";
+    for (const entry of entries) {
+      palette.appendChild(button(entry.label, () => {
+        this.selectedDoodadType = entry.typeId;
+        if (!isWildflowerDoodadType(entry.typeId)) this.doodadMode = "place";
+        this.armDoodad(this.doodadMode);
+        this.setStatus(`Placing ${entry.label.toLowerCase()}.`);
+      }, {
+        active: this.viewport.tool?.kind === "doodad"
+          && !["select", "erase"].includes(this.viewport.tool?.mode)
+          && this.selectedDoodadType === entry.typeId,
+      }));
+    }
+    return palette;
+  }
+
   renderActions() {
     const section = group("Save and test");
     section.append(
@@ -399,6 +492,20 @@ export class MapEditorPanel {
       shape: this.paintShape,
       symmetry: this.symmetry,
     });
+  }
+
+  armDoodad(mode) {
+    this.doodadMode = ["place", "spray", "select", "erase"].includes(mode) ? mode : "place";
+    this.viewport.armTool({
+      kind: "doodad",
+      mode: this.doodadMode,
+      typeId: this.selectedDoodadType,
+      color: isWildflowerDoodadType(this.selectedDoodadType) ? this.doodadColor : null,
+      radius: this.doodadRadius,
+      density: this.doodadDensity,
+      symmetry: this.symmetry,
+    });
+    this.render();
   }
 
   setPaintShape(shape) {
@@ -641,6 +748,22 @@ function patchCountField(labelText, value, max, onChange, disabled = false) {
   input.disabled = disabled;
   input.addEventListener("change", () => onChange(input.value));
   return field(labelText, input);
+}
+
+function numericInput(value, min, max, onChange, ariaLabel) {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = String(min);
+  input.max = String(max);
+  input.step = "1";
+  input.value = String(value);
+  input.setAttribute("aria-label", ariaLabel);
+  input.addEventListener("change", () => {
+    const next = Math.max(min, Math.min(max, Math.trunc(Number(input.value)) || min));
+    input.value = String(next);
+    onChange(next);
+  });
+  return input;
 }
 
 function dimensionInput(label, value, onInput) {

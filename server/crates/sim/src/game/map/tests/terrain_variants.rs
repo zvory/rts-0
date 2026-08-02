@@ -14,7 +14,8 @@ fn authored_map_accepts_visual_open_terrain_variants() {
           "_design": "n/a",
           "terrain": {},
           "startLocations": [{{"x": 8, "y": 8}}],
-          "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}]
+          "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
+          "doodads": []
         }}"#,
         serde_json::to_string(&rows).unwrap()
     );

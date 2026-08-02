@@ -3,6 +3,7 @@ import { createRigAnimationStage, rigContainerScale, sampleRigAnimationInto } fr
 import { flushRigDiagnosticCounts } from "./diagnostics.js";
 import { isImmutablePartSelection, normalizedPartSet, partSelectionKey } from "./part_selection.js";
 import { resolvePngSpriteTransform } from "./png_transform.js";
+import { applyWorldYDepth } from "../world_y_depth.js";
 
 const ATLAS_SPRITES_CACHE = new WeakMap();
 const ROUTE_COVERAGE_CACHE = new WeakMap();
@@ -176,6 +177,7 @@ class PngAtlasRigInstance {
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? 1;
     setPoint(this.container.position, entity.x ?? 0, entity.y ?? 0);
+    applyWorldYDepth(this.container, entity);
     const scale = rigContainerScale(renderContext);
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;

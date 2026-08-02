@@ -88,6 +88,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
             steel_patches: 12,
             oil_patches: 3,
         }],
+        doodads: Vec::new(),
     });
     let mut task = RoomTask::new(
         "__lab__:map-editor:map=Chokes".to_string(),

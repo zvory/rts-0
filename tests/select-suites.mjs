@@ -85,6 +85,10 @@ const configModulePolicies = new Map([
     "client/src/config/player_palette_mirror.js",
     { ciClass: "full", suites: ["nextest-server", "js-protocol-contracts"] },
   ],
+  [
+    "client/src/config/doodads.js",
+    { ciClass: "full", suites: ["nextest-contract-protocol", "js-protocol-contracts"] },
+  ],
   ["client/src/config/presentation.js", { ciClass: "client_only", suites: [] }],
 ]);
 

@@ -43,12 +43,12 @@ const materializedHash = (data) => fnv1a64([
 ]);
 
 const bundledMapContracts = new Map([
-  ["1v1-no-terrain.json", [126, 126, "43229a90f176eca98bc846369c23829ec21ef651110c6130f60cd44064e0f493", "d29299dd1553ec21"]],
-  ["1v1.json", [126, 126, "dc1f3578b9b8e59dddef9dad876a43873771efac6d7cff010b65a6088f30c91d", "d0b81232a3d4f7e7"]],
-  ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "831dec9e14715c54"]],
-  ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "c21f82a96623e5f4"]],
-  ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "4730254f979d8825"]],
-  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "29382d5c52dec25c"]],
+  ["1v1-no-terrain.json", [126, 126, "43229a90f176eca98bc846369c23829ec21ef651110c6130f60cd44064e0f493", "2f8b9b017b963b3d"]],
+  ["1v1.json", [126, 126, "dc1f3578b9b8e59dddef9dad876a43873771efac6d7cff010b65a6088f30c91d", "9b1ea08eb9074177"]],
+  ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "87fd0a1f1e0bfece"]],
+  ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "3646e6748318acae"]],
+  ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "e021c05abe9ed2f1"]],
+  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "086605a89730c7d6"]],
 ]);
 
 for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMapContracts) {
@@ -74,10 +74,10 @@ for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMa
 }
 
 const bundledScenarioContracts = new Map([
-  ["lategame.json", ["d0b81232a3d4f7e7", "7918f89f6178e9c9"]],
-  ["render-preview.json", ["d0b81232a3d4f7e7", "f82d4bf8967c50c9"]],
-  ["fixed-roster-hellhole.json", ["4730254f979d8825", "b8b0dd056c34c92d"]],
-  ["tank-trap-cluster-clear.json", ["d0b81232a3d4f7e7", "7918f89f6178e9c9"]],
+  ["lategame.json", ["9b1ea08eb9074177", "7918f89f6178e9c9"]],
+  ["render-preview.json", ["9b1ea08eb9074177", "f82d4bf8967c50c9"]],
+  ["fixed-roster-hellhole.json", ["e021c05abe9ed2f1", "b8b0dd056c34c92d"]],
+  ["tank-trap-cluster-clear.json", ["9b1ea08eb9074177", "7918f89f6178e9c9"]],
 ]);
 
 for (const [fileName, [contentHash, expectedMaterializedHash]] of bundledScenarioContracts) {

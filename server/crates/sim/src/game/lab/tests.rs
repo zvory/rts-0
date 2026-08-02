@@ -1,7 +1,7 @@
 use super::*;
 use crate::game::entity::{PanzerfaustState, WeaponSetup};
 use crate::game::services::occupancy::footprint_center;
-use crate::protocol::{terrain, LabBaseSite, LabMapTile};
+use crate::protocol::{terrain, LabBaseSite, LabMapTile, MapDoodad};
 
 fn lab_players() -> [PlayerInit; 2] {
     [
@@ -62,6 +62,22 @@ fn map_draft() -> LabMapDraft {
             steel_patches: 7,
             oil_patches: 2,
         }],
+        doodads: vec![
+            MapDoodad {
+                id: 9,
+                type_id: "wildflower.cluster".to_string(),
+                x: 900,
+                y: 920,
+                color: Some("#e05a91".to_string()),
+            },
+            MapDoodad {
+                id: 3,
+                type_id: "tree.spruce".to_string(),
+                x: 800,
+                y: 820,
+                color: None,
+            },
+        ],
     }
 }
 
@@ -93,6 +109,17 @@ fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
     assert_eq!(game.state.map.resource_counts_at((32, 32)).oil_patches, 2);
     assert_eq!(game.export_lab_map().base_sites[0].steel_patches, 7);
     assert_eq!(game.export_lab_map().base_sites[0].oil_patches, 2);
+    assert_eq!(
+        game.state
+            .map
+            .doodads
+            .iter()
+            .map(|doodad| doodad.id)
+            .collect::<Vec<_>>(),
+        vec![3, 9]
+    );
+    assert_eq!(game.export_lab_map().doodads, game.state.map.doodads);
+    assert_eq!(game.start_payload().map.doodads, game.state.map.doodads);
     assert_eq!(game.state.map_metadata.name, "Edited Lab Map");
     assert_eq!(
         game.start_payload()
@@ -217,6 +244,7 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
             .map(|&(x, y)| LabMapTile { x, y })
             .collect(),
         base_sites: Vec::new(),
+        doodads: Vec::new(),
     };
 
     let outcome = game

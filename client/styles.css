@@ -5642,6 +5642,15 @@ input[type="text"]:focus {
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
+.map-editor-doodad-palette {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+.map-editor-field input[type="color"] {
+  min-height: 34px;
+  padding: 3px;
+}
+
 .map-editor-player-picker {
   grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
 }

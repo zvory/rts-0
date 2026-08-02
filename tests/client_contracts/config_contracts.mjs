@@ -1,4 +1,3 @@
-// tests/client_contracts/config_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
 import { assert, assertDeepEqual } from "./assertions.mjs";
@@ -66,7 +65,6 @@ import {
 import { Input } from "../../client/src/input/index.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { CommandInteraction } from "../../client/src/command_interaction.js";
-
 const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "ABILITIES",
   "ANTI_TANK_GUN_BODY",
@@ -94,6 +92,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "COLORS",
   "COMMAND_CAR_BODY",
   "COMMAND_CAR_SUPPLY_CAP_BONUS",
+  "DOODAD_TYPE",
+  "DOODAD_TYPE_IDS",
   "EKAT_CONSUME_GOLEM_RANGE_TILES",
   "EKAT_FACTION_ID",
   "EKAT_LINE_SHOT_COOLDOWN_TICKS",

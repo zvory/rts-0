@@ -32,6 +32,7 @@ fn main() {
         starts: vec![(6, 6), (57, 57)],
         base_sites: vec![(6, 6), (57, 57)],
         base_resource_counts: Default::default(),
+        doodads: Vec::new(),
     };
     let mut game = Game::new_with_random_ai_profiles_and_map_metadata(
         &players,

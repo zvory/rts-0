@@ -3,6 +3,7 @@ import { createRigAnimationStage, rigContainerScale, sampleRigAnimationInto } fr
 import { hexToInt, lightenColor } from "../shared.js";
 import { flushRigDiagnosticCounts } from "./diagnostics.js";
 import { normalizedPartSet, partSelectionKey } from "./part_selection.js";
+import { applyWorldYDepth } from "../world_y_depth.js";
 
 const SVG_RIG_DIAGNOSTIC_LABELS = Object.freeze([
   "renderer.rig.redraw.skipped.hidden",
@@ -120,6 +121,7 @@ export class UnitRigInstance {
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? 1;
     setPoint(this.container.position, entity.x ?? 0, entity.y ?? 0);
+    applyWorldYDepth(this.container, entity);
     const scale = rigContainerScale(renderContext);
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = 0;

@@ -424,6 +424,7 @@ mod tests {
                     x: crate::config::TILE_SIZE as f32 * 5.5,
                     y: crate::config::TILE_SIZE as f32 * 1.5,
                 }],
+                doodads: Vec::new(),
             },
             players: vec![PlayerStart {
                 id: 1,

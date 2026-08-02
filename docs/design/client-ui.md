@@ -903,7 +903,8 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
-status, local save/load, export, and Lab handoff; Tools owns terrain paint and start/base locations.
+status, local save/load, export, and Lab handoff; Tools owns terrain paint, start/base locations, and
+doodad authoring.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
@@ -938,6 +939,11 @@ mutates rows in place, records dirty tiles, and commits once. The renderer patch
 edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
+
+The doodad palette exposes oak, pine, spruce, and alder. Trees are placed singly and share one
+mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed singly or sprayed
+with a chosen tint. Symmetry, move, delete, and undo/redo apply to doodads. Trees do not yet change
+line of sight, cover, or combat damage, and wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
 The bounded server record expires after two minutes and is consumed once. Lab consumption creates a
@@ -2086,9 +2092,16 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   are removed when an entity id no longer needs them. Both runtimes share one
   sampled render context per entity draw so renderer-local motion state advances once. Units use low-detail hard-edged silhouettes tinted by player color, a dark
   drop shadow, dark outline, HP bar above when damaged/selected, and glowing selection ring when
-  entrenched units retain their player-color tint while scaling down. Occupied trenches add shadow
-  and lip overlays around live units; empty trenches retain only the base decal.
-  selected. When the in-match Game settings
+  selected. Entrenched units retain their player-color tint while scaling down. Occupied trenches add
+  shadow and lip overlays around live units; empty trenches retain only the base decal.
+  Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values
+  draw first, so a southern tree or unit naturally covers a northern one. When any received unit
+  intersects a tree canopy in front of it, its rig is rendered into a dedicated filter surface
+  above the canopy. A Pixi post-process samples the merged sprite/rig alpha and emits only a white
+  outer silhouette, rather than outlining individual rig parts. Friendly, allied, and visible enemy
+  units use the same treatment. This readability pass uses only already-admitted entities and does
+  not reveal enemies, hidden entities, shadows, status bars, or selection/effect overlays.
+  When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
   Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
   field-of-fire overlays. An enemy deployed Anti-Tank Gun observed through ordinary vision or an

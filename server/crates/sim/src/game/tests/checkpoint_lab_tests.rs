@@ -5,6 +5,7 @@ use crate::game::lab::{
     LabSpawnEntity, LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION,
 };
 use crate::game::upgrade::UpgradeKind;
+use crate::protocol::MapDoodad;
 
 const TEST_BUILD_SHA: &str = "checkpoint-lab-test";
 
@@ -92,6 +93,13 @@ fn assert_restore_invalid_map(scenario: crate::game::lab::LabCheckpointScenarioV
 #[test]
 fn checkpoint_lab_scenario_export_matches_direct_state() {
     let mut authored = default_lab_game(0x5150_5001);
+    authored.state.map.doodads = vec![MapDoodad {
+        id: 1,
+        type_id: "tree.alder".to_string(),
+        x: 800,
+        y: 900,
+        color: None,
+    }];
     authored
         .apply_lab_op(LabOp::SetPlayerResources(LabSetPlayerResources {
             player_id: 1,
@@ -139,6 +147,7 @@ fn checkpoint_lab_scenario_export_matches_direct_state() {
         checkpoint.map.data.terrain.len(),
         (checkpoint.map.data.width * checkpoint.map.data.height) as usize
     );
+    assert_eq!(checkpoint.map.data.doodads, authored.state.map.doodads);
     assert!(
         !checkpoint.checkpoint_payload.contains("\"terrain\""),
         "embedded GameCheckpointV1 must not duplicate map terrain"
@@ -241,6 +250,7 @@ fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
             .map(|tile| (tile.x, tile.y))
             .collect(),
         base_resource_counts: Default::default(),
+        doodads: Vec::new(),
     };
     let materialized_hash = map.materialized_hash();
     checkpoint.map.materialized_hash = materialized_hash.clone();

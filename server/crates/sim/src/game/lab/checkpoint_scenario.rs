@@ -6,7 +6,7 @@ use super::{LabEntityIdRemap, LabError};
 use crate::game::map::{BaseResourceCounts, Map};
 use crate::game::Game;
 use crate::game::MapMetadata;
-use crate::protocol::terrain;
+use crate::protocol::{terrain, validate_map_doodads, MapDoodad};
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
@@ -16,7 +16,6 @@ const MAX_LAB_CHECKPOINT_PLAYERS: usize = 8;
 const MAX_LAB_CHECKPOINT_MAP_TILES: usize = 1_000_000;
 const MAX_LAB_CHECKPOINT_MAP_STARTS: usize = MAX_LAB_CHECKPOINT_PLAYERS;
 const MAX_LAB_CHECKPOINT_MAP_BASE_SITES: usize = MAX_LAB_CHECKPOINT_PLAYERS * 8;
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LabCheckpointScenarioV1 {
@@ -48,6 +47,8 @@ pub struct LabCheckpointScenarioMapData {
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
     pub base_sites: Vec<LabScenarioBaseSite>,
+    #[serde(default)]
+    pub doodads: Vec<MapDoodad>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -112,6 +113,7 @@ impl LabCheckpointScenarioMap {
                         }
                     })
                     .collect(),
+                doodads: map.doodads.clone(),
             },
         }
     }
@@ -147,6 +149,7 @@ impl LabCheckpointScenarioMap {
                 .map(|tile| (tile.x, tile.y))
                 .collect(),
             base_resource_counts,
+            doodads: data.doodads,
         };
         if map.materialized_hash() != self.materialized_hash {
             return Err(LabError::InvalidMap {
@@ -242,6 +245,25 @@ impl LabCheckpointScenarioMap {
                 });
             }
         }
+        let world_width_px =
+            width
+                .checked_mul(crate::config::TILE_SIZE)
+                .ok_or_else(|| LabError::InvalidMap {
+                    name: self.name.clone(),
+                    reason: "checkpoint scenario map world-pixel dimensions overflow".to_string(),
+                })?;
+        let world_height_px = height
+            .checked_mul(crate::config::TILE_SIZE)
+            .ok_or_else(|| LabError::InvalidMap {
+                name: self.name.clone(),
+                reason: "checkpoint scenario map world-pixel dimensions overflow".to_string(),
+            })?;
+        validate_map_doodads(&self.data.doodads, world_width_px, world_height_px).map_err(
+            |reason| LabError::InvalidMap {
+                name: self.name.clone(),
+                reason: format!("checkpoint scenario map {reason}"),
+            },
+        )?;
         Ok(())
     }
 }

@@ -1,9 +1,9 @@
 {
-  "reason": "checkpointed fog-discovered ground decals require a bounded store and narrow projection APIs",
+  "reason": "Merge doodad pathing with checkpointed ground decals",
   "line_counts": [
     {
       "path": "ability.rs",
-      "lines": 238
+      "lines": 171
     },
     {
       "path": "ability_projectile.rs",
@@ -11,11 +11,11 @@
     },
     {
       "path": "ability_projection.rs",
-      "lines": 77
+      "lines": 87
     },
     {
       "path": "ability_projection_tests.rs",
-      "lines": 316
+      "lines": 341
     },
     {
       "path": "ability_runtime.rs",
@@ -23,15 +23,35 @@
     },
     {
       "path": "analysis.rs",
-      "lines": 118
+      "lines": 125
+    },
+    {
+      "path": "anti_tank_gun_memory.rs",
+      "lines": 179
+    },
+    {
+      "path": "apm.rs",
+      "lines": 91
     },
     {
       "path": "artillery.rs",
-      "lines": 327
+      "lines": 356
+    },
+    {
+      "path": "auto_build.rs",
+      "lines": 38
     },
     {
       "path": "building_memory.rs",
-      "lines": 331
+      "lines": 374
+    },
+    {
+      "path": "checkpoint/anti_tank_gun_memory.rs",
+      "lines": 42
+    },
+    {
+      "path": "checkpoint/conversion.rs",
+      "lines": 15
     },
     {
       "path": "checkpoint/error.rs",
@@ -39,7 +59,7 @@
     },
     {
       "path": "checkpoint/metadata.rs",
-      "lines": 211
+      "lines": 216
     },
     {
       "path": "checkpoint/mod.rs",
@@ -47,15 +67,39 @@
     },
     {
       "path": "checkpoint/player_dto.rs",
-      "lines": 52
+      "lines": 54
     },
     {
       "path": "checkpoint/validation.rs",
-      "lines": 510
+      "lines": 508
+    },
+    {
+      "path": "checkpoint/validation/ability_charges.rs",
+      "lines": 37
+    },
+    {
+      "path": "checkpoint/validation/anti_tank_gun_memory.rs",
+      "lines": 50
+    },
+    {
+      "path": "checkpoint/validation/building_memory.rs",
+      "lines": 30
+    },
+    {
+      "path": "checkpoint/validation/entities.rs",
+      "lines": 64
+    },
+    {
+      "path": "checkpoint/validation/entities_tests.rs",
+      "lines": 24
+    },
+    {
+      "path": "checkpoint/validation/firing_reveal.rs",
+      "lines": 101
     },
     {
       "path": "command.rs",
-      "lines": 790
+      "lines": 855
     },
     {
       "path": "commands.rs",
@@ -66,8 +110,28 @@
       "lines": 72
     },
     {
+      "path": "entity/armor_reaction.rs",
+      "lines": 16
+    },
+    {
       "path": "entity/entity.rs",
-      "lines": 1386
+      "lines": 1410
+    },
+    {
+      "path": "entity/entity/production.rs",
+      "lines": 63
+    },
+    {
+      "path": "entity/entity/production_repeat.rs",
+      "lines": 65
+    },
+    {
+      "path": "entity/entity/rally.rs",
+      "lines": 61
+    },
+    {
+      "path": "entity/entity/research.rs",
+      "lines": 43
     },
     {
       "path": "entity/kind.rs",
@@ -75,23 +139,27 @@
     },
     {
       "path": "entity/mod.rs",
-      "lines": 58
+      "lines": 64
     },
     {
       "path": "entity/order.rs",
-      "lines": 508
+      "lines": 585
+    },
+    {
+      "path": "entity/reveal_reaction.rs",
+      "lines": 94
     },
     {
       "path": "entity/state.rs",
-      "lines": 407
+      "lines": 434
     },
     {
       "path": "entity/store.rs",
-      "lines": 199
+      "lines": 232
     },
     {
       "path": "entity/tests.rs",
-      "lines": 500
+      "lines": 737
     },
     {
       "path": "entrenchment_combat.rs",
@@ -99,15 +167,27 @@
     },
     {
       "path": "firing_reveal.rs",
-      "lines": 185
+      "lines": 213
     },
     {
       "path": "fog.rs",
-      "lines": 526
+      "lines": 599
+    },
+    {
+      "path": "fog/presentation.rs",
+      "lines": 112
+    },
+    {
+      "path": "fog/reveal_provenance.rs",
+      "lines": 189
+    },
+    {
+      "path": "fog/smoke_melee.rs",
+      "lines": 55
     },
     {
       "path": "fog/tests.rs",
-      "lines": 190
+      "lines": 273
     },
     {
       "path": "ground_decal.rs",
@@ -119,43 +199,75 @@
     },
     {
       "path": "invariants.rs",
-      "lines": 958
+      "lines": 1026
     },
     {
       "path": "lab.rs",
-      "lines": 1417
+      "lines": 1498
     },
     {
       "path": "lab/checkpoint_scenario.rs",
-      "lines": 344
+      "lines": 426
+    },
+    {
+      "path": "lab/map_draft.rs",
+      "lines": 68
     },
     {
       "path": "lab/tests.rs",
-      "lines": 839
+      "lines": 1058
     },
     {
       "path": "lab_god_mode_tests.rs",
-      "lines": 192
+      "lines": 193
     },
     {
       "path": "map.rs",
-      "lines": 796
+      "lines": 806
     },
     {
       "path": "map/authored.rs",
-      "lines": 325
+      "lines": 330
     },
     {
       "path": "map/authored/assignment.rs",
       "lines": 171
     },
     {
+      "path": "map/base_resources.rs",
+      "lines": 43
+    },
+    {
+      "path": "map/data.rs",
+      "lines": 20
+    },
+    {
+      "path": "map/doodads.rs",
+      "lines": 54
+    },
+    {
       "path": "map/team_assignment_tests.rs",
-      "lines": 174
+      "lines": 175
     },
     {
       "path": "map/tests/base_limits.rs",
-      "lines": 55
+      "lines": 162
+    },
+    {
+      "path": "map/tests/doodads.rs",
+      "lines": 163
+    },
+    {
+      "path": "map/tests/four_player.rs",
+      "lines": 74
+    },
+    {
+      "path": "map/tests/schone_tage.rs",
+      "lines": 25
+    },
+    {
+      "path": "map/tests/terrain_variants.rs",
+      "lines": 39
     },
     {
       "path": "mod.rs",
@@ -163,91 +275,95 @@
     },
     {
       "path": "mortar.rs",
-      "lines": 372
+      "lines": 436
     },
     {
       "path": "mortar/entrenchment_tests.rs",
-      "lines": 71
-    },
-    {
-      "path": "mortar/tests.rs",
-      "lines": 88
-    },
-    {
-      "path": "mortar_scatter.rs",
-      "lines": 123
-    },
-    {
-      "path": "panzerfaust_shot.rs",
-      "lines": 242
-    },
-    {
-      "path": "pathfinding.rs",
-      "lines": 298
-    },
-    {
-      "path": "phase7_privacy_tests.rs",
-      "lines": 450
-    },
-    {
-      "path": "player_state.rs",
-      "lines": 160
-    },
-    {
-      "path": "replay.rs",
-      "lines": 284
-    },
-    {
-      "path": "replay_artifact.rs",
-      "lines": 201
-    },
-    {
-      "path": "resource_placement.rs",
-      "lines": 173
-    },
-    {
-      "path": "resource_placement_tests.rs",
-      "lines": 30
-    },
-    {
-      "path": "scoring.rs",
-      "lines": 55
-    },
-    {
-      "path": "services/ability_orders.rs",
-      "lines": 856
-    },
-    {
-      "path": "services/combat/acquisition.rs",
-      "lines": 311
-    },
-    {
-      "path": "services/combat/activation.rs",
       "lines": 72
     },
     {
-      "path": "services/combat/chase.rs",
-      "lines": 79
+      "path": "mortar/tests.rs",
+      "lines": 89
+    },
+    {
+      "path": "mortar_scatter.rs",
+      "lines": 124
+    },
+    {
+      "path": "observer_snapshot.rs",
+      "lines": 96
+    },
+    {
+      "path": "panzerfaust_shot.rs",
+      "lines": 247
+    },
+    {
+      "path": "pathfinding.rs",
+      "lines": 333
+    },
+    {
+      "path": "phase7_privacy_tests.rs",
+      "lines": 510
+    },
+    {
+      "path": "player_state.rs",
+      "lines": 172
+    },
+    {
+      "path": "replay.rs",
+      "lines": 282
+    },
+    {
+      "path": "replay_artifact.rs",
+      "lines": 221
+    },
+    {
+      "path": "resource_placement.rs",
+      "lines": 171
+    },
+    {
+      "path": "resource_placement_tests.rs",
+      "lines": 31
+    },
+    {
+      "path": "scoring.rs",
+      "lines": 74
+    },
+    {
+      "path": "services/ability_orders.rs",
+      "lines": 936
+    },
+    {
+      "path": "services/combat/acquisition.rs",
+      "lines": 282
+    },
+    {
+      "path": "services/combat/acquisition_pass.rs",
+      "lines": 232
+    },
+    {
+      "path": "services/combat/activation.rs",
+      "lines": 75
     },
     {
       "path": "services/combat/coax.rs",
-      "lines": 257
+      "lines": 268
     },
     {
       "path": "services/combat/damage.rs",
-      "lines": 314
+      "lines": 362
     },
     {
       "path": "services/combat/events.rs",
-      "lines": 134
+      "lines": 131
     },
     {
       "path": "services/combat/mod.rs",
-      "lines": 621
+      "lines": 631
     },
     {
       "path": "services/combat/panzerfaust.rs",
-      "lines": 391
+      "lines": 340
     },
     {
       "path": "services/combat/panzerfaust/events.rs",
@@ -255,27 +371,43 @@
     },
     {
       "path": "services/combat/panzerfaust/runtime.rs",
-      "lines": 225
+      "lines": 168
     },
     {
       "path": "services/combat/priority.rs",
-      "lines": 416
+      "lines": 404
     },
     {
       "path": "services/combat/projection.rs",
-      "lines": 149
+      "lines": 208
+    },
+    {
+      "path": "services/combat/shot_blocker_index.rs",
+      "lines": 61
+    },
+    {
+      "path": "services/combat/target_legality.rs",
+      "lines": 189
     },
     {
       "path": "services/combat/target_policy.rs",
-      "lines": 180
+      "lines": 175
     },
     {
       "path": "services/combat/tests.rs",
-      "lines": 3223
+      "lines": 3233
+    },
+    {
+      "path": "services/combat/tests/accuracy.rs",
+      "lines": 168
     },
     {
       "path": "services/combat/tests/anti_tank_acquisition.rs",
-      "lines": 53
+      "lines": 250
+    },
+    {
+      "path": "services/combat/tests/anti_tank_behavior.rs",
+      "lines": 260
     },
     {
       "path": "services/combat/tests/coax.rs",
@@ -283,39 +415,43 @@
     },
     {
       "path": "services/combat/tests/entrenchment.rs",
-      "lines": 413
+      "lines": 475
+    },
+    {
+      "path": "services/combat/tests/fog_visibility.rs",
+      "lines": 134
     },
     {
       "path": "services/combat/tests/mortar_autocast.rs",
-      "lines": 163
+      "lines": 333
     },
     {
       "path": "services/combat/tests/moving_fire_policy.rs",
-      "lines": 409
+      "lines": 497
     },
     {
       "path": "services/combat/tests/range_targeting.rs",
-      "lines": 147
+      "lines": 317
     },
     {
       "path": "services/combat/tests/retention.rs",
-      "lines": 253
+      "lines": 486
     },
     {
       "path": "services/combat/tests/support_weapon_attack_move.rs",
-      "lines": 152
+      "lines": 214
     },
     {
       "path": "services/combat/tests/tank_traps.rs",
-      "lines": 146
+      "lines": 267
     },
     {
       "path": "services/combat/tests/target_legality.rs",
-      "lines": 380
+      "lines": 531
     },
     {
       "path": "services/combat/tests/target_priority.rs",
-      "lines": 25
+      "lines": 55
     },
     {
       "path": "services/combat/tests/weapon_cooldowns.rs",
@@ -323,35 +459,55 @@
     },
     {
       "path": "services/combat/tests/weapon_profiles.rs",
-      "lines": 256
+      "lines": 307
     },
     {
       "path": "services/combat/weapons.rs",
-      "lines": 388
+      "lines": 373
     },
     {
       "path": "services/commands.rs",
-      "lines": 1922
+      "lines": 2092
     },
     {
       "path": "services/commands/artillery_scatter.rs",
-      "lines": 94
+      "lines": 48
+    },
+    {
+      "path": "services/commands/auto_build.rs",
+      "lines": 18
+    },
+    {
+      "path": "services/commands/cancel.rs",
+      "lines": 50
+    },
+    {
+      "path": "services/commands/command_helpers.rs",
+      "lines": 64
     },
     {
       "path": "services/commands/guards.rs",
-      "lines": 89
+      "lines": 132
     },
     {
       "path": "services/commands/planner_facts.rs",
-      "lines": 175
+      "lines": 241
+    },
+    {
+      "path": "services/commands/production_repeat.rs",
+      "lines": 57
     },
     {
       "path": "services/commands/scout_plane_ability.rs",
-      "lines": 79
+      "lines": 74
+    },
+    {
+      "path": "services/commands/support_weapon_setup.rs",
+      "lines": 145
     },
     {
       "path": "services/commands/tests.rs",
-      "lines": 161
+      "lines": 166
     },
     {
       "path": "services/commands/tests/abilities.rs",
@@ -359,15 +515,23 @@
     },
     {
       "path": "services/commands/tests/artillery_point_fire_queue.rs",
-      "lines": 246
+      "lines": 226
     },
     {
       "path": "services/commands/tests/build.rs",
-      "lines": 650
+      "lines": 826
     },
     {
       "path": "services/commands/tests/command_budget.rs",
-      "lines": 172
+      "lines": 231
+    },
+    {
+      "path": "services/commands/tests/construction_cancel.rs",
+      "lines": 234
+    },
+    {
+      "path": "services/commands/tests/mortar_setup.rs",
+      "lines": 146
     },
     {
       "path": "services/commands/tests/orders.rs",
@@ -375,7 +539,11 @@
     },
     {
       "path": "services/commands/tests/production.rs",
-      "lines": 678
+      "lines": 733
+    },
+    {
+      "path": "services/commands/tests/production_repeat.rs",
+      "lines": 351
     },
     {
       "path": "services/commands/tests/rally.rs",
@@ -383,39 +551,51 @@
     },
     {
       "path": "services/commands/tests/scout_plane_production.rs",
-      "lines": 191
+      "lines": 288
+    },
+    {
+      "path": "services/commands/tests/support_weapon_setup.rs",
+      "lines": 52
     },
     {
       "path": "services/commands/tests/support_weapons.rs",
-      "lines": 733
+      "lines": 872
     },
     {
       "path": "services/commands/tests/tank_traps.rs",
-      "lines": 192
+      "lines": 337
     },
     {
       "path": "services/construction.rs",
-      "lines": 987
+      "lines": 1082
     },
     {
       "path": "services/construction/build_wait_tests.rs",
-      "lines": 280
+      "lines": 487
+    },
+    {
+      "path": "services/construction/pump_jack.rs",
+      "lines": 139
     },
     {
       "path": "services/death.rs",
-      "lines": 158
+      "lines": 209
+    },
+    {
+      "path": "services/death/tests.rs",
+      "lines": 180
     },
     {
       "path": "services/economy.rs",
-      "lines": 395
+      "lines": 398
     },
     {
       "path": "services/economy/pump_jack.rs",
-      "lines": 111
+      "lines": 119
     },
     {
       "path": "services/economy/tests.rs",
-      "lines": 341
+      "lines": 578
     },
     {
       "path": "services/entrenchment.rs",
@@ -423,19 +603,19 @@
     },
     {
       "path": "services/entrenchment/spatial.rs",
-      "lines": 233
+      "lines": 239
     },
     {
       "path": "services/entrenchment/tests.rs",
-      "lines": 158
+      "lines": 159
     },
     {
       "path": "services/geometry.rs",
-      "lines": 1358
+      "lines": 1370
     },
     {
       "path": "services/line_of_sight.rs",
-      "lines": 327
+      "lines": 330
     },
     {
       "path": "services/mod.rs",
@@ -443,43 +623,75 @@
     },
     {
       "path": "services/move_coordinator.rs",
-      "lines": 1806
+      "lines": 1826
+    },
+    {
+      "path": "services/move_coordinator/footprint_pathing.rs",
+      "lines": 353
     },
     {
       "path": "services/move_coordinator/formation.rs",
-      "lines": 442
+      "lines": 361
     },
     {
       "path": "services/move_coordinator/formation/goal_search.rs",
-      "lines": 263
+      "lines": 58
+    },
+    {
+      "path": "services/move_coordinator/formation/layout.rs",
+      "lines": 259
+    },
+    {
+      "path": "services/move_coordinator/formation/polyline.rs",
+      "lines": 151
     },
     {
       "path": "services/move_coordinator/formation/reachability.rs",
-      "lines": 244
+      "lines": 235
     },
     {
       "path": "services/move_coordinator/formation/tests.rs",
-      "lines": 424
+      "lines": 668
+    },
+    {
+      "path": "services/move_coordinator/pathing_budget_tests.rs",
+      "lines": 175
+    },
+    {
+      "path": "services/move_coordinator/rally.rs",
+      "lines": 199
+    },
+    {
+      "path": "services/move_coordinator/spawn_tests.rs",
+      "lines": 218
+    },
+    {
+      "path": "services/move_coordinator/tree_paths.rs",
+      "lines": 83
+    },
+    {
+      "path": "services/movement/armor_reaction.rs",
+      "lines": 227
     },
     {
       "path": "services/movement/collision.rs",
-      "lines": 403
+      "lines": 402
     },
     {
       "path": "services/movement/mod.rs",
-      "lines": 207
+      "lines": 220
     },
     {
       "path": "services/movement/pivot_drive.rs",
-      "lines": 292
+      "lines": 346
     },
     {
       "path": "services/movement/scout_car.rs",
-      "lines": 950
+      "lines": 1028
     },
     {
       "path": "services/movement/standability.rs",
-      "lines": 86
+      "lines": 85
     },
     {
       "path": "services/movement/steering.rs",
@@ -487,27 +699,47 @@
     },
     {
       "path": "services/movement/tests.rs",
-      "lines": 5176
+      "lines": 5102
+    },
+    {
+      "path": "services/movement/tests/pivot_drive.rs",
+      "lines": 58
+    },
+    {
+      "path": "services/movement/tests/static_repath.rs",
+      "lines": 110
+    },
+    {
+      "path": "services/movement/tests/tree_trunks.rs",
+      "lines": 62
+    },
+    {
+      "path": "services/movement/tests/vehicle_traffic.rs",
+      "lines": 254
+    },
+    {
+      "path": "services/movement/traffic.rs",
+      "lines": 49
     },
     {
       "path": "services/movement/waypoints.rs",
-      "lines": 860
+      "lines": 942
     },
     {
       "path": "services/occupancy.rs",
-      "lines": 1010
+      "lines": 717
     },
     {
       "path": "services/order_execution.rs",
-      "lines": 164
+      "lines": 195
     },
     {
       "path": "services/order_execution/targeting.rs",
-      "lines": 432
+      "lines": 362
     },
     {
       "path": "services/order_execution/targeting/tests.rs",
-      "lines": 86
+      "lines": 71
     },
     {
       "path": "services/order_planner.rs",
@@ -515,15 +747,31 @@
     },
     {
       "path": "services/order_queue.rs",
-      "lines": 1500
+      "lines": 1472
+    },
+    {
+      "path": "services/order_queue/artillery.rs",
+      "lines": 87
     },
     {
       "path": "services/order_queue/attack.rs",
-      "lines": 58
+      "lines": 32
     },
     {
       "path": "services/order_queue/tests/artillery_point_fire_tests.rs",
-      "lines": 66
+      "lines": 127
+    },
+    {
+      "path": "services/order_queue/tests/construction_tests.rs",
+      "lines": 60
+    },
+    {
+      "path": "services/order_queue/tests/hold_position_tests.rs",
+      "lines": 43
+    },
+    {
+      "path": "services/order_queue/tests/mortar_setup_tests.rs",
+      "lines": 25
     },
     {
       "path": "services/order_queue/tests/queued_attack_tests.rs",
@@ -531,31 +779,63 @@
     },
     {
       "path": "services/pathing.rs",
-      "lines": 2077
+      "lines": 1845
+    },
+    {
+      "path": "services/pathing/cache.rs",
+      "lines": 82
+    },
+    {
+      "path": "services/pathing/request.rs",
+      "lines": 157
+    },
+    {
+      "path": "services/pathing/request_tests.rs",
+      "lines": 283
+    },
+    {
+      "path": "services/pathing/tree_detours.rs",
+      "lines": 170
+    },
+    {
+      "path": "services/pathing/tree_detours_tests.rs",
+      "lines": 134
     },
     {
       "path": "services/production.rs",
-      "lines": 862
+      "lines": 914
+    },
+    {
+      "path": "services/production/tests/rally.rs",
+      "lines": 253
+    },
+    {
+      "path": "services/production/tests/upgrades.rs",
+      "lines": 105
+    },
+    {
+      "path": "services/production/tests/waiting.rs",
+      "lines": 195
     },
     {
       "path": "services/scout_plane.rs",
-      "lines": 397
+      "lines": 280
     },
     {
       "path": "services/scout_plane/tests.rs",
-      "lines": 183
+      "lines": 194
     },
     {
       "path": "services/spatial.rs",
-      "lines": 115
+      "lines": 117
     },
     {
       "path": "services/standability.rs",
-      "lines": 983
+      "lines": 1084
     },
     {
       "path": "services/standability/build_site_tests.rs",
-      "lines": 314
+      "lines": 315
     },
     {
       "path": "services/standability/placement_policy.rs",
@@ -566,72 +846,132 @@
       "lines": 41
     },
     {
+      "path": "services/standability/tree_trunk_tests.rs",
+      "lines": 76
+    },
+    {
+      "path": "services/standability/tree_trunks.rs",
+      "lines": 53
+    },
+    {
       "path": "services/supply.rs",
-      "lines": 32
+      "lines": 27
     },
     {
       "path": "services/world_query.rs",
-      "lines": 481
+      "lines": 531
     },
     {
       "path": "setup.rs",
-      "lines": 590
+      "lines": 608
     },
     {
       "path": "setup/checkpoint_start.rs",
-      "lines": 52
+      "lines": 51
     },
     {
       "path": "setup/dev_scenarios.rs",
-      "lines": 645
+      "lines": 724
+    },
+    {
+      "path": "setup/dev_scenarios/attack_move_reload.rs",
+      "lines": 89
+    },
+    {
+      "path": "setup/dev_scenarios/attack_move_reload_tests.rs",
+      "lines": 122
+    },
+    {
+      "path": "setup/dev_scenarios/command_car_corner_tests.rs",
+      "lines": 165
+    },
+    {
+      "path": "setup/dev_scenarios/dev_scenario_setup.rs",
+      "lines": 41
+    },
+    {
+      "path": "setup/dev_scenarios/dispatch.rs",
+      "lines": 86
+    },
+    {
+      "path": "setup/dev_scenarios/dynamic_construction_path_block.rs",
+      "lines": 145
+    },
+    {
+      "path": "setup/dev_scenarios/factory_wall_rally_spawn.rs",
+      "lines": 58
+    },
+    {
+      "path": "setup/dev_scenarios/factory_wall_rally_spawn_tests.rs",
+      "lines": 90
     },
     {
       "path": "setup/dev_scenarios/layouts.rs",
-      "lines": 427
+      "lines": 502
     },
     {
       "path": "setup/dev_scenarios/layouts/tank_traps.rs",
       "lines": 297
     },
     {
-      "path": "setup/dev_scenarios/panzerfaust.rs",
-      "lines": 360
+      "path": "setup/dev_scenarios/replay_142_vehicle_lock.rs",
+      "lines": 82
+    },
+    {
+      "path": "setup/dev_scenarios/replay_238_rifleman_corner_lock.rs",
+      "lines": 65
+    },
+    {
+      "path": "setup/dev_scenarios/scout_car_lake_reverse_l_path.rs",
+      "lines": 202
+    },
+    {
+      "path": "setup/dev_scenarios/scout_car_open_ground_l_path.rs",
+      "lines": 147
     },
     {
       "path": "setup/dev_scenarios/tank_coax.rs",
       "lines": 150
     },
     {
+      "path": "setup/dev_scenarios/tank_retreat.rs",
+      "lines": 414
+    },
+    {
+      "path": "setup/dev_scenarios/test_support.rs",
+      "lines": 19
+    },
+    {
       "path": "setup/dev_scenarios/tests.rs",
-      "lines": 1445
+      "lines": 1499
     },
     {
       "path": "setup/tests.rs",
-      "lines": 401
+      "lines": 444
     },
     {
       "path": "smoke.rs",
-      "lines": 272
+      "lines": 299
     },
     {
       "path": "snapshot.rs",
-      "lines": 338
+      "lines": 398
     },
     {
       "path": "snapshot_memory_tests.rs",
-      "lines": 325
+      "lines": 554
     },
     {
       "path": "state.rs",
-      "lines": 143
+      "lines": 155
     },
     {
       "path": "systems.rs",
-      "lines": 543
+      "lines": 551
     },
     {
       "path": "systems/occupancy_phase_cache.rs",
-      "lines": 185
+      "lines": 188
     },
     {
       "path": "teams.rs",
@@ -639,43 +979,51 @@
     },
     {
       "path": "tests.rs",
-      "lines": 37
+      "lines": 39
     },
     {
       "path": "tests/ability_runtime_tests.rs",
-      "lines": 217
+      "lines": 243
     },
     {
       "path": "tests/ai_identity_tests.rs",
-      "lines": 42
+      "lines": 43
     },
     {
       "path": "tests/artillery_blanket_tests.rs",
-      "lines": 266
+      "lines": 334
     },
     {
       "path": "tests/artillery_tests.rs",
-      "lines": 579
+      "lines": 725
     },
     {
       "path": "tests/at_gun_firing_reveal_tests.rs",
-      "lines": 427
+      "lines": 596
+    },
+    {
+      "path": "tests/at_gun_firing_reveal_tests/visibility_reaction.rs",
+      "lines": 498
+    },
+    {
+      "path": "tests/at_gun_firing_reveal_tests/visibility_reaction/lifecycle.rs",
+      "lines": 79
     },
     {
       "path": "tests/build_wait_tests.rs",
-      "lines": 321
+      "lines": 327
     },
     {
       "path": "tests/checkpoint_helpers.rs",
-      "lines": 339
+      "lines": 344
     },
     {
       "path": "tests/checkpoint_lab_tests.rs",
-      "lines": 304
+      "lines": 327
     },
     {
       "path": "tests/checkpoint_payload_tests.rs",
-      "lines": 454
+      "lines": 582
     },
     {
       "path": "tests/checkpoint_start_tests.rs",
@@ -683,11 +1031,11 @@
     },
     {
       "path": "tests/checkpoint_visibility_tests.rs",
-      "lines": 743
+      "lines": 784
     },
     {
       "path": "tests/derived_state_tests.rs",
-      "lines": 945
+      "lines": 962
     },
     {
       "path": "tests/determinism_tests.rs",
@@ -695,43 +1043,39 @@
     },
     {
       "path": "tests/ekat_tests.rs",
-      "lines": 1230
+      "lines": 1358
     },
     {
       "path": "tests/faction_ability_tests.rs",
-      "lines": 389
+      "lines": 546
     },
     {
       "path": "tests/fixtures.rs",
-      "lines": 250
+      "lines": 286
     },
     {
       "path": "tests/meth_movement_tests.rs",
-      "lines": 224
+      "lines": 209
     },
     {
       "path": "tests/mortar_manual_fire_tests.rs",
-      "lines": 345
+      "lines": 465
     },
     {
       "path": "tests/movement_replay_tests.rs",
-      "lines": 1068
+      "lines": 1071
     },
     {
-      "path": "tests/panzerfaust_death_tests.rs",
-      "lines": 67
-    },
-    {
-      "path": "tests/panzerfaust_targeting_tests.rs",
-      "lines": 204
-    },
-    {
-      "path": "tests/panzerfaust_tests.rs",
-      "lines": 838
+      "path": "tests/panzerfaust_upgrade_tests.rs",
+      "lines": 309
     },
     {
       "path": "tests/primary_base_tests.rs",
       "lines": 100
+    },
+    {
+      "path": "tests/repeat_production_tests.rs",
+      "lines": 418
     },
     {
       "path": "tests/replay_artifact_tests.rs",
@@ -739,31 +1083,47 @@
     },
     {
       "path": "tests/resources_mining_tests.rs",
-      "lines": 432
+      "lines": 634
+    },
+    {
+      "path": "tests/road_terrain_tests.rs",
+      "lines": 87
     },
     {
       "path": "tests/scoring_projection_tests.rs",
-      "lines": 573
+      "lines": 690
+    },
+    {
+      "path": "tests/smoke_charge_tests.rs",
+      "lines": 173
     },
     {
       "path": "tests/smoke_mortar_tests.rs",
-      "lines": 1389
+      "lines": 1385
+    },
+    {
+      "path": "tests/smoke_mortar_visibility_tests.rs",
+      "lines": 191
     },
     {
       "path": "tests/tank_trap_tests.rs",
-      "lines": 196
+      "lines": 313
     },
     {
       "path": "trench.rs",
-      "lines": 164
+      "lines": 163
     },
     {
       "path": "trench_tests.rs",
-      "lines": 823
+      "lines": 971
     },
     {
       "path": "upgrade.rs",
-      "lines": 236
+      "lines": 167
+    },
+    {
+      "path": "world_combat.rs",
+      "lines": 446
     }
   ],
   "service_edges": [
@@ -795,7 +1155,7 @@
       "source": "combat",
       "target": "line_of_sight",
       "path": "services/combat/acquisition.rs",
-      "line": 8
+      "line": 5
     },
     {
       "source": "combat",
@@ -807,43 +1167,37 @@
       "source": "combat",
       "target": "line_of_sight",
       "path": "services/combat/mod.rs",
-      "line": 20
+      "line": 18
     },
     {
       "source": "combat",
       "target": "move_coordinator",
       "path": "services/combat/mod.rs",
-      "line": 21
+      "line": 19
     },
     {
       "source": "combat",
       "target": "movement",
       "path": "services/combat/weapons.rs",
-      "line": 4
-    },
-    {
-      "source": "combat",
-      "target": "occupancy",
-      "path": "services/combat/mod.rs",
-      "line": 22
+      "line": 6
     },
     {
       "source": "combat",
       "target": "spatial",
       "path": "services/combat/acquisition.rs",
-      "line": 9
+      "line": 6
     },
     {
       "source": "combat",
       "target": "spatial",
       "path": "services/combat/mod.rs",
-      "line": 23
+      "line": 20
     },
     {
       "source": "combat",
       "target": "world_query",
       "path": "services/combat/acquisition.rs",
-      "line": 10
+      "line": 7
     },
     {
       "source": "combat",
@@ -855,13 +1209,13 @@
       "source": "commands",
       "target": "ability_orders",
       "path": "services/commands.rs",
-      "line": 17
+      "line": 19
     },
     {
       "source": "commands",
       "target": "ability_orders",
       "path": "services/commands/planner_facts.rs",
-      "line": 4
+      "line": 7
     },
     {
       "source": "commands",
@@ -873,23 +1227,11 @@
       "source": "commands",
       "target": "construction",
       "path": "services/commands.rs",
-      "line": 21
-    },
-    {
-      "source": "commands",
-      "target": "move_coordinator",
-      "path": "services/commands.rs",
       "line": 23
     },
     {
       "source": "commands",
-      "target": "movement",
-      "path": "services/commands.rs",
-      "line": 24
-    },
-    {
-      "source": "commands",
-      "target": "order_execution",
+      "target": "move_coordinator",
       "path": "services/commands.rs",
       "line": 25
     },
@@ -897,19 +1239,25 @@
       "source": "commands",
       "target": "order_execution",
       "path": "services/commands.rs",
-      "line": 29
+      "line": 26
+    },
+    {
+      "source": "commands",
+      "target": "order_execution",
+      "path": "services/commands.rs",
+      "line": 30
     },
     {
       "source": "commands",
       "target": "order_planner",
       "path": "services/commands.rs",
-      "line": 33
+      "line": 34
     },
     {
       "source": "commands",
       "target": "order_planner",
       "path": "services/commands/planner_facts.rs",
-      "line": 5
+      "line": 8
     },
     {
       "source": "commands",
@@ -921,19 +1269,19 @@
       "source": "commands",
       "target": "spatial",
       "path": "services/commands.rs",
-      "line": 34
+      "line": 35
     },
     {
       "source": "commands",
       "target": "standability",
       "path": "services/commands.rs",
-      "line": 35
+      "line": 36
     },
     {
       "source": "commands",
       "target": "world_query",
       "path": "services/commands.rs",
-      "line": 36
+      "line": 37
     },
     {
       "source": "construction",
@@ -961,15 +1309,9 @@
     },
     {
       "source": "economy",
-      "target": "spatial",
-      "path": "services/economy.rs",
-      "line": 7
-    },
-    {
-      "source": "economy",
       "target": "world_query",
       "path": "services/economy.rs",
-      "line": 8
+      "line": 7
     },
     {
       "source": "entrenchment",
@@ -999,19 +1341,19 @@
       "source": "move_coordinator",
       "target": "geometry",
       "path": "services/move_coordinator.rs",
-      "line": 28
+      "line": 27
     },
     {
       "source": "move_coordinator",
       "target": "occupancy",
       "path": "services/move_coordinator.rs",
-      "line": 33
+      "line": 32
     },
     {
       "source": "move_coordinator",
       "target": "pathing",
       "path": "services/move_coordinator.rs",
-      "line": 36
+      "line": 35
     },
     {
       "source": "move_coordinator",
@@ -1071,7 +1413,7 @@
       "source": "movement",
       "target": "occupancy",
       "path": "services/movement/standability.rs",
-      "line": 3
+      "line": 5
     },
     {
       "source": "movement",
@@ -1137,7 +1479,7 @@
       "source": "movement",
       "target": "standability",
       "path": "services/movement/standability.rs",
-      "line": 4
+      "line": 6
     },
     {
       "source": "movement",
@@ -1146,26 +1488,26 @@
       "line": 15
     },
     {
+      "source": "movement",
+      "target": "standability",
+      "path": "services/movement/waypoints.rs",
+      "line": 16
+    },
+    {
       "source": "order_queue",
       "target": "ability_orders",
       "path": "services/order_queue.rs",
-      "line": 10
+      "line": 11
     },
     {
       "source": "order_queue",
       "target": "construction",
       "path": "services/order_queue.rs",
-      "line": 15
-    },
-    {
-      "source": "order_queue",
-      "target": "move_coordinator",
-      "path": "services/order_queue.rs",
       "line": 16
     },
     {
       "source": "order_queue",
-      "target": "movement",
+      "target": "move_coordinator",
       "path": "services/order_queue.rs",
       "line": 17
     },
@@ -1185,49 +1527,49 @@
       "source": "order_queue",
       "target": "standability",
       "path": "services/order_queue.rs",
-      "line": 25
+      "line": 24
     },
     {
       "source": "order_queue",
       "target": "world_query",
       "path": "services/order_queue.rs",
-      "line": 26
+      "line": 25
     },
     {
       "source": "pathing",
       "target": "occupancy",
       "path": "services/pathing.rs",
-      "line": 12
+      "line": 13
     },
     {
       "source": "pathing",
       "target": "standability",
       "path": "services/pathing.rs",
-      "line": 13
+      "line": 14
     },
     {
       "source": "production",
       "target": "move_coordinator",
       "path": "services/production.rs",
-      "line": 3
+      "line": 5
     },
     {
       "source": "standability",
       "target": "geometry",
       "path": "services/standability.rs",
-      "line": 7
+      "line": 9
     },
     {
       "source": "standability",
       "target": "occupancy",
       "path": "services/standability.rs",
-      "line": 12
+      "line": 14
     },
     {
       "source": "standability",
       "target": "spatial",
       "path": "services/standability.rs",
-      "line": 13
+      "line": 15
     },
     {
       "source": "world_query",
@@ -1249,32 +1591,32 @@
     },
     {
       "path": "services/commands.rs",
-      "line": 83,
+      "line": 89,
       "name": "apply_commands"
     },
     {
       "path": "services/commands.rs",
-      "line": 1483,
+      "line": 1749,
       "name": "artillery_point_fire_system"
     },
     {
       "path": "services/commands.rs",
-      "line": 1286,
+      "line": 1541,
       "name": "order_artillery_point_fire"
     },
     {
       "path": "services/commands.rs",
-      "line": 1846,
+      "line": 2031,
       "name": "order_cancel"
     },
     {
       "path": "services/commands.rs",
-      "line": 1731,
+      "line": 1930,
       "name": "order_train"
     },
     {
       "path": "services/commands.rs",
-      "line": 1337,
+      "line": 1607,
       "name": "try_fire_artillery"
     },
     {
@@ -1284,22 +1626,22 @@
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 32,
+      "line": 36,
       "name": "apply_with_players"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 42,
+      "line": 46,
       "name": "apply_with_players_and_smokes"
     },
     {
       "path": "services/construction.rs",
-      "line": 22,
+      "line": 24,
       "name": "construction_system"
     },
     {
       "path": "services/construction.rs",
-      "line": 281,
+      "line": 329,
       "name": "deconstruction_system"
     },
     {
@@ -1309,37 +1651,37 @@
     },
     {
       "path": "services/economy.rs",
-      "line": 254,
+      "line": 286,
       "name": "gather_harvesting"
     },
     {
       "path": "services/economy.rs",
-      "line": 18,
+      "line": 43,
       "name": "gather_system"
     },
     {
       "path": "services/movement/mod.rs",
-      "line": 54,
+      "line": 56,
       "name": "movement_system"
     },
     {
       "path": "services/movement/mod.rs",
-      "line": 80,
+      "line": 82,
       "name": "movement_system_with_events"
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 52,
+      "line": 49,
       "name": "advance_moving_units"
     },
     {
       "path": "services/order_queue.rs",
-      "line": 109,
+      "line": 110,
       "name": "promote_ready_orders"
     },
     {
       "path": "services/production.rs",
-      "line": 13,
+      "line": 16,
       "name": "production_system"
     },
     {
@@ -1351,33 +1693,23 @@
   "player_state_usages": [
     {
       "path": "auto_build.rs",
-      "line": 26,
+      "line": 27,
       "code": "impl PlayerState {"
     },
     {
-      "path": "services/commands/auto_build.rs",
-      "line": 4,
-      "code": "pub(super) fn apply(players: &mut [PlayerState], player: u32, command: SimCommand) {"
-    },
-    {
       "path": "lab.rs",
-      "line": 1400,
+      "line": 1481,
       "code": "player: &super::PlayerState,"
     },
     {
       "path": "mod.rs",
-      "line": 134,
+      "line": 143,
       "code": "pub(crate) struct PlayerState {"
     },
     {
       "path": "player_state.rs",
       "line": 11,
       "code": "impl PlayerState {"
-    },
-    {
-      "path": "player_state.rs",
-      "line": 1,
-      "code": "use super::PlayerState;"
     },
     {
       "path": "scoring.rs",
@@ -1395,99 +1727,89 @@
       "code": "players: &mut [PlayerState],"
     },
     {
-      "path": "services/ability_orders.rs",
-      "line": 22,
-      "code": "use crate::game::PlayerState;"
-    },
-    {
       "path": "services/combat/tests.rs",
-      "line": 124,
+      "line": 128,
       "code": "PlayerState {"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 123,
+      "line": 127,
       "code": "fn player_state(id: u32, is_ai: bool) -> PlayerState {"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 157,
+      "line": 161,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 165,
+      "line": 169,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 173,
+      "line": 177,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 183,
-      "code": "players: &[PlayerState],"
-    },
-    {
-      "path": "services/combat/tests.rs",
-      "line": 13,
-      "code": "use crate::game::{PlayerState, ScoreState};"
-    },
-    {
-      "path": "services/commands.rs",
-      "line": 1051,
+      "line": 187,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1656,
+      "line": 1327,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 86,
+      "line": 1852,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 92,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 655,
+      "line": 822,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1130,
+      "line": 1353,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1289,
+      "line": 1545,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1339,
+      "line": 1609,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1486,
+      "line": 1752,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1733,
+      "line": 1932,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands.rs",
-      "line": 1848,
+      "line": 2033,
       "code": "players: &mut [PlayerState],"
     },
     {
-      "path": "services/commands.rs",
-      "line": 40,
-      "code": "use crate::game::PlayerState;"
+      "path": "services/commands/auto_build.rs",
+      "line": 4,
+      "code": "pub(super) fn apply(players: &mut [PlayerState], player: u32, command: SimCommand) {"
     },
     {
       "path": "services/commands/scout_plane_ability.rs",
@@ -1495,44 +1817,34 @@
       "code": "players: &mut [PlayerState],"
     },
     {
-      "path": "services/commands/scout_plane_ability.rs",
-      "line": 8,
-      "code": "use crate::game::PlayerState;"
-    },
-    {
       "path": "services/commands/tests.rs",
-      "line": 104,
+      "line": 109,
       "code": "PlayerState {"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 103,
+      "line": 108,
       "code": "fn player_state(id: u32) -> PlayerState {"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 35,
+      "line": 39,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands/tests.rs",
-      "line": 45,
+      "line": 49,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/construction.rs",
-      "line": 25,
+      "line": 27,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/construction.rs",
-      "line": 281,
+      "line": 329,
       "code": "pub(crate) fn deconstruction_system(entities: &mut EntityStore, players: &mut [PlayerState]) {"
-    },
-    {
-      "path": "services/construction.rs",
-      "line": 12,
-      "code": "use crate::game::PlayerState;"
     },
     {
       "path": "services/death.rs",
@@ -1541,133 +1853,88 @@
     },
     {
       "path": "services/death.rs",
-      "line": 144,
-      "code": "players: &mut [PlayerState],"
-    },
-    {
-      "path": "services/death.rs",
-      "line": 8,
-      "code": "use crate::game::PlayerState;"
-    },
-    {
-      "path": "services/economy.rs",
-      "line": 21,
+      "line": 192,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/economy.rs",
-      "line": 257,
+      "line": 46,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/economy.rs",
-      "line": 9,
-      "code": "use crate::game::PlayerState;"
-    },
-    {
-      "path": "services/movement/mod.rs",
-      "line": 57,
+      "line": 288,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/movement/mod.rs",
-      "line": 83,
+      "line": 59,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/movement/mod.rs",
-      "line": 20,
-      "code": "use crate::game::PlayerState;"
+      "line": 85,
+      "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/movement/pivot_drive.rs",
-      "line": 28,
+      "line": 38,
       "code": "players: &[PlayerState],"
     },
     {
-      "path": "services/movement/pivot_drive.rs",
-      "line": 9,
-      "code": "use crate::game::PlayerState;"
-    },
-    {
       "path": "services/movement/tests.rs",
-      "line": 82,
+      "line": 86,
       "code": "PlayerState {"
     },
     {
       "path": "services/movement/tests.rs",
-      "line": 81,
+      "line": 85,
       "code": "fn player_with_oil(id: u32, oil: u32) -> PlayerState {"
     },
     {
-      "path": "services/movement/tests.rs",
-      "line": 17,
-      "code": "use crate::game::{PlayerState, ScoreState};"
-    },
-    {
       "path": "services/movement/waypoints.rs",
-      "line": 55,
-      "code": "players: &mut [PlayerState],"
-    },
-    {
-      "path": "services/movement/waypoints.rs",
-      "line": 17,
-      "code": "use crate::game::PlayerState;"
-    },
-    {
-      "path": "services/order_queue.rs",
-      "line": 326,
-      "code": "players: &[PlayerState],"
-    },
-    {
-      "path": "services/order_queue.rs",
-      "line": 498,
-      "code": "players: &[PlayerState],"
-    },
-    {
-      "path": "services/order_queue.rs",
-      "line": 667,
-      "code": "players: &[PlayerState],"
-    },
-    {
-      "path": "services/order_queue.rs",
-      "line": 112,
+      "line": 52,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/order_queue.rs",
-      "line": 29,
-      "code": "use crate::game::PlayerState;"
+      "line": 373,
+      "code": "players: &[PlayerState],"
     },
     {
-      "path": "services/production.rs",
-      "line": 16,
+      "path": "services/order_queue.rs",
+      "line": 509,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/order_queue.rs",
+      "line": 642,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/order_queue.rs",
+      "line": 113,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/production.rs",
-      "line": 306,
+      "line": 301,
       "code": "players: &[PlayerState],"
     },
     {
       "path": "services/production.rs",
-      "line": 298,
+      "line": 19,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production.rs",
+      "line": 293,
       "code": "pub(crate) fn sync_all_owned_upgrade_effects(entities: &mut EntityStore, players: &[PlayerState]) {"
     },
     {
-      "path": "services/production.rs",
+      "path": "services/supply.rs",
       "line": 6,
-      "code": "use crate::game::PlayerState;"
-    },
-    {
-      "path": "services/supply.rs",
-      "line": 7,
       "code": "pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntityStore) {"
-    },
-    {
-      "path": "services/supply.rs",
-      "line": 2,
-      "code": "use crate::game::PlayerState;"
     },
     {
       "path": "setup.rs",
@@ -1676,56 +1943,46 @@
     },
     {
       "path": "setup.rs",
-      "line": 550,
+      "line": 568,
       "code": "player: &mut PlayerState,"
     },
     {
       "path": "snapshot.rs",
-      "line": 236,
+      "line": 280,
       "code": "fn player(&self, id: u32) -> Option<&PlayerState> {"
     },
     {
       "path": "state.rs",
-      "line": 107,
+      "line": 114,
       "code": "players: Vec<PlayerState>,"
     },
     {
       "path": "state.rs",
-      "line": 18,
+      "line": 21,
       "code": "pub(in crate::game) players: Vec<PlayerState>,"
-    },
-    {
-      "path": "state.rs",
-      "line": 9,
-      "code": "trench::TrenchStore, EntityStore, MapMetadata, PlayerStartingLoadout, PlayerState,"
     },
     {
       "path": "systems.rs",
       "line": 137,
       "code": "players: &mut [PlayerState],"
-    },
-    {
-      "path": "systems.rs",
-      "line": 47,
-      "code": "use crate::game::PlayerState;"
     }
   ],
   "player_state_field_writes": [
     {
       "path": "lab.rs",
-      "line": 789,
+      "line": 856,
       "field": "oil",
       "code": "player.oil = input.oil;"
     },
     {
       "path": "lab.rs",
-      "line": 788,
+      "line": 855,
       "field": "steel",
       "code": "player.steel = input.steel;"
     },
     {
       "path": "services/movement/tests.rs",
-      "line": 2615,
+      "line": 2620,
       "field": "oil",
       "code": "players[0].oil = 1;"
     }
@@ -1733,145 +1990,85 @@
   "entity_field_writes": [
     {
       "path": "lab.rs",
-      "line": 764,
+      "line": 819,
       "field": "owner",
       "code": "entity.owner = input.owner;"
     },
     {
       "path": "services/combat/tests.rs",
-      "line": 1404,
+      "line": 1428,
       "field": "hp",
       "code": "dead_target.hp = 0;"
     },
     {
-      "path": "services/construction.rs",
-      "line": 435,
-      "field": "pos_x",
-      "code": "w.pos_x = cx;"
-    },
-    {
-      "path": "services/construction.rs",
-      "line": 436,
-      "field": "pos_y",
-      "code": "w.pos_y = cy;"
-    },
-    {
-      "path": "services/movement/collision.rs",
-      "line": 248,
-      "field": "pos_x",
-      "code": "e.pos_x = nax.clamp(0.0, world_max);"
-    },
-    {
-      "path": "services/movement/collision.rs",
-      "line": 255,
-      "field": "pos_x",
-      "code": "e.pos_x = nbx.clamp(0.0, world_max);"
-    },
-    {
-      "path": "services/movement/collision.rs",
-      "line": 249,
-      "field": "pos_y",
-      "code": "e.pos_y = nay.clamp(0.0, world_max);"
-    },
-    {
-      "path": "services/movement/collision.rs",
-      "line": 256,
-      "field": "pos_y",
-      "code": "e.pos_y = nby.clamp(0.0, world_max);"
-    },
-    {
       "path": "services/movement/tests.rs",
-      "line": 3981,
+      "line": 3992,
       "field": "pos_x",
       "code": "e.pos_x = sx + 0.0001;"
     },
     {
-      "path": "services/movement/waypoints.rs",
-      "line": 415,
-      "field": "pos_x",
-      "code": "e.pos_x = x.clamp(0.0, map.world_size_px() - 0.01);"
-    },
-    {
-      "path": "services/movement/waypoints.rs",
-      "line": 416,
-      "field": "pos_y",
-      "code": "e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);"
-    },
-    {
       "path": "tests/resources_mining_tests.rs",
-      "line": 86,
+      "line": 103,
       "field": "pos_x",
       "code": "holder_entity.pos_x = node_x;"
     },
     {
       "path": "tests/resources_mining_tests.rs",
-      "line": 94,
-      "field": "pos_x",
-      "code": "ordered_entity.pos_x = node_x + 4.0;"
-    },
-    {
-      "path": "tests/resources_mining_tests.rs",
-      "line": 150,
+      "line": 293,
       "field": "pos_x",
       "code": "worker_entity.pos_x = node_x + worker_radius + node_radius - 1.0;"
     },
     {
       "path": "tests/resources_mining_tests.rs",
-      "line": 87,
+      "line": 104,
       "field": "pos_y",
       "code": "holder_entity.pos_y = node_y;"
     },
     {
       "path": "tests/resources_mining_tests.rs",
-      "line": 95,
-      "field": "pos_y",
-      "code": "ordered_entity.pos_y = node_y;"
-    },
-    {
-      "path": "tests/resources_mining_tests.rs",
-      "line": 151,
+      "line": 294,
       "field": "pos_y",
       "code": "worker_entity.pos_y = node_y;"
     },
     {
       "path": "tests/scoring_projection_tests.rs",
-      "line": 329,
+      "line": 406,
       "field": "hp",
       "code": ".hp = 0;"
     },
     {
       "path": "tests/scoring_projection_tests.rs",
-      "line": 518,
+      "line": 626,
       "field": "hp",
       "code": ".hp = 0;"
     },
     {
       "path": "tests/scoring_projection_tests.rs",
-      "line": 44,
+      "line": 52,
       "field": "hp",
       "code": "entity.hp = 0;"
     },
     {
       "path": "tests/scoring_projection_tests.rs",
-      "line": 119,
+      "line": 138,
       "field": "hp",
       "code": "entity.hp = 0;"
     },
     {
       "path": "tests/smoke_mortar_tests.rs",
-      "line": 1294,
+      "line": 1353,
       "field": "hp",
       "code": "e.hp = 0;"
     },
     {
       "path": "tests/smoke_mortar_tests.rs",
-      "line": 1243,
+      "line": 1298,
       "field": "pos_x",
       "code": "unit.pos_x = smoke_pos.0;"
     },
     {
       "path": "tests/smoke_mortar_tests.rs",
-      "line": 1244,
+      "line": 1299,
       "field": "pos_y",
       "code": "unit.pos_y = smoke_pos.1;"
     }
@@ -1879,7 +2076,7 @@
   "public_export_counts": [
     {
       "path": "ability.rs",
-      "count": 10
+      "count": 5
     },
     {
       "path": "ability_projectile.rs",
@@ -1894,8 +2091,16 @@
       "count": 1
     },
     {
+      "path": "anti_tank_gun_memory.rs",
+      "count": 4
+    },
+    {
       "path": "artillery.rs",
       "count": 3
+    },
+    {
+      "path": "auto_build.rs",
+      "count": 1
     },
     {
       "path": "building_memory.rs",
@@ -1911,7 +2116,23 @@
     },
     {
       "path": "entity/entity.rs",
-      "count": 113
+      "count": 114
+    },
+    {
+      "path": "entity/entity/production.rs",
+      "count": 6
+    },
+    {
+      "path": "entity/entity/production_repeat.rs",
+      "count": 2
+    },
+    {
+      "path": "entity/entity/rally.rs",
+      "count": 6
+    },
+    {
+      "path": "entity/entity/research.rs",
+      "count": 4
     },
     {
       "path": "entity/mod.rs",
@@ -1923,7 +2144,7 @@
     },
     {
       "path": "entity/state.rs",
-      "count": 14
+      "count": 15
     },
     {
       "path": "entity/store.rs",
@@ -1935,7 +2156,11 @@
     },
     {
       "path": "fog.rs",
-      "count": 14
+      "count": 15
+    },
+    {
+      "path": "fog/presentation.rs",
+      "count": 1
     },
     {
       "path": "ground_decal.rs",
@@ -1951,15 +2176,27 @@
     },
     {
       "path": "lab.rs",
-      "count": 21
+      "count": 23
     },
     {
       "path": "lab/checkpoint_scenario.rs",
-      "count": 8
+      "count": 9
     },
     {
       "path": "map.rs",
-      "count": 20
+      "count": 23
+    },
+    {
+      "path": "map/base_resources.rs",
+      "count": 2
+    },
+    {
+      "path": "map/data.rs",
+      "count": 1
+    },
+    {
+      "path": "map/doodads.rs",
+      "count": 3
     },
     {
       "path": "mod.rs",
@@ -1967,11 +2204,15 @@
     },
     {
       "path": "mortar.rs",
-      "count": 7
+      "count": 8
     },
     {
       "path": "mortar_scatter.rs",
       "count": 1
+    },
+    {
+      "path": "observer_snapshot.rs",
+      "count": 5
     },
     {
       "path": "panzerfaust_shot.rs",
@@ -1983,7 +2224,7 @@
     },
     {
       "path": "player_state.rs",
-      "count": 14
+      "count": 15
     },
     {
       "path": "replay.rs",
@@ -1991,7 +2232,7 @@
     },
     {
       "path": "replay_artifact.rs",
-      "count": 8
+      "count": 9
     },
     {
       "path": "resource_placement.rs",
@@ -1999,11 +2240,11 @@
     },
     {
       "path": "scoring.rs",
-      "count": 4
+      "count": 5
     },
     {
       "path": "services/ability_orders.rs",
-      "count": 15
+      "count": 16
     },
     {
       "path": "services/commands.rs",
@@ -2019,7 +2260,7 @@
     },
     {
       "path": "services/economy.rs",
-      "count": 1
+      "count": 2
     },
     {
       "path": "services/entrenchment.rs",
@@ -2027,7 +2268,7 @@
     },
     {
       "path": "services/geometry.rs",
-      "count": 22
+      "count": 23
     },
     {
       "path": "services/line_of_sight.rs",
@@ -2039,7 +2280,7 @@
     },
     {
       "path": "services/move_coordinator.rs",
-      "count": 15
+      "count": 16
     },
     {
       "path": "services/movement/collision.rs",
@@ -2059,11 +2300,11 @@
     },
     {
       "path": "services/occupancy.rs",
-      "count": 15
+      "count": 17
     },
     {
       "path": "services/order_execution.rs",
-      "count": 7
+      "count": 9
     },
     {
       "path": "services/order_execution/targeting.rs",
@@ -2079,15 +2320,19 @@
     },
     {
       "path": "services/pathing.rs",
-      "count": 11
+      "count": 9
     },
     {
-      "path": "services/production.rs",
+      "path": "services/pathing/request.rs",
       "count": 2
     },
     {
-      "path": "services/scout_plane.rs",
+      "path": "services/production.rs",
       "count": 4
+    },
+    {
+      "path": "services/scout_plane.rs",
+      "count": 3
     },
     {
       "path": "services/spatial.rs",
@@ -2095,7 +2340,7 @@
     },
     {
       "path": "services/standability.rs",
-      "count": 10
+      "count": 12
     },
     {
       "path": "services/supply.rs",
@@ -2103,7 +2348,7 @@
     },
     {
       "path": "services/world_query.rs",
-      "count": 16
+      "count": 17
     },
     {
       "path": "setup.rs",
@@ -2111,10 +2356,42 @@
     },
     {
       "path": "setup/dev_scenarios.rs",
-      "count": 10
+      "count": 11
     },
     {
-      "path": "setup/dev_scenarios/panzerfaust.rs",
+      "path": "setup/dev_scenarios/attack_move_reload.rs",
+      "count": 1
+    },
+    {
+      "path": "setup/dev_scenarios/dev_scenario_setup.rs",
+      "count": 2
+    },
+    {
+      "path": "setup/dev_scenarios/dispatch.rs",
+      "count": 1
+    },
+    {
+      "path": "setup/dev_scenarios/dynamic_construction_path_block.rs",
+      "count": 1
+    },
+    {
+      "path": "setup/dev_scenarios/factory_wall_rally_spawn.rs",
+      "count": 1
+    },
+    {
+      "path": "setup/dev_scenarios/replay_142_vehicle_lock.rs",
+      "count": 1
+    },
+    {
+      "path": "setup/dev_scenarios/replay_238_rifleman_corner_lock.rs",
+      "count": 1
+    },
+    {
+      "path": "setup/dev_scenarios/scout_car_lake_reverse_l_path.rs",
+      "count": 1
+    },
+    {
+      "path": "setup/dev_scenarios/scout_car_open_ground_l_path.rs",
       "count": 1
     },
     {
@@ -2122,12 +2399,16 @@
       "count": 1
     },
     {
+      "path": "setup/dev_scenarios/tank_retreat.rs",
+      "count": 2
+    },
+    {
       "path": "smoke.rs",
-      "count": 18
+      "count": 20
     },
     {
       "path": "snapshot.rs",
-      "count": 6
+      "count": 4
     },
     {
       "path": "systems.rs",
@@ -2143,7 +2424,7 @@
     },
     {
       "path": "upgrade.rs",
-      "count": 7
+      "count": 5
     }
   ]
 }

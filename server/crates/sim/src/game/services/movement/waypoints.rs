@@ -531,12 +531,14 @@ pub(super) fn advance_moving_units(
                 }
                 let stuck_ticks = e.movement.as_ref().map(|m| m.stuck_ticks).unwrap_or(0);
                 // Tolerant arrival: stuck and near goal.
-                if stuck_ticks >= config::STUCK_ARRIVAL_TICKS {
+                if stuck_ticks >= config::STUCK_ARRIVAL_TICKS && static_blocked_ticks == 0 {
                     if let Some((gx, gy)) = e.path_goal() {
                         let dx = x - gx;
                         let dy = y - gy;
                         let dist_to_goal = (dx * dx + dy * dy).sqrt();
-                        if dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX {
+                        if dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX
+                            && unit_static_segment_standable(map, occ, e.kind, (x, y), (gx, gy))
+                        {
                             e.clear_path();
                             e.mark_move_phase(MovePhase::Arrived);
                             if let Some(m) = e.movement.as_mut() {

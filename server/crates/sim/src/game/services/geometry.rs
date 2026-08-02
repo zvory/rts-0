@@ -324,6 +324,17 @@ pub(crate) fn unit_body_intersects_rect(body: UnitBody, rect: RectBody) -> bool 
     }
 }
 
+pub(crate) fn unit_body_intersects_circle(body: UnitBody, circle: CircleBody) -> bool {
+    if !valid_unit_body(body) || !valid_circle(circle) {
+        return false;
+    }
+    match body {
+        UnitBody::Circle(unit) => circles_intersect(unit, circle),
+        UnitBody::OrientedCapsule(capsule) => circle_intersects_capsule(circle, capsule),
+        UnitBody::OrientedBox(oriented) => circle_intersects_oriented_box(circle, oriented),
+    }
+}
+
 pub(crate) fn unit_bodies_intersect(a: UnitBody, b: UnitBody) -> bool {
     if !valid_unit_body(a) || !valid_unit_body(b) {
         return false;

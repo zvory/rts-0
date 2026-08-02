@@ -9,6 +9,7 @@ export class MapEditorWorkerRenderer {
     renderer.layers.feedback.addChild(this.overlay);
     this.labels = [];
     this.terrainRevision = 0;
+    this.doodadRevision = 0;
     this.overlayRevision = 0;
     this.lastTiming = Object.freeze({ workerUpdateMs: 0, workerPresentMs: 0 });
     this.destroyed = false;
@@ -19,9 +20,11 @@ export class MapEditorWorkerRenderer {
     const updateStartedAt = performance.now();
     validateMapEditorPresentation(record);
     this._applyTerrain(record.terrainUpdate);
+    this._applyDoodads(record.doodadUpdate);
     this._applyOverlay(record.overlay);
     this.renderer.world.position.set(-record.camera.x * record.camera.zoom, -record.camera.y * record.camera.zoom);
     this.renderer.world.scale.set(record.camera.zoom);
+    this.renderer.updateStaticDoodadWind(record.visualTimeMs, record.camera);
     const workerUpdateMs = performance.now() - updateStartedAt;
     const presentStartedAt = performance.now();
     this.renderer.present();
@@ -50,6 +53,21 @@ export class MapEditorWorkerRenderer {
     this.terrainRevision = update.revision;
   }
 
+  _applyDoodads(update) {
+    if (!update || update.revision <= this.doodadRevision) return;
+    if (update.kind === "replace") {
+      this.renderer.replaceStaticDoodads(update.doodads || []);
+    } else if (update.kind === "patch") {
+      this.renderer.patchStaticDoodads({
+        upserts: update.upserts || [],
+        removedIds: update.removedIds || [],
+      });
+    } else {
+      throw new TypeError(`Unsupported Map Editor doodad update ${String(update.kind)}.`);
+    }
+    this.doodadRevision = update.revision;
+  }
+
   _applyOverlay(overlay) {
     if (!overlay || overlay.revision <= this.overlayRevision) return;
     gfxReset(this.overlay.clear());
@@ -63,6 +81,16 @@ export class MapEditorWorkerRenderer {
       gfxNoFill(this.overlay);
     }
     for (const site of overlay.sites) this._drawSite(site);
+    if (overlay.doodadSelection) {
+      gfxStroke(this.overlay, 2, 0xfff4ba, 0.96);
+      gfxCircle(this.overlay, overlay.doodadSelection.x, overlay.doodadSelection.y, 15);
+    }
+    if (overlay.doodadBrushPreview) {
+      const preview = overlay.doodadBrushPreview;
+      const color = preview.mode === "erase" ? 0xff6f6f : 0xc5ef8a;
+      gfxStroke(this.overlay, 2, color, 0.9);
+      gfxCircle(this.overlay, preview.x, preview.y, Math.max(4, preview.radius || 4));
+    }
     if (overlay.paintPreview) {
       const preview = overlay.paintPreview;
       gfxStroke(this.overlay, 2, preview.color, 0.9);

@@ -33,8 +33,9 @@ use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_tiles, Occupancy,
 };
 use crate::game::services::pathing::{
-    simplify_reverse_waypoints_with_limit, PathCacheStatus, PathRequest, PathingRequestDiagnostics,
-    PathingRequestOutcome, PathingService, RouteShape,
+    expand_reverse_waypoints, simplify_reverse_waypoints_with_limit, tree_detour_between,
+    PathCacheStatus, PathRequest, PathingRequestDiagnostics, PathingRequestOutcome, PathingService,
+    RouteShape,
 };
 use crate::game::services::standability;
 use crate::game::smoke::SmokeCloudStore;
@@ -50,6 +51,7 @@ mod pathing_budget_tests;
 mod rally;
 #[cfg(test)]
 mod spawn_tests;
+mod tree_paths;
 
 #[cfg(test)]
 use footprint_pathing::{build_staging_goal, build_staging_goal_in_range};
@@ -923,6 +925,9 @@ impl<'a> MoveCoordinator<'a> {
         source: PathingRequestSource,
     ) -> bool {
         let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
+        if let Some(result) = self.request_same_tile_tree_path(entities, id, goal, source) {
+            return result;
+        }
         let ((sx, sy), kind, start_pos) = match entities.get(id) {
             Some(e) => (
                 self.map.tile_of(e.pos_x, e.pos_y),
@@ -1017,20 +1022,7 @@ impl<'a> MoveCoordinator<'a> {
             return false;
         };
 
-        // Snap the final waypoint to the exact requested goal for precise arrival.
-        if !waypoints.is_empty() {
-            waypoints[0] = goal;
-            if route_shape == RouteShape::VehicleClearance && !uses_pivot_vehicle_movement(kind) {
-                waypoints = simplify_reverse_waypoints_with_limit(
-                    self.map,
-                    self.occ,
-                    kind,
-                    start_pos,
-                    waypoints,
-                    SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX,
-                );
-            }
-        }
+        waypoints = self.expand_tree_waypoints(kind, start_pos, goal, route_shape, waypoints);
 
         let path_ok = !waypoints.is_empty();
         if let Some(e) = entities.get_mut(id) {

@@ -51,9 +51,20 @@ const SHOT_REVEAL_POOL_PROFILE = Object.freeze({
   effects: "shotReveals",
 });
 
+const FOREST_OUTLINE_POOL_PROFILE = Object.freeze({
+  familyKey: "forestUnitOutline",
+  liveRigUnit: "forestUnitOutlineRigs",
+  unit: "forestUnitOutlines",
+  liveRigOverlay: "forestUnitOutlineRigOverlays",
+  overlay: "forestUnitOutlines",
+  omitShadow: true,
+  omitEffects: true,
+});
+
 const ROUTE_PLAN_CACHE = new Map([
   [DEFAULT_POOL_PROFILE, new Map()],
   [SHOT_REVEAL_POOL_PROFILE, new Map()],
+  [FOREST_OUTLINE_POOL_PROFILE, new Map()],
 ]);
 
 const LIVE_RIG_SOURCES = Object.freeze([
@@ -320,18 +331,19 @@ const EMPTY_ROUTE_PLAN = Object.freeze({
 });
 
 function compileRoutePlan(parts, pools, familyKey) {
-  const routes = [
-    Object.freeze({
+  const routes = [];
+  if (!pools.omitShadow) {
+    routes.push(Object.freeze({
       poolName: pools.liveRigShadow || "liveUnitRigShadows",
       layerName: pools.shadow || "unitShadows",
       parts: parts.shadow,
-    }),
-    Object.freeze({
-      poolName: pools.liveRigUnit || "liveUnitRigs",
-      layerName: pools.unit || "units",
-      parts: parts.unit,
-    }),
-  ];
+    }));
+  }
+  routes.push(Object.freeze({
+    poolName: pools.liveRigUnit || "liveUnitRigs",
+    layerName: pools.unit || "units",
+    parts: parts.unit,
+  }));
   if (Array.isArray(parts.overlay) && parts.overlay.length > 0) {
     routes.push(Object.freeze({
       poolName: pools.liveRigOverlay || "liveUnitRigOverlays",
@@ -339,7 +351,7 @@ function compileRoutePlan(parts, pools, familyKey) {
       parts: parts.overlay,
     }));
   }
-  if (parts.effects?.length) {
+  if (!pools.omitEffects && parts.effects?.length) {
     routes.push(Object.freeze({
       poolName: pools.liveRigEffects || "liveUnitRigEffects",
       layerName: pools.effects || pools.unit || "units",
@@ -367,6 +379,9 @@ function knownPoolProfile(pools) {
   if (usesProfile(pools, SHOT_REVEAL_POOL_PROFILE) && matchesPoolProfile(pools, SHOT_REVEAL_POOL_PROFILE)) {
     return SHOT_REVEAL_POOL_PROFILE;
   }
+  if (usesProfile(pools, FOREST_OUTLINE_POOL_PROFILE) && matchesPoolProfile(pools, FOREST_OUTLINE_POOL_PROFILE)) {
+    return FOREST_OUTLINE_POOL_PROFILE;
+  }
   if (matchesPoolProfile(pools, DEFAULT_POOL_PROFILE)) return DEFAULT_POOL_PROFILE;
   return null;
 }
@@ -393,6 +408,8 @@ function matchesPoolProfile(pools, profile) {
     (pools.liveRigOverlay == null || pools.liveRigOverlay === profile.liveRigOverlay) &&
     (pools.overlay == null || pools.overlay === profile.overlay) &&
     (pools.liveRigEffects == null || pools.liveRigEffects === profile.liveRigEffects) &&
-    (pools.effects == null || pools.effects === profile.effects)
+    (pools.effects == null || pools.effects === profile.effects) &&
+    Boolean(pools.omitShadow) === Boolean(profile.omitShadow) &&
+    Boolean(pools.omitEffects) === Boolean(profile.omitEffects)
   );
 }

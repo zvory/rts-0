@@ -208,6 +208,24 @@ export function installFakePixi() {
     }
   }
 
+  class FakeFilter {
+    constructor(options = {}) {
+      this.options = options;
+      this.resources = options.resources || {};
+      this.padding = 0;
+    }
+    destroy() { this.destroyed = true; }
+  }
+
+  class FakeGlProgram {
+    constructor(options = {}) { this.options = options; }
+    static from(options) { return new FakeGlProgram(options); }
+  }
+
+  class FakeUniformGroup {
+    constructor(uniforms = {}) { this.uniforms = uniforms; }
+  }
+
   class FakeRectangle {
     constructor(x = 0, y = 0, width = 0, height = 0) {
       this.x = x;
@@ -249,6 +267,9 @@ export function installFakePixi() {
     Assets: { load: async (resource) => FakeTexture.from(resource) },
     Rectangle: FakeRectangle,
     Sprite: FakeSprite,
+    Filter: FakeFilter,
+    GlProgram: FakeGlProgram,
+    UniformGroup: FakeUniformGroup,
     SCALE_MODES: { NEAREST: "nearest" },
     TextureStyle: { defaultOptions: {} },
   };

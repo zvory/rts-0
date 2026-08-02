@@ -66,6 +66,7 @@ pub(super) fn load_for_players(
         starts,
         base_sites: materialized.base_sites,
         base_resource_counts: materialized.base_resource_counts,
+        doodads: materialized.doodads,
     })
 }
 
@@ -132,6 +133,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
             )
         })
         .collect();
+    let doodads = super::doodads::canonicalize(width, height, authored.doodads)?;
     Ok(AuthoredMapData {
         name: authored.name,
         width,
@@ -140,6 +142,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         starts: start_locations,
         base_sites: base_locations,
         base_resource_counts,
+        doodads,
     })
 }
 
@@ -158,6 +161,8 @@ struct AuthoredMap {
     terrain: Vec<String>,
     start_locations: Vec<AuthoredLocation>,
     base_sites: Vec<AuthoredBaseSite>,
+    #[serde(default)]
+    doodads: Vec<crate::protocol::MapDoodad>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

@@ -383,6 +383,7 @@ impl Game {
             tile_size: config::TILE_SIZE,
             terrain: self.state.map.terrain.clone(),
             resources,
+            doodads: self.state.map.doodads.clone(),
         };
         let players = self
             .state
