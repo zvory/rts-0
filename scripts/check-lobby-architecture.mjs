@@ -40,15 +40,15 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/lobby.rs": 950,
   "room_task/match_history.rs": 180,
   "room_task/observer.rs": 160,
-  "room_task/replay.rs": 723,
+  "room_task/replay.rs": 757,
   "room_task/summary.rs": 120,
   "room_task/types.rs": 220,
 }));
 // Lab map-draft validation, replay rebasing, peer refresh, and the Phase 4 local artifact handoff
 // are intentionally room-owned; keep the aggregate ratchet at the resulting footprint.
-// Chat is a separate room-owned concern with its own bounded module; account for that focused
-// addition without relaxing any of the existing child-module budgets.
-const roomTaskTotalLineBudget = 6636;
+// Chat is a separate room-owned concern with its own bounded module. Replay result delivery reuses
+// the existing gameOver contract at the playback boundary; account for those focused additions.
+const roomTaskTotalLineBudget = 6670;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 
