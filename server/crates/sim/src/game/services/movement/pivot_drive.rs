@@ -325,25 +325,23 @@ pub(super) fn pivot_drive_speed_scale(abs_angle_error: f32) -> f32 {
 pub(super) fn close_nudge_hull_axis_motion(
     path_dir: (f32, f32),
     body_facing: f32,
-) -> ((f32, f32), bool) {
+    budget: f32,
+) -> ((f32, f32), f32) {
     if !body_facing.is_finite() {
-        return (path_dir, true);
+        return (path_dir, budget);
     }
-    let forward = (body_facing.cos(), body_facing.sin());
-    if !forward.0.is_finite() || !forward.1.is_finite() {
-        return (path_dir, true);
+    let (fx, fy) = (body_facing.cos(), body_facing.sin());
+    if !fx.is_finite() || !fy.is_finite() {
+        return (path_dir, budget);
     }
-    let travel_facing = path_dir.1.atan2(path_dir.0);
-    let reverse_facing = normalize_angle(body_facing + std::f32::consts::PI);
-    let aligned = travel_facing.is_finite()
-        && angle_delta(body_facing, travel_facing)
-            .abs()
-            .min(angle_delta(reverse_facing, travel_facing).abs())
-            <= PIVOT_VEHICLE_CRAWL_ANGLE_RAD;
-    if path_dir.0 * forward.0 + path_dir.1 * forward.1 < 0.0 {
-        ((-forward.0, -forward.1), aligned)
+    let forward = (fx, fy);
+    let dot = path_dir.0 * forward.0 + path_dir.1 * forward.1;
+    let aligned = dot.abs() >= PIVOT_VEHICLE_CRAWL_ANGLE_RAD.cos();
+    let step_budget = if aligned { budget } else { 0.0 };
+    if dot < 0.0 {
+        ((-forward.0, -forward.1), step_budget)
     } else {
-        (forward, aligned)
+        (forward, step_budget)
     }
 }
 
