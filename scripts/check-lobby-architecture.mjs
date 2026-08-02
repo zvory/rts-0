@@ -26,12 +26,13 @@ const allowedLabMutationFiles = new Set([
 ]);
 const roomTaskRootBudget = {
   file: "room_task.rs",
-  maxLines: 560,
+  maxLines: 565,
 };
 const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/branch.rs": 340,
   "room_task/chat.rs": 220,
   "room_task/dev.rs": 470,
+  "room_task/ground_decals.rs": 100,
   "room_task/helpers.rs": 140,
   "room_task/lab.rs": 1400,
   "room_task/lab/replay.rs": 650,
@@ -40,15 +41,16 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/lobby.rs": 950,
   "room_task/match_history.rs": 180,
   "room_task/observer.rs": 160,
-  "room_task/replay.rs": 757,
+  "room_task/replay.rs": 760,
   "room_task/summary.rs": 120,
   "room_task/types.rs": 220,
 }));
 // Lab map-draft validation, replay rebasing, peer refresh, and the Phase 4 local artifact handoff
 // are intentionally room-owned; keep the aggregate ratchet at the resulting footprint.
-// Chat is a separate room-owned concern with its own bounded module. Replay result delivery reuses
-// the existing gameOver contract at the playback boundary; account for those focused additions.
-const roomTaskTotalLineBudget = 6670;
+// Chat and durable ground-decal repair are separate room-owned concerns with bounded modules.
+// Replay result delivery reuses the existing gameOver contract at the playback boundary; account
+// for those focused additions.
+const roomTaskTotalLineBudget = 6780;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 

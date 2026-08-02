@@ -14,8 +14,9 @@ pub mod terrain;
 mod kind;
 
 pub use kind::{
-    blocks_line_of_sight, fires_while_moving, is_anti_tank_gun, is_rifle_infantry,
+    artillery_ground_decal_source_kind, blocks_line_of_sight, death_ground_decal_class,
+    fires_while_moving, is_anti_tank_gun, is_rifle_infantry, mortar_ground_decal_source_kind,
     movement_body_class, static_blocker_class, supports_manual_emplacement,
-    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
-    EntityKind, MovementBodyClass, StaticBlockerClass,
+    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind,
+    MovementBodyClass, StaticBlockerClass,
 };

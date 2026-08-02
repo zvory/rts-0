@@ -4,6 +4,10 @@ use crate::config;
 use crate::game::entity::EntityKind;
 use crate::game::fog::Fog;
 use crate::protocol::{self, GroundDecalView};
+use crate::rules::{
+    artillery_ground_decal_source_kind, death_ground_decal_class,
+    mortar_ground_decal_source_kind,
+};
 use serde::{Deserialize, Serialize};
 
 pub(crate) const MAX_GROUND_DECALS: usize = 4_096;
@@ -79,7 +83,7 @@ impl GroundDecalStore {
         facing: Option<f32>,
         weapon_facing: Option<f32>,
     ) -> Option<u32> {
-        let decal_class = death_decal_class(kind)?;
+        let decal_class = death_ground_decal_class(kind)?;
         self.create(
             decal_class,
             protocol::kind_to_wire(kind),
@@ -95,7 +99,7 @@ impl GroundDecalStore {
     pub(crate) fn create_mortar_impact(&mut self, _owner: u32, x: f32, y: f32) -> Option<u32> {
         self.create(
             "mortarBlast",
-            protocol::kind_to_wire(EntityKind::MortarTeam),
+            protocol::kind_to_wire(mortar_ground_decal_source_kind()),
             x,
             y,
             0,
@@ -108,7 +112,7 @@ impl GroundDecalStore {
     pub(crate) fn create_artillery_impact(&mut self, _owner: u32, x: f32, y: f32) -> Option<u32> {
         self.create(
             "artilleryBlast",
-            protocol::kind_to_wire(EntityKind::Artillery),
+            protocol::kind_to_wire(artillery_ground_decal_source_kind()),
             x,
             y,
             0,
@@ -301,14 +305,14 @@ fn valid_class_and_source(decal: &GroundDecal) -> bool {
         .find(|kind| protocol::kind_to_wire(*kind) == decal.source_kind);
     match decal.decal_class.as_str() {
         "mortarBlast" => {
-            kind == Some(EntityKind::MortarTeam)
+            kind == Some(mortar_ground_decal_source_kind())
                 && decal
                     .radius_tiles
                     .is_some_and(|radius| radius == config::MORTAR_OUTER_RADIUS_TILES)
                 && decal.owner == 0
         }
         "artilleryBlast" => {
-            kind == Some(EntityKind::Artillery)
+            kind == Some(artillery_ground_decal_source_kind())
                 && decal
                     .radius_tiles
                     .is_some_and(|radius| radius == config::ARTILLERY_OUTER_RADIUS_TILES)
@@ -317,27 +321,9 @@ fn valid_class_and_source(decal: &GroundDecal) -> bool {
         class => {
             decal.radius_tiles.is_none()
                 && kind
-                    .and_then(death_decal_class)
+                    .and_then(death_ground_decal_class)
                     .is_some_and(|expected| expected == class)
         }
-    }
-}
-
-fn death_decal_class(kind: EntityKind) -> Option<&'static str> {
-    match kind {
-        EntityKind::Worker
-        | EntityKind::Rifleman
-        | EntityKind::Panzerfaust
-        | EntityKind::MachineGunner
-        | EntityKind::MortarTeam
-        | EntityKind::Ekat => Some("infantry"),
-        EntityKind::ScoutCar
-        | EntityKind::Tank
-        | EntityKind::CommandCar
-        | EntityKind::AntiTankGun
-        | EntityKind::Artillery => Some("scorch"),
-        kind if kind.is_building() => Some("buildingScorch"),
-        _ => None,
     }
 }
 
@@ -478,7 +464,7 @@ mod tests {
             .state
             .entities
             .iter()
-            .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
+            .find(|entity| entity.owner == 1 && death_ground_decal_class(entity.kind).is_some())
             .expect("player one worker")
             .clone();
         game.state

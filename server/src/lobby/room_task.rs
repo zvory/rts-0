@@ -22,6 +22,7 @@ use tokio::time::Instant as TokioInstant;
 mod branch;
 mod chat;
 mod dev;
+mod ground_decals;
 mod helpers;
 mod lab;
 mod lifecycle;

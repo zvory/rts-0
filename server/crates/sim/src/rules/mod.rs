@@ -7,5 +7,6 @@ mod projection_visibility;
 
 #[allow(unused_imports)]
 pub use rts_rules::{
-    combat, defs, economy, faction, is_anti_tank_gun, is_rifle_infantry, target, terrain,
+    artillery_ground_decal_source_kind, combat, death_ground_decal_class, defs, economy, faction,
+    is_anti_tank_gun, is_rifle_infantry, mortar_ground_decal_source_kind, target, terrain,
 };

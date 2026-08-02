@@ -683,9 +683,10 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   joins, AI seats, spectator returns, and lobby browser slots. Selecting a lower-capacity map removes overflow AI seats first, then
   moves overflow humans to spectators. Live-match handlers live in `room_task/live.rs`,
   replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
-  `room_task/lab.rs`, dev-watch scenario handling lives in `room_task/dev.rs`, and room lifecycle
-  bookkeeping lives in `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick
-  authority. Plain `/lab` is a client-side catalog selector. Its Blank Lab entry launches blank startup on
+  `room_task/lab.rs`, durable decal repair lives in `room_task/ground_decals.rs`, dev-watch scenario
+  handling lives in `room_task/dev.rs`, and room lifecycle bookkeeping lives in
+  `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick authority. Plain
+  `/lab` is a client-side catalog selector. Its Blank Lab entry launches blank startup on
   the current default `1v1` map, while catalog setups retain their selected maps. Direct lab URLs keep
   compatibility: `scenario=lategame` requests the bundled catalog setup, `scenario=blank` keeps
   blank lab startup, and custom map or seed lab URLs stay blank unless they set an explicit setup. Bundled
@@ -816,6 +817,10 @@ split into focused room-local modules:
 - `room_task/live.rs` owns live-match room controls: command routing, command receipts, active
   player pause and unpause, speed-only live-game room-time state, give-up, late spectator
   attach, live start-payload glue, pending recipient notices, and live snapshot notice plumbing.
+- `room_task/ground_decals.rs` owns rate-limited decal repair requests and derives each response's
+  player, observer, replay, or full-world projection from server-owned connection state.
+- `room_task/observer.rs` owns current live/replay observer snapshot fanout and scoped replay
+  analysis delivery.
 - `room_task/lab.rs` owns lab sessions: first-join launch, lab role/vision metadata, request
   authorization, mutation and issue-as routing, result delivery, dirty state, operation logging,
   state broadcasts, room-time controls, and scenario export/import/validation.
