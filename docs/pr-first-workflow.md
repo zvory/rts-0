@@ -56,6 +56,18 @@ or the PR helper classified the branch as pure Markdown (`.md`) and intentionall
 not a substitute for the full test gate. The owned PR body keeps the pass or skip summary, issues
 found, changes made, verification, and remaining concerns for post-merge audit.
 
+Manual adversarial verification is an explicit fallback, not the default path. Use it only when the
+normal helper cannot own the branch/status flow, such as an intentionally non-`zvorygin/*` branch or
+a maintainer-directed exception. The reviewer must inspect the final `origin/main..HEAD` diff,
+exercise the focused checks that cover the touched contracts, look for CI/local-environment masking
+(e.g. untracked duplicate assets or generated files), fix any blockers in a new commit, and then post
+the `adversarial-quality-pass` success status on the final head SHA. The PR body must record that a
+manual adversarial review was performed, list any issue found and fixed, and include the exact
+verification commands or reproduction steps. For example, PR #1283 used this fallback: manual review
+found that a Schone Tage regression expected nine base sites while the tracked expanded map had ten,
+then reran the map test with the untracked duplicate asset moved aside to match CI's tracked asset
+set before posting the required status.
+
 When the Rust job is slow, use the ordinary job log first: the Rust context lines show
 `CARGO_TARGET_DIR`, Rust/cargo/nextest versions, and the Actions Cargo cache exact-hit result,
 while the `tests/run-all.sh` timing summary and nextest output show whether time was spent
