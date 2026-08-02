@@ -53,6 +53,7 @@ function assert(cond, msg) {
     latestPredictionSnapshot: snapshot,
     prediction: {
       enabled: true,
+      latestAuthoritativeTick: snapshot.tick,
       reconcilePredictor(value) {
         reconciles += 1;
         assert(value === snapshot, "delayed WASM init imports the latest authoritative snapshot");
@@ -69,6 +70,40 @@ function assert(cond, msg) {
   assert(destroyed === 0, "a stale callback never destroys the still-current loading adapter");
   assert(reconciles === 1, "WASM readiness catches up without waiting for another packet");
   assert(frames === 1, "WASM readiness publishes the caught-up prediction frame immediately");
+}
+
+{
+  const snapshot = {
+    tick: 12,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodKind: "worker", prodQueue: 2 }],
+  };
+  const adapter = {
+    destroy() {},
+    reconcile() { return { correctionDistance: 0, snapCorrection: false }; },
+    enqueueCommand() { return false; },
+  };
+  const prediction = new PredictionController({
+    predictor: adapter,
+    sendCommand: () => true,
+  });
+  const match = {
+    predictionInitToken: 1,
+    predictionAdapter: adapter,
+    progressPredictionEligible: true,
+    latestPredictionSnapshot: snapshot,
+    prediction,
+    predictionRuntimeEnabled: () => true,
+    applyPredictionFrame() {},
+    publishPredictionDebug() {},
+    logPredictionStatus() {},
+    mountSettings() {},
+  };
+  finishPredictionRuntimeInit(match, { token: 1, adapter, ready: true, remountSettings: false });
+  assert(prediction.latestAuthoritativeTick === snapshot.tick,
+    "runtime recovery restores the reset controller's authoritative baseline immediately");
+  prediction.issueCommand({ c: "train", building: 20, unit: "worker" });
+  assert(prediction.optimisticUiState().production[0]?.optimisticQueue === 3,
+    "the restored entity baseline preserves existing queue state for immediate optimistic commands");
 }
 
 {

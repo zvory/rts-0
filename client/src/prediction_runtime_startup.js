@@ -25,8 +25,16 @@ export function finishPredictionRuntimeInit(match, { token, adapter, ready, remo
   if (ready) {
     const snapshot = match.latestPredictionSnapshot;
     if (snapshot) {
-      if (match.prediction.enabled) match.prediction.reconcilePredictor(snapshot);
-      else if (match.progressPredictionEligible) {
+      if (match.prediction.enabled) {
+        // A toggle or replay-budget reset clears the controller's authoritative entity index.
+        // Restore the full controller baseline before accepting commands; an adapter-only
+        // reconcile would leave optimistic train/rally composition empty until the next packet.
+        if (match.prediction.latestAuthoritativeTick == null) {
+          match.prediction.applyAuthoritativeSnapshot(snapshot);
+        } else {
+          match.prediction.reconcilePredictor(snapshot);
+        }
+      } else if (match.progressPredictionEligible) {
         try {
           adapter.reconcile(snapshot, []);
         } catch {
