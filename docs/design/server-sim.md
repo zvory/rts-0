@@ -1679,9 +1679,12 @@ units do not see through friendly or enemy structures; the visible edge of a bui
 still reveal that building's footprint for projection. Blocking buildings stamp their own footprint
 as visible but do not project sight through themselves. Fog may reveal the blocking stone tile
 itself and the visible edge of a smoke cloud, but not tiles behind blockers.
-Units inside smoke do not stamp vision; friendly units inside smoke remain owner-visible through
-projection, while enemy units inside smoke are withheld and cannot be targeted. Combat
-auto-acquisition and firing both use the smoke-aware LOS query; explicit attack orders remain
+Units inside smoke do not stamp their normal sight radius; friendly units inside smoke remain
+owner-visible through projection, while enemies remain concealed at range. Two living units both
+inside smoke gain mutual actionable close-quarters visibility when their body-edge gap is at most
+one tile. Fog stamps only the other unit's occupied tile for that exception, and command validation,
+auto-acquisition, snapshot projection, and direct fire share the same range predicate. Combat
+auto-acquisition and firing otherwise use the smoke-aware LOS query; explicit attack orders remain
 stationary behind terrain, smoke, or entity blockers and cannot fire until the shot is clear. Direct-fire shot
 projection also checks hard entity blockers: tanks and non-Tank-Trap building footprints intercept
 shots, while Tank Traps do not. Future forest visibility/cover rules should extend the terrain rules

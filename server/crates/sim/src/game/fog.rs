@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 
 mod presentation;
 mod reveal_provenance;
+mod smoke_melee;
 pub(in crate::game) use reveal_provenance::FiringRevealVisibility;
 
 /// Temporary sight left behind by an owned unit/building after it dies.
@@ -221,6 +222,9 @@ impl Fog {
                 continue;
             };
             stamp_sight(grid, size, e, map, &los);
+        }
+        if let Some(smokes) = smokes {
+            smoke_melee::stamp_visibility(&mut self.grids, size, store, smokes, map);
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
         self.accumulate_explored_for_players(players);

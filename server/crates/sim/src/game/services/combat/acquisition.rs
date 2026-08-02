@@ -139,9 +139,6 @@ pub(super) fn resolve_target_for_weapon(
     weapon_range_px: f32,
     target_filter: &dyn Fn(u32) -> bool,
 ) -> Option<u32> {
-    if smokes.point_inside(px, py) {
-        return None;
-    }
     // Ordered attackers keep command intent outside the ranker. If the target is still
     // explicitly attackable and visible, retain it without letting auto-acquisition steal focus.
     if mode == CombatMode::Ordered {

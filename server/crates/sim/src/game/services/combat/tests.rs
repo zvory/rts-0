@@ -1044,7 +1044,7 @@ fn units_inside_smoke_drop_retained_targets() {
     let map = open_map(12);
     let mut entities = EntityStore::new();
     let attacker_pos = map.tile_center(4, 4);
-    let enemy_pos = map.tile_center(5, 4);
+    let enemy_pos = map.tile_center(6, 4);
     let attacker_id = entities
         .spawn_unit(1, EntityKind::Tank, attacker_pos.0, attacker_pos.1)
         .expect("attacker should spawn");
@@ -1074,6 +1074,47 @@ fn units_inside_smoke_drop_retained_targets() {
             .expect("attacker should exist")
             .target_id(),
         None
+    );
+}
+
+#[test]
+fn units_at_melee_range_inside_smoke_auto_acquire_and_attack() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(4, 4);
+    let enemy_pos = map.tile_center(5, 4);
+    let attacker_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    let mut smokes = SmokeCloudStore::new();
+    smokes
+        .spawn(attacker_pos.0, attacker_pos.1, 2.0, 100, 0)
+        .expect("smoke should spawn");
+
+    let events = run_combat_tick_on_map_with_seed_and_smokes(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+        0,
+        &smokes,
+    );
+
+    assert_eq!(
+        entities
+            .get(attacker_id)
+            .expect("attacker should exist")
+            .target_id(),
+        Some(enemy_id),
+        "close units should acquire one another through smoke"
+    );
+    assert!(
+        events.values().flatten().any(
+            |event| matches!(event, Event::Attack { from, to, .. } if *from == attacker_id && *to == enemy_id)
+        ),
+        "the acquired close-quarters target should be attacked"
     );
 }
 

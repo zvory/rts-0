@@ -47,7 +47,7 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     }
     let observer_pos = game.state.map.tile_center(4, 4);
     let smoke_pos = game.state.map.tile_center(7, 4);
-    let friendly_pos = game.state.map.tile_center(8, 4);
+    let friendly_pos = game.state.map.tile_center(9, 4);
     let observer = game
         .state
         .entities
@@ -1217,6 +1217,43 @@ fn snapshot_projects_visible_smoke_but_hides_enemy_inside_it() {
     assert!(
         snapshot.entities.iter().all(|entity| entity.id != enemy),
         "enemy inside smoke should be withheld from the opposing player snapshot"
+    );
+}
+
+#[test]
+fn snapshot_reveals_enemy_at_melee_range_inside_smoke() {
+    let (mut game, _observer, friendly, enemy, smoke_pos) = smoke_projection_fixture();
+    let melee_pos = game.state.map.tile_center(8, 4);
+    game.state
+        .entities
+        .get_mut(friendly)
+        .expect("friendly should exist")
+        .set_position(melee_pos.0, melee_pos.1);
+    game.rebuild_final_spatial();
+    let ids = game
+        .state
+        .players
+        .iter()
+        .map(|player| player.id)
+        .collect::<Vec<_>>();
+    game.state.fog.recompute_with_smoke(
+        &ids,
+        &game.state.entities,
+        &game.state.map,
+        &game.state.smokes,
+    );
+
+    let snapshot = game.snapshot_for(1);
+    let enemy_tile = game.state.map.tile_of(smoke_pos.0, smoke_pos.1);
+    let enemy_tile_index = (enemy_tile.1 * game.state.map.size + enemy_tile.0) as usize;
+
+    assert!(
+        snapshot.entities.iter().any(|entity| entity.id == enemy),
+        "enemy at melee range should be visible inside smoke"
+    );
+    assert_eq!(
+        snapshot.visible_tiles[enemy_tile_index], 1,
+        "close-quarters visibility should expose only the enemy's occupied tile"
     );
 }
 

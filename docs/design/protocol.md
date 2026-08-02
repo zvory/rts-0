@@ -706,6 +706,10 @@ has a living member, their own connection continues to receive the surviving tea
 visibility. `exploredTiles` is the cumulative server-owned history of those team-visible tiles; it
 is checkpointed and replayed, and clients replace their local exploration grid on every snapshot
 instead of accumulating whichever observer perspectives they happened to render. Allied
+Smoke suppresses normal sight, but two living units whose positions are both inside smoke gain
+mutual actionable visibility when their body-edge gap is at most one tile. This close-quarters
+exception exposes the opposing unit and its occupied tile without granting a normal sight radius.
+Allied
 non-resource entities visible through team current fog expose full read-only
 inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
 legacy Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough

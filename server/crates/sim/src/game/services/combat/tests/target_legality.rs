@@ -210,6 +210,61 @@ fn direct_fire_legality_rejects_smoke_at_attacker_or_target() {
 }
 
 #[test]
+fn direct_fire_legality_allows_units_at_melee_range_inside_smoke() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(4, 4);
+    let target_pos = map.tile_center(5, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    let mut smokes = SmokeCloudStore::new();
+    smokes
+        .spawn(attacker_pos.0, attacker_pos.1, 2.0, 100, 0)
+        .expect("smoke should spawn");
+
+    assert!(direct_fire_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        target,
+        DirectFireLegality::AutoAcquire,
+    ));
+}
+
+#[test]
+fn direct_fire_legality_keeps_units_concealed_beyond_smoke_melee_range() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(4, 4);
+    let target_pos = map.tile_center(6, 4);
+    let smoke_pos = map.tile_center(5, 4);
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    let mut smokes = SmokeCloudStore::new();
+    smokes
+        .spawn(smoke_pos.0, smoke_pos.1, 2.0, 100, 0)
+        .expect("smoke should spawn");
+
+    assert!(!direct_fire_legal(
+        &map,
+        &entities,
+        &smokes,
+        attacker,
+        target,
+        DirectFireLegality::AutoAcquire,
+    ));
+}
+
+#[test]
 fn direct_fire_legality_rejects_terrain_los_blocking() {
     let map = map_with_rock_at((4, 4));
     let mut entities = EntityStore::new();

@@ -230,14 +230,15 @@ pub(crate) fn unit_explicit_attack_target_valid(
         Some(target) if crate::rules::target::default_weapon_can_target(attacker.kind, target.kind)
             && explicit_attack_target_inside_fixed_arc(attacker, target)
             && is_explicit_attack_targetable(target, teams, attacker_owner, attacker_id)
-            && projection::team_visible_world(
-                attacker_owner,
-                target.pos_x,
-                target.pos_y,
-                fog,
-                teams
-            )
-            && smokes.is_none_or(|smokes| !smokes.point_inside(target.pos_x, target.pos_y)))
+            && (smokes.is_some_and(|smokes| smokes.units_have_melee_visibility(attacker, target))
+                || (projection::team_visible_world(
+                    attacker_owner,
+                    target.pos_x,
+                    target.pos_y,
+                    fog,
+                    teams
+                )
+                && smokes.is_none_or(|smokes| !smokes.point_inside(target.pos_x, target.pos_y)))))
 }
 
 fn explicit_attack_target_inside_fixed_arc(attacker: &Entity, target: &Entity) -> bool {

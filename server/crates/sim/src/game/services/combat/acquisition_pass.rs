@@ -177,9 +177,6 @@ fn retained_target(
     require_weapon_range: bool,
     target_filter: &dyn Fn(u32) -> bool,
 ) -> Option<u32> {
-    if smokes.point_inside(px, py) {
-        return None;
-    }
     let attacker = entities.get(self_id)?;
     if mode == CombatMode::Ordered {
         if let Some(target) = attacker.order().attack_target() {

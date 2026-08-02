@@ -55,12 +55,20 @@ pub(super) fn direct_fire_target_legal(
         return false;
     }
     let end = (target_entity.pos_x, target_entity.pos_y);
-    if smokes.point_inside(start.0, start.1) || smokes.point_inside(end.0, end.1) {
+    let smoke_melee_visibility = smokes.units_have_melee_visibility(attacker_entity, target_entity);
+    if (smokes.point_inside(start.0, start.1) || smokes.point_inside(end.0, end.1))
+        && !smoke_melee_visibility
+    {
         return false;
     }
-    let visible =
-        crate::rules::projection::team_visible_world(attacker_owner, end.0, end.1, fog, teams);
-    if !visible || !los.clear_between_world_points(start, end) {
+    let visible = smoke_melee_visibility
+        || crate::rules::projection::team_visible_world(attacker_owner, end.0, end.1, fog, teams);
+    let clear_los = if smoke_melee_visibility {
+        LineOfSight::new(map).clear_between_world_points(start, end)
+    } else {
+        los.clear_between_world_points(start, end)
+    };
+    if !visible || !clear_los {
         return false;
     }
     if legality == DirectFireLegality::IntendedTarget {
@@ -151,15 +159,20 @@ fn target_has_legal_shot(
     py: f32,
     target: &Entity,
 ) -> bool {
-    !smokes.point_inside(px, py)
-        && !smokes.point_inside(target.pos_x, target.pos_y)
-        && crate::rules::projection::team_visible_world(
-            owner,
-            target.pos_x,
-            target.pos_y,
-            fog,
-            teams,
-        )
+    let smoke_melee_visibility = entities
+        .get(self_id)
+        .is_some_and(|attacker| smokes.units_have_melee_visibility(attacker, target));
+    let visible = smoke_melee_visibility
+        || (!smokes.point_inside(px, py)
+            && !smokes.point_inside(target.pos_x, target.pos_y)
+            && crate::rules::projection::team_visible_world(
+                owner,
+                target.pos_x,
+                target.pos_y,
+                fog,
+                teams,
+            ));
+    visible
         && (entities
             .get(self_id)
             .is_some_and(|entity| entity.kind == EntityKind::MortarTeam)

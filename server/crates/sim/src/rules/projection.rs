@@ -131,6 +131,29 @@ pub fn entity_visible_to_with_smoke(
     entity_visible_to(viewer, entity, fog)
 }
 
+pub(crate) fn entity_visible_to_with_smoke_melee(
+    viewer: u32,
+    entity: &Entity,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    entities: &EntityStore,
+    teams: Option<&TeamRelations>,
+) -> bool {
+    if entity_visible_to_with_smoke(viewer, entity, fog, smokes) {
+        return true;
+    }
+    if !fog.is_visible_world(viewer, entity.pos_x, entity.pos_y) {
+        return false;
+    }
+    entities.iter().any(|spotter| {
+        teams
+            .map(|teams| teams.same_team_or_same_owner(viewer, spotter.owner))
+            .unwrap_or(spotter.owner == viewer)
+            && SmokeCloudStore::units_within_melee_visibility_range(spotter, entity)
+            && smokes.point_inside(spotter.pos_x, spotter.pos_y)
+    })
+}
+
 pub fn event_visible_to(
     viewer: u32,
     event_origin_x: f32,
@@ -257,7 +280,16 @@ pub fn project_entity(
         && !selected_owner
         && !context
             .smokes
-            .map(|smokes| entity_visible_to_with_smoke(viewer, entity, context.fog, smokes))
+            .map(|smokes| {
+                entity_visible_to_with_smoke_melee(
+                    viewer,
+                    entity,
+                    context.fog,
+                    smokes,
+                    context.entities,
+                    context.teams,
+                )
+            })
             .unwrap_or_else(|| entity_visible_to(viewer, entity, context.fog))
     {
         return None;
@@ -288,7 +320,16 @@ pub fn project_entity(
         && !entity.is_node()
         && !context
             .smokes
-            .map(|smokes| entity_visible_to_with_smoke(viewer, entity, actionable_fog, smokes))
+            .map(|smokes| {
+                entity_visible_to_with_smoke_melee(
+                    viewer,
+                    entity,
+                    actionable_fog,
+                    smokes,
+                    context.entities,
+                    context.teams,
+                )
+            })
             .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog));
     view.vision_only = vision_only;
 
@@ -320,11 +361,21 @@ pub fn project_entity(
                 exact_owner
                     || !context.fogged
                     || (!vision_only
-                        && actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
-                        && !context
+                        && context
                             .smokes
-                            .map(|smokes| smokes.point_inside(target.pos_x, target.pos_y))
-                            .unwrap_or(false))
+                            .map(|smokes| {
+                                entity_visible_to_with_smoke_melee(
+                                    viewer,
+                                    target,
+                                    actionable_fog,
+                                    smokes,
+                                    context.entities,
+                                    context.teams,
+                                )
+                            })
+                            .unwrap_or_else(|| {
+                                actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+                            }))
             })
             .unwrap_or(false)
     } else {
