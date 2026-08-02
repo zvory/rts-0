@@ -7,6 +7,7 @@ export function interactLaunchUrl({
   map,
   opponent,
   spectate,
+  autoSpectator = false,
   renderer,
   seed,
   scenario,
@@ -18,6 +19,7 @@ export function interactLaunchUrl({
   map: string;
   opponent: string;
   spectate?: readonly string[] | null;
+  autoSpectator?: boolean;
   renderer: string;
   seed: string;
   scenario: string;
@@ -55,6 +57,7 @@ export function interactLaunchUrl({
   if (aiPlayers) {
     url.searchParams.append("rtsAi", `1:${aiPlayers[0]}`);
     url.searchParams.append("rtsAi", `2:${aiPlayers[1]}`);
+    if (autoSpectator) url.searchParams.set("rtsAutoSpectator", "1");
   } else {
     url.searchParams.set("rtsName", "Interact");
     url.searchParams.set("rtsAi", `2:${opponent}`);

@@ -113,6 +113,10 @@ const automaticSpectatorDriver = new InteractDriver({
   autoSpectator: true,
 });
 assert.equal(automaticSpectatorDriver.options.autoSpectator, true, "AI-vs-AI Interact retains the fight-following launch preference");
+automaticSpectatorDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
+automaticSpectatorDriver.workspace = workspace;
+assert.equal(new URL(automaticSpectatorDriver.launchUrl()).searchParams.get("rtsAutoSpectator"), "1",
+  "AI-vs-AI Interact carries the fight-following opt-in in its isolated launch URL");
 
 assert.equal(transitionDriverState(DRIVER_STATES.OPENING, "opened"), DRIVER_STATES.OPEN, "driver opens once");
 assert.equal(transitionDriverState(DRIVER_STATES.OPEN, "closing"), DRIVER_STATES.CLOSING, "driver closes from open");

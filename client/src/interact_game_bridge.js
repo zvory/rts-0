@@ -38,6 +38,16 @@ export function interactGameLaunchEnabled(locationLike = globalThis.location) {
   }
 }
 
+export function interactAutoSpectatorEnabled(locationLike = globalThis.location) {
+  if (!interactGameLaunchEnabled(locationLike)) return false;
+  try {
+    const params = new URLSearchParams(locationLike?.search || "");
+    return params.get("rtsRole") === "spectator" && params.get("rtsAutoSpectator") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function interactScenarioLaunchEnabled(locationLike = globalThis.location) {
   try {
     const params = new URLSearchParams(locationLike?.search || "");

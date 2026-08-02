@@ -39,7 +39,6 @@ src/
   progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   auto_spectator.js # spectator/replay battle director: tick-paced combat clustering and camera framing
-  auto_spectator_settings.js # default-off spectator framing plus explicit Interact launch opt-in
   spectator_controls_panel.js # floating live-spectator/replay camera and all-unit range controls
   match_auto_spectator.js # Match availability, camera-limit, and director-construction wiring
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
@@ -2231,7 +2230,6 @@ Current areas:
 - `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` catalog
   route detection, direct launch URL parsing for scenario/map/seed and sanitized lab visual profile
   ids, audio, combat audio, alerts, fog, camera, prediction settings, unit range settings,
-  auto spectator launch settings,
   `report_window_aggregate.js`.
 
 Import rules:
