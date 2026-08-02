@@ -11,8 +11,13 @@ with restrained natural colors, crisp edges, no shadow, no text, no watermark, a
 The subjects were:
 
 - `tree-oak.png`: a mature broadleaf oak with a sturdy brown trunk and rounded olive canopy.
-- `tree-pine.png`: a mature conifer with a narrow trunk and tiered deep-green needles.
+- `tree-pine.png`: a mature Scots pine with a narrow trunk and tiered deep-green needles.
 - `tree-birch.png`: a European birch with a white-charcoal trunk and airy yellow-green canopy.
+- `tree-spruce.png`: a Norway spruce with dense drooping blue-green boughs.
+- `tree-aspen.png`: a Eurasian aspen with a pale trunk and loose blue-green crown.
+- `tree-alder.png`: a black alder with dark forked trunks and dense rounded foliage.
+- `tree-*-topdown.png`: a second version of every tree species rendered from a strict 90-degree
+  vertical orthographic camera for in-game perspective comparison.
 - `wildflower-single.png`: one pale five-petal flower with a short green stem and two leaves.
 - `wildflower-cluster.png`: a cohesive tuft of five pale blossoms with short stems and sparse leaves.
 
