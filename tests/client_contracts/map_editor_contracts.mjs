@@ -33,7 +33,7 @@ import fs from "node:fs";
       selectedBaseIndex: null,
       tool: { kind: "terrain", terrain: TERRAIN.WATER },
       session: {
-        draft: { terrain: ["....", "....", "....", "...."] },
+        draft: { width: 4, height: 4, terrain: ["....", "....", "....", "...."] },
         paintTerrainTiles() {
           return [
             { x: 1, y: 1, code: paintCode },
@@ -120,6 +120,7 @@ import {
   MAP_EDITOR_MAX_SIZE,
   MAP_EDITOR_MIN_SIZE,
   MAP_EDITOR_SYMMETRY,
+  mapEditorSymmetrySupported,
   MapEditorSession,
   mapEditorRectTiles,
   materializedMapsEqual,
@@ -226,7 +227,8 @@ assert(
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
-  assert.equal(session.exportMap().version, 4);
+  assert.equal(session.exportMap().version, 5);
+  assert.deepEqual({ width: materialized.width, height: materialized.height }, { width: 126, height: 126 });
   assert.equal(session.exportMap().layouts, undefined, "flat map data has no layout matrix");
   assert.equal(materialized.starts.length, 2);
   assert.equal(materialized.baseSites.length, 4, "every authored base is materialized without choosing a player layout");
@@ -238,6 +240,36 @@ assert(
     [2, 3],
     "neutral base controls retain their backing authored base indices",
   );
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  assert.equal(session.initializeFromStart({
+    map: { width: 12, height: 8, terrain: Array(12 * 8).fill(TERRAIN.GRASS) },
+    players: [{ startTileX: 3, startTileY: 2 }, { startTileX: 9, startTileY: 6 }],
+  }, { name: "Wide authoritative map" }), true);
+  assert.deepEqual({ width: session.draft.width, height: session.draft.height }, { width: 12, height: 8 },
+    "authoritative rectangular maps import without requiring equal axes");
+  const bounds = [];
+  const viewport = {
+    session,
+    terrainRevision: 0,
+    root: { clientWidth: 960, clientHeight: 640 },
+    camera: {
+      worldW: 0,
+      setBounds(...args) { bounds.push(args); },
+      setZoom(value) { this.zoom = value; },
+      centerOn(x, y) { this.centre = { x, y }; },
+    },
+  };
+  MapEditorViewport.prototype.rebuildTerrain.call(viewport);
+  assert.deepEqual(bounds, [[384, 256, 960, 640]], "editor camera bounds preserve rectangular world extents");
+  assert.deepEqual(viewport.camera.centre, { x: 192, y: 128 });
+  assert.deepEqual({
+    width: viewport.pendingTerrainUpdate.width,
+    height: viewport.pendingTerrainUpdate.height,
+    cells: viewport.pendingTerrainUpdate.terrain.length,
+  }, { width: 12, height: 8, cells: 96 }, "worker terrain replacement carries both axes explicitly");
 }
 
 {
@@ -409,7 +441,7 @@ assert(
 
   const recordViewport = {
     session: {
-      draft: { terrain: Array(16) },
+      draft: { width: 16, height: 16, terrain: Array(16) },
       mapOverlay: () => ({ starts: [], bases: [] }),
     },
     symmetry: MAP_EDITOR_SYMMETRY.NONE,
@@ -436,7 +468,7 @@ assert(
   };
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(legacy);
-  assert.equal(session.exportMap().version, 4, "local v2 maps migrate into current flat map data");
+  assert.equal(session.exportMap().version, 5, "local v2 maps migrate into current flat map data");
   assert.equal(session.exportMap().layouts, undefined);
 }
 
@@ -459,8 +491,8 @@ assert(
     setItem(key, value) { values.set(key, value); },
   };
   const session = new MapEditorSession({ storage });
-  assert.equal(session.loadLocal("legacy-workspace"), true, "v4 sessions recover saved v2 workspaces");
-  assert.equal(session.exportMap().version, 4);
+  assert.equal(session.loadLocal("legacy-workspace"), true, "v5 sessions recover saved v2 workspaces");
+  assert.equal(session.exportMap().version, 5);
   assert.equal(session.materialized().baseSites.length, 2);
 }
 
@@ -547,46 +579,52 @@ assert(
   const viewport = { armed: "unchanged", armTool(tool) { this.armed = tool; } };
   const statuses = [];
   const panel = {
-    session, viewport, blankMapSize: "48", selectedStartIndex: 3, selectedBaseIndex: 4,
+    session, viewport, blankMapWidth: "64", blankMapHeight: "48", selectedStartIndex: 3, selectedBaseIndex: 4,
+    requestedDimensions: MapEditorPanel.prototype.requestedDimensions,
     setStatus(message, error = false) { statuses.push({ message, error }); },
   };
   assert.equal(MapEditorPanel.prototype.newBlankMap.call(panel), true);
-  assert.equal(session.draft.terrain.length, 48);
+  assert.deepEqual({ width: session.draft.width, height: session.draft.height }, { width: 64, height: 48 });
   assert.equal(viewport.armed, null);
-  assert.deepEqual(statuses.pop(), { message: "Created a blank 48 × 48 two-player map.", error: false });
+  assert.deepEqual(statuses.pop(), { message: "Created a blank 64 × 48 two-player map.", error: false });
 
   const before = session.materialized();
-  panel.blankMapSize = String(MAP_EDITOR_MAX_SIZE + 1);
+  panel.blankMapWidth = String(MAP_EDITOR_MAX_SIZE + 1);
   assert.equal(MapEditorPanel.prototype.newBlankMap.call(panel), false);
   assert.deepEqual(session.materialized(), before, "invalid custom sizes preserve the current draft");
   assert.deepEqual(statuses.pop(), {
-    message: `Blank map size must be a whole number from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`,
+    message: `Map width and height must be whole numbers from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`,
     error: true,
   });
 
   const defaults = new MapEditorSession({ storage: null });
   defaults.initializeBlank();
-  assert.equal(defaults.draft.terrain.length, MAP_EDITOR_DEFAULT_SIZE);
+  assert.deepEqual({ width: defaults.draft.width, height: defaults.draft.height }, {
+    width: MAP_EDITOR_DEFAULT_SIZE, height: MAP_EDITOR_DEFAULT_SIZE,
+  });
 }
 
 {
   const panel = {
-    blankMapSize: "126", observedMapSize: null, renders: 0,
+    blankMapWidth: "126", blankMapHeight: "126", observedMapDimensions: null,
+    symmetry: MAP_EDITOR_SYMMETRY.NONE,
+    viewport: { setSymmetry() {}, tool: null },
+    renders: 0,
     render() { this.renders += 1; },
   };
-  const snapshot = (size, detail = {}) => ({
-    draft: { terrain: Array.from({ length: size }, () => ".".repeat(size)) },
+  const snapshot = (width, height, detail = {}) => ({
+    draft: { width, height, terrain: Array.from({ length: height }, () => ".".repeat(width)) },
     ...detail,
   });
-  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96));
-  assert.equal(panel.blankMapSize, "96", "the blank-size field starts from the active map size");
-  panel.blankMapSize = "72";
-  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96, { reason: "changed" }));
-  assert.equal(panel.blankMapSize, "72", "ordinary map edits preserve an in-progress custom size");
-  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96, { reason: "loaded" }));
-  assert.equal(panel.blankMapSize, "96", "loading a same-sized map restores its inferred size");
-  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(48, { reason: "undo" }));
-  assert.equal(panel.blankMapSize, "48", "size-changing history updates the inferred size");
+  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96, 64));
+  assert.deepEqual([panel.blankMapWidth, panel.blankMapHeight], ["96", "64"], "dimension fields start from the active map");
+  panel.blankMapWidth = "72";
+  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96, 64, { reason: "changed" }));
+  assert.equal(panel.blankMapWidth, "72", "ordinary map edits preserve in-progress dimensions");
+  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(96, 64, { reason: "loaded" }));
+  assert.deepEqual([panel.blankMapWidth, panel.blankMapHeight], ["96", "64"], "loading restores both dimensions");
+  MapEditorPanel.prototype.applySessionSnapshot.call(panel, snapshot(48, 32, { reason: "undo" }));
+  assert.deepEqual([panel.blankMapWidth, panel.blankMapHeight], ["48", "32"], "dimension-changing history updates both fields");
   assert.equal(panel.renders, 4);
 }
 
@@ -641,6 +679,17 @@ assert(
   assert.deepEqual(mapEditorRectTiles({ x: 1, y: 1 }, { x: 2, y: 3 }, 8), [
     { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 1, y: 2 }, { x: 2, y: 2 }, { x: 1, y: 3 }, { x: 2, y: 3 },
   ]);
+  assert.deepEqual(symmetricMapTiles({ width: 12, height: 8 }, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.HALF_TURN), [
+    { x: 1, y: 2 }, { x: 10, y: 5 },
+  ], "half-turn symmetry uses each rectangular axis independently");
+  assert.deepEqual(symmetricMapTiles({ width: 12, height: 8 }, [{ x: 1, y: 2 }], MAP_EDITOR_SYMMETRY.RADIAL), [
+    { x: 1, y: 2 },
+  ], "quarter-turn symmetry is unavailable when it would change the map shape");
+  assert.equal(mapEditorSymmetrySupported({ width: 12, height: 8 }, MAP_EDITOR_SYMMETRY.RADIAL), false);
+  assert.deepEqual(mapEditorSymmetryGuideLines({ width: 12, height: 8 }, MAP_EDITOR_SYMMETRY.HORIZONTAL), [
+    { x0: 0, y0: 128, x1: 384, y1: 128 },
+  ]);
+  assert.deepEqual(mapEditorSymmetryGuideCentre({ width: 12, height: 8 }, MAP_EDITOR_SYMMETRY.HALF_TURN), { x: 192, y: 128 });
 }
 
 {
@@ -783,11 +832,29 @@ assert(
 }
 
 {
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ width: 32, height: 24, playerCount: 2 });
+  const before = session.materialized();
+  const resized = session.resize({ width: 64, height: 24 });
+  assert.deepEqual(resized, { ok: true, count: 1 });
+  const map = session.materialized();
+  assert.deepEqual({ width: map.width, height: map.height, cells: map.terrain.length }, {
+    width: 64, height: 24, cells: 64 * 24,
+  });
+  assert.deepEqual(map.starts, before.starts.map((start) => ({ x: start.x + 16, y: start.y })),
+    "centred horizontal expansion shifts authored locations with the preserved terrain");
+  assert(map.terrain.slice(0, 16).every((code) => code === TERRAIN.GRASS),
+    "new side tiles are filled with grass rather than stretching the source terrain");
+  assert.equal(session.undo(), true);
+  assert.deepEqual(session.materialized(), before, "rectangular resize is one undoable editor operation");
+}
+
+{
   const draft = authoredMapFromMaterialized({
-    name: "Round trip", description: "", size: 32,
-    terrain: Array(32 * 32).fill(TERRAIN.GRASS),
-    starts: [{ x: 8, y: 8 }, { x: 23, y: 23 }],
-    baseSites: [{ x: 8, y: 8 }, { x: 23, y: 23 }, { x: 16, y: 16 }],
+    name: "Round trip", description: "", width: 48, height: 32,
+    terrain: Array(48 * 32).fill(TERRAIN.GRASS),
+    starts: [{ x: 8, y: 8 }, { x: 39, y: 23 }],
+    baseSites: [{ x: 8, y: 8 }, { x: 39, y: 23 }, { x: 24, y: 16 }],
   });
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(draft);
@@ -799,7 +866,7 @@ assert(
 {
   const request = [];
   await createMapHandoff({
-    destination: "lab", authoredMap: { version: 4 }, materializedMap: { starts: [], baseSites: [] },
+    destination: "lab", authoredMap: { version: 5 }, materializedMap: { width: 32, height: 16, starts: [], baseSites: [] },
     fetchImpl: async (_url, init) => {
       request.push(JSON.parse(init.body));
       return { ok: true, json: async () => ({ handoffId: "0123456789abcdef0123456789abcdef" }) };

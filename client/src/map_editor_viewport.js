@@ -10,6 +10,7 @@ import {
   MAP_EDITOR_BASE_SITE_CLEARANCE_TILES,
   MAP_EDITOR_MAIN_CLEARANCE_TILES,
   MAP_EDITOR_SYMMETRY,
+  mapEditorSymmetrySupported,
   moveSymmetricDraftLocation,
   protectDraftBaseTerrain,
   symmetricTerrainTiles,
@@ -17,50 +18,51 @@ import {
 
 const TILE_SIZE = 32;
 
-export function mapEditorSymmetryGuideLines(size, symmetry) {
-  const mapSize = Math.max(0, Math.trunc(Number(size)) || 0);
-  const worldSize = mapSize * TILE_SIZE;
-  const centre = worldSize / 2;
-  const horizontal = { x0: 0, y0: centre, x1: worldSize, y1: centre };
-  const vertical = { x0: centre, y0: 0, x1: centre, y1: worldSize };
+export function mapEditorSymmetryGuideLines(dimensions, symmetry) {
+  const { width, height } = mapDimensions(dimensions);
+  const worldWidth = width * TILE_SIZE;
+  const worldHeight = height * TILE_SIZE;
+  const centreX = worldWidth / 2;
+  const centreY = worldHeight / 2;
+  const horizontal = { x0: 0, y0: centreY, x1: worldWidth, y1: centreY };
+  const vertical = { x0: centreX, y0: 0, x1: centreX, y1: worldHeight };
   if (symmetry === MAP_EDITOR_SYMMETRY.HORIZONTAL) return [horizontal];
   if (symmetry === MAP_EDITOR_SYMMETRY.VERTICAL) return [vertical];
   if (symmetry === MAP_EDITOR_SYMMETRY.THREE_WAY) {
     return [-Math.PI / 2, Math.PI / 6, 5 * Math.PI / 6]
-      .map((angle) => symmetryGuideRay(centre, worldSize, angle));
+      .map((angle) => symmetryGuideRay(centreX, centreY, worldWidth, worldHeight, angle));
   }
   if (symmetry === MAP_EDITOR_SYMMETRY.RADIAL) return [horizontal, vertical];
   if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN) {
-    return [{ x0: 0, y0: 0, x1: worldSize, y1: worldSize }];
+    return [{ x0: 0, y0: 0, x1: worldWidth, y1: worldHeight }];
   }
   if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI) {
-    return [{ x0: 0, y0: worldSize, x1: worldSize, y1: 0 }];
+    return [{ x0: 0, y0: worldHeight, x1: worldWidth, y1: 0 }];
   }
   return [];
 }
 
-function symmetryGuideRay(centre, worldSize, angle) {
+function symmetryGuideRay(centreX, centreY, worldWidth, worldHeight, angle) {
   const dx = Math.cos(angle);
   const dy = Math.sin(angle);
   const distances = [];
-  if (dx > 0) distances.push((worldSize - centre) / dx);
-  if (dx < 0) distances.push(-centre / dx);
-  if (dy > 0) distances.push((worldSize - centre) / dy);
-  if (dy < 0) distances.push(-centre / dy);
+  if (dx > 0) distances.push((worldWidth - centreX) / dx);
+  if (dx < 0) distances.push(-centreX / dx);
+  if (dy > 0) distances.push((worldHeight - centreY) / dy);
+  if (dy < 0) distances.push(-centreY / dy);
   const distance = Math.min(...distances.filter((candidate) => candidate >= 0));
   return {
-    x0: centre,
-    y0: centre,
-    x1: centre + dx * distance,
-    y1: centre + dy * distance,
+    x0: centreX,
+    y0: centreY,
+    x1: centreX + dx * distance,
+    y1: centreY + dy * distance,
   };
 }
 
-export function mapEditorSymmetryGuideCentre(size, symmetry) {
+export function mapEditorSymmetryGuideCentre(dimensions, symmetry) {
   if (symmetry !== MAP_EDITOR_SYMMETRY.HALF_TURN) return null;
-  const mapSize = Math.max(0, Math.trunc(Number(size)) || 0);
-  const centre = mapSize * TILE_SIZE / 2;
-  return { x: centre, y: centre };
+  const { width, height } = mapDimensions(dimensions);
+  return { x: width * TILE_SIZE / 2, y: height * TILE_SIZE / 2 };
 }
 
 export class MapEditorViewport {
@@ -122,13 +124,19 @@ export class MapEditorViewport {
 
   armTool(tool) {
     this.tool = tool ? structuredCloneSafe(tool) : null;
-    if (this.tool?.symmetry) this.symmetry = this.tool.symmetry;
+    if (this.tool?.symmetry) {
+      this.symmetry = mapEditorSymmetrySupported(this.session.draft, this.tool.symmetry)
+        ? this.tool.symmetry
+        : MAP_EDITOR_SYMMETRY.NONE;
+      this.tool.symmetry = this.symmetry;
+    }
     this.drawOverlay();
     return this.tool;
   }
 
   setSymmetry(symmetry) {
     this.symmetry = Object.values(MAP_EDITOR_SYMMETRY).includes(symmetry)
+      && mapEditorSymmetrySupported(this.session.draft, symmetry)
       ? symmetry
       : MAP_EDITOR_SYMMETRY.NONE;
     this.drawOverlay();
@@ -158,34 +166,41 @@ export class MapEditorViewport {
     this.pendingTerrainUpdate = {
       kind: "replace",
       revision: this.terrainRevision,
-      width: materialized.size,
-      height: materialized.size,
+      width: materialized.width,
+      height: materialized.height,
       tileSize: TILE_SIZE,
       terrain: materialized.terrain,
     };
-    const worldSize = materialized.size * TILE_SIZE;
+    const worldWidth = materialized.width * TILE_SIZE;
+    const worldHeight = materialized.height * TILE_SIZE;
     const firstMap = this.camera.worldW <= 0;
-    this.camera.setBounds(worldSize, worldSize, this.root.clientWidth, this.root.clientHeight);
+    this.camera.setBounds(worldWidth, worldHeight, this.root.clientWidth, this.root.clientHeight);
     if (firstMap) {
-      const fit = Math.min(this.root.clientWidth / worldSize, this.root.clientHeight / worldSize) * 0.92;
+      const fit = Math.min(this.root.clientWidth / worldWidth, this.root.clientHeight / worldHeight) * 0.92;
       this.camera.setZoom(fit);
-      this.camera.centerOn(worldSize / 2, worldSize / 2);
+      this.camera.centerOn(worldWidth / 2, worldHeight / 2);
     }
   }
 
   drawOverlay() {
     const draft = this.session.draft;
     if (!draft) return;
-    const size = draft.terrain.length;
+    const dimensions = { width: draft.width, height: draft.height };
+    const worldWidth = draft.width * TILE_SIZE;
+    const worldHeight = draft.height * TILE_SIZE;
     const gridPaths = [];
-    for (let tile = 0; tile <= size; tile += 8) {
-      const p = tile * TILE_SIZE;
-      gridPaths.push([[p, 0], [p, size * TILE_SIZE]], [[0, p], [size * TILE_SIZE, p]]);
+    for (let tile = 0; tile <= draft.width; tile += 8) {
+      const x = tile * TILE_SIZE;
+      gridPaths.push([[x, 0], [x, worldHeight]]);
     }
-    const guides = mapEditorSymmetryGuideLines(size, this.symmetry).map((guide) => [
+    for (let tile = 0; tile <= draft.height; tile += 8) {
+      const y = tile * TILE_SIZE;
+      gridPaths.push([[0, y], [worldWidth, y]]);
+    }
+    const guides = mapEditorSymmetryGuideLines(dimensions, this.symmetry).map((guide) => [
       [guide.x0, guide.y0], [guide.x1, guide.y1],
     ]);
-    const guideCentre = mapEditorSymmetryGuideCentre(size, this.symmetry);
+    const guideCentre = mapEditorSymmetryGuideCentre(dimensions, this.symmetry);
     const locations = this.session.mapOverlay();
     const sites = [];
     for (const start of locations?.starts || []) sites.push(this.siteRecord(start, 0x4ec9ff, 11, `S${start.index + 1}`));
@@ -292,14 +307,14 @@ export class MapEditorViewport {
   }
 
   paintBox(from, to) {
-    const size = this.session.draft?.terrain?.length || 0;
-    this.paintTiles(mapEditorRectTiles(from, to, size));
+    const dimensions = this.session.draft;
+    this.paintTiles(mapEditorRectTiles(from, to, dimensions));
   }
 
   paintTiles(tiles) {
-    const size = this.session.draft?.terrain?.length || 0;
+    const dimensions = this.session.draft;
     const changes = this.session.paintTerrainTiles(
-      symmetricTerrainTiles(size, tiles, this.tool.terrain, this.tool?.symmetry),
+      symmetricTerrainTiles(dimensions, tiles, this.tool.terrain, this.tool?.symmetry),
       this.tool.terrain,
     );
     if (changes.length > 0) {
@@ -355,12 +370,13 @@ export class MapEditorViewport {
   eventTile(event, { kind = this.tool?.kind } = {}) {
     const rect = this.presentation.canvas.getBoundingClientRect();
     const world = this.camera.screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-    const size = this.session.draft?.terrain?.length || 0;
+    const width = this.session.draft?.width || 0;
+    const height = this.session.draft?.height || 0;
     const radius = kind === "start" ? MAP_EDITOR_MAIN_CLEARANCE_TILES : kind === "base" ? MAP_EDITOR_BASE_SITE_CLEARANCE_TILES : 0;
-    if (!size || size <= radius * 2) return null;
+    if (!width || !height || width <= radius * 2 || height <= radius * 2) return null;
     return {
-      x: Math.max(radius, Math.min(size - radius - 1, Math.floor(world.x / TILE_SIZE))),
-      y: Math.max(radius, Math.min(size - radius - 1, Math.floor(world.y / TILE_SIZE))),
+      x: Math.max(radius, Math.min(width - radius - 1, Math.floor(world.x / TILE_SIZE))),
+      y: Math.max(radius, Math.min(height - radius - 1, Math.floor(world.y / TILE_SIZE))),
     };
   }
 
@@ -516,6 +532,17 @@ function lineTiles(from, to) {
     if (twice <= dx) { error += dx; y += sy; }
   }
   return out;
+}
+
+function mapDimensions(value) {
+  if (typeof value === "number") {
+    const size = Math.max(0, Math.trunc(Number(value)) || 0);
+    return { width: size, height: size };
+  }
+  return {
+    width: Math.max(0, Math.trunc(Number(value?.width)) || 0),
+    height: Math.max(0, Math.trunc(Number(value?.height)) || 0),
+  };
 }
 
 function terrainLabel(code) {

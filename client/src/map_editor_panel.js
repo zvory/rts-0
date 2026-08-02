@@ -10,6 +10,7 @@ import {
   MAP_EDITOR_MAX_START_LOCATIONS,
   MAP_EDITOR_MIN_SIZE,
   MAP_EDITOR_SYMMETRY,
+  mapEditorSymmetrySupported,
   removeDraftLocation,
 } from "./map_editor_session.js";
 
@@ -40,8 +41,9 @@ export class MapEditorPanel {
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
-    this.blankMapSize = String(MAP_EDITOR_DEFAULT_SIZE);
-    this.observedMapSize = null;
+    this.blankMapWidth = String(MAP_EDITOR_DEFAULT_SIZE);
+    this.blankMapHeight = String(MAP_EDITOR_DEFAULT_SIZE);
+    this.observedMapDimensions = null;
     this.pending = false;
     this.status = "Ready to edit the map.";
     this.statusError = false;
@@ -61,14 +63,24 @@ export class MapEditorPanel {
   }
 
   applySessionSnapshot(snapshot) {
-    const size = snapshot?.draft?.terrain?.length;
+    const width = snapshot?.draft?.width;
+    const height = snapshot?.draft?.height;
     const loadedMap = snapshot?.reason === "loaded"
       || snapshot?.reason === "initialized"
       || snapshot?.lastAction === "Loaded local map";
-    if (Number.isInteger(size) && (this.observedMapSize === null || size !== this.observedMapSize || loadedMap)) {
-      this.blankMapSize = String(size);
+    const dimensionsChanged = !this.observedMapDimensions
+      || width !== this.observedMapDimensions.width
+      || height !== this.observedMapDimensions.height;
+    if (Number.isInteger(width) && Number.isInteger(height) && (dimensionsChanged || loadedMap)) {
+      this.blankMapWidth = String(width);
+      this.blankMapHeight = String(height);
     }
-    if (Number.isInteger(size)) this.observedMapSize = size;
+    if (Number.isInteger(width) && Number.isInteger(height)) this.observedMapDimensions = { width, height };
+    if (!mapEditorSymmetrySupported(snapshot?.draft, this.symmetry)) {
+      this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
+      this.viewport.setSymmetry(this.symmetry);
+      if (this.viewport.tool) this.viewport.armTool({ ...this.viewport.tool, symmetry: this.symmetry });
+    }
     this.render();
   }
 
@@ -120,20 +132,15 @@ export class MapEditorPanel {
     }
     select.value = this.selectedMapFile;
     select.addEventListener("change", () => { this.selectedMapFile = select.value; });
-    const blankSize = document.createElement("input");
-    blankSize.type = "number";
-    blankSize.min = String(MAP_EDITOR_MIN_SIZE);
-    blankSize.max = String(MAP_EDITOR_MAX_SIZE);
-    blankSize.step = "1";
-    blankSize.value = this.blankMapSize;
-    blankSize.className = "map-editor-blank-size";
-    blankSize.setAttribute("aria-label", "Blank map size");
-    blankSize.addEventListener("input", () => { this.blankMapSize = blankSize.value; });
+    const blankWidth = dimensionInput("Map width", this.blankMapWidth, (value) => { this.blankMapWidth = value; });
+    const blankHeight = dimensionInput("Map height", this.blankMapHeight, (value) => { this.blankMapHeight = value; });
     section.append(
       field("Bundled map", select),
       button("Load bundled map", () => void this.loadBundledMap(), { disabled: !this.selectedMapFile || this.pending }),
-      field("Blank map size", blankSize),
+      field("Map width", blankWidth),
+      field("Map height", blankHeight),
       button("New blank map", () => this.newBlankMap(), { disabled: this.pending }),
+      button("Resize current map", () => this.resizeMap(), { disabled: this.pending }),
     );
     if (this.catalogSkipped.length) {
       section.appendChild(readout(`Skipped unsupported map filename${this.catalogSkipped.length === 1 ? "" : "s"}: ${this.catalogSkipped.join(", ")}`, true));
@@ -216,6 +223,7 @@ export class MapEditorPanel {
       const option = document.createElement("option");
       option.value = value;
       option.textContent = label;
+      option.disabled = !mapEditorSymmetrySupported(this.session.draft, value);
       symmetry.appendChild(option);
     }
     symmetry.value = this.symmetry;
@@ -363,6 +371,7 @@ export class MapEditorPanel {
 
   setSymmetry(symmetry) {
     this.symmetry = Object.values(MAP_EDITOR_SYMMETRY).includes(symmetry)
+      && mapEditorSymmetrySupported(this.session.draft, symmetry)
       ? symmetry
       : MAP_EDITOR_SYMMETRY.NONE;
     this.viewport.setSymmetry(this.symmetry);
@@ -371,17 +380,38 @@ export class MapEditorPanel {
   }
 
   newBlankMap() {
-    const size = Number(this.blankMapSize);
-    if (!Number.isInteger(size) || size < MAP_EDITOR_MIN_SIZE || size > MAP_EDITOR_MAX_SIZE) {
-      this.setStatus(`Blank map size must be a whole number from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`, true);
+    const dimensions = this.requestedDimensions();
+    if (!dimensions) {
+      this.setStatus(`Map width and height must be whole numbers from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`, true);
       return false;
     }
-    this.session.initializeBlank({ size, playerCount: 2 });
+    this.session.initializeBlank({ ...dimensions, playerCount: 2 });
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
     this.viewport.armTool(null);
-    this.setStatus(`Created a blank ${size} × ${size} two-player map.`);
+    this.setStatus(`Created a blank ${dimensions.width} × ${dimensions.height} two-player map.`);
     return true;
+  }
+
+  resizeMap() {
+    const dimensions = this.requestedDimensions();
+    if (!dimensions) {
+      this.setStatus(`Map width and height must be whole numbers from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`, true);
+      return false;
+    }
+    const result = this.session.resize(dimensions);
+    this.viewport.armTool(null);
+    this.setStatus(result.ok
+      ? result.count ? `Resized the map to ${dimensions.width} × ${dimensions.height}; new edge tiles are grass.` : "Map dimensions unchanged."
+      : result.error, !result.ok);
+    return result.ok;
+  }
+
+  requestedDimensions() {
+    const width = Number(this.blankMapWidth);
+    const height = Number(this.blankMapHeight);
+    if (![width, height].every((value) => Number.isInteger(value) && value >= MAP_EDITOR_MIN_SIZE && value <= MAP_EDITOR_MAX_SIZE)) return null;
+    return { width, height };
   }
 
   async loadCatalog() {
@@ -560,6 +590,19 @@ function patchCountField(labelText, value, max, onChange, disabled = false) {
   input.disabled = disabled;
   input.addEventListener("change", () => onChange(input.value));
   return field(labelText, input);
+}
+
+function dimensionInput(label, value, onInput) {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = String(MAP_EDITOR_MIN_SIZE);
+  input.max = String(MAP_EDITOR_MAX_SIZE);
+  input.step = "1";
+  input.value = value;
+  input.className = "map-editor-blank-size";
+  input.setAttribute("aria-label", label);
+  input.addEventListener("input", () => onInput(input.value));
+  return input;
 }
 
 function readout(text, error = false) {

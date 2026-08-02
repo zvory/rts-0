@@ -9,7 +9,7 @@ export const MAP_EDITOR_DEFAULT_STEEL_PATCHES = 12;
 export const MAP_EDITOR_DEFAULT_OIL_PATCHES = 3;
 export const MAP_EDITOR_DEFAULT_SIZE = 126;
 export const MAP_EDITOR_MIN_SIZE = 16;
-export const MAP_EDITOR_MAX_SIZE = 166;
+export const MAP_EDITOR_MAX_SIZE = 256;
 // Mirror the authored-map clearance contract enforced by the simulation.
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
@@ -82,12 +82,14 @@ export class MapEditorSession {
   initializeFromStart(startPayload, { name = "Map" } = {}) {
     if (this.draft) return false;
     const map = startPayload?.map || {};
-    const size = Number(map.width);
-    if (!Number.isInteger(size) || size <= 0 || Number(map.height) !== size) return false;
+    const width = Number(map.width);
+    const height = Number(map.height);
+    if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) return false;
     this.draft = authoredMapFromMaterialized({
       name,
       description: "Map imported from an authoritative session.",
-      size,
+      width,
+      height,
       terrain: map.terrain,
       starts: (startPayload?.players || []).map((player) => ({ x: Number(player.startTileX), y: Number(player.startTileY) })),
       baseSites: [],
@@ -104,7 +106,8 @@ export class MapEditorSession {
     this.draft = authoredMapFromMaterialized({
       name: scenario?.map?.name || scenario?.name || "Map",
       description: "Map imported from Lab.",
-      size: data.size,
+      width: data.width ?? data.size,
+      height: data.height ?? data.size,
       terrain: data.terrain,
       starts: data.starts,
       baseSites: data.baseSites || data.expansionSites,
@@ -116,27 +119,26 @@ export class MapEditorSession {
     return true;
   }
 
-  initializeBlank({ size = MAP_EDITOR_DEFAULT_SIZE, playerCount = 2, name = "Untitled map" } = {}) {
-    const mapSize = Math.max(
-      MAP_EDITOR_MIN_SIZE,
-      Math.min(MAP_EDITOR_MAX_SIZE, Math.trunc(Number(size)) || MAP_EDITOR_DEFAULT_SIZE),
-    );
+  initializeBlank({ size, width = size ?? MAP_EDITOR_DEFAULT_SIZE, height = size ?? MAP_EDITOR_DEFAULT_SIZE, playerCount = 2, name = "Untitled map" } = {}) {
+    const mapWidth = boundedMapDimension(width);
+    const mapHeight = boundedMapDimension(height);
     const count = Math.max(1, Math.min(MAP_EDITOR_MAX_START_LOCATIONS, Math.trunc(Number(playerCount)) || 2));
-    const startTile = (fraction) => Math.max(
+    const startTile = (dimension, fraction) => Math.max(
       MAP_EDITOR_MAIN_CLEARANCE_TILES,
-      Math.min(mapSize - MAP_EDITOR_MAIN_CLEARANCE_TILES - 1, Math.floor(mapSize * fraction)),
+      Math.min(dimension - MAP_EDITOR_MAIN_CLEARANCE_TILES - 1, Math.floor(dimension * fraction)),
     );
     const starts = [
-      { x: startTile(0.25), y: startTile(0.25) },
-      { x: startTile(0.75), y: startTile(0.75) },
-      { x: startTile(0.75), y: startTile(0.25) },
-      { x: startTile(0.25), y: startTile(0.75) },
+      { x: startTile(mapWidth, 0.25), y: startTile(mapHeight, 0.25) },
+      { x: startTile(mapWidth, 0.75), y: startTile(mapHeight, 0.75) },
+      { x: startTile(mapWidth, 0.75), y: startTile(mapHeight, 0.25) },
+      { x: startTile(mapWidth, 0.25), y: startTile(mapHeight, 0.75) },
     ].slice(0, count);
     this.draft = authoredMapFromMaterialized({
       name,
       description: "",
-      size: mapSize,
-      terrain: Array(mapSize * mapSize).fill(TERRAIN.GRASS),
+      width: mapWidth,
+      height: mapHeight,
+      terrain: Array(mapWidth * mapHeight).fill(TERRAIN.GRASS),
       starts,
       baseSites: starts,
     });
@@ -148,12 +150,13 @@ export class MapEditorSession {
     return true;
   }
 
-  loadAuthoredMap(source, { expectedSize = null, playerCount = null } = {}) {
+  loadAuthoredMap(source, { expectedSize = null, expectedWidth = expectedSize, expectedHeight = expectedSize, playerCount = null } = {}) {
     const draft = clone(source);
     normalizeDraft(draft);
-    const requiredSize = positiveInteger(expectedSize);
-    if (requiredSize && draft.terrain.length !== requiredSize) {
-      throw new Error(`This session uses a ${requiredSize} × ${requiredSize} map; ${draft.name} is ${draft.terrain.length} × ${draft.terrain.length}.`);
+    const requiredWidth = positiveInteger(expectedWidth);
+    const requiredHeight = positiveInteger(expectedHeight);
+    if ((requiredWidth && draft.width !== requiredWidth) || (requiredHeight && draft.height !== requiredHeight)) {
+      throw new Error(`This session uses a ${requiredWidth || draft.width} × ${requiredHeight || draft.height} map; ${draft.name} is ${draft.width} × ${draft.height}.`);
     }
     const requiredPlayers = positiveInteger(playerCount);
     if (requiredPlayers && draft.startLocations.length !== requiredPlayers) {
@@ -165,6 +168,26 @@ export class MapEditorSession {
     this.lastAction = `Loaded ${draft.name}`;
     this.notify("loaded");
     return true;
+  }
+
+  resize({ width, height } = {}) {
+    if (!this.draft) return draftEditError("Map is not initialized.");
+    const mapWidth = positiveInteger(width);
+    const mapHeight = positiveInteger(height);
+    if (!validEditorDimension(mapWidth) || !validEditorDimension(mapHeight)) {
+      return draftEditError(`Map dimensions must be whole numbers from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`);
+    }
+    if (mapWidth === this.draft.width && mapHeight === this.draft.height) return { ok: true, count: 0 };
+    const resized = resizeDraftCentered(this.draft, mapWidth, mapHeight);
+    if (!resized.ok) return resized;
+    const before = clone(this.draft);
+    this.draft = resized.draft;
+    this.undoStack.push(before);
+    if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
+    this.redoStack = [];
+    this.lastAction = `Resized map to ${mapWidth} × ${mapHeight}`;
+    this.notify("loaded");
+    return { ok: true, count: 1 };
   }
 
   subscribe(handler) {
@@ -242,7 +265,7 @@ export class MapEditorSession {
 
   paintTerrainTiles(tiles, terrainCode) {
     if (!this.draft || !this.terrainStroke || !Array.isArray(tiles)) return [];
-    const size = this.draft.terrain.length;
+    const { width, height } = draftDimensions(this.draft);
     const byRow = new Map();
     const changed = [];
     for (const tile of tiles) {
@@ -251,7 +274,7 @@ export class MapEditorSession {
       const code = tile?.paintTerrainCode ?? terrainCode;
       const ch = TERRAIN_TO_CHAR[code];
       if (
-        !ch || x < 0 || y < 0 || x >= size || y >= size
+        !ch || x < 0 || y < 0 || x >= width || y >= height
         || (
           code !== TERRAIN.GRASS
           && !isRoadTerrain(code)
@@ -304,7 +327,7 @@ export class MapEditorSession {
 
   saveLocal(key) {
     if (!this.draft || !this.storage?.setItem) return false;
-    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 4, draft: this.draft })); } catch { return false; }
+    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 5, draft: this.draft })); } catch { return false; }
     this.lastAction = "Saved local map";
     this.markSaved();
     return true;
@@ -315,6 +338,7 @@ export class MapEditorSession {
     let parsed;
     try {
       const text = this.storage.getItem(storageKey(key))
+        || this.storage.getItem(legacyV4StorageKey(key))
         || this.storage.getItem(legacyV3StorageKey(key))
         || this.storage.getItem(legacyStorageKey(key));
       if (!text) return false;
@@ -340,7 +364,8 @@ export class MapEditorSession {
     normalizeDraft(draft);
     return {
       name: draft.name,
-      size: draft.terrain.length,
+      width: draft.width,
+      height: draft.height,
       terrain: draft.terrain.flatMap((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch])),
       starts: draft.startLocations.map(copyLocation),
       baseSites: draft.baseSites.map(copyBaseSite),
@@ -360,31 +385,31 @@ export class MapEditorSession {
   }
 }
 
-export function symmetricMapTiles(size, tiles, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
-  return symmetricTiles(size, tiles, symmetry);
+export function symmetricMapTiles(dimensions, tiles, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
+  return symmetricTiles(dimensions, tiles, symmetry);
 }
 
 /**
  * Expand terrain paint across the selected symmetry while keeping marked-road directions
  * geometrically correct in each reflected or rotated copy.
  */
-export function symmetricTerrainTiles(size, tiles, terrainCode, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
-  return symmetricTiles(size, tiles, symmetry, (tile, transform) => ({
+export function symmetricTerrainTiles(dimensions, tiles, terrainCode, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
+  return symmetricTiles(dimensions, tiles, symmetry, (tile, transform) => ({
     ...tile,
     paintTerrainCode: transformTerrainCode(terrainCode, transform),
   }));
 }
 
-function symmetricTiles(size, tiles, symmetry, decorate = (tile) => tile) {
-  const mapSize = positiveInteger(size);
-  if (!mapSize || !Array.isArray(tiles)) return [];
+function symmetricTiles(dimensions, tiles, symmetry, decorate = (tile) => tile) {
+  const map = normalizeDimensions(dimensions);
+  if (!map || !Array.isArray(tiles)) return [];
   const expanded = [];
   const seen = new Set();
   for (const tile of tiles) {
-    const source = validMapTile(tile, mapSize);
+    const source = validMapTile(tile, map);
     if (!source) continue;
-    for (const transform of SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)]) {
-      const transformed = transformMapTile(source, mapSize, transform);
+    for (const transform of symmetryTransforms(map, symmetry)) {
+      const transformed = transformMapTile(source, map, transform);
       if (!transformed || seen.has(locationKey(transformed))) continue;
       seen.add(locationKey(transformed));
       expanded.push(decorate(transformed, transform));
@@ -393,10 +418,10 @@ function symmetricTiles(size, tiles, symmetry, decorate = (tile) => tile) {
   return expanded;
 }
 
-export function mapEditorRectTiles(first, last, size) {
-  const mapSize = positiveInteger(size);
-  const start = validMapTile(first, mapSize);
-  const end = validMapTile(last, mapSize);
+export function mapEditorRectTiles(first, last, dimensions) {
+  const map = normalizeDimensions(dimensions);
+  const start = validMapTile(first, map);
+  const end = validMapTile(last, map);
   if (!start || !end) return [];
   const tiles = [];
   for (let y = Math.min(start.y, end.y); y <= Math.max(start.y, end.y); y++) {
@@ -414,15 +439,15 @@ export function moveSymmetricDraftLocation(draft, {
   const target = normalizedDraftTile(draft, tile, radius);
   if (!source || !target) return draftEditError("Choose a valid location and map tile.");
   if (sameLocation(source, target)) return { ok: true, count: 0 };
-  const transforms = SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)];
+  const transforms = symmetryTransforms(draftDimensions(draft), symmetry);
   const plannedSources = new Set();
   const plans = [];
   for (const transform of transforms) {
-    const transformedFrom = transformMapTile(source, draft.terrain.length, transform);
+    const transformedFrom = transformMapTile(source, draftDimensions(draft), transform);
     const index = transformedLocationIndex(collection, transformedFrom, plannedSources, symmetry);
     if (index < 0 || plannedSources.has(index)) continue;
     const from = collection[index];
-    const to = transformMapTile(target, draft.terrain.length, transform);
+    const to = transformMapTile(target, draftDimensions(draft), transform);
     if (!draftLocationTileWithinClearance(draft, to, radius)) {
       return draftEditError("That location's symmetric copies do not fit within the map edge clearance.");
     }
@@ -519,11 +544,11 @@ export function removeDraftLocation(draft, { kind = "base", locationIndex = 0 } 
 export function paintDraftRect(draft, rect, terrainCode) {
   const ch = TERRAIN_TO_CHAR[terrainCode];
   if (!ch || !Array.isArray(draft?.terrain) || !draft.terrain.length) return;
-  const size = draft.terrain.length;
-  const x0 = clampTile(Math.min(rect.x0, rect.x1), size);
-  const x1 = clampTile(Math.max(rect.x0, rect.x1), size);
-  const y0 = clampTile(Math.min(rect.y0, rect.y1), size);
-  const y1 = clampTile(Math.max(rect.y0, rect.y1), size);
+  const { width, height } = draftDimensions(draft);
+  const x0 = clampTile(Math.min(rect.x0, rect.x1), width);
+  const x1 = clampTile(Math.max(rect.x0, rect.x1), width);
+  const y0 = clampTile(Math.min(rect.y0, rect.y1), height);
+  const y1 = clampTile(Math.max(rect.y0, rect.y1), height);
   for (let y = y0; y <= y1; y++) {
     const chars = [...draft.terrain[y]];
     for (let x = x0; x <= x1; x++) chars[x] = ch;
@@ -536,10 +561,10 @@ export function protectDraftBaseTerrain(draft) {
   const starts = new Set((draft.startLocations || []).map(locationKey));
   for (const site of draft.baseSites || []) {
     const radius = starts.has(locationKey(site)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES;
-    const size = draft.terrain.length;
-    for (let y = clampTile(site.y - radius, size); y <= clampTile(site.y + radius, size); y++) {
+    const { width, height } = draftDimensions(draft);
+    for (let y = clampTile(site.y - radius, height); y <= clampTile(site.y + radius, height); y++) {
       const chars = [...draft.terrain[y]];
-      for (let x = clampTile(site.x - radius, size); x <= clampTile(site.x + radius, size); x++) {
+      for (let x = clampTile(site.x - radius, width); x <= clampTile(site.x + radius, width); x++) {
         if (!ROAD_TERRAIN_CHARS.has(chars[x])) chars[x] = TERRAIN_TO_CHAR[TERRAIN.GRASS];
       }
       draft.terrain[y] = chars.join("");
@@ -547,20 +572,24 @@ export function protectDraftBaseTerrain(draft) {
   }
 }
 
-export function authoredMapFromMaterialized({ name, description, size, terrain, starts, baseSites }) {
-  const mapSize = Math.max(1, Math.trunc(Number(size)) || 1);
+export function authoredMapFromMaterialized({ name, description, size, width = size, height = size, terrain, starts, baseSites }) {
+  const mapWidth = Math.max(1, Math.trunc(Number(width)) || 1);
+  const mapHeight = Math.max(1, Math.trunc(Number(height)) || 1);
   const codes = Array.from(terrain || []);
-  const terrainRows = Array.from({ length: mapSize }, (_, y) => (
-    Array.from({ length: mapSize }, (_, x) => TERRAIN_TO_CHAR[codes[y * mapSize + x]] || ".").join("")
+  const terrainRows = Array.from({ length: mapHeight }, (_, y) => (
+    Array.from({ length: mapWidth }, (_, x) => TERRAIN_TO_CHAR[codes[y * mapWidth + x]] || ".").join("")
   ));
-  const startLocations = normalizeLocations(starts, mapSize);
-  const bases = normalizeBaseSiteRecords(baseSites, mapSize);
+  const dimensions = { width: mapWidth, height: mapHeight };
+  const startLocations = normalizeLocations(starts, dimensions);
+  const bases = normalizeBaseSiteRecords(baseSites, dimensions);
   for (const start of startLocations) if (!bases.some((site) => sameLocation(site, start))) bases.push(newBaseSite(start));
   const draft = {
-    version: 4,
+    version: 5,
     name: String(name || "Map").trim() || "Map",
     description: String(description || ""),
     _design: "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
+    width: mapWidth,
+    height: mapHeight,
     terrain: terrainRows,
     startLocations,
     baseSites: bases,
@@ -570,46 +599,91 @@ export function authoredMapFromMaterialized({ name, description, size, terrain, 
 }
 
 export function materializedMapsEqual(left, right) {
-  if (!left || !right || left.name !== right.name || left.size !== right.size) return false;
+  if (!left || !right || left.name !== right.name || left.width !== right.width || left.height !== right.height) return false;
   if (!sameFlatArray(left.terrain, right.terrain)) return false;
   return sameLocationSet(left.starts, right.starts) && sameBaseSiteSet(left.baseSites, right.baseSites);
 }
 
 function normalizeDraft(draft) {
   if (!draft || typeof draft !== "object") throw new Error("Map data is invalid.");
-  if (Number(draft.version) !== 4) replaceObject(draft, migrateLegacyDraft(draft));
-  const size = draft.terrain?.length;
-  if (!positiveInteger(size) || !Array.isArray(draft.terrain) || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== size)) {
-    throw new Error("Map terrain must be a square grid.");
+  if (Number(draft.version) !== 5) replaceObject(draft, migrateLegacyDraft(draft));
+  const height = positiveInteger(draft.height);
+  const width = positiveInteger(draft.width);
+  if (!width || !height || !Array.isArray(draft.terrain) || draft.terrain.length !== height || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== width)) {
+    throw new Error("Map terrain rows must match its width and height.");
   }
-  draft.version = 4;
+  draft.version = 5;
   draft.name = String(draft.name || "Map").trim() || "Map";
   draft.description = String(draft.description || "");
   draft._design = String(draft._design || "Flat map locations.");
   draft.terrain = draft.terrain.map((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch] === undefined ? "." : ch).join(""));
-  draft.startLocations = normalizeLocations(draft.startLocations, size).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
-  draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, size);
+  const dimensions = { width, height };
+  draft.width = width;
+  draft.height = height;
+  draft.startLocations = normalizeLocations(draft.startLocations, dimensions).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
+  draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, dimensions);
   protectDraftBaseTerrain(draft);
 }
 
 function migrateLegacyDraft(source) {
   const sites = Array.isArray(source?.sites) ? source.sites : [];
   const byId = new Map(sites.map((site) => [site.id, site]));
-  const starts = normalizeLocations(source?.startLocations, source?.terrain?.length || 0);
+  const dimensions = inferredDraftDimensions(source);
+  const starts = normalizeLocations(source?.startLocations, dimensions);
   for (const layout of source?.layouts || []) for (const slot of layout?.slots || []) {
     const site = byId.get(slot.main);
     if (site && !starts.some((candidate) => sameLocation(candidate, site))) starts.push(copyLocation(site));
   }
   if (!starts.length) for (const site of sites.filter((site) => site.kind === "main")) starts.push(copyLocation(site));
   return {
-    version: 4,
+    version: 5,
     name: source?.name || "Map",
     description: source?.description || "",
     _design: "Migrated map data. Flat locations and per-base resource counts are authoritative.",
+    width: dimensions.width,
+    height: dimensions.height,
     terrain: source?.terrain || [],
     startLocations: starts,
     baseSites: (source?.baseSites || sites).map(copyBaseSite),
   };
+}
+
+function resizeDraftCentered(source, width, height) {
+  const current = draftDimensions(source);
+  const offsetX = Math.floor((width - current.width) / 2);
+  const offsetY = Math.floor((height - current.height) / 2);
+  const terrain = Array.from({ length: height }, () => Array(width).fill(TERRAIN_TO_CHAR[TERRAIN.GRASS]));
+  for (let y = 0; y < current.height; y++) {
+    const targetY = y + offsetY;
+    if (targetY < 0 || targetY >= height) continue;
+    const row = [...source.terrain[y]];
+    for (let x = 0; x < current.width; x++) {
+      const targetX = x + offsetX;
+      if (targetX >= 0 && targetX < width) terrain[targetY][targetX] = row[x];
+    }
+  }
+  const shift = (location) => ({ ...location, x: location.x + offsetX, y: location.y + offsetY });
+  const startLocations = source.startLocations.map(shift);
+  const baseSites = source.baseSites.map(shift);
+  const draft = {
+    ...clone(source),
+    width,
+    height,
+    terrain: terrain.map((row) => row.join("")),
+    startLocations,
+    baseSites,
+  };
+  if (startLocations.some((location) => !draftLocationTileWithinClearance(draft, location, MAP_EDITOR_MAIN_CLEARANCE_TILES))) {
+    return draftEditError("Resize would move a start location inside the map edge clearance.");
+  }
+  const startKeys = new Set(startLocations.map(locationKey));
+  if (baseSites.some((location) => !draftLocationTileWithinClearance(
+    draft,
+    location,
+    startKeys.has(locationKey(location)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES,
+  ))) return draftEditError("Resize would move a base site inside the map edge clearance.");
+  normalizeDraft(draft);
+  return { ok: true, draft };
 }
 
 function locationCollection(draft, kind) { return kind === "start" ? draft?.startLocations : draft?.baseSites; }
@@ -621,17 +695,17 @@ function protectedTerrainTile(draft, x, y) {
     return Math.abs(site.x - x) <= radius && Math.abs(site.y - y) <= radius;
   });
 }
-function normalizeLocations(locations, size) {
+function normalizeLocations(locations, dimensions) {
   const out = [];
   const seen = new Set();
   for (const location of Array.isArray(locations) ? locations : []) {
-    const valid = validMapTile(location, size);
+    const valid = validMapTile(location, dimensions);
     if (valid && !seen.has(locationKey(valid))) { seen.add(locationKey(valid)); out.push(valid); }
   }
   return out;
 }
-function normalizeBaseSites(baseSites, startLocations, size) {
-  const normalized = normalizeBaseSiteRecords(baseSites, size);
+function normalizeBaseSites(baseSites, startLocations, dimensions) {
+  const normalized = normalizeBaseSiteRecords(baseSites, dimensions);
   const startKeys = new Set(startLocations.map(locationKey));
   if (
     normalized.length <= MAP_EDITOR_MAX_BASE_SITES
@@ -646,11 +720,11 @@ function normalizeBaseSites(baseSites, startLocations, size) {
     .slice(0, Math.max(0, availableBaseSlots));
   return [...retainedStarts, ...retainedBases, ...missingStarts.map(newBaseSite)];
 }
-function normalizeBaseSiteRecords(baseSites, size) {
+function normalizeBaseSiteRecords(baseSites, dimensions) {
   const out = [];
   const seen = new Set();
   for (const site of Array.isArray(baseSites) ? baseSites : []) {
-    const valid = validMapTile(site, size);
+    const valid = validMapTile(site, dimensions);
     if (!valid || seen.has(locationKey(valid))) continue;
     seen.add(locationKey(valid));
     out.push({
@@ -662,16 +736,20 @@ function normalizeBaseSiteRecords(baseSites, size) {
   return out;
 }
 function normalizedDraftTile(draft, tile, radius) {
-  const size = draft?.terrain?.length || 0;
-  const valid = validMapTile(tile, size);
-  if (!valid || size <= radius * 2) return null;
-  return { x: Math.max(radius, Math.min(size - radius - 1, valid.x)), y: Math.max(radius, Math.min(size - radius - 1, valid.y)) };
+  const dimensions = draftDimensions(draft);
+  const valid = validMapTile(tile, dimensions);
+  if (!valid || dimensions.width <= radius * 2 || dimensions.height <= radius * 2) return null;
+  return {
+    x: Math.max(radius, Math.min(dimensions.width - radius - 1, valid.x)),
+    y: Math.max(radius, Math.min(dimensions.height - radius - 1, valid.y)),
+  };
 }
 function symmetricDraftLocationTiles(draft, tile, symmetry, radius) {
   const locations = [];
   const seen = new Set();
-  for (const transform of SYMMETRY_TRANSFORMS[normalizeMapEditorSymmetry(symmetry)]) {
-    const transformed = transformMapTile(tile, draft.terrain.length, transform);
+  const dimensions = draftDimensions(draft);
+  for (const transform of symmetryTransforms(dimensions, symmetry)) {
+    const transformed = transformMapTile(tile, dimensions, transform);
     if (!draftLocationTileWithinClearance(draft, transformed, radius)) return null;
     const key = locationKey(transformed);
     if (!seen.has(key)) {
@@ -682,13 +760,13 @@ function symmetricDraftLocationTiles(draft, tile, symmetry, radius) {
   return locations;
 }
 function draftLocationTileWithinClearance(draft, tile, radius) {
-  const size = draft?.terrain?.length || 0;
-  const valid = validMapTile(tile, size);
+  const { width, height } = draftDimensions(draft);
+  const valid = validMapTile(tile, { width, height });
   return !!valid
     && valid.x >= radius
     && valid.y >= radius
-    && valid.x < size - radius
-    && valid.y < size - radius;
+    && valid.x < width - radius
+    && valid.y < height - radius;
 }
 function transformedLocationIndex(collection, target, excluded, symmetry) {
   if (!target) return -1;
@@ -715,35 +793,61 @@ function transformedLocationIndex(collection, target, excluded, symmetry) {
   }
   return nearest;
 }
-function validMapTile(tile, size) {
+function validMapTile(tile, dimensions) {
+  const map = normalizeDimensions(dimensions);
+  if (!map) return null;
   const x = Math.trunc(Number(tile?.x)); const y = Math.trunc(Number(tile?.y));
-  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < size && y < size ? { x, y } : null;
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < map.width && y < map.height ? { x, y } : null;
 }
-function transformMapTile(tile, size, transform) {
+function transformMapTile(tile, dimensions, transform) {
   if (!tile) return null;
-  const max = size - 1;
-  if (transform === "horizontal") return { x: tile.x, y: max - tile.y };
-  if (transform === "vertical") return { x: max - tile.x, y: tile.y };
-  if (transform === "rotate90") return { x: max - tile.y, y: tile.x };
-  if (transform === "rotate120") return rotateAndSnapMapTile(tile, size, -0.5, SIN_120);
-  if (transform === "rotate180") return { x: max - tile.x, y: max - tile.y };
-  if (transform === "rotate240") return rotateAndSnapMapTile(tile, size, -0.5, -SIN_120);
-  if (transform === "rotate270") return { x: tile.y, y: max - tile.x };
+  const map = normalizeDimensions(dimensions);
+  if (!map) return null;
+  const maxX = map.width - 1;
+  const maxY = map.height - 1;
+  if (transform === "horizontal") return { x: tile.x, y: maxY - tile.y };
+  if (transform === "vertical") return { x: maxX - tile.x, y: tile.y };
+  if (transform === "rotate90") return map.width === map.height ? { x: maxX - tile.y, y: tile.x } : null;
+  if (transform === "rotate120") return map.width === map.height ? rotateAndSnapMapTile(tile, map, -0.5, SIN_120) : null;
+  if (transform === "rotate180") return { x: maxX - tile.x, y: maxY - tile.y };
+  if (transform === "rotate240") return map.width === map.height ? rotateAndSnapMapTile(tile, map, -0.5, -SIN_120) : null;
+  if (transform === "rotate270") return map.width === map.height ? { x: tile.y, y: maxY - tile.x } : null;
   if (transform === "diagonalMain") return { x: tile.y, y: tile.x };
-  if (transform === "diagonalAnti") return { x: max - tile.y, y: max - tile.x };
+  if (transform === "diagonalAnti") return { x: maxX - tile.y, y: maxY - tile.x };
   return copyLocation(tile);
 }
-function rotateAndSnapMapTile(tile, size, cosine, sine) {
-  const centre = (size - 1) / 2;
-  const dx = tile.x - centre;
-  const dy = tile.y - centre;
+function rotateAndSnapMapTile(tile, dimensions, cosine, sine) {
+  const map = normalizeDimensions(dimensions);
+  const centreX = (map.width - 1) / 2;
+  const centreY = (map.height - 1) / 2;
+  const dx = tile.x - centreX;
+  const dy = tile.y - centreY;
   const rotated = {
-    x: Math.round(centre + dx * cosine - dy * sine),
-    y: Math.round(centre + dx * sine + dy * cosine),
+    x: Math.round(centreX + dx * cosine - dy * sine),
+    y: Math.round(centreY + dx * sine + dy * cosine),
   };
   // A square has no exact three-fold rotational symmetry. Keep the closest tile-centre
   // projection when it remains on the map and omit copies that rotate beyond its corners.
-  return validMapTile(rotated, size);
+  return validMapTile(rotated, map);
+}
+
+export function mapEditorSymmetrySupported(dimensions, symmetry) {
+  const map = normalizeDimensions(dimensions);
+  if (!map) return false;
+  const normalized = normalizeMapEditorSymmetry(symmetry);
+  return map.width === map.height || ![
+    MAP_EDITOR_SYMMETRY.THREE_WAY,
+    MAP_EDITOR_SYMMETRY.RADIAL,
+    MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN,
+    MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI,
+  ].includes(normalized);
+}
+
+function symmetryTransforms(dimensions, symmetry) {
+  const normalized = normalizeMapEditorSymmetry(symmetry);
+  return mapEditorSymmetrySupported(dimensions, normalized)
+    ? SYMMETRY_TRANSFORMS[normalized]
+    : SYMMETRY_TRANSFORMS[MAP_EDITOR_SYMMETRY.NONE];
 }
 function transformTerrainCode(code, transform) {
   if (transform === "rotate120" || transform === "rotate240") {
@@ -824,10 +928,35 @@ function draftFingerprint(draft) { return JSON.stringify(draft); }
 function clone(value) { return structuredCloneSafe(value); }
 function structuredCloneSafe(value) { return typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value)); }
 function replaceObject(target, source) { for (const key of Object.keys(target)) delete target[key]; Object.assign(target, clone(source)); }
-function positiveInteger(value) { const number = Math.trunc(Number(value)); return Number.isInteger(number) && number > 0 ? number : 0; }
+function positiveInteger(value) { const number = Number(value); return Number.isInteger(number) && number > 0 ? number : 0; }
+function validEditorDimension(value) { return value >= MAP_EDITOR_MIN_SIZE && value <= MAP_EDITOR_MAX_SIZE; }
+function boundedMapDimension(value) {
+  return Math.max(MAP_EDITOR_MIN_SIZE, Math.min(MAP_EDITOR_MAX_SIZE, Math.trunc(Number(value)) || MAP_EDITOR_DEFAULT_SIZE));
+}
+function inferredDraftDimensions(draft) {
+  const height = positiveInteger(draft?.height) || (Array.isArray(draft?.terrain) ? draft.terrain.length : 0);
+  const inferredWidth = Array.isArray(draft?.terrain) && typeof draft.terrain[0] === "string"
+    ? [...draft.terrain[0]].length
+    : 0;
+  return {
+    width: positiveInteger(draft?.width) || inferredWidth,
+    height,
+  };
+}
+function draftDimensions(draft) { return normalizeDimensions({ width: draft?.width, height: draft?.height }) || { width: 0, height: 0 }; }
+function normalizeDimensions(value) {
+  if (typeof value === "number") {
+    const size = positiveInteger(value);
+    return size ? { width: size, height: size } : null;
+  }
+  const width = positiveInteger(value?.width);
+  const height = positiveInteger(value?.height);
+  return width && height ? { width, height } : null;
+}
 function clampTile(value, size) { return Math.max(0, Math.min(size - 1, Math.trunc(value))); }
 function draftEditError(error) { return { ok: false, error }; }
-function storageKey(key) { return `rts.map-editor.v4.${String(key || "default")}`; }
+function storageKey(key) { return `rts.map-editor.v5.${String(key || "default")}`; }
+function legacyV4StorageKey(key) { return `rts.map-editor.v4.${String(key || "default")}`; }
 function legacyV3StorageKey(key) { return `rts.map-editor.v3.${String(key || "default")}`; }
 function legacyStorageKey(key) { return `rts.mapEditor.${String(key || "default")}.v2`; }
 function defaultStorage() { try { return globalThis.localStorage || null; } catch { return null; } }
