@@ -137,7 +137,7 @@ fn checkpoint_lab_scenario_export_matches_direct_state() {
         .all(|entry| entry.old_id == entry.new_id));
     assert_eq!(
         checkpoint.map.data.terrain.len(),
-        (checkpoint.map.data.width * checkpoint.map.data.width) as usize
+        (checkpoint.map.data.width * checkpoint.map.data.height) as usize
     );
     assert!(
         !checkpoint.checkpoint_payload.contains("\"terrain\""),

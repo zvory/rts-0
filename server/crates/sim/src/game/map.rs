@@ -414,7 +414,8 @@ mod tests {
         for player_count in 1..=4 {
             let map = Map::generate(player_count, 0x1234_5678);
             assert_eq!(map.width, 126);
-            assert_eq!(map.terrain.len(), (map.width * map.width) as usize);
+            assert_eq!(map.height, 126);
+            assert_eq!(map.terrain.len(), (map.width * map.height) as usize);
             assert_eq!(map.starts.len(), player_count);
             assert!(!map.base_sites.is_empty());
 

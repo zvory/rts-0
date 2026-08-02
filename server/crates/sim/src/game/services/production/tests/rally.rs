@@ -95,7 +95,7 @@ fn simultaneous_production_reserves_distinct_rally_tiles() {
 #[test]
 fn produced_unit_uses_nearest_reachable_free_rally_tile() {
     let mut map = flat_map(32);
-    for ty in 0..map.width {
+    for ty in 0..map.height {
         let index = map.index(16, ty);
         map.terrain[index] = terrain::ROCK;
     }
