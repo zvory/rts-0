@@ -307,7 +307,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   including passability, construction, cover, concealment, and line of sight.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
-- Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 75` (~2.5s) and
+- Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 113` (~3.77s) and
   `ANTI_TANK_GUN_TEARDOWN_TICKS = 45` (~1.5s).
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
   `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
