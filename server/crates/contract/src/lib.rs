@@ -289,8 +289,10 @@ pub struct MapInfo {
     /// Positions of all neutral resource nodes (steel/oil). Included so the
     /// client can render them on the minimap before fog-of-war reveals them.
     pub resources: Vec<ResourceNode>,
-    /// Authored map objects sent once at match start. Tree records also provide authoritative
-    /// trunk collision/pathing inputs; Tank Trap records materialize as ordinary neutral entities.
+    /// Static authored map objects sent once at match start. Tree records also provide
+    /// authoritative trunk collision/pathing inputs. Entity-backed authored objects such as Tank
+    /// Traps are excluded from this client-visible projection and arrive through fog-filtered
+    /// snapshots instead.
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
 }

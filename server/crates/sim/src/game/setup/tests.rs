@@ -356,6 +356,10 @@ fn authored_tank_trap_doodads_spawn_completed_neutral_entities() {
     assert_eq!(trap.owner, 0);
     assert_eq!((trap.pos_x, trap.pos_y), (x, y));
     assert!(!trap.under_construction());
+    assert!(
+        game.start_payload().map.doodads.is_empty(),
+        "entity-backed authored objects must not reveal their positions outside fog"
+    );
 }
 
 #[test]

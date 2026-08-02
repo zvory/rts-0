@@ -531,10 +531,11 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ],
-    // Authored map objects, canonicalized by ascending nonzero id. Tree records have
-    // authoritative tiny trunk collision; wildflowers are inert; unit.tank_trap records spawn
-    // completed neutral Tank Trap entities. Coordinates are integer world pixels. color is
-    // allowed only on wildflowers.
+    // Static authored map objects, canonicalized by ascending nonzero id. Tree records have
+    // authoritative tiny trunk collision and wildflowers are inert. Entity-backed authored
+    // objects such as unit.tank_trap are omitted so their positions arrive only through
+    // fog-filtered entity snapshots. Coordinates are integer world pixels. color is allowed only
+    // on wildflowers.
     doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only

@@ -400,7 +400,17 @@ impl Game {
             tile_size: config::TILE_SIZE,
             terrain: self.state.map.terrain.clone(),
             resources,
-            doodads: self.state.map.doodads.clone(),
+            // Entity-backed authored objects must not bypass fog through the shared start payload.
+            // They remain in the authoritative map for Lab/editor round-tripping, while clients
+            // learn about their live entities only through recipient-filtered snapshots.
+            doodads: self
+                .state
+                .map
+                .doodads
+                .iter()
+                .filter(|doodad| !crate::game::map::doodads::is_tank_trap(doodad))
+                .cloned()
+                .collect(),
         };
         let players = self
             .state
