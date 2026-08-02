@@ -72,10 +72,23 @@ const LIVE_RIG_SOURCES = Object.freeze([
   [KIND.WORKER, WORKER_RIG_SVG],
 ]);
 
-const WORKER_UNIT_PARTS = Object.freeze([
+const GOLEM_UNIT_PARTS = Object.freeze([
   "part.body",
   "part.busyIndicator",
   "part.facingTick",
+]);
+
+const WORKER_UNIT_PARTS = Object.freeze([
+  "part.body",
+  "part.head",
+  "part.shoulders",
+  "part.wrench.shaft",
+  "part.wrench.shaftHighlight",
+  "part.wrench.collar",
+  "part.wrench.headBack",
+  "part.wrench.jawCut",
+  "part.wrench.headHighlight",
+  "part.busyIndicator",
 ]);
 
 const TANK_UNIT_PARTS = Object.freeze([
@@ -170,7 +183,7 @@ const LIVE_RIG_PARTS = Object.freeze({
   [KIND.EKAT]: EKAT_PARTS,
   [KIND.GOLEM]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
-    unit: WORKER_UNIT_PARTS,
+    unit: GOLEM_UNIT_PARTS,
   }),
   [KIND.MACHINE_GUNNER]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
