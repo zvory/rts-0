@@ -116,10 +116,27 @@ function requireRegularFile(filename, label, maxBytes = MAX_SOURCE_BYTES) {
 
 function readPng(filename, label) {
   requireRegularFile(filename, label);
+  const contents = fs.readFileSync(filename);
+  const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (
+    contents.length < 24 ||
+    !contents.subarray(0, pngSignature.length).equals(pngSignature) ||
+    contents.toString("ascii", 12, 16) !== "IHDR"
+  ) {
+    throw new Error(`${label} is not a readable PNG: missing PNG signature or IHDR`);
+  }
+  const declaredWidth = contents.readUInt32BE(16);
+  const declaredHeight = contents.readUInt32BE(20);
+  if (
+    declaredWidth < 2 || declaredHeight < 2 ||
+    declaredWidth > Math.floor(MAX_PIXELS / declaredHeight)
+  ) {
+    throw new Error(`${label} dimensions are outside the supported capture bound`);
+  }
   let png;
-  try { png = PNG.sync.read(fs.readFileSync(filename)); }
+  try { png = PNG.sync.read(contents); }
   catch (error) { throw new Error(`${label} is not a readable PNG: ${error.message}`); }
-  if (png.width < 2 || png.height < 2 || png.width * png.height > MAX_PIXELS) {
+  if (png.width !== declaredWidth || png.height !== declaredHeight) {
     throw new Error(`${label} dimensions are outside the supported capture bound`);
   }
   return png;

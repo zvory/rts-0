@@ -83,6 +83,18 @@ try {
   const composed = path.join(root, "comparison.mp4");
   solidPng(before, 200, 20, 20);
   solidPng(after, 20, 20, 200);
+  const oversized = path.join(root, "oversized.png");
+  const oversizedHeader = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(oversizedHeader);
+  oversizedHeader.write("IHDR", 12, "ascii");
+  oversizedHeader.writeUInt32BE(100_000, 16);
+  oversizedHeader.writeUInt32BE(100_000, 20);
+  fs.writeFileSync(oversized, oversizedHeader);
+  assert.throws(
+    () => composeBeforeAfter({ before: oversized, after, output: composed }),
+    /dimensions are outside the supported capture bound/,
+    "oversized declared dimensions are rejected before PNG decoding",
+  );
   const probe = composeBeforeAfter({ before, after, output: composed });
   assert.equal(probe.codec, "h264");
   assert(probe.duration >= 3.9 && probe.duration <= 4.1);
