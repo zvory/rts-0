@@ -1,4 +1,8 @@
-import { PRESENTATION_FRAME_VERSION, STATIC_MAP_PRESENTATION_VERSION } from "../presentation/frame.js";
+import {
+  MAX_PRESENTED_DOODADS,
+  PRESENTATION_FRAME_VERSION,
+  STATIC_MAP_PRESENTATION_VERSION,
+} from "../presentation/frame.js";
 
 export const RENDER_WORKER_MESSAGE_VERSION = 1;
 export const RENDER_WORKER_MESSAGE = Object.freeze({
@@ -52,6 +56,7 @@ export function createMapGenerationMessage(staticMap) {
       tileSizePx: positiveFinite(staticMap.tileSizePx, "map tileSizePx"),
       terrain: gridRecord(staticMap.terrain, terrain),
       resourceSites: clonePlain(staticMap.resourceSites || []),
+      doodads: clonePlain(staticMap.doodads || []),
     },
   }, [terrain.buffer]);
 }
@@ -161,6 +166,7 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
     case RENDER_WORKER_MESSAGE.MAP_GENERATION:
       validateGrid(payload?.map?.terrain, "terrain");
       requireId(payload?.map?.revision, "map revision", { allowZero: false });
+      validateDoodads(payload?.map?.doodads);
       break;
     case RENDER_WORKER_MESSAGE.REVISIONED_GRIDS:
       if (!payload?.revisions?.visible && !payload?.revisions?.explored) {
@@ -288,6 +294,26 @@ function validateGrid(grid, label, valuesOptional = false) {
   if (!valuesOptional || grid.values != null) {
     if (!(grid?.values instanceof Uint8Array) || grid.values.length !== grid.width * grid.height) {
       throw new TypeError(`${label} grid requires a shape-matched Uint8Array`);
+    }
+  }
+}
+
+function validateDoodads(records) {
+  if (!Array.isArray(records) || records.length > MAX_PRESENTED_DOODADS) {
+    throw new TypeError("static map doodads must be a bounded array");
+  }
+  const ids = new Set();
+  for (const record of records) {
+    requireId(record?.id, "doodad id", { allowZero: false });
+    if (ids.has(record.id)) throw new TypeError("static map doodad ids must be unique");
+    ids.add(record.id);
+    if (typeof record?.typeId !== "string" || !record.typeId || record.typeId.length > 80) {
+      throw new TypeError("static map doodad typeId must be bounded text");
+    }
+    nonNegativeFinite(record?.x, "doodad x");
+    nonNegativeFinite(record?.y, "doodad y");
+    if (record.color != null && (typeof record.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(record.color))) {
+      throw new TypeError("static map doodad color must be #RRGGBB");
     }
   }
 }

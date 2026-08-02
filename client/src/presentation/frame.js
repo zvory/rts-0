@@ -8,6 +8,25 @@ import { createRendererProjectionRecord } from "./projection_record.js";
 
 export const PRESENTATION_FRAME_VERSION = 2;
 export const STATIC_MAP_PRESENTATION_VERSION = 2;
+export const MAX_PRESENTED_DOODADS = 4096;
+
+const STATIC_DOODAD_TYPES = new Set([
+  "tree.oak",
+  "tree.oak.topdown",
+  "tree.pine",
+  "tree.pine.topdown",
+  "tree.birch",
+  "tree.birch.topdown",
+  "tree.spruce",
+  "tree.spruce.topdown",
+  "tree.aspen",
+  "tree.aspen.topdown",
+  "tree.alder",
+  "tree.alder.topdown",
+  "wildflower.single",
+  "wildflower.cluster",
+]);
+const DOODAD_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 const FEEDBACK_ARRAYS = Object.freeze([
   ["commandFeedback", "command"],
@@ -257,6 +276,10 @@ export class PresentationFrameAssembler {
         // Malformed static resource records are omitted; dynamic assembly diagnostics remain bounded.
       }
     }
+    const doodads = normalizeStaticDoodads(map?.doodads, {
+      widthPx: width * tileSizePx,
+      heightPx: height * tileSizePx,
+    });
     this._mapSource = map;
     this._staticMap = Object.freeze({
       version: STATIC_MAP_PRESENTATION_VERSION,
@@ -267,8 +290,32 @@ export class PresentationFrameAssembler {
       tileSizePx,
       terrain,
       resourceSites: Object.freeze(resourceSites),
+      doodads,
     });
   }
+}
+
+function normalizeStaticDoodads(values, { widthPx, heightPx }) {
+  if (!Array.isArray(values)) return Object.freeze([]);
+  const records = [];
+  const ids = new Set();
+  for (const value of values) {
+    if (records.length >= MAX_PRESENTED_DOODADS) break;
+    const id = Number(value?.id);
+    const typeId = typeof value?.typeId === "string" ? value.typeId : "";
+    const x = Number(value?.x);
+    const y = Number(value?.y);
+    if (!Number.isSafeInteger(id) || id <= 0 || ids.has(id)) continue;
+    if (!STATIC_DOODAD_TYPES.has(typeId)) continue;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > widthPx || y > heightPx) continue;
+    const record = { id, typeId, x, y };
+    if (DOODAD_COLOR_RE.test(value?.color || "") && typeId.startsWith("wildflower.")) {
+      record.color = value.color.toLowerCase();
+    }
+    ids.add(id);
+    records.push(detachedRecord(record));
+  }
+  return Object.freeze(records);
 }
 
 function entityRecord(entity, {

@@ -130,6 +130,7 @@ async function initialize(message) {
   if (renderer.app?.renderer?.type !== pixi.RendererType.WEBGL) {
     throw new Error("Pixi worker initialized a non-WebGL backend.");
   }
+  await renderer.waitForDoodadAssets();
   if (surface === "mapEditor") {
     adapter = new MapEditorWorkerRenderer(renderer);
   } else {
@@ -152,7 +153,7 @@ async function initialize(message) {
     resolution: renderer.app.renderer.resolution,
     width: renderer.app.renderer.width,
     height: renderer.app.renderer.height,
-    assets: surface === "match" ? renderer.captureReadiness({}) : { ready: true },
+    assets: surface === "match" ? renderer.captureReadiness({}) : renderer.doodadReadiness(),
   });
 }
 
@@ -261,7 +262,7 @@ function epochNow() {
 }
 
 function readinessSnapshot() {
-  if (surface === "mapEditor") return { ready: true };
+  if (surface === "mapEditor") return renderer.doodadReadiness();
   return {
     ...renderer.captureReadiness({}),
     groundDecals: renderer.groundDecalDiagnostics(),

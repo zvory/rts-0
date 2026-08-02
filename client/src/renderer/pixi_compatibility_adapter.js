@@ -267,6 +267,7 @@ function materializeStaticMap(staticMap) {
     tileSize: staticMap.tileSizePx,
     terrain,
     resources: staticMap.resourceSites.map((resource) => ({ ...resource })),
+    doodads: (staticMap.doodads || []).map((doodad) => ({ ...doodad })),
   };
 }
 
@@ -278,6 +279,7 @@ function buildCameraFacade(projection) {
     zoom: queries.state.zoom,
     snapshot: queries.snapshot,
     projectedExtent: queries.projectedExtent,
+    containsProjected: queries.containsProjected,
   });
 }
 

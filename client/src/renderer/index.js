@@ -5,9 +5,9 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 // positioned/scaled from the Camera each frame, plus a screen-space overlay layer
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
-//   terrain → decals → trenches → visual-samples → resources → building-shadows → buildings
+//   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
-//   → units → smokes → selection-rings → hp-bars → fog → visual-sample-labels
+//   → units → doodad-canopies → smokes → selection-rings → hp-bars → fog → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → feedback/miss-toasts → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
@@ -86,7 +86,8 @@ import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_rout
 import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
-import { buildStaticMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
+import { DoodadLayer } from "./doodad_layer.js";
+import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
@@ -169,6 +170,13 @@ export class Renderer {
       this.layers[name] = c;
       this.world.addChild(c);
     }
+    this._assetReadiness = new Map();
+    this._doodads = new DoodadLayer({
+      pixi: PIXI,
+      understoryLayer: this.layers.doodadUnderstory,
+      canopyLayer: this.layers.doodadCanopies,
+      trackAsset: (id, promise, metadata) => this._trackVisualAsset(id, promise, metadata),
+    });
     this._groundDecals = new GroundDecalLayer({
       layer: this.layers.decals,
       pixi: PIXI,
@@ -272,7 +280,6 @@ export class Renderer {
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
     this._livePngRigAtlasesByKind = createLivePngRigAtlases();
     this._livePngRigAtlasTextures = new Map();
-    this._assetReadiness = new Map();
     this._missingTextureEntityIds = new Set();
     this._renderFrameCount = 0;
     this._lastRenderErrorFrame = -1;
@@ -429,6 +436,29 @@ export class Renderer {
     };
   }
 
+  doodadReadiness() {
+    const assetIds = this._doodads?.assetIds || new Set();
+    const assets = [...this._assetReadiness.values()]
+      .filter((asset) => assetIds.has(asset.id))
+      .map((asset) => ({
+        id: asset.id,
+        kind: asset.kind || null,
+        source: asset.source,
+        status: asset.status,
+        message: asset.message || null,
+      }));
+    return {
+      assets,
+      ready: assets.length === assetIds.size && assets.every((asset) => asset.status === "ready"),
+      failedAssets: assets.filter((asset) => asset.status === "failed"),
+      pendingAssets: assets.filter((asset) => asset.status === "pending"),
+    };
+  }
+
+  waitForDoodadAssets() {
+    return this._doodads?.ready?.() || Promise.resolve(true);
+  }
+
   _storeLoadedTexture(map, key, texture) {
     if (this._destroyed) {
       destroyRendererOwnedTexture(texture);
@@ -480,6 +510,7 @@ export class Renderer {
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
+    time("renderer.doodads", () => this._doodads?.update(this.visualNow(), camera));
 
     // Begin a fresh reconciliation pass.
     for (const key of Object.keys(this._seen)) this._seen[key].clear();
@@ -1147,6 +1178,8 @@ export class Renderer {
     this._trenchDecals = null;
     this._visualSamples?.destroy();
     this._visualSamples = null;
+    this._doodads?.destroy();
+    this._doodads = null;
 
     // Cached terrain sprite + its generated texture.
     if (this._terrainSprite) {
@@ -1175,8 +1208,28 @@ function destroyRendererOwnedTexture(texture) {
   texture.source?.destroy?.();
 }
 
+function buildStaticMapWithDoodads(map) {
+  buildStaticTerrainMap.call(this, map);
+  this._doodads?.replace(map?.doodads || []);
+}
+
+function replaceStaticDoodads(records) {
+  return this._doodads?.replace(records) || 0;
+}
+
+function patchStaticDoodads(update) {
+  return this._doodads?.patch(update) || 0;
+}
+
+function updateStaticDoodadWind(visualTimeMs, camera) {
+  return this._doodads?.update(visualTimeMs, camera) || 0;
+}
+
 Object.assign(Renderer.prototype, {
-  buildStaticMap,
+  buildStaticMap: buildStaticMapWithDoodads,
+  replaceStaticDoodads,
+  patchStaticDoodads,
+  updateStaticDoodadWind,
   previewStaticTerrain,
   updateStaticTerrainTiles,
   _initGroundDecalsForMap,

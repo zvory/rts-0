@@ -22,6 +22,7 @@ export function createWorkerPresentationState() {
         ...map,
         generation: message.generation,
         terrain: gridSnapshot(map.terrain),
+        doodads: Object.freeze((map.doodads || []).map((record) => Object.freeze({ ...record }))),
       });
       return staticMap;
     },
