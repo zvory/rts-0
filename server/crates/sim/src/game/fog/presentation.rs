@@ -5,7 +5,7 @@ use super::Fog;
 impl Fog {
     /// Build a temporary fog view where `viewer` can see every tile visible to any of `players`.
     pub fn union_for(&self, viewer: u32, players: &[u32]) -> Self {
-        let cells = (self.size * self.size) as usize;
+        let cells = self.width.saturating_mul(self.height) as usize;
         let mut union = vec![false; cells];
         let mut explored_union = vec![false; cells];
         for player in players {
@@ -21,7 +21,7 @@ impl Fog {
             }
         }
 
-        let mut fog = Fog::new(self.size);
+        let mut fog = Fog::new(self.width, self.height);
         fog.grids.insert(viewer, union);
         fog.explored_grids.insert(viewer, explored_union);
         fog
@@ -31,7 +31,7 @@ impl Fog {
     /// because an enemy fired from them. Firing reveals remain in [`Self::union_for`] so combat
     /// and command validation keep using the actionable grid.
     pub(in crate::game) fn presentation_union_for(&self, viewer: u32, players: &[u32]) -> Self {
-        let cells = (self.size * self.size) as usize;
+        let cells = self.width.saturating_mul(self.height) as usize;
         let mut union = vec![false; cells];
         let mut explored_union = vec![false; cells];
         for player in players {
@@ -50,7 +50,7 @@ impl Fog {
             }
         }
 
-        let mut fog = Fog::new(self.size);
+        let mut fog = Fog::new(self.width, self.height);
         fog.grids.insert(viewer, union);
         fog.explored_grids.insert(viewer, explored_union);
         fog
@@ -61,7 +61,7 @@ impl Fog {
         &mut self,
         viewer_sources: &[(u32, Vec<u32>)],
     ) {
-        let cells = self.size.saturating_mul(self.size) as usize;
+        let cells = self.width.saturating_mul(self.height) as usize;
         for (viewer, sources) in viewer_sources {
             let mut current_union = vec![false; cells];
             for source in sources {

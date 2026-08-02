@@ -461,8 +461,8 @@ fn eject_worker_from_static_overlap(map: &Map, entities: &mut EntityStore, worke
     }
 
     let mut destination: Option<((f32, f32), f32)> = None;
-    for ty in 0..map.size {
-        for tx in 0..map.size {
+    for ty in 0..map.height {
+        for tx in 0..map.width {
             let (cx, cy) = map.tile_center(tx, ty);
             if !standability::unit_static_standable(map, &occ, wkind, cx, cy) {
                 continue;
@@ -502,7 +502,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let mut active_sites = BTreeSet::new();
         construction_system(
             &map,
@@ -588,7 +588,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let mut active_sites = BTreeSet::new();
         construction_system(
             &map,
@@ -705,7 +705,7 @@ mod tests {
         let starting_oil = players[0].oil;
         let mut events = HashMap::new();
 
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let mut active_sites = BTreeSet::new();
         construction_system(
             &map,
@@ -809,7 +809,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let mut active_sites = BTreeSet::new();
         construction_system(
             &map,
@@ -864,7 +864,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let mut active_sites = BTreeSet::new();
         construction_system(
             &map,
@@ -930,7 +930,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let mut active_sites = BTreeSet::new();
         construction_system(
             &map,
@@ -1046,7 +1046,8 @@ mod tests {
 
     pub(super) fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![],
             ..Default::default()

@@ -17,7 +17,7 @@ fn apply_test_damage_with_weapon(
     range_px: f32,
 ) {
     let map = Map::generate(2, 0x00C0_FFEE);
-    let fog = Fog::new(map.size);
+    let fog = Fog::new(map.width, map.height);
     let smokes = SmokeCloudStore::new();
     let mut rng = SmallRng::seed_from_u64(0);
     let blockers = ShotBlockerIndex::build(&map, entities);

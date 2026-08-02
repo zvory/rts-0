@@ -940,8 +940,11 @@ fn expanded_body(body: UnitBody, extra_px: f32) -> UnitBody {
 
 fn body_hits_static_blocker(map: &Map, occ: &Occupancy, kind: EntityKind, body: UnitBody) -> bool {
     let aabb = body.aabb();
-    let world_size = map.world_size_px();
-    if aabb.min_x < 0.0 || aabb.min_y < 0.0 || aabb.max_x > world_size || aabb.max_y > world_size {
+    if aabb.min_x < 0.0
+        || aabb.min_y < 0.0
+        || aabb.max_x > map.world_width_px()
+        || aabb.max_y > map.world_height_px()
+    {
         return true;
     }
 
@@ -998,7 +1001,7 @@ mod tests {
             .scout_car_reverse_waypoint = Some(intermediate);
 
         let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         let entity = entities
             .get(scout)
             .expect("scout car should still exist")

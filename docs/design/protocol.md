@@ -1365,10 +1365,11 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV4,
+  authoredMap: AuthoredMapV5,
   materializedMap: {
     name: string,
-    size: u32,
+    width: u32,
+    height: u32,
     terrain: u8[],
     starts: LabMapTile[],
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[]
@@ -1378,9 +1379,11 @@ POST /api/map-handoffs
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV4 }
+ | { destination: "editor", authoredMap: AuthoredMapV5 }
 ```
-`AuthoredMapV4` has flat `startLocations` and `baseSites` arrays. Start locations determine the
+`AuthoredMapV5` declares independent `width` and `height` tile dimensions, whose product must
+exactly match the row-major terrain body, and has flat `startLocations` and `baseSites` arrays.
+Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
 counts. Creation validates the complete authored-map schema and binds its terrain, locations, and
@@ -1407,7 +1410,8 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
     contentHash: string,
     materializedHash: string,
     data: {
-      size: u32,
+      width: u32,
+      height: u32,
       terrain: u8[],
       starts: [{ x: u32, y: u32 }],
       baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }]

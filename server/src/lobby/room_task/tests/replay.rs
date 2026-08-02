@@ -49,11 +49,11 @@ fn spawn_hidden_replay_depot_and_scout_position(
     viewers: [u32; 2],
 ) -> (u32, (f32, f32)) {
     let current_view = game.snapshot_for_spectator(&viewers);
-    let map_size = (current_view.visible_tiles.len() as f64).sqrt() as u32;
-    for tile_y in 0..map_size {
-        for tile_x in 0..map_size {
+    let map = game.start_payload().map;
+    for tile_y in 0..map.height {
+        for tile_x in 0..map.width {
             let depot_pos = tile_center(tile_x, tile_y);
-            let tile_index = (tile_y * map_size + tile_x) as usize;
+            let tile_index = (tile_y * map.width + tile_x) as usize;
             if current_view.visible_tiles.get(tile_index).copied() != Some(0) {
                 continue;
             }
@@ -78,8 +78,8 @@ fn spawn_hidden_replay_depot_and_scout_position(
                     let scout_y = tile_y as i32 + offset_y;
                     if scout_x < 0
                         || scout_y < 0
-                        || scout_x >= map_size as i32
-                        || scout_y >= map_size as i32
+                        || scout_x >= map.width as i32
+                        || scout_y >= map.height as i32
                     {
                         continue;
                     }

@@ -6,7 +6,8 @@ use rts_contract::{InitialCamera, LabVisionMode};
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LabMapDraft {
     pub name: String,
-    pub size: u32,
+    pub width: u32,
+    pub height: u32,
     pub terrain: Vec<u8>,
     pub starts: Vec<LabMapTile>,
     pub base_sites: Vec<LabBaseSite>,
@@ -73,7 +74,8 @@ pub struct LabCheckpointScenarioMap {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LabCheckpointScenarioMapData {
-    pub size: u32,
+    pub width: u32,
+    pub height: u32,
     pub terrain: Vec<u8>,
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
@@ -138,8 +140,9 @@ mod tests {
     #[test]
     fn checkpoint_map_data_uses_per_base_resource_counts() {
         let data = LabCheckpointScenarioMapData {
-            size: 16,
-            terrain: vec![0; 16 * 16],
+            width: 16,
+            height: 12,
+            terrain: vec![0; 16 * 12],
             starts: vec![LabScenarioTile { x: 4, y: 4 }],
             base_sites: vec![LabScenarioBaseSite {
                 x: 12,
@@ -154,8 +157,9 @@ mod tests {
         assert!(serialized.get("expansionSites").is_none());
 
         let encoded = serde_json::json!({
-            "size": 16,
-            "terrain": vec![0; 16 * 16],
+            "width": 16,
+            "height": 12,
+            "terrain": vec![0; 16 * 12],
             "starts": [{ "x": 4, "y": 4 }],
             "baseSites": [{
                 "x": 12,

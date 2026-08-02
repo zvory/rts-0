@@ -21,7 +21,7 @@ impl DerivedState {
         pathing_cache_capacity: usize,
     ) -> Self {
         DerivedState {
-            final_spatial: SpatialIndex::build(entities, map.size),
+            final_spatial: SpatialIndex::build(entities, map.width, map.height),
             pathing: PathingService::new(default_pathing_budget, pathing_cache_capacity),
         }
     }
@@ -47,7 +47,7 @@ impl DerivedState {
     }
 
     pub(in crate::game) fn rebuild_final_spatial(&mut self, map: &Map, entities: &EntityStore) {
-        self.final_spatial = SpatialIndex::build(entities, map.size);
+        self.final_spatial = SpatialIndex::build(entities, map.width, map.height);
     }
 
     #[allow(dead_code)]

@@ -54,7 +54,7 @@ pub(super) fn scout_car_snaking_corridor_map() -> ScoutCarCorridorLayout {
     let middle_lane_y = 64u32;
     let upper_lane_y = 60u32;
 
-    let stone_max_x = map.size - 1;
+    let stone_max_x = map.width - 1;
     block_rect_tiles(&mut map, 0, stone_min_y, stone_max_x, stone_max_y);
 
     carve_vertical_corridor(&mut map, exit_x, lower_lane_y, stone_max_y);
@@ -83,12 +83,12 @@ pub(super) fn scout_car_wall_chokepoint_map(
     unit_count: usize,
 ) -> (Map, (u32, u32), Vec<(f32, f32)>, (f32, f32)) {
     let mut map = flat_dev_map(1);
-    let center_x = map.size / 2;
-    let wall_y = map.size - 18;
+    let center_x = map.width / 2;
+    let wall_y = map.height - 18;
     let start_tile = (center_x, wall_y + 10);
     let gap_left_x = center_x - 1;
     let gap_right_x = center_x;
-    let max_tile = map.size - 1;
+    let max_tile = map.width - 1;
 
     block_rect_tiles(&mut map, 0, wall_y, max_tile, wall_y);
     carve_rect_tiles(&mut map, gap_left_x, wall_y, gap_right_x, wall_y);
@@ -119,10 +119,10 @@ pub(super) fn vehicle_corner_wall_map(
     unit_count: usize,
 ) -> (Map, (u32, u32), Vec<(f32, f32)>, (f32, f32)) {
     let mut map = flat_dev_map(1);
-    let center_x = map.size / 2;
+    let center_x = map.width / 2;
     let wall_left_x = center_x;
     let wall_right_x = wall_left_x + 2;
-    let wall_top_y = map.size / 2 - 8;
+    let wall_top_y = map.height / 2 - 8;
     let wall_bottom_y = wall_top_y + 16;
 
     block_rect_tiles(
@@ -137,8 +137,8 @@ pub(super) fn vehicle_corner_wall_map(
     let lead_x = wall_left_x as f32 * ts - ts;
     let lead_y = (wall_top_y as f32 + 7.5) * ts;
     let start_tile = (
-        ((lead_x / ts).floor() as u32).min(map.size - 1),
-        ((lead_y / ts).floor() as u32).min(map.size - 1),
+        ((lead_x / ts).floor() as u32).min(map.width - 1),
+        ((lead_y / ts).floor() as u32).min(map.height - 1),
     );
     let (side_spacing, rear_spacing) = vehicle_corner_wall_spawn_spacing(unit);
     let starts: Vec<(f32, f32)> = match unit_count {
@@ -178,7 +178,7 @@ pub(super) fn vehicle_small_block_baseline_map(
     (f32, f32),
 ) {
     let mut map = flat_dev_map(1);
-    let center_tile = (map.size / 2, map.size / 2 + 18);
+    let center_tile = (map.width / 2, map.height / 2 + 18);
     let ts = config::TILE_SIZE as f32;
     let start_y = (center_tile.1 as f32 + 0.5) * ts;
     let center_x = (center_tile.0 as f32 + 0.5) * ts;
@@ -208,7 +208,7 @@ pub(super) fn factory_zero_gap_perpendicular_map(
     unit: EntityKind,
 ) -> (Map, (u32, u32), (f32, f32), (f32, f32), (f32, f32)) {
     let mut map = flat_dev_map(1);
-    let factory_tile = (map.size / 2 - 6, map.size / 2);
+    let factory_tile = (map.width / 2 - 6, map.height / 2);
     let factory_pos = services::occupancy::footprint_center(
         &map,
         EntityKind::Factory,
@@ -229,8 +229,8 @@ pub(super) fn factory_zero_gap_perpendicular_map(
     );
     let goal = (unit_start.0 + ts * 10.0, unit_start.1);
     let start_tile = (
-        ((unit_start.0 / ts).floor() as u32).min(map.size - 1),
-        ((unit_start.1 / ts).floor() as u32).min(map.size - 1),
+        ((unit_start.0 / ts).floor() as u32).min(map.width - 1),
+        ((unit_start.1 / ts).floor() as u32).min(map.height - 1),
     );
     if let Some(slot) = map.starts.get_mut(0) {
         *slot = start_tile;
@@ -282,7 +282,7 @@ pub(super) fn factory_wall_rally_spawn_map() -> (
     (f32, f32),
 ) {
     let mut map = flat_dev_map(1);
-    let factory_tile = (map.size / 2, map.size / 2);
+    let factory_tile = (map.width / 2, map.height / 2);
     block_rect_tiles(
         &mut map,
         factory_tile.0 - 2,

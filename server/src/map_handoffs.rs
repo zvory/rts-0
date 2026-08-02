@@ -211,8 +211,8 @@ fn validate_materialized_binding(
     if authored.name != materialized.name {
         return Err("Authored and materialized map names do not match.".to_string());
     }
-    if authored.size != materialized.size {
-        return Err("Authored and materialized map sizes do not match.".to_string());
+    if authored.width != materialized.width || authored.height != materialized.height {
+        return Err("Authored and materialized map dimensions do not match.".to_string());
     }
     if authored.terrain != materialized.terrain {
         return Err("Authored and materialized terrain do not match.".to_string());
@@ -299,7 +299,8 @@ mod tests {
             authored_map,
             materialized_map: LabMapDraft {
                 name: "1v1 No Terrain".to_string(),
-                size: 126,
+                width: 126,
+                height: 126,
                 terrain: vec![terrain::GRASS; 126 * 126],
                 starts,
                 base_sites,
@@ -388,9 +389,10 @@ mod tests {
     }
 
     #[test]
-    fn handoff_validation_accepts_a_non_default_map_size() {
-        let size = 48_u32;
-        let starts = [LabMapTile { x: 8, y: 8 }, LabMapTile { x: 39, y: 39 }];
+    fn handoff_validation_accepts_non_default_rectangular_dimensions() {
+        let width = 48_u32;
+        let height = 32_u32;
+        let starts = [LabMapTile { x: 8, y: 8 }, LabMapTile { x: 39, y: 23 }];
         let start_locations = starts
             .iter()
             .map(|tile| serde_json::json!({ "x": tile.x, "y": tile.y }))
@@ -407,18 +409,21 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let mut request = valid_request();
-        request.authored_map["name"] = "Custom size".into();
+        request.authored_map["name"] = "Custom dimensions".into();
+        request.authored_map["width"] = width.into();
+        request.authored_map["height"] = height.into();
         request.authored_map["terrain"] = serde_json::Value::Array(
-            (0..size)
-                .map(|_| ".".repeat(size as usize).into())
+            (0..height)
+                .map(|_| ".".repeat(width as usize).into())
                 .collect(),
         );
         request.authored_map["startLocations"] = start_locations.into();
         request.authored_map["baseSites"] = base_sites.into();
         request.materialized_map = LabMapDraft {
-            name: "Custom size".to_string(),
-            size,
-            terrain: vec![terrain::GRASS; (size * size) as usize],
+            name: "Custom dimensions".to_string(),
+            width,
+            height,
+            terrain: vec![terrain::GRASS; (width * height) as usize],
             starts: starts.to_vec(),
             base_sites: starts
                 .iter()

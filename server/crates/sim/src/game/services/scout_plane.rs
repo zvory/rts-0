@@ -48,7 +48,8 @@ pub(crate) fn launch_ability(
 pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
     dismiss_inactive_planes(entities);
 
-    let world_max = (map.world_size_px() - 0.01).max(0.0);
+    let world_max_x = (map.world_width_px() - 0.01).max(0.0);
+    let world_max_y = (map.world_height_px() - 0.01).max(0.0);
     let speed = config::unit_stats(EntityKind::ScoutPlane)
         .map(|stats| stats.speed)
         .unwrap_or(config::SCOUT_PLANE_SPEED_PX_PER_TICK)
@@ -65,7 +66,13 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
             continue;
         };
 
-        let step = advance_one(snapshot.flight, speed, orbit_radius, world_max);
+        let step = advance_one(
+            snapshot.flight,
+            speed,
+            orbit_radius,
+            world_max_x,
+            world_max_y,
+        );
         let mut lifetime_expired = false;
         if let Some(plane) = entities.get_mut(id) {
             plane.clear_path();
@@ -173,13 +180,14 @@ fn advance_one(
     snapshot: ScoutPlaneSnapshot,
     speed: f32,
     orbit_radius: f32,
-    world_max: f32,
+    world_max_x: f32,
+    world_max_y: f32,
 ) -> ScoutPlaneStep {
-    let mut x = snapshot.x.clamp(0.0, world_max);
-    let mut y = snapshot.y.clamp(0.0, world_max);
+    let mut x = snapshot.x.clamp(0.0, world_max_x);
+    let mut y = snapshot.y.clamp(0.0, world_max_y);
     let center = (
-        snapshot.center.0.clamp(0.0, world_max),
-        snapshot.center.1.clamp(0.0, world_max),
+        snapshot.center.0.clamp(0.0, world_max_x),
+        snapshot.center.1.clamp(0.0, world_max_y),
     );
     let mut phase = snapshot.phase;
     let mut orbiting = snapshot.orbiting;
@@ -194,8 +202,8 @@ fn advance_one(
             let travel = budget.min(dist - orbit_radius);
             if travel > 0.0 {
                 let inv = 1.0 / dist;
-                x = (x + dx * inv * travel).clamp(0.0, world_max);
-                y = (y + dy * inv * travel).clamp(0.0, world_max);
+                x = (x + dx * inv * travel).clamp(0.0, world_max_x);
+                y = (y + dy * inv * travel).clamp(0.0, world_max_y);
                 facing = Some(dy.atan2(dx));
                 budget = (budget - travel).max(0.0);
             }
@@ -223,16 +231,16 @@ fn advance_one(
             let travel = budget.min(dist);
             if travel > 0.0 {
                 let inv = 1.0 / dist;
-                x = (x + dx * inv * travel).clamp(0.0, world_max);
-                y = (y + dy * inv * travel).clamp(0.0, world_max);
+                x = (x + dx * inv * travel).clamp(0.0, world_max_x);
+                y = (y + dy * inv * travel).clamp(0.0, world_max_y);
                 facing = Some(dy.atan2(dx));
                 budget = (budget - travel).max(0.0);
             }
         }
         if budget > 0.0 {
             phase = normalize_angle(phase + budget / orbit_radius);
-            x = (center.0 + phase.cos() * orbit_radius).clamp(0.0, world_max);
-            y = (center.1 + phase.sin() * orbit_radius).clamp(0.0, world_max);
+            x = (center.0 + phase.cos() * orbit_radius).clamp(0.0, world_max_x);
+            y = (center.1 + phase.sin() * orbit_radius).clamp(0.0, world_max_y);
             facing = Some(normalize_angle(phase + std::f32::consts::FRAC_PI_2));
         }
     }
@@ -251,8 +259,9 @@ fn clamp_world_point(map: &Map, x: f32, y: f32) -> Option<(f32, f32)> {
     if !x.is_finite() || !y.is_finite() {
         return None;
     }
-    let world_max = (map.world_size_px() - 0.01).max(0.0);
-    Some((x.clamp(0.0, world_max), y.clamp(0.0, world_max)))
+    let world_max_x = (map.world_width_px() - 0.01).max(0.0);
+    let world_max_y = (map.world_height_px() - 0.01).max(0.0);
+    Some((x.clamp(0.0, world_max_x), y.clamp(0.0, world_max_y)))
 }
 
 fn normalize_angle(angle: f32) -> f32 {

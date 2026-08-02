@@ -40,8 +40,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1827,
-      "reason": "Cluster clearing adds a coordinator entry point that installs one serialized multi-target Attack order while preserving normal attack setup; keep ratcheting until coordinator order-entry policy is split."
+      "lines": 1834,
+      "reason": "Rectangular-map staging and full-rotation spawn checks require independent X/Y world bounds; keep ratcheting until coordinator order-entry policy is split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
@@ -55,8 +55,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
-      "lines": 1848,
-      "reason": "Game-state Phase 2 routes pathing through the DerivedState shell and exposes internal config preservation for reset; keep ratcheting until pathing diagnostics are split."
+      "lines": 1850,
+      "reason": "Square test fixtures now construct explicit width and height so the pathing boundary cannot regress to a scalar map size; keep ratcheting until pathing diagnostics are split."
     },
     {
       "path": "server/src/main.rs",

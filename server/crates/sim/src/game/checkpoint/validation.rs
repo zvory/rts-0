@@ -33,12 +33,16 @@ use firing_reveal::{validate_firing_reveal_reaction_gates, validate_firing_revea
 const MAX_RESOURCE_INCOME_HISTORY_PER_PLAYER: usize = (config::TICK_HZ as usize * 60) + 1;
 
 pub(super) fn validate_supplied_map(map: &Map) -> Result<(), CheckpointPayloadError> {
-    if map.size == 0 {
-        return Err(CheckpointPayloadError::InvalidValue { field: "map.size" });
+    if map.width == 0 || map.height == 0 {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "map.dimensions",
+        });
     }
-    let cells = (map.size as usize)
-        .checked_mul(map.size as usize)
-        .ok_or(CheckpointPayloadError::InvalidValue { field: "map.size" })?;
+    let cells = (map.width as usize)
+        .checked_mul(map.height as usize)
+        .ok_or(CheckpointPayloadError::InvalidValue {
+            field: "map.dimensions",
+        })?;
     if map.terrain.len() != cells {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "map.terrain",
@@ -118,7 +122,7 @@ pub(super) fn validate_entities(
         });
     }
     let mut ids = BTreeSet::new();
-    let world = map.world_size_px();
+    let world = (map.world_width_px(), map.world_height_px());
     for entity in &entities.entities {
         validate_entity(entity, entities.next_id, player_ids, world, tick, &mut ids)?;
     }
@@ -170,7 +174,7 @@ fn validate_entity(
     entity: &Entity,
     next_id: u32,
     player_ids: &BTreeSet<u32>,
-    world: f32,
+    world: (f32, f32),
     tick: u32,
     ids: &mut BTreeSet<u32>,
 ) -> Result<(), CheckpointPayloadError> {
@@ -227,7 +231,7 @@ fn validate_entity(
 
 fn validate_tank_armor_reaction_lock(
     entity: &Entity,
-    world: f32,
+    world: (f32, f32),
     tick: u32,
 ) -> Result<(), CheckpointPayloadError> {
     let Some(combat) = entity.combat.as_ref() else {
@@ -263,12 +267,16 @@ pub(super) fn validate_fog(
     map: &Map,
     tick: u32,
 ) -> Result<(), CheckpointPayloadError> {
-    if fog.size != map.size {
-        return Err(CheckpointPayloadError::InvalidValue { field: "fog.size" });
+    if fog.width != map.width || fog.height != map.height {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "fog.dimensions",
+        });
     }
-    let cells = (map.size as usize)
-        .checked_mul(map.size as usize)
-        .ok_or(CheckpointPayloadError::InvalidValue { field: "fog.size" })?;
+    let cells = (map.width as usize)
+        .checked_mul(map.height as usize)
+        .ok_or(CheckpointPayloadError::InvalidValue {
+            field: "fog.dimensions",
+        })?;
     for (field, grids) in [
         ("fog.grids", &fog.grids),
         ("fog.exploredGrids", &fog.explored_grids),
@@ -393,7 +401,7 @@ pub(super) fn validate_panzerfaust_shots(
         }
         validate_allocated_entity_ref("panzerfaustShots.attacker", attacker, next_entity_id)?;
         validate_allocated_entity_ref("panzerfaustShots.target", target, next_entity_id)?;
-        let world = map.world_size_px();
+        let world = (map.world_width_px(), map.world_height_px());
         if !in_world(source_x, source_y, world) {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "panzerfaustShots.source",
@@ -470,8 +478,8 @@ fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadE
     Ok(())
 }
 
-fn in_world(x: f32, y: f32, world: f32) -> bool {
-    x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0 && x < world && y < world
+fn in_world(x: f32, y: f32, world: (f32, f32)) -> bool {
+    x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0 && x < world.0 && y < world.1
 }
 
 #[cfg(test)]

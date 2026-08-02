@@ -10,17 +10,18 @@ const POSITION_GRID_TILES: f32 = 32.0;
 pub(super) fn record_activity(
     events: &HashMap<u32, Vec<Event>>,
     tick: u32,
-    world_size: f32,
+    world_dimensions: (f32, f32),
     last_activity_tick: &mut Option<u32>,
     last_activity_position: &mut Option<[f32; 2]>,
     active_through_tick: &mut Option<u32>,
     published_position: &mut Option<[f32; 2]>,
 ) {
+    let (world_width, world_height) = world_dimensions;
     if events.values().flatten().any(is_hostile_weapon_activity) {
         *last_activity_tick = Some(tick);
     }
     if let Some(position) = activity_centroid(events) {
-        *last_activity_position = Some(quantize_position(position, world_size));
+        *last_activity_position = Some(quantize_position(position, world_width, world_height));
     }
 
     // Publish only on fixed boundaries. Keeping the published deadline separate
@@ -53,7 +54,8 @@ pub(super) fn valid_checkpoint_signal_state(
     last_activity_position: Option<[f32; 2]>,
     active_through_tick: Option<u32>,
     published_position: Option<[f32; 2]>,
-    world_size: f32,
+    world_width: f32,
+    world_height: f32,
 ) -> bool {
     let deadline_valid = match (last_activity_tick, active_through_tick) {
         (_, None) => true,
@@ -64,10 +66,10 @@ pub(super) fn valid_checkpoint_signal_state(
     };
     deadline_valid
         && last_activity_position.is_none_or(|position| {
-            last_activity_tick.is_some() && position_in_world(position, world_size)
+            last_activity_tick.is_some() && position_in_world(position, world_width, world_height)
         })
         && published_position.is_none_or(|position| {
-            active_through_tick.is_some() && position_in_world(position, world_size)
+            active_through_tick.is_some() && position_in_world(position, world_width, world_height)
         })
 }
 
@@ -130,24 +132,27 @@ fn activity_position(event: &Event) -> Option<[f32; 2]> {
     }
 }
 
-fn quantize_position(position: [f32; 2], world_size: f32) -> [f32; 2] {
+fn quantize_position(position: [f32; 2], world_width: f32, world_height: f32) -> [f32; 2] {
     let grid = position_grid_px();
-    let max_grid_point = (((world_size - 1.0).max(0.0) / grid).floor() * grid).max(0.0);
+    let max_grid_x = (((world_width - 1.0).max(0.0) / grid).floor() * grid).max(0.0);
+    let max_grid_y = (((world_height - 1.0).max(0.0) / grid).floor() * grid).max(0.0);
     [
-        ((position[0] / grid).round() * grid).clamp(0.0, max_grid_point),
-        ((position[1] / grid).round() * grid).clamp(0.0, max_grid_point),
+        ((position[0] / grid).round() * grid).clamp(0.0, max_grid_x),
+        ((position[1] / grid).round() * grid).clamp(0.0, max_grid_y),
     ]
 }
 
-fn position_in_world(position: [f32; 2], world_size: f32) -> bool {
-    world_size.is_finite()
-        && world_size > 0.0
+fn position_in_world(position: [f32; 2], world_width: f32, world_height: f32) -> bool {
+    world_width.is_finite()
+        && world_height.is_finite()
+        && world_width > 0.0
+        && world_height > 0.0
         && position[0].is_finite()
         && position[1].is_finite()
         && position[0] >= 0.0
         && position[1] >= 0.0
-        && position[0] < world_size
-        && position[1] < world_size
+        && position[0] < world_width
+        && position[1] < world_height
         && position.into_iter().all(position_component_is_quantized)
 }
 
@@ -189,7 +194,7 @@ mod tests {
         record_activity(
             &attack_events(),
             17,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -199,7 +204,7 @@ mod tests {
         record_activity(
             &HashMap::new(),
             30,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -222,7 +227,7 @@ mod tests {
         record_activity(
             &attack_events(),
             17,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -231,7 +236,7 @@ mod tests {
         record_activity(
             &HashMap::new(),
             30,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -242,7 +247,7 @@ mod tests {
         record_activity(
             &attack_events_at([3072.0, 1024.0]),
             31,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -260,7 +265,7 @@ mod tests {
         record_activity(
             &HashMap::new(),
             45,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -294,7 +299,7 @@ mod tests {
         record_activity(
             &attack_events(),
             17,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -306,7 +311,7 @@ mod tests {
         record_activity(
             &HashMap::new(),
             30,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -344,7 +349,7 @@ mod tests {
         record_activity(
             &events,
             15,
-            4096.0,
+            (4096.0, 4096.0),
             &mut last,
             &mut last_position,
             &mut deadline,
@@ -361,6 +366,7 @@ mod tests {
             point,
             Some(75),
             point,
+            4096.0,
             4096.0
         ));
         assert!(valid_checkpoint_signal_state(
@@ -368,6 +374,7 @@ mod tests {
             point,
             Some(75),
             point,
+            4096.0,
             4096.0
         ));
         assert!(!valid_checkpoint_signal_state(
@@ -375,6 +382,7 @@ mod tests {
             point,
             Some(76),
             point,
+            4096.0,
             4096.0
         ));
         assert!(!valid_checkpoint_signal_state(
@@ -382,6 +390,7 @@ mod tests {
             point,
             Some(90),
             point,
+            4096.0,
             4096.0
         ));
         assert!(!valid_checkpoint_signal_state(
@@ -389,6 +398,7 @@ mod tests {
             point,
             Some(75),
             point,
+            4096.0,
             4096.0
         ));
         assert!(!valid_checkpoint_signal_state(
@@ -396,6 +406,7 @@ mod tests {
             Some([f32::NAN, 0.0]),
             Some(75),
             point,
+            4096.0,
             4096.0
         ));
         assert!(!valid_checkpoint_signal_state(
@@ -403,6 +414,7 @@ mod tests {
             point,
             Some(75),
             Some([4096.0, 0.0]),
+            4096.0,
             4096.0
         ));
         assert!(!valid_checkpoint_signal_state(
@@ -410,6 +422,7 @@ mod tests {
             Some([2049.0, 1024.0]),
             Some(75),
             point,
+            4096.0,
             4096.0
         ));
         assert!(!valid_checkpoint_signal_state(
@@ -417,6 +430,7 @@ mod tests {
             point,
             Some(75),
             Some([2048.0, 1025.0]),
+            4096.0,
             4096.0
         ));
     }
@@ -424,9 +438,9 @@ mod tests {
     #[test]
     fn edge_positions_stay_on_the_coarse_grid_and_inside_the_world() {
         assert_eq!(
-            quantize_position([4095.0, 4095.0], 4096.0),
+            quantize_position([4095.0, 4095.0], 4096.0, 4096.0),
             [3072.0, 3072.0]
         );
-        assert_eq!(quantize_position([511.0, 513.0], 768.0), [0.0, 0.0]);
+        assert_eq!(quantize_position([511.0, 513.0], 768.0, 768.0), [0.0, 0.0]);
     }
 }

@@ -182,7 +182,8 @@ fn apply_magic_anchor_stationary_pull(
     tick: u32,
     ability_runtime: &AbilityRuntime,
 ) {
-    let world_max = map.world_size_px() - 0.01;
+    let world_max_x = map.world_width_px() - 0.01;
+    let world_max_y = map.world_height_px() - 0.01;
     for id in entities.ids() {
         let Some((kind, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
             if !e.is_unit() || e.kind == EntityKind::ScoutPlane || !e.path_is_empty() {
@@ -206,8 +207,8 @@ fn apply_magic_anchor_stationary_pull(
         if pull_px <= 0.0 || !pull_px.is_finite() {
             continue;
         }
-        let next_x = (x + dir.0 * pull_px).clamp(0.0, world_max);
-        let next_y = (y + dir.1 * pull_px).clamp(0.0, world_max);
+        let next_x = (x + dir.0 * pull_px).clamp(0.0, world_max_x);
+        let next_y = (y + dir.1 * pull_px).clamp(0.0, world_max_y);
         if !standability::unit_static_standable(occ, map, kind, next_x, next_y, facing) {
             continue;
         }

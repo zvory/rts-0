@@ -30,7 +30,7 @@ fn apply_test_damage_with_seed(
         .and_then(|entity| combat_rules::default_weapon_profile(entity.kind))
         .expect("attacker should have a default weapon profile");
     let map = Map::generate(2, 0x00C0_FFEE);
-    let fog = Fog::new(map.size);
+    let fog = Fog::new(map.width, map.height);
     let smokes = SmokeCloudStore::new();
     let mut rng = SmallRng::seed_from_u64(rng_seed);
     let blockers = ShotBlockerIndex::build(&map, entities);

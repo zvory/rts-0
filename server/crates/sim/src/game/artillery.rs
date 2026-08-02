@@ -242,7 +242,8 @@ mod tests {
 
     fn open_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![(4, 4), (size - 5, size - 5)],
             ..Default::default()
@@ -250,7 +251,7 @@ mod tests {
     }
 
     fn visible_team_fog(map: &Map, entities: &EntityStore) -> Fog {
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2, 3], entities, map);
         fog
     }

@@ -45,7 +45,9 @@ impl Fog {
             if entity.hp == 0 || smokes.point_inside(entity.pos_x, entity.pos_y) {
                 continue;
             }
-            let Some(tile) = super::world_tile_index(self.size, entity.pos_x, entity.pos_y) else {
+            let Some(tile) =
+                super::world_tile_index(self.width, self.height, entity.pos_x, entity.pos_y)
+            else {
                 continue;
             };
             let Some(visibility) = self
@@ -64,7 +66,8 @@ impl Fog {
                 .unwrap_or(false);
         }
 
-        let size = self.size;
+        let width = self.width;
+        let height = self.height;
         for source in sources {
             let Some(entity) = store.get(source.entity_id()) else {
                 continue;
@@ -75,7 +78,7 @@ impl Fog {
             let Some(grid) = self.grids.get_mut(&source.viewer()) else {
                 continue;
             };
-            stamp_point(grid, size, entity.pos_x, entity.pos_y);
+            stamp_point(grid, width, height, entity.pos_x, entity.pos_y);
         }
     }
 
@@ -116,8 +119,8 @@ impl Fog {
         x: f32,
         y: f32,
     ) -> Option<FiringRevealEpisode> {
-        let tile = super::world_tile_index(self.size, x, y)?;
-        if !self.is_visible(viewer, tile % self.size, tile / self.size) {
+        let tile = super::world_tile_index(self.width, self.height, x, y)?;
+        if !self.is_visible(viewer, tile % self.width, tile / self.width) {
             return None;
         }
         self.firing_reveal_visibility

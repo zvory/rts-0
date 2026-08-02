@@ -40,20 +40,21 @@ pub(super) fn nearest_free_goal(
     let occupied_unit_bodies =
         occupied_and_reserved_bodies(entities, teams, player, unit_id, fog, smokes);
     let mut reachability = formation::FormationReachability::new(map, occ);
-    let max_tile = map.size.checked_sub(1)?;
+    let max_tile_x = map.width.checked_sub(1)?;
+    let max_tile_y = map.height.checked_sub(1)?;
     let anchor = map.tile_of(rally.0, rally.1);
     let max_radius = anchor
         .0
         .max(anchor.1)
-        .max(max_tile.saturating_sub(anchor.0))
-        .max(max_tile.saturating_sub(anchor.1));
+        .max(max_tile_x.saturating_sub(anchor.0))
+        .max(max_tile_y.saturating_sub(anchor.1));
     let mut best: Option<(f32, (f32, f32))> = None;
 
     for radius in 0..=max_radius {
         let min_x = anchor.0.saturating_sub(radius);
-        let max_x = anchor.0.saturating_add(radius).min(max_tile);
+        let max_x = anchor.0.saturating_add(radius).min(max_tile_x);
         let min_y = anchor.1.saturating_sub(radius);
-        let max_y = anchor.1.saturating_add(radius).min(max_tile);
+        let max_y = anchor.1.saturating_add(radius).min(max_tile_y);
         for ty in min_y..=max_y {
             for tx in min_x..=max_x {
                 if tx.abs_diff(anchor.0).max(ty.abs_diff(anchor.1)) != radius {
@@ -173,7 +174,8 @@ fn nearest_unsearched_tile_distance_sq(
     min_y: u32,
     max_y: u32,
 ) -> Option<f32> {
-    let max_tile = map.size.checked_sub(1)?;
+    let max_tile_x = map.width.checked_sub(1)?;
+    let max_tile_y = map.height.checked_sub(1)?;
     let tile_size = config::TILE_SIZE as f32;
     let mut lower_bound_sq = f32::INFINITY;
     let mut consider_axis_distance = |tile_center: f32, rally_coordinate: f32| {
@@ -183,13 +185,13 @@ fn nearest_unsearched_tile_distance_sq(
     if min_x > 0 {
         consider_axis_distance((min_x as f32 - 0.5) * tile_size, rally.0);
     }
-    if max_x < max_tile {
+    if max_x < max_tile_x {
         consider_axis_distance((max_x as f32 + 1.5) * tile_size, rally.0);
     }
     if min_y > 0 {
         consider_axis_distance((min_y as f32 - 0.5) * tile_size, rally.1);
     }
-    if max_y < max_tile {
+    if max_y < max_tile_y {
         consider_axis_distance((max_y as f32 + 1.5) * tile_size, rally.1);
     }
 

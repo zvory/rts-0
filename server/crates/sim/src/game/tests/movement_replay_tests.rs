@@ -942,9 +942,9 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
     let mut game = setup.game;
 
     assert_eq!(setup.units.len(), 15);
-    let wall_y = game.state.map.size - 18;
-    let gap_left_x = game.state.map.size / 2 - 1;
-    let gap_right_x = game.state.map.size / 2;
+    let wall_y = game.state.map.width - 18;
+    let gap_left_x = game.state.map.width / 2 - 1;
+    let gap_right_x = game.state.map.width / 2;
     assert_eq!(
         game.state.map.terrain[game.state.map.index(gap_left_x, wall_y)],
         terrain::GRASS

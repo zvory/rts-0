@@ -83,7 +83,7 @@ impl<'a> LineOfSight<'a> {
     /// True when `tile` is visible from a world-pixel origin. The target tile itself may be
     /// opaque so units can reveal the face of a stone wall without seeing past it.
     pub(crate) fn tile_visible_from_world(&self, from: (f32, f32), tile: (u32, u32)) -> bool {
-        if tile.0 >= self.map.size || tile.1 >= self.map.size {
+        if tile.0 >= self.map.width || tile.1 >= self.map.height {
             return false;
         }
         self.raycast_clear(from, self.map.tile_center(tile.0, tile.1), true, true)
@@ -104,8 +104,8 @@ impl<'a> LineOfSight<'a> {
         if from_x < 0.0 || from_y < 0.0 || to_x < 0.0 || to_y < 0.0 {
             return false;
         }
-        let world_size = self.map.world_size_px();
-        if from_x >= world_size || from_y >= world_size || to_x >= world_size || to_y >= world_size
+        if !self.map.contains_world_point(from_x, from_y)
+            || !self.map.contains_world_point(to_x, to_y)
         {
             return false;
         }
@@ -231,7 +231,7 @@ impl<'a> LineOfSight<'a> {
         let Some(blockers) = self.building_blockers else {
             return false;
         };
-        let idx = (tile.1 * self.map.size + tile.0) as usize;
+        let idx = (tile.1 * self.map.width + tile.0) as usize;
         blockers.get(idx).copied().unwrap_or(false)
     }
 }
@@ -264,7 +264,8 @@ mod tests {
         let mut terrain = vec![wire_terrain::GRASS; (size * size) as usize];
         terrain[(tile.1 * size + tile.0) as usize] = wire_terrain::ROCK;
         Map {
-            size,
+            width: size,
+            height: size,
             terrain,
             starts: vec![(1, 1)],
             ..Default::default()
@@ -273,7 +274,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![wire_terrain::GRASS; (size * size) as usize],
             starts: vec![(1, 1)],
             ..Default::default()
@@ -306,7 +308,8 @@ mod tests {
         terrain[2 * size as usize + 3] = wire_terrain::ROCK;
         terrain[3 * size as usize + 2] = wire_terrain::ROCK;
         let map = Map {
-            size,
+            width: size,
+            height: size,
             terrain,
             starts: vec![(1, 1)],
             ..Default::default()

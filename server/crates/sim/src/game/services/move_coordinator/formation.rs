@@ -272,8 +272,7 @@ fn formation_goal_point_free(
     if !point.0.is_finite() || !point.1.is_finite() {
         return false;
     }
-    let world_size = map.world_size_px();
-    if point.0 < 0.0 || point.1 < 0.0 || point.0 >= world_size || point.1 >= world_size {
+    if !map.contains_world_point(point.0, point.1) {
         return false;
     }
     let tile = map.tile_of(point.0, point.1);
