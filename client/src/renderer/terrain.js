@@ -8,6 +8,7 @@ import {
   roadMarkingOrientation,
   terrainColor,
   terrainOverlayColor,
+  terrainVariantPalette,
 } from "./terrain_palette.js";
 
 const TERRAIN_TEXTURE_DOWNSAMPLE = 4;
@@ -42,6 +43,12 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   ctx.fillStyle = colorCss(color);
   ctx.fillRect(x, y, textureTileSize, textureTileSize);
 
+  const variant = terrainVariantPalette(code);
+  if (variant) {
+    drawTerrainVariantDetails(ctx, variant, tx, ty, x, y, textureTileSize);
+    return;
+  }
+
   const blocks = textureTileSize >= 4 ? 4 : 2;
   const block = textureTileSize / blocks;
   for (let by = 0; by < blocks; by++) {
@@ -56,6 +63,78 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   drawRoadShoulder(ctx, map, tx, ty, code, textureTileSize);
   drawRoadMarking(ctx, code, x, y, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
+}
+
+function drawTerrainVariantDetails(ctx, variant, tx, ty, x, y, size) {
+  const pixel = Math.max(1, Math.floor(size / 8));
+  const cells = Math.max(2, Math.floor(size / pixel));
+  if (variant.pattern === "mud") {
+    drawBrokenMudMarks(ctx, variant, tx, ty, x, y, pixel, cells);
+    return;
+  }
+  if (variant.pattern === "frost") {
+    drawFrostDetails(ctx, variant, tx, ty, x, y, pixel, cells);
+    return;
+  }
+  for (let py = 0; py < cells; py += 1) {
+    for (let px = 0; px < cells; px += 1) {
+      const n = hash2(tx * 31 + px * 7, ty * 37 + py * 11);
+      let detail = null;
+      if (variant.pattern === "gravel") {
+        if (n > 0.83) detail = variant.details[0];
+        else if (n < 0.13) detail = variant.details[1];
+      } else if (variant.pattern === "dirt") {
+        if (n > 0.9) detail = variant.details[0];
+        else if (n < 0.08) detail = variant.details[1];
+      }
+      if (detail == null) continue;
+      ctx.fillStyle = colorCss(detail, 0.78);
+      ctx.fillRect(x + px * pixel, y + py * pixel, pixel, pixel);
+    }
+  }
+}
+
+function drawFrostDetails(ctx, variant, tx, ty, x, y, pixel, cells) {
+  if (hash2(tx * 211 + 127, ty * 223 + 131) < 0.28) {
+    const length = 2 + Math.floor(hash2(tx * 227 + 137, ty * 229 + 139) * 3);
+    const startX = Math.floor(hash2(tx * 233 + 149, ty * 239 + 151) * Math.max(1, cells - length + 1));
+    const startY = Math.floor(hash2(tx * 241 + 157, ty * 251 + 163) * cells);
+    ctx.fillStyle = colorCss(variant.details[0], 0.72);
+    for (let offset = 0; offset < length; offset += 1) {
+      const drift = offset === length - 1 && hash2(tx * 257, ty * 263) > 0.62 ? 1 : 0;
+      const py = Math.min(cells - 1, startY + drift);
+      ctx.fillRect(x + (startX + offset) * pixel, y + py * pixel, pixel, pixel);
+    }
+  }
+  if (hash2(tx * 269 + 167, ty * 271 + 173) >= 0.1) return;
+  const px = Math.floor(hash2(tx * 277 + 179, ty * 281 + 181) * cells);
+  const py = Math.floor(hash2(tx * 283 + 191, ty * 293 + 193) * cells);
+  ctx.fillStyle = colorCss(variant.details[1], 0.65);
+  ctx.fillRect(x + px * pixel, y + py * pixel, pixel, pixel);
+}
+
+function drawBrokenMudMarks(ctx, variant, tx, ty, x, y, pixel, cells) {
+  const activation = hash2(tx * 103 + 31, ty * 107 + 37);
+  if (activation < variant.activity) {
+    const length = Math.min(cells, 2 + Math.floor(hash2(tx * 109 + 41, ty * 113 + 43) * 4));
+    const startX = Math.floor(hash2(tx * 127 + 47, ty * 131 + 53) * Math.max(1, cells - length + 1));
+    const startY = Math.floor(hash2(tx * 137 + 59, ty * 139 + 61) * cells);
+    const angled = hash2(tx * 149 + 67, ty * 151 + 71) > 0.8;
+    ctx.fillStyle = colorCss(variant.details[0], 0.76);
+    for (let offset = 0; offset < length; offset += 1) {
+      const py = Math.max(0, Math.min(cells - 1, startY + (angled && offset >= Math.ceil(length / 2) ? 1 : 0)));
+      ctx.fillRect(x + (startX + offset) * pixel, y + py * pixel, pixel, pixel);
+    }
+  }
+  if (hash2(tx * 157 + 73, ty * 163 + 79) >= 0.12) return;
+  const poolX = Math.floor(hash2(tx * 167 + 83, ty * 173 + 89) * Math.max(1, cells - 2));
+  const poolY = Math.floor(hash2(tx * 179 + 97, ty * 181 + 101) * Math.max(1, cells - 1));
+  const poolWidth = hash2(tx * 191 + 103, ty * 193 + 107) > 0.55 ? 3 : 2;
+  ctx.fillStyle = colorCss(variant.details[0], 0.58);
+  ctx.fillRect(x + poolX * pixel, y + poolY * pixel, Math.min(poolWidth, cells - poolX) * pixel, pixel);
+  if (hash2(tx * 197 + 109, ty * 199 + 113) > 0.68 && poolY + 1 < cells) {
+    ctx.fillRect(x + (poolX + 1) * pixel, y + (poolY + 1) * pixel, pixel, pixel);
+  }
 }
 
 function drawRoadShoulder(ctx, map, tx, ty, code, size) {

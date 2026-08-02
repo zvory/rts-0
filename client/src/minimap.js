@@ -13,11 +13,9 @@ import {
   KIND,
   ORDER_STAGE,
   PASSABLE,
-  TERRAIN,
   UPGRADE,
   isBuilding,
   isResource,
-  isRoadTerrain,
   isUnit,
 } from "./protocol.js";
 import {
@@ -28,6 +26,7 @@ import {
   STATS,
   isProducerBuilding,
 } from "./config.js";
+import { minimapTerrainColor, minimapTerrainStyleSignature } from "./minimap_terrain.js";
 import {
   artilleryFireRadiusTiles,
   artilleryMinFireRadiusTiles,
@@ -87,17 +86,6 @@ const scaleBetween = (value, min, max) => {
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
-
-const terrainStyleSignature = () => [
-  COLORS.rock,
-  COLORS.water,
-  COLORS.road,
-  COLORS.roadAlt,
-  COLORS.field,
-  COLORS.mud,
-  COLORS.grass,
-  COLORS.grassAlt,
-].join(",");
 
 const resourceStyleSignature = () => [
   COLORS.oil,
@@ -163,26 +151,6 @@ const signatureReasonForKey = (key) => {
   if (key === "style") return "style";
   if (key === "layout") return "resource-layout";
   return "other";
-};
-
-// Per-terrain fill (matches the renderer palette; rock reads as impassable).
-const terrainFill = (code, tx, ty) => {
-  if (code === TERRAIN.ROCK) return hex(COLORS.rock);
-  if (code === TERRAIN.WATER) return hex(COLORS.water);
-  if (isRoadTerrain(code)) {
-    return hex(hash2(tx, ty) > 0.6 ? COLORS.roadAlt : COLORS.road);
-  }
-  const n = hash2(tx, ty);
-  if (n > 0.78) return hex(COLORS.field);
-  if (n < 0.18) return hex(COLORS.mud);
-  return hex((tx + ty) % 2 === 0 ? COLORS.grass : COLORS.grassAlt);
-};
-
-const hash2 = (x, y) => {
-  let n = (x * 374761393 + y * 668265263) | 0;
-  n = (n ^ (n >>> 13)) | 0;
-  n = Math.imul(n, 1274126177);
-  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 };
 
 /**
@@ -425,7 +393,7 @@ export class Minimap {
     for (let ty = 0; ty < map.height; ty++) {
       for (let tx = 0; tx < map.width; tx++) {
         const code = map.terrain[ty * map.width + tx];
-        ctx.fillStyle = terrainFill(code, tx, ty);
+        ctx.fillStyle = hex(minimapTerrainColor(code, tx, ty));
         const p = this._worldToCanvas(tx * ts, ty * ts);
         ctx.fillRect(p.x, p.y, cw, ch);
       }
@@ -554,7 +522,7 @@ export class Minimap {
       offX: this._offX,
       offY: this._offY,
       presentation: this._canvasPresentationSignature(),
-      style: terrainStyleSignature(),
+      style: minimapTerrainStyleSignature(),
     };
   }
 

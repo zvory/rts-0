@@ -570,36 +570,44 @@ try {
     const status = response.status();
     if (status >= 400 && !response.url().includes("favicon")) responseErrors.push(`${status}: ${response.url()}`);
   });
-  await editorPage.setViewport({ width: 1280, height: 600 });
+  await editorPage.setViewport({ width: 780, height: 600 });
   const editorUrl = new URL(BASE_URL);
   editorUrl.pathname = "/map-editor";
   editorUrl.search = "";
   await editorPage.goto(editorUrl.href, { waitUntil: "domcontentloaded", timeout: 15000 });
-  await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 8, { timeout: 5000 });
+  await editorPage.waitForFunction(() => document.querySelectorAll(".map-editor-terrain-icon").length === 18, { timeout: 5000 });
   await editorPage.waitForFunction(() => window.__rtsRenderWorkerStats?.surface === "mapEditor"
     && window.__rtsRenderWorkerStats?.backendInfo?.backend === "webgl", { timeout: 5000 });
   const editorUi = await editorPage.evaluate(() => {
-    const panelWindow = document.querySelector(".map-editor-panel");
-    const panel = document.querySelector(".map-editor-panel-body");
+    const optionsWindow = document.querySelector(".map-editor-options-window");
+    const toolsWindow = document.querySelector(".map-editor-tools-window");
+    const panel = toolsWindow?.querySelector(".map-editor-panel-body");
     const water = document.querySelector(".map-editor-terrain-button[data-terrain=water]");
-    const dragHandle = panelWindow?.querySelector(".lab-panel-drag-handle");
-    const resizeHandle = panelWindow?.querySelector(".lab-panel-resize-handle");
-    const collapseButton = panelWindow?.querySelector(".lab-panel-collapse");
-    const panelRect = panelWindow?.getBoundingClientRect();
+    const optionsRect = optionsWindow?.getBoundingClientRect();
+    const panelRect = toolsWindow?.getBoundingClientRect();
+    const noInitialStatus = document.querySelector(".map-editor-status") === null;
     water?.scrollIntoView({ block: "center" });
     const beforeScrollTop = panel?.scrollTop ?? -1;
     water?.click();
-    const refreshedPanel = document.querySelector(".map-editor-panel-body");
+    const refreshedPanel = document.querySelector(".map-editor-tools-window .map-editor-panel-body");
+    const floatingChrome = [
+      [optionsWindow, "map editor options"],
+      [toolsWindow, "map editor tools"],
+    ].every(([panelWindow, label]) =>
+      panelWindow?.querySelector(".lab-panel-drag-handle")?.getAttribute("aria-label") === `Move ${label} panel`
+      && panelWindow?.querySelector(".lab-panel-resize-handle")?.getAttribute("aria-label") === `Resize ${label} panel`
+      && Boolean(panelWindow?.querySelector(".lab-panel-collapse")));
     return {
       beforeScrollTop,
       afterScrollTop: refreshedPanel?.scrollTop ?? -1,
       maxScroll: (refreshedPanel?.scrollHeight ?? 0) - (refreshedPanel?.clientHeight ?? 0),
       terrainPreviews: [...document.querySelectorAll(".map-editor-terrain-icon")]
         .map((icon) => ({ width: icon.width, height: icon.height })),
-      header: document.querySelector(".map-editor-header")?.textContent?.trim() || "",
-      floatingChrome: dragHandle?.getAttribute("aria-label") === "Move map editor panel" &&
-        resizeHandle?.getAttribute("aria-label") === "Resize map editor panel" &&
-        Boolean(collapseButton),
+      headers: [...document.querySelectorAll(".map-editor-header")]
+        .map((header) => header.textContent?.trim() || ""),
+      floatingChrome,
+      noInitialStatus,
+      panelsDoNotOverlap: optionsRect && panelRect && optionsRect.right <= panelRect.left,
       withinViewport: panelRect && panelRect.bottom <= window.innerHeight - 11,
       noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
         .every((node) => node.scrollWidth <= node.clientWidth),
@@ -632,14 +640,16 @@ try {
     };
   });
   ok(
-    editorUi.header.includes("Map Editor") &&
-      editorUi.terrainPreviews.length === 8 &&
+    editorUi.headers.some((header) => header.includes("Options")) &&
+      editorUi.headers.some((header) => header.includes("Tools")) &&
+      editorUi.noInitialStatus &&
+      editorUi.terrainPreviews.length === 18 &&
       editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0),
-    `MAP EDITOR: terrain buttons show eight rendered terrain previews (header=${editorUi.header}, previews=${editorUi.terrainPreviews.length})`,
+    `MAP EDITOR: separate Options/Tools panels omit initial status slop and show all 18 terrain previews (headers=${editorUi.headers.join("/")}, previews=${editorUi.terrainPreviews.length})`,
   );
   ok(
-    editorUi.floatingChrome && editorUi.withinViewport && editorUi.noHorizontalOverflow,
-    "MAP EDITOR: accessible floating chrome and terrain/start-base pickers stay within the viewport",
+    editorUi.floatingChrome && editorUi.panelsDoNotOverlap && editorUi.withinViewport && editorUi.noHorizontalOverflow,
+    "MAP EDITOR: accessible floating panels do not overlap and terrain/start-base pickers stay within the viewport",
   );
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,

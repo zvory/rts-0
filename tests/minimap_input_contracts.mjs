@@ -10,6 +10,7 @@ import { runMinimapAttackAlertContracts } from "./minimap_attack_alert_contracts
 import {
   ABILITIES,
   ARTILLERY_BLANKET_RADIUS_TILES,
+  TERRAIN_VARIANT_PALETTES,
 } from "../client/src/config.js";
 import { ABILITY, cmd, KIND, LAB_ROLE, ORDER_STAGE, SETUP, TERRAIN, UPGRADE } from "../client/src/protocol.js";
 
@@ -1007,6 +1008,43 @@ function pointerEvent(canvas, clientX, clientY, {
   assert(h.net.sent.every((command) => command.c === "attackMove" && command.queued === true), "held-A minimap targeting queues attack-move commands");
   assert(h.clientIntent.commandTarget === "attack", "held-A minimap targeting stays armed after queued clicks");
   h.minimap.destroy();
+}
+
+// Visual open-terrain variants use their production minimap palettes and static cache.
+{
+  installWindowStub();
+  const layers = [];
+  const canvas = fakeRenderableCanvas({ width: 20, height: 20 });
+  const terrain = [TERRAIN.GRAVEL_A, TERRAIN.GRAVEL_B, TERRAIN.GRAVEL_C,
+    TERRAIN.DIRT_A, TERRAIN.DIRT_B, TERRAIN.DIRT_C,
+    TERRAIN.MUD_A, TERRAIN.MUD_B, TERRAIN.MUD_C, TERRAIN.FROSTED_GROUND];
+  const state = {
+    playerId: 1,
+    map: { width: terrain.length, height: 1, tileSize: 1, terrain, resources: [] },
+    selectedEntities() { return []; },
+    entitiesInterpolated() { return []; },
+    players: [],
+  };
+  const fog = { isVisible() { return true; }, isExplored() { return true; } };
+  const camera = { x: 0, y: 0, zoom: 1, viewW: terrain.length, viewH: 1, centerOn() {} };
+  const minimap = new Minimap(canvas, state, camera, fog, { issueCommand() {} }, null, {
+    staticCanvasFactory: staticCanvasFactory(layers),
+  });
+
+  minimap.render();
+  const fills = layers[0].context.calls.filter((call) => call.op === "fillRect");
+  assert(fills.length === terrain.length, "minimap paints every visual open-terrain code");
+  for (const [index, code] of terrain.entries()) {
+    const palette = TERRAIN_VARIANT_PALETTES[code];
+    const expected = [palette.base, palette.alt].map((color) => `#${color.toString(16).padStart(6, "0")}`);
+    assert(expected.includes(fills[index].fillStyle), `minimap terrain ${code} uses its production base/alt palette`);
+  }
+  minimap.render();
+  assert(
+    layers[0].context.calls.filter((call) => call.op === "fillRect").length === fills.length,
+    "visual open-terrain minimap pixels reuse the static cache",
+  );
+  minimap.destroy();
 }
 
 // Static terrain and resource marks are cached instead of repainted every render.

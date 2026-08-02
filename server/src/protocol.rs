@@ -45,5 +45,18 @@ mod tests {
             terrain::ROAD_DIAGONAL_NE_SW,
             rts_rules::terrain::MAP_TERRAIN_ROAD_DIAGONAL_NE_SW
         );
+        assert_eq!(terrain::GRAVEL_A, rts_rules::terrain::MAP_TERRAIN_GRAVEL_A);
+        assert_eq!(terrain::GRAVEL_B, rts_rules::terrain::MAP_TERRAIN_GRAVEL_B);
+        assert_eq!(terrain::GRAVEL_C, rts_rules::terrain::MAP_TERRAIN_GRAVEL_C);
+        assert_eq!(terrain::DIRT_A, rts_rules::terrain::MAP_TERRAIN_DIRT_A);
+        assert_eq!(terrain::DIRT_B, rts_rules::terrain::MAP_TERRAIN_DIRT_B);
+        assert_eq!(terrain::DIRT_C, rts_rules::terrain::MAP_TERRAIN_DIRT_C);
+        assert_eq!(terrain::MUD_A, rts_rules::terrain::MAP_TERRAIN_MUD_A);
+        assert_eq!(terrain::MUD_B, rts_rules::terrain::MAP_TERRAIN_MUD_B);
+        assert_eq!(terrain::MUD_C, rts_rules::terrain::MAP_TERRAIN_MUD_C);
+        assert_eq!(
+            terrain::FROSTED_GROUND,
+            rts_rules::terrain::MAP_TERRAIN_FROSTED_GROUND
+        );
     }
 }

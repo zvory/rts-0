@@ -521,8 +521,10 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     tileSize: u32,               // world px per tile
     // terrain: row-major array length width*height. Codes: 0 grass, 1 rock,
     // 2 water, 3 bare road, 4 horizontal-marked road, 5 vertical-marked road,
-    // 6 NW-SE diagonal-marked road, 7 NE-SW diagonal-marked road.
-    // Grass/all roads are passable; rock/water are impassable.
+    // 6 NW-SE diagonal-marked road, 7 NE-SW diagonal-marked road,
+    // 8-10 gravel A/B/C, 11-13 dirt A/B/C, 14-16 mud A/B/C,
+    // 17 frosted ground. Grass, all roads, gravel, dirt, mud, and frosted
+    // ground are passable; rock/water are impassable.
     terrain: number[],
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.

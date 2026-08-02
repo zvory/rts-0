@@ -15,7 +15,8 @@ import {
 } from "./map_editor_session.js";
 
 const MAP_CATALOG_URL = "/maps/catalog";
-const MAP_EDITOR_PANEL_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
+const MAP_EDITOR_OPTIONS_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
+const MAP_EDITOR_TOOLS_STORAGE_KEY = "rts.mapEditor.tools.window.v1";
 
 export class MapEditorPanel {
   constructor({
@@ -45,21 +46,32 @@ export class MapEditorPanel {
     this.blankMapHeight = String(MAP_EDITOR_DEFAULT_SIZE);
     this.observedMapDimensions = null;
     this.pending = false;
-    this.status = "Ready to edit the map.";
+    this.status = "";
     this.statusError = false;
     this.destroyed = false;
-    this.el = document.createElement("aside");
-    this.el.className = "lab-panel map-editor-panel map-editor-window";
-    this.el.setAttribute("aria-label", "Map Editor controls");
-    root.appendChild(this.el);
-    this.windowChrome = new LabPanelWindowChrome(this.el, {
-      storageKey: MAP_EDITOR_PANEL_STORAGE_KEY,
-      panelLabel: "map editor",
+    this.optionsEl = this.createPanelElement("map-editor-options-window", "Map Editor options");
+    this.toolsEl = this.createPanelElement("map-editor-tools-window", "Map Editor tools");
+    this.el = this.optionsEl;
+    root.append(this.optionsEl, this.toolsEl);
+    this.optionsWindowChrome = new LabPanelWindowChrome(this.optionsEl, {
+      storageKey: MAP_EDITOR_OPTIONS_STORAGE_KEY,
+      panelLabel: "map editor options",
+    });
+    this.toolsWindowChrome = new LabPanelWindowChrome(this.toolsEl, {
+      storageKey: MAP_EDITOR_TOOLS_STORAGE_KEY,
+      panelLabel: "map editor tools",
     });
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);
     this.unsubscribe = session.subscribe((snapshot) => this.applySessionSnapshot(snapshot));
     void this.loadCatalog();
+  }
+
+  createPanelElement(className, ariaLabel) {
+    const el = document.createElement("aside");
+    el.className = `lab-panel map-editor-panel ${className}`;
+    el.setAttribute("aria-label", ariaLabel);
+    return el;
   }
 
   applySessionSnapshot(snapshot) {
@@ -86,21 +98,22 @@ export class MapEditorPanel {
 
   render() {
     if (this.destroyed) return;
-    const previousBody = this.el.querySelector(".map-editor-panel-body");
-    const scroll = previousBody && {
-      left: previousBody.scrollLeft,
-      top: previousBody.scrollTop,
-    };
-    this.el.replaceChildren();
-    const header = this.windowChrome.renderHeader({
-      kicker: "Editor",
-      title: "Map Editor",
-      collapseLabel: "map editor panel",
+    this.renderOptionsWindow();
+    this.renderToolsWindow();
+  }
+
+  renderOptionsWindow() {
+    const scroll = panelScroll(this.optionsEl);
+    this.optionsEl.replaceChildren();
+    const header = this.optionsWindowChrome.renderHeader({
+      kicker: "Options",
+      collapseLabel: "map editor options panel",
     });
     header.classList.add("map-editor-header");
     const body = document.createElement("div");
     body.className = "lab-panel-body map-editor-panel-body";
-    body.appendChild(this.renderStatus());
+    const status = this.renderStatus();
+    if (status) body.appendChild(status);
     if (!this.session.draft) {
       body.appendChild(readout("Preparing editor…"));
     } else {
@@ -108,16 +121,30 @@ export class MapEditorPanel {
         this.renderMapSource(),
         this.renderHistory(),
         this.renderDetails(),
-        this.renderTerrain(),
-        this.renderLocations(),
         this.renderActions(),
       );
     }
-    this.el.append(header, body, this.windowChrome.renderResizeHandle());
-    if (scroll) {
-      body.scrollLeft = scroll.left;
-      body.scrollTop = scroll.top;
+    this.optionsEl.append(header, body, this.optionsWindowChrome.renderResizeHandle());
+    restorePanelScroll(body, scroll);
+  }
+
+  renderToolsWindow() {
+    const scroll = panelScroll(this.toolsEl);
+    this.toolsEl.replaceChildren();
+    const header = this.toolsWindowChrome.renderHeader({
+      kicker: "Tools",
+      collapseLabel: "map editor tools panel",
+    });
+    header.classList.add("map-editor-header");
+    const body = document.createElement("div");
+    body.className = "lab-panel-body map-editor-panel-body";
+    if (!this.session.draft) {
+      body.appendChild(readout("Preparing editor…"));
+    } else {
+      body.append(this.renderTerrain(), this.renderLocations());
     }
+    this.toolsEl.append(header, body, this.toolsWindowChrome.renderResizeHandle());
+    restorePanelScroll(body, scroll);
   }
 
   renderMapSource() {
@@ -179,6 +206,16 @@ export class MapEditorPanel {
     palette.className = "map-editor-palette";
     for (const [code, label] of [
       [TERRAIN.GRASS, "Grass / erase"],
+      [TERRAIN.GRAVEL_A, "Gravel A — Slate"],
+      [TERRAIN.GRAVEL_B, "Gravel B — Limestone"],
+      [TERRAIN.GRAVEL_C, "Gravel C — Chalk"],
+      [TERRAIN.DIRT_A, "Dirt A — Loam"],
+      [TERRAIN.DIRT_B, "Dirt B — Red Clay"],
+      [TERRAIN.DIRT_C, "Dirt C — Dry Ochre"],
+      [TERRAIN.MUD_A, "Mud A — Churned"],
+      [TERRAIN.MUD_B, "Mud B — Waterlogged"],
+      [TERRAIN.MUD_C, "Mud C — Clay"],
+      [TERRAIN.FROSTED_GROUND, "Frosted Ground"],
       [TERRAIN.ROCK, "Stone"],
       [TERRAIN.WATER, "Water"],
       [TERRAIN.ROAD_BARE, "Road — bare"],
@@ -321,6 +358,7 @@ export class MapEditorPanel {
   }
 
   renderStatus() {
+    if (!this.status) return null;
     const status = document.createElement("p");
     status.className = "map-editor-status";
     status.dataset.state = this.statusError ? "error" : "ok";
@@ -528,9 +566,22 @@ export class MapEditorPanel {
     this.destroyed = true;
     window.removeEventListener("keydown", this.onKeyDown);
     this.unsubscribe?.();
-    this.windowChrome.destroy();
-    this.el.remove();
+    this.optionsWindowChrome.destroy();
+    this.toolsWindowChrome.destroy();
+    this.optionsEl.remove();
+    this.toolsEl.remove();
   }
+}
+
+function panelScroll(el) {
+  const body = el.querySelector(".map-editor-panel-body");
+  return body && { left: body.scrollLeft, top: body.scrollTop };
+}
+
+function restorePanelScroll(body, scroll) {
+  if (!scroll) return;
+  body.scrollLeft = scroll.left;
+  body.scrollTop = scroll.top;
 }
 
 function group(title) {
@@ -614,6 +665,16 @@ function readout(text, error = false) {
 }
 
 function terrainName(code) {
+  if (code === TERRAIN.GRAVEL_A) return "gravel-a";
+  if (code === TERRAIN.GRAVEL_B) return "gravel-b";
+  if (code === TERRAIN.GRAVEL_C) return "gravel-c";
+  if (code === TERRAIN.DIRT_A) return "dirt-a";
+  if (code === TERRAIN.DIRT_B) return "dirt-b";
+  if (code === TERRAIN.DIRT_C) return "dirt-c";
+  if (code === TERRAIN.MUD_A) return "mud-a";
+  if (code === TERRAIN.MUD_B) return "mud-b";
+  if (code === TERRAIN.MUD_C) return "mud-c";
+  if (code === TERRAIN.FROSTED_GROUND) return "frosted-ground";
   if (code === TERRAIN.ROCK) return "stone";
   if (code === TERRAIN.WATER) return "water";
   if (code === TERRAIN.ROAD_BARE) return "road-bare";

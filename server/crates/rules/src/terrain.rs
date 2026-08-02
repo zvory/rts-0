@@ -12,6 +12,16 @@ pub const MAP_TERRAIN_ROAD_HORIZONTAL: u8 = 4;
 pub const MAP_TERRAIN_ROAD_VERTICAL: u8 = 5;
 pub const MAP_TERRAIN_ROAD_DIAGONAL_NW_SE: u8 = 6;
 pub const MAP_TERRAIN_ROAD_DIAGONAL_NE_SW: u8 = 7;
+pub const MAP_TERRAIN_GRAVEL_A: u8 = 8;
+pub const MAP_TERRAIN_GRAVEL_B: u8 = 9;
+pub const MAP_TERRAIN_GRAVEL_C: u8 = 10;
+pub const MAP_TERRAIN_DIRT_A: u8 = 11;
+pub const MAP_TERRAIN_DIRT_B: u8 = 12;
+pub const MAP_TERRAIN_DIRT_C: u8 = 13;
+pub const MAP_TERRAIN_MUD_A: u8 = 14;
+pub const MAP_TERRAIN_MUD_B: u8 = 15;
+pub const MAP_TERRAIN_MUD_C: u8 = 16;
+pub const MAP_TERRAIN_FROSTED_GROUND: u8 = 17;
 
 pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
 
@@ -26,7 +36,17 @@ pub enum TerrainKind {
 impl TerrainKind {
     pub fn from_map_code(code: u8) -> Option<Self> {
         match code {
-            MAP_TERRAIN_GRASS => Some(TerrainKind::Open),
+            MAP_TERRAIN_GRASS
+            | MAP_TERRAIN_GRAVEL_A
+            | MAP_TERRAIN_GRAVEL_B
+            | MAP_TERRAIN_GRAVEL_C
+            | MAP_TERRAIN_DIRT_A
+            | MAP_TERRAIN_DIRT_B
+            | MAP_TERRAIN_DIRT_C
+            | MAP_TERRAIN_MUD_A
+            | MAP_TERRAIN_MUD_B
+            | MAP_TERRAIN_MUD_C
+            | MAP_TERRAIN_FROSTED_GROUND => Some(TerrainKind::Open),
             MAP_TERRAIN_ROAD_BARE
             | MAP_TERRAIN_ROAD_HORIZONTAL
             | MAP_TERRAIN_ROAD_VERTICAL
@@ -75,6 +95,24 @@ mod tests {
     use super::*;
     #[test]
     fn passable_map_codes_project_to_their_terrain_kind() {
+        let open_codes = [
+            MAP_TERRAIN_GRASS,
+            MAP_TERRAIN_GRAVEL_A,
+            MAP_TERRAIN_GRAVEL_B,
+            MAP_TERRAIN_GRAVEL_C,
+            MAP_TERRAIN_DIRT_A,
+            MAP_TERRAIN_DIRT_B,
+            MAP_TERRAIN_DIRT_C,
+            MAP_TERRAIN_MUD_A,
+            MAP_TERRAIN_MUD_B,
+            MAP_TERRAIN_MUD_C,
+            MAP_TERRAIN_FROSTED_GROUND,
+        ];
+        for code in open_codes {
+            assert_eq!(TerrainKind::from_map_code(code), Some(TerrainKind::Open));
+            assert!(is_passable_map_code(code));
+            assert!(!blocks_line_of_sight(code));
+        }
         assert_eq!(
             TerrainKind::from_map_code(MAP_TERRAIN_GRASS),
             Some(TerrainKind::Open)
@@ -101,7 +139,6 @@ mod tests {
         );
         assert_eq!(TerrainKind::from_map_code(MAP_TERRAIN_ROCK), None);
         assert_eq!(TerrainKind::from_map_code(MAP_TERRAIN_WATER), None);
-        assert!(is_passable_map_code(MAP_TERRAIN_GRASS));
         assert!(is_passable_map_code(MAP_TERRAIN_ROAD_BARE));
         assert!(is_passable_map_code(MAP_TERRAIN_ROAD_HORIZONTAL));
         assert!(is_passable_map_code(MAP_TERRAIN_ROAD_VERTICAL));
