@@ -15,19 +15,29 @@ pub(crate) fn entity_hidden_by_stealth_from_team(
     fog: &Fog,
     teams: &TeamRelations,
 ) -> bool {
-    if !entity.is_unit()
-        || teams.same_team_or_same_owner(viewer, entity.owner)
-        || !map.world_point_is_stealth(entity.pos_x, entity.pos_y)
-    {
+    entity_hidden_by_stealth_from_players([viewer], entity, map, fog, teams)
+}
+
+pub(crate) fn entity_hidden_by_stealth_from_players(
+    viewers: impl IntoIterator<Item = u32>,
+    entity: &Entity,
+    map: &Map,
+    fog: &Fog,
+    teams: &TeamRelations,
+) -> bool {
+    if !entity.is_unit() || !map.world_point_is_stealth(entity.pos_x, entity.pos_y) {
         return false;
     }
-    !teams
-        .same_team_player_ids(viewer)
-        .into_iter()
-        .any(|player| {
-            fog.active_firing_reveal_episode(player, entity.id)
-                .is_some()
-        })
+    !viewers.into_iter().any(|viewer| {
+        teams.same_team_or_same_owner(viewer, entity.owner)
+            || teams
+                .same_team_player_ids(viewer)
+                .into_iter()
+                .any(|player| {
+                    fog.active_firing_reveal_episode(player, entity.id)
+                        .is_some()
+                })
+    })
 }
 
 pub fn event_visible_to(

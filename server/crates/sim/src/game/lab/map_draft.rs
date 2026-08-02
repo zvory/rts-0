@@ -7,6 +7,7 @@ use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 use super::LabError;
 
 pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
+    let (stealth_tiles, no_vehicle_tiles) = map.protocol_overlay_tiles();
     LabMapDraft {
         name: name.to_string(),
         width: map.width,
@@ -31,8 +32,8 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
             })
             .collect(),
         doodads: map.doodads.clone(),
-        stealth_tiles: map.protocol_stealth_tiles(),
-        no_vehicle_tiles: map.protocol_no_vehicle_tiles(),
+        stealth_tiles,
+        no_vehicle_tiles,
     }
 }
 

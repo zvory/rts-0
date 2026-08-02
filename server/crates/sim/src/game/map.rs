@@ -71,9 +71,9 @@ pub struct Map {
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
     pub doodads: Vec<MapDoodad>,
     /// Canonical sparse tile coordinates granting unit concealment.
-    pub stealth_tiles: Vec<(u32, u32)>,
+    pub(crate) stealth_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
-    pub no_vehicle_tiles: Vec<(u32, u32)>,
+    pub(crate) no_vehicle_tiles: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -290,35 +290,24 @@ impl Map {
     }
 
     #[inline]
-    pub fn is_stealth_tile(&self, x: u32, y: u32) -> bool {
+    fn is_stealth_tile(&self, x: u32, y: u32) -> bool {
         self.stealth_tiles.binary_search(&(x, y)).is_ok()
     }
 
     #[inline]
-    pub fn is_no_vehicle_tile(&self, x: u32, y: u32) -> bool {
-        self.no_vehicle_tiles.binary_search(&(x, y)).is_ok()
-    }
-
-    #[inline]
-    pub fn world_point_is_stealth(&self, x: f32, y: f32) -> bool {
+    pub(crate) fn world_point_is_stealth(&self, x: f32, y: f32) -> bool {
         self.contains_world_point(x, y) && {
             let (tx, ty) = self.tile_of(x, y);
             self.is_stealth_tile(tx, ty)
         }
     }
 
-    pub(crate) fn protocol_stealth_tiles(&self) -> Vec<MapTile> {
-        self.stealth_tiles
-            .iter()
-            .map(|&(x, y)| MapTile { x, y })
-            .collect()
-    }
-
-    pub(crate) fn protocol_no_vehicle_tiles(&self) -> Vec<MapTile> {
-        self.no_vehicle_tiles
-            .iter()
-            .map(|&(x, y)| MapTile { x, y })
-            .collect()
+    pub(crate) fn protocol_overlay_tiles(&self) -> (Vec<MapTile>, Vec<MapTile>) {
+        let convert = |tiles: &[(u32, u32)]| tiles.iter().map(|&(x, y)| MapTile { x, y }).collect();
+        (
+            convert(&self.stealth_tiles),
+            convert(&self.no_vehicle_tiles),
+        )
     }
 
     /// Whether a tile is passable terrain. Out-of-bounds is impassable. This does NOT

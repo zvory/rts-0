@@ -136,9 +136,10 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         })
         .collect();
     let doodads = super::doodads::canonicalize(width, height, authored.doodads)?;
-    let stealth_tiles = parse_locations(width, height, &authored.stealth_tiles, "stealthTiles")?;
+    let stealth_tiles =
+        parse_overlay_locations(width, height, &authored.stealth_tiles, "stealthTiles")?;
     let no_vehicle_tiles =
-        parse_locations(width, height, &authored.no_vehicle_tiles, "noVehicleTiles")?;
+        parse_overlay_locations(width, height, &authored.no_vehicle_tiles, "noVehicleTiles")?;
     Ok(AuthoredMapData {
         name: authored.name,
         width,
@@ -268,6 +269,16 @@ fn parse_locations(
         }
         locations.push((location.x, location.y));
     }
+    Ok(locations)
+}
+
+fn parse_overlay_locations(
+    width: u32,
+    height: u32,
+    authored: &[AuthoredLocation],
+    field: &str,
+) -> Result<Vec<(u32, u32)>, String> {
+    let mut locations = parse_locations(width, height, authored, field)?;
     locations.sort_unstable();
     Ok(locations)
 }

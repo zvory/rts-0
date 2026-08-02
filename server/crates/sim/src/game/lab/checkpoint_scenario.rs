@@ -90,6 +90,7 @@ pub struct LabCheckpointScenarioSource {
 
 impl LabCheckpointScenarioMap {
     pub(super) fn from_map(map: &Map, metadata: &MapMetadata) -> Self {
+        let (stealth_tiles, no_vehicle_tiles) = map.protocol_overlay_tiles();
         Self {
             name: metadata.name.clone(),
             schema_version: metadata.schema_version,
@@ -118,8 +119,8 @@ impl LabCheckpointScenarioMap {
                     })
                     .collect(),
                 doodads: map.doodads.clone(),
-                stealth_tiles: map.protocol_stealth_tiles(),
-                no_vehicle_tiles: map.protocol_no_vehicle_tiles(),
+                stealth_tiles,
+                no_vehicle_tiles,
             },
         }
     }
@@ -313,6 +314,15 @@ fn validate_overlay_tiles(
                 reason: format!("checkpoint scenario map {field} is invalid"),
             });
         }
+    }
+    if tiles
+        .windows(2)
+        .any(|pair| (pair[0].x, pair[0].y) >= (pair[1].x, pair[1].y))
+    {
+        return Err(LabError::InvalidMap {
+            name: name.to_string(),
+            reason: format!("checkpoint scenario map {field} is not canonical"),
+        });
     }
     Ok(())
 }

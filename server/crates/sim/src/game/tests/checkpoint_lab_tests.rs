@@ -5,7 +5,7 @@ use crate::game::lab::{
     LabSpawnEntity, LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION,
 };
 use crate::game::upgrade::UpgradeKind;
-use crate::protocol::MapDoodad;
+use crate::protocol::{MapDoodad, MapTile};
 
 const TEST_BUILD_SHA: &str = "checkpoint-lab-test";
 
@@ -222,6 +222,16 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
         }
         Err(err) => panic!("unexpected error for wrong materialized map: {err:?}"),
     }
+}
+
+#[test]
+fn lab_checkpoint_scenario_rejects_noncanonical_overlays() {
+    let game = default_lab_game(0x5150_5007);
+    let mut checkpoint = game
+        .export_lab_checkpoint_scenario("Overlay order".to_string(), TEST_BUILD_SHA)
+        .expect("checkpoint export");
+    checkpoint.map.data.stealth_tiles = vec![MapTile { x: 2, y: 1 }, MapTile { x: 1, y: 1 }];
+    assert_restore_invalid_map(checkpoint, "not canonical");
 }
 
 #[test]

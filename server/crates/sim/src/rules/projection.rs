@@ -24,6 +24,7 @@ use super::projection_abilities::{
     active_ability_object_expires_in, active_return_object_id, return_available_tick,
 };
 use super::projection_panzerfaust::project_panzerfaust_state;
+use super::projection_visibility::entity_hidden_by_stealth_from_players;
 pub(crate) use super::projection_visibility::entity_hidden_by_stealth_from_team;
 pub(crate) use super::projection_visibility::shot_reveals_attacker;
 #[allow(unused_imports)]
@@ -83,6 +84,29 @@ pub(crate) enum PrivateDetailProjection<'a> {
 }
 
 impl PrivateDetailProjection<'_> {
+    fn entity_hidden_by_stealth(
+        self,
+        viewer: u32,
+        entity: &Entity,
+        map: &crate::game::map::Map,
+        fog: &Fog,
+        teams: &TeamRelations,
+    ) -> bool {
+        match self {
+            Self::ExactViewer => {
+                entity_hidden_by_stealth_from_team(viewer, entity, map, fog, teams)
+            }
+            Self::SelectedOwners(player_ids) => entity_hidden_by_stealth_from_players(
+                player_ids.iter().copied(),
+                entity,
+                map,
+                fog,
+                teams,
+            ),
+            Self::AllProjected => false,
+        }
+    }
+
     fn viewer_for(self, viewer: u32, entity: &Entity) -> Option<u32> {
         match self {
             Self::ExactViewer => (entity.owner == viewer).then_some(viewer),
@@ -178,7 +202,13 @@ pub fn project_entity(
     );
     let concealment_fog = context.concealment_fog.unwrap_or(context.fog);
     let hidden_by_stealth = context.map.zip(context.teams).is_some_and(|(map, teams)| {
-        entity_hidden_by_stealth_from_team(viewer, entity, map, concealment_fog, teams)
+        context.private_detail_projection.entity_hidden_by_stealth(
+            viewer,
+            entity,
+            map,
+            concealment_fog,
+            teams,
+        )
     });
     if context.fogged
         && !selected_owner
@@ -271,7 +301,7 @@ pub fn project_entity(
                     || !context.fogged
                     || (!vision_only
                         && !context.map.zip(context.teams).is_some_and(|(map, teams)| {
-                            entity_hidden_by_stealth_from_team(
+                            context.private_detail_projection.entity_hidden_by_stealth(
                                 viewer,
                                 target,
                                 map,

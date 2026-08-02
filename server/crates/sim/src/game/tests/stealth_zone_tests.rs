@@ -110,6 +110,13 @@ fn scout_car_waits_for_hidden_rifle_fire_and_the_reveal_reaction_delay() {
         revealed.vision_only,
         "a firing unit in stealth should use the transient reveal presentation"
     );
+    assert!(
+        game.snapshot_for_observer(&ObserverView::Players(vec![1]))
+            .entities
+            .iter()
+            .any(|view| view.id == rifles[0]),
+        "a player-perspective observer should receive that player's firing reveal"
+    );
 
     while game.tick_count() < reveal_started + config::TICK_HZ - 1 {
         game.tick();

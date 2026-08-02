@@ -45,6 +45,27 @@ fn authored_overlays_are_canonicalized_and_hash_as_distinct_layers() {
 }
 
 #[test]
+fn overlay_canonicalization_does_not_reorder_authored_starts() {
+    let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+        serde_json::json!([]),
+        serde_json::json!([]),
+    ))
+    .expect("test map JSON");
+    authored["startLocations"] = serde_json::json!([
+        {"x": 24, "y": 8},
+        {"x": 8, "y": 8}
+    ]);
+    authored["baseSites"] = serde_json::json!([
+        {"x": 24, "y": 8, "steelPatches": 12, "oilPatches": 3},
+        {"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}
+    ]);
+
+    let materialized =
+        Map::materialize_authored_json(&authored.to_string(), 2).expect("valid authored starts");
+    assert_eq!(materialized.starts, vec![(24, 8), (8, 8)]);
+}
+
+#[test]
 fn authored_overlays_reject_duplicates_and_out_of_bounds_tiles() {
     for (tiles, expected) in [
         (
