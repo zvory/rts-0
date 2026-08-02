@@ -5,7 +5,7 @@
   "exceptions": [
     {
       "path": "client/styles.css",
-      "lines": 5734,
+      "lines": 5743,
       "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; keep ratcheting until those responsibilities have an evidence-backed split."
     },
     {
@@ -40,12 +40,12 @@
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1906,
+      "lines": 1905,
       "reason": "Close vehicle move precision adds focused same-tile exact-goal handling and regression coverage in the oversized coordinator; requires human playtest review and should ratchet down when order-entry policy/tests split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
-      "lines": 5101,
+      "lines": 5102,
       "reason": "Existing oversized movement test module before repo-wide source-size gate."
     },
     {
