@@ -20,9 +20,9 @@ use crate::protocol::Event;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
 
 use super::pivot_drive::{
-    angle_delta, distance_between, normalize_angle, pivot_drive_intent, pivot_drive_speed_scale,
-    rotate_toward, vehicle_body_turn_rate, vehicle_oil_starves_movement,
-    vehicle_traffic_adjustment,
+    angle_delta, close_nudge_hull_axis_motion, distance_between, normalize_angle,
+    pivot_drive_intent, pivot_drive_speed_scale, rotate_toward, vehicle_body_turn_rate,
+    vehicle_oil_starves_movement, vehicle_traffic_adjustment,
 };
 use super::scout_car::{plan_scout_car_motion, route_accepts_waypoint};
 use super::standability::{
@@ -41,39 +41,6 @@ fn panzerfaust_movement_locked(e: &Entity) -> bool {
         e.combat.as_ref().and_then(|combat| combat.panzerfaust),
         Some(PanzerfaustState::Windup { .. })
     )
-}
-
-fn pivot_vehicle_step_dir(path_dir: (f32, f32), body_facing: f32) -> (f32, f32) {
-    if !body_facing.is_finite() {
-        return path_dir;
-    }
-    let forward = (body_facing.cos(), body_facing.sin());
-    if !forward.0.is_finite() || !forward.1.is_finite() {
-        return path_dir;
-    }
-    let dot = path_dir.0 * forward.0 + path_dir.1 * forward.1;
-    if dot < 0.0 {
-        (-forward.0, -forward.1)
-    } else {
-        forward
-    }
-}
-
-fn pivot_vehicle_axis_aligned_for_close_nudge(path_dir: (f32, f32), body_facing: f32) -> bool {
-    if !body_facing.is_finite() {
-        return true;
-    }
-    let travel_facing = path_dir.1.atan2(path_dir.0);
-    if !travel_facing.is_finite() {
-        return true;
-    }
-    let forward_error = angle_delta(body_facing, travel_facing).abs();
-    let reverse_error = angle_delta(
-        normalize_angle(body_facing + std::f32::consts::PI),
-        travel_facing,
-    )
-    .abs();
-    forward_error.min(reverse_error) <= 0.55
 }
 
 /// Advance moving units along waypoint paths, preserving passable landings and Move arrival.
@@ -331,20 +298,14 @@ pub(super) fn advance_moving_units(
                         e.mark_move_phase(MovePhase::Moving);
                     }
                 } else {
-                    // Partial step toward the waypoint. Pivot-drive vehicles translate
-                    // along their hull axis, forward or reverse, so the body facing and motion
-                    // read as one physical action instead of sideways sliding.
+                    // Partial step toward the waypoint.
                     let path_dir = (dx / dist, dy / dist);
                     let same_tile_final_vehicle_nudge = is_pivot_vehicle
                         && path_len == 1
                         && map.tile_of(x, y) == map.tile_of(wx, wy);
-                    let nudge_axis_aligned = !same_tile_final_vehicle_nudge
-                        || pivot_vehicle_axis_aligned_for_close_nudge(path_dir, body_facing);
-                    let step_dir = if same_tile_final_vehicle_nudge {
-                        pivot_vehicle_step_dir(path_dir, body_facing)
-                    } else {
-                        path_dir
-                    };
+                    let (step_dir, nudge_axis_aligned) = same_tile_final_vehicle_nudge
+                        .then(|| close_nudge_hull_axis_motion(path_dir, body_facing))
+                        .unwrap_or((path_dir, true));
                     let step_budget = if nudge_axis_aligned { budget } else { 0.0 };
                     let direct_nx = x + step_dir.0 * step_budget;
                     let direct_ny = y + step_dir.1 * step_budget;
