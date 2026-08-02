@@ -1020,13 +1020,24 @@ fn lab_timeline_resets_on_scenario_import() {
         },
     );
     let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
-    assert!(messages.iter().any(|msg| {
-        matches!(
-            msg,
-            ServerMessage::LabResult(result)
-                if result.ok && result.request_id == 43 && result.op == "importScenario"
-        )
-    }));
+    let result_index = messages
+        .iter()
+        .position(|msg| {
+            matches!(
+                msg,
+                ServerMessage::LabResult(result)
+                    if result.ok && result.request_id == 43 && result.op == "importScenario"
+            )
+        })
+        .expect("successful import result");
+    let start_index = messages
+        .iter()
+        .position(|msg| matches!(msg, ServerMessage::Start(_)))
+        .expect("timeline-reset start payload");
+    assert!(
+        result_index < start_index,
+        "the import request resolves before clients rebuild"
+    );
     assert!(messages.iter().any(|msg| {
         matches!(
             msg,

@@ -2,7 +2,7 @@
 
 import { assert } from "./assertions.mjs";
 import { installFakePixi } from "./pixi_fakes.mjs";
-import { EVENT, KIND } from "../../client/src/protocol.js";
+import { KIND } from "../../client/src/protocol.js";
 import { GroundDecalBuffer } from "../../client/src/state_ground_decals.js";
 import {
   GROUND_DECAL_TEXTURE_WORLD_SCALE,
@@ -37,26 +37,25 @@ class RecordingCanvasContext {
 
 {
   const buffer = new GroundDecalBuffer();
-  const events = [];
+  const records = [];
   for (let i = 0; i < STRESS_DECAL_COUNT; i += 1) {
-    const ev = makeDeathEvent(i);
-    events.push(ev);
-    if (i % 3 === 0) events.push({ ...ev });
+    const record = makeAuthoritativeRecord(i);
+    records.push(record);
+    if (i % 3 === 0) records.push({ ...record });
   }
 
-  const queued = buffer.applySnapshotEvents(events, {
+  const { queued } = buffer.applyAuthoritativeBatch({ revision: 1, decals: records }, {
     players: [{ id: 1, color: "#4878c8" }],
-    tick: 700,
   });
   const firstBatch = buffer.consumePending();
-  assert(queued === STRESS_DECAL_COUNT, "stress buffer queues each death id only once");
+  assert(queued === STRESS_DECAL_COUNT, "stress buffer queues each authoritative id only once");
   assert(firstBatch.length === STRESS_DECAL_COUNT, "stress buffer exposes the deduped high-count decal batch");
 
-  buffer.applySnapshotEvents(events, {
+  buffer.applyAuthoritativeBatch({ revision: 2, decals: records }, {
     players: [{ id: 1, color: "#4878c8" }],
-    tick: 701,
   });
-  assert(buffer.consumePending().length === 0, "stress buffer keeps old death ids deduped after consumption");
+  assert(buffer.consumePending().length === 0,
+    "stress buffer keeps stable authoritative ids deduped after consumption");
 }
 
 {
@@ -153,13 +152,15 @@ class RecordingCanvasContext {
   }
 }
 
-function makeDeathEvent(index) {
+function makeAuthoritativeRecord(index) {
   return {
-    e: EVENT.DEATH,
     id: 10000 + index,
-    kind: index % 2 === 0 ? KIND.WORKER : KIND.TANK,
+    sourceKind: index % 2 === 0 ? KIND.WORKER : KIND.TANK,
+    decalClass: index % 2 === 0 ? "infantry" : "scorch",
     x: 16 + (index % 80) * 50,
     y: 24 + Math.floor(index / 80) * 240,
+    owner: 1,
+    seed: 910000 + index,
   };
 }
 

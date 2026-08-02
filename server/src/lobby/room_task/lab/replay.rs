@@ -366,6 +366,7 @@ impl RoomTask {
                 }
                 self.phase = Phase::InGame(Box::new(seek.game));
                 self.lab_room_time_controller_id = Some(player_id);
+                self.ground_decal_request_times.clear();
                 self.send_lab_start_payloads_to_all(true);
                 self.broadcast_lab_room_time_state();
                 self.broadcast_lab_state();

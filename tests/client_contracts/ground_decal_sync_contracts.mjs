@@ -16,6 +16,8 @@ assert(
   const timers = [];
   const cleared = new Set();
   let resets = 0;
+  let labResultHandler = null;
+  let labUnsubscribed = 0;
   const buffer = new GroundDecalBuffer();
   const state = {
     groundDecals: buffer,
@@ -28,6 +30,12 @@ assert(
   const sync = new GroundDecalSync({
     net: { requestGroundDecals(afterRevision) { requests.push(afterRevision); return true; } },
     state,
+    labClient: {
+      subscribeResult(handler) {
+        labResultHandler = handler;
+        return () => { labUnsubscribed += 1; };
+      },
+    },
     resetPresentation: () => { resets += 1; },
     retryDelaysMs: [10, 20],
     setTimer(fn, ms) { const id = timers.length; timers.push({ fn, ms }); return id; },
@@ -70,15 +78,16 @@ assert(
   assert(!sync.applyResponse({ revision: 2, decals: [] }) && buffer.authoritativeRevision === 3,
     "late responses cannot move the applied revision backward");
 
-  sync.reset({ awaitSnapshot: true });
+  labResultHandler({ ok: true, op: "setVision" });
   assert(buffer.authoritativeRevision === 0 && buffer.pendingCount === 0 && resets === 1,
-    "perspective reset clears local decal records, pixels, and applied revision");
+    "Lab perspective changes clear local decal records, pixels, and applied revision");
   assert(!sync.applyResponse({ revision: 4, decals: [] }),
     "a response from the old perspective is ignored until its replacement snapshot arrives");
   sync.observeSnapshot(4);
   assert(requests.at(-1) === 0, "the first replacement-perspective snapshot requests full history");
   sync.destroy();
-  assert(cleared.size > 0, "destroy cancels outstanding repair work");
+  assert(cleared.size > 0 && labUnsubscribed === 1,
+    "destroy cancels outstanding repair work and its Lab result subscription");
 }
 
 {

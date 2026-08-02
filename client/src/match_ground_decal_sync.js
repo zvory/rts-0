@@ -9,6 +9,7 @@ export class GroundDecalSync {
   constructor({
     net,
     state,
+    labClient = null,
     resetPresentation = null,
     retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
     setTimer = (fn, ms) => setTimeout(fn, ms),
@@ -25,6 +26,11 @@ export class GroundDecalSync {
     this.retryTimer = null;
     this.awaitingPerspectiveSnapshot = false;
     this.destroyed = false;
+    this.unsubscribeLabResults = labClient?.subscribeResult?.((result) => {
+      if (result?.ok && (result.op === "setVision" || result.op === "importScenario")) {
+        this.reset({ awaitSnapshot: true });
+      }
+    }) || null;
   }
 
   observeSnapshot(revision) {
@@ -59,6 +65,8 @@ export class GroundDecalSync {
     if (this.destroyed) return;
     this.destroyed = true;
     this._cancelRetry();
+    this.unsubscribeLabResults?.();
+    this.unsubscribeLabResults = null;
   }
 
   _ensureRequest() {

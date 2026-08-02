@@ -265,11 +265,9 @@ export class Match {
     this.desktopCursorAutoLockFailures = 0;
     this.onDesktopCursorAutoLockSignal = this.handleDesktopCursorAutoLockSignal.bind(this);
 
-    // Module graph.
     this.state = this._timeInit("match.state", () => new GameState(payload, { renderClock: this.renderClock }));
     this.groundDecalSync = new GroundDecalSync({
-      net: this.net,
-      state: this.state,
+      net: this.net, state: this.state, labClient: this.labClient,
       resetPresentation: () => this.resetGroundDecalPresentation(),
     });
     applyInitialUnitRanges(this.state, options.unitRangesEnabled);

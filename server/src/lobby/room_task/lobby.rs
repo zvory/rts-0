@@ -161,6 +161,7 @@ impl RoomTask {
         self.pending_recipient_notices.remove(&player_id);
         self.recent_chat_times.remove(&player_id);
         self.observer_views.remove(&player_id);
+        self.ground_decal_request_times.remove(&player_id);
         if let Some(session) = &mut self.lab_session {
             session.remove_viewer(player_id);
         }

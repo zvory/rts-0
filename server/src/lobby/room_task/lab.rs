@@ -948,8 +948,13 @@ impl RoomTask {
         };
         if let Some(result) = result {
             let refresh_snapshot = refresh_snapshot_after_result && result.ok;
+            let resets_client_timeline = refresh_snapshot && result.op == "importScenario";
             self.send_lab_result_to(player_id, result);
-            if refresh_snapshot
+            if resets_client_timeline {
+                self.ground_decal_request_times.clear();
+                self.send_lab_start_payloads_to_all(true);
+                self.fanout_current_observer_snapshots_to(self.order.clone());
+            } else if refresh_snapshot
                 && self.session_policy().clock.room_time_source() == Some(RoomTimeSource::Lab)
             {
                 self.fanout_current_observer_snapshots_to(self.order.clone());
@@ -986,6 +991,7 @@ impl RoomTask {
             }
         }
         self.observer_views.insert(operator_id, observer_view);
+        self.ground_decal_request_times.remove(&operator_id);
         self.broadcast_lab_state();
         lab_result_ok(request_id, op, None)
     }

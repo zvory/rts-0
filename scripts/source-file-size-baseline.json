@@ -24,11 +24,6 @@
       "reason": "Checkpoint policy and simulation-architecture enforcement remain concentrated in this oversized checker; keep ratcheting until scanners and tests are split into modules."
     },
     {
-      "path": "server/crates/protocol/src/lib.rs",
-      "lines": 1615,
-      "reason": "Lab map and base-site DTOs moved into lab_scenario.rs; keep ratcheting until the remaining protocol DTO and integration-test groups are split."
-    },
-    {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
       "lines": 3283,
       "reason": "Anti-tank range coverage moved into its focused module; keep ratcheting until the remaining combat tests are split."
