@@ -628,6 +628,9 @@ try {
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
+      doodadToolLabels: [...document.querySelectorAll(".map-editor-palette button")]
+        .map((button) => button.textContent?.trim() || "")
+        .filter((label) => ["Remove doodads", "Erase brush", "Delete selection", "Select / move"].includes(label)),
       blankMapWidth: (() => {
         const input = document.querySelector("input[aria-label='Map width']");
         return input && {
@@ -694,6 +697,13 @@ try {
       editorUi.blankMapHeight.width <= 80 &&
       editorUi.clearanceSection === "Start and base locations",
     "MAP EDITOR: symmetry, independent blank-map dimensions, and grass-clearance controls are presented correctly",
+  );
+  ok(
+    editorUi.doodadToolLabels.includes("Remove doodads") &&
+      editorUi.doodadToolLabels.includes("Erase brush") &&
+      editorUi.doodadToolLabels.includes("Delete selection") &&
+      !editorUi.doodadToolLabels.includes("Select / move"),
+    `MAP EDITOR: doodad tools expose box removal and the erase brush without move (${editorUi.doodadToolLabels.join(", ")})`,
   );
   await editorPage.close();
 

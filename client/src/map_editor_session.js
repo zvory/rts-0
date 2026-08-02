@@ -2,7 +2,6 @@ import { PASSABLE, TERRAIN, isRoadTerrain } from "./protocol.js";
 import {
   createMapEditorDoodads,
   MAP_EDITOR_MAX_DOODADS,
-  moveMapEditorDoodad,
   normalizeMapEditorDoodads,
   removeMapEditorDoodads,
 } from "./map_editor_doodads.js";
@@ -366,13 +365,6 @@ export class MapEditorSession {
       this.doodadStroke.upserts.set(record.id, clone(record));
     }
     return added;
-  }
-
-  moveDoodad(id, point) {
-    if (!this.draft || !this.doodadStroke || !draftContainsWorldPoint(this.draft, point)) return null;
-    const moved = moveMapEditorDoodad(this.draft, id, point);
-    if (moved) this.doodadStroke.upserts.set(moved.id, clone(moved));
-    return moved;
   }
 
   removeDoodads(ids) {

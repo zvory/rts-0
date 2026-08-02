@@ -947,9 +947,11 @@ The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Trees are p
 share one mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed
 singly or sprayed with a chosen tint. Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
-deconstruction, and vehicle-pathing behavior. Symmetry, move, delete, and undo/redo apply to all
-authored doodads. Trees do not yet change line of sight, cover, or combat damage, and wildflowers
-remain mechanically inert.
+deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved: the
+removal tool box-selects any number of doodads for deletion, and a separate erase brush removes
+doodads continuously. Symmetry applies when creating doodads, while delete and undo/redo apply to
+all authored doodads. Trees do not yet change line of sight, cover, or combat damage, and
+wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
 The bounded server record expires after two minutes and is consumed once. Lab consumption creates a

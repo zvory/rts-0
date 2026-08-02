@@ -418,13 +418,13 @@ export class MapEditorPanel {
         }
         this.armDoodad("spray");
       }, { active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "spray" }),
-      button("Select / move", () => this.armDoodad("select"), {
-        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "select",
+      button("Remove doodads", () => this.armDoodad("remove"), {
+        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "remove",
       }),
       button("Erase brush", () => this.armDoodad("erase"), {
         active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "erase",
       }),
-      button("Delete selected", () => this.viewport.deleteSelectedDoodad()),
+      button("Delete selection", () => this.viewport.deleteSelectedDoodads()),
     );
 
     const color = document.createElement("input");
@@ -458,7 +458,7 @@ export class MapEditorPanel {
       field("Flower color", color),
       field("Brush radius (world px)", radius),
       field("Spray density", density),
-      readout("Symmetry applies when creating doodads. Drag selected doodads to move them; Delete/Backspace removes the selection."),
+      readout("Symmetry applies when creating doodads. Remove doodads uses a drag box; Delete/Backspace removes everything selected."),
     );
     return section;
   }
@@ -474,7 +474,7 @@ export class MapEditorPanel {
         this.setStatus(`Placing ${entry.label.toLowerCase()}.`);
       }, {
         active: this.viewport.tool?.kind === "doodad"
-          && !["select", "erase"].includes(this.viewport.tool?.mode)
+          && !["remove", "erase"].includes(this.viewport.tool?.mode)
           && this.selectedDoodadType === entry.typeId,
       }));
     }
@@ -541,7 +541,7 @@ export class MapEditorPanel {
   }
 
   armDoodad(mode) {
-    this.doodadMode = ["place", "spray", "select", "erase"].includes(mode) ? mode : "place";
+    this.doodadMode = ["place", "spray", "remove", "erase"].includes(mode) ? mode : "place";
     this.viewport.armTool({
       kind: "doodad",
       mode: this.doodadMode,
