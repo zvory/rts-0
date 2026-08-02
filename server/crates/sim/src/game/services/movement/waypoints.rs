@@ -303,9 +303,11 @@ pub(super) fn advance_moving_units(
                     let same_tile_final_vehicle_nudge = is_pivot_vehicle
                         && path_len == 1
                         && map.tile_of(x, y) == map.tile_of(wx, wy);
-                    let (step_dir, nudge_axis_aligned) = same_tile_final_vehicle_nudge
-                        .then(|| close_nudge_hull_axis_motion(path_dir, body_facing))
-                        .unwrap_or((path_dir, true));
+                    let (step_dir, nudge_axis_aligned) = if same_tile_final_vehicle_nudge {
+                        close_nudge_hull_axis_motion(path_dir, body_facing)
+                    } else {
+                        (path_dir, true)
+                    };
                     let step_budget = if nudge_axis_aligned { budget } else { 0.0 };
                     let direct_nx = x + step_dir.0 * step_budget;
                     let direct_ny = y + step_dir.1 * step_budget;

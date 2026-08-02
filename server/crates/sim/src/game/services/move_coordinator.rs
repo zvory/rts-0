@@ -950,13 +950,12 @@ impl<'a> MoveCoordinator<'a> {
                 && center_dist.is_finite()
                 && center_dist > EXACT_GOAL_ARRIVAL_EPS_PX;
             if let Some(e) = entities.get_mut(id) {
-                let same_tile_path = if same_tile_vehicle_nudge {
-                    Some(goal)
-                } else if source == PathingRequestSource::Gather {
-                    Some(goal)
-                } else {
-                    None
-                };
+                let same_tile_path =
+                    if same_tile_vehicle_nudge || source == PathingRequestSource::Gather {
+                        Some(goal)
+                    } else {
+                        None
+                    };
                 e.set_path(same_tile_path.into_iter().collect());
                 e.set_last_repath_tick(self.tick);
                 e.set_path_goal(Some(goal));
