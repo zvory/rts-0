@@ -27,6 +27,7 @@ impl Default for Map {
             starts: Vec::new(),
             base_sites: Vec::new(),
             base_resource_counts: HashMap::new(),
+            doodads: Vec::new(),
         }
     }
 }

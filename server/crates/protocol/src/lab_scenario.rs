@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+pub use rts_contract::{validate_map_doodads, MapDoodad};
 use rts_contract::{InitialCamera, LabVisionMode};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -10,6 +11,7 @@ pub struct LabMapDraft {
     pub terrain: Vec<u8>,
     pub starts: Vec<LabMapTile>,
     pub base_sites: Vec<LabBaseSite>,
+    pub doodads: Vec<MapDoodad>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -78,6 +80,8 @@ pub struct LabCheckpointScenarioMapData {
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
     pub base_sites: Vec<LabScenarioBaseSite>,
+    #[serde(default)]
+    pub doodads: Vec<MapDoodad>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -147,6 +151,7 @@ mod tests {
                 steel_patches: 36,
                 oil_patches: 9,
             }],
+            doodads: Vec::new(),
         };
 
         let serialized = serde_json::to_value(&data).expect("checkpoint map data serializes");
@@ -163,6 +168,7 @@ mod tests {
                 "steelPatches": 36,
                 "oilPatches": 9
             }],
+            "doodads": [],
         });
         let parsed: LabCheckpointScenarioMapData =
             serde_json::from_value(encoded).expect("checkpoint map data parses");

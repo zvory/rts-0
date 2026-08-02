@@ -423,6 +423,7 @@ mod tests {
                 tile_size: crate::config::TILE_SIZE,
                 terrain: vec![terrain::GRASS; 64 * 64],
                 resources: Vec::new(),
+                doodads: Vec::new(),
             },
             players: vec![
                 PlayerStart {

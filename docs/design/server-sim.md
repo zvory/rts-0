@@ -18,7 +18,7 @@ crates/
     src/game/
     mod.rs       # Game struct + public API (the seam below)
     command.rs   # SimCommand domain commands + protocol translation helpers
-    map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
+    map.rs       # Map: authored terrain/doodad loading, passability, base-site/doodad validation
     entity/      # Entity, EntityKind, Order state machines, grouped state, and EntityStore
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player live visibility grids; snapshots union living teammate grids
@@ -62,7 +62,7 @@ pub struct Game { /* private */ }
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Loads the hardcoded handcrafted map and assigns ordered players to fixed authored start
-    /// locations. A map owns flat `startLocations` and `baseSites`: start locations determine its
+    /// locations. A map owns flat `startLocations`, `baseSites`, and static `doodads`: start locations determine its
     /// capacity, while every base site receives its authored 0–36 Steel and 0–9 Oil patches.
     /// Singleton-team FFA
     /// matches shuffle fixed start locations by `seed`; team matches choose ordered starts from the
@@ -71,7 +71,8 @@ impl Game {
     /// layouts or player-owned natural groups exist in authored maps. Generated oil clusters place each oil patch on a unique passable tile
     /// center near the intended layout, keep one tile between oil patches, and reject sites whose
     /// Pump Jack footprint would collide with non-oil resources while preserving City Centre
-    /// resource-distance bounds. Lab-restored oil nodes are normalized to passable tile centers and
+    /// resource-distance bounds. Schema-v5 doodads are catalog-validated, id-canonicalized static
+    /// presentation records and do not participate in gameplay systems. Lab-restored oil nodes are normalized to passable tile centers and
     /// keep one free tile between oil patches.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
     /// controller/profile selection.
@@ -521,9 +522,10 @@ store a separate authoritative command stream, but they must not infer live stat
 Map policy:
 
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  and permanent base sites on every tick. Internal cold checkpoints may still clone the full `Map` while
+  and permanent base sites on every tick, while start/export boundaries read the map's inert static
+  doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
-- `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, or base-site bodies. It
+- `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, base-site bodies, or doodad bodies. It
   embeds `mapBinding` only.
 - The containing artifact supplies the exact map data. A replay artifact stores or references the
   launch-time map composition beside the checkpoint; a lab setup container embeds or references
@@ -533,8 +535,9 @@ Map policy:
 - Import receives `(container metadata, exact supplied Map, GameCheckpointV1)`. Before constructing
   a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `size`,
   `playerCount`, and `materializedMapHash` against the supplied map. `materializedMapHash` is a
-  stable hash over the live `Map` fields that affect simulation (`size`, row-major terrain,
-  selected starts, and base sites). If any binding fact differs, the importer rejects the
+  stable hash over the materialized live `Map` fields (`size`, row-major terrain, selected starts,
+  base sites/resource counts, and canonical doodads). An explicit empty schema-v5 doodad list has
+  the same materialized hash as the equivalent legacy no-doodad map. If any binding fact differs, the importer rejects the
   payload; it must not fall back to regenerating a map from seed or silently accepting a nearby map.
 
 Field map for Phase 2 DTO conversion:
@@ -580,6 +583,8 @@ Validation model and bounds:
 - Parse and byte caps first: reject payload text above 4 MiB before JSON parsing; reject a
   start-state container section above 6 MiB, excluding any replay command-stream attachment that has
   its own cap; reject a sibling map body above 1 MiB until a custom-map phase chooses a larger cap.
+  Map-bearing containers additionally cap canonical static doodads at 4,096 records and validate
+  their fixed catalog strings, optional color shape, ids, ordering, and integer world bounds.
 - Version and feature checks happen before field validation: `schema == "rts.gameCheckpoint"`,
   `version == 1`, supported `compatibility.simSchemaVersion`, known required features, and a
   compatible RNG algorithm are mandatory.

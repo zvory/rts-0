@@ -42,13 +42,14 @@ fn authored_map_supports_many_unconditional_base_sites() {
         .collect();
     let json = format!(
         r#"{{
-          "version": 4,
+          "version": 5,
           "name": "many-bases",
           "description": "many permanent bases",
           "_design": "n/a",
           "terrain": {},
           "startLocations": [{{"x": 8, "y": 24}}],
-          "baseSites": [{}]
+          "baseSites": [{}],
+          "doodads": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
         base_sites.join(",")
@@ -73,13 +74,14 @@ fn authored_map_rejects_more_than_bounded_base_sites() {
         .collect();
     let json = format!(
         r#"{{
-          "version": 4,
+          "version": 5,
           "name": "too-many-bases",
           "description": "too many bases",
           "_design": "n/a",
           "terrain": {},
           "startLocations": [{{"x": 8, "y": 100}}],
-          "baseSites": [{}]
+          "baseSites": [{}],
+          "doodads": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
         base_sites.join(",")
@@ -98,7 +100,7 @@ fn authored_map_accepts_zero_and_maximum_per_base_resource_counts() {
     let rows = vec![".".repeat(40); 40];
     let json = format!(
         r#"{{
-          "version": 4,
+          "version": 5,
           "name": "resource-bounds",
           "description": "per-base resource bounds",
           "_design": "n/a",
@@ -107,7 +109,8 @@ fn authored_map_accepts_zero_and_maximum_per_base_resource_counts() {
           "baseSites": [
             {{"x": 8, "y": 8, "steelPatches": 0, "oilPatches": 0}},
             {{"x": 31, "y": 31, "steelPatches": 36, "oilPatches": 9}}
-          ]
+          ],
+          "doodads": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
     );
@@ -134,13 +137,14 @@ fn authored_map_rejects_per_base_resource_counts_above_the_limits() {
         });
         site[field] = value.into();
         let json = serde_json::json!({
-            "version": 4,
+            "version": 5,
             "name": "bad-resource-count",
             "description": "invalid per-base resource count",
             "_design": "n/a",
             "terrain": rows.clone(),
             "startLocations": [{ "x": 8, "y": 8 }],
-            "baseSites": [site]
+            "baseSites": [site],
+            "doodads": []
         })
         .to_string();
         let err = Map::from_authored_json(1, &json, 0)

@@ -12,18 +12,19 @@ use rts_protocol::{
     LabReplayOperationEntry, LabReplayTimelineMetadata, LabReplayValidationError, LabResult,
     LabScenarioEntityIdRemap, LabScenarioLabMetadata, LabScenarioPayload, LabScenarioTile,
     LabSpawnEntitySpec, LabStartMetadata, LabStartRole, LabState, LabUpdateSpec, LabVisionMode,
-    LivePauseState, LobbyPlayer, MapInfo, MatchControlCapabilities, MovementPathDiagnosticScope,
-    NoticeSeverity, ObserverAnalysisAiDiagnostics, ObserverAnalysisKindCount,
-    ObserverAnalysisPayload, ObserverAnalysisPlayer, ObserverAnalysisProduction,
-    ObserverAnalysisResourcesLost, ObserverViewSelection, OrderPlanMarker, PlayerResourceSnapshot,
-    PlayerScore, PlayerStart, ProtocolCompactCodes, ProtocolContract, ProtocolMessageTags,
-    ProtocolVocabularies, RememberedBuildingView, ReplayBranchSeat, ReplayStartMetadata,
-    ResourceDelta, ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeState,
-    ScoutPlaneStateView, ServerMessage, SlotField, SmokeCloudView, Snapshot, SnapshotCodec,
-    SnapshotCodecContract, SnapshotEncodeError, SnapshotFrame, SnapshotNetStatus, StartPayload,
-    TeamId, TrenchView, VisibilityCapabilities, VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION,
-    COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID, LAB_REPLAY_ARTIFACT_KIND, LAB_REPLAY_ARTIFACT_SCHEMA,
-    LAB_REPLAY_ARTIFACT_SCHEMA_VERSION, LAB_REPLAY_MAX_ARTIFACT_BYTES, LAB_REPLAY_MAX_OPERATIONS,
+    LivePauseState, LobbyPlayer, MapDoodad, MapInfo, MatchControlCapabilities,
+    MovementPathDiagnosticScope, NoticeSeverity, ObserverAnalysisAiDiagnostics,
+    ObserverAnalysisKindCount, ObserverAnalysisPayload, ObserverAnalysisPlayer,
+    ObserverAnalysisProduction, ObserverAnalysisResourcesLost, ObserverViewSelection,
+    OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart, ProtocolCompactCodes,
+    ProtocolContract, ProtocolMessageTags, ProtocolVocabularies, RememberedBuildingView,
+    ReplayBranchSeat, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
+    RoomTimeCapabilities, RoomTimeState, ScoutPlaneStateView, ServerMessage, SlotField,
+    SmokeCloudView, Snapshot, SnapshotCodec, SnapshotCodecContract, SnapshotEncodeError,
+    SnapshotFrame, SnapshotNetStatus, StartPayload, TeamId, TrenchView, VisibilityCapabilities,
+    VisionSelectionRequest, COMPACT_SNAPSHOT_VERSION, COMPACT_UNKNOWN_CODE, DEFAULT_FACTION_ID,
+    LAB_REPLAY_ARTIFACT_KIND, LAB_REPLAY_ARTIFACT_SCHEMA, LAB_REPLAY_ARTIFACT_SCHEMA_VERSION,
+    LAB_REPLAY_MAX_ARTIFACT_BYTES, LAB_REPLAY_MAX_OPERATIONS,
     LAB_REPLAY_TIMELINE_KEYFRAME_INTERVAL_TICKS, MESSAGEPACK_SNAPSHOT_FRAME_MAGIC,
     PREDICTION_PROTOCOL_VERSION, SNAPSHOT_CODEC_COMPACT_JSON, SNAPSHOT_CODEC_MESSAGEPACK_COMPACT,
     SNAPSHOT_CODEC_VERSION, SNAPSHOT_FRAME_KIND_BINARY, SNAPSHOT_FRAME_KIND_TEXT,
@@ -96,6 +97,7 @@ fn stable_rust_public_surface_compiles() {
     assert_type::<LivePauseState>();
     assert_type::<LobbyPlayer>();
     assert_type::<MapInfo>();
+    assert_type::<MapDoodad>();
     assert_type::<MatchControlCapabilities>();
     assert_type::<MovementPathDiagnosticScope>();
     assert_type::<NoticeSeverity>();

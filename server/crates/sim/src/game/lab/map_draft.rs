@@ -29,6 +29,7 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
                 }
             })
             .collect(),
+        doodads: map.doodads.clone(),
     }
 }
 

@@ -217,6 +217,9 @@ fn validate_materialized_binding(
     if authored.terrain != materialized.terrain {
         return Err("Authored and materialized terrain do not match.".to_string());
     }
+    if authored.doodads != materialized.doodads {
+        return Err("Authored and materialized doodads do not match.".to_string());
+    }
     if !locations_match(&authored.starts, &materialized.starts)
         || !base_sites_match(authored, &materialized.base_sites)
     {
@@ -267,7 +270,7 @@ fn error_response(status: StatusCode, error: String) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rts_server::protocol::{terrain, LabBaseSite, LabMapTile};
+    use rts_server::protocol::{terrain, LabBaseSite, LabMapTile, MapDoodad};
 
     fn valid_request() -> CreateMapHandoffRequest {
         let authored_map: serde_json::Value =
@@ -303,6 +306,7 @@ mod tests {
                 terrain: vec![terrain::GRASS; 126 * 126],
                 starts,
                 base_sites,
+                doodads: Vec::new(),
             },
         }
     }
@@ -336,6 +340,27 @@ mod tests {
         assert!(validate_request(&request)
             .expect_err("mismatched materialization must fail")
             .contains("terrain do not match"));
+    }
+
+    #[test]
+    fn handoff_validation_binds_doodads_exactly() {
+        let mut request = valid_request();
+        let doodad = MapDoodad {
+            id: 1,
+            type_id: "wildflower.single".to_string(),
+            x: 512,
+            y: 640,
+            color: Some("#e05a91".to_string()),
+        };
+        request.authored_map["doodads"] =
+            serde_json::to_value([doodad.clone()]).expect("doodad JSON");
+        request.materialized_map.doodads = vec![doodad];
+        assert_eq!(validate_request(&request), Ok(()));
+
+        request.materialized_map.doodads[0].x += 1;
+        assert!(validate_request(&request)
+            .expect_err("mismatched doodads must fail")
+            .contains("doodads do not match"));
     }
 
     #[test]
@@ -402,6 +427,7 @@ mod tests {
                     oil_patches: 3,
                 })
                 .collect(),
+            doodads: Vec::new(),
         };
 
         assert_eq!(validate_request(&request), Ok(()));

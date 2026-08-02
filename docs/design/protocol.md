@@ -526,7 +526,10 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     terrain: number[],
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
-    resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ]
+    resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ],
+    // Static mechanically inert decoration, canonicalized by ascending nonzero id.
+    // Coordinates are integer world pixels. color is allowed only on wildflowers.
+    doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
 }
@@ -1363,26 +1366,35 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV4,
+  authoredMap: AuthoredMapV5,
   materializedMap: {
     name: string,
     size: u32,
     terrain: u8[],
     starts: LabMapTile[],
-    baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[]
+    baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
+    doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[]
   }
 }
 -> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV4 }
+ | { destination: "editor", authoredMap: AuthoredMapV5 }
 ```
-`AuthoredMapV4` has flat `startLocations` and `baseSites` arrays. Start locations determine the
+`AuthoredMapV5` has flat `startLocations`, `baseSites`, and required `doodads` arrays. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
-counts. Creation validates the complete authored-map schema and binds its terrain, locations, and
-resource counts to `materializedMap` before storing it. Records are capped at 64, expire after two
+counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
+by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.oak`, `tree.pine`,
+`tree.birch`, `tree.spruce`, `tree.aspen`, `tree.alder`, the corresponding
+`tree.<species>.topdown` variants, `wildflower.single`, and `wildflower.cluster`. Every tree id has
+the same inert `Tree` semantic class; species and perspective affect presentation only. Tree color
+is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
+`#rrggbb`. Doodads have no collision, pathing, fog, vision, cover, or combat behavior in schema v5.
+Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
+count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
+doodads to `materializedMap`. Records are capped at 64, expire after two
 minutes, and are removed on the first consume; unknown, expired, or already-used ids return HTTP 410.
 The map body never appears in a URL. Consumption uses POST so browser or intermediary prefetching
 cannot burn the one-use record. Consuming a Lab-directed record creates a private Lab from the
@@ -1408,7 +1420,8 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       size: u32,
       terrain: u8[],
       starts: [{ x: u32, y: u32 }],
-      baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }]
+      baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }],
+      doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }]
     }
   },
   metadata: {

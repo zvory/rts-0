@@ -289,6 +289,168 @@ pub struct MapInfo {
     /// Positions of all neutral resource nodes (steel/oil). Included so the
     /// client can render them on the minimap before fog-of-war reveals them.
     pub resources: Vec<ResourceNode>,
+    /// Static, mechanically inert map decoration. Doodads are sent once at match start and are
+    /// not part of fog, occupancy, pathing, combat, or snapshots.
+    pub doodads: Vec<MapDoodad>,
+}
+
+/// A server-validated static decoration authored in integer world pixels.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MapDoodad {
+    pub id: u32,
+    pub type_id: String,
+    pub x: u32,
+    pub y: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MapDoodadClass {
+    Tree,
+    Wildflower,
+}
+
+pub const MAX_MAP_DOODADS: usize = 4_096;
+pub const MAP_TILE_SIZE_PX: u32 = 32;
+pub const MAP_DOODAD_TYPE_IDS: [&str; 14] = [
+    "tree.oak",
+    "tree.pine",
+    "tree.birch",
+    "tree.spruce",
+    "tree.aspen",
+    "tree.alder",
+    "tree.oak.topdown",
+    "tree.pine.topdown",
+    "tree.birch.topdown",
+    "tree.spruce.topdown",
+    "tree.aspen.topdown",
+    "tree.alder.topdown",
+    "wildflower.single",
+    "wildflower.cluster",
+];
+
+pub fn classify_map_doodad(type_id: &str) -> Option<MapDoodadClass> {
+    match type_id {
+        "tree.oak"
+        | "tree.pine"
+        | "tree.birch"
+        | "tree.spruce"
+        | "tree.aspen"
+        | "tree.alder"
+        | "tree.oak.topdown"
+        | "tree.pine.topdown"
+        | "tree.birch.topdown"
+        | "tree.spruce.topdown"
+        | "tree.aspen.topdown"
+        | "tree.alder.topdown" => Some(MapDoodadClass::Tree),
+        "wildflower.single" | "wildflower.cluster" => Some(MapDoodadClass::Wildflower),
+        _ => None,
+    }
+}
+
+/// Validate a canonical doodad list at an already overflow-checked world size.
+pub fn validate_map_doodads(doodads: &[MapDoodad], world_size_px: u32) -> Result<(), String> {
+    if doodads.len() > MAX_MAP_DOODADS {
+        return Err(format!(
+            "doodads must contain at most {MAX_MAP_DOODADS} entries"
+        ));
+    }
+    let mut previous_id = 0;
+    for (index, doodad) in doodads.iter().enumerate() {
+        if doodad.id == 0 {
+            return Err(format!("doodads[{index}].id must be nonzero"));
+        }
+        if doodad.id <= previous_id {
+            return Err(format!(
+                "doodads must be ordered by ascending unique id; id {} at index {index} is not canonical",
+                doodad.id
+            ));
+        }
+        previous_id = doodad.id;
+        if doodad.x >= world_size_px || doodad.y >= world_size_px {
+            return Err(format!(
+                "doodads[{index}] position ({},{}) is outside the {world_size_px}px map",
+                doodad.x, doodad.y
+            ));
+        }
+        let Some(class) = classify_map_doodad(&doodad.type_id) else {
+            return Err(format!(
+                "doodads[{index}].typeId {:?} is not in the server catalog",
+                doodad.type_id
+            ));
+        };
+        match (class, doodad.color.as_deref()) {
+            (MapDoodadClass::Tree, Some(_)) => {
+                return Err(format!(
+                    "doodads[{index}].color is only allowed for wildflowers"
+                ))
+            }
+            (MapDoodadClass::Wildflower, Some(color)) if !canonical_hex_color(color) => {
+                return Err(format!(
+                    "doodads[{index}].color must use canonical lowercase #rrggbb"
+                ))
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn canonical_hex_color(color: &str) -> bool {
+    color.len() == 7
+        && color.starts_with('#')
+        && color.as_bytes()[1..]
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+}
+
+#[cfg(test)]
+mod map_doodad_tests {
+    use super::*;
+
+    fn flower(id: u32) -> MapDoodad {
+        MapDoodad {
+            id,
+            type_id: "wildflower.single".to_string(),
+            x: 12,
+            y: 34,
+            color: Some("#e05a91".to_string()),
+        }
+    }
+
+    #[test]
+    fn map_doodad_validator_enforces_count_and_canonical_ids() {
+        let too_many = (1..=(MAX_MAP_DOODADS as u32 + 1))
+            .map(flower)
+            .collect::<Vec<_>>();
+        assert!(validate_map_doodads(&too_many, 1_024)
+            .expect_err("count cap")
+            .contains("at most"));
+        assert!(validate_map_doodads(&[flower(2), flower(1)], 1_024)
+            .expect_err("canonical order")
+            .contains("ascending unique id"));
+        assert!(validate_map_doodads(&[flower(1), flower(1)], 1_024)
+            .expect_err("duplicate ids")
+            .contains("ascending unique id"));
+    }
+
+    #[test]
+    fn map_doodad_catalog_is_unique_and_classifies_every_species_variant() {
+        for (index, type_id) in MAP_DOODAD_TYPE_IDS.iter().enumerate() {
+            assert!(
+                !MAP_DOODAD_TYPE_IDS[..index].contains(type_id),
+                "duplicate doodad type id {type_id}"
+            );
+            let class = classify_map_doodad(type_id).expect("catalog id classifies");
+            if type_id.starts_with("tree.") {
+                assert_eq!(class, MapDoodadClass::Tree);
+            } else {
+                assert_eq!(class, MapDoodadClass::Wildflower);
+            }
+        }
+    }
 }
 
 /// A static resource node position included in the start payload.

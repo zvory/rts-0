@@ -53,8 +53,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`.
   `validateScenario` previews bounds without mutating the room or accepting client server paths.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
-- `/api/map-handoffs` validates map data, caps records at 64, expires them after two minutes, and
-  consumes each id once. Lab `exportMap` returns only `LabMapDraft` in reverse.
+- Map handoffs validate data, cap one-use records at 64 for two minutes, and reverse through
+  `LabMapDraft`. Schema-v5 map boundaries carry canonical inert `doodads[]`, capped at 4,096.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**

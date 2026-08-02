@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
-use crate::game::map::{Map, CURRENT_MAP_VERSION};
+use crate::game::map::{doodads, Map, CURRENT_MAP_VERSION};
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
 use crate::game::services::{production, standability};
 use crate::game::upgrade::UpgradeKind;
@@ -551,6 +551,12 @@ impl Game {
             .map(|tile| (tile.x, tile.y))
             .collect();
         let base_resource_counts = map_draft::resource_counts(&draft, name)?;
+        let doodads = doodads::canonicalize(draft.size, draft.doodads).map_err(|reason| {
+            LabError::InvalidMap {
+                name: name.to_string(),
+                reason,
+            }
+        })?;
         let mut occupied_sites = std::collections::HashSet::new();
         for &(x, y) in &starts {
             validate_lab_map_site(
@@ -584,6 +590,7 @@ impl Game {
             starts,
             base_sites,
             base_resource_counts,
+            doodads,
         };
         let map_metadata = MapMetadata {
             name: name.to_string(),

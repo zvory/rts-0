@@ -89,6 +89,7 @@ fn start_payload_for_terrain(
             tile_size: config::TILE_SIZE,
             terrain,
             resources: Vec::new(),
+            doodads: Vec::new(),
         },
         players: starts
             .iter()
@@ -657,6 +658,7 @@ fn resource_mappings_prefer_reachable_components_over_cross_wall_distance() {
                 resource_at(1, kinds::STEEL, 2, 5),
                 resource_at(2, kinds::STEEL, 21, 5),
             ],
+            doodads: Vec::new(),
         },
         players: vec![
             PlayerStart {
@@ -735,6 +737,7 @@ fn analysis_key_tracks_static_map_start_and_resource_identity() {
             tile_size: config::TILE_SIZE,
             terrain: vec![terrain::GRASS; 16],
             resources: Vec::new(),
+            doodads: Vec::new(),
         },
         players: vec![PlayerStart {
             id: 1,

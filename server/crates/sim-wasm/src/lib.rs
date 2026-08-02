@@ -867,6 +867,7 @@ mod tests {
                 tile_size: balance::TILE_SIZE,
                 terrain: vec![0; 64 * 64],
                 resources: Vec::new(),
+                doodads: Vec::new(),
             },
             players: vec![
                 PlayerStart {

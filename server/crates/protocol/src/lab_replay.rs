@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    terrain, Command, LabCheckpointScenarioV1, LabScenarioEntityIdRemap, LabSpawnEntitySpec,
-    LabUpdateSpec, LabVisionMode, TeamId,
+    terrain, validate_map_doodads, Command, LabCheckpointScenarioV1, LabScenarioEntityIdRemap,
+    LabSpawnEntitySpec, LabUpdateSpec, LabVisionMode, TeamId, MAP_TILE_SIZE_PX,
 };
 use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
 
@@ -749,6 +749,11 @@ fn validate_map_container(
             )));
         }
     }
+    let world_size_px = size
+        .checked_mul(MAP_TILE_SIZE_PX)
+        .ok_or_else(|| invalid(format!("{label}.map.data world-pixel size overflows")))?;
+    validate_map_doodads(&scenario.map.data.doodads, world_size_px)
+        .map_err(|reason| invalid(format!("{label}.map.data {reason}")))?;
     Ok(())
 }
 

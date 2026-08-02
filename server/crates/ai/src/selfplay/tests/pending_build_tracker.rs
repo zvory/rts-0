@@ -27,6 +27,7 @@ fn pending_tracker_start_payload() -> StartPayload {
             tile_size: config::TILE_SIZE,
             terrain: vec![terrain::GRASS; 96 * 96],
             resources: Vec::new(),
+            doodads: Vec::new(),
         },
         players: vec![PlayerStart {
             id: 1,
