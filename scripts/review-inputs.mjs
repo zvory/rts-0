@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import path from "node:path";
 
 export const MAX_RAW_REVIEW_BYTES = 256 * 1024;
 

@@ -190,7 +190,7 @@ Return JSON with:
 `;
 }
 
-export function buildCodexArgs({ repoRoot, gitCommonDir = "", schemaFile, reportFile, codexModel, prompt }) {
+export function buildCodexArgs({ repoRoot, gitCommonDir = "", schemaFile, reportFile, codexModel }) {
   const args = [
     "exec",
     "--cd",
@@ -213,7 +213,9 @@ export function buildCodexArgs({ repoRoot, gitCommonDir = "", schemaFile, report
   if (codexModel) {
     args.push("--model", codexModel);
   }
-  args.push(prompt);
+  // Keep the prompt and bounded changed-path manifest off the process command line. This avoids
+  // operating-system argument limits on large branches and matches the specialist-pass boundary.
+  args.push("-");
   return args;
 }
 
@@ -371,7 +373,8 @@ class Runner {
     const result = spawnSync(command, args, {
       cwd: options.cwd,
       env: { ...process.env, ...this.env, ...(options.env || {}) },
-      stdio: "inherit",
+      input: options.input,
+      stdio: options.input === undefined ? "inherit" : ["pipe", "inherit", "inherit"],
     });
     if (result.error) throw result.error;
     if (result.status !== 0) {
@@ -469,18 +472,22 @@ class Runner {
     });
     const reportFile = options.reportFile || path.join(os.tmpdir(), `rts-adversarial-quality-pass-${process.pid}.json`);
     const gitCommonDir = this.gitCommonDir(repoRoot);
-    const reviewInputs = collectReviewInputs({ repoRoot, baseRef: options.baseRef });
-    const prompt = renderPrompt({ baseRef: options.baseRef, headRef: "HEAD", reviewInputs });
-    const codexArgs = buildCodexArgs({
-      repoRoot,
-      gitCommonDir,
-      schemaFile: options.schemaFile,
-      reportFile,
-      codexModel: options.codexModel,
-      prompt,
-    });
+    const buildReviewInvocation = () => {
+      const reviewInputs = collectReviewInputs({ repoRoot, baseRef: options.baseRef });
+      return {
+        prompt: renderPrompt({ baseRef: options.baseRef, headRef: "HEAD", reviewInputs }),
+        codexArgs: buildCodexArgs({
+          repoRoot,
+          gitCommonDir,
+          schemaFile: options.schemaFile,
+          reportFile,
+          codexModel: options.codexModel,
+        }),
+      };
+    };
 
     if (options.dryRun) {
+      const { prompt, codexArgs } = buildReviewInvocation();
       this.log(`quality-pass: would run ${options.codexCommand} ${codexArgs.map(shellQuote).join(" ")}`);
       if (options.push) {
         this.log(`quality-pass: would push HEAD to ${options.remote}/${headBranch}`);
@@ -499,10 +506,17 @@ class Runner {
     if (options.fetchBase) {
       this.gitInherit(buildFetchArgs({ remote: options.remote, baseRef: options.baseRef }), repoRoot);
     }
+    // Collect after fetching so metadata, exclusions, and the base ref inspected by Codex all
+    // describe the same repository state.
+    const { prompt, codexArgs } = buildReviewInvocation();
     const beforeHead = this.git(["rev-parse", "HEAD"], repoRoot);
 
     this.log(`quality-pass: running Codex final quality pass for ${headBranch}`);
-    this.runInherit(options.codexCommand, codexArgs, { cwd: repoRoot, env: { [QUALITY_PASS_ENV]: "1" } });
+    this.runInherit(options.codexCommand, codexArgs, {
+      cwd: repoRoot,
+      env: { [QUALITY_PASS_ENV]: "1" },
+      input: prompt,
+    });
     this.assertPatchNotesUnchanged(repoRoot, beforeHead);
     if (!fs.existsSync(reportFile)) {
       throw new Error(`quality pass did not write report file: ${reportFile}`);

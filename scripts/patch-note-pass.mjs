@@ -403,7 +403,6 @@ export function execute(options) {
     return decision;
   }
   const changedPaths = git(options.repoRoot, ["diff", "--name-only", "--no-renames", `${options.baseRef}...HEAD`]).split("\n").filter(Boolean);
-  const reviewInputs = collectReviewInputs({ repoRoot: options.repoRoot, baseRef: options.baseRef });
   const existing = existingFragmentPath(options.repoRoot, options.baseRef, branch, slug);
   const existingRelativePath = existing ? path.relative(options.repoRoot, existing) : "";
   if (options.userOptOut) {
@@ -447,6 +446,9 @@ export function execute(options) {
   if (!existing && fs.existsSync(fragmentPath)) {
     throw new Error(`refusing to overwrite base-owned patch-note fragment ${relativePath}`);
   }
+  // Building the manifest performs Git object lookups per changed path. Defer it until after the
+  // cheap opt-out and no-candidate exits so those paths stay cheap.
+  const reviewInputs = collectReviewInputs({ repoRoot: options.repoRoot, baseRef: options.baseRef });
   const prompt = renderPrompt({
     baseRef: options.baseRef, branch, reviewInputs,
     existingFragment: existing ? fs.readFileSync(existing, "utf8") : "", fragmentPath: relativePath,

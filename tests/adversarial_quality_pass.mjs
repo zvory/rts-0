@@ -83,7 +83,6 @@ assert.deepEqual(
     schemaFile: "/tmp/schema.json",
     reportFile: "/tmp/report.json",
     codexModel: "gpt-5.5",
-    prompt: "Review.",
   }),
   [
     "exec",
@@ -102,7 +101,7 @@ assert.deepEqual(
     "/tmp/report.json",
     "--model",
     "gpt-5.5",
-    "Review.",
+    "-",
   ],
 );
 
@@ -276,6 +275,12 @@ if [ "$is_patch_note" = "1" ]; then
 }
 JSON
   exit 0
+fi
+quality_prompt="$(cat)"
+if [[ "$quality_prompt" != *"final autonomous quality pass"* ]] ||
+   [[ "$quality_prompt" != *"Changed-path metadata:"* ]]; then
+  echo "missing quality pass prompt on stdin" >&2
+  exit 1
 fi
 if [ -n "\${CODEX_CALLED_MARKER:-}" ]; then
   printf 'codex called\\n' >>"$CODEX_CALLED_MARKER"
