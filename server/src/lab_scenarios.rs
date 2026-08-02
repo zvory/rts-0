@@ -710,7 +710,7 @@ mod tests {
     use super::*;
     use crate::protocol::Event;
     use crate::tools::hellhole_spec::{
-        INITIAL_ENTITY_COUNT, SCATTERED_TANK_TRAP_COUNT, SHUTTLE_UNIT_COUNT,
+        composition_300_supply, INITIAL_ENTITY_COUNT, SCATTERED_TANK_TRAP_COUNT, SHUTTLE_UNIT_COUNT,
     };
     use std::collections::BTreeMap;
 
@@ -1215,25 +1215,19 @@ mod tests {
             .collect();
         assert_eq!(supply, vec![(1, 300), (2, 300), (3, 300), (4, 300)]);
 
-        let expected_counts = BTreeMap::from([
-            ("anti_tank_gun".to_string(), 9),
-            ("artillery".to_string(), 1),
+        let mut expected_counts = BTreeMap::from([
             ("barracks".to_string(), 1),
             ("city_centre".to_string(), 1),
-            ("command_car".to_string(), 9),
             ("depot".to_string(), 5),
             ("factory".to_string(), 1),
-            ("golem".to_string(), 1),
-            ("machine_gunner".to_string(), 10),
-            ("mortar_team".to_string(), 9),
             ("research_complex".to_string(), 1),
-            ("panzerfaust".to_string(), 9),
-            ("rifleman".to_string(), 10),
-            ("scout_car".to_string(), 10),
             ("steelworks".to_string(), 1),
-            ("tank".to_string(), 17),
-            ("worker".to_string(), 1),
         ]);
+        for kind in composition_300_supply().expect("canonical Hellhole composition") {
+            *expected_counts
+                .entry(rts_sim::protocol::kind_to_wire(kind).to_string())
+                .or_default() += 1;
+        }
         let mut counts_by_owner = BTreeMap::<u32, BTreeMap<String, usize>>::new();
         for entity in &snapshot.entities {
             if (1..=4).contains(&entity.owner) {
