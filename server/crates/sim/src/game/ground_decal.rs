@@ -8,9 +8,11 @@ use crate::protocol::{self, GroundDecalView};
 use crate::rules::{artillery_ground_decal_source_kind, mortar_ground_decal_source_kind};
 use serde::{Deserialize, Serialize};
 
+mod revision_log;
 mod spatial_index;
 mod types;
 
+use revision_log::{GroundDecalRevisionEntry, GroundDecalRevisionLog};
 use spatial_index::GroundDecalSpatialIndex;
 use types::{
     deserialize_source_kind, serialize_source_kind, valid_class_and_source, GroundDecalClass,
@@ -61,6 +63,7 @@ pub(crate) struct GroundDecalStore {
     revision: u32,
     decals: Vec<GroundDecal>,
     discovered_by_player: BTreeMap<u32, BTreeMap<u32, u32>>,
+    revision_log: GroundDecalRevisionLog,
     #[serde(skip)]
     spatial_index: GroundDecalSpatialIndex,
 }
@@ -78,6 +81,7 @@ impl GroundDecalStore {
             revision: 0,
             decals: Vec::new(),
             discovered_by_player: BTreeMap::new(),
+            revision_log: GroundDecalRevisionLog::default(),
             spatial_index: GroundDecalSpatialIndex::new(),
         }
     }
@@ -151,8 +155,8 @@ impl GroundDecalStore {
             return None;
         }
         self.spatial_index.ensure(&self.decals);
-        let created_revision = self.next_revision()?;
         let id = self.next_id;
+        let created_revision = self.record_revision(GroundDecalRevisionEntry::Created { id })?;
         self.next_id = self.next_id.checked_add(1).unwrap_or(0);
         self.decals.push(GroundDecal {
             id,
@@ -207,7 +211,9 @@ impl GroundDecalStore {
             }
         }
         for id in newly_visible {
-            let Some(revision) = self.next_revision() else {
+            let Some(revision) =
+                self.record_revision(GroundDecalRevisionEntry::Discovered { player, id })
+            else {
                 return;
             };
             self.discovered_by_player
@@ -215,55 +221,6 @@ impl GroundDecalStore {
                 .or_default()
                 .insert(id, revision);
         }
-    }
-
-    pub(crate) fn revision_for_players(&self, players: &[u32]) -> u32 {
-        players
-            .iter()
-            .filter_map(|player| self.discovered_by_player.get(player))
-            .flat_map(|known| known.values().copied())
-            .max()
-            .unwrap_or(0)
-    }
-
-    pub(crate) fn views_for_players_after(
-        &self,
-        players: &[u32],
-        after_revision: u32,
-    ) -> (u32, Vec<GroundDecalView>) {
-        let revision = self.revision_for_players(players);
-        let decals = self
-            .decals
-            .iter()
-            .filter(|decal| {
-                players.iter().any(|player| {
-                    self.discovered_by_player
-                        .get(player)
-                        .and_then(|known| known.get(&decal.id))
-                        .is_some_and(|revision| *revision > after_revision)
-                })
-            })
-            .map(GroundDecal::to_view)
-            .collect();
-        (revision, decals)
-    }
-
-    pub(crate) fn full_world_revision(&self) -> u32 {
-        self.revision
-    }
-
-    pub(crate) fn full_world_views_after(
-        &self,
-        after_revision: u32,
-    ) -> (u32, Vec<GroundDecalView>) {
-        (
-            self.revision,
-            self.decals
-                .iter()
-                .filter(|decal| decal.created_revision > after_revision)
-                .map(GroundDecal::to_view)
-                .collect(),
-        )
     }
 
     pub(in crate::game) fn valid_checkpoint_state(
@@ -319,13 +276,12 @@ impl GroundDecalStore {
                 }
             }
         }
-        usize::try_from(self.revision).ok() == Some(used_revisions.len())
-    }
-
-    fn next_revision(&mut self) -> Option<u32> {
-        let next = self.revision.checked_add(1)?;
-        self.revision = next;
-        Some(next)
+        self.revision_log.valid(
+            self.revision,
+            &self.decals,
+            &self.discovered_by_player,
+            used_revisions.len(),
+        )
     }
 }
 
@@ -455,12 +411,17 @@ mod tests {
 
         store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None));
         assert_eq!(store.views_for_players_after(&[2], 0), (0, Vec::new()));
+        assert_eq!(store.recent_views_for_players(&[2], 64), (0, 0, Vec::new()));
 
         store.refresh_memory_for_player(2, &fog_with_visible_tile(2, Some(5)));
         let (revision, decals) = store.views_for_players_after(&[2], 0);
         assert!(revision > 0);
         assert_eq!(decals.len(), 1);
         assert_eq!(decals[0].decal_class, "mortarBlast");
+        let (fast_revision, fast_after, fast_decals) = store.recent_views_for_players(&[2], 64);
+        assert_eq!(fast_revision, revision);
+        assert_eq!(fast_after, 0);
+        assert_eq!(fast_decals, decals);
         assert_eq!(
             decals[0].owner, 0,
             "impact decals must not leak firing owner"
@@ -472,6 +433,11 @@ mod tests {
 
         store.refresh_memory_for_player(2, &fog_with_visible_tile(2, Some(5)));
         assert_eq!(store.revision_for_players(&[2]), revision);
+        assert_eq!(
+            store.recent_views_for_players(&[2], 64),
+            (fast_revision, fast_after, fast_decals),
+            "the same bounded tail repeats until later revisions roll it out"
+        );
     }
 
     #[test]
@@ -483,8 +449,33 @@ mod tests {
         store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None));
 
         assert_eq!(store.views_for_players_after(&[2], 0), (0, Vec::new()));
+        assert!(store.recent_views_for_players(&[2], 64).2.is_empty());
         assert_eq!(store.views_for_players_after(&[1], 0).1.len(), 1);
+        assert_eq!(store.recent_views_for_players(&[1], 64).2.len(), 1);
         assert_eq!(store.full_world_views_after(0).1.len(), 1);
+        assert_eq!(store.recent_full_world_views(64).2.len(), 1);
+    }
+
+    #[test]
+    fn recent_player_delta_is_revision_bounded_and_complete_after_its_cursor() {
+        let mut store = GroundDecalStore::new();
+        let map = one_player_game().state.map;
+        for offset in 0..70 {
+            store
+                .create_mortar_impact(&map, 48.0 + offset as f32 * 0.01, 48.0)
+                .unwrap();
+        }
+        store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
+
+        let (revision, after_revision, decals) = store.recent_views_for_players(&[1], 64);
+        assert_eq!(after_revision, revision - 64);
+        assert_eq!(decals.len(), 64);
+        assert_eq!(
+            decals,
+            store.views_for_players_after(&[1], after_revision).1,
+            "the advertised range must contain every entitled row after its cursor"
+        );
+        assert!(decals.iter().all(|decal| decal.owner == 0));
     }
 
     #[test]

@@ -296,6 +296,7 @@ pub(super) fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
     Snapshot {
         tick,
         ground_decal_revision: 0,
+        ground_decal_delta: None,
         world_combat_position: None,
         steel: 75,
         oil: 0,

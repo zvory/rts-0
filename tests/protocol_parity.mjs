@@ -42,6 +42,7 @@ import {
   WEAPON_KIND,
   WEAPON_KIND_CODE,
   COMPACT_SNAPSHOT_VERSION,
+  MAX_COMPACT_GROUND_DECALS,
   SNAPSHOT_CODEC,
   SNAPSHOT_CODEC_VERSION,
   SNAPSHOT_FRAME_KIND,
@@ -106,6 +107,7 @@ const STABLE_JS_PROTOCOL_EXPORTS = [
   "C",
   "CMD",
   "COMPACT_SNAPSHOT_VERSION",
+  "MAX_COMPACT_GROUND_DECALS",
   "DEFAULT_FACTION_ID",
   "EVENT",
   "EVENT_CODE",
@@ -291,6 +293,10 @@ assertSameCodes(
   { [KIND.STEEL]: KIND_CODE[KIND.STEEL], [KIND.OIL]: KIND_CODE[KIND.OIL] },
 );
 assert(protocolContract.compactSnapshotVersion === COMPACT_SNAPSHOT_VERSION, "compact snapshot version must match Rust");
+assert(
+  protocolContract.maxGroundDecalsPerSnapshotDelta === MAX_COMPACT_GROUND_DECALS,
+  "ground decal snapshot delta bound must match Rust",
+);
 assert(
   protocolContract.snapshotCodecs.defaultCodec === SNAPSHOT_CODEC.MESSAGEPACK_COMPACT,
   "default snapshot codec must match Rust",

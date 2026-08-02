@@ -4,8 +4,8 @@ const DEFAULT_RETRY_DELAYS_MS = Object.freeze([600, 1000, 2500, 5000]);
 
 /**
  * Keeps the renderer's local ground-mark cache aligned with the small revision
- * advertised by snapshots. The server remains the source of truth; repeated
- * snapshots only coalesce requests and never advance the applied revision.
+ * advertised by snapshots. Bounded inline deltas handle ordinary discoveries;
+ * the reliable request remains the repair path for gaps and cache recovery.
  */
 export class GroundDecalSync {
   constructor({
@@ -37,10 +37,36 @@ export class GroundDecalSync {
     }) || null;
   }
 
-  observeSnapshot(revision) {
+  observeSnapshot(revision, delta = null) {
     if (this.destroyed || !isRevision(revision)) return false;
-    if (this.awaitingPerspectiveSnapshot) this.awaitingPerspectiveSnapshot = false;
+    if (this.awaitingPerspectiveSnapshot) {
+      // The first inbound snapshot may have been queued before a seek or perspective reset.
+      // Ignore its inline rows; the correlated repair response is projected after the request.
+      this.awaitingPerspectiveSnapshot = false;
+      this.targetRevision = Math.max(this.targetRevision, revision);
+      return this._ensureRequest();
+    }
+    if (delta && typeof delta === "object") {
+      this.state?.groundDecals?.applySnapshotDelta?.(
+        {
+          revision,
+          afterRevision: delta.afterRevision,
+          decals: delta.decals,
+        },
+        {
+          players: this.state?.players,
+          tileSize: this.state?.map?.tileSize,
+        },
+      );
+    }
     this.targetRevision = Math.max(this.targetRevision, revision);
+    const applied = this.state?.groundDecals?.authoritativeRevision || 0;
+    if (applied >= this.targetRevision) {
+      this.outstandingRequestId = null;
+      this.retryIndex = 0;
+      this._cancelRetry();
+      return false;
+    }
     return this._ensureRequest();
   }
 

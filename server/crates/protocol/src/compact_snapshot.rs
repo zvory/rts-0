@@ -14,7 +14,7 @@ use crate::{
 };
 use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
-    DebugPathView, EntityView, Event, OrderPlanMarker, RememberedAntiTankGunView,
+    DebugPathView, EntityView, Event, GroundDecalView, OrderPlanMarker, RememberedAntiTankGunView,
     RememberedBuildingView, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus,
     TrenchView,
 };
@@ -71,6 +71,19 @@ impl Serialize for CompactSnapshot<'_> {
         map.serialize_entry("v", &COMPACT_SNAPSHOT_VERSION)?;
         if snapshot.ground_decal_revision != 0 {
             map.serialize_entry("gr", &snapshot.ground_decal_revision)?;
+        }
+        if let Some(delta) = &snapshot.ground_decal_delta {
+            map.serialize_entry(
+                "gd",
+                &(
+                    delta.after_revision,
+                    delta
+                        .decals
+                        .iter()
+                        .map(CompactGroundDecal)
+                        .collect::<Vec<_>>(),
+                ),
+            )?;
         }
         map.serialize_entry(
             "s",
@@ -220,10 +233,11 @@ const SECTION_EVENTS: &str = "events";
 const SECTION_SMOKES: &str = "smokes";
 const SECTION_ABILITY_OBJECTS: &str = "abilityObjects";
 const SECTION_TRENCHES: &str = "trenches";
+const SECTION_GROUND_DECALS: &str = "groundDecals";
 const SECTION_PLAYER_STATUS: &str = "playerStatus";
 const SECTION_NET_STATUS: &str = "netStatus";
 const SECTION_OTHER: &str = "other";
-const SECTION_ORDER: [&str; 10] = [
+const SECTION_ORDER: [&str; 11] = [
     SECTION_ENTITIES,
     SECTION_VISIBILITY,
     SECTION_RESOURCE_DELTAS,
@@ -231,6 +245,7 @@ const SECTION_ORDER: [&str; 10] = [
     SECTION_SMOKES,
     SECTION_ABILITY_OBJECTS,
     SECTION_TRENCHES,
+    SECTION_GROUND_DECALS,
     SECTION_PLAYER_STATUS,
     SECTION_NET_STATUS,
     SECTION_OTHER,
@@ -341,6 +356,14 @@ fn section_counts(snapshot: &Snapshot) -> BTreeMap<&'static str, u32> {
     insert_count(&mut counts, SECTION_TRENCHES, snapshot.trenches.len());
     insert_count(
         &mut counts,
+        SECTION_GROUND_DECALS,
+        snapshot
+            .ground_decal_delta
+            .as_ref()
+            .map_or(0, |delta| delta.decals.len()),
+    );
+    insert_count(
+        &mut counts,
         SECTION_PLAYER_STATUS,
         1usize
             .saturating_add(snapshot.player_resources.len())
@@ -371,6 +394,7 @@ fn section_for_compact_key(key: &str) -> &'static str {
         "sm" => SECTION_SMOKES,
         "ao" => SECTION_ABILITY_OBJECTS,
         "tr" => SECTION_TRENCHES,
+        "gd" => SECTION_GROUND_DECALS,
         "s" | "pr" | "u" | "wc" => SECTION_PLAYER_STATUS,
         "n" => SECTION_NET_STATUS,
         _ => SECTION_OTHER,
@@ -520,6 +544,29 @@ impl Serialize for CompactTrench<'_> {
         seq.serialize_element(&trench.x)?;
         seq.serialize_element(&trench.y)?;
         seq.serialize_element(&trench.radius_tiles)?;
+        seq.end()
+    }
+}
+
+struct CompactGroundDecal<'a>(&'a GroundDecalView);
+
+impl Serialize for CompactGroundDecal<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let decal = self.0;
+        let mut seq = serializer.serialize_seq(Some(10))?;
+        seq.serialize_element(&decal.id)?;
+        seq.serialize_element(&decal.decal_class)?;
+        seq.serialize_element(&kind_code(&decal.source_kind))?;
+        seq.serialize_element(&decal.x)?;
+        seq.serialize_element(&decal.y)?;
+        seq.serialize_element(&decal.owner)?;
+        seq.serialize_element(&decal.seed)?;
+        seq.serialize_element(&decal.facing)?;
+        seq.serialize_element(&decal.weapon_facing)?;
+        seq.serialize_element(&decal.radius_tiles)?;
         seq.end()
     }
 }
@@ -1248,6 +1295,7 @@ mod tests {
         let snapshot = Snapshot {
             tick: 1,
             ground_decal_revision: 0,
+            ground_decal_delta: None,
             world_combat_position: None,
             steel: 0,
             oil: 0,
@@ -1291,6 +1339,7 @@ mod tests {
         let snapshot = Snapshot {
             tick: 1,
             ground_decal_revision: 0,
+            ground_decal_delta: None,
             world_combat_position: None,
             steel: 0,
             oil: 0,
@@ -1324,10 +1373,25 @@ mod tests {
     }
 
     #[test]
-    fn compact_snapshot_carries_ground_decal_revision() {
+    fn compact_snapshot_carries_bounded_ground_decal_delta() {
         let mut snapshot = Snapshot {
             tick: 1,
             ground_decal_revision: 31,
+            ground_decal_delta: Some(rts_contract::GroundDecalDelta {
+                after_revision: 24,
+                decals: vec![GroundDecalView {
+                    id: 7,
+                    decal_class: "infantry".to_string(),
+                    source_kind: "rifleman".to_string(),
+                    x: 32.0,
+                    y: 64.0,
+                    owner: 1,
+                    seed: 9,
+                    facing: Some(0.5),
+                    weapon_facing: None,
+                    radius_tiles: None,
+                }],
+            }),
             world_combat_position: None,
             steel: 0,
             oil: 0,
@@ -1350,8 +1414,14 @@ mod tests {
         };
         let value = compact_snapshot_value(&snapshot).unwrap();
         assert_eq!(value["gr"], 31);
+        assert_eq!(value["gd"][0], 24);
+        assert_eq!(value["gd"][1][0][0], 7);
+        assert_eq!(value["gd"][1][0][1], "infantry");
+        assert_eq!(value["gd"][1][0][2], kind_code("rifleman"));
         snapshot.ground_decal_revision = 0;
+        snapshot.ground_decal_delta = None;
         let value = compact_snapshot_value(&snapshot).unwrap();
         assert!(value.get("gr").is_none());
+        assert!(value.get("gd").is_none());
     }
 }

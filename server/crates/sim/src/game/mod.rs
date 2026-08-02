@@ -59,9 +59,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::config;
 use crate::protocol::{
-    AutoBuildSettingsSnapshot, Event, GroundDecalView, MapInfo, PlayerResourceSnapshot,
-    PlayerScore, PlayerStart, RememberedBuildingView, ResourceDelta, ResourceNode, Snapshot,
-    StartPayload, DEFAULT_FACTION_ID,
+    AutoBuildSettingsSnapshot, Event, GroundDecalDelta, GroundDecalView, MapInfo,
+    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ResourceDelta,
+    ResourceNode, Snapshot, StartPayload, DEFAULT_FACTION_ID, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};

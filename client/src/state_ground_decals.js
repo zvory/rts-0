@@ -30,16 +30,38 @@ export class GroundDecalBuffer {
     }
     if (revision < this.authoritativeRevision) return { accepted: false, queued: 0 };
 
+    const queued = this._queueDecals(decals, context);
+    this.authoritativeRevision = revision;
+    return { accepted: true, queued };
+  }
+
+  applySnapshotDelta({ revision, afterRevision, decals } = {}, context = {}) {
+    if (!Number.isInteger(revision) || revision < 0 || revision > 0xffffffff) {
+      return { accepted: false, complete: false, queued: 0 };
+    }
+    if (!Number.isInteger(afterRevision) || afterRevision < 0 || afterRevision > revision) {
+      return { accepted: false, complete: false, queued: 0 };
+    }
+    if (revision < this.authoritativeRevision) {
+      return { accepted: false, complete: false, queued: 0 };
+    }
+
+    const queued = this._queueDecals(decals, context);
+    const complete = afterRevision <= this.authoritativeRevision;
+    if (complete) this.authoritativeRevision = revision;
+    return { accepted: true, complete, queued };
+  }
+
+  _queueDecals(records, context) {
     let queued = 0;
-    for (const record of Array.isArray(decals) ? decals : []) {
+    for (const record of Array.isArray(records) ? records : []) {
       const decal = normalizeAuthoritativeGroundDecal(record, context);
       if (!decal || this.authoritativeDecals.has(decal.id)) continue;
       this.authoritativeDecals.set(decal.id, decal);
       this._pending.push(decal);
       queued += 1;
     }
-    this.authoritativeRevision = revision;
-    return { accepted: true, queued };
+    return queued;
   }
 
   consumePending() {

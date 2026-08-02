@@ -1196,6 +1196,7 @@ mod tests {
         Snapshot {
             tick: 0,
             ground_decal_revision: 0,
+            ground_decal_delta: None,
             world_combat_position: None,
             steel: 0,
             oil: 0,
