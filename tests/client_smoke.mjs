@@ -613,6 +613,8 @@ try {
       withinViewport: panelRect && panelRect.bottom <= window.innerHeight - 11,
       noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
         .every((node) => node.scrollWidth <= node.clientWidth),
+      actionButtons: [...document.querySelectorAll(".map-editor-options-window button")]
+        .map((control) => control.textContent),
       zoom: (() => {
         const section = [...document.querySelectorAll(".map-editor-group")]
           .find((node) => node.querySelector("legend")?.textContent === "Zoom");
@@ -673,6 +675,13 @@ try {
       ["Fill screen", "Fit to screen", "−", "+"].every((label) => editorUi.zoom.buttons.includes(label)) &&
       editorUi.zoom.min === "5" && editorUi.zoom.max === "400" && editorUi.zoom.value > 0,
     `MAP EDITOR: top Tools section exposes bounded framing, step, and percentage zoom controls (${JSON.stringify(editorUi.zoom)})`,
+  );
+  ok(
+    editorUi.actionButtons.includes("Load map JSON") &&
+      editorUi.actionButtons.includes("Export map JSON") &&
+      !editorUi.actionButtons.includes("Save on this device") &&
+      !editorUi.actionButtons.includes("Load saved map"),
+    `MAP EDITOR: explicit JSON file actions replace browser workspace controls (${editorUi.actionButtons.join("/")})`,
   );
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,

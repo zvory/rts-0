@@ -238,6 +238,71 @@ assert(
 
 {
   const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  const statuses = [];
+  const panel = {
+    session,
+    viewport: { armTool(tool) { this.tool = tool; } },
+    selectedStartIndex: 4,
+    selectedBaseIndex: 7,
+    loadMapData: MapEditorPanel.prototype.loadMapData,
+    setStatus(message, error = false) { statuses.push({ message, error }); },
+  };
+  await MapEditorPanel.prototype.loadJsonFile.call(panel, {
+    name: "local-map.json",
+    size: 1024,
+    async text() { return JSON.stringify(oneVOneNoTerrainMap); },
+  });
+  assert.equal(session.exportMap().name, oneVOneNoTerrainMap.name, "local JSON loads through the authored-map validator");
+  assert.equal(session.hasUnsavedChanges, false, "a freshly imported file is the editor's saved baseline");
+  assert.equal(panel.selectedStartIndex, 0);
+  assert.equal(panel.selectedBaseIndex, 0);
+  assert.equal(panel.viewport.tool, null);
+  assert.deepEqual(statuses.pop(), { message: "Loaded local-map.json.", error: false });
+
+  await MapEditorPanel.prototype.loadJsonFile.call(panel, {
+    name: "broken.json",
+    size: 12,
+    async text() { return "{not json"; },
+  });
+  assert.match(statuses.at(-1).message, /^Could not load broken\.json:/);
+  assert.equal(statuses.at(-1).error, true, "invalid local JSON produces a visible error");
+
+  await MapEditorPanel.prototype.loadJsonFile.call(panel, {
+    name: "huge.json",
+    size: 2 * 1024 * 1024 + 1,
+    async text() { throw new Error("oversized files must not be read"); },
+  });
+  assert.deepEqual(statuses.at(-1), {
+    message: "Could not load huge.json: Map JSON files must be 2 MB or smaller.",
+    error: true,
+  });
+
+  session.mutate("Changed imported map", (draft) => { draft.description = "changed"; });
+  assert.equal(session.hasUnsavedChanges, true);
+  const savedDocument = globalThis.document;
+  const savedCreateObjectURL = URL.createObjectURL;
+  const savedRevokeObjectURL = URL.revokeObjectURL;
+  const anchor = { click() {}, remove() {} };
+  globalThis.document = {
+    body: { appendChild(node) { assert.equal(node, anchor); } },
+    createElement(tag) { assert.equal(tag, "a"); return anchor; },
+  };
+  URL.createObjectURL = () => "blob:map-export";
+  URL.revokeObjectURL = (url) => { assert.equal(url, "blob:map-export"); };
+  try {
+    MapEditorPanel.prototype.exportJson.call(panel);
+  } finally {
+    globalThis.document = savedDocument;
+    URL.createObjectURL = savedCreateObjectURL;
+    URL.revokeObjectURL = savedRevokeObjectURL;
+  }
+  assert.equal(session.hasUnsavedChanges, false, "exporting the current map clears the unsaved-change warning");
+  assert.match(statuses.at(-1).message, /^Exported .+\.json\.$/);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
   assert.equal(session.exportMap().version, 5);
@@ -512,54 +577,6 @@ assert(
   session.loadAuthoredMap(legacy);
   assert.equal(session.exportMap().version, 5, "local v2 maps migrate into current flat map data");
   assert.equal(session.exportMap().layouts, undefined);
-}
-
-{
-  const legacyWorkspace = {
-    version: 2,
-    name: "Saved legacy map",
-    terrain: Array.from({ length: 32 }, () => ".".repeat(32)),
-    sites: [
-      { id: "main", kind: "main", x: 8, y: 8 },
-      { id: "natural", kind: "natural", x: 22, y: 22 },
-    ],
-    layouts: [{ id: "one", playerCount: 1, slots: [{ main: "main", naturals: ["natural"] }] }],
-  };
-  const values = new Map([
-    ["rts.mapEditor.legacy-workspace.v2", JSON.stringify({ schemaVersion: 2, draft: legacyWorkspace })],
-  ]);
-  const storage = {
-    getItem(key) { return values.get(key) || null; },
-    setItem(key, value) { values.set(key, value); },
-  };
-  const session = new MapEditorSession({ storage });
-  assert.equal(session.loadLocal("legacy-workspace"), true, "v5 sessions recover saved v2 workspaces");
-  assert.equal(session.exportMap().version, 5);
-  assert.equal(session.materialized().baseSites.length, 2);
-}
-
-{
-  const v4Draft = {
-    version: 4,
-    name: "Saved v4 map",
-    description: "",
-    terrain: Array.from({ length: 16 }, () => ".".repeat(16)),
-    startLocations: [{ x: 7, y: 7 }],
-    baseSites: [{ x: 7, y: 7, steelPatches: 12, oilPatches: 3 }],
-  };
-  const values = new Map([
-    ["rts.map-editor.v4.v4-workspace", JSON.stringify({ schemaVersion: 4, draft: v4Draft })],
-  ]);
-  const storage = {
-    getItem(key) { return values.get(key) || null; },
-    setItem(key, value) { values.set(key, value); },
-  };
-  const session = new MapEditorSession({ storage });
-  assert.equal(session.loadLocal("v4-workspace"), true);
-  assert.equal(session.exportMap().version, 5);
-  assert.deepEqual(session.exportMap().doodads, [], "v4 local maps migrate to an empty v5 doodad layer");
-  assert.equal(session.saveLocal("v4-workspace"), true);
-  assert(values.has("rts.map-editor.v5.v4-workspace"), "new local saves use the v5 namespace");
 }
 
 {
@@ -983,7 +1000,10 @@ assert(
 }
 
 {
-  assert.equal(mapEditorLaunchConfig({ search: "?workspace=map-1", pathname: "/map-editor" }).workspaceId, "map-1");
+  assert.deepEqual(mapEditorLaunchConfig({ search: "", pathname: "/map-editor" }), {
+    handoffId: "",
+    error: "",
+  });
   assert.equal(MAP_EDITOR_MAX_BASE_SITES, 32);
   assert.equal(MAP_EDITOR_MAX_STEEL_PATCHES, 36);
   assert.equal(MAP_EDITOR_MAX_OIL_PATCHES, 9);

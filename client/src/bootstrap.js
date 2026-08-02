@@ -235,7 +235,6 @@ export function replaceLabCatalogRoute(launch, {
   if (!isLabPath(locationLike?.pathname) || !launch?.scenario) return "";
   const params = new URLSearchParams(locationLike.search || "");
   params.delete("handoff");
-  params.delete("workspace");
   params.set("scenario", safeLabToken(launch.scenario, "blank", 48));
 
   const mapName = safeLabToken(launch.map, "1v1", 48);
@@ -261,10 +260,8 @@ export function labHandoffLaunchConfig() {
   const params = new URLSearchParams(window.location.search);
   const raw = String(params.get("handoff") || "").trim().toLowerCase();
   if (!raw) return null;
-  const workspace = String(params.get("workspace") || "default").trim();
   return {
     handoffId: /^[a-f0-9]{32}$/.test(raw) ? raw : "",
-    workspaceId: /^[A-Za-z0-9_-]{1,48}$/.test(workspace) ? workspace : "default",
     error: /^[a-f0-9]{32}$/.test(raw) ? "" : "Invalid Map Editor handoff id.",
   };
 }

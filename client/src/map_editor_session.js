@@ -91,8 +91,7 @@ const SYMMETRY_TRANSFORMS = Object.freeze({
 });
 
 export class MapEditorSession {
-  constructor({ storage = defaultStorage(), historyLimit = MAP_EDITOR_HISTORY_LIMIT } = {}) {
-    this.storage = storage;
+  constructor({ historyLimit = MAP_EDITOR_HISTORY_LIMIT } = {}) {
     this.historyLimit = Math.max(1, Math.trunc(historyLimit) || MAP_EDITOR_HISTORY_LIMIT);
     this.draft = null;
     this.undoStack = [];
@@ -184,6 +183,9 @@ export class MapEditorSession {
   loadAuthoredMap(source, { expectedSize = null, expectedWidth = expectedSize, expectedHeight = expectedSize, playerCount = null } = {}) {
     const draft = clone(source);
     normalizeDraft(draft);
+    if (!validEditorDimension(draft.width) || !validEditorDimension(draft.height)) {
+      throw new Error(`Map dimensions must be whole numbers from ${MAP_EDITOR_MIN_SIZE} to ${MAP_EDITOR_MAX_SIZE}.`);
+    }
     const requiredWidth = positiveInteger(expectedWidth);
     const requiredHeight = positiveInteger(expectedHeight);
     if ((requiredWidth && draft.width !== requiredWidth) || (requiredHeight && draft.height !== requiredHeight)) {
@@ -197,6 +199,7 @@ export class MapEditorSession {
     this.undoStack = [];
     this.redoStack = [];
     this.lastAction = `Loaded ${draft.name}`;
+    this.markSaved({ notify: false });
     this.notify("loaded");
     return true;
   }
@@ -413,39 +416,6 @@ export class MapEditorSession {
       .map((location, index) => ({ ...location, index }))
       .filter((site) => !startKeys.has(locationKey(site)));
     return { starts, bases };
-  }
-
-  saveLocal(key) {
-    if (!this.draft || !this.storage?.setItem) return false;
-    try { this.storage.setItem(storageKey(key), JSON.stringify({ schemaVersion: 5, draft: this.draft })); } catch { return false; }
-    this.lastAction = "Saved local map";
-    this.markSaved();
-    return true;
-  }
-
-  loadLocal(key) {
-    if (!this.storage?.getItem) return false;
-    let parsed;
-    try {
-      const text = this.storage.getItem(storageKey(key))
-        || this.storage.getItem(legacyV4StorageKey(key))
-        || this.storage.getItem(legacyV3StorageKey(key))
-        || this.storage.getItem(legacyStorageKey(key));
-      if (!text) return false;
-      parsed = JSON.parse(text);
-      if (parsed?.draft) parsed = parsed.draft;
-      normalizeDraft(parsed);
-    } catch { return false; }
-    if (!this.draft) {
-      this.draft = parsed;
-      this.lastAction = "Loaded local map";
-      this.markSaved({ notify: false });
-      this.notify("loaded");
-      return true;
-    }
-    this.mutate("Loaded local map", (draft) => replaceObject(draft, parsed));
-    this.markSaved({ notify: false });
-    return true;
   }
 
   materialized() {
@@ -1107,8 +1077,3 @@ function normalizeDimensions(value) {
 }
 function clampTile(value, size) { return Math.max(0, Math.min(size - 1, Math.trunc(value))); }
 function draftEditError(error) { return { ok: false, error }; }
-function storageKey(key) { return `rts.map-editor.v5.${String(key || "default")}`; }
-function legacyV4StorageKey(key) { return `rts.map-editor.v4.${String(key || "default")}`; }
-function legacyV3StorageKey(key) { return `rts.map-editor.v3.${String(key || "default")}`; }
-function legacyStorageKey(key) { return `rts.mapEditor.${String(key || "default")}.v2`; }
-function defaultStorage() { try { return globalThis.localStorage || null; } catch { return null; } }

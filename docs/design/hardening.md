@@ -95,7 +95,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   command counts so long artifacts and expensive controls are visible in server logs.
 - **Authoring is non-persistent**: lab setup validation exports and validates the current
   authoritative `Game` in memory, then returns a bounded JSON preview to the requesting operator.
-  The map editor stores drafts in browser storage or exports JSON locally. Public HTTP and
+  The map editor imports and exports map JSON through explicit local file actions. Public HTTP and
   WebSocket surfaces do not write maps, setup files, repository branches, or pull requests on the
   server.
 - **Deploy drain**: SIGTERM/Ctrl-C starts a server drain instead of immediately shutting down.
