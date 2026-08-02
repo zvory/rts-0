@@ -20,9 +20,9 @@ use crate::protocol::Event;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
 
 use super::pivot_drive::{
-    angle_delta, distance_between, normalize_angle, pivot_drive_intent, pivot_drive_speed_scale,
-    rotate_toward, vehicle_body_turn_rate, vehicle_oil_starves_movement,
-    vehicle_traffic_adjustment,
+    angle_delta, close_nudge_hull_axis_motion, distance_between, normalize_angle,
+    pivot_drive_intent, pivot_drive_speed_scale, rotate_toward, vehicle_body_turn_rate,
+    vehicle_oil_starves_movement, vehicle_traffic_adjustment,
 };
 use super::scout_car::{plan_scout_car_motion, route_accepts_waypoint};
 use super::standability::{
@@ -300,9 +300,15 @@ pub(super) fn advance_moving_units(
                 } else {
                     // Partial step toward the waypoint.
                     let path_dir = (dx / dist, dy / dist);
-                    let step_dir = path_dir;
-                    let direct_nx = x + step_dir.0 * budget;
-                    let direct_ny = y + step_dir.1 * budget;
+                    let same_tile = map.tile_of(x, y) == map.tile_of(wx, wy);
+                    let close_nudge = is_pivot_vehicle && path_len == 1 && same_tile;
+                    let (step_dir, step_budget) = if close_nudge {
+                        close_nudge_hull_axis_motion(path_dir, body_facing, budget)
+                    } else {
+                        (path_dir, budget)
+                    };
+                    let direct_nx = x + step_dir.0 * step_budget;
+                    let direct_ny = y + step_dir.1 * step_budget;
                     let steered = if can_local_steer {
                         let steering_path_dir = entities
                             .get(id)
