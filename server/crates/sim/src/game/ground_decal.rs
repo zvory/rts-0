@@ -5,8 +5,7 @@ use crate::game::entity::EntityKind;
 use crate::game::fog::Fog;
 use crate::protocol::{self, GroundDecalView};
 use crate::rules::{
-    artillery_ground_decal_source_kind, death_ground_decal_class,
-    mortar_ground_decal_source_kind,
+    artillery_ground_decal_source_kind, death_ground_decal_class, mortar_ground_decal_source_kind,
 };
 use serde::{Deserialize, Serialize};
 
