@@ -434,8 +434,8 @@ pub(super) fn advance_moving_units(
         };
 
         if let Some(e) = entities.get_mut(id) {
-            e.pos_x = x.clamp(0.0, map.world_size_px() - 0.01);
-            e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);
+            e.pos_x = x.clamp(0.0, map.world_width_px() - 0.01);
+            e.pos_y = y.clamp(0.0, map.world_height_px() - 0.01);
             e.set_movement_delta(e.pos_x - orig_x, e.pos_y - orig_y);
             let moved_by_path = distance_between((orig_x, orig_y), (e.pos_x, e.pos_y)) > 0.01;
             let rotated_by_path = new_facing
@@ -737,12 +737,7 @@ fn recovery_candidate_is_legal(
     if !candidate.0.is_finite() || !candidate.1.is_finite() {
         return false;
     }
-    let world_size = map.world_size_px();
-    if candidate.0 < 0.0
-        || candidate.1 < 0.0
-        || candidate.0 >= world_size
-        || candidate.1 >= world_size
-    {
+    if !map.contains_world_point(candidate.0, candidate.1) {
         return false;
     }
     if e.next_waypoint()

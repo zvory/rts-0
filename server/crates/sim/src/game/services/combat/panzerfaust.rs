@@ -271,10 +271,7 @@ fn panzerfaust_target_in_range(
     if dist2(attacker.pos_x, attacker.pos_y, target.pos_x, target.pos_y) > range_px * range_px {
         return false;
     }
-    target.pos_x >= 0.0
-        && target.pos_y >= 0.0
-        && target.pos_x < map.world_size_px()
-        && target.pos_y < map.world_size_px()
+    map.contains_world_point(target.pos_x, target.pos_y)
 }
 
 pub(super) struct PanzerfaustFireContext<'a, 'los> {

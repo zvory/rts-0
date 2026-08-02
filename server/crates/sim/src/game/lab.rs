@@ -135,7 +135,8 @@ pub enum LabOpOutcome {
     },
     MapDraftApplied {
         name: String,
-        size: u32,
+        width: u32,
+        height: u32,
         battle_reset: bool,
     },
     ScenarioRestored(LabScenarioRestore),
@@ -236,7 +237,8 @@ pub enum LabPlacementBlocker {
         entity_kind: String,
     },
     Boundary {
-        world_size: u32,
+        world_width: u32,
+        world_height: u32,
     },
 }
 
@@ -493,8 +495,8 @@ impl Game {
             });
         }
         let tile_count = draft
-            .size
-            .checked_mul(draft.size)
+            .width
+            .checked_mul(draft.height)
             .and_then(|count| usize::try_from(count).ok())
             .ok_or_else(|| LabError::InvalidMap {
                 name: name.to_string(),
@@ -555,7 +557,8 @@ impl Game {
         for &(x, y) in &starts {
             validate_lab_map_site(
                 name,
-                draft.size,
+                draft.width,
+                draft.height,
                 &draft.terrain,
                 x,
                 y,
@@ -569,7 +572,8 @@ impl Game {
             }
             validate_lab_map_site(
                 name,
-                draft.size,
+                draft.width,
+                draft.height,
                 &draft.terrain,
                 x,
                 y,
@@ -579,7 +583,8 @@ impl Game {
         }
 
         let map = Map {
-            size: draft.size,
+            width: draft.width,
+            height: draft.height,
             terrain: draft.terrain,
             starts,
             base_sites,
@@ -599,7 +604,8 @@ impl Game {
         *self = replacement;
         Ok(LabOpOutcome::MapDraftApplied {
             name: name.to_string(),
-            size: draft.size,
+            width: draft.width,
+            height: draft.height,
             battle_reset: true,
         })
     }
@@ -1117,15 +1123,19 @@ fn placement_blockers(
     building: bool,
 ) -> Vec<LabPlacementBlocker> {
     let mut blockers = Vec::new();
-    let world_size = map.size.saturating_mul(config::TILE_SIZE);
+    let world_width = map.width.saturating_mul(config::TILE_SIZE);
+    let world_height = map.height.saturating_mul(config::TILE_SIZE);
     if !x.is_finite()
         || !y.is_finite()
         || x < 0.0
         || y < 0.0
-        || x >= world_size as f32
-        || y >= world_size as f32
+        || x >= world_width as f32
+        || y >= world_height as f32
     {
-        blockers.push(LabPlacementBlocker::Boundary { world_size });
+        blockers.push(LabPlacementBlocker::Boundary {
+            world_width,
+            world_height,
+        });
     }
 
     let tile_size = config::TILE_SIZE as f32;
@@ -1169,12 +1179,15 @@ fn placement_blockers(
                     .iter()
                     .any(|blocker| matches!(blocker, LabPlacementBlocker::Boundary { .. }))
                 {
-                    blockers.push(LabPlacementBlocker::Boundary { world_size });
+                    blockers.push(LabPlacementBlocker::Boundary {
+                        world_width,
+                        world_height,
+                    });
                 }
             } else if !map.is_passable(tx, ty) {
                 let terrain = map
                     .terrain
-                    .get(ty as usize * map.size as usize + tx as usize)
+                    .get(ty as usize * map.width as usize + tx as usize)
                     .copied()
                     .map(terrain_name)
                     .unwrap_or("unknown")
@@ -1290,14 +1303,15 @@ fn terrain_name(tile: u8) -> &'static str {
 
 fn validate_lab_map_site(
     name: &str,
-    size: u32,
+    width: u32,
+    height: u32,
     terrain_grid: &[u8],
     x: u32,
     y: u32,
     radius: i32,
     occupied_sites: &mut std::collections::HashSet<(u32, u32)>,
 ) -> Result<(), LabError> {
-    if x >= size || y >= size {
+    if x >= width || y >= height {
         return Err(LabError::InvalidMap {
             name: name.to_string(),
             reason: format!("base site ({x},{y}) is outside the map"),
@@ -1329,13 +1343,13 @@ fn validate_lab_map_site(
                     reason: format!("base site ({x},{y}) is too close to the map edge"),
                 });
             };
-            if tx < 0 || ty < 0 || tx >= size as i32 || ty >= size as i32 {
+            if tx < 0 || ty < 0 || tx >= width as i32 || ty >= height as i32 {
                 return Err(LabError::InvalidMap {
                     name: name.to_string(),
                     reason: format!("base site ({x},{y}) is too close to the map edge"),
                 });
             }
-            let index = ty as usize * size as usize + tx as usize;
+            let index = ty as usize * width as usize + tx as usize;
             if !terrain_grid
                 .get(index)
                 .copied()
@@ -1395,8 +1409,7 @@ fn validate_world_position(map: &Map, x: f32, y: f32) -> Result<(), LabError> {
             reason: "position must be finite",
         });
     }
-    let world = map.world_size_px();
-    if x < 0.0 || y < 0.0 || x >= world || y >= world {
+    if !map.contains_world_point(x, y) {
         return Err(LabError::InvalidPosition {
             x,
             y,

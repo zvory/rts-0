@@ -766,7 +766,7 @@ mod tests {
                 });
             for tile_y in start_y..start_y + definition.stats.foot_h {
                 for tile_x in start_x..start_x + definition.stats.foot_w {
-                    let terrain = map.terrain[(tile_y * map.size + tile_x) as usize];
+                    let terrain = map.terrain[(tile_y * map.width + tile_x) as usize];
                     assert_eq!(
                         terrain,
                         rts_rules::terrain::MAP_TERRAIN_GRASS,

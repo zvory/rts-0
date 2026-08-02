@@ -204,7 +204,7 @@ fn anti_tank_gun_firing_from_fog_projects_as_actionable_snapshot_entity() {
         .expect("firing AT gun should still exist");
     let tile_x = (enemy.pos_x / config::TILE_SIZE as f32).floor() as usize;
     let tile_y = (enemy.pos_y / config::TILE_SIZE as f32).floor() as usize;
-    let tile = tile_y * game.state.map.size as usize + tile_x;
+    let tile = tile_y * game.state.map.width as usize + tile_x;
     assert_eq!(
         snapshot.visible_tiles[tile], 0,
         "an actionable firing reveal must not clear the attacker's presentation-fog tile"

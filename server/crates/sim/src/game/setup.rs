@@ -261,7 +261,7 @@ impl Game {
             })
             .collect();
         let map = map_override.unwrap_or_else(|| Map::generate_for_players(&start_players, seed));
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let mut entities = EntityStore::new();
 
         let mut player_states = Vec::with_capacity(players.len() + 1);
@@ -378,8 +378,8 @@ impl Game {
             })
             .collect();
         let map = MapInfo {
-            width: self.state.map.size,
-            height: self.state.map.size,
+            width: self.state.map.width,
+            height: self.state.map.height,
             tile_size: config::TILE_SIZE,
             terrain: self.state.map.terrain.clone(),
             resources,
@@ -449,9 +449,8 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let (hx, hy) = map.tile_center(tx, ty);
     let ts = config::TILE_SIZE as f32;
 
-    let center = map.world_size_px() * 0.5;
-    let dx = center - hx;
-    let dy = center - hy;
+    let dx = map.world_width_px() * 0.5 - hx;
+    let dy = map.world_height_px() * 0.5 - hy;
     let base_angle = dy.atan2(dx);
 
     let perp_x = -base_angle.sin();
@@ -554,9 +553,10 @@ fn oil_patch_tile_offset(index: u32, step_x: i32, step_y: i32) -> (i32, i32) {
 }
 
 fn offset_tile_center(map: &Map, tx: u32, ty: u32, dx: i32, dy: i32) -> (f32, f32) {
-    let max_tile = map.size.saturating_sub(1) as i32;
-    let desired_tx = (tx as i32 + dx).clamp(0, max_tile) as u32;
-    let desired_ty = (ty as i32 + dy).clamp(0, max_tile) as u32;
+    let max_x = map.width.saturating_sub(1) as i32;
+    let max_y = map.height.saturating_sub(1) as i32;
+    let desired_tx = (tx as i32 + dx).clamp(0, max_x) as u32;
+    let desired_ty = (ty as i32 + dy).clamp(0, max_y) as u32;
     map.tile_center(desired_tx, desired_ty)
 }
 

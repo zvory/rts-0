@@ -13,39 +13,41 @@ use crate::game::entity::EntityStore;
 /// refill each tick. Each cell stores the ids of entities whose center falls on that tile.
 #[derive(Debug, Clone, Default)]
 pub struct SpatialIndex {
-    size: u32,
+    width: u32,
+    height: u32,
     cells: Vec<Vec<u32>>,
 }
 
 impl SpatialIndex {
     /// Build a fresh index from all live entities.
-    pub fn build(entities: &EntityStore, map_size: u32) -> Self {
-        let cell_count = (map_size * map_size) as usize;
+    pub fn build(entities: &EntityStore, map_width: u32, map_height: u32) -> Self {
+        let cell_count = map_width.saturating_mul(map_height) as usize;
         let mut cells = vec![Vec::new(); cell_count];
         for e in entities.iter() {
             let tx = (e.pos_x / config::TILE_SIZE as f32).floor() as i32;
             let ty = (e.pos_y / config::TILE_SIZE as f32).floor() as i32;
-            if tx < 0 || ty < 0 || tx >= map_size as i32 || ty >= map_size as i32 {
+            if tx < 0 || ty < 0 || tx >= map_width as i32 || ty >= map_height as i32 {
                 continue;
             }
-            let idx = (ty as u32 * map_size + tx as u32) as usize;
+            let idx = (ty as u32 * map_width + tx as u32) as usize;
             cells[idx].push(e.id);
         }
         for cell in &mut cells {
             cell.sort_unstable();
         }
         SpatialIndex {
-            size: map_size,
+            width: map_width,
+            height: map_height,
             cells,
         }
     }
 
     /// Iterate all entity ids whose tile center lies within the inclusive tile rectangle.
     pub fn ids_in_rect(&self, min_tx: i32, min_ty: i32, max_tx: i32, max_ty: i32) -> RectIter<'_> {
-        let min_tx = min_tx.clamp(0, self.size as i32 - 1);
-        let min_ty = min_ty.clamp(0, self.size as i32 - 1);
-        let max_tx = max_tx.clamp(0, self.size as i32 - 1);
-        let max_ty = max_ty.clamp(0, self.size as i32 - 1);
+        let min_tx = min_tx.clamp(0, self.width as i32 - 1);
+        let min_ty = min_ty.clamp(0, self.height as i32 - 1);
+        let max_tx = max_tx.clamp(0, self.width as i32 - 1);
+        let max_ty = max_ty.clamp(0, self.height as i32 - 1);
         RectIter {
             index: self,
             x: min_tx,
@@ -98,7 +100,7 @@ impl Iterator for RectIter<'_> {
             if self.y > self.max_ty {
                 return None;
             }
-            let idx = (self.y as u32 * self.index.size + self.x as u32) as usize;
+            let idx = (self.y as u32 * self.index.width + self.x as u32) as usize;
             if self.cell_idx < self.index.cells[idx].len() {
                 let id = self.index.cells[idx][self.cell_idx];
                 self.cell_idx += 1;

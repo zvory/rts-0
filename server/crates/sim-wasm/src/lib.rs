@@ -436,8 +436,8 @@ impl CorePredictor {
             self.note_disabled("invalidMoveTarget");
             return;
         }
-        let target_x = x.clamp(0.0, self.world_width_px());
-        let target_y = y.clamp(0.0, self.world_height_px());
+        let target_x = x.clamp(0.0, self.world_max_x_px());
+        let target_y = y.clamp(0.0, self.world_max_y_px());
         for id in units {
             if let Some(entity) = self.owned.get_mut(id) {
                 let order = MoveOrder {
@@ -490,11 +490,11 @@ impl CorePredictor {
         }
     }
 
-    fn world_width_px(&self) -> f32 {
+    fn world_max_x_px(&self) -> f32 {
         self.map.width as f32 * self.map.tile_size as f32
     }
 
-    fn world_height_px(&self) -> f32 {
+    fn world_max_y_px(&self) -> f32 {
         self.map.height as f32 * self.map.tile_size as f32
     }
 

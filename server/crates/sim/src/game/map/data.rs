@@ -9,7 +9,8 @@ use super::BaseResourceCounts;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredMapData {
     pub name: String,
-    pub size: u32,
+    pub width: u32,
+    pub height: u32,
     pub terrain: Vec<u8>,
     pub starts: Vec<(u32, u32)>,
     pub base_sites: Vec<(u32, u32)>,

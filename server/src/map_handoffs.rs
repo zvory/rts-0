@@ -211,8 +211,8 @@ fn validate_materialized_binding(
     if authored.name != materialized.name {
         return Err("Authored and materialized map names do not match.".to_string());
     }
-    if authored.size != materialized.size {
-        return Err("Authored and materialized map sizes do not match.".to_string());
+    if authored.width != materialized.width || authored.height != materialized.height {
+        return Err("Authored and materialized map dimensions do not match.".to_string());
     }
     if authored.terrain != materialized.terrain {
         return Err("Authored and materialized terrain do not match.".to_string());
@@ -299,7 +299,8 @@ mod tests {
             authored_map,
             materialized_map: LabMapDraft {
                 name: "1v1 No Terrain".to_string(),
-                size: 126,
+                width: 126,
+                height: 126,
                 terrain: vec![terrain::GRASS; 126 * 126],
                 starts,
                 base_sites,
@@ -390,7 +391,8 @@ mod tests {
         request.authored_map["baseSites"] = base_sites.into();
         request.materialized_map = LabMapDraft {
             name: "Custom size".to_string(),
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: starts.to_vec(),
             base_sites: starts

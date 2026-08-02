@@ -249,8 +249,8 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
         .fog
         .recompute(&active_players, &game.state.entities, &game.state.map);
 
-    let hidden_pos = (0..game.state.map.size)
-        .flat_map(|ty| (0..game.state.map.size).map(move |tx| (tx, ty)))
+    let hidden_pos = (0..game.state.map.width)
+        .flat_map(|ty| (0..game.state.map.width).map(move |tx| (tx, ty)))
         .find_map(|(tx, ty)| {
             let (x, y) = game.state.map.tile_center(tx, ty);
             let hidden_from_all = active_players

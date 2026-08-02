@@ -1182,10 +1182,11 @@ fn direct_attack_staging_goal(
     } else {
         (1.0, 0.0)
     };
-    let world_max = map.world_size_px() - 0.01;
+    let world_max_x = map.world_width_px() - 0.01;
+    let world_max_y = map.world_height_px() - 0.01;
     Some((
-        (target.0 + dir_x * desired_distance).clamp(0.0, world_max),
-        (target.1 + dir_y * desired_distance).clamp(0.0, world_max),
+        (target.0 + dir_x * desired_distance).clamp(0.0, world_max_x),
+        (target.1 + dir_y * desired_distance).clamp(0.0, world_max_y),
     ))
 }
 
@@ -1215,8 +1216,11 @@ fn full_rotation_spawn_clear(
         return false;
     };
     let envelope = CircleBody { x, y, radius };
-    let world_max = map.world_size_px();
-    if x - radius < 0.0 || y - radius < 0.0 || x + radius > world_max || y + radius > world_max {
+    if x - radius < 0.0
+        || y - radius < 0.0
+        || x + radius > map.world_width_px()
+        || y + radius > map.world_height_px()
+    {
         return false;
     }
 
@@ -1287,7 +1291,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![],
             ..Default::default()
@@ -1732,7 +1737,8 @@ mod tests {
     #[test]
     fn smooth_vehicle_paths_use_clearance_route_shape() {
         let map = Map {
-            size: 40,
+            width: 40,
+            height: 40,
             terrain: vec![crate::protocol::terrain::GRASS; 40 * 40],
             starts: vec![],
             ..Default::default()
@@ -1783,7 +1789,8 @@ mod tests {
     #[test]
     fn request_attack_move_path_keeps_tile_guided_movement_route() {
         let map = Map {
-            size: 40,
+            width: 40,
+            height: 40,
             terrain: vec![crate::protocol::terrain::GRASS; 40 * 40],
             starts: vec![],
             ..Default::default()

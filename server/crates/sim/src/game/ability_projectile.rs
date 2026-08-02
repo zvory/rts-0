@@ -303,7 +303,7 @@ mod tests {
     }
 
     fn tick_runtime(runtime: &mut AbilityRuntime, entities: &mut EntityStore, tick: u32) {
-        let spatial = SpatialIndex::build(entities, 32);
+        let spatial = SpatialIndex::build(entities, 32, 32);
         runtime.tick_projectiles(entities, &teams(), &spatial, tick);
         runtime.tick(entities, tick);
     }

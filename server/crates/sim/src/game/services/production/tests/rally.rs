@@ -95,7 +95,7 @@ fn simultaneous_production_reserves_distinct_rally_tiles() {
 #[test]
 fn produced_unit_uses_nearest_reachable_free_rally_tile() {
     let mut map = flat_map(32);
-    for ty in 0..map.size {
+    for ty in 0..map.width {
         let index = map.index(16, ty);
         map.terrain[index] = terrain::ROCK;
     }
@@ -188,7 +188,7 @@ fn visible_enemy_blocks_produced_unit_rally_goal() {
         .expect("city centre")
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
     let mut players = vec![player(1), player(2)];
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], &entities, &map);
 
     tick_production_with_fog(&map, &mut entities, &mut players, &fog);
@@ -236,7 +236,7 @@ fn enemy_future_goal_does_not_reserve_rally_tile() {
         .expect("city centre")
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
     let mut players = vec![player(1), player(2)];
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], &entities, &map);
 
     tick_production_with_fog(&map, &mut entities, &mut players, &fog);

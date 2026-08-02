@@ -42,8 +42,8 @@ fn default_lab_game(seed: u32) -> Game {
 }
 
 fn free_spawn_position(game: &Game, owner: u32, kind: EntityKind) -> (f32, f32) {
-    for y in 2..game.state.map.size.saturating_sub(2) {
-        for x in 2..game.state.map.size.saturating_sub(2) {
+    for y in 2..game.state.map.width.saturating_sub(2) {
+        for x in 2..game.state.map.width.saturating_sub(2) {
             if !game.state.map.is_passable(x as i32, y as i32) {
                 continue;
             }
@@ -137,7 +137,7 @@ fn checkpoint_lab_scenario_export_matches_direct_state() {
         .all(|entry| entry.old_id == entry.new_id));
     assert_eq!(
         checkpoint.map.data.terrain.len(),
-        (checkpoint.map.data.size * checkpoint.map.data.size) as usize
+        (checkpoint.map.data.width * checkpoint.map.data.width) as usize
     );
     assert!(
         !checkpoint.checkpoint_payload.contains("\"terrain\""),
@@ -223,7 +223,8 @@ fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
         .expect("live lab checkpoint scenario should export");
     checkpoint.map.data.starts.swap(0, 1);
     let map = Map {
-        size: checkpoint.map.data.size,
+        width: checkpoint.map.data.width,
+        height: checkpoint.map.data.height,
         terrain: checkpoint.map.data.terrain.clone(),
         starts: checkpoint
             .map

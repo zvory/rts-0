@@ -8,13 +8,13 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, wx, wy)
         .expect("worker should spawn");
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let occ = Occupancy::build(&map, &entities);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
     let mut players = vec![player_state(1)];
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1], &entities, &map);
     let mut smokes = SmokeCloudStore::new();
     let mut ability_runtime = AbilityRuntime::new();
@@ -87,13 +87,13 @@ fn build_order_does_not_pull_worker_off_active_construction() {
     worker_entity.mark_build_phase(BuildPhase::Constructing { site });
     worker_entity.set_target_id(Some(site));
 
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let occ = Occupancy::build(&map, &entities);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
     let mut players = vec![player_state(1)];
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1], &entities, &map);
     let mut smokes = SmokeCloudStore::new();
     let mut ability_runtime = AbilityRuntime::new();
@@ -279,13 +279,13 @@ fn build_order_accepts_resuming_owned_scaffold() {
     let scaffold = entities
         .spawn_building(1, EntityKind::CityCentre, site_x, site_y, false)
         .expect("scaffold should spawn");
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let occ = Occupancy::build(&map, &entities);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
     let mut players = vec![player_state(1)];
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1], &entities, &map);
     let mut smokes = SmokeCloudStore::new();
     let mut ability_runtime = AbilityRuntime::new();
@@ -359,14 +359,14 @@ fn build_order_accepts_resuming_owned_scaffold_without_resources() {
     entities
         .spawn_building(1, EntityKind::CityCentre, site_x, site_y, false)
         .expect("scaffold should spawn");
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let occ = Occupancy::build(&map, &entities);
     let mut pathing = PathingService::new(1024, 32);
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
     let mut players = vec![player_state(1)];
     assert!(players[0].spend_cost(rules::economy::ResourceCost::new(1_000, 1_000)));
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1], &entities, &map);
     let mut smokes = SmokeCloudStore::new();
     let mut ability_runtime = AbilityRuntime::new();

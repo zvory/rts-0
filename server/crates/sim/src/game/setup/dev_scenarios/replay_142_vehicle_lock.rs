@@ -16,7 +16,7 @@ impl Game {
         }
 
         let mut map = flat_dev_map(1);
-        let start_tile = (map.size / 2, map.size - 20);
+        let start_tile = (map.width / 2, map.height - 20);
         let anchor = map.tile_center(start_tile.0, start_tile.1);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = start_tile;

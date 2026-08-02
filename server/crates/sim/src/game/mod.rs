@@ -282,7 +282,8 @@ impl Game {
         world_combat::record_activity(
             &events,
             self.state.tick,
-            self.state.map.world_size_px(),
+            self.state.map.world_width_px(),
+            self.state.map.world_height_px(),
             &mut self.state.last_world_combat_tick,
             &mut self.state.last_world_combat_position,
             &mut self.state.world_combat_active_through_tick,
@@ -322,7 +323,8 @@ impl Game {
     /// normal command validation and replay logging path applies.
     pub fn worker_retreat_commands_for(&self, player: u32) -> Vec<SimCommand> {
         let last_tick = self.state.tick.checked_sub(1);
-        let world_max = self.state.map.world_size_px() - 0.01;
+        let world_max_x = self.state.map.world_width_px() - 0.01;
+        let world_max_y = self.state.map.world_height_px() - 0.01;
         let retreat_px = AI_WORKER_RETREAT_TILES * config::TILE_SIZE as f32;
         let mut commands = Vec::new();
         for entity in self.state.entities.iter() {
@@ -349,8 +351,8 @@ impl Game {
             };
             commands.push(SimCommand::Move {
                 units: vec![entity.id],
-                x: (vx + ux * retreat_px).clamp(0.0, world_max),
-                y: (vy + uy * retreat_px).clamp(0.0, world_max),
+                x: (vx + ux * retreat_px).clamp(0.0, world_max_x),
+                y: (vy + uy * retreat_px).clamp(0.0, world_max_y),
                 queued: false,
             });
         }

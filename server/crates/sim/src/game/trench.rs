@@ -73,8 +73,7 @@ impl TrenchStore {
         {
             return None;
         }
-        let world = map.world_size_px();
-        if x < 0.0 || y < 0.0 || x >= world || y >= world {
+        if !map.contains_world_point(x, y) {
             return None;
         }
         let id = self.next_id;

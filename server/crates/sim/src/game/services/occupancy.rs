@@ -40,17 +40,17 @@ impl<'a> Occupancy<'a> {
 
 impl OccupancyData {
     fn build(map: &Map, entities: &EntityStore) -> Self {
-        let size = map.size;
-        let mut all_ground_blocked = vec![false; (size * size) as usize];
-        let mut vehicle_body_blocked = vec![false; (size * size) as usize];
-        let mut tank_trap_tiles = vec![false; (size * size) as usize];
+        let cells = map.width.saturating_mul(map.height) as usize;
+        let mut all_ground_blocked = vec![false; cells];
+        let mut vehicle_body_blocked = vec![false; cells];
+        let mut tank_trap_tiles = vec![false; cells];
         for e in entities.iter() {
             if !e.is_building() {
                 continue;
             }
             for (tx, ty) in building_footprint(map, e) {
-                if tx < size && ty < size {
-                    let idx = (ty * size + tx) as usize;
+                if tx < map.width && ty < map.height {
+                    let idx = (ty * map.width + tx) as usize;
                     match static_blocker_class(e.kind) {
                         StaticBlockerClass::AllGround => all_ground_blocked[idx] = true,
                         StaticBlockerClass::VehicleBodyOnly => vehicle_body_blocked[idx] = true,
@@ -62,12 +62,17 @@ impl OccupancyData {
                 }
             }
         }
-        close_tank_trap_vehicle_gaps(size, &tank_trap_tiles, &mut vehicle_body_blocked);
-        let mut all_ground_static_blocked = vec![false; (size * size) as usize];
-        let mut vehicle_body_static_blocked = vec![false; (size * size) as usize];
-        for ty in 0..size {
-            for tx in 0..size {
-                let idx = (ty * size + tx) as usize;
+        close_tank_trap_vehicle_gaps(
+            map.width,
+            map.height,
+            &tank_trap_tiles,
+            &mut vehicle_body_blocked,
+        );
+        let mut all_ground_static_blocked = vec![false; cells];
+        let mut vehicle_body_static_blocked = vec![false; cells];
+        for ty in 0..map.height {
+            for tx in 0..map.width {
+                let idx = (ty * map.width + tx) as usize;
                 let terrain_blocked = !map.is_passable(tx as i32, ty as i32);
                 all_ground_static_blocked[idx] = all_ground_blocked[idx] || terrain_blocked;
                 vehicle_body_static_blocked[idx] =
@@ -77,9 +82,9 @@ impl OccupancyData {
         let all_ground_clearance_tiles = build_clearance_field(map, &all_ground_static_blocked);
         let vehicle_body_clearance_tiles = build_clearance_field(map, &vehicle_body_static_blocked);
         let all_ground_static_fingerprint =
-            static_blocked_fingerprint(size, &all_ground_static_blocked);
+            static_blocked_fingerprint(map.width, map.height, &all_ground_static_blocked);
         let vehicle_body_static_fingerprint =
-            static_blocked_fingerprint(size, &vehicle_body_static_blocked);
+            static_blocked_fingerprint(map.width, map.height, &vehicle_body_static_blocked);
 
         OccupancyData {
             all_ground_blocked,
@@ -109,7 +114,7 @@ impl Occupancy<'_> {
         if !self.map.in_bounds(tx, ty) {
             return 0;
         }
-        let idx = (ty as u32 * self.map.size + tx as u32) as usize;
+        let idx = (ty as u32 * self.map.width + tx as u32) as usize;
         match movement_body_class {
             MovementBodyClass::InfantryLike => self.data.all_ground_clearance_tiles[idx],
             MovementBodyClass::VehicleBody => self.data.vehicle_body_clearance_tiles[idx],
@@ -122,8 +127,7 @@ impl Occupancy<'_> {
         if !x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0 {
             return 0;
         }
-        let world_size = self.map.world_size_px();
-        if x >= world_size || y >= world_size {
+        if !self.map.contains_world_point(x, y) {
             return 0;
         }
         let ts = config::TILE_SIZE as f32;
@@ -182,11 +186,10 @@ impl Occupancy<'_> {
     }
 
     pub(crate) fn building_blocked_at_tile(&self, tx: i32, ty: i32) -> bool {
-        let size = self.map.size as i32;
-        if tx < 0 || ty < 0 || tx >= size || ty >= size {
+        if !self.map.in_bounds(tx, ty) {
             return false;
         }
-        let idx = (ty * self.map.size as i32 + tx) as usize;
+        let idx = (ty as u32 * self.map.width + tx as u32) as usize;
         self.data.all_ground_blocked[idx] || self.data.vehicle_body_blocked[idx]
     }
 
@@ -200,11 +203,10 @@ impl Occupancy<'_> {
         ty: i32,
         movement_body_class: MovementBodyClass,
     ) -> bool {
-        let size = self.map.size as i32;
-        if tx < 0 || ty < 0 || tx >= size || ty >= size {
+        if !self.map.in_bounds(tx, ty) {
             return false;
         }
-        let idx = (ty * self.map.size as i32 + tx) as usize;
+        let idx = (ty as u32 * self.map.width + tx as u32) as usize;
         if self.data.all_ground_blocked[idx] {
             return false;
         }
@@ -216,13 +218,14 @@ impl Occupancy<'_> {
 }
 
 fn close_tank_trap_vehicle_gaps(
-    size: u32,
+    width: u32,
+    height: u32,
     tank_trap_tiles: &[bool],
     vehicle_body_blocked: &mut [bool],
 ) {
-    for ty in 0..size {
-        for tx in 0..size {
-            let source_idx = (ty * size + tx) as usize;
+    for ty in 0..height {
+        for tx in 0..width {
+            let source_idx = (ty * width + tx) as usize;
             if !tank_trap_tiles[source_idx] {
                 continue;
             }
@@ -230,12 +233,12 @@ fn close_tank_trap_vehicle_gaps(
                 ((tx.saturating_add(2), ty), (tx.saturating_add(1), ty)),
                 ((tx, ty.saturating_add(2)), (tx, ty.saturating_add(1))),
             ] {
-                if target.0 >= size || target.1 >= size {
+                if target.0 >= width || target.1 >= height {
                     continue;
                 }
-                let target_idx = (target.1 * size + target.0) as usize;
+                let target_idx = (target.1 * width + target.0) as usize;
                 if tank_trap_tiles[target_idx] {
-                    let midpoint_idx = (midpoint.1 * size + midpoint.0) as usize;
+                    let midpoint_idx = (midpoint.1 * width + midpoint.0) as usize;
                     vehicle_body_blocked[midpoint_idx] = true;
                 }
             }
@@ -252,14 +255,15 @@ impl Passability for Occupancy<'_> {
 }
 
 fn build_clearance_field(map: &Map, static_blocked: &[bool]) -> Vec<u16> {
-    let size = map.size as i32;
-    let len = (map.size * map.size) as usize;
+    let width = map.width as i32;
+    let height = map.height as i32;
+    let len = map.width.saturating_mul(map.height) as usize;
     let mut clearance = vec![u16::MAX; len];
     let mut queue = VecDeque::new();
 
-    for ty in 0..size {
-        for tx in 0..size {
-            let idx = (ty as u32 * map.size + tx as u32) as usize;
+    for ty in 0..height {
+        for tx in 0..width {
+            let idx = (ty as u32 * map.width + tx as u32) as usize;
             if static_blocked[idx] {
                 clearance[idx] = 0;
                 queue.push_back((tx, ty));
@@ -268,7 +272,7 @@ fn build_clearance_field(map: &Map, static_blocked: &[bool]) -> Vec<u16> {
     }
 
     while let Some((tx, ty)) = queue.pop_front() {
-        let idx = (ty as u32 * map.size + tx as u32) as usize;
+        let idx = (ty as u32 * map.width + tx as u32) as usize;
         let next_clearance = clearance[idx].saturating_add(1);
         for dy in -1..=1 {
             for dx in -1..=1 {
@@ -280,7 +284,7 @@ fn build_clearance_field(map: &Map, static_blocked: &[bool]) -> Vec<u16> {
                 if !map.in_bounds(nx, ny) {
                     continue;
                 }
-                let nidx = (ny as u32 * map.size + nx as u32) as usize;
+                let nidx = (ny as u32 * map.width + nx as u32) as usize;
                 if next_clearance < clearance[nidx] {
                     clearance[nidx] = next_clearance;
                     queue.push_back((nx, ny));
@@ -289,10 +293,10 @@ fn build_clearance_field(map: &Map, static_blocked: &[bool]) -> Vec<u16> {
         }
     }
 
-    for ty in 0..size {
-        for tx in 0..size {
-            let idx = (ty as u32 * map.size + tx as u32) as usize;
-            let edge_clearance = (tx + 1).min(ty + 1).min(size - tx).min(size - ty) as u16;
+    for ty in 0..height {
+        for tx in 0..width {
+            let idx = (ty as u32 * map.width + tx as u32) as usize;
+            let edge_clearance = (tx + 1).min(ty + 1).min(width - tx).min(height - ty) as u16;
             clearance[idx] = clearance[idx].min(edge_clearance);
         }
     }
@@ -300,9 +304,10 @@ fn build_clearance_field(map: &Map, static_blocked: &[bool]) -> Vec<u16> {
     clearance
 }
 
-fn static_blocked_fingerprint(size: u32, static_blocked: &[bool]) -> u64 {
+fn static_blocked_fingerprint(width: u32, height: u32, static_blocked: &[bool]) -> u64 {
     let mut hash = FNV_OFFSET_BASIS;
-    hash = fnv_mix(hash, size as u64);
+    hash = fnv_mix(hash, width as u64);
+    hash = fnv_mix(hash, height as u64);
     for (idx, blocked) in static_blocked.iter().enumerate() {
         if *blocked {
             hash = fnv_mix(hash, idx as u64 + 1);
@@ -322,7 +327,8 @@ mod tests {
 
     fn flat_test_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![],
             ..Default::default()

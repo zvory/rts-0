@@ -45,8 +45,8 @@ impl Game {
             })?;
 
         let mut map = flat_dev_map(1);
-        let center_y = map.size / 2;
-        let start_x = map.size / 2 - 20;
+        let center_y = map.height / 2;
+        let start_x = map.width / 2 - 20;
         let goal = map.tile_center(start_x + 20, center_y);
         let (start_tile, mover_start, build_tile) = match scenario_case {
             DynamicConstructionPathBlockCase::HeadOn => {

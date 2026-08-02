@@ -14,7 +14,7 @@ fn three_player_map_is_selectable_and_loads_for_each_supported_player_count() {
     for player_count in 1..=3 {
         let mut map = Map::load("3 Player Map", player_count, 0x1234_5678)
             .expect("three-player map should load for every supported player count");
-        assert_eq!(map.size, 150);
+        assert_eq!(map.width, 150);
         assert_eq!(map.starts.len(), player_count);
         assert_eq!(map.base_sites.len(), 12);
         if player_count == 3 {

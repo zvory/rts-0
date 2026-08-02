@@ -75,7 +75,8 @@ impl LingeringSightSource {
 /// Visible-tile grids, one per player. Recomputed from scratch at 15 Hz and held between samples.
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Fog {
-    size: u32,
+    width: u32,
+    height: u32,
     /// player id -> row-major visibility grid (`true` = visible in the latest sample).
     grids: HashMap<u32, Vec<bool>>,
     /// player id -> cumulative row-major exploration grid (`true` = ever visible).
@@ -89,9 +90,10 @@ pub struct Fog {
 }
 
 impl Fog {
-    pub fn new(size: u32) -> Self {
+    pub fn new(width: u32, height: u32) -> Self {
         Fog {
-            size,
+            width,
+            height,
             grids: HashMap::new(),
             explored_grids: HashMap::new(),
             firing_reveal_visibility: BTreeMap::new(),
@@ -99,7 +101,8 @@ impl Fog {
     }
 
     pub(in crate::game) fn from_checkpoint_grids(
-        size: u32,
+        width: u32,
+        height: u32,
         grids: BTreeMap<u32, Vec<bool>>,
         mut explored_grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
@@ -129,15 +132,16 @@ impl Fog {
             }
         }
         Fog {
-            size,
+            width,
+            height,
             grids: grids.into_iter().collect(),
             explored_grids: explored_grids.into_iter().collect(),
             firing_reveal_visibility,
         }
     }
 
-    pub(in crate::game) fn checkpoint_size(&self) -> u32 {
-        self.size
+    pub(in crate::game) fn checkpoint_dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
     }
 
     pub(in crate::game) fn checkpoint_grids(&self) -> BTreeMap<u32, Vec<bool>> {
@@ -185,8 +189,9 @@ impl Fog {
         smokes: Option<&SmokeCloudStore>,
     ) {
         self.firing_reveal_visibility.clear();
-        let size = self.size;
-        let cells = (self.size * self.size) as usize;
+        let width = self.width;
+        let height = self.height;
+        let cells = self.width.saturating_mul(self.height) as usize;
         // Reset / allocate a grid per player.
         for &p in players {
             let g = self.grids.entry(p).or_insert_with(|| vec![false; cells]);
@@ -221,10 +226,10 @@ impl Fog {
             let Some(grid) = self.grids.get_mut(&e.owner) else {
                 continue;
             };
-            stamp_sight(grid, size, e, map, &los);
+            stamp_sight(grid, width, height, e, map, &los);
         }
         if let Some(smokes) = smokes {
-            smoke_melee::stamp_visibility(&mut self.grids, size, store, smokes, map);
+            smoke_melee::stamp_visibility(&mut self.grids, width, height, store, smokes, map);
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
         self.accumulate_explored_for_players(players);
@@ -259,7 +264,8 @@ impl Fog {
         store: &EntityStore,
         smokes: Option<&SmokeCloudStore>,
     ) {
-        let size = self.size;
+        let width = self.width;
+        let height = self.height;
         let building_mask = BuildingLosMask::new(store, map);
         let los = match smokes {
             Some(smokes) => {
@@ -277,7 +283,15 @@ impl Fog {
             let Some(grid) = self.grids.get_mut(&source.owner) else {
                 continue;
             };
-            stamp_sight_at(grid, size, source.x, source.y, source.sight_tiles, &los);
+            stamp_sight_at(
+                grid,
+                width,
+                height,
+                source.x,
+                source.y,
+                source.sight_tiles,
+                &los,
+            );
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
     }
@@ -290,7 +304,8 @@ impl Fog {
         smokes: &SmokeCloudStore,
         teams: &TeamRelations,
     ) {
-        let size = self.size;
+        let width = self.width;
+        let height = self.height;
         let building_mask = BuildingLosMask::new(store, map);
         let los =
             LineOfSight::with_smoke_and_building_blockers(map, smokes, &building_mask.blockers);
@@ -306,7 +321,15 @@ impl Fog {
                 let Some(grid) = self.grids.get_mut(&recipient) else {
                     continue;
                 };
-                stamp_sight_at(grid, size, source.x, source.y, source.sight_tiles, &los);
+                stamp_sight_at(
+                    grid,
+                    width,
+                    height,
+                    source.x,
+                    source.y,
+                    source.sight_tiles,
+                    &los,
+                );
             }
         }
         reveal_visible_building_footprints(&mut self.grids, &building_mask);
@@ -319,7 +342,8 @@ impl Fog {
         smokes: &SmokeCloudStore,
         teams: &TeamRelations,
     ) {
-        let size = self.size;
+        let width = self.width;
+        let height = self.height;
         let building_mask = BuildingLosMask::new(store, map);
         let los = LineOfSight::with_smoke_only(map, smokes);
         for plane in store.iter() {
@@ -340,7 +364,8 @@ impl Fog {
                 };
                 stamp_sight_at(
                     grid,
-                    size,
+                    width,
+                    height,
                     plane.pos_x,
                     plane.pos_y,
                     plane.sight_tiles(),
@@ -353,11 +378,11 @@ impl Fog {
 
     /// Whether `player` can currently see the tile `(tx, ty)`.
     pub fn is_visible(&self, player: u32, tx: u32, ty: u32) -> bool {
-        if tx >= self.size || ty >= self.size {
+        if tx >= self.width || ty >= self.height {
             return false;
         }
         match self.grids.get(&player) {
-            Some(g) => g[(ty * self.size + tx) as usize],
+            Some(g) => g[(ty * self.width + tx) as usize],
             None => false,
         }
     }
@@ -382,7 +407,7 @@ impl Fog {
     }
 
     pub(crate) fn all_visible_tiles(&self) -> Vec<u8> {
-        vec![1; self.size.saturating_mul(self.size) as usize]
+        vec![1; self.width.saturating_mul(self.height) as usize]
     }
 
     /// Whether `player` can currently see the world-pixel point `(x, y)`.
@@ -393,7 +418,7 @@ impl Fog {
         }
         let tx = (x / ts).floor() as i64;
         let ty = (y / ts).floor() as i64;
-        if tx < 0 || ty < 0 || tx as u32 >= self.size || ty as u32 >= self.size {
+        if tx < 0 || ty < 0 || tx as u32 >= self.width || ty as u32 >= self.height {
             return false;
         }
         self.is_visible(player, tx as u32, ty as u32)
@@ -406,8 +431,8 @@ fn entity_grants_standard_sight(entity: &Entity) -> bool {
     entity.kind != EntityKind::ScoutPlane
 }
 
-fn stamp_point(grid: &mut [bool], size: u32, x: f32, y: f32) {
-    let Some(tile) = world_tile_index(size, x, y) else {
+fn stamp_point(grid: &mut [bool], width: u32, height: u32, x: f32, y: f32) {
+    let Some(tile) = world_tile_index(width, height, x, y) else {
         return;
     };
     if let Some(visible) = grid.get_mut(tile as usize) {
@@ -415,31 +440,39 @@ fn stamp_point(grid: &mut [bool], size: u32, x: f32, y: f32) {
     }
 }
 
-fn world_tile_index(size: u32, x: f32, y: f32) -> Option<u32> {
+fn world_tile_index(width: u32, height: u32, x: f32, y: f32) -> Option<u32> {
     let ts = config::TILE_SIZE as f32;
     if !x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0 {
         return None;
     }
     let tx = (x / ts).floor() as i64;
     let ty = (y / ts).floor() as i64;
-    if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
+    if tx < 0 || ty < 0 || tx as u32 >= width || ty as u32 >= height {
         return None;
     }
-    Some(ty as u32 * size + tx as u32)
+    Some(ty as u32 * width + tx as u32)
 }
 
 /// Mark every tile within an entity's sight area as visible.
-fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, map: &Map, los: &LineOfSight<'_>) {
+fn stamp_sight(
+    grid: &mut [bool],
+    width: u32,
+    height: u32,
+    e: &Entity,
+    map: &Map,
+    los: &LineOfSight<'_>,
+) {
     if e.is_building() {
-        stamp_building_sight(grid, size, e, map, los);
+        stamp_building_sight(grid, width, height, e, map, los);
         return;
     }
-    stamp_sight_at(grid, size, e.pos_x, e.pos_y, e.sight_tiles(), los);
+    stamp_sight_at(grid, width, height, e.pos_x, e.pos_y, e.sight_tiles(), los);
 }
 
 fn stamp_building_sight(
     grid: &mut [bool],
-    size: u32,
+    width: u32,
+    height: u32,
     e: &Entity,
     map: &Map,
     los: &LineOfSight<'_>,
@@ -450,7 +483,7 @@ fn stamp_building_sight(
     }
     let footprint = building_footprint(map, e);
     for (origin_tx, origin_ty) in footprint {
-        if origin_tx >= size || origin_ty >= size {
+        if origin_tx >= width || origin_ty >= height {
             continue;
         }
         let origin = map.tile_center(origin_tx, origin_ty);
@@ -458,13 +491,13 @@ fn stamp_building_sight(
             for dx in -r..=r {
                 let tx = origin_tx as i32 + dx;
                 let ty = origin_ty as i32 + dy;
-                if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
+                if tx < 0 || ty < 0 || tx as u32 >= width || ty as u32 >= height {
                     continue;
                 }
                 if !los.tile_visible_from_world(origin, (tx as u32, ty as u32)) {
                     continue;
                 }
-                grid[(ty as u32 * size + tx as u32) as usize] = true;
+                grid[(ty as u32 * width + tx as u32) as usize] = true;
             }
         }
     }
@@ -472,7 +505,8 @@ fn stamp_building_sight(
 
 fn stamp_sight_at(
     grid: &mut [bool],
-    size: u32,
+    width: u32,
+    height: u32,
     x: f32,
     y: f32,
     sight_tiles: u32,
@@ -493,13 +527,13 @@ fn stamp_sight_at(
             }
             let tx = cx + dx;
             let ty = cy + dy;
-            if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
+            if tx < 0 || ty < 0 || tx as u32 >= width || ty as u32 >= height {
                 continue;
             }
             if !los.tile_visible_from_world((x, y), (tx as u32, ty as u32)) {
                 continue;
             }
-            grid[(ty as u32 * size + tx as u32) as usize] = true;
+            grid[(ty as u32 * width + tx as u32) as usize] = true;
         }
     }
 }
@@ -511,7 +545,7 @@ struct BuildingLosMask {
 
 impl BuildingLosMask {
     fn new(store: &EntityStore, map: &Map) -> Self {
-        let cells = (map.size * map.size) as usize;
+        let cells = map.width.saturating_mul(map.height) as usize;
         let mut blockers = vec![false; cells];
         let mut footprints = Vec::new();
         for entity in store.iter() {
@@ -520,8 +554,8 @@ impl BuildingLosMask {
             }
             let footprint = building_footprint(map, entity)
                 .into_iter()
-                .filter(|(tx, ty)| *tx < map.size && *ty < map.size)
-                .map(|(tx, ty)| (ty * map.size + tx) as usize)
+                .filter(|(tx, ty)| *tx < map.width && *ty < map.height)
+                .map(|(tx, ty)| (ty * map.width + tx) as usize)
                 .collect::<Vec<_>>();
             if footprint.is_empty() {
                 continue;

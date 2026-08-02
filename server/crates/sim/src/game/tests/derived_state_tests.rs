@@ -870,7 +870,8 @@ fn derived_state_lab_fixture() -> Game {
     ];
     let size = 64;
     let map = Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(16, 16), (48, 48)],
         ..Default::default()

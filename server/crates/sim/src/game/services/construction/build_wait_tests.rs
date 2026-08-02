@@ -3,7 +3,7 @@ use super::{test_flat_map as flat_map, test_player_state as player_state};
 
 macro_rules! run_construction_tick {
     ($map:expr, $entities:expr, $players:expr, $events:expr) => {{
-        let fog = Fog::new($map.size);
+        let fog = Fog::new($map.width, $map.height);
         let mut active_sites = BTreeSet::new();
         construction_system($map, $entities, $players, $events, &fog, &mut active_sites);
     }};
@@ -468,7 +468,7 @@ fn eject_helper_searches_beyond_eight_tiles() {
     let mut map = flat_map(24);
     map.terrain.fill(crate::protocol::terrain::ROCK);
     let destination_tile = (20, 12);
-    map.terrain[(destination_tile.1 * map.size + destination_tile.0) as usize] =
+    map.terrain[(destination_tile.1 * map.width + destination_tile.0) as usize] =
         crate::protocol::terrain::GRASS;
     let mut entities = EntityStore::new();
     let start = map.tile_center(10, 12);

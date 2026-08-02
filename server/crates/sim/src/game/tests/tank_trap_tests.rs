@@ -187,7 +187,7 @@ fn tank_trap_grants_no_local_sight() {
         },
     ];
     let mut game = Game::new_for_replay(&players, 0x1234_5678);
-    let x = (game.state.map.size - 2) as f32 * config::TILE_SIZE as f32;
+    let x = (game.state.map.width - 2) as f32 * config::TILE_SIZE as f32;
     let y = x;
 
     assert!(

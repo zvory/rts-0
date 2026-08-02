@@ -613,7 +613,7 @@ mod tests {
         let mut pathing = PathingService::new(8_192, 256);
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         let smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
 
@@ -749,7 +749,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![],
             ..Default::default()
@@ -826,7 +827,7 @@ mod tests {
     }
 
     fn tick_production(map: &Map, entities: &mut EntityStore, players: &mut [PlayerState]) {
-        let fog = Fog::new(map.size);
+        let fog = Fog::new(map.width, map.height);
         tick_production_with_fog(map, entities, players, &fog);
     }
 

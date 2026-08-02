@@ -482,11 +482,13 @@ fn lab_outcome_json(outcome: &LabOpOutcome) -> serde_json::Value {
         }),
         LabOpOutcome::MapDraftApplied {
             name,
-            size,
+            width,
+            height,
             battle_reset,
         } => serde_json::json!({
             "name": name,
-            "size": size,
+            "width": width,
+            "height": height,
             "battleReset": battle_reset
         }),
         LabOpOutcome::ScenarioRestored(restore) => serde_json::to_value(restore)
@@ -1147,7 +1149,8 @@ impl RoomTask {
         let outcome_json = match &outcome {
             LabOpOutcome::MapDraftApplied {
                 name,
-                size,
+                width,
+                height,
                 battle_reset,
             } => {
                 let Some(payload) = self.live_game().map(Game::start_payload) else {
@@ -1155,7 +1158,8 @@ impl RoomTask {
                 };
                 serde_json::json!({
                     "name": name,
-                    "size": size,
+                    "width": width,
+                    "height": height,
                     "battleReset": battle_reset,
                     "tick": payload.tick,
                     "map": payload.map,

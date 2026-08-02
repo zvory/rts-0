@@ -6,7 +6,7 @@ mod assignment;
 
 use super::{
     AuthoredMapData, BaseResourceCounts, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES,
-    BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
+    BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION, LEGACY_SQUARE_MAP_VERSION,
 };
 use crate::protocol::terrain;
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
@@ -15,6 +15,7 @@ use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 /// supports four active players, while a map can contain many more permanent resource bases.
 const MAX_START_LOCATIONS: usize = 4;
 const MAX_BASE_SITES: usize = 32;
+const MAX_MAP_DIMENSION_TILES: usize = 256;
 
 pub(super) fn schema_version(json: &str) -> Result<u32, String> {
     let authored: AuthoredMap =
@@ -25,7 +26,7 @@ pub(super) fn schema_version(json: &str) -> Result<u32, String> {
 pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
     let authored: AuthoredMap =
         serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
-    if authored.version != CURRENT_MAP_VERSION {
+    if !supported_schema_version(authored.version) {
         return Err(format!(
             "map schema version {} is not supported; server requires version {CURRENT_MAP_VERSION}",
             authored.version
@@ -59,7 +60,8 @@ pub(super) fn load_for_players(
     let starts = assignment::assign_start_locations(&materialized.starts, players, seed)?;
 
     Ok(Map {
-        size: materialized.size,
+        width: materialized.width,
+        height: materialized.height,
         terrain: materialized.terrain,
         starts,
         base_sites: materialized.base_sites,
@@ -70,15 +72,31 @@ pub(super) fn load_for_players(
 pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMapData, String> {
     let authored: AuthoredMap =
         serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
-    if authored.version != CURRENT_MAP_VERSION {
+    if !supported_schema_version(authored.version) {
         return Err(format!(
             "map schema version {} is not supported; server requires version {CURRENT_MAP_VERSION}",
             authored.version
         ));
     }
-    let (size, terrain) = parse_terrain(&authored.terrain)?;
-    let start_locations = parse_locations(size, &authored.start_locations, "startLocations")?;
-    let base_sites = parse_base_sites(size, &authored.base_sites)?;
+    let (width, height, terrain) = parse_terrain(&authored.terrain)?;
+    match authored.version {
+        CURRENT_MAP_VERSION => {
+            if authored.width != Some(width) || authored.height != Some(height) {
+                return Err(format!(
+                    "map width/height must match the {width}x{height} terrain grid"
+                ));
+            }
+        }
+        LEGACY_SQUARE_MAP_VERSION => {
+            if width != height {
+                return Err("legacy version 4 terrain must be square".to_string());
+            }
+        }
+        _ => unreachable!("schema version was checked above"),
+    }
+    let start_locations =
+        parse_locations(width, height, &authored.start_locations, "startLocations")?;
+    let base_sites = parse_base_sites(width, height, &authored.base_sites)?;
     let base_locations: Vec<_> = base_sites.iter().map(|site| (site.x, site.y)).collect();
 
     if player_count == 0 {
@@ -111,7 +129,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
             ));
         }
     }
-    validate_base_clearance(size, &terrain, &start_locations, &base_locations)?;
+    validate_base_clearance(width, height, &terrain, &start_locations, &base_locations)?;
     let base_resource_counts = base_sites
         .into_iter()
         .map(|site| {
@@ -126,7 +144,8 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         .collect();
     Ok(AuthoredMapData {
         name: authored.name,
-        size,
+        width,
+        height,
         terrain,
         starts: start_locations,
         base_sites: base_locations,
@@ -139,6 +158,10 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
 struct AuthoredMap {
     version: u32,
     name: String,
+    #[serde(default)]
+    width: Option<u32>,
+    #[serde(default)]
+    height: Option<u32>,
     #[allow(dead_code)]
     description: String,
     #[allow(dead_code)]
@@ -147,6 +170,10 @@ struct AuthoredMap {
     terrain: Vec<String>,
     start_locations: Vec<AuthoredLocation>,
     base_sites: Vec<AuthoredBaseSite>,
+}
+
+fn supported_schema_version(version: u32) -> bool {
+    Map::supports_authored_schema_version(version)
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -165,30 +192,33 @@ struct AuthoredBaseSite {
     oil_patches: u32,
 }
 
-fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
+fn parse_terrain(rows: &[String]) -> Result<(u32, u32, Vec<u8>), String> {
     if rows.is_empty() {
         return Err("terrain must contain at least one row".to_string());
     }
 
-    let size = rows[0].chars().count();
-    if size == 0 {
+    let width = rows[0].chars().count();
+    if width == 0 {
         return Err("terrain rows must not be empty".to_string());
     }
-    if rows.len() != size {
+    if width > MAX_MAP_DIMENSION_TILES || rows.len() > MAX_MAP_DIMENSION_TILES {
         return Err(format!(
-            "terrain must be square; got {} rows by {size} columns",
-            rows.len()
+            "terrain width and height must each be at most {MAX_MAP_DIMENSION_TILES} tiles"
         ));
     }
-
-    let size_u32 =
-        u32::try_from(size).map_err(|_| "terrain size does not fit in u32".to_string())?;
-    let mut out = Vec::with_capacity(size * size);
+    let width_u32 =
+        u32::try_from(width).map_err(|_| "terrain width does not fit in u32".to_string())?;
+    let height_u32 =
+        u32::try_from(rows.len()).map_err(|_| "terrain height does not fit in u32".to_string())?;
+    let capacity = width.checked_mul(rows.len()).ok_or_else(|| {
+        "terrain width multiplied by height overflows addressable memory".to_string()
+    })?;
+    let mut out = Vec::with_capacity(capacity);
     for (y, row) in rows.iter().enumerate() {
         let width = row.chars().count();
-        if width != size {
+        if width != width_u32 as usize {
             return Err(format!(
-                "terrain row {y} has width {width}; expected {size}"
+                "terrain row {y} has width {width}; expected {width_u32}"
             ));
         }
         for (x, ch) in row.chars().enumerate() {
@@ -211,20 +241,21 @@ fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
         }
     }
 
-    Ok((size_u32, out))
+    Ok((width_u32, height_u32, out))
 }
 
 fn parse_locations(
-    size: u32,
+    width: u32,
+    height: u32,
     authored: &[AuthoredLocation],
     field: &str,
 ) -> Result<Vec<(u32, u32)>, String> {
     let mut locations = Vec::with_capacity(authored.len());
     let mut seen = HashSet::with_capacity(authored.len());
     for (index, location) in authored.iter().enumerate() {
-        if location.x >= size || location.y >= size {
+        if location.x >= width || location.y >= height {
             return Err(format!(
-                "{field}[{index}] = ({},{}) is outside the {size}x{size} map",
+                "{field}[{index}] = ({},{}) is outside the {width}x{height} map",
                 location.x, location.y
             ));
         }
@@ -240,15 +271,16 @@ fn parse_locations(
 }
 
 fn parse_base_sites(
-    size: u32,
+    width: u32,
+    height: u32,
     authored: &[AuthoredBaseSite],
 ) -> Result<Vec<AuthoredBaseSite>, String> {
     let mut sites = Vec::with_capacity(authored.len());
     let mut seen = HashSet::with_capacity(authored.len());
     for (index, site) in authored.iter().copied().enumerate() {
-        if site.x >= size || site.y >= size {
+        if site.x >= width || site.y >= height {
             return Err(format!(
-                "baseSites[{index}] = ({},{}) is outside the {size}x{size} map",
+                "baseSites[{index}] = ({},{}) is outside the {width}x{height} map",
                 site.x, site.y
             ));
         }
@@ -274,7 +306,8 @@ fn parse_base_sites(
 }
 
 fn validate_base_clearance(
-    size: u32,
+    width: u32,
+    height: u32,
     terrain_grid: &[u8],
     start_locations: &[(u32, u32)],
     base_sites: &[(u32, u32)],
@@ -290,12 +323,12 @@ fn validate_base_clearance(
             for dx in -radius..=radius {
                 let tx = sx as i32 + dx;
                 let ty = sy as i32 + dy;
-                if tx < 0 || ty < 0 || tx >= size as i32 || ty >= size as i32 {
+                if tx < 0 || ty < 0 || tx >= width as i32 || ty >= height as i32 {
                     return Err(format!(
                         "base site ({sx},{sy}) is too close to the map edge"
                     ));
                 }
-                let idx = (ty as u32 * size + tx as u32) as usize;
+                let idx = (ty as u32 * width + tx as u32) as usize;
                 if !crate::rules::terrain::is_passable_map_code(terrain_grid[idx]) {
                     return Err(format!(
                         "base site ({sx},{sy}) has impassable terrain in its protected area at ({tx},{ty})"

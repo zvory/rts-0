@@ -42,7 +42,8 @@ pub struct LabCheckpointScenarioMap {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LabCheckpointScenarioMapData {
-    pub size: u32,
+    pub width: u32,
+    pub height: u32,
     pub terrain: Vec<u8>,
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
@@ -90,7 +91,8 @@ impl LabCheckpointScenarioMap {
             content_hash: metadata.content_hash.clone(),
             materialized_hash: map.materialized_hash(),
             data: LabCheckpointScenarioMapData {
-                size: map.size,
+                width: map.width,
+                height: map.height,
                 terrain: map.terrain.clone(),
                 starts: map
                     .starts
@@ -131,7 +133,8 @@ impl LabCheckpointScenarioMap {
             })
             .collect();
         let map = Map {
-            size: data.size,
+            width: data.width,
+            height: data.height,
             terrain: data.terrain,
             starts: data
                 .starts
@@ -169,15 +172,17 @@ impl LabCheckpointScenarioMap {
                 reason: "checkpoint scenario map name must be non-empty".to_string(),
             });
         }
-        let size = self.data.size;
-        let tile_count = size
-            .checked_mul(size)
+        let width = self.data.width;
+        let height = self.data.height;
+        let tile_count = width
+            .checked_mul(height)
             .map(|count| count as usize)
             .ok_or_else(|| LabError::InvalidMap {
                 name: self.name.clone(),
-                reason: "checkpoint scenario map size overflows".to_string(),
+                reason: "checkpoint scenario map dimensions overflow".to_string(),
             })?;
-        if size == 0
+        if width == 0
+            || height == 0
             || tile_count != self.data.terrain.len()
             || tile_count > MAX_LAB_CHECKPOINT_MAP_TILES
         {
@@ -217,7 +222,7 @@ impl LabCheckpointScenarioMap {
             });
         }
         for tile in &self.data.starts {
-            if tile.x >= size || tile.y >= size {
+            if tile.x >= width || tile.y >= height {
                 return Err(LabError::InvalidMap {
                     name: self.name.clone(),
                     reason: "checkpoint scenario map site is out of bounds".to_string(),
@@ -226,7 +231,7 @@ impl LabCheckpointScenarioMap {
         }
         let mut base_sites = HashSet::with_capacity(self.data.base_sites.len());
         for site in &self.data.base_sites {
-            if site.x >= size || site.y >= size {
+            if site.x >= width || site.y >= height {
                 return Err(LabError::InvalidMap {
                     name: self.name.clone(),
                     reason: "checkpoint scenario map site is out of bounds".to_string(),

@@ -225,7 +225,7 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
     SemanticGameView {
         tick: game.tick_count(),
         seed: game.seed(),
-        map_size: game.state.map.size,
+        map_size: game.state.map.width,
         map_terrain: game.state.map.terrain.clone(),
         map_metadata: game.map_metadata().clone(),
         starting_loadouts: game.starting_loadouts().to_vec(),

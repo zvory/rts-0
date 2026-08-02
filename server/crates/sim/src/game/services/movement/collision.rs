@@ -52,7 +52,8 @@ pub(crate) fn resolve_collisions(
     map: &Map,
     occ: &Occupancy,
 ) {
-    let world_max = map.world_size_px() - 0.01;
+    let world_max_x = map.world_width_px() - 0.01;
+    let world_max_y = map.world_height_px() - 0.01;
     let ids = entities.ids();
     let mut candidates = Vec::new();
 
@@ -62,7 +63,7 @@ pub(crate) fn resolve_collisions(
         let pass_spatial = if pass == 0 {
             spatial
         } else {
-            rebuilt_spatial = SpatialIndex::build(entities, map.size);
+            rebuilt_spatial = SpatialIndex::build(entities, map.width, map.height);
             &rebuilt_spatial
         };
 
@@ -245,15 +246,15 @@ pub(crate) fn resolve_collisions(
 
                 if let Some((nax, nay)) = a_push {
                     if let Some(e) = entities.get_mut(a) {
-                        e.pos_x = nax.clamp(0.0, world_max);
-                        e.pos_y = nay.clamp(0.0, world_max);
+                        e.pos_x = nax.clamp(0.0, world_max_x);
+                        e.pos_y = nay.clamp(0.0, world_max_y);
                         moved_any = true;
                     }
                 }
                 if let Some((nbx, nby)) = b_push {
                     if let Some(e) = entities.get_mut(b) {
-                        e.pos_x = nbx.clamp(0.0, world_max);
-                        e.pos_y = nby.clamp(0.0, world_max);
+                        e.pos_x = nbx.clamp(0.0, world_max_x);
+                        e.pos_y = nby.clamp(0.0, world_max_y);
                         moved_any = true;
                     }
                 }
