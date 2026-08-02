@@ -129,16 +129,11 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 ## Specialized workflows
 
 - Never use the in-app browser skill.
-- Balance or gameplay changes: collect factual patch-note bullets covering changed stats, economy,
-  combat behavior, UI affordances, and what should be watched in playtests. The configured
-  `agent-pr.sh` patch-note pass is the final backstop and records qualifying changes under
-  `patch-notes/YYYY-MM-DD/<branch-slug>.md` before adversarial review. That specialist pass is the
-  sole owner of `patch-notes/`; adversarial review must not create, edit, or delete its fragments.
-- If the user explicitly asks to skip or omit patch notes for the current task or PR, honor that
-  request for the whole PR and pass `--skip-patch-notes` on the first `scripts/agent-pr.sh` run. The
-  helper records the choice in PR metadata and inherits it on later reruns. Do not infer an opt-out
-  merely because a change seems minor. If the user reverses the request, pass `--auto-patch-notes`
-  to restore normal classification.
+- For player-facing gameplay or presentation changes, stage concise factual Discord copy before
+  `agent-pr.sh`: `node scripts/patch-note-outbox.mjs stage --change "<player-facing change>"`.
+  Repeat `--change` as useful; for visual comparisons add matching Interact PNG paths or preview
+  URLs with `--before <png> --after <png>`. Staging is optional when no player-facing note is useful
+  or the user asks to omit it. Delivery after merge is best-effort and must never block completion.
 - New units: complete Phase 0 and Phase 1 (unit brief and rules/balance specification) before
   implementation. Until the user explicitly authorizes implementation, edit only planning,
   checklist, and design documents.

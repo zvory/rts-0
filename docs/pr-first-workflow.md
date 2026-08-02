@@ -8,22 +8,8 @@ The normal agent lifecycle is:
 4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`.
    Before the quality pass, the helper archives any plan newly completed by the branch and commits
    that move, so the archive lands in the final phase PR rather than as a post-merge local change.
-   It then runs the ordered specialist passes in `scripts/agent-pr-passes.json`. The patch-note pass
-   runs Codex repository review mode against the base branch, with its classifier instructions sent
-   over stdin, and creates or refreshes one dated, branch-keyed fragment only for a change to an
-   active participant's experience in an ordinary live match. Spectator/observer,
-   replay, match-history, Lab/dev, lobby/setup, and analysis-only changes are explicitly excluded,
-   even when they are user-facing. Each configured pass can select its own Codex model through its
-   `modelEnv` setting. When the user explicitly opts the current PR out of patch notes in
-   conversation, invoke the helper with `--skip-patch-notes`. The pass bypasses classification,
-   safely removes any branch-owned fragment generated earlier, and records
-   `Patch-Notes: skipped-user-request` in the owned PR metadata. Later helper reruns inherit that
-   PR-scoped choice; `--auto-patch-notes` restores normal classification. The final adversarial pass
-   runs after all specialist edits but does not own
-   patch-note generation: every path under `patch-notes/` is protected from that pass, and the
-   workflow fails before push if the pass changes one.
-   Both AI passes receive compact metadata instead of raw generated, binary, or oversized artifact
-   bodies; they review the corresponding generator, authored inputs, and tests. This keeps large
+   The adversarial pass receives compact metadata instead of raw generated, binary, or oversized
+   artifact bodies. It reviews the corresponding generator, authored inputs, and tests. This keeps large
    checkpoint and snapshot-stream refreshes from overflowing the helper or dominating review.
    The helper first classifies the branch diff against `origin/main`. If every changed file ends in
    `.md`, it skips Codex adversarial review, pushes the branch, posts a successful
@@ -36,13 +22,11 @@ The normal agent lifecycle is:
    head SHA reachable from `origin/main`, and the local `main` checkout fast-forwarded with an
    ordinary `git pull --ff-only origin main`. The final refresh also runs the existing automatic
    merged-worktree cleanup, including when `main` was already current and Git's `post-merge` hook
-   therefore did not fire. Patch-note delivery no longer depends on this foreground waiter:
-   `.github/workflows/patch-note-delivery.yml` deterministically reads any merged fragment and sends
-   it to Discord without an LLM. Hourly and manual reconciliation recover missed runs, and a success
-   status on the immutable PR head suppresses duplicate delivery. `scripts/wait-pr.sh` does not
-   deliver notes, so the foreground waiter cannot race the GitHub workflow. Rerunning
-   `scripts/agent-pr.sh` during CI recovery only regenerates the fragment; it does not notify
-   Discord.
+   therefore did not fire. If the implementing agent staged a local patch note with
+   `node scripts/patch-note-outbox.mjs stage --change "<change>"`, the waiter then attempts to send
+   it to the configured Discord webhooks. Optional `--before <png> --after <png>` inputs produce a
+   labeled four-second comparison. Delivery is deliberately best-effort: failure leaves the local
+   outbox entry for manual retry and never changes the successful merge result.
 
 GitHub Actions owns the full-suite merge gate through the aggregate `./tests/run-all.sh` check in
 the `Main test gate` workflow. The workflow runs split coverage jobs for server build, Rust
@@ -77,7 +61,7 @@ compiling or running specific tests. Do not add a separate diagnostic workflow f
 - CI failed: inspect the failing check from the PR or `gh pr checks <pr>`.
   Fix the branch in its worktree, run the smallest relevant local verification,
   commit, push, and rerun `scripts/agent-pr.sh --verification "..."` so the PR
-  body records the current evidence. A recorded user patch-note opt-out is inherited automatically.
+  body records the current evidence. A staged patch note remains in the local outbox across reruns.
 - Branch stale or conflicted: fetch `origin/main`, merge it into the PR branch,
   resolve conflicts in the same worktree, rerun focused verification, and push.
   Do not claim completion or start follow-up work until `scripts/wait-pr.sh <pr>`

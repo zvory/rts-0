@@ -49,20 +49,6 @@ function createTask(branch, directory, fileName) {
   return { taskPath, headSha: git(["rev-parse", "HEAD"], { cwd: taskPath }).trim() };
 }
 
-function addPatchNote(taskPath, branch, text) {
-  const slug = branch.replace(/^zvorygin\//, "");
-  const relativePath = path.join("patch-notes", "2026-07-20", `${slug}.md`);
-  fs.mkdirSync(path.dirname(path.join(taskPath, relativePath)), { recursive: true });
-  fs.writeFileSync(
-    path.join(taskPath, relativePath),
-    `<!-- rts-patch-note:v1 -->\n<!-- branch: ${branch} -->\n# Fixture\n\n## Changes\n\n- ${text}\n`,
-  );
-  git(["add", relativePath], { cwd: taskPath });
-  git(["commit", "-m", "Add patch note"], { cwd: taskPath });
-  git(["push", "origin", branch], { cwd: taskPath });
-  return git(["rev-parse", "HEAD"], { cwd: taskPath }).trim();
-}
-
 function mergeTask(branch) {
   git(["fetch", "origin", branch], { cwd: publisher });
   git(["merge", "--no-ff", `origin/${branch}`, "-m", `Merge ${branch}`], { cwd: publisher });
@@ -91,6 +77,7 @@ function waitEnvironment(headSha, number, files = []) {
     RTS_WAIT_PR_CHECKS_JSON: "[]",
     RTS_WORKTREE_ROOT: worktreeRoot,
     RTS_CARGO_TARGET_BASE_DIR: targetRoot,
+    RTS_WAIT_PR_SKIP_PATCH_NOTE_DELIVERY: "1",
   };
 }
 
@@ -115,13 +102,12 @@ configureIdentity(publisher);
 try {
   const firstBranch = "zvorygin/wait-pr-41";
   const first = createTask(firstBranch, "wait-pr-41", "first.txt");
-  first.headSha = addPatchNote(first.taskPath, firstBranch, "Merged fixture change.");
   mergeTask(firstBranch);
   fs.writeFileSync(path.join(repo, "local-note.txt"), "preserve me\n");
 
   const output = run("bash", [waitScript, "41"], {
     cwd: first.taskPath,
-    env: waitEnvironment(first.headSha, 41, ["first.txt", "patch-notes/2026-07-20/wait-pr-41.md"]),
+    env: waitEnvironment(first.headSha, 41, ["first.txt"]),
   });
 
   assert.match(output, /refreshing local main checkout/);
