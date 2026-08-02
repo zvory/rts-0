@@ -34,7 +34,8 @@ src/
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_runtime_reset.js # shared clearing of state derived from one authoritative timeline
   state_auto_build.js # authoritative Auto-Build snapshot normalization and command acknowledgement
-  state_ground_decals.js # client-only death/impact decal queue, classification, owner/facing recovery, building-footprint sizing
+  state_ground_decals.js # authoritative ground-decal revision/cache, normalization, repaint queue, building-footprint sizing
+  match_ground_decal_sync.js # snapshot-revision repair requests, retry coalescing, seek/view reset
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_interaction.js # shared Input/HUD/Minimap command issue-and-planned-order recording
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
@@ -428,21 +429,27 @@ export function buildRendererFeedbackView(state, options?)
 `state_ground_decals.js`
 ```js
 export class GroundDecalBuffer {
-  applySnapshotEvents(events, context)
+  applyAuthoritativeBatch(message, context)
   reconcilePending()                    // stage shared pre-assembly batch used by Match
   acknowledgeReconciled()               // release it after a successful backend frame
   consumePending()
+  requeueAuthoritative()                // repaint retained records after renderer reset
   get pendingCount()
   clear()
 }
-export function normalizeGroundDecalEvent(ev, context?)
+export function normalizeAuthoritativeGroundDecal(record, context?)
 export function groundDecalClassForKind(kind)
 export function groundDecalClassForImpactEvent(eventKind)
 ```
-`GameState.applySnapshot` feeds fog-filtered transient death, mortar-impact, and artillery-impact
-events into this browser-local buffer. The buffer dedupes deaths by id and impact events by their
-received snapshot identity, recovers owner/facing from the prior visible entity snapshot only for
-death marks, and never infers a hidden death or impact from missing entities.
+Snapshots advertise only the requesting perspective's `groundDecalRevision`. `GroundDecalSync`
+coalesces that signal into one reliable `requestGroundDecals { afterRevision }` repair at a time and
+retries with bounded backoff until the retained cache reaches the advertised revision. Responses
+contain only decals first discovered by that perspective after the supplied revision. The buffer
+normalizes and deduplicates those stable server ids, retains their records for renderer rehydration,
+and queues each newly learned mark once. Replay seeks and observer-view changes clear both the
+cache and painted presentation, then resynchronize from revision zero after the replacement
+perspective snapshot arrives. Transient combat events still drive short-lived effects and audio,
+but are not used to create permanent decals.
 
 `renderer/decals.js`
 ```js
@@ -460,8 +467,9 @@ export class GroundDecalLayer {
 the checked-in `ground-decals-v1.png` plus deterministic rect metadata, and runtime loads that one
 PNG through `fetch`/`createImageBitmap`. New visible death and impact decals stamp from those rects;
 an unavailable or failed atlas remains a reported blocking asset error and never silently chooses a
-procedural replacement. Historical decals are pixels, not retained display objects or
-per-frame records. `diagnostics()` exposes total stamped decals, queued decals, texture update
+procedural replacement. Historical decals are retained as normalized records in `GameState` for
+rehydration but are not retained display objects or iterated during ordinary frames. `diagnostics()`
+exposes total stamped decals, queued decals, texture update
 count, texture dimensions/downsample, child count, and asset-load status for stress checks. The
 renderer tears down the decal sprite, texture, canvas, tint scratch canvas, loaded atlas masks, and
 late async asset loads through `Renderer.destroy()` / rematch cleanup.
@@ -1248,11 +1256,11 @@ Selected worker units do not draw weapon range indicators, even when their frame
 weapon range metadata. Entrenched units render as smaller, trench-tinted rig instances without a
 separate occupied-infantry trench ring in the selection layer. Trench ground decals render at half
 the authoritative trench radius; snapshot data and the gameplay radius remain unchanged. Frame-local entity views may carry
-bounded render diagnostics for local profiling consumers without changing the authoritative snapshot model. Visible unit death events are normalized by `GameState`
-into deduped, browser-local pending ground decal stamps and rendered below resources and fog as
+bounded render diagnostics for local profiling consumers without changing the authoritative snapshot model. Server-authored, fog-discovered death and impact marks are
+normalized by `GameState` into deduped pending stamps and rendered below resources and fog as
 visual-only decals. Death decals use the generated PNG atlas only after readiness; unretained durable
-batches are retried rather than stamped before readiness. They do not change server protocol,
-simulation, or balance.
+batches are retried rather than stamped before readiness. Decals do not affect simulation or
+balance.
 
 Renderer feedback should consume a narrow read model containing placement, command feedback,
 support-weapon setup previews, ability targeting previews, ability objects, and selected entities,
@@ -1953,9 +1961,9 @@ overlay container as smoke clouds, below selection rings and HP bars):
 
 Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `decals` between
 terrain and resources):
-- Decals are client-only, best-effort visual state derived only from received fog-filtered `death`,
-  `mortarImpact`, and `artilleryImpact` events. They are not persisted in the protocol, replay
-  artifacts, match history, or server sim.
+- Decals are checkpointed server state. Snapshots expose a fog-safe, perspective-scoped revision;
+  the client requests stable records after its applied revision, so late join, reconnect, and
+  replay seek reconstruct already-discovered battlefield marks without replaying transient events.
 - Infantry deaths stamp translucent player-tinted SVG paint masks. Vehicle and support-weapon
   deaths stamp neutral charcoal hull-shaped scorch masks with smaller, subdued player-colored paint
   fragments. Destroyed buildings stamp neutral charcoal rectangles exactly matching their rendered
@@ -1964,10 +1972,11 @@ terrain and resources):
 - Mortar impacts stamp a compact, air-burst-style starburst with a small dark center; artillery
   impacts stamp a larger starburst scaled to their authoritative impact radius. Both are neutral
   earth/charcoal marks, with no source owner or hidden-source recovery.
-- `GameState` queues only unpainted death ids and received impact records. Match stages the pending
-  batch before presentation assembly and releases it only after a successful backend presentation;
-  Pixi stamps detached frame records and never consumes the shared queue. A skipped snapshot or
-  reconnect may miss older decals; the client must not infer them.
+- `GameState` retains normalized records keyed by stable server id and queues only newly learned
+  records. Match stages the pending batch before presentation assembly and releases it only after a
+  successful backend presentation; Pixi stamps detached frame records and never consumes the
+  shared queue. A skipped snapshot merely leaves a revision mismatch that the reliable repair path
+  resolves. The client never infers hidden deaths or impacts.
 - The renderer stamps each new-decal batch into one downsampled texture, updates that texture once
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.
