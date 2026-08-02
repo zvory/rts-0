@@ -90,6 +90,7 @@ import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { DoodadLayer } from "./doodad_layer.js";
+import { createUnitOutlineFilter } from "./unit_outline_filter.js";
 import {
   _drawStealthUnitOutlines,
   _drawTreeOccludedUnitOutlines,
@@ -179,6 +180,10 @@ export class Renderer {
       this.world.addChild(c);
     }
     this.layers.units.sortableChildren = true;
+    this._forestUnitOutlineFilter = createUnitOutlineFilter(PIXI);
+    this._stealthUnitOutlineFilter = createUnitOutlineFilter(PIXI);
+    this.layers.forestUnitOutlines.filters = [this._forestUnitOutlineFilter];
+    this.layers.stealthUnitOutlines.filters = [this._stealthUnitOutlineFilter];
     this._assetReadiness = new Map();
     this._doodads = new DoodadLayer({
       pixi: PIXI,
@@ -264,11 +269,9 @@ export class Renderer {
       unitShadows: new Map(),
       trenchOccupantShadows: new Map(),
       units: new Map(),
-      forestUnitOutlines: new Map(),
       trenchOccupantLips: new Map(),
       selectionRings: new Map(),
       hpBars: new Map(),
-      stealthUnitOutlines: new Map(),
       shotRevealShadows: new Map(),
       shotReveals: new Map(),
       aboveFogHpBars: new Map(),
@@ -287,6 +290,7 @@ export class Renderer {
     // Local frame-strip motion state. Sprite strips animate only when their
     // authoritative or predicted render position is actually changing.
     this._frameStripMotion = new Map();
+    this._unitRenderContexts = new Map();
     // Live SVG rig instances are routed per unit kind. Invalid or missing
     // definitions fail through the renderer's missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
@@ -312,6 +316,10 @@ export class Renderer {
       liveShotRevealRigs: new Map(),
       liveShotRevealRigOverlays: new Map(),
       liveShotRevealRigEffects: new Map(),
+      forestUnitOutlineRigs: new Map(),
+      forestUnitOutlineRigOverlays: new Map(),
+      stealthUnitOutlineRigs: new Map(),
+      stealthUnitOutlineRigOverlays: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
@@ -323,6 +331,10 @@ export class Renderer {
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
       liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
       liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
+      forestUnitOutlineRigs: { poolName: "forestUnitOutlineRigs", layerName: "forestUnitOutlines" },
+      forestUnitOutlineRigOverlays: { poolName: "forestUnitOutlineRigOverlays", layerName: "forestUnitOutlines" },
+      stealthUnitOutlineRigs: { poolName: "stealthUnitOutlineRigs", layerName: "stealthUnitOutlines" },
+      stealthUnitOutlineRigOverlays: { poolName: "stealthUnitOutlineRigOverlays", layerName: "stealthUnitOutlines" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
@@ -625,6 +637,7 @@ export class Renderer {
       }
     });
     time("renderer.units", () => {
+      this._unitRenderContexts.clear();
       for (const e of regularEntities) {
         liveIds.add(e.id);
         if (isUnit(e.kind) && !e.visionOnly) {
@@ -632,6 +645,7 @@ export class Renderer {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
               visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
+              rememberRenderContext: true,
             });
           });
         }
@@ -640,13 +654,20 @@ export class Renderer {
     time("renderer.forestUnitOutlines", () => {
       this._drawSafely(
         "forestUnitOutlines",
-        () => this._drawTreeOccludedUnitOutlines(regularEntities),
+        () => this._drawTreeOccludedUnitOutlines(regularEntities, state, colorByOwner, {
+          renderContexts: this._unitRenderContexts,
+          visualUnitOverrides: visualUnitOverrideMap,
+          visualFrameStripOverrides: visualFrameStripOverrideMap,
+        }),
       );
     });
     time("renderer.stealthUnitOutlines", () => {
       this._drawSafely(
         "stealthUnitOutlines",
-        () => this._drawStealthUnitOutlines(regularEntities),
+        () => this._drawStealthUnitOutlines(regularEntities, state, colorByOwner, {
+          visualUnitOverrides: visualUnitOverrideMap,
+          visualFrameStripOverrides: visualFrameStripOverrideMap,
+        }),
       );
     });
     // Selection rings are in a layer below units, so selected units stay readable
@@ -1177,12 +1198,19 @@ export class Renderer {
     this._assetReadiness?.clear?.();
     this._missingTextureEntityIds?.clear?.();
     this._tankMotion.clear();
+    this._unitRenderContexts.clear();
     if (this._liveRigPools) {
       for (const pool of Object.values(this._liveRigPools)) {
         for (const instance of pool.values()) instance.destroy();
         pool.clear();
       }
     }
+    this.layers.forestUnitOutlines.filters = null;
+    this.layers.stealthUnitOutlines.filters = null;
+    this._forestUnitOutlineFilter?.destroy?.();
+    this._stealthUnitOutlineFilter?.destroy?.();
+    this._forestUnitOutlineFilter = null;
+    this._stealthUnitOutlineFilter = null;
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
     destroyRendererTextureMap(this._visualFrameStripTextures);

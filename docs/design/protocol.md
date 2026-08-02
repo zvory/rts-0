@@ -782,8 +782,8 @@ both legality and reaction bypass. Repeated shots extend one stable reveal
 episode, so move orders or transient target switches cannot restart the same episode's reaction
 deadline. Tile-level provenance covers colocated entities and remains tied to the stamped tile when
 the firing entity moves before the next fog rebuild.
-A firing unit concealed by `stealthTiles` is projected with `visionOnly` and rendered as a white
-outline rather than full unit art. Its ordinary damaged-unit HP bar remains visible above fog. Firing
+A firing unit concealed by `stealthTiles` is projected with `visionOnly` and rendered as the white
+alpha edge of its current production rig/frame rather than full-color unit art. Its ordinary damaged-unit HP bar remains visible above fog. Firing
 reveal provenance distinguishes concealment from terrain visibility: if the recipient already sees
 the ground, `visibleTiles` remains clear instead of drawing a dark square over the stealth tile.
 Artillery Fire creates the same kind of actionable temporary live fog for every enemy player,

@@ -8,7 +8,8 @@ import {
   _drawStealthUnitOutlines,
   _drawTreeOccludedUnitOutlines,
 } from "../../client/src/renderer/tree_unit_occlusion.js";
-import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
+import { createUnitOutlineFilter } from "../../client/src/renderer/unit_outline_filter.js";
+import { installFakePixi } from "./pixi_fakes.mjs";
 
 const restorePixi = installFakePixi();
 try {
@@ -42,40 +43,86 @@ try {
     unit(5, 3, KIND.TANK, 101, 71, 36),
   ];
   const outlineCalls = [];
+  const state = { playerId: 1 };
+  const colorByOwner = new Map([[1, 0x0072b2], [2, 0xd55e00], [3, 0xcc79a7]]);
+  const renderContexts = new Map(entities.map((entity) => [entity.id, {
+    now: 1000 + entity.id,
+    teamColor: colorByOwner.get(entity.owner),
+  }]));
+  const rifleFrameStripOverride = { strip: { id: "real-rifle-strip" }, texture: { id: "real-rifle-texture" } };
+  const visualFrameStripOverrides = new Map([[KIND.RIFLEMAN, rifleFrameStripOverride]]);
   const outlineRenderer = {
     _doodads: doodads,
-    _slot(pool, id) {
-      const graphics = new RecordingGraphics();
-      outlineCalls.push({ pool, id, graphics });
-      return graphics;
+    _drawUnit(entity, colors, renderState, pools) {
+      outlineCalls.push({ entity, colors, renderState, pools });
     },
     _recordRenderDiagnostic() {},
     _recordRenderError(_label, error) { throw error; },
   };
   assert.equal(
-    _drawTreeOccludedUnitOutlines.call(outlineRenderer, entities),
+    _drawTreeOccludedUnitOutlines.call(outlineRenderer, entities, state, colorByOwner, {
+      renderContexts,
+      visualFrameStripOverrides,
+    }),
     3,
-    "ordinary friendly, allied, and visible enemy units behind a canopy receive stable outlines",
+    "ordinary friendly, allied, and visible enemy units behind a canopy use filtered real-rig outlines",
   );
-  assert.deepEqual(outlineCalls.map((call) => call.id), [1, 2, 5],
+  assert.deepEqual(outlineCalls.map((call) => call.entity.id), [1, 2, 5],
     "in-front units remain unchanged and reveal-only units use their dedicated pass");
   for (const call of outlineCalls) {
-    assert.equal(call.pool, "forestUnitOutlines");
-    assert(call.graphics.calls.some(([kind, width, color]) =>
-      kind === "lineStyle" && width === 2.25 && color === 0xffffff),
-    "forest readability is a white outline with no filtered duplicate art");
+    assert.equal(call.colors, colorByOwner);
+    assert.equal(call.renderState, state);
+    assert.equal(call.pools.unit, "forestUnitOutlines");
+    assert.equal(call.pools.liveRigUnit, "forestUnitOutlineRigs");
+    assert.equal(call.pools.liveRigOverlay, "forestUnitOutlineRigOverlays");
+    assert.equal(call.pools.omitShadow, true);
+    assert.equal(call.pools.omitEffects, true);
+    assert.notEqual(call.pools.renderContext, renderContexts.get(call.entity.id),
+      "the outline pass clones rather than mutates the live unit render context");
+    assert.deepEqual(call.pools.renderContext, renderContexts.get(call.entity.id));
+    if (call.entity.kind === KIND.RIFLEMAN) {
+      assert.equal(call.pools.visualFrameStrip, rifleFrameStripOverride,
+        "the outline pass reuses the same production frame-strip override as the visible unit");
+    }
   }
   outlineCalls.length = 0;
   assert.equal(
-    _drawTreeOccludedUnitOutlines.call(outlineRenderer, entities.filter((entity) => entity.owner !== 3)),
+    _drawTreeOccludedUnitOutlines.call(
+      outlineRenderer,
+      entities.filter((entity) => entity.owner !== 3),
+      state,
+      colorByOwner,
+      { renderContexts, visualFrameStripOverrides },
+    ),
     2,
     "the pass cannot outline an enemy omitted by authoritative visibility filtering",
   );
   outlineCalls.length = 0;
-  assert.equal(_drawStealthUnitOutlines.call(outlineRenderer, entities), 1,
+  assert.equal(_drawStealthUnitOutlines.call(
+    outlineRenderer,
+    entities,
+    state,
+    colorByOwner,
+    { visualFrameStripOverrides },
+  ), 1,
     "a reveal-only stealth unit always receives an outline even without canopy geometry");
-  assert.deepEqual(outlineCalls.map(({ pool, id }) => [pool, id]), [["stealthUnitOutlines", 3]],
-    "stealth reveals use the above-fog outline layer instead of a full unit rig");
+  assert.equal(outlineCalls[0].entity.id, 3);
+  assert.equal(outlineCalls[0].pools.unit, "stealthUnitOutlines");
+  assert.equal(outlineCalls[0].pools.liveRigUnit, "stealthUnitOutlineRigs");
+  assert.equal(outlineCalls[0].pools.liveRigOverlay, "stealthUnitOutlineRigOverlays");
+  assert.equal(outlineCalls[0].pools.visualFrameStrip, rifleFrameStripOverride,
+    "stealth reveals reuse the real animated rifleman frame rather than proxy geometry");
+  assert.equal("renderContext" in outlineCalls[0].pools, false,
+    "a reveal-only unit builds its normal production render context in the outline pass");
+
+  const filter = createUnitOutlineFilter(PIXI);
+  const fragment = filter.options.glProgram.options.fragment;
+  assert.match(fragment, /texture2D\(uTexture, vTextureCoord\)\.a/,
+    "the filter reads the rendered unit's real alpha");
+  assert.match(fragment, /neighborAlpha - centerAlpha/,
+    "the filter emits only the silhouette's outer edge");
+  assert.doesNotMatch(fragment, /texture2D\([^;]+\)\.rgb/,
+    "the filter never copies faction-colored pixels from the duplicated rig");
 
   const hpCalls = [];
   _drawAboveFogHp.call({
@@ -102,12 +149,20 @@ try {
     "the production renderer keeps forest outlines above canopies in a dedicated layer");
   assert(renderer.layers.stealthUnitOutlines,
     "the production renderer keeps reveal-only outlines above fog in a dedicated layer");
-  assert.equal(renderer.layers.forestUnitOutlines.filters, undefined,
-    "outline rendering does not allocate a rectangular GPU filter surface");
+  assert.equal(renderer.layers.forestUnitOutlines.filters.length, 1,
+    "forest outlines filter the actual production rig alpha");
+  assert.equal(renderer.layers.stealthUnitOutlines.filters.length, 1,
+    "stealth reveals filter the actual production rig alpha above fog");
+  assert(renderer._liveRigPools.forestUnitOutlineRigs instanceof Map);
+  assert(renderer._liveRigPools.stealthUnitOutlineRigs instanceof Map);
   renderer._drawMissingTexture({ id: 808, x: 10, y: 83 }, "units");
   assert.equal(renderer._pools.units.get(808).zIndex, 83,
     "Graphics fallback unit bodies use the same world-Y depth key");
+  const forestFilter = renderer._forestUnitOutlineFilter;
+  const stealthFilter = renderer._stealthUnitOutlineFilter;
   renderer.destroy();
+  assert.equal(forestFilter.destroyed, true, "forest outline filter is released on teardown");
+  assert.equal(stealthFilter.destroyed, true, "stealth outline filter is released on teardown");
 } finally {
   restorePixi();
 }
