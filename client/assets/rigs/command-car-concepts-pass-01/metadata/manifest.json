@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "status": "unapproved concept exploration",
+  "runtime": {
+    "enabled": false,
+    "references": []
+  },
+  "generation": {
+    "provenanceStatus": "prompt and source inputs recorded",
+    "generator": "Codex built-in image_gen",
+    "model": null,
+    "settings": "Built-in tool settings are not exposed",
+    "exactPrompt": "client/assets/rigs/command-car-concepts-pass-01/metadata/generation-prompts.md",
+    "sourceInputs": [
+      "client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-preview.png",
+      "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-white-carry-alpha.png",
+      "client/assets/rigs/panzerfaust-pass-01/generated/panzerfaust-pass-01-base-carry-long-alpha-trimmed.png"
+    ],
+    "promptSummary": "client/assets/rigs/command-car-concepts-pass-01/metadata/prompt-summary.md"
+  },
+  "concepts": [
+    {
+      "id": "open-staff-car",
+      "silhouette": "compact open staff car",
+      "asset": "client/assets/rigs/command-car-concepts-pass-01/generated/command-car-concept-a-open-staff-car.png"
+    },
+    {
+      "id": "radio-roadster",
+      "silhouette": "compact radio roadster",
+      "asset": "client/assets/rigs/command-car-concepts-pass-01/generated/command-car-concept-b-radio-roadster.png"
+    },
+    {
+      "id": "officer-sidecar",
+      "silhouette": "officer motorcycle with sidecar",
+      "asset": "client/assets/rigs/command-car-concepts-pass-01/generated/command-car-concept-c-officer-sidecar.png"
+    },
+    {
+      "id": "signals-sidecar",
+      "silhouette": "signals motorcycle with sidecar",
+      "asset": "client/assets/rigs/command-car-concepts-pass-01/generated/command-car-concept-d-signals-sidecar.png"
+    }
+  ]
+}
