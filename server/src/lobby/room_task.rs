@@ -455,8 +455,9 @@ impl RoomTask {
             } => self.on_set_vision_selection(player_id, selection),
             RoomEvent::RequestGroundDecals {
                 player_id,
+                request_id,
                 after_revision,
-            } => self.on_request_ground_decals(player_id, after_revision),
+            } => self.on_request_ground_decals(player_id, request_id, after_revision),
             RoomEvent::Lab {
                 player_id,
                 request_id,

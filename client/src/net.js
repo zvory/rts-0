@@ -484,11 +484,14 @@ export class Net {
   }
 
   /** Request fog-safe authoritative ground decals discovered after a local revision. */
-  requestGroundDecals(afterRevision = 0) {
+  requestGroundDecals(requestId, afterRevision = 0) {
+    if (!Number.isInteger(requestId) || requestId <= 0 || requestId > 0xffffffff) {
+      return false;
+    }
     if (!Number.isInteger(afterRevision) || afterRevision < 0 || afterRevision > 0xffffffff) {
       return false;
     }
-    return this._send(msg.requestGroundDecals(afterRevision));
+    return this._send(msg.requestGroundDecals(requestId, afterRevision));
   }
 
   /**

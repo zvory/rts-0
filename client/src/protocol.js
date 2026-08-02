@@ -177,8 +177,9 @@ export const msg = Object.freeze({
   seekRoomTime: (ticksBack) => ({ t: C.SEEK_ROOM_TIME, ticksBack }),
   seekRoomTimeTo: (tick) => ({ t: C.SEEK_ROOM_TIME_TO, tick }),
   setVisionSelection: (selection) => ({ t: C.SET_VISION_SELECTION, selection }),
-  requestGroundDecals: (afterRevision = 0) => ({
+  requestGroundDecals: (requestId, afterRevision = 0) => ({
     t: C.REQUEST_GROUND_DECALS,
+    requestId,
     afterRevision,
   }),
   lab: (requestId, op) => ({ t: C.LAB, requestId, op }),

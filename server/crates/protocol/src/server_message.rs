@@ -30,6 +30,7 @@ pub enum ServerMessage {
     Snapshot(Snapshot),
     /// Reliable response to `requestGroundDecals`, scoped to the requester's current vision.
     GroundDecals {
+        request_id: u32,
         revision: u32,
         decals: Vec<GroundDecalView>,
     },
@@ -122,6 +123,7 @@ mod tests {
     #[test]
     fn serializes_ground_decal_delta_response() {
         let message = ServerMessage::GroundDecals {
+            request_id: 4,
             revision: 9,
             decals: vec![GroundDecalView {
                 id: 3,
@@ -138,6 +140,7 @@ mod tests {
         };
         let wire = serde_json::to_value(message).unwrap();
         assert_eq!(wire["t"], "groundDecals");
+        assert_eq!(wire["requestId"], 4);
         assert_eq!(wire["revision"], 9);
         assert_eq!(wire["decals"][0]["decalClass"], "mortarBlast");
         assert_eq!(wire["decals"][0]["radiusTiles"], 1.5);

@@ -391,6 +391,7 @@ mod tests {
 
         let snapshot = Snapshot {
             tick: 0,
+            ground_decal_revision: 0,
             world_combat_position: None,
             steel: 0,
             oil: 0,

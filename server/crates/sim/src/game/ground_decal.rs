@@ -285,7 +285,7 @@ impl GroundDecalStore {
                 }
             }
         }
-        true
+        usize::try_from(self.revision).ok() == Some(used_revisions.len())
     }
 
     fn next_revision(&mut self) -> Option<u32> {
@@ -539,5 +539,32 @@ mod tests {
             result.is_err(),
             "noncanonical blast radii must reject restore"
         );
+    }
+
+    #[test]
+    fn checkpoint_rejects_noncanonical_revision_gaps() {
+        let players = [PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "kriegsia".to_string(),
+            name: "One".to_string(),
+            color: "#fff".to_string(),
+            is_ai: false,
+        }];
+        let mut game = Game::new(&players, 7);
+        game.state
+            .ground_decals
+            .create_mortar_impact(1, 48.0, 48.0)
+            .unwrap();
+        let payload = game.checkpoint_payload_text_for_test().unwrap();
+        let mut value: serde_json::Value = serde_json::from_str(&payload).unwrap();
+        value["groundDecals"]["revision"] = serde_json::json!(u32::MAX);
+        let malformed = serde_json::to_string(&value).unwrap();
+        let result = Game::restore_checkpoint_payload_text_for_test(
+            &malformed,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        );
+        assert!(result.is_err(), "revision gaps must reject restore");
     }
 }

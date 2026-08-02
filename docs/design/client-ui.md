@@ -440,8 +440,9 @@ export class GroundDecalBuffer {
 export function normalizeAuthoritativeGroundDecal(record, context?)
 ```
 Snapshots advertise only the requesting perspective's `groundDecalRevision`. `GroundDecalSync`
-coalesces that signal into one reliable `requestGroundDecals { afterRevision }` repair at a time and
-retries with bounded backoff until the retained cache reaches the advertised revision. Responses
+coalesces that signal into one reliable `requestGroundDecals { requestId, afterRevision }` repair at a time and
+retries with bounded backoff until the retained cache reaches the advertised revision. The echoed
+request id rejects delayed responses from a prior replay tick or vision perspective. Responses
 contain only decals first discovered by that perspective after the supplied revision. The buffer
 normalizes and deduplicates those stable server ids, retains their records for renderer rehydration,
 and queues each newly learned mark once. Replay seeks and observer-view changes clear both the

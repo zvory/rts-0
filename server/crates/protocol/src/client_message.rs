@@ -94,6 +94,8 @@ pub enum ClientMessage {
     Activity,
     /// Request durable ground decals learned since this recipient-scoped revision.
     RequestGroundDecals {
+        #[serde(rename = "requestId")]
+        request_id: u32,
         #[serde(rename = "afterRevision")]
         after_revision: u32,
     },

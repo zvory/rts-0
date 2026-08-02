@@ -7,7 +7,9 @@ import { KIND, msg } from "../../client/src/protocol.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
 assert(
-  JSON.stringify(msg.requestGroundDecals(7)) === JSON.stringify({ t: "requestGroundDecals", afterRevision: 7 }),
+  JSON.stringify(msg.requestGroundDecals(3, 7)) === JSON.stringify({
+    t: "requestGroundDecals", requestId: 3, afterRevision: 7,
+  }),
   "ground-decal request builder mirrors the reliable wire contract",
 );
 
@@ -28,7 +30,12 @@ assert(
     resetAuthoritativeGroundDecals: () => buffer.clear(),
   };
   const sync = new GroundDecalSync({
-    net: { requestGroundDecals(afterRevision) { requests.push(afterRevision); return true; } },
+    net: {
+      requestGroundDecals(requestId, afterRevision) {
+        requests.push({ requestId, afterRevision });
+        return true;
+      },
+    },
     state,
     labClient: {
       subscribeResult(handler) {
@@ -42,16 +49,18 @@ assert(
     clearTimer(id) { cleared.add(id); },
   });
 
-  assert(sync.observeSnapshot(3) && requests.join(",") === "0",
+  assert(sync.observeSnapshot(3) && requests[0].requestId === 1 && requests[0].afterRevision === 0,
     "a newer snapshot revision requests authoritative changes after the applied revision");
   assert(!sync.observeSnapshot(3) && requests.length === 1,
     "repeated snapshots coalesce while one revision request is outstanding");
   assert(timers[0].ms === 10, "the first lost response uses the bounded retry schedule");
   timers[0].fn();
-  assert(requests.join(",") === "0,0", "a lost authoritative response retries from the same applied revision");
+  assert(requests[1].requestId === 1 && requests[1].afterRevision === 0,
+    "a lost authoritative response retries the same correlated request");
 
   assert(sync.applyResponse({
     t: "groundDecals",
+    requestId: 1,
     revision: 2,
     decals: [
       { id: 10, decalClass: "infantry", sourceKind: KIND.RIFLEMAN, x: 32, y: 48, owner: 1, seed: 5 },
@@ -60,10 +69,12 @@ assert(
   }), "a valid authoritative delta advances applied state");
   assert(buffer.authoritativeRevision === 2 && buffer.pendingCount === 1,
     "authoritative application advances only from the response and deduplicates decal ids");
-  assert(requests.at(-1) === 2, "a partial response immediately requests the remainder from its revision");
+  assert(requests.at(-1).requestId === 2 && requests.at(-1).afterRevision === 2,
+    "a partial response immediately requests the remainder with a new correlation id");
 
   sync.applyResponse({
     t: "groundDecals",
+    requestId: 2,
     revision: 3,
     decals: [
       { id: 10, decalClass: "infantry", sourceKind: KIND.RIFLEMAN, x: 32, y: 48, owner: 1, seed: 5 },
@@ -75,16 +86,26 @@ assert(
   buffer.consumePending();
   assert(buffer.requeueAuthoritative() === 2 && buffer.peekPending().length === 2,
     "normalized authoritative records remain available to repaint a replacement renderer generation");
-  assert(!sync.applyResponse({ revision: 2, decals: [] }) && buffer.authoritativeRevision === 3,
+  assert(!sync.applyResponse({ requestId: 2, revision: 2, decals: [] }) && buffer.authoritativeRevision === 3,
     "late responses cannot move the applied revision backward");
 
   labResultHandler({ ok: true, op: "setVision" });
   assert(buffer.authoritativeRevision === 0 && buffer.pendingCount === 0 && resets === 1,
     "Lab perspective changes clear local decal records, pixels, and applied revision");
-  assert(!sync.applyResponse({ revision: 4, decals: [] }),
+  assert(!sync.applyResponse({ requestId: 2, revision: 4, decals: [] }),
     "a response from the old perspective is ignored until its replacement snapshot arrives");
   sync.observeSnapshot(4);
-  assert(requests.at(-1) === 0, "the first replacement-perspective snapshot requests full history");
+  assert(requests.at(-1).requestId === 3 && requests.at(-1).afterRevision === 0,
+    "the first replacement-perspective snapshot requests full history with a fresh id");
+  assert(!sync.applyResponse({
+    requestId: 2,
+    revision: 4,
+    decals: [{
+      id: 99, decalClass: "infantry", sourceKind: KIND.RIFLEMAN,
+      x: 16, y: 16, owner: 1, seed: 9,
+    }],
+  }) && buffer.authoritativeRevision === 0,
+  "a delayed response from the old perspective is rejected after the replacement snapshot");
   sync.destroy();
   assert(cleared.size > 0 && labUnsubscribed === 1,
     "destroy cancels outstanding repair work and its Lab result subscription");

@@ -22,6 +22,8 @@ export class GroundDecalSync {
     this.setTimer = setTimer;
     this.clearTimer = clearTimer;
     this.targetRevision = 0;
+    this.nextRequestId = 1;
+    this.outstandingRequestId = null;
     this.retryIndex = 0;
     this.retryTimer = null;
     this.awaitingPerspectiveSnapshot = false;
@@ -42,8 +44,10 @@ export class GroundDecalSync {
 
   applyResponse(message) {
     if (this.destroyed || this.awaitingPerspectiveSnapshot) return false;
+    if (message?.requestId !== this.outstandingRequestId) return false;
     const result = this.state?.applyAuthoritativeGroundDecals?.(message);
     if (!result?.accepted) return false;
+    this.outstandingRequestId = null;
     this.retryIndex = 0;
     this._cancelRetry();
     this.targetRevision = Math.max(this.targetRevision, message.revision);
@@ -56,6 +60,7 @@ export class GroundDecalSync {
     this._cancelRetry();
     this.retryIndex = 0;
     this.targetRevision = 0;
+    this.outstandingRequestId = null;
     this.awaitingPerspectiveSnapshot = awaitSnapshot;
     this.state?.resetAuthoritativeGroundDecals?.();
     if (resetPresentation) this.resetPresentation?.();
@@ -73,7 +78,11 @@ export class GroundDecalSync {
     if (this.awaitingPerspectiveSnapshot || this.retryTimer != null) return false;
     const applied = this.state?.groundDecals?.authoritativeRevision || 0;
     if (applied >= this.targetRevision) return false;
-    const sent = this.net?.requestGroundDecals?.(applied) === true;
+    if (this.outstandingRequestId == null) {
+      this.outstandingRequestId = this.nextRequestId;
+      this.nextRequestId = this.nextRequestId === 0xffffffff ? 1 : this.nextRequestId + 1;
+    }
+    const sent = this.net?.requestGroundDecals?.(this.outstandingRequestId, applied) === true;
     this._scheduleRetry();
     return sent;
   }

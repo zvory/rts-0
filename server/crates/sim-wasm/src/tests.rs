@@ -63,6 +63,7 @@ fn snapshot() -> Snapshot {
     let neutral_tank_trap = EntityView::new(303, 0, "tank_trap", 300.0, 300.0, 100, 100, "idle");
     Snapshot {
         tick: 10,
+        ground_decal_revision: 0,
         world_combat_position: None,
         steel: 75,
         oil: 0,

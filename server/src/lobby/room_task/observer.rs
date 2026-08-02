@@ -14,7 +14,15 @@ use rts_sim::game::{Game, ObserverView};
 const GROUND_DECAL_REQUEST_INTERVAL: std::time::Duration = std::time::Duration::from_millis(500);
 
 impl RoomTask {
-    pub(super) fn on_request_ground_decals(&mut self, player_id: u32, after_revision: u32) {
+    pub(super) fn on_request_ground_decals(
+        &mut self,
+        player_id: u32,
+        request_id: u32,
+        after_revision: u32,
+    ) {
+        if request_id == 0 {
+            return;
+        }
         let now = StdInstant::now();
         if self
             .ground_decal_request_times
@@ -51,7 +59,11 @@ impl RoomTask {
             &self.room,
             player_id,
             &player.msg_tx,
-            ServerMessage::GroundDecals { revision, decals },
+            ServerMessage::GroundDecals {
+                request_id,
+                revision,
+                decals,
+            },
         );
     }
 

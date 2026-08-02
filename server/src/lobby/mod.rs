@@ -481,7 +481,11 @@ pub enum RoomEvent {
         selection: VisionSelectionRequest,
     },
     /// Request fog-scoped durable ground marks after a recipient-held cursor.
-    RequestGroundDecals { player_id: u32, after_revision: u32 },
+    RequestGroundDecals {
+        player_id: u32,
+        request_id: u32,
+        after_revision: u32,
+    },
     /// Privileged lab request routed only by lab rooms.
     Lab {
         player_id: u32,
