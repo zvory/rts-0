@@ -20,7 +20,7 @@ Use for tests, CI/hooks, or focused verification.
   documented in `docs/interact-cli.md`.
 - `tests/run-all.sh --only-rust` — architecture policy plus Rust nextest and lint only.
 - `tests/run-all.sh --only-rust-checks` — policy plus lint, without nextest.
-- `RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest` — one CI partition.
+- `RTS_NEXTEST_PARTITION=slice:1/4 tests/run-all.sh --only-nextest` — one CI partition.
 - `tests/run-all.sh --only-live-node` — JS contracts plus live Node API suites only.
 - `tests/run-all.sh --only-browser` — browser smoke plus configured tri-state browser suites only.
 - `tests/run-all.sh --only-browser-scenarios=smoke,phase-0.5` — browser shard.
