@@ -1255,6 +1255,12 @@ fn snapshot_reveals_enemy_at_melee_range_inside_smoke() {
         snapshot.visible_tiles[enemy_tile_index], 1,
         "close-quarters visibility should expose only the enemy's occupied tile"
     );
+
+    let observer = game.snapshot_for_observer(&super::ObserverView::Players(vec![1]));
+    assert!(
+        observer.entities.iter().any(|entity| entity.id == enemy),
+        "an observer using the player's perspective should receive the same close enemy"
+    );
 }
 
 #[test]

@@ -138,6 +138,7 @@ pub(crate) fn entity_visible_to_with_smoke_melee(
     smokes: &SmokeCloudStore,
     entities: &EntityStore,
     teams: Option<&TeamRelations>,
+    private_detail_projection: PrivateDetailProjection<'_>,
 ) -> bool {
     if entity_visible_to_with_smoke(viewer, entity, fog, smokes) {
         return true;
@@ -146,11 +147,8 @@ pub(crate) fn entity_visible_to_with_smoke_melee(
         return false;
     }
     entities.iter().any(|spotter| {
-        teams
-            .map(|teams| teams.same_team_or_same_owner(viewer, spotter.owner))
-            .unwrap_or(spotter.owner == viewer)
-            && SmokeCloudStore::units_within_melee_visibility_range(spotter, entity)
-            && smokes.point_inside(spotter.pos_x, spotter.pos_y)
+        private_detail_projection.includes_owner_or_ally(viewer, spotter.owner, teams)
+            && smokes.units_have_melee_visibility(spotter, entity)
     })
 }
 
@@ -288,6 +286,7 @@ pub fn project_entity(
                     smokes,
                     context.entities,
                     context.teams,
+                    context.private_detail_projection,
                 )
             })
             .unwrap_or_else(|| entity_visible_to(viewer, entity, context.fog))
@@ -328,6 +327,7 @@ pub fn project_entity(
                     smokes,
                     context.entities,
                     context.teams,
+                    context.private_detail_projection,
                 )
             })
             .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog));
@@ -371,6 +371,7 @@ pub fn project_entity(
                                     smokes,
                                     context.entities,
                                     context.teams,
+                                    context.private_detail_projection,
                                 )
                             })
                             .unwrap_or_else(|| {
