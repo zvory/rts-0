@@ -194,6 +194,7 @@ export class Match {
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
     this.latestPredictionSnapshot = null;
+    this.predictionBudgetRecoveryAttempted = false;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
     this.frameProfiler = new FrameProfiler();
     this.snapshotProcessingReport = createSnapshotProcessingReport();

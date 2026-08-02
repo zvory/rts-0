@@ -103,6 +103,18 @@ function assert(cond, msg) {
   }) === true, "replay-budget recovery handles an exceeded frame");
   assert(resetAdapters === 1 && initialized === 1,
     "replay-budget recovery immediately initializes the replacement shared runtime");
+  assert(recoverPredictionRuntimeAfterBudget(match, {
+    budgetExceededCount: 1,
+    lastTickMs: 9,
+    lastReplayTicks: 3,
+  }) === false, "an over-budget replacement terminates recovery instead of restarting recursively");
+  assert(resetAdapters === 1 && initialized === 1, "replay-budget recovery is bounded to one restart");
+  recoverPredictionRuntimeAfterBudget(match, { budgetExceededCount: 0 });
+  assert(recoverPredictionRuntimeAfterBudget(match, {
+    budgetExceededCount: 1,
+    lastTickMs: 8,
+    lastReplayTicks: 2,
+  }) === true, "a healthy measured window rearms future replay-budget recovery");
 }
 
 {
