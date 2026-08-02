@@ -285,6 +285,35 @@ assert(
 }
 
 {
+  const views = [];
+  const viewport = {
+    camera: {
+      worldW: 3200,
+      worldH: 1600,
+      viewW: 800,
+      viewH: 600,
+      zoom: 1,
+      setView(view) { views.push(view); this.zoom = view.zoom; },
+      setZoom(zoom) { this.zoom = Math.max(0.05, Math.min(4, zoom)); },
+    },
+    frameMap: MapEditorViewport.prototype.frameMap,
+    zoomPercent: MapEditorViewport.prototype.zoomPercent,
+  };
+  assert.equal(MapEditorViewport.prototype.fitToScreen.call(viewport), true);
+  assert.deepEqual(views.at(-1), { centerX: 1600, centerY: 800, zoom: 0.25 },
+    "Fit to screen centers the map and keeps its full rectangular extent visible");
+  assert.equal(MapEditorViewport.prototype.fillScreen.call(viewport), true);
+  assert.deepEqual(views.at(-1), { centerX: 1600, centerY: 800, zoom: 0.375 },
+    "Fill screen centers the map and covers the viewport");
+  assert.equal(MapEditorViewport.prototype.setZoomPercent.call(viewport, 175), 175,
+    "the direct percentage control sets camera scale");
+  assert.equal(MapEditorViewport.prototype.zoomIn.call(viewport), 219,
+    "the plus control zooms in around the viewport centre");
+  assert.equal(MapEditorViewport.prototype.zoomOut.call(viewport), 175,
+    "the minus control reverses one zoom step");
+}
+
+{
   const session = new MapEditorSession({ storage: null });
   session.initializeFromScenario({
     name: "Checkpoint", map: { data: {

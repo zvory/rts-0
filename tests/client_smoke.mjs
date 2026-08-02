@@ -613,6 +613,18 @@ try {
       withinViewport: panelRect && panelRect.bottom <= window.innerHeight - 11,
       noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
         .every((node) => node.scrollWidth <= node.clientWidth),
+      zoom: (() => {
+        const section = [...document.querySelectorAll(".map-editor-group")]
+          .find((node) => node.querySelector("legend")?.textContent === "Zoom");
+        const input = section?.querySelector("input[aria-label='Zoom percentage']");
+        return section && input && {
+          firstSection: section === document.querySelector(".map-editor-tools-window .map-editor-group"),
+          buttons: [...section.querySelectorAll("button")].map((control) => control.textContent),
+          min: input.min,
+          max: input.max,
+          value: Number(input.value),
+        };
+      })(),
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
@@ -652,6 +664,12 @@ try {
   ok(
     editorUi.floatingChrome && editorUi.panelsDoNotOverlap && editorUi.withinViewport && editorUi.noHorizontalOverflow,
     "MAP EDITOR: accessible floating panels do not overlap and terrain/start-base pickers stay within the viewport",
+  );
+  ok(
+    editorUi.zoom?.firstSection &&
+      ["Fill screen", "Fit to screen", "−", "+"].every((label) => editorUi.zoom.buttons.includes(label)) &&
+      editorUi.zoom.min === "5" && editorUi.zoom.max === "400" && editorUi.zoom.value > 0,
+    `MAP EDITOR: top Tools section exposes bounded framing, step, and percentage zoom controls (${JSON.stringify(editorUi.zoom)})`,
   );
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,

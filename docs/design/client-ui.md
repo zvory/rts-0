@@ -906,7 +906,8 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 `MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
 status, local save/load, export, and Lab handoff; Tools owns terrain paint, start/base locations, and
-doodad authoring.
+doodad authoring. The top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
+zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
