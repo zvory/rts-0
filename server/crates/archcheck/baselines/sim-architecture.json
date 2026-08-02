@@ -1,5 +1,5 @@
 {
-  "reason": "Doodad collision and rectangular-map validation add scoped map exports and helpers",
+  "reason": "Move tree-detour coverage into a test-only module",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -775,7 +775,7 @@
     },
     {
       "path": "services/pathing.rs",
-      "lines": 1843
+      "lines": 1845
     },
     {
       "path": "services/pathing/cache.rs",
@@ -791,7 +791,11 @@
     },
     {
       "path": "services/pathing/tree_detours.rs",
-      "lines": 308
+      "lines": 170
+    },
+    {
+      "path": "services/pathing/tree_detours_tests.rs",
+      "lines": 134
     },
     {
       "path": "services/production.rs",

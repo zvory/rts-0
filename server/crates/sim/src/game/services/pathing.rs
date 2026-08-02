@@ -17,6 +17,8 @@ use crate::rules::terrain::{self, TerrainKind};
 use cache::{CacheEntry, CacheKey};
 
 mod tree_detours;
+#[cfg(test)]
+mod tree_detours_tests;
 pub(in crate::game::services) use tree_detours::{expand_reverse_waypoints, tree_detour_between};
 
 const VEHICLE_HARD_CLEARANCE_TILES: u16 = 1;
