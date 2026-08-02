@@ -4,7 +4,8 @@ pub(crate) fn is_player_activity(message: &ClientMessage) -> bool {
     match message {
         ClientMessage::Ping { .. }
         | ClientMessage::NetReport { .. }
-        | ClientMessage::MatchLoadReady { .. } => false,
+        | ClientMessage::MatchLoadReady { .. }
+        | ClientMessage::RequestGroundDecals { .. } => false,
         ClientMessage::Join { .. }
         | ClientMessage::SetName { .. }
         | ClientMessage::Ready { .. }

@@ -149,6 +149,13 @@ export class PixiPresentationAdapter {
     this._renderer.resize(widthCssPx, heightCssPx, dpr);
   }
 
+  resetGroundDecals() {
+    const staticMap = this._sources?.staticMap?.();
+    if (staticMap) this._renderer._initGroundDecalsForMap(materializeStaticMap(staticMap));
+    this._decalFrameKey = null;
+    this._retainedGroundDecalKey = null;
+  }
+
   setRenderClock(renderClock) {
     this._renderer.setRenderClock(renderClock);
   }

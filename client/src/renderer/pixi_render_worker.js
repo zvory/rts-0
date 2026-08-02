@@ -79,9 +79,14 @@ async function handleMessage(candidate) {
       if (presentation.retainDecals(message)) {
         respond(RENDER_WORKER_RESPONSE.RETAINED, message.generation, {
           revision: message.payload.revision,
+          decalEpoch: message.payload.decalEpoch ?? 0,
           frameId: message.payload.frameId || 0,
         });
       }
+      break;
+    case RENDER_WORKER_MESSAGE.RESET_GROUND_DECALS:
+      presentation.resetDecals(message);
+      adapter?.resetGroundDecals?.();
       break;
     case RENDER_WORKER_MESSAGE.FRAME:
       await presentFrame(message);

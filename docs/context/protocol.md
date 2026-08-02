@@ -18,7 +18,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   projection-affecting snapshot fields, events, or observer modes
 
 ## Code map
-- `server/crates/protocol/src/lib.rs` — authoritative Rust wire DTOs and compact transport
+- `server/crates/protocol/src/{client_message,server_message,lib}.rs` — authoritative Rust wire
+  DTOs and compact transport
 - `server/crates/contract/src/lib.rs` — shared semantic DTOs re-exported by protocol
 - `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports
 - `server/crates/sim/src/protocol.rs` — sim-facing adapter for typed kind conversion
@@ -53,8 +54,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`.
   `validateScenario` previews bounds without mutating the room or accepting client server paths.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
-- Map handoffs validate data, cap one-use records at 64 for two minutes, and reverse through
-  `LabMapDraft`. Schema-v5 map boundaries carry canonical `doodads[]`, capped at 4,096; tree
+- Map handoffs cap 64 one-use records for two minutes; reverse uses `LabMapDraft`.
+  Schema-v5 map boundaries carry canonical `doodads[]` capped at 4,096; tree
   records have tiny trunk collision while wildflowers remain inert.
 
 ## Invariants

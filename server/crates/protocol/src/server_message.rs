@@ -28,6 +28,12 @@ pub enum ServerMessage {
     Start(StartPayload),
     /// Per-player, fog-filtered world state.
     Snapshot(Snapshot),
+    /// Reliable response to `requestGroundDecals`, scoped to the requester's current vision.
+    GroundDecals {
+        request_id: u32,
+        revision: u32,
+        decals: Vec<GroundDecalView>,
+    },
     /// Shared room-controlled time cursor/state. Sent latest-only outside snapshot cadence.
     RoomTimeState(RoomTimeState),
     /// An accepted replay seek is about to reset and incrementally advance shared room time.
@@ -108,4 +114,35 @@ pub enum ServerMessage {
     Error {
         msg: String,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serializes_ground_decal_delta_response() {
+        let message = ServerMessage::GroundDecals {
+            request_id: 4,
+            revision: 9,
+            decals: vec![GroundDecalView {
+                id: 3,
+                decal_class: "mortarBlast".to_string(),
+                source_kind: "mortarTeam".to_string(),
+                x: 48.0,
+                y: 64.0,
+                owner: 1,
+                seed: 77,
+                facing: None,
+                weapon_facing: None,
+                radius_tiles: Some(1.5),
+            }],
+        };
+        let wire = serde_json::to_value(message).unwrap();
+        assert_eq!(wire["t"], "groundDecals");
+        assert_eq!(wire["requestId"], 4);
+        assert_eq!(wire["revision"], 9);
+        assert_eq!(wire["decals"][0]["decalClass"], "mortarBlast");
+        assert_eq!(wire["decals"][0]["radiusTiles"], 1.5);
+    }
 }

@@ -382,6 +382,7 @@ mod tests {
     fn empty_snapshot(tick: u32) -> Snapshot {
         Snapshot {
             tick,
+            ground_decal_revision: 0,
             world_combat_position: None,
             steel: 100,
             oil: 25,

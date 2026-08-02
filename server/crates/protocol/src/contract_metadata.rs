@@ -193,7 +193,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 48;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 49;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -538,6 +538,7 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("PING", "ping"),
                 ("NET_REPORT", "netReport"),
                 ("ACTIVITY", "activity"),
+                ("REQUEST_GROUND_DECALS", "requestGroundDecals"),
                 ("SET_ROOM_TIME_SPEED", "setRoomTimeSpeed"),
                 ("STEP_ROOM_TIME", "stepRoomTime"),
                 ("SEEK_ROOM_TIME", "seekRoomTime"),
@@ -556,6 +557,7 @@ pub fn protocol_contract() -> ProtocolContract {
                 ("MATCH_COUNTDOWN", "matchCountdown"),
                 ("START", "start"),
                 ("SNAPSHOT", "snapshot"),
+                ("GROUND_DECALS", "groundDecals"),
                 ("ROOM_TIME_STATE", "roomTimeState"),
                 ("ROOM_TIME_SEEK_STARTED", "roomTimeSeekStarted"),
                 ("LIVE_PAUSE_STATE", "livePauseState"),

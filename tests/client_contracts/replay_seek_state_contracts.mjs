@@ -28,10 +28,18 @@ state.applySnapshot({
   events: [],
 });
 state.visualEffects.muzzleFlashes.push({ from: 1, to: 2, createdAt: 1 });
-state.groundDecals.applySnapshotEvents(
-  [{ e: "death", id: 1, x: 15, y: 25, kind: KIND.WORKER }],
-  { tick: 1, players: state.players, tileSize: state.tileSize },
-);
+state.applyAuthoritativeGroundDecals({
+  revision: 1,
+  decals: [{
+    id: 1,
+    decalClass: "infantry",
+    sourceKind: KIND.WORKER,
+    x: 15,
+    y: 25,
+    owner: 1,
+    seed: 99,
+  }],
+});
 
 state.resetForReplaySeek();
 

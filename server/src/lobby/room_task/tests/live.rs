@@ -38,6 +38,35 @@ fn paused_replay_viewer_does_not_advance_on_scheduled_tick() {
 }
 
 #[test]
+fn ground_decal_repair_responds_in_game_and_lobby_requests_do_not_consume_the_limit() {
+    let mut task = RoomTask::new(
+        "ground-decal-repair-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_player(&mut task, 1, true);
+
+    task.on_request_ground_decals(1, 1, 0);
+    assert!(task.ground_decal_request_times.is_empty());
+
+    task.start_match();
+    while writer.reliable_rx.try_recv().is_ok() {}
+    task.on_request_ground_decals(1, 2, 0);
+
+    assert!(matches!(
+        writer.reliable_rx.try_recv(),
+        Ok(ServerMessage::GroundDecals {
+            request_id: 2,
+            revision: 0,
+            decals,
+        }) if decals.is_empty()
+    ));
+    assert!(task.ground_decal_request_times.contains_key(&1));
+}
+
+#[test]
 fn live_chat_routes_team_privately_and_is_captured_for_replay() {
     use crate::protocol::{ChatChannel, ChatScope};
 

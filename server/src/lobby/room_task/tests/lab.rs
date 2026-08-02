@@ -780,6 +780,8 @@ fn lab_team_vision_receives_only_selected_player_mortar_events() {
     );
     drain_reliable_messages(&mut operator_writer);
     drain_reliable_messages(&mut viewer_writer);
+    task.ground_decal_request_times
+        .insert(99, std::time::Instant::now());
 
     task.on_lab_request(
         99,
@@ -789,6 +791,7 @@ fn lab_team_vision_receives_only_selected_player_mortar_events() {
         },
     );
     assert!(lab_results(&mut operator_writer)[0].ok);
+    assert!(!task.ground_decal_request_times.contains_key(&99));
     task.on_lab_request(
         100,
         101,

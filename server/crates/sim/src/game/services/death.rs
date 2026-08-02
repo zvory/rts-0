@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::fog::{Fog, LingeringSightSource};
+use crate::game::ground_decal::GroundDecalStore;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
@@ -23,6 +24,7 @@ pub(crate) fn death_system(
     teams: &TeamRelations,
     players: &mut [PlayerState],
     lingering_sight: &mut Vec<LingeringSightSource>,
+    ground_decals: &mut GroundDecalStore,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
@@ -36,6 +38,8 @@ pub(crate) fn death_system(
             y: e.pos_y,
             sight_tiles: e.sight_tiles(),
             kind: e.kind,
+            facing: e.facing(),
+            weapon_facing: e.weapon_facing(),
             killer: e.last_damage_owner(),
             queued_units: e
                 .prod_queue()
@@ -71,6 +75,14 @@ pub(crate) fn death_system(
         entities.release_miner(dead.id);
         entities.remove(dead.id);
         record_score_death(players, dead.owner, dead.kind, dead.killer);
+        ground_decals.create_death(
+            dead.kind,
+            dead.x,
+            dead.y,
+            dead.owner,
+            Some(dead.facing),
+            dead.weapon_facing,
+        );
         if let Some(source) = LingeringSightSource::new(
             dead.owner,
             dead.x,
@@ -183,6 +195,8 @@ struct DeadEntity {
     y: f32,
     sight_tiles: u32,
     kind: EntityKind,
+    facing: f32,
+    weapon_facing: Option<f32>,
     killer: Option<u32>,
     queued_units: Vec<EntityKind>,
     queued_upgrades: Vec<crate::game::upgrade::UpgradeKind>,

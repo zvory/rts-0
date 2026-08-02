@@ -220,9 +220,17 @@ impl Game {
             .views_for(player, fog, fogged, memory_players);
 
         let player_resources = self.player_resource_snapshots(player_resource_projection);
+        let ground_decal_revision = if omniscient {
+            self.state.ground_decals.full_world_revision()
+        } else {
+            self.state
+                .ground_decals
+                .revision_for_players(memory_players)
+        };
 
         Snapshot {
             tick: self.state.tick,
+            ground_decal_revision,
             world_combat_position: world_combat::signal_position(
                 self.state.tick,
                 self.state.world_combat_active_through_tick,

@@ -69,6 +69,9 @@ impl Serialize for CompactSnapshot<'_> {
         let mut map = serializer.serialize_map(None)?;
         map.serialize_entry("t", "snapshot")?;
         map.serialize_entry("v", &COMPACT_SNAPSHOT_VERSION)?;
+        if snapshot.ground_decal_revision != 0 {
+            map.serialize_entry("gr", &snapshot.ground_decal_revision)?;
+        }
         map.serialize_entry(
             "s",
             &[
@@ -1244,6 +1247,7 @@ mod tests {
     fn compact_entity_trims_trailing_optional_nulls() {
         let snapshot = Snapshot {
             tick: 1,
+            ground_decal_revision: 0,
             world_combat_position: None,
             steel: 0,
             oil: 0,
@@ -1286,6 +1290,7 @@ mod tests {
     fn compact_json_snapshot_codec_remains_available_for_local_baselines() {
         let snapshot = Snapshot {
             tick: 1,
+            ground_decal_revision: 0,
             world_combat_position: None,
             steel: 0,
             oil: 0,
@@ -1316,5 +1321,37 @@ mod tests {
             }
             crate::SnapshotFrame::Binary(_) => panic!("compact JSON baseline codec must stay text"),
         }
+    }
+
+    #[test]
+    fn compact_snapshot_carries_ground_decal_revision() {
+        let mut snapshot = Snapshot {
+            tick: 1,
+            ground_decal_revision: 31,
+            world_combat_position: None,
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+            auto_build: None,
+            entities: Vec::new(),
+            resource_deltas: Vec::new(),
+            smokes: Vec::new(),
+            ability_objects: Vec::new(),
+            trenches: Vec::new(),
+            visible_tiles: Vec::new(),
+            explored_tiles: Vec::new(),
+            remembered_buildings: Vec::new(),
+            remembered_anti_tank_guns: Vec::new(),
+            events: Vec::new(),
+            upgrades: Vec::new(),
+            player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
+        };
+        let value = compact_snapshot_value(&snapshot).unwrap();
+        assert_eq!(value["gr"], 31);
+        snapshot.ground_decal_revision = 0;
+        let value = compact_snapshot_value(&snapshot).unwrap();
+        assert!(value.get("gr").is_none());
     }
 }

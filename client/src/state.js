@@ -315,14 +315,6 @@ export class GameState extends VisualEffectBackedState {
     this._curById = new Map();
     for (const e of entities) this._curById.set(e.id, e);
     this.visualEffects.pruneRecoilForSnapshot(this._curById);
-    this.groundDecals.applySnapshotEvents(events, {
-      prevById: this._prevById,
-      curById: this._curById,
-      players: this.players,
-      tick: msg.tick,
-      tileSize: this.map?.tileSize,
-    });
-
     this.resources = {
       steel: msg.steel | 0,
       oil: msg.oil | 0,
@@ -355,6 +347,21 @@ export class GameState extends VisualEffectBackedState {
   setObserverView(observerView = null) {
     this.observerView =
       observerView && typeof observerView === "object" ? { ...observerView } : null;
+  }
+
+  applyAuthoritativeGroundDecals(message) {
+    return this.groundDecals.applyAuthoritativeBatch(message, {
+      players: this.players,
+      tileSize: this.map?.tileSize,
+    });
+  }
+
+  resetAuthoritativeGroundDecals() {
+    this.groundDecals.clear();
+  }
+
+  requeueAuthoritativeGroundDecals() {
+    return this.groundDecals.requeueAuthoritative();
   }
 
   consumePendingGroundDecals() {

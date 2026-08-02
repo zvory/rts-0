@@ -26,6 +26,7 @@ pub mod entity;
 mod entrenchment_combat;
 mod firing_reveal;
 pub(crate) mod fog;
+mod ground_decal;
 mod hero_abilities;
 mod invariants;
 pub mod lab;
@@ -58,9 +59,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::config;
 use crate::protocol::{
-    AutoBuildSettingsSnapshot, Event, MapInfo, PlayerResourceSnapshot, PlayerScore, PlayerStart,
-    RememberedBuildingView, ResourceDelta, ResourceNode, Snapshot, StartPayload,
-    DEFAULT_FACTION_ID,
+    AutoBuildSettingsSnapshot, Event, GroundDecalView, MapInfo, PlayerResourceSnapshot,
+    PlayerScore, PlayerStart, RememberedBuildingView, ResourceDelta, ResourceNode, Snapshot,
+    StartPayload, DEFAULT_FACTION_ID,
 };
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
@@ -268,6 +269,7 @@ impl Game {
             &mut self.state.firing_reveals,
             &mut self.state.smokes,
             &mut self.state.trenches,
+            &mut self.state.ground_decals,
             &mut self.state.ability_runtime,
             &mut self.state.mortar_shells,
             &mut self.state.artillery_shells,
@@ -316,6 +318,35 @@ impl Game {
 
     pub fn current_tick(&self) -> u32 {
         self.state.tick
+    }
+
+    /// Fog-safe durable ground marks learned by one ordinary player after a prior cursor.
+    pub fn ground_decals_for_player(
+        &self,
+        player: u32,
+        after_revision: u32,
+    ) -> (u32, Vec<GroundDecalView>) {
+        self.state
+            .ground_decals
+            .views_for_players_after(&[player], after_revision)
+    }
+
+    /// Durable ground marks scoped to an observer's selected perspective.
+    pub fn ground_decals_for_observer(
+        &self,
+        view: &ObserverView,
+        after_revision: u32,
+    ) -> (u32, Vec<GroundDecalView>) {
+        match view {
+            ObserverView::Omniscient => self
+                .state
+                .ground_decals
+                .full_world_views_after(after_revision),
+            ObserverView::Players(players) => self
+                .state
+                .ground_decals
+                .views_for_players_after(players, after_revision),
+        }
     }
 
     /// Ordinary retreat commands for AI-owned workers hit on the previous tick.
@@ -588,12 +619,22 @@ impl Game {
         self.refresh_building_memory(player_ids);
         self.refresh_anti_tank_gun_memory(player_ids);
         self.refresh_trench_memory(player_ids);
+        self.refresh_ground_decal_memory(player_ids);
     }
 
     pub(in crate::game) fn refresh_trench_memory(&mut self, player_ids: &[u32]) {
         for &player in player_ids {
             let fog = self.team_current_fog_for(player, &self.state.fog);
             self.state.trenches.refresh_memory_for_player(player, &fog);
+        }
+    }
+
+    fn refresh_ground_decal_memory(&mut self, player_ids: &[u32]) {
+        for &player in player_ids {
+            let fog = self.team_current_fog_for(player, &self.state.fog);
+            self.state
+                .ground_decals
+                .refresh_memory_for_player(player, &fog);
         }
     }
 

@@ -182,10 +182,13 @@ export function installFakePixi() {
       this.resource = resource;
       this.options = options;
       this.updateCount = 0;
+      this.sourceUpdateCount = 0;
+      this.textureUpdateCount = 0;
       this.destroyed = false;
       this.source = {
         update: () => {
           this.updateCount += 1;
+          this.sourceUpdateCount += 1;
         },
         destroy: () => {
           this.textureSourceDestroyed = true;
@@ -194,6 +197,7 @@ export function installFakePixi() {
     }
     update() {
       this.updateCount += 1;
+      this.textureUpdateCount += 1;
     }
     destroy(options) {
       this.destroyed = true;

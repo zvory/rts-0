@@ -1,5 +1,4 @@
 import { ARTILLERY_OUTER_RADIUS_TILES, STATS } from "./config.js";
-import { EVENT, KIND, isBuilding } from "./protocol.js";
 
 export const GROUND_DECAL_CLASS = Object.freeze({
   NONE: "none",
@@ -10,79 +9,37 @@ export const GROUND_DECAL_CLASS = Object.freeze({
   ARTILLERY_BLAST: "artilleryBlast",
 });
 
-const INFANTRY_DECAL_KINDS = new Set([
-  KIND.WORKER,
-  KIND.RIFLEMAN,
-  KIND.PANZERFAUST,
-  KIND.MACHINE_GUNNER,
-  KIND.MORTAR_TEAM,
-  KIND.EKAT,
-]);
-
-const SCORCH_DECAL_KINDS = new Set([
-  KIND.SCOUT_CAR,
-  KIND.TANK,
-  KIND.COMMAND_CAR,
-  KIND.ANTI_TANK_GUN,
-  KIND.ARTILLERY,
-]);
-
 const TWO_PI = Math.PI * 2;
 const NEUTRAL_DECAL_COLOR = "#9aa0a8";
 const DEFAULT_TILE_SIZE = 32;
-const MAX_TRACKED_IMPACT_KEYS = 4096;
-
-export function groundDecalClassForKind(kind) {
-  if (INFANTRY_DECAL_KINDS.has(kind)) return GROUND_DECAL_CLASS.INFANTRY;
-  if (SCORCH_DECAL_KINDS.has(kind)) return GROUND_DECAL_CLASS.SCORCH;
-  if (isBuilding(kind)) return GROUND_DECAL_CLASS.BUILDING_SCORCH;
-  return GROUND_DECAL_CLASS.NONE;
-}
-
-export function groundDecalClassForImpactEvent(eventKind) {
-  if (eventKind === EVENT.MORTAR_IMPACT) return GROUND_DECAL_CLASS.MORTAR_BLAST;
-  if (eventKind === EVENT.ARTILLERY_IMPACT) return GROUND_DECAL_CLASS.ARTILLERY_BLAST;
-  return GROUND_DECAL_CLASS.NONE;
-}
+const AUTHORITATIVE_DECAL_CLASSES = new Set(Object.values(GROUND_DECAL_CLASS));
 
 export class GroundDecalBuffer {
   constructor() {
-    this.paintedDeathIds = new Set();
-    this.paintedImpactKeys = new Set();
-    this._paintedImpactKeyOrder = [];
     this._pending = [];
     this._reconciled = null;
     this._reconciledRevision = 0;
     this._nextRevision = 1;
+    this.authoritativeRevision = 0;
+    this.authoritativeDecals = new Map();
   }
 
-  applySnapshotEvents(events, context = {}) {
-    if (!Array.isArray(events) || events.length === 0) return 0;
+  applyAuthoritativeBatch({ revision, decals } = {}, context = {}) {
+    if (!Number.isInteger(revision) || revision < 0 || revision > 0xffffffff) {
+      return { accepted: false, queued: 0 };
+    }
+    if (revision < this.authoritativeRevision) return { accepted: false, queued: 0 };
+
     let queued = 0;
-    for (let eventIndex = 0; eventIndex < events.length; eventIndex += 1) {
-      const ev = events[eventIndex];
-      if (!ev) continue;
-
-      if (ev.e === EVENT.DEATH && typeof ev.id === "number") {
-        if (this.paintedDeathIds.has(ev.id)) continue;
-        const decal = normalizeGroundDecalEvent(ev, { ...context, eventIndex });
-        if (!decal) continue;
-        this.paintedDeathIds.add(ev.id);
-        this._pending.push(decal);
-        queued += 1;
-        continue;
-      }
-
-      if (groundDecalClassForImpactEvent(ev.e) === GROUND_DECAL_CLASS.NONE) continue;
-      const impactKey = groundImpactKey(ev, context.tick, eventIndex);
-      if (this.paintedImpactKeys.has(impactKey)) continue;
-      const decal = normalizeGroundDecalEvent(ev, { ...context, eventIndex });
-      if (!decal) continue;
-      this._markImpactPainted(impactKey);
+    for (const record of Array.isArray(decals) ? decals : []) {
+      const decal = normalizeAuthoritativeGroundDecal(record, context);
+      if (!decal || this.authoritativeDecals.has(decal.id)) continue;
+      this.authoritativeDecals.set(decal.id, decal);
       this._pending.push(decal);
       queued += 1;
     }
-    return queued;
+    this.authoritativeRevision = revision;
+    return { accepted: true, queued };
   }
 
   consumePending() {
@@ -126,139 +83,74 @@ export class GroundDecalBuffer {
   }
 
   clear() {
-    this.paintedDeathIds.clear();
-    this.paintedImpactKeys.clear();
-    this._paintedImpactKeyOrder = [];
     this._pending = [];
     this._reconciled = null;
     this._reconciledRevision = 0;
     this._nextRevision = 1;
+    this.authoritativeRevision = 0;
+    this.authoritativeDecals.clear();
   }
 
-  _markImpactPainted(key) {
-    this.paintedImpactKeys.add(key);
-    this._paintedImpactKeyOrder.push(key);
-    while (this._paintedImpactKeyOrder.length > MAX_TRACKED_IMPACT_KEYS) {
-      const oldest = this._paintedImpactKeyOrder.shift();
-      if (oldest != null) this.paintedImpactKeys.delete(oldest);
-    }
+  requeueAuthoritative() {
+    this._pending = [...this.authoritativeDecals.values()];
+    this._reconciled = null;
+    this._reconciledRevision = 0;
+    return this._pending.length;
   }
+
 }
 
-export function normalizeGroundDecalEvent(ev, {
-  prevById = null,
-  curById = null,
+export function normalizeAuthoritativeGroundDecal(record, {
   players = [],
-  tick = 0,
-  eventIndex = 0,
   tileSize = DEFAULT_TILE_SIZE,
 } = {}) {
-  if (!ev) return null;
-  if (ev.e === EVENT.MORTAR_IMPACT || ev.e === EVENT.ARTILLERY_IMPACT) {
-    return normalizeGroundImpactDecalEvent(ev, { tick, eventIndex, tileSize });
-  }
-  if (ev.e !== EVENT.DEATH || typeof ev.id !== "number") return null;
-  if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return null;
-  const decalClass = groundDecalClassForKind(ev.kind);
+  if (!record || !Number.isSafeInteger(record.id) || record.id < 0) return null;
+  if (!Number.isFinite(record.x) || !Number.isFinite(record.y)) return null;
+  const decalClass = AUTHORITATIVE_DECAL_CLASSES.has(record.decalClass)
+    && record.decalClass !== GROUND_DECAL_CLASS.NONE
+    ? record.decalClass
+    : GROUND_DECAL_CLASS.NONE;
   if (decalClass === GROUND_DECAL_CLASS.NONE) return null;
 
-  const seed = groundDecalSeed(ev, tick);
-  const source = lookupEntity(prevById, ev.id) || lookupEntity(curById, ev.id);
-  const owner = Number.isFinite(source?.owner) ? source.owner : 0;
+  const kind = typeof record.sourceKind === "string" ? record.sourceKind : record.kind;
+  if (typeof kind !== "string" || kind.length === 0) return null;
+  const seed = Number.isInteger(record.seed) ? record.seed >>> 0 : record.id >>> 0;
+  const owner = Number.isInteger(record.owner) && record.owner >= 0 ? record.owner : 0;
   const fallbackFacing = angleFromSeed(seed);
-  const facing = normalizeAngle(
-    Number.isFinite(source?.facing)
-      ? source.facing
-      : Number.isFinite(source?.weaponFacing)
-        ? source.weaponFacing
-        : fallbackFacing,
-  );
+  const facing = normalizeAngle(Number.isFinite(record.facing) ? record.facing : fallbackFacing);
   const weaponFacing = normalizeAngle(
-    Number.isFinite(source?.weaponFacing) ? source.weaponFacing : facing,
+    Number.isFinite(record.weaponFacing) ? record.weaponFacing : facing,
   );
+  const safeTileSize = Number.isFinite(tileSize) && tileSize > 0 ? tileSize : DEFAULT_TILE_SIZE;
+  const radiusTiles = Number.isFinite(record.radiusTiles) && record.radiusTiles > 0
+    ? record.radiusTiles
+    : decalClass === GROUND_DECAL_CLASS.MORTAR_BLAST
+      ? 1.5
+      : decalClass === GROUND_DECAL_CLASS.ARTILLERY_BLAST
+        ? ARTILLERY_OUTER_RADIUS_TILES
+        : null;
   const footprint = decalClass === GROUND_DECAL_CLASS.BUILDING_SCORCH
-    ? buildingFootprintPixels(ev.kind, tileSize)
+    ? buildingFootprintPixels(kind, safeTileSize)
     : null;
 
   return {
-    id: ev.id,
-    kind: ev.kind,
+    id: record.id,
+    kind,
     decalClass,
-    x: ev.x,
-    y: ev.y,
+    x: record.x,
+    y: record.y,
     owner,
     color: playerColor(players, owner),
     facing,
     weaponFacing,
     seed,
     variant: seed % 4,
+    ...(radiusTiles == null ? {} : {
+      radiusTiles,
+      radiusWorld: radiusTiles * safeTileSize,
+    }),
     ...(footprint || {}),
   };
-}
-
-function normalizeGroundImpactDecalEvent(ev, { tick, eventIndex, tileSize }) {
-  if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return null;
-  const decalClass = groundDecalClassForImpactEvent(ev.e);
-  if (decalClass === GROUND_DECAL_CLASS.NONE) return null;
-  const kind = decalClass === GROUND_DECAL_CLASS.MORTAR_BLAST
-    ? KIND.MORTAR_TEAM
-    : KIND.ARTILLERY;
-  const seed = groundImpactDecalSeed(ev, tick, eventIndex, kind);
-  const fallbackRadiusTiles = decalClass === GROUND_DECAL_CLASS.MORTAR_BLAST
-    ? 1.5
-    : ARTILLERY_OUTER_RADIUS_TILES;
-  const radiusTiles = Number.isFinite(ev.radiusTiles) && ev.radiusTiles > 0
-    ? ev.radiusTiles
-    : fallbackRadiusTiles;
-  const safeTileSize = Number.isFinite(tileSize) && tileSize > 0 ? tileSize : DEFAULT_TILE_SIZE;
-
-  return {
-    id: seed,
-    kind,
-    decalClass,
-    x: ev.x,
-    y: ev.y,
-    radiusTiles,
-    radiusWorld: radiusTiles * safeTileSize,
-    owner: 0,
-    color: NEUTRAL_DECAL_COLOR,
-    seed,
-    variant: seed % 4,
-  };
-}
-
-export function groundDecalSeed(ev, tick = 0) {
-  const qx = Math.round((Number.isFinite(ev?.x) ? ev.x : 0) * 4);
-  const qy = Math.round((Number.isFinite(ev?.y) ? ev.y : 0) * 4);
-  let hash = 0x811c9dc5;
-  hash = hashMix(hash, ev?.id ?? 0);
-  hash = hashMix(hash, tick ?? 0);
-  hash = hashMix(hash, qx);
-  hash = hashMix(hash, qy);
-  const kind = String(ev?.kind || "");
-  for (let i = 0; i < kind.length; i += 1) hash = hashMix(hash, kind.charCodeAt(i));
-  return hash >>> 0;
-}
-
-export function groundImpactDecalSeed(ev, tick = 0, eventIndex = 0, kind = "") {
-  return groundDecalSeed({
-    ...ev,
-    id: Number.isInteger(eventIndex) ? eventIndex : 0,
-    kind,
-  }, tick);
-}
-
-function groundImpactKey(ev, tick = 0, eventIndex = 0) {
-  const safeTick = Number.isFinite(tick) ? Math.max(0, Math.trunc(tick)) : 0;
-  const safeIndex = Number.isInteger(eventIndex) ? eventIndex : 0;
-  const qx = Math.round((Number.isFinite(ev?.x) ? ev.x : 0) * 4);
-  const qy = Math.round((Number.isFinite(ev?.y) ? ev.y : 0) * 4);
-  const radius = Math.round((Number.isFinite(ev?.radiusTiles) ? ev.radiusTiles : 0) * 1024);
-  return `${safeTick}:${safeIndex}:${ev?.e || ""}:${qx}:${qy}:${radius}`;
-}
-
-function lookupEntity(map, id) {
-  return map && typeof map.get === "function" ? map.get(id) : null;
 }
 
 function playerColor(players, owner) {
@@ -286,16 +178,4 @@ function normalizeAngle(angle) {
   let out = (angle + Math.PI) % TWO_PI;
   if (out < 0) out += TWO_PI;
   return out - Math.PI;
-}
-
-function hashMix(hash, value) {
-  let v = Number.isFinite(value) ? value | 0 : 0;
-  hash ^= v & 0xff;
-  hash = Math.imul(hash, 0x01000193);
-  hash ^= (v >>> 8) & 0xff;
-  hash = Math.imul(hash, 0x01000193);
-  hash ^= (v >>> 16) & 0xff;
-  hash = Math.imul(hash, 0x01000193);
-  hash ^= (v >>> 24) & 0xff;
-  return Math.imul(hash, 0x01000193);
 }

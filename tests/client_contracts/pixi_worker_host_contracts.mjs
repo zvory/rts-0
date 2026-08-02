@@ -178,6 +178,44 @@ async function generationAndFatalContracts() {
   postFailureFixture.adapter.destroy();
 }
 
+async function decalResetContracts() {
+  const fixture = createFixture();
+  const { adapter, worker, assembler } = fixture;
+  const oldFrame = assemble(assembler, 1, {
+    groundDecalRevision: 5,
+    groundDecals: [{ id: 5, kind: "rifleman", x: 16, y: 16, seed: 5 }],
+  });
+  const oldSubmission = adapter.render(oldFrame);
+  const oldDurable = worker.messages.find((message) => message.type === "durableDecals");
+  assert(oldDurable?.payload.decalEpoch === 0 && oldDurable.payload.revision === 5,
+    "the initial durable update belongs to the initial decal epoch");
+
+  adapter.resetGroundDecals();
+  const reset = worker.messages.find((message) => message.type === "resetGroundDecals");
+  assert(reset?.payload.decalEpoch === 1
+      && !worker.messages.some((message) => message.type === "resetGeneration"),
+    "a viewpoint change resets only the decal layer without changing presentation generations");
+  worker.emit(response(RENDER_WORKER_RESPONSE.RETAINED, 1, { revision: 5, decalEpoch: 0 }));
+  assert(adapter._retainedDecalRevision === 0,
+    "a late durable acknowledgment from the old decal epoch cannot revive its retention watermark");
+  worker.present(oldFrame);
+  await oldSubmission.settled;
+
+  const replacement = assemble(assembler, 2, {
+    groundDecalRevision: 1,
+    groundDecals: [{ id: 9, kind: "rifleman", x: 48, y: 48, seed: 9 }],
+  });
+  const replacementSubmission = adapter.render(replacement);
+  const replacementDurable = worker.messages.filter((message) => message.type === "durableDecals").at(-1);
+  assert(replacementDurable?.payload.decalEpoch === 1 && replacementDurable.payload.revision === 1,
+    "the replacement viewpoint can retain a lower authoritative decal revision in its new epoch");
+  worker.emit(response(RENDER_WORKER_RESPONSE.RETAINED, 1, { revision: 1, decalEpoch: 1 }));
+  worker.present(replacement);
+  assert((await replacementSubmission.settled).status === PRESENTATION_OUTCOME.PRESENTED,
+    "decal-only repair leaves the ordinary frame lifecycle intact");
+  adapter.destroy();
+}
+
 async function editorFatalContracts() {
   const fixture = createFixture({ surface: "mapEditor" });
   const { adapter } = fixture;
@@ -272,7 +310,7 @@ function createFixture({ surface = "match" } = {}) {
   return { adapter, worker, canvas, root, assembler, map, incidents };
 }
 
-function assemble(assembler, tick) {
+function assemble(assembler, tick, { groundDecalRevision = 0, groundDecals = [] } = {}) {
   const camera = new Camera(640, 480);
   camera.setBounds(64, 64, 640, 480);
   return assembler.assemble({
@@ -284,6 +322,8 @@ function assemble(assembler, tick) {
       visibleRevision: tick,
       exploredRevision: tick,
     },
+    groundDecalRevision,
+    groundDecals,
     sourceTick: tick,
     visualTimeMs: tick * 16,
   });
@@ -334,6 +374,7 @@ async function assertRejects(promise, message) {
 try {
   await queueAndLifecycleContracts();
   await generationAndFatalContracts();
+  await decalResetContracts();
   await editorFatalContracts();
   await measurementBoundaryContracts();
 } finally {

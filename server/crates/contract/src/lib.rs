@@ -505,6 +505,9 @@ pub struct PlayerScore {
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub tick: u32,
+    /// Recipient-scoped cursor for reliable, request-driven ground decal reconciliation.
+    #[serde(default)]
+    pub ground_decal_revision: u32,
     /// Coarse world combat area shared identically with every recipient for directional ambience.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub world_combat_position: Option<[f32; 2]>,
@@ -629,6 +632,26 @@ pub struct TrenchView {
     pub x: f32,
     pub y: f32,
     pub radius_tiles: f32,
+}
+
+/// One durable authoritative ground mark. Visual randomness is fixed by `seed`, so clients can
+/// rebuild the same decal texture after reconnects and replay seeks.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GroundDecalView {
+    pub id: u32,
+    pub decal_class: String,
+    pub source_kind: String,
+    pub x: f32,
+    pub y: f32,
+    pub owner: u32,
+    pub seed: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub facing: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weapon_facing: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radius_tiles: Option<f32>,
 }
 
 /// Server-side transport and scheduling health attached to every snapshot.

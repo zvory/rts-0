@@ -96,6 +96,8 @@ fn empty_live_room_clears_lifecycle_bookkeeping_and_drain_tracking() {
     assert_eq!(task.match_human_count, 1);
     assert!(!task.match_map_name.is_empty());
     assert_eq!(task.match_participants, vec!["Player 1".to_string()]);
+    task.ground_decal_request_times
+        .insert(1, std::time::Instant::now());
 
     task.on_leave(1);
 
@@ -110,6 +112,7 @@ fn empty_live_room_clears_lifecycle_bookkeeping_and_drain_tracking() {
     assert!(task.match_run_id.is_none());
     assert!(task.match_map_name.is_empty());
     assert!(task.match_participants.is_empty());
+    assert!(task.ground_decal_request_times.is_empty());
 }
 
 #[test]
@@ -259,6 +262,8 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
         players[0].id,
         rts_sim::game::ObserverView::Players(vec![players[0].id]),
     );
+    task.ground_decal_request_times
+        .insert(players[0].id, std::time::Instant::now());
 
     task.players
         .get(&players[0].id)
@@ -282,6 +287,7 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
         task.observer_view_selection_for(players[0].id),
         VisionSelectionRequest::All
     );
+    assert!(task.ground_decal_request_times.is_empty());
     assert!(writer_a.snapshots.take().is_none());
     assert!(writer_b.snapshots.take().is_none());
 

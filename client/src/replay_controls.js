@@ -15,6 +15,7 @@ export class RoomTimeControls {
     capabilities = null,
     label = null,
     initialVisionSelection = null,
+    onVisionSelectionChange = null,
   }) {
     this.net = net;
     this.state = state;
@@ -24,6 +25,7 @@ export class RoomTimeControls {
     this.visibility = this.capabilities.visibility || {};
     this.actions = this.capabilities.actions || {};
     this.label = label || (this.replayViewer ? "Replay" : "Room time");
+    this.onVisionSelectionChange = onVisionSelectionChange;
     this.visionSelection = visionSelectionIds(initialVisionSelection, this.state?.players);
     this.omniscientVision = initialVisionSelection?.mode === VISION_SELECTION.OMNISCIENT;
     this.state?.setObserverView?.(this.visionSelectionRequest());
@@ -663,6 +665,7 @@ export class RoomTimeControls {
   sendVisionSelection() {
     const selection = this.visionSelectionRequest();
     this.state?.setObserverView?.(selection);
+    this.onVisionSelectionChange?.(selection);
     this.net.setVisionSelection(selection);
   }
 

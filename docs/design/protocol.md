@@ -86,6 +86,7 @@ lobby/config dump replaces the source scrape.
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs notable reports for diagnostics only; it never affects simulation state. |
 | `activity` | — | Throttled notice that the connected browser received human pointer, keyboard, wheel, or foregrounding input. It extends the server's player-inactivity deadline but does not mutate room state. Automatic heartbeat and diagnostics traffic never sends this message. |
+| `requestGroundDecals` | `requestId: u32`, `afterRevision: u32` | Request reliable durable ground marks learned after this recipient-scoped cursor. `requestId` is nonzero and echoed by the response so clients can reject replies from an earlier seek or vision perspective. Accepted only during an active live/replay simulation and rate-limited to one response per connection per 500 ms. |
 | `setRoomTimeSpeed` | `speed: f32` | Set the room-controlled time speed where the current room-time capability profile allows speed control. `0` pauses replay playback, speed-only live-game rooms, dev scenario watch rooms, and lab rooms; other accepted speeds are clamped. Ignored in fixed-realtime rooms. |
 | `stepRoomTime` | — | Advance room-controlled time by one authoritative simulation tick where the current room clock capability allows stepping. Currently accepted only in paused dev scenario watch rooms and paused lab rooms. |
 | `seekRoomTime` | `ticksBack: u32` | Rewind room-controlled time by N simulation ticks where the current room clock capability allows relative seek; pass a large value (e.g. `2^31-1`) to reset to tick 0. Currently accepted in replay and lab rooms. |
@@ -383,6 +384,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `matchCountdown` | `countdownId: u32`, `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. Active human clients begin warming their renderer when they become ready, then acknowledge this exact nonzero countdown generation with `matchLoadReady` once warmup completes. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, and rejects new joins. At expiry it sends `start` only if every active human acknowledged; otherwise it returns the room to editable lobby state and broadcasts `<name> failed to load the game.` Spectators and AI do not block launch. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
+| `groundDecals` | `requestId: u32`, `revision: u32`, `decals: GroundDecalView[]` — reliable fog/observer-scoped delta response. `requestId` echoes the request so stale pre-seek or pre-view-change responses cannot enter the current cache. Each row carries `id`, `decalClass`, `sourceKind`, `x`, `y`, `owner`, `seed`, and optional `facing`, `weaponFacing`, or `radiusTiles`. |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
 | `roomTimeSeekStarted` | `controllerId: u32`, `fromTick: u32`, `targetTick: u32` — reliable broadcast to every replay viewer immediately before an accepted shared replay seek resets timeline-derived presentation and begins incremental fast-forward. Rejected and rate-limited seeks do not emit it. |
 | `livePauseState` | `Live match pause state` (see 2.6). |
@@ -667,6 +669,7 @@ transport decode:
 {
   t: "snapshot",
   tick: u32,
+  groundDecalRevision: u32,      // recipient-scoped durable-ground-mark discovery cursor
   worldCombatPosition?: [f32, f32], // coarse global combat area; omitted when inactive
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
@@ -704,6 +707,17 @@ resource vectors are deferred to a separate generic-resource migration. Selected
 include `playerResources` rows only for the explicitly selected real player ids; omniscient views
 expose all active player rows. Each row carries that owner's completed research so multi-player
 observer views do not depend on the single-recipient top-level `upgrades` field.
+
+Durable death, mortar-impact, and artillery-impact decals live in an authoritative append-only
+store capped at 4,096 rows per match. A mark becomes known to a player only when its point or blast
+footprint is physically visible in that player's current team fog; firing ownership and transient
+event delivery do not by themselves reveal an impact hidden in fog. `groundDecalRevision` is the
+latest discovery revision for the projected player union (or the global cursor for omniscient
+views). Clients compare it with their cache and send `requestGroundDecals`; the reliable response
+contains only marks first discovered after `afterRevision`, or marks created after that cursor for
+omniscient views. Full requests from zero repair late joins, reconnects, seeks, and view changes.
+The client cache is an optimization: checkpointed server rows and discovery revisions are the
+authority.
 
 For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
 server-authoritative union of current fog grids contributed by living teammates on the recipient's
@@ -781,7 +795,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 48. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 49. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -807,7 +821,8 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 48,
+  "v": 49,
+  "gr": groundDecalRevision, // omitted when zero
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "ab": [paused, reserveSteel, reserveOil], // omitted when no real player is projected
   "e": [
@@ -862,7 +877,7 @@ compatibility internals.
 
 | Value/path | Rust owner | JS mirror path | Category | Current checker | Proposed future checker | Client-only exclusion reason | Compact version impact |
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|
-| `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, HTTP lab setup catalog endpoint, HTTP map handoff endpoints, lobby/replay/branch message tags and fields | `server/crates/protocol/src/lib.rs`; lobby/lab catalog/map-handoff HTTP route handlers in `server/src/main.rs` and `server/src/map_handoffs.rs`; lab catalog source of truth in `server/src/lab_scenarios.rs`; room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; `client/src/lab_catalog.js` consumes the HTTP lab catalog; `client/src/map_editor_handoff.js` consumes the map handoff API; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire/HTTP DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary, create-lobby behavior, lab catalog loading, and map handoff binding | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | Lab catalog rows and map handoff records are HTTP metadata, not mirrored through `protocol.js`; their app-owned clients validate response shapes | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
+| `ClientMessage`, `ServerMessage`, `Command`, HTTP lobby browser/create endpoints, HTTP lab setup catalog endpoint, HTTP map handoff endpoints, lobby/replay/branch message tags and fields | `server/crates/protocol/src/client_message.rs`, `server/crates/protocol/src/server_message.rs`, and `server/crates/protocol/src/lib.rs`; lobby/lab catalog/map-handoff HTTP route handlers in `server/src/main.rs` and `server/src/map_handoffs.rs`; lab catalog source of truth in `server/src/lab_scenarios.rs`; room-task summaries in `server/src/lobby/**` | `client/src/protocol.js` `C`, `S`, `CMD`, `msg.*`, `decodeServerMessage`; `client/src/lab_catalog.js` consumes the HTTP lab catalog; `client/src/map_editor_handoff.js` consumes the map handoff API; future internal `client/src/protocol_*.js` or `client/src/protocol/**` files must re-export through `client/src/protocol.js` | wire/HTTP DTO | `tests/protocol_parity.mjs` compares the structured Rust protocol contract dump to JS tags/builders/decoder and asserts stable JS public exports; serde compile/tests plus `rts-protocol` public-surface integration coverage guard Rust export names; focused server tests cover lobby summary, create-lobby behavior, lab catalog loading, and map handoff binding | Remaining source-text checks for DTO/lobby assertions outside the current dump scope | Lab catalog rows and map handoff records are HTTP metadata, not mirrored through `protocol.js`; their app-owned clients validate response shapes | No compact bump unless a compact snapshot slot/code changes; normal JSON message changes still require Rust, JS, and docs together |
 | Semantic start/snapshot/replay/analysis DTOs | `server/crates/contract/src/lib.rs`, re-exported by `server/crates/protocol/src/lib.rs` | `client/src/protocol.js` decoder output consumed by client modules | wire DTO | `tests/protocol_parity.mjs` fixture decodes selected compact fields; Rust serde tests cover local serialization | Structured contract/schema dump for semantic DTO fields plus compact round-trip fixtures | None; JS is a protocol mirror | Compact bump only when the live compact representation changes |
 | `terrain` codes | `server/crates/protocol/src/contract_metadata.rs` `terrain`, re-exported by `lib.rs`; adapter test checks rules terrain constants | `client/src/protocol_constants.js` `TERRAIN` and `PASSABLE`, re-exported by `client/src/protocol.js` | wire DTO / compact transport code | `tests/protocol_parity.mjs` extracts Rust terrain codes | Structured protocol constants dump | None | No compact snapshot bump today; terrain is in the `start.map.terrain` payload, not the compact snapshot frame |
 | `kinds` strings, `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS` | `server/crates/protocol/src/contract_metadata.rs` `kinds`, re-exported by `lib.rs`; domain identity is `rts-rules::EntityKind::stable_id()` | `client/src/protocol_constants.js` `KIND`, `UNIT_KINDS`, `BUILDING_KINDS`, `RESOURCE_KINDS`, re-exported by `client/src/protocol.js` | wire DTO plus domain adapter grouping | `tests/protocol_parity.mjs` checks kind code mapping; adapter tests round-trip every `EntityKind`; catalog parity checks many kind references | Structured protocol constants dump plus catalog export that classifies unit/building/resource groups | None | Bump only if compact kind codes or compact slots change; append-only codes otherwise |

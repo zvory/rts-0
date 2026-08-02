@@ -478,6 +478,5 @@ function colorCss(color, alpha = 1) {
 }
 
 function updateTexture(texture) {
-  if (typeof texture?.update === "function") texture.update();
-  else texture?.source?.update?.();
+  texture?.source?.update?.();
 }

@@ -1504,6 +1504,21 @@ async fn handle_client_message(
             };
             send_room_event(player_id, current_room, event).await;
         }
+        ClientMessage::RequestGroundDecals {
+            request_id,
+            after_revision,
+        } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::RequestGroundDecals {
+                    player_id,
+                    request_id,
+                    after_revision,
+                },
+            )
+            .await;
+        }
         ClientMessage::Lab { request_id, op } => {
             send_room_event(
                 player_id,

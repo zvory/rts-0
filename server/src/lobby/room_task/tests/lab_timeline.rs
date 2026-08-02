@@ -1027,6 +1027,12 @@ fn lab_timeline_resets_on_scenario_import() {
                 if result.ok && result.request_id == 43 && result.op == "importScenario"
         )
     }));
+    assert!(
+        !messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::Start(_))),
+        "scenario import repairs the existing match instead of resetting its snapshot sequence"
+    );
     assert!(messages.iter().any(|msg| {
         matches!(
             msg,

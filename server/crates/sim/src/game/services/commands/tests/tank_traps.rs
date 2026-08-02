@@ -84,6 +84,7 @@ fn tank_trap_cluster_attack_captures_visible_traps_inside_four_tiles() {
     let mut players = vec![player_state(1), player_state(2)];
     let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
     let mut lingering_sight = Vec::new();
+    let mut ground_decals = crate::game::ground_decal::GroundDecalStore::new();
     crate::game::services::death::death_system(
         &mut entities,
         &fog,
@@ -91,6 +92,7 @@ fn tank_trap_cluster_attack_captures_visible_traps_inside_four_tiles() {
         &teams,
         &mut players,
         &mut lingering_sight,
+        &mut ground_decals,
         &mut events,
         1,
     );

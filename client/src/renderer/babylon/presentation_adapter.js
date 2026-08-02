@@ -116,6 +116,7 @@ export class BabylonPresentationAdapter {
 
   enterFixedCapture() {}
   exitFixedCapture() {}
+  resetGroundDecals() {}
 
   destroy() {
     if (this._destroyed) return;

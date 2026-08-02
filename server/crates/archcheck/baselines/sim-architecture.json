@@ -1,5 +1,5 @@
 {
-  "reason": "Move tree-detour coverage into a test-only module",
+  "reason": "Merge doodad pathing with checkpointed ground decals",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -63,7 +63,7 @@
     },
     {
       "path": "checkpoint/mod.rs",
-      "lines": 493
+      "lines": 508
     },
     {
       "path": "checkpoint/player_dto.rs",
@@ -190,6 +190,10 @@
       "lines": 273
     },
     {
+      "path": "ground_decal.rs",
+      "lines": 570
+    },
+    {
       "path": "hero_abilities.rs",
       "lines": 125
     },
@@ -267,7 +271,7 @@
     },
     {
       "path": "mod.rs",
-      "lines": 708
+      "lines": 749
     },
     {
       "path": "mortar.rs",
@@ -2157,6 +2161,10 @@
     {
       "path": "fog/presentation.rs",
       "count": 1
+    },
+    {
+      "path": "ground_decal.rs",
+      "count": 12
     },
     {
       "path": "hero_abilities.rs",
