@@ -85,6 +85,51 @@ fn snapshot() -> Snapshot {
     }
 }
 
+fn construction_view(id: u32, owner: u32, fraction: f32, active: bool) -> EntityView {
+    let mut entity = EntityView::new(id, owner, "barracks", 200.0, 200.0, 100, 500, "construct");
+    entity.build_progress = Some(fraction);
+    entity.build_active = active;
+    entity
+}
+
+fn production_view(id: u32, owner: u32, fraction: f32) -> EntityView {
+    let mut entity = EntityView::new(id, owner, "city_centre", 300.0, 300.0, 1000, 1000, "idle");
+    entity.prod_kind = Some("worker".to_string());
+    entity.prod_progress = Some(fraction);
+    entity.prod_queue = Some(1);
+    entity
+}
+
+fn research_view(id: u32, owner: u32, fraction: f32) -> EntityView {
+    let mut entity = EntityView::new(
+        id,
+        owner,
+        "research_complex",
+        400.0,
+        400.0,
+        500,
+        500,
+        "idle",
+    );
+    entity.prod_upgrade = Some("tank_unlock".to_string());
+    entity.prod_progress = Some(fraction);
+    entity.prod_queue = Some(1);
+    entity
+}
+
+fn with_entities(extra: Vec<EntityView>) -> Snapshot {
+    let mut snapshot = snapshot();
+    snapshot.entities.extend(extra);
+    snapshot
+}
+
+fn approx_eq(actual: f32, expected: f32) {
+    assert!(
+        (actual - expected).abs() < 0.000_01,
+        "expected {expected}, got {actual}"
+    );
+}
+
 #[test]
 fn baseline_from_snapshot_is_owner_safe() {
     let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
@@ -106,12 +151,237 @@ fn baseline_from_snapshot_is_owner_safe() {
 }
 
 #[test]
+fn progress_baseline_is_exact_owner_only_and_contains_only_safe_fields() {
+    let authoritative = with_entities(vec![
+        construction_view(401, 1, 0.25, true),
+        construction_view(402, 2, 0.4, true),
+        production_view(403, 3, 0.5),
+    ]);
+    let baseline = OwnedPredictionBaseline::from_snapshot(1, &authoritative);
+
+    assert_eq!(baseline.progress.len(), 1);
+    assert_eq!(baseline.progress[0].id, 401);
+    assert_eq!(
+        serde_json::to_value(&baseline.progress[0]).unwrap(),
+        serde_json::json!({
+            "id": 401,
+            "kind": "construction",
+            "identity": "build:barracks",
+            "fraction": 0.25,
+            "totalTicks": balance::building_stats(EntityKind::Barracks).unwrap().build_ticks
+        })
+    );
+    let serialized = serde_json::to_string(&baseline.progress).unwrap();
+    assert!(!serialized.contains("402"));
+    assert!(!serialized.contains("403"));
+    assert!(!serialized.contains("owner"));
+    assert!(!serialized.contains("hp"));
+    assert!(!serialized.contains("state"));
+}
+
+#[test]
+fn imported_progress_must_reference_a_matching_owned_building() {
+    let mut missing = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
+    missing.progress.push(OwnedProgressBaseline {
+        id: 999,
+        kind: ProgressPredictionKind::Production,
+        identity: "unit:worker".to_string(),
+        fraction: 0.2,
+        total_ticks: balance::unit_stats(EntityKind::Worker).unwrap().build_ticks,
+    });
+    let mut predictor = predictor_from_start_payload(start_payload(), 1);
+    assert!(predictor.import_baseline(missing).is_err());
+
+    let mut mismatched = OwnedPredictionBaseline::from_snapshot(
+        1,
+        &with_entities(vec![production_view(410, 1, 0.2)]),
+    );
+    mismatched.progress[0].total_ticks += 1;
+    assert!(predictor.import_baseline(mismatched).is_err());
+}
+
+#[test]
+fn construction_progress_supports_fractional_visual_ticks_and_sparse_output() {
+    let baseline = OwnedPredictionBaseline::from_snapshot(
+        1,
+        &with_entities(vec![construction_view(401, 1, 0.25, true)]),
+    );
+    let total = baseline.progress[0].total_ticks;
+    let mut predictor = predictor_from_start_payload(start_payload(), 1);
+    predictor.import_baseline(baseline).unwrap();
+
+    assert!(predictor.render_prediction_frame(0.0).progress.is_empty());
+    let frame = predictor.render_prediction_frame(0.5);
+    assert_eq!(frame.progress.len(), 1);
+    approx_eq(frame.progress[0].fraction, 0.25 + 0.5 / total as f32);
+    assert_eq!(
+        serde_json::to_value(&frame.progress[0]).unwrap(),
+        serde_json::json!({
+            "id": 401,
+            "kind": "construction",
+            "identity": "build:barracks",
+            "fraction": frame.progress[0].fraction
+        })
+    );
+
+    let negative = predictor.render_prediction_frame(-2.0);
+    let not_finite = predictor.render_prediction_frame(f32::NAN);
+    assert!(negative.progress.is_empty());
+    assert!(not_finite.progress.is_empty());
+    let clamped = predictor.render_prediction_frame(4.0);
+    assert!(clamped.progress[0].fraction <= 0.25 + 1.0 / total as f32);
+}
+
+#[test]
+fn production_and_research_use_rust_authoritative_durations() {
+    let baseline = OwnedPredictionBaseline::from_snapshot(
+        1,
+        &with_entities(vec![
+            production_view(410, 1, 0.2),
+            research_view(411, 1, 0.4),
+        ]),
+    );
+    assert_eq!(baseline.progress.len(), 2);
+    let mut predictor = predictor_from_start_payload(start_payload(), 1);
+    predictor.import_baseline(baseline).unwrap();
+    predictor.advance_ticks(1);
+    let frame = predictor.render_prediction_frame(0.0);
+
+    let production = frame.progress.iter().find(|patch| patch.id == 410).unwrap();
+    assert_eq!(production.identity, "unit:worker");
+    approx_eq(
+        production.fraction,
+        0.2 + 1.0 / balance::unit_stats(EntityKind::Worker).unwrap().build_ticks as f32,
+    );
+    let research = frame.progress.iter().find(|patch| patch.id == 411).unwrap();
+    assert_eq!(research.identity, "upgrade:tank_unlock");
+    let research_ticks =
+        rts_sim::game::upgrade::definition(rts_sim::game::upgrade::UpgradeKind::TankUnlock)
+            .research_ticks;
+    approx_eq(research.fraction, 0.4 + 1.0 / research_ticks as f32);
+}
+
+#[test]
+fn progress_admission_is_fail_closed_for_inactive_waiting_complete_and_invalid_identity() {
+    let mut inactive = construction_view(420, 1, 0.2, false);
+    inactive.state = "construct".to_string();
+    let mut waiting = production_view(421, 1, 0.2);
+    waiting.prod_waiting = true;
+    let complete = production_view(422, 1, 1.0);
+    let mut unknown = production_view(423, 1, 0.2);
+    unknown.prod_kind = Some("not_a_unit".to_string());
+    let mut ambiguous = production_view(424, 1, 0.2);
+    ambiguous.prod_upgrade = Some("tank_unlock".to_string());
+    let baseline = OwnedPredictionBaseline::from_snapshot(
+        1,
+        &with_entities(vec![inactive, waiting, complete, unknown, ambiguous]),
+    );
+    assert!(baseline.progress.is_empty());
+}
+
+#[test]
+fn progress_caps_below_completion_and_never_regresses_high_authority() {
+    let baseline = OwnedPredictionBaseline::from_snapshot(
+        1,
+        &with_entities(vec![
+            construction_view(430, 1, 0.97, true),
+            production_view(431, 1, 0.99),
+        ]),
+    );
+    let mut predictor = predictor_from_start_payload(start_payload(), 1);
+    predictor.import_baseline(baseline).unwrap();
+    predictor.advance_ticks(10_000);
+    let frame = predictor.render_prediction_frame(0.75);
+    assert_eq!(frame.progress.len(), 1);
+    assert_eq!(frame.progress[0].id, 430);
+    approx_eq(frame.progress[0].fraction, PROGRESS_PREDICTION_MAX);
+}
+
+#[test]
+fn progress_reimport_corrects_replaces_identity_and_clears_cancelled_lane() {
+    let first = OwnedPredictionBaseline::from_snapshot(
+        1,
+        &with_entities(vec![production_view(440, 1, 0.25)]),
+    );
+    let total = first.progress[0].total_ticks;
+    let mut predictor = predictor_from_start_payload(start_payload(), 1);
+    predictor.import_baseline(first).unwrap();
+    predictor.advance_ticks(10);
+
+    let mut corrected_snapshot = with_entities(vec![production_view(440, 1, 0.2)]);
+    corrected_snapshot.tick = 20;
+    predictor
+        .import_baseline(OwnedPredictionBaseline::from_snapshot(
+            1,
+            &corrected_snapshot,
+        ))
+        .unwrap();
+    approx_eq(
+        predictor.diagnostics().progress_correction_magnitude,
+        (0.25 + 10.0 / total as f32) - 0.2,
+    );
+    assert!(predictor.render_prediction_frame(0.0).progress.is_empty());
+
+    let mut changed = production_view(440, 1, 0.1);
+    changed.prod_kind = Some("rifleman".to_string());
+    let mut changed_snapshot = with_entities(vec![changed]);
+    changed_snapshot.tick = 21;
+    predictor
+        .import_baseline(OwnedPredictionBaseline::from_snapshot(1, &changed_snapshot))
+        .unwrap();
+    assert_eq!(predictor.diagnostics().progress_correction_magnitude, 0.0);
+    predictor.advance_ticks(1);
+    assert_eq!(
+        predictor.render_prediction_frame(0.0).progress[0].identity,
+        "unit:rifleman"
+    );
+
+    let mut cancelled_building = production_view(440, 1, 0.0);
+    cancelled_building.prod_kind = None;
+    cancelled_building.prod_progress = None;
+    cancelled_building.prod_queue = Some(0);
+    let mut cancelled = with_entities(vec![cancelled_building]);
+    cancelled.tick = 22;
+    predictor
+        .import_baseline(OwnedPredictionBaseline::from_snapshot(1, &cancelled))
+        .unwrap();
+    predictor.advance_ticks(5);
+    assert!(predictor.render_prediction_frame(0.5).progress.is_empty());
+}
+
+#[test]
+fn command_enqueue_does_not_advance_global_or_progress_time() {
+    let baseline = OwnedPredictionBaseline::from_snapshot(
+        1,
+        &with_entities(vec![production_view(450, 1, 0.25)]),
+    );
+    let mut predictor = predictor_from_start_payload(start_payload(), 1);
+    predictor.import_baseline(baseline).unwrap();
+    let before = predictor.render_prediction_frame(0.5);
+
+    predictor.enqueue_command(
+        7,
+        Command::Move {
+            units: vec![101],
+            x: 140.0,
+            y: 100.0,
+            queued: false,
+        },
+    );
+
+    let after = predictor.render_prediction_frame(0.5);
+    assert_eq!(after.tick, before.tick);
+    assert_eq!(after.progress, before.progress);
+    assert_eq!(predictor.diagnostics().tick, 10);
+}
+
+#[test]
 fn prediction_frame_contains_only_owned_pose_patches() {
     let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
     let mut predictor = predictor_from_start_payload(start_payload(), 1);
     predictor.import_baseline(baseline).unwrap();
 
-    let rendered = predictor.render_prediction_frame();
+    let rendered = predictor.render_prediction_frame(0.0);
     assert_eq!(rendered.entities.len(), 1);
     assert_eq!(rendered.entities[0].id, 101);
     assert_eq!(rendered.entities[0].x, 100.0);
@@ -123,7 +393,8 @@ fn prediction_frame_contains_only_owned_pose_patches() {
         json,
         serde_json::json!({
             "tick": 10,
-            "entities": [{ "id": 101, "x": 100.0, "y": 100.0 }]
+            "entities": [{ "id": 101, "x": 100.0, "y": 100.0 }],
+            "progress": []
         })
     );
 
@@ -157,7 +428,7 @@ fn baseline_gather_and_build_activity_are_preserved_by_absence() {
         );
 
         predictor.advance_ticks(5);
-        let frame = predictor.render_prediction_frame();
+        let frame = predictor.render_prediction_frame(0.0);
         assert!(frame.entities.is_empty(), "{authoritative_state}");
     }
 }
@@ -191,7 +462,7 @@ fn unsupported_active_order_plan_stage_discards_unreachable_supported_suffix() {
         predictor.import_baseline(baseline).unwrap();
         predictor.advance_ticks(30);
         assert!(
-            predictor.render_prediction_frame().entities.is_empty(),
+            predictor.render_prediction_frame(0.0).entities.is_empty(),
             "{unsupported_kind}"
         );
     }
@@ -239,7 +510,7 @@ fn middle_authoritative_barrier_stops_retained_and_local_queued_moves() {
         );
         predictor.advance_ticks(60);
 
-        let frame = predictor.render_prediction_frame();
+        let frame = predictor.render_prediction_frame(0.0);
         assert_eq!(frame.entities[0].x, 102.0, "{barrier_kind}");
         assert_eq!(frame.entities[0].motion, None, "{barrier_kind}");
         let summary = predictor.local_lane_summary();
@@ -268,7 +539,7 @@ fn non_movement_authoritative_state_blocks_visible_move_marker() {
         predictor.import_baseline(baseline).unwrap();
         predictor.advance_ticks(60);
         assert!(
-            predictor.render_prediction_frame().entities.is_empty(),
+            predictor.render_prediction_frame(0.0).entities.is_empty(),
             "{authoritative_state}"
         );
         assert_eq!(
@@ -287,7 +558,7 @@ fn baseline_movement_keeps_terminal_pose_claim_until_reconciliation() {
 
     predictor.advance_ticks(100);
     assert_eq!(
-        serde_json::to_value(predictor.render_prediction_frame()).unwrap(),
+        serde_json::to_value(predictor.render_prediction_frame(0.0)).unwrap(),
         serde_json::json!({
             "tick": 110,
             "entities": [{
@@ -295,12 +566,13 @@ fn baseline_movement_keeps_terminal_pose_claim_until_reconciliation() {
                 "x": 120.0,
                 "y": 100.0,
                 "facing": 0.0
-            }]
+            }],
+            "progress": []
         })
     );
 
     predictor.advance_ticks(30);
-    let retained = predictor.render_prediction_frame();
+    let retained = predictor.render_prediction_frame(0.0);
     assert_eq!(retained.entities[0].x, 120.0);
     assert_eq!(retained.entities[0].motion, None);
 
@@ -312,7 +584,7 @@ fn baseline_movement_keeps_terminal_pose_claim_until_reconciliation() {
     predictor
         .import_baseline(OwnedPredictionBaseline::from_snapshot(1, &reconciled))
         .unwrap();
-    assert!(predictor.render_prediction_frame().entities.is_empty());
+    assert!(predictor.render_prediction_frame(0.0).entities.is_empty());
 }
 
 #[test]
@@ -342,7 +614,7 @@ fn attack_command_is_authoritative_only() {
     let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
     let mut predictor = predictor_from_start_payload(start_payload(), 1);
     predictor.import_baseline(baseline).unwrap();
-    let before = predictor.render_prediction_frame();
+    let before = predictor.render_prediction_frame(0.0);
 
     predictor.enqueue_command(
         7,
@@ -354,7 +626,7 @@ fn attack_command_is_authoritative_only() {
         },
     );
 
-    let after = predictor.render_prediction_frame();
+    let after = predictor.render_prediction_frame(0.0);
     assert_eq!(after.entities[0].x, before.entities[0].x);
     assert_eq!(after.entities[0].y, before.entities[0].y);
     assert_eq!(after.entities[0].motion, None);
@@ -412,6 +684,7 @@ fn no_op_ticks_are_deterministic() {
             order_plan: Vec::new(),
             authoritative_barrier_after: None,
         }],
+        progress: Vec::new(),
         visible_obstacles: Vec::new(),
     };
     let mut a = predictor_from_start_payload(start_payload(), 1);
@@ -420,8 +693,11 @@ fn no_op_ticks_are_deterministic() {
     b.import_baseline(baseline).unwrap();
     a.advance_ticks(30);
     b.advance_ticks(30);
-    assert_eq!(a.render_prediction_frame(), b.render_prediction_frame());
-    assert!(a.render_prediction_frame().entities.is_empty());
+    assert_eq!(
+        a.render_prediction_frame(0.0),
+        b.render_prediction_frame(0.0)
+    );
+    assert!(a.render_prediction_frame(0.0).entities.is_empty());
 }
 
 #[test]
@@ -439,7 +715,7 @@ fn simple_move_command_advances_owned_unit() {
         },
     );
     predictor.advance_ticks(3);
-    let frame = predictor.render_prediction_frame();
+    let frame = predictor.render_prediction_frame(0.0);
     let entity = &frame.entities[0];
     assert!(entity.x > 100.0);
     assert_eq!(entity.y, 100.0);
@@ -476,7 +752,7 @@ fn queued_move_commands_are_preserved_in_order() {
     assert_eq!(summary.owned_entities[0].queued_order_stages[0].y, 104.0);
     predictor.advance_ticks(2);
     assert_eq!(
-        predictor.render_prediction_frame().entities[0].motion,
+        predictor.render_prediction_frame(0.0).entities[0].motion,
         Some(PredictedMotion::Move)
     );
 }
@@ -511,7 +787,7 @@ fn queued_hold_position_follows_the_last_move_then_stands_ground() {
     );
 
     predictor.advance_ticks(16);
-    let frame = predictor.render_prediction_frame();
+    let frame = predictor.render_prediction_frame(0.0);
     let entity = &frame.entities[0];
     assert_eq!(entity.x, 110.0);
     assert_eq!(entity.y, 100.0);
@@ -569,7 +845,7 @@ fn held_unit_promotes_a_later_queued_move() {
             queued: false,
         },
     );
-    let held = &predictor.render_prediction_frame().entities[0];
+    let held = &predictor.render_prediction_frame(0.0).entities[0];
     assert_eq!(held.motion, Some(PredictedMotion::Idle));
 
     predictor.enqueue_command(
@@ -582,7 +858,7 @@ fn held_unit_promotes_a_later_queued_move() {
         },
     );
 
-    let queued = &predictor.render_prediction_frame().entities[0];
+    let queued = &predictor.render_prediction_frame(0.0).entities[0];
     assert_eq!(queued.motion, Some(PredictedMotion::Idle));
     assert_eq!(
         predictor.local_lane_summary().owned_entities[0].queued_order_stages[0].kind,
@@ -590,7 +866,7 @@ fn held_unit_promotes_a_later_queued_move() {
     );
 
     predictor.advance_ticks(2);
-    let moving = &predictor.render_prediction_frame().entities[0];
+    let moving = &predictor.render_prediction_frame(0.0).entities[0];
     assert!(moving.x > 100.0);
     assert_eq!(moving.motion, Some(PredictedMotion::Move));
 }
@@ -669,7 +945,7 @@ fn json_api_round_trips_like_wasm_binding() {
         .unwrap();
     predictor.enqueue_command(1, serde_json::from_str(&command_json).unwrap());
     predictor.advance_ticks(5);
-    let render_json = serde_json::to_string(&predictor.prediction_frame()).unwrap();
+    let render_json = serde_json::to_string(&predictor.prediction_frame(0.0)).unwrap();
     assert!(render_json.contains("\"tick\":15"));
     assert!(serde_json::to_string(&predictor.diagnostics())
         .unwrap()

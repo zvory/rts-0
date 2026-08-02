@@ -2,9 +2,9 @@
 //!
 //! This crate intentionally does not expose the authoritative [`rts_sim::game::Game`] world. The
 //! browser imports only an [`OwnedPredictionBaseline`]: owned entities and owner economy fields
-//! plus visible non-authoritative obstacles with no enemy ids, orders, target ids, production, or
-//! economy state. Phase 3 predicts the supported movement/order surface and reports unsupported
-//! systems explicitly so harness diffs can distinguish "unknown" from "divergent".
+//! plus exact-owner progress baselines and visible non-authoritative obstacles with no enemy ids,
+//! orders, target ids, or economy state. The runtime predicts the supported movement/order surface
+//! and extrapolates already-active progress without claiming lifecycle completion.
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 const CORRECTION_EPS_PX: f32 = 0.01;
+pub const PROGRESS_PREDICTION_MAX: f32 = 0.98;
 const UNSUPPORTED_FIELDS: &[&str] = &[
     "combat",
     "economyGathering",
@@ -38,16 +39,22 @@ pub struct OwnedPredictionBaseline {
     #[serde(default)]
     pub owned_entities: Vec<OwnedEntityBaseline>,
     #[serde(default)]
+    pub progress: Vec<OwnedProgressBaseline>,
+    #[serde(default)]
     pub visible_obstacles: Vec<VisibleObstacle>,
 }
 
 impl OwnedPredictionBaseline {
     pub fn from_snapshot(player_id: u32, snapshot: &Snapshot) -> Self {
         let mut owned_entities = Vec::new();
+        let mut progress = Vec::new();
         let mut visible_obstacles = Vec::new();
         for entity in &snapshot.entities {
             if entity.owner == player_id {
                 owned_entities.push(OwnedEntityBaseline::from_view(entity));
+                if let Some(baseline) = OwnedProgressBaseline::from_view(entity) {
+                    progress.push(baseline);
+                }
             } else if is_visible_prediction_obstacle(entity) {
                 visible_obstacles.push(VisibleObstacle::from_view(entity));
             }
@@ -60,7 +67,111 @@ impl OwnedPredictionBaseline {
             supply_used: Some(snapshot.supply_used),
             supply_cap: Some(snapshot.supply_cap),
             owned_entities,
+            progress,
             visible_obstacles,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnedProgressBaseline {
+    pub id: u32,
+    pub kind: ProgressPredictionKind,
+    pub identity: String,
+    pub fraction: f32,
+    pub total_ticks: u32,
+}
+
+impl OwnedProgressBaseline {
+    fn from_view(entity: &EntityView) -> Option<Self> {
+        let entity_kind = entity.kind.parse::<EntityKind>().ok()?;
+        if entity.build_active {
+            let fraction = valid_incomplete_fraction(entity.build_progress?)?;
+            let total_ticks = balance::building_stats(entity_kind)?.build_ticks;
+            return (total_ticks > 0).then(|| Self {
+                id: entity.id,
+                kind: ProgressPredictionKind::Construction,
+                identity: format!("build:{}", entity.kind),
+                fraction,
+                total_ticks,
+            });
+        }
+        balance::building_stats(entity_kind)?;
+        if entity.build_progress.is_some()
+            || entity.state == "construct"
+            || entity.prod_waiting
+            || entity.prod_queue.unwrap_or(0) == 0
+        {
+            return None;
+        }
+        let fraction = valid_incomplete_fraction(entity.prod_progress?)?;
+        let (identity, total_ticks) =
+            match (entity.prod_upgrade.as_deref(), entity.prod_kind.as_deref()) {
+                (Some(upgrade_id), None) => {
+                    let upgrade = upgrade_id
+                        .parse::<rts_sim::game::upgrade::UpgradeKind>()
+                        .ok()?;
+                    (
+                        format!("upgrade:{upgrade_id}"),
+                        rts_sim::game::upgrade::definition(upgrade).research_ticks,
+                    )
+                }
+                (None, Some(unit_id)) => {
+                    let unit = unit_id.parse::<EntityKind>().ok()?;
+                    (
+                        format!("unit:{unit_id}"),
+                        balance::unit_stats(unit)?.build_ticks,
+                    )
+                }
+                _ => return None,
+            };
+        (total_ticks > 0).then_some(Self {
+            id: entity.id,
+            kind: ProgressPredictionKind::Production,
+            identity,
+            fraction,
+            total_ticks,
+        })
+    }
+}
+
+fn valid_incomplete_fraction(fraction: f32) -> Option<f32> {
+    (fraction.is_finite() && (0.0..1.0).contains(&fraction)).then_some(fraction)
+}
+
+fn progress_baseline_matches_entity(
+    baseline: &OwnedProgressBaseline,
+    entity_kind: EntityKind,
+) -> bool {
+    match baseline.kind {
+        ProgressPredictionKind::Construction => {
+            balance::building_stats(entity_kind).is_some_and(|stats| {
+                baseline.identity == format!("build:{}", entity_kind.stable_id())
+                    && baseline.total_ticks == stats.build_ticks
+            })
+        }
+        ProgressPredictionKind::Production => {
+            if balance::building_stats(entity_kind).is_none() {
+                return false;
+            }
+            if let Some(unit_id) = baseline.identity.strip_prefix("unit:") {
+                return unit_id
+                    .parse::<EntityKind>()
+                    .ok()
+                    .and_then(balance::unit_stats)
+                    .is_some_and(|stats| baseline.total_ticks == stats.build_ticks);
+            }
+            if let Some(upgrade_id) = baseline.identity.strip_prefix("upgrade:") {
+                return upgrade_id
+                    .parse::<rts_sim::game::upgrade::UpgradeKind>()
+                    .ok()
+                    .is_some_and(|upgrade| {
+                        baseline.total_ticks
+                            == rts_sim::game::upgrade::definition(upgrade).research_ticks
+                    });
+            }
+            false
         }
     }
 }
@@ -176,6 +287,8 @@ pub struct PredictorDiagnostics {
     pub pending_client_seqs: Vec<u32>,
     pub pending_command_kinds: Vec<String>,
     pub correction_magnitude: f32,
+    pub progress_lane_count: usize,
+    pub progress_correction_magnitude: f32,
     pub unsupported_fields: Vec<String>,
     pub disabled_reasons: Vec<String>,
 }
@@ -190,6 +303,7 @@ pub struct PredictorDiagnostics {
 pub struct OwnedPredictionFrame {
     pub tick: u32,
     pub entities: Vec<EntityPredictionPatch>,
+    pub progress: Vec<ProgressPredictionPatch>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -211,6 +325,70 @@ pub struct EntityPredictionPatch {
 pub enum PredictedMotion {
     Move,
     Idle,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ProgressPredictionKind {
+    Construction,
+    Production,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressPredictionPatch {
+    pub id: u32,
+    pub kind: ProgressPredictionKind,
+    pub identity: String,
+    pub fraction: f32,
+}
+
+#[derive(Debug, Clone)]
+struct ProgressState {
+    id: u32,
+    kind: ProgressPredictionKind,
+    identity: String,
+    baseline_fraction: f32,
+    total_ticks: u32,
+    baseline_tick: u32,
+}
+
+impl ProgressState {
+    fn try_from_baseline(
+        baseline: OwnedProgressBaseline,
+        baseline_tick: u32,
+    ) -> Result<Self, String> {
+        if valid_incomplete_fraction(baseline.fraction).is_none() || baseline.total_ticks == 0 {
+            return Err(format!(
+                "invalid progress baseline for entity {}",
+                baseline.id
+            ));
+        }
+        Ok(Self {
+            id: baseline.id,
+            kind: baseline.kind,
+            identity: baseline.identity,
+            baseline_fraction: baseline.fraction,
+            total_ticks: baseline.total_ticks,
+            baseline_tick,
+        })
+    }
+
+    fn predicted_fraction(&self, tick: u32, visual_tick_fraction: f32) -> f32 {
+        let elapsed_ticks = tick.wrapping_sub(self.baseline_tick) as f32 + visual_tick_fraction;
+        (self.baseline_fraction + elapsed_ticks / self.total_ticks as f32)
+            .min(PROGRESS_PREDICTION_MAX)
+    }
+
+    fn patch(&self, tick: u32, visual_tick_fraction: f32) -> Option<ProgressPredictionPatch> {
+        let fraction = self.predicted_fraction(tick, visual_tick_fraction);
+        (fraction > self.baseline_fraction).then(|| ProgressPredictionPatch {
+            id: self.id,
+            kind: self.kind,
+            identity: self.identity.clone(),
+            fraction,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -259,9 +437,11 @@ struct CorePredictor {
     supply_used: Option<u32>,
     supply_cap: Option<u32>,
     owned: BTreeMap<u32, EntityState>,
+    progress: BTreeMap<u32, ProgressState>,
     visible_obstacles: Vec<VisibleObstacle>,
     pending: VecDeque<PendingCommand>,
     correction_magnitude: f32,
+    progress_correction_magnitude: f32,
     disabled_reasons: Vec<String>,
 }
 
@@ -276,9 +456,11 @@ impl CorePredictor {
             supply_used: None,
             supply_cap: None,
             owned: BTreeMap::new(),
+            progress: BTreeMap::new(),
             visible_obstacles: Vec::new(),
             pending: VecDeque::new(),
             correction_magnitude: 0.0,
+            progress_correction_magnitude: 0.0,
             disabled_reasons: vec!["baselineNotImported".to_string()],
         }
     }
@@ -291,6 +473,8 @@ impl CorePredictor {
             ));
         }
         self.correction_magnitude = correction_magnitude(&self.owned, &baseline.owned_entities);
+        self.progress_correction_magnitude =
+            progress_correction_magnitude(&self.progress, self.tick, &baseline.progress);
         self.tick = baseline.tick;
         self.steel = baseline.steel;
         self.oil = baseline.oil;
@@ -304,6 +488,26 @@ impl CorePredictor {
             .into_iter()
             .map(|entity| (entity.id, entity))
             .collect();
+        let progress = baseline
+            .progress
+            .into_iter()
+            .map(|progress| {
+                let entity = self.owned.get(&progress.id).ok_or_else(|| {
+                    format!("progress baseline entity {} is not owned", progress.id)
+                })?;
+                if !progress_baseline_matches_entity(&progress, entity.kind) {
+                    return Err(format!(
+                        "progress baseline does not match owned building {}",
+                        progress.id
+                    ));
+                }
+                ProgressState::try_from_baseline(progress, self.tick)
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(|progress| (progress.id, progress))
+            .collect();
+        self.progress = progress;
         self.visible_obstacles = baseline.visible_obstacles;
         self.pending.clear();
         self.disabled_reasons.clear();
@@ -327,7 +531,8 @@ impl CorePredictor {
         }
     }
 
-    fn prediction_frame(&self) -> OwnedPredictionFrame {
+    fn prediction_frame(&self, visual_tick_fraction: f32) -> OwnedPredictionFrame {
+        let visual_tick_fraction = normalize_visual_tick_fraction(visual_tick_fraction);
         OwnedPredictionFrame {
             tick: self.tick,
             entities: self
@@ -335,6 +540,11 @@ impl CorePredictor {
                 .values()
                 .filter(|entity| entity.has_pose_claim())
                 .map(EntityState::to_prediction_patch)
+                .collect(),
+            progress: self
+                .progress
+                .values()
+                .filter_map(|progress| progress.patch(self.tick, visual_tick_fraction))
                 .collect(),
         }
     }
@@ -356,6 +566,8 @@ impl CorePredictor {
                 .map(|pending| command_kind(&pending.command).to_string())
                 .collect(),
             correction_magnitude: self.correction_magnitude,
+            progress_lane_count: self.progress.len(),
+            progress_correction_magnitude: self.progress_correction_magnitude,
             unsupported_fields: unsupported_fields(),
             disabled_reasons: self.disabled_reasons.clone(),
         }
@@ -770,8 +982,11 @@ impl WasmPredictor {
     }
 
     #[wasm_bindgen(js_name = renderPredictionFrameJson)]
-    pub fn render_prediction_frame_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.core.prediction_frame()).map_err(js_error)
+    pub fn render_prediction_frame_json(
+        &self,
+        visual_tick_fraction: f32,
+    ) -> Result<String, JsValue> {
+        serde_json::to_string(&self.core.prediction_frame(visual_tick_fraction)).map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = diagnosticsJson)]
@@ -813,8 +1028,8 @@ impl NativePredictor {
         self.core.advance_ticks(ticks);
     }
 
-    pub fn render_prediction_frame(&self) -> OwnedPredictionFrame {
-        self.core.prediction_frame()
+    pub fn render_prediction_frame(&self, visual_tick_fraction: f32) -> OwnedPredictionFrame {
+        self.core.prediction_frame(visual_tick_fraction)
     }
 
     pub fn diagnostics(&self) -> PredictorDiagnostics {
@@ -840,6 +1055,29 @@ fn correction_magnitude(
             })
         })
         .fold(0.0, f32::max)
+}
+
+fn progress_correction_magnitude(
+    current: &BTreeMap<u32, ProgressState>,
+    current_tick: u32,
+    baseline: &[OwnedProgressBaseline],
+) -> f32 {
+    baseline
+        .iter()
+        .filter_map(|next| {
+            let old = current.get(&next.id)?;
+            (old.kind == next.kind && old.identity == next.identity)
+                .then(|| (old.predicted_fraction(current_tick, 0.0) - next.fraction).abs())
+        })
+        .fold(0.0, f32::max)
+}
+
+fn normalize_visual_tick_fraction(fraction: f32) -> f32 {
+    if fraction.is_finite() {
+        fraction.clamp(0.0, 1.0 - f32::EPSILON)
+    } else {
+        0.0
+    }
 }
 
 fn owner_safe_order_plan_prefix(markers: &[OrderPlanMarker]) -> Vec<OrderPlanMarker> {

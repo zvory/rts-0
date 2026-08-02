@@ -216,7 +216,7 @@ export class WasmLocalLane {
 
   renderPredictionFrameSummary() {
     if (!this.ready || !this.predictor) return null;
-    const frame = JSON.parse(this.predictor.renderPredictionFrameJson());
+    const frame = JSON.parse(this.predictor.renderPredictionFrameJson(0));
     return {
       tick: frame.tick,
       entityCount: frame.entities?.length || 0,
