@@ -212,8 +212,9 @@ Each descriptor is `{id, order, space, visibilityPolicy, depthPolicy}`. Later wo
 namespaced metadata but cannot rename/reorder layers or weaken visibility policy.
 Within Pixi's fog-gated world, tree canopies and unit body/overlay/effect containers share
 back-to-front world-Y ordering; tree understory and shadows remain below them, while selection, HP,
-and fog remain above. A received own or allied unit occluded by a tree gets a presentation-only,
-low-alpha duplicate of its unit art above the canopy. The pass never admits a hidden or enemy entity.
+and fog remain above. Any received unit occluded by a tree gets a presentation-only white body
+outline above the canopy. This applies equally to friendly, allied, and visible enemy units, but the
+pass only consumes already-admitted entities and therefore cannot reveal an enemy hidden by fog.
 
 `frame_recovery.js` samples one projection and visual time, updates fog, builds feedback, reconciles
 one monotonic ground-decal revision, assembles one frame, and calls `renderer.render(frame)`.

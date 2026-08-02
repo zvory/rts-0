@@ -103,11 +103,11 @@ try {
   assert(
     LAYERS.indexOf("doodadUnderstory") < unitIndex
       && !LAYERS.includes("doodadCanopies")
-      && LAYERS.indexOf("alliedTreeReveals") > unitIndex
-      && LAYERS.indexOf("alliedTreeReveals") < LAYERS.indexOf("selectionRings")
-      && LAYERS.indexOf("alliedTreeReveals") < LAYERS.indexOf("hpBars")
-      && LAYERS.indexOf("alliedTreeReveals") < LAYERS.indexOf("fog"),
-    "trees and units share one depth layer while allied reveals stay beneath selection, HP, and fog",
+      && LAYERS.indexOf("forestUnitOutlines") > unitIndex
+      && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("selectionRings")
+      && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("hpBars")
+      && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("fog"),
+    "trees and units share one depth layer while forest outlines stay beneath selection, HP, and fog",
   );
 
   layer.destroy();

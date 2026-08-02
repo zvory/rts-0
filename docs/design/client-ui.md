@@ -2087,9 +2087,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   selected. Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values
-  draw first, so a southern tree or unit naturally covers a northern one. When a received friendly
-  or allied unit intersects a tree canopy in front of it, a low-alpha duplicate of the actual unit
-  art is drawn above the canopy. This readability pass uses only already-admitted entities and does
+  draw first, so a southern tree or unit naturally covers a northern one. When any received unit
+  intersects a tree canopy in front of it, a white body outline is drawn above the canopy. Friendly,
+  allied, and visible enemy units use the same treatment. This readability pass uses only
+  already-admitted entities and does
   not reveal enemies, hidden entities, shadows, status bars, or selection/effect overlays.
   When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed

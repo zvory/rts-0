@@ -14,10 +14,6 @@ const UNIT_RIG_POOL_FAMILIES = Object.freeze([
     "liveShotRevealRigOverlays",
     "liveShotRevealRigEffects",
   ]),
-  Object.freeze([
-    "alliedTreeRevealRigs",
-    "alliedTreeRevealRigOverlays",
-  ]),
 ]);
 const UNIT_RIG_POOL_FAMILY_BY_NAME = new Map();
 for (const family of UNIT_RIG_POOL_FAMILIES) {
@@ -131,8 +127,8 @@ export function pngDrawPlanFor(definition, atlas, routePlan) {
 }
 
 /**
- * Reconcile only the pool family used by this draw. Normal units, shot reveals, and friendly
- * canopy reveals may share an entity id and must never destroy one another's retained instances.
+ * Reconcile only the pool family used by this draw. Normal units and shot reveals may share an
+ * entity id and must never destroy one another's retained instances.
  */
 export function reconcileActiveLiveRigPools(renderer, entityId, activePoolNames) {
   const active = new Set(activePoolNames || []);

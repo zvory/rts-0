@@ -7,7 +7,7 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 //
 //   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
-//   → world-Y-sorted units/tree-canopies → allied-tree-reveals → smokes
+//   → world-Y-sorted units/tree-canopies → forest-unit-outlines → smokes
 //   → selection-rings → hp-bars → fog → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → feedback/miss-toasts → placement-ghost → drag-box
 //
@@ -88,7 +88,7 @@ import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { DoodadLayer } from "./doodad_layer.js";
-import { _drawTreeOccludedAllies } from "./tree_unit_occlusion.js";
+import { _drawTreeOccludedUnitOutlines } from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
 import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
 import {
@@ -259,6 +259,7 @@ export class Renderer {
       unitShadows: new Map(),
       trenchOccupantShadows: new Map(),
       units: new Map(),
+      forestUnitOutlines: new Map(),
       trenchOccupantLips: new Map(),
       selectionRings: new Map(),
       hpBars: new Map(),
@@ -305,8 +306,6 @@ export class Renderer {
       liveShotRevealRigs: new Map(),
       liveShotRevealRigOverlays: new Map(),
       liveShotRevealRigEffects: new Map(),
-      alliedTreeRevealRigs: new Map(),
-      alliedTreeRevealRigOverlays: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
@@ -318,8 +317,6 @@ export class Renderer {
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
       liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
       liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
-      alliedTreeRevealRigs: { poolName: "alliedTreeRevealRigs", layerName: "alliedTreeReveals" },
-      alliedTreeRevealRigOverlays: { poolName: "alliedTreeRevealRigOverlays", layerName: "alliedTreeReveals" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
@@ -636,13 +633,11 @@ export class Renderer {
         }
       }
     });
-    time("renderer.alliedTreeReveals", () => {
+    time("renderer.forestUnitOutlines", () => {
       this._drawSafely(
-        "alliedTreeReveals",
-        () => this._drawTreeOccludedAllies(regularEntities, state, colorByOwner, {
+        "forestUnitOutlines",
+        () => this._drawTreeOccludedUnitOutlines(regularEntities, {
           renderContexts: this._unitRenderContexts,
-          visualUnitOverrides: visualUnitOverrideMap,
-          visualFrameStripOverrides: visualFrameStripOverrideMap,
         }),
       );
     });
@@ -1275,7 +1270,7 @@ Object.assign(Renderer.prototype, {
   _tankMotionVisual,
   _frameStripMovementVisual,
   _drawUnit,
-  _drawTreeOccludedAllies,
+  _drawTreeOccludedUnitOutlines,
   _rigRenderContextFor,
   _drawShotRevealUnit,
   _drawBuilding,

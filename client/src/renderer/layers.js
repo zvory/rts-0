@@ -15,7 +15,7 @@ export const LAYERS = [
   "trenchOccupantShadows",
   "trenchOccupantLips",
   "units",
-  "alliedTreeReveals",
+  "forestUnitOutlines",
   "smokes",
   "selectionRings",
   "hpBars",

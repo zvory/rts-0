@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import { KIND } from "../../client/src/protocol.js";
 import { DoodadLayer } from "../../client/src/renderer/doodad_layer.js";
 import { Renderer } from "../../client/src/renderer/index.js";
-import { _sweep } from "../../client/src/renderer/layers.js";
-import { frameStripDrawPlanFor, reconcileActiveLiveRigPools } from "../../client/src/renderer/rigs/draw_plans.js";
-import { liveRigRoutePlanFor } from "../../client/src/renderer/rigs/live_routing.js";
-import { _drawTreeOccludedAllies } from "../../client/src/renderer/tree_unit_occlusion.js";
+import { _drawTreeOccludedUnitOutlines } from "../../client/src/renderer/tree_unit_occlusion.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
 const restorePixi = installFakePixi();
@@ -34,71 +31,44 @@ try {
     "the canopy spatial index rejects distant units without a full doodad scan");
 
   const entities = [
-    unit(1, 1, 100, 70),
-    unit(2, 2, 100, 74),
-    unit(3, 3, 100, 72),
-    unit(4, 1, 100, 110),
+    unit(1, 1, KIND.RIFLEMAN, 100, 70),
+    unit(2, 2, KIND.RIFLEMAN, 100, 74),
+    unit(3, 3, KIND.RIFLEMAN, 100, 72),
+    unit(4, 1, KIND.RIFLEMAN, 100, 110),
+    unit(5, 3, KIND.TANK, 101, 71, 36),
   ];
-  const renderContexts = new Map(entities.map((entity) => [entity.id, { now: 1200, facing: 0.3 }]));
-  const drawCalls = [];
-  const revealRenderer = {
+  const renderContexts = new Map(entities.map((entity) => [entity.id, { facing: entity.id * 0.1 }]));
+  const outlineGraphics = new Map();
+  const outlineRenderer = {
     _doodads: doodads,
-    _drawUnit(entity, colorByOwner, state, options) { drawCalls.push({ entity, colorByOwner, state, options }); },
+    _slot(_pool, id) {
+      if (!outlineGraphics.has(id)) outlineGraphics.set(id, new PIXI.Graphics());
+      return outlineGraphics.get(id);
+    },
     _recordRenderDiagnostic() {},
     _recordRenderError(_label, error) { throw error; },
   };
-  const state = {
-    isOwnOwner(owner) { return owner === 1; },
-    isAllyOwner(owner) { return owner === 2; },
-  };
-  const colorByOwner = new Map([[1, 0x4477aa], [2, 0x55aa77], [3, 0xaa5544]]);
-  assert.equal(_drawTreeOccludedAllies.call(revealRenderer, entities, state, colorByOwner, { renderContexts }), 2,
-    "only own and allied units behind overlapping canopies receive a reveal body");
-  assert.deepEqual(drawCalls.map(({ entity }) => entity.id), [1, 2],
-    "enemy and in-front units keep their ordinary presentation unchanged");
-  for (const { options } of drawCalls) {
-    assert.equal(options.alpha, 0.28, "canopy reveal redraws the actual unit body at low alpha");
-    assert.equal(options.omitShadow, true, "canopy reveal does not duplicate the unit shadow");
-    assert.equal(options.omitEffects, true, "canopy reveal does not duplicate transient weapon effects");
-    assert.equal(options.liveRigUnit, "alliedTreeRevealRigs");
-    assert.equal(options.liveRigOverlay, "alliedTreeRevealRigOverlays");
+  assert.equal(
+    _drawTreeOccludedUnitOutlines.call(outlineRenderer, entities, { renderContexts }),
+    4,
+    "every already-visible friendly, allied, and enemy unit behind a canopy receives an outline",
+  );
+  assert.deepEqual([...outlineGraphics.keys()], [1, 2, 3, 5],
+    "in-front units remain unchanged while visible enemies are treated like friendly units");
+  for (const id of [1, 2, 3]) {
+    const graphics = outlineGraphics.get(id);
+    assert(graphics.calls.some((call) => call[0] === "drawCircle"), "infantry uses a body outline only");
+    assert(graphics.calls.some((call) => call[0] === "lineStyle" && call[2] === 0xffffff && call[3] === 0.94),
+      "forest outline is an opaque white stroke without a filled duplicate");
+    assert.equal(graphics.rotation, id * 0.1, "outline follows the rendered unit facing");
   }
-
-  const revealPools = {
-    omitShadow: true,
-    omitEffects: true,
-    unit: "alliedTreeReveals",
-    overlay: "alliedTreeReveals",
-    liveRigUnit: "alliedTreeRevealRigs",
-    liveRigOverlay: "alliedTreeRevealRigOverlays",
-  };
-  const revealPlan = liveRigRoutePlanFor(KIND.RIFLEMAN, revealPools);
-  const stripPlan = frameStripDrawPlanFor(revealPlan);
-  assert.equal(revealPlan.shadowRoute, null, "the reveal route has no shadow route");
-  assert.equal(stripPlan.unitRoute.poolName, "alliedTreeRevealRigs",
-    "frame-strip reveals route their actual body into the isolated reveal pool");
-
-  let staleOverlayDestroyed = 0;
-  const normalInstance = instance();
-  const revealInstance = instance();
-  const rigRenderer = rigSweepHarness(7, normalInstance, revealInstance);
-  rigRenderer._liveRigPools.alliedTreeRevealRigOverlays.set(7, {
-    container: { visible: true },
-    destroy() { staleOverlayDestroyed += 1; },
-  });
-  reconcileActiveLiveRigPools(rigRenderer, 7, ["alliedTreeRevealRigs"]);
-  assert.equal(rigRenderer._liveRigPools.liveUnitRigs.get(7), normalInstance,
-    "reveal reconciliation cannot destroy the normal unit body with the same id");
-  assert.equal(staleOverlayDestroyed, 1, "reveal reconciliation still removes an inactive reveal overlay");
-  reconcileActiveLiveRigPools(rigRenderer, 7, ["liveUnitRigs"]);
-  assert.equal(rigRenderer._liveRigPools.alliedTreeRevealRigs.get(7), revealInstance,
-    "normal reconciliation cannot churn a retained canopy reveal");
-
-  rigRenderer._seen.liveUnitRigs.add(7);
-  _sweep.call(rigRenderer);
-  assert.equal(revealInstance.container.visible, false,
-    "an unoccluded reveal is hidden while the live normal unit keeps the shared id retained");
-  assert.equal(revealInstance.destroyed, false, "temporary unocclusion does not churn the reveal GPU instance");
+  assert(outlineGraphics.get(5).calls.some((call) => call[0] === "drawRoundedRect"),
+    "vehicle outlines follow the oriented body footprint");
+  assert.equal(
+    _drawTreeOccludedUnitOutlines.call(outlineRenderer, entities.filter((entity) => entity.owner !== 3), { renderContexts }),
+    2,
+    "the pass cannot outline an enemy omitted by authoritative visibility filtering",
+  );
 
   doodads.destroy();
 
@@ -113,60 +83,20 @@ try {
     "the production renderer enables strict sorting on the shared unit/canopy layer");
   assert.equal(renderer._doodads.canopyLayer, renderer.layers.units,
     "the production renderer sends tree canopies into the unit body depth layer");
+  assert(renderer.layers.forestUnitOutlines,
+    "the production renderer keeps forest outlines above canopies in a dedicated layer");
   renderer._drawMissingTexture({ id: 808, x: 10, y: 83 }, "units");
   assert.equal(renderer._pools.units.get(808).zIndex, 83,
     "Graphics fallback unit bodies use the same world-Y depth key");
-  let revealDestroyed = false;
-  renderer._liveRigPools.alliedTreeRevealRigs.set(999, {
-    destroy() { revealDestroyed = true; },
-  });
+  const retainedOutline = renderer._slot("forestUnitOutlines", 999);
   renderer.destroy();
-  assert.equal(revealDestroyed, true, "renderer teardown releases retained allied canopy reveal rigs");
+  assert.equal(retainedOutline.destroyed, true, "renderer teardown releases retained forest outline graphics");
 } finally {
   restorePixi();
 }
 
-function unit(id, owner, x, y) {
-  return { id, owner, kind: KIND.RIFLEMAN, x, y, visualBounds: { widthPx: 28 } };
+function unit(id, owner, kind, x, y, widthPx = 28) {
+  return { id, owner, kind, x, y, facing: 0, visualBounds: { widthPx } };
 }
 
-function instance() {
-  return {
-    container: { visible: true },
-    destroyed: false,
-    destroy() { this.destroyed = true; },
-  };
-}
-
-function rigSweepHarness(id, normalInstance, revealInstance) {
-  const liveRigPools = {
-    liveUnitRigShadows: new Map(),
-    liveUnitRigs: new Map([[id, normalInstance]]),
-    liveUnitRigOverlays: new Map(),
-    liveUnitRigEffects: new Map(),
-    liveShotRevealRigShadows: new Map(),
-    liveShotRevealRigs: new Map(),
-    liveShotRevealRigOverlays: new Map(),
-    liveShotRevealRigEffects: new Map(),
-    alliedTreeRevealRigs: new Map([[id, revealInstance]]),
-    alliedTreeRevealRigOverlays: new Map(),
-  };
-  const seen = Object.fromEntries(Object.keys(liveRigPools).map((name) => [name, new Set()]));
-  return {
-    _pools: {},
-    _seen: seen,
-    _unseen: new Map(),
-    _liveRigPools: liveRigPools,
-    _liveRigRoutes: Object.fromEntries(Object.keys(liveRigPools).map((poolName) => [poolName, {
-      poolName,
-      layerName: poolName.startsWith("allied") ? "alliedTreeReveals" : "units",
-    }])),
-    layers: {
-      units: { removeChild() {} },
-      alliedTreeReveals: { removeChild() {} },
-    },
-    _recordRenderDiagnostic() {},
-  };
-}
-
-console.log("✅ tree_unit_depth_contracts.mjs: strict world-Y depth, friendly canopy reveals, and isolated pools passed");
+console.log("✅ tree_unit_depth_contracts.mjs: strict world-Y depth and visibility-gated forest outlines passed");
