@@ -1181,6 +1181,37 @@ assert(
 }
 
 {
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.beginDoodadStroke("Placed fixtures");
+  session.placeDoodads([
+    { x: 40, y: 60 },
+    { x: 100, y: 120 },
+  ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
+  session.commitDoodadStroke();
+  session.beginDoodadStroke("Active spray");
+  session.placeDoodads([{ x: 180, y: 200 }], {
+    typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE,
+    color: "#ef739d",
+  });
+  const statuses = [];
+  const viewport = {
+    session,
+    selectedDoodadIds: new Set([1, 2]),
+    onStatus(message, error) { statuses.push({ message, error }); },
+    drawOverlay() {},
+  };
+  assert.equal(MapEditorViewport.prototype.deleteSelectedDoodads.call(viewport), false,
+    "selection deletion refuses to merge into another active doodad edit");
+  assert.deepEqual(session.draft.doodads.map((record) => record.id), [1, 2, 3]);
+  assert(session.doodadStroke, "the active edit remains open for its pointer lifecycle to finish");
+  assert.deepEqual(statuses, [{
+    message: "Finish the current doodad edit before deleting the selection.", error: true,
+  }]);
+  session.cancelDoodadStroke();
+}
+
+{
   const viewport = {
     doodadRevision: 3,
     pendingDoodadUpdate: {
@@ -1217,6 +1248,24 @@ assert(
   });
   assert.deepEqual(calls, [["patch", patch], "overlay"],
     "a doodad-only commit patches vegetation without rebuilding the static terrain texture");
+}
+
+{
+  const calls = [];
+  const selectedDoodadIds = new Set([1]);
+  const viewport = {
+    selectedDoodadIds,
+    rebuildTerrain() { calls.push("terrain"); },
+    rebuildDoodads() { calls.push("doodads"); },
+    drawOverlay() { calls.push("overlay"); },
+  };
+  MapEditorViewport.prototype.applySessionSnapshot.call(viewport, {
+    reason: "loaded",
+    draft: { doodads: [{ id: 1 }] },
+  });
+  assert.equal(viewport.selectedDoodadIds.size, 0,
+    "loading a different map clears selection even when it reuses a selected doodad id");
+  assert.deepEqual(calls, ["terrain", "doodads", "overlay"]);
 }
 
 {

@@ -174,7 +174,10 @@ export class MapEditorViewport {
       return false;
     }
     const count = this.selectedDoodadIds.size;
-    this.session.beginDoodadStroke(count === 1 ? "Deleted doodad" : `Deleted ${count} doodads`);
+    if (!this.session.beginDoodadStroke(count === 1 ? "Deleted doodad" : `Deleted ${count} doodads`)) {
+      this.onStatus("Finish the current doodad edit before deleting the selection.", true);
+      return false;
+    }
     this.session.removeDoodads(this.selectedDoodadIds);
     const changed = this.session.commitDoodadStroke();
     this.selectedDoodadIds.clear();
@@ -200,8 +203,12 @@ export class MapEditorViewport {
     } else {
       this.rebuildDoodads();
     }
-    const existingDoodadIds = new Set((snapshot.draft.doodads || []).map((record) => record.id));
-    this.selectedDoodadIds = new Set([...this.selectedDoodadIds].filter((id) => existingDoodadIds.has(id)));
+    if (snapshot.reason === "initialized" || snapshot.reason === "loaded") {
+      this.selectedDoodadIds.clear();
+    } else {
+      const existingDoodadIds = new Set((snapshot.draft.doodads || []).map((record) => record.id));
+      this.selectedDoodadIds = new Set([...this.selectedDoodadIds].filter((id) => existingDoodadIds.has(id)));
+    }
     this.drawOverlay();
   }
 
