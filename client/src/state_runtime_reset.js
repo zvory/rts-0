@@ -26,7 +26,7 @@ export function resetAuthoritativeRuntime(state) {
   state.exploredTiles = [];
   state.groundDecals = new GroundDecalBuffer();
   state.visualEffects = new VisualEffectBuffers();
-  state.predictedById.clear();
+  state.predictionPatchById.clear();
   state.predictionCorrectionById.clear();
   state.predictionDiagnostics = null;
   state.optimisticProduction = [];

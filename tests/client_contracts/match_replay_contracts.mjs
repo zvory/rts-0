@@ -1023,8 +1023,8 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   predictionPolicyMatch.state = {
     spectator: false,
     applyPredictionDisplayOverlay(overlay) {
-      if (Object.prototype.hasOwnProperty.call(overlay || {}, "predictedSnapshot")) {
-        this.predictedSnapshot = overlay.predictedSnapshot;
+      if (Object.prototype.hasOwnProperty.call(overlay || {}, "predictionFrame")) {
+        this.predictionFrame = overlay.predictionFrame;
       }
       if (Object.prototype.hasOwnProperty.call(overlay || {}, "optimisticCommands")) {
         this.optimisticCommands = overlay.optimisticCommands;
@@ -1080,7 +1080,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   predictionPolicyMatch.logPredictionStatus = () => {};
   predictionPolicyMatch.setPredictionEnabled(false);
   assert(!predictionPolicyMatch.prediction.enabled, "prediction setting can disable live prediction");
-  assert(predictionPolicyMatch.state.predictedSnapshot === null, "disabling prediction clears local predicted overlay");
+  assert(predictionPolicyMatch.state.predictionFrame === null, "disabling prediction clears local predicted overlay");
   assert(predictionPolicyMatch.state.optimisticCommands === null, "disabling prediction clears optimistic command UI");
   assert(predictionPolicyMatch.prediction.predictor === predictionPolicyMatch.predictionAdapter,
     "disabling prediction replaces the controller predictor with a fresh inactive adapter");
@@ -1199,7 +1199,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(advanceVisualCalls === 0, "live pause stops per-frame movement prediction ticks");
   assert(pauseVisualClockCalls === 1, "live pause keeps the prediction visual clock synced to wall time");
   assert(
-    pausePredictionOverlays.at(-1)?.predictedSnapshot === null,
+    pausePredictionOverlays.at(-1)?.predictionFrame === null,
     "live pause clears the predicted movement overlay",
   );
 
@@ -1234,7 +1234,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   };
   livePauseStateMatch.applyLivePauseState({ paused: true, canPause: false, canUnpause: true });
   assert(livePauseStateMatch.predictionVisualSuspended, "entering live pause suspends prediction visuals");
-  assert(livePauseOverlays.at(-1)?.predictedSnapshot === null, "entering live pause drops any predicted movement frame");
+  assert(livePauseOverlays.at(-1)?.predictionFrame === null, "entering live pause drops any predicted movement frame");
   assert(progressPauseStates.at(-1) === true, "live pause freezes progress prediction for a non-pausing client");
   assert(worldBedStates.at(-1) === false, "entering live pause fades out the world combat bed");
   livePauseStateMatch.applyLivePauseState({ paused: false, canPause: true, canUnpause: false });

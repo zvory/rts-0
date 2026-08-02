@@ -80,6 +80,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "progress_extrapolator.js": "model",
   "prediction_controller.js": "model",
   "prediction_compatibility.js": "model",
+  "prediction_frame.js": "model",
   "sim_wasm_adapter.js": "model",
   "prediction_settings.js": "platform",
   "unit_range_settings.js": "platform",

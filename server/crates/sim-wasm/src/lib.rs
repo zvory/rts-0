@@ -8,9 +8,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
-use rts_contract::{
-    EntityView, MapInfo, OrderPlanMarker, Snapshot, SnapshotNetStatus, StartPayload,
-};
+use rts_contract::{EntityView, MapInfo, OrderPlanMarker, Snapshot, StartPayload};
 use rts_protocol::Command;
 use rts_rules::{balance, static_blocker_class, EntityKind, StaticBlockerClass};
 use serde::{Deserialize, Serialize};
@@ -92,6 +90,10 @@ pub struct OwnedEntityBaseline {
     pub weapon_facing: Option<f32>,
     #[serde(default)]
     pub order_plan: Vec<OrderPlanMarker>,
+    /// Number of retained supported stages before an authoritative stage this partial predictor
+    /// cannot model. `Some(0)` means even the first retained/local queued stage is behind authority.
+    #[serde(default)]
+    pub authoritative_barrier_after: Option<usize>,
 }
 
 impl OwnedEntityBaseline {
@@ -106,7 +108,8 @@ impl OwnedEntityBaseline {
             state: Some(entity.state.clone()),
             facing: entity.facing,
             weapon_facing: entity.weapon_facing,
-            order_plan: owner_safe_order_plan(&entity.order_plan),
+            order_plan: owner_safe_order_plan_prefix(&entity.order_plan),
+            authoritative_barrier_after: authoritative_order_barrier(entity),
         }
     }
 }
@@ -177,17 +180,50 @@ pub struct PredictorDiagnostics {
     pub disabled_reasons: Vec<String>,
 }
 
+/// Sparse, owner-scoped presentation claims produced by the partial predictor.
+///
+/// This intentionally is not a protocol `Snapshot`: the predictor cannot claim authoritative
+/// identity, health, activity, combat, economy, or fog state. Each entry may only adjust the pose
+/// of an entity that the client already has in its authoritative owned-entity snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnedPredictionFrame {
+    pub tick: u32,
+    pub entities: Vec<EntityPredictionPatch>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EntityPredictionPatch {
+    pub id: u32,
+    pub x: f32,
+    pub y: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub facing: Option<f32>,
+    /// Present only when a locally issued, supported command gives the predictor explicit
+    /// presentation authority. Baseline activity never populates this field.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub motion: Option<PredictedMotion>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PredictedMotion {
+    Move,
+    Idle,
+}
+
 #[derive(Debug, Clone)]
 struct EntityState {
     id: u32,
     kind: EntityKind,
     x: f32,
     y: f32,
-    hp: u32,
-    max_hp: u32,
     state: String,
     facing: Option<f32>,
-    weapon_facing: Option<f32>,
+    motion: Option<PredictedMotion>,
+    authoritative_barrier_after: Option<usize>,
+    terminal_pose_claim: bool,
     active_order: Option<MoveOrder>,
     queued_orders: VecDeque<MoveOrder>,
 }
@@ -197,6 +233,7 @@ struct MoveOrder {
     kind: MoveOrderKind,
     x: f32,
     y: f32,
+    motion: Option<PredictedMotion>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -290,32 +327,15 @@ impl CorePredictor {
         }
     }
 
-    fn snapshot(&self) -> Snapshot {
-        Snapshot {
+    fn prediction_frame(&self) -> OwnedPredictionFrame {
+        OwnedPredictionFrame {
             tick: self.tick,
-            world_combat_position: None,
-            steel: self.steel.unwrap_or(0),
-            oil: self.oil.unwrap_or(0),
-            supply_used: self.supply_used.unwrap_or(0),
-            supply_cap: self.supply_cap.unwrap_or(0),
-            auto_build: None,
             entities: self
                 .owned
                 .values()
-                .map(|entity| entity.to_view(self.player_id))
+                .filter(|entity| entity.has_pose_claim())
+                .map(EntityState::to_prediction_patch)
                 .collect(),
-            resource_deltas: Vec::new(),
-            smokes: Vec::new(),
-            ability_objects: Vec::new(),
-            trenches: Vec::new(),
-            visible_tiles: Vec::new(),
-            explored_tiles: Vec::new(),
-            remembered_buildings: Vec::new(),
-            remembered_anti_tank_guns: Vec::new(),
-            events: Vec::new(),
-            upgrades: Vec::new(),
-            player_resources: Vec::new(),
-            net_status: SnapshotNetStatus::default(),
         }
     }
 
@@ -404,6 +424,9 @@ impl CorePredictor {
                         entity.active_order = None;
                         entity.queued_orders.clear();
                         entity.state = "idle".to_string();
+                        entity.motion = Some(PredictedMotion::Idle);
+                        entity.authoritative_barrier_after = None;
+                        entity.terminal_pose_claim = false;
                     }
                 }
             }
@@ -444,6 +467,7 @@ impl CorePredictor {
                     kind,
                     x: target_x,
                     y: target_y,
+                    motion: Some(PredictedMotion::Move),
                 };
                 if queued {
                     if !entity.queue_has_terminal_hold() {
@@ -453,6 +477,9 @@ impl CorePredictor {
                     entity.active_order = Some(order);
                     entity.queued_orders.clear();
                     entity.state = state_for_order(kind).to_string();
+                    entity.motion = order.motion;
+                    entity.authoritative_barrier_after = None;
+                    entity.terminal_pose_claim = false;
                 }
             }
         }
@@ -477,15 +504,20 @@ impl CorePredictor {
                     kind: MoveOrderKind::HoldPosition,
                     x,
                     y,
+                    motion: Some(PredictedMotion::Idle),
                 });
             } else {
                 entity.active_order = Some(MoveOrder {
                     kind: MoveOrderKind::HoldPosition,
                     x: entity.x,
                     y: entity.y,
+                    motion: Some(PredictedMotion::Idle),
                 });
                 entity.queued_orders.clear();
                 entity.state = "idle".to_string();
+                entity.motion = Some(PredictedMotion::Idle);
+                entity.authoritative_barrier_after = None;
+                entity.terminal_pose_claim = false;
             }
         }
     }
@@ -507,13 +539,14 @@ impl CorePredictor {
 
 impl EntityState {
     fn try_from_baseline(baseline: OwnedEntityBaseline) -> Result<Self, String> {
+        let authoritative_barrier_after = baseline.authoritative_barrier_after;
         let kind = baseline
             .kind
             .parse::<EntityKind>()
             .map_err(|_| format!("unsupported entity kind {:?}", baseline.kind))?;
         let mut active_order = None;
         let mut queued_orders = VecDeque::new();
-        for marker in owner_safe_order_plan(&baseline.order_plan) {
+        for marker in owner_safe_order_plan_prefix(&baseline.order_plan) {
             let order = MoveOrder {
                 kind: match marker.kind.as_str() {
                     "attackMove" => MoveOrderKind::AttackMove,
@@ -522,29 +555,36 @@ impl EntityState {
                 },
                 x: marker.x,
                 y: marker.y,
+                // Reconstructing an authoritative baseline order is sufficient for pose
+                // prediction, but does not grant presentation authority over gameplay activity.
+                motion: None,
             };
             // Authoritative active HoldPosition is intentionally absent from orderPlan, so every
             // hold marker arriving in a baseline is a queued terminal stage.
-            if active_order.is_none() && order.kind != MoveOrderKind::HoldPosition {
+            if authoritative_barrier_after != Some(0)
+                && active_order.is_none()
+                && order.kind != MoveOrderKind::HoldPosition
+            {
                 active_order = Some(order);
             } else {
                 queued_orders.push_back(order);
             }
         }
+        let state = baseline.state.unwrap_or_else(|| {
+            active_order
+                .map(|order| state_for_order(order.kind).to_string())
+                .unwrap_or_else(|| "idle".to_string())
+        });
         Ok(Self {
             id: baseline.id,
             kind,
             x: baseline.x,
             y: baseline.y,
-            hp: baseline.hp,
-            max_hp: baseline.max_hp,
-            state: baseline.state.unwrap_or_else(|| {
-                active_order
-                    .map(|order| state_for_order(order.kind).to_string())
-                    .unwrap_or_else(|| "idle".to_string())
-            }),
+            state,
             facing: baseline.facing,
-            weapon_facing: baseline.weapon_facing,
+            motion: None,
+            authoritative_barrier_after,
+            terminal_pose_claim: false,
             active_order,
             queued_orders,
         })
@@ -554,6 +594,11 @@ impl EntityState {
         let Some(order) = self.active_order else {
             if self.queued_orders.is_empty() {
                 self.state = "idle".to_string();
+            } else if self.authoritative_barrier_after == Some(0) {
+                // Gathering, construction, combat, and other unsupported authoritative activity
+                // may own the current stage. A queued local move is not active merely because the
+                // movement-only model cannot see that stage.
+                return;
             } else {
                 self.finish_order();
             }
@@ -594,28 +639,43 @@ impl EntityState {
     }
 
     fn finish_order(&mut self) {
-        self.active_order = self.queued_orders.pop_front();
+        let completed_pose_order = self.active_order.is_some();
+        let completed_predicted_order = self
+            .active_order
+            .is_some_and(|order| order.motion.is_some());
+        if completed_pose_order {
+            if let Some(stages_before_barrier) = self.authoritative_barrier_after.as_mut() {
+                *stages_before_barrier = stages_before_barrier.saturating_sub(1);
+            }
+        }
+        self.active_order = if self.authoritative_barrier_after == Some(0) {
+            None
+        } else {
+            self.queued_orders.pop_front()
+        };
+        self.motion = self
+            .active_order
+            .and_then(|order| order.motion)
+            .or_else(|| completed_predicted_order.then_some(PredictedMotion::Idle));
+        self.terminal_pose_claim = completed_pose_order && self.active_order.is_none();
         self.state = self
             .active_order
             .map(|order| state_for_order(order.kind).to_string())
             .unwrap_or_else(|| "idle".to_string());
     }
 
-    fn to_view(&self, player_id: u32) -> EntityView {
-        let mut view = EntityView::new(
-            self.id,
-            player_id,
-            self.kind.stable_id(),
-            self.x,
-            self.y,
-            self.hp,
-            self.max_hp,
-            &self.state,
-        );
-        view.facing = self.facing;
-        view.weapon_facing = self.weapon_facing;
-        view.order_plan = self.order_plan();
-        view
+    fn to_prediction_patch(&self) -> EntityPredictionPatch {
+        EntityPredictionPatch {
+            id: self.id,
+            x: self.x,
+            y: self.y,
+            facing: self.facing,
+            motion: self.motion,
+        }
+    }
+
+    fn has_pose_claim(&self) -> bool {
+        self.active_order.is_some() || self.motion.is_some() || self.terminal_pose_claim
     }
 
     fn to_summary(&self) -> PredictedEntitySummary {
@@ -632,13 +692,6 @@ impl EntityState {
                 .map(|order| order.to_marker())
                 .collect(),
         }
-    }
-
-    fn order_plan(&self) -> Vec<OrderPlanMarker> {
-        self.active_order_marker()
-            .into_iter()
-            .chain(self.queued_orders.iter().map(|order| order.to_marker()))
-            .collect()
     }
 
     fn active_order_marker(&self) -> Option<OrderPlanMarker> {
@@ -716,9 +769,9 @@ impl WasmPredictor {
         self.core.advance_ticks(ticks);
     }
 
-    #[wasm_bindgen(js_name = renderSnapshotJson)]
-    pub fn render_snapshot_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.core.snapshot()).map_err(js_error)
+    #[wasm_bindgen(js_name = renderPredictionFrameJson)]
+    pub fn render_prediction_frame_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.core.prediction_frame()).map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = diagnosticsJson)]
@@ -760,8 +813,8 @@ impl NativePredictor {
         self.core.advance_ticks(ticks);
     }
 
-    pub fn render_snapshot(&self) -> Snapshot {
-        self.core.snapshot()
+    pub fn render_prediction_frame(&self) -> OwnedPredictionFrame {
+        self.core.prediction_frame()
     }
 
     pub fn diagnostics(&self) -> PredictorDiagnostics {
@@ -789,12 +842,30 @@ fn correction_magnitude(
         .fold(0.0, f32::max)
 }
 
-fn owner_safe_order_plan(markers: &[OrderPlanMarker]) -> Vec<OrderPlanMarker> {
+fn owner_safe_order_plan_prefix(markers: &[OrderPlanMarker]) -> Vec<OrderPlanMarker> {
     markers
         .iter()
-        .filter(|marker| matches!(marker.kind.as_str(), "move" | "attackMove" | "holdPosition"))
+        .take_while(|marker| is_supported_order_marker(marker))
         .cloned()
         .collect()
+}
+
+fn authoritative_order_barrier(entity: &EntityView) -> Option<usize> {
+    let first_unsupported = entity
+        .order_plan
+        .iter()
+        .position(|marker| !is_supported_order_marker(marker));
+    if entity.order_plan.is_empty() {
+        (entity.state != "idle").then_some(0)
+    } else if entity.state != "move" {
+        Some(0)
+    } else {
+        first_unsupported
+    }
+}
+
+fn is_supported_order_marker(marker: &OrderPlanMarker) -> bool {
+    matches!(marker.kind.as_str(), "move" | "attackMove" | "holdPosition")
 }
 
 fn unsupported_fields() -> Vec<String> {
@@ -846,7 +917,7 @@ fn js_error<E: ToString>(error: E) -> JsValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rts_contract::PlayerStart;
+    use rts_contract::{PlayerStart, SnapshotNetStatus};
 
     fn start_payload() -> StartPayload {
         StartPayload {
@@ -894,7 +965,7 @@ mod tests {
     }
 
     fn snapshot() -> Snapshot {
-        let mut owned = EntityView::new(101, 1, "worker", 100.0, 100.0, 40, 40, "idle");
+        let mut owned = EntityView::new(101, 1, "worker", 100.0, 100.0, 40, 40, "move");
         owned.order_plan = vec![OrderPlanMarker {
             kind: "move".to_string(),
             x: 120.0,
@@ -954,19 +1025,26 @@ mod tests {
     }
 
     #[test]
-    fn render_snapshot_excludes_visible_obstacles_and_fog_state() {
+    fn prediction_frame_contains_only_owned_pose_patches() {
         let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
         let mut predictor = predictor_from_start_payload(start_payload(), 1);
         predictor.import_baseline(baseline).unwrap();
 
-        let rendered = predictor.render_snapshot();
+        let rendered = predictor.render_prediction_frame();
         assert_eq!(rendered.entities.len(), 1);
-        assert_eq!(rendered.entities[0].owner, 1);
         assert_eq!(rendered.entities[0].id, 101);
-        assert!(rendered.visible_tiles.is_empty());
-        assert!(rendered.events.is_empty());
-        assert!(rendered.smokes.is_empty());
-        assert!(rendered.remembered_buildings.is_empty());
+        assert_eq!(rendered.entities[0].x, 100.0);
+        assert_eq!(rendered.entities[0].y, 100.0);
+        assert_eq!(rendered.entities[0].motion, None);
+
+        let json = serde_json::to_value(&rendered).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "tick": 10,
+                "entities": [{ "id": 101, "x": 100.0, "y": 100.0 }]
+            })
+        );
 
         let diagnostics = predictor.diagnostics();
         assert!(diagnostics
@@ -979,11 +1057,211 @@ mod tests {
     }
 
     #[test]
+    fn baseline_gather_and_build_activity_are_preserved_by_absence() {
+        for authoritative_state in ["gather", "build"] {
+            let mut authoritative = snapshot();
+            authoritative.entities[0].state = authoritative_state.to_string();
+            authoritative.entities[0].order_plan.clear();
+            let baseline = OwnedPredictionBaseline::from_snapshot(1, &authoritative);
+            let mut predictor = predictor_from_start_payload(start_payload(), 1);
+            predictor.import_baseline(baseline).unwrap();
+            predictor.enqueue_command(
+                5,
+                Command::Move {
+                    units: vec![101],
+                    x: 140.0,
+                    y: 100.0,
+                    queued: true,
+                },
+            );
+
+            predictor.advance_ticks(5);
+            let frame = predictor.render_prediction_frame();
+            assert!(frame.entities.is_empty(), "{authoritative_state}");
+        }
+    }
+
+    #[test]
+    fn unsupported_active_order_plan_stage_discards_unreachable_supported_suffix() {
+        for unsupported_kind in ["gather", "build"] {
+            let mut authoritative = snapshot();
+            authoritative.entities[0].state = unsupported_kind.to_string();
+            authoritative.entities[0].order_plan = vec![
+                OrderPlanMarker {
+                    kind: unsupported_kind.to_string(),
+                    x: 100.0,
+                    y: 100.0,
+                },
+                OrderPlanMarker {
+                    kind: "move".to_string(),
+                    x: 140.0,
+                    y: 100.0,
+                },
+            ];
+
+            let baseline = OwnedPredictionBaseline::from_snapshot(1, &authoritative);
+            assert_eq!(
+                baseline.owned_entities[0].authoritative_barrier_after,
+                Some(0)
+            );
+            assert!(baseline.owned_entities[0].order_plan.is_empty());
+
+            let mut predictor = predictor_from_start_payload(start_payload(), 1);
+            predictor.import_baseline(baseline).unwrap();
+            predictor.advance_ticks(30);
+            assert!(
+                predictor.render_prediction_frame().entities.is_empty(),
+                "{unsupported_kind}"
+            );
+        }
+    }
+
+    #[test]
+    fn middle_authoritative_barrier_stops_retained_and_local_queued_moves() {
+        for barrier_kind in ["gather", "build"] {
+            let mut authoritative = snapshot();
+            authoritative.entities[0].state = "move".to_string();
+            authoritative.entities[0].order_plan = vec![
+                OrderPlanMarker {
+                    kind: "move".to_string(),
+                    x: 102.0,
+                    y: 100.0,
+                },
+                OrderPlanMarker {
+                    kind: barrier_kind.to_string(),
+                    x: 102.0,
+                    y: 100.0,
+                },
+                OrderPlanMarker {
+                    kind: "move".to_string(),
+                    x: 140.0,
+                    y: 100.0,
+                },
+            ];
+            let baseline = OwnedPredictionBaseline::from_snapshot(1, &authoritative);
+            assert_eq!(
+                baseline.owned_entities[0].authoritative_barrier_after,
+                Some(1)
+            );
+            assert_eq!(baseline.owned_entities[0].order_plan.len(), 1);
+
+            let mut predictor = predictor_from_start_payload(start_payload(), 1);
+            predictor.import_baseline(baseline).unwrap();
+            predictor.enqueue_command(
+                9,
+                Command::Move {
+                    units: vec![101],
+                    x: 160.0,
+                    y: 100.0,
+                    queued: true,
+                },
+            );
+            predictor.advance_ticks(60);
+
+            let frame = predictor.render_prediction_frame();
+            assert_eq!(frame.entities[0].x, 102.0, "{barrier_kind}");
+            assert_eq!(frame.entities[0].motion, None, "{barrier_kind}");
+            let summary = predictor.local_lane_summary();
+            assert!(summary.owned_entities[0].order_plan.is_empty());
+            assert_eq!(summary.owned_entities[0].queued_order_stages[0].x, 160.0);
+        }
+    }
+
+    #[test]
+    fn non_movement_authoritative_state_blocks_visible_move_marker() {
+        for authoritative_state in ["attack", "gather", "build", "idle"] {
+            let mut authoritative = snapshot();
+            authoritative.entities[0].state = authoritative_state.to_string();
+            authoritative.entities[0].order_plan = vec![OrderPlanMarker {
+                kind: "move".to_string(),
+                x: 140.0,
+                y: 100.0,
+            }];
+            let baseline = OwnedPredictionBaseline::from_snapshot(1, &authoritative);
+            assert_eq!(
+                baseline.owned_entities[0].authoritative_barrier_after,
+                Some(0)
+            );
+
+            let mut predictor = predictor_from_start_payload(start_payload(), 1);
+            predictor.import_baseline(baseline).unwrap();
+            predictor.advance_ticks(60);
+            assert!(
+                predictor.render_prediction_frame().entities.is_empty(),
+                "{authoritative_state}"
+            );
+            assert_eq!(
+                predictor.local_lane_summary().owned_entities[0].queued_order_stages[0].x,
+                140.0
+            );
+        }
+    }
+
+    #[test]
+    fn baseline_movement_keeps_terminal_pose_claim_until_reconciliation() {
+        let mut predictor = predictor_from_start_payload(start_payload(), 1);
+        predictor
+            .import_baseline(OwnedPredictionBaseline::from_snapshot(1, &snapshot()))
+            .unwrap();
+
+        predictor.advance_ticks(100);
+        assert_eq!(
+            serde_json::to_value(predictor.render_prediction_frame()).unwrap(),
+            serde_json::json!({
+                "tick": 110,
+                "entities": [{
+                    "id": 101,
+                    "x": 120.0,
+                    "y": 100.0,
+                    "facing": 0.0
+                }]
+            })
+        );
+
+        predictor.advance_ticks(30);
+        let retained = predictor.render_prediction_frame();
+        assert_eq!(retained.entities[0].x, 120.0);
+        assert_eq!(retained.entities[0].motion, None);
+
+        let mut reconciled = snapshot();
+        reconciled.tick = 140;
+        reconciled.entities[0].x = 120.0;
+        reconciled.entities[0].state = "idle".to_string();
+        reconciled.entities[0].order_plan.clear();
+        predictor
+            .import_baseline(OwnedPredictionBaseline::from_snapshot(1, &reconciled))
+            .unwrap();
+        assert!(predictor.render_prediction_frame().entities.is_empty());
+    }
+
+    #[test]
+    fn serialized_pose_patch_has_no_identity_or_full_state_claims() {
+        let patch = EntityPredictionPatch {
+            id: 101,
+            x: 101.5,
+            y: 99.25,
+            facing: Some(0.5),
+            motion: Some(PredictedMotion::Move),
+        };
+
+        assert_eq!(
+            serde_json::to_value(patch).unwrap(),
+            serde_json::json!({
+                "id": 101,
+                "x": 101.5,
+                "y": 99.25,
+                "facing": 0.5,
+                "motion": "move"
+            })
+        );
+    }
+
+    #[test]
     fn attack_command_is_authoritative_only() {
         let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
         let mut predictor = predictor_from_start_payload(start_payload(), 1);
         predictor.import_baseline(baseline).unwrap();
-        let before = predictor.render_snapshot();
+        let before = predictor.render_prediction_frame();
 
         predictor.enqueue_command(
             7,
@@ -995,11 +1273,10 @@ mod tests {
             },
         );
 
-        let after = predictor.render_snapshot();
+        let after = predictor.render_prediction_frame();
         assert_eq!(after.entities[0].x, before.entities[0].x);
         assert_eq!(after.entities[0].y, before.entities[0].y);
-        assert_eq!(after.entities[0].hp, before.entities[0].hp);
-        assert_eq!(after.events.len(), 0);
+        assert_eq!(after.entities[0].motion, None);
         let diagnostics = predictor.diagnostics();
         assert_eq!(diagnostics.pending_client_seqs, vec![7]);
         assert!(diagnostics
@@ -1052,6 +1329,7 @@ mod tests {
                 facing: None,
                 weapon_facing: None,
                 order_plan: Vec::new(),
+                authoritative_barrier_after: None,
             }],
             visible_obstacles: Vec::new(),
         };
@@ -1061,8 +1339,8 @@ mod tests {
         b.import_baseline(baseline).unwrap();
         a.advance_ticks(30);
         b.advance_ticks(30);
-        assert_eq!(a.render_snapshot(), b.render_snapshot());
-        assert_eq!(a.render_snapshot().entities[0].x, 10.0);
+        assert_eq!(a.render_prediction_frame(), b.render_prediction_frame());
+        assert!(a.render_prediction_frame().entities.is_empty());
     }
 
     #[test]
@@ -1080,12 +1358,12 @@ mod tests {
             },
         );
         predictor.advance_ticks(3);
-        let snapshot = predictor.render_snapshot();
-        let entity = &snapshot.entities[0];
+        let frame = predictor.render_prediction_frame();
+        let entity = &frame.entities[0];
         assert!(entity.x > 100.0);
-        assert_eq!(entity.owner, 1);
         assert_eq!(entity.y, 100.0);
-        assert_eq!(entity.state, "move");
+        assert_eq!(entity.motion, Some(PredictedMotion::Move));
+        assert_eq!(entity.facing, Some(0.0));
         assert_eq!(predictor.diagnostics().pending_commands, 1);
     }
 
@@ -1116,7 +1394,10 @@ mod tests {
         assert_eq!(summary.owned_entities[0].order_plan[0].x, 102.0);
         assert_eq!(summary.owned_entities[0].queued_order_stages[0].y, 104.0);
         predictor.advance_ticks(2);
-        assert_eq!(predictor.render_snapshot().entities[0].state, "move");
+        assert_eq!(
+            predictor.render_prediction_frame().entities[0].motion,
+            Some(PredictedMotion::Move)
+        );
     }
 
     #[test]
@@ -1149,10 +1430,11 @@ mod tests {
         );
 
         predictor.advance_ticks(16);
-        let entity = &predictor.render_snapshot().entities[0];
+        let frame = predictor.render_prediction_frame();
+        let entity = &frame.entities[0];
         assert_eq!(entity.x, 110.0);
         assert_eq!(entity.y, 100.0);
-        assert_eq!(entity.state, "idle");
+        assert_eq!(entity.motion, Some(PredictedMotion::Idle));
     }
 
     #[test]
@@ -1206,9 +1488,8 @@ mod tests {
                 queued: false,
             },
         );
-        let held = &predictor.render_snapshot().entities[0];
-        assert_eq!(held.state, "idle");
-        assert!(held.order_plan.is_empty());
+        let held = &predictor.render_prediction_frame().entities[0];
+        assert_eq!(held.motion, Some(PredictedMotion::Idle));
 
         predictor.enqueue_command(
             2,
@@ -1220,15 +1501,17 @@ mod tests {
             },
         );
 
-        let queued = &predictor.render_snapshot().entities[0];
-        assert_eq!(queued.state, "idle");
-        assert_eq!(queued.order_plan.len(), 1);
-        assert_eq!(queued.order_plan[0].kind, "move");
+        let queued = &predictor.render_prediction_frame().entities[0];
+        assert_eq!(queued.motion, Some(PredictedMotion::Idle));
+        assert_eq!(
+            predictor.local_lane_summary().owned_entities[0].queued_order_stages[0].kind,
+            "move"
+        );
 
         predictor.advance_ticks(2);
-        let moving = &predictor.render_snapshot().entities[0];
+        let moving = &predictor.render_prediction_frame().entities[0];
         assert!(moving.x > 100.0);
-        assert_eq!(moving.state, "move");
+        assert_eq!(moving.motion, Some(PredictedMotion::Move));
     }
 
     #[test]
@@ -1305,7 +1588,7 @@ mod tests {
             .unwrap();
         predictor.enqueue_command(1, serde_json::from_str(&command_json).unwrap());
         predictor.advance_ticks(5);
-        let render_json = serde_json::to_string(&predictor.snapshot()).unwrap();
+        let render_json = serde_json::to_string(&predictor.prediction_frame()).unwrap();
         assert!(render_json.contains("\"tick\":15"));
         assert!(serde_json::to_string(&predictor.diagnostics())
             .unwrap()

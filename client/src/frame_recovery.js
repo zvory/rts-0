@@ -202,7 +202,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     const frameSummary = match.frameProfiler?.endFrame({ context: collectMatchFrameContext(match) });
     if (!capture) {
       match.health?.noteFrameSummary?.(frameSummary, {
-        predictedSnapshotPresent: (match.state?.predictedById?.size || 0) > 0,
+        predictedSnapshotPresent: (match.state?.predictionPatchById?.size || 0) > 0,
       });
     }
   }

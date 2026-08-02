@@ -6,7 +6,9 @@ import {
 } from "../client/src/prediction_controller.js";
 import { predictionCompatibility } from "../client/src/prediction_compatibility.js";
 import { DEFAULT_FACTION_ID, PREDICTION_PROTOCOL_VERSION } from "../client/src/protocol.js";
+import { createRigRenderContext } from "../client/src/renderer/rigs/animation.js";
 import { GameState } from "../client/src/state.js";
+import { SimWasmPredictionAdapter } from "../client/src/sim_wasm_adapter.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -14,6 +16,22 @@ function assert(cond, msg) {
 
 function sentSeqs(sent) {
   return sent.map((entry) => entry.clientSeq).join(",");
+}
+
+{
+  let fullSnapshotCalled = false;
+  const adapter = new SimWasmPredictionAdapter();
+  adapter.ready = true;
+  adapter.predictor = {
+    renderPredictionFrameJson: () => JSON.stringify({ tick: 7, entities: [{ id: 1, x: 4, y: 5 }] }),
+    renderSnapshotJson: () => {
+      fullSnapshotCalled = true;
+      throw new Error("legacy full snapshot render must not be used");
+    },
+  };
+  const frame = adapter.renderPredictionFrame();
+  assert(frame.tick === 7 && frame.entities[0].x === 4, "WASM adapter consumes the sparse prediction-frame API");
+  assert(fullSnapshotCalled === false, "WASM adapter never requests a synthetic full snapshot");
 }
 
 {
@@ -277,20 +295,94 @@ function sentSeqs(sent) {
     events: [],
   });
   state.applyPredictionDisplayOverlay({
-    predictedSnapshot: {
+    predictionFrame: {
       tick: 3,
-      entities: [{ id: 10, owner: 1, kind: "worker", x: 52, y: 32, hp: 40, maxHp: 40, state: "move" }],
+      entities: [{ id: 10, x: 52, y: 32, facing: 1.5, motion: "move" }],
     },
   });
   assert(state.entitiesInterpolated(1)[0].x === 52, "render reads predicted owned position");
+  assert(state.entitiesInterpolated(1)[0].state === "move", "explicit predicted motion drives immediate movement presentation");
   assert(
     state.entitiesInterpolated(1, { includePrediction: false })[0].x === 32,
     "authoritative reads can ignore prediction for fog",
   );
   assert(state.entityById(10).x === 52, "entityById exposes predicted owned position for local UX");
+  assert(state.entityById(10).facing === 1.5, "entityById composes predicted body facing onto authority");
   state.applyPredictionDisplayOverlay({ optimisticCommands: { production: [], rally: [] } });
   assert(state.entitiesInterpolated(1)[0].x === 52, "optimistic overlay updates do not clear predicted movement");
   assert(state.localFactionId === DEFAULT_FACTION_ID, "GameState exposes normalized local faction identity");
+}
+
+{
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0), resources: [] },
+    players: [
+      { id: 1, teamId: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 },
+      { id: 2, teamId: 2, name: "B", color: "#0f0", startTileX: 2, startTileY: 2 },
+    ],
+  });
+  const authoritative = [
+    {
+      id: 20, owner: 1, kind: "worker", x: 32, y: 32, facing: 0.25,
+      hp: 31, maxHp: 40, state: "gather", weaponFacing: 2.4, targetId: 90,
+      latchedNode: 90, setupState: "deployed", abilities: ["future_ability"],
+      futureSentinel: { mustSurvive: true },
+    },
+    {
+      id: 21, owner: 1, kind: "worker", x: 64, y: 32, facing: 0.5,
+      hp: 38, maxHp: 40, state: "build", buildProgress: 0.4, targetId: 91,
+      futureSentinel: "construction-preserved",
+    },
+    { id: 22, owner: 2, kind: "worker", x: 96, y: 32, hp: 40, maxHp: 40, state: "idle" },
+  ];
+  state.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 2,
+    supplyCap: 10,
+    entities: authoritative,
+    events: [],
+  });
+
+  const applyBusyFrame = (offset) => state.applyPredictionDisplayOverlay({
+    predictionFrame: {
+      tick: 1 + offset,
+      entities: [
+        {
+          id: 20, x: 32 + offset, y: 33, facing: 1,
+          owner: 999, kind: "tank", hp: 0, state: "idle", weaponFacing: 0,
+          latchedNode: null, abilities: [], futureSentinel: "clobbered",
+        },
+        {
+          id: 21, x: 64 + offset, y: 34,
+          state: "idle", buildProgress: 0, targetId: null, futureSentinel: "clobbered",
+        },
+        { id: 22, x: 140, y: 32, motion: "move" },
+        { id: 999, x: 200, y: 200, motion: "move" },
+      ],
+    },
+  });
+
+  for (const offset of [1, 2, 3, 4]) {
+    applyBusyFrame(offset);
+    const gather = state.entityById(20);
+    const build = state.entityById(21);
+    assert(gather.x === 32 + offset && gather.facing === 1, "sparse prediction keeps owned pose responsive");
+    assert(gather.state === "gather" && gather.latchedNode === 90, "missing motion preserves gathering activity across prediction frames");
+    assert(createRigRenderContext(gather).busy === true, "gathering worker keeps the yellow busy indicator across prediction frames");
+    assert(gather.hp === 31 && gather.weaponFacing === 2.4 && gather.targetId === 90, "prediction cannot overwrite authoritative combat and health fields");
+    assert(gather.abilities[0] === "future_ability" && gather.futureSentinel.mustSurvive, "prediction preserves optional and future authoritative fields");
+    assert(build.state === "build" && build.buildProgress === 0.4 && build.targetId === 91, "missing motion preserves construction activity across prediction frames");
+    assert(createRigRenderContext(build).busy === true, "constructing worker keeps the yellow busy indicator across prediction frames");
+    assert(build.futureSentinel === "construction-preserved", "construction projection preserves unknown future fields");
+    assert(state.entityById(22).x === 96 && state.entityById(22).predicted !== true, "prediction patches cannot alter another player's entity");
+    assert(state.entityById(999) === undefined, "prediction patches cannot create entities absent from authority");
+    const variants = state.entityVariants(1);
+    assert(variants.interpolatedEntities.find((e) => e.id === 20)?.state === "gather", "frame variants use the same authoritative-first compositor");
+  }
 }
 
 {
@@ -549,11 +641,11 @@ function sentSeqs(sent) {
     events: [],
   });
   state.applyPredictionDisplayOverlay({
-    predictedSnapshot: {
+    predictionFrame: {
       tick: 2,
       entities: [
-        { id: 10, owner: 1, kind: "worker", x: 48, y: 32, hp: 40, maxHp: 40, state: "move" },
-        { id: 11, owner: 2, kind: "worker", x: 128, y: 32, hp: 40, maxHp: 40, state: "move" },
+        { id: 10, x: 48, y: 32, motion: "move" },
+        { id: 11, x: 128, y: 32, motion: "move" },
       ],
     },
   });

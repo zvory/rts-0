@@ -36,6 +36,8 @@ const forbiddenWasmDeps = [
   "tracing-subscriber",
 ];
 const forbiddenWasmSource = [
+  "renderSnapshotJson",
+  "fn snapshot(&self) -> Snapshot",
   "snapshot_for_all",
   "snapshot_full",
   "full_world",
@@ -68,6 +70,13 @@ for (const file of wasmRustFiles) {
     if (source.includes(token)) {
       failures.push(`${file}: forbidden browser-prediction source reference ${JSON.stringify(token)}`);
     }
+  }
+}
+
+for (const file of ["client/src/state.js", "client/src/prediction_frame.js"]) {
+  const source = read(file);
+  if (/\.\.\.\s*(?:predicted|prediction|patch)\b/.test(source)) {
+    failures.push(`${file}: prediction data must be composed through an explicit field allowlist`);
   }
 }
 

@@ -26,6 +26,7 @@ src/
   report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   prediction_compatibility.js # server/client prediction-build compatibility guard
+  prediction_frame.js # allowlisted composition of sparse owned-unit prediction patches
   prediction_settings.js # localStorage-backed prediction toggle
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
@@ -239,11 +240,23 @@ planned-order feedback. Promise-returning Lab issue-as commands stay non-optimis
 planned order. The controller owns browser-local `clientSeq` allocation and
 passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, spectators, and
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
-`GameState.applySnapshot` remains authoritative. Prediction display writes go through
-`GameState.applyPredictionDisplayOverlay({optimisticCommands?, predictedSnapshot?, diagnostics?,
-smoothCorrections?})`, so controller bookkeeping and WASM render snapshots stay outside broad
-snapshot mutation. Replay viewers, spectators, and dev-watch passive viewers keep prediction
-disabled and clear this overlay instead of allocating gameplay prediction state.
+`GameState.applySnapshot` remains authoritative. The partial WASM predictor returns a sparse
+`PredictionFrame` whose entity patches may identify an existing locally owned entity and claim only
+predicted position, body facing, and an optional explicit motion presentation. It never returns an
+`EntityView`, cannot create or replace entity identity, and cannot claim health, gameplay activity,
+weapon facing, construction, gathering, combat, ability, or future snapshot fields. A missing motion
+claim preserves the authoritative gameplay `state`; a motion claim is admitted only when a modeled
+pending local command owns that presentation transition. The compositor maps that claim onto the
+frame-local display entity's `move`/`idle` state for existing renderer and HUD consumers; it never
+mutates the buffered authoritative entity, and no baseline-derived activity may produce the claim.
+
+`prediction_frame.js` is the sole allowlisted compositor for these patches. Rendering, current-state
+UI reads, and `entityById()` start from the authoritative entity and apply the same compositor; they
+never spread or substitute a predicted entity record. Prediction display writes go through
+`GameState.applyPredictionDisplayOverlay({optimisticCommands?, predictionFrame?, diagnostics?,
+smoothCorrections?})`, so controller bookkeeping and prediction patches stay outside broad snapshot
+mutation. Replay viewers, spectators, and dev-watch passive viewers keep prediction disabled and
+clear this overlay instead of allocating gameplay prediction state.
 
 `renderer/rigs/schema.js`
 ```js
@@ -1098,7 +1111,7 @@ export class GameState {
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
   selectControlGroup(slot), controlGroupEntities(slot)
   setOptimisticCommandState(state)        // production/rally optimism display overlay
-  setPredictedSnapshot(snapshot, diagnostics, options), clearPredictedSnapshot()
+  setPredictionFrame(frame, diagnostics, options), clearPredictionFrame()
 }
 ```
 
@@ -2215,7 +2228,8 @@ Current areas:
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_runtime_reset.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
   `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
-  `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
+  `prediction_controller.js`, `prediction_compatibility.js`, `prediction_frame.js`,
+  `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js` plus `config/timing.js`, `config/presentation.js`,
   `config/rules_mirror.js`, and `config/factions.js`.

@@ -97,12 +97,16 @@ predictor.importBaselineJson(JSON.stringify(baseline));
 predictor.enqueueCommandJson(1, JSON.stringify({ c: "move", units: [101], x: 580, y: 100 }));
 predictor.advanceTicks(300);
 
-const rendered = JSON.parse(predictor.renderSnapshotJson());
+const rendered = JSON.parse(predictor.renderPredictionFrameJson());
 const diagnostics = JSON.parse(predictor.diagnosticsJson());
 assert(rendered.tick === 300, `expected tick 300, got ${rendered.tick}`);
-assert(rendered.entities.length === 1, "expected one owned entity");
-assert(rendered.entities[0].owner === 1, "prediction render remains scoped to owned entities");
+assert(rendered.entities.length === 1, "expected one owned prediction patch");
+assert(rendered.entities[0].id === 101, "prediction patch identifies the existing owned entity");
 assert(rendered.entities[0].x > 100, "worker advanced along move command");
+assert(
+  Object.keys(rendered.entities[0]).every((key) => ["id", "x", "y", "facing", "motion"].includes(key)),
+  "prediction patch remains capability-scoped to pose and explicit motion",
+);
 assert(diagnostics.pendingCommands === 1, "pending command diagnostics survive smoke");
 
 predictor.free();

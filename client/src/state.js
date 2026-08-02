@@ -7,6 +7,7 @@
 
 import { admitSelectionIds } from "./command_budget.js";
 import { ProgressExtrapolator } from "./progress_extrapolator.js";
+import { composePredictionPatch, normalizePredictionPatch } from "./prediction_frame.js";
 import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
 import { admitControlGroupIds } from "./state_control_groups.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
@@ -153,8 +154,8 @@ export class GameState extends VisualEffectBackedState {
     this.observerView = startInfo.observerView || null;
 
     this.groundDecals = new GroundDecalBuffer();
-    /** @type {Map<number, object>} owned predicted entity id -> predicted entity view. */
-    this.predictedById = new Map();
+    /** @type {Map<number, object>} owned entity id -> sparse local prediction patch. */
+    this.predictionPatchById = new Map();
     this.predictionCorrectionById = new Map();
     this.predictionDiagnostics = null;
     this.optimisticProduction = [];
@@ -420,8 +421,10 @@ export class GameState extends VisualEffectBackedState {
    * @returns {object|undefined}
    */
   entityById(id) {
-    const entity = this.predictedById.get(id) || this._curById.get(id);
-    return entity ? this._applyDisplayEntity({ ...entity }, this.visualNow()) : entity;
+    const entity = this._curById.get(id);
+    if (!entity) return entity;
+    const now = this.visualNow();
+    return this._applyDisplayEntity(this._applyPredictedEntity({ ...entity }, now), now);
   }
 
   progressPredictionDebug() {
@@ -435,19 +438,19 @@ export class GameState extends VisualEffectBackedState {
   applyPredictionDisplayOverlay(overlay = null) {
     if (!overlay || typeof overlay !== "object") {
       this._applyOptimisticCommandOverlay(null);
-      this._clearPredictedSnapshotOverlay();
+      this._clearPredictionFrameOverlay();
       return;
     }
     if (Object.prototype.hasOwnProperty.call(overlay, "optimisticCommands")) {
       this._applyOptimisticCommandOverlay(overlay.optimisticCommands);
     }
-    if (Object.prototype.hasOwnProperty.call(overlay, "predictedSnapshot")) {
-      if (overlay.predictedSnapshot) {
-        this._applyPredictedSnapshotOverlay(overlay.predictedSnapshot, overlay.diagnostics ?? null, {
+    if (Object.prototype.hasOwnProperty.call(overlay, "predictionFrame")) {
+      if (overlay.predictionFrame) {
+        this._applyPredictionFrameOverlay(overlay.predictionFrame, overlay.diagnostics ?? null, {
           smoothCorrections: !!overlay.smoothCorrections,
         });
       } else {
-        this._clearPredictedSnapshotOverlay();
+        this._clearPredictionFrameOverlay();
       }
     }
   }
@@ -476,21 +479,23 @@ export class GameState extends VisualEffectBackedState {
     }
   }
 
-  setPredictedSnapshot(snapshot, diagnostics = null, { smoothCorrections = false } = {}) {
-    this.applyPredictionDisplayOverlay({ predictedSnapshot: snapshot, diagnostics, smoothCorrections });
+  setPredictionFrame(frame, diagnostics = null, { smoothCorrections = false } = {}) {
+    this.applyPredictionDisplayOverlay({ predictionFrame: frame, diagnostics, smoothCorrections });
   }
 
-  _applyPredictedSnapshotOverlay(snapshot, diagnostics = null, { smoothCorrections = false } = {}) {
-    const predicted = new Map();
-    for (const entity of snapshot?.entities || []) {
-      if (entity?.owner !== this.playerId || !isUnit(entity.kind)) continue;
-      predicted.set(entity.id, { ...entity, predicted: true });
+  _applyPredictionFrameOverlay(frame, diagnostics = null, { smoothCorrections = false } = {}) {
+    const patches = new Map();
+    for (const candidate of frame?.entities || []) {
+      const authoritative = this._curById.get(candidate?.id);
+      if (!authoritative || authoritative.owner !== this.playerId || !isUnit(authoritative.kind)) continue;
+      const patch = normalizePredictionPatch(candidate);
+      if (patch) patches.set(patch.id, patch);
     }
     const now = this.visualNow();
     const corrections = new Map();
     if (smoothCorrections) {
-      for (const [id, next] of predicted) {
-        const prev = this.predictedById.get(id);
+      for (const [id, next] of patches) {
+        const prev = this.predictionPatchById.get(id);
         if (!prev) continue;
         const dx = prev.x - next.x;
         const dy = prev.y - next.y;
@@ -500,32 +505,25 @@ export class GameState extends VisualEffectBackedState {
         }
       }
     }
-    this.predictedById = predicted;
+    this.predictionPatchById = patches;
     this.predictionCorrectionById = corrections;
     this.predictionDiagnostics = diagnostics;
   }
 
-  clearPredictedSnapshot() {
-    this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
+  clearPredictionFrame() {
+    this.applyPredictionDisplayOverlay({ predictionFrame: null });
   }
 
-  _clearPredictedSnapshotOverlay() {
-    this.predictedById.clear();
+  _clearPredictionFrameOverlay() {
+    this.predictionPatchById.clear();
     this.predictionCorrectionById.clear();
     this.predictionDiagnostics = null;
   }
 
   _applyPredictedEntity(entity, now) {
-    const predicted = this.predictedById.get(entity.id);
-    if (!predicted || entity.owner !== this.playerId || !isUnit(entity.kind)) return entity;
-    const out = {
-      ...entity,
-      ...predicted,
-      hp: entity.hp,
-      maxHp: entity.maxHp,
-      owner: entity.owner,
-      predicted: true,
-    };
+    const patch = this.predictionPatchById.get(entity.id);
+    if (!patch || entity.owner !== this.playerId || !isUnit(entity.kind)) return entity;
+    const out = composePredictionPatch(entity, patch);
     const correction = this.predictionCorrectionById.get(entity.id);
     if (correction) {
       const age = now - correction.startedAt;

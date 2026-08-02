@@ -62,7 +62,7 @@ export function suspendPredictionVisuals(match) {
 }
 
 export function clearPredictedMovementOverlay(match) {
-  match.applyPredictionDisplayOverlay({ predictedSnapshot: null });
+  match.applyPredictionDisplayOverlay({ predictionFrame: null });
 }
 
 export function livePauseActionLabel(match) {

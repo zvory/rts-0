@@ -376,7 +376,7 @@ export class Match {
         () => {
           notePredictionAuthoritativeSnapshot(this);
           this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
-          this.applyPredictedSnapshot();
+          this.applyPredictionFrame();
         },
       );
       this.clientIntent?.reconcilePlannedOrders?.(this.state.selectedEntities(), {
@@ -503,7 +503,7 @@ export class Match {
     this.state?.applyPredictionDisplayOverlay?.(overlay);
   }
 
-  applyPredictedSnapshot() {
+  applyPredictionFrame() {
     if (!this.predictionStateCompatible()) {
       this.disablePredictionForStateMismatch();
       return;
@@ -515,16 +515,16 @@ export class Match {
       return;
     }
     if (!this.prediction.enabled || !this.predictionAdapter.ready) {
-      this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
+      this.applyPredictionDisplayOverlay({ predictionFrame: null });
       this.publishPredictionDebug();
       return;
     }
-    const snapshot = this.predictionAdapter.renderSnapshot();
-    if (!snapshot) return;
+    const frame = this.predictionAdapter.renderPredictionFrame();
+    if (!frame) return;
     const diagnostics = this.predictionAdapter.diagnostics();
     if (this.disablePredictionForReplayBudget(diagnostics)) return;
     this.applyPredictionDisplayOverlay({
-      predictedSnapshot: snapshot,
+      predictionFrame: frame,
       diagnostics,
       smoothCorrections: true,
     });
@@ -542,11 +542,11 @@ export class Match {
       return;
     }
     if (!this.prediction.enabled || !this.predictionAdapter.ready) return;
-    const snapshot = this.predictionAdapter.advanceVisual();
-    if (snapshot) {
+    const frame = this.predictionAdapter.advanceVisual();
+    if (frame) {
       const diagnostics = this.predictionAdapter.diagnostics();
       if (this.disablePredictionForReplayBudget(diagnostics)) return;
-      this.applyPredictionDisplayOverlay({ predictedSnapshot: snapshot, diagnostics });
+      this.applyPredictionDisplayOverlay({ predictionFrame: frame, diagnostics });
       this.publishPredictionDebug();
     }
   }
@@ -559,7 +559,7 @@ export class Match {
     });
     this.prediction.reset({ enabled: true, preserveClientSeq: true, reason: "replay-budget-exceeded" });
     this.resetPredictionAdapter();
-    this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
+    this.applyPredictionDisplayOverlay({ predictionFrame: null });
     this.publishPredictionDebug();
     this.logPredictionStatus("tracking-replay-budget-exceeded");
     return true;
@@ -604,7 +604,7 @@ export class Match {
   disablePredictionForStateMismatch() {
     if (!this.prediction.enabled) return;
     this.prediction.reset({ enabled: false, preserveClientSeq: true, reason: "state-mismatch" });
-    this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictedSnapshot: null });
+    this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictionFrame: null });
     if (!this.predictionStateMismatchLogged) {
       this.predictionStateMismatchLogged = true;
       this.logPredictionStatus("disabled-state-mismatch");
@@ -623,7 +623,7 @@ export class Match {
     if (!allowed) {
       this.predictionInitToken += 1;
       this.resetPredictionAdapter();
-      this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictedSnapshot: null });
+      this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictionFrame: null });
       this.publishPredictionDebug();
       this.mountSettings({ keepOpen: true });
       return;

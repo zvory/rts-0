@@ -72,7 +72,7 @@ export class SimWasmPredictionAdapter {
     if (!this.ready || !this.predictor) return false;
     this.predictor.enqueueCommandJson(clientSeq, JSON.stringify(command));
     this.measureTicks(() => this.predictor.advanceTicks(1), 1);
-    this.lastPredictedTick = this.renderSnapshot()?.tick ?? this.lastPredictedTick;
+    this.lastPredictedTick = this.renderPredictionFrame()?.tick ?? this.lastPredictedTick;
     return true;
   }
 
@@ -96,7 +96,7 @@ export class SimWasmPredictionAdapter {
     const correction = Number(diagnostics?.correctionMagnitude) || 0;
     this.maxCorrectionDistance = Math.max(this.maxCorrectionDistance, correction);
     if (correction > SNAP_CORRECTION_PX) this.snapCorrectionCount += 1;
-    this.lastPredictedTick = this.renderSnapshot()?.tick ?? authoritativeSnapshot.tick ?? null;
+    this.lastPredictedTick = this.renderPredictionFrame()?.tick ?? authoritativeSnapshot.tick ?? null;
     this.lastAdvanceAt = this.now();
     return {
       diagnostics,
@@ -118,9 +118,9 @@ export class SimWasmPredictionAdapter {
       this.measureTicks(() => this.predictor.advanceTicks(ticks), ticks);
       this.lastAdvanceAt += ticks * (1000 / 30);
     }
-    const snapshot = this.renderSnapshot();
-    if (snapshot) this.lastPredictedTick = snapshot.tick;
-    return snapshot;
+    const frame = this.renderPredictionFrame();
+    if (frame) this.lastPredictedTick = frame.tick;
+    return frame;
   }
 
   pauseVisualClock() {
@@ -128,9 +128,9 @@ export class SimWasmPredictionAdapter {
     if (Number.isFinite(now)) this.lastAdvanceAt = now;
   }
 
-  renderSnapshot() {
+  renderPredictionFrame() {
     if (!this.ready || !this.predictor) return null;
-    return JSON.parse(this.predictor.renderSnapshotJson());
+    return JSON.parse(this.predictor.renderPredictionFrameJson());
   }
 
   diagnostics() {

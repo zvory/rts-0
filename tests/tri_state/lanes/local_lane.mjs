@@ -144,7 +144,7 @@ export class WasmLocalLane {
     return this.record("capture", {
       label,
       summary: this.summary(),
-      renderSnapshot: this.renderSnapshotSummary(),
+      predictionFrame: this.renderPredictionFrameSummary(),
       diagnostics: this.diagnostics(),
     }).summary;
   }
@@ -214,20 +214,18 @@ export class WasmLocalLane {
     return { ready: true, ...JSON.parse(this.predictor.diagnosticsJson()) };
   }
 
-  renderSnapshotSummary() {
+  renderPredictionFrameSummary() {
     if (!this.ready || !this.predictor) return null;
-    const snapshot = JSON.parse(this.predictor.renderSnapshotJson());
+    const frame = JSON.parse(this.predictor.renderPredictionFrameJson());
     return {
-      tick: snapshot.tick,
-      entityCount: snapshot.entities?.length || 0,
-      entities: (snapshot.entities || []).map((entity) => ({
-        id: entity.id,
-        owner: entity.owner,
-        kind: entity.kind,
-        x: round(entity.x),
-        y: round(entity.y),
-        state: entity.state,
-        orderPlan: summarizePlan(entity.orderPlan || []),
+      tick: frame.tick,
+      entityCount: frame.entities?.length || 0,
+      entities: (frame.entities || []).map((patch) => ({
+        id: patch.id,
+        x: round(patch.x),
+        y: round(patch.y),
+        facing: round(patch.facing),
+        motion: patch.motion,
       })),
     };
   }
