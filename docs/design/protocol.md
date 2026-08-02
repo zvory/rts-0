@@ -709,15 +709,15 @@ expose all active player rows. Each row carries that owner's completed research 
 observer views do not depend on the single-recipient top-level `upgrades` field.
 
 Durable death, mortar-impact, and artillery-impact decals live in an authoritative append-only
-store capped at 4,096 rows per match. A mark becomes known to a player only when its point or blast
-footprint is physically visible in that player's current team fog; firing ownership and transient
-event delivery do not by themselves reveal an impact hidden in fog. `groundDecalRevision` is the
-latest discovery revision for the projected player union (or the global cursor for omniscient
-views). Clients compare it with their cache and send `requestGroundDecals`; the reliable response
-contains only marks first discovered after `afterRevision`, or marks created after that cursor for
-omniscient views. Full requests from zero repair late joins, reconnects, seeks, and view changes.
-The client cache is an optimization: checkpointed server rows and discovery revisions are the
-authority.
+store with compact typed rows and a derived spatial discovery index. A mark becomes known to a
+player only when its point or blast footprint is physically visible in that player's current team
+fog; firing ownership and transient event delivery do not by themselves reveal an impact hidden
+in fog. `groundDecalRevision` is the latest discovery revision for the projected player union (or
+the global cursor for omniscient views). Clients compare it with their cache and send
+`requestGroundDecals`; the reliable response contains only marks first discovered after
+`afterRevision`, or marks created after that cursor for omniscient views. Full requests from zero
+repair late joins, reconnects, seeks, and view changes. The client cache is an optimization:
+checkpointed server rows and discovery revisions are the authority.
 
 For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
 server-authoritative union of current fog grids contributed by living teammates on the recipient's

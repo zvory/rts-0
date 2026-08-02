@@ -9,7 +9,7 @@ use super::commands::PendingCommand;
 use super::entity::{Entity, EntityStore};
 use super::firing_reveal::FiringRevealSource;
 use super::fog::{FiringRevealVisibility, Fog, LingeringSightSource};
-use super::ground_decal::{GroundDecalStore, MAX_GROUND_DECALS};
+use super::ground_decal::GroundDecalStore;
 use super::map::Map;
 use super::mortar::MortarShellStore;
 use super::panzerfaust_shot::PanzerfaustShotStore;
@@ -336,11 +336,6 @@ impl GameCheckpointV1 {
         )?;
         validate_count("smokes", self.smokes.checkpoint_len(), MAX_SMOKE_CLOUDS)?;
         validate_count("trenches", self.trenches.checkpoint_len(), MAX_TRENCHES)?;
-        validate_count(
-            "groundDecals",
-            self.ground_decals.checkpoint_len(),
-            MAX_GROUND_DECALS,
-        )?;
         validate_count(
             "abilityRuntime",
             self.ability_runtime.instances().count()
