@@ -24,6 +24,13 @@ use super::projection_abilities::{
     active_ability_object_expires_in, active_return_object_id, return_available_tick,
 };
 use super::projection_panzerfaust::project_panzerfaust_state;
+pub(crate) use super::projection_visibility::shot_reveals_attacker;
+#[allow(unused_imports)]
+pub use super::projection_visibility::{
+    attack_event_visible_to, attack_event_visible_to_team, attack_event_visible_to_with_smoke,
+    event_visible_to, event_visible_to_team, event_visible_to_team_with_smoke,
+    event_visible_to_with_smoke, team_visible_world,
+};
 
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
@@ -150,120 +157,6 @@ pub(crate) fn entity_visible_to_with_smoke_melee(
         private_detail_projection.includes_owner_or_ally(viewer, spotter.owner, teams)
             && smokes.units_have_melee_visibility(spotter, entity)
     })
-}
-
-pub fn event_visible_to(
-    viewer: u32,
-    event_origin_x: f32,
-    event_origin_y: f32,
-    attacker_owner: u32,
-    fog: &Fog,
-) -> bool {
-    viewer == attacker_owner || fog.is_visible_world(viewer, event_origin_x, event_origin_y)
-}
-
-pub fn team_visible_world(viewer: u32, x: f32, y: f32, fog: &Fog, teams: &TeamRelations) -> bool {
-    teams
-        .same_team_player_ids(viewer)
-        .into_iter()
-        .any(|player_id| fog.is_visible_world(player_id, x, y))
-}
-
-pub fn event_visible_to_team(
-    viewer: u32,
-    event_origin_x: f32,
-    event_origin_y: f32,
-    owner: u32,
-    fog: &Fog,
-    teams: &TeamRelations,
-) -> bool {
-    teams.same_team_or_same_owner(viewer, owner)
-        || team_visible_world(viewer, event_origin_x, event_origin_y, fog, teams)
-}
-
-pub fn event_visible_to_team_with_smoke(
-    viewer: u32,
-    event_origin_x: f32,
-    event_origin_y: f32,
-    owner: u32,
-    fog: &Fog,
-    teams: &TeamRelations,
-    smokes: &SmokeCloudStore,
-) -> bool {
-    if !teams.same_team_or_same_owner(viewer, owner)
-        && smokes.point_inside(event_origin_x, event_origin_y)
-    {
-        return false;
-    }
-    event_visible_to_team(viewer, event_origin_x, event_origin_y, owner, fog, teams)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn attack_event_visible_to_team(
-    viewer: u32,
-    attacker_x: f32,
-    attacker_y: f32,
-    target_x: f32,
-    target_y: f32,
-    attacker_owner: u32,
-    fog: &Fog,
-    teams: &TeamRelations,
-) -> bool {
-    event_visible_to_team(viewer, attacker_x, attacker_y, attacker_owner, fog, teams)
-        || team_visible_world(viewer, target_x, target_y, fog, teams)
-}
-
-/// Whether a direct shot exposes its attacker through transient and actionable firing reveals.
-pub(crate) fn shot_reveals_attacker(victim_kind: EntityKind) -> bool {
-    victim_kind != EntityKind::TankTrap
-}
-
-pub fn event_visible_to_with_smoke(
-    viewer: u32,
-    event_origin_x: f32,
-    event_origin_y: f32,
-    attacker_owner: u32,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-) -> bool {
-    if viewer != attacker_owner && smokes.point_inside(event_origin_x, event_origin_y) {
-        return false;
-    }
-    event_visible_to(viewer, event_origin_x, event_origin_y, attacker_owner, fog)
-}
-
-#[allow(dead_code)]
-pub fn attack_event_visible_to(
-    viewer: u32,
-    attacker_x: f32,
-    attacker_y: f32,
-    target_x: f32,
-    target_y: f32,
-    attacker_owner: u32,
-    fog: &Fog,
-) -> bool {
-    event_visible_to(viewer, attacker_x, attacker_y, attacker_owner, fog)
-        || fog.is_visible_world(viewer, target_x, target_y)
-}
-
-#[allow(clippy::too_many_arguments)]
-#[allow(dead_code)]
-pub fn attack_event_visible_to_with_smoke(
-    viewer: u32,
-    attacker_x: f32,
-    attacker_y: f32,
-    target_x: f32,
-    target_y: f32,
-    attacker_owner: u32,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-) -> bool {
-    if viewer != attacker_owner && smokes.point_inside(attacker_x, attacker_y) {
-        return false;
-    }
-    event_visible_to_with_smoke(viewer, attacker_x, attacker_y, attacker_owner, fog, smokes)
-        || (!smokes.point_inside(target_x, target_y)
-            && fog.is_visible_world(viewer, target_x, target_y))
 }
 
 pub fn project_entity(

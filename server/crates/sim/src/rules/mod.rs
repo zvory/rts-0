@@ -3,6 +3,7 @@
 pub mod projection;
 mod projection_abilities;
 mod projection_panzerfaust;
+mod projection_visibility;
 
 #[allow(unused_imports)]
 pub use rts_rules::{
