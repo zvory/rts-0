@@ -103,11 +103,11 @@ try {
   assert(
     LAYERS.indexOf("doodadUnderstory") < unitIndex
       && !LAYERS.includes("doodadCanopies")
+      && LAYERS.indexOf("selectionRings") < unitIndex
       && LAYERS.indexOf("forestUnitOutlines") > unitIndex
-      && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("selectionRings")
       && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("hpBars")
       && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("fog"),
-    "trees and units share one depth layer while post-processed forest outlines stay beneath selection, HP, and fog",
+    "trees and units share one depth layer while selection stays below units and forest outlines stay below HP and fog",
   );
 
   layer.destroy();

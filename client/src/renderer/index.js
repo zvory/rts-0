@@ -7,8 +7,8 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 //
 //   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
-//   → world-Y-sorted units/tree-canopies → post-processed forest-unit-outlines → smokes
-//   → selection-rings → hp-bars → fog → visual-sample-labels
+//   → selection-rings → world-Y-sorted units/tree-canopies
+//   → post-processed forest-unit-outlines → smokes → hp-bars → fog → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → feedback/miss-toasts → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
@@ -649,7 +649,9 @@ export class Renderer {
         }),
       );
     });
-    // Selection rings + HP bars after shapes are placed so they read on top.
+    // Selection rings are in a layer below units, so selected units stay readable
+    // while the ring remains visible around the silhouette. Forest outlines and HP
+    // bars stay above the unit layer.
     time("renderer.selectionHp", () => {
       for (const e of regularEntities) {
         liveIds.add(e.id);
