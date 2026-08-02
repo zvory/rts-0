@@ -2,10 +2,9 @@ use super::*;
 
 #[test]
 fn parses_ground_decal_delta_request() {
-    let msg: ClientMessage = serde_json::from_str(
-        r#"{"t":"requestGroundDecals","requestId":7,"afterRevision":23}"#,
-    )
-    .unwrap();
+    let msg: ClientMessage =
+        serde_json::from_str(r#"{"t":"requestGroundDecals","requestId":7,"afterRevision":23}"#)
+            .unwrap();
     assert!(matches!(
         msg,
         ClientMessage::RequestGroundDecals {
