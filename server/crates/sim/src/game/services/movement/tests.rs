@@ -4904,17 +4904,17 @@ fn plain_move_becomes_idle_after_arrival() {
     assert!(matches!(e.order(), Order::Idle));
 }
 
-/// A unit shoved sideways past an intermediate waypoint (but > ARRIVE_RADIUS away) should
-/// still pop it via the pass-by (dot-product) check.
+/// A unit shoved sideways past an intermediate waypoint should consume it when the swept route
+/// to the following waypoint is statically legal.
 #[test]
-fn pass_by_waypoint_pops_when_overshooting_sideways() {
+fn swept_route_skips_waypoint_after_sideways_overshoot() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     // Path: unit moves right. Intermediate at (20,20), final at (25,20).
     let (iwx, iwy) = map.tile_center(20, 20);
     let (gx, gy) = map.tile_center(25, 20);
-    // Unit is positioned past the intermediate along the path direction but 20 px above
-    // it — simulating a collision shove. dist to intermediate ≈ 20 px > ARRIVE_RADIUS (16).
+    // Unit is positioned past the intermediate along the path direction but 20 px above it,
+    // simulating a collision shove outside the legacy 16 px intermediate-arrival radius.
     let unit_x = iwx + 5.0;
     let unit_y = iwy - 20.0;
     let unit = entities
@@ -4930,7 +4930,7 @@ fn pass_by_waypoint_pops_when_overshooting_sideways() {
     assert_eq!(
         e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
         1,
-        "intermediate waypoint must be popped via pass-by when unit is geometrically past it"
+        "statically reachable next segment should allow the intermediate waypoint to be skipped"
     );
 }
 
