@@ -25,7 +25,9 @@ src/
   stress_test_launch.js # Bounded /stress-test route/query parser
   report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
+  prediction_runtime_startup.js # WASM runtime readiness and latest-snapshot catch-up
   prediction_compatibility.js # server/client prediction-build compatibility guard
+  prediction_frame.js # allowlisted composition of sparse owned pose/progress prediction patches
   prediction_settings.js # localStorage-backed prediction toggle
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   sim_wasm_adapter.js # optional WASM prediction adapter
@@ -36,7 +38,6 @@ src/
   client_intent.js # ClientIntent: browser-local placement, command targeting, lab tools, previews, feedback
   command_interaction.js # shared Input/HUD/Minimap command issue-and-planned-order recording
   command_budget.js # client mirror of command-supply selection admission and outgoing command guard
-  progress_extrapolator.js # local display extrapolation for active construction progress
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   auto_spectator.js # spectator/replay battle director: tick-paced combat clustering and camera framing
   spectator_controls_panel.js # floating live-spectator/replay camera and all-unit range controls
@@ -239,11 +240,35 @@ planned-order feedback. Promise-returning Lab issue-as commands stay non-optimis
 planned order. The controller owns browser-local `clientSeq` allocation and
 passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, spectators, and
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
-`GameState.applySnapshot` remains authoritative. Prediction display writes go through
-`GameState.applyPredictionDisplayOverlay({optimisticCommands?, predictedSnapshot?, diagnostics?,
-smoothCorrections?})`, so controller bookkeeping and WASM render snapshots stay outside broad
-snapshot mutation. Replay viewers, spectators, and dev-watch passive viewers keep prediction
-disabled and clear this overlay instead of allocating gameplay prediction state.
+`GameState.applySnapshot` remains authoritative. The partial WASM predictor returns a sparse
+`PredictionFrame` whose entity patches may identify an existing locally owned entity and claim only
+predicted position, body facing, and an optional explicit motion presentation. It never returns an
+`EntityView`, cannot create or replace entity identity, and cannot claim health, gameplay activity,
+weapon facing, gathering, combat, ability, or future snapshot fields. A missing motion
+claim preserves the authoritative gameplay `state`; a motion claim is admitted only when a modeled
+pending local command owns that presentation transition. The compositor maps that claim onto the
+frame-local display entity's `move`/`idle` state for existing renderer and HUD consumers; it never
+mutates the buffered authoritative entity, and no baseline-derived activity may produce the claim.
+
+The same frame carries a separate `progress` array whose patches contain only an existing owned
+building id, `construction`/`production` kind, active-item identity, and a normalized fraction. The
+WASM runtime derives those claims from the latest authoritative owner baseline and Rust-authoritative
+durations, samples the render clock at a fractional tick for smooth bars, and caps claims below
+completion until the server confirms completion. The client admits a patch only while the current
+authoritative building still has the same active identity and activity signal; a patch cannot create
+an entity or alter queue, health, state, economy, or supply.
+
+`prediction_frame.js` is the sole allowlisted compositor for both patch types. Rendering, current-state
+UI reads, and `entityById()` start from the authoritative entity and apply the same compositor; they
+never spread or substitute a predicted entity record. Prediction display writes go through
+`GameState.applyPredictionDisplayOverlay({optimisticCommands?, predictionFrame?, diagnostics?,
+smoothCorrections?, includePose?})`, so controller bookkeeping and prediction patches stay outside
+broad snapshot mutation. Progress is composed before train/rally optimism. Live pause clears pose but
+retains the last frozen progress frame until the first post-unpause authoritative snapshot rebases the
+WASM clock. The progress runtime is available in compatible active live-player matches independently
+of the Movement Prediction preference and supported-pose faction list; replay and spectator views do
+not predict progress. If WASM is loading or unavailable, authoritative progress is the fail-safe rather
+than a second JavaScript calculator.
 
 `renderer/rigs/schema.js`
 ```js
@@ -869,7 +894,10 @@ save/open uses the bounded lab replay artifact path instead of the legacy `expor
 authoritative map-only payload, creates a server-validated editor handoff, and navigates away; no Lab
 entity, resource, order, timeline, or replay state crosses that boundary.
 
-`MapEditorApp` owns the dedicated editor. The panel loads bundled JSON from `/maps/catalog` and
+`MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
+independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
+status, local save/load, export, and Lab handoff; Tools owns terrain paint and start/base locations.
+Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–166-tile square blank maps with a 126-tile default and a compact size field that follows the active draft, edits name/description plus flat start and base
 locations, and provides undo/redo, local save/load, and JSON export. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
@@ -1094,13 +1122,13 @@ export class GameState {
   setSelection(ids), addToSelection(ids), clearSelection()
   selectedEntities()                     // resolved entity objects from current snapshot
   entityById(id)
-  setProgressPredictionPaused(paused)    // freezes/resumes wall-clock progress display prediction
+  setProgressPredictionPaused(paused)    // exposes frozen/resumed WASM progress state to diagnostics
   // control groups (client-only):
   controlGroups                          // ten budget-admitted Array<entityId> slots; slot 9 maps to key 0
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
   selectControlGroup(slot), controlGroupEntities(slot)
   setOptimisticCommandState(state)        // production/rally optimism display overlay
-  setPredictedSnapshot(snapshot, diagnostics, options), clearPredictedSnapshot()
+  setPredictionFrame(frame, diagnostics, options), clearPredictionFrame(), clearPredictionPose()
 }
 ```
 
@@ -2205,7 +2233,7 @@ removed `GameState` intent shims such as `state.commandTarget`, `state.placement
 update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `match_combat_audio.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `prediction_runtime_startup.js`, `match_combat_audio.js`,
   `match_notice_presenter.js`,
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`,
   `match_settings_toggles.js`, `match_auto_spectator.js`, `auto_spectator.js`,
@@ -2218,8 +2246,9 @@ Current areas:
   `room_time_panel.js`, `replay_viewer.js`, `lab_control_policy.js`, `room_capabilities.js`,
   `visual_profiles.js`. App's browser leave confirmation is scoped to active running live-player matches; spectator, Lab, replay, and resolved/stopped sessions leave without the prompt.
 - `model`: `state.js`, `state_runtime_reset.js`, `state_queries.js`, `state_visual_effects.js`, `client_intent.js`,
-  `command_budget.js`, `command_composer.js`, `progress_extrapolator.js`,
-  `prediction_controller.js`, `prediction_compatibility.js`, `sim_wasm_adapter.js`.
+  `command_budget.js`, `command_composer.js`,
+  `prediction_controller.js`, `prediction_compatibility.js`, `prediction_frame.js`,
+  `sim_wasm_adapter.js`.
 - `transport`: `net.js`, `protocol.js`, `lab_client.js`.
 - `rules-mirror`: `config.js` plus `config/timing.js`, `config/presentation.js`,
   `config/rules_mirror.js`, and `config/factions.js`.
