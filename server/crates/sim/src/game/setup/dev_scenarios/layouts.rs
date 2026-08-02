@@ -166,26 +166,6 @@ pub(super) fn vehicle_corner_wall_map(
     (map, start_tile, starts, goal)
 }
 
-/// Recreates the northeast rock corner around world tile (85, 10) from beta match 238 on
-/// Schone Tage. The translated shape is intentionally exact around the Rifleman's contact point.
-pub(super) fn replay_238_rifleman_corner_map() -> (Map, (u32, u32), (f32, f32), (f32, f32)) {
-    let mut map = flat_dev_map(1);
-    block_rect_tiles(&mut map, 83, 10, 85, 10);
-    block_rect_tiles(&mut map, 81, 11, 87, 12);
-    block_rect_tiles(&mut map, 80, 13, 88, 14);
-    block_rect_tiles(&mut map, 81, 15, 87, 17);
-
-    // Tick 2,915 replay evidence: Rifleman 165 was fixed at this point while repeatedly
-    // repathing toward the adjacent grass tile at (82.5, 10.5).
-    let start = (2755.293, 311.360);
-    let goal = (2640.0, 336.0);
-    let start_tile = (86, 9);
-    if let Some(slot) = map.starts.get_mut(0) {
-        *slot = start_tile;
-    }
-    (map, start_tile, start, goal)
-}
-
 #[allow(clippy::type_complexity)]
 pub(super) fn vehicle_small_block_baseline_map(
     vehicle: EntityKind,

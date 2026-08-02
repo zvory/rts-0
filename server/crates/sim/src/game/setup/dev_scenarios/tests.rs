@@ -441,6 +441,7 @@ fn dev_scenarios_default_to_kriegsia_start_faction() {
         Game::new_scout_car_open_ground_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
         Game::new_scout_car_lake_reverse_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_030d),
         Game::new_replay_142_vehicle_lock_scenario(EntityKind::ScoutCar, 2, 0x5150_030d),
+        Game::new_replay_238_rifleman_corner_lock_scenario(EntityKind::Rifleman, 1, 0x5150_030d),
         Game::new_scout_car_wall_chokepoint_scenario(EntityKind::ScoutCar, 3, 0x5150_030d),
         Game::new_vehicle_corner_wall_scenario(EntityKind::Tank, 1, 0x5150_030d),
         Game::new_vehicle_small_block_baseline_scenario(
@@ -1055,9 +1056,15 @@ fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
 
 #[test]
 fn replay_238_rifleman_repeatedly_repaths_without_rounding_corner() {
-    let setup =
-        Game::new_replay_238_rifleman_corner_lock_scenario(EntityKind::Rifleman, 1, 0x5150_0238)
-            .expect("scenario setup should succeed");
+    let setup = Game::new_dev_scenario(
+        "replay_238_rifleman_corner_lock",
+        EntityKind::Rifleman,
+        1,
+        None,
+        None,
+        0x5150_0238,
+    )
+    .expect("scenario setup should succeed through the dev-scenario dispatcher");
     let command = setup.command();
     let mut game = setup.game;
     let rifleman = setup.units[0];
