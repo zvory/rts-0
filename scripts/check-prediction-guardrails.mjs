@@ -36,6 +36,8 @@ const forbiddenWasmDeps = [
   "tracing-subscriber",
 ];
 const forbiddenWasmSource = [
+  "renderSnapshotJson",
+  "fn snapshot(&self) -> Snapshot",
   "snapshot_for_all",
   "snapshot_full",
   "full_world",
@@ -49,6 +51,10 @@ const forbiddenWasmSource = [
 ];
 
 const failures = [];
+
+if (existsSync(path.join(repoRoot, "client/src/progress_extrapolator.js"))) {
+  failures.push("client/src/progress_extrapolator.js: duplicate JavaScript progress predictor must not return");
+}
 
 for (const file of predictionJsFiles) {
   const source = read(file);
@@ -69,6 +75,18 @@ for (const file of wasmRustFiles) {
       failures.push(`${file}: forbidden browser-prediction source reference ${JSON.stringify(token)}`);
     }
   }
+}
+
+for (const file of ["client/src/state.js", "client/src/prediction_frame.js"]) {
+  const source = read(file);
+  if (/\.\.\.\s*(?:predicted|prediction|patch)\b/.test(source)) {
+    failures.push(`${file}: prediction data must be composed through an explicit field allowlist`);
+  }
+}
+
+const frameSource = read("client/src/prediction_frame.js");
+for (const token of ["normalizeProgressPatch", "progressPatchMatches", "composeProgressPatch"]) {
+  if (!frameSource.includes(token)) failures.push(`client/src/prediction_frame.js: missing progress allowlist seam ${token}`);
 }
 
 if (failures.length > 0) {

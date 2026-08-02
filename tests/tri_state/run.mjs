@@ -310,17 +310,18 @@ async function executeStep(context, step) {
       break;
     }
     case "assertLocalRenderOwnedOnly": {
-      const frame = [...(lanes.local.frames || [])].reverse().find((entry) => entry.renderSnapshot);
-      const entities = frame?.renderSnapshot?.entities || [];
+      const frame = [...(lanes.local.frames || [])].reverse().find((entry) => entry.predictionFrame);
+      const entities = frame?.predictionFrame?.entities || [];
       const playerId = lanes.local.playerId;
+      const ownedIds = new Set((frame?.summary?.owned || []).map((entity) => entity.id));
       const diff = {
         assertion: step.op,
-        ok: frame && playerId != null && entities.every((entity) => entity.owner === playerId),
+        ok: frame && playerId != null && entities.every((entity) => ownedIds.has(entity.id)),
         playerId,
         entities,
       };
       artifacts.diff(diff);
-      if (!diff.ok) throw new Error(`local render snapshot included non-owned entities: ${JSON.stringify(diff)}`);
+      if (!diff.ok) throw new Error(`local prediction frame included a non-owned entity id: ${JSON.stringify(diff)}`);
       break;
     }
     case "assertLocalOwnedStable": {
