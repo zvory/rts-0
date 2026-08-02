@@ -59,6 +59,23 @@ fn pivot_vehicle_step_dir(path_dir: (f32, f32), body_facing: f32) -> (f32, f32) 
     }
 }
 
+fn pivot_vehicle_axis_aligned_for_close_nudge(path_dir: (f32, f32), body_facing: f32) -> bool {
+    if !body_facing.is_finite() {
+        return true;
+    }
+    let travel_facing = path_dir.1.atan2(path_dir.0);
+    if !travel_facing.is_finite() {
+        return true;
+    }
+    let forward_error = angle_delta(body_facing, travel_facing).abs();
+    let reverse_error = angle_delta(
+        normalize_angle(body_facing + std::f32::consts::PI),
+        travel_facing,
+    )
+    .abs();
+    forward_error.min(reverse_error) <= 0.55
+}
+
 /// Advance moving units along waypoint paths, preserving passable landings and Move arrival.
 /// Unit overlap is handled later by collision resolution.
 #[allow(clippy::too_many_arguments)]
@@ -321,13 +338,16 @@ pub(super) fn advance_moving_units(
                     let same_tile_final_vehicle_nudge = is_pivot_vehicle
                         && path_len == 1
                         && map.tile_of(x, y) == map.tile_of(wx, wy);
+                    let nudge_axis_aligned = !same_tile_final_vehicle_nudge
+                        || pivot_vehicle_axis_aligned_for_close_nudge(path_dir, body_facing);
                     let step_dir = if same_tile_final_vehicle_nudge {
                         pivot_vehicle_step_dir(path_dir, body_facing)
                     } else {
                         path_dir
                     };
-                    let direct_nx = x + step_dir.0 * budget;
-                    let direct_ny = y + step_dir.1 * budget;
+                    let step_budget = if nudge_axis_aligned { budget } else { 0.0 };
+                    let direct_nx = x + step_dir.0 * step_budget;
+                    let direct_ny = y + step_dir.1 * step_budget;
                     let steered = if can_local_steer {
                         let steering_path_dir = entities
                             .get(id)
