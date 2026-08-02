@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -35,8 +36,32 @@ function runHelper(worktree) {
       ...process.env,
       PATH: `${fakeBin}:${process.env.PATH}`,
       RTS_FAKE_NPM_COUNTER: installCounter,
+      RTS_NODE_DEPS_WAIT_SECONDS: "5",
     },
   });
+}
+
+function runHelperAsync(worktree) {
+  return new Promise((resolve, reject) => {
+    execFile("bash", [helper, "--repo", worktree, "--cache-dir", cacheRoot, "--quiet"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        RTS_FAKE_NPM_COUNTER: installCounter,
+        RTS_FAKE_NPM_DELAY_MS: "200",
+        RTS_NODE_DEPS_WAIT_SECONDS: "5",
+      },
+    }, (error, stdout, stderr) => error ? reject(Object.assign(error, { stdout, stderr })) : resolve(stdout));
+  });
+}
+
+function cacheEntry(worktree) {
+  const digest = crypto.createHash("sha256");
+  for (const filename of ["package.json", "package-lock.json"]) {
+    digest.update(fs.readFileSync(path.join(worktree, filename))).update("\0");
+  }
+  return path.join(cacheRoot, digest.digest("hex"));
 }
 
 function installCount() {
@@ -52,6 +77,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 if (process.argv[2] !== "ci") process.exit(2);
 fs.appendFileSync(process.env.RTS_FAKE_NPM_COUNTER, "ci\\n");
+const delay = Number(process.env.RTS_FAKE_NPM_DELAY_MS || 0);
+if (delay) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
 const manifest = JSON.parse(fs.readFileSync("package.json", "utf8"));
 for (const name of Object.keys(manifest.devDependencies || {})) {
   fs.mkdirSync(path.join("node_modules", ...name.split("/")), { recursive: true });
@@ -67,10 +94,10 @@ try {
   writeManifest(second, dependencies);
   fs.mkdirSync(path.join(first, "node_modules", "local-only"), { recursive: true });
 
-  runHelper(first);
+  await Promise.all([runHelperAsync(first), runHelperAsync(second)]);
   assert.equal(fs.lstatSync(path.join(first, "node_modules")).isSymbolicLink(), true);
   assert.equal(fs.existsSync(path.join(first, "node_modules", "pngjs")), true);
-  assert.equal(installCount(), 1, "the first worktree installs the shared lockfile once");
+  assert.equal(installCount(), 1, "concurrent worktrees install the shared lockfile once");
 
   runHelper(second);
   assert.equal(fs.lstatSync(path.join(second, "node_modules")).isSymbolicLink(), true);
@@ -83,9 +110,18 @@ try {
   assert.equal(installCount(), 2, "a cache missing a declared dependency is rebuilt");
 
   writeManifest(second, { ...dependencies, "new-package": "1.0.0" });
+  const staleLock = `${cacheEntry(second)}.lock`;
+  fs.mkdirSync(staleLock, { recursive: true });
+  fs.writeFileSync(path.join(staleLock, "owner"), "99999999-dead\n");
   runHelper(second);
   assert.equal(fs.existsSync(path.join(second, "node_modules", "new-package")), true);
-  assert.equal(installCount(), 3, "package manifest changes select a new cache entry");
+  assert.equal(installCount(), 3, "a dead installer lock is reclaimed for the new cache entry");
+
+  writeManifest(second, { ...dependencies, "ownerless-lock-package": "1.0.0" });
+  fs.mkdirSync(`${cacheEntry(second)}.lock`, { recursive: true });
+  runHelper(second);
+  assert.equal(fs.existsSync(path.join(second, "node_modules", "ownerless-lock-package")), true);
+  assert.equal(installCount(), 4, "an interrupted lock handoff without an owner is reclaimed");
 } finally {
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
