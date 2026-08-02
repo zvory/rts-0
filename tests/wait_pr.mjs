@@ -71,25 +71,35 @@ function mergedViewJson(headSha, number, files = []) {
   });
 }
 
-function waitEnvironment(headSha, number, files = []) {
-  return {
+function waitEnvironment(headSha, number, files = [], options = {}) {
+  const environment = {
     RTS_WAIT_PR_VIEW_JSON: mergedViewJson(headSha, number, files),
     RTS_WAIT_PR_CHECKS_JSON: "[]",
     RTS_WORKTREE_ROOT: worktreeRoot,
     RTS_CARGO_TARGET_BASE_DIR: targetRoot,
-    RTS_WAIT_PR_SKIP_PATCH_NOTE_DELIVERY: "1",
   };
+  if (options.skipDelivery !== false) environment.RTS_WAIT_PR_SKIP_PATCH_NOTE_DELIVERY = "1";
+  if (options.deliveryLog) environment.RTS_WAIT_PR_DELIVERY_LOG = options.deliveryLog;
+  return environment;
 }
 
 fs.mkdirSync(path.join(repo, "scripts"), { recursive: true });
 fs.mkdirSync(worktreeRoot, { recursive: true });
 fs.copyFileSync(cleanupScript, path.join(repo, "scripts", "cleanup-worktrees.sh"));
 fs.chmodSync(path.join(repo, "scripts", "cleanup-worktrees.sh"), 0o755);
+fs.writeFileSync(path.join(repo, "scripts", "ensure-node-deps.sh"), `#!/usr/bin/env bash
+printf 'deps %s\\n' "$PWD" >>"$RTS_WAIT_PR_DELIVERY_LOG"
+`);
+fs.chmodSync(path.join(repo, "scripts", "ensure-node-deps.sh"), 0o755);
+fs.writeFileSync(path.join(repo, "scripts", "patch-note-outbox.mjs"), `
+import fs from "node:fs";
+fs.appendFileSync(process.env.RTS_WAIT_PR_DELIVERY_LOG, \`outbox \${process.cwd()}\\n\`);
+`);
 git(["init", "--initial-branch=main"], { cwd: repo });
 configureIdentity(repo);
 commitFile(repo, "base.txt", "base");
 commitFile(repo, "local-note.txt", "committed local note");
-git(["add", "scripts/cleanup-worktrees.sh"]);
+git(["add", "scripts"]);
 git(["commit", "--amend", "--no-edit"]);
 git(["config", "branch.main.mergeOptions", "--no-ff"]);
 
@@ -104,15 +114,22 @@ try {
   const first = createTask(firstBranch, "wait-pr-41", "first.txt");
   mergeTask(firstBranch);
   fs.writeFileSync(path.join(repo, "local-note.txt"), "preserve me\n");
+  const deliveryLog = path.join(fixtureRoot, "delivery.log");
 
   const output = run("bash", [waitScript, "41"], {
     cwd: first.taskPath,
-    env: waitEnvironment(first.headSha, 41, ["first.txt"]),
+    env: waitEnvironment(first.headSha, 41, ["first.txt"], { skipDelivery: false, deliveryLog }),
   });
 
   assert.match(output, /refreshing local main checkout/);
-  assert.doesNotMatch(output, /Discord/);
+  assert.match(output, /attempting best-effort Discord patch-note delivery/);
   assert.match(output, /local main is current/);
+  const canonicalRepo = fs.realpathSync(repo);
+  assert.deepEqual(
+    fs.readFileSync(deliveryLog, "utf8").trim().split("\n"),
+    [`deps ${canonicalRepo}`, `outbox ${canonicalRepo}`],
+    "post-merge dependency and outbox tools must run from the surviving main worktree",
+  );
   assert.equal(
     git(["rev-parse", "main"]).trim(),
     git(["rev-parse", "origin/main"]).trim(),
