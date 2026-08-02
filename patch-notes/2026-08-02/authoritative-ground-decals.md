@@ -11,4 +11,4 @@ _2026-08-02_
 
 ## Playtest watch
 
-- Watch for missing or duplicate scars after scouting or reconnecting, and for trench texture refresh issues.
+- Watch for missing or duplicate scars after scouting or reconnecting, and trench texture refresh issues.
