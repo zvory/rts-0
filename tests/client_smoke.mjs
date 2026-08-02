@@ -570,7 +570,7 @@ try {
     const status = response.status();
     if (status >= 400 && !response.url().includes("favicon")) responseErrors.push(`${status}: ${response.url()}`);
   });
-  await editorPage.setViewport({ width: 1280, height: 600 });
+  await editorPage.setViewport({ width: 780, height: 600 });
   const editorUrl = new URL(BASE_URL);
   editorUrl.pathname = "/map-editor";
   editorUrl.search = "";
@@ -583,6 +583,7 @@ try {
     const toolsWindow = document.querySelector(".map-editor-tools-window");
     const panel = toolsWindow?.querySelector(".map-editor-panel-body");
     const water = document.querySelector(".map-editor-terrain-button[data-terrain=water]");
+    const optionsRect = optionsWindow?.getBoundingClientRect();
     const panelRect = toolsWindow?.getBoundingClientRect();
     const noInitialStatus = document.querySelector(".map-editor-status") === null;
     water?.scrollIntoView({ block: "center" });
@@ -606,6 +607,7 @@ try {
         .map((header) => header.textContent?.trim() || ""),
       floatingChrome,
       noInitialStatus,
+      panelsDoNotOverlap: optionsRect && panelRect && optionsRect.right <= panelRect.left,
       withinViewport: panelRect && panelRect.bottom <= window.innerHeight - 11,
       noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
         .every((node) => node.scrollWidth <= node.clientWidth),
@@ -636,8 +638,8 @@ try {
     `MAP EDITOR: separate Options/Tools panels omit initial status slop and show all 18 terrain previews (headers=${editorUi.headers.join("/")}, previews=${editorUi.terrainPreviews.length})`,
   );
   ok(
-    editorUi.floatingChrome && editorUi.withinViewport && editorUi.noHorizontalOverflow,
-    "MAP EDITOR: accessible floating chrome and terrain/start-base pickers stay within the viewport",
+    editorUi.floatingChrome && editorUi.panelsDoNotOverlap && editorUi.withinViewport && editorUi.noHorizontalOverflow,
+    "MAP EDITOR: accessible floating panels do not overlap and terrain/start-base pickers stay within the viewport",
   );
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,
