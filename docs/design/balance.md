@@ -493,9 +493,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
   place smoke between the advance and the anti-tank gun / machine-gun nest, then move mobile units through
   the resulting dead zone. Active smoke is neutral world state: it blocks authoritative fog and
   combat LOS, prevents units inside smoke from contributing vision, hides enemies inside smoke, and
-  does not participate in pathing, collision, scoring, supply, or targeting as an entity. Units
-  inside a cloud still receive that cloud in their own snapshot so the obscuring effect remains
-  visible to the player occupying it.
+  does not participate in pathing, collision, scoring, supply, or targeting as an entity. The
+  concealment has a unit-to-unit close-quarters exception: two living units both inside smoke gain
+  mutual actionable visibility when the gap between their body edges is at most 1 tile, allowing
+  ordinary direct attacks while terrain and longer-range contacts remain obscured. Units inside a
+  cloud still receive that cloud in their own snapshot so the obscuring effect remains visible to
+  the player occupying it.
   The command card shows the selected Scout Car's remaining charges as `2`, `1`, or `0`. While a
   missing charge regenerates, the ability's existing clock animation shows progress toward the
   next charge; recharge does not disable a stored charge that is still available.

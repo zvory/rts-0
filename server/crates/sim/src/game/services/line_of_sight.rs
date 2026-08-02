@@ -25,7 +25,6 @@ enum RaycastStep {
 }
 
 impl<'a> LineOfSight<'a> {
-    #[cfg(test)]
     pub(crate) fn new(map: &'a Map) -> Self {
         LineOfSight {
             map,

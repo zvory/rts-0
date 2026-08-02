@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::EntityStore;
+use crate::game::entity::{Entity, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::teams::TeamRelations;
@@ -158,6 +158,32 @@ impl SmokeCloudStore {
 
     pub(crate) fn point_inside(&self, x: f32, y: f32) -> bool {
         self.clouds.iter().any(|cloud| cloud.contains_point(x, y))
+    }
+
+    /// Smoke conceals at range, but units close enough to fight hand-to-hand can see one another.
+    /// The allowance is measured from body edge so large units receive the same physical gap as
+    /// infantry rather than needing their centers to overlap.
+    pub(crate) fn units_have_melee_visibility(&self, first: &Entity, second: &Entity) -> bool {
+        Self::units_within_melee_visibility_range(first, second)
+            && self.point_inside(first.pos_x, first.pos_y)
+            && self.point_inside(second.pos_x, second.pos_y)
+    }
+
+    pub(crate) fn units_within_melee_visibility_range(first: &Entity, second: &Entity) -> bool {
+        if first.id == second.id
+            || first.hp == 0
+            || second.hp == 0
+            || !first.is_unit()
+            || !second.is_unit()
+        {
+            return false;
+        }
+        let dx = second.pos_x - first.pos_x;
+        let dy = second.pos_y - first.pos_y;
+        let range = first.radius()
+            + second.radius()
+            + config::SMOKE_MELEE_VISIBILITY_RANGE_TILES * config::TILE_SIZE as f32;
+        dx.is_finite() && dy.is_finite() && range.is_finite() && dx * dx + dy * dy <= range * range
     }
 
     pub(crate) fn segment_blocked(&self, start: (f32, f32), end: (f32, f32)) -> bool {

@@ -15,6 +15,8 @@ pub const SMOKE_ABILITY_RANGE_TILES: u32 = 14;
 pub const SMOKE_LAUNCH_MAX_DELAY_TICKS: u32 = TICK_HZ / 10;
 pub const SMOKE_CLOUD_RADIUS_TILES: f32 = 2.0;
 pub const SMOKE_CLOUD_DURATION_TICKS: u32 = TICK_HZ * 5;
+/// Body-edge distance at which two units inside smoke gain mutual close-quarters visibility.
+pub const SMOKE_MELEE_VISIBILITY_RANGE_TILES: f32 = 1.0;
 pub const SMOKE_PLUS_CLOUD_RADIUS_TILES: f32 = SMOKE_CLOUD_RADIUS_TILES * 2.0;
 pub const SMOKE_PLUS_CLOUD_DURATION_TICKS: u32 = SMOKE_CLOUD_DURATION_TICKS * 2;
 pub const SMOKE_ABILITY_COOLDOWN_TICKS: u16 = 0;
