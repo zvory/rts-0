@@ -1022,9 +1022,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   predictionPolicyMatch.replayViewer = false;
   predictionPolicyMatch.state = {
     spectator: false,
-    clearPredictionPose() {
-      this.poseCleared = true;
-    },
+    clearPredictionPose() { this.poseCleared = true; },
     clearPredictionFrame() {
       this.predictionFrame = null;
     },
@@ -1269,9 +1267,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     diagnostics: () => ({}),
   };
   pausePredictionMatch.state = {
-    clearPredictionPose() {
-      this.poseCleared = true;
-    },
+    clearPredictionPose() { this.poseCleared = true; },
     applyPredictionDisplayOverlay(overlay) {
       pausePredictionOverlays.push(overlay);
     },

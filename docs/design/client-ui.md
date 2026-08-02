@@ -25,6 +25,7 @@ src/
   stress_test_launch.js # Bounded /stress-test route/query parser
   report_window_aggregate.js # bounded rolling-window aggregation helper for telemetry reports
   prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
+  prediction_runtime_startup.js # WASM runtime readiness and latest-snapshot catch-up
   prediction_compatibility.js # server/client prediction-build compatibility guard
   prediction_frame.js # allowlisted composition of sparse owned pose/progress prediction patches
   prediction_settings.js # localStorage-backed prediction toggle
@@ -2225,7 +2226,7 @@ removed `GameState` intent shims such as `state.commandTarget`, `state.placement
 update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `match_combat_audio.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `prediction_runtime_startup.js`, `match_combat_audio.js`,
   `match_notice_presenter.js`,
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`,
   `match_settings_toggles.js`, `match_auto_spectator.js`, `auto_spectator.js`,

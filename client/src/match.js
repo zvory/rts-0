@@ -15,6 +15,7 @@ import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import * as matchLabTools from "./match_lab_tools.js";
 import { PredictionController } from "./prediction_controller.js";
+import { finishPredictionRuntimeInit, newestPredictionSnapshot } from "./prediction_runtime_startup.js";
 import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
 import { prepareRenderer } from "./renderer/preparation.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
@@ -188,6 +189,7 @@ export class Match {
     this.giveUpSent = false;
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
+    this.latestPredictionSnapshot = null;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
     this.frameProfiler = new FrameProfiler();
     this.snapshotProcessingReport = createSnapshotProcessingReport();
@@ -511,6 +513,7 @@ export class Match {
   }
 
   applyAuthoritativePredictionSnapshot(snapshot) {
+    this.latestPredictionSnapshot = newestPredictionSnapshot(this.latestPredictionSnapshot, snapshot);
     const result = this.prediction.applyAuthoritativeSnapshot(snapshot);
     if (!this.prediction.enabled && this.progressPredictionEligible && this.predictionAdapter.ready) {
       try {
@@ -683,22 +686,7 @@ export class Match {
     const token = ++this.predictionInitToken;
     const adapter = this.predictionAdapter;
     void adapter.init().then((ready) => {
-      if (token !== this.predictionInitToken) {
-        adapter.destroy();
-        return;
-      }
-      if (!this.predictionRuntimeEnabled()) {
-        adapter.destroy();
-        this.publishPredictionDebug();
-        if (remountSettings) this.mountSettings({ keepOpen: true });
-        return;
-      }
-      if (ready) this.logPredictionStatus("ready");
-      else {
-        this.prediction.recordDisableReason("wasm-unavailable");
-        this.logPredictionStatus("disabled");
-      }
-      if (remountSettings) this.mountSettings({ keepOpen: true });
+      finishPredictionRuntimeInit(this, { token, adapter, ready, remountSettings });
     });
   }
 

@@ -13,9 +13,79 @@ import { createRigRenderContext } from "../client/src/renderer/rigs/animation.js
 import { GameState } from "../client/src/state.js";
 import { SimWasmPredictionAdapter } from "../client/src/sim_wasm_adapter.js";
 import { CaptureRenderClock } from "../client/src/visual_clock.js";
+import { finishPredictionRuntimeInit } from "../client/src/prediction_runtime_startup.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
+}
+
+{
+  const snapshot = { tick: 9, entities: [{ id: 1, prodProgress: 0.1 }] };
+  let reconciles = 0;
+  let frames = 0;
+  let destroyed = 0;
+  const adapter = { destroy() { destroyed += 1; } };
+  const match = {
+    predictionInitToken: 2,
+    predictionAdapter: adapter,
+    progressPredictionEligible: true,
+    latestPredictionSnapshot: snapshot,
+    prediction: {
+      enabled: true,
+      reconcilePredictor(value) {
+        reconciles += 1;
+        assert(value === snapshot, "delayed WASM init imports the latest authoritative snapshot");
+      },
+    },
+    predictionRuntimeEnabled: () => true,
+    applyPredictionFrame: () => { frames += 1; },
+    publishPredictionDebug() {},
+    logPredictionStatus() {},
+    mountSettings() {},
+  };
+  finishPredictionRuntimeInit(match, { token: 1, adapter, ready: true, remountSettings: false });
+  finishPredictionRuntimeInit(match, { token: 2, adapter, ready: true, remountSettings: false });
+  assert(destroyed === 0, "a stale callback never destroys the still-current loading adapter");
+  assert(reconciles === 1, "WASM readiness catches up without waiting for another packet");
+  assert(frames === 1, "WASM readiness publishes the caught-up prediction frame immediately");
+}
+
+{
+  const priorFetch = globalThis.fetch;
+  let releaseModule = null;
+  let importCount = 0;
+  let predictorCount = 0;
+  const moduleGate = new Promise((resolve) => { releaseModule = resolve; });
+  globalThis.fetch = async () => ({
+    ok: true,
+    headers: { get: () => "text/javascript" },
+  });
+  try {
+    const adapter = new SimWasmPredictionAdapter({
+      startInfo: { tick: 0, map: { width: 1, height: 1, tileSize: 32, terrain: [], resources: [] }, players: [] },
+      playerId: 1,
+      importModule: async () => {
+        importCount += 1;
+        return {
+          default: () => moduleGate,
+          WasmPredictor: {
+            fromStartJson() {
+              predictorCount += 1;
+              return {};
+            },
+          },
+        };
+      },
+    });
+    const first = adapter.init();
+    const second = adapter.init();
+    assert(first === second, "concurrent WASM initialization callers share one in-flight promise");
+    releaseModule();
+    assert(await first && await second, "all shared WASM initialization callers observe readiness");
+    assert(importCount === 1 && predictorCount === 1, "shared WASM initialization imports and constructs once");
+  } finally {
+    globalThis.fetch = priorFetch;
+  }
 }
 
 {
@@ -399,6 +469,10 @@ function sentSeqs(sent) {
       hp: 38, maxHp: 40, state: "build", buildProgress: 0.4, targetId: 91,
       futureSentinel: "construction-preserved",
     },
+    {
+      id: 23, owner: 1, kind: "barracks", x: 64, y: 64, hp: 200, maxHp: 400,
+      state: "construct", buildProgress: 0.25, buildActive: true,
+    },
     { id: 22, owner: 2, kind: "worker", x: 96, y: 32, hp: 40, maxHp: 40, state: "idle" },
   ];
   state.applySnapshot({
@@ -427,6 +501,9 @@ function sentSeqs(sent) {
         { id: 22, x: 140, y: 32, motion: "move" },
         { id: 999, x: 200, y: 200, motion: "move" },
       ],
+      progress: [
+        { id: 23, kind: "construction", identity: "build:barracks", fraction: 0.25 + offset * 0.01 },
+      ],
     },
   });
 
@@ -442,6 +519,9 @@ function sentSeqs(sent) {
     assert(build.state === "build" && build.buildProgress === 0.4 && build.targetId === 91, "missing motion preserves construction activity across prediction frames");
     assert(createRigRenderContext(build).busy === true, "constructing worker keeps the yellow busy indicator across prediction frames");
     assert(build.futureSentinel === "construction-preserved", "construction projection preserves unknown future fields");
+    const scaffold = state.entityById(23);
+    assert(scaffold.buildProgress === 0.25 + offset * 0.01 && scaffold.buildProgressPredicted === true,
+      "construction progress advances through the sparse lane while worker activity remains authoritative");
     assert(state.entityById(22).x === 96 && state.entityById(22).predicted !== true, "prediction patches cannot alter another player's entity");
     assert(state.entityById(999) === undefined, "prediction patches cannot create entities absent from authority");
     const variants = state.entityVariants(1);

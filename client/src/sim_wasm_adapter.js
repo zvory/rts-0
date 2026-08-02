@@ -22,6 +22,8 @@ export class SimWasmPredictionAdapter {
     this.loading = false;
     this.module = null;
     this.predictor = null;
+    this.initPromise = null;
+    this.lifecycleGeneration = 0;
     this.displayValid = false;
     this.lastPredictedTick = null;
     this.lastAdvanceAt = null;
@@ -44,37 +46,49 @@ export class SimWasmPredictionAdapter {
     this.resetReportStats();
   }
 
-  async init() {
-    if (this.ready || this.loading || this.disabledReason) return this.ready;
+  init() {
+    if (this.ready || this.disabledReason) return Promise.resolve(this.ready);
+    if (this.initPromise) return this.initPromise;
     this.loading = true;
     const startedAt = this.now();
-    try {
-      await assertModuleAvailable(WASM_GLUE_PATH);
-      const module = await this.importModule(WASM_GLUE_PATH);
-      await module.default();
-      this.module = module;
-      this.predictor = module.WasmPredictor.fromStartJson(
-        JSON.stringify(this.startInfo),
-        this.playerId,
-      );
-      this.ready = true;
-      this.startupMs = this.now() - startedAt;
-      this.lastAdvanceAt = this.visualNow();
-      this.refreshMemoryBytes();
-      return true;
-    } catch (err) {
-      this.disabledReason = errorMessage(err);
-      return false;
-    } finally {
-      this.loading = false;
-    }
+    const generation = this.lifecycleGeneration;
+    this.initPromise = (async () => {
+      try {
+        await assertModuleAvailable(WASM_GLUE_PATH);
+        const module = await this.importModule(WASM_GLUE_PATH);
+        await module.default();
+        if (generation !== this.lifecycleGeneration) return false;
+        this.module = module;
+        this.predictor = module.WasmPredictor.fromStartJson(
+          JSON.stringify(this.startInfo),
+          this.playerId,
+        );
+        this.ready = true;
+        this.startupMs = this.now() - startedAt;
+        this.lastAdvanceAt = this.visualNow();
+        this.refreshMemoryBytes();
+        return true;
+      } catch (err) {
+        if (generation === this.lifecycleGeneration) this.disabledReason = errorMessage(err);
+        return false;
+      } finally {
+        if (generation === this.lifecycleGeneration) {
+          this.loading = false;
+          this.initPromise = null;
+        }
+      }
+    })();
+    return this.initPromise;
   }
 
   destroy() {
+    this.lifecycleGeneration += 1;
     if (this.predictor && typeof this.predictor.free === "function") {
       this.predictor.free();
     }
     this.predictor = null;
+    this.initPromise = null;
+    this.loading = false;
     this.ready = false;
     this.displayValid = false;
     this.visualPaused = false;
