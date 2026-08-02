@@ -92,6 +92,9 @@ for (const [fileName, [contentHash, expectedMaterializedHash]] of bundledScenari
   assert.equal(scenario.map.data.height, 126, `${fileName} preserves its map height`);
   assert.equal(scenario.map.data.terrain.length, 126 * 126, `${fileName} terrain matches its declared area`);
   assert.equal("size" in scenario.map.data, false, `${fileName} no longer carries a square-only map size`);
+  assert.equal(checkpoint.fog.width, 126, `${fileName} checkpoint fog preserves its width`);
+  assert.equal(checkpoint.fog.height, 126, `${fileName} checkpoint fog preserves its height`);
+  assert.equal("size" in checkpoint.fog, false, `${fileName} checkpoint fog no longer carries a square-only size`);
   assert.equal(materializedHash(scenario.map.data), expectedMaterializedHash, `${fileName} materialized map hash matches its rectangular data`);
   assert.equal(scenario.map.materializedHash, expectedMaterializedHash, `${fileName} outer materialized hash is current`);
   assert.deepEqual(
