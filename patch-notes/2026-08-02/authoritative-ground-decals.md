@@ -6,9 +6,9 @@ _2026-08-02_
 
 ## Changes
 
-- Scars from unit/building losses and mortar/artillery impacts now persist, appear when scouted, and survive reconnects.
-- Ground decals and trench terrain now render reliably.
+- Battle scars from destroyed units/buildings and mortar/artillery impacts now persist, appear when scouted, and survive reconnects.
+- Ground decals and trench terrain now update reliably.
 
 ## Playtest watch
 
-- Watch for missing or duplicate scars after scouting or reconnecting, and trench texture refresh issues.
+- Watch for missing or duplicate scars after scouting or reconnecting, and for trench texture refresh issues.
