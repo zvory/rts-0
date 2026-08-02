@@ -5619,48 +5619,9 @@ input[type="text"]:focus {
 
 .map-editor-history,
 .map-editor-palette,
-.map-editor-player-picker,
-.map-editor-zoom-framing,
-.map-editor-zoom-controls {
+.map-editor-player-picker {
   display: grid;
   gap: 7px;
-}
-
-.map-editor-zoom-framing,
-.map-editor-zoom-controls {
-  grid-column: 1 / -1;
-}
-
-.map-editor-zoom-framing {
-  grid-template-columns: 1fr 1fr;
-}
-
-.map-editor-zoom-controls {
-  grid-template-columns: 36px minmax(72px, 1fr) auto 36px;
-  align-items: center;
-}
-
-.map-editor-zoom-controls input {
-  box-sizing: border-box;
-  min-width: 0;
-  width: 100%;
-  border: 1px solid rgba(208, 184, 132, 0.28);
-  border-radius: 4px;
-  padding: 7px 8px;
-  background: #111619;
-  color: #eee6d4;
-  text-align: right;
-}
-
-.map-editor-zoom-percent {
-  color: #d8c79f;
-  font: 600 12px var(--mono);
-}
-
-.map-editor-zoom-step {
-  padding: 4px;
-  font-size: 17px;
-  line-height: 1;
 }
 
 .map-editor-history {
