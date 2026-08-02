@@ -818,6 +818,7 @@ assert(
     const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
     const ring = renderer._ringRadius(entity);
     assert(unitStrip?.strip?.unit === KIND.SCOUT_PLANE, "Scout Plane live rendering uses the PNG frame strip");
+    assert(unitStrip?.container.zIndex === entity.y, "frame-strip unit bodies use world-Y depth");
     assert(unitStrip?.texture === stripTexture, "Scout Plane frame-strip renderer uses the preloaded strip texture");
     assert(
       unitStrip?.frameTextures?.length === unitStrip?.strip?.frameCount,
@@ -878,6 +879,7 @@ assert(
     const bodyCalls = unitRig?.parts.get("part.body")?.display.calls || [];
     const shadowCalls = shadowRig?.parts.get("part.shadow")?.display.calls || [];
 
+    assert(unitRig?.container.zIndex === entity.y, "SVG unit bodies use world-Y depth");
     assert(unitRig?.container.scaleX === 0.85 && unitRig.container.scaleY === 0.85,
       "occupied infantry rig scales down while in a trench");
     assert(shadowRig?.container.scaleX === 0.85 && shadowRig.container.scaleY === 0.85,
@@ -1001,6 +1003,7 @@ assert(
 
     const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
     const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
+    assert(unitRig?.container.zIndex === entity.y, "PNG atlas unit bodies use world-Y depth");
     assert(
       unitRig?.container.scaleX === 0.75 && unitRig.container.scaleY === 0.75,
       "artillery unit rig renders 25% smaller",

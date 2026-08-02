@@ -19,7 +19,8 @@ const assembler = new PresentationFrameAssembler({
       { id: 2, typeId: "wildflower.cluster", x: 40, y: 52, color: "#AABBCC" },
       { id: 2, typeId: "tree.pine", x: 64, y: 64 },
       { id: 3, typeId: "legacy.forest", x: 20, y: 20 },
-      { id: 4, typeId: "tree.birch", x: Number.NaN, y: 20 },
+      { id: 4, typeId: "tree.birch", x: 72, y: 20 },
+      { id: 6, typeId: "tree.aspen", x: 96, y: 20 },
       { id: 5, typeId: "tree.spruce", x: 80, y: 72 },
     ],
   },
@@ -30,7 +31,7 @@ assert.deepEqual(assembler.staticMap.doodads, [
   { id: 1, typeId: "tree.oak", x: 32, y: 48 },
   { id: 2, typeId: "wildflower.cluster", x: 40, y: 52, color: "#aabbcc" },
   { id: 5, typeId: "tree.spruce", x: 80, y: 72 },
-], "static-map presentation detaches valid doodads and drops duplicates, legacy forest data, and malformed records");
+], "static-map presentation detaches valid doodads and drops duplicates, removed species, and legacy forest data");
 assert(Object.isFrozen(assembler.staticMap.doodads) && Object.isFrozen(assembler.staticMap.doodads[0]),
   "static doodads are immutable presentation records");
 

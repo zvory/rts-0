@@ -289,8 +289,8 @@ pub struct MapInfo {
     /// Positions of all neutral resource nodes (steel/oil). Included so the
     /// client can render them on the minimap before fog-of-war reveals them.
     pub resources: Vec<ResourceNode>,
-    /// Static, mechanically inert map decoration. Doodads are sent once at match start and are
-    /// not part of fog, occupancy, pathing, combat, or snapshots.
+    /// Static map decoration sent once at match start. Tree records also provide authoritative
+    /// trunk collision/pathing inputs; doodads remain outside fog, combat, and snapshots.
     pub doodads: Vec<MapDoodad>,
 }
 
@@ -314,12 +314,10 @@ pub enum MapDoodadClass {
 
 pub const MAX_MAP_DOODADS: usize = 4_096;
 pub const MAP_TILE_SIZE_PX: u32 = 32;
-pub const MAP_DOODAD_TYPE_IDS: [&str; 8] = [
+pub const MAP_DOODAD_TYPE_IDS: [&str; 6] = [
     "tree.oak",
     "tree.pine",
-    "tree.birch",
     "tree.spruce",
-    "tree.aspen",
     "tree.alder",
     "wildflower.single",
     "wildflower.cluster",
@@ -327,12 +325,7 @@ pub const MAP_DOODAD_TYPE_IDS: [&str; 8] = [
 
 pub fn classify_map_doodad(type_id: &str) -> Option<MapDoodadClass> {
     match type_id {
-        "tree.oak"
-        | "tree.pine"
-        | "tree.birch"
-        | "tree.spruce"
-        | "tree.aspen"
-        | "tree.alder" => Some(MapDoodadClass::Tree),
+        "tree.oak" | "tree.pine" | "tree.spruce" | "tree.alder" => Some(MapDoodadClass::Tree),
         "wildflower.single" | "wildflower.cluster" => Some(MapDoodadClass::Wildflower),
         _ => None,
     }

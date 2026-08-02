@@ -7,7 +7,8 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 //
 //   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
-//   → units → doodad-canopies → smokes → selection-rings → hp-bars → fog → visual-sample-labels
+//   → world-Y-sorted units/tree-canopies → allied-tree-reveals → smokes
+//   → selection-rings → hp-bars → fog → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → feedback/miss-toasts → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
@@ -87,6 +88,8 @@ import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { DoodadLayer } from "./doodad_layer.js";
+import { _drawTreeOccludedAllies } from "./tree_unit_occlusion.js";
+import { applyWorldYDepth } from "./world_y_depth.js";
 import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
@@ -170,11 +173,12 @@ export class Renderer {
       this.layers[name] = c;
       this.world.addChild(c);
     }
+    this.layers.units.sortableChildren = true;
     this._assetReadiness = new Map();
     this._doodads = new DoodadLayer({
       pixi: PIXI,
       understoryLayer: this.layers.doodadUnderstory,
-      canopyLayer: this.layers.doodadCanopies,
+      canopyLayer: this.layers.units,
       trackAsset: (id, promise, metadata) => this._trackVisualAsset(id, promise, metadata),
     });
     this._groundDecals = new GroundDecalLayer({
@@ -275,6 +279,7 @@ export class Renderer {
     // Local frame-strip motion state. Sprite strips animate only when their
     // authoritative or predicted render position is actually changing.
     this._frameStripMotion = new Map();
+    this._unitRenderContexts = new Map();
     // Live SVG rig instances are routed per unit kind. Invalid or missing
     // definitions fail through the renderer's missing-texture guard.
     this._liveRigDefinitionsByKind = createLiveRigDefinitions();
@@ -300,6 +305,8 @@ export class Renderer {
       liveShotRevealRigs: new Map(),
       liveShotRevealRigOverlays: new Map(),
       liveShotRevealRigEffects: new Map(),
+      alliedTreeRevealRigs: new Map(),
+      alliedTreeRevealRigOverlays: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
@@ -311,6 +318,8 @@ export class Renderer {
       liveShotRevealRigs: { poolName: "liveShotRevealRigs", layerName: "shotReveals" },
       liveShotRevealRigOverlays: { poolName: "liveShotRevealRigOverlays", layerName: "shotReveals" },
       liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
+      alliedTreeRevealRigs: { poolName: "alliedTreeRevealRigs", layerName: "alliedTreeReveals" },
+      alliedTreeRevealRigOverlays: { poolName: "alliedTreeRevealRigOverlays", layerName: "alliedTreeReveals" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
@@ -613,6 +622,7 @@ export class Renderer {
       }
     });
     time("renderer.units", () => {
+      this._unitRenderContexts.clear();
       for (const e of regularEntities) {
         liveIds.add(e.id);
         if (isUnit(e.kind)) {
@@ -620,10 +630,21 @@ export class Renderer {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
               visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
+              rememberRenderContext: true,
             });
           });
         }
       }
+    });
+    time("renderer.alliedTreeReveals", () => {
+      this._drawSafely(
+        "alliedTreeReveals",
+        () => this._drawTreeOccludedAllies(regularEntities, state, colorByOwner, {
+          renderContexts: this._unitRenderContexts,
+          visualUnitOverrides: visualUnitOverrideMap,
+          visualFrameStripOverrides: visualFrameStripOverrideMap,
+        }),
+      );
     });
     // Selection rings + HP bars after shapes are placed so they read on top.
     time("renderer.selectionHp", () => {
@@ -920,6 +941,7 @@ export class Renderer {
     if (!entity || entity.id == null || !this._pools?.[poolName]) return;
     if (Number.isInteger(entity.id)) this._missingTextureEntityIds.add(entity.id);
     const g = this._slot(poolName, entity.id);
+    if (poolName === "units") applyWorldYDepth(g, entity);
     const x = Number.isFinite(entity.x) ? entity.x : 0;
     const y = Number.isFinite(entity.y) ? entity.y : 0;
     const size = MISSING_TEXTURE_SIZE_PX;
@@ -1146,6 +1168,7 @@ export class Renderer {
     this._assetReadiness?.clear?.();
     this._missingTextureEntityIds?.clear?.();
     this._tankMotion.clear();
+    this._unitRenderContexts.clear();
     if (this._liveRigPools) {
       for (const pool of Object.values(this._liveRigPools)) {
         for (const instance of pool.values()) instance.destroy();
@@ -1252,6 +1275,7 @@ Object.assign(Renderer.prototype, {
   _tankMotionVisual,
   _frameStripMovementVisual,
   _drawUnit,
+  _drawTreeOccludedAllies,
   _rigRenderContextFor,
   _drawShotRevealUnit,
   _drawBuilding,

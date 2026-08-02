@@ -17,9 +17,7 @@ Species-specific direction:
 - English/pedunculate oak: broad irregular lobed crown and sturdy branching trunk.
 - Scots pine: open irregular high crown, rounded needle clusters, and visible reddish upper trunk;
   never a dense spruce silhouette.
-- Silver birch: airy yellow-green crown, white bark with dark markings, and delicate branching.
 - Norway spruce: dense blue-green cone, layered drooping boughs, and short visible trunk.
-- Eurasian aspen: narrow softly rounded pale blue-green crown, fine leaves, and slender gray trunk.
 - Black alder: compact uneven dark-green crown with several dark low branching stems.
 
 The built-in outputs were keyed with `remove_chroma_key.py` using border auto-key detection, soft

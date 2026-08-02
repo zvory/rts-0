@@ -1,20 +1,28 @@
 import { createRigAnimationStage } from "./animation.js";
 import { pngAtlasRouteCoverage } from "./png_runtime.js";
 
-const UNIT_RIG_POOL_NAMES = Object.freeze([
-  "liveUnitRigShadows",
-  "liveUnitRigs",
-  "liveUnitRigOverlays",
-  "liveUnitRigEffects",
-  "liveShotRevealRigShadows",
-  "liveShotRevealRigs",
-  "liveShotRevealRigOverlays",
-  "liveShotRevealRigEffects",
+const UNIT_RIG_POOL_FAMILIES = Object.freeze([
+  Object.freeze([
+    "liveUnitRigShadows",
+    "liveUnitRigs",
+    "liveUnitRigOverlays",
+    "liveUnitRigEffects",
+  ]),
+  Object.freeze([
+    "liveShotRevealRigShadows",
+    "liveShotRevealRigs",
+    "liveShotRevealRigOverlays",
+    "liveShotRevealRigEffects",
+  ]),
+  Object.freeze([
+    "alliedTreeRevealRigs",
+    "alliedTreeRevealRigOverlays",
+  ]),
 ]);
-const UNIT_RIG_POOL_BITS = Object.freeze(Object.fromEntries(
-  UNIT_RIG_POOL_NAMES.map((poolName, index) => [poolName, 1 << index]),
-));
-const ALL_UNIT_RIG_POOLS_MASK = (1 << UNIT_RIG_POOL_NAMES.length) - 1;
+const UNIT_RIG_POOL_FAMILY_BY_NAME = new Map();
+for (const family of UNIT_RIG_POOL_FAMILIES) {
+  for (const poolName of family) UNIT_RIG_POOL_FAMILY_BY_NAME.set(poolName, family);
+}
 
 const FRAME_STRIP_DRAW_PLAN_CACHE = new WeakMap();
 const PNG_DRAW_PLAN_CACHE = new WeakMap();
@@ -62,7 +70,7 @@ export function frameStripDrawPlanFor(routePlan) {
   const cached = FRAME_STRIP_DRAW_PLAN_CACHE.get(routePlan);
   if (cached) return cached;
   const shadowRoute = routePlan.shadowRoute;
-  const unitRoute = routePlan.routes[1];
+  const unitRoute = routePlan.routes.find((route) => route !== shadowRoute);
   const plan = Object.freeze({
     shadowRoute,
     unitRoute,
@@ -123,30 +131,30 @@ export function pngDrawPlanFor(definition, atlas, routePlan) {
 }
 
 /**
- * Preserve the original per-frame inactive-pool cleanup. Every known pool is checked each frame;
- * the mask only avoids Map probes for pools present in the active draw plan.
+ * Reconcile only the pool family used by this draw. Normal units, shot reveals, and friendly
+ * canopy reveals may share an entity id and must never destroy one another's retained instances.
  */
 export function reconcileActiveLiveRigPools(renderer, entityId, activePoolNames) {
-  const inactiveMask = ALL_UNIT_RIG_POOLS_MASK & ~poolMask(activePoolNames);
-  for (let index = 0; index < UNIT_RIG_POOL_NAMES.length; index += 1) {
-    if ((inactiveMask & (1 << index)) === 0) continue;
-    const poolName = UNIT_RIG_POOL_NAMES[index];
-    const pool = renderer._liveRigPools?.[poolName];
-    const instance = pool?.get?.(entityId);
-    if (!instance) continue;
-    instance.destroy?.();
-    pool.delete(entityId);
-    renderer._seen?.[poolName]?.delete?.(entityId);
-    renderer._recordRenderDiagnostic?.(`renderer.rig.instance.destroyed.unused.${poolName}`);
+  const active = new Set(activePoolNames || []);
+  const families = new Set();
+  for (const poolName of active) {
+    const family = UNIT_RIG_POOL_FAMILY_BY_NAME.get(poolName);
+    if (family) families.add(family);
+  }
+  for (const family of families) {
+    for (const poolName of family) {
+      if (active.has(poolName)) continue;
+      const pool = renderer._liveRigPools?.[poolName];
+      const instance = pool?.get?.(entityId);
+      if (!instance) continue;
+      instance.destroy?.();
+      pool.delete(entityId);
+      renderer._seen?.[poolName]?.delete?.(entityId);
+      renderer._recordRenderDiagnostic?.(`renderer.rig.instance.destroyed.unused.${poolName}`);
+    }
   }
 }
 
 function freezeRoute(poolName, layerName, parts) {
   return Object.freeze({ poolName, layerName, parts });
-}
-
-function poolMask(poolNames) {
-  let mask = 0;
-  for (const poolName of poolNames || []) mask |= UNIT_RIG_POOL_BITS[poolName] || 0;
-  return mask;
 }

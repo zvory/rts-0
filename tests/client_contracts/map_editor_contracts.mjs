@@ -911,9 +911,9 @@ assert(
   assert.deepEqual(
     MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "tree").map((entry) => entry.typeId),
     [
-      "tree.oak", "tree.pine", "tree.birch", "tree.spruce", "tree.aspen", "tree.alder",
+      "tree.oak", "tree.pine", "tree.spruce", "tree.alder",
     ],
-    "the tree palette exposes the six accepted inert species",
+    "the tree palette exposes four visual species sharing one authoritative tree/trunk semantic",
   );
   assert.equal(canonicalDoodadColor(" #AbC "), "#aabbcc");
   assert.equal(canonicalDoodadColor("not-a-color"), null);
@@ -922,7 +922,7 @@ assert(
     { id: 7, typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 30, y: 40, color: "#F0A" },
     { id: 0, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 50, y: 60 },
     { id: 9, typeId: "tree.unknown", x: 1, y: 1 },
-    { id: 10, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_BIRCH, x: 128, y: 0 },
+    { id: 10, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, x: 128, y: 0 },
   ], 128);
   assert.deepEqual(doodads, [
     { typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 30, y: 40, color: "#ff00aa", id: 1 },
@@ -966,7 +966,7 @@ assert(
   assert.deepEqual(session.materialized().doodads.map((record) => record.id), [1, 2]);
 
   session.beginDoodadStroke("Cancelled tree");
-  session.placeDoodads([{ x: 200, y: 220 }], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_BIRCH });
+  session.placeDoodads([{ x: 200, y: 220 }], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER });
   session.cancelDoodadStroke();
   assert.deepEqual(session.materialized().doodads.map((record) => record.id), [1, 2],
     "pointer cancellation can restore the doodad draft atomically");
@@ -1064,12 +1064,12 @@ assert(
     },
   };
   MapEditorViewport.prototype.queueDoodadPatch.call(viewport, {
-    upserts: [{ id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER_TOPDOWN, x: 30, y: 40 }],
+    upserts: [{ id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, x: 30, y: 40 }],
     removedIds: [1],
   });
   assert.deepEqual(viewport.pendingDoodadUpdate, {
     kind: "patch", revision: 4,
-    upserts: [{ id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER_TOPDOWN, x: 30, y: 40 }],
+    upserts: [{ id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, x: 30, y: 40 }],
     removedIds: [1],
   }, "pending doodad patches coalesce by stable id without resurrecting removals");
 }

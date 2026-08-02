@@ -8,14 +8,16 @@ use crate::game::entity::{
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, building_rect_for_footprint, circle_intersects_rect, rects_intersect,
-    tile_rect, unit_bodies_intersect, unit_body, unit_body_for_entity, unit_body_intersects_rect,
-    unit_body_with_facing, CircleBody, RectBody, UnitBody,
+    tile_rect, unit_bodies_intersect, unit_body, unit_body_for_entity, unit_body_intersects_circle,
+    unit_body_intersects_rect, unit_body_with_facing, CircleBody, RectBody, UnitBody,
 };
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 
 mod placement_policy;
 mod pump_jack;
+mod tree_trunks;
+pub(super) use tree_trunks::segment_clear as unit_tree_segment_clear;
 
 use placement_policy::{build_placement_policy, BuildPlacementPolicy};
 
@@ -30,6 +32,10 @@ pub(crate) fn unit_static_standable(
     y: f32,
 ) -> bool {
     unit_static_standable_with_facing(map, occ, kind, x, y, 0.0)
+}
+
+pub(super) fn unit_bounding_radius(kind: EntityKind) -> Option<f32> {
+    unit_body(kind, 0.0, 0.0).map(UnitBody::bounding_radius)
 }
 
 pub(crate) fn unit_static_standable_with_facing(
@@ -60,6 +66,9 @@ pub(crate) fn unit_static_standable_with_facing(
             return false;
         }
     }
+    if !tree_trunks::body_clear(occ, body) {
+        return false;
+    }
 
     true
 }
@@ -75,6 +84,9 @@ pub(crate) fn unit_static_segment_standable(
     if !unit_static_standable_with_facing(map, occ, kind, from.0, from.1, facing)
         || !unit_static_standable_with_facing(map, occ, kind, to.0, to.1, facing)
     {
+        return false;
+    }
+    if !unit_tree_segment_clear(occ, kind, from, to) {
         return false;
     }
 
@@ -469,6 +481,9 @@ fn segment_body_facing(kind: EntityKind, from: (f32, f32), to: (f32, f32)) -> f3
 #[cfg(test)]
 #[path = "standability/build_site_tests.rs"]
 mod build_site_tests;
+#[cfg(test)]
+#[path = "standability/tree_trunk_tests.rs"]
+mod tree_trunk_tests;
 
 #[cfg(test)]
 mod tests {

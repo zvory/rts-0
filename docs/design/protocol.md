@@ -529,8 +529,9 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ],
-    // Static mechanically inert decoration, canonicalized by ascending nonzero id.
-    // Coordinates are integer world pixels. color is allowed only on wildflowers.
+    // Static map doodads, canonicalized by ascending nonzero id. Tree records have
+    // authoritative tiny trunk collision; wildflowers are inert. Coordinates are integer
+    // world pixels. color is allowed only on wildflowers.
     doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
@@ -1389,11 +1390,13 @@ supported player count; every base site is a permanent resource location, includ
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
 counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
 by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.oak`, `tree.pine`,
-`tree.birch`, `tree.spruce`, `tree.aspen`, `tree.alder`, `wildflower.single`, and
-`wildflower.cluster`. Every tree id has the same inert `Tree` semantic class; species affects
+`tree.spruce`, `tree.alder`, `wildflower.single`, and `wildflower.cluster`. Every tree id has the
+same `Tree` semantic class and authoritative 4.5-world-pixel circular trunk; species affects
 presentation only. Tree color
 is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
-`#rrggbb`. Doodads have no collision, pathing, fog, vision, cover, or combat behavior in schema v5.
+`#rrggbb`. Tree trunks participate in unit standability and add a finite tile-path avoidance cost,
+while leaving the rest of their tile traversable. Wildflowers have no collision or pathing effect.
+Doodads have no fog, vision, cover, or combat behavior in schema v5.
 Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
 count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
 doodads to `materializedMap`. Records are capped at 64, expire after two

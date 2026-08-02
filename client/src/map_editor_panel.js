@@ -395,7 +395,7 @@ export class MapEditorPanel {
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Wildflower spray density");
     section.append(
-      readout(`${this.session.draft.doodads.length}/${MAP_EDITOR_MAX_DOODADS} doodads. Trees are visual variants of one future semantic tree type; none affect gameplay yet.`),
+      readout(`${this.session.draft.doodads.length}/${MAP_EDITOR_MAX_DOODADS} doodads. Tree species are visual variants of one semantic tree type; each tree has a tiny impassable trunk.`),
       readout("Trees"),
       treePalette,
       readout("Wildflowers"),

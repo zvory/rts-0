@@ -58,7 +58,7 @@ fn authored_doodads_are_validated_canonicalized_and_hashed() {
         "baseSites": [{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}],
         "doodads": [
             {"id": 7, "typeId": "wildflower.cluster", "x": 700, "y": 701, "color": "#e05a91"},
-            {"id": 2, "typeId": "tree.birch", "x": 400, "y": 500}
+            {"id": 2, "typeId": "tree.alder", "x": 400, "y": 500}
         ]
     });
     let json = serde_json::to_string(&document).expect("map JSON");
@@ -103,6 +103,14 @@ fn authored_doodads_reject_unknown_fields_and_invalid_catalog_data() {
         ),
         (
             serde_json::json!({"id": 1, "typeId": "tree.maple", "x": 400, "y": 500}),
+            "server catalog",
+        ),
+        (
+            serde_json::json!({"id": 1, "typeId": "tree.birch", "x": 400, "y": 500}),
+            "server catalog",
+        ),
+        (
+            serde_json::json!({"id": 1, "typeId": "tree.aspen", "x": 400, "y": 500}),
             "server catalog",
         ),
         (

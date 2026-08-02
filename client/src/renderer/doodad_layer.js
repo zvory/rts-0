@@ -6,9 +6,11 @@ import {
   doodadManifestEntry,
 } from "./doodad_manifest.js";
 import { gfxEllipse, gfxFill } from "./native_graphics.js";
+import { applyWorldYDepth } from "./world_y_depth.js";
 
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const MIN_CULL_MARGIN_CSS_PX = 140;
+const CANOPY_BUCKET_PX = 128;
 const MAX_SIZE_VARIATION = 1.08;
 const MAX_DOODAD_WIDTH_PX = Math.max(...Object.values(DOODAD_MANIFEST).map((entry) => entry.widthPx))
   * MAX_SIZE_VARIATION;
@@ -30,11 +32,13 @@ export class DoodadLayer {
     this.pixi = pixi;
     this.understoryLayer = understoryLayer;
     this.canopyLayer = canopyLayer;
+    this.canopyLayer.sortableChildren = true;
     this.trackAsset = trackAsset;
     this.loadTexture = loadTexture;
     this.textures = new Map();
     this.instances = new Map();
     this.records = new Map();
+    this.canopyBuckets = new Map();
     this.assetIds = new Set();
     this.loadPromises = [];
     this.destroyed = false;
@@ -80,6 +84,7 @@ export class DoodadLayer {
     }
     for (const record of normalized) this._upsert(record);
     this.records = new Map(normalized.map((record) => [record.id, record]));
+    this._rebuildCanopyIndex();
     return normalized.length;
   }
 
@@ -95,6 +100,7 @@ export class DoodadLayer {
       this.records.set(record.id, record);
       this._upsert(record);
     }
+    this._rebuildCanopyIndex();
     return this.records.size;
   }
 
@@ -128,6 +134,32 @@ export class DoodadLayer {
       instance.display.rotation = sway;
     }
     return visible;
+  }
+
+  /** Presentation-only overlap query against nearby visible canopies. */
+  occludesUnit(entity, radiusPx = 0) {
+    const x = Number(entity?.x);
+    const y = Number(entity?.y);
+    const radius = Math.max(0, Number(radiusPx) || 0);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    const candidates = new Set();
+    for (let bucketY = bucketAt(y - radius); bucketY <= bucketAt(y + radius); bucketY += 1) {
+      for (let bucketX = bucketAt(x - radius); bucketX <= bucketAt(x + radius); bucketX += 1) {
+        for (const id of this.canopyBuckets.get(bucketKey(bucketX, bucketY)) || []) candidates.add(id);
+      }
+    }
+    for (const id of candidates) {
+      const instance = this.instances.get(id);
+      if (!instance || instance.display.visible === false || instance.record.y <= y) continue;
+      const bounds = canopyBounds(instance);
+      if (
+        x + radius >= bounds.left
+        && x - radius <= bounds.right
+        && y + radius >= bounds.top
+        && y - radius <= bounds.bottom
+      ) return true;
+    }
+    return false;
   }
 
   _upsert(record) {
@@ -171,6 +203,22 @@ export class DoodadLayer {
     this.instances.set(record.id, instance);
   }
 
+  _rebuildCanopyIndex() {
+    this.canopyBuckets.clear();
+    for (const instance of this.instances.values()) {
+      if (instance.manifest.layer !== "canopy") continue;
+      const bounds = canopyBounds(instance);
+      for (let bucketY = bucketAt(bounds.top); bucketY <= bucketAt(bounds.bottom); bucketY += 1) {
+        for (let bucketX = bucketAt(bounds.left); bucketX <= bucketAt(bounds.right); bucketX += 1) {
+          const key = bucketKey(bucketX, bucketY);
+          const ids = this.canopyBuckets.get(key) || [];
+          ids.push(instance.record.id);
+          this.canopyBuckets.set(key, ids);
+        }
+      }
+    }
+  }
+
   _remove(id) {
     const instance = this.instances.get(id);
     if (!instance) return;
@@ -189,7 +237,7 @@ export class DoodadLayer {
       instances: this.instances.size,
       textures: this.textures.size,
       understoryChildren: this.understoryLayer?.children?.length || 0,
-      canopyChildren: this.canopyLayer?.children?.length || 0,
+      canopyChildren: [...this.instances.values()].filter((instance) => instance.manifest.layer === "canopy").length,
     });
   }
 
@@ -198,6 +246,7 @@ export class DoodadLayer {
     this.destroyed = true;
     for (const id of [...this.instances.keys()]) this._remove(id);
     this.records.clear();
+    this.canopyBuckets.clear();
     for (const texture of this.textures.values()) destroyTexture(texture);
     this.textures.clear();
     this.loadPromises = [];
@@ -229,8 +278,29 @@ function normalizeDoodads(records, { max = MAX_DOODADS } = {}) {
 function positionInstance(instance) {
   const { record, manifest, display, shadow } = instance;
   display.position?.set?.(record.x, record.y);
+  applyWorldYDepth(display, record);
   display.tint = manifest.tintable && record.color ? colorNumber(record.color) : 0xffffff;
   if (shadow) shadow.position?.set?.(record.x, record.y + manifest.shadow.offsetY);
+}
+
+function canopyBounds(instance) {
+  const variation = sizeVariation(instance.record.id);
+  const width = instance.manifest.widthPx * variation;
+  const height = instance.manifest.heightPx * variation;
+  return {
+    left: instance.record.x - width / 2,
+    right: instance.record.x + width / 2,
+    top: instance.record.y - height * instance.manifest.anchorY,
+    bottom: instance.record.y + height * (1 - instance.manifest.anchorY),
+  };
+}
+
+function bucketAt(value) {
+  return Math.floor(value / CANOPY_BUCKET_PX);
+}
+
+function bucketKey(x, y) {
+  return `${x}:${y}`;
 }
 
 function colorNumber(color) {

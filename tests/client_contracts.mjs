@@ -24,6 +24,7 @@ await import("./client_contracts/worker_rehydration_contracts.mjs");
 await import("./client_contracts/worker_safe_rig_asset_contracts.mjs");
 await import("./client_contracts/doodad_presentation_contracts.mjs");
 await import("./client_contracts/doodad_renderer_contracts.mjs");
+await import("./client_contracts/tree_unit_depth_contracts.mjs");
 await import("./client_contracts/presentation_coordinator_contracts.mjs");
 await import("./client_contracts/pixi_presentation_adapter_contracts.mjs");
 await import("./client_contracts/babylon_kernel_contracts.mjs");

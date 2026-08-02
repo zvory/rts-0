@@ -71,8 +71,10 @@ impl Game {
     /// layouts or player-owned natural groups exist in authored maps. Generated oil clusters place each oil patch on a unique passable tile
     /// center near the intended layout, keep one tile between oil patches, and reject sites whose
     /// Pump Jack footprint would collide with non-oil resources while preserving City Centre
-    /// resource-distance bounds. Schema-v5 doodads are catalog-validated, id-canonicalized static
-    /// presentation records and do not participate in gameplay systems. Lab-restored oil nodes are normalized to passable tile centers and
+    /// resource-distance bounds. Schema-v5 doodads are catalog-validated and id-canonicalized.
+    /// Tree species share a 4.5px authoritative circular trunk used by exact unit standability;
+    /// tree tiles receive a finite path-avoidance cost but remain traversable outside the trunk.
+    /// Wildflowers remain presentation-only. Lab-restored oil nodes are normalized to passable tile centers and
     /// keep one free tile between oil patches.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
     /// controller/profile selection.
@@ -522,8 +524,8 @@ store a separate authoritative command stream, but they must not infer live stat
 Map policy:
 
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  and permanent base sites on every tick, while start/export boundaries read the map's inert static
-  doodads. Internal cold checkpoints may still clone the full `Map` while
+  permanent base sites, and tree-trunk collision/path cost on every tick, while start/export
+  boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
 - `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, base-site bodies, or doodad bodies. It
   embeds `mapBinding` only.

@@ -307,18 +307,19 @@ const EMPTY_ROUTE_PLAN = Object.freeze({
 });
 
 function compileRoutePlan(parts, pools, familyKey) {
-  const routes = [
-    Object.freeze({
+  const routes = [];
+  if (!pools.omitShadow) {
+    routes.push(Object.freeze({
       poolName: pools.liveRigShadow || "liveUnitRigShadows",
       layerName: pools.shadow || "unitShadows",
       parts: parts.shadow,
-    }),
-    Object.freeze({
-      poolName: pools.liveRigUnit || "liveUnitRigs",
-      layerName: pools.unit || "units",
-      parts: parts.unit,
-    }),
-  ];
+    }));
+  }
+  routes.push(Object.freeze({
+    poolName: pools.liveRigUnit || "liveUnitRigs",
+    layerName: pools.unit || "units",
+    parts: parts.unit,
+  }));
   if (Array.isArray(parts.overlay) && parts.overlay.length > 0) {
     routes.push(Object.freeze({
       poolName: pools.liveRigOverlay || "liveUnitRigOverlays",
@@ -326,7 +327,7 @@ function compileRoutePlan(parts, pools, familyKey) {
       parts: parts.overlay,
     }));
   }
-  if (parts.effects?.length) {
+  if (!pools.omitEffects && parts.effects?.length) {
     routes.push(Object.freeze({
       poolName: pools.liveRigEffects || "liveUnitRigEffects",
       layerName: pools.effects || pools.unit || "units",

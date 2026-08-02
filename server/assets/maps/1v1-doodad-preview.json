@@ -1,7 +1,7 @@
 {
   "version": 5,
   "name": "1v1 Doodad Preview",
-  "description": "The default 1v1 terrain and resource layout with review stands for every tree species/perspective and colored wildflower patches.",
+  "description": "The default 1v1 terrain and resource layout with review stands for all four supported tree species and colored wildflower patches.",
   "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
   "terrain": [
     "................................................................................................~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -326,61 +326,61 @@
     },
     {
       "id": 21,
-      "typeId": "tree.birch",
+      "typeId": "tree.oak",
       "x": 1455,
       "y": 1204
     },
     {
       "id": 22,
-      "typeId": "tree.birch",
+      "typeId": "tree.pine",
       "x": 1483,
       "y": 1291
     },
     {
       "id": 23,
-      "typeId": "tree.birch",
+      "typeId": "tree.spruce",
       "x": 1522,
       "y": 1133
     },
     {
       "id": 24,
-      "typeId": "tree.birch",
+      "typeId": "tree.alder",
       "x": 1518,
       "y": 1231
     },
     {
       "id": 25,
-      "typeId": "tree.birch",
+      "typeId": "tree.oak",
       "x": 1557,
       "y": 1329
     },
     {
       "id": 26,
-      "typeId": "tree.birch",
+      "typeId": "tree.pine",
       "x": 1585,
       "y": 1171
     },
     {
       "id": 27,
-      "typeId": "tree.birch",
+      "typeId": "tree.spruce",
       "x": 1581,
       "y": 1269
     },
     {
       "id": 28,
-      "typeId": "tree.birch",
+      "typeId": "tree.alder",
       "x": 1620,
       "y": 1132
     },
     {
       "id": 29,
-      "typeId": "tree.birch",
+      "typeId": "tree.oak",
       "x": 1616,
       "y": 1294
     },
     {
       "id": 30,
-      "typeId": "tree.birch",
+      "typeId": "tree.pine",
       "x": 1644,
       "y": 1232
     },
@@ -446,61 +446,61 @@
     },
     {
       "id": 41,
-      "typeId": "tree.aspen",
+      "typeId": "tree.spruce",
       "x": 3084,
       "y": 1968
     },
     {
       "id": 42,
-      "typeId": "tree.aspen",
+      "typeId": "tree.alder",
       "x": 3123,
       "y": 2066
     },
     {
       "id": 43,
-      "typeId": "tree.aspen",
+      "typeId": "tree.oak",
       "x": 3151,
       "y": 1908
     },
     {
       "id": 44,
-      "typeId": "tree.aspen",
+      "typeId": "tree.pine",
       "x": 3147,
       "y": 1995
     },
     {
       "id": 45,
-      "typeId": "tree.aspen",
+      "typeId": "tree.spruce",
       "x": 3186,
       "y": 2093
     },
     {
       "id": 46,
-      "typeId": "tree.aspen",
+      "typeId": "tree.alder",
       "x": 3214,
       "y": 1935
     },
     {
       "id": 47,
-      "typeId": "tree.aspen",
+      "typeId": "tree.oak",
       "x": 3221,
       "y": 2033
     },
     {
       "id": 48,
-      "typeId": "tree.aspen",
+      "typeId": "tree.pine",
       "x": 3249,
       "y": 1907
     },
     {
       "id": 49,
-      "typeId": "tree.aspen",
+      "typeId": "tree.spruce",
       "x": 3245,
       "y": 2069
     },
     {
       "id": 50,
-      "typeId": "tree.aspen",
+      "typeId": "tree.alder",
       "x": 3284,
       "y": 1996
     },

@@ -5,9 +5,7 @@ export const MAX_DOODADS = 4096;
 const TREE_SPECS = Object.freeze({
   oak: Object.freeze({ widthPx: 119, heightPx: 112, anchorY: 0.94, windAmplitude: 0.025, windRate: 0.00115, shadowX: 34, shadowY: 9 }),
   pine: Object.freeze({ widthPx: 120, heightPx: 122, anchorY: 0.96, windAmplitude: 0.018, windRate: 0.001, shadowX: 34, shadowY: 8 }),
-  birch: Object.freeze({ widthPx: 70, heightPx: 108, anchorY: 0.95, windAmplitude: 0.032, windRate: 0.0013, shadowX: 20, shadowY: 7 }),
   spruce: Object.freeze({ widthPx: 103, heightPx: 126, anchorY: 0.96, windAmplitude: 0.016, windRate: 0.00095, shadowX: 30, shadowY: 8 }),
-  aspen: Object.freeze({ widthPx: 77, heightPx: 112, anchorY: 0.95, windAmplitude: 0.034, windRate: 0.00135, shadowX: 22, shadowY: 7 }),
   alder: Object.freeze({ widthPx: 93, heightPx: 102, anchorY: 0.94, windAmplitude: 0.027, windRate: 0.0012, shadowX: 27, shadowY: 8 }),
 });
 

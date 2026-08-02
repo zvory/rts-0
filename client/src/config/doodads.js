@@ -3,9 +3,7 @@
 export const DOODAD_TYPE = Object.freeze({
   TREE_OAK: "tree.oak",
   TREE_PINE: "tree.pine",
-  TREE_BIRCH: "tree.birch",
   TREE_SPRUCE: "tree.spruce",
-  TREE_ASPEN: "tree.aspen",
   TREE_ALDER: "tree.alder",
   WILDFLOWER_SINGLE: "wildflower.single",
   WILDFLOWER_CLUSTER: "wildflower.cluster",

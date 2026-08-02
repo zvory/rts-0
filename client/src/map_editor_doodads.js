@@ -4,12 +4,10 @@ export const MAP_EDITOR_MAX_DOODADS = 4096;
 export const MAP_EDITOR_DEFAULT_FLOWER_COLOR = "#e8b84a";
 export const MAP_EDITOR_DOODAD_TYPES = DOODAD_TYPE;
 export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, label: "Oak", kind: "tree", perspective: "threeQuarter" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, label: "Pine", kind: "tree", perspective: "threeQuarter" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_BIRCH, label: "Birch", kind: "tree", perspective: "threeQuarter" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE, label: "Spruce", kind: "tree", perspective: "threeQuarter" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ASPEN, label: "Aspen", kind: "tree", perspective: "threeQuarter" }),
-  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, label: "Alder", kind: "tree", perspective: "threeQuarter" }),
+  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, label: "Oak", kind: "tree" }),
+  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, label: "Pine", kind: "tree" }),
+  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE, label: "Spruce", kind: "tree" }),
+  Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, label: "Alder", kind: "tree" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, label: "Single flowers", kind: "wildflower" }),
   Object.freeze({ typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_CLUSTER, label: "Flower cluster", kind: "wildflower" }),
 ]);

@@ -40,12 +40,12 @@ try {
     },
   });
   await layer.ready();
-  for (const species of ["oak", "pine", "birch", "spruce", "aspen", "alder"]) {
+  for (const species of ["oak", "pine", "spruce", "alder"]) {
     assert.equal(DOODAD_MANIFEST[`tree.${species}`]?.image, `/assets/doodads/tree-${species}.png`,
       `${species} uses its exact worker-safe raster asset path`);
   }
-  assert.equal(DOODAD_TYPE_IDS.filter((typeId) => typeId.startsWith("tree.")).length, 6,
-    "renderer catalog exposes the six accepted tree species");
+  assert.equal(DOODAD_TYPE_IDS.filter((typeId) => typeId.startsWith("tree.")).length, 4,
+    "renderer catalog exposes the four accepted tree species");
   assert.equal(readiness.size, DOODAD_TYPE_IDS.length, "every allowlisted doodad asset is readiness-tracked");
   assert([...readiness.values()].every((status) => status === "ready"), "doodad readiness requires every texture");
 
@@ -57,7 +57,7 @@ try {
     { id: 1, typeId: "tree.pine", x: 90, y: 90 },
   ]);
   assert.equal(layer.instances.size, 3, "replace reconciles only unique allowlisted doodads");
-  assert.equal(canopies.children.length, 2, "tree art shares the canopy layer above unit bodies");
+  assert.equal(canopies.children.length, 2, "tree art shares the world-Y-sorted unit/canopy layer");
   assert.equal(understory.children.length, 3, "flowers and tree shadows share the private below-unit layer");
   assert.equal(layer.instances.get(2).display.tint, 0xd95f8d, "wildflower colors tint the authored white-petal asset");
 
@@ -102,11 +102,12 @@ try {
   const unitIndex = LAYERS.indexOf("units");
   assert(
     LAYERS.indexOf("doodadUnderstory") < unitIndex
-      && LAYERS.indexOf("doodadCanopies") > unitIndex
-      && LAYERS.indexOf("doodadCanopies") < LAYERS.indexOf("selectionRings")
-      && LAYERS.indexOf("doodadCanopies") < LAYERS.indexOf("hpBars")
-      && LAYERS.indexOf("doodadCanopies") < LAYERS.indexOf("fog"),
-    "doodad private layers bracket units while canopies stay beneath selection, HP, and authoritative fog",
+      && !LAYERS.includes("doodadCanopies")
+      && LAYERS.indexOf("alliedTreeReveals") > unitIndex
+      && LAYERS.indexOf("alliedTreeReveals") < LAYERS.indexOf("selectionRings")
+      && LAYERS.indexOf("alliedTreeReveals") < LAYERS.indexOf("hpBars")
+      && LAYERS.indexOf("alliedTreeReveals") < LAYERS.indexOf("fog"),
+    "trees and units share one depth layer while allied reveals stay beneath selection, HP, and fog",
   );
 
   layer.destroy();

@@ -28,6 +28,7 @@ use super::scout_car::{
 };
 mod pivot_drive;
 mod static_repath;
+mod tree_trunks;
 mod vehicle_traffic;
 
 /// Distance (px) between two entity centers.

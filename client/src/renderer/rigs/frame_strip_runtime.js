@@ -1,6 +1,7 @@
 import { SETUP, STATE } from "../../protocol.js";
 import { hexToInt, lightenColor } from "../shared.js";
 import { rigContainerScale } from "./animation.js";
+import { applyWorldYDepth } from "../world_y_depth.js";
 
 export function renderFrameStripUnit(renderer, entity, strip, texture, options = {}) {
   if (!strip || !texture || !options.poolName || !options.layerName) return null;
@@ -199,6 +200,7 @@ class FrameStripUnitInstance {
     this.container.visible = true;
     this.container.alpha = renderContext.shotRevealAlpha ?? options.alpha ?? 1;
     setPoint(this.container.position, finite(entity.x, 0), finite(entity.y, 0));
+    applyWorldYDepth(this.container, entity);
     const scale = rigContainerScale(renderContext);
     setPoint(this.container.scale, scale, scale);
     this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext);

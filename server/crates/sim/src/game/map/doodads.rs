@@ -2,6 +2,16 @@ use super::{fnv_bytes, fnv_usize};
 use crate::config;
 use crate::protocol::{validate_map_doodads, MapDoodad};
 
+/// Every visual tree species shares this authoritative circular trunk footprint. Riflemen have a
+/// 9px body radius, so the trunk is deliberately small enough for infantry to move between
+/// loosely spaced trees while still preventing units from walking through their centers.
+pub(crate) const TREE_TRUNK_RADIUS_PX: f32 = 4.5;
+
+pub(crate) fn is_tree(doodad: &MapDoodad) -> bool {
+    // Canonical maps are validated against the server catalog before reaching the simulation.
+    doodad.type_id.starts_with("tree.")
+}
+
 pub(crate) fn canonicalize(
     size: u32,
     mut doodads: Vec<MapDoodad>,
