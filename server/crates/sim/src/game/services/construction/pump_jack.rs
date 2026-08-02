@@ -99,7 +99,7 @@ fn ejection_position(
 ) -> Option<(f32, f32)> {
     let (start_x, start_y) = map.tile_of(x, y);
     let tile_size = config::TILE_SIZE as f32;
-    let max_radius = map.size.min(i32::MAX as u32) as i32;
+    let max_radius = map.width.max(map.height).min(i32::MAX as u32) as i32;
     for radius in 1..=max_radius {
         for dy in -radius..=radius {
             for dx in -radius..=radius {

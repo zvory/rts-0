@@ -116,4 +116,20 @@ export function runMinimapAttackAlertContracts() {
   minimap._drawPings(1000);
   assert(minimap._pings.length === 0, "generic alerts retain their 900-millisecond lifetime");
   minimap.destroy();
+
+  const wideState = {
+    map: { width: 8, height: 4, tileSize: 32, terrain: new Array(32).fill(0) },
+    playerId: 1,
+    events: [],
+    entitiesInterpolated() { return []; },
+  };
+  const wideMinimap = new Minimap(canvas, wideState, {}, {}, { issueCommand() {} });
+  assert(wideMinimap._ensureTransform(), "rectangular minimap transform resolves");
+  assertApprox(wideMinimap._scale, 220 / 256, 0.000001, "rectangular minimap uses one undistorted scale");
+  assertApprox(wideMinimap._offX, 0, 0.000001, "wide minimap reaches the horizontal edges");
+  assertApprox(wideMinimap._offY, 55, 0.000001, "wide minimap letterboxes the shorter vertical axis");
+  const wideBottomRight = wideMinimap._canvasToWorld(220, 165);
+  assertApprox(wideBottomRight.x, 255, 0.000001, "rectangular minimap clamps clicks to its horizontal world bound");
+  assertApprox(wideBottomRight.y, 127, 0.000001, "rectangular minimap clamps clicks to its vertical world bound");
+  wideMinimap.destroy();
 }

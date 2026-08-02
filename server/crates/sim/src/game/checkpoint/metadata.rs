@@ -70,7 +70,8 @@ pub(super) struct MapBindingV1 {
     schema_version: u32,
     content_hash: String,
     materialized_map_hash: String,
-    size: u32,
+    width: u32,
+    height: u32,
     player_count: u32,
 }
 
@@ -81,7 +82,8 @@ impl MapBindingV1 {
             schema_version: state.map_metadata.schema_version,
             content_hash: state.map_metadata.content_hash.clone(),
             materialized_map_hash: state.map.materialized_hash(),
-            size: state.map.size,
+            width: state.map.width,
+            height: state.map.height,
             player_count: state.players.len() as u32,
         }
     }
@@ -109,8 +111,11 @@ impl MapBindingV1 {
                 field: "materializedMapHash",
             });
         }
-        if self.size != map.size {
-            return Err(CheckpointPayloadError::MapBindingMismatch { field: "size" });
+        if self.width != map.width {
+            return Err(CheckpointPayloadError::MapBindingMismatch { field: "width" });
+        }
+        if self.height != map.height {
+            return Err(CheckpointPayloadError::MapBindingMismatch { field: "height" });
         }
         if self.player_count as usize != map.starts.len() {
             return Err(CheckpointPayloadError::MapBindingMismatch {

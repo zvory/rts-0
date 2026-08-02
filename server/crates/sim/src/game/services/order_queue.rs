@@ -666,7 +666,7 @@ fn build_intent_promotion_error(
     if !rules::economy::build_requirement_met_for_faction(owner_faction, kind, &owned) {
         return Some("Requirement not met".to_string());
     }
-    if tile_x >= map.size || tile_y >= map.size {
+    if tile_x >= map.width || tile_y >= map.height {
         return Some("Cannot build there".to_string());
     }
     let can_resume =
@@ -710,7 +710,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![(4, 4)],
             ..Default::default()
@@ -771,7 +772,7 @@ mod tests {
         let mut pathing = PathingService::new(1024, 32);
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         let player_ids: Vec<u32> = players.iter().map(|p| p.id).collect();
         fog.recompute(&player_ids, entities, map);
         let mut smokes = SmokeCloudStore::new();

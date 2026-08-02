@@ -253,7 +253,7 @@ fn direct_fire_legality_waits_for_sampled_smoke_melee_visibility() {
         .spawn(attacker_pos.0, attacker_pos.1, 2.0, 100, 0)
         .expect("smoke should spawn");
     let teams = default_team_relations();
-    let fog = Fog::new(map.size);
+    let fog = Fog::new(map.width, map.height);
     let los = LineOfSight::with_smoke(&map, &smokes);
     let blockers = ShotBlockerIndex::build(&map, &entities);
 

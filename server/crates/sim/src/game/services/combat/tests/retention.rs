@@ -68,8 +68,8 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_hidden() {
         (130.0, 100.0),
     );
     let los = LineOfSight::new(&map);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    let mut fog = Fog::new(map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2], &entities, &map);
     let retained_entity = entities
         .get(retained)
@@ -113,10 +113,10 @@ fn lingering_death_vision_feeds_auto_acquisition() {
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
     let teams = default_team_relations();
-    let spatial = SpatialIndex::build(&entities, map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
     let los = LineOfSight::new(&map);
     let smokes = SmokeCloudStore::new();
-    let mut live_fog = Fog::new(map.size);
+    let mut live_fog = Fog::new(map.width, map.height);
     live_fog.recompute(&[1, 2], &EntityStore::new(), &map);
     let source = LingeringSightSource::new(1, target_pos.0, target_pos.1, 2, 99)
         .expect("death vision source should be valid");
@@ -380,8 +380,8 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_smoke_covered() {
         .spawn(retained_entity.pos_x, retained_entity.pos_y, 1.0, 100, 0)
         .expect("smoke should spawn");
     let los = LineOfSight::with_smoke(&map, &smokes);
-    let spatial = SpatialIndex::build(&entities, map.size);
-    let mut fog = Fog::new(map.size);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute_with_smoke(&[1, 2], &entities, &map, &smokes);
     let tank_entity = entities.get(tank).expect("tank should exist");
 
@@ -450,7 +450,7 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_out_of_range() {
         }
 
         let los = LineOfSight::new(&map);
-        let spatial = SpatialIndex::build(&entities, map.size);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
         let fog = visible_fog(&map, &entities);
         let retained_entity = entities
             .get(retained)

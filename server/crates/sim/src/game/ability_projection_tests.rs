@@ -29,8 +29,8 @@ fn ekat_vs_ai_players() -> [PlayerInit; 2] {
 }
 
 fn first_tile_matching(game: &Game, predicate: impl Fn(f32, f32) -> bool) -> (f32, f32) {
-    (0..game.state.map.size)
-        .flat_map(|ty| (0..game.state.map.size).map(move |tx| (tx, ty)))
+    (0..game.state.map.width)
+        .flat_map(|ty| (0..game.state.map.width).map(move |tx| (tx, ty)))
         .find_map(|(tx, ty)| {
             let (x, y) = game.state.map.tile_center(tx, ty);
             predicate(x, y).then_some((x, y))

@@ -524,7 +524,7 @@ impl Game {
         }
 
         let mut map = flat_dev_map(2);
-        let center = (map.size / 2, map.size / 2);
+        let center = (map.width / 2, map.height / 2);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = (center.0 - 8, center.1 + 8);
         }
@@ -669,7 +669,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
     let mut game = Game::new_without_ai_controllers(&players, seed);
     game.state.map = map;
     game.state.entities = entities;
-    game.state.fog = Fog::new(game.state.map.size);
+    game.state.fog = Fog::new(game.state.map.width, game.state.map.height);
     game.state.pending.clear();
     game.state.command_log.clear();
     game.state.tick = 0;
@@ -699,7 +699,7 @@ fn build_dev_scenario_game_with_teams<const N: usize>(
         player.reset_for_dev_scenario(start_tile);
     }
     let ids = game.state.player_ids();
-    game.state.fog = Fog::new(game.state.map.size);
+    game.state.fog = Fog::new(game.state.map.width, game.state.map.height);
     game.state.fog.recompute_with_smoke(
         &ids,
         &game.state.entities,

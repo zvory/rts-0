@@ -15,6 +15,12 @@ import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import * as matchLabTools from "./match_lab_tools.js";
 import { PredictionController } from "./prediction_controller.js";
+import {
+  finishPredictionRuntimeInit,
+  newestPredictionSnapshot,
+  recoverPredictionRuntimeAfterBudget,
+  usablePredictionAdapter,
+} from "./prediction_runtime_startup.js";
 import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
 import { prepareRenderer } from "./renderer/preparation.js";
 import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
@@ -23,7 +29,11 @@ import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { RoomTimeControls } from "./replay_controls.js";
 import { createRoomCapabilities } from "./room_capabilities.js";
-import { predictionBlockedReason, predictionCompatibility } from "./prediction_compatibility.js";
+import {
+  predictionBlockedReason,
+  predictionCompatibility,
+  predictionRuntimeCompatibility,
+} from "./prediction_compatibility.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { createMatchRenderClock, enterFixedCapture, exitFixedCapture, renderFixedCaptureFrame } from "./match_fixed_capture.js";
@@ -184,6 +194,8 @@ export class Match {
     this.giveUpSent = false;
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
+    this.latestPredictionSnapshot = null;
+    this.predictionBudgetRecoveryAttempted = false;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
     this.frameProfiler = new FrameProfiler();
     this.snapshotProcessingReport = createSnapshotProcessingReport();
@@ -193,6 +205,9 @@ export class Match {
     this.predictionPlayerId = payload?.playerId;
     this.matchRunId = typeof payload?.matchRunId === "string" ? payload.matchRunId : "";
     this.predictionCompatibility = predictionCompatibility(payload);
+    this.predictionRuntimeCompatibility = predictionRuntimeCompatibility(payload);
+    this.progressPredictionEligible = !this.replayViewer && !payload?.spectator &&
+      this.predictionRuntimeCompatibility.ok;
     this.predictionAdapter = this.createPredictionAdapter();
     this.predictionInitToken = 0;
     this.prediction = new PredictionController({
@@ -371,12 +386,12 @@ export class Match {
       this.health.noteSnapshotArrival(now, document.hidden, m?.tick);
       recordSnapshotProcessing(
         this.snapshotProcessingReport,
-        () => this.prediction.applyAuthoritativeSnapshot(m),
+        () => this.applyAuthoritativePredictionSnapshot(m),
         () => this.state.applySnapshot(m, this.state.visualNow(), { controlPolicy: this.controlPolicy }),
         () => {
           notePredictionAuthoritativeSnapshot(this);
           this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
-          this.applyPredictedSnapshot();
+          this.applyPredictionFrame();
         },
       );
       this.clientIntent?.reconcilePlannedOrders?.(this.state.selectedEntities(), {
@@ -439,7 +454,7 @@ export class Match {
     this.startMatchPings();
     this.startNetReports();
     this.health.publish();
-    if (this.prediction.enabled) this.initPredictionAdapter();
+    if (this.predictionRuntimeEnabled()) this.initPredictionAdapter();
 
     if (
       (this.capabilities.roomTime.available || this.capabilities.visibility.visionSelection) &&
@@ -503,7 +518,21 @@ export class Match {
     this.state?.applyPredictionDisplayOverlay?.(overlay);
   }
 
-  applyPredictedSnapshot() {
+  applyAuthoritativePredictionSnapshot(snapshot) {
+    this.latestPredictionSnapshot = newestPredictionSnapshot(this.latestPredictionSnapshot, snapshot);
+    const result = this.prediction.applyAuthoritativeSnapshot(snapshot);
+    if (!this.prediction.enabled && this.progressPredictionEligible && this.predictionAdapter.ready) {
+      try {
+        this.predictionAdapter.reconcile(snapshot, []);
+      } catch (error) {
+        this.prediction.recordDisableReason("progress-reconcile-failed");
+        this.state?.clearPredictionFrame?.();
+      }
+    }
+    return result;
+  }
+
+  applyPredictionFrame() {
     if (!this.predictionStateCompatible()) {
       this.disablePredictionForStateMismatch();
       return;
@@ -511,22 +540,30 @@ export class Match {
     if (this.predictionVisualsPaused()) {
       this.pausePredictionVisualClock();
       clearPredictedMovementOverlay(this);
+      if (this.progressPredictionEligible && this.predictionAdapter.ready) {
+        const frame = this.predictionAdapter.renderPredictionFrame();
+        if (frame) this.applyPredictionDisplayOverlay({ predictionFrame: frame, includePose: false });
+      }
       this.publishPredictionDebug();
       return;
     }
-    if (!this.prediction.enabled || !this.predictionAdapter.ready) {
-      this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
+    if (!this.predictionRuntimeEnabled() || !this.predictionAdapter.ready) {
+      this.applyPredictionDisplayOverlay({ predictionFrame: null });
       this.publishPredictionDebug();
       return;
     }
-    const snapshot = this.predictionAdapter.renderSnapshot();
-    if (!snapshot) return;
+    const frame = this.predictionAdapter.renderPredictionFrame();
+    if (!frame) {
+      this.state?.clearPredictionFrame?.();
+      return;
+    }
     const diagnostics = this.predictionAdapter.diagnostics();
     if (this.disablePredictionForReplayBudget(diagnostics)) return;
     this.applyPredictionDisplayOverlay({
-      predictedSnapshot: snapshot,
+      predictionFrame: frame,
       diagnostics,
       smoothCorrections: true,
+      includePose: this.prediction.enabled,
     });
     this.publishPredictionDebug();
   }
@@ -539,30 +576,30 @@ export class Match {
     if (this.predictionVisualsPaused()) {
       this.pausePredictionVisualClock();
       clearPredictedMovementOverlay(this);
+      if (this.progressPredictionEligible && this.predictionAdapter.ready) {
+        const frame = this.predictionAdapter.renderPredictionFrame();
+        if (frame) this.applyPredictionDisplayOverlay({ predictionFrame: frame, includePose: false });
+      }
       return;
     }
-    if (!this.prediction.enabled || !this.predictionAdapter.ready) return;
-    const snapshot = this.predictionAdapter.advanceVisual();
-    if (snapshot) {
+    if (!this.predictionRuntimeEnabled() || !this.predictionAdapter.ready) return;
+    const frame = this.predictionAdapter.advanceVisual();
+    if (frame) {
       const diagnostics = this.predictionAdapter.diagnostics();
       if (this.disablePredictionForReplayBudget(diagnostics)) return;
-      this.applyPredictionDisplayOverlay({ predictedSnapshot: snapshot, diagnostics });
+      this.applyPredictionDisplayOverlay({
+        predictionFrame: frame,
+        diagnostics,
+        includePose: this.prediction.enabled,
+      });
       this.publishPredictionDebug();
+    } else {
+      this.state?.clearPredictionFrame?.();
     }
   }
 
   disablePredictionForReplayBudget(diagnostics) {
-    if (!this.prediction.enabled || !(diagnostics?.budgetExceededCount > 0)) return false;
-    this.prediction.recordReplayBudgetExceeded({
-      elapsedMs: diagnostics.lastTickMs,
-      replayTicks: diagnostics.lastReplayTicks,
-    });
-    this.prediction.reset({ enabled: true, preserveClientSeq: true, reason: "replay-budget-exceeded" });
-    this.resetPredictionAdapter();
-    this.applyPredictionDisplayOverlay({ predictedSnapshot: null });
-    this.publishPredictionDebug();
-    this.logPredictionStatus("tracking-replay-budget-exceeded");
-    return true;
+    return recoverPredictionRuntimeAfterBudget(this, diagnostics);
   }
 
   publishPredictionDebug() {
@@ -589,6 +626,10 @@ export class Match {
     return typeof this.state?.applyPredictionDisplayOverlay === "function";
   }
 
+  predictionRuntimeEnabled() {
+    return this.prediction.enabled || this.progressPredictionEligible;
+  }
+
   predictionVisualsPaused() {
     return predictionVisualsPausedModel(this);
   }
@@ -604,7 +645,7 @@ export class Match {
   disablePredictionForStateMismatch() {
     if (!this.prediction.enabled) return;
     this.prediction.reset({ enabled: false, preserveClientSeq: true, reason: "state-mismatch" });
-    this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictedSnapshot: null });
+    this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictionFrame: null });
     if (!this.predictionStateMismatchLogged) {
       this.predictionStateMismatchLogged = true;
       this.logPredictionStatus("disabled-state-mismatch");
@@ -621,9 +662,15 @@ export class Match {
     const allowed = !blockedReason;
     this.prediction.reset({ enabled: allowed, preserveClientSeq: true, reason: blockedReason });
     if (!allowed) {
-      this.predictionInitToken += 1;
-      this.resetPredictionAdapter();
-      this.applyPredictionDisplayOverlay({ optimisticCommands: null, predictedSnapshot: null });
+      this.applyPredictionDisplayOverlay({ optimisticCommands: null });
+      this.state?.clearPredictionPose?.();
+      if (!this.progressPredictionEligible) {
+        this.predictionInitToken += 1;
+        this.resetPredictionAdapter();
+        this.state?.clearPredictionFrame?.();
+      } else if (!this.predictionAdapter.ready && !this.predictionAdapter.loading) {
+        this.initPredictionAdapter();
+      }
       this.publishPredictionDebug();
       this.mountSettings({ keepOpen: true });
       return;
@@ -633,24 +680,9 @@ export class Match {
 
   initPredictionAdapter({ remountSettings = false } = {}) {
     const token = ++this.predictionInitToken;
-    const adapter = this.predictionAdapter;
+    const adapter = usablePredictionAdapter(this);
     void adapter.init().then((ready) => {
-      if (token !== this.predictionInitToken) {
-        adapter.destroy();
-        return;
-      }
-      if (!this.prediction.enabled) {
-        adapter.destroy();
-        this.publishPredictionDebug();
-        if (remountSettings) this.mountSettings({ keepOpen: true });
-        return;
-      }
-      if (ready) this.logPredictionStatus("ready");
-      else {
-        this.prediction.recordDisableReason("wasm-unavailable");
-        this.logPredictionStatus("disabled");
-      }
-      if (remountSettings) this.mountSettings({ keepOpen: true });
+      finishPredictionRuntimeInit(this, { token, adapter, ready, remountSettings });
     });
   }
 
@@ -658,6 +690,7 @@ export class Match {
     return new SimWasmPredictionAdapter({
       startInfo: this.predictionStartInfo,
       playerId: this.predictionPlayerId,
+      visualNow: () => this.renderClock.now(),
       replayBudgetMs: PREDICTION_REPLAY_BUDGET_MS,
     });
   }

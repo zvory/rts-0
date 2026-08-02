@@ -847,9 +847,8 @@ pub(crate) fn staging_point(
     let preferred_direction = if len > f32::EPSILON {
         (dx / len, dy / len)
     } else {
-        let map_center = map.world_size_px() * 0.5;
-        let center_dx = map_center - x;
-        let center_dy = map_center - y;
+        let center_dx = map.world_width_px() * 0.5 - x;
+        let center_dy = map.world_height_px() * 0.5 - y;
         let center_len = center_dx.hypot(center_dy);
         if center_len > f32::EPSILON {
             (center_dx / center_len, center_dy / center_len)
@@ -867,8 +866,10 @@ pub(crate) fn staging_point(
         let sy = y + preferred_direction.1 * staging_distance;
         return SmokeCloudStore::clamp_point_to_map(map, sx, sy);
     }
-    let map_center = map.world_size_px() * 0.5;
-    let center_direction = (map_center - x, map_center - y);
+    let center_direction = (
+        map.world_width_px() * 0.5 - x,
+        map.world_height_px() * 0.5 - y,
+    );
     let candidate_directions = [
         preferred_direction,
         center_direction,

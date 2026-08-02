@@ -8,7 +8,8 @@ use super::{
 /// A per-tick grid of trench centers. Its exact distance checks preserve the authoritative
 /// candidate set while avoiding a complete trench scan for every stationary infantry unit.
 pub(super) struct TrenchSpatialIndex {
-    size: u32,
+    width: u32,
+    height: u32,
     cells: Vec<Vec<Trench>>,
     max_radius_px: f32,
     max_search_radius_px: f32,
@@ -17,8 +18,9 @@ pub(super) struct TrenchSpatialIndex {
 impl TrenchSpatialIndex {
     pub(super) fn build(map: &Map, trenches: &TrenchStore) -> Self {
         let mut index = Self {
-            size: map.size,
-            cells: vec![Vec::new(); (map.size * map.size) as usize],
+            width: map.width,
+            height: map.height,
+            cells: vec![Vec::new(); map.width.saturating_mul(map.height) as usize],
             max_radius_px: 0.0,
             max_search_radius_px: 0.0,
         };
@@ -75,14 +77,15 @@ impl TrenchSpatialIndex {
         max_tx: i32,
         max_ty: i32,
     ) -> impl Iterator<Item = &Vec<Trench>> {
-        let max_tile = self.size.saturating_sub(1) as i32;
-        let min_tx = min_tx.clamp(0, max_tile);
-        let min_ty = min_ty.clamp(0, max_tile);
-        let max_tx = max_tx.clamp(0, max_tile);
-        let max_ty = max_ty.clamp(0, max_tile);
+        let max_x = self.width.saturating_sub(1) as i32;
+        let max_y = self.height.saturating_sub(1) as i32;
+        let min_tx = min_tx.clamp(0, max_x);
+        let min_ty = min_ty.clamp(0, max_y);
+        let max_tx = max_tx.clamp(0, max_x);
+        let max_ty = max_ty.clamp(0, max_y);
         (min_ty..=max_ty).flat_map(move |ty| {
             (min_tx..=max_tx)
-                .map(move |tx| &self.cells[(ty as u32 * self.size + tx as u32) as usize])
+                .map(move |tx| &self.cells[(ty as u32 * self.width + tx as u32) as usize])
         })
     }
 
@@ -93,10 +96,10 @@ impl TrenchSpatialIndex {
         let ts = config::TILE_SIZE as f32;
         let tx = (x / ts).floor() as i32;
         let ty = (y / ts).floor() as i32;
-        if tx < 0 || ty < 0 || tx >= self.size as i32 || ty >= self.size as i32 {
+        if tx < 0 || ty < 0 || tx >= self.width as i32 || ty >= self.height as i32 {
             return None;
         }
-        Some((ty as u32 * self.size + tx as u32) as usize)
+        Some((ty as u32 * self.width + tx as u32) as usize)
     }
 }
 
@@ -104,7 +107,8 @@ impl TrenchSpatialIndex {
 /// is updated immediately after each slot correction, matching the existing id-ordered mutation
 /// semantics without repeating a global entity scan for every candidate slot.
 pub(super) struct EntrenchmentEntityIndex {
-    size: u32,
+    width: u32,
+    height: u32,
     cells: Vec<Vec<u32>>,
     max_unit_radius_px: f32,
     max_building_reach_px: f32,
@@ -113,8 +117,9 @@ pub(super) struct EntrenchmentEntityIndex {
 impl EntrenchmentEntityIndex {
     pub(super) fn build(map: &Map, entities: &EntityStore) -> Self {
         let mut index = Self {
-            size: map.size,
-            cells: vec![Vec::new(); (map.size * map.size) as usize],
+            width: map.width,
+            height: map.height,
+            cells: vec![Vec::new(); map.width.saturating_mul(map.height) as usize],
             max_unit_radius_px: 0.0,
             max_building_reach_px: 0.0,
         };
@@ -193,14 +198,15 @@ impl EntrenchmentEntityIndex {
         max_tx: i32,
         max_ty: i32,
     ) -> impl Iterator<Item = &Vec<u32>> {
-        let max_tile = self.size.saturating_sub(1) as i32;
-        let min_tx = min_tx.clamp(0, max_tile);
-        let min_ty = min_ty.clamp(0, max_tile);
-        let max_tx = max_tx.clamp(0, max_tile);
-        let max_ty = max_ty.clamp(0, max_tile);
+        let max_x = self.width.saturating_sub(1) as i32;
+        let max_y = self.height.saturating_sub(1) as i32;
+        let min_tx = min_tx.clamp(0, max_x);
+        let min_ty = min_ty.clamp(0, max_y);
+        let max_tx = max_tx.clamp(0, max_x);
+        let max_ty = max_ty.clamp(0, max_y);
         (min_ty..=max_ty).flat_map(move |ty| {
             (min_tx..=max_tx)
-                .map(move |tx| &self.cells[(ty as u32 * self.size + tx as u32) as usize])
+                .map(move |tx| &self.cells[(ty as u32 * self.width + tx as u32) as usize])
         })
     }
 
@@ -211,10 +217,10 @@ impl EntrenchmentEntityIndex {
         let ts = config::TILE_SIZE as f32;
         let tx = (x / ts).floor() as i32;
         let ty = (y / ts).floor() as i32;
-        if tx < 0 || ty < 0 || tx >= self.size as i32 || ty >= self.size as i32 {
+        if tx < 0 || ty < 0 || tx >= self.width as i32 || ty >= self.height as i32 {
             return None;
         }
-        Some((ty as u32 * self.size + tx as u32) as usize)
+        Some((ty as u32 * self.width + tx as u32) as usize)
     }
 }
 

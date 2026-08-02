@@ -61,17 +61,18 @@ impl<'a> FormationReachability<'a> {
 }
 
 struct ReachabilityGrid {
-    size: u32,
+    width: u32,
+    height: u32,
     passable: Vec<bool>,
     components: Vec<u32>,
 }
 
 impl ReachabilityGrid {
     fn build(map: &Map, occ: &Occupancy<'_>, kind: EntityKind) -> Self {
-        let len = (map.size * map.size) as usize;
+        let len = map.width.saturating_mul(map.height) as usize;
         let mut passable = vec![false; len];
-        for ty in 0..map.size {
-            for tx in 0..map.size {
+        for ty in 0..map.height {
+            for tx in 0..map.width {
                 let idx = map.index(tx, ty);
                 passable[idx] = reachability_tile_passable(map, occ, kind, tx as i32, ty as i32);
             }
@@ -80,8 +81,8 @@ impl ReachabilityGrid {
         let mut components = vec![0; len];
         let mut next_component = 1u32;
         let mut queue = VecDeque::new();
-        for ty in 0..map.size {
-            for tx in 0..map.size {
+        for ty in 0..map.height {
+            for tx in 0..map.width {
                 let idx = map.index(tx, ty);
                 if !passable[idx] || components[idx] != 0 {
                     continue;
@@ -93,7 +94,7 @@ impl ReachabilityGrid {
                     for (dx, dy) in NEIGHBORS {
                         let nx = cx + dx;
                         let ny = cy + dy;
-                        if !in_bounds(map.size, nx, ny)
+                        if !in_bounds(map.width, map.height, nx, ny)
                             || !step_allowed(map, &passable, cx, cy, dx, dy)
                         {
                             continue;
@@ -112,14 +113,15 @@ impl ReachabilityGrid {
         }
 
         Self {
-            size: map.size,
+            width: map.width,
+            height: map.height,
             passable,
             components,
         }
     }
 
     fn component(&self, tile: (u32, u32)) -> Option<u32> {
-        if tile.0 >= self.size || tile.1 >= self.size {
+        if tile.0 >= self.width || tile.1 >= self.height {
             return None;
         }
         let component = self.components[self.index(tile.0, tile.1)];
@@ -138,7 +140,9 @@ impl ReachabilityGrid {
         for (dx, dy) in NEIGHBORS {
             let nx = sx + dx;
             let ny = sy + dy;
-            if !in_bounds(self.size, nx, ny) || !step_allowed_grid(self, sx, sy, dx, dy) {
+            if !in_bounds(self.width, self.height, nx, ny)
+                || !step_allowed_grid(self, sx, sy, dx, dy)
+            {
                 continue;
             }
             if let Some(component) = self.component((nx as u32, ny as u32)) {
@@ -152,7 +156,7 @@ impl ReachabilityGrid {
     }
 
     fn index(&self, tx: u32, ty: u32) -> usize {
-        (ty * self.size + tx) as usize
+        (ty * self.width + tx) as usize
     }
 }
 
@@ -226,6 +230,6 @@ fn step_allowed_grid(grid: &ReachabilityGrid, tx: i32, ty: i32, dx: i32, dy: i32
             && grid.passable[grid.index(tx as u32, (ty + dy) as u32)])
 }
 
-fn in_bounds(size: u32, tx: i32, ty: i32) -> bool {
-    tx >= 0 && ty >= 0 && (tx as u32) < size && (ty as u32) < size
+fn in_bounds(width: u32, height: u32, tx: i32, ty: i32) -> bool {
+    tx >= 0 && ty >= 0 && (tx as u32) < width && (ty as u32) < height
 }

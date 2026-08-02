@@ -44,7 +44,7 @@ fn four_player_map_retains_every_resource_site() {
 #[test]
 fn four_player_map_is_fourfold_rotationally_symmetric() {
     let map = Map::load("4 Player Map", 4, 0x1234_5678).expect("four-player map should load");
-    let size = map.size as usize;
+    let size = map.width as usize;
 
     for y in 0..size {
         for x in 0..size {
@@ -62,7 +62,7 @@ fn four_player_map_is_fourfold_rotationally_symmetric() {
     let base_sites: HashSet<_> = map.base_sites.iter().copied().collect();
     for (locations, kind) in [(&starts, "start"), (&base_sites, "base site")] {
         for &location in locations {
-            let rotated = (map.size - 1 - location.1, location.0);
+            let rotated = (map.width - 1 - location.1, location.0);
             assert!(
                 locations.contains(&rotated),
                 "four-player {kind} ({},{}) has no 90-degree rotational counterpart",

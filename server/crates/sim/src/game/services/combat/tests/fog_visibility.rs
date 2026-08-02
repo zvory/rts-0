@@ -29,7 +29,7 @@ fn deployed_anti_tank_gun_does_not_auto_acquire_targets_hidden_by_fog() {
         .expect("tank should exist")
         .set_facing(std::f32::consts::PI);
 
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1], &entities, &map);
     assert!(
         !fog.is_visible_world(
@@ -104,7 +104,7 @@ fn deployed_anti_tank_gun_auto_acquires_target_visible_to_teammate() {
     let player_three = player_state(3, false);
     let players = [player_one, player_two, player_three];
 
-    let mut fog = Fog::new(map.size);
+    let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1, 2, 3], &entities, &map);
     let tank = entities.get(tank_id).expect("tank should exist");
     assert!(

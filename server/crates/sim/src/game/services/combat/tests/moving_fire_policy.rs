@@ -404,7 +404,7 @@ fn tank_range_tiles(entities: &EntityStore, tank_id: u32) -> f32 {
 fn run_open_movement_tick(entities: &mut EntityStore) {
     let map = open_map(24);
     let occ = Occupancy::build(&map, entities);
-    let spatial = SpatialIndex::build(entities, map.size);
+    let spatial = SpatialIndex::build(entities, map.width, map.height);
     movement_system(&map, entities, &mut [], &occ, &spatial, 0);
 }
 

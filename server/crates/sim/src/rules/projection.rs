@@ -717,7 +717,8 @@ mod tests {
 
     fn flat_map(size: u32) -> Map {
         Map {
-            size,
+            width: size,
+            height: size,
             terrain: vec![terrain::GRASS; (size * size) as usize],
             starts: vec![(4, 4)],
             ..Default::default()
@@ -809,7 +810,7 @@ mod tests {
             .spawn_building(1, EntityKind::PumpJack, 128.0, 128.0, true)
             .expect("pump jack should spawn");
         let pump = entities.get(pump_id).expect("pump jack entity");
-        let fog = Fog::new(16);
+        let fog = Fog::new(16, 16);
         let teams = TeamRelations::from_player_teams([(1, 7), (2, 7), (3, 3)]);
         let project = |viewer| {
             project_entity(
@@ -860,12 +861,13 @@ mod tests {
             tank.set_weapon_facing(1.2);
         }
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2, 3], &entities, &map);
         let tank = entities.get(tank_id).expect("tank should exist");
         let hidden_target = entities
@@ -904,12 +906,13 @@ mod tests {
             tank.set_weapon_facing(0.0);
         }
         let map = Map {
-            size: 16,
+            width: 16,
+            height: 16,
             terrain: vec![terrain::GRASS; 16 * 16],
             starts: vec![(1, 1)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2, 3], &entities, &map);
         let tank = entities.get(tank_id).expect("tank should exist");
         let target = entities.get(target_id).expect("target should exist");
@@ -939,12 +942,13 @@ mod tests {
             gunner.set_weapon_facing(0.0);
         }
         let map = Map {
-            size: 16,
+            width: 16,
+            height: 16,
             terrain: vec![terrain::GRASS; 16 * 16],
             starts: vec![(1, 1)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2, 3], &entities, &map);
         let gunner = entities.get(gunner_id).expect("gunner should exist");
         let target = entities.get(target_id).expect("target should exist");
@@ -975,12 +979,13 @@ mod tests {
             gunner.set_weapon_facing(1.2);
         }
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2, 3], &entities, &map);
         let gunner = entities.get(gunner_id).expect("gunner should exist");
         let hidden_target = entities
@@ -1009,12 +1014,13 @@ mod tests {
             }
         }
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1], &entities, &map);
         let tank = entities.get(tank_id).expect("tank should exist");
 
@@ -1039,12 +1045,13 @@ mod tests {
             }
         }
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2], &entities, &map);
         let tank = entities.get(tank_id).expect("tank should exist");
 
@@ -1072,7 +1079,7 @@ mod tests {
             .start_breakthrough_aura(90);
 
         let map = flat_map(64);
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2], &entities, &map);
         let command_car = entities
             .get(command_car_id)
@@ -1116,12 +1123,13 @@ mod tests {
         }
 
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1), (40, 40)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2], &entities, &map);
         let unit = entities.get(unit_id).expect("unit should exist");
 
@@ -1171,12 +1179,13 @@ mod tests {
         }
 
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1), (40, 40)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2], &entities, &map);
         let worker = entities.get(worker_id).expect("worker should exist");
 
@@ -1217,12 +1226,13 @@ mod tests {
         }
 
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1], &entities, &map);
         let unit = entities.get(unit_id).expect("unit should exist");
 
@@ -1269,12 +1279,13 @@ mod tests {
         }
 
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1), (40, 40)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2], &entities, &map);
         let unit = entities.get(unit_id).expect("unit should exist");
 
@@ -1333,12 +1344,13 @@ mod tests {
             .start_ability_cooldown(ability::AbilityKind::Charge, 42);
 
         let map = Map {
-            size: 64,
+            width: 64,
+            height: 64,
             terrain: vec![terrain::GRASS; 64 * 64],
             starts: vec![(1, 1), (40, 40)],
             ..Default::default()
         };
-        let mut fog = Fog::new(map.size);
+        let mut fog = Fog::new(map.width, map.height);
         fog.recompute(&[1, 2], &entities, &map);
         let rifle = entities.get(rifle_id).expect("rifleman should exist");
 
@@ -1358,7 +1370,7 @@ mod tests {
             .spawn_building(1, EntityKind::Barracks, 160.0, 160.0, false)
             .expect("scaffold should spawn");
         let scaffold = entities.get(scaffold_id).expect("scaffold should exist");
-        let mut fog = Fog::new(16);
+        let mut fog = Fog::new(16, 16);
         fog.recompute(&[1, 2], &entities, &flat_map(16));
         let mut active_sites = BTreeSet::new();
         active_sites.insert(scaffold_id);
@@ -1410,7 +1422,7 @@ mod tests {
             }
         }
 
-        let fog = Fog::new(16);
+        let fog = Fog::new(16, 16);
         let trap = entities.get(trap_id).expect("trap should exist");
         let view = project_for_test(1, trap, &fog, false, &entities, None, false)
             .expect("viewer should see trap");

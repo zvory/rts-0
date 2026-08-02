@@ -4,16 +4,334 @@ import {
   PredictionController,
   PREDICTION_STATE,
 } from "../client/src/prediction_controller.js";
-import { predictionCompatibility } from "../client/src/prediction_compatibility.js";
+import {
+  predictionCompatibility,
+  predictionRuntimeCompatibility,
+} from "../client/src/prediction_compatibility.js";
 import { DEFAULT_FACTION_ID, PREDICTION_PROTOCOL_VERSION } from "../client/src/protocol.js";
+import { createRigRenderContext } from "../client/src/renderer/rigs/animation.js";
 import { GameState } from "../client/src/state.js";
+import { SimWasmPredictionAdapter } from "../client/src/sim_wasm_adapter.js";
+import { CaptureRenderClock } from "../client/src/visual_clock.js";
+import {
+  finishPredictionRuntimeInit,
+  recoverPredictionRuntimeAfterBudget,
+  usablePredictionAdapter,
+} from "../client/src/prediction_runtime_startup.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
 }
 
+{
+  const failed = { disabledReason: "transient load failure" };
+  const replacement = { disabledReason: null };
+  let resets = 0;
+  const match = {
+    predictionAdapter: failed,
+    resetPredictionAdapter() {
+      resets += 1;
+      this.predictionAdapter = replacement;
+    },
+  };
+  assert(usablePredictionAdapter(match) === replacement && resets === 1,
+    "retrying prediction replaces an adapter poisoned by a transient initialization failure");
+  assert(usablePredictionAdapter(match) === replacement && resets === 1,
+    "a usable adapter is retained without another reset");
+}
+
+{
+  const snapshot = { tick: 9, entities: [{ id: 1, prodProgress: 0.1 }] };
+  let reconciles = 0;
+  let frames = 0;
+  let destroyed = 0;
+  const adapter = { destroy() { destroyed += 1; } };
+  const match = {
+    predictionInitToken: 2,
+    predictionAdapter: adapter,
+    progressPredictionEligible: true,
+    latestPredictionSnapshot: snapshot,
+    prediction: {
+      enabled: true,
+      latestAuthoritativeTick: snapshot.tick,
+      reconcilePredictor(value) {
+        reconciles += 1;
+        assert(value === snapshot, "delayed WASM init imports the latest authoritative snapshot");
+      },
+    },
+    predictionRuntimeEnabled: () => true,
+    applyPredictionFrame: () => { frames += 1; },
+    publishPredictionDebug() {},
+    logPredictionStatus() {},
+    mountSettings() {},
+  };
+  finishPredictionRuntimeInit(match, { token: 1, adapter, ready: true, remountSettings: false });
+  finishPredictionRuntimeInit(match, { token: 2, adapter, ready: true, remountSettings: false });
+  assert(destroyed === 0, "a stale callback never destroys the still-current loading adapter");
+  assert(reconciles === 1, "WASM readiness catches up without waiting for another packet");
+  assert(frames === 1, "WASM readiness publishes the caught-up prediction frame immediately");
+}
+
+{
+  const snapshot = {
+    tick: 12,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodKind: "worker", prodQueue: 2 }],
+  };
+  const adapter = {
+    destroy() {},
+    reconcile() { return { correctionDistance: 0, snapCorrection: false }; },
+    enqueueCommand() { return false; },
+  };
+  const prediction = new PredictionController({
+    predictor: adapter,
+    sendCommand: () => true,
+  });
+  const match = {
+    predictionInitToken: 1,
+    predictionAdapter: adapter,
+    progressPredictionEligible: true,
+    latestPredictionSnapshot: snapshot,
+    prediction,
+    predictionRuntimeEnabled: () => true,
+    applyPredictionFrame() {},
+    publishPredictionDebug() {},
+    logPredictionStatus() {},
+    mountSettings() {},
+  };
+  finishPredictionRuntimeInit(match, { token: 1, adapter, ready: true, remountSettings: false });
+  assert(prediction.latestAuthoritativeTick === snapshot.tick,
+    "runtime recovery restores the reset controller's authoritative baseline immediately");
+  prediction.issueCommand({ c: "train", building: 20, unit: "worker" });
+  assert(prediction.optimisticUiState().production[0]?.optimisticQueue === 3,
+    "the restored entity baseline preserves existing queue state for immediate optimistic commands");
+}
+
+{
+  let disableReason = null;
+  let cleared = 0;
+  let frames = 0;
+  const match = {
+    predictionInitToken: 1,
+    progressPredictionEligible: true,
+    latestPredictionSnapshot: { tick: 4, entities: [] },
+    prediction: {
+      enabled: false,
+      recordDisableReason(reason) { disableReason = reason; },
+    },
+    predictionAdapter: null,
+    predictionRuntimeEnabled: () => true,
+    state: { clearPredictionFrame() { cleared += 1; } },
+    applyPredictionFrame() { frames += 1; },
+    publishPredictionDebug() {},
+    logPredictionStatus() {},
+    mountSettings() {},
+  };
+  const adapter = { reconcile() { throw new Error("bad baseline"); }, destroy() {} };
+  match.predictionAdapter = adapter;
+  finishPredictionRuntimeInit(match, { token: 1, adapter, ready: true, remountSettings: false });
+  assert(disableReason === "progress-reconcile-failed" && cleared === 1,
+    "progress-only startup baseline failures fall back to authoritative display");
+  assert(frames === 0, "failed startup reconciliation never publishes a stale progress frame");
+}
+
+{
+  let initialized = 0;
+  let resetAdapters = 0;
+  const prediction = new PredictionController({ sendCommand: () => true });
+  prediction.applyAuthoritativeSnapshot({
+    tick: 7,
+    netStatus: { lastSimConsumedClientSeq: 0 },
+    entities: [{ id: 20, owner: 1, kind: "city_centre", prodQueue: 2 }],
+  });
+  prediction.applyAuthoritativeSnapshot({
+    tick: 7,
+    netStatus: { lastSimConsumedClientSeq: 0 },
+    entities: [{ id: 20, owner: 1, kind: "city_centre", prodQueue: 2 }],
+  });
+  prediction.issueCommand({ c: "train", building: 20, unit: "worker" });
+  const match = {
+    prediction,
+    resetPredictionAdapter() { resetAdapters += 1; },
+    initPredictionAdapter() { initialized += 1; },
+    applyPredictionDisplayOverlay() {},
+    publishPredictionDebug() {},
+    logPredictionStatus() {},
+  };
+  assert(recoverPredictionRuntimeAfterBudget(match, {
+    budgetExceededCount: 1,
+    lastReplayBudgetExceeded: true,
+    lastTickMs: 8,
+    lastReplayTicks: 3,
+  }) === true, "replay-budget recovery handles an exceeded frame");
+  assert(resetAdapters === 1 && initialized === 1,
+    "replay-budget recovery immediately initializes the replacement shared runtime");
+  const preserved = prediction.debugSummary();
+  assert(preserved.pendingClientSeqs.join(",") === "1",
+    "replay-budget recovery preserves in-flight command reconciliation state");
+  assert(prediction.optimisticUiState().production[0]?.optimisticQueue === 3,
+    "replay-budget recovery preserves optimistic production state");
+  assert(preserved.latestAuthoritativeTick === 7 && preserved.duplicateSnapshotCount === 1,
+    "replay-budget recovery preserves the authoritative baseline and snapshot diagnostics");
+  assert(recoverPredictionRuntimeAfterBudget(match, {
+    budgetExceededCount: 1,
+    lastReplayBudgetExceeded: true,
+    lastTickMs: 9,
+    lastReplayTicks: 3,
+  }) === false, "an over-budget replacement terminates recovery instead of restarting recursively");
+  assert(resetAdapters === 1 && initialized === 1, "replay-budget recovery is bounded to one restart");
+  recoverPredictionRuntimeAfterBudget(match, {
+    budgetExceededCount: 1,
+    lastReplayBudgetExceeded: false,
+  });
+  assert(recoverPredictionRuntimeAfterBudget(match, {
+    budgetExceededCount: 2,
+    lastReplayBudgetExceeded: true,
+    lastTickMs: 8,
+    lastReplayTicks: 2,
+  }) === true, "a healthy measured window rearms future replay-budget recovery");
+}
+
+{
+  const priorFetch = globalThis.fetch;
+  let releaseModule = null;
+  let importCount = 0;
+  let predictorCount = 0;
+  const moduleGate = new Promise((resolve) => { releaseModule = resolve; });
+  globalThis.fetch = async () => ({
+    ok: true,
+    headers: { get: () => "text/javascript" },
+  });
+  try {
+    const adapter = new SimWasmPredictionAdapter({
+      startInfo: { tick: 0, map: { width: 1, height: 1, tileSize: 32, terrain: [], resources: [] }, players: [] },
+      playerId: 1,
+      importModule: async () => {
+        importCount += 1;
+        return {
+          default: () => moduleGate,
+          WasmPredictor: {
+            fromStartJson() {
+              predictorCount += 1;
+              return {};
+            },
+          },
+        };
+      },
+    });
+    const first = adapter.init();
+    const second = adapter.init();
+    assert(first === second, "concurrent WASM initialization callers share one in-flight promise");
+    releaseModule();
+    assert(await first && await second, "all shared WASM initialization callers observe readiness");
+    assert(importCount === 1 && predictorCount === 1, "shared WASM initialization imports and constructs once");
+  } finally {
+    globalThis.fetch = priorFetch;
+  }
+}
+
+{
+  const fractions = [];
+  const captureClock = new CaptureRenderClock(1000);
+  const adapter = new SimWasmPredictionAdapter({ visualNow: () => captureClock.now() });
+  adapter.ready = true;
+  adapter.displayValid = true;
+  adapter.lastAdvanceAt = captureClock.now();
+  adapter.predictor = {
+    advanceTicks() {},
+    renderPredictionFrameJson(fraction) {
+      fractions.push(fraction);
+      return JSON.stringify({ tick: 1, entities: [], progress: [] });
+    },
+  };
+  adapter.renderPredictionFrame();
+  captureClock.advanceTo(1016.6666667);
+  adapter.renderPredictionFrame();
+  assert(fractions[0] === 0 && Math.abs(fractions[1] - 0.5) < 0.0001,
+    "fixed capture samples WASM progress from deterministic visual time");
+}
+
 function sentSeqs(sent) {
   return sent.map((entry) => entry.clientSeq).join(",");
+}
+
+{
+  let fullSnapshotCalled = false;
+  let visualNow = 16.6666667;
+  let renderedFraction = null;
+  let advanceTicksCalls = 0;
+  const adapter = new SimWasmPredictionAdapter({ visualNow: () => visualNow });
+  adapter.ready = true;
+  adapter.displayValid = true;
+  adapter.lastAdvanceAt = 0;
+  adapter.predictor = {
+    renderPredictionFrameJson: (fraction) => {
+      renderedFraction = fraction;
+      return JSON.stringify({
+        tick: 7,
+        entities: [{ id: 1, x: 4, y: 5 }],
+        progress: [{ id: 2, kind: "production", identity: "unit:worker", fraction: 0.3 }],
+      });
+    },
+    enqueueCommandJson() {},
+    advanceTicks() { advanceTicksCalls += 1; },
+    renderSnapshotJson: () => {
+      fullSnapshotCalled = true;
+      throw new Error("legacy full snapshot render must not be used");
+    },
+  };
+  const frame = adapter.renderPredictionFrame();
+  assert(frame.tick === 7 && frame.entities[0].x === 4, "WASM adapter consumes the sparse prediction-frame API");
+  assert(frame.progress[0].fraction === 0.3, "WASM adapter preserves the separate sparse progress lane");
+  assert(Math.abs(renderedFraction - 0.5) < 0.0001, "WASM render receives a render-clock fractional tick");
+  assert(fullSnapshotCalled === false, "WASM adapter never requests a synthetic full snapshot");
+  adapter.enqueueCommand(1, { c: "move", units: [1], x: 8, y: 9 });
+  assert(advanceTicksCalls === 0, "command enqueue does not advance the shared display tick");
+  adapter.pauseVisualClock(visualNow);
+  const frozen = adapter.renderPredictionFrame(5000);
+  assert(frozen === adapter.frozenFrame, "paused WASM display returns the frozen prediction frame");
+  visualNow = 100;
+  adapter.resumeVisualClock(visualNow);
+  adapter.renderPredictionFrame(116.6666667);
+  assert(Math.abs(renderedFraction - 0.5) < 0.0001, "resumed visual clock excludes paused wall time");
+
+  adapter.module = {
+    WasmPredictor: {
+      baselineFromSnapshotJson() { throw new Error("bad baseline"); },
+    },
+  };
+  let reconcileFailed = false;
+  try {
+    adapter.reconcile({ tick: 8, entities: [] }, []);
+  } catch {
+    reconcileFailed = true;
+  }
+  assert(reconcileFailed && adapter.renderPredictionFrame() === null,
+    "failed reconcile invalidates stale pose and progress output for authoritative fallback");
+}
+
+{
+  let now = 0;
+  const adapter = new SimWasmPredictionAdapter({ now: () => now, replayBudgetMs: 4 });
+  adapter.ready = true;
+  adapter.module = {
+    WasmPredictor: {
+      baselineFromSnapshotJson() { return "{}"; },
+    },
+  };
+  adapter.predictor = {
+    importBaselineJson() { now += 5; },
+    diagnosticsJson() { return JSON.stringify({ correctionMagnitude: 0 }); },
+    renderPredictionFrameJson() { return JSON.stringify({ tick: 1, entities: [], progress: [] }); },
+  };
+  adapter.reconcile({ tick: 1 }, []);
+  assert(adapter.diagnostics().lastReplayBudgetExceeded === true,
+    "adapter diagnostics distinguish a latest over-budget replay from the cumulative count");
+  now = 10;
+  adapter.predictor.importBaselineJson = () => { now += 1; };
+  adapter.reconcile({ tick: 2 }, []);
+  const diagnostics = adapter.diagnostics();
+  assert(diagnostics.budgetExceededCount === 1 && diagnostics.lastReplayBudgetExceeded === false,
+    "a healthy replay clears only the latest-result flag and preserves cumulative telemetry");
 }
 
 {
@@ -277,20 +595,104 @@ function sentSeqs(sent) {
     events: [],
   });
   state.applyPredictionDisplayOverlay({
-    predictedSnapshot: {
+    predictionFrame: {
       tick: 3,
-      entities: [{ id: 10, owner: 1, kind: "worker", x: 52, y: 32, hp: 40, maxHp: 40, state: "move" }],
+      entities: [{ id: 10, x: 52, y: 32, facing: 1.5, motion: "move" }],
     },
   });
   assert(state.entitiesInterpolated(1)[0].x === 52, "render reads predicted owned position");
+  assert(state.entitiesInterpolated(1)[0].state === "move", "explicit predicted motion drives immediate movement presentation");
   assert(
     state.entitiesInterpolated(1, { includePrediction: false })[0].x === 32,
     "authoritative reads can ignore prediction for fog",
   );
   assert(state.entityById(10).x === 52, "entityById exposes predicted owned position for local UX");
+  assert(state.entityById(10).facing === 1.5, "entityById composes predicted body facing onto authority");
   state.applyPredictionDisplayOverlay({ optimisticCommands: { production: [], rally: [] } });
   assert(state.entitiesInterpolated(1)[0].x === 52, "optimistic overlay updates do not clear predicted movement");
   assert(state.localFactionId === DEFAULT_FACTION_ID, "GameState exposes normalized local faction identity");
+}
+
+{
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0), resources: [] },
+    players: [
+      { id: 1, teamId: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 },
+      { id: 2, teamId: 2, name: "B", color: "#0f0", startTileX: 2, startTileY: 2 },
+    ],
+  });
+  const authoritative = [
+    {
+      id: 20, owner: 1, kind: "worker", x: 32, y: 32, facing: 0.25,
+      hp: 31, maxHp: 40, state: "gather", weaponFacing: 2.4, targetId: 90,
+      latchedNode: 90, setupState: "deployed", abilities: ["future_ability"],
+      futureSentinel: { mustSurvive: true },
+    },
+    {
+      id: 21, owner: 1, kind: "worker", x: 64, y: 32, facing: 0.5,
+      hp: 38, maxHp: 40, state: "build", buildProgress: 0.4, targetId: 91,
+      futureSentinel: "construction-preserved",
+    },
+    {
+      id: 23, owner: 1, kind: "barracks", x: 64, y: 64, hp: 200, maxHp: 400,
+      state: "construct", buildProgress: 0.25, buildActive: true,
+    },
+    { id: 22, owner: 2, kind: "worker", x: 96, y: 32, hp: 40, maxHp: 40, state: "idle" },
+  ];
+  state.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 2,
+    supplyCap: 10,
+    entities: authoritative,
+    events: [],
+  });
+
+  const applyBusyFrame = (offset) => state.applyPredictionDisplayOverlay({
+    predictionFrame: {
+      tick: 1 + offset,
+      entities: [
+        {
+          id: 20, x: 32 + offset, y: 33, facing: 1,
+          owner: 999, kind: "tank", hp: 0, state: "idle", weaponFacing: 0,
+          latchedNode: null, abilities: [], futureSentinel: "clobbered",
+        },
+        {
+          id: 21, x: 64 + offset, y: 34,
+          state: "idle", buildProgress: 0, targetId: null, futureSentinel: "clobbered",
+        },
+        { id: 22, x: 140, y: 32, motion: "move" },
+        { id: 999, x: 200, y: 200, motion: "move" },
+      ],
+      progress: [
+        { id: 23, kind: "construction", identity: "build:barracks", fraction: 0.25 + offset * 0.01 },
+      ],
+    },
+  });
+
+  for (const offset of [1, 2, 3, 4]) {
+    applyBusyFrame(offset);
+    const gather = state.entityById(20);
+    const build = state.entityById(21);
+    assert(gather.x === 32 + offset && gather.facing === 1, "sparse prediction keeps owned pose responsive");
+    assert(gather.state === "gather" && gather.latchedNode === 90, "missing motion preserves gathering activity across prediction frames");
+    assert(createRigRenderContext(gather).busy === true, "gathering worker keeps the yellow busy indicator across prediction frames");
+    assert(gather.hp === 31 && gather.weaponFacing === 2.4 && gather.targetId === 90, "prediction cannot overwrite authoritative combat and health fields");
+    assert(gather.abilities[0] === "future_ability" && gather.futureSentinel.mustSurvive, "prediction preserves optional and future authoritative fields");
+    assert(build.state === "build" && build.buildProgress === 0.4 && build.targetId === 91, "missing motion preserves construction activity across prediction frames");
+    assert(createRigRenderContext(build).busy === true, "constructing worker keeps the yellow busy indicator across prediction frames");
+    assert(build.futureSentinel === "construction-preserved", "construction projection preserves unknown future fields");
+    const scaffold = state.entityById(23);
+    assert(scaffold.buildProgress === 0.25 + offset * 0.01 && scaffold.buildProgressPredicted === true,
+      "construction progress advances through the sparse lane while worker activity remains authoritative");
+    assert(state.entityById(22).x === 96 && state.entityById(22).predicted !== true, "prediction patches cannot alter another player's entity");
+    assert(state.entityById(999) === undefined, "prediction patches cannot create entities absent from authority");
+    const variants = state.entityVariants(1);
+    assert(variants.interpolatedEntities.find((e) => e.id === 20)?.state === "gather", "frame variants use the same authoritative-first compositor");
+  }
 }
 
 {
@@ -309,6 +711,14 @@ function sentSeqs(sent) {
     compatibility.reason === "unsupported-local-faction",
     "unsupported local faction uses stable diagnostic reason",
   );
+  const runtime = predictionRuntimeCompatibility({
+    playerId: 1,
+    spectator: false,
+    predictionVersion: PREDICTION_PROTOCOL_VERSION,
+    predictionBuildId: "same-build",
+    players: [{ id: 1, factionId: "phase2_empty_fixture" }],
+  }, { clientBuildId: "same-build" });
+  assert(runtime.ok === true, "unsupported pose faction remains eligible for owner-safe display progress");
 }
 
 {
@@ -549,11 +959,11 @@ function sentSeqs(sent) {
     events: [],
   });
   state.applyPredictionDisplayOverlay({
-    predictedSnapshot: {
+    predictionFrame: {
       tick: 2,
       entities: [
-        { id: 10, owner: 1, kind: "worker", x: 48, y: 32, hp: 40, maxHp: 40, state: "move" },
-        { id: 11, owner: 2, kind: "worker", x: 128, y: 32, hp: 40, maxHp: 40, state: "move" },
+        { id: 10, x: 48, y: 32, motion: "move" },
+        { id: 11, x: 128, y: 32, motion: "move" },
       ],
     },
   });

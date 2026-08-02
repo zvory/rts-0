@@ -27,7 +27,7 @@ fn apply_test_damage_with_seed_and_teams(
     rng_seed: u64,
 ) {
     let map = Map::generate(2, 0x00C0_FFEE);
-    let fog = Fog::new(map.size);
+    let fog = Fog::new(map.width, map.height);
     let smokes = SmokeCloudStore::new();
     let mut rng = SmallRng::seed_from_u64(rng_seed);
     let weapon_profile = entities

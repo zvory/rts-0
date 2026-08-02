@@ -53,7 +53,8 @@ fn assert_close(actual: f32, expected: f32) {
 
 fn flat_map(size: u32) -> Map {
     Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![],
         ..Default::default()
@@ -61,7 +62,7 @@ fn flat_map(size: u32) -> Map {
 }
 
 fn set_passable(map: &mut Map, tx: u32, ty: u32) {
-    map.terrain[(ty * map.size + tx) as usize] = terrain::GRASS;
+    map.terrain[(ty * map.width + tx) as usize] = terrain::GRASS;
 }
 
 #[test]

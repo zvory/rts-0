@@ -97,7 +97,7 @@ fn set_rally_clamps_out_of_bounds_point() {
         )],
     );
 
-    let max = map.world_size_px() - 1.0;
+    let max = map.world_width_px() - 1.0;
     assert_eq!(
         entities.get(barracks).unwrap().rally_point(),
         Some((max, 0.0)),

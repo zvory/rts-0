@@ -11,7 +11,8 @@ const EPS: f32 = 0.01;
 
 fn test_map(size: u32) -> Map {
     Map {
-        size,
+        width: size,
+        height: size,
         terrain: vec![terrain::GRASS; (size * size) as usize],
         starts: vec![(4, 4), (size.saturating_sub(5), size.saturating_sub(5))],
         ..Default::default()
@@ -186,7 +187,7 @@ fn scout_plane_travels_to_orbit_ring_without_overshooting() {
         orbiting: false,
     };
 
-    let step = advance_one(snapshot, speed, orbit_radius, 2_048.0);
+    let step = advance_one(snapshot, speed, orbit_radius, 2_048.0, 2_048.0);
     assert!((step.x - speed).abs() <= EPS);
     assert!(step.y.abs() <= EPS);
     assert!(!step.orbiting);

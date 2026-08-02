@@ -36,7 +36,8 @@ impl Game {
     /// Called automatically at the end of [`Game::tick`] in debug builds. Tests may also call it
     /// explicitly after manual state mutations.
     pub fn assert_invariants(&self) {
-        let world_max = self.state.map.world_size_px();
+        let world_max_x = self.state.map.world_width_px();
+        let world_max_y = self.state.map.world_height_px();
         let player_ids: Vec<u32> = self.state.players.iter().map(|p| p.id).collect();
 
         // ------------------------------------------------------------------
@@ -78,10 +79,11 @@ impl Game {
                 entity_context(&self.state.map, e)
             );
             assert!(
-                e.pos_x >= 0.0 && e.pos_x < world_max && e.pos_y >= 0.0 && e.pos_y < world_max,
-                "invariant: tick {} entity position out of world bounds [0, {:.2}); {}",
+                e.pos_x >= 0.0 && e.pos_x < world_max_x && e.pos_y >= 0.0 && e.pos_y < world_max_y,
+                "invariant: tick {} entity position out of world bounds [0, {:.2})x[0, {:.2}); {}",
                 self.state.tick,
-                world_max,
+                world_max_x,
+                world_max_y,
                 entity_context(&self.state.map, e)
             );
             if e.is_unit() {
@@ -481,27 +483,30 @@ fn location_context(map: &Map, x: f32, y: f32) -> String {
     if !x.is_finite() || !y.is_finite() {
         return format!(
             "world=({x}, {y}) tile=(n/a) region=n/a map={}x{} tiles",
-            map.size, map.size
+            map.width, map.height
         );
     }
 
     let (tile_x, tile_y) = map.tile_of(x, y);
     format!(
-        "world=({:.2}, {:.2}) tile=({}, {}) region={} map={}x{} tiles/{:.0}px",
+        "world=({:.2}, {:.2}) tile=({}, {}) region={} map={}x{} tiles/{:.0}x{:.0}px",
         x,
         y,
         tile_x,
         tile_y,
         map_region(map, x, y),
-        map.size,
-        map.size,
-        map.world_size_px()
+        map.width,
+        map.height,
+        map.world_width_px(),
+        map.world_height_px()
     )
 }
 
 fn tile_location_context(map: &Map, tile: (u32, u32)) -> String {
-    let max_tile = map.size.saturating_sub(1);
-    let (x, y) = map.tile_center(tile.0.min(max_tile), tile.1.min(max_tile));
+    let (x, y) = map.tile_center(
+        tile.0.min(map.width.saturating_sub(1)),
+        tile.1.min(map.height.saturating_sub(1)),
+    );
     format!("center={}", location_context(map, x, y))
 }
 
@@ -697,13 +702,14 @@ fn circle_rect_collision_context(map: &Map, circle: CircleBody, rect: RectBody) 
 }
 
 fn map_region(map: &Map, x: f32, y: f32) -> String {
-    let world_size = map.world_size_px();
-    if world_size <= 0.0 {
+    let world_width = map.world_width_px();
+    let world_height = map.world_height_px();
+    if world_width <= 0.0 || world_height <= 0.0 {
         return "unknown".to_string();
     }
 
-    let horizontal = third_label(x / world_size, "left", "middle", "right");
-    let vertical = third_label(y / world_size, "top", "middle", "bottom");
+    let horizontal = third_label(x / world_width, "left", "middle", "right");
+    let vertical = third_label(y / world_height, "top", "middle", "bottom");
     if horizontal == "middle" && vertical == "middle" {
         "middle".to_string()
     } else {
@@ -974,7 +980,8 @@ mod tests {
     #[test]
     fn location_context_describes_human_map_region() {
         let map = Map {
-            size: 30,
+            width: 30,
+            height: 30,
             terrain: vec![terrain::GRASS; 30 * 30],
             starts: vec![],
             ..Default::default()

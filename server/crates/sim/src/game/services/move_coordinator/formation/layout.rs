@@ -63,8 +63,8 @@ pub(super) fn compact_formation_points(
     let grid = CompactGrid {
         columns,
         rows,
-        start_x: centered_tile_start(center_tile.0, width_tiles, map.size),
-        start_y: centered_tile_start(center_tile.1, height_tiles, map.size),
+        start_x: centered_tile_start(center_tile.0, width_tiles, map.width),
+        start_y: centered_tile_start(center_tile.1, height_tiles, map.height),
         pitch_tiles,
         reverse_minor: reverse_minor && minor_span <= f32::EPSILON,
         has_vehicle,

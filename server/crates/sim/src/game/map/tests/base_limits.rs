@@ -14,7 +14,7 @@ fn three_player_map_is_selectable_and_loads_for_each_supported_player_count() {
     for player_count in 1..=3 {
         let mut map = Map::load("3 Player Map", player_count, 0x1234_5678)
             .expect("three-player map should load for every supported player count");
-        assert_eq!(map.size, 150);
+        assert_eq!(map.width, 150);
         assert_eq!(map.starts.len(), player_count);
         assert_eq!(map.base_sites.len(), 12);
         if player_count == 3 {
@@ -42,8 +42,10 @@ fn authored_map_supports_many_unconditional_base_sites() {
         .collect();
     let json = format!(
         r#"{{
-          "version": 4,
+          "version": 5,
           "name": "many-bases",
+          "width": 80,
+          "height": 80,
           "description": "many permanent bases",
           "_design": "n/a",
           "terrain": {},
@@ -73,8 +75,10 @@ fn authored_map_rejects_more_than_bounded_base_sites() {
         .collect();
     let json = format!(
         r#"{{
-          "version": 4,
+          "version": 5,
           "name": "too-many-bases",
+          "width": 200,
+          "height": 200,
           "description": "too many bases",
           "_design": "n/a",
           "terrain": {},
@@ -98,8 +102,10 @@ fn authored_map_accepts_zero_and_maximum_per_base_resource_counts() {
     let rows = vec![".".repeat(40); 40];
     let json = format!(
         r#"{{
-          "version": 4,
+          "version": 5,
           "name": "resource-bounds",
+          "width": 40,
+          "height": 40,
           "description": "per-base resource bounds",
           "_design": "n/a",
           "terrain": {},
@@ -134,8 +140,10 @@ fn authored_map_rejects_per_base_resource_counts_above_the_limits() {
         });
         site[field] = value.into();
         let json = serde_json::json!({
-            "version": 4,
+            "version": 5,
             "name": "bad-resource-count",
+            "width": 32,
+            "height": 32,
             "description": "invalid per-base resource count",
             "_design": "n/a",
             "terrain": rows.clone(),
