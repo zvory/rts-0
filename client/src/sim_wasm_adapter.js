@@ -38,6 +38,7 @@ export class SimWasmPredictionAdapter {
     this.maxReplayTicks = 0;
     this.replayBudgetMs = replayBudgetMs;
     this.budgetExceededCount = 0;
+    this.lastReplayBudgetExceeded = false;
     this.memoryBytes = 0;
     this.progressCorrectionCount = 0;
     this.progressCorrectionTotal = 0;
@@ -119,6 +120,7 @@ export class SimWasmPredictionAdapter {
     }, replayTicks);
     this.displayValid = true;
     const replayBudgetExceeded = elapsed > this.replayBudgetMs;
+    this.lastReplayBudgetExceeded = replayBudgetExceeded;
     this.recordReplayReport(elapsed, replayTicks, replayBudgetExceeded);
     if (replayBudgetExceeded) this.budgetExceededCount += 1;
     let diagnostics = this.diagnostics();
@@ -208,6 +210,7 @@ export class SimWasmPredictionAdapter {
       maxReplayTicks: this.maxReplayTicks,
       replayBudgetMs: this.replayBudgetMs,
       budgetExceededCount: this.budgetExceededCount,
+      lastReplayBudgetExceeded: this.lastReplayBudgetExceeded,
       memoryBytes: this.refreshMemoryBytes(),
       progressCorrectionCount: this.progressCorrectionCount,
       progressLastCorrection: this.progressLastCorrection,

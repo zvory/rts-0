@@ -678,6 +678,7 @@ export class Match {
   }
 
   initPredictionAdapter({ remountSettings = false } = {}) {
+    if (this.predictionAdapter?.disabledReason) this.resetPredictionAdapter();
     const token = ++this.predictionInitToken;
     const adapter = this.predictionAdapter;
     void adapter.init().then((ready) => {

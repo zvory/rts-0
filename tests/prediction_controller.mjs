@@ -98,6 +98,7 @@ function assert(cond, msg) {
   };
   assert(recoverPredictionRuntimeAfterBudget(match, {
     budgetExceededCount: 1,
+    lastReplayBudgetExceeded: true,
     lastTickMs: 8,
     lastReplayTicks: 3,
   }) === true, "replay-budget recovery handles an exceeded frame");
@@ -105,13 +106,18 @@ function assert(cond, msg) {
     "replay-budget recovery immediately initializes the replacement shared runtime");
   assert(recoverPredictionRuntimeAfterBudget(match, {
     budgetExceededCount: 1,
+    lastReplayBudgetExceeded: true,
     lastTickMs: 9,
     lastReplayTicks: 3,
   }) === false, "an over-budget replacement terminates recovery instead of restarting recursively");
   assert(resetAdapters === 1 && initialized === 1, "replay-budget recovery is bounded to one restart");
-  recoverPredictionRuntimeAfterBudget(match, { budgetExceededCount: 0 });
-  assert(recoverPredictionRuntimeAfterBudget(match, {
+  recoverPredictionRuntimeAfterBudget(match, {
     budgetExceededCount: 1,
+    lastReplayBudgetExceeded: false,
+  });
+  assert(recoverPredictionRuntimeAfterBudget(match, {
+    budgetExceededCount: 2,
+    lastReplayBudgetExceeded: true,
     lastTickMs: 8,
     lastReplayTicks: 2,
   }) === true, "a healthy measured window rearms future replay-budget recovery");
@@ -233,6 +239,31 @@ function sentSeqs(sent) {
   }
   assert(reconcileFailed && adapter.renderPredictionFrame() === null,
     "failed reconcile invalidates stale pose and progress output for authoritative fallback");
+}
+
+{
+  let now = 0;
+  const adapter = new SimWasmPredictionAdapter({ now: () => now, replayBudgetMs: 4 });
+  adapter.ready = true;
+  adapter.module = {
+    WasmPredictor: {
+      baselineFromSnapshotJson() { return "{}"; },
+    },
+  };
+  adapter.predictor = {
+    importBaselineJson() { now += 5; },
+    diagnosticsJson() { return JSON.stringify({ correctionMagnitude: 0 }); },
+    renderPredictionFrameJson() { return JSON.stringify({ tick: 1, entities: [], progress: [] }); },
+  };
+  adapter.reconcile({ tick: 1 }, []);
+  assert(adapter.diagnostics().lastReplayBudgetExceeded === true,
+    "adapter diagnostics distinguish a latest over-budget replay from the cumulative count");
+  now = 10;
+  adapter.predictor.importBaselineJson = () => { now += 1; };
+  adapter.reconcile({ tick: 2 }, []);
+  const diagnostics = adapter.diagnostics();
+  assert(diagnostics.budgetExceededCount === 1 && diagnostics.lastReplayBudgetExceeded === false,
+    "a healthy replay clears only the latest-result flag and preserves cumulative telemetry");
 }
 
 {

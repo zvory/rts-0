@@ -44,7 +44,7 @@ export function finishPredictionRuntimeInit(match, { token, adapter, ready, remo
 
 export function recoverPredictionRuntimeAfterBudget(match, diagnostics) {
   if (!match.prediction.enabled) return false;
-  if (!(diagnostics?.budgetExceededCount > 0)) {
+  if (diagnostics?.lastReplayBudgetExceeded !== true) {
     match.predictionBudgetRecoveryAttempted = false;
     return false;
   }
