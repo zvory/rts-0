@@ -27,10 +27,7 @@ import {
   readUnitRangesEnabled,
   writeUnitRangesEnabled,
 } from "../../client/src/unit_range_settings.js";
-import {
-  readAutoSpectatorEnabled,
-  writeAutoSpectatorEnabled,
-} from "../../client/src/auto_spectator_settings.js";
+import { initialAutoSpectatorEnabled } from "../../client/src/auto_spectator_settings.js";
 import {
   HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
   HOTKEY_PRESET_CLASSIC,
@@ -240,11 +237,11 @@ function hotkeyService() {
     assert(!readUnitRangesEnabled(storage), "unit range setting persists disabled state");
     writeUnitRangesEnabled(true, storage);
     assert(readUnitRangesEnabled(storage), "unit range setting clears override when re-enabled");
-    assert(!readAutoSpectatorEnabled(storage), "auto spectator defaults off");
-    writeAutoSpectatorEnabled(true, storage);
-    assert(readAutoSpectatorEnabled(storage), "auto spectator persists enabled state");
-    writeAutoSpectatorEnabled(false, storage);
-    assert(!readAutoSpectatorEnabled(storage), "auto spectator clears its enabled override");
+    storage.setItem("rts.autoSpectator.enabled", "1");
+    assert(!initialAutoSpectatorEnabled({ interactLaunch: false, storage }),
+      "ordinary spectator and replay sessions ignore earlier fight-following state");
+    assert(initialAutoSpectatorEnabled({ interactLaunch: true, storage }),
+      "explicit Interact spectator launches can still request fight-following before startup");
   }
 
   withFakeSettingsDocument(() => {

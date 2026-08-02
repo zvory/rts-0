@@ -33,7 +33,7 @@ import {
 import { Match } from "./match.js";
 import { MatchHistory, requestReplayRoom } from "./match_history.js";
 import { applyMatchUnitRanges } from "./match_settings_toggles.js";
-import { readAutoSpectatorEnabled, writeAutoSpectatorEnabled } from "./auto_spectator_settings.js";
+import { initialAutoSpectatorEnabled } from "./auto_spectator_settings.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import {
@@ -263,7 +263,6 @@ export class App {
     this.unitRangesEnabled = readUnitRangesEnabled();
     this.exclusiveFullscreenEnabled = exclusiveFullscreenSupported() &&
       readExclusiveFullscreenEnabled();
-    this.autoSpectatorEnabled = readAutoSpectatorEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
     this.aiDiagnosticsPanelPreferences = createAiDiagnosticsPanelPreferences();
     this.matchLaunchDone = false;
@@ -831,7 +830,9 @@ export class App {
         predictionEnabled: this.predictionEnabled,
         unitRangesEnabled: this.unitRangesEnabled,
         exclusiveFullscreenEnabled: this.exclusiveFullscreenEnabled,
-        autoSpectatorEnabled: this.autoSpectatorEnabled,
+        autoSpectatorEnabled: initialAutoSpectatorEnabled({
+          interactLaunch: interactGameLaunchEnabled(),
+        }),
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
         onExclusiveFullscreenEnabledChange: (enabled) =>
@@ -1280,10 +1281,9 @@ export class App {
   }
 
   setAutoSpectatorEnabled(enabled) {
-    this.autoSpectatorEnabled = !!enabled;
-    writeAutoSpectatorEnabled(this.autoSpectatorEnabled);
-    if (this.match?.autoSpectator?.enabled !== this.autoSpectatorEnabled) {
-      this.match?.setAutoSpectatorEnabled?.(this.autoSpectatorEnabled);
+    const next = !!enabled;
+    if (this.match?.autoSpectator?.enabled !== next) {
+      this.match?.setAutoSpectatorEnabled?.(next);
     }
   }
 
