@@ -5,7 +5,7 @@
   "exceptions": [
     {
       "path": "client/styles.css",
-      "lines": 5745,
+      "lines": 5734,
       "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; keep ratcheting until those responsibilities have an evidence-backed split."
     },
     {
@@ -30,28 +30,23 @@
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
-      "lines": 3283,
+      "lines": 3233,
       "reason": "Anti-tank range coverage moved into its focused module; keep ratcheting until the remaining combat tests are split."
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 2093,
+      "lines": 2092,
       "reason": "Tank Trap cluster admission captures a fog-safe authoritative target set and applies per-unit weapon legality through the shared planner; keep ratcheting by extracting cohesive targeted-command admission and execution."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1834,
-      "reason": "Rectangular-map staging and full-rotation spawn checks require independent X/Y world bounds; keep ratcheting until coordinator order-entry policy is split."
+      "lines": 1906,
+      "reason": "Close vehicle move precision adds focused same-tile exact-goal handling and regression coverage in the oversized coordinator; requires human playtest review and should ratchet down when order-entry policy/tests split."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",
-      "lines": 5124,
+      "lines": 5101,
       "reason": "Existing oversized movement test module before repo-wide source-size gate."
-    },
-    {
-      "path": "server/crates/sim/src/game/services/order_queue.rs",
-      "lines": 1511,
-      "reason": "Concurrent artillery fire-position and Tank Trap cluster merges grew queued-order scheduling above the cap; keep ratcheting while cluster and ability queue policy move into focused modules."
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
@@ -60,7 +55,7 @@
     },
     {
       "path": "server/src/main.rs",
-      "lines": 1718,
+      "lines": 1703,
       "reason": "Client index generation and analytics configuration moved out of the oversized server shell; keep ratcheting until more connection handling is split."
     },
     {
