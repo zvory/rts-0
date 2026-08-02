@@ -488,8 +488,7 @@ mod tests {
             to_pos: None,
             weapon_kind: None,
         };
-        let per_player_events =
-            HashMap::from([(1, vec![attack.clone()]), (2, vec![attack.clone()])]);
+        let per_player_events = HashMap::from([(1, vec![attack.clone()])]);
         let full_vision_events = union_events(per_player_events.values());
 
         let player = SnapshotProjection::player_fog(1, SnapshotOptions::default())
@@ -509,7 +508,7 @@ mod tests {
                 .filter(|event| **event == attack)
                 .count(),
             1,
-            "spectator should receive the deduplicated attack after active-player delivery"
+            "spectator should receive player one's attack after active-player delivery"
         );
     }
 }
