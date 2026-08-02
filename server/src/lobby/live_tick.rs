@@ -65,7 +65,7 @@ pub(super) fn fanout_current_observer_snapshots(
     tick_start: StdInstant,
     game: &Game,
 ) {
-    let mut per_player_events = HashMap::new();
+    let per_player_events = HashMap::new();
     SnapshotFanout::new(
         room,
         Duration::ZERO,
@@ -77,7 +77,7 @@ pub(super) fn fanout_current_observer_snapshots(
     .send_to_recipients(players, recipients, |id, player| {
         let projection = projection_policy
             .selected_perspective_snapshot_for(observer_view_or_all(observer_views.get(&id), game));
-        let snapshot = projection.snapshot_with_events(game, &mut per_player_events, &[]);
+        let snapshot = projection.snapshot_with_events(game, &per_player_events, &[]);
         Some(SnapshotFanoutPayload::new(snapshot, player.spectator))
     });
 }
@@ -89,7 +89,7 @@ impl LiveTickDriver<'_> {
         let mut perf = rts_sim::perf::TickPerf::maybe_new();
 
         let tick_result = self.tick_game(&mut game, perf.as_mut());
-        let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
+        let per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
             Ok(events) => events.into_iter().collect(),
             Err(payload) => {
                 let reason = panic_reason(&payload);
@@ -104,7 +104,7 @@ impl LiveTickDriver<'_> {
         self.record_consumed_client_sequences(game.tick_count());
         self.fan_out_snapshots(
             &game,
-            &mut per_player_events,
+            &per_player_events,
             scheduler_lag,
             tick_start,
             perf.as_mut(),
@@ -242,7 +242,7 @@ impl LiveTickDriver<'_> {
     fn fan_out_snapshots(
         &mut self,
         game: &Game,
-        per_player_events: &mut HashMap<u32, Vec<Event>>,
+        per_player_events: &HashMap<u32, Vec<Event>>,
         scheduler_lag: Duration,
         tick_start: StdInstant,
         mut perf: Option<&mut rts_sim::perf::TickPerf>,

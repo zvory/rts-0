@@ -43,7 +43,7 @@ impl RoomTask {
         &mut self,
         session: &ReplaySession,
         recipients: impl IntoIterator<Item = u32>,
-        mut per_player_events: HashMap<u32, Vec<Event>>,
+        per_player_events: HashMap<u32, Vec<Event>>,
         context: ReplayTickContext,
         perf: Option<&mut rts_sim::perf::TickPerf>,
     ) {
@@ -54,7 +54,7 @@ impl RoomTask {
             context.projection_policy,
             session,
             recipients,
-            &mut per_player_events,
+            &per_player_events,
             context.scheduler_lag,
             context.tick_budget,
             context.tick_start,
