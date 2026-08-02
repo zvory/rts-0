@@ -55,8 +55,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   `validateScenario` previews bounds without mutating the room or accepting client server paths.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
 - Map handoffs cap 64 one-use records for two minutes; reverse uses `LabMapDraft`.
-  Schema-v5 map boundaries carry canonical `doodads[]` capped at 4,096; tree
-  records have tiny trunk collision while wildflowers remain inert.
+  Schema-v5 maps carry canonical `doodads[]` (cap 4,096); trees have tiny trunks,
+  flowers are inert, and Tank Traps spawn as neutral entities.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**
