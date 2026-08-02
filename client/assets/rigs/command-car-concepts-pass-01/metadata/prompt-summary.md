@@ -10,9 +10,8 @@ This pass explores four compact command-unit silhouettes in the white-painted un
 The images are unapproved concept references only. They are not runtime textures, are not referenced
 by the client renderer, and do not establish a command-car implementation or balance direction.
 
-## Provenance limitation
+## Generation record
 
-The original generation prompt, generator/model, settings, and source-input list were not retained
-with this pass. This summary is reconstructed only from the committed concept names and commit
-description; it is not a claim that the images can be reproduced from this text. A later generation
-pass should record those inputs before its outputs are committed.
+All four concepts were generated through the Codex built-in `image_gen` tool. The exact prompts and
+three project-local source-reference paths are retained in [generation-prompts.md](generation-prompts.md).
+The built-in tool did not expose a model name or generation settings, so those fields remain unavailable.

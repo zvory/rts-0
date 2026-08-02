@@ -6,12 +6,16 @@
     "references": []
   },
   "generation": {
-    "provenanceStatus": "incomplete",
-    "generator": null,
+    "provenanceStatus": "prompt and source inputs recorded",
+    "generator": "Codex built-in image_gen",
     "model": null,
-    "settings": null,
-    "exactPrompt": null,
-    "sourceInputs": [],
+    "settings": "Built-in tool settings are not exposed",
+    "exactPrompt": "client/assets/rigs/command-car-concepts-pass-01/metadata/generation-prompts.md",
+    "sourceInputs": [
+      "client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-preview.png",
+      "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-white-carry-alpha.png",
+      "client/assets/rigs/panzerfaust-pass-01/generated/panzerfaust-pass-01-base-carry-long-alpha-trimmed.png"
+    ],
     "promptSummary": "client/assets/rigs/command-car-concepts-pass-01/metadata/prompt-summary.md"
   },
   "concepts": [
