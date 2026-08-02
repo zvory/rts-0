@@ -50,7 +50,7 @@ Use for tests, CI/hooks, or focused verification.
   They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
 - `agent-pr.sh` skips Codex for pure `.md` diffs and otherwise formats touched Rust.
   Patch notes use a local outbox, with no extra Codex pass.
-- Root npm supports Node 22.18+ Lab TypeScript and no-emit checks; daemon requests never install.
+- Root npm tools require Node 22.18+ and run `scripts/ensure-node-deps.sh` for shared dependencies.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.
 - Skip only when `tests/select-suites.mjs` maps changed files away from the suite.

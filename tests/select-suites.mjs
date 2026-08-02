@@ -161,6 +161,7 @@ function isQualityPassWorkflowPath(pathname) {
     pathname === "scripts/adversarial-quality-pass.mjs" ||
     pathname === "scripts/adversarial-quality-pass.schema.json" ||
     pathname === "scripts/patch-note-outbox.mjs" ||
+    pathname === "scripts/ensure-node-deps.sh" ||
     pathname === "scripts/agent-pr.sh" ||
     pathname === "scripts/wait-pr.sh" ||
     pathname === "scripts/archive-completed-plans.mjs" ||
@@ -169,6 +170,7 @@ function isQualityPassWorkflowPath(pathname) {
     pathname === "tests/archive_completed_plans.mjs" ||
     pathname === "tests/adversarial_quality_pass.mjs" ||
     pathname === "tests/patch_note_outbox.mjs" ||
+    pathname === "tests/ensure_node_deps.mjs" ||
     pathname === "tests/wait_pr.mjs" ||
     pathname === "tests/run-all.sh"
   );

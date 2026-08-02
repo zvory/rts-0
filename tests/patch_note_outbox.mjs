@@ -22,6 +22,7 @@ import {
 
 const waiter = fs.readFileSync(new URL("../scripts/wait-pr.sh", import.meta.url), "utf8");
 assert.match(waiter, /deliver_patch_note_best_effort "\$head_ref" "\$delivery_main_worktree"/);
+assert.match(waiter, /ensure-node-deps\.sh" --repo "\$main_worktree" --quiet/);
 assert.match(waiter, /patch-note delivery failed; the local outbox entry was retained/);
 
 function run(command, args, cwd) {
