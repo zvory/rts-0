@@ -1,133 +1,98 @@
-# Phase 5 - Expose Rules and Known-World Queries
+# Phase 5 - Expose the Rules and Queries Authors Actually Need
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 4 merges.
+- [ ] Ready for implementation after Phase 4 merges and reports concrete gaps.
 
 ## Objective
 
-Expose the game semantics and deterministic known-world queries AI authors currently reconstruct by
-hand. Assemble a faction-bound `AiRulebook` from authoritative `rts-rules`, and construct
-`WorldQueries` only from `AiFrame` plus public static map data. Preserve Jeff's exact placement and
-geometry behavior behind compatibility policies and never imply knowledge of hidden dynamic state.
+Expose a small faction-aware rulebook and fog-safe known-world queries for questions the Phase 4
+reference strategy or current AI code actually asks. Delegate to existing authoritative rules and
+existing AI map/placement logic; do not move ownership between crates or build a comprehensive game
+ontology in the name of the SDK.
 
-## Authoritative Rules Cleanup
+## Public Surface
 
-- Move pure upgrade definition data and `required_for_unit` from `rts-sim::game::upgrade` into an
-  authoritative `rts_rules::upgrade` module, using the existing `rts_rules::faction::UpgradeKind`
-  and balance constants.
-- Leave `rts_sim::game::upgrade` as a compatibility re-export/delegator so simulation callers,
-  iteration order, replay, costs, duration, producers, prerequisites, and stable IDs do not change.
-- Add a small faction-bound `AiRulebook` façade that delegates to existing `rts-rules` definitions,
-  economy, faction, upgrade, combat, target, and terrain modules. Do not create another entity,
-  building, upgrade, or ability table.
-- Cover the high-value author questions:
-  - definition and faction availability;
-  - costs, supply, build time, max health, footprint, roles/capabilities, and weapon range facts;
-  - builder/producer relationships and train/build prerequisites;
-  - researchable upgrades, upgrade prerequisites/cost/duration, and unit unlocks;
-  - supported abilities where already available from the rules catalog.
-- Preserve authoritative catalog ordering in faction-filtered results and distinguish global
-  definition existence from faction availability.
+- Add a faction-bound `AiRulebook` that delegates to current authoritative `rts-rules` definitions.
+  Start with the demonstrated high-value questions: costs, supply, build/train time, health,
+  footprint, builder/producer relationships, faction availability, prerequisites, and existing
+  capabilities needed by a real consumer.
+- Add deterministic `WorldQueries` indexes for owned entities, currently visible allies/enemies,
+  remembered contacts, and known resources. Keep current and remembered knowledge separate.
+- Add checked finite world/tile coordinate helpers.
+- Expose the existing AI-known build-site approximation behind uncertainty-honest results such as
+  `Invalid`, `KnownBlocked`, and `NoKnownConflict`. Never call the result legal, placeable, clear,
+  or accepted.
+- Preserve the existing candidate order, ring traversal, tie-breaking, floating-point operations,
+  footprint checks, public-resource treatment, projected-building treatment, and failed-site
+  exclusions for compatibility consumers.
+- Add static terrain connectivity only if the Phase 4 consumer needs it. Name it explicitly as
+  static connectivity, never current reachability or pathability.
 
-## Perspective-Safe World Queries
+## Scope Guardrails
 
-- Add deterministic indexes for owned entities, currently observed allies/enemies, separately
-  labeled remembered contacts, and known resources. Returned collections have documented stable ID
-  ordering; caller-ordered candidate lists remain separate when order expresses policy.
-- Add checked, finite, bounds-safe world/tile coordinate helpers.
-- Reuse cached public static map analysis for tile passability, clearance, component ID, and a
-  result named `StaticConnectivity::{Connected, Disconnected, Invalid}`. It is terrain-only and
-  must not be exposed as current reachability or pathability.
-- Preserve map-analysis cache invalidation when Lab terrain/start/resource identity changes.
-- Move the existing AI-known placement approximation behind the query surface with uncertainty
-  types such as `Invalid`, `KnownBlocked`, and `NoKnownConflict`.
-- Preserve Jeff's legacy placement/search policy exactly:
-  - ring traversal, tie-breaking, `f32` comparisons, radii, and center preferences;
-  - existing AI building clearance, public resource occupancy, projected-building treatment,
-    footprint bounds/passability, producer spawn-tile check, and failed-site exclusions;
-  - the current omission of unit-body and remembered-building occupancy.
-- Never name a known-world result `Legal` or `Placeable`; ordinary simulation command validation
-  remains authoritative and hidden blockers must not become query side channels.
-- Defer the current defensive firing-lane approximation. It mixes enough combat-facing semantics
-  that it should be reconsidered only after the smaller rulebook, placement, and static-connectivity
-  API has real consumers; Jeff continues to use its compatibility helper unchanged.
+- Do not move upgrade definitions from `rts-sim` to `rts-rules` in this phase. That ownership cleanup
+  is independently plausible but not required to improve authoring and would enlarge the contract
+  and verification surface.
+- Do not duplicate entity, building, upgrade, weapon, or ability tables. If a requested answer lacks
+  an authoritative source, omit it and record the gap.
+- `WorldQueries` may depend only on `AiFrame`, public static map data/analysis, and explicit
+  controller-owned exclusions. It may not accept `Game`, full snapshots, entity stores, hidden
+  occupancy/standability, fog internals, or simulation path caches.
+- Hidden dynamic state must not affect a query when the input frame is unchanged.
+- Do not expose the defensive firing-lane approximation, A*, ETA, tactical search, target legality,
+  line of fire, or authoritative dynamic placement.
 
-## Security Invariants
+## Existing-AI Adoption
 
-- `WorldQueries` may accept only `AiFrame`, public static map analysis, and explicit controller
-  exclusions such as failed known sites.
-- It may never accept `Game`, `EntityStore`, full snapshots, authoritative occupancy/standability,
-  fog internals, path caches, or private LOS/combat services.
-- Two games that differ only in player-hidden dynamic state and produce the same frame must produce
-  identical query results.
-- Remembered contacts remain labeled as remembered and are not silently treated as current
-  blockers or targets.
+- Route at least one real Jeff/AI-2.1 rule lookup and one placement/query call through the shared
+  implementation, using narrow compatibility policy where truthful public knowledge differs from
+  historical inputs.
+- Treat that adoption as the proof that the surface is not an unused façade. Preserve the Phase 1
+  transcript exactly; do not tune any policy.
+- Remove a duplicate only when the adopted call site proves it is one-for-one obsolete.
 
 ## Expected Touch Points
 
-- `server/crates/rules/src/lib.rs` and a new `rules/src/upgrade.rs`.
-- `server/crates/sim/src/game/upgrade.rs` compatibility shim.
 - New `server/crates/ai/src/sdk/{rulebook.rs,world_queries.rs}` and SDK exports.
-- `server/crates/ai/src/ai_shared.rs` and `selfplay/player_view.rs` placement helpers.
-- `server/crates/ai/src/ai_core/map_analysis.rs`.
-- Compatibility call sites in actions/defense/runtime only as required for exact delegation.
-- Focused rules/query tests.
-- `docs/design/ai.md`, `docs/design/server-sim.md`, and the relevant balance/rules source-of-truth
-  documentation for the upgrade ownership move.
+- Existing `rts-rules` APIs only where a small missing public accessor is required; no authority move.
+- Existing AI placement/map-analysis helpers and their compatibility call sites.
+- The Phase 4 reference consumer and focused public integration tests.
+- `docs/design/ai.md` and the author guide.
 
-No wire protocol or client changes belong in this phase. An unexpected need for them is scope
-expansion and must stop for replanning.
+No wire protocol, client, balance, lobby, or simulation command-processing changes belong here.
 
 ## Implementation Checklist
 
-- [ ] Move pure upgrade authority into `rts-rules` with a sim compatibility seam.
-- [ ] Add the faction-bound `AiRulebook` without duplicating registries.
-- [ ] Add deterministic indexes, coordinate helpers, and static connectivity.
-- [ ] Add uncertainty-labeled known-world placement/search.
-- [ ] Delegate Jeff through exact compatibility query policies.
-- [ ] Leave firing-lane behavior behind the unchanged Jeff compatibility helper.
-- [ ] Add hidden-state A/B and legacy/new equivalence tests.
-- [ ] Pass the unchanged Phase 1 transcript fixture.
-- [ ] Update ownership and AI design documentation.
-- [ ] Mark this phase done in the implementation commit.
+- [ ] Derive the initial API from named Phase 4/current-AI call sites.
+- [ ] Add the bounded faction rulebook without a second registry.
+- [ ] Add deterministic known-world indexes and checked coordinate helpers.
+- [ ] Expose only the existing known-placement approximation with honest uncertainty names.
+- [ ] Add static connectivity only for a concrete consumer.
+- [ ] Adopt the surface in at least one current rule lookup and one current query call.
+- [ ] Add hidden-state A/B and old/new equivalence tests.
+- [ ] Pass the unchanged Phase 1 transcript and mark the phase done.
 
 ## Verification
 
-- Prove every façade answer matches direct authoritative rules/catalog data and preserves order.
-- Prove every upgrade definition matches the pre-move simulation definition exactly.
-- Test deterministic indexes, coordinate bounds, static components, Lab cache invalidation, and
-  input-order independence where ordering is not a policy input.
-- Compare legacy/new placement results and candidate invocation sequences across every building
-  kind, representative maps, edge/resource/visible-building/spawn-blocked cases, failed exclusions,
-  and randomized candidate grids.
-- Add hidden-world A/B tests and run the exact Phase 1 normal/full Jeff transcript without fixture
-  regeneration.
-- Run focused `rts-rules` and `rts-ai` tests, crate-boundary checks, sim archcheck, docs health, and
-  diff check.
-
-## Manual Test Focus
-
-Inspect a deterministic Jeff matchup around initial production buildings, Pump Jacks, expansion,
-and the home Machine Gunner/Anti-Tank defense. In a controlled perspective-safe fixture, show that a
-visible blocker may affect a query while an otherwise identical hidden blocker does not. First Tank,
-Scout Car, expansion, and attack timing must remain identical.
+- Prove every rulebook answer matches its authoritative source and preserves catalog ordering.
+- Compare old and new placement results and candidate invocation order across representative maps,
+  edge/resource/visible-building/spawn cases, failed exclusions, and randomized candidate grids.
+- Prove identical frames produce identical query answers when hidden game state differs.
+- Compile the Phase 4 consumer using public imports only.
+- Run focused `rts-rules`/`rts-ai` tests, clippy, crate/sim architecture checks, docs health, diff
+  checks, and the exact Phase 1 normal/full transcript without fixture regeneration.
 
 ## Non-Goals
 
-- No A*, navigation mesh, path distance/ETA, traffic, vehicle-body, formation, influence-map, or
-  tactical-search API.
-- No authoritative dynamic occupancy, standability, target legality, shot interception, smoke, or
-  combat LOS oracle.
-- No public firing-lane query in this phase.
-- No claim that a candidate will be accepted by the server.
-- No remembered-enemy prediction, behavior tree, GOAP, or Jeff tuning.
-- No protocol additions or external plugin ABI.
+- No exhaustive semantic catalog or unrelated authoritative-owner cleanup.
+- No guarantee that a locally selected action will be accepted by the simulation.
+- No hidden-state oracle, current reachability, path ETA, traffic, formation, firing-lane, influence
+  map, or tactical solver.
+- No task status, scheduler, behavior tree, GOAP, plugin ABI, or non-Rust contract.
 
 ## Handoff Expectations
 
-Report the final rulebook/query API, authoritative upgrade owner and compatibility seam, proof that
-no duplicate registry exists, input-provenance table for every query, exact uncertainty semantics,
-legacy quirks preserved, helper-equivalence results, full Jeff parity fixture identity, and manual
-placement/defense observations. Tell Phase 6 which explicit candidates and rule answers the planner
-may consume without claiming authority.
+Report each public rule/query with its concrete consumer and authoritative input, uncertainty and
+ordering semantics, existing-AI call sites migrated, duplicates actually removed, hidden-state and
+parity evidence, and specific action friction left for Phase 6.

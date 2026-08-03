@@ -1,4 +1,4 @@
-# Phase 4 - Add Observational Task Feedback
+# Phase 4 - Prove the Authoring Path with a Real Strategy
 
 ## Phase Status
 
@@ -6,119 +6,73 @@
 
 ## Objective
 
-Add a deliberately small first command-lifecycle surface without pretending the simulation
-correlated or accepted an AI command. Provide stable handles and conservative own-state feedback
-for build, gather, move, and setup actions, while consolidating Jeff's existing pending-construction
-and combat-stage bookkeeping under one private compatibility owner. Jeff continues to consume the
-exact legacy semantics and must remain transcript-identical.
+Use the public Phase 3 SDK to write one small but real deterministic strategy, then fix only the
+first-use problems that strategy demonstrates. The result must be useful as executable documentation
+for an AI author: it should run through the canonical live runtime, make ordinary economic and
+combat decisions, and use no private AI modules, raw protocol DTOs, or `SimCommand` construction.
 
-## Public Task Model
+This replaces the former observational task-feedback phase. We do not yet have a sound meaning for
+"this command completed": owner-visible state can show a postcondition without proving which command
+caused it, and missing evidence cannot reliably distinguish rejection, delay, destruction, fog, or
+supersession. Stable intent IDs and statuses would therefore harden an attractive but misleading API.
 
-- Add deterministic `AiIntentId`, `AiTaskRecord`, `AiTaskStatus`, `AiTaskUpdate`, and a bounded
-  read-only ledger view under `rts_ai::sdk`.
-- Extend `AiActions` with an explicit `submit_tracked(TrackedAction) -> AiIntentId` path. IDs combine
-  player ID with a monotonically increasing per-controller sequence starting at one, so a custom
-  strategy receives its handle at submission without reverse-engineering the later command batch.
-- Cover only `Build`/`ResumeBuild`, `Gather`, `Move`, and `Setup` tracked actions in this phase. A
-  grouped action receives one ID and retains its ordered subject list; do not split or coalesce it
-  into inferred per-unit workflows.
-- Use only `Issued`, `ObservedActive`, `Satisfied`, `Unknown`, and `TimedOut`. `Issued` means only
-  that the runtime emitted the corresponding ordinary command; it does not mean accepted, paid,
-  queued, executing, or valid.
-- The internal legacy bridge may allocate diagnostic IDs after existing command suppression, so
-  suppressed legacy commands receive no record. These IDs are not fed back into Jeff and do not
-  need to pretend that an untyped legacy `Move` was semantically a stage directive.
-- Bound terminal history deterministically by pruning oldest terminal records only; do not prune
-  active records merely to meet the cap.
+## Work
 
-## Observational Semantics
-
-- Reconcile tasks only from the fog-safe `AiFrame` and controller state already delivered through
-  the canonical runtime. Do not add an event handoff or change the live/offline host contract.
-- Build becomes active/satisfied only from matching owner-visible worker/building evidence.
-- Gather is satisfied when the worker is observed gathering and latched to the requested node.
-- Move uses matching own order/state and the existing deterministic arrival tolerance; setup uses
-  the subject's own setup order/posture. Ambiguous evidence remains `ObservedActive` or `Unknown`.
-- A missing owned subject before a postcondition becomes `Unknown`, not failed. Timeouts use
-  simulation ticks, never wall time, and do not influence Jeff in this phase.
-- At most one strongest transition is emitted per task per frame; direct `Issued -> Satisfied` is
-  allowed when the postcondition is already visible.
-
-## Compatibility Migration
-
-- Move these responsibilities under one explicitly named private compatibility component owned by
-  the runtime, distinct from the generic public task ledger:
-  - `PendingBuildTracker` and its failed-site cache;
-  - staged and held unit sets;
-  - active-attack suppression state.
-- Preserve the exact legacy update points and behavior:
-  - pending builds are observed only when the old controller observed them, not on every sim tick;
-  - four-pixel progress threshold and 300-tick staleness;
-  - identical worker-state/absence/footprint success rules;
-  - identical 16-entry failed-site clear behavior and per-kind successful clear;
-  - identical command/unit order, one-shot Hold Position, attack-before-stage state updates,
-    suppression horizon, ownership pruning, and same-think move/setup handling.
-- Let any legacy-derived task diagnostics run in shadow. Public task status must not drive placement
-  retries, suppression, or any Jeff decision.
-- Remove duplicated controller/script bookkeeping only after characterization tests and the complete
-  Jeff transcript pass.
+- Add a compact reference strategy in an outside-crate integration-test/example location using only
+  public `rts_ai::sdk` imports and the supported custom-strategy constructor.
+- Give it enough policy to exercise the real lifecycle: inspect owned units and economy, issue at
+  least one economic action and one tactical action, keep small cross-tick memory, and tolerate
+  unavailable candidates without panicking.
+- Run it through the same canonical controller driver and ordinary `Game::enqueue` validation used
+  by Jeff and AI 2.1. Do not build a special example-only host.
+- Add a short author guide showing the strategy lifecycle, frame knowledge boundaries, deterministic
+  ordering, action emission, and how to run the example/test.
+- Fix SDK naming, visibility, ergonomics, or missing small accessors only when the reference strategy
+  provides a concrete call site. Record larger missing capabilities for Phases 5 and 6 instead of
+  inventing them here.
+- Keep the example intentionally ordinary. It is a usability specimen, not a new competitive AI,
+  a framework, or a benchmark claim.
 
 ## Expected Touch Points
 
-- New `server/crates/ai/src/sdk/task.rs` plus focused task-ledger and private compatibility modules.
-- The canonical controller/runtime and Phase 3 `AiActions` surface.
-- `server/crates/ai/src/live.rs`.
-- `server/crates/ai/src/selfplay/pending_build.rs` and `selfplay/scripts.rs` for migration/deletion.
-- `server/crates/ai/src/ai_core/decision/mod.rs`, observation, and facts for bridge metadata only.
-- Focused ledger/compatibility tests.
-- `docs/design/ai.md`.
+- `server/crates/ai/tests/` and/or `server/crates/ai/examples/`.
+- Small focused changes under `server/crates/ai/src/sdk/` if first-use friction proves them necessary.
+- `docs/design/ai.md` and a concise AI-author guide linked from it.
 
-Do not touch `rts-sim`, the wire protocol, client, lobby, balance, or `Game` API.
+Do not touch `rts-sim`, wire protocol mirrors, client code, balance, lobby scheduling, Jeff policy,
+or AI 2.1 policy.
 
 ## Implementation Checklist
 
-- [ ] Define deterministic task IDs, the four tracked action families, cautious statuses, and
-      bounded history.
-- [ ] Return IDs directly from typed submission and retain grouped subject order.
-- [ ] Add own-state observational reconciliation for the supported task families.
-- [ ] Move pending-build and combat-stage state into one compatibility owner.
-- [ ] Characterize and preserve every legacy timeout/filter/cache quirk.
-- [ ] Keep generic task status out of Jeff decisions.
-- [ ] Remove obsolete duplicate state only after exact parity.
-- [ ] Document what task statuses do and do not prove.
+- [ ] Add a nontrivial public-SDK-only reference strategy.
+- [ ] Run it through the canonical production runtime and ordinary simulation validation.
+- [ ] Cover lifecycle, cross-tick memory, economic action, and tactical action.
+- [ ] Add a concise runnable author guide.
+- [ ] Fix only demonstrated Phase 3 API friction.
+- [ ] List concrete rule/query and action-helper gaps for Phases 5 and 6.
+- [ ] Pass the unchanged Phase 1 Jeff transcript.
 - [ ] Mark this phase done in the implementation commit.
 
 ## Verification
 
-- Test stable ID allocation/return, grouped subject order, update ordering, bounded pruning,
-  unknown/timeout cases, and every supported task family.
-- Prove that no hidden state or recipient event is needed to obtain the same updates.
-- Port or expand exact compatibility tests for moving/stuck builders, progress epsilon, expiry,
-  footprint success, failed-site cap/clear, stage/hold filtering, attack suppression, ownership
-  pruning, and queued Anti-Tank Gun setup.
-- Run the generic ledger in shadow first and the exact Phase 1 normal/full transcript throughout;
-  any command or post-tick difference blocks completion.
-- Run focused `rts-ai` nextest, simulation archcheck, docs health, and diff check.
-
-## Manual Test Focus
-
-Inspect a fixed-seed Jeff replay around a long-distance build, the home Machine Gunner screen, the
-first Tank/Scout Car launch, regrouping/stage suppression, and a worker retreat. Separately run a
-small custom strategy through each tracked action and confirm returned IDs remain correlated and
-diagnostics say “observed active,” “unknown,” or “timed out,” never “accepted” or “rejected.”
+- Compile the reference consumer outside private `rts_ai` module visibility.
+- Prove initialization occurs once and steps occur only on canonical decision ticks.
+- Run a deterministic reference-strategy matchup twice and compare ordered command logs.
+- Verify every command reaches normal simulation validation and replay logging.
+- Run focused `rts-ai` tests, strict clippy, crate/simulation architecture checks, docs health, and
+  the exact Phase 1 normal/full transcript without fixture regeneration.
 
 ## Non-Goals
 
-- No train, research, attack, stage, supersession, recipient-event, or causal death tracking.
-- No authoritative receipts, rejection reasons, sim/protocol changes, or guaranteed causality.
-- No task status feeding Jeff, idempotent `ensure_*` layer, goal scheduler, behavior tree, or GOAP.
-- No rulebook, placement, pathing, or combat-range queries.
-- No checkpoint persistence or external plugin ABI.
+- No command acceptance, completion, rejection, or causal task status.
+- No intent IDs, task ledger, timeouts, idempotent goals, scheduler, behavior tree, or GOAP.
+- No rulebook extraction, placement/path query suite, or public budget/reservation planner; concrete
+  needs for those surfaces are inputs to Phases 5 and 6.
+- No new player-selectable AI unless separately justified by the user.
+- No policy-strength claim or broad SDK stability promise.
 
 ## Handoff Expectations
 
-Report the task/status schema, typed submission-to-ID path, grouped-action and pruning rules, exact
-compatibility owner and methods, removed duplicate fields, frame fields used as evidence, parity
-fixture identity, and core manual checks. Give Phase 5 a list of remaining duplicated rule,
-footprint, coordinate, arrival-tolerance, production-capability, and setup-posture lookups, and keep
-the deferred task families in the final backlog.
+Report the public imports used, the complete authoring flow, commands exercised, first-use SDK fixes,
+determinism/parity evidence, and a prioritized list of specific missing rule/query/action operations.
+Phase 5 must use that list to bound its surface rather than implementing a catalog speculatively.

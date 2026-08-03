@@ -4,11 +4,11 @@
 
 Deliver the highest-value first 80% of an AI authoring SDK without designing a universal or
 "godlike" AI framework. The work first freezes the real production behavior of Jeff's AI and makes
-offline tools execute that same runtime, then extracts typed observations, conservative task
-feedback, rule/query services, and transactional actions behind compatibility seams. The final two
-phases prove the surfaces are real by first moving Jeff and the shared profile engine onto them,
-then separately removing obsolete shims and installing architecture ratchets, while requiring the
-original production transcript to remain exact.
+offline tools execute that same runtime, then extracts typed observations and proves them by writing
+a real public-SDK strategy. Rule/query and typed-action surfaces grow only from demonstrated author
+and current-AI needs. Existing-AI migration, cleanup, and architecture ratchets are conditional on
+concrete duplication and recurring boundary problems, while the original production transcript
+remains exact.
 
 ## Overall Constraints
 
@@ -26,9 +26,9 @@ original production transcript to remain exact.
   owner-private facts already available to that player, controller state, and public static
   map/start data; they may never consult full snapshots, hidden occupancy,
   simulation path caches, private line-of-sight state, or hidden blockers.
-- Prefer honest epistemic names. `NoKnownConflict`, `Issued`, `ObservedActive`,
-  `Unknown`, and `TimedOut` must not be presented as authoritative legal/clear/accepted/rejected
-  answers.
+- Prefer honest epistemic names. `NoKnownConflict` must not be presented as an authoritative
+  legal/clear/accepted answer. Do not expose command completion/status until there is a sound causal
+  contract; an observed postcondition alone is insufficient.
 - Treat deterministic ordering as behavior. Preserve controller order, helper-call order,
   caller-ordered worker and producer candidates, stable ID tie-breaks, existing `f32` calculations,
   and command-vector order unless a later user explicitly approves a gameplay change.
@@ -81,58 +81,52 @@ through a crate-private `LegacyProfileStrategy` whose compatibility projection r
 historical `AiObservation` quirk exactly. Prove frame secrecy, lifecycle determinism, external-crate
 usability, and full Jeff transcript parity without changing the simulation or wire protocol.
 
-### [Phase 4 - Add Observational Task Feedback](phase-4.md)
+### [Phase 4 - Prove the Authoring Path with a Real Strategy](phase-4.md)
 
-Add deterministic intent IDs and conservative observational feedback only for build, gather, move,
-and setup actions whose own-state evidence is already available. Consolidate existing pending-build
-and stage/attack bookkeeping under one runtime-owned compatibility owner while preserving its exact
-update points, timeouts, filters, and ordering. Defer causal train, research, attack, and event-based
-tracking; task status remains non-authoritative and does not feed Jeff's policy.
+Write a small deterministic strategy using only the public SDK and run it through the canonical
+runtime and ordinary simulation validation. Fix only first-use problems demonstrated by that
+consumer, add a concise runnable author guide, and produce a concrete list of missing rule/query and
+action operations. The former observational task-feedback phase is deferred because visible
+postconditions cannot establish command causality, acceptance, or completion.
 
-### [Phase 5 - Expose Rules and Known-World Queries](phase-5.md)
+### [Phase 5 - Expose the Rules and Queries Authors Actually Need](phase-5.md)
 
-Expose a faction-bound `AiRulebook` assembled from authoritative `rts-rules`, and move pure upgrade
-definitions into that rules authority with a simulation compatibility shim. Add deterministic
-known-world indexes, coordinate helpers, static terrain connectivity, and Jeff-compatible build-site
-search whose types state their uncertainty and never consult hidden simulation state. Explicitly
-defer the current defensive firing-lane approximation so this phase does not import combat or
-line-of-fire semantics into the first query surface.
+Expose a bounded faction rulebook and fog-safe known-world queries derived from Phase 4 and current
+AI call sites. Delegate to existing authority, retain uncertainty-honest placement results, and
+adopt the shared implementation in at least one real Jeff/AI-2.1 rule and query call site. Do not
+move upgrade ownership or add static connectivity unless a concrete consumer requires it.
 
-### [Phase 6 - Expose the Transactional Action Planner](phase-6.md)
+### [Phase 6 - Add a Typed Per-Think Action Builder](phase-6.md)
 
-Promote the existing per-think budget, worker/node/producer reservations, command accumulation, and
-tactical group canonicalization into a public `AiActionPlanner`. Cover the common paid build,
-resume, train, research, gather, move, attack, hold, and Anti-Tank Gun setup operations with atomic
-local blockers and a narrow SDK-owned uncommon-action enum. Keep Jeff on mechanical compatibility
-wrappers and preserve its steel-only commitments, candidate ordering, trace labels, and command-call
-order.
+Extend the SDK action sink with typed helpers, same-think budgets, explicit reservation namespaces,
+call-ordered emission, and honest local blockers for operations used by the reference strategy and
+current AIs. Route bounded Jeff/AI-2.1 call sites through the shared implementation immediately.
+Local success means only that a command was emitted; there are no intent IDs or completion claims.
 
-### [Phase 7 - Cut Jeff Over to the SDK](phase-7.md)
+### [Phase 7 - Finish Bounded Existing-AI Adoption](phase-7.md)
 
-Move Jeff and the shared profile decision engine onto `AiFrame`, `AiRulebook`, `WorldQueries`, the
-task compatibility layer, `AiActionPlanner`, and minimal `UnitGroup` helpers without changing their
-policy. Migrate one slice at a time and preserve all legacy projections, placement arithmetic,
-candidate ordering, runtime memory, traces, and command construction behind compatibility seams.
-Do not perform broad cleanup or add architecture enforcement in this parity-only cutover PR.
+Conditionally migrate only concrete rule/query/action duplication left by Phases 5 and 6. Split
+independent slices instead of forcing a whole-engine cutover, and retain `AiObservation`, `AiFacts`,
+or other compatibility projections when they remain useful. Skip the phase with evidence if each
+surface already has a real current-AI consumer and single implementation owner.
 
-### [Phase 8 - Clean Up and Ratchet the SDK](phase-8.md)
+### [Phase 8 - Evidence-Driven Cleanup and Narrow Ratchets](phase-8.md)
 
-After the cutover has merged and parity has been independently rerun, delete only adapters and
-duplicated helpers proven obsolete. Add an outside-crate conformance strategy exercising the full
-first-80% authoring path and a narrow architecture checker that confines protocol parsing and raw
-command construction to documented boundaries. Preserve the immutable Jeff transcript while
-documenting all legitimate low-level exceptions and deferred gold-architecture work.
+Conditionally delete only compatibility implementations proven obsolete and add only architecture
+rules backed by a demonstrated recurring regression. Reuse the Phase 4 strategy as the conformance
+specimen, preserve legitimate low-level runtime/harness roles, and skip the phase if there is no
+concrete deletion or checker to justify.
 
 ## Phase Index
 
 1. [Phase 1 - Freeze Production Jeff](phase-1.md)
 2. [Phase 2 - Canonicalize Live and Offline Execution](phase-2.md)
 3. [Phase 3 - Add the Typed Authoring Seam](phase-3.md)
-4. [Phase 4 - Add Observational Task Feedback](phase-4.md)
-5. [Phase 5 - Expose Rules and Known-World Queries](phase-5.md)
-6. [Phase 6 - Expose the Transactional Action Planner](phase-6.md)
-7. [Phase 7 - Cut Jeff Over to the SDK](phase-7.md)
-8. [Phase 8 - Clean Up and Ratchet the SDK](phase-8.md)
+4. [Phase 4 - Prove the Authoring Path with a Real Strategy](phase-4.md)
+5. [Phase 5 - Expose the Rules and Queries Authors Actually Need](phase-5.md)
+6. [Phase 6 - Add a Typed Per-Think Action Builder](phase-6.md)
+7. [Phase 7 - Finish Bounded Existing-AI Adoption](phase-7.md)
+8. [Phase 8 - Evidence-Driven Cleanup and Narrow Ratchets](phase-8.md)
 
 ## Required Verification Themes
 
@@ -154,6 +148,8 @@ Phase 1 Jeff oracle once it exists:
 ## Deferred Gold-Architecture Backlog
 
 - Simulation-correlated authoritative command receipts and detailed rejection reasons.
+- Intent IDs or task statuses. Revisit only with a causal simulation contract or a concrete author
+  problem whose semantics can be stated without confusing observation with completion.
 - Recipient-event delivery and causal train, research, attack, death, or supersession tracking.
 - Idempotent cross-tick `ensure_*` goals and a general goal scheduler.
 - Behavior trees, GOAP, asynchronous planning, influence maps, or automated strategic decomposition.
@@ -176,6 +172,7 @@ scripts/phase-runner.sh --plan aisdk phase-3 --pr --wait
 scripts/phase-runner.sh --plan aisdk phase-4 --pr --wait
 scripts/phase-runner.sh --plan aisdk phase-5 --pr --wait
 scripts/phase-runner.sh --plan aisdk phase-6 --pr --wait
+# Run phases 7 and 8 only when their entry decisions identify concrete work.
 scripts/phase-runner.sh --plan aisdk phase-7 --pr --wait
 scripts/phase-runner.sh --plan aisdk phase-8 --pr --wait
 ```
