@@ -1,113 +1,75 @@
-# Phase 8 - Clean Up and Ratchet the SDK
+# Phase 8 - Evidence-Driven Cleanup and Narrow Ratchets
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 7 merges.
+- [ ] Conditional after Phase 7 review; skip any work without a concrete duplicate or recurring
+      boundary violation.
 
 ## Objective
 
-Prove the delivered surfaces form a practical outside-authoring path, remove only compatibility code
-made obsolete by the merged Jeff cutover, and install narrow architecture checks that keep policy
-code on the SDK. This phase starts with an independent parity rerun and retains every low-level
-exception that still has a legitimate host, replay, scorecard, or synthetic-harness responsibility.
+Remove only compatibility code proven obsolete by merged migrations and add only narrow checks that
+prevent a demonstrated regression. The public reference strategy from Phase 4 is the authoring
+conformance specimen; do not create a second ceremonial SDK showcase.
 
-## Entry Criteria
+## Entry Decision
 
-- Phase 7 is merged and its head is reachable from `origin/main`.
-- The Phase 1 fixture is byte-for-byte unchanged and passes normal/full reruns from that merged head.
-- Jeff and the shared profile engine already consume the public SDK surfaces; this phase does not
-  complete or repair the cutover.
+- Independently rerun the Phase 1 transcript from current `origin/main`.
+- List each proposed deletion with its replacement owner and zero remaining legitimate consumers.
+- List each proposed architecture rule with the concrete regression it prevents and the exact file
+  roles that must remain exempt.
+- If those lists are empty, mark the phase unnecessary and archive the plan. Cleanup is not required
+  merely because this is the last numbered phase.
 
 ## Work
 
-- Add an outside-crate `sdk_conformance` strategy that uses the supported public runtime to:
-  - read an `AiFrame`;
-  - ask an `AiRulebook` question and make a `WorldQueries` call;
-  - submit and inspect one tracked task;
-  - form a `UnitGroup` and submit actions through `AiActionPlanner`;
-  - reach ordinary simulation validation without private imports or raw protocol/command types.
-- Delete or collapse only one-for-one obsolete compatibility implementations proven unused after
-  the Phase 7 cutover, such as old raw observation projection, command-emitting contexts, duplicate
-  placement helpers, profile-backed runtime remnants, and superseded pending/stage copies.
-- Retain compatibility projections still required to reproduce Jeff's historical policy inputs.
-  Retain synthetic scripts, replay decoding, scorecard inspection, and other infrastructure that
-  legitimately reads or matches low-level commands.
-- Add `scripts/check-ai-sdk-boundaries.mjs` with narrow file-role allowlists. Ratchet production
-  strategy/profile/decision code against direct `StartPayload`, `Snapshot`, `EntityView`, protocol
-  string parsing, `rts_sim::protocol` imports, `SimCommand` construction, or new snapshot-derived
-  placement helpers.
-- Allow raw protocol and command work only in documented adapter/runtime (`AiController`/`live.rs`),
-  planner-emitter, replay, scorecard, host, and synthetic-test roles. Public `UncommonAction`
-  remains SDK-owned and does not exempt strategies from the raw-command rule.
-- Wire the checker into the normal policy lane in `tests/run-all.sh` and update
-  `tests/select-suites.mjs` so SDK and checker changes select it.
-- Update `docs/design/ai.md` with the final public lifecycle, ownership, fog/determinism guarantees,
-  custom-strategy path, task-versus-command-authority distinction, low-level allowlist, and deferred
-  gold-architecture backlog. Refresh context pointers only if document structure changes.
+- Delete one-for-one obsolete compatibility implementations only after proving them unused.
+- Retain low-level parsing/command access for runtime adapters, replay, scorecard, host, and synthetic
+  harness code with legitimate responsibilities.
+- Strengthen the Phase 4 public reference consumer if later SDK additions are otherwise unexercised.
+- Add a boundary check only for a narrow, stable rule already respected by production strategy code,
+  such as preventing new raw protocol parsing or `SimCommand` construction outside documented
+  adapters. Use explicit small role allowlists and focused checker tests.
+- Update `docs/design/ai.md` and the author guide to describe the actual final lifecycle, knowledge
+  boundary, local-action semantics, existing-AI consumers, and retained exceptions.
 
 ## Expected Touch Points
 
-- `server/crates/ai/src/lib.rs`, completed `sdk/**`, and obsolete compatibility modules identified
-  by Phase 7.
-- `server/crates/ai/src/ai_core/**`, `ai_shared.rs`, and `selfplay/**` only where a proven duplicate
-  is removed or a legitimate low-level exception is documented.
-- New `server/crates/ai/tests/sdk_conformance.rs`.
-- New `scripts/check-ai-sdk-boundaries.mjs`.
-- `tests/run-all.sh`, `tests/select-suites.mjs`, and their focused tests.
-- `docs/design/ai.md` and capsule pointers only if needed.
+- Only obsolete compatibility files named by the Phase 7 handoff.
+- The existing Phase 4 reference integration test/example.
+- A focused checker and suite selection only if the entry decision justifies one.
+- `docs/design/ai.md` and the author guide.
 
-No gameplay policy, balance, protocol, client, or simulation-command-processing change belongs in
-this phase.
+No gameplay policy, balance, protocol, client, simulation validation, or broad reorganization belongs
+here.
 
 ## Implementation Checklist
 
-- [ ] Independently rerun Phase 1 normal/full parity before cleanup.
-- [ ] Add an actual outside-crate conformance strategy using every first-80% surface.
-- [ ] Delete only proven-unused one-for-one compatibility implementations.
-- [ ] Keep legitimate low-level host/harness/replay/scorecard exceptions.
-- [ ] Add and wire the architecture checker with narrow role allowlists.
-- [ ] Verify public strategies never import or construct `SimCommand`.
-- [ ] Document final ownership, supported entry points, exceptions, and deferred work.
-- [ ] Pass the unchanged transcript after each deletion cluster and before delivery.
-- [ ] Mark this phase done in the implementation commit.
+- [ ] Rerun exact parity before cleanup.
+- [ ] Document the replacement owner and consumer audit for every deletion.
+- [ ] Delete only proven-unused one-for-one implementations.
+- [ ] Extend the existing reference consumer only where needed.
+- [ ] Add only regression-backed narrow boundary rules, or explicitly skip the checker.
+- [ ] Preserve legitimate runtime/replay/scorecard/host/synthetic exceptions.
+- [ ] Pass the transcript after each deletion cluster and mark the phase done or unnecessary.
 
 ## Verification
 
-```bash
-node scripts/check-ai-sdk-boundaries.mjs
-cargo test --manifest-path server/Cargo.toml -p rts-ai --test sdk_conformance
-cargo nextest run --config-file .config/nextest.toml \
-  --manifest-path server/Cargo.toml --profile default -p rts-ai
-RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml \
-  --manifest-path server/Cargo.toml --profile default -p rts-ai
-cargo clippy --manifest-path server/Cargo.toml -p rts-ai --all-targets
-```
-
-- Run the exact Phase 1 transcript after each deletion cluster and verify the fixture checksum is
-  unchanged.
-- Run crate/sim architecture checks, suite-selection tests, docs health, and diff check.
-- The GitHub `Main test gate` remains authoritative.
-
-## Manual Test Focus
-
-Read the conformance strategy as an external AI author and confirm it uses only public semantic
-types. Run one deterministic Jeff matchup and inspect representative build, production, gathering,
-staging, setup, attack, and retreat entries; the transcript, not visual similarity, is the parity
-authority.
+- Run the exact Phase 1 normal/full transcript without fixture regeneration.
+- Run the public reference consumer and all focused SDK tests.
+- If a checker is added, test both forbidden production-strategy access and every documented allowed
+  role; wire suite selection only after those tests pass.
+- Run focused `rts-ai` nextest, strict clippy, crate/sim architecture checks, docs health, and diff
+  checks. GitHub's main gate remains authoritative.
 
 ## Non-Goals
 
-- No policy improvement, new task family, balance change, or transcript regeneration.
-- No conversion of replay/scorecard/synthetic harness code with legitimate raw duties.
-- No behavior tree, GOAP, goal scheduler, authoritative command-result protocol, general tactical
-  solver, stable plugin ABI, or non-Rust interface.
-- No broad aesthetic rewrite or deletion justified only by textual duplication.
+- No cleanup quota, broad import policy, directory reorganization, or aesthetic rewrite.
+- No second conformance strategy solely to touch every type.
+- No policy improvement, task lifecycle, goal framework, plugin ABI, or speculative hardening.
 
 ## Completion and Handoff Expectations
 
-Report the merged head, unchanged fixture path/checksum, exact transcript/conformance/checker/full-AI
-commands, public strategy entry points, deleted compatibility implementations, retained low-level
-exceptions with owners, and manual replay artifact. The final reviewer must rerun the transcript and
-boundary checker from current `origin/main`, inspect the conformance test as an actual outside-crate
-consumer, verify raw access is confined to documented boundaries, and audit the completed plan for
-archival.
+Report whether the phase was implemented or skipped, parity evidence, each deleted implementation
+and replacement owner, retained low-level exceptions, any regression-backed boundary rules, and the
+final supported authoring path. Archive unresolved task/result semantics and other speculative work
+as deferred research rather than unfinished implementation.

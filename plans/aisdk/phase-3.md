@@ -19,8 +19,8 @@ an API extraction only: no simulation, protocol, cadence, command-order, or game
   associated types, `async`, required constructors, or checkpoint requirements.
 - Expose a small `AiActions` sink for Phase 3. It accepts a bounded SDK-owned action request enum in
   call order, while only the host adapter translates finalized requests into ordinary
-  `SimCommand`s; transactional budgets, reservations, task handles, and richer typed helpers belong
-  to later phases.
+  `SimCommand`s. Local budgets, reservations, and richer typed helpers may follow concrete author
+  needs; task handles and result tracking are deferred until they have sound causal semantics.
 - Define an owned/normalized, read-only `AiFrame` with typed access to:
   - player, tick, team, alive/AI summaries, economy, and completed upgrades;
   - map dimensions, tile size, terrain, public start positions, and static resource locations;
@@ -116,5 +116,5 @@ the acceptance authority.
 
 Report the public SDK imports and lifecycle, frame field/knowledge contract, adapter source allowlist,
 legacy projection quirks, custom-strategy construction path, outside-crate smoke test, and unchanged
-Jeff fixture identity. Tell Phase 4 which frame fields and compatibility hooks are safe for
-observational task reconciliation.
+Jeff fixture identity. Tell Phase 4 which first-use gaps a real public-SDK strategy should exercise
+without adding command-result or completion claims.
