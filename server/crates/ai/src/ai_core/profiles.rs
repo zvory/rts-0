@@ -196,6 +196,7 @@ pub(crate) struct AttackPolicy {
 pub(crate) struct DefensiveMachineGunnerPolicy {
     pub(crate) target_count: usize,
     pub(crate) perimeter_distance_tiles: f32,
+    pub(crate) lateral_spacing_tiles: f32,
     pub(crate) replacement_health_percent: Option<u8>,
 }
 
@@ -360,6 +361,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 4,
         perimeter_distance_tiles: 20.0,
+        lateral_spacing_tiles: 1.5,
         replacement_health_percent: None,
     }),
     turtle_defense: None,
