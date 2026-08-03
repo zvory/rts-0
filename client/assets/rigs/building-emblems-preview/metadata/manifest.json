@@ -1,0 +1,49 @@
+{
+  "id": "building-emblems-preview-06",
+  "mode": "built-in-imagegen",
+  "backgroundRemoval": "remove_chroma_key.py auto-key border soft-matte despill",
+  "teamTintPaint": "deterministic flat white fill plus dilated black alpha outline, preserving intentional black recognition cutouts; multiplicative runtime faction tint",
+  "emblemSize": [256, 256],
+  "emblems": [
+    {
+      "kind": "factory",
+      "meaning": "Vehicle Works / tank silhouette",
+      "emblem": "../factory-emblem-team-tint.png",
+      "source": "../generated/source/factory-tank-magenta.png",
+      "alpha": "../generated/alpha/factory-tank.png",
+      "atlas": "../factory-atlas-team-tint.png"
+    },
+    {
+      "kind": "steelworks",
+      "meaning": "Gun Works / cannon silhouette",
+      "emblem": "../steelworks-emblem-team-tint.png",
+      "source": "../generated/source/steelworks-cannon-magenta-v2.png",
+      "alpha": "../generated/alpha/steelworks-cannon-v2.png",
+      "atlas": "../steelworks-atlas-team-tint.png"
+    },
+    {
+      "kind": "engineering_complex",
+      "meaning": "Engineering Complex / atom with eight electrons",
+      "emblem": "../engineering-complex-emblem-team-tint.png",
+      "source": "../generated/source/engineering-complex-atom-magenta.png",
+      "alpha": "../generated/alpha/engineering-complex-atom.png",
+      "atlas": "../engineering_complex-atlas-team-tint.png"
+    },
+    {
+      "kind": "barracks",
+      "meaning": "Barracks / one M14-style rifle silhouette",
+      "emblem": "../barracks-emblem-m14-team-tint.png",
+      "source": "../generated/source/barracks-m14-magenta.png",
+      "alpha": "../generated/alpha/barracks-m14.png",
+      "atlas": "../barracks-atlas-m14-team-tint.png"
+    },
+    {
+      "kind": "training_centre",
+      "meaning": "Training Centre / MG42-style machine gun without bipod and Panzerfaust silhouettes",
+      "emblem": "../training-centre-emblem-mg42-panzerfaust-team-tint.png",
+      "source": "../generated/source/training-centre-mg42-panzerfaust-magenta.png",
+      "alpha": "../generated/alpha/training-centre-mg42-panzerfaust.png",
+      "atlas": "../training_centre-atlas-mg42-panzerfaust-team-tint.png"
+    }
+  ]
+}

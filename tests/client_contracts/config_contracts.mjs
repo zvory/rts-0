@@ -1100,45 +1100,45 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       kind: KIND.ENGINEERING_COMPLEX,
       buildProgress: null,
     };
-    const rdHud = Object.create(HUD.prototype);
-    rdHud.state = {
+    const engineeringHud = Object.create(HUD.prototype);
+    engineeringHud.state = {
       playerId,
       resources: { steel: 500, oil: 500 },
       upgrades: [],
       selectedEntities: () => [selectedEngineeringComplex],
       entitiesInterpolated: () => [selectedEngineeringComplex],
     };
-    rdHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
-    rdHud._cardSig = null;
-    rdHud._trainRoundRobin = new Map();
-    rdHud._cancelRoundRobin = new Map();
-    rdHud._resourceIcons = {};
-    renderCommandCard(rdHud);
-    const rdAtGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG"));
-    const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
-    const rdArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    const rdSeparateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
-    const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
-    const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
-    const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
-    const rdScoutPlaneButton = renderedButtons.find((button) => button.innerHTML.includes("SP+"));
-    assert(rdAtGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in Engineering Complex");
-    assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot before AT Guns");
-    assert(rdArtilleryResearchButton?.disabled, "Artillery should be disabled before AT Guns is complete or queued");
-    assert(rdArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in Engineering Complex");
-    assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control should require Artillery");
-    assert(rdArtilleryFireControlButton?.title === "Requires Artillery", "Artillery Fire Control should name its prerequisite");
-    assert(rdTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in Engineering Complex");
-    assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in Engineering Complex");
-    assert(rdSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in Engineering Complex");
-    assert(rdScoutPlaneButton?.dataset.hotkey === "Z", "Scout Plane research should appear in Engineering Complex");
+    engineeringHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
+    engineeringHud._cardSig = null;
+    engineeringHud._trainRoundRobin = new Map();
+    engineeringHud._cancelRoundRobin = new Map();
+    engineeringHud._resourceIcons = {};
+    renderCommandCard(engineeringHud);
+    const engineeringAtGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG"));
+    const engineeringArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
+    const engineeringArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
+    const engineeringSeparateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const engineeringTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
+    const engineeringMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
+    const engineeringSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
+    const engineeringScoutPlaneButton = renderedButtons.find((button) => button.innerHTML.includes("SP+"));
+    assert(engineeringAtGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in Engineering Complex");
+    assert(engineeringArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot before AT Guns");
+    assert(engineeringArtilleryResearchButton?.disabled, "Artillery should be disabled before AT Guns is complete or queued");
+    assert(engineeringArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in Engineering Complex");
+    assert(engineeringArtilleryFireControlButton?.disabled, "Artillery Fire Control should require Artillery");
+    assert(engineeringArtilleryFireControlButton?.title === "Requires Artillery", "Artillery Fire Control should name its prerequisite");
+    assert(engineeringTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in Engineering Complex");
+    assert(engineeringMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in Engineering Complex");
+    assert(engineeringSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in Engineering Complex");
+    assert(engineeringScoutPlaneButton?.dataset.hotkey === "Z", "Scout Plane research should appear in Engineering Complex");
     assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "Engineering Complex should not expose Command Car research");
-    assert(!rdSeparateArtilleryResearchButton, "Engineering Complex should not expose separate Artillery research");
+    assert(!engineeringSeparateArtilleryResearchButton, "Engineering Complex should not expose separate Artillery research");
 
     renderedButtons.length = 0;
     selectedEngineeringComplex.prodUpgradeQueue = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
-    rdHud._cardSig = null;
-    renderCommandCard(rdHud);
+    engineeringHud._cardSig = null;
+    renderCommandCard(engineeringHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
     const atGunsUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     assert(unlockedArtilleryResearchButton?.dataset.hotkey === "W", "Artillery should retain the W slot");
@@ -1150,8 +1150,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
     ];
-    rdHud._cardSig = null;
-    renderCommandCard(rdHud);
+    engineeringHud._cardSig = null;
+    renderCommandCard(engineeringHud);
     const unlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable when Artillery is queued");
 

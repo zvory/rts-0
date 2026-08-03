@@ -15,8 +15,11 @@ const INVISIBLE_PAINT = Object.freeze({
 const PLACEHOLDER_GEOMETRY = Object.freeze({ type: "rect", x: 0, y: 0, width: 1, height: 1 });
 const RUNTIME_TILE_SIZE = 32;
 
-function buildingSpec(kind, frameWidth, frameHeight, image, silhouetteShadow = true) {
-  return Object.freeze({ kind, frameWidth, frameHeight, image, silhouetteShadow });
+function buildingSpec(kind, frameWidth, frameHeight, image, {
+  silhouetteShadow = true,
+  emblem = false,
+} = {}) {
+  return Object.freeze({ kind, frameWidth, frameHeight, image, silhouetteShadow, emblem });
 }
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
@@ -24,17 +27,23 @@ const BUILDING_PNG_SPECS = Object.freeze([
   buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
     "/assets/rigs/buildings-b7-team-paint-refined-preview/resource_depot-atlas.png?v=b7-team-paint-refined-preview-01"),
   buildingSpec(KIND.BARRACKS, 384, 256,
-    "/assets/rigs/buildings-b7-team-paint-refined-preview/barracks-atlas.png?v=b7-team-paint-refined-preview-01"),
+    "/assets/rigs/building-emblems-preview/barracks-atlas-m14-team-tint.png?v=building-emblems-preview-04",
+    { emblem: true }),
   buildingSpec(KIND.TRAINING_CENTRE, 384, 256,
-    "/assets/rigs/buildings-b7-team-paint-refined-preview/training_centre-atlas.png?v=b7-team-paint-refined-preview-01"),
+    "/assets/rigs/building-emblems-preview/training_centre-atlas-mg42-panzerfaust-team-tint.png?v=building-emblems-preview-06",
+    { emblem: true }),
   buildingSpec(KIND.ENGINEERING_COMPLEX, 384, 384,
-    "/assets/rigs/buildings-b4-selected-pass-01/engineering_complex-atlas.png?v=b4-selected-01"),
+    "/assets/rigs/building-emblems-preview/engineering_complex-atlas-team-tint.png?v=building-emblems-preview-03",
+    { emblem: true }),
   buildingSpec(KIND.FACTORY, 384, 384,
-    "/assets/rigs/buildings-b3-corrected-preview/factory-atlas.png?v=b3-corrected-03"),
+    "/assets/rigs/building-emblems-preview/factory-atlas-team-tint.png?v=building-emblems-preview-03",
+    { emblem: true }),
   buildingSpec(KIND.STEELWORKS, 384, 384,
-    "/assets/rigs/buildings-b4-selected-pass-01/steelworks-atlas.png?v=b4-selected-01"),
+    "/assets/rigs/building-emblems-preview/steelworks-atlas-team-tint.png?v=building-emblems-preview-03",
+    { emblem: true }),
   buildingSpec(KIND.PUMP_JACK, 128, 128,
-    "/assets/rigs/buildings-b2-distinct-pass-01/pump_jack-atlas.png?v=b2-distinct-01", false),
+    "/assets/rigs/buildings-b2-distinct-pass-01/pump_jack-atlas.png?v=b2-distinct-01",
+    { silhouetteShadow: false }),
 ]);
 
 function deepFreeze(value) {
@@ -65,11 +74,12 @@ function buildingFootprint(kind) {
 }
 
 function definition(spec) {
-  const { kind, silhouetteShadow } = spec;
+  const { kind, silhouetteShadow, emblem } = spec;
   const { footW, footH } = buildingFootprint(kind);
   const width = footW * RUNTIME_TILE_SIZE;
   const height = footH * RUNTIME_TILE_SIZE;
   const parts = [part("part.base", 10, "fixed"), part("part.tint", 11, "team")];
+  if (emblem) parts.push(part("part.emblem", 12, "team"));
   if (silhouetteShadow) parts.push(part("part.shadow", 0, "fixed", 0.3));
   const validation = validateRigDefinition({
     id: `${kind}.building-raster`,
@@ -95,7 +105,7 @@ function definition(spec) {
 }
 
 function atlas(spec) {
-  const { kind, frameWidth, frameHeight, image, silhouetteShadow } = spec;
+  const { kind, frameWidth, frameHeight, image, silhouetteShadow, emblem } = spec;
   const { footW, footH } = buildingFootprint(kind);
   const worldWidth = footW * RUNTIME_TILE_SIZE;
   const worldHeight = footH * RUNTIME_TILE_SIZE;
@@ -127,6 +137,9 @@ function atlas(spec) {
       frame: frame(frameWidth),
     },
   ];
+  const bodyParts = ["part.base", "part.tint"];
+  const shadowParts = [];
+  let nextColumn = 2;
   if (silhouetteShadow) {
     sprites.push({
       id: "sprite.shadow",
@@ -134,10 +147,24 @@ function atlas(spec) {
       sourceParts: ["part.shadow"],
       tintSlot: "fixed",
       drawOrder: 0,
-      frame: frame(frameWidth * 2),
+      frame: frame(frameWidth * nextColumn),
     });
+    shadowParts.push("part.shadow");
+    nextColumn += 1;
   }
-  const columns = silhouetteShadow ? 3 : 2;
+  if (emblem) {
+    sprites.push({
+      id: "sprite.emblem",
+      animationPart: "part.emblem",
+      sourceParts: ["part.emblem"],
+      tintSlot: "team",
+      drawOrder: 12,
+      frame: frame(frameWidth * nextColumn),
+    });
+    bodyParts.push("part.emblem");
+    nextColumn += 1;
+  }
+  const columns = nextColumn;
   return deepFreeze({
     enabled: true,
     unit: kind,
@@ -153,6 +180,10 @@ function atlas(spec) {
       rows: 1,
       width: frameWidth * columns,
       height: frameHeight,
+    },
+    routes: {
+      body: bodyParts,
+      shadow: shadowParts,
     },
     sprites,
   });
