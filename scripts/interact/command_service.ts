@@ -133,7 +133,6 @@ export class InteractService {
         opponent: input.opponent || "ai_2_1",
         spectate: input.spectate || null,
         autoSpectator: input.autoSpectator === true,
-        renderer: input.renderer || "pixi",
         viewport: input.viewport,
         baseUrl: process.env.RTS_INTERACT_BASE_URL || process.env.RTS_INTERACT_LAB_BASE_URL || "",
         signal: openAbortController.signal,
@@ -156,7 +155,6 @@ export class InteractService {
           devScenario: kind === "scenario"
             ? { id: input.id, unit: input.unit, count: input.count, blocker: input.blocker || null, case: input.case || null }
             : null,
-          renderer: input.renderer || "pixi",
         },
       };
       this.sessions.set(sessionId, session);

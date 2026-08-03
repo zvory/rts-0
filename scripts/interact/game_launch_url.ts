@@ -8,7 +8,6 @@ export function interactLaunchUrl({
   opponent,
   spectate,
   autoSpectator = false,
-  renderer,
   seed,
   scenario,
   visualProfile,
@@ -21,7 +20,6 @@ export function interactLaunchUrl({
   opponent: string;
   spectate?: readonly string[] | null;
   autoSpectator?: boolean;
-  renderer: string;
   seed: string;
   scenario: string;
   visualProfile?: string;
@@ -34,7 +32,6 @@ export function interactLaunchUrl({
     if (seed) url.searchParams.set("seed", seed);
     if (scenario) url.searchParams.set("scenario", safeToken(scenario, "blank", 48));
     if (visualProfile) url.searchParams.set("visualProfile", safeToken(visualProfile, "", 48));
-    if (renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");
     url.searchParams.set("interact", "lab");
     url.searchParams.set("rtsNoAutoPointerLock", "1");
     return url.href;
@@ -47,7 +44,6 @@ export function interactLaunchUrl({
     url.searchParams.set("count", String(devScenario.count));
     if (devScenario.blocker) url.searchParams.set("blocker", devScenario.blocker);
     if (devScenario.case) url.searchParams.set("case", devScenario.case);
-    if (renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");
     url.searchParams.set("interact", "dev-scenario");
     url.searchParams.set("rtsNoAutoPointerLock", "1");
     return url.href;
@@ -67,7 +63,6 @@ export function interactLaunchUrl({
   }
   url.searchParams.set("rtsStart", "1");
   if (map && map !== "Chokes") url.searchParams.set("rtsMap", map);
-  if (renderer === "babylon") url.searchParams.set("rtsRenderer", "babylon");
   url.searchParams.set("interact", "game");
   url.searchParams.set("rtsNoAutoPointerLock", "1");
   return url.href;

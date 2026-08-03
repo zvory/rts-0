@@ -416,6 +416,28 @@ mod tests {
     }
 
     #[test]
+    fn defensive_firing_sector_rejects_a_building_masking_its_flank() {
+        let mut observation = los_test_observation(EntityKind::Depot);
+        let ts = observation.map.tile_size as f32;
+        let origin = (5.5 * ts, 5.5 * ts);
+        observation.owned[0].y = 7.0 * ts;
+        assert!(defensive_firing_lane_is_clear(
+            &observation,
+            None,
+            origin,
+            (1.0, 0.0),
+            14.0,
+        ));
+        assert!(!defensive_firing_sector_is_clear(
+            &observation,
+            None,
+            origin,
+            (1.0, 0.0),
+            14.0,
+        ));
+    }
+
+    #[test]
     fn defensive_assignment_shifts_out_from_behind_building() {
         let observation = los_test_observation(EntityKind::Depot);
         let ts = observation.map.tile_size as f32;
@@ -438,11 +460,13 @@ mod tests {
         )
         .expect("nearby clear firing position");
         assert_ne!((adjusted.x, adjusted.y), (original.x, original.y));
-        assert!(defensive_firing_lane_is_clear(
+        let direction = normalized_direction((adjusted.x, adjusted.y), (25.5 * ts, 5.5 * ts))
+            .expect("adjusted assignment direction");
+        assert!(defensive_firing_sector_is_clear(
             &observation,
             None,
             (adjusted.x, adjusted.y),
-            (1.0, 0.0),
+            direction,
             14.0,
         ));
     }
@@ -667,16 +691,16 @@ fn clear_firing_assignment(
         offsets.extend([
             (perpendicular.0 * r, perpendicular.1 * r),
             (-perpendicular.0 * r, -perpendicular.1 * r),
-            (-direction.0 * r, -direction.1 * r),
             (direction.0 * r, direction.1 * r),
             (
-                (perpendicular.0 - direction.0) * r,
-                (perpendicular.1 - direction.1) * r,
+                (perpendicular.0 + direction.0) * r,
+                (perpendicular.1 + direction.1) * r,
             ),
             (
-                (-perpendicular.0 - direction.0) * r,
-                (-perpendicular.1 - direction.1) * r,
+                (-perpendicular.0 + direction.0) * r,
+                (-perpendicular.1 + direction.1) * r,
             ),
+            (-direction.0 * r, -direction.1 * r),
         ]);
     }
     offsets
@@ -696,14 +720,52 @@ fn clear_firing_assignment(
             }
         })
         .find(|candidate| {
+            let candidate_origin = (candidate.x, candidate.y);
+            let Some(candidate_direction) =
+                normalized_direction(candidate_origin, (enemy_base.x, enemy_base.y))
+            else {
+                return false;
+            };
             defensive_position_is_open(observation, map_analysis, candidate.x, candidate.y)
-                && defensive_firing_lane_is_clear(
+                && defensive_firing_sector_is_clear(
                     observation,
                     map_analysis,
-                    (candidate.x, candidate.y),
-                    direction,
+                    candidate_origin,
+                    candidate_direction,
                     lane_tiles,
                 )
+        })
+}
+
+fn defensive_firing_sector_is_clear(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    origin: (f32, f32),
+    direction: (f32, f32),
+    lane_tiles: f32,
+) -> bool {
+    let perpendicular = (-direction.1, direction.0);
+    // A clear centre ray alone can thread a building corner while most of an
+    // emplaced weapon's useful approach sector remains masked. Require clear
+    // centre, left, and right rays spanning four tiles at maximum range.
+    let half_width_tiles = 2.0;
+    [-half_width_tiles, 0.0, half_width_tiles]
+        .into_iter()
+        .all(|offset| {
+            let endpoint_direction = (
+                direction.0 * lane_tiles + perpendicular.0 * offset,
+                direction.1 * lane_tiles + perpendicular.1 * offset,
+            );
+            let Some(ray_direction) = normalized_direction((0.0, 0.0), endpoint_direction) else {
+                return false;
+            };
+            defensive_firing_lane_is_clear(
+                observation,
+                map_analysis,
+                origin,
+                ray_direction,
+                lane_tiles,
+            )
         })
 }
 

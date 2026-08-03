@@ -235,6 +235,7 @@ export function replaceLabCatalogRoute(launch, {
   if (!isLabPath(locationLike?.pathname) || !launch?.scenario) return "";
   const params = new URLSearchParams(locationLike.search || "");
   params.delete("handoff");
+  params.delete("rtsRenderer");
   params.set("scenario", safeLabToken(launch.scenario, "blank", 48));
 
   const mapName = safeLabToken(launch.map, "1v1", 48);

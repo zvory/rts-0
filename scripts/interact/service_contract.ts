@@ -25,7 +25,6 @@ export interface ServiceInput extends JsonObject {
   count?: number;
   blocker?: string;
   case?: string;
-  renderer?: string;
   viewport?: ViewportInput;
   categories?: string[];
   details?: boolean;

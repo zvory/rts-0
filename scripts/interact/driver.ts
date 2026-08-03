@@ -125,7 +125,6 @@ interface DriverOptions {
   devScenario?: { id: string; unit: string; count: number; blocker: string; case: string };
   opponent?: string;
   spectate?: string[] | null; autoSpectator?: boolean;
-  renderer?: string;
   viewport?: Viewport;
   timeoutMs?: number;
   startupTimeoutMs?: number;
@@ -203,7 +202,6 @@ export class InteractDriver {
     devScenario = { id: "", unit: "", count: 1, blocker: "", case: "" },
     opponent = "ai_2_1",
     spectate = null, autoSpectator = false,
-    renderer = "pixi",
     viewport = DEFAULT_VIEWPORT,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     startupTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
@@ -224,7 +222,6 @@ export class InteractDriver {
       devScenario,
       opponent,
       spectate, autoSpectator,
-      renderer,
       viewport,
       timeoutMs: boundedTimeout(timeoutMs, "timeoutMs", MAX_TIMEOUT_MS),
       startupTimeoutMs: boundedTimeout(startupTimeoutMs, "startupTimeoutMs", MAX_STARTUP_TIMEOUT_MS),
@@ -1070,7 +1067,6 @@ export class InteractDriver {
       opponent: this.options.opponent,
       spectate: this.options.spectate,
       autoSpectator: this.options.autoSpectator,
-      renderer: this.options.renderer,
       seed: this.options.seed,
       scenario: this.options.scenario,
       visualProfile: this.options.visualProfile,

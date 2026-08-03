@@ -219,8 +219,8 @@ in a match:
   rendererP95Ms: u16,       // bucketed p95 match.renderer duration
   rendererUpdateMaxMs: u16, // max backend scene translation/update duration
   rendererUpdateP95Ms: u16, // bucketed p95 backend scene translation/update duration
-  rendererPresentMaxMs: u16, // max synchronous Pixi/Babylon present duration
-  rendererPresentP95Ms: u16, // bucketed p95 synchronous Pixi/Babylon present duration
+  rendererPresentMaxMs: u16, // max Pixi worker present duration
+  rendererPresentP95Ms: u16, // bucketed p95 Pixi worker present duration
   topRendererPhase: string, // allowlisted top renderer.* phase label for this report window
   topRendererPhaseMs: u16,
   topRenderDiagnosticGroup: string, // allowlisted grouped render/minimap/HUD diagnostic counter

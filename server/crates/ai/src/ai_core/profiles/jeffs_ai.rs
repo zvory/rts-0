@@ -124,8 +124,12 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     home_anti_tank: Some(HomeAntiTankPolicy {
         defensive_tanks: 1,
         target_guns: 2,
-        anti_tank_position_tiles: 1.0,
-        machine_gunner_screen_tiles: 5.0,
+        // Keep the guns three tiles behind the six-tile home Tank line while
+        // remaining forward of the production-building belt.
+        anti_tank_position_tiles: 3.0,
+        // Screen 7.5 tiles ahead of the defensive Tanks: deep enough to meet
+        // infantry first without detaching the Machine Gunners from support.
+        machine_gunner_screen_tiles: 7.5,
         lateral_spacing_tiles: 4.5,
     }),
     tech_transition: Some(TechTransitionPolicy {
@@ -189,7 +193,8 @@ mod tests {
         let home_anti_tank = JEFFS_AI.home_anti_tank.unwrap();
         assert_eq!(home_anti_tank.defensive_tanks, 1);
         assert_eq!(home_anti_tank.target_guns, 2);
-        assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 5.0);
+        assert_eq!(home_anti_tank.anti_tank_position_tiles, 3.0);
+        assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 7.5);
         assert_eq!(
             transition.resource_float,
             ResourceFloatThreshold { steel: 0, oil: 0 }

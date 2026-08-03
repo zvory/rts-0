@@ -1,5 +1,14 @@
 # Playable Babylon Catch-Up
 
+> **Archived as abandoned — 2026-08-02.** The catch-up was determined to be hopeless at a
+> reasonable scope: Babylon remained too far behind the existing Pixi gameplay presentation, and
+> closing that gap would take disproportionate effort. Carrying a second 3D engine would also put
+> the client into ongoing optimization hell, increasing frame-time and input-latency risk and
+> making acceptable performance on terrible laptops much harder. Pixi is sufficient for this 2D
+> authoritative RTS, so the experiment was unshipped and future renderer work belongs on the Pixi
+> worker path. The incomplete phases below are retained only as historical context and must not be
+> executed.
+
 ## Goal
 
 Make Babylon the fastest path for normal live-game development by importing the existing

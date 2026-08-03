@@ -70,7 +70,6 @@ import {
   interactScenarioLaunchEnabled,
 } from "./interact_game_bridge.js";
 import { CleanPresentation } from "./clean_presentation.js";
-import { rendererBackendBundleForMatch } from "./renderer/backend_selection.js";
 import { prepareRenderer } from "./renderer/preparation.js";
 import {
   RendererPreparationSlot,
@@ -716,14 +715,9 @@ export class App {
     // initializing and tear down before it can construct the real renderer.
     if (this.labLaunch || this.labCatalogLaunch || this.labHandoffLaunch) return null;
     if (this.rendererPreparationSlot.current) return this.rendererPreparationSlot.current;
-    const rendererBackendBundle = rendererBackendBundleForMatch(this.rendererBackendBundle, {
-      spectator: this.lobby?.isSpectator?.() === true,
-      replay: false,
-      lab: false,
-    });
     return this.rendererPreparationSlot.warm(
-      () => prepareRenderer(dom.viewport, rendererBackendBundle),
-      { compatibilityKey: rendererBackendBundle?.id || "pixi" },
+      () => prepareRenderer(dom.viewport, this.rendererBackendBundle),
+      { compatibilityKey: this.rendererBackendBundle?.id || "pixi" },
     );
   }
 
@@ -791,16 +785,11 @@ export class App {
     }
 
     const MatchClass = startsReplay ? ReplayViewer : Match;
-    const matchRendererBackendBundle = rendererBackendBundleForMatch(this.rendererBackendBundle, {
-      spectator: payload?.spectator,
-      replay: startsReplay,
-      lab: !!labMetadata,
-    });
     const rendererPreparation = await settleRendererPreparationForStart(
       this.rendererPreparationSlot,
       {
         lab: !!labMetadata,
-        compatibilityKey: matchRendererBackendBundle?.id || "pixi",
+        compatibilityKey: this.rendererBackendBundle?.id || "pixi",
       },
     );
     if (labMetadata) {
@@ -845,9 +834,7 @@ export class App {
         visualProfile,
         visualProfileError,
         initialVisionSelection,
-        // ReplayViewer always constructs Pixi, and ordinary spectators remain on Pixi even when
-        // this page explicitly selected the experimental Babylon live-player renderer.
-        rendererBackendBundle: matchRendererBackendBundle,
+        rendererBackendBundle: this.rendererBackendBundle,
         rendererPreparation,
         isStartCurrent: () => generation === this.matchStartGeneration,
         onLabToolChange: (change) => this.labPanel?.applyLabToolChange?.(change),
