@@ -154,7 +154,6 @@ const AREA_BY_FILE = new Map(Object.entries({
   "fog.js": "platform",
   "camera.js": "platform",
   "camera_projection.js": "platform",
-  "fixed_perspective_camera.js": "platform",
   "map_editor_launch.js": "platform",
   "stress_test_launch.js": "platform",
 }));
@@ -176,13 +175,10 @@ const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "renderer/pixi_compatibility_adapter.js -> presentation/submission.js": "The Pixi backend returns the renderer-neutral asynchronous presentation lifecycle result.",
   "renderer/pixi_compatibility_adapter.js -> presentation/grid_snapshot.js": "The Pixi owner materializes cloneable revisioned grid records into private staging buffers.",
   "renderer/pixi_compatibility_adapter.js -> presentation/projection_record.js": "The Pixi owner reconstructs private orthographic queries from the plain RendererProjectionV2 record.",
-  "renderer/babylon/fog_layer.js -> presentation/grid_snapshot.js": "The Babylon owner reads cloneable GridSnapshotV2 values through the shared bounds helper.",
   "renderer/worker_messages.js -> presentation/frame.js": "The future worker wire pins and validates the renderer-neutral presentation and static-map versions.",
   "renderer/map_editor_worker_renderer.js -> map_editor_presentation.js": "The worker-owned Pixi Map Editor renderer validates the detached editor record it consumes.",
   "renderer/pixi_worker_host.js -> presentation/submission.js": "The sole main-thread Pixi host exposes the renderer-neutral asynchronous presentation lifecycle.",
   "presentation/projection_record.js -> camera_projection.js": "RendererProjectionV2 reconstruction reuses the pure projection math used by the semantic camera.",
-  "renderer/babylon/backend_bundle.js -> fixed_perspective_camera.js": "The selected Babylon bundle owns construction of its engine-independent semantic camera.",
-  "renderer/babylon/presentation_adapter.js -> presentation/submission.js": "The Babylon backend follows the same renderer-neutral presentation lifecycle contract.",
 }));
 
 const ALLOWED_PROTOTYPE_GRAFTS = new Set([
@@ -202,7 +198,7 @@ const PIXI_WORKER_PRIVATE_MODULES = new Set([
   "renderer/map_editor_worker_renderer.js",
   "renderer/worker_environment.js",
 ]);
-const forbiddenPresentationRuntimeRe = /\b(?:PIXI|BABYLON|WebSocket|GameState|ClientIntent)\b/;
+const forbiddenPresentationRuntimeRe = /\b(?:PIXI|WebSocket|GameState|ClientIntent)\b/;
 
 // Phase 6 client-boundary ratchet: these are the cleanup-phase byte counts for
 // the largest modules. Future growth should either extract a focused helper or
@@ -506,13 +502,6 @@ function checkPresentationBoundary(file, source) {
 }
 
 function checkMatchRendererSeam(file, source) {
-  if (file.startsWith("renderer/babylon/")) {
-    for (const forbidden of ["requestAnimationFrame", "runRenderLoop", "PixiPresentationAdapter", "GameState", "ClientIntent"]) {
-      if (source.includes(forbidden)) {
-        failures.push(`${file}: Babylon backend must not reference ${forbidden}; Match owns timing and detached presentation`);
-      }
-    }
-  }
   if (file === "frame_recovery.js") {
     const calls = source.match(/match\.renderer\.render\([^\n]*/g) || [];
     if (calls.length !== 1 || calls[0] !== "match.renderer.render(presentationFrame));") {

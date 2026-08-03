@@ -3,11 +3,9 @@
 `client/` (ES modules, no bundler; `index.html` imports `src/main.js` as a module).
 PixiJS v8.19.0 is pinned to its CDN ESM build and imported only by the Pixi render module worker.
 The worker uses the native async `Application.init({preference:"webgl"})` lifecycle after receiving
-the sole visible transferred canvas. The default backend bundle creates the existing orthographic
-semantic camera and asynchronous Pixi worker host. The explicit live-player/Lab
-`rtsRenderer=babylon` selector lazily loads the pinned Babylon dependency and creates the fixed
-perspective camera before its renderer; ordinary spectators and replays remain on Pixi, and
-`Match` still owns the only animation-frame loop.
+the sole visible transferred canvas. The production backend bundle creates the existing
+orthographic semantic camera and asynchronous Pixi worker host for live play, Lab, spectators, and
+replays. `Match` owns the only animation-frame loop.
 
 ```
 index.html        # PINNED — #app + module entry + screens markup; no main-thread Pixi script
@@ -616,8 +614,7 @@ so deployed black-screen incidents are recoverable from server logs. The Match-o
 `PresentationCoordinator` keeps pending selection/decal metadata keyed by generation and frame id.
 The worker reports durable decal retention independently, and only an asynchronous matching
 `presented` outcome advances the displayed counter or publishes selection; failed/superseded frames
-preserve the prior scene. Babylon follows the same update/present attribution with one
-`scene.render()`. Neither backend owns an animation loop.
+preserve the prior scene. The Pixi worker does not own an animation loop.
 The sidecar contains no mutable state/intent,
 selection proxy, mutable typed array, Pixi object, or transport record. Static terrain/resource
 locations are separately revisioned; visible/explored grids reuse opaque snapshots by revision.
@@ -737,7 +734,7 @@ plus bundled checkpoint setup metadata from `GET /api/lab-scenarios`; clicking a
 hidden `__lab__:<room>:map=<map>:scenario=<id>` join room, replaces the catalog URL with the
 corresponding direct scenario URL, and lets `App` start the normal lab flow. Keeping the scenario in
 the visible URL makes catalog-launched blank and bundled Labs reloadable with Lab-scoped options such
-as `visualProfile` and `rtsRenderer`.
+as `visualProfile`.
 Direct `/lab?scenario=lategame`, `/lab?scenario=blank`, map, and seed URLs still bypass the selector
 and auto-join for compatibility.
 

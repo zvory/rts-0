@@ -15,7 +15,7 @@ export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
   Object.freeze({ id: "match.visualProfile.unitOverrides", reviewTrigger: "a playtest needs representative visuals" }),
   Object.freeze({ id: "match.visualProfile.frameStripOverrides", reviewTrigger: "a playtest needs representative visuals" }),
   Object.freeze({ id: "match.visualProfile.terrainPreviewReveal", reviewTrigger: "a terrain matrix needs fog-free material review" }),
-  Object.freeze({ id: "match.presentationAssembler.staticMap", reviewTrigger: "Babylon staging needs a shared static-map DTO" }),
+  Object.freeze({ id: "match.presentationAssembler.staticMap", reviewTrigger: "A detached static-map consumer needs a shared DTO" }),
 ]);
 
 const FEEDBACK_ARRAY_TYPES = Object.freeze({

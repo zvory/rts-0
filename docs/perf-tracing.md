@@ -22,7 +22,7 @@ sub-phases cover entity preparation, feedback view building, resources/buildings
 selection/HP, shot reveals, sweeps, fog draw, feedback/effects overlays, and placement when those
 phases execute on the profiled thread. For Pixi, `match.renderer` now measures only detached
 main-thread submission; `renderer.update` and `renderer.present` execute in the module worker and
-are returned as separate worker timings. Babylon retains its synchronous nested phase attribution.
+are returned as separate worker timings.
 The acknowledged renderer frame counter advances only after a successful present.
 The profiler counts complete frame work and actual present work strictly above `1000 / 60` ms;
 these 60 FPS counters do not change the existing 33 ms slow-frame definition. Its histogram has a
@@ -731,7 +731,7 @@ architecture policy gate.
 `client_net_report` issue classification uses stable buckets:
 
 - `client_renderer_present`: any present-budget miss, `rendererPresentMaxMs >= 33`, or
-  `rendererPresentP95Ms >= 16`; distinguishes actual Pixi/Babylon presentation from scene update.
+  `rendererPresentP95Ms >= 16`; distinguishes actual Pixi presentation from scene update.
 - `client_renderer_update`: `rendererUpdateMaxMs >= 33` or `rendererUpdateP95Ms >= 16`; points at
   backend scene translation/drawing preparation before the actual present.
 - `client_renderer`: `rendererMaxMs >= 33` or `rendererP95Ms >= 16`; inspect `worstFramePhase`,

@@ -143,8 +143,16 @@ export function _drawSelectionAndHp(e, selection, state) {
 
   if (selected) {
     const g = this._slot("selectionRings", e.id);
-    g.position.set(e.x, e.y);
     const ring = this._ringRadius(e);
+    // Keep the ground-projection offset screen-aligned while rotating the
+    // directional footprint itself around its center.
+    g.position.set(e.x, e.y + ring.cy);
+    // Directional footprints track the body beneath them. Infantry keeps its
+    // ground-projected oval screen-aligned so its facing does not make the
+    // marker wobble around a nearly circular silhouette.
+    g.rotation = usesVehicleSelectionBody(e.kind) && Number.isFinite(e.facing)
+      ? e.facing
+      : 0;
     let color;
     if (ownOwner(state, e.owner)) color = COLORS.selectOwn;
     else if (allyOwner(state, e.owner)) color = COLORS.selectAlly;
@@ -153,9 +161,9 @@ export function _drawSelectionAndHp(e, selection, state) {
     // Subtle halo + crisp ring. The layer sits below units, so the selected
     // silhouette stays readable while the colored outline remains distinct.
     gfxStroke(g, 4, color, 0.16);
-    gfxEllipse(g, 0, ring.cy, ring.rx, ring.ry);
+    gfxEllipse(g, 0, 0, ring.rx, ring.ry);
     gfxStroke(g, 1.5, color, 0.78);
-    gfxEllipse(g, 0, ring.cy, ring.rx, ring.ry);
+    gfxEllipse(g, 0, 0, ring.rx, ring.ry);
   }
 
   if (progressStatus || damaged || selected) {

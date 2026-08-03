@@ -71,12 +71,11 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
     return value;
   }
   if (command === "open") {
-    exact(value, ["workspaceRoot", "map", "seed", "scenario", "visualProfile", "renderer", "viewport"], "open");
+    exact(value, ["workspaceRoot", "map", "seed", "scenario", "visualProfile", "viewport"], "open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) token(value.map, "open.map", 48);
     if (value.scenario != null) token(value.scenario, "open.scenario", 48);
     if (value.visualProfile != null) token(value.visualProfile, "open.visualProfile", 48);
-    if (value.renderer != null && (typeof value.renderer !== "string" || !["pixi", "babylon"].includes(value.renderer))) invalid("open.renderer", "must be pixi or babylon");
     if (value.seed != null && !((typeof value.seed === "string" && value.seed.length <= 64) || isInteger(value.seed, 0, U32_MAX))) invalid("open.seed", "must be a bounded string or unsigned integer");
     if (value.viewport != null) viewport(value.viewport, 4096, "open.viewport");
     return value;
@@ -197,14 +196,13 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
 
 function validateScenarioNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {
   if (command === "scenario-open") {
-    exact(value, ["workspaceRoot", "id", "unit", "count", "blocker", "case", "renderer", "viewport"], "dev-scenario open");
+    exact(value, ["workspaceRoot", "id", "unit", "count", "blocker", "case", "viewport"], "dev-scenario open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("dev-scenario open.workspaceRoot", "must be a non-empty string");
     scenarioToken(value.id, "dev-scenario open.id");
     scenarioToken(value.unit, "dev-scenario open.unit");
     integer(value.count, "dev-scenario open.count", 1, 400);
     if (value.blocker != null) scenarioToken(value.blocker, "dev-scenario open.blocker");
     if (value.case != null) scenarioToken(value.case, "dev-scenario open.case");
-    if (value.renderer != null && !["pixi", "babylon"].includes(String(value.renderer))) invalid("dev-scenario open.renderer", "must be pixi or babylon");
     if (value.viewport != null) viewport(value.viewport, 4096, "dev-scenario open.viewport");
     return value;
   }
@@ -257,7 +255,7 @@ function validateScenarioNamespaceInput(command: string, value: CommandInput, se
 
 function validateGameNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {
   if (command === "game-open") {
-    exact(value, ["workspaceRoot", "map", "opponent", "spectate", "autoSpectator", "renderer", "viewport"], "game open");
+    exact(value, ["workspaceRoot", "map", "opponent", "spectate", "autoSpectator", "viewport"], "game open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("game open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) displayName(value.map, "game open.map", 64);
     if (value.opponent != null && !["ai_2_1", "ai_turtle"].includes(String(value.opponent))) invalid("game open.opponent", "must be ai_2_1 or ai_turtle");
@@ -267,7 +265,6 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
       });
       if (value.opponent != null) invalid("game open", "cannot combine opponent with spectate");
     }
-    if (value.renderer != null && !["pixi", "babylon"].includes(String(value.renderer))) invalid("game open.renderer", "must be pixi or babylon");
     if (value.autoSpectator != null && typeof value.autoSpectator !== "boolean") invalid("game open.autoSpectator", "must be a boolean");
     if (value.autoSpectator && value.spectate == null) invalid("game open.autoSpectator", "requires spectate:[ai,ai]");
     if (value.viewport != null) viewport(value.viewport, 4096, "game open.viewport");

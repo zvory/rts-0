@@ -281,8 +281,8 @@ async function testLabLaunchConfig() {
         profiledParams.get("map") === "Chokes" &&
         profiledParams.get("room") === "sandbox" &&
         profiledParams.get("visualProfile") === "trench-variants-1" &&
-        profiledParams.get("rtsRenderer") === "babylon",
-      "catalog route replacement preserves the selected setup, custom visual profile, and renderer",
+        !profiledParams.has("rtsRenderer"),
+      "catalog route replacement preserves the selected setup and custom visual profile while dropping the retired renderer selector",
     );
   } finally {
     if (priorDocument === undefined) delete globalThis.document;

@@ -63,12 +63,12 @@ function namespace(summary: string, commands: Record<string, string>): Namespace
 const COMMAND_RECORDS = Object.freeze({
   open: descriptor(
     "Open or recover the one authoritative Interact session for this worktree.",
-    "{workspaceRoot?:string,map?:token,seed?:string|u32,scenario?:token,visualProfile?:token,renderer?:\"pixi\"|\"babylon\",viewport?:{width:int,height:int,deviceScaleFactor?:number}}",
+    "{workspaceRoot?:string,map?:token,seed?:string|u32,scenario?:token,visualProfile?:token,viewport?:{width:int,height:int,deviceScaleFactor?:number}}",
     {
       scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
-      defaults: ["workspaceRoot=current worktree", `map=${DEFAULT_LAB_MAP}`, "scenario=blank", "visualProfile=none", "renderer=pixi", "seed=empty", "viewport=1440x900 at DPR 1"],
+      defaults: ["workspaceRoot=current worktree", `map=${DEFAULT_LAB_MAP}`, "scenario=blank", "visualProfile=none", "seed=empty", "viewport=1440x900 at DPR 1"],
       bounds: ["one session", "map/scenario/visualProfile <=48 safe-token characters", "viewport 320-4096 x 240-4096", "DPR >0 and <=4"],
-      example: { renderer: "babylon", viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
+      example: { viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
     },
   ),
   close: descriptor("Close the active browser/server session without stopping the daemon.", "{sessionId:string}", {
@@ -190,10 +190,10 @@ const COMMAND_RECORDS = Object.freeze({
     lane: "cancellation", recordable: false,
     bounds: ["an active fixed or time-lapse capture is required"], example: { sessionId: "<session-id>" },
   }),
-  "game-open": descriptor("Open or recover one isolated human-vs-AI match or AI-vs-AI spectator match.", "{workspaceRoot?:string,map?:string,opponent?:ai-profile,spectate?:[ai-profile,ai-profile],autoSpectator?:boolean,renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
+  "game-open": descriptor("Open or recover one isolated human-vs-AI match or AI-vs-AI spectator match.", "{workspaceRoot?:string,map?:string,opponent?:ai-profile,spectate?:[ai-profile,ai-profile],autoSpectator?:boolean,viewport?:viewport}", {
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats", "autoSpectator=true enables Follow active fights before the first match frame"],
-    defaults: ["workspaceRoot=current worktree", "map=Chokes", "opponent=ai_2_1", "renderer=pixi", "viewport=1440x900 at DPR 1"],
+    defaults: ["workspaceRoot=current worktree", "map=Chokes", "opponent=ai_2_1", "viewport=1440x900 at DPR 1"],
     bounds: ["one session across Lab, game, and dev-scenario", "autoSpectator=true requires spectate", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
     example: { spectate: ["ai_2_1", "ai_turtle"], autoSpectator: true, viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
   }),
@@ -252,10 +252,10 @@ const COMMAND_RECORDS = Object.freeze({
     bounds: ["AI-vs-AI spectator session only", "duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "at most 1800 frames", "64 MiB output"],
     example: { sessionId: "<game-session-id>", name: "whole-map", maxDurationMs: 120000, sampleEveryMs: 1000, speed: 8, region: "viewport" },
   }),
-  "scenario-open": descriptor("Open or recover one authored server-backed dev scenario for observation and media capture.", "{workspaceRoot?:string,id:token,unit:token,count:int,blocker?:token,case?:token,renderer?:\"pixi\"|\"babylon\",viewport?:viewport}", {
+  "scenario-open": descriptor("Open or recover one authored server-backed dev scenario for observation and media capture.", "{workspaceRoot?:string,id:token,unit:token,count:int,blocker?:token,case?:token,viewport?:viewport}", {
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["id/unit/count/blocker/case use the same bounded launch fields as /dev/scenarios", "the scenario remains server-authored and observation-only"],
-    defaults: ["blocker/case=omitted", "renderer=pixi", "viewport=1440x900 at DPR 1"],
+    defaults: ["blocker/case=omitted", "viewport=1440x900 at DPR 1"],
     bounds: ["one session across Lab, game, and dev-scenario", "safe lowercase scenario tokens", "count 1-400", "viewport 320-4096 x 240-4096"],
     example: { id: "direct_reverse_order", unit: "tank", count: 1, viewport: { width: 1000, height: 700, deviceScaleFactor: 1 } },
   }),

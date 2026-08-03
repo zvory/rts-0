@@ -40,8 +40,7 @@ this plan, not acceptable beta caveats.
   `OffscreenCanvas`, or WebGL context gets one clear startup error instead of silently selecting a
   different Pixi implementation.
 - Force Pixi to use WebGL. Do not initialize, probe, import, or add an option for WebGPU.
-- Existing explicit Babylon work is outside this plan. It is a separate renderer backend, not a
-  fallback for a failed Pixi worker, and this plan must not broaden or redesign it.
+- A failed Pixi worker is a bounded visible renderer error; there is no alternate renderer fallback.
 - Keep the server-authoritative simulation, fog filtering, Match-owned animation-frame loop,
   semantic camera, main-thread input, HUD, minimap, audio, and detached presentation boundary.
 - The worker owns the transferred canvas, Pixi application, Pixi scene graph, textures, asset
