@@ -483,20 +483,31 @@ fn encode_jsonl(records: &[TranscriptRecord]) -> Vec<u8> {
 }
 
 fn read_jsonl(path: &Path) -> Result<Vec<TranscriptRecord>, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
-    text.lines()
+    let bytes =
+        std::fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    decode_jsonl(&bytes, &path.display().to_string())
+}
+
+fn decode_jsonl(bytes: &[u8], source: &str) -> Result<Vec<TranscriptRecord>, String> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|error| format!("oracle fixture {source} is not UTF-8: {error}"))?;
+    let records: Vec<_> = text
+        .lines()
         .enumerate()
         .map(|(index, line)| {
             serde_json::from_str(line).map_err(|error| {
-                format!(
-                    "invalid oracle record {} in {}: {error}",
-                    index + 1,
-                    path.display()
-                )
+                format!("invalid oracle record {} in {source}: {error}", index + 1,)
             })
         })
-        .collect()
+        .collect::<Result<_, _>>()?;
+    let canonical = encode_jsonl(&records);
+    if canonical != bytes {
+        return Err(format!(
+            "oracle fixture {source} is not canonical JSONL at byte {}",
+            first_difference(&canonical, bytes)
+        ));
+    }
+    Ok(records)
 }
 
 fn fingerprint<T: Serialize + ?Sized>(value: &T) -> String {
@@ -671,6 +682,32 @@ mod comparator_tests {
     #[test]
     fn jeff_live_oracle_fnv1a64_matches_the_published_test_vector() {
         assert_eq!(fnv1a64(b"hello"), 0xa430_d846_80aa_bd0b);
+    }
+
+    #[test]
+    fn jeff_live_oracle_rejects_noncanonical_jsonl_bytes() {
+        let transcript = sample_transcript(moves());
+        let canonical = encode_jsonl(&transcript);
+        assert_eq!(
+            decode_jsonl(&canonical, "sample").expect("canonical transcript"),
+            transcript
+        );
+
+        let mut padded = canonical.clone();
+        let colon = padded
+            .iter()
+            .position(|byte| *byte == b':')
+            .expect("serialized record has a field separator");
+        padded.insert(colon + 1, b' ');
+        assert!(decode_jsonl(&padded, "padded")
+            .unwrap_err()
+            .contains("is not canonical JSONL at byte"));
+
+        let mut unterminated = canonical;
+        assert_eq!(unterminated.pop(), Some(b'\n'));
+        assert!(decode_jsonl(&unterminated, "unterminated")
+            .unwrap_err()
+            .contains("is not canonical JSONL at byte"));
     }
 
     #[test]
