@@ -9,13 +9,13 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 
-use super::scout_car::vehicle_desired_path_point;
 use super::standability::{footing_profile, footing_resistance, FootingProfile};
-use super::vehicle_profiles::pivot_drive_profile;
 use super::traffic::{
     car_will_start_reverse_to_final_waypoint, traffic_body_half_width,
     vehicle_body_half_width_with_clearance,
 };
+use super::vehicle_profiles::pivot_drive_profile;
+use super::vehicle_route::vehicle_desired_path_point;
 use super::{MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
 pub(super) use super::vehicle_profiles::VEHICLE_REVERSE_GOAL_DISTANCE_PX;

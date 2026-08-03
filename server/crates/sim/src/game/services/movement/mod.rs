@@ -28,6 +28,7 @@ mod standability;
 mod steering;
 mod traffic;
 mod vehicle_profiles;
+mod vehicle_route;
 mod waypoints;
 
 #[cfg(test)]
