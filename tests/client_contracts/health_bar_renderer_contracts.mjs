@@ -44,13 +44,13 @@ try {
   const highHpDividers = highHpBar.rtsTicks.calls.filter((call) => call[0] === "drawRect");
   const majorDividers = highHpDividers.filter((call) => call[3] === 1.2);
   assert(
-    majorDividers.length === 2,
-    "250 HP health bar draws heavy dividers at 100 HP and 200 HP",
+    highHpDividers.length === 16 && majorDividers.length === 2,
+    "250 HP health bar thickens two existing dividers without adding marks",
   );
   assert(
-    Math.abs(majorDividers[0][1] - (-2.6)) < 0.001
-      && Math.abs(majorDividers[1][1] - 5.4) < 0.001,
-    "major health dividers are positioned at exact 100 HP intervals",
+    Math.abs((majorDividers[0][1] + majorDividers[0][3] / 2) - (-10 + 20 * 7 / 17)) < 0.001
+      && Math.abs((majorDividers[1][1] + majorDividers[1][3] / 2) - (-10 + 20 * 14 / 17)) < 0.001,
+    "every seventh health-cell divider is heavier",
   );
 
   let barsDrawn = 0;

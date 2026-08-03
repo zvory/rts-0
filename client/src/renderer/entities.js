@@ -50,7 +50,7 @@ import {
 } from "./terrain_palette.js";
 
 const HP_PER_SEGMENT = 15;
-const HP_PER_MAJOR_DIVIDER = 100;
+const HP_SEGMENTS_PER_MAJOR_DIVIDER = 7;
 const HP_MINOR_DIVIDER_WIDTH = 0.4;
 const HP_MAJOR_DIVIDER_WIDTH = 1.2;
 
@@ -275,8 +275,7 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
   const maxHp = Number.isFinite(e.maxHp) && e.maxHp > 0 ? e.maxHp : 0;
   const segmentCount = Math.max(1, Math.round(maxHp / HP_PER_SEGMENT));
   const dividerCount = segmentCount - 1;
-  const majorDividerCount = Math.max(0, Math.ceil(maxHp / HP_PER_MAJOR_DIVIDER) - 1);
-  const geometryKey = `${halfW}|${barH}|${segmentCount}|${maxHp}`;
+  const geometryKey = `${halfW}|${barH}|${segmentCount}`;
   if (g.rtsGeometryKey !== geometryKey) {
     g.rtsGeometryKey = geometryKey;
     g.rtsBackground.clear().rect(-halfW - 1, -1, barW + 2, barH + 2).fill({ color: COLORS.hpBack, alpha: 0.9 });
@@ -285,15 +284,12 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
     g.rtsTicks.clear();
     for (let i = 1; i <= dividerCount; i++) {
       const x = -halfW + barW * (i / segmentCount);
-      g.rtsTicks.rect(x - HP_MINOR_DIVIDER_WIDTH / 2, 0, HP_MINOR_DIVIDER_WIDTH, barH);
+      const width = i % HP_SEGMENTS_PER_MAJOR_DIVIDER === 0
+        ? HP_MAJOR_DIVIDER_WIDTH
+        : HP_MINOR_DIVIDER_WIDTH;
+      g.rtsTicks.rect(x - width / 2, 0, width, barH);
     }
-    for (let i = 1; i <= majorDividerCount; i++) {
-      const x = -halfW + barW * ((i * HP_PER_MAJOR_DIVIDER) / maxHp);
-      g.rtsTicks.rect(x - HP_MAJOR_DIVIDER_WIDTH / 2, 0, HP_MAJOR_DIVIDER_WIDTH, barH);
-    }
-    if (dividerCount > 0 || majorDividerCount > 0) {
-      g.rtsTicks.fill({ color: 0x000000, alpha: 0.95 });
-    }
+    if (dividerCount > 0) g.rtsTicks.fill({ color: 0x000000, alpha: 0.95 });
   }
   g.position.set(e.x, topY);
 

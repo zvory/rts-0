@@ -2238,8 +2238,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   at full health; damaged-only remains the default. Normal HP fills use the owning player's color,
   and black internal dividers split the span into `round(maxHp / 15)` whole cells (at least one).
   Any remainder is distributed across those cells rather than drawing a fractional final cell, so
-  each cell represents approximately 15 HP. Those cell dividers are thin hairlines; heavier
-  reference dividers sit at exact 100 HP intervals, independent of the approximate cell spacing.
+  each cell represents approximately 15 HP. Those cell dividers are thin hairlines, except every
+  seventh existing divider is heavier to mark approximately 105 HP without adding another mark.
   Construction and deconstruction keep their existing status colors on the shared bar layer.
   Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
