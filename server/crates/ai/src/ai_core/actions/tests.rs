@@ -123,6 +123,35 @@ fn committed_steel_is_reserved_from_budget() {
 }
 
 #[test]
+fn compatibility_context_does_not_apply_the_public_strategy_cap() {
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 10,
+        },
+        Vec::new(),
+        Vec::new(),
+    );
+    let facts = facts_from_observation(&observation);
+    let mut ctx = context_from_facts(&facts, &observation);
+    let command_count = crate::sdk::MAX_ACTIONS_PER_STEP + 1;
+
+    for id in 0..command_count as u32 {
+        ctx.emit_action(AiActionRequest::Move {
+            units: vec![id],
+            x: 0.0,
+            y: 0.0,
+            queued: false,
+        });
+    }
+
+    assert_eq!(ctx.command_trace().len(), command_count);
+    assert_eq!(ctx.into_commands().len(), command_count);
+}
+
+#[test]
 fn build_action_reserves_worker_and_cost() {
     let observation = observation(
         AiEconomy {

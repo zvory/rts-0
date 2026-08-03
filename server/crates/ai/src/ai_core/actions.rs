@@ -5,7 +5,6 @@ use crate::ai_core::observation::{AiEntityState, AiEntitySummary, AiResourceSumm
 use crate::ai_shared;
 use crate::config;
 use crate::sdk::actions::{ActionBudget, ActionReservations, AiActionRequest};
-use crate::sdk::MAX_ACTIONS_PER_STEP;
 use rts_rules;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
@@ -46,9 +45,6 @@ impl<'a> AiActionContext<'a> {
     }
 
     pub(crate) fn emit_action(&mut self, action: AiActionRequest) {
-        if self.emitted.len() >= MAX_ACTIONS_PER_STEP {
-            return;
-        }
         let command = crate::action_emitter::emit_request(action.clone());
         self.command_trace.push(command_trace_label(&command));
         self.emitted.push(action);

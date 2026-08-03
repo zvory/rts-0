@@ -75,8 +75,48 @@ fn known_candidate_and_producer_blockers_are_mutation_free() {
 }
 
 #[test]
+fn empty_frame_knowledge_does_not_disable_candidate_validation() {
+    let mut batch = actions(500, 500, 20);
+    let before = state(&batch);
+
+    assert_eq!(
+        batch.gather(&[1], &[40], false).unwrap_err().blocker(),
+        &ActionBlocker::NoKnownCandidate(ReservationNamespace::ResourceNode)
+    );
+    assert_eq!(state(&batch), before);
+
+    assert_eq!(
+        batch
+            .train(&[20], EntityKind::Worker)
+            .unwrap_err()
+            .blocker(),
+        &ActionBlocker::NoCompatibleProducer
+    );
+    assert_eq!(state(&batch), before);
+}
+
+#[test]
+fn reserved_candidate_blocker_identifies_the_known_candidate() {
+    let mut batch = actions(500, 500, 20);
+    batch.resource_ids.insert(40);
+    assert_eq!(batch.gather(&[1], &[40], false), Ok((1, 40)));
+    let before = state(&batch);
+
+    assert_eq!(
+        batch.gather(&[2], &[999, 40], false).unwrap_err().blocker(),
+        &ActionBlocker::AlreadyReserved {
+            namespace: ReservationNamespace::ResourceNode,
+            id: 40,
+        }
+    );
+    assert_eq!(state(&batch), before);
+}
+
+#[test]
 fn reservations_are_independent_and_conflicts_are_mutation_free() {
     let mut batch = actions(500, 500, 20);
+    batch.resource_ids.extend([7, 8]);
+    batch.owned_kinds.insert(7, EntityKind::CityCentre);
     assert_eq!(batch.gather(&[7], &[7], false), Ok((7, 7)));
     assert_eq!(batch.train(&[7], EntityKind::Worker), Ok(7));
     assert_eq!(
@@ -120,6 +160,9 @@ fn reservations_are_independent_and_conflicts_are_mutation_free() {
 #[test]
 fn typed_helpers_preserve_mixed_call_order_and_flags() {
     let mut batch = actions(10_000, 10_000, 100);
+    batch.owned_kinds.insert(20, EntityKind::CityCentre);
+    batch.owned_kinds.insert(21, EntityKind::TrainingCentre);
+    batch.resource_ids.insert(30);
     batch
         .paid_build(&[4, 3], EntityKind::Depot, 10, 11)
         .unwrap();

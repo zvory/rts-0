@@ -398,7 +398,7 @@ impl AiActions {
         let node = self.preflight_candidate(
             nodes,
             ReservationNamespace::ResourceNode,
-            (!self.resource_ids.is_empty()).then_some(&self.resource_ids),
+            Some(&self.resource_ids),
         )?;
         self.preflight_capacity()?;
         self.reservations.reserve_worker(worker);
@@ -524,12 +524,12 @@ impl AiActions {
         if candidates.is_empty() {
             return Err(ActionBlocker::EmptyCandidates(namespace).into());
         }
-        let mut saw_known = false;
+        let mut first_known = None;
         for id in candidates {
             if known.is_some_and(|known| !known.contains(id)) {
                 continue;
             }
-            saw_known = true;
+            first_known.get_or_insert(*id);
             let reserved = match namespace {
                 ReservationNamespace::Actor => self.reservations.worker_reserved(*id),
                 ReservationNamespace::ResourceNode => self.reservations.resource_node_reserved(*id),
@@ -541,14 +541,9 @@ impl AiActions {
                 return Ok(*id);
             }
         }
-        if known.is_some() && !saw_known {
-            Err(ActionBlocker::NoKnownCandidate(namespace).into())
-        } else {
-            Err(ActionBlocker::AlreadyReserved {
-                namespace,
-                id: candidates[0],
-            }
-            .into())
+        match first_known {
+            Some(id) => Err(ActionBlocker::AlreadyReserved { namespace, id }.into()),
+            None => Err(ActionBlocker::NoKnownCandidate(namespace).into()),
         }
     }
 
@@ -562,13 +557,11 @@ impl AiActions {
         }
         let mut first_compatible = None;
         for id in candidates {
-            if !self.owned_kinds.is_empty() {
-                let Some(kind) = self.owned_kinds.get(id) else {
-                    continue;
-                };
-                if !compatible(*kind) {
-                    continue;
-                }
+            let Some(kind) = self.owned_kinds.get(id) else {
+                continue;
+            };
+            if !compatible(*kind) {
+                continue;
             }
             first_compatible.get_or_insert(*id);
             if !self.reservations.production_building_reserved(*id) {
