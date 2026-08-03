@@ -31,6 +31,7 @@ import {
   ENTRENCHMENT_TRENCH_RADIUS_TILES,
   ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
   ARTILLERY_UNLOCK_RESEARCH_TICKS,
+  BALLISTIC_TABLES_RESEARCH_TICKS,
   ABILITIES,
   STATS,
   TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES,
@@ -425,12 +426,13 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Artillery research keeps a permanent slot and its prerequisite explicit",
   );
   assert(
-    UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 100 &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 150 &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === TICK_HZ * 20 &&
+    UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 50 &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 100 &&
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === BALLISTIC_TABLES_RESEARCH_TICKS &&
+      BALLISTIC_TABLES_RESEARCH_TICKS === TICK_HZ * 15 &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresUpgrade === UPGRADE.ARTILLERY_UNLOCK &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].description.includes("3 tiles"),
-    "Artillery Fire Control exposes its 100/150 cost, 20-second duration, Artillery prerequisite, and radius effect",
+    "Artillery Fire Control exposes its 50/100 cost, 15-second duration, Artillery prerequisite, and radius effect",
   );
   assert(
     STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in Engineering Complex",
