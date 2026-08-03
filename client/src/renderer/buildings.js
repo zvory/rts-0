@@ -9,7 +9,12 @@ import {
   isProducerBuilding,
 } from "../config.js";
 import { buildingRigDefinitionFor } from "./rigs/building_routing.js";
+import {
+  buildingPngRigAtlasFor,
+  buildingPngRigDefinitionFor,
+} from "./rigs/building_png.js";
 import { isConstructionScaffold } from "./entity_state.js";
+import { renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
 import {
@@ -52,6 +57,9 @@ import {
   terrainOverlayColor,
 } from "./terrain_palette.js";
 
+const VEHICLE_WORKS_BODY_PARTS = Object.freeze(["part.base", "part.tint"]);
+const VEHICLE_WORKS_SHADOW_PARTS = Object.freeze(["part.shadow"]);
+
 export function _drawBuilding(e, colorByOwner, state) {
   const stat = STATS[e.kind] || {};
   const ts = (this._map && this._map.tileSize) || 32;
@@ -62,23 +70,49 @@ export function _drawBuilding(e, colorByOwner, state) {
 
   const underConstruction = isConstructionScaffold(e);
   const bodyAlpha = underConstruction ? 0.45 : 1;
-  const definition = e.kind === KIND.TANK_TRAP
+  const svgDefinition = e.kind === KIND.TANK_TRAP
     ? null
     : buildingRigDefinitionFor(this._buildingRigDefinitions, e.kind);
+  const pngDefinition = e.kind === KIND.TANK_TRAP
+    ? null
+    : buildingPngRigDefinitionFor(this._buildingPngRigDefinitions, e.kind);
+  const pngAtlas = e.kind === KIND.TANK_TRAP
+    ? null
+    : buildingPngRigAtlasFor(this._buildingPngRigAtlasesByKind, e.kind);
+  const pngAtlasTexture = e.kind === KIND.TANK_TRAP
+    ? null
+    : this._buildingPngRigAtlasTextures?.get?.(e.kind) ?? null;
+  const usePngRig = !!(pngDefinition && pngAtlas && pngAtlasTexture);
+  const definition = usePngRig ? pngDefinition : svgDefinition;
 
-  // Shadow (slightly offset, under buildings).
-  const shadowKey = `${e.x}|${e.y}|${w}|${h}`;
-  const sh = this._staticSlot?.(
-    "buildingShadows",
-    e.id,
-    shadowKey,
-  ) || this._slot("buildingShadows", e.id);
-  sh.position.set(0, 0);
-  if (sh.rtsStaticRedraw !== false) {
-    gfxFill(sh, COLORS.shadow, 0.3);
-    gfxRect(sh, x0 + 4, y0 + 6, w, h);
-    gfxNoFill(sh);
-    sh.rtsStaticRenderKey = shadowKey;
+  const useVehicleWorksPngShadow = usePngRig && e.kind === KIND.FACTORY;
+  if (useVehicleWorksPngShadow) {
+    renderPngUnitRig(this, e, colorByOwner, state, pngDefinition, {
+      atlas: pngAtlas,
+      atlasTexture: pngAtlasTexture,
+      routes: [{
+        poolName: "buildingPngShadows",
+        layerName: "buildingShadows",
+        parts: VEHICLE_WORKS_SHADOW_PARTS,
+      }],
+      alpha: bodyAlpha,
+    });
+  } else {
+    // Legacy buildings retain a footprint shadow. Perspective raster buildings
+    // provide their own silhouette-derived shadow route instead.
+    const shadowKey = `${e.x}|${e.y}|${w}|${h}`;
+    const sh = this._staticSlot?.(
+      "buildingShadows",
+      e.id,
+      shadowKey,
+    ) || this._slot("buildingShadows", e.id);
+    sh.position.set(0, 0);
+    if (sh.rtsStaticRedraw !== false) {
+      gfxFill(sh, COLORS.shadow, 0.3);
+      gfxRect(sh, x0 + 4, y0 + 6, w, h);
+      gfxNoFill(sh);
+      sh.rtsStaticRenderKey = shadowKey;
+    }
   }
 
   const tint = e.kind !== KIND.TANK_TRAP && !definition
@@ -87,7 +121,7 @@ export function _drawBuilding(e, colorByOwner, state) {
   const bodyKey = e.kind === KIND.TANK_TRAP
     ? `tankTrap|${e.x}|${e.y}|${ts}|${e.id}|${bodyAlpha}`
     : definition
-      ? `rig|${e.kind}`
+      ? `${usePngRig ? "png" : "rig"}|${e.kind}`
       : `fallback|${e.kind}|${e.x}|${e.y}|${w}|${h}|${bodyAlpha}|${tint}`;
   const g = this._staticSlot?.("buildings", e.id, bodyKey)
     || this._slot("buildings", e.id);
@@ -98,14 +132,27 @@ export function _drawBuilding(e, colorByOwner, state) {
       g.rtsStaticRenderKey = bodyKey;
     }
   } else {
-    // SVG rig body — look up the compiled definition and route it through the
-    // buildingRigs pool into the buildings layer. Falls back to imperative
-    // rect drawing if no definition is loaded (e.g. compile error on startup).
+    // Production PNG bodies use one fixed full-color layer plus one extracted
+    // cream-paint mask tinted at runtime. SVG rigs remain the loading and
+    // asset-failure fallback; imperative geometry covers compile failures.
     if (definition) {
-      renderLiveUnitRig(this, e, colorByOwner, state, definition, {
-        routes: [{ poolName: "buildingRigs", layerName: "buildings" }],
-        alpha: bodyAlpha,
-      });
+      if (usePngRig) {
+        renderPngUnitRig(this, e, colorByOwner, state, definition, {
+          atlas: pngAtlas,
+          atlasTexture: pngAtlasTexture,
+          routes: [{
+            poolName: "buildingRigs",
+            layerName: "buildings",
+            parts: e.kind === KIND.FACTORY ? VEHICLE_WORKS_BODY_PARTS : undefined,
+          }],
+          alpha: bodyAlpha,
+        });
+      } else {
+        renderLiveUnitRig(this, e, colorByOwner, state, definition, {
+          routes: [{ poolName: "buildingRigs", layerName: "buildings" }],
+          alpha: bodyAlpha,
+        });
+      }
       if (g.rtsStaticRedraw !== false) g.rtsStaticRenderKey = bodyKey;
     } else if (g.rtsStaticRedraw !== false) {
       gfxStroke(g, 2, 0x1a1712, underConstruction ? 0.55 : 0.95);

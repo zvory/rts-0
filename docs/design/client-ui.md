@@ -2188,10 +2188,15 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   fallback, and the optional weapon hint is forwarded to recoil timing. Authored main-cannon and
   coax muzzle anchors use sampled rig-part transforms so feedback origins follow the visible barrel
   tip during recoil scale and kick.
-- Buildings: SVG-authored rig definitions are compiled at Renderer startup and rendered on the
-  buildings layer; shadows remain imperative draws, production progress bars, queue labels, and
-  icons remain imperative draws on the building overlays layer, and construction/deconstruction
-  status uses the shared HP bar layer.
+- Kriegsia City Centre, Barracks, Training Centre, Research Complex, Steelworks, Vehicle Works,
+  and Pump Jack use footprint-scaled raster atlases. Each atlas composes a fixed full-color base
+  with a grayscale mask extracted from authored white paint and tinted to the owning player at
+  runtime; brick, doors, windows, machinery, outlines, and material shading stay fixed. Selected
+  perspective buildings supply blurred, offset silhouette shadows instead of rectangular footprint
+  shadows. Supply Depots, Zamok, Tank Traps, and asset load failures retain their non-raster paths.
+  Production progress bars and queue labels remain imperative overlays, while construction and
+  deconstruction status uses the shared HP bar layer. Building art carries identity without a
+  separate abbreviation stencil.
 - Units: SVG-authored rigs remain authoritative for Worker, Golem, and Ekat. Production PNG strips
   or atlases are authoritative for Rifleman, loaded Panzerfaust, Machine Gunner, Anti-Tank Gun,
   Mortar Team, Artillery, Scout Car, Scout Plane, Command Car, and Tank. Command Car uses a

@@ -1,0 +1,9 @@
+{
+  "id": "buildings-b3-corrected-preview",
+  "generator": "built-in ImageGen",
+  "background": "magenta chroma keyed to alpha",
+  "runtime": "fixed base and grayscale team-tint mask, plus a silhouette shadow atlas frame",
+  "buildings": {
+    "factory": { "footprint": [3, 3], "frame": [384, 384], "tintMaskPercent": 20.2, "runtimeScalePercent": 112, "silhouetteShadow": true }
+  }
+}

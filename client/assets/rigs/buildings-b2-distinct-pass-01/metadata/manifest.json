@@ -1,0 +1,16 @@
+{
+  "id": "buildings-b2-distinct-pass-01",
+  "generator": "built-in ImageGen",
+  "background": "#ff00ff",
+  "runtime": "two-frame atlas: fixed full-color base, then grayscale cream-paint team-tint mask",
+  "excluded": ["depot", "tank_trap"],
+  "buildings": {
+    "city_centre": { "footprint": [3, 3], "frame": [384, 384], "tintMaskPercent": 21.0 },
+    "barracks": { "footprint": [3, 2], "frame": [384, 256], "tintMaskPercent": 38.1 },
+    "factory": { "footprint": [3, 3], "frame": [384, 384], "tintMaskPercent": 28.0 },
+    "training_centre": { "footprint": [3, 2], "frame": [384, 256], "tintMaskPercent": 28.4 },
+    "research_complex": { "footprint": [3, 3], "frame": [384, 384], "tintMaskPercent": 22.0 },
+    "steelworks": { "footprint": [3, 3], "frame": [384, 384], "tintMaskPercent": 21.2 },
+    "pump_jack": { "footprint": [1, 1], "frame": [128, 128], "tintMaskPercent": 24.8 }
+  }
+}

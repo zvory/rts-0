@@ -88,6 +88,10 @@ import {
 import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_routing.js";
 import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
+import {
+  createBuildingPngRigAtlases,
+  createBuildingPngRigDefinitions,
+} from "./rigs/building_png.js";
 import { _drawResource } from "./resources.js";
 import { DoodadLayer } from "./doodad_layer.js";
 import { createUnitOutlineFilter } from "./unit_outline_filter.js";
@@ -309,6 +313,10 @@ export class Renderer {
     this._visualFrameStripTextures = new Map();
     this._visualFrameStripTextureLoads = new Map();
     this._buildingRigDefinitions = createBuildingRigDefinitions();
+    this._buildingPngRigDefinitions = createBuildingPngRigDefinitions();
+    this._buildingPngRigAtlasesByKind = createBuildingPngRigAtlases();
+    this._buildingPngRigAtlasTextures = new Map();
+    this._loadBuildingPngRigAtlases();
     this._liveRigPools = {
       liveUnitRigShadows: new Map(),
       liveUnitRigs: new Map(),
@@ -322,6 +330,7 @@ export class Renderer {
       forestUnitOutlineRigOverlays: new Map(),
       stealthUnitOutlineRigs: new Map(),
       stealthUnitOutlineRigOverlays: new Map(),
+      buildingPngShadows: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
@@ -337,6 +346,7 @@ export class Renderer {
       forestUnitOutlineRigOverlays: { poolName: "forestUnitOutlineRigOverlays", layerName: "forestUnitOutlines" },
       stealthUnitOutlineRigs: { poolName: "stealthUnitOutlineRigs", layerName: "stealthUnitOutlines" },
       stealthUnitOutlineRigOverlays: { poolName: "stealthUnitOutlineRigOverlays", layerName: "stealthUnitOutlines" },
+      buildingPngShadows: { poolName: "buildingPngShadows", layerName: "buildingShadows" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
@@ -400,6 +410,20 @@ export class Renderer {
           console.warn(`RTS frame strip disabled for ${kind}: ${err?.message || err}`);
           throw err;
         }), { kind: strip.unit || kind, source: "liveFrameStrip" });
+    }
+  }
+
+  _loadBuildingPngRigAtlases() {
+    for (const [kind, atlas] of this._buildingPngRigAtlasesByKind || []) {
+      this._trackVisualAsset(`building-png:${kind}`, loadPngRigAtlasTexture(PIXI, atlas)
+        .then((texture) => {
+          return this._storeLoadedTexture(this._buildingPngRigAtlasTextures, kind, texture);
+        })
+        .catch((err) => {
+          if (this._destroyed) return;
+          console.warn(`RTS building PNG atlas disabled for ${kind}: ${err?.message || err}`);
+          throw err;
+        }), { kind, source: "buildingPngAtlas" });
     }
   }
 
@@ -1215,6 +1239,7 @@ export class Renderer {
     this._stealthUnitOutlineFilter?.destroy?.();
     this._stealthUnitOutlineFilter = null;
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
+    destroyRendererTextureMap(this._buildingPngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
     destroyRendererTextureMap(this._visualFrameStripTextures);
     this._visualFrameStripTextureLoads?.clear?.();
