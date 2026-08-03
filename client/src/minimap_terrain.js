@@ -9,7 +9,7 @@ const hash2 = (x, y) => {
 };
 
 export const minimapTerrainStyleSignature = () => [
-  COLORS.rock, COLORS.water, COLORS.minimapRoad, COLORS.minimapRoadLine,
+  COLORS.rock, COLORS.water, COLORS.road, COLORS.roadAlt, COLORS.minimapRoadLine,
   COLORS.field, COLORS.mud, COLORS.grass, COLORS.grassAlt,
   ...Object.values(TERRAIN_VARIANT_PALETTES).flatMap(({ base, alt }) => [base, alt]),
 ].join(",");
@@ -46,7 +46,7 @@ export const minimapTerrainColor = (code, tx, ty) => {
   }
   if (code === TERRAIN.ROCK) return COLORS.rock;
   if (code === TERRAIN.WATER) return COLORS.water;
-  if (isRoadTerrain(code)) return COLORS.minimapRoad;
+  if (isRoadTerrain(code)) return hash2(tx, ty) > 0.6 ? COLORS.roadAlt : COLORS.road;
   const n = hash2(tx, ty);
   if (n > 0.78) return COLORS.field;
   if (n < 0.18) return COLORS.mud;

@@ -63,19 +63,22 @@ export function runMinimapRoadContracts() {
     addEventListener() {},
     removeEventListener() {},
   };
-  for (const code of [
+  const roadCodes = [
     TERRAIN.ROAD_BARE,
     TERRAIN.ROAD_HORIZONTAL,
     TERRAIN.ROAD_VERTICAL,
     TERRAIN.ROAD_DIAGONAL_NW_SE,
     TERRAIN.ROAD_DIAGONAL_NE_SW,
-  ]) {
-    assert(
-      minimapTerrainColor(code, 2, 3) === COLORS.minimapRoad,
-      `minimap road ${code} uses the dedicated black surface`,
-    );
+  ];
+  for (const code of roadCodes) {
+    const sampledColors = new Set();
+    for (let ty = 0; ty < 16; ty++) {
+      for (let tx = 0; tx < 16; tx++) sampledColors.add(minimapTerrainColor(code, tx, ty));
+    }
+    assert(sampledColors.size === 2, `minimap road ${code} uses both charcoal variants`);
+    assert(sampledColors.has(COLORS.road), `minimap road ${code} uses the dark charcoal surface`);
+    assert(sampledColors.has(COLORS.roadAlt), `minimap road ${code} uses the alternate charcoal surface`);
   }
-  assert(COLORS.minimapRoad === 0x000000, "minimap road surface stays pure black");
 
   const layers = [];
   const canvas = renderableCanvas();
@@ -121,7 +124,7 @@ export function runMinimapRoadContracts() {
   const fogIndex = drawIndex(fogLayer);
   const roadIndex = drawIndex(roadLayer);
   const resourceIndex = drawIndex(resourceLayer);
-  assert(terrainIndex >= 0 && fogIndex > terrainIndex, "fog draws above black road terrain");
+  assert(terrainIndex >= 0 && fogIndex > terrainIndex, "fog draws above charcoal road terrain");
   assert(roadIndex > fogIndex, "yellow road dots stay visible above unexplored fog");
   assert(resourceIndex > roadIndex, "resource blips retain priority above road dots");
   const roadDots = roadLayer.context.calls.filter((call) => call.op === "arc");
