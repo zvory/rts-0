@@ -25,6 +25,7 @@ import { evaluateInteractBridgeCall } from "./bridge_call.ts";
 import { performMouseDrag, type MouseDragInput } from "./mouse_drag.ts";
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
+export const INTERACT_MEDIA_DPR = Object.freeze({ screenshot: 4, video: 2 });
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 60_000;
@@ -527,12 +528,12 @@ export class InteractDriver {
       if ((region === "minimap" || region === "tab-menu") && presentation === "clean") throw new InteractDriverError("invalidPresentation", "UI regions are hidden in clean presentation; use normal presentation.");
       const tools = await checkMediaCapabilities();
       const normalizedSessionId = safeCaptureSessionId(sessionId);
-      const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
       const originalViewport = this.page!.viewport?.() || null;
+      const normalizedViewport = mediaCaptureViewport(viewport, originalViewport, INTERACT_MEDIA_DPR.video);
       let recordingDir = "";
       let recorder = null;
       try {
-        if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
+        await this.page!.setViewport(normalizedViewport);
         await this.callBridge("presentation", { mode: presentation === "clean" ? "clean" : "default" });
         await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
         await this.waitForCaptureReadiness([]);
@@ -607,14 +608,14 @@ export class InteractDriver {
       const normalizedSessionId = safeCaptureSessionId(sessionId);
       const artifactName = safeArtifactName(name, "fixed");
       const originalViewport = this.page!.viewport?.() || null;
-      const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
+      const normalizedViewport = mediaCaptureViewport(viewport, originalViewport, INTERACT_MEDIA_DPR.video);
       let captureDir = "";
       let captureEntered = false;
       let encoder = null;
       try {
         const status = await this.callBridge("status", {});
         if (!status.roomTime?.paused) throw new InteractDriverError("roomTimeNotPaused", "capture-fixed requires paused authoritative room time.");
-        if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
+        await this.page!.setViewport(normalizedViewport);
         await this.callBridge("presentation", { mode: "clean" });
         await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
         await this.waitForCaptureReadiness([]);
@@ -734,7 +735,10 @@ export class InteractDriver {
     }
   }
 
-  captureTimelapse(input = {}) { return captureGameTimelapse(this, input); }
+  captureTimelapse(input: NonNullable<Parameters<typeof captureGameTimelapse>[1]> = {}) {
+    const viewport = mediaCaptureViewport(input.viewport, this.page?.viewport?.() || null, INTERACT_MEDIA_DPR.video);
+    return captureGameTimelapse(this, { ...input, viewport });
+  }
   fixedCaptureStatus() {
     if (!this.fixedCapture) return { active: false, last: this.lastFixedCapture };
     const { cancelled, name, fps, frameCount, frameIndex } = this.fixedCapture;
@@ -945,11 +949,11 @@ export class InteractDriver {
     }
     const normalizedSessionId = safeCaptureSessionId(sessionId);
     const artifactName = safeArtifactName(name);
-    const normalizedViewport = viewport ? normalizeCaptureViewport(viewport) : null;
     const originalViewport = this.page!.viewport?.() || null;
+    const normalizedViewport = mediaCaptureViewport(viewport, originalViewport, INTERACT_MEDIA_DPR.screenshot);
     const requestedSubjectIds = boundedEntityIds(subjectIds);
     try {
-      if (normalizedViewport) await this.page!.setViewport(normalizedViewport);
+      await this.page!.setViewport(normalizedViewport);
       await this.callBridge("presentation", { mode: presentation === "clean" ? "clean" : "default" });
       if ((region === "minimap" || region === "tab-menu") && presentation === "clean") throw new InteractDriverError("invalidPresentation", "UI regions are hidden in clean presentation; use normal presentation.");
       await this.page!.evaluate(() => document.fonts?.ready || Promise.resolve());
@@ -1209,6 +1213,15 @@ function normalizeCaptureViewport(viewport: Viewport) {
     throw new InteractDriverError("invalidViewport", `capture viewport width and height must be at most ${MAX_CAPTURE_VIEWPORT}.`);
   }
   return normalized;
+}
+
+export function mediaCaptureViewport(requested: Viewport | null | undefined, current: Viewport | null | undefined, defaultDpr: number) {
+  const base = requested || current || DEFAULT_VIEWPORT;
+  return normalizeCaptureViewport({
+    width: base.width,
+    height: base.height,
+    deviceScaleFactor: requested?.deviceScaleFactor ?? defaultDpr,
+  });
 }
 
 function normalizeRecordingCrop(crop: CaptureClip, viewportClip: CaptureClip) {

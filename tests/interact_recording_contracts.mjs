@@ -217,6 +217,9 @@ try {
   const closeDriver = fixtureRecordingDriver(root, tools);
   const closeSessionId = fixtureSessionId();
   await closeDriver.recordStart({ sessionId: closeSessionId, name: "close", maxDurationMs: 5_000 });
+  assert.equal(closeDriver.fixtureViewport.deviceScaleFactor, 2, "real-time recordings default to DPR 2");
+  assert.deepEqual(closeDriver.fixtureScreencastOptions, { format: "png", everyNthFrame: 1 },
+    "real-time recordings retain Chrome screencast events as their composition cadence");
   await assert.rejects(
     closeDriver.screenshot({ sessionId: closeSessionId, name: "conflicting-capture" }),
     (error) => error?.code === "recordingActive",
@@ -360,15 +363,17 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
   driver.browserVersion = "fixture-chrome";
   let frame = 0;
   let recorderStops = 0;
+  let screencastOptions = null;
   let viewport = { width: 640, height: 480, deviceScaleFactor: 1 };
   const png = spawnSync(mediaTools.ffmpeg, [
-    "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=640x480",
+    "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=1280x960",
     "-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "pipe:1",
   ], { encoding: null, timeout: 15_000 });
   assert.equal(png.status, 0, `fixture PNG succeeds: ${String(png.stderr)}`);
   driver.page = {
     viewport: () => viewport,
     setViewport: async (next) => { viewport = next; },
+    screenshot: async () => png.stdout,
     close: async () => {},
     evaluate: async (fn, bridgeCall) => {
       if (bridgeCall?.method === "captureReadiness") {
@@ -393,8 +398,9 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
       const client = new EventEmitter();
       let timer = null;
       let session = 0;
-      client.send = async (method) => {
+      client.send = async (method, input) => {
         if (method === "Page.startScreencast") {
+          screencastOptions = input;
           const emit = () => client.emit("Page.screencastFrame", {
             data: png.stdout.toString("base64"), metadata: { timestamp: session / 200 }, sessionId: ++session,
           });
@@ -414,6 +420,8 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
     },
   };
   Object.defineProperty(driver, "fixtureRecorderStops", { get: () => recorderStops });
+  Object.defineProperty(driver, "fixtureViewport", { get: () => ({ ...viewport }) });
+  Object.defineProperty(driver, "fixtureScreencastOptions", { get: () => screencastOptions });
   return driver;
 }
 

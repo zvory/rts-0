@@ -289,6 +289,11 @@ subject rows. `presentation: "clean"` hides UI chrome; `presentation: "normal"` 
 panels and game UI. Game screenshots and recordings default to `normal`; Lab screenshots and
 recordings default to `clean`. Inspect the Tailnet preview once before delivery.
 
+Media capture temporarily retains the current CSS viewport dimensions at a higher default pixel
+density: screenshots use DPR 4, while real-time recordings, fixed-step videos, and sampled time
+lapses use DPR 2. Supplying `viewport.deviceScaleFactor` explicitly overrides the relevant media
+default. Capture completion restores the session viewport.
+
 Successful visual responses include this delivery-shaped field (the URL is opaque and host-specific):
 
 ```json
@@ -369,10 +374,12 @@ viewport, `region:"viewport"`, `region:"minimap"`, or an in-viewport custom crop
 initial capture frame, within the same serialized command. This avoids paused dead air between
 separate `record-start` and `time resume` calls.
 
-Interact acknowledges raw Chrome DevTools screencast frames and streams them directly to a
-mobile-compatible H.264 MP4 with `yuv420p`, an `avc1` tag, and fast-start metadata. One timing
-authority maps cumulative monotonic wall time to 30 FPS output slots; each slot receives the newest
-raw frame. There is no intermediate WebM timeline and no second timestamp redistribution pass.
+Interact acknowledges raw Chrome DevTools screencast events as its composition cadence and takes
+non-overlapping physical-resolution PNG source frames from the persistent page. It streams those
+frames directly to a mobile-compatible H.264 MP4 with `yuv420p`, an `avc1` tag, and fast-start
+metadata. One timing authority maps cumulative monotonic wall time to 30 FPS output slots; each slot
+receives the newest physical source frame. There is no intermediate WebM timeline and no second
+timestamp redistribution pass.
 Odd dimensions are normalized to even values for H.264 compatibility. Finalization extracts
 at most six representative PNGs,
 creates a 3×2 contact sheet, probes the media, and returns a Tailnet MP4 preview plus a Tailnet
