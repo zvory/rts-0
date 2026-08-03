@@ -16,7 +16,6 @@ export const COLORS = Object.freeze({
   roadShoulder: 0x5a4934,
   roadShoulderDark: 0x40352a,
   roadLine: 0xd0aa32,
-  minimapRoad: 0x000000,
   minimapRoadLine: 0xf1cb43,
   grid: 0x000000,
   steel: 0x9a9a9a,
