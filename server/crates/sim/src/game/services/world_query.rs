@@ -222,6 +222,26 @@ pub(crate) struct ExplicitAttackQuery<'a> {
     pub(crate) attacker_owner: u32,
 }
 
+impl<'a> ExplicitAttackQuery<'a> {
+    pub(crate) fn new(
+        map: &'a Map,
+        entities: &'a EntityStore,
+        teams: &'a TeamRelations,
+        fog: &'a Fog,
+        smokes: Option<&'a SmokeCloudStore>,
+        attacker_owner: u32,
+    ) -> Self {
+        Self {
+            map,
+            entities,
+            teams,
+            fog,
+            smokes,
+            attacker_owner,
+        }
+    }
+}
+
 pub(crate) fn unit_explicit_attack_target_valid(
     query: ExplicitAttackQuery<'_>,
     attacker_id: u32,
