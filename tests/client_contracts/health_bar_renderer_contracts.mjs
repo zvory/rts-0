@@ -5,10 +5,14 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 
 const restorePixi = installFakePixi();
 try {
-  const bar = new PIXI.Container();
-  bar.rtsBackground = new PIXI.Graphics();
-  bar.rtsFill = new PIXI.Graphics();
-  bar.rtsTicks = new PIXI.Graphics();
+  const makeBar = () => {
+    const bar = new PIXI.Container();
+    bar.rtsBackground = new PIXI.Graphics();
+    bar.rtsFill = new PIXI.Graphics();
+    bar.rtsTicks = new PIXI.Graphics();
+    return bar;
+  };
+  const bar = makeBar();
   _hpBar.call({ _map: { tileSize: 32 } }, bar, {
     kind: KIND.RIFLEMAN,
     owner: 1,
@@ -22,6 +26,31 @@ try {
   assert(
     bar.rtsTicks.calls.filter((call) => call[0] === "drawRect").length === 2,
     "40 HP health bar rounds to three whole 15 HP segments",
+  );
+  assert(
+    bar.rtsTicks.calls.filter((call) => call[0] === "drawRect").every((call) => call[3] === 0.4),
+    "ordinary 15 HP dividers use thin hairline marks",
+  );
+
+  const highHpBar = makeBar();
+  _hpBar.call({ _map: { tileSize: 32 } }, highHpBar, {
+    kind: KIND.RIFLEMAN,
+    owner: 1,
+    x: 100,
+    y: 120,
+    hp: 250,
+    maxHp: 250,
+  }, null, 0x4878c8);
+  const highHpDividers = highHpBar.rtsTicks.calls.filter((call) => call[0] === "drawRect");
+  const majorDividers = highHpDividers.filter((call) => call[3] === 1.2);
+  assert(
+    majorDividers.length === 2,
+    "250 HP health bar draws heavy dividers at 100 HP and 200 HP",
+  );
+  assert(
+    Math.abs(majorDividers[0][1] - (-2.6)) < 0.001
+      && Math.abs(majorDividers[1][1] - 5.4) < 0.001,
+    "major health dividers are positioned at exact 100 HP intervals",
   );
 
   let barsDrawn = 0;
