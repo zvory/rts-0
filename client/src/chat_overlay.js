@@ -26,6 +26,13 @@ function isTextEntry(target) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable;
 }
 
+function isInteractiveControl(target) {
+  if (isTextEntry(target)) return true;
+  const tag = String(target?.tagName || "").toUpperCase();
+  if (tag === "BUTTON" || tag === "A" || tag === "SUMMARY") return true;
+  return !!target?.closest?.("button, a[href], [role='button'], [role='link'], [tabindex]");
+}
+
 function consume(event) {
   event.preventDefault?.();
   event.stopImmediatePropagation?.();
@@ -76,9 +83,10 @@ export class ChatOverlay {
     this.sendButton?.addEventListener?.("click", this.onSend);
   }
 
-  setLobbyContext(payload) {
+  setLobbyContext(payload, { docked = true } = {}) {
     const room = String(payload?.room || "");
-    if (this.scope !== "lobby" || this.room !== room) {
+    const shouldDock = !!docked && !!this.root && !!this.lobbyDock;
+    if (this.scope !== "lobby" || this.room !== room || this.docked !== shouldDock) {
       this.closeComposer({ force: true });
       this.clearMessages();
     }
@@ -89,8 +97,12 @@ export class ChatOverlay {
     this.channels = ["all"];
     this.channel = "all";
     this.onOpenChange = null;
-    this.dockInLobby();
-    if (this.composer) this.composer.hidden = false;
+    if (shouldDock) {
+      this.dockInLobby();
+      if (this.composer) this.composer.hidden = false;
+    } else {
+      this.restoreFloatingRoot();
+    }
     this.sync();
   }
 
@@ -142,11 +154,12 @@ export class ChatOverlay {
     }
     const open = this.composer && !this.composer.hidden;
     if (!open) {
-      if (event.code !== "Enter" || this.readOnly || isTextEntry(event.target)) return;
+      if (event.code !== "Enter" || this.readOnly || isInteractiveControl(event.target)) return;
       consume(event);
       this.openComposer();
       return;
     }
+    if (event.target !== this.input && isInteractiveControl(event.target)) return;
     if (event.code === "Escape") {
       consume(event);
       this.closeComposer();
@@ -174,7 +187,7 @@ export class ChatOverlay {
       return;
     }
     if (event.code !== "Enter" || event.isComposing) return;
-    if (isTextEntry(event.target) && event.target !== this.input) return;
+    if (event.target !== this.input && isInteractiveControl(event.target)) return;
     consume(event);
     if (event.target !== this.input) {
       this.input?.focus?.();
@@ -210,18 +223,28 @@ export class ChatOverlay {
 
   receive(message) {
     if (!this.enabled || message?.scope !== this.scope || !this.messages) return;
+    const previousScrollHeight = Number(this.messages.scrollHeight) || 0;
+    const previousScrollTop = Number(this.messages.scrollTop) || 0;
+    const clientHeight = Number(this.messages.clientHeight) || 0;
+    const wasNearBottom = previousScrollHeight <= previousScrollTop + clientHeight + 8;
     const line = this.documentLike.createElement("div");
     line.className = `chat-message chat-message-${message.channel === "team" ? "team" : "all"}`;
     const prefix = message.channel === "team" ? "TEAM" : "ALL";
     line.textContent = `[${prefix}] ${String(message.senderName || "Commander")}: ${String(message.text || "")}`;
     this.messages.appendChild(line);
-    const maxMessages = this.scope === "lobby"
+    const persistentLobby = this.scope === "lobby" && this.docked;
+    const maxMessages = persistentLobby
       ? MAX_LOBBY_CHAT_MESSAGES
       : MAX_VISIBLE_CHAT_MESSAGES;
     while (this.messages.children.length > maxMessages) {
       this.messages.children[0].remove();
     }
-    if (this.scope === "lobby") return;
+    if (persistentLobby && wasNearBottom) {
+      this.messages.scrollTop = this.messages.scrollHeight;
+    }
+    if (persistentLobby) {
+      return;
+    }
     const timer = this.windowLike.setTimeout(() => {
       this.timers.delete(timer);
       line.classList?.add?.("is-fading");

@@ -103,10 +103,11 @@ assert(
   const input = new FakeElement("input");
   const sendButton = new FakeElement("button");
   const windowListeners = {};
+  let timeoutCalls = 0;
   const windowLike = {
     addEventListener(type, handler) { windowListeners[type] = handler; },
     removeEventListener(type) { delete windowListeners[type]; },
-    setTimeout() { return 1; },
+    setTimeout() { timeoutCalls += 1; return timeoutCalls; },
     clearTimeout() {},
   };
   const created = [];
@@ -158,7 +159,7 @@ assert(
     "chat is rendered as literal text rather than HTML",
   );
 
-  chat.setLobbyContext({ room: "branch-room" });
+  chat.setLobbyContext({ room: "ordinary-room" });
   assert(
     !root.hidden && chat.scope === "lobby" && !chat.readOnly && root.parentNode === lobbyDock,
     "lobby context docks writable chat in the room panel",
@@ -169,6 +170,24 @@ assert(
   sendButton.click();
   assertDeepEqual(sent.at(-1), { channel: "all", text: "ready when you are" },
     "the docked lobby Send button uses ephemeral all-chat");
+
+  const lobbyButton = new FakeElement("button");
+  const lobbyButtonEnter = key("Enter", lobbyButton);
+  windowListeners.keydown(lobbyButtonEnter);
+  assert(!lobbyButtonEnter.prevented && !lobbyButtonEnter.stopped,
+    "docked chat does not intercept Enter activation on other lobby controls");
+
+  chat.setLobbyContext({ room: "branch-room" }, { docked: false });
+  assert(root.parentNode === floatingHost && composer.hidden,
+    "branch staging keeps lobby-scope chat in the floating presentation");
+  handlers.get("chat")({
+    scope: "lobby",
+    channel: "all",
+    senderName: "Branch host",
+    text: "claim a seat",
+  });
+  assert(timeoutCalls === 2,
+    "floating branch-staging chat retains the bounded fading overlay behavior");
 
   chat.setGameContext({ replay: {}, playerId: 99, spectator: true, players: [] });
   assert(root.parentNode === floatingHost, "game context restores chat to the floating overlay host");

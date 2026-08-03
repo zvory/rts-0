@@ -1247,6 +1247,10 @@ input[type="text"]:focus {
   display: grid !important;
 }
 
+#lobby-screen.is-joined .lobby-map-setup.lobby-joined-only {
+  display: grid !important;
+}
+
 .lobby-chat-header {
   padding: 20px;
   border-bottom: 1px solid rgba(91, 83, 65, 0.58);

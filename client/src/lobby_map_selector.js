@@ -1,5 +1,5 @@
-// Custom lobby map selector: host-only map list with bundled minimap previews.
-// Lobby owns authoritative selection state; this view only previews and emits a chosen map name.
+// Custom lobby map selector with bundled minimap previews.
+// Lobby owns authoritative selection state; guests can browse previews but only hosts may select.
 
 export const LOBBY_MAP_PRESENTATION = Object.freeze({
   "1v1 No Terrain": Object.freeze({

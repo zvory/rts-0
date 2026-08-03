@@ -518,7 +518,7 @@ export class App {
   }
 
   onBranchStagingForChat(payload) {
-    this.chat?.setLobbyContext(payload);
+    this.chat?.setLobbyContext(payload, { docked: false });
   }
 
   applyMatchLaunchAction(action) {

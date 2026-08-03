@@ -67,7 +67,7 @@
 
 #chat-input::placeholder { color: var(--ink-faint); }
 
-.chat-overlay[data-scope="game"] .chat-send {
+.chat-overlay .chat-send {
   display: none;
 }
 
@@ -139,6 +139,7 @@
 }
 
 .lobby-chat-panel .chat-send {
+  display: inline-flex;
   min-height: 38px;
   padding: 8px 12px;
 }

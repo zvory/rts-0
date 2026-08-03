@@ -214,7 +214,9 @@ the `Net`, and cannot prevent delivery to later subscribers even if console or d
 `App` owns one `ChatOverlay` for the lifetime of the socket and moves it between the joined-lobby
 chat column and game overlay context. Lobby chat keeps an all-chat composer visible, retains at
 most 50 messages only in the current browser while it remains in that room, and clears on room
-change; the server neither persists nor includes lobby messages in replays. In game, Enter opens a
+change; the server neither persists nor includes lobby messages in replays. Replay branch staging
+keeps lobby-scope chat in the floating, bounded, fading presentation because the ordinary lobby
+screen and its chat dock are hidden. In game, Enter opens a
 transparent single-line composer over the current screen; Enter sends and closes it, Escape
 cancels, and Tab cycles team/all only when the local active player has at least one teammate.
 Singleton-team 1v1/FFA players and spectators use all-chat. While the composer is focused, its
