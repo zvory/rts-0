@@ -290,7 +290,7 @@ export class Match {
     );
     this.rendererBackendBundle = options.rendererBackendBundle || createPixiBackendBundle();
     this.camera = this._timeInit("match.camera", () => this.rendererBackendBundle.createCamera({
-      minZoom: autoSpectatorCameraMinZoom(this, payload),
+      minZoom: options.cameraMinZoom ?? autoSpectatorCameraMinZoom(this, payload),
       maxZoom: options.cameraMaxZoom,
       maxVisibleWorldPx: !this.labMetadata && !this.replayViewer && !payload?.spectator
         ? CAMERA.maxVisibleTilesPerAxis * this.state.map.tileSize

@@ -298,7 +298,7 @@ export class Minimap {
   // --- Rendering -------------------------------------------------------------
 
   /** Draw the full minimap for the current frame. */
-  render(frameViews = null, { profiler = null } = {}) {
+  render(frameViews = null, { profiler = null, capturePresentation = false } = {}) {
     this._profiler = profiler || null;
     const ctx = this.ctx;
     if (!ctx) return;
@@ -323,9 +323,9 @@ export class Minimap {
     this._drawResourceLayer();
     this._drawPlayerOwnedEntityOutline(entities);
     this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
-    this._drawArtilleryFiringMarkers(now);
-    this._drawViewport();
-    this._drawPings(now);
+    if (!capturePresentation) this._drawArtilleryFiringMarkers(now);
+    if (!capturePresentation) this._drawViewport();
+    if (!capturePresentation) this._drawPings(now);
   }
 
   /**

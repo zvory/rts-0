@@ -345,13 +345,14 @@ fn authored_tank_trap_doodads_spawn_completed_neutral_entities() {
         color: None,
     });
 
-    let game = Game::new_with_random_ai_profiles_and_map(&players, 0x7a4a_7001, map);
+    let mut game = Game::new_with_random_ai_profiles_and_map(&players, 0x7a4a_7001, map);
     let trap = game
         .state
         .entities
         .iter()
         .find(|entity| entity.kind == EntityKind::TankTrap)
         .expect("authored tank trap should spawn");
+    let trap_id = trap.id;
 
     assert_eq!(trap.owner, 0);
     assert_eq!((trap.pos_x, trap.pos_y), (x, y));
@@ -359,6 +360,17 @@ fn authored_tank_trap_doodads_spawn_completed_neutral_entities() {
     assert!(
         game.start_payload().map.doodads.is_empty(),
         "entity-backed authored objects must not reveal their positions outside fog"
+    );
+
+    let occupied =
+        crate::game::services::occupancy::Occupancy::build(&game.state.map, &game.state.entities);
+    assert!(!occupied.passable_for_kind(2, 2, EntityKind::ScoutCar));
+    game.state.entities.remove(trap_id);
+    let after_destroy =
+        crate::game::services::occupancy::Occupancy::build(&game.state.map, &game.state.entities);
+    assert!(
+        after_destroy.passable_for_kind(2, 2, EntityKind::ScoutCar),
+        "destroyed authored trap must disappear from rebuilt live occupancy"
     );
 }
 

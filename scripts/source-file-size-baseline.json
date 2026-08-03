@@ -5,7 +5,7 @@
   "exceptions": [
     {
       "path": "client/styles.css",
-      "lines": 5743,
+      "lines": 5718,
       "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; keep ratcheting until those responsibilities have an evidence-backed split."
     },
     {
@@ -35,7 +35,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1924,
+      "lines": 1913,
       "reason": "Close vehicle move precision adds focused same-tile exact-goal handling and regression coverage in the oversized coordinator; requires human playtest review and should ratchet down when order-entry policy/tests split."
     },
     {
@@ -45,7 +45,7 @@
     },
     {
       "path": "server/crates/sim/src/game/services/pathing.rs",
-      "lines": 1850,
+      "lines": 1849,
       "reason": "Square test fixtures now construct explicit width and height so the pathing boundary cannot regress to a scalar map size; keep ratcheting until pathing diagnostics are split."
     },
     {

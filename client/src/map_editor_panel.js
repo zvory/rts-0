@@ -1,5 +1,7 @@
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
+import { buildMapFromRecipe, isMapAuthoringRecipe } from "./map_authoring/recipe.js";
+import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import {
   canonicalDoodadColor,
   MAP_EDITOR_DEFAULT_FLOWER_COLOR,
@@ -26,6 +28,7 @@ const MAP_CATALOG_URL = "/maps/catalog";
 const MAP_EDITOR_MAX_JSON_BYTES = 2 * 1024 * 1024;
 const MAP_EDITOR_OPTIONS_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
 const MAP_EDITOR_TOOLS_STORAGE_KEY = "rts.mapEditor.tools.window.v1";
+const MAP_EDITOR_ANALYSIS_TIMEOUT_MS = 20_000;
 
 export class MapEditorPanel {
   constructor({
@@ -33,13 +36,23 @@ export class MapEditorPanel {
     session,
     viewport,
     onOpenLab,
+    onOpenPreview,
     fetchImpl = globalThis.fetch?.bind(globalThis),
+    createAbortController = () => new AbortController(),
+    setTimeoutImpl = globalThis.setTimeout?.bind(globalThis),
+    clearTimeoutImpl = globalThis.clearTimeout?.bind(globalThis),
+    analysisTimeoutMs = MAP_EDITOR_ANALYSIS_TIMEOUT_MS,
   }) {
     this.root = root;
     this.session = session;
     this.viewport = viewport;
     this.onOpenLab = onOpenLab;
+    this.onOpenPreview = onOpenPreview;
     this.fetchImpl = fetchImpl;
+    this.createAbortController = createAbortController;
+    this.setTimeoutImpl = setTimeoutImpl;
+    this.clearTimeoutImpl = clearTimeoutImpl;
+    this.analysisTimeoutMs = analysisTimeoutMs;
     this.catalog = [];
     this.catalogSkipped = [];
     this.catalogError = "";
@@ -58,8 +71,23 @@ export class MapEditorPanel {
     this.blankMapHeight = String(MAP_EDITOR_DEFAULT_SIZE);
     this.observedMapDimensions = null;
     this.pending = false;
+    this.analysisPending = false;
+    this.analysisResult = null;
+    this.analysisKind = null;
+    this.analysisRequestToken = 0;
+    this.analysisAbortController = null;
+    this.analysisTimeoutId = null;
+    this.analysisMapFingerprint = null;
+    this.recipeText = JSON.stringify({
+      name: "Recipe map",
+      width: session.draft?.width || MAP_EDITOR_DEFAULT_SIZE,
+      height: session.draft?.height || MAP_EDITOR_DEFAULT_SIZE,
+      symmetry: "none",
+      operations: [],
+    }, null, 2);
     this.status = "";
     this.statusError = false;
+    this.analysisStatusOwned = false;
     this.destroyed = false;
     this.optionsEl = this.createPanelElement("map-editor-options-window", "Map Editor options");
     this.toolsEl = this.createPanelElement("map-editor-tools-window", "Map Editor tools");
@@ -88,6 +116,12 @@ export class MapEditorPanel {
   }
 
   applySessionSnapshot(snapshot) {
+    const analysisFingerprint = authoredMapFingerprint(snapshot?.draft);
+    if (this.analysisMapFingerprint === null) this.analysisMapFingerprint = analysisFingerprint;
+    else if (analysisFingerprint !== this.analysisMapFingerprint) {
+      MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
+      this.analysisMapFingerprint = analysisFingerprint;
+    }
     const width = snapshot?.draft?.width;
     const height = snapshot?.draft?.height;
     const loadedMap = snapshot?.reason === "loaded"
@@ -330,7 +364,14 @@ export class MapEditorPanel {
       field("Paint shape", shapes),
       field("Symmetry", symmetry),
     );
+    for (const warning of this.currentSymmetryWarnings()) {
+      section.appendChild(readout(`Symmetry warning: ${warning}`, true));
+    }
     return section;
+  }
+
+  currentSymmetryWarnings() {
+    return mapSymmetryWarnings(this.session.draft, this.symmetry);
   }
 
   renderMapOverlays() {
@@ -517,15 +558,35 @@ export class MapEditorPanel {
 
   renderActions() {
     const section = group("Save and test");
+    const recipe = document.createElement("textarea");
+    recipe.value = this.recipeText;
+    recipe.rows = 10;
+    recipe.maxLength = MAP_EDITOR_MAX_JSON_BYTES;
+    recipe.spellcheck = false;
+    recipe.setAttribute("aria-label", "Map recipe JSON");
+    recipe.addEventListener("input", () => { this.recipeText = recipe.value; });
     section.append(
-      button("Load map JSON", () => this.chooseJsonFile()),
+      button("Load map or recipe JSON", () => this.chooseJsonFile()),
+      field("Recipe JSON", recipe),
+      button("Apply recipe JSON", () => this.applyRecipeText()),
       button("Export map JSON", () => this.exportJson()),
+      button(this.analysisPending && this.analysisKind === "check" ? "Checking…" : "Authoritative check", () => void this.runAuthoritativeAnalysis("check"), {
+        disabled: this.analysisPending,
+      }),
+      button(this.analysisPending && this.analysisKind === "report" ? "Reporting routes…" : "Route report", () => void this.runAuthoritativeAnalysis("report"), {
+        disabled: this.analysisPending,
+      }),
+      button(this.pending ? "Preparing preview…" : "Preview PNGs", () => void this.openPreview(), {
+        disabled: this.pending,
+      }),
       button(this.pending ? "Opening Lab…" : "Open in Lab", () => void this.openLab(), {
         disabled: this.pending,
         className: "map-editor-primary",
       }),
-      readout("Opening Lab validates this map on the server and starts a fresh ordinary Lab. Units and elapsed time never return to the editor."),
+      readout("Recipe JSON uses the same fill, rectangle, blob, stroke, road, base, start, and symmetry operations as the map-author CLI. Opening Lab validates the resulting map on the server and starts a fresh ordinary Lab."),
+      readout("Preview PNGs opens the existing game renderer with 2048 px world and minimap downloads."),
     );
+    if (this.analysisResult) section.appendChild(renderAnalysisResult(this.analysisKind, this.analysisResult));
     return section;
   }
 
@@ -687,10 +748,113 @@ export class MapEditorPanel {
   }
 
   loadMapData(map) {
-    this.session.loadAuthoredMap(map);
+    const recipe = isMapAuthoringRecipe(map);
+    this.session.loadAuthoredMap(recipe ? buildMapFromRecipe(map) : map);
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
+    MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
     this.viewport.armTool(null);
+    return recipe ? "recipe" : "map";
+  }
+
+  applyRecipeText() {
+    try {
+      if (this.recipeText.length > MAP_EDITOR_MAX_JSON_BYTES) throw new Error("Recipe JSON must be 2 MB or smaller.");
+      const value = JSON.parse(this.recipeText);
+      if (!isMapAuthoringRecipe(value)) {
+        throw new Error("Recipe JSON needs width and height; operations may be omitted or an array.");
+      }
+      this.loadMapData(value);
+      this.setStatus(`Applied recipe for ${this.session.draft.name}.`);
+      return true;
+    } catch (error) {
+      this.setStatus(`Could not apply recipe: ${error.message || error}`, true);
+      return false;
+    }
+  }
+
+  async runAuthoritativeAnalysis(kind) {
+    const mode = kind === "report" ? "report" : "check";
+    if (this.analysisPending) return null;
+    if (!this.fetchImpl) {
+      this.setStatus("Authoritative map analysis is unavailable.", true);
+      return null;
+    }
+    const body = JSON.stringify(this.session.exportMap());
+    const fingerprint = body;
+    const token = (this.analysisRequestToken || 0) + 1;
+    this.analysisRequestToken = token;
+    this.analysisMapFingerprint = fingerprint;
+    const controller = this.createAbortController?.();
+    this.analysisAbortController = controller || null;
+    this.analysisPending = true;
+    this.analysisKind = mode;
+    this.analysisResult = null;
+    setAuthoritativeAnalysisStatus(
+      this,
+      mode === "report" ? "Calculating authoritative routes…" : "Running authoritative map check…",
+    );
+    try {
+      const responseAndJson = (async () => {
+        const response = await this.fetchImpl(`/api/map-authoring/${mode}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+          ...(controller?.signal ? { signal: controller.signal } : {}),
+        });
+        return { response, result: await response.json() };
+      })();
+      const timeout = new Promise((_, reject) => {
+        if (typeof this.setTimeoutImpl !== "function") return;
+        const delay = positiveTimeout(this.analysisTimeoutMs, MAP_EDITOR_ANALYSIS_TIMEOUT_MS);
+        this.analysisTimeoutId = this.setTimeoutImpl(() => {
+          controller?.abort?.();
+          reject(new Error(`analysis timed out after ${delay} ms`));
+        }, delay);
+      });
+      const { response, result } = await Promise.race([responseAndJson, timeout]);
+      if (!MapEditorPanel.prototype.authoritativeAnalysisRequestIsCurrent.call(this, token, fingerprint)) return null;
+      this.analysisResult = result;
+      if (!response.ok || result?.valid !== true) throw new Error(result?.error || `HTTP ${response.status}`);
+      setAuthoritativeAnalysisStatus(this, authoritativeAnalysisSummary(mode, result));
+      return result;
+    } catch (error) {
+      if (!MapEditorPanel.prototype.authoritativeAnalysisRequestIsCurrent.call(this, token, fingerprint)) return null;
+      setAuthoritativeAnalysisStatus(this, `Authoritative ${mode} failed: ${error.message || error}`, true);
+      return null;
+    } finally {
+      if (this.analysisRequestToken === token) {
+        MapEditorPanel.prototype.clearAuthoritativeAnalysisTimeout.call(this);
+        this.analysisAbortController = null;
+        this.analysisPending = false;
+        this.render();
+      }
+    }
+  }
+
+  authoritativeAnalysisRequestIsCurrent(token, fingerprint) {
+    if (this.destroyed || this.analysisRequestToken !== token) return false;
+    return authoredMapFingerprint(this.session.exportMap()) === fingerprint;
+  }
+
+  clearAuthoritativeAnalysisTimeout() {
+    if (this.analysisTimeoutId != null) this.clearTimeoutImpl?.(this.analysisTimeoutId);
+    this.analysisTimeoutId = null;
+  }
+
+  invalidateAuthoritativeAnalysis() {
+    this.analysisRequestToken = (this.analysisRequestToken || 0) + 1;
+    this.analysisAbortController?.abort?.();
+    this.analysisAbortController = null;
+    MapEditorPanel.prototype.clearAuthoritativeAnalysisTimeout.call(this);
+    this.analysisPending = false;
+    this.analysisResult = null;
+    this.analysisKind = null;
+    if (this.analysisStatusOwned) {
+      this.status = "";
+      this.statusError = false;
+      this.analysisStatusOwned = false;
+    }
   }
 
   undo() {
@@ -720,8 +884,8 @@ export class MapEditorPanel {
       }
       if (typeof file?.text !== "function") throw new Error("The selected file could not be read.");
       const text = await file.text();
-      this.loadMapData(JSON.parse(text));
-      this.setStatus(`Loaded ${name}.`);
+      const kind = this.loadMapData(JSON.parse(text));
+      this.setStatus(`Loaded ${kind === "recipe" ? "recipe " : ""}${name}.`);
     } catch (error) {
       this.setStatus(`Could not load ${name}: ${error.message || error}`, true);
     }
@@ -761,6 +925,23 @@ export class MapEditorPanel {
     }
   }
 
+  async openPreview() {
+    if (this.pending) return;
+    this.pending = true;
+    this.setStatus("Validating map and preparing PNG previews…");
+    try {
+      await this.onOpenPreview?.({
+        authoredMap: this.session.exportMap(),
+        materializedMap: this.session.materialized(),
+      });
+      this.pending = false;
+      this.setStatus("Opened the PNG preview page.");
+    } catch (error) {
+      this.pending = false;
+      this.setStatus(error.message || String(error), true);
+    }
+  }
+
   handleKeyDown(event) {
     if (event.defaultPrevented || isTextEntry(event.target) || !(event.ctrlKey || event.metaKey) || event.altKey) return;
     const key = String(event.key || "").toLowerCase();
@@ -774,12 +955,14 @@ export class MapEditorPanel {
   setStatus(message, error = false) {
     this.status = String(message || "");
     this.statusError = !!error;
+    this.analysisStatusOwned = false;
     this.render();
   }
 
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
     window.removeEventListener("keydown", this.onKeyDown);
     this.unsubscribe?.();
     this.unsubscribeCamera?.();
@@ -788,6 +971,53 @@ export class MapEditorPanel {
     this.optionsEl.remove();
     this.toolsEl.remove();
   }
+}
+
+function authoredMapFingerprint(map) {
+  return JSON.stringify(map ?? null);
+}
+
+function setAuthoritativeAnalysisStatus(panel, message, error = false) {
+  panel.setStatus(message, error);
+  panel.analysisStatusOwned = true;
+}
+
+function positiveTimeout(value, fallback) {
+  const timeout = Number(value);
+  return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
+}
+
+export function authoritativeAnalysisSummary(kind, result) {
+  if (result?.valid !== true) return result?.error || "Authoritative analysis rejected the map.";
+  if (kind === "report") {
+    const analyzed = nonnegativeIntegerOrUnknown(result.analyzedRouteCount);
+    const unanalyzed = nonnegativeIntegerOrUnknown(result.unanalyzedRouteCount);
+    const routes = Array.isArray(result.routes) ? result.routes : [];
+    const unreachable = routes.filter((route) => route?.analyzed !== false && route?.reachable === false).length;
+    return `Route report: ${analyzed} analyzed, ${unreachable} unreachable; ${unanalyzed} unanalyzed/truncated.`;
+  }
+  const bases = Array.isArray(result.baseSites) ? result.baseSites.length : 0;
+  const starts = Array.isArray(result.startLocations) ? result.startLocations.length : 0;
+  return `Authoritative check passed: ${bases} bases, ${starts} starts.`;
+}
+
+function nonnegativeIntegerOrUnknown(value) {
+  const count = Number(value);
+  return Number.isInteger(count) && count >= 0 ? String(count) : "unknown";
+}
+
+function renderAnalysisResult(kind, result) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "map-editor-readout";
+  wrapper.appendChild(readout(authoritativeAnalysisSummary(kind, result), result?.valid !== true));
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "Full authoritative JSON";
+  const json = document.createElement("pre");
+  json.textContent = JSON.stringify(result, null, 2);
+  details.append(summary, json);
+  wrapper.appendChild(details);
+  return wrapper;
 }
 
 function panelScroll(el) {

@@ -5461,7 +5461,6 @@ input[type="text"]:focus {
   vertical-align: middle;
 }
 
-/* Dedicated Map Editor --------------------------------------------------- */
 .map-editor-mode #app > :not(#game-screen):not(#status-badge) {
   display: none !important;
 }

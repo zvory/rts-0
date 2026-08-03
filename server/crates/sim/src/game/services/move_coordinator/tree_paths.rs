@@ -60,24 +60,17 @@ impl MoveCoordinator<'_> {
         start: (f32, f32),
         goal: (f32, f32),
         route_shape: RouteShape,
-        mut waypoints: Vec<(f32, f32)>,
+        waypoints: Vec<(f32, f32)>,
     ) -> Vec<(f32, f32)> {
-        if waypoints.is_empty() {
-            return waypoints;
-        }
-        waypoints[0] = goal;
-        let mut waypoints = expand_reverse_waypoints(self.map, self.occ, kind, start, waypoints)
-            .unwrap_or_default();
-        if route_shape == RouteShape::VehicleClearance && !uses_pivot_vehicle_movement(kind) {
-            waypoints = simplify_reverse_waypoints_with_limit(
-                self.map,
-                self.occ,
-                kind,
-                start,
-                waypoints,
-                SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX,
-            );
-        }
-        waypoints
+        finalize_reverse_waypoints(
+            self.map,
+            self.occ,
+            kind,
+            start,
+            goal,
+            route_shape,
+            waypoints,
+        )
+        .unwrap_or_default()
     }
 }

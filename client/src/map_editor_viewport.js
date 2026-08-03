@@ -4,6 +4,7 @@ import { createMapEditorTerrainPreview } from "./map_editor_terrain_preview.js";
 import { PRESENTATION_OUTCOME } from "./presentation/submission.js";
 import { TERRAIN } from "./protocol.js";
 import { MapEditorPixiPresentationAdapter } from "./renderer/map_editor_presentation_adapter.js";
+import { lineTiles } from "./map_authoring/geometry.js";
 import {
   allocateMapEditorDoodadId,
   createDoodadSprayStroke,
@@ -862,25 +863,6 @@ function coalesceTerrainChanges(previous, changes) {
 
 function presentationOutcomeMessage(outcome) {
   return outcome?.error?.message || outcome?.error?.name || "unknown worker failure";
-}
-
-function lineTiles(from, to) {
-  const out = [];
-  let x = from.x;
-  let y = from.y;
-  const dx = Math.abs(to.x - x);
-  const sx = x < to.x ? 1 : -1;
-  const dy = -Math.abs(to.y - y);
-  const sy = y < to.y ? 1 : -1;
-  let error = dx + dy;
-  while (true) {
-    out.push({ x, y });
-    if (x === to.x && y === to.y) break;
-    const twice = error * 2;
-    if (twice >= dy) { error += dy; x += sx; }
-    if (twice <= dx) { error += dx; y += sy; }
-  }
-  return out;
 }
 
 function mapDimensions(value) {

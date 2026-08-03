@@ -7,6 +7,7 @@ import {
 } from "./bootstrap.js";
 import { MapEditorApp } from "./map_editor_app.js";
 import { mapEditorLaunchConfig } from "./map_editor_launch.js";
+import { mapPreviewLaunchConfig } from "./map_preview_launch.js";
 import { SnapshotStreamNet } from "./snapshot_stream_net.js";
 
 async function start() {
@@ -15,11 +16,15 @@ async function start() {
 
   let app;
   try {
-    const stressTestLaunch = stressTestLaunchConfig();
-    const snapshotStreamLaunch = stressTestLaunch || snapshotStreamLaunchConfig();
+    const mapPreviewLaunch = mapPreviewLaunchConfig();
+    const stressTestLaunch = mapPreviewLaunch ? null : stressTestLaunchConfig();
+    const snapshotStreamLaunch = mapPreviewLaunch
+      ? null
+      : stressTestLaunch || snapshotStreamLaunchConfig();
     app = mapEditorLaunchConfig()
       ? new MapEditorApp()
       : new App({
+        mapPreviewLaunch,
         net: snapshotStreamLaunch
           ? new SnapshotStreamNet({
             id: snapshotStreamLaunch.id,

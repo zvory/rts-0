@@ -65,6 +65,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "map_editor_viewport.js": "app-shell",
   "map_editor_presentation.js": "app-shell",
   "map_editor_terrain_preview.js": "app-shell",
+  "map_preview_bridge.js": "app-shell",
 
   "state.js": "model",
   "state_runtime_reset.js": "model",
@@ -120,6 +121,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "resource_icons.js": "ui",
   "status_badge.js": "ui",
   "minimap.js": "ui",
+  "minimap_capture.js": "ui",
   "minimap_icon_image.js": "ui",
   "minimap_road_layer.js": "ui",
   "minimap_terrain.js": "ui",
@@ -156,10 +158,12 @@ const AREA_BY_FILE = new Map(Object.entries({
   "camera.js": "platform",
   "camera_projection.js": "platform",
   "map_editor_launch.js": "platform",
+  "map_preview_launch.js": "platform",
   "stress_test_launch.js": "platform",
 }));
 
 const AREA_PREFIXES = [
+  ["map_authoring/", "ui"],
   ["config/", "rules-mirror"],
   ["config_", "rules-mirror"],
   ["presentation/", "presentation"],

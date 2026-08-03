@@ -115,7 +115,10 @@ src/
   map_editor_app.js # Dedicated `/map-editor` lifecycle; never constructs Net, Match, or GameState
   map_editor_launch.js # Bounded editor route/handoff query parsing
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
+  map_preview_app.js # Capture-only authored-map route composed around existing renderers
+  map_preview_bridge.js # Bounded world/minimap PNG capture surface
   map_editor_session.js # Flat authored-map state, undo/redo, and stroke transactions
+  map_authoring/ # Pure browser/Node geometry, symmetry, and serializable map operations shared by the editor and CLI
   map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, JSON files, and Lab launch
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
@@ -909,6 +912,12 @@ export class MapEditorSession {
   mapOverlay()
 }
 ```
+`map_authoring/` is the single implementation of authoring geometry, symmetry, advisory symmetry
+checking, authored-map limits, and recipe materialization. Browser pointer
+gestures and `scripts/map-author.mjs` recipes are adapters over its pure ESM operations; the package
+does not access the DOM, Pixi, Node filesystem APIs, or simulation state. UI-only input/history and
+CLI-only file/argument handling stay outside it.
+
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
 status, lab vision, command-limit policy, setup authoring metadata, validation,
 setup import/export/reset, and result status; Tools owns target player, player state, spawn palettes,
@@ -927,13 +936,20 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
-status, local JSON import/export, and Lab handoff; Tools owns terrain paint, start/base locations, and
+status, local authored-map or recipe JSON import, map JSON export, and Lab handoff; Tools owns terrain paint, start/base locations, and
 doodad authoring. The top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
 zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
-base locations, and provides undo/redo, local JSON import/export, and centered resize. Resize
+base locations, and provides undo/redo, local JSON import/map export, and centered resize. Recipe
+imports and the in-page recipe JSON textarea apply the shared fill, rectangle, blob, stroke, road,
+base, start, and symmetry operations. An omitted `operations` field means an empty operation list;
+rich per-operation visual recipe controls remain deferred. Recipe/import normalization preserves
+authored terrain verbatim, including impassable terrain in a protected base footprint, so the
+advisory and authoritative checks can report the author's actual input. Interactive rock/water
+painting is still rejected in protected footprints, and moving or adding a location makes its
+footprint passable. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
 shifts start/base locations with the centered source map. Authored v6 maps and materialized Lab
 handoffs carry explicit `width` and `height`; loading bundled or locally imported older square maps
@@ -958,6 +974,10 @@ water remain rejected there. Authored map rows
 encode bare, horizontal-marked, vertical-marked, NW-SE diagonal-marked, and NE-SW diagonal-marked
 roads with `=`, `-`, `|`, `\`, and `/`, respectively. The ten visual Open-terrain variants use
 `0` through `9` in protocol-code order: Gravel A/B/C, Dirt A/B/C, Mud A/B/C, then Frosted Ground.
+The selected symmetry runs the shared advisory checker against the current draft and renders any
+terrain, start/base, overlay, resource, or doodad mismatch directly below the selector. Three-way
+checks compare complete generated square-grid orbits, including rounded copies clipped by an edge;
+marked-road checks still require the transformed orientation.
 Editor status stays above the scrolling controls; failures use a high-contrast alert treatment.
 A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
@@ -987,6 +1007,37 @@ The bounded server record expires after two minutes and is consumed once. Lab co
 private Lab whose first `start` payload already contains the edited map at tick zero; returning through
 `Edit map` transfers only an authoritative exported map. The handoff itself carries the current map
 in either direction; the editor does not maintain a separate browser-storage workspace.
+
+`/map-preview` is a launch-gated consumer of the same one-use, two-minute Lab handoff used by
+`Open in Lab`. It accepts no map data through query parameters or browser-evaluation calls. The
+server validates the authored and materialized maps, creates a private Lab, and sends an ordinary
+authoritative start payload and snapshot. The route then runs the normal `App`/`Match`, Pixi world
+renderer, and live `Minimap`, including server-materialized starting city centres, neutral bases,
+resources, and doodads; it does not maintain preview-only map rendering logic.
+
+Its versioned bridge exposes only bounded 64–4096-pixel `world` and square `minimap` PNG captures,
+with at most 16,777,216 output pixels. It enables reveal-all vision, suppresses app chrome, fits the
+complete map on initial load, and restores that fitted interactive preview after each export. World
+captures use Match's fixed-capture path, force renderer DPR 1 so requested dimensions mean output
+pixels on every display, wait for authoritative entity assets, and encode decoded renderer RGBA
+rather than taking a DOM screenshot. Minimap captures call `Minimap.capturePng`, which temporarily
+resizes the production minimap and omits only transient camera, ping, and artillery markers; terrain,
+resources, and authoritative entities remain. `scripts/map-preview.mjs` is the local Node/Chrome
+adapter: it validates and materializes an authored map with `MapEditorSession`, creates a bounded Lab
+handoff on a loopback RTS server, calls the narrow bridge under a browser-side deadline, validates
+the returned PNG dimensions, and writes the requested artifact. The Map Editor's `Preview PNGs`
+action uses the same handoff and route, whose visible controls call the same bridge. The page owns
+no authoring operations or recipe semantics.
+
+The editor's `Authoritative check` and `Route report` actions post the current exported map to
+`/api/map-authoring/check` and `/api/map-authoring/report`. The panel summarizes validity and base
+counts or route/unreachable counts, while one collapsed `<details>` element exposes the complete
+JSON response as a single text node. `scripts/map-author.mjs check|report <map.json>` is the matching
+thin Node adapter over the `authored-map` Rust binary; neither adapter reimplements materialization
+or pathing. Each browser request is bound to the exact exported-map fingerprint, has a total
+20-second deadline, and is aborted and cleared when the draft changes or the panel is destroyed;
+late responses cannot replace the result for a newer draft.
+
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.

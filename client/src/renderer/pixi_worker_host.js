@@ -157,11 +157,11 @@ export class PixiWorkerPresentationAdapter {
     return this._fatal;
   }
 
-  resize(widthCssPx, heightCssPx) {
+  resize(widthCssPx, heightCssPx, dprOverride = null) {
     if (this._destroyed || this._fatal) return;
     const width = positiveSize(widthCssPx);
     const height = positiveSize(heightCssPx);
-    const dpr = currentDpr();
+    const dpr = dprOverride == null ? currentDpr() : positiveDpr(dprOverride);
     this._canvas.style.width = `${width}px`;
     this._canvas.style.height = `${height}px`;
     this.app.renderer.width = Math.ceil(width * dpr);
@@ -188,8 +188,9 @@ export class PixiWorkerPresentationAdapter {
     this._captureMode = false;
   }
 
-  async readPresentedPixels(frameId = this._lastPresentedFrameId) {
+  async readPresentedPixels(frameId = this._lastPresentedFrameId, { signal = null } = {}) {
     if (this._destroyed || this._fatal) throw this._fatal || new Error("Pixi render worker is destroyed.");
+    if (signal?.aborted) throw signal.reason || new Error("Pixi framebuffer read was aborted.");
     if (this._inFlight || this._pending) {
       throw new Error("Cannot capture worker pixels while a newer frame is rendering.");
     }
@@ -198,15 +199,26 @@ export class PixiWorkerPresentationAdapter {
     }
     if (this._lastCapturedPixels?.frameId === frameId) return this._lastCapturedPixels;
     this._captureId += 1;
+    const captureId = this._captureId;
     const request = deferred();
-    this._captureRequests.set(this._captureId, request);
+    const onAbort = () => {
+      if (!this._captureRequests.delete(captureId)) return;
+      request.reject(signal.reason || new Error("Pixi framebuffer read was aborted."));
+    };
+    request.cleanup = () => signal?.removeEventListener("abort", onAbort);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    this._captureRequests.set(captureId, request);
     this._post(createCaptureMessage({
       generation: this._generation,
       frameId,
-      captureId: this._captureId,
+      captureId,
       readPixels: true,
     }));
-    return request.promise;
+    try {
+      return await request.promise;
+    } finally {
+      request.cleanup();
+    }
   }
 
   captureReadiness() {
@@ -252,8 +264,7 @@ export class PixiWorkerPresentationAdapter {
     this._pending = null;
     this._pendingResize = null;
     this._settleDecalWaiters(null);
-    for (const request of this._captureRequests.values()) request.reject(error);
-    this._captureRequests.clear();
+    this._rejectCaptureRequests(error);
     if (!this._workerTerminated) {
       try { this._post(createDestroyMessage(this._generation)); } catch {}
     }
@@ -321,8 +332,7 @@ export class PixiWorkerPresentationAdapter {
     this._decalEpoch = 0;
     this._settleDecalWaiters(null);
     const resetError = new Error("Pixi render worker generation changed during capture.");
-    for (const request of this._captureRequests.values()) request.reject(resetError);
-    this._captureRequests.clear();
+    this._rejectCaptureRequests(resetError);
     this._lastPresentedFrameId = 0;
     this._lastCapturedPixels = null;
     this._post(createResetGenerationMessage(nextGeneration));
@@ -453,6 +463,7 @@ export class PixiWorkerPresentationAdapter {
       const request = this._captureRequests.get(message.payload.captureId);
       if (!request) return;
       this._captureRequests.delete(message.payload.captureId);
+      request.cleanup();
       request.resolve({
         frameId: message.payload.frameId,
         width: message.payload.width,
@@ -572,8 +583,7 @@ export class PixiWorkerPresentationAdapter {
     this._pending = null;
     this._pendingResize = null;
     this._settleDecalWaiters(null);
-    for (const request of this._captureRequests.values()) request.reject(this._fatal);
-    this._captureRequests.clear();
+    this._rejectCaptureRequests(this._fatal);
     this._showFatal(this._fatal.message);
     this._teardownWorker();
     this._recordCounter("renderWorker.frames.failed");
@@ -693,6 +703,14 @@ export class PixiWorkerPresentationAdapter {
       workerPresentMs: summarize(this._stats.workerPresentMs),
     };
   }
+
+  _rejectCaptureRequests(error) {
+    for (const request of this._captureRequests.values()) {
+      request.cleanup();
+      request.reject(error);
+    }
+    this._captureRequests.clear();
+  }
 }
 
 function createJob(frame) {
@@ -784,6 +802,12 @@ function assertWorkerCapabilities() {
 function currentDpr() {
   const value = Number(globalThis.devicePixelRatio || 1);
   return Math.max(0.25, Math.min(8, Number.isFinite(value) ? value : 1));
+}
+
+function positiveDpr(value) {
+  const dpr = Number(value);
+  if (!Number.isFinite(dpr) || dpr <= 0 || dpr > 4) throw new RangeError("Pixi worker DPR must be positive and at most 4.");
+  return dpr;
 }
 
 function positiveSize(value) {

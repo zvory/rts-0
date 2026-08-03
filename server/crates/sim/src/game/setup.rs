@@ -340,22 +340,7 @@ impl Game {
             }
         }
 
-        // Authored tank-trap markers become ordinary completed neutral entities. Keeping them
-        // in the map document lets the editor round-trip their placement while the live entity
-        // remains subject to fog, combat, deconstruction, and vehicle pathing.
-        for doodad in map
-            .doodads
-            .iter()
-            .filter(|doodad| crate::game::map::doodads::is_tank_trap(doodad))
-        {
-            let _ = entities.spawn_building(
-                0,
-                EntityKind::TankTrap,
-                doodad.x as f32,
-                doodad.y as f32,
-                true,
-            );
-        }
+        spawn_authored_map_entities(&map, &mut entities);
 
         let derived = live_derived_state(&map, &entities, 0);
         let mut game = Game {
@@ -445,6 +430,26 @@ impl Game {
             map,
             players,
         }
+    }
+}
+
+/// Materialize entity-backed authored map objects exactly as a new live match does.
+///
+/// Callers receive ordinary entities rather than permanent occupancy bits: once a tank trap is
+/// destroyed or deconstructed, rebuilding occupancy from the live store stops blocking it.
+pub(in crate::game) fn spawn_authored_map_entities(map: &Map, entities: &mut EntityStore) {
+    for doodad in map
+        .doodads
+        .iter()
+        .filter(|doodad| crate::game::map::doodads::is_tank_trap(doodad))
+    {
+        let _ = entities.spawn_building(
+            0,
+            EntityKind::TankTrap,
+            doodad.x as f32,
+            doodad.y as f32,
+            true,
+        );
     }
 }
 

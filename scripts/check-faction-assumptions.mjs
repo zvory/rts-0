@@ -333,6 +333,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/order_queue/attack.rs",
   "server/crates/sim/src/game/services/occupancy.rs",
   "server/crates/sim/src/game/services/pathing.rs",
+  // The route finalizer is roster-neutral; its sole concrete Scout Car reference is a regression
+  // proving parity with the current live non-pivot vehicle route. Keep that fixture count exact.
+  "server/crates/sim/src/game/services/pathing/route_finalize.rs",
   "server/crates/sim/src/game/services/production.rs",
   // Scout Plane sorties still use a dedicated runtime kind outside normal ground-unit systems.
   "server/crates/sim/src/game/services/scout_plane.rs",
@@ -375,6 +378,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/setup/dev_scenarios/layouts/tank_traps.rs",
   "server/crates/sim/src/game/systems.rs",
   "server/crates/sim/src/game/upgrade.rs",
+  // Static map-authoring reports deliberately publish one representative current-roster infantry
+  // and vehicle profile. They do not admit factions or choose a player's roster.
+  "server/crates/sim/src/game/map_authoring.rs",
   "server/crates/sim/src/protocol.rs",
   "server/crates/sim/src/rules/projection.rs",
   "server/src/dev_scenarios.rs",
@@ -436,6 +442,8 @@ const approvedSpecialCaseBudgets = new Map([
   // Tank Trap deconstruction adds worker-only command validation and trap target admission.
   ["server/crates/sim/src/game/services/commands.rs", 259],
   ["server/crates/sim/src/game/invariants.rs", 13],
+  ["server/crates/sim/src/game/map_authoring.rs", 2],
+  ["server/crates/sim/src/game/services/pathing/route_finalize.rs", 1],
 ]);
 const budgetOverruns = [];
 for (const root of sourceRoots) {
