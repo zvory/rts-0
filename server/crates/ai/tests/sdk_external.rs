@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use rts_ai::sdk::{AiActions, AiFrame, AiStrategy};
+use rts_ai::sdk::{AiActions, AiFrame, AiRulebook, AiStrategy, EntityKind, WorldQueries};
 use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::replay::{replay_commands, CommandLogEntry};
 use rts_sim::game::{Game, PlayerInit};
@@ -27,6 +27,14 @@ struct LifecycleProbe<S> {
 
 impl<S: AiStrategy> AiStrategy for LifecycleProbe<S> {
     fn initialize(&mut self, frame: &AiFrame) {
+        let rules = AiRulebook::for_frame(frame).expect("reference faction should have a rulebook");
+        assert!(rules.can_gather(EntityKind::Worker));
+        assert_eq!(
+            rules.entity(EntityKind::CityCentre).unwrap().builders,
+            vec![EntityKind::Worker]
+        );
+        let queries = WorldQueries::new(frame);
+        assert!(queries.known_resources(EntityKind::Steel).next().is_some());
         self.log.lock().unwrap().initialized_at.push(frame.tick());
         self.inner.initialize(frame);
     }
