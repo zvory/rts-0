@@ -279,9 +279,15 @@ assert(
     assert(decalLayer.stampBatch([{
       id: 77,
       decalClass: "tankTreads",
-      poses: [[160, 320, 0], [224, 320, 2048]],
+      poses: [[160, 320, 0], [192, 320, 1252]],
+    }]) === 1 && decalLayer.diagnostics().tankTreads.totalSegments === 1,
+    "authoritative history already painted precisely from live poses does not darken twice");
+    assert(decalLayer.stampBatch([{
+      id: 78,
+      decalClass: "tankTreads",
+      poses: [[256, 256, 0], [320, 256, 0]],
     }]) === 1 && decalLayer.diagnostics().tankTreads.totalSegments === 2,
-    "checkpointed trail chunks paint through the same tiled tread layer as the live preview");
+    "unseen checkpointed trail chunks still paint through the tiled tread layer");
 
     const trenchLayer = new TrenchDecalLayer({ layer: new PIXI.Container() });
     trenchLayer.resetForMap(map);

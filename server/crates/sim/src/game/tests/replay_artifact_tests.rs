@@ -69,7 +69,7 @@ fn replay_artifact_captures_live_game_contract() {
     let checkpoint: serde_json::Value =
         serde_json::from_str(&start_checkpoint_payload(&artifact)).expect("valid checkpoint JSON");
     assert_eq!(checkpoint["schema"], "rts.gameCheckpoint");
-    assert_eq!(checkpoint["version"], 1);
+    assert_eq!(checkpoint["version"], 2);
     assert_eq!(checkpoint["compatibility"]["createdBy"], "replay");
     assert_eq!(checkpoint["tick"], 0);
     assert_eq!(

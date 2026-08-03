@@ -1,13 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
-use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
-use crate::config;
 use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::protocol::TankTrailView;
+
+mod checkpoint;
+mod geometry;
+
+use geometry::{TankTrailSpatialIndex, TrailBounds};
 
 const POSITION_QUANTUM_PX: f32 = 4.0;
 const HEADING_SCALE: f32 = i8::MAX as f32 / std::f32::consts::PI;
@@ -75,80 +78,11 @@ impl TankTrailPose {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct TrailBounds {
-    min_x_quarter_px: i32,
-    min_y_quarter_px: i32,
-    max_x_quarter_px: i32,
-    max_y_quarter_px: i32,
-}
-
-impl TrailBounds {
-    fn from_poses(poses: &[TankTrailPose]) -> Option<Self> {
-        let first = *poses.first()?;
-        let mut min_x = first.x();
-        let mut min_y = first.y();
-        let mut max_x = min_x;
-        let mut max_y = min_y;
-        for pair in poses.windows(2) {
-            let from = pair[0];
-            let to = pair[1];
-            let turn = shortest_angle_delta(from.heading(), to.heading());
-            let steps = ((contact_motion(from, to) / 4.0).ceil() as usize).clamp(1, 64);
-            for step in 0..=steps {
-                let t = step as f32 / steps as f32;
-                let x = from.x() + (to.x() - from.x()) * t;
-                let y = from.y() + (to.y() - from.y()) * t;
-                let heading = from.heading() + turn * t;
-                let (pose_min_x, pose_min_y, pose_max_x, pose_max_y) =
-                    world_pose_bounds(x, y, heading);
-                min_x = min_x.min(pose_min_x);
-                min_y = min_y.min(pose_min_y);
-                max_x = max_x.max(pose_max_x);
-                max_y = max_y.max(pose_max_y);
-            }
-        }
-        Some(Self {
-            min_x_quarter_px: (min_x * 4.0).floor() as i32,
-            min_y_quarter_px: (min_y * 4.0).floor() as i32,
-            max_x_quarter_px: (max_x * 4.0).ceil() as i32,
-            max_y_quarter_px: (max_y * 4.0).ceil() as i32,
-        })
-    }
-
-    fn tile_range(self, map: &Map) -> Option<(u32, u32, u32, u32)> {
-        let tile_size_quarter = i64::from(config::TILE_SIZE) * 4;
-        let map_width = i64::from(map.width);
-        let map_height = i64::from(map.height);
-        if tile_size_quarter <= 0 || map_width <= 0 || map_height <= 0 {
-            return None;
-        }
-        let min_tx = i64::from(self.min_x_quarter_px)
-            .div_euclid(tile_size_quarter)
-            .clamp(0, map_width - 1);
-        let min_ty = i64::from(self.min_y_quarter_px)
-            .div_euclid(tile_size_quarter)
-            .clamp(0, map_height - 1);
-        let max_tx = i64::from(self.max_x_quarter_px.saturating_sub(1))
-            .div_euclid(tile_size_quarter)
-            .clamp(0, map_width - 1);
-        let max_ty = i64::from(self.max_y_quarter_px.saturating_sub(1))
-            .div_euclid(tile_size_quarter)
-            .clamp(0, map_height - 1);
-        Some((
-            u32::try_from(min_tx).ok()?,
-            u32::try_from(min_ty).ok()?,
-            u32::try_from(max_tx).ok()?,
-            u32::try_from(max_ty).ok()?,
-        ))
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct FinalizedTankTrail {
     id: u32,
+    owner: u32,
     poses: Vec<TankTrailPose>,
     bounds: TrailBounds,
     created_revision: u32,
@@ -179,38 +113,9 @@ struct ActiveTankTrail {
 
 #[derive(Debug, Clone)]
 pub(super) struct PendingTankTrail {
+    owner: u32,
     poses: Vec<TankTrailPose>,
     bounds: TrailBounds,
-}
-
-#[derive(Debug, Clone, Default)]
-struct TankTrailSpatialIndex {
-    by_tile: BTreeMap<(u32, u32), Vec<u32>>,
-    indexed_len: usize,
-}
-
-impl TankTrailSpatialIndex {
-    fn ensure(&mut self, trails: &[FinalizedTankTrail], map: &Map) {
-        if self.indexed_len == trails.len() {
-            return;
-        }
-        self.by_tile.clear();
-        for trail in trails {
-            self.add(trail, map);
-        }
-        self.indexed_len = trails.len();
-    }
-
-    fn add(&mut self, trail: &FinalizedTankTrail, map: &Map) {
-        let Some((min_tx, min_ty, max_tx, max_ty)) = trail.bounds.tile_range(map) else {
-            return;
-        };
-        for ty in min_ty..=max_ty {
-            for tx in min_tx..=max_tx {
-                self.by_tile.entry((tx, ty)).or_default().push(trail.id);
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -219,93 +124,6 @@ pub(super) struct TankTrailStore {
     finalized: Vec<FinalizedTankTrail>,
     active_by_tank: BTreeMap<u32, ActiveTankTrail>,
     spatial_index: TankTrailSpatialIndex,
-}
-
-impl Serialize for TankTrailStore {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let finalized = self
-            .finalized
-            .iter()
-            .map(|trail| (trail.created_revision, encode_poses(&trail.poses)))
-            .collect::<Vec<_>>();
-        let active = self
-            .active_by_tank
-            .iter()
-            .map(|(tank_id, trail)| {
-                (
-                    *tank_id,
-                    trail.owner,
-                    encode_poses(&trail.poses),
-                    trail.last_observed,
-                    trail.last_motion_tick,
-                )
-            })
-            .collect::<Vec<_>>();
-        (finalized, active).serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for TankTrailStore {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        type FinalizedRow = (u32, String);
-        type ActiveRow = (u32, u32, String, TankTrailPose, u32);
-        let (finalized_rows, active_rows): (Vec<FinalizedRow>, Vec<ActiveRow>) =
-            Deserialize::deserialize(deserializer)?;
-        let mut finalized = Vec::with_capacity(finalized_rows.len());
-        for (index, (created_revision, encoded)) in finalized_rows.into_iter().enumerate() {
-            let poses = decode_poses::<D::Error>(&encoded)?;
-            if poses.len() < 2 || poses.len() > MAX_ACTIVE_POSES {
-                return Err(D::Error::custom("invalid finalized tank trail pose count"));
-            }
-            let id = u32::try_from(index)
-                .ok()
-                .and_then(|value| value.checked_add(1))
-                .ok_or_else(|| D::Error::custom("too many finalized tank trails"))?;
-            let bounds = TrailBounds::from_poses(&poses)
-                .ok_or_else(|| D::Error::custom("invalid finalized tank trail bounds"))?;
-            finalized.push(FinalizedTankTrail {
-                id,
-                poses,
-                bounds,
-                created_revision,
-            });
-        }
-        let next_id = u32::try_from(finalized.len())
-            .ok()
-            .and_then(|value| value.checked_add(1))
-            .ok_or_else(|| D::Error::custom("too many finalized tank trails"))?;
-        let mut active_by_tank = BTreeMap::new();
-        for (tank_id, owner, encoded, last_observed, last_motion_tick) in active_rows {
-            let poses = decode_poses::<D::Error>(&encoded)?;
-            if poses.is_empty() || poses.len() > MAX_ACTIVE_POSES {
-                return Err(D::Error::custom("invalid active tank trail pose count"));
-            }
-            let previous = active_by_tank.insert(
-                tank_id,
-                ActiveTankTrail {
-                    owner,
-                    poses,
-                    last_observed,
-                    last_motion_tick,
-                },
-            );
-            if previous.is_some() {
-                return Err(D::Error::custom("duplicate active tank trail"));
-            }
-        }
-        Ok(Self {
-            next_id,
-            finalized,
-            active_by_tank,
-            spatial_index: TankTrailSpatialIndex::default(),
-        })
-    }
 }
 
 impl Default for TankTrailStore {
@@ -373,18 +191,18 @@ impl TankTrailStore {
                     || center_span_with(&active.poses, pose) > MAX_CENTER_SPAN_PX
                 {
                     let continuity = active.poses.last().copied();
-                    if let Some(chunk) = Self::pending(active.poses) {
+                    if let Some(chunk) = Self::pending(active.owner, active.poses) {
                         pending.push(chunk);
                     }
-                    active.poses = continuity.map_or_else(|| vec![pose], |last| vec![last, pose]);
+                    active.poses = continuity
+                        .filter(|last| center_span(&[*last, pose]) <= MAX_CENTER_SPAN_PX)
+                        .map_or_else(|| vec![pose], |last| vec![last, pose]);
                 } else {
                     active.poses.push(pose);
                 }
             }
             if tick.saturating_sub(active.last_motion_tick) >= STOP_SETTLE_TICKS {
-                if let Some(chunk) = Self::pending(active.poses) {
-                    pending.push(chunk);
-                }
+                pending.extend(Self::finish(active));
             } else {
                 self.active_by_tank.insert(tank_id, active);
             }
@@ -397,19 +215,46 @@ impl TankTrailStore {
             .collect::<Vec<_>>();
         for id in vanished {
             if let Some(active) = self.active_by_tank.remove(&id) {
-                if let Some(chunk) = Self::pending(active.poses) {
-                    pending.push(chunk);
-                }
+                pending.extend(Self::finish(active));
             }
         }
         pending
     }
 
-    fn pending(poses: Vec<TankTrailPose>) -> Option<PendingTankTrail> {
+    fn finish(mut active: ActiveTankTrail) -> Vec<PendingTankTrail> {
+        let mut pending = Vec::new();
+        if active.poses.last().copied() != Some(active.last_observed) {
+            if active.poses.len() < MAX_ACTIVE_POSES
+                && center_span_with(&active.poses, active.last_observed) <= MAX_CENTER_SPAN_PX
+            {
+                active.poses.push(active.last_observed);
+            } else {
+                let continuity = active.poses.last().copied();
+                if let Some(chunk) = Self::pending(active.owner, active.poses) {
+                    pending.push(chunk);
+                }
+                active.poses = continuity
+                    .filter(|last| {
+                        center_span(&[ *last, active.last_observed]) <= MAX_CENTER_SPAN_PX
+                    })
+                    .map_or_else(
+                        || vec![active.last_observed],
+                        |last| vec![last, active.last_observed],
+                    );
+            }
+        }
+        if let Some(chunk) = Self::pending(active.owner, active.poses) {
+            pending.push(chunk);
+        }
+        pending
+    }
+
+    fn pending(owner: u32, poses: Vec<TankTrailPose>) -> Option<PendingTankTrail> {
         if poses.len() < 2 {
             return None;
         }
         Some(PendingTankTrail {
+            owner,
             bounds: TrailBounds::from_poses(&poses)?,
             poses,
         })
@@ -430,6 +275,7 @@ impl TankTrailStore {
         };
         let trail = FinalizedTankTrail {
             id,
+            owner: pending.owner,
             poses: pending.poses,
             bounds: pending.bounds,
             created_revision,
@@ -464,6 +310,34 @@ impl TankTrailStore {
 
     pub(super) fn created_revision(&self, id: u32) -> Option<u32> {
         self.trail(id).map(|trail| trail.created_revision)
+    }
+
+    pub(super) fn owner(&self, id: u32) -> Option<u32> {
+        self.trail(id).map(|trail| trail.owner)
+    }
+
+    pub(super) fn owned_created_revisions<'a>(
+        &'a self,
+        players: &'a BTreeSet<u32>,
+    ) -> impl Iterator<Item = u32> + 'a {
+        self.finalized
+            .iter()
+            .filter(|trail| players.contains(&trail.owner))
+            .map(|trail| trail.created_revision)
+    }
+
+    pub(super) fn owned_views_after(
+        &self,
+        players: &BTreeSet<u32>,
+        after_revision: u32,
+    ) -> Vec<TankTrailView> {
+        self.finalized
+            .iter()
+            .filter(|trail| {
+                players.contains(&trail.owner) && trail.created_revision > after_revision
+            })
+            .map(FinalizedTankTrail::to_view)
+            .collect()
     }
 
     pub(super) fn created_revisions(&self) -> impl Iterator<Item = u32> + '_ {
@@ -504,6 +378,7 @@ impl TankTrailStore {
         candidates
             .into_iter()
             .filter(|id| !known.contains_key(id))
+            .filter(|id| self.owner(*id) != Some(player))
             .filter(|id| {
                 self.trail(*id)
                     .is_some_and(|trail| trail_fully_visible(trail, player, fog, map))
@@ -524,6 +399,8 @@ impl TankTrailStore {
             let expected_id = u32::try_from(index).ok().and_then(|i| i.checked_add(1));
             if Some(trail.id) != expected_id
                 || trail.created_revision == 0
+                || trail.owner == 0
+                || !player_ids.contains(&trail.owner)
                 || trail.poses.len() < 2
                 || trail.poses.len() > MAX_ACTIVE_POSES
                 || TrailBounds::from_poses(&trail.poses) != Some(trail.bounds)
@@ -560,36 +437,7 @@ impl TankTrailStore {
 }
 
 fn pose_valid(pose: TankTrailPose, map: &Map) -> bool {
-    map.contains_world_point(pose.x(), pose.y())
-}
-
-fn encode_poses(poses: &[TankTrailPose]) -> String {
-    let mut bytes = Vec::with_capacity(poses.len() * 5);
-    for pose in poses {
-        bytes.extend_from_slice(&pose.0 .0.to_le_bytes());
-        bytes.extend_from_slice(&pose.0 .1.to_le_bytes());
-        bytes.push(pose.0 .2 as u8);
-    }
-    STANDARD_NO_PAD.encode(bytes)
-}
-
-fn decode_poses<E: serde::de::Error>(encoded: &str) -> Result<Vec<TankTrailPose>, E> {
-    let bytes = STANDARD_NO_PAD
-        .decode(encoded)
-        .map_err(|_| E::custom("invalid tank trail pose encoding"))?;
-    if !bytes.len().is_multiple_of(5) {
-        return Err(E::custom("invalid tank trail pose byte length"));
-    }
-    Ok(bytes
-        .chunks_exact(5)
-        .map(|bytes| {
-            TankTrailPose((
-                u16::from_le_bytes([bytes[0], bytes[1]]),
-                u16::from_le_bytes([bytes[2], bytes[3]]),
-                bytes[4] as i8,
-            ))
-        })
-        .collect())
+    pose.0 .2 != i8::MIN && map.contains_world_point(pose.x(), pose.y())
 }
 
 fn trail_fully_visible(trail: &FinalizedTankTrail, player: u32, fog: &Fog, map: &Map) -> bool {
@@ -649,115 +497,4 @@ fn shortest_angle_delta(from: f32, to: f32) -> f32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pose_is_six_bytes_in_memory_and_five_bytes_in_checkpoints() {
-        let pose = TankTrailPose((400, 404, -12));
-        assert_eq!(std::mem::size_of::<TankTrailPose>(), 6);
-        assert_eq!(serde_json::to_string(&pose).unwrap(), "[400,404,-12]");
-        assert_eq!(
-            STANDARD_NO_PAD.decode(encode_poses(&[pose])).unwrap().len(),
-            5
-        );
-    }
-
-    #[test]
-    fn sampling_is_sparse_but_preserves_pivots() {
-        let origin = TankTrailPose((100, 100, 0));
-        let short_travel = TankTrailPose((115, 100, 0));
-        let full_travel = TankTrailPose((116, 100, 0));
-        let small_turn = TankTrailPose((100, 100, (0.20 * HEADING_SCALE) as i8));
-        let sampled_turn = TankTrailPose((100, 100, (0.30 * HEADING_SCALE) as i8));
-
-        assert!(!sample_needed(origin, short_travel));
-        assert!(sample_needed(origin, full_travel));
-        assert!(!sample_needed(origin, small_turn));
-        assert!(sample_needed(origin, sampled_turn));
-    }
-
-    #[test]
-    fn packed_heading_preserves_an_in_place_pivot() {
-        let a = TankTrailPose((100, 100, 0));
-        let b = TankTrailPose((
-            100,
-            100,
-            (std::f32::consts::FRAC_PI_2 * HEADING_SCALE).round() as i8,
-        ));
-        assert!(contact_motion(a, b) > 40.0);
-        assert_eq!(a.wire()[..2], b.wire()[..2]);
-        assert_ne!(a.wire()[2], b.wire()[2]);
-    }
-
-    #[test]
-    fn finalized_chunk_bounds_include_the_oriented_track_footprint() {
-        let poses = vec![TankTrailPose((25, 25, 0)), TankTrailPose((35, 25, 0))];
-        let bounds = TrailBounds::from_poses(&poses).unwrap();
-        assert!(bounds.min_x_quarter_px <= 300);
-        assert!(bounds.max_x_quarter_px >= 660);
-        assert!(bounds.min_y_quarter_px <= 336);
-        assert!(bounds.max_y_quarter_px >= 464);
-    }
-
-    #[test]
-    fn checkpoint_accepts_an_active_chunk_at_the_runtime_pose_limit() {
-        let map = Map::generate(1, 7);
-        let pose = TankTrailPose((25, 25, 0));
-        let mut store = TankTrailStore::new();
-        store.active_by_tank.insert(
-            7,
-            ActiveTankTrail {
-                owner: 1,
-                poses: vec![pose; MAX_ACTIVE_POSES],
-                last_observed: pose,
-                last_motion_tick: 3,
-            },
-        );
-        assert!(store.valid_checkpoint_state(&map, &BTreeSet::from([1]), 3));
-    }
-
-    #[test]
-    fn checkpoint_encoding_packs_poses_and_rebuilds_derived_bounds() {
-        let map = Map::generate(1, 7);
-        let poses = vec![TankTrailPose((25, 25, 0)), TankTrailPose((41, 25, 0))];
-        let pending = TankTrailStore::pending(poses).unwrap();
-        let mut store = TankTrailStore::new();
-        assert!(store.commit(pending, 1, 7, &map));
-
-        let json = serde_json::to_string(&store).unwrap();
-        assert!(json.len() < 64, "compact checkpoint row was {json}");
-        assert!(!json.contains("bounds"));
-        assert!(!json.contains("nextId"));
-
-        let restored: TankTrailStore = serde_json::from_str(&json).unwrap();
-        assert_eq!(restored.view(1), store.view(1));
-        assert_eq!(restored.finalized[0].bounds, store.finalized[0].bounds);
-    }
-
-    #[test]
-    fn finalized_history_has_a_hard_memory_ceiling() {
-        let map = Map::generate(1, 7);
-        let poses = vec![TankTrailPose((25, 25, 0)), TankTrailPose((41, 25, 0))];
-        let pending = TankTrailStore::pending(poses).unwrap();
-        let mut store = TankTrailStore::new();
-        assert!(store.commit(pending.clone(), 1, 1, &map));
-        let prototype = store.finalized[0].clone();
-        store.finalized = (1..=MAX_FINALIZED_TRAILS)
-            .map(|id| FinalizedTankTrail {
-                id: id as u32,
-                created_revision: id as u32,
-                ..prototype.clone()
-            })
-            .collect();
-        store.next_id = MAX_FINALIZED_TRAILS as u32 + 1;
-
-        assert!(store.next_id().is_none());
-        assert!(!store.commit(
-            pending,
-            MAX_FINALIZED_TRAILS as u32 + 1,
-            MAX_FINALIZED_TRAILS as u32 + 1,
-            &map,
-        ));
-    }
-}
+mod tests;

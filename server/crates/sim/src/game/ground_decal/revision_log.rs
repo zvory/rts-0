@@ -1,8 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 
-use super::tank_trail::TankTrailStore;
 use super::{decal_for_id, GroundDecal, GroundDecalStore, GroundDecalView, TankTrailView};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,17 +105,12 @@ impl GroundDecalRevisionLog {
 
     pub(super) fn valid(
         &self,
-        revision: u32,
-        current_tick: u32,
-        decals: &[GroundDecal],
-        discovered_by_player: &BTreeMap<u32, BTreeMap<u32, u32>>,
-        trails: &TankTrailStore,
-        discovered_trails_by_player: &BTreeMap<u32, BTreeMap<u32, u32>>,
+        store: &GroundDecalStore,
         used_revision_count: usize,
     ) -> bool {
-        if usize::try_from(revision).ok() != Some(used_revision_count)
+        if usize::try_from(store.revision).ok() != Some(used_revision_count)
             || self.0.len() != used_revision_count
-            || self.0.iter().any(|entry| entry.tick() > current_tick)
+            || self.0.iter().any(|entry| entry.tick() > store.current_tick)
             || self
                 .0
                 .windows(2)
@@ -132,17 +126,20 @@ impl GroundDecalRevisionLog {
                 return false;
             };
             match entry {
-                GroundDecalRevisionEntry::Created { id, .. } => decal_for_id(decals, *id)
+                GroundDecalRevisionEntry::Created { id, .. } => decal_for_id(&store.decals, *id)
                     .is_some_and(|decal| decal.created_revision == entry_revision),
-                GroundDecalRevisionEntry::Discovered { player, id, .. } => discovered_by_player
+                GroundDecalRevisionEntry::Discovered { player, id, .. } => store
+                    .discovered_by_player
                     .get(player)
                     .and_then(|known| known.get(id))
                     .is_some_and(|known_revision| *known_revision == entry_revision),
-                GroundDecalRevisionEntry::TrailCreated { id, .. } => trails
+                GroundDecalRevisionEntry::TrailCreated { id, .. } => store
+                    .tank_trails
                     .created_revision(*id)
                     .is_some_and(|revision| revision == entry_revision),
                 GroundDecalRevisionEntry::TrailDiscovered { player, id, .. } => {
-                    discovered_trails_by_player
+                    store
+                        .discovered_trails_by_player
                         .get(player)
                         .and_then(|known| known.get(id))
                         .is_some_and(|known_revision| *known_revision == entry_revision)
@@ -163,28 +160,9 @@ impl GroundDecalRevisionEntry {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn checkpoint_revision_rows_use_compact_numeric_tuples() {
-        let entry = GroundDecalRevisionEntry::TrailDiscovered {
-            player: 2,
-            id: 17,
-            tick: 900,
-        };
-        let json = serde_json::to_string(&entry).unwrap();
-        assert_eq!(json, "[3,2,17,900]");
-        assert_eq!(
-            serde_json::from_str::<GroundDecalRevisionEntry>(&json).unwrap(),
-            entry
-        );
-    }
-}
-
 impl GroundDecalStore {
     pub(crate) fn revision_for_players(&self, players: &[u32]) -> u32 {
+        let player_set = players.iter().copied().collect::<BTreeSet<_>>();
         let decal_revision = players
             .iter()
             .filter_map(|player| self.discovered_by_player.get(player))
@@ -197,7 +175,12 @@ impl GroundDecalStore {
             .flat_map(|known| known.values().copied())
             .max()
             .unwrap_or(0);
-        decal_revision.max(trail_revision)
+        let owned_trail_revision = self
+            .tank_trails
+            .owned_created_revisions(&player_set)
+            .max()
+            .unwrap_or(0);
+        decal_revision.max(trail_revision).max(owned_trail_revision)
     }
 
     pub(crate) fn views_for_players_after(
@@ -219,11 +202,18 @@ impl GroundDecalStore {
             })
             .map(GroundDecal::to_view)
             .collect();
+        let player_set = players.iter().copied().collect::<BTreeSet<_>>();
         let trail_ids = players
             .iter()
             .filter_map(|player| self.discovered_trails_by_player.get(player))
             .flat_map(|known| known.iter())
             .filter_map(|(id, revision)| (*revision > after_revision).then_some(*id))
+            .chain(
+                self.tank_trails
+                    .owned_views_after(&player_set, after_revision)
+                    .into_iter()
+                    .map(|trail| trail.id),
+            )
             .collect::<BTreeSet<_>>();
         let trails = trail_ids
             .into_iter()
@@ -244,6 +234,10 @@ impl GroundDecalStore {
             | GroundDecalRevisionEntry::TrailDiscovered { player, .. } => {
                 player_set.contains(player)
             }
+            GroundDecalRevisionEntry::TrailCreated { id, .. } => self
+                .tank_trails
+                .owner(*id)
+                .is_some_and(|owner| player_set.contains(&owner)),
             _ => false,
         };
         let all_revisions = self.revision_log.revisions_matching(include);
@@ -327,4 +321,24 @@ pub(super) fn current_delta_after_for_test(
     max_revisions: usize,
 ) -> u32 {
     current_delta_after(revision, all_revisions, current_revisions, max_revisions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checkpoint_revision_rows_use_compact_numeric_tuples() {
+        let entry = GroundDecalRevisionEntry::TrailDiscovered {
+            player: 2,
+            id: 17,
+            tick: 900,
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert_eq!(json, "[3,2,17,900]");
+        assert_eq!(
+            serde_json::from_str::<GroundDecalRevisionEntry>(&json).unwrap(),
+            entry
+        );
+    }
 }

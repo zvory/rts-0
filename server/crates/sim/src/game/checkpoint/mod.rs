@@ -44,11 +44,10 @@ struct PlayerCheckpointRef<'a, T> {
 }
 
 const CHECKPOINT_SCHEMA: &str = "rts.gameCheckpoint";
-const CHECKPOINT_VERSION: u32 = 1;
-// Construction funding provenance is authoritative state: restoring a scaffold without it can
-// either lose a legitimate refund or mint resources for an authored scaffold. Keep older payloads
-// outside this compatibility boundary instead of silently defaulting the receipt.
-const SIM_SCHEMA_VERSION: u32 = 3;
+const CHECKPOINT_VERSION: u32 = 2;
+// Construction funding and tank-trail ownership are authoritative state. Keep older payloads
+// outside this compatibility boundary instead of silently guessing missing fields.
+const SIM_SCHEMA_VERSION: u32 = 4;
 const RULES_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const RNG_ALGORITHM: &str = "rts-small-rng-0.8-draws-v1";

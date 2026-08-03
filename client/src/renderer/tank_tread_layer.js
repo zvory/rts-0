@@ -7,6 +7,8 @@ const TILE_WORLD_SIZE = 512;
 const SEGMENT_PADDING = 40;
 const MIN_CONTACT_MOTION = 3;
 const UPLOAD_INTERVAL_MS = 100;
+const COVERAGE_CELL_WORLD_SIZE = 8;
+const COVERAGE_HEADING_BINS = 32;
 
 /**
  * Renders approximate checkpointed tread history plus precise live marks for every tank currently
@@ -27,6 +29,7 @@ export class TankTreadLayer {
     this.tiles = new Map();
     this.poses = new Map();
     this.authoritativeTrailIds = new Set();
+    this.liveCoverage = new Set();
     this.worldWidth = 0;
     this.worldHeight = 0;
     this.nextUploadAt = 0;
@@ -64,7 +67,11 @@ export class TankTreadLayer {
       const contactMotion = Math.hypot(current.x - previous.x, current.y - previous.y) +
         Math.abs(shortestAngleDelta(previous.facing, current.facing)) * 29;
       if (contactMotion < MIN_CONTACT_MOTION) continue;
-      if (this._stampSegment(treadSegment(previous, current, entity.id), dirty)) stamped += 1;
+      const segment = treadSegment(previous, current, entity.id);
+      if (this._stampSegment(segment, dirty)) {
+        stamped += 1;
+        this._rememberLiveCoverage(segment);
+      }
       this.poses.set(entity.id, current);
     }
     for (const id of this.poses.keys()) {
@@ -98,7 +105,12 @@ export class TankTreadLayer {
       for (let index = 1; index < poses.length; index += 1) {
         const pose = poses[index];
         const current = treadPose(pose.x, pose.y, pose.facing, previous);
-        if (this._stampSegment(treadSegment(previous, current, trail.id ^ index), dirty)) {
+        const segment = treadSegment(previous, current, trail.id ^ index);
+        if (this._consumeLiveCoverage(segment)) {
+          previous = current;
+          continue;
+        }
+        if (this._stampSegment(segment, dirty)) {
           stamped += 1;
         }
         previous = current;
@@ -128,6 +140,7 @@ export class TankTreadLayer {
   destroy() {
     this.poses.clear();
     this.authoritativeTrailIds.clear();
+    this.liveCoverage.clear();
     this.nextUploadAt = 0;
     for (const tile of this.tiles.values()) {
       if (tile.sprite?.parent && typeof tile.sprite.parent.removeChild === "function") {
@@ -168,6 +181,23 @@ export class TankTreadLayer {
       }
     }
     return painted;
+  }
+
+  _rememberLiveCoverage(segment) {
+    for (const pose of coveragePoses(segment)) {
+      this.liveCoverage.add(coverageKey(pose.x, pose.y, pose.facing, this.worldWidth));
+    }
+  }
+
+  _consumeLiveCoverage(segment) {
+    const matched = [];
+    for (const pose of coveragePoses(segment)) {
+      const key = nearbyCoverageKey(pose, this.liveCoverage, this.worldWidth);
+      if (key === null) return false;
+      matched.push(key);
+    }
+    for (const key of matched) this.liveCoverage.delete(key);
+    return matched.length > 0;
   }
 
   _tile(tx, ty) {
@@ -239,6 +269,49 @@ function treadSegment(previous, current, seed) {
     treadPhaseLeft: current.treadPhaseLeft,
     treadPhaseRight: current.treadPhaseRight,
   };
+}
+
+function coveragePoses(segment) {
+  const turn = shortestAngleDelta(segment.previousFacing, segment.facing);
+  const travel = Math.hypot(segment.x - segment.previousX, segment.y - segment.previousY);
+  const steps = Math.max(1, Math.ceil((travel + Math.abs(turn) * 29) / 4));
+  const poses = [];
+  for (let step = 0; step <= steps; step += 1) {
+    poses.push(interpolatedPose(segment, turn, step / steps));
+  }
+  return poses;
+}
+
+function coverageKey(x, y, facing, worldWidth) {
+  const width = Math.ceil(worldWidth / COVERAGE_CELL_WORLD_SIZE);
+  const cellX = Math.floor(x / COVERAGE_CELL_WORLD_SIZE);
+  const cellY = Math.floor(y / COVERAGE_CELL_WORLD_SIZE);
+  const heading = normalizedHeadingBin(facing);
+  return ((cellY * width + cellX) * COVERAGE_HEADING_BINS) + heading;
+}
+
+function nearbyCoverageKey(pose, coverage, worldWidth) {
+  const heading = normalizedHeadingBin(pose.facing);
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dh = -1; dh <= 1; dh += 1) {
+        const candidateHeading = (heading + dh + COVERAGE_HEADING_BINS) % COVERAGE_HEADING_BINS;
+        const key = coverageKey(
+          pose.x + dx * COVERAGE_CELL_WORLD_SIZE,
+          pose.y + dy * COVERAGE_CELL_WORLD_SIZE,
+          candidateHeading * Math.PI * 2 / COVERAGE_HEADING_BINS,
+          worldWidth,
+        );
+        if (coverage.has(key)) return key;
+      }
+    }
+  }
+  return null;
+}
+
+function normalizedHeadingBin(facing) {
+  const normalized = ((facing % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  return Math.round(normalized * COVERAGE_HEADING_BINS / (Math.PI * 2)) % COVERAGE_HEADING_BINS;
 }
 
 function stampTankTreads(ctx, segment, downsample) {

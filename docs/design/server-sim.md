@@ -454,7 +454,7 @@ container-supplied `Map`, and rebuilds derived state before returning a live `Ga
 entity DTOs by id so normalized payload text does not depend on entity-store iteration order, and
 rejects payloads above the same v1 byte limit enforced by import.
 
-The payload schema is named `rts.gameCheckpoint` and starts at version `1`. Field names are
+The payload schema is named `rts.gameCheckpoint`; the current emitted version is `2`. Field names are
 camelCase. DTOs must be explicit Rust types with serde support; do not serialize private
 `GameState`, `Entity`, store, service, or snapshot internals directly as the stable persisted
 contract. Persisted DTOs should use strict deserialization (`deny_unknown_fields` or an equivalent
@@ -467,11 +467,11 @@ Top-level shape:
 ```json
 {
   "schema": "rts.gameCheckpoint",
-  "version": 1,
+  "version": 2,
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 3,
+    "simSchemaVersion": 4,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -606,7 +606,7 @@ Validation model and bounds:
   Map-bearing containers additionally cap canonical static doodads at 4,096 records and validate
   their fixed catalog strings, optional color shape, ids, ordering, and integer world bounds.
 - Version and feature checks happen before field validation: `schema == "rts.gameCheckpoint"`,
-  `version == 1`, supported `compatibility.simSchemaVersion`, known required features, and a
+  `version == 2`, supported `compatibility.simSchemaVersion`, known required features, and a
   compatible RNG algorithm are mandatory.
 - Count caps for version 1: at most 8 players, 2,000 entities, 1,024 pending commands, 200,000
   command-log entries when a replay container explicitly allows command history, 256 total active
@@ -634,14 +634,14 @@ id, dangling reference, field path, or invariant that failed, is logged or expos
 tooling. The importer must validate all of this before constructing a live `Game`; partially
 constructed state is not allowed to escape.
 
-Compatibility policy for version 1 is strict. Same-version readers may add optional compatibility
+Compatibility policy is strict. Same-version readers may add optional compatibility
 metadata only when old readers can ignore it without changing authoritative state. Adding,
 removing, renaming, or changing the meaning of authoritative fields requires a new checkpoint
 version and either an explicit migrator or a stable rejection reason. Existing replay and lab assets
 remain on their current schemas until their phases introduce containers around this payload.
-Simulation schema 2 adds the authoritative construction-cost payment receipt; schema 1 payloads are
-rejected because their unfinished scaffolds cannot be refunded safely. Bundled lab checkpoint assets
-use schema 2 and contain no in-progress construction that needs a receipt backfill.
+Simulation schema 2 adds the authoritative construction-cost payment receipt; schema 4 adds compact,
+owner-attributed approximate tank-trail history. Checkpoint version 1 and simulation schemas before 4
+are rejected rather than guessing at missing authoritative trail ownership or converting old rows.
 
 The canonical Hellhole server benchmark is a direct `Game`-API harness, not a live room. Running
 `scripts/hellhole-perf-harness.sh` restores `fixed-roster-hellhole`, issues its deterministic Lab
