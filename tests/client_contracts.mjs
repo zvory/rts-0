@@ -107,6 +107,7 @@ await import("./client_contracts/audio_contracts.mjs");
 await import("./client_contracts/observer_analysis_contracts.mjs");
 await import("./client_contracts/map_editor_layer_contracts.mjs");
 await import("./client_contracts/map_editor_contracts.mjs");
+await import("./client_contracts/map_editor_doodad_brush_contracts.mjs");
 await import("./client_contracts/map_author_analysis_contracts.mjs");
 await import("./client_contracts/map_preview_contracts.mjs");
 await import("./rectangular_map_asset_contracts.mjs");
