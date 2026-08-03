@@ -1533,6 +1533,36 @@ assert(
 
 {
   const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.beginDoodadStroke("Placed spacing fixture");
+  session.placeDoodads([{ x: 64, y: 96 }], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
+  session.commitDoodadStroke();
+  session.beginDoodadStroke("Placed symmetric mixed trees");
+  const updates = [];
+  const viewport = {
+    session,
+    tool: {
+      typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK,
+      typeIds: [MAP_EDITOR_DOODAD_TYPES.TREE_OAK, MAP_EDITOR_DOODAD_TYPES.TREE_PINE],
+      color: null,
+      symmetry: MAP_EDITOR_SYMMETRY.HALF_TURN,
+    },
+    queueDoodadPatch(update) { updates.push(structuredClone(update)); },
+  };
+  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 80, y: 96 }]);
+  assert.deepEqual(session.draft.doodads.map(({ x, y }) => ({ x, y })), [{ x: 64, y: 96 }],
+    "tree spacing rejects an entire symmetric group when any counterpart is blocked");
+  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 160, y: 160 }]);
+  assert.deepEqual(updates[0].upserts.map(({ x, y }) => ({ x, y })), [
+    { x: 160, y: 160 }, { x: 351, y: 351 },
+  ], "an unblocked symmetric tree group is placed in full");
+  assert.equal(new Set(updates[0].upserts.map(({ typeId }) => typeId)).size, 1,
+    "mirrored trees use the same species from the selected mix");
+  session.cancelDoodadStroke();
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ width: 64, height: 24, playerCount: 1 });
   session.beginDoodadStroke("Placed trees on wide map");
   const added = session.placeDoodads([
