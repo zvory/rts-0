@@ -79,10 +79,7 @@ fn snapshot_target_invariant_accepts_projected_public_resource_target() {
         .fog
         .recompute(&player_ids, &game.state.entities, &game.state.map);
 
-    assert!(!game
-        .state
-        .fog
-        .is_visible_world(1, node_pos.0, node_pos.1));
+    assert!(!game.state.fog.is_visible_world(1, node_pos.0, node_pos.1));
     let snapshot = game.snapshot_for(1);
     assert_eq!(
         snapshot
