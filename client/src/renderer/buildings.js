@@ -57,8 +57,8 @@ import {
   terrainOverlayColor,
 } from "./terrain_palette.js";
 
-const VEHICLE_WORKS_BODY_PARTS = Object.freeze(["part.base", "part.tint"]);
-const VEHICLE_WORKS_SHADOW_PARTS = Object.freeze(["part.shadow"]);
+const PERSPECTIVE_BUILDING_BODY_PARTS = Object.freeze(["part.base", "part.tint"]);
+const PERSPECTIVE_BUILDING_SHADOW_PARTS = Object.freeze(["part.shadow"]);
 
 export function _drawBuilding(e, colorByOwner, state) {
   const stat = STATS[e.kind] || {};
@@ -85,15 +85,16 @@ export function _drawBuilding(e, colorByOwner, state) {
   const usePngRig = !!(pngDefinition && pngAtlas && pngAtlasTexture);
   const definition = usePngRig ? pngDefinition : svgDefinition;
 
-  const useVehicleWorksPngShadow = usePngRig && e.kind === KIND.FACTORY;
-  if (useVehicleWorksPngShadow) {
+  const usePngSilhouetteShadow = usePngRig
+    && pngAtlas.sprites.some((sprite) => sprite.animationPart === "part.shadow");
+  if (usePngSilhouetteShadow) {
     renderPngUnitRig(this, e, colorByOwner, state, pngDefinition, {
       atlas: pngAtlas,
       atlasTexture: pngAtlasTexture,
       routes: [{
         poolName: "buildingPngShadows",
         layerName: "buildingShadows",
-        parts: VEHICLE_WORKS_SHADOW_PARTS,
+        parts: PERSPECTIVE_BUILDING_SHADOW_PARTS,
       }],
       alpha: bodyAlpha,
     });
@@ -143,7 +144,7 @@ export function _drawBuilding(e, colorByOwner, state) {
           routes: [{
             poolName: "buildingRigs",
             layerName: "buildings",
-            parts: e.kind === KIND.FACTORY ? VEHICLE_WORKS_BODY_PARTS : undefined,
+            parts: usePngSilhouetteShadow ? PERSPECTIVE_BUILDING_BODY_PARTS : undefined,
           }],
           alpha: bodyAlpha,
         });

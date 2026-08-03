@@ -829,7 +829,7 @@ test("PNG route coverage keeps mutable and Set part selections independent", () 
   assert.deepEqual(turretCoverage.missingParts, []);
 });
 
-test("B2/B3 building PNG atlases cover the distinct Kriegsia set at footprint scale", () => {
+test("B2/B3/B4 building PNG atlases cover the distinct Kriegsia set at footprint scale", () => {
   const expectedFootprints = new Map([
     [KIND.CITY_CENTRE, [3, 3]],
     [KIND.BARRACKS, [3, 2]],
@@ -858,16 +858,21 @@ test("B2/B3 building PNG atlases cover the distinct Kriegsia set at footprint sc
     assert.deepEqual(pngAtlasRouteCoverage(definition, atlas, route).missingParts, []);
     assert.equal(atlas.viewBox.width, footW * 32);
     assert.equal(atlas.viewBox.height, footH * 32);
-    const expectedSpriteCount = kind === KIND.FACTORY ? 3 : 2;
+    const hasSilhouetteShadow = [
+      KIND.FACTORY,
+      KIND.RESEARCH_COMPLEX,
+      KIND.STEELWORKS,
+    ].includes(kind);
+    const expectedSpriteCount = hasSilhouetteShadow ? 3 : 2;
     assert.equal(atlas.sprites.length, expectedSpriteCount);
     assert.deepEqual(
       atlas.sprites.map((sprite) => sprite.tintSlot),
-      kind === KIND.FACTORY
+      hasSilhouetteShadow
         ? ["fixed", "team", "fixed"]
         : ["fixed", "team"],
     );
 
-    if (kind === KIND.FACTORY) {
+    if (hasSilhouetteShadow) {
       const shadowRoute = { parts: ["part.shadow"] };
       assert.equal(pngAtlasCanRenderRoute(definition, atlas, shadowRoute), true);
       assert.deepEqual(pngAtlasRouteCoverage(definition, atlas, shadowRoute).missingParts, []);

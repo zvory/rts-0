@@ -26,6 +26,14 @@ const BUILDING_PNG_SPECS = Object.freeze([
 const B3_BUILDING_KINDS = new Set([
   KIND.FACTORY,
 ]);
+const B4_BUILDING_KINDS = new Set([
+  KIND.RESEARCH_COMPLEX,
+  KIND.STEELWORKS,
+]);
+const SILHOUETTE_SHADOW_KINDS = new Set([
+  ...B3_BUILDING_KINDS,
+  ...B4_BUILDING_KINDS,
+]);
 
 function deepFreeze(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -50,7 +58,7 @@ function definition(kind, footW, footH) {
   const width = footW * 32;
   const height = footH * 32;
   const parts = [part("part.base", 10, "fixed"), part("part.tint", 11, "team")];
-  if (kind === KIND.FACTORY) parts.push(part("part.shadow", 0, "fixed", 0.3));
+  if (SILHOUETTE_SHADOW_KINDS.has(kind)) parts.push(part("part.shadow", 0, "fixed", 0.3));
   const validation = validateRigDefinition({
     id: `${kind}.building-raster`,
     kind,
@@ -89,8 +97,14 @@ function atlas(kind, slug, footW, footH, frameWidth, frameHeight) {
   });
   const assetPass = B3_BUILDING_KINDS.has(kind)
     ? "buildings-b3-corrected-preview"
-    : "buildings-b2-distinct-pass-01";
-  const assetVersion = B3_BUILDING_KINDS.has(kind) ? "b3-corrected-03" : "b2-distinct-01";
+    : B4_BUILDING_KINDS.has(kind)
+      ? "buildings-b4-selected-pass-01"
+      : "buildings-b2-distinct-pass-01";
+  const assetVersion = B3_BUILDING_KINDS.has(kind)
+    ? "b3-corrected-03"
+    : B4_BUILDING_KINDS.has(kind)
+      ? "b4-selected-01"
+      : "b2-distinct-01";
   const sprites = [
     {
       id: "sprite.base",
@@ -109,7 +123,7 @@ function atlas(kind, slug, footW, footH, frameWidth, frameHeight) {
       frame: frame(frameWidth),
     },
   ];
-  if (kind === KIND.FACTORY) {
+  if (SILHOUETTE_SHADOW_KINDS.has(kind)) {
     sprites.push({
       id: "sprite.shadow",
       animationPart: "part.shadow",
@@ -119,7 +133,7 @@ function atlas(kind, slug, footW, footH, frameWidth, frameHeight) {
       frame: frame(frameWidth * 2),
     });
   }
-  const columns = kind === KIND.FACTORY ? 3 : 2;
+  const columns = SILHOUETTE_SHADOW_KINDS.has(kind) ? 3 : 2;
   return deepFreeze({
     enabled: true,
     unit: kind,
