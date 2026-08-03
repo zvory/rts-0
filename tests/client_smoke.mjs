@@ -589,6 +589,9 @@ try {
     const optionsRect = optionsWindow?.getBoundingClientRect();
     const panelRect = toolsWindow?.getBoundingClientRect();
     const layersRect = layersWindow?.getBoundingClientRect();
+    const layersMoveHandle = layersWindow?.querySelector(".lab-panel-drag-handle");
+    layersMoveHandle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    const movedLayersRect = layersWindow?.getBoundingClientRect();
     const noInitialStatus = document.querySelector(".map-editor-status") === null;
     water?.scrollIntoView({ block: "center" });
     const beforeScrollTop = panel?.scrollTop ?? -1;
@@ -650,6 +653,9 @@ try {
           columns: getComputedStyle(list).gridTemplateColumns.split(" ").length,
           height: layersRect.height,
           maxToggleHeight: Math.max(...toggles.map((toggle) => toggle.getBoundingClientRect().height)),
+          movePreservedSize: Math.abs(movedLayersRect.left - layersRect.left - 24) <= 1 &&
+            Math.abs(movedLayersRect.width - layersRect.width) <= 1 &&
+            Math.abs(movedLayersRect.height - layersRect.height) <= 1,
         };
       })(),
       overlayTools: (() => {
@@ -712,6 +718,7 @@ try {
       editorUi.layers.every((layer) => layer.title === `${layer.label} — ${layer.description}`) &&
       editorUi.layerPanel?.outsideTools && editorUi.layerPanel.columns === 2 &&
       editorUi.layerPanel.height < 180 && editorUi.layerPanel.maxToggleHeight < 32 &&
+      editorUi.layerPanel.movePreservedSize &&
       ["Terrain & bases", "Stealth", "No vehicles", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)) &&
       ["Paint stealth", "Paint no vehicles", "Erase stealth", "Erase no vehicles"]
@@ -764,6 +771,22 @@ try {
       editorUi.doodadToolLabels.includes("Delete selection") &&
       !editorUi.doodadToolLabels.includes("Select / move"),
     `MAP EDITOR: doodad tools expose box removal and the erase brush without move (${editorUi.doodadToolLabels.join(", ")})`,
+  );
+  await editorPage.setViewport({ width: 600, height: 360 });
+  const mobileLayers = await editorPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => {
+    const body = document.querySelector(".map-editor-layers-body");
+    const lastToggle = body?.querySelector(".map-editor-layer-toggle:last-child");
+    if (body) body.scrollTop = body.scrollHeight;
+    const bodyRect = body?.getBoundingClientRect();
+    const lastRect = lastToggle?.getBoundingClientRect();
+    resolve({
+      scrollable: body && body.scrollHeight > body.clientHeight && getComputedStyle(body).overflowY === "auto",
+      lastToggleReachable: bodyRect && lastRect && lastRect.bottom <= bodyRect.bottom + 1,
+    });
+  })));
+  ok(
+    mobileLayers.scrollable && mobileLayers.lastToggleReachable,
+    `MAP EDITOR: short mobile Layers panel scrolls to every toggle (${JSON.stringify(mobileLayers)})`,
   );
   await editorPage.close();
 

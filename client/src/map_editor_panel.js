@@ -99,14 +99,18 @@ export class MapEditorPanel {
     this.optionsWindowChrome = new LabPanelWindowChrome(this.optionsEl, {
       storageKey: MAP_EDITOR_OPTIONS_STORAGE_KEY,
       panelLabel: "map editor options",
+      minWidth: 220,
     });
     this.toolsWindowChrome = new LabPanelWindowChrome(this.toolsEl, {
       storageKey: MAP_EDITOR_TOOLS_STORAGE_KEY,
       panelLabel: "map editor tools",
+      minWidth: 220,
     });
     this.layersWindowChrome = new LabPanelWindowChrome(this.layersEl, {
       storageKey: MAP_EDITOR_LAYERS_STORAGE_KEY,
       panelLabel: "map editor layers",
+      minWidth: 220,
+      minHeight: 120,
     });
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);

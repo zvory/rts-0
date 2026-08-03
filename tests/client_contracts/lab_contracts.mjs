@@ -1289,6 +1289,35 @@ await withFakeDocument(async () => {
 
 await withFakeDocument(async () => {
   const el = document.createElement("aside");
+  el.getBoundingClientRect = () => ({ left: 248, top: 58, width: 224, height: 150 });
+  const windowListeners = new Map();
+  const chrome = new LabPanelWindowChrome(el, {
+    windowObj: {
+      innerWidth: 720 + 1,
+      innerHeight: 800,
+      addEventListener(type, handler) {
+        windowListeners.set(type, handler);
+      },
+      removeEventListener(type, handler) {
+        if (windowListeners.get(type) === handler) windowListeners.delete(type);
+      },
+    },
+    minWidth: 220,
+    minHeight: 120,
+    panelLabel: "compact layers",
+  });
+  const header = chrome.renderHeader({ kicker: "Layers" });
+  const dragHandle = header.children[0];
+  dragHandle.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+  assert(
+    el.style.left === "272px" && el.style.width === "224px" && el.style.height === "150px",
+    "LabPanelWindowChrome preserves configured compact geometry when a panel is moved",
+  );
+  chrome.destroy();
+});
+
+await withFakeDocument(async () => {
+  const el = document.createElement("aside");
   const storage = fakeStorage({
     "test.lab.panel.mobile": JSON.stringify({
       schemaVersion: 1,

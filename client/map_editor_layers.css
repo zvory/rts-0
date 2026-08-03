@@ -1,3 +1,26 @@
+.map-editor-panel {
+  --map-editor-panel-width: min(390px, calc((100vw - 48px) / 3));
+  width: var(--map-editor-panel-width);
+  min-width: min(240px, var(--map-editor-panel-width));
+}
+
+.map-editor-layers-window {
+  right: auto;
+  left: calc((100vw - 48px) / 3 + 24px);
+  max-height: min(240px, calc(100vh - 70px));
+  padding: 8px 8px 10px;
+}
+
+.map-editor-layers-window .lab-panel-titlebar {
+  top: -8px;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
+
+.map-editor-layers-window .lab-panel-resize-handle {
+  margin: 4px 0 -6px auto;
+}
+
 .map-editor-layer-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -38,6 +61,26 @@
 
 .map-editor-layers-body {
   gap: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding-right: 0;
+}
+
+@media (min-width: 1218px) {
+  .map-editor-layers-window {
+    left: calc(50% - 195px);
+  }
+}
+
+@media (max-width: 720px) {
+  .map-editor-layers-window {
+    top: calc(33.333vh + 4px);
+    bottom: auto;
+    max-height: calc(33.333vh - 12px);
+  }
+
+  .map-editor-options-window,
+  .map-editor-tools-window {
+    max-height: calc(33.333vh - 12px);
+  }
 }
