@@ -1062,6 +1062,16 @@ function nearPoint(call, point, epsilon = 0.001) {
   });
   assert(tankRing.rotation === facing, "vehicle selection ovals rotate with body facing");
   assert(riflemanRing.rotation === 0, "infantry selection ovals remain screen-aligned");
+  assertApprox(tankRing.x, 100, 0.001,
+    "vehicle selection rotation keeps the ring horizontally centered on the entity");
+  assertApprox(tankRing.y, 102, 0.001,
+    "vehicle selection rotation keeps the ground-projection offset screen-aligned");
+  const tankEllipses = tankRing.calls.filter((call) => call[0] === "drawEllipse");
+  assert(
+    tankEllipses.length === 2
+      && tankEllipses.every((call) => call[1] === 0 && call[2] === 0),
+    "vehicle selection ovals rotate around their own center",
+  );
 }
 
 {
