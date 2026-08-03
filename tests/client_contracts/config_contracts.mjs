@@ -118,12 +118,10 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "FIXTURE_FACTION_ID",
   "HARVEST_TICKS",
   "INTERP_DELAY_MS",
-  "MAIN_MAP_FOG_EXPLORED_ALPHA",
-  "MAIN_MAP_FOG_UNEXPLORED_ALPHA",
+  "MAIN_MAP_FOG_EXPLORED_ALPHA", "MAIN_MAP_FOG_UNEXPLORED_ALPHA",
   "METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS",
   "METHAMPHETAMINES_RESEARCH_TICKS",
-  "MINIMAP_FOG_EXPLORED_ALPHA",
-  "MINIMAP_FOG_UNEXPLORED_ALPHA",
+  "MINIMAP_FOG_EXPLORED_ALPHA", "MINIMAP_FOG_UNEXPLORED_ALPHA",
   "MINING_CC_RANGE_TILES",
   "MORTAR_AUTOCAST_RESEARCH_TICKS",
   "MORTAR_FIELD_OF_FIRE_RAD",
@@ -180,24 +178,14 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "trainableUnitsForFaction",
   "workerBuildablesForFaction",
 ]);
-// Config
-// ---------------------------------------------------------------------------
+// Config --------------------------------------------------------------------
 {
   assertDeepEqual(
     Object.keys(configExports).sort(),
     EXPECTED_CONFIG_EXPORT_NAMES,
     "client config public export names remain stable across internal splits",
   );
-  assert(
-    configExports.MAIN_MAP_FOG_EXPLORED_ALPHA === 0.30 &&
-      configExports.MAIN_MAP_FOG_UNEXPLORED_ALPHA === 0.60,
-    "main-map fog uses the lighter explored and unexplored opacities",
-  );
-  assert(
-    configExports.MINIMAP_FOG_EXPLORED_ALPHA === 0.48 &&
-      configExports.MINIMAP_FOG_UNEXPLORED_ALPHA === 0.8,
-    "main-map fog tuning leaves the existing minimap opacities unchanged",
-  );
+  assert([configExports.MAIN_MAP_FOG_EXPLORED_ALPHA, configExports.MAIN_MAP_FOG_UNEXPLORED_ALPHA, configExports.MINIMAP_FOG_EXPLORED_ALPHA, configExports.MINIMAP_FOG_UNEXPLORED_ALPHA].join(",") === "0.3,0.6,0.48,0.8", "main-map fog is lighter while minimap fog opacities remain unchanged");
   assert(MINING_CC_RANGE_TILES === 11, "client mirrors the server mining City Centre range");
   assert(
     MORTAR_MIN_RANGE_TILES === 5 && MORTAR_RANGE_TILES === 17,
