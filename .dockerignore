@@ -6,6 +6,7 @@
 .agents
 .cargo
 .claude
+.codex-worktrees
 .config
 .github
 desktop
