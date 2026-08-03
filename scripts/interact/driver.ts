@@ -23,9 +23,13 @@ import { defaultMapForMode } from "./session_defaults.ts";
 import { waitForInteractStartup } from "./bridge_startup.ts";
 import { evaluateInteractBridgeCall } from "./bridge_call.ts";
 import { performMouseDrag, type MouseDragInput } from "./mouse_drag.ts";
+import { InteractDriverError } from "./driver_error.ts";
+import {
+  DEFAULT_VIEWPORT, INTERACT_MEDIA_DPR, MAX_CAPTURE_VIEWPORT, mediaCaptureViewport, normalizeViewport,
+} from "./viewport.ts";
 export { validateWorkspaceRoot } from "./workspace_inspection.ts";
-const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 900, deviceScaleFactor: 1 });
-export const INTERACT_MEDIA_DPR = Object.freeze({ screenshot: 4, video: 2 });
+export { InteractDriverError } from "./driver_error.ts";
+export { INTERACT_MEDIA_DPR, mediaCaptureViewport } from "./viewport.ts";
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 60_000;
@@ -34,7 +38,6 @@ const LOG_TAIL_LINES = 12;
 const LOG_TAIL_LINE_CHARS = 512;
 const MAX_PAGE_ERRORS = 80;
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
-const MAX_CAPTURE_VIEWPORT = 2048;
 const ARTIFACT_CAPABILITY_HEADER = "x-interact-lab-capability";
 export const DRIVER_STATES = Object.freeze({
   OPENING: "opening",
@@ -143,17 +146,6 @@ declare global {
       status(): { ready?: boolean; launchError?: string };
       call(method: string, input: unknown): Promise<{ ok: boolean; value?: unknown; error?: { code?: string; message?: string; details?: JsonObject } }>;
     };
-  }
-}
-
-export class InteractDriverError extends Error {
-  details: JsonObject;
-  code: string;
-  constructor(code: string, message: string, details: JsonObject = {}) {
-    super(message);
-    this.name = "InteractDriverError";
-    this.code = code;
-    this.details = details;
   }
 }
 
@@ -736,8 +728,7 @@ export class InteractDriver {
   }
 
   captureTimelapse(input: NonNullable<Parameters<typeof captureGameTimelapse>[1]> = {}) {
-    const viewport = mediaCaptureViewport(input.viewport, this.page?.viewport?.() || null, INTERACT_MEDIA_DPR.video);
-    return captureGameTimelapse(this, { ...input, viewport });
+    return captureGameTimelapse(this, { ...input, viewport: mediaCaptureViewport(input.viewport, this.page?.viewport?.() || null, INTERACT_MEDIA_DPR.video) });
   }
   fixedCaptureStatus() {
     if (!this.fixedCapture) return { active: false, last: this.lastFixedCapture };
@@ -1207,23 +1198,6 @@ function safeCaptureSessionId(value: unknown) {
   return sessionId;
 }
 
-function normalizeCaptureViewport(viewport: Viewport) {
-  const normalized = normalizeViewport(viewport);
-  if (normalized.width > MAX_CAPTURE_VIEWPORT || normalized.height > MAX_CAPTURE_VIEWPORT) {
-    throw new InteractDriverError("invalidViewport", `capture viewport width and height must be at most ${MAX_CAPTURE_VIEWPORT}.`);
-  }
-  return normalized;
-}
-
-export function mediaCaptureViewport(requested: Viewport | null | undefined, current: Viewport | null | undefined, defaultDpr: number) {
-  const base = requested || current || DEFAULT_VIEWPORT;
-  return normalizeCaptureViewport({
-    width: base.width,
-    height: base.height,
-    deviceScaleFactor: requested?.deviceScaleFactor ?? defaultDpr,
-  });
-}
-
 function normalizeRecordingCrop(crop: CaptureClip, viewportClip: CaptureClip) {
   const normalized = { x: Number(crop.x), y: Number(crop.y), width: Number(crop.width), height: Number(crop.height) };
   if (!Object.values(normalized).every(Number.isFinite) || normalized.x < 0 || normalized.y < 0 || normalized.width < 2 || normalized.height < 2) {
@@ -1331,16 +1305,6 @@ async function artifactHttpError(response: Response, fallback: string) {
   let message = fallback;
   try { message = (await response.json())?.error || message; } catch {}
   return new InteractDriverError("artifactTransferFailed", message);
-}
-
-function normalizeViewport(viewport: { width: number; height: number; deviceScaleFactor?: number; dpr?: number }): Viewport {
-  const width = Number(viewport?.width);
-  const height = Number(viewport?.height);
-  const deviceScaleFactor = Number(viewport?.deviceScaleFactor ?? viewport?.dpr ?? 1);
-  if (!Number.isInteger(width) || width < 320 || width > 4096 || !Number.isInteger(height) || height < 240 || height > 4096 || !Number.isFinite(deviceScaleFactor) || deviceScaleFactor <= 0 || deviceScaleFactor > 4) {
-    throw new InteractDriverError("invalidViewport", "viewport must have bounded width, height, and DPR.");
-  }
-  return { width, height, deviceScaleFactor };
 }
 
 function boundedTimeout(value: number, label: string, maximum: number) {

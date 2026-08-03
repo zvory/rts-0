@@ -220,6 +220,11 @@ try {
   assert.equal(closeDriver.fixtureViewport.deviceScaleFactor, 2, "real-time recordings default to DPR 2");
   assert.deepEqual(closeDriver.fixtureScreencastOptions, { format: "png", everyNthFrame: 1 },
     "real-time recordings retain Chrome screencast events as their composition cadence");
+  assert.deepEqual(closeDriver.fixtureScreenshotOptions, {
+    type: "png",
+    clip: { x: 0, y: 0, width: 640, height: 480 },
+    captureBeyondViewport: false,
+  }, "real-time recordings capture only their requested CSS region at physical resolution");
   await assert.rejects(
     closeDriver.screenshot({ sessionId: closeSessionId, name: "conflicting-capture" }),
     (error) => error?.code === "recordingActive",
@@ -228,6 +233,11 @@ try {
   await closeDriver.close();
   assert.equal(closeDriver.state, DRIVER_STATES.CLOSED, "driver close reaches the closed state while recording");
   assert.equal(closeDriver.recordingStatus().last.stoppedBy, "sessionClose", "driver close boundedly finalizes its recorder");
+  assert.deepEqual(
+    { width: closeDriver.recordingStatus().last.probe.width, height: closeDriver.recordingStatus().last.probe.height },
+    { width: 1280, height: 960 },
+    "the DPR 2 physical region reaches the final video without a second full-viewport crop",
+  );
   fs.rmSync(path.dirname(closeDriver.recordingStatus().last.videoPath), { recursive: true, force: true });
 
   const delayedStopDriver = fixtureRecordingDriver(root, tools, { recorderStopDelayMs: 250 });
@@ -364,6 +374,7 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
   let frame = 0;
   let recorderStops = 0;
   let screencastOptions = null;
+  let screenshotOptions = null;
   let viewport = { width: 640, height: 480, deviceScaleFactor: 1 };
   const png = spawnSync(mediaTools.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=1280x960",
@@ -373,7 +384,7 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
   driver.page = {
     viewport: () => viewport,
     setViewport: async (next) => { viewport = next; },
-    screenshot: async () => png.stdout,
+    screenshot: async (options) => { screenshotOptions = options; return png.stdout; },
     close: async () => {},
     evaluate: async (fn, bridgeCall) => {
       if (bridgeCall?.method === "captureReadiness") {
@@ -422,6 +433,7 @@ function fixtureRecordingDriver(workspaceRoot, mediaTools, { failScreencast = fa
   Object.defineProperty(driver, "fixtureRecorderStops", { get: () => recorderStops });
   Object.defineProperty(driver, "fixtureViewport", { get: () => ({ ...viewport }) });
   Object.defineProperty(driver, "fixtureScreencastOptions", { get: () => screencastOptions });
+  Object.defineProperty(driver, "fixtureScreenshotOptions", { get: () => screenshotOptions });
   return driver;
 }
 

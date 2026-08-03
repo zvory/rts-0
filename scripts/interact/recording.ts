@@ -129,7 +129,8 @@ export async function checkMediaCapabilities({
 
 // Chrome's screencast timestamps describe compositor events, not a complete video timeline.
 // This recorder deliberately uses one authority: cumulative elapsed monotonic wall time mapped
-// to 30 FPS slots. Each slot receives the newest acknowledged CDP frame, and any reuse is counted.
+// to 30 FPS slots. Each slot receives the newest physical-resolution region frame, and any reuse
+// is counted.
 export async function createWallClockRecorder({ page, outputPath, clip, scale, tools, maxDurationMs, timeoutMs = 15_000 }: {
   page: Page;
   outputPath: string;
@@ -141,15 +142,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
 }) {
   const fps = RECORDING_LIMITS.fps;
   const client = await page.createCDPSession();
-  const viewport = page.viewport?.() || { deviceScaleFactor: 1 };
-  const dpr = Number(viewport.deviceScaleFactor) || 1;
-  const crop = {
-    x: Math.max(0, Math.round(clip.x * dpr)),
-    y: Math.max(0, Math.round(clip.y * dpr)),
-    width: Math.max(2, Math.round(clip.width * dpr)),
-    height: Math.max(2, Math.round(clip.height * dpr)),
-  };
-  const encoder = createPngMp4Encoder({ outputPath, fps, crop, scale, tools });
+  const encoder = createPngMp4Encoder({ outputPath, fps, scale, tools });
   let currentFrame: Buffer|null = null;
   let currentFrameId = 0;
   let rawEvents = 0;
@@ -169,10 +162,14 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
   let firstFrameReject!: (error: InteractRecordingError) => void;
   const firstFrame = new Promise<void>((resolve, reject) => { firstFrameResolve = resolve; firstFrameReject = reject; });
 
-  const capturePhysicalFrame = () => {
-    if (capturePromise || stopping) return;
+  const capturePhysicalRegionFrame = () => {
+    if (capturePromise || captureError || stopping) return;
     capturePromise = (async () => {
-      const buffer = Buffer.from(await page.screenshot({ type: "png", captureBeyondViewport: false }) || []);
+      const buffer = Buffer.from(await page.screenshot({
+        type: "png",
+        clip,
+        captureBeyondViewport: false,
+      }) || []);
       if (buffer.length === 0) throw new InteractRecordingError("recordingEmpty", "Chrome returned an empty physical recording frame.");
       currentFrame = buffer;
       currentFrameId += 1;
@@ -200,7 +197,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
       if (lastChromeTimestamp != null) largestChromeGapMs = Math.max(largestChromeGapMs, (timestamp - lastChromeTimestamp) * 1000);
       lastChromeTimestamp = timestamp;
     }
-    capturePhysicalFrame();
+    capturePhysicalRegionFrame();
   };
   client.on("Page.screencastFrame", onFrame);
   try {
