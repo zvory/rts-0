@@ -61,6 +61,11 @@ client/vendor/sim-wasm/rts_sim_wasm_bg.wasm
 client/assets/rigs/**/*.*
 !client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png
 !client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png
+!client/assets/rigs/building-emblems-preview/barracks-atlas-m14-team-tint.png
+!client/assets/rigs/building-emblems-preview/factory-atlas-team-tint.png
+!client/assets/rigs/building-emblems-preview/research_complex-atlas-team-tint.png
+!client/assets/rigs/building-emblems-preview/steelworks-atlas-team-tint.png
+!client/assets/rigs/building-emblems-preview/training_centre-atlas-mg42-panzerfaust-team-tint.png
 !client/assets/rigs/buildings-b2-distinct-pass-01/pump_jack-atlas.png
 !client/assets/rigs/buildings-b3-corrected-preview/factory-atlas.png
 !client/assets/rigs/buildings-b4-selected-pass-01/research_complex-atlas.png
