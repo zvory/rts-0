@@ -223,6 +223,11 @@ const approvedCurrentFactionFiles = new Set([
   // The SDK frame adapter converts the protocol's dedicated remembered-anti-tank-gun records back
   // into the typed kind that the wire record omits. Keep this exception at one occurrence.
   "server/crates/ai/src/sdk/frame.rs",
+  // SDK rulebook and world-query inline tests name current-catalog kinds while proving delegation
+  // and exact legacy-placement parity. Production answers remain catalog/frame driven; keep the
+  // corresponding occurrence budgets exact so new assumptions still fail this ratchet.
+  "server/crates/ai/src/sdk/rulebook.rs",
+  "server/crates/ai/src/sdk/world_queries.rs",
   "server/crates/ai/src/selfplay/milestones.rs",
   "server/crates/ai/src/selfplay/pending_build.rs",
   "server/crates/ai/src/selfplay/player_view.rs",
@@ -422,6 +427,8 @@ const approvedSpecialCaseBudgets = new Map([
   // Stewardship Phase 3 moved ability and upgrade identity into this authoritative catalog owner;
   // the typed enum declarations and catalog rows intentionally raise the owner-file baseline.
   ["server/crates/ai/src/sdk/frame.rs", 1],
+  ["server/crates/ai/src/sdk/rulebook.rs", 6],
+  ["server/crates/ai/src/sdk/world_queries.rs", 12],
   ["server/crates/rules/src/faction.rs", 121],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
