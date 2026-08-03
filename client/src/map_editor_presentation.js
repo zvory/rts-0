@@ -1,4 +1,10 @@
-export const MAP_EDITOR_PRESENTATION_VERSION = 1;
+import {
+  defaultMapAuthoringLayerVisibility,
+  normalizeMapAuthoringLayerVisibility,
+  validateMapAuthoringLayerVisibility,
+} from "./map_authoring/layers.js";
+
+export const MAP_EDITOR_PRESENTATION_VERSION = 2;
 
 export function createMapEditorPresentation({
   generation = 1,
@@ -7,6 +13,7 @@ export function createMapEditorPresentation({
   terrainUpdate = null,
   doodadUpdate = null,
   overlay = null,
+  layerVisibility = defaultMapAuthoringLayerVisibility(),
   visualTimeMs = 0,
 }) {
   const record = {
@@ -17,6 +24,7 @@ export function createMapEditorPresentation({
     terrainUpdate: terrainUpdate == null ? null : plain(terrainUpdate),
     doodadUpdate: doodadUpdate == null ? null : plain(doodadUpdate),
     overlay: overlay == null ? null : plain(overlay),
+    layerVisibility: normalizeMapAuthoringLayerVisibility(layerVisibility),
     visualTimeMs: finiteNonNegative(visualTimeMs, "visualTimeMs"),
   };
   validateMapEditorPresentation(record);
@@ -32,6 +40,7 @@ export function validateMapEditorPresentation(record) {
   }
   if (!(record.camera?.zoom > 0)) throw new RangeError("Map Editor camera zoom must be positive");
   finiteNonNegative(record.visualTimeMs, "visualTimeMs");
+  validateMapAuthoringLayerVisibility(record.layerVisibility);
   const update = record.terrainUpdate;
   if (update) {
     positiveInteger(update.revision, "terrain revision");

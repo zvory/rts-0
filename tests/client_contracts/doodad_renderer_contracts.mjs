@@ -8,6 +8,10 @@ import {
 } from "../../client/src/renderer/doodad_manifest.js";
 import { LAYERS } from "../../client/src/renderer/layers.js";
 import { MapEditorWorkerRenderer } from "../../client/src/renderer/map_editor_worker_renderer.js";
+import {
+  defaultMapAuthoringLayerVisibility,
+  MAP_AUTHORING_LAYER,
+} from "../../client/src/map_authoring/layers.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
 const restorePixi = installFakePixi();
@@ -132,7 +136,7 @@ try {
 
   const editorCalls = [];
   const editorRenderer = {
-    layers: { feedback: new PIXI.Container(), buildings: new PIXI.Container() },
+    layers: { terrain: new PIXI.Container(), feedback: new PIXI.Container(), buildings: new PIXI.Container() },
     world: {
       position: { set() {} },
       scale: { set() {} },
@@ -145,7 +149,7 @@ try {
   };
   const editor = new MapEditorWorkerRenderer(editorRenderer);
   editor.present({
-    version: 1,
+    version: 2,
     generation: 1,
     frameId: 1,
     visualTimeMs: 2400,
@@ -153,14 +157,18 @@ try {
     terrainUpdate: null,
     doodadUpdate: { kind: "replace", revision: 1, doodads: [
       { id: 8, typeId: "tree.pine", x: 4, y: 5 },
+      { id: 7, typeId: "wildflower.single", x: 10, y: 12, color: "#ffffff" },
       { id: 9, typeId: "unit.tank_trap", x: 80, y: 80 },
     ] },
+    layerVisibility: defaultMapAuthoringLayerVisibility(),
     overlay: {
       revision: 1,
       gridPaths: [],
       guides: [],
       guideCentre: null,
-      sites: [],
+      sites: [{ x: 16, y: 16, color: 0x4ec9ff, radius: 7, label: "S1", selected: false }],
+      stealthTiles: [{ x: 1, y: 1 }],
+      noVehicleTiles: [{ x: 2, y: 2 }],
       paintPreview: null,
       doodadSelections: [{ id: 8, x: 4, y: 5 }],
       doodadSelectionBox: { x: 0, y: 0, width: 10, height: 12 },
@@ -169,6 +177,38 @@ try {
   });
   assert.equal(editor.tankTraps.size, 1, "the editor draws authored Tank Traps with the live entity geometry");
   assert.equal(editorRenderer.layers.buildings.children.length, 1, "Tank Trap previews use the building layer");
+  assert.deepEqual(latestDrawRectWidths(editor.overlay), [32, 28],
+    "independent semantic layers both draw when visible");
+  editor._applyLayerVisibility({
+    ...defaultMapAuthoringLayerVisibility(),
+    [MAP_AUTHORING_LAYER.STEALTH]: false,
+  });
+  assert.deepEqual(latestDrawRectWidths(editor.overlay), [28],
+    "hiding stealth leaves the no-vehicle layer visible");
+  editor._applyLayerVisibility(defaultMapAuthoringLayerVisibility());
+  editor._applyLayerVisibility({
+    ...defaultMapAuthoringLayerVisibility(),
+    [MAP_AUTHORING_LAYER.TREES]: false,
+  });
+  assert.deepEqual(editorCalls.filter(([kind]) => kind === "replace").at(-1)[1].map(({ id }) => id), [7],
+    "the tree switch hides trees without hiding decorative doodads");
+  editor._applyLayerVisibility({
+    ...defaultMapAuthoringLayerVisibility(),
+    [MAP_AUTHORING_LAYER.TREES]: false,
+    [MAP_AUTHORING_LAYER.DECORATIVE_DOODADS]: false,
+    [MAP_AUTHORING_LAYER.GAMEPLAY_DOODADS]: false,
+  });
+  assert.equal(editor.tankTraps.size, 0, "gameplay doodads have an independent visibility switch");
+  editor._applyLayerVisibility(defaultMapAuthoringLayerVisibility());
+  assert.equal(editor.tankTraps.size, 1, "reenabling layers restores records without mutating the authored map");
+  editor._applyLayerVisibility({
+    ...defaultMapAuthoringLayerVisibility(),
+    [MAP_AUTHORING_LAYER.BASE]: false,
+  });
+  assert.equal(editorRenderer.layers.terrain.visible, false,
+    "the base-layer switch hides the shared terrain surface");
+  assert.equal(editor.labels.length, 0, "hiding the base layer also hides start/base markers");
+  editor._applyLayerVisibility(defaultMapAuthoringLayerVisibility());
   editor._applyDoodads({ kind: "patch", revision: 2, upserts: [], removedIds: [8] });
   editor._applyDoodads({
     kind: "patch",
@@ -176,8 +216,10 @@ try {
     upserts: [{ id: 10, typeId: "unit.tank_trap", x: 112, y: 80 }],
     removedIds: [],
   });
+  const replaceCountBeforeStaleRevision = editorCalls.filter(([kind]) => kind === "replace").length;
   editor._applyDoodads({ kind: "replace", revision: 1, doodads: [] });
-  assert.equal(editorCalls.filter(([kind]) => kind === "replace").length, 1, "editor applies each monotonic doodad revision once");
+  assert.equal(editorCalls.filter(([kind]) => kind === "replace").length, replaceCountBeforeStaleRevision,
+    "editor ignores stale doodad revisions even after visibility-only reconciliations");
   assert.equal(editorCalls.filter(([kind]) => kind === "patch").length, 2, "editor forwards compact doodad patches");
   assert.deepEqual(
     editorCalls.filter(([kind]) => kind === "patch").at(-1)[1].removedIds,
@@ -190,6 +232,14 @@ try {
   assert.equal(editorCalls.filter(([kind]) => kind === "destroy").length, 1, "editor renderer teardown remains idempotent");
 } finally {
   restorePixi();
+}
+
+function latestDrawRectWidths(graphics) {
+  const lastClear = graphics.calls.findLastIndex(([kind]) => kind === "clear");
+  return graphics.calls.slice(lastClear + 1)
+    .filter(([kind]) => kind === "drawRect")
+    .map(([, , , width]) => width)
+    .filter((width) => width === 32 || width === 28);
 }
 
 console.log("✅ doodad_renderer_contracts.mjs: static assets, layering, wind, editor updates, and teardown passed");

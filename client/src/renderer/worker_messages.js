@@ -3,6 +3,7 @@ import {
   PRESENTATION_FRAME_VERSION,
   STATIC_MAP_PRESENTATION_VERSION,
 } from "../presentation/frame.js";
+import { MAP_EDITOR_PRESENTATION_VERSION } from "../map_editor_presentation.js";
 
 export const RENDER_WORKER_MESSAGE_VERSION = 1;
 export const RENDER_WORKER_MESSAGE = Object.freeze({
@@ -125,8 +126,11 @@ export function createResetGroundDecalsMessage(generation, decalEpoch) {
 }
 
 export function createEditorFrameMessage(record, generation = 1) {
-  if (record?.version !== 1 || !Number.isSafeInteger(record?.frameId) || record.frameId <= 0) {
-    throw new TypeError("Map Editor worker frame requires a version-1 record and positive frame id.");
+  if (record?.version !== MAP_EDITOR_PRESENTATION_VERSION
+    || !Number.isSafeInteger(record?.frameId) || record.frameId <= 0) {
+    throw new TypeError(
+      `Map Editor worker frame requires a version-${MAP_EDITOR_PRESENTATION_VERSION} record and positive frame id.`,
+    );
   }
   return request(RENDER_WORKER_MESSAGE.FRAME, generation, { editor: clonePlain(record) });
 }
@@ -193,7 +197,8 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       break;
     case RENDER_WORKER_MESSAGE.FRAME:
       if (payload?.editor) {
-        if (payload.editor.version !== 1 || !Number.isSafeInteger(payload.editor.frameId) || payload.editor.frameId <= 0) {
+        if (payload.editor.version !== MAP_EDITOR_PRESENTATION_VERSION
+          || !Number.isSafeInteger(payload.editor.frameId) || payload.editor.frameId <= 0) {
           throw new TypeError("invalid Map Editor worker frame");
         }
       } else {

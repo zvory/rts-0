@@ -62,7 +62,7 @@ import fs from "node:fs";
     MapEditorViewport.prototype.drawOverlay.call(viewport);
     viewport.tick(16);
     assert.equal(presentations.length, 1, "the Map Editor submits one detached presentation record");
-    assert.equal(presentations[0].record.version, 1);
+    assert.equal(presentations[0].record.version, 2);
     assert.equal(scheduled.length, 1, "the Map Editor keeps its camera/input RAF running during presentation");
 
     for (let i = 0; i < 20; i += 1) {
@@ -102,6 +102,7 @@ import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
 import { authoritativeAnalysisSummary, MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { buildMapFromRecipe } from "../../client/src/map_authoring/recipe.js";
+import { defaultMapAuthoringLayerVisibility } from "../../client/src/map_authoring/layers.js";
 import {
   canonicalDoodadColor,
   createDoodadSprayStroke,
@@ -675,24 +676,27 @@ assert(
 {
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
-  const forest = [{ x: 14, y: 14 }, { x: 15, y: 14 }];
-  session.beginOverlayStroke("Painted forest");
-  assert.deepEqual(session.paintOverlayTiles(forest, { stealth: true, noVehicle: true }), forest);
+  const overlap = [{ x: 14, y: 14 }, { x: 15, y: 14 }];
+  session.beginOverlayStroke("Painted stealth");
+  assert.deepEqual(session.paintOverlayTiles(overlap, { stealth: true }), overlap);
   assert.equal(session.commitOverlayStroke(), true);
-  assert.deepEqual(session.materialized().stealthTiles, forest);
-  assert.deepEqual(session.materialized().noVehicleTiles, forest,
-    "the Forest tool authors both sparse gameplay layers");
+  session.beginOverlayStroke("Excluded vehicles");
+  assert.deepEqual(session.paintOverlayTiles(overlap, { noVehicle: true }), overlap);
+  assert.equal(session.commitOverlayStroke(), true);
+  assert.deepEqual(session.materialized().stealthTiles, overlap);
+  assert.deepEqual(session.materialized().noVehicleTiles, overlap,
+    "independent authoring tools may intentionally overlap their sparse semantic layers");
 
   session.beginOverlayStroke("Made long grass");
-  assert.deepEqual(session.paintOverlayTiles([forest[1]], { noVehicle: false }), [forest[1]]);
+  assert.deepEqual(session.paintOverlayTiles([overlap[1]], { noVehicle: false }), [overlap[1]]);
   assert.equal(session.commitOverlayStroke(), true);
-  assert.deepEqual(session.materialized().stealthTiles, forest,
+  assert.deepEqual(session.materialized().stealthTiles, overlap,
     "removing vehicle exclusion leaves independent stealth cover intact");
-  assert.deepEqual(session.materialized().noVehicleTiles, [forest[0]]);
-  assert.deepEqual(session.exportMap().stealthTiles, forest,
+  assert.deepEqual(session.materialized().noVehicleTiles, [overlap[0]]);
+  assert.deepEqual(session.exportMap().stealthTiles, overlap,
     "authored exports retain sparse coordinate pairs rather than a full tile layer");
   assert.equal(session.undo(), true);
-  assert.deepEqual(session.materialized().noVehicleTiles, forest,
+  assert.deepEqual(session.materialized().noVehicleTiles, overlap,
     "overlay strokes participate in the editor's normal undo history");
 }
 
@@ -1270,6 +1274,9 @@ assert(
   });
   assert.equal(structuredClone(record).doodadUpdate.doodads[0].id, 1,
     "the revisioned doodad replacement and editor overlay remain structured-cloneable");
+  assert.equal(record.version, 2);
+  assert.deepEqual(record.layerVisibility, defaultMapAuthoringLayerVisibility(),
+    "Map Editor presentation v2 carries complete layer visibility to the Pixi owner");
   assert.throws(() => createMapEditorPresentation({
     frameId: 1, camera: { x: 0, y: 0, zoom: 1 },
     doodadUpdate: { kind: "patch", revision: 1, upserts: [], removedIds: [2, 2] },

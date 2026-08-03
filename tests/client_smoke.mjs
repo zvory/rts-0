@@ -627,6 +627,16 @@ try {
           value: Number(input.value),
         };
       })(),
+      layers: [...document.querySelectorAll(".map-editor-layer-toggle")].map((label) => ({
+        label: label.querySelector("span")?.textContent || "",
+        description: label.querySelector("small")?.textContent || "",
+        checked: !!label.querySelector("input[type=checkbox]")?.checked,
+      })),
+      overlayTools: (() => {
+        const section = [...document.querySelectorAll(".map-editor-group")]
+          .find((node) => node.querySelector("legend")?.textContent === "Gameplay overlays");
+        return [...section?.querySelectorAll("button") || []].map((button) => button.textContent?.trim() || "");
+      })(),
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
@@ -676,6 +686,20 @@ try {
       editorUi.zoom.min === "5" && editorUi.zoom.max === "400" && editorUi.zoom.value > 0,
     `MAP EDITOR: top Tools section exposes bounded framing, step, and percentage zoom controls (${JSON.stringify(editorUi.zoom)})`,
   );
+  ok(
+    editorUi.layers.length === 6 && editorUi.layers.every((layer) => layer.checked && layer.description) &&
+      ["Terrain & bases", "Stealth", "No vehicles", "Trees", "Gameplay doodads", "Decorative doodads"]
+        .every((label) => editorUi.layers.some((layer) => layer.label === label)) &&
+      ["Paint stealth", "Paint no vehicles", "Erase stealth", "Erase no vehicles"]
+        .every((label) => editorUi.overlayTools.includes(label)) &&
+      !editorUi.overlayTools.includes("Forest") && !editorUi.overlayTools.includes("Erase both"),
+    `MAP EDITOR: six independent visible layers replace combined Forest authoring (${JSON.stringify(editorUi.layers)})`,
+  );
+  await editorPage.click("input[aria-label='Show Stealth']");
+  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === false);
+  await editorPage.click("input[aria-label='Show Stealth']");
+  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === true);
+  ok(true, "MAP EDITOR: layer checkbox changes reach the live worker presentation path");
   ok(
     editorUi.actionButtons.includes("Load map or recipe JSON") &&
       editorUi.actionButtons.includes("Apply recipe JSON") &&

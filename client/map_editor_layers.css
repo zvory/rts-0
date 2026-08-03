@@ -1,0 +1,30 @@
+.map-editor-layer-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 7px;
+}
+
+.map-editor-layer-toggle {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  column-gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid rgba(208, 184, 132, 0.18);
+  border-radius: 4px;
+  color: #e7dfce;
+  cursor: pointer;
+}
+
+.map-editor-layer-toggle input {
+  grid-row: 1 / span 2;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #c9aa67;
+}
+
+.map-editor-layer-toggle small {
+  color: #aaa28f;
+  font-size: 10px;
+}

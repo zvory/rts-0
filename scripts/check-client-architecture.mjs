@@ -181,7 +181,9 @@ const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "renderer/pixi_compatibility_adapter.js -> presentation/grid_snapshot.js": "The Pixi owner materializes cloneable revisioned grid records into private staging buffers.",
   "renderer/pixi_compatibility_adapter.js -> presentation/projection_record.js": "The Pixi owner reconstructs private orthographic queries from the plain RendererProjectionV2 record.",
   "renderer/worker_messages.js -> presentation/frame.js": "The future worker wire pins and validates the renderer-neutral presentation and static-map versions.",
+  "renderer/worker_messages.js -> map_editor_presentation.js": "The worker host pins the detached Map Editor presentation version before cloning it across the boundary.",
   "renderer/map_editor_worker_renderer.js -> map_editor_presentation.js": "The worker-owned Pixi Map Editor renderer validates the detached editor record it consumes.",
+  "renderer/map_editor_worker_renderer.js -> map_authoring/layers.js": "The Map Editor worker consumes the pure shared UI/CLI layer vocabulary to classify presentation-only visibility without importing editor state.",
   "renderer/pixi_worker_host.js -> presentation/submission.js": "The sole main-thread Pixi host exposes the renderer-neutral asynchronous presentation lifecycle.",
   "presentation/projection_record.js -> camera_projection.js": "RendererProjectionV2 reconstruction reuses the pure projection math used by the semantic camera.",
 }));

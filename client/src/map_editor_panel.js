@@ -1,6 +1,7 @@
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { buildMapFromRecipe, isMapAuthoringRecipe } from "./map_authoring/recipe.js";
+import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import {
   canonicalDoodadColor,
@@ -190,6 +191,7 @@ export class MapEditorPanel {
     } else {
       body.append(
         this.renderZoom(),
+        this.renderLayers(),
         this.renderTerrain(),
         this.renderMapOverlays(),
         this.renderDoodads(),
@@ -239,6 +241,30 @@ export class MapEditorPanel {
   updateZoomControl(percent = this.viewport.zoomPercent()) {
     if (!this.zoomInput?.isConnected) return;
     this.zoomInput.value = String(percent);
+  }
+
+  renderLayers() {
+    const section = group("Visible layers");
+    const list = document.createElement("div");
+    list.className = "map-editor-layer-list";
+    const visibility = this.viewport.layerVisibilitySnapshot();
+    for (const layer of MAP_AUTHORING_LAYERS) {
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = visibility[layer.id];
+      input.setAttribute("aria-label", `Show ${layer.label}`);
+      input.addEventListener("change", () => this.viewport.setLayerVisibility(layer.id, input.checked));
+      const label = document.createElement("label");
+      label.className = "map-editor-layer-toggle";
+      const text = document.createElement("span");
+      text.textContent = layer.label;
+      const description = document.createElement("small");
+      description.textContent = layer.description;
+      label.append(input, text, description);
+      list.appendChild(label);
+    }
+    section.appendChild(list);
+    return section;
   }
 
   renderMapSource() {
@@ -379,12 +405,10 @@ export class MapEditorPanel {
     const palette = document.createElement("div");
     palette.className = "map-editor-palette";
     const tools = [
-      ["Forest", { stealth: true, noVehicle: true }, "forest tiles"],
-      ["Stealth only", { stealth: true }, "stealth tiles"],
-      ["No vehicles only", { noVehicle: true }, "no-vehicle tiles"],
+      ["Paint stealth", { stealth: true }, "stealth tiles"],
+      ["Paint no vehicles", { noVehicle: true }, "no-vehicle tiles"],
       ["Erase stealth", { stealth: false }, "stealth erasure"],
       ["Erase no vehicles", { noVehicle: false }, "no-vehicle erasure"],
-      ["Erase both", { stealth: false, noVehicle: false }, "overlay erasure"],
     ];
     for (const [label, edit, status] of tools) {
       palette.appendChild(button(label, () => {
@@ -397,7 +421,7 @@ export class MapEditorPanel {
     }
     section.append(
       readout(`${this.session.draft.stealthTiles.length} stealth tiles; ${this.session.draft.noVehicleTiles.length} no-vehicle tiles.`),
-      readout("Forest paints both layers. Long grass or other future cover can use stealth alone."),
+      readout("Stealth and vehicle exclusion are independent map semantics. Paint or erase each layer explicitly."),
       palette,
     );
     return section;
