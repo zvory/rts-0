@@ -1,0 +1,25 @@
+# AI controller transcript fixtures
+
+`jeff_live_oracle_v1.jsonl` is the immutable schema-1 production-controller specimen for Jeff's
+AI. It runs two `jeffs_ai` controllers on authored `Chokes` with seed `0x4a45_4646`; ordinary tests
+compare ticks 0-3599 and `RTS_FULL_AI_TESTS=1` compares ticks 0-8999.
+
+Generate a review candidate, which writes only below this crate's `target/` directory, with:
+
+```bash
+RTS_FULL_AI_TESTS=1 RTS_GENERATE_JEFF_ORACLE_CANDIDATE=1 \
+  cargo nextest run --config-file .config/nextest.toml \
+  --manifest-path server/Cargo.toml --profile default -p rts-ai \
+  -E 'test(/jeff_live_oracle/)'
+```
+
+The resulting file is
+`server/crates/ai/target/jeff-live-oracle/candidate-v1.jsonl`. Generation never updates this
+directory. The checked-in fixture must not be regenerated to make Phases 2-8 refactors pass;
+changing it requires a separately approved production behavior change with a transcript review.
+
+Canonical records are compact UTF-8 JSON Lines with one LF-terminated serde struct record per
+line. Field order is the Rust schema declaration order. Fingerprints are lowercase
+`fnv1a64:<hex>` values computed over the compact `serde_json` bytes of the named value; the exact
+emitted `SimCommand` values remain in the fixture so command drift is reviewable without reversing
+a hash.

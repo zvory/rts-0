@@ -127,6 +127,21 @@ production, and combat.
 
 ### Self-play and arena tools
 
+The test-only schema-1 Jeff live-controller oracle freezes command generation separately from
+simulation replay. It drives two production `AiController`s in player order on authored `Chokes`
+with seed `0x4a45_4646`, captures both stagger offsets and every empty/result batch before enqueue,
+then fingerprints the fog-filtered inputs, recipient events, and post-tick player views while
+preserving exact retreat and emitted commands. The normal test compares a 3,600-tick prefix; the
+`RTS_FULL_AI_TESTS=1` tier compares the full 9,000-tick fixture. The fixture and candidate policy
+are documented in `server/crates/ai/fixtures/README.md` and the testing design.
+
+This oracle currently mirrors the live host sequence rather than sharing it. It therefore freezes
+the controller plus that mirror but cannot catch a change made only to `lobby/live_tick.rs`.
+Likewise, `ProfileBackedScript` remains an offline adapter with different cadence, placement
+search, filtering, memory, and no live worker-retreat injection. The next AI SDK phase must replace
+those duplicated host paths with one shared tick driver, using this immutable transcript to prove
+that the live cutover changes no Jeff behavior.
+
 The ai-matchup binary runs one fixed-horizon profile-versus-profile match until a starting City
 Centre objective win or the tick cap. A match with no objective winner at the default 25,000-tick
 horizon is a draw.

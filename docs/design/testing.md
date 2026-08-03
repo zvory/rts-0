@@ -21,6 +21,44 @@ deterministic simulation ordering. Preserved schema 2 incident replay files are 
 not supported replay fixtures; current replay workloads use schema 3 captures. Entity iteration and
 A* tie-breaking must remain stable; avoid hash-order-dependent simulation behavior.
 
+**Live-controller transcript parity.** The schema-1 Jeff oracle in
+`server/crates/ai/fixtures/jeff_live_oracle_v1.jsonl` answers a different question from command-log
+replay: it reruns the actual `AiController` and proves that the controller generates the same
+ordered command batches from the same fog-filtered inputs. Its test-only host mirrors the current
+AI-only portion of `lobby/live_tick.rs`: two `jeffs_ai` controllers run in player order on authored
+`Chokes` with seed `0x4a45_4646`, every controller result is collected before any command is
+enqueued, and `primary_base_alive_players()` supplies the objective-alive set. The transcript keeps
+every empty call, exact retreat input and emitted `SimCommand`, current-tick decision trace,
+post-tick command-log delta, recipient-event digest, objective-alive IDs, and per-player snapshot
+digest. Compact serde JSON bytes and repository-owned FNV-1a64 fingerprints are the stable
+canonical representation; Git or compiler identity is not behavior identity.
+
+The ordinary gate compares ticks 0-3599, covering both nine-tick stagger offsets, opening economy,
+failed-site placement recovery, construction, production, staging, and first attack orders. With
+`RTS_FULL_AI_TESTS=1`, it compares all 9,000 ticks, extending through Tank/Scout Car production,
+armored movement and hold orders, expansion construction, later pending-build recovery, and stage
+suppression. A first-divergence report classifies input, command, trace, or post-tick drift and
+includes fixture metadata plus the exact tick/player/command index and surrounding fingerprints.
+
+Candidate generation is explicit and target-only:
+
+```bash
+RTS_FULL_AI_TESTS=1 RTS_GENERATE_JEFF_ORACLE_CANDIDATE=1 \
+  cargo nextest run --config-file .config/nextest.toml \
+  --manifest-path server/Cargo.toml --profile default -p rts-ai \
+  -E 'test(/jeff_live_oracle/)'
+```
+
+It writes `server/crates/ai/target/jeff-live-oracle/candidate-v1.jsonl`; ordinary tests never write
+or bless fixtures. The checked-in schema-1 fixture is immutable during the AI SDK refactors and
+must not be regenerated to hide a mismatch.
+
+This first oracle deliberately mirrors rather than shares the production host sequence, so it
+cannot detect a future edit made only in `lobby/live_tick.rs`. The offline profile-backed tools
+also still differ from live cadence, placement, filtering, and retreat injection. The next AI SDK
+phase must close both gaps by extracting one shared tick driver used by live, offline, and oracle
+hosts while the frozen transcript proves that production behavior survived the cutover.
+
 **Derived-state rebuild coverage.** The test-only `Game` rebuild seam clears the persistent
 `PathingService` cache and rebuilds the final spatial index from authoritative entities at a tick
 boundary. The paired-game derived-state test warms pathing, rebuilds derived state in one copy, and

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation.
+- [x] Done.
 
 ## Objective
 
@@ -78,16 +78,16 @@ room execution.
 
 ## Implementation Checklist
 
-- [ ] Mirror the exact current production AI-only call order without extracting it.
-- [ ] Document the temporary host-orchestration blind spot and Phase 2 closure requirement.
-- [ ] Define the versioned transcript schema and stable canonical hashing.
-- [ ] Capture exact commands and all required input/post-tick fingerprints.
-- [ ] Commit one bounded Jeff-versus-Jeff fixture with normal/full tiers.
-- [ ] Add actionable first-divergence reporting and comparator tests.
-- [ ] Add an explicit target-only candidate generator and fixture refresh policy.
-- [ ] Document what replay proves versus what the Jeff oracle proves.
-- [ ] Confirm no production AI, simulation, protocol, or gameplay code changed.
-- [ ] Mark this phase done in the implementation commit.
+- [x] Mirror the exact current production AI-only call order without extracting it.
+- [x] Document the temporary host-orchestration blind spot and Phase 2 closure requirement.
+- [x] Define the versioned transcript schema and stable canonical hashing.
+- [x] Capture exact commands and all required input/post-tick fingerprints.
+- [x] Commit one bounded Jeff-versus-Jeff fixture with normal/full tiers.
+- [x] Add actionable first-divergence reporting and comparator tests.
+- [x] Add an explicit target-only candidate generator and fixture refresh policy.
+- [x] Document what replay proves versus what the Jeff oracle proves.
+- [x] Confirm no production AI, simulation, protocol, or gameplay code changed.
+- [x] Mark this phase done in the implementation commit.
 
 ## Verification
 
