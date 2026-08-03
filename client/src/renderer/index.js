@@ -422,12 +422,12 @@ export class Renderer {
           if (this._destroyed) return;
           console.warn(`RTS building PNG atlas disabled for ${kind}: ${err?.message || err}`);
           throw err;
-        }), { kind, source: "buildingPngAtlas" });
+        }), { kind, source: "buildingPngAtlas", required: false });
     }
   }
 
-  _trackVisualAsset(id, promise, { kind = "", source = "asset" } = {}) {
-    const record = { id, kind, source, status: "pending", message: "" };
+  _trackVisualAsset(id, promise, { kind = "", source = "asset", required = true } = {}) {
+    const record = { id, kind, source, required, status: "pending", message: "" };
     this._assetReadiness.set(id, record);
     record.promise = Promise.resolve(promise).then(
       (value) => {
@@ -442,6 +442,18 @@ export class Renderer {
       },
     );
     return record.promise;
+  }
+
+  startupAssetReadiness() {
+    const assets = [...this._assetReadiness.values()];
+    const pendingAssets = assets.filter((asset) => asset.status === "pending");
+    const failedAssets = assets.filter((asset) => asset.required && asset.status === "failed");
+    return {
+      ready: pendingAssets.length === 0 && failedAssets.length === 0,
+      failedAssets,
+      fallbackAssets: assets.filter((asset) => !asset.required && asset.status === "failed"),
+      pendingAssets,
+    };
   }
 
   captureReadiness({ subjectIds = [], subjectKinds = [] } = {}) {

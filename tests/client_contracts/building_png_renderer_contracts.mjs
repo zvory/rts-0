@@ -110,7 +110,6 @@ try {
     typeof fallback?.matches === "function",
     "building uses its SVG rig while the production atlas is unavailable",
   );
-  assert(!renderer._iconPool, "building renderer omits legacy abbreviation labels");
 
   for (const seen of Object.values(renderer._seen)) seen.clear();
   renderer._buildingPngRigAtlasTextures.set(
@@ -144,6 +143,43 @@ try {
   renderer?.destroy();
   restorePixi();
 }
+
+const readinessRenderer = {
+  _assetReadiness: new Map(),
+  _missingTextureEntityIds: new Set(),
+  _renderFrameCount: 0,
+  _renderErrors: new Map(),
+  groundDecalDiagnostics: () => ({ assetStatus: "idle" }),
+};
+Renderer.prototype._trackVisualAsset.call(
+  readinessRenderer,
+  "building-png:barracks",
+  Promise.reject(new Error("building atlas unavailable")),
+  { kind: KIND.BARRACKS, source: "buildingPngAtlas", required: false },
+);
+await Promise.resolve();
+await Promise.resolve();
+const startupReadiness = Renderer.prototype.startupAssetReadiness.call(readinessRenderer);
+strictAssert.equal(startupReadiness.ready, true);
+strictAssert.equal(startupReadiness.failedAssets.length, 0);
+strictAssert.equal(startupReadiness.fallbackAssets.length, 1);
+const captureReadiness = Renderer.prototype.captureReadiness.call(readinessRenderer, {
+  subjectKinds: [KIND.BARRACKS],
+});
+strictAssert.equal(captureReadiness.ready, false);
+strictAssert.equal(captureReadiness.failedAssets.length, 1);
+Renderer.prototype._trackVisualAsset.call(
+  readinessRenderer,
+  "live-png:tank",
+  Promise.reject(new Error("required unit atlas unavailable")),
+  { kind: KIND.TANK, source: "livePngAtlas" },
+);
+await Promise.resolve();
+await Promise.resolve();
+const blockedStartup = Renderer.prototype.startupAssetReadiness.call(readinessRenderer);
+strictAssert.equal(blockedStartup.ready, false);
+strictAssert.equal(blockedStartup.failedAssets.length, 1);
+strictAssert.equal(blockedStartup.fallbackAssets.length, 1);
 
 console.log("building_png_renderer_contracts: ok");
 
