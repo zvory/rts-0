@@ -15,6 +15,7 @@ use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
 };
 use crate::ai_shared;
+use crate::sdk::{AiActionRequest, AiActions, AiFrame, AiStrategy};
 use crate::selfplay::pending_build::PendingBuildTracker;
 use crate::selfplay::player_view::{
     footprint_placeable_from_snapshot, occupied_tiles_from_snapshot, PlayerView,
@@ -29,6 +30,7 @@ const DECISION_INTERVAL: u32 = 9;
 const LIVE_DECISION_TRACE_MAX_LINES: usize = 24;
 const LIVE_DECISION_TRACE_MAX_LINE_CHARS: usize = 256;
 const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
+const CUSTOM_STRATEGY_PROFILE_ID: &str = "custom_strategy";
 
 /// The default live-lobby profile id.
 pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_1_ID;
@@ -239,6 +241,16 @@ pub struct AiController {
     active_attack_units: BTreeMap<u32, u32>,
     last_decision_trace: Option<AiDecisionTraceSnapshot>,
     last_debug_map_layers: Vec<ObserverMapAnalysisLayer>,
+    custom_strategy: Option<Box<dyn AiStrategy>>,
+    strategy_initialized: bool,
+}
+
+struct LegacyProfileStrategy;
+
+impl LegacyProfileStrategy {
+    fn project(frame: &AiFrame) -> Option<AiObservation> {
+        AiObservation::from_frame(frame)
+    }
 }
 
 impl AiController {
@@ -259,7 +271,18 @@ impl AiController {
             active_attack_units: BTreeMap::new(),
             last_decision_trace: None,
             last_debug_map_layers: Vec::new(),
+            custom_strategy: None,
+            strategy_initialized: false,
         }
+    }
+
+    /// Constructs a custom strategy in the same cadence, fog, validation, and replay envelope as
+    /// built-in profiles.
+    pub fn with_strategy(player: u32, strategy: Box<dyn AiStrategy>) -> Self {
+        let mut controller = Self::new(player);
+        controller.profile_id = CUSTOM_STRATEGY_PROFILE_ID;
+        controller.custom_strategy = Some(strategy);
+        controller
     }
 
     pub fn player_id(&self) -> u32 {
@@ -291,7 +314,9 @@ impl AiController {
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         let mut commands = context.retreat_commands;
         let tick = context.snapshot.tick;
-        self.static_map_context.get_or_analyze(context.start);
+        if self.custom_strategy.is_none() {
+            self.static_map_context.get_or_analyze(context.start);
+        }
         if !tick
             .wrapping_add(self.player)
             .is_multiple_of(DECISION_INTERVAL)
@@ -307,13 +332,42 @@ impl AiController {
             alive_player_ids: context.alive_player_ids,
         };
         self.pending_builds.observe(view);
-        let Some(observation) = AiObservation::from_snapshot_with_alive(
+        let pending_builds = self.pending_builds.intents();
+        let Some(frame) = AiFrame::from_host(
             context.start,
             context.snapshot,
             self.player,
-            self.pending_builds.intents(),
+            pending_builds.iter().copied().map(Into::into),
             Some(context.alive_player_ids),
         ) else {
+            return commands;
+        };
+
+        #[cfg(test)]
+        {
+            let direct = AiObservation::from_snapshot_with_alive(
+                context.start,
+                context.snapshot,
+                self.player,
+                pending_builds,
+                Some(context.alive_player_ids),
+            );
+            assert_eq!(LegacyProfileStrategy::project(&frame), direct);
+        }
+
+        if let Some(strategy) = self.custom_strategy.as_mut() {
+            if !self.strategy_initialized {
+                strategy.initialize(&frame);
+                self.strategy_initialized = true;
+            }
+            let mut actions = AiActions::new();
+            strategy.step(&frame, &mut actions);
+            commands.extend(actions.into_requests().into_iter().map(action_to_command));
+            self.pending_builds.record_commands(tick, &commands);
+            return commands;
+        }
+
+        let Some(observation) = LegacyProfileStrategy::project(&frame) else {
             return commands;
         };
         self.prune_combat_memory(&observation, tick);
@@ -509,6 +563,82 @@ impl AiController {
             }
         }
         filtered
+    }
+}
+
+fn action_to_command(request: AiActionRequest) -> SimCommand {
+    match request {
+        AiActionRequest::Move {
+            units,
+            x,
+            y,
+            queued,
+        } => SimCommand::Move {
+            units,
+            x,
+            y,
+            queued,
+        },
+        AiActionRequest::AttackMove {
+            units,
+            x,
+            y,
+            queued,
+        } => SimCommand::AttackMove {
+            units,
+            x,
+            y,
+            queued,
+        },
+        AiActionRequest::Attack {
+            units,
+            target,
+            queued,
+        } => SimCommand::Attack {
+            units,
+            target,
+            queued,
+        },
+        AiActionRequest::Gather {
+            units,
+            node,
+            queued,
+        } => SimCommand::Gather {
+            units,
+            node,
+            queued,
+        },
+        AiActionRequest::Build {
+            units,
+            building,
+            tile_x,
+            tile_y,
+            queued,
+        } => SimCommand::Build {
+            units,
+            building,
+            tile_x,
+            tile_y,
+            queued,
+        },
+        AiActionRequest::Train { building, unit } => SimCommand::Train { building, unit },
+        AiActionRequest::Research { building, upgrade } => {
+            SimCommand::Research { building, upgrade }
+        }
+        AiActionRequest::HoldPosition { units, queued } => {
+            SimCommand::HoldPosition { units, queued }
+        }
+        AiActionRequest::SetupAntiTankGuns {
+            units,
+            x,
+            y,
+            queued,
+        } => SimCommand::SetupAntiTankGuns {
+            units,
+            x,
+            y,
+            queued,
+        },
     }
 }
 
@@ -747,6 +877,53 @@ mod tests {
 
         assert_eq!(commands, vec![retreat]);
         assert_eq!(trace, None);
+    }
+
+    #[test]
+    fn custom_strategy_actions_follow_host_retreats_on_decision_ticks() {
+        struct MoveStrategy;
+
+        impl AiStrategy for MoveStrategy {
+            fn step(&mut self, _frame: &AiFrame, actions: &mut AiActions) {
+                actions.submit(AiActionRequest::Move {
+                    units: vec![7],
+                    x: 128.0,
+                    y: 160.0,
+                    queued: false,
+                });
+            }
+        }
+
+        let players = driver_test_players();
+        let game = Game::new_without_ai_controllers(&players, 13);
+        let start = game.start_payload();
+        let mut snapshot = game.snapshot_for(1);
+        snapshot.tick = 8;
+        let retreat = SimCommand::Move {
+            units: vec![42],
+            x: 64.0,
+            y: 96.0,
+            queued: false,
+        };
+        let mut controller = AiController::with_strategy(1, Box::new(MoveStrategy));
+
+        let commands = controller.think(AiThinkContext {
+            start: &start,
+            snapshot: &snapshot,
+            alive_player_ids: &[1, 2],
+            retreat_commands: vec![retreat.clone()],
+        });
+
+        assert_eq!(commands[0], retreat);
+        assert_eq!(
+            commands[1],
+            SimCommand::Move {
+                units: vec![7],
+                x: 128.0,
+                y: 160.0,
+                queued: false,
+            }
+        );
     }
 
     #[test]

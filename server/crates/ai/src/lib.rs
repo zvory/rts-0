@@ -4,6 +4,7 @@
 //! simulation crate does not depend on this crate.
 
 pub mod ai_core;
+pub mod sdk;
 pub mod selfplay;
 pub mod tools;
 
