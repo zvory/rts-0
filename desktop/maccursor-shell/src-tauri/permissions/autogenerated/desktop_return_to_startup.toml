@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-desktop-return-to-startup"
+description = "Enables the desktop_return_to_startup command without any pre-configured scope."
+commands.allow = ["desktop_return_to_startup"]
+
+[[permission]]
+identifier = "deny-desktop-return-to-startup"
+description = "Denies the desktop_return_to_startup command without any pre-configured scope."
+commands.deny = ["desktop_return_to_startup"]

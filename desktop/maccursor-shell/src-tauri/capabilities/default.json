@@ -18,6 +18,7 @@
     "allow-desktop-log-info",
     "allow-desktop-reveal-logs",
     "allow-desktop-log-client-event",
-    "allow-desktop-open-profile"
+    "allow-desktop-open-profile",
+    "allow-desktop-return-to-startup"
   ]
 }

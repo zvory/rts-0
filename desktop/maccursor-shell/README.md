@@ -57,6 +57,10 @@ spike:
 }
 ```
 
+The loaded lobby and Lab scenario catalog show a **Back** button in desktop sessions. It invokes the
+shell-owned `desktop_return_to_startup` command and returns the same WebView to the Beta/Mainline
+selector. The command is unavailable to ordinary browsers and rejects startup or unrelated origins.
+
 Pointer Lock is deliberately disabled inside the macOS shell. Cursor-lock requests
 use `window.__RTS_NATIVE_CURSOR`, a Tauri-injected native bridge that hides and
 disconnects the macOS cursor, forwards native mouse movement/down/up/wheel
@@ -207,13 +211,14 @@ Manual check:
    `https://rts-0-zvorygin-beta.fly.dev/`.
 4. Restart, choose Mainline, and confirm the loaded page uses
    `https://rts-0-zvorygin.fly.dev/`.
-5. From the lobby, use **Open Lab** and confirm the lab opens in the same
-   shell window and starts the lab room.
-6. Start a one-player sandbox or AI match from either release channel.
-7. Press F11 on the startup selector, Beta, Mainline, lobby, and in-match
+5. From the lobby, use **Back** and confirm the release-channel selector returns; reopen a channel.
+6. Use **Open Lab**, confirm the scenario catalog opens in the same shell window, then use **Back**
+   and confirm the release-channel selector returns.
+7. Reopen a channel and start a one-player sandbox or AI match.
+8. Press F11 on the startup selector, Beta, Mainline, lobby, and in-match
    screens; confirm each press toggles temporary display-mode fullscreen. Also
    confirm **Settings > Game > Use fullscreen mode** stays synchronized.
-8. Confirm the shell locks the cursor automatically in-match. Open Settings and
+9. Confirm the shell locks the cursor automatically in-match. Open Settings and
    hold Tab, and confirm each menu releases the cursor and remains clickable.
    Close each menu and confirm capture resumes. Then Alt-Tab away
    and back to confirm the display mode and cursor capture restore cleanly.
@@ -221,5 +226,5 @@ Manual check:
    wheel zoom. Press Escape and confirm the cursor and display mode restore.
    Inspect
    `window.__RTS_NATIVE_CURSOR.diagnostics()` if movement feels delayed.
-9. Use **Copy log path** or **Reveal logs** from the startup screen and confirm
+10. Use **Copy log path** or **Reveal logs** from the startup screen and confirm
    `shell.log` contains startup and selected-profile events.
