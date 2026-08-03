@@ -1,4 +1,4 @@
-import { KIND } from "../protocol.js";
+import { KIND, isRoadTerrain } from "../protocol.js";
 import { mulberry32, rgba } from "./decals/selection.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
 
@@ -10,6 +10,7 @@ const UPLOAD_INTERVAL_MS = 100;
 const COVERAGE_CELL_WORLD_SIZE = 8;
 const COVERAGE_HEADING_BINS = 32;
 const MAX_LIVE_COVERAGE_CELLS = 65_536;
+const TREAD_OPACITY_SCALE = 0.42;
 
 /**
  * Renders approximate checkpointed tread history plus precise live marks for every tank currently
@@ -37,6 +38,7 @@ export class TankTreadLayer {
     this.mapTileSize = 32;
     this.mapWidthTiles = 0;
     this.mapHeightTiles = 0;
+    this.roadTiles = new Set();
     this.authoritativeRevealDirty = false;
     this.lastVisibleFogRevision = null;
     this.nextUploadAt = 0;
@@ -53,6 +55,9 @@ export class TankTreadLayer {
     this.mapTileSize = tileSize;
     this.mapWidthTiles = Math.max(1, map?.width || 1);
     this.mapHeightTiles = Math.max(1, map?.height || 1);
+    for (let index = 0; index < this.mapWidthTiles * this.mapHeightTiles; index += 1) {
+      if (isRoadTerrain(map?.terrain?.[index])) this.roadTiles.add(index);
+    }
     return true;
   }
 
@@ -152,6 +157,10 @@ export class TankTreadLayer {
       for (const [tileIndex, segments] of segmentsByTile) {
         const tx = tileIndex % this.mapWidthTiles;
         const ty = Math.floor(tileIndex / this.mapWidthTiles);
+        if (this.roadTiles.has(tileIndex)) {
+          segmentsByTile.delete(tileIndex);
+          continue;
+        }
         if (!fog.isVisible(tx, ty)) continue;
         const clip = {
           x: tx * this.mapTileSize,
@@ -210,6 +219,7 @@ export class TankTreadLayer {
     this.mapTileSize = 32;
     this.mapWidthTiles = 0;
     this.mapHeightTiles = 0;
+    this.roadTiles.clear();
     this.totalSegments = 0;
     this.textureUpdateCount = 0;
   }
@@ -265,12 +275,46 @@ export class TankTreadLayer {
           tile.ctx.clip();
         }
         stampTankTreads(tile.ctx, segment, DOWNSAMPLE);
+        this._clearRoadPixels(tile.ctx, tx, ty, minX, minY, maxX, maxY, clip);
         tile.ctx.restore();
         dirty.add(tile);
         painted = true;
       }
     }
     return painted;
+  }
+
+  _clearRoadPixels(ctx, textureTx, textureTy, minX, minY, maxX, maxY, clip) {
+    if (this.roadTiles.size === 0) return;
+    const textureMinX = textureTx * TILE_WORLD_SIZE;
+    const textureMinY = textureTy * TILE_WORLD_SIZE;
+    const textureMaxX = textureMinX + TILE_WORLD_SIZE;
+    const textureMaxY = textureMinY + TILE_WORLD_SIZE;
+    const clearMinX = Math.max(minX, textureMinX, clip?.x ?? minX);
+    const clearMinY = Math.max(minY, textureMinY, clip?.y ?? minY);
+    const clearMaxX = Math.min(maxX, textureMaxX, clip ? clip.x + clip.width : maxX);
+    const clearMaxY = Math.min(maxY, textureMaxY, clip ? clip.y + clip.height : maxY);
+    if (clearMinX >= clearMaxX || clearMinY >= clearMaxY) return;
+    const firstTx = Math.max(0, Math.floor(clearMinX / this.mapTileSize));
+    const firstTy = Math.max(0, Math.floor(clearMinY / this.mapTileSize));
+    const lastTx = Math.min(this.mapWidthTiles - 1,
+      Math.floor(Math.max(clearMinX, clearMaxX - 0.001) / this.mapTileSize));
+    const lastTy = Math.min(this.mapHeightTiles - 1,
+      Math.floor(Math.max(clearMinY, clearMaxY - 0.001) / this.mapTileSize));
+    for (let mapTy = firstTy; mapTy <= lastTy; mapTy += 1) {
+      for (let mapTx = firstTx; mapTx <= lastTx; mapTx += 1) {
+        if (!this.roadTiles.has(mapTy * this.mapWidthTiles + mapTx)) continue;
+        const roadX = mapTx * this.mapTileSize;
+        const roadY = mapTy * this.mapTileSize;
+        const roadClearX = Math.max(roadX, clearMinX);
+        const roadClearY = Math.max(roadY, clearMinY);
+        const roadClearMaxX = Math.min(roadX + this.mapTileSize, clearMaxX);
+        const roadClearMaxY = Math.min(roadY + this.mapTileSize, clearMaxY);
+        ctx.clearRect(roadClearX / DOWNSAMPLE, roadClearY / DOWNSAMPLE,
+          (roadClearMaxX - roadClearX) / DOWNSAMPLE,
+          (roadClearMaxY - roadClearY) / DOWNSAMPLE);
+      }
+    }
   }
 
   _rememberLiveCoverage(segment) {
@@ -425,10 +469,12 @@ function stampTankTreads(ctx, segment, downsample) {
     const t = step / steps;
     const pose = interpolatedPose(segment, turn, t);
     const churn = Math.min(1, Math.abs(turn) * 9);
-    ctx.fillStyle = rgba(0x4a3520, (0.004 + churn * 0.018) / steps);
+    ctx.fillStyle = rgba(0x4a3520,
+      ((0.004 + churn * 0.018) / steps) * TREAD_OPACITY_SCALE);
     stampContactBed(ctx, pose, downsample, -11.8);
     stampContactBed(ctx, pose, downsample, 11.8);
-    ctx.fillStyle = rgba(0x241a10, (0.035 + rng() * 0.008) / Math.sqrt(steps));
+    ctx.fillStyle = rgba(0x241a10,
+      ((0.035 + rng() * 0.008) / Math.sqrt(steps)) * TREAD_OPACITY_SCALE);
     stampShoes(ctx, pose, downsample, -11.8, lerp(previousLeft, segment.treadPhaseLeft, t));
     stampShoes(ctx, pose, downsample, 11.8, lerp(previousRight, segment.treadPhaseRight, t));
   }
@@ -474,7 +520,7 @@ function stampShear(ctx, segment, downsample, lateral, beltDelta, rng) {
     const slip = Math.hypot(to.x - from.x, to.y - from.y);
     if (slip < 0.08) continue;
     ctx.fillStyle = rgba(0x2c2014,
-      Math.min(0.16, 0.025 + slip * 0.045) * (0.88 + rng() * 0.24));
+      Math.min(0.16, 0.025 + slip * 0.045) * (0.88 + rng() * 0.24) * TREAD_OPACITY_SCALE);
     stampSweptRect(ctx, from, to, 2.1, downsample);
   }
 }

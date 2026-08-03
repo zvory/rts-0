@@ -3,7 +3,7 @@ import { GroundDecalSync } from "../../client/src/match_ground_decal_sync.js";
 import { GroundDecalBuffer } from "../../client/src/state_ground_decals.js";
 import { GroundDecalLayer } from "../../client/src/renderer/decals.js";
 import { TrenchDecalLayer } from "../../client/src/renderer/trenches.js";
-import { KIND, msg } from "../../client/src/protocol.js";
+import { KIND, TERRAIN, msg } from "../../client/src/protocol.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
 const inlineDecal = (id, overrides = {}) => ({
@@ -279,6 +279,35 @@ assert(
       decalLayer.diagnostics().tankTreads.tileCount === 1 &&
       layer.children[1].texture.sourceUpdateCount === 1,
     "treads upload one bounded tile without modifying the whole-map permanent decal texture");
+
+    const roadMap = {
+      width: 4,
+      height: 4,
+      tileSize: 32,
+      terrain: Array(16).fill(TERRAIN.GRASS),
+    };
+    roadMap.terrain.splice(8, 4, ...Array(4).fill(TERRAIN.ROAD_HORIZONTAL));
+    const roadLayer = new GroundDecalLayer({ layer: new PIXI.Container() });
+    roadLayer.resetForMap(roadMap);
+    roadLayer.stampLiveTankTreads([tank]);
+    roadLayer.stampLiveTankTreads([{ ...tank, x: 48, facing: 0.12 }]);
+    assert(roadLayer.tankTreads.tiles.get("0:0")?.ctx.clearRects
+      .some((rect) => rect.join(",") === "0,32,16,16"),
+    "live tank treads clear road-tile pixels after stamping");
+    const roadDiagnostics = roadLayer.diagnostics().tankTreads;
+    roadLayer.stampBatch([{
+      id: 79,
+      decalClass: "tankTreads",
+      poses: [[160, 320, 0], [192, 320, 1252]],
+    }]);
+    assert(roadLayer.stampLiveTankTreads([], {
+      visibleRevision: 1,
+      isVisible: (tx, ty) => tx === 1 && ty === 2,
+    }) === 0 &&
+      roadLayer.diagnostics().tankTreads.totalSegments === roadDiagnostics.totalSegments &&
+      roadLayer.diagnostics().tankTreads.textureUpdateCount === roadDiagnostics.textureUpdateCount,
+    "later-discovered authoritative road trails are discarded without raster or upload work");
+    roadLayer.destroy();
     assert(decalLayer.stampBatch([{
       id: 77,
       decalClass: "tankTreads",
