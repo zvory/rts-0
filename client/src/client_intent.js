@@ -42,7 +42,7 @@ export class ClientIntent {
     this.formationMovePreview = null;
     /** @type {null | {targetId:number, kind:string, x:number, y:number}} */
     this.attackTargetPreview = null;
-    /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
+    /** @type {null | {resourceId:number, resourceX:number, resourceY:number, anchorId:number, anchorX:number, anchorY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
     /** @type {null | {source?:string, mouseX:number, mouseY:number, guns:Array<object>}} */
     this.antiTankGunSetupPreview = null;
@@ -235,8 +235,8 @@ export class ClientIntent {
   }
 
   /**
-   * Set or clear the hovered resource-to-City-Centre mining preview.
-   * @param {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} preview
+   * Set or clear the hovered resource-to-Resource-Depot mining preview.
+   * @param {null | {resourceId:number, resourceX:number, resourceY:number, anchorId:number, anchorX:number, anchorY:number, inRange:boolean}} preview
    */
   updateResourceMiningPreview(preview) {
     this.resourceMiningPreview = preview;

@@ -333,7 +333,7 @@ impl Game {
         }
 
         // Every authored base site receives resources. Claimed sites already received theirs
-        // alongside the player's City Centre; every other site remains an available expansion.
+        // alongside the player's Resource Depot; every other site remains an available expansion.
         for site in &map.base_sites {
             if !starts_with_resources.contains(site) {
                 spawn_base_resources(&mut entities, &map, *site);
@@ -516,11 +516,11 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
             let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
             let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
             debug_assert!(
-                (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
+                (config::START_RESOURCE_MIN_DIST_TILES..=config::START_RESOURCE_MAX_DIST_TILES)
                     .contains(&dist_tiles),
-                "steel patch {patch_index} at {dist_tiles:.2} tiles from City Centre is out of [{:.1}, {:.1}] bounds",
-                config::CC_RESOURCE_MIN_DIST_TILES,
-                config::CC_RESOURCE_MAX_DIST_TILES
+                "steel patch {patch_index} at {dist_tiles:.2} tiles from Resource Depot is out of [{:.1}, {:.1}] bounds",
+                config::START_RESOURCE_MIN_DIST_TILES,
+                config::START_RESOURCE_MAX_DIST_TILES
             );
             entities.spawn_node(EntityKind::Steel, px, py);
             patch_index += 1;
@@ -552,11 +552,11 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         oil_tiles.insert(tile);
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
         debug_assert!(
-            (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
+            (config::START_RESOURCE_MIN_DIST_TILES..=config::START_RESOURCE_MAX_DIST_TILES)
                 .contains(&dist_tiles),
-            "oil patch {i} at {dist_tiles:.2} tiles from City Centre is out of [{:.1}, {:.1}] bounds",
-            config::CC_RESOURCE_MIN_DIST_TILES,
-            config::CC_RESOURCE_MAX_DIST_TILES
+            "oil patch {i} at {dist_tiles:.2} tiles from Resource Depot is out of [{:.1}, {:.1}] bounds",
+            config::START_RESOURCE_MIN_DIST_TILES,
+            config::START_RESOURCE_MAX_DIST_TILES
         );
         entities.spawn_node(EntityKind::Oil, px, py);
     }
@@ -571,7 +571,7 @@ fn tile_step(value: f32) -> i32 {
 }
 
 fn oil_patch_tile_offset(index: u32, step_x: i32, step_y: i32) -> (i32, i32) {
-    // Integer offsets keep mirrored starts at identical CC distances after tile snapping. The
+    // Integer offsets keep mirrored starts at identical base-resource distances after tile snapping. The
     // nine authored slots maintain at least one free tile between desired Pump Jack centres.
     const OFFSETS: [(i32, i32); 9] = [
         (4, 4),
@@ -596,7 +596,7 @@ fn offset_tile_center(map: &Map, tx: u32, ty: u32, dx: i32, dy: i32) -> (f32, f3
     map.tile_center(desired_tx, desired_ty)
 }
 
-/// Spawn a City Centre, starting workers, and resource clusters for one player.
+/// Spawn a Resource Depot, starting workers, and resource clusters for one player.
 fn spawn_player_start(
     entities: &mut EntityStore,
     map: &Map,

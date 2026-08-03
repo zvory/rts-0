@@ -50,11 +50,11 @@ fn under_construction_depots(game: &Game) -> Vec<u32> {
         .collect()
 }
 
-fn under_construction_city_centres(game: &Game) -> Vec<u32> {
+fn under_construction_resource_depots(game: &Game) -> Vec<u32> {
     game.state
         .entities
         .iter()
-        .filter(|entity| entity.kind == EntityKind::CityCentre && entity.under_construction())
+        .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.under_construction())
         .map(|entity| entity.id)
         .collect()
 }
@@ -70,7 +70,7 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
         .entities
         .spawn_unit(1, EntityKind::Worker, worker_pos.0, worker_pos.1)
         .expect("worker should spawn");
-    let cost = crate::rules::economy::resource_cost(EntityKind::CityCentre);
+    let cost = crate::rules::economy::resource_cost(EntityKind::ResourceDepot);
     let shortage_notice = crate::rules::economy::resource_shortage_notice_for_cost(0, 0, cost);
     game.state.players[0].set_resources(0, 0);
     refresh_derived_state(&mut game);
@@ -79,7 +79,7 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
         1,
         Command::Build {
             units: vec![worker],
-            building: EntityKind::CityCentre,
+            building: EntityKind::ResourceDepot,
             tile_x,
             tile_y,
             queued: false,
@@ -96,7 +96,7 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
         Some(crate::game::entity::BuildPhase::WaitingAtSite)
     );
     assert!(
-        under_construction_city_centres(&game).is_empty(),
+        under_construction_resource_depots(&game).is_empty(),
         "broke arrival must not spawn a scaffold"
     );
     assert_eq!(notice_count(&first_events, 1, shortage_notice), 1);
@@ -108,14 +108,14 @@ fn build_wait_full_tick_retries_resources_without_notice_spam() {
         "continuing the same resource wait should stay quiet"
     );
     assert!(
-        under_construction_city_centres(&game).is_empty(),
+        under_construction_resource_depots(&game).is_empty(),
         "resource wait must keep retrying without reserving or spawning"
     );
 
     game.state.players[0].set_resources(cost.steel, cost.oil);
     game.tick();
 
-    let scaffolds = under_construction_city_centres(&game);
+    let scaffolds = under_construction_resource_depots(&game);
     assert_eq!(scaffolds.len(), 1);
     assert_eq!(
         game.state
@@ -265,7 +265,7 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
         .entities
         .spawn_unit(2, EntityKind::Worker, right.0, right.1)
         .expect("second worker should spawn");
-    let cost = crate::rules::economy::resource_cost(EntityKind::CityCentre);
+    let cost = crate::rules::economy::resource_cost(EntityKind::ResourceDepot);
     game.state.players[0].set_resources(cost.steel, cost.oil);
     game.state.players[1].set_resources(cost.steel, cost.oil);
     refresh_derived_state(&mut game);
@@ -276,7 +276,7 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
             player_id,
             Command::Build {
                 units: vec![worker],
-                building: EntityKind::CityCentre,
+                building: EntityKind::ResourceDepot,
                 tile_x,
                 tile_y,
                 queued: false,
@@ -286,7 +286,7 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
 
     let events = game.tick();
 
-    let scaffolds = under_construction_city_centres(&game);
+    let scaffolds = under_construction_resource_depots(&game);
     assert_eq!(scaffolds.len(), 1);
     let scaffold = game
         .state

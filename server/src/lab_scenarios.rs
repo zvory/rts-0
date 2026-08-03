@@ -873,7 +873,7 @@ mod tests {
             "anti_tank_gun",
             "artillery",
             "barracks",
-            "city_centre",
+            "resource_depot",
             "command_car",
             "depot",
             "factory",
@@ -881,7 +881,7 @@ mod tests {
             "mortar_team",
             "oil",
             "pump_jack",
-            "research_complex",
+            "engineering_complex",
             "rifleman",
             "scout_car",
             "steel",
@@ -1218,10 +1218,10 @@ mod tests {
 
         let mut expected_counts = BTreeMap::from([
             ("barracks".to_string(), 1),
-            ("city_centre".to_string(), 1),
+            ("resource_depot".to_string(), 1),
             ("depot".to_string(), 5),
             ("factory".to_string(), 1),
-            ("research_complex".to_string(), 1),
+            ("engineering_complex".to_string(), 1),
             ("steelworks".to_string(), 1),
         ]);
         for kind in fixed_roster_composition() {

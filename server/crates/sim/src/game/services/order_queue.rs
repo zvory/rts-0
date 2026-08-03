@@ -914,10 +914,10 @@ mod tests {
     fn queued_gather_on_depleted_node_is_skipped_silently() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
-        let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        let (cx, cy) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
         entities
-            .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
-            .expect("city centre should spawn");
+            .spawn_building(1, EntityKind::ResourceDepot, cx, cy, true)
+            .expect("resource depot should spawn");
         let node = entities
             .spawn_node(EntityKind::Steel, cx + 64.0, cy)
             .expect("node should spawn");
@@ -949,10 +949,10 @@ mod tests {
     fn queued_gather_on_oil_node_is_skipped() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
-        let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        let (cx, cy) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
         entities
-            .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
-            .expect("city centre should spawn");
+            .spawn_building(1, EntityKind::ResourceDepot, cx, cy, true)
+            .expect("resource depot should spawn");
         let node = entities
             .spawn_node(EntityKind::Oil, cx + 64.0, cy)
             .expect("oil node should spawn");
@@ -980,12 +980,12 @@ mod tests {
     fn idle_worker_promotes_queued_build_on_clear_site() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
-        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        let (depot_x, depot_y) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
         entities
-            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-            .expect("city centre should spawn");
+            .spawn_building(1, EntityKind::ResourceDepot, depot_x, depot_y, true)
+            .expect("resource depot should spawn");
         let worker = entities
-            .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+            .spawn_unit(1, EntityKind::Worker, depot_x + 96.0, depot_y)
             .expect("worker should spawn");
         entities
             .get_mut(worker)
@@ -1004,14 +1004,14 @@ mod tests {
     fn queued_build_promotes_when_player_cannot_afford() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
-        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        let (depot_x, depot_y) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
         entities
-            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-            .expect("city centre should spawn");
+            .spawn_building(1, EntityKind::ResourceDepot, depot_x, depot_y, true)
+            .expect("resource depot should spawn");
         let worker = entities
-            .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+            .spawn_unit(1, EntityKind::Worker, depot_x + 96.0, depot_y)
             .expect("worker should spawn");
-        let fallback = (cc_x + 160.0, cc_y);
+        let fallback = (depot_x + 160.0, depot_y);
         {
             let w = entities.get_mut(worker).expect("worker should exist");
             w.append_queued_order(OrderIntent::build(EntityKind::Depot, 16, 16));
@@ -1039,12 +1039,12 @@ mod tests {
     fn queued_build_promotion_defers_resource_notice_until_arrival() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
-        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        let (depot_x, depot_y) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
         entities
-            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-            .expect("city centre should spawn");
+            .spawn_building(1, EntityKind::ResourceDepot, depot_x, depot_y, true)
+            .expect("resource depot should spawn");
         let worker = entities
-            .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+            .spawn_unit(1, EntityKind::Worker, depot_x + 96.0, depot_y)
             .expect("worker should spawn");
         entities
             .get_mut(worker)
@@ -1070,12 +1070,12 @@ mod tests {
     fn queued_build_with_huge_tiles_is_drained_without_panic() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
-        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        let (depot_x, depot_y) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
         entities
-            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-            .expect("city centre should spawn");
+            .spawn_building(1, EntityKind::ResourceDepot, depot_x, depot_y, true)
+            .expect("resource depot should spawn");
         let worker = entities
-            .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+            .spawn_unit(1, EntityKind::Worker, depot_x + 96.0, depot_y)
             .expect("worker should spawn");
         {
             let w = entities.get_mut(worker).expect("worker should exist");

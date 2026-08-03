@@ -1,7 +1,7 @@
 //! Command-line profile matchup runner.
 //!
 //! This is a developer/test tool. It runs one directed self-play profile matchup until one
-//! starting City Centre dies or a fixed tick cap is reached, then prints the result.
+//! starting Resource Depot dies or a fixed tick cap is reached, then prints the result.
 #![allow(dead_code)]
 
 use std::path::PathBuf;
@@ -231,8 +231,8 @@ fn print_table(result: &ProfileMatchupResult) {
         }
     );
     println!(
-        "starting City Centres: {}",
-        starting_city_centre_text(&result.starting_city_centres)
+        "starting Resource Depots: {}",
+        starting_resource_depot_text(&result.starting_resource_depots)
     );
     if let Some(path) = &result.replay_artifact {
         println!("replay artifact: {path}");
@@ -273,8 +273,8 @@ fn print_table(result: &ProfileMatchupResult) {
             tick_text(player.first_rifleman_attack_command_tick),
             tick_text(player.first_scout_car_tick),
             planned_completed_tick_text(
-                player.first_expansion_city_centre_planned_tick,
-                player.first_expansion_city_centre_completed_tick
+                player.first_expansion_resource_depot_planned_tick,
+                player.first_expansion_resource_depot_completed_tick
             ),
             tick_text(player.first_tank_tick),
             format_counts(&player.final_counts)
@@ -285,17 +285,18 @@ fn print_table(result: &ProfileMatchupResult) {
 fn winner_text(result: &ProfileMatchupResult) -> String {
     if let Some(winner) = &result.winner {
         return format!(
-            "{} won by killing the enemy starting City Centre as player {}",
+            "{} won by killing the enemy starting Resource Depot as player {}",
             winner.profile, winner.player_id
         );
     }
     match result.end_reason {
         ProfileMatchupEndReason::TickCap => "draw at tick cap".to_string(),
-        ProfileMatchupEndReason::StartingCityCentresDestroyed => {
-            "draw: both starting City Centres were destroyed".to_string()
+        ProfileMatchupEndReason::StartingResourceDepotsDestroyed => {
+            "draw: both starting Resource Depots were destroyed".to_string()
         }
-        ProfileMatchupEndReason::StartingCityCentreKilled => {
-            "draw: starting City Centre destroyed without a surviving objective winner".to_string()
+        ProfileMatchupEndReason::StartingResourceDepotKilled => {
+            "draw: starting Resource Depot destroyed without a surviving objective winner"
+                .to_string()
         }
     }
 }
@@ -314,8 +315,8 @@ fn planned_completed_tick_text(planned: Option<u32>, completed: Option<u32>) -> 
     }
 }
 
-fn starting_city_centre_text(
-    centres: &[crate::selfplay::ProfileMatchupStartingCityCentreResult],
+fn starting_resource_depot_text(
+    centres: &[crate::selfplay::ProfileMatchupStartingResourceDepotResult],
 ) -> String {
     if centres.is_empty() {
         return "-".to_string();
@@ -387,7 +388,7 @@ mod tests {
     use super::{parse_args, winner_text, DEFAULT_TICKS};
     use crate::selfplay::{
         ProfileMatchupEndReason, ProfileMatchupPlayerResult, ProfileMatchupResult,
-        ProfileMatchupStartingCityCentreResult, ProfileMatchupWinner,
+        ProfileMatchupStartingResourceDepotResult, ProfileMatchupWinner,
     };
     use std::collections::BTreeMap;
 
@@ -409,12 +410,15 @@ mod tests {
     }
 
     #[test]
-    fn starting_city_centre_result_is_reported_as_objective_win() {
-        let result = profile_result(ProfileMatchupEndReason::StartingCityCentreKilled, Some(2));
+    fn starting_resource_depot_result_is_reported_as_objective_win() {
+        let result = profile_result(
+            ProfileMatchupEndReason::StartingResourceDepotKilled,
+            Some(2),
+        );
 
         assert_eq!(
             winner_text(&result),
-            "right won by killing the enemy starting City Centre as player 2"
+            "right won by killing the enemy starting Resource Depot as player 2"
         );
     }
 
@@ -433,9 +437,9 @@ mod tests {
                 player_id,
                 profile: profile_for_player(player_id).to_string(),
             }),
-            starting_city_centres: vec![
-                starting_city_centre(1, (winner_player_id == Some(2)).then_some(120)),
-                starting_city_centre(2, (winner_player_id == Some(1)).then_some(120)),
+            starting_resource_depots: vec![
+                starting_resource_depot(1, (winner_player_id == Some(2)).then_some(120)),
+                starting_resource_depot(2, (winner_player_id == Some(1)).then_some(120)),
             ],
             players: vec![player_result(1), player_result(2)],
             first_damage_tick: None,
@@ -464,18 +468,18 @@ mod tests {
             first_rifleman_attack_command_tick: None,
             first_scout_car_tick: None,
             first_scout_car_harass_command_tick: None,
-            first_expansion_city_centre_planned_tick: None,
-            first_expansion_city_centre_completed_tick: None,
+            first_expansion_resource_depot_planned_tick: None,
+            first_expansion_resource_depot_completed_tick: None,
             first_tank_tick: None,
             final_counts: BTreeMap::new(),
         }
     }
 
-    fn starting_city_centre(
+    fn starting_resource_depot(
         player_id: u32,
         death_tick: Option<u32>,
-    ) -> ProfileMatchupStartingCityCentreResult {
-        ProfileMatchupStartingCityCentreResult {
+    ) -> ProfileMatchupStartingResourceDepotResult {
+        ProfileMatchupStartingResourceDepotResult {
             player_id,
             profile: profile_for_player(player_id).to_string(),
             entity_id: player_id * 100,

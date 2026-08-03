@@ -222,15 +222,15 @@ fn spectator_projection_uses_selected_player_trench_vision() {
     let p3_base = game.state.map.tile_center(3, 55);
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
+        .spawn_building(1, EntityKind::ResourceDepot, p1_base.0, p1_base.1, true)
         .expect("p1 base should spawn");
     game.state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
+        .spawn_building(2, EntityKind::ResourceDepot, p2_base.0, p2_base.1, true)
         .expect("p2 base should spawn");
     game.state
         .entities
-        .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
+        .spawn_building(3, EntityKind::ResourceDepot, p3_base.0, p3_base.1, true)
         .expect("p3 base should spawn");
     let scout_pos = game.state.map.tile_center(32, 32);
     game.state
@@ -657,7 +657,7 @@ fn move_command_ignores_trench_seen_only_by_defeated_teammate() {
     let base_pos = game.state.map.tile_center(4, 4);
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, base_pos.0, base_pos.1, true)
+        .spawn_building(1, EntityKind::ResourceDepot, base_pos.0, base_pos.1, true)
         .expect("player one should have a survival building");
     let start = game.state.map.tile_center(8, 4);
     let rifleman = game
@@ -762,7 +762,7 @@ fn excluded_units_and_buildings_do_not_create_or_occupy_trenches() {
         EntityKind::Golem,
         EntityKind::Tank,
         EntityKind::ScoutCar,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
     ] {
         let mut game = empty_flat_game(&players());
         grant_entrenchment(&mut game, 1);

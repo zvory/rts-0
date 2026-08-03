@@ -89,11 +89,11 @@ fn known_kind(kind: &str) -> bool {
             | kinds::SCOUT_CAR
             | kinds::TANK
             | kinds::COMMAND_CAR
-            | kinds::CITY_CENTRE
+            | kinds::RESOURCE_DEPOT
             | kinds::DEPOT
             | kinds::BARRACKS
             | kinds::TRAINING_CENTRE
-            | kinds::RESEARCH_COMPLEX
+            | kinds::ENGINEERING_COMPLEX
             | kinds::FACTORY
             | kinds::STEELWORKS
             | kinds::PUMP_JACK

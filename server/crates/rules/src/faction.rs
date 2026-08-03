@@ -167,7 +167,7 @@ pub const EKAT_CONSUME_GOLEM_ABILITY: &str = AbilityKind::EkatConsumeGolem.stabl
 
 const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
-        kind: EntityKind::CityCentre,
+        kind: EntityKind::ResourceDepot,
         count: 1,
         formation: StartingFormation::Center,
         completed: true,
@@ -255,24 +255,24 @@ const DEFAULT_UNITS: &[EntityKind] = &[
 ];
 
 const DEFAULT_BUILDINGS: &[EntityKind] = &[
-    EntityKind::CityCentre,
+    EntityKind::ResourceDepot,
     // Retained for replay and fixture compatibility, but unavailable in the current build catalog.
     EntityKind::Depot,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
     EntityKind::Factory,
-    EntityKind::ResearchComplex,
+    EntityKind::EngineeringComplex,
     EntityKind::Steelworks,
     EntityKind::TankTrap,
     EntityKind::PumpJack,
 ];
 
 const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
-    EntityKind::CityCentre,
+    EntityKind::ResourceDepot,
     EntityKind::PumpJack,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
-    EntityKind::ResearchComplex,
+    EntityKind::EngineeringComplex,
     EntityKind::Factory,
     EntityKind::Steelworks,
     EntityKind::TankTrap,
@@ -295,31 +295,31 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::AntiTankGunUnlock,
-        researched_at: EntityKind::ResearchComplex,
+        researched_at: EntityKind::EngineeringComplex,
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::ArtilleryUnlock,
-        researched_at: EntityKind::ResearchComplex,
+        researched_at: EntityKind::EngineeringComplex,
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::BallisticTables,
-        researched_at: EntityKind::ResearchComplex,
+        researched_at: EntityKind::EngineeringComplex,
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::TankUnlock,
-        researched_at: EntityKind::ResearchComplex,
+        researched_at: EntityKind::EngineeringComplex,
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::MortarAutocast,
-        researched_at: EntityKind::ResearchComplex,
+        researched_at: EntityKind::EngineeringComplex,
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::SmokePlus,
-        researched_at: EntityKind::ResearchComplex,
+        researched_at: EntityKind::EngineeringComplex,
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::ScoutPlaneUnlock,
-        researched_at: EntityKind::ResearchComplex,
+        researched_at: EntityKind::EngineeringComplex,
     },
 ];
 
@@ -363,7 +363,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
             balance::SMOKE_ABILITY_COST_STEEL,
             balance::SMOKE_ABILITY_COST_OIL,
         ),
-        tech_requirement: Some(EntityKind::ResearchComplex),
+        tech_requirement: Some(EntityKind::EngineeringComplex),
         upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
@@ -613,7 +613,7 @@ pub const CURRENT_CATALOG: FactionCatalog = FactionCatalog {
     builders: &[EntityKind::Worker],
     gatherers: &[EntityKind::Worker],
     production_anchors: &[
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Barracks,
         EntityKind::Factory,
         EntityKind::Steelworks,
@@ -908,10 +908,10 @@ mod tests {
     #[test]
     fn default_catalog_routes_current_tech_tree() {
         let catalog = CURRENT_CATALOG;
-        let research_complex = EntityKind::ResearchComplex;
+        let engineering_complex = EntityKind::EngineeringComplex;
 
         assert_eq!(
-            catalog.trainable_units(EntityKind::CityCentre),
+            catalog.trainable_units(EntityKind::ResourceDepot),
             vec![EntityKind::Worker]
         );
         assert!(
@@ -944,12 +944,12 @@ mod tests {
         );
         assert!(catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(UpgradeKind::Entrenchment, EntityKind::TrainingCentre));
-        assert!(catalog.allows_research(UpgradeKind::AntiTankGunUnlock, research_complex));
-        assert!(catalog.allows_research(UpgradeKind::BallisticTables, research_complex));
-        assert!(catalog.allows_research(UpgradeKind::ArtilleryUnlock, research_complex));
-        assert!(catalog.allows_research(UpgradeKind::TankUnlock, research_complex));
-        assert!(catalog.allows_research(UpgradeKind::MortarAutocast, research_complex));
-        assert!(catalog.allows_research(UpgradeKind::SmokePlus, research_complex));
+        assert!(catalog.allows_research(UpgradeKind::AntiTankGunUnlock, engineering_complex));
+        assert!(catalog.allows_research(UpgradeKind::BallisticTables, engineering_complex));
+        assert!(catalog.allows_research(UpgradeKind::ArtilleryUnlock, engineering_complex));
+        assert!(catalog.allows_research(UpgradeKind::TankUnlock, engineering_complex));
+        assert!(catalog.allows_research(UpgradeKind::MortarAutocast, engineering_complex));
+        assert!(catalog.allows_research(UpgradeKind::SmokePlus, engineering_complex));
         assert!(!catalog.allows_research(UpgradeKind::TankUnlock, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
@@ -988,7 +988,7 @@ mod tests {
         assert!(catalog.allows_ability(AbilityKind::EkatMagicAnchor, EntityKind::Ekat));
         assert!(catalog.allows_ability(AbilityKind::EkatConsumeGolem, EntityKind::Ekat));
         assert!(!catalog.allows_unit(EntityKind::Rifleman));
-        assert!(!catalog.allows_building(EntityKind::CityCentre));
+        assert!(!catalog.allows_building(EntityKind::ResourceDepot));
     }
 
     #[test]
@@ -1005,8 +1005,8 @@ mod tests {
         );
         assert_eq!(
             smoke.tech_requirement,
-            Some(EntityKind::ResearchComplex),
-            "Smoke should require a completed R&D Complex"
+            Some(EntityKind::EngineeringComplex),
+            "Smoke should require a completed Engineering Complex"
         );
         assert_eq!(
             smoke.cost,
@@ -1021,7 +1021,7 @@ mod tests {
         assert_eq!(
             scout_plane.upgrade_requirement,
             Some(UpgradeKind::ScoutPlaneUnlock),
-            "Scout Plane should require its R&D upgrade"
+            "Scout Plane should require its Engineering Complex upgrade"
         );
 
         let point_fire = CURRENT_CATALOG.ability(AbilityKind::PointFire).unwrap();
@@ -1122,11 +1122,13 @@ mod tests {
         let catalog = EMPTY_FIXTURE_CATALOG;
 
         assert!(!catalog.allows_unit(EntityKind::Worker));
-        assert!(!catalog.allows_building(EntityKind::CityCentre));
+        assert!(!catalog.allows_building(EntityKind::ResourceDepot));
         assert!(!catalog.can_build(EntityKind::Worker, EntityKind::Depot));
         assert!(catalog.allows_unit(EntityKind::ScoutCar));
         assert!(catalog.allows_building(EntityKind::Depot));
-        assert!(catalog.trainable_units(EntityKind::CityCentre).is_empty());
+        assert!(catalog
+            .trainable_units(EntityKind::ResourceDepot)
+            .is_empty());
         assert!(!catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
         assert!(!catalog.allows_research(UpgradeKind::Entrenchment, EntityKind::TrainingCentre));
         assert!(!catalog.allows_ability(AbilityKind::Smoke, EntityKind::ScoutCar));

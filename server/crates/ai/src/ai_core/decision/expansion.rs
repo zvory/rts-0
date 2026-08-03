@@ -50,14 +50,14 @@ pub(super) fn plan_expansion(
         };
     };
 
-    let building_count = facts.building_count(EntityKind::CityCentre);
+    let building_count = facts.building_count(EntityKind::ResourceDepot);
     let blocks_tech_path =
-        expansion.blocks_tech_path && building_count < expansion.target_city_centres;
+        expansion.blocks_tech_path && building_count < expansion.target_resource_depots;
     let mut blockers = Vec::new();
-    if building_count >= expansion.target_city_centres {
+    if building_count >= expansion.target_resource_depots {
         blockers.push(ExpansionBlocker::AlreadyAtTarget);
     }
-    let counts = facts.building_counts(EntityKind::CityCentre);
+    let counts = facts.building_counts(EntityKind::ResourceDepot);
     if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
         blockers.push(ExpansionBlocker::MaxPending);
     }
@@ -71,7 +71,7 @@ pub(super) fn plan_expansion(
         blockers.push(ExpansionBlocker::RequirementNotMet);
     }
     if !rts_rules::economy::build_requirement_met(
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         facts.complete_building_kinds(),
     ) {
         blockers.push(ExpansionBlocker::RequirementNotMet);
@@ -114,7 +114,7 @@ pub(super) fn expansion_blocks_tech_path(
         return false;
     };
     expansion.blocks_tech_path
-        && facts.building_count(EntityKind::CityCentre) < expansion.target_city_centres
+        && facts.building_count(EntityKind::ResourceDepot) < expansion.target_resource_depots
 }
 
 pub(super) fn should_save_for_expansion(
@@ -125,7 +125,7 @@ pub(super) fn should_save_for_expansion(
     let Some(expansion) = active_expansion(observation, profile) else {
         return false;
     };
-    facts.building_count(EntityKind::CityCentre) < expansion.target_city_centres
+    facts.building_count(EntityKind::ResourceDepot) < expansion.target_resource_depots
         && expansion_prerequisites_met(facts, expansion)
 }
 
@@ -146,7 +146,7 @@ fn armored_production_reserve_met(
     let Some(timing) = profile.fast_tank_timing else {
         return true;
     };
-    let (city_steel, city_oil) = rts_rules::economy::cost(EntityKind::CityCentre);
+    let (depot_steel, depot_oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
     // A queued Factory unit has already paid its cost. Do not require Jeff to
     // bank that same armored reserve a second time or continuous production
     // would make the expansion gate unreachable.
@@ -166,12 +166,12 @@ fn armored_production_reserve_met(
         };
         rts_rules::economy::cost(next_unit)
     };
-    observation.economy.steel >= city_steel.saturating_add(unit_steel)
-        && observation.economy.oil >= city_oil.saturating_add(unit_oil)
+    observation.economy.steel >= depot_steel.saturating_add(unit_steel)
+        && observation.economy.oil >= depot_oil.saturating_add(unit_oil)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn try_build_expansion_city_centre<F>(
+pub(super) fn try_build_expansion_resource_depot<F>(
     observation: &AiObservation,
     facts: &AiFacts,
     actions: &mut AiActionContext<'_>,
@@ -183,23 +183,23 @@ where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
     let expansion = active_expansion(observation, profile)?;
-    let kind = EntityKind::CityCentre;
+    let kind = EntityKind::ResourceDepot;
     config::building_stats(kind)?;
     if !rts_rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
         return None;
     }
-    if facts.building_count(kind) >= expansion.target_city_centres {
+    if facts.building_count(kind) >= expansion.target_resource_depots {
         return None;
     }
     let counts = facts.building_counts(kind);
     if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
         return None;
     }
-    let (tile_x, tile_y) = expansion_city_centre_site(observation, expansion, kind, placeable)?;
+    let (tile_x, tile_y) = expansion_resource_depot_site(observation, expansion, kind, placeable)?;
     actions::try_build_at(actions, builder_pools, kind, tile_x, tile_y)
 }
 
-pub(super) fn expansion_city_centre_site<F>(
+pub(super) fn expansion_resource_depot_site<F>(
     observation: &AiObservation,
     expansion: ExpansionPolicy,
     kind: EntityKind,
@@ -279,7 +279,7 @@ pub(super) fn expansion_candidate_resources(
     observation: &AiObservation,
 ) -> Vec<&AiResourceSummary> {
     let start_resource_radius =
-        (config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
+        (config::START_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
     let start_resource_radius2 = squared(start_resource_radius);
     observation
         .resources
@@ -340,7 +340,7 @@ pub(super) fn expansion_cluster_resources_for_anchor<'a>(
     resources: &[&'a AiResourceSummary],
 ) -> Vec<&'a AiResourceSummary> {
     let center = tile_center(anchor, observation.map.tile_size);
-    let radius = (config::MINING_CC_RANGE_TILES + 2.0) * observation.map.tile_size as f32;
+    let radius = (config::MINING_ANCHOR_RANGE_TILES + 2.0) * observation.map.tile_size as f32;
     let radius2 = squared(radius);
     resources
         .iter()
@@ -402,7 +402,7 @@ pub(super) fn expansion_site_candidate(
     resources: &[&AiResourceSummary],
 ) -> Option<ExpansionSiteCandidate> {
     let (cx, cy) = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
-    let max_dist = config::MINING_CC_RANGE_TILES * observation.map.tile_size as f32;
+    let max_dist = config::MINING_ANCHOR_RANGE_TILES * observation.map.tile_size as f32;
     let max_dist2 = squared(max_dist);
     let mut steel_in_range = 0usize;
     let mut oil_in_range = 0usize;

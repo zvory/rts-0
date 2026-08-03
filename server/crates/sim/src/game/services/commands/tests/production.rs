@@ -70,7 +70,7 @@ fn support_weapon_and_vehicle_training_require_finished_unlock_upgrades() {
 }
 
 #[test]
-fn advanced_unlocks_research_only_at_research_complex() {
+fn advanced_unlocks_research_only_at_engineering_complex() {
     let map = flat_map(24);
     for (wrong_building_kind, upgrade) in [
         (EntityKind::Steelworks, UpgradeKind::AntiTankGunUnlock),
@@ -85,10 +85,10 @@ fn advanced_unlocks_research_only_at_research_complex() {
         let wrong_building = entities
             .spawn_building(1, wrong_building_kind, wrong_x, wrong_y, true)
             .expect("wrong research building should spawn");
-        let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 10, 4);
-        let research_complex = entities
-            .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
-            .expect("research complex should spawn");
+        let (rd_x, rd_y) = footprint_center(&map, EntityKind::EngineeringComplex, 10, 4);
+        let engineering_complex = entities
+            .spawn_building(1, EntityKind::EngineeringComplex, rd_x, rd_y, true)
+            .expect("engineering complex should spawn");
         let mut players = vec![player_state(1), player_state(2)];
         if upgrade == UpgradeKind::ArtilleryUnlock {
             players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
@@ -122,14 +122,14 @@ fn advanced_unlocks_research_only_at_research_complex() {
             vec![(
                 1,
                 SimCommand::Research {
-                    building: research_complex,
+                    building: engineering_complex,
                     upgrade,
                 },
             )],
         );
         let queue = entities
-            .get(research_complex)
-            .expect("research complex")
+            .get(engineering_complex)
+            .expect("engineering complex")
             .research_queue();
         assert_eq!(queue.len(), 1);
         assert_eq!(queue[0].upgrade, upgrade);
@@ -144,10 +144,10 @@ fn entrenchment_researches_at_training_centre_with_contract_cost_and_time() {
     let training_centre = entities
         .spawn_building(1, EntityKind::TrainingCentre, tc_x, tc_y, true)
         .expect("training centre should spawn");
-    let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 12, 6);
-    let research_complex = entities
-        .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
-        .expect("research complex should spawn");
+    let (rd_x, rd_y) = footprint_center(&map, EntityKind::EngineeringComplex, 12, 6);
+    let engineering_complex = entities
+        .spawn_building(1, EntityKind::EngineeringComplex, rd_x, rd_y, true)
+        .expect("engineering complex should spawn");
     let mut players = vec![player_state(1), player_state(2)];
 
     let events = apply_with_players(
@@ -157,14 +157,14 @@ fn entrenchment_researches_at_training_centre_with_contract_cost_and_time() {
         vec![(
             1,
             SimCommand::Research {
-                building: research_complex,
+                building: engineering_complex,
                 upgrade: UpgradeKind::Entrenchment,
             },
         )],
     );
     assert!(entities
-        .get(research_complex)
-        .expect("research complex")
+        .get(engineering_complex)
+        .expect("engineering complex")
         .research_queue()
         .is_empty());
     assert!(matches!(
@@ -205,14 +205,21 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, 96.0, 96.0)
         .expect("worker should spawn");
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 5, 5);
-    let city_centre = entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
-    let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 10, 5);
-    let research_complex = entities
-        .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
-        .expect("research complex should spawn");
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 5, 5);
+    let resource_depot = entities
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
+    let (rd_x, rd_y) = footprint_center(&map, EntityKind::EngineeringComplex, 10, 5);
+    let engineering_complex = entities
+        .spawn_building(1, EntityKind::EngineeringComplex, rd_x, rd_y, true)
+        .expect("engineering complex should spawn");
     let resources_before = (players[0].steel, players[0].oil, players[0].supply_used);
 
     let events = apply_with_players(
@@ -233,14 +240,14 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
             (
                 1,
                 SimCommand::Train {
-                    building: city_centre,
+                    building: resource_depot,
                     unit: EntityKind::Worker,
                 },
             ),
             (
                 1,
                 SimCommand::Research {
-                    building: research_complex,
+                    building: engineering_complex,
                     upgrade: UpgradeKind::TankUnlock,
                 },
             ),
@@ -265,16 +272,16 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
     );
     assert!(
         entities
-            .get(city_centre)
-            .expect("city centre")
+            .get(resource_depot)
+            .expect("resource depot")
             .prod_queue()
             .is_empty(),
         "fixture faction must not train globally-defined current units"
     );
     assert!(
         entities
-            .get(research_complex)
-            .expect("research complex")
+            .get(engineering_complex)
+            .expect("engineering complex")
             .research_queue()
             .is_empty(),
         "fixture faction must not research globally-defined current upgrades"
@@ -296,13 +303,13 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
 fn artillery_research_requires_at_guns() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
-    let research_complex = entities
-        .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
-        .expect("research complex should spawn");
+    let (rd_x, rd_y) = footprint_center(&map, EntityKind::EngineeringComplex, 6, 6);
+    let engineering_complex = entities
+        .spawn_building(1, EntityKind::EngineeringComplex, rd_x, rd_y, true)
+        .expect("engineering complex should spawn");
     let mut players = vec![player_state(1), player_state(2)];
     let command = SimCommand::Research {
-        building: research_complex,
+        building: engineering_complex,
         upgrade: UpgradeKind::ArtilleryUnlock,
     };
 
@@ -313,8 +320,8 @@ fn artillery_research_requires_at_guns() {
         vec![(1, command.clone())],
     );
     assert!(entities
-        .get(research_complex)
-        .expect("research complex")
+        .get(engineering_complex)
+        .expect("engineering complex")
         .research_queue()
         .is_empty());
     assert!(matches!(
@@ -325,8 +332,8 @@ fn artillery_research_requires_at_guns() {
     players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
     apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
     let queue = entities
-        .get(research_complex)
-        .expect("research complex")
+        .get(engineering_complex)
+        .expect("engineering complex")
         .research_queue();
     assert_eq!(queue.len(), 1);
     assert_eq!(queue[0].upgrade, UpgradeKind::ArtilleryUnlock);
@@ -336,13 +343,13 @@ fn artillery_research_requires_at_guns() {
 fn artillery_fire_control_requires_artillery_research() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
-    let research_complex = entities
-        .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
-        .expect("research complex should spawn");
+    let (rd_x, rd_y) = footprint_center(&map, EntityKind::EngineeringComplex, 6, 6);
+    let engineering_complex = entities
+        .spawn_building(1, EntityKind::EngineeringComplex, rd_x, rd_y, true)
+        .expect("engineering complex should spawn");
     let mut players = vec![player_state(1), player_state(2)];
     let command = SimCommand::Research {
-        building: research_complex,
+        building: engineering_complex,
         upgrade: UpgradeKind::BallisticTables,
     };
 
@@ -353,8 +360,8 @@ fn artillery_fire_control_requires_artillery_research() {
         vec![(1, command.clone())],
     );
     assert!(entities
-        .get(research_complex)
-        .expect("research complex")
+        .get(engineering_complex)
+        .expect("engineering complex")
         .research_queue()
         .is_empty());
     players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
@@ -365,15 +372,15 @@ fn artillery_fire_control_requires_artillery_research() {
         vec![(1, command.clone())],
     );
     assert!(entities
-        .get(research_complex)
-        .expect("research complex")
+        .get(engineering_complex)
+        .expect("engineering complex")
         .research_queue()
         .is_empty());
     players[0].upgrades.insert(UpgradeKind::ArtilleryUnlock);
     apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
     let queue = entities
-        .get(research_complex)
-        .expect("research complex")
+        .get(engineering_complex)
+        .expect("engineering complex")
         .research_queue();
     assert_eq!(queue.len(), 1);
     assert_eq!(queue[0].upgrade, UpgradeKind::BallisticTables);
@@ -383,10 +390,10 @@ fn artillery_fire_control_requires_artillery_research() {
 fn artillery_unlock_can_queue_behind_its_prerequisite() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
-    let research_complex = entities
-        .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
-        .expect("research complex should spawn");
+    let (rd_x, rd_y) = footprint_center(&map, EntityKind::EngineeringComplex, 6, 6);
+    let engineering_complex = entities
+        .spawn_building(1, EntityKind::EngineeringComplex, rd_x, rd_y, true)
+        .expect("engineering complex should spawn");
     let mut players = vec![player_state(1), player_state(2)];
 
     apply_with_players(
@@ -397,14 +404,14 @@ fn artillery_unlock_can_queue_behind_its_prerequisite() {
             (
                 1,
                 SimCommand::Research {
-                    building: research_complex,
+                    building: engineering_complex,
                     upgrade: UpgradeKind::AntiTankGunUnlock,
                 },
             ),
             (
                 1,
                 SimCommand::Research {
-                    building: research_complex,
+                    building: engineering_complex,
                     upgrade: UpgradeKind::ArtilleryUnlock,
                 },
             ),
@@ -412,8 +419,8 @@ fn artillery_unlock_can_queue_behind_its_prerequisite() {
     );
 
     let queued: Vec<_> = entities
-        .get(research_complex)
-        .expect("research complex")
+        .get(engineering_complex)
+        .expect("engineering complex")
         .research_queue()
         .iter()
         .map(|item| item.upgrade)
@@ -459,10 +466,10 @@ fn manual_train_resource_shortages_create_unpaid_queue_entries() {
     assert!(oil_missing_events.get(&1).is_none_or(Vec::is_empty));
 
     let mut steel_missing_entities = EntityStore::new();
-    let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
-    let city_centre = steel_missing_entities
-        .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
-        .expect("city centre should spawn");
+    let (cx, cy) = footprint_center(&map, EntityKind::ResourceDepot, 6, 6);
+    let resource_depot = steel_missing_entities
+        .spawn_building(1, EntityKind::ResourceDepot, cx, cy, true)
+        .expect("resource depot should spawn");
     let mut steel_missing_players = vec![player_state(1), player_state(2)];
     assert!(steel_missing_players[0].spend_cost(rules::economy::ResourceCost::new(1_000, 0)));
     let steel_missing_events = apply_with_players(
@@ -472,14 +479,14 @@ fn manual_train_resource_shortages_create_unpaid_queue_entries() {
         vec![(
             1,
             SimCommand::Train {
-                building: city_centre,
+                building: resource_depot,
                 unit: EntityKind::Worker,
             },
         )],
     );
     let steel_queue = steel_missing_entities
-        .get(city_centre)
-        .expect("city centre")
+        .get(resource_depot)
+        .expect("resource depot")
         .prod_queue();
     assert_eq!(steel_queue.len(), 1);
     assert!(
@@ -526,10 +533,10 @@ fn manual_research_shortage_creates_unpaid_queue_entry() {
 fn manual_production_queue_is_capped_even_when_entries_are_unpaid() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (x, y) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
-    let city_centre = entities
-        .spawn_building(1, EntityKind::CityCentre, x, y, true)
-        .expect("city centre should spawn");
+    let (x, y) = footprint_center(&map, EntityKind::ResourceDepot, 6, 6);
+    let resource_depot = entities
+        .spawn_building(1, EntityKind::ResourceDepot, x, y, true)
+        .expect("resource depot should spawn");
     let mut players = vec![player_state(1), player_state(2)];
     players[0].set_resources(0, 0);
 
@@ -538,7 +545,7 @@ fn manual_production_queue_is_capped_even_when_entries_are_unpaid() {
             (
                 1,
                 SimCommand::Train {
-                    building: city_centre,
+                    building: resource_depot,
                     unit: EntityKind::Worker,
                 },
             )
@@ -548,8 +555,8 @@ fn manual_production_queue_is_capped_even_when_entries_are_unpaid() {
 
     assert_eq!(
         entities
-            .get(city_centre)
-            .expect("city centre")
+            .get(resource_depot)
+            .expect("resource depot")
             .prod_queue()
             .len(),
         crate::game::entity::MAX_PRODUCTION_QUEUE

@@ -186,7 +186,7 @@ mod tests {
 
         assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
-            trainable_units(EntityKind::CityCentre),
+            trainable_units(EntityKind::ResourceDepot),
             &[EntityKind::Worker]
         );
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
@@ -206,7 +206,7 @@ mod tests {
                 EntityKind::CommandCar
             ]
         );
-        assert_eq!(trainable_units(EntityKind::ResearchComplex), &[]);
+        assert_eq!(trainable_units(EntityKind::EngineeringComplex), &[]);
         assert_eq!(
             trainable_units(EntityKind::Steelworks),
             &[
@@ -262,11 +262,14 @@ mod tests {
         );
 
         assert!(!build_requirement_met(barracks, &[]));
-        assert!(build_requirement_met(barracks, &[EntityKind::CityCentre]));
+        assert!(build_requirement_met(
+            barracks,
+            &[EntityKind::ResourceDepot]
+        ));
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::CityCentre]
+            &[EntityKind::ResourceDepot]
         ));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
@@ -274,13 +277,13 @@ mod tests {
         ));
         assert!(build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::CityCentre, barracks]
+            &[EntityKind::ResourceDepot, barracks]
         ));
 
         assert!(!build_requirement_met(EntityKind::Factory, &[]));
         assert!(!build_requirement_met(
             EntityKind::Factory,
-            &[EntityKind::CityCentre]
+            &[EntityKind::ResourceDepot]
         ));
         assert!(!build_requirement_met(
             EntityKind::Factory,
@@ -288,21 +291,21 @@ mod tests {
         ));
         assert!(build_requirement_met(
             EntityKind::Factory,
-            &[EntityKind::CityCentre, EntityKind::TrainingCentre]
+            &[EntityKind::ResourceDepot, EntityKind::TrainingCentre]
         ));
-        assert!(!build_requirement_met(EntityKind::ResearchComplex, &[]));
+        assert!(!build_requirement_met(EntityKind::EngineeringComplex, &[]));
         assert!(!build_requirement_met(
-            EntityKind::ResearchComplex,
+            EntityKind::EngineeringComplex,
             &[EntityKind::TrainingCentre]
         ));
         assert!(build_requirement_met(
-            EntityKind::ResearchComplex,
-            &[EntityKind::CityCentre, EntityKind::TrainingCentre]
+            EntityKind::EngineeringComplex,
+            &[EntityKind::ResourceDepot, EntityKind::TrainingCentre]
         ));
         assert!(!build_requirement_met(EntityKind::Steelworks, &[]));
         assert!(build_requirement_met(
             EntityKind::Steelworks,
-            &[EntityKind::CityCentre, EntityKind::TrainingCentre]
+            &[EntityKind::ResourceDepot, EntityKind::TrainingCentre]
         ));
 
         assert_eq!(cost(EntityKind::Worker), (50, 0));
@@ -314,13 +317,13 @@ mod tests {
         assert_eq!(cost(EntityKind::Tank), (425, 150));
         assert_eq!(cost(EntityKind::MortarTeam), (100, 40));
         assert_eq!(cost(EntityKind::Factory), (125, 125));
-        assert_eq!(cost(EntityKind::CityCentre), (450, 100));
+        assert_eq!(cost(EntityKind::ResourceDepot), (450, 100));
         assert_eq!(cost(EntityKind::TrainingCentre), (100, 25));
         assert_eq!(cost(EntityKind::Depot), (100, 0));
         assert_eq!(cost(EntityKind::AntiTankGun), (150, 40));
         assert_eq!(supply_cost(EntityKind::AntiTankGun), 6);
         assert_eq!(cost(EntityKind::Artillery), (150, 50));
-        assert_eq!(cost(EntityKind::ResearchComplex), (100, 100));
+        assert_eq!(cost(EntityKind::EngineeringComplex), (100, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 4);
         assert_eq!(supply_cost(EntityKind::ScoutPlane), 0);
         assert_eq!(
@@ -385,12 +388,12 @@ mod tests {
         assert!(build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,
             barracks,
-            &[EntityKind::CityCentre]
+            &[EntityKind::ResourceDepot]
         ));
         assert!(build_requirement_met_for_faction(
             DEFAULT_FACTION_ID,
             EntityKind::Factory,
-            &[EntityKind::CityCentre, EntityKind::TrainingCentre]
+            &[EntityKind::ResourceDepot, EntityKind::TrainingCentre]
         ));
         assert!(train_requirement_met_for_faction(
             DEFAULT_FACTION_ID,
@@ -411,16 +414,16 @@ mod tests {
     fn unknown_faction_economy_queries_fail_closed() {
         let faction_id = "unknown_faction";
 
-        assert!(trainable_units_for_faction(faction_id, EntityKind::CityCentre).is_empty());
+        assert!(trainable_units_for_faction(faction_id, EntityKind::ResourceDepot).is_empty());
         assert!(!build_requirement_met_for_faction(
             faction_id,
             EntityKind::Depot,
-            &[EntityKind::CityCentre]
+            &[EntityKind::ResourceDepot]
         ));
         assert!(!train_requirement_met_for_faction(
             faction_id,
             EntityKind::Worker,
-            &[EntityKind::CityCentre]
+            &[EntityKind::ResourceDepot]
         ));
         assert!(!can_build_for_faction(
             faction_id,
@@ -430,12 +433,12 @@ mod tests {
         assert!(!can_gather_for_faction(faction_id, EntityKind::Worker));
         assert!(!can_act_as_production_anchor_for_faction(
             faction_id,
-            EntityKind::CityCentre
+            EntityKind::ResourceDepot
         ));
         assert!(!can_research_for_faction(
             faction_id,
             UpgradeKind::TankUnlock,
-            EntityKind::ResearchComplex
+            EntityKind::EngineeringComplex
         ));
     }
 

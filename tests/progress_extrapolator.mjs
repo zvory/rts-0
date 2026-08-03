@@ -13,7 +13,7 @@ function building(extra = {}) {
   return {
     id: 10,
     owner: 1,
-    kind: KIND.CITY_CENTRE,
+    kind: KIND.RESOURCE_DEPOT,
     state: STATE.IDLE,
     x: 64,
     y: 64,
@@ -84,7 +84,7 @@ function progressFrame(state, progress, { includePose = true } = {}) {
 {
   const state = gameState();
   const research = building({
-    kind: KIND.RESEARCH_COMPLEX,
+    kind: KIND.ENGINEERING_COMPLEX,
     prodKind: undefined,
     prodUpgrade: UPGRADE.TANK_UNLOCK,
     prodProgress: 0.4,

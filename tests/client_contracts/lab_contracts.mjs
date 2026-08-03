@@ -107,7 +107,7 @@ import { textWithin } from "./dom_text.mjs";
 {
   const allKriegsiaResearch = [
     ...researchableUpgradesForFaction(DEFAULT_FACTION_ID, KIND.TRAINING_CENTRE),
-    ...researchableUpgradesForFaction(DEFAULT_FACTION_ID, KIND.RESEARCH_COMPLEX),
+    ...researchableUpgradesForFaction(DEFAULT_FACTION_ID, KIND.ENGINEERING_COMPLEX),
   ];
   for (const filename of ["lategame.json", "render-preview.json"]) {
     const scenario = JSON.parse(
@@ -397,7 +397,7 @@ await withFakeDocument(() => {
     "LabPanel spawn palette includes Kriegsia catalog units",
   );
   assert(
-    !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.CITY_CENTRE),
+    !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.RESOURCE_DEPOT),
     "LabPanel spawn palette excludes buildings from primary unit options",
   );
   assert(
@@ -420,7 +420,7 @@ await withFakeDocument(() => {
     "LabPanel building spawn palette exposes product-playable faction catalogs",
   );
   assert(
-    labSpawnBuildingKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.CITY_CENTRE),
+    labSpawnBuildingKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.RESOURCE_DEPOT),
     "LabPanel building spawn palette includes Kriegsia catalog buildings",
   );
   assert(
@@ -955,12 +955,12 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-faction").value = "ekat";
   panel.fields.get("spawn-faction").listeners.change();
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
-  panel.armBuildingSpawnPaletteTool(KIND.CITY_CENTRE);
+  panel.armBuildingSpawnPaletteTool(KIND.RESOURCE_DEPOT);
   assert(armedTool?.kind === "spawnEntity", "LabPanel building palette arms the spawn lab tool through Match");
   assert(armedTool?.paintOnDrag === true, "LabPanel building palette enables persistent drag painting");
   assert(
     armedTool.payload.owner === 2 &&
-      armedTool.payload.kind === KIND.CITY_CENTRE &&
+      armedTool.payload.kind === KIND.RESOURCE_DEPOT &&
       armedTool.payload.factionId === DEFAULT_FACTION_ID &&
       armedTool.payload.completed === true,
     "LabPanel building palette captures owner, faction, and kind with completed spawn payloads",
@@ -969,7 +969,7 @@ await withFakeDocument(async () => {
   assert(
     sent.at(-1).op.op === "spawnEntity" &&
       sent.at(-1).op.owner === 2 &&
-      sent.at(-1).op.kind === KIND.CITY_CENTRE &&
+      sent.at(-1).op.kind === KIND.RESOURCE_DEPOT &&
       sent.at(-1).op.x === 240 &&
       sent.at(-1).op.y === 288 &&
       sent.at(-1).op.completed === true,

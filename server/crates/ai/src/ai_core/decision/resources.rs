@@ -5,7 +5,7 @@ use super::*;
 use crate::ai_core::resource_availability::ResourceAvailability;
 
 pub(super) const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 =
-    config::MINING_CC_RANGE_TILES + 3.0;
+    config::MINING_ANCHOR_RANGE_TILES + 3.0;
 
 // Starting steel is split across both sides of a base; AI staging still treats the map-center side
 // as the exposed resource line that existed before the split.
@@ -135,18 +135,22 @@ pub(super) fn target_steel_workers_for_profile(
     let Some(expansion) = active_expansion(observation, profile) else {
         return base_target;
     };
-    if facts.complete_building_count(EntityKind::CityCentre) < expansion.target_city_centres {
+    if facts.complete_building_count(EntityKind::ResourceDepot) < expansion.target_resource_depots {
         return base_target.min(expansion.pre_expansion_steel_worker_cap);
     }
 
-    let expanded_target = base_target.max(completed_cc_steel_saturation_target(observation));
+    let expanded_target = base_target.max(completed_resource_depot_steel_saturation_target(
+        observation,
+    ));
     expansion
         .post_expansion_steel_worker_cap
         .map(|cap| expanded_target.min(cap))
         .unwrap_or(expanded_target)
 }
 
-pub(super) fn completed_cc_steel_saturation_target(observation: &AiObservation) -> usize {
+pub(super) fn completed_resource_depot_steel_saturation_target(
+    observation: &AiObservation,
+) -> usize {
     resource_availability(observation).current_steel_saturation_target()
 }
 
@@ -156,7 +160,7 @@ pub(super) fn max_worker_resource_assignment_distance_px(
     profile: &AiProfile,
 ) -> Option<f32> {
     let expansion = active_expansion(observation, profile)?;
-    if facts.complete_building_count(EntityKind::CityCentre) < expansion.target_city_centres {
+    if facts.complete_building_count(EntityKind::ResourceDepot) < expansion.target_resource_depots {
         return None;
     }
     Some(EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES * observation.map.tile_size as f32)
@@ -187,7 +191,9 @@ pub(super) fn desired_oil_workers(
         .unwrap_or(0);
     let expansion_oil_first = active_expansion(observation, profile)
         .filter(|e| e.oil_before_steel_in_expansion)
-        .map(|e| facts.complete_building_count(EntityKind::CityCentre) >= e.target_city_centres)
+        .map(|e| {
+            facts.complete_building_count(EntityKind::ResourceDepot) >= e.target_resource_depots
+        })
         .unwrap_or(false);
     let oil_steel_floor = if expansion_oil_first {
         0
@@ -247,8 +253,8 @@ pub(super) fn next_tank_resource_goal(
     }
     let kind = if facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
         EntityKind::TrainingCentre
-    } else if facts.complete_building_count(EntityKind::ResearchComplex) == 0 {
-        EntityKind::ResearchComplex
+    } else if facts.complete_building_count(EntityKind::EngineeringComplex) == 0 {
+        EntityKind::EngineeringComplex
     } else if facts.complete_building_count(EntityKind::Factory) == 0 {
         EntityKind::Factory
     } else if facts.complete_building_count(EntityKind::Steelworks) == 0 {
@@ -394,7 +400,7 @@ mod tests {
         let ts = config::TILE_SIZE as f32;
         let mut observation = observation(
             vec![
-                entity(10, EntityKind::CityCentre, 8.5 * ts, 8.5 * ts),
+                entity(10, EntityKind::ResourceDepot, 8.5 * ts, 8.5 * ts),
                 pump_jack_at(60, 10.5 * ts, 12.5 * ts, false),
             ],
             vec![

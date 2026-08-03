@@ -1045,7 +1045,7 @@ in either direction; the editor does not maintain a separate browser-storage wor
 `Open in Lab`. It accepts no map data through query parameters or browser-evaluation calls. The
 server validates the authored and materialized maps, creates a private Lab, and sends an ordinary
 authoritative start payload and snapshot. The route then runs the normal `App`/`Match`, Pixi world
-renderer, and live `Minimap`, including server-materialized starting city centres, neutral bases,
+renderer, and live `Minimap`, including server-materialized starting resource depots, neutral bases,
 resources, and doodads; it does not maintain preview-only map rendering logic.
 
 Its versioned bridge exposes only bounded 64–4096-pixel `world` and square `minimap` PNG captures,
@@ -1214,7 +1214,7 @@ commands, currently `ekat.ability.ekatTeleport`, `ekat.ability.ekatLineShot`, an
 `ekat.ability.ekatMagicAnchor`. The always-active `hud.selectIdleWorkers` action appears in the HUD
 Shortcuts editor context and participates in conflict checks against every command-card context.
 Grid binds it to `T`; Classic RTS binds it to `I` because `T` is already assigned to training-centre,
-tank, and tank-research actions. Imports migrate old flat Kriegsia ids like `build.city_centre`
+tank, and tank-research actions. Imports migrate old flat Kriegsia ids like `build.resource_depot`
 into the Kriegsia binding set, preserve structurally valid unavailable faction commands with
 warnings, ignore unknown non-faction commands with warnings, reject invalid keys and same-context
 duplicates, and store accepted payloads as custom profiles. Untargeted imports rewrite ids/names to
@@ -1342,7 +1342,7 @@ right-clicks compose a Pump Jack build intent on the clicked oil patch rather th
 command. The worker build submenu also exposes Pump Jack in the top-middle `W` slot; while armed,
 its placement preview snaps to the closest live oil patch within one map tile of the cursor before
 applying the normal footprint validation. Pump Jack construction remains legal outside the completed
-friendly City Centre/Zamok mining radius, while the normal resource-mining preview warns that the
+friendly Resource Depot/Zamok mining radius, while the normal resource-mining preview warns that the
 distant extractor will be inactive. Completed owned or allied Pump Jacks with inactive extraction show a red prohibited-sign
 badge above the building until a completed friendly mining anchor comes into range. If an owned or
 allied unit covers the patch, right-clicking that unit's body still resolves
@@ -1788,7 +1788,7 @@ Cancel clears the affected producer's repeat state. Standing repeat controls nev
 queue entries; their swirl remains a policy indicator until a fully funded item is admitted.
 Research buttons that unlock production appear directly
 below the production button they unlock and disappear once complete. AT Guns and Artillery
-have separate stable R&D slots. A dependent button unlocks for queueing when
+have separate stable Engineering Complex slots. A dependent button unlocks for queueing when
 its prerequisite is complete or already present earlier in the selected building's authoritative
 `prodUpgradeQueue`. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. Selecting an owned building
@@ -1796,7 +1796,7 @@ under construction shows a dedicated construction card with Cancel in the bottom
 click selection prefers the scaffold over an overlapping builder, and cancellation returns the full
 construction cost. The Scout Plane affordance
 is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It unlocks after
-the Scout Plane R&D research completes, costs 50 steel and 75 oil, has no City Centre requirement,
+the Scout Plane Engineering Complex research completes, costs 50 steel and 75 oil, has no Resource Depot requirement,
 disables while that Command Car has an active Scout
 Plane or its 30-second cooldown is running, and issues immediately rather than entering a
 building production queue. Scout Planes are hit-testable for hover/readout purposes but normal
@@ -2169,7 +2169,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 [rendering parity ledger](rendering-parity.md).
 
 - Minimap roads reuse the world's deterministic dark-charcoal surface variants so revealed terrain stays visually coherent. Authored marked-road tiles draw small yellow centerline dots above fog, keeping the route network legible in unexplored territory; the dotted overlay is a cached static layer, while bare road tiles widen the charcoal surface without adding markings.
-- Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through City Centre), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass. Positional under-attack alerts use a 2.2-second red pulse with a crisp white inner rim. The nearest local owned unit or building at the alert position strobes its icon interior between white and its team color in 300-millisecond phases for the same duration; the resolved entity keeps flashing if it moves.
+- Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through Resource Depot), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass. Positional under-attack alerts use a 2.2-second red pulse with a crisp white inner rim. The nearest local owned unit or building at the alert position strobes its icon interior between white and its team color in 300-millisecond phases for the same duration; the resolved entity keeps flashing if it moves.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
   health bars → fog overlay → local visual-sample labels → shot-revealed units → damaged actionable-reveal health bars → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost and Lab ruler →
@@ -2202,7 +2202,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   fallback, and the optional weapon hint is forwarded to recoil timing. Authored main-cannon and
   coax muzzle anchors use sampled rig-part transforms so feedback origins follow the visible barrel
   tip during recoil scale and kick.
-- Kriegsia City Centre, Barracks, Training Centre, Research Complex, Steelworks, Vehicle Works,
+- Kriegsia Resource Depot, Barracks, Training Centre, Engineering Complex, Steelworks, Vehicle Works,
   and Pump Jack use footprint-scaled raster atlases. Each atlas composes a fixed full-color base
   with a grayscale mask extracted from authored white paint and tinted to the owning player at
   runtime; brick, doors, windows, machinery, outlines, and material shading stay fixed. Selected
@@ -2364,8 +2364,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   buildings use the same HP-layer bar for normal health.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
-  resource, draw a blue circle on the resource when the nearest completed own City Centre
-  is inside mining range; draw a red/dashed line to the City Centre when too far.
+  resource, draw a blue circle on the resource when the nearest completed own Resource Depot
+  is inside mining range; draw a red/dashed line to the Resource Depot when too far.
 - Tanks: render the hull from mirrored client `TANK_BODY` constants (`50.4px` length, `28.8px` width,
   `1.5px` clearance) so the visible body, selection ring, click target, and advisory build
   preview match the server's oriented vehicle body. Track tread offsets advance from actual
@@ -2454,7 +2454,7 @@ Current areas:
   `config/rules_mirror.js`, and `config/factions.js`.
 - `ui`: HUD, command card descriptors/selection panels, hotkey profiles/editor, lobby
   controller/browser/roster views, match history, minimap, resource icons, scoreboard, status badge, branch
-  staging, lab panel, lab setup authoring helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Command discovery includes the R&D research-chain context so direct-hotkey and settings catalogs keep Artillery in its permanent W slot. Wait-until-ready ability descriptors remain available for queue-admissible carriers, including Mortar Fire while it is cooling down. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. Lab and room-time panel collapse controls activate immediately on touch release, suppress the follow-up synthesized click, cancel pending activation when the pointer leaves or cancels, and reset activation state on teardown or re-render. On narrow viewports, the default Lab Options and Tools headers sit below the expanded room-time controls, and their collapse buttons remain touch-friendly. Mobile restore ignores saved desktop coordinates for both Lab windows and room-time controls while preserving saved collapsed state. The settings panel uses the in-match header action slot for Give Up
+  staging, lab panel, lab setup authoring helpers, settings. Command-card tooltips render optional unit descriptions when descriptor metadata provides them. Command discovery includes the Engineering Complex research-chain context so direct-hotkey and settings catalogs keep Artillery in its permanent W slot. Wait-until-ready ability descriptors remain available for queue-admissible carriers, including Mortar Fire while it is cooling down. Lab research controls render direct per-upgrade toggle buttons for the selected Lab target player; completed upgrades render as pressed buttons with a check-mark background. The Lab panel window toggle button shows Collapse when expanded and Expand when collapsed. Lab and room-time panel collapse controls activate immediately on touch release, suppress the follow-up synthesized click, cancel pending activation when the pointer leaves or cancels, and reset activation state on teardown or re-render. On narrow viewports, the default Lab Options and Tools headers sit below the expanded room-time controls, and their collapse buttons remain touch-friendly. Mobile restore ignores saved desktop coordinates for both Lab windows and room-time controls while preserving saved collapsed state. The settings panel uses the in-match header action slot for Give Up
   in live matches and Back to Lobby in Lab/replay sessions. After a finished match, App resets the
   Lobby controller to the root browser before showing the lobby screen again. Lobby AI creation is
   exposed from the roster's team context, not as a duplicate global sidebar action. The in-match

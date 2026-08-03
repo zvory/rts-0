@@ -2,7 +2,7 @@
 
 Second local image-generation pass for five production-building identifiers. Unlike the rejected
 badge pass, these are bare silhouette-first emblems with no plate, border, frame, bolts, or backing
-field. The city centre remains unchanged.
+field. The Resource Depot remains unchanged.
 
 Each emblem is retained as a standalone 256×256 alpha PNG. The selected `*-team-tint.png`
 variants use flat white paint with a thick black outline. Their preview atlases append one
@@ -12,7 +12,7 @@ emblem layer by the owning player's color: white becomes the faction color while
 
 - Barracks: one simplified M14-style rifle silhouette
 - Training Centre: MG42-style machine gun without a bipod, crossed with a Panzerfaust-style launcher
-- R&D Complex: atomic symbol with eight electrons
+- Engineering Complex: atomic symbol with eight electrons
 - Vehicle Works: medium tank silhouette
 - Gun Works: field-artillery cannon silhouette
 

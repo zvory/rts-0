@@ -16,7 +16,7 @@ const TURTLE_UPGRADES: [UpgradeKind; 2] =
 const TURTLE_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
-    EntityKind::ResearchComplex,
+    EntityKind::EngineeringComplex,
     EntityKind::Steelworks,
 ];
 
@@ -52,7 +52,7 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
     },
     resources: AI_2_1.resources,
     expansion: Some(ExpansionPolicy {
-        target_city_centres: 2,
+        target_resource_depots: 2,
         required_complete_building: EntityKind::TrainingCentre,
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 0,
@@ -61,7 +61,7 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
         search_radius_tiles: 6,
         // Turtle cannot rely on the Tank profile's high army spending to bank
         // the ordinary 350-steel trigger. Once its Training Centre is complete,
-        // reserve for the second City Centre before adding more support units.
+        // reserve for the second Resource Depot before adding more support units.
         trigger_steel: TURTLE_EXPANSION_STEEL_TRIGGER,
         trigger_supply_used: 30,
         blocks_tech_path: false,

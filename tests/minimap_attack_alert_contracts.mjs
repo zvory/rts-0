@@ -32,7 +32,7 @@ export function runMinimapAttackAlertContracts() {
   };
   const entities = [
     { id: 11, kind: KIND.RIFLEMAN, owner: 1, x: 42, y: 60 },
-    { id: 12, kind: KIND.CITY_CENTRE, owner: 1, x: 160, y: 160 },
+    { id: 12, kind: KIND.RESOURCE_DEPOT, owner: 1, x: 160, y: 160 },
     { id: 13, kind: KIND.RIFLEMAN, owner: 2, x: 40, y: 60 },
   ];
   const state = {

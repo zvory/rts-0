@@ -102,7 +102,7 @@ pub struct ProfileMatchupResult {
     pub ticks: u32,
     pub end_reason: ProfileMatchupEndReason,
     pub winner: Option<ProfileMatchupWinner>,
-    pub starting_city_centres: Vec<ProfileMatchupStartingCityCentreResult>,
+    pub starting_resource_depots: Vec<ProfileMatchupStartingResourceDepotResult>,
     pub players: Vec<ProfileMatchupPlayerResult>,
     pub first_damage_tick: Option<u32>,
     pub attack_events: usize,
@@ -116,8 +116,8 @@ pub struct ProfileMatchupResult {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileMatchupEndReason {
-    StartingCityCentreKilled,
-    StartingCityCentresDestroyed,
+    StartingResourceDepotKilled,
+    StartingResourceDepotsDestroyed,
     TickCap,
 }
 
@@ -130,7 +130,7 @@ pub struct ProfileMatchupWinner {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProfileMatchupStartingCityCentreResult {
+pub struct ProfileMatchupStartingResourceDepotResult {
     pub player_id: u32,
     pub profile: String,
     pub entity_id: u32,
@@ -155,8 +155,8 @@ pub struct ProfileMatchupPlayerResult {
     pub first_rifleman_attack_command_tick: Option<u32>,
     pub first_scout_car_tick: Option<u32>,
     pub first_scout_car_harass_command_tick: Option<u32>,
-    pub first_expansion_city_centre_planned_tick: Option<u32>,
-    pub first_expansion_city_centre_completed_tick: Option<u32>,
+    pub first_expansion_resource_depot_planned_tick: Option<u32>,
+    pub first_expansion_resource_depot_completed_tick: Option<u32>,
     pub first_tank_tick: Option<u32>,
     pub final_counts: BTreeMap<String, u32>,
 }
@@ -171,19 +171,19 @@ pub struct ProfileMatchupTraceEntry {
 }
 
 #[derive(Debug, Clone)]
-struct StartingCityCentreObjective {
-    centres: Vec<StartingCityCentreState>,
+struct StartingResourceDepotObjective {
+    centres: Vec<StartingResourceDepotState>,
 }
 
 #[derive(Debug, Clone)]
-struct StartingCityCentreState {
+struct StartingResourceDepotState {
     player_id: u32,
     profile: String,
     entity_id: u32,
     death_tick: Option<u32>,
 }
 
-impl StartingCityCentreObjective {
+impl StartingResourceDepotObjective {
     fn capture(game: &Game, start: &StartPayload, players: &[PlayerInit]) -> Result<Self, String> {
         let viewer = players
             .first()
@@ -205,7 +205,7 @@ impl StartingCityCentreObjective {
                 .iter()
                 .filter(|entity| {
                     entity.owner == player.id
-                        && entity.kind == kinds::CITY_CENTRE
+                        && entity.kind == kinds::RESOURCE_DEPOT
                         && entity.build_progress.is_none()
                         && entity.hp > 0
                 })
@@ -215,11 +215,11 @@ impl StartingCityCentreObjective {
                 })
                 .ok_or_else(|| {
                     format!(
-                        "missing completed starting City Centre for player {}",
+                        "missing completed starting Resource Depot for player {}",
                         player.id
                     )
                 })?;
-            centres.push(StartingCityCentreState {
+            centres.push(StartingResourceDepotState {
                 player_id: player.id,
                 profile: player.name.clone(),
                 entity_id: centre.id,
@@ -247,7 +247,7 @@ impl StartingCityCentreObjective {
             let alive = snapshot.entities.iter().any(|entity| {
                 entity.id == centre.entity_id
                     && entity.owner == centre.player_id
-                    && entity.kind == kinds::CITY_CENTRE
+                    && entity.kind == kinds::RESOURCE_DEPOT
                     && entity.hp > 0
             });
             if !alive {
@@ -289,16 +289,16 @@ impl StartingCityCentreObjective {
         if destroyed == 0 {
             ProfileMatchupEndReason::TickCap
         } else if destroyed == self.centres.len() {
-            ProfileMatchupEndReason::StartingCityCentresDestroyed
+            ProfileMatchupEndReason::StartingResourceDepotsDestroyed
         } else {
-            ProfileMatchupEndReason::StartingCityCentreKilled
+            ProfileMatchupEndReason::StartingResourceDepotKilled
         }
     }
 
-    fn results(&self) -> Vec<ProfileMatchupStartingCityCentreResult> {
+    fn results(&self) -> Vec<ProfileMatchupStartingResourceDepotResult> {
         self.centres
             .iter()
-            .map(|centre| ProfileMatchupStartingCityCentreResult {
+            .map(|centre| ProfileMatchupStartingResourceDepotResult {
                 player_id: centre.player_id,
                 profile: centre.profile.clone(),
                 entity_id: centre.entity_id,
@@ -366,7 +366,7 @@ pub fn run_profile_matchup_result(
     let mut game = Game::new_without_ai_controllers(&players, options.seed);
     let replay_start = ReplayStartComposition::capture(&game, server_build_sha())?;
     let start = game.start_payload();
-    let mut objective = StartingCityCentreObjective::capture(&game, &start, &players)?;
+    let mut objective = StartingResourceDepotObjective::capture(&game, &start, &players)?;
     let mut controllers = vec![
         AiController::with_profile_id(1, profile_a.id),
         AiController::with_profile_id(2, profile_b.id),
@@ -471,7 +471,7 @@ pub fn run_profile_matchup_result(
     let alive = objective.alive_player_ids();
     let winner = objective.winner();
     let end_reason = objective.end_reason();
-    let starting_city_centres = objective.results();
+    let starting_resource_depots = objective.results();
     let final_counts = final_unit_counts(&game, &players);
     let final_values = final_material_values(&game, &players);
     let command_stats = command_stats_by_player(game.command_log());
@@ -516,10 +516,10 @@ pub fn run_profile_matchup_result(
                 first_rifleman_attack_command_tick: score.first_rifleman_attack_command_tick,
                 first_scout_car_tick: score.first_scout_car_tick,
                 first_scout_car_harass_command_tick: score.first_scout_car_harass_command_tick,
-                first_expansion_city_centre_planned_tick: score
-                    .first_expansion_city_centre_planned_tick,
-                first_expansion_city_centre_completed_tick: score
-                    .first_expansion_city_centre_completed_tick,
+                first_expansion_resource_depot_planned_tick: score
+                    .first_expansion_resource_depot_planned_tick,
+                first_expansion_resource_depot_completed_tick: score
+                    .first_expansion_resource_depot_completed_tick,
                 first_tank_tick: score.first_tank_tick,
                 final_counts: final_counts.get(&player.id).cloned().unwrap_or_default(),
             }
@@ -534,7 +534,7 @@ pub fn run_profile_matchup_result(
         ticks: game.tick_count(),
         end_reason,
         winner,
-        starting_city_centres,
+        starting_resource_depots,
         players,
         first_damage_tick,
         attack_events,
@@ -599,8 +599,8 @@ struct PlayerScorecard {
     first_rifleman_attack_command_tick: Option<u32>,
     first_scout_car_tick: Option<u32>,
     first_scout_car_harass_command_tick: Option<u32>,
-    first_expansion_city_centre_planned_tick: Option<u32>,
-    first_expansion_city_centre_completed_tick: Option<u32>,
+    first_expansion_resource_depot_planned_tick: Option<u32>,
+    first_expansion_resource_depot_completed_tick: Option<u32>,
     first_tank_tick: Option<u32>,
     damage_dealt_events: usize,
     death_count: usize,
@@ -622,18 +622,18 @@ impl ScorecardCollector {
 
     fn observe_snapshot(&mut self, tick: u32, player_id: u32, snapshot: &Snapshot) {
         let score = self.players.entry(player_id).or_default();
-        let complete_city_centres = snapshot
+        let complete_resource_depots = snapshot
             .entities
             .iter()
             .filter(|entity| {
                 entity.owner == player_id
-                    && entity.kind == kinds::CITY_CENTRE
+                    && entity.kind == kinds::RESOURCE_DEPOT
                     && entity.build_progress.is_none()
             })
             .count();
-        if complete_city_centres >= 2 {
+        if complete_resource_depots >= 2 {
             score
-                .first_expansion_city_centre_completed_tick
+                .first_expansion_resource_depot_completed_tick
                 .get_or_insert(tick);
         }
         if snapshot
@@ -663,18 +663,18 @@ impl ScorecardCollector {
         if matches!(
             command,
             rts_sim::game::command::SimCommand::Build {
-                building: EntityKind::CityCentre,
+                building: EntityKind::ResourceDepot,
                 ..
             }
         ) && snapshot
             .entities
             .iter()
-            .filter(|entity| entity.owner == player_id && entity.kind == kinds::CITY_CENTRE)
+            .filter(|entity| entity.owner == player_id && entity.kind == kinds::RESOURCE_DEPOT)
             .count()
             >= 1
         {
             score
-                .first_expansion_city_centre_planned_tick
+                .first_expansion_resource_depot_planned_tick
                 .get_or_insert(tick);
         }
 
@@ -1005,8 +1005,8 @@ mod tests {
             entity(2, 1, kinds::RIFLEMAN),
             entity(3, 1, kinds::SCOUT_CAR),
             entity(4, 1, kinds::TANK),
-            entity(5, 1, kinds::CITY_CENTRE),
-            entity(6, 1, kinds::CITY_CENTRE),
+            entity(5, 1, kinds::RESOURCE_DEPOT),
+            entity(6, 1, kinds::RESOURCE_DEPOT),
         ]);
 
         collector.observe_snapshot(100, 1, &snapshot);
@@ -1048,7 +1048,7 @@ mod tests {
             1,
             &SimCommand::Build {
                 units: vec![1],
-                building: EntityKind::CityCentre,
+                building: EntityKind::ResourceDepot,
                 tile_x: 20,
                 tile_y: 20,
                 queued: false,
@@ -1088,10 +1088,13 @@ mod tests {
         let score = collector.players.get(&1).expect("player scorecard");
         assert_eq!(score.first_scout_car_tick, Some(100));
         assert_eq!(score.first_tank_tick, Some(100));
-        assert_eq!(score.first_expansion_city_centre_completed_tick, Some(100));
+        assert_eq!(
+            score.first_expansion_resource_depot_completed_tick,
+            Some(100)
+        );
         assert_eq!(score.first_rifleman_attack_command_tick, Some(110));
         assert_eq!(score.first_scout_car_harass_command_tick, Some(125));
-        assert_eq!(score.first_expansion_city_centre_planned_tick, Some(130));
+        assert_eq!(score.first_expansion_resource_depot_planned_tick, Some(130));
         assert_eq!(score.damage_dealt_events, 1);
         assert_eq!(score.death_count, 1);
     }
@@ -1135,9 +1138,9 @@ mod tests {
         assert!(result.ai_trace_tail.len() <= super::PROFILE_MATCHUP_TRACE_TAIL);
         assert_eq!(result.end_reason, super::ProfileMatchupEndReason::TickCap);
         assert!(result.winner.is_none());
-        assert_eq!(result.starting_city_centres.len(), 2);
+        assert_eq!(result.starting_resource_depots.len(), 2);
         assert!(result
-            .starting_city_centres
+            .starting_resource_depots
             .iter()
             .all(|centre| centre.alive && centre.death_tick.is_none()));
         assert!(result
@@ -1147,7 +1150,7 @@ mod tests {
     }
 
     #[test]
-    fn starting_city_centre_objective_tracks_destroyed_start() {
+    fn starting_resource_depot_objective_tracks_destroyed_start() {
         let players = vec![
             PlayerInit {
                 id: 1,
@@ -1168,8 +1171,8 @@ mod tests {
         ];
         let mut game = Game::new_without_ai_controllers(&players, 7);
         let start = game.start_payload();
-        let mut objective = super::StartingCityCentreObjective::capture(&game, &start, &players)
-            .expect("starting City Centres should be captured");
+        let mut objective = super::StartingResourceDepotObjective::capture(&game, &start, &players)
+            .expect("starting Resource Depots should be captured");
 
         assert_eq!(objective.alive_player_ids(), vec![1, 2]);
         assert!(objective.winner().is_none());
@@ -1184,7 +1187,7 @@ mod tests {
         assert_eq!(winner.profile, AI_2_1_ID);
         assert_eq!(
             objective.end_reason(),
-            super::ProfileMatchupEndReason::StartingCityCentreKilled
+            super::ProfileMatchupEndReason::StartingResourceDepotKilled
         );
         assert_eq!(objective.alive_player_ids(), vec![1]);
         assert!(objective.results().iter().any(|centre| {

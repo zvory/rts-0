@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn unit_attackers_prefer_workers_over_armored_buildings() {
         let candidates = [
-            candidate(10, EntityKind::CityCentre, 400.0, false),
+            candidate(10, EntityKind::ResourceDepot, 400.0, false),
             candidate(11, EntityKind::Worker, 2_500.0, false),
         ];
 
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn worker_group_beats_weapon_fit_for_building_cleanup() {
         let candidates = [
-            candidate(10, EntityKind::CityCentre, 400.0, false),
+            candidate(10, EntityKind::ResourceDepot, 400.0, false),
             candidate(11, EntityKind::Worker, 2_500.0, false),
         ];
 
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn cleanup_building_targets_still_use_weapon_fit() {
         let candidates = [
-            candidate(10, EntityKind::CityCentre, 400.0, false),
+            candidate(10, EntityKind::ResourceDepot, 400.0, false),
             candidate(11, EntityKind::PumpJack, 2_500.0, false),
         ];
 

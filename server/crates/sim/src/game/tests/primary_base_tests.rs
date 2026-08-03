@@ -64,18 +64,18 @@ fn expansion_center(game: &Game, player_id: u32) -> (f32, f32) {
 }
 
 #[test]
-fn primary_base_alive_players_do_not_count_expansion_city_centres() {
+fn primary_base_alive_players_do_not_count_expansion_resource_depots() {
     let players = [ai_player(1, "kriegsia"), ai_player(2, "kriegsia")];
     let mut game = Game::new_without_ai_controllers(&players, 0x5150_0B45);
     assert!(game.primary_base_alive_players().contains(&2));
 
-    let starting_city_centre = starting_base_id(&game, 2, EntityKind::CityCentre);
-    game.state.entities.remove(starting_city_centre);
+    let starting_resource_depot = starting_base_id(&game, 2, EntityKind::ResourceDepot);
+    game.state.entities.remove(starting_resource_depot);
     let expansion = expansion_center(&game, 2);
     game.state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, expansion.0, expansion.1, true)
-        .expect("expansion City Centre should spawn");
+        .spawn_building(2, EntityKind::ResourceDepot, expansion.0, expansion.1, true)
+        .expect("expansion Resource Depot should spawn");
 
     assert!(
         game.alive_players().contains(&2),
@@ -83,7 +83,7 @@ fn primary_base_alive_players_do_not_count_expansion_city_centres() {
     );
     assert!(
         !game.primary_base_alive_players().contains(&2),
-        "primary-base objective should end when the starting City Centre is gone"
+        "primary-base objective should end when the starting Resource Depot is gone"
     );
 }
 

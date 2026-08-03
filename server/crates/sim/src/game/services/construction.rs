@@ -684,10 +684,17 @@ mod tests {
     fn unattended_scaffold_resumes_but_second_builder_is_rejected() {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
-        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 10, 10);
+        let (resource_depot_x, resource_depot_y) =
+            footprint_center(&map, EntityKind::ResourceDepot, 10, 10);
         entities
-            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-            .expect("city centre should spawn");
+            .spawn_building(
+                1,
+                EntityKind::ResourceDepot,
+                resource_depot_x,
+                resource_depot_y,
+                true,
+            )
+            .expect("resource depot should spawn");
         let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
         let site = entities
             .spawn_building(1, EntityKind::Depot, sx, sy, false)

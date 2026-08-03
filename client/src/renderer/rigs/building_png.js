@@ -24,16 +24,16 @@ function buildingSpec(kind, frameWidth, frameHeight, image, {
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
-  buildingSpec(KIND.CITY_CENTRE, 384, 384,
-    "/assets/rigs/buildings-b7-team-paint-refined-preview/city_centre-atlas.png?v=b7-team-paint-refined-preview-01"),
+  buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
+    "/assets/rigs/buildings-b7-team-paint-refined-preview/resource_depot-atlas.png?v=b7-team-paint-refined-preview-01"),
   buildingSpec(KIND.BARRACKS, 384, 256,
     "/assets/rigs/building-emblems-preview/barracks-atlas-m14-team-tint.png?v=building-emblems-preview-04",
     { emblem: true }),
   buildingSpec(KIND.TRAINING_CENTRE, 384, 256,
     "/assets/rigs/building-emblems-preview/training_centre-atlas-mg42-panzerfaust-team-tint.png?v=building-emblems-preview-06",
     { emblem: true }),
-  buildingSpec(KIND.RESEARCH_COMPLEX, 384, 384,
-    "/assets/rigs/building-emblems-preview/research_complex-atlas-team-tint.png?v=building-emblems-preview-03",
+  buildingSpec(KIND.ENGINEERING_COMPLEX, 384, 384,
+    "/assets/rigs/building-emblems-preview/engineering_complex-atlas-team-tint.png?v=building-emblems-preview-03",
     { emblem: true }),
   buildingSpec(KIND.FACTORY, 384, 384,
     "/assets/rigs/building-emblems-preview/factory-atlas-team-tint.png?v=building-emblems-preview-03",

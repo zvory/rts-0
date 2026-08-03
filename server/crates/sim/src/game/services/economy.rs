@@ -110,7 +110,7 @@ fn gather_to_node(
     };
 
     if dist2(wx, wy, node_pos.0, node_pos.1).sqrt() <= interact {
-        if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
+        if !world_query::resource_has_completed_mining_anchor_for_player(entities, owner, node) {
             wait_gatherer_for_anchor(entities, id, node_pos, wx, wy);
             return;
         }
@@ -195,7 +195,11 @@ fn closest_unoccupied_same_resource_node(
                 && candidate.kind == target_kind
                 && direct_gather_node_mineable(candidate.kind)
                 && candidate.remaining().unwrap_or(0) > 0
-                && world_query::resource_has_completed_mining_cc(entities, owner, candidate.id)
+                && world_query::resource_has_completed_mining_anchor_for_player(
+                    entities,
+                    owner,
+                    candidate.id,
+                )
                 && entities.node_slot_holder(candidate.id).is_none()
         })
         .filter_map(|candidate| {
@@ -294,7 +298,7 @@ fn gather_harvesting(
         Some(e) => (e.owner, e.kind),
         None => return,
     };
-    if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
+    if !world_query::resource_has_completed_mining_anchor_for_player(entities, owner, node) {
         let node_pos = entities.get(node).map(|node| (node.pos_x, node.pos_y));
         let worker_pos = entities.get(id).map(|worker| (worker.pos_x, worker.pos_y));
         match (node_pos, worker_pos) {

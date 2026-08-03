@@ -83,7 +83,7 @@ const baseline = {
     },
     {
       id: 201,
-      kind: "city_centre",
+      kind: "resource_depot",
       x: 240,
       y: 240,
       hp: 1000,

@@ -177,16 +177,16 @@ fn remembered_buildings_use_team_visible_observations() {
     let p3_base = game.state.map.tile_center(55, 55);
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
-        .expect("p1 city centre should spawn");
+        .spawn_building(1, EntityKind::ResourceDepot, p1_base.0, p1_base.1, true)
+        .expect("p1 resource depot should spawn");
     game.state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
-        .expect("p2 city centre should spawn");
+        .spawn_building(2, EntityKind::ResourceDepot, p2_base.0, p2_base.1, true)
+        .expect("p2 resource depot should spawn");
     game.state
         .entities
-        .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
-        .expect("p3 city centre should spawn");
+        .spawn_building(3, EntityKind::ResourceDepot, p3_base.0, p3_base.1, true)
+        .expect("p3 resource depot should spawn");
     let scout_pos = game.state.map.tile_center(20, 20);
     let depot_pos = game.state.map.tile_center(22, 20);
     let scout = game

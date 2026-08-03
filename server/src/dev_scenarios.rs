@@ -1317,7 +1317,7 @@ mod tests {
             None
         );
         assert_eq!(
-            parse_dev_scenario_launch("scout_car_snaking_corridor", "city_centre", "1", None),
+            parse_dev_scenario_launch("scout_car_snaking_corridor", "resource_depot", "1", None),
             None
         );
         assert_eq!(

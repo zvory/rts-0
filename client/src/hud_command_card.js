@@ -113,10 +113,10 @@ export function duplicateCommandIdsForCard(renderedCard) {
 export function buildCommandCardContextCatalog() {
   const playerId = 1;
   const baseEntities = [
-    { id: 1, owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
+    { id: 1, owner: playerId, kind: KIND.RESOURCE_DEPOT, buildProgress: null },
     { id: 2, owner: playerId, kind: KIND.BARRACKS, buildProgress: null },
     { id: 3, owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: null },
-    { id: 4, owner: playerId, kind: KIND.RESEARCH_COMPLEX, buildProgress: null },
+    { id: 4, owner: playerId, kind: KIND.ENGINEERING_COMPLEX, buildProgress: null },
     { id: 5, owner: playerId, kind: KIND.FACTORY, buildProgress: null },
     { id: 6, owner: playerId, kind: KIND.STEELWORKS, buildProgress: null },
   ];
@@ -194,15 +194,15 @@ export function buildCommandCardContextCatalog() {
       entities: allEntities.filter((e) => e.id !== scoutPlane.id),
     })) },
     { id: "artillery", card: buildCommandCardDescriptors(ctx([artillery])) },
-    { id: "city-centre-train", card: buildCommandCardDescriptors(ctx([baseEntities[0]])) },
+    { id: "resource-depot-train", card: buildCommandCardDescriptors(ctx([baseEntities[0]])) },
     { id: "barracks-train", card: buildCommandCardDescriptors(ctx([baseEntities[1]])) },
     { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
     { id: "gun-works-train", card: buildCommandCardDescriptors(ctx([baseEntities[5]])) },
     { id: "training-centre", card: buildCommandCardDescriptors(ctx([baseEntities[2]], { upgrades: [] })) },
-    { id: "research-complex", card: buildCommandCardDescriptors(ctx([baseEntities[3]], { upgrades: [] })) },
+    { id: "engineering-complex", card: buildCommandCardDescriptors(ctx([baseEntities[3]], { upgrades: [] })) },
     {
-      id: "research-complex-at-guns",
-      label: "R&D Complex (AT Guns researched)",
+      id: "engineering-complex-at-guns",
+      label: "Engineering Complex (AT Guns researched)",
       card: buildCommandCardDescriptors(ctx([baseEntities[3]], {
         upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
       })),

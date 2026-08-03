@@ -913,7 +913,7 @@ pub(super) fn main_steel_defensive_line_assignments(
 
 pub(super) fn main_steel_cluster_center(observation: &AiObservation) -> Option<(f32, f32)> {
     let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let radius = (config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
+    let radius = (config::START_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
     let radius2 = squared(radius);
     forward_steel_cluster_center(
         observation
@@ -982,7 +982,8 @@ impl LocalDefenseGeometry {
         let base_radius2 = squared(LOCAL_DEFENSE_RADIUS_TILES * tile_size);
         let resource_radius2 = squared(RESOURCE_LINE_DEFENSE_RADIUS_TILES * tile_size);
         let worker_radius2 = squared(WORKER_DEFENSE_RADIUS_TILES * tile_size);
-        let home_resource_radius2 = squared((config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * tile_size);
+        let home_resource_radius2 =
+            squared((config::START_RESOURCE_MAX_DIST_TILES + 1.5) * tile_size);
         let home_resources = observation
             .resources
             .iter()

@@ -278,7 +278,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.
   Legacy `charge` commands remain decodable but have no eligible carriers, cooldown, or runtime
   status.
-- **Advanced research locks**: R&D Complex can queue `anti_tank_gun_unlock` for 100 steel / 50 oil
+- **Advanced research locks**: Engineering Complex can queue `anti_tank_gun_unlock` for 100 steel / 50 oil
   over 300 ticks, unlocking Anti-Tank Gun training at Gun Works for that player;
   `artillery_unlock` for 200 steel / 100 oil over 750 ticks after completed
   `anti_tank_gun_unlock`, unlocking Artillery training at Gun Works;

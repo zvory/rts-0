@@ -17,7 +17,7 @@ fn scores_count_starting_entities() {
     );
     assert_eq!(
         human.structure_score,
-        entity_score_value(EntityKind::CityCentre)
+        entity_score_value(EntityKind::ResourceDepot)
     );
     assert_eq!(human.units_killed, 0);
     assert_eq!(human.units_lost, 0);
@@ -40,7 +40,7 @@ fn scores_record_kills_and_losses_on_death() {
         .state
         .entities
         .iter()
-        .find(|e| e.owner == 2 && e.kind == EntityKind::CityCentre)
+        .find(|e| e.owner == 2 && e.kind == EntityKind::ResourceDepot)
         .map(|e| e.id)
         .expect("victim building should exist");
     for id in [victim_unit, victim_building] {
@@ -96,17 +96,17 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
     let players = human_vs_ai_players();
     let mut game =
         Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0xA11A_0001);
-    let city_centre = game
+    let resource_depot = game
         .state
         .entities
         .iter()
-        .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
+        .find(|e| e.owner == 1 && e.kind == EntityKind::ResourceDepot)
         .map(|e| e.id)
-        .expect("player city centre should exist");
+        .expect("player resource depot should exist");
     game.enqueue(
         1,
         Command::Train {
-            building: city_centre,
+            building: resource_depot,
             unit: EntityKind::Worker,
         },
     );
@@ -173,8 +173,8 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         .iter()
         .any(|row| row.kind == "worker" && row.count == config::STARTING_WORKERS));
     assert!(player_one.production.iter().any(|row| {
-        row.building_id == city_centre
-            && row.building_kind == "city_centre"
+        row.building_id == resource_depot
+            && row.building_kind == "resource_depot"
             && row.item_kind == "worker"
             && row.item_type == "unit"
             && row.queue_depth == 1
@@ -552,7 +552,7 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         .entities
         .spawn_building(
             1,
-            EntityKind::CityCentre,
+            EntityKind::ResourceDepot,
             player_one_base.0,
             player_one_base.1,
             true,
@@ -563,7 +563,7 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         .entities
         .spawn_building(
             2,
-            EntityKind::CityCentre,
+            EntityKind::ResourceDepot,
             player_two_base.0,
             player_two_base.1,
             true,
@@ -572,7 +572,13 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
     let enemy_base = game.state.map.tile_center(28, 28);
     game.state
         .entities
-        .spawn_building(3, EntityKind::CityCentre, enemy_base.0, enemy_base.1, true)
+        .spawn_building(
+            3,
+            EntityKind::ResourceDepot,
+            enemy_base.0,
+            enemy_base.1,
+            true,
+        )
         .expect("enemy base should spawn");
 
     let rifle_pos = game.state.map.tile_center(2, 2);

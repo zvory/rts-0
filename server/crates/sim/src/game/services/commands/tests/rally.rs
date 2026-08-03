@@ -210,10 +210,10 @@ fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
 fn coordinate_only_resource_rallies_remain_plain_ground_points() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
-    let city_centre = entities
-        .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
-        .expect("city centre should spawn");
+    let (cx, cy) = footprint_center(&map, EntityKind::ResourceDepot, 6, 6);
+    let resource_depot = entities
+        .spawn_building(1, EntityKind::ResourceDepot, cx, cy, true)
+        .expect("resource depot should spawn");
     entities
         .spawn_node(EntityKind::Steel, 320.0, 256.0)
         .expect("steel should spawn");
@@ -227,7 +227,7 @@ fn coordinate_only_resource_rallies_remain_plain_ground_points() {
         vec![(
             1,
             SimCommand::SetRally {
-                building: city_centre,
+                building: resource_depot,
                 x: 320.0,
                 y: 256.0,
                 kind: RallyKind::Move,
@@ -235,7 +235,10 @@ fn coordinate_only_resource_rallies_remain_plain_ground_points() {
             },
         )],
     );
-    let rally = entities.get(city_centre).expect("city centre").rally_plan()[0];
+    let rally = entities
+        .get(resource_depot)
+        .expect("resource depot")
+        .rally_plan()[0];
     assert_eq!((rally.point.x, rally.point.y), (320.0, 256.0));
 
     apply(
@@ -244,7 +247,7 @@ fn coordinate_only_resource_rallies_remain_plain_ground_points() {
         vec![(
             1,
             SimCommand::SetRally {
-                building: city_centre,
+                building: resource_depot,
                 x: 384.0,
                 y: 256.0,
                 kind: RallyKind::Move,
@@ -252,6 +255,9 @@ fn coordinate_only_resource_rallies_remain_plain_ground_points() {
             },
         )],
     );
-    let rally = entities.get(city_centre).expect("city centre").rally_plan()[0];
+    let rally = entities
+        .get(resource_depot)
+        .expect("resource depot")
+        .rally_plan()[0];
     assert_eq!((rally.point.x, rally.point.y), (384.0, 256.0));
 }

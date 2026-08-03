@@ -4,12 +4,12 @@ use super::*;
 fn produced_unit_rallies_to_nearest_free_tile() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let city_centre = spawn_building_training(
+    let resource_depot = spawn_building_training(
         &map,
         &mut entities,
         10,
         10,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Worker,
     );
     let blocked = map.tile_center(18, 10);
@@ -18,8 +18,8 @@ fn produced_unit_rallies_to_nearest_free_tile() {
         .expect("rally destination blocker should spawn");
     let rally = (blocked.0 + 14.0, blocked.1);
     entities
-        .get_mut(city_centre)
-        .expect("city centre")
+        .get_mut(resource_depot)
+        .expect("resource depot")
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
     let mut players = vec![player(1)];
 
@@ -37,8 +37,8 @@ fn produced_unit_rallies_to_nearest_free_tile() {
     assert_eq!(worker.path_goal(), Some(map.tile_center(19, 10)));
     assert_eq!(
         entities
-            .get(city_centre)
-            .expect("city centre")
+            .get(resource_depot)
+            .expect("resource depot")
             .rally_point(),
         Some(rally),
         "resolving this unit's destination must not move the producer's rally marker"
@@ -54,7 +54,7 @@ fn simultaneous_production_reserves_distinct_rally_tiles() {
         &mut entities,
         5,
         5,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Worker,
     );
     let right = spawn_building_training(
@@ -62,14 +62,14 @@ fn simultaneous_production_reserves_distinct_rally_tiles() {
         &mut entities,
         28,
         5,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Worker,
     );
     let rally = map.tile_center(20, 20);
     for producer in [left, right] {
         entities
             .get_mut(producer)
-            .expect("city centre")
+            .expect("resource depot")
             .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
     }
     let mut players = vec![player(1)];
@@ -100,18 +100,18 @@ fn produced_unit_uses_nearest_reachable_free_rally_tile() {
         map.terrain[index] = terrain::ROCK;
     }
     let mut entities = EntityStore::new();
-    let city_centre = spawn_building_training(
+    let resource_depot = spawn_building_training(
         &map,
         &mut entities,
         6,
         10,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Worker,
     );
     let rally = map.tile_center(24, 10);
     entities
-        .get_mut(city_centre)
-        .expect("city centre")
+        .get_mut(resource_depot)
+        .expect("resource depot")
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
     let mut players = vec![player(1)];
 
@@ -132,12 +132,12 @@ fn produced_unit_uses_nearest_reachable_free_rally_tile() {
 fn hidden_enemy_does_not_change_produced_unit_rally_goal() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let city_centre = spawn_building_training(
+    let resource_depot = spawn_building_training(
         &map,
         &mut entities,
         10,
         10,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Worker,
     );
     let rally = map.tile_center(24, 24);
@@ -145,8 +145,8 @@ fn hidden_enemy_does_not_change_produced_unit_rally_goal() {
         .spawn_unit(2, EntityKind::Worker, rally.0, rally.1)
         .expect("hidden enemy should spawn");
     entities
-        .get_mut(city_centre)
-        .expect("city centre")
+        .get_mut(resource_depot)
+        .expect("resource depot")
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
     let mut players = vec![player(1), player(2)];
 
@@ -167,12 +167,12 @@ fn hidden_enemy_does_not_change_produced_unit_rally_goal() {
 fn visible_enemy_blocks_produced_unit_rally_goal() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let city_centre = spawn_building_training(
+    let resource_depot = spawn_building_training(
         &map,
         &mut entities,
         10,
         10,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Worker,
     );
     let rally = map.tile_center(24, 24);
@@ -184,8 +184,8 @@ fn visible_enemy_blocks_produced_unit_rally_goal() {
         .spawn_unit(1, EntityKind::Rifleman, observer.0, observer.1)
         .expect("friendly observer should spawn");
     entities
-        .get_mut(city_centre)
-        .expect("city centre")
+        .get_mut(resource_depot)
+        .expect("resource depot")
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
     let mut players = vec![player(1), player(2)];
     let mut fog = Fog::new(map.width, map.height);
@@ -208,12 +208,12 @@ fn visible_enemy_blocks_produced_unit_rally_goal() {
 fn enemy_future_goal_does_not_reserve_rally_tile() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let city_centre = spawn_building_training(
+    let resource_depot = spawn_building_training(
         &map,
         &mut entities,
         10,
         10,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Worker,
     );
     let rally = map.tile_center(24, 24);
@@ -232,8 +232,8 @@ fn enemy_future_goal_does_not_reserve_rally_tile() {
         .spawn_unit(1, EntityKind::Rifleman, observer.0, observer.1)
         .expect("friendly observer should spawn");
     entities
-        .get_mut(city_centre)
-        .expect("city centre")
+        .get_mut(resource_depot)
+        .expect("resource depot")
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
     let mut players = vec![player(1), player(2)];
     let mut fog = Fog::new(map.width, map.height);

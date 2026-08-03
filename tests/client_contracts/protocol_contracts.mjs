@@ -130,7 +130,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       [
         3,
         1,
-        KIND_CODE[KIND.CITY_CENTRE],
+        KIND_CODE[KIND.RESOURCE_DEPOT],
         100,
         120,
         450,
@@ -261,7 +261,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       [EVENT_CODE[EVENT.OVERPENETRATION], 22],
       [EVENT_CODE[EVENT.MISS], 7],
       [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
-      [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.CITY_CENTRE]],
+      [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.RESOURCE_DEPOT]],
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
       [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
       [EVENT_CODE[EVENT.MORTAR_LAUNCH], 9, [256, 272], [320, 352], 1.5, 68],

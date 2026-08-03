@@ -223,9 +223,9 @@ try {
 
   const own = await page.evaluate(() => {
     const s = window.__rts.match.state, es = s.entitiesInterpolated(1).filter((e) => e.owner === s.playerId);
-    return { cityCentre: es.filter((e) => e.kind === "city_centre").length, w: es.filter((e) => e.kind === "worker").length };
+    return { resourceDepot: es.filter((e) => e.kind === "resource_depot").length, w: es.filter((e) => e.kind === "worker").length };
   });
-  ok(own.cityCentre === 1 && own.w === 6, `client sees own City Centre + 6 workers (cityCentre=${own.cityCentre}, workers=${own.w})`);
+  ok(own.resourceDepot === 1 && own.w === 6, `client sees own Resource Depot + 6 workers (resourceDepot=${own.resourceDepot}, workers=${own.w})`);
 
   await page.waitForFunction(() => {
     const wasm = window.__rtsPredictionDebug?.wasm;
@@ -366,14 +366,14 @@ try {
 
   const trainBtn = await page.evaluate(() => {
     const m = window.__rts.match, s = m.state;
-    const cityCentre = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
-    if (!cityCentre) return false;
+    const resourceDepot = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "resource_depot");
+    if (!resourceDepot) return false;
     m.clientIntent.closeCommandCardMenu();
-    s.setSelection([cityCentre.id]);
+    s.setSelection([resourceDepot.id]);
     m.hud.update();
     return !!document.querySelector('#command-card [data-hotkey="Q"]');
   });
-  ok(trainBtn, "TRAIN CARD: selecting the City Centre shows a Worker train button");
+  ok(trainBtn, "TRAIN CARD: selecting the Resource Depot shows a Worker train button");
   await page.waitForFunction(() => {
     const state = window.__rts?.match?.state;
     const button = document.querySelector('#command-card button[data-hotkey="Q"]');
@@ -385,8 +385,8 @@ try {
   await page.click('#command-card button[data-hotkey="Q"]');
   await page.waitForFunction(() => {
     const s = window.__rts.match.state;
-    const cityCentre = s.entityById([...s.selection][0]);
-    return cityCentre?.prodQueue > 0 && cityCentre.prodProgress >= 0;
+    const resourceDepot = s.entityById([...s.selection][0]);
+    return resourceDepot?.prodQueue > 0 && resourceDepot.prodProgress >= 0;
   }, { timeout: 6000 });
   const productionProgress = await page.evaluate(async () => {
     const match = window.__rts.match;
@@ -565,10 +565,10 @@ try {
 
   const beforePan = await page.evaluate(() => {
     const m = window.__rts.match, s = m.state;
-    const cityCentre = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
-    if (cityCentre) {
+    const resourceDepot = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "resource_depot");
+    if (resourceDepot) {
       m.clientIntent.closeCommandCardMenu();
-      s.setSelection([cityCentre.id]);
+      s.setSelection([resourceDepot.id]);
     }
     return {
       x: window.__rts.match.camera.x,

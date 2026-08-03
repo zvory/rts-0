@@ -2,17 +2,17 @@ use super::fixtures::*;
 use super::*;
 
 #[test]
-fn scout_car_smoke_requires_completed_research_complex() {
+fn scout_car_smoke_requires_completed_engineering_complex() {
     let (mut game, scout, _target, _) = smoke_command_fixture();
     let target = game.state.map.tile_center(12, 8);
-    let research_complexes: Vec<u32> = game
+    let engineering_complexes: Vec<u32> = game
         .state
         .entities
         .iter()
-        .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::ResearchComplex)
+        .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::EngineeringComplex)
         .map(|entity| entity.id)
         .collect();
-    for id in research_complexes {
+    for id in engineering_complexes {
         game.state.entities.remove(id);
     }
     let research_pos = game.state.map.tile_center(4, 4);
@@ -21,12 +21,12 @@ fn scout_car_smoke_requires_completed_research_complex() {
         .entities
         .spawn_building(
             1,
-            EntityKind::ResearchComplex,
+            EntityKind::EngineeringComplex,
             research_pos.0,
             research_pos.1,
             false,
         )
-        .expect("incomplete R&D Complex should spawn");
+        .expect("incomplete Engineering Complex should spawn");
 
     game.enqueue(
         1,
@@ -47,7 +47,7 @@ fn scout_car_smoke_requires_completed_research_complex() {
             .expect("scout should exist")
             .ability_uses_remaining(ability::AbilityKind::Smoke),
         Some(config::SCOUT_CAR_SMOKE_CHARGES),
-        "Scout Car smoke should remain locked without a completed R&D Complex"
+        "Scout Car smoke should remain locked without a completed Engineering Complex"
     );
     assert_eq!(
         game.state.smokes.iter().count(),
@@ -60,12 +60,12 @@ fn scout_car_smoke_requires_completed_research_complex() {
         .entities
         .spawn_building(
             1,
-            EntityKind::ResearchComplex,
+            EntityKind::EngineeringComplex,
             research_pos.0,
             research_pos.1,
             true,
         )
-        .expect("completed R&D Complex should spawn");
+        .expect("completed Engineering Complex should spawn");
     game.enqueue(
         1,
         Command::UseAbility {
@@ -151,7 +151,7 @@ fn smoke_plus_doubles_scout_car_smoke_radius_and_duration() {
 }
 
 #[test]
-fn command_car_requires_completed_research_complex_then_trains_at_factory() {
+fn command_car_requires_completed_engineering_complex_then_trains_at_factory() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -165,19 +165,19 @@ fn command_car_requires_completed_research_complex_then_trains_at_factory() {
     for id in game.state.entities.ids() {
         game.state.entities.remove(id);
     }
-    let research_complex_pos = game.state.map.tile_center(8, 12);
+    let engineering_complex_pos = game.state.map.tile_center(8, 12);
     let factory_pos = game.state.map.tile_center(12, 8);
-    let research_complex = game
+    let engineering_complex = game
         .state
         .entities
         .spawn_building(
             1,
-            EntityKind::ResearchComplex,
-            research_complex_pos.0,
-            research_complex_pos.1,
+            EntityKind::EngineeringComplex,
+            engineering_complex_pos.0,
+            engineering_complex_pos.1,
             false,
         )
-        .expect("research complex should spawn");
+        .expect("engineering complex should spawn");
     let factory = game
         .state
         .entities
@@ -199,16 +199,16 @@ fn command_car_requires_completed_research_complex_then_trains_at_factory() {
             .expect("factory")
             .prod_queue()
             .is_empty(),
-        "Command Cars should require a completed R&D Complex"
+        "Command Cars should require a completed Engineering Complex"
     );
 
-    let research_complex = game
+    let engineering_complex = game
         .state
         .entities
-        .get_mut(research_complex)
-        .expect("research complex");
-    while research_complex.under_construction() {
-        research_complex.advance_construction();
+        .get_mut(engineering_complex)
+        .expect("engineering complex");
+    while engineering_complex.under_construction() {
+        engineering_complex.advance_construction();
     }
     game.enqueue(
         1,
@@ -225,7 +225,7 @@ fn command_car_requires_completed_research_complex_then_trains_at_factory() {
             .expect("factory")
             .prod_queue()
             .is_empty(),
-        "a completed R&D Complex should not unlock Tanks without Tank Production"
+        "a completed Engineering Complex should not unlock Tanks without Tank Production"
     );
 
     game.enqueue(
@@ -244,7 +244,7 @@ fn command_car_requires_completed_research_complex_then_trains_at_factory() {
             .entities
             .iter()
             .any(|e| e.owner == 1 && e.kind == EntityKind::CommandCar),
-        "Vehicle Works should train Command Cars once an R&D Complex is complete"
+        "Vehicle Works should train Command Cars once an Engineering Complex is complete"
     );
 }
 

@@ -27,7 +27,7 @@ pub use replay::{
 pub use replay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result,
     ProfileMatchupEndReason, ProfileMatchupOptions, ProfileMatchupPlayerResult,
-    ProfileMatchupResult, ProfileMatchupStartingCityCentreResult, ProfileMatchupTraceEntry,
+    ProfileMatchupResult, ProfileMatchupStartingResourceDepotResult, ProfileMatchupTraceEntry,
     ProfileMatchupWinner,
 };
 

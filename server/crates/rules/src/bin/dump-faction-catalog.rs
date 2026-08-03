@@ -277,8 +277,8 @@ fn print_client_constants(indent: &str) {
     println!("{indent}  \"constants\": {{");
     println!("{indent}    \"tickHz\": {},", balance::TICK_HZ);
     println!(
-        "{indent}    \"miningCcRangeTiles\": {},",
-        json_f32(balance::MINING_CC_RANGE_TILES)
+        "{indent}    \"miningAnchorRangeTiles\": {},",
+        json_f32(balance::MINING_ANCHOR_RANGE_TILES)
     );
     println!("{indent}    \"oilLoad\": {},", balance::OIL_LOAD);
     println!("{indent}    \"harvestTicks\": {},", balance::HARVEST_TICKS);

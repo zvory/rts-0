@@ -21,10 +21,10 @@ import { ABILITY, KIND, LAB_ROLE, SETUP, UPGRADE } from "../client/src/protocol.
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
 const ekatCommandId = (family, subject) => factionCommandId(EKAT_FACTION_ID, family, subject);
 
-const researchComplex = {
+const engineeringComplex = {
   id: 10,
   owner: 1,
-  kind: KIND.RESEARCH_COMPLEX,
+  kind: KIND.ENGINEERING_COMPLEX,
 };
 
 function testGroupCooldownClocks(values, totalTicks) {
@@ -38,10 +38,10 @@ function testGroupCooldownClocks(values, totalTicks) {
     }));
 }
 
-function rAndDCard(upgrades = [], prodUpgradeQueue = []) {
+function engineeringComplexCard(upgrades = [], prodUpgradeQueue = []) {
   return buildCommandCardDescriptors({
     playerId: 1,
-    selection: [{ ...researchComplex, prodUpgradeQueue }],
+    selection: [{ ...engineeringComplex, prodUpgradeQueue }],
     resources: { steel: 1000, oil: 1000 },
     upgrades,
     playerHasCompleteKind: () => true,
@@ -66,14 +66,14 @@ function buttonSlots(card) {
 }
 
 {
-  const ids = slotIds(rAndDCard());
+  const ids = slotIds(engineeringComplexCard());
   assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
   assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
   assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 6), [
+  assert.deepEqual(slotCommandIds(engineeringComplexCard()).slice(0, 6), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
@@ -81,16 +81,16 @@ function buttonSlots(card) {
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
     kriegsiaCommandId("research", UPGRADE.SMOKE_PLUS),
   ]);
-  assert.equal(rAndDCard().slots[1].enabled, false);
-  assert.equal(rAndDCard().slots[1].title, "Requires AT Guns");
-  assert.equal(rAndDCard().slots[1].label, "Artillery");
-  assert.equal(rAndDCard().slots[2].title, "Requires Artillery");
-  assert.equal(rAndDCard().slots[2].label, "Artillery Fire Control");
-  assert.equal(rAndDCard().slots[2].icon, "AFC");
+  assert.equal(engineeringComplexCard().slots[1].enabled, false);
+  assert.equal(engineeringComplexCard().slots[1].title, "Requires AT Guns");
+  assert.equal(engineeringComplexCard().slots[1].label, "Artillery");
+  assert.equal(engineeringComplexCard().slots[2].title, "Requires Artillery");
+  assert.equal(engineeringComplexCard().slots[2].label, "Artillery Fire Control");
+  assert.equal(engineeringComplexCard().slots[2].icon, "AFC");
 }
 
 {
-  const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK]);
+  const card = engineeringComplexCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK]);
   const ids = slotIds(card);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(card.slots[1].label, "Artillery");
@@ -100,15 +100,15 @@ function buttonSlots(card) {
 }
 
 {
-  const emptyResearchComplex = { ...researchComplex, id: 11, prodUpgradeQueue: [] };
-  const queuedResearchComplex = {
-    ...researchComplex,
+  const emptyEngineeringComplex = { ...engineeringComplex, id: 11, prodUpgradeQueue: [] };
+  const queuedEngineeringComplex = {
+    ...engineeringComplex,
     id: 12,
     prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
   };
   const card = buildCommandCardDescriptors({
     playerId: 1,
-    selection: [emptyResearchComplex, queuedResearchComplex],
+    selection: [emptyEngineeringComplex, queuedEngineeringComplex],
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
     playerHasCompleteKind: () => true,
@@ -116,23 +116,23 @@ function buttonSlots(card) {
   });
   assert.equal(
     card.slots[1].intent.buildingId,
-    queuedResearchComplex.id,
+    queuedEngineeringComplex.id,
     "dependent research should target the selected building that owns its queued prerequisite",
   );
 }
 
 {
-  const selectedResearchComplex = { ...researchComplex, id: 11, prodUpgradeQueue: [] };
-  const otherResearchComplex = {
-    ...researchComplex,
+  const selectedEngineeringComplex = { ...engineeringComplex, id: 11, prodUpgradeQueue: [] };
+  const otherEngineeringComplex = {
+    ...engineeringComplex,
     id: 12,
     prodUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
   };
   const card = buildCommandCardDescriptors({
     playerId: 1,
-    selection: [selectedResearchComplex],
-    currentEntities: [selectedResearchComplex, otherResearchComplex],
+    selection: [selectedEngineeringComplex],
+    currentEntities: [selectedEngineeringComplex, otherEngineeringComplex],
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
     playerHasCompleteKind: () => true,
@@ -143,14 +143,14 @@ function buttonSlots(card) {
 }
 
 {
-  const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
+  const card = engineeringComplexCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
   assert.equal(card.slots[1].enabled, false);
   assert.equal(card.slots[1].title, "Queued");
   assert.equal(card.slots[2].enabled, true);
 }
 
 {
-  const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
+  const ids = slotIds(engineeringComplexCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
   assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
@@ -160,7 +160,7 @@ function buttonSlots(card) {
 }
 
 {
-  const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
+  const card = engineeringComplexCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
   const ids = slotIds(card);
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
@@ -196,7 +196,7 @@ function buttonSlots(card) {
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
-  assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.CITY_CENTRE));
+  assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.RESOURCE_DEPOT));
   assert.equal(buildCard.slots[0].slotIndex, 0);
   assert.equal(buildCard.slots[0].hotkey, "Q");
   assert.equal(buildCard.slots[1].commandId, kriegsiaCommandId("build", KIND.PUMP_JACK));
@@ -220,7 +220,7 @@ function buttonSlots(card) {
   }], "worker build menu dispatch stays descriptor-driven");
   assert.deepEqual(buildCard.slots[0].intent, {
     type: "beginPlacement",
-    building: KIND.CITY_CENTRE,
+    building: KIND.RESOURCE_DEPOT,
   }, "worker build dispatch keeps placement intent in the descriptor");
   assert.deepEqual(buildCard.slots[8].intent, {
     type: "closeCommandCardMenu",
@@ -292,10 +292,10 @@ function buttonSlots(card) {
 }
 
 {
-  const cityCentre = { id: 27, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
-  const cityCentreCard = buildCommandCardDescriptors({
+  const resourceDepot = { id: 27, owner: 1, kind: KIND.RESOURCE_DEPOT, buildProgress: null };
+  const resourceDepotCard = buildCommandCardDescriptors({
     playerId: 1,
-    selection: [cityCentre],
+    selection: [resourceDepot],
     resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
     upgrades: [],
     playerHasCompleteKind: (kind) => kind === KIND.STEELWORKS,
@@ -303,9 +303,9 @@ function buttonSlots(card) {
   });
   const scoutPlaneCommandId = kriegsiaCommandId("train", KIND.SCOUT_PLANE);
   assert.deepEqual(
-    commandCardActivationCandidates(cityCentreCard, scoutPlaneCommandId),
+    commandCardActivationCandidates(resourceDepotCard, scoutPlaneCommandId),
     [],
-    "City Centre no longer exposes Scout Plane production",
+    "Resource Depot no longer exposes Scout Plane production",
   );
 }
 
@@ -619,19 +619,19 @@ function buttonSlots(card) {
     "mixed-army-support",
     "command-car",
     "artillery",
-    "city-centre-train",
+    "resource-depot-train",
     "barracks-train",
     "factory-train",
     "gun-works-train",
     "training-centre",
-    "research-complex",
-    "research-complex-at-guns",
+    "engineering-complex",
+    "engineering-complex-at-guns",
     "ekat-unit",
     "ekat-zamok-train",
   ]);
   assert(
     catalog.some((entry) =>
-      entry.id === "research-complex-at-guns" &&
+      entry.id === "engineering-complex-at-guns" &&
         entry.card.slots.some((slot) =>
           slot?.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
         )
@@ -648,11 +648,11 @@ function buttonSlots(card) {
     "command-card context catalog samples Ekat abilities so direct hotkeys can discover them",
   );
   assert.deepEqual(WORKER_BUILDABLE, [
-    KIND.CITY_CENTRE,
+    KIND.RESOURCE_DEPOT,
     KIND.PUMP_JACK,
     KIND.BARRACKS,
     KIND.TRAINING_CENTRE,
-    KIND.RESEARCH_COMPLEX,
+    KIND.ENGINEERING_COMPLEX,
     KIND.FACTORY,
     KIND.STEELWORKS,
     KIND.TANK_TRAP,

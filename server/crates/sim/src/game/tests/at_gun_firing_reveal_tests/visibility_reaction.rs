@@ -111,8 +111,14 @@ fn allied_reveal_reaction_fixture() -> (Game, u32, u32, (f32, f32), u32) {
     let counter_pos = (victim_pos.0, victim_pos.1 + config::TILE_SIZE as f32 * 10.0);
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, victim_pos.0, victim_pos.1, true)
-        .expect("city centre");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            victim_pos.0,
+            victim_pos.1,
+            true,
+        )
+        .expect("resource depot");
     let counter = game
         .state
         .entities
