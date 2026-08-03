@@ -2,6 +2,7 @@ import { COLORS } from "../client/src/config.js";
 import { Minimap } from "../client/src/minimap.js";
 import { minimapTerrainColor } from "../client/src/minimap_terrain.js";
 import { TERRAIN } from "../client/src/protocol.js";
+import { terrainColor } from "../client/src/renderer/terrain_palette.js";
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message || "Assertion failed");
@@ -73,7 +74,14 @@ export function runMinimapRoadContracts() {
   for (const code of roadCodes) {
     const sampledColors = new Set();
     for (let ty = 0; ty < 16; ty++) {
-      for (let tx = 0; tx < 16; tx++) sampledColors.add(minimapTerrainColor(code, tx, ty));
+      for (let tx = 0; tx < 16; tx++) {
+        const minimapColor = minimapTerrainColor(code, tx, ty);
+        sampledColors.add(minimapColor);
+        assert(
+          minimapColor === terrainColor(code, tx, ty),
+          `minimap road ${code} matches the world surface at ${tx},${ty}`,
+        );
+      }
     }
     assert(sampledColors.size === 2, `minimap road ${code} uses both charcoal variants`);
     assert(sampledColors.has(COLORS.road), `minimap road ${code} uses the dark charcoal surface`);
