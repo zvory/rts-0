@@ -24,6 +24,16 @@ export function isNeutralColorAdjustment(adjustment) {
   );
 }
 
+export function relativeColorAdjustment(target, baked = NEUTRAL_COLOR_ADJUSTMENT) {
+  const normalizedTarget = normalizeColorAdjustment(target);
+  const normalizedBaked = normalizeColorAdjustment(baked);
+  return normalizeColorAdjustment({
+    brightness: ratioPercent(normalizedTarget.brightness, normalizedBaked.brightness),
+    saturation: ratioPercent(normalizedTarget.saturation, normalizedBaked.saturation),
+    hue: relativeHuePercent(normalizedTarget.hue, normalizedBaked.hue),
+  });
+}
+
 export function applyColorAdjustmentToRgba(data, adjustment) {
   const normalized = normalizeColorAdjustment(adjustment);
   if (!data || isNeutralColorAdjustment(normalized)) return data;
@@ -80,6 +90,14 @@ function luminance(r, g, b) {
 
 function positivePercent(value, fallback) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function ratioPercent(target, baked) {
+  return baked > 0 ? (target * 100) / baked : target;
+}
+
+function relativeHuePercent(target, baked) {
+  return 100 + target - baked;
 }
 
 function clampByte(value) {

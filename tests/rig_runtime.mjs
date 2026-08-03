@@ -34,6 +34,7 @@ import {
   FRAME_STRIP_TARGET_COLOR_ADJUSTMENT,
   frameStripRuntimeColorAdjustment,
 } from "../client/src/renderer/rigs/frame_strip_color_profile.js";
+import { relativeColorAdjustment } from "../client/src/renderer/rigs/color_adjustment.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/machine_gunner_png_strip.js";
 import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
@@ -63,6 +64,10 @@ const fixturesDir = path.join(__dirname, "fixtures/svg");
 const machineGunnerPngManifestPath = path.join(
   repoRoot,
   "client/assets/rigs/machine-gunner-pass-01/metadata/manifest.json",
+);
+const tankPngMetadataPath = path.join(
+  repoRoot,
+  "client/assets/rigs/tank-ps1/metadata/tiger-i-pass-11-white.json",
 );
 const fixedNow = 12_345;
 function main() {
@@ -1171,6 +1176,29 @@ test("frame-strip color profile applies shared and per-strip targets only when n
     productionUnitAdjustment,
   );
   assert.deepEqual(frameStripRuntimeColorAdjustment({}), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
+});
+
+test("tank PNG runtime color pass compensates its baked source to the production target", () => {
+  const metadata = JSON.parse(fs.readFileSync(tankPngMetadataPath, "utf8"));
+  const baked = {
+    brightness: metadata.pipelineOptions.brightness,
+    saturation: metadata.pipelineOptions.saturation,
+    hue: metadata.pipelineOptions.hue,
+  };
+  assert.deepEqual(
+    TANK_PNG_RIG_ATLAS.runtimeColorAdjustment,
+    relativeColorAdjustment(metadata.presentationColorTarget, baked),
+  );
+});
+
+test("relative color adjustment composes scale channels and hue rotation correctly", () => {
+  assert.deepEqual(
+    relativeColorAdjustment(
+      { brightness: 90, saturation: 90, hue: 120 },
+      { brightness: 80, saturation: 120, hue: 90 },
+    ),
+    { brightness: 112.5, saturation: 75, hue: 130 },
+  );
 });
 
 test("frame-strip color adjustment brightens raw pixels without changing alpha", () => {

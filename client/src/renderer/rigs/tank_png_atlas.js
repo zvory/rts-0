@@ -1,5 +1,7 @@
 // Checked-in production metadata for the Tank PNG atlas.
 // Raster-native rig metadata supplies animation bindings, anchors, and native effects.
+import { relativeColorAdjustment } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -7,15 +9,17 @@ function deepFreeze(value) {
   return value;
 }
 
+const BAKED_COLOR_ADJUSTMENT = Object.freeze({ brightness: 70, saturation: 80, hue: 100 });
+const TARGET_COLOR_ADJUSTMENT = Object.freeze({ brightness: 90, saturation: 90, hue: 100 });
+
 export const TANK_PNG_RIG_ATLAS = deepFreeze({
   "enabled": true,
   "unit": "tank",
   "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass11-white-dim30",
-  "runtimeColorAdjustment": {
-    "brightness": 128.57142857142858,
-    "saturation": 112.5,
-    "hue": 100
-  },
+  "runtimeColorAdjustment": relativeColorAdjustment(
+    TARGET_COLOR_ADJUSTMENT,
+    BAKED_COLOR_ADJUSTMENT,
+  ),
   "iconVisibleBounds": {
     "x": 54,
     "y": 116,

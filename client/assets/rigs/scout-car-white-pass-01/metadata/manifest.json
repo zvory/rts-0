@@ -10,7 +10,7 @@
   "runtime": {
     "bodyTintSlot": "team-light",
     "gunTintSlot": "fixed",
-    "colorAdjustment": {
+    "runtimeColorAdjustment": {
       "brightness": 90,
       "saturation": 90,
       "hue": 100

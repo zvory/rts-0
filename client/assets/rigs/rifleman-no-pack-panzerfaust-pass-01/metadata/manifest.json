@@ -86,7 +86,7 @@
     "The Panzerfaust variant uses the same full-canvas transform as the no-pack variant, preserving the underlying soldier anchor while allowing the oversized launcher to expand the silhouette.",
     "The five-frame no-pack strip is the live ordinary and spent Rifleman route.",
     "The composited eight-frame launcher strip is live only while panzerfaustLoaded is true; launch immediately returns the same entity to the normal strip.",
-    "Both strips use a 70% runtime brightness target to reduce the white-source luminance before team tinting.",
+    "Both strips use the shared 90% runtime brightness and saturation target before team tinting.",
     "The loaded Panzerfaust runtime appends three scale-matched wind-up frames selected from Set A; the rifle is absent throughout the wind-up."
   ]
 }

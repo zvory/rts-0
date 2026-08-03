@@ -203,6 +203,10 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
 
 {
   const atlas = createLivePngRigAtlases().get(KIND.SCOUT_CAR);
+  const manifest = JSON.parse(fs.readFileSync(
+    new URL("../../client/assets/rigs/scout-car-white-pass-01/metadata/manifest.json", import.meta.url),
+    "utf8",
+  ));
   assert(atlas?.enabled, "scout car PNG atlas is registered for live rendering");
   assert(
     atlas.image.includes("/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png"),
@@ -214,6 +218,14 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
       atlas.runtimeColorAdjustment?.saturation === 90 &&
       atlas.runtimeColorAdjustment?.hue === 100,
     "scout car PNG atlas applies the shared runtime color target to its white source",
+  );
+  assert(
+    atlas.image.includes(manifest.runtimeAtlas.replace(/^client/, "")) &&
+      atlas.grid?.width === manifest.runtimeAtlasSize[0] &&
+      atlas.grid?.height === manifest.runtimeAtlasSize[1] &&
+      JSON.stringify(atlas.runtimeColorAdjustment) ===
+        JSON.stringify(manifest.runtime.runtimeColorAdjustment),
+    "scout car PNG atlas mirrors its checked-in source manifest",
   );
   const bodySprite = atlas.sprites.find((sprite) => sprite.id === "sprite.body");
   const gunSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.rearMachineGun");
