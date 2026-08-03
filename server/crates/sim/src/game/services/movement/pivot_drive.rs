@@ -11,23 +11,19 @@ use crate::protocol::{Event, NoticeSeverity};
 
 use super::scout_car::vehicle_desired_path_point;
 use super::standability::{footing_profile, footing_resistance, FootingProfile};
+use super::vehicle_profiles::pivot_drive_profile;
 use super::traffic::{
     car_will_start_reverse_to_final_waypoint, traffic_body_half_width,
     vehicle_body_half_width_with_clearance,
 };
 use super::{MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
-pub(super) const PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
-pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 =
-    PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK * 1.25;
-const ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND: f32 = 50.0;
-pub(super) const ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK: f32 =
-    ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND.to_radians() / config::TICK_HZ as f32;
-pub(super) const PIVOT_VEHICLE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
-pub(super) const VEHICLE_REVERSE_GOAL_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 3.0;
-const VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
-const PIVOT_VEHICLE_CRAWL_ANGLE_RAD: f32 = 0.55;
-const PIVOT_VEHICLE_PIVOT_ANGLE_RAD: f32 = 1.25;
+pub(super) use super::vehicle_profiles::VEHICLE_REVERSE_GOAL_DISTANCE_PX;
+#[cfg(test)]
+pub(super) use super::vehicle_profiles::{
+    ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK, PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK,
+    PIVOT_VEHICLE_LOOKAHEAD_PX,
+};
 const VEHICLE_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 const VEHICLE_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
 const VEHICLE_FOLLOW_ALIGNMENT_COS_MIN: f32 = 0.5;
@@ -228,12 +224,7 @@ fn forward_traffic_heading(entity: &Entity, facing: f32) -> Option<(f32, f32)> {
 }
 
 pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
-    match kind {
-        EntityKind::MortarTeam => std::f32::consts::TAU,
-        EntityKind::AntiTankGun => ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
-        EntityKind::Tank => TANK_BODY_TURN_RATE_RAD_PER_TICK,
-        _ => PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK,
-    }
+    pivot_drive_profile(kind).body_turn_rate_rad_per_tick
 }
 
 pub(super) fn pivot_drive_intent(
@@ -251,11 +242,12 @@ pub(super) fn pivot_drive_intent(
         return None;
     }
 
+    let profile = pivot_drive_profile(e.kind);
     let travel_facing = dy.atan2(dx);
     let normal_desired_facing =
         if pivot_drive_desired_point_is_final_waypoint(e, (desired_x, desired_y))
-            && dist <= VEHICLE_REVERSE_GOAL_DISTANCE_PX
-            && angle_delta(e.facing(), travel_facing).abs() > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
+            && dist <= profile.reverse_goal_distance_px
+            && angle_delta(e.facing(), travel_facing).abs() > profile.reverse_min_behind_angle_rad
         {
             normalize_angle(travel_facing + std::f32::consts::PI)
         } else {
@@ -307,22 +299,12 @@ pub(crate) fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
     }
 }
 
-pub(super) fn pivot_drive_speed_scale(abs_angle_error: f32) -> f32 {
-    if !abs_angle_error.is_finite() {
-        return 0.0;
-    }
-    if abs_angle_error <= PIVOT_VEHICLE_CRAWL_ANGLE_RAD {
-        1.0
-    } else if abs_angle_error >= PIVOT_VEHICLE_PIVOT_ANGLE_RAD {
-        0.0
-    } else {
-        let t = (abs_angle_error - PIVOT_VEHICLE_CRAWL_ANGLE_RAD)
-            / (PIVOT_VEHICLE_PIVOT_ANGLE_RAD - PIVOT_VEHICLE_CRAWL_ANGLE_RAD);
-        1.0 - t
-    }
+pub(super) fn pivot_drive_speed_scale(kind: EntityKind, abs_angle_error: f32) -> f32 {
+    pivot_drive_profile(kind).speed_scale(abs_angle_error)
 }
 
 pub(super) fn close_nudge_hull_axis_motion(
+    kind: EntityKind,
     path_dir: (f32, f32),
     body_facing: f32,
     budget: f32,
@@ -336,7 +318,7 @@ pub(super) fn close_nudge_hull_axis_motion(
     }
     let forward = (fx, fy);
     let dot = path_dir.0 * forward.0 + path_dir.1 * forward.1;
-    let aligned = dot.abs() >= PIVOT_VEHICLE_CRAWL_ANGLE_RAD.cos();
+    let aligned = pivot_drive_profile(kind).close_nudge_allows_translation(dot);
     let step_budget = if aligned { budget } else { 0.0 };
     if dot < 0.0 {
         ((-forward.0, -forward.1), step_budget)

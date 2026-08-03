@@ -13,17 +13,13 @@ use crate::game::services::standability as static_standability;
 
 use super::pivot_drive::{
     angle_delta, distance_between, normalize_angle, vehicle_traffic_adjustment,
-    PIVOT_VEHICLE_LOOKAHEAD_PX, VEHICLE_REVERSE_GOAL_DISTANCE_PX,
+    VEHICLE_REVERSE_GOAL_DISTANCE_PX,
 };
+use super::vehicle_profiles::{car_motion_profile, pivot_drive_profile, CarMotionProfile};
+#[cfg(test)]
+pub(super) use super::vehicle_profiles::SCOUT_CAR_MIN_TURN_RADIUS_PX;
+pub(super) use super::vehicle_profiles::SCOUT_CAR_ROUTE_LOOKAHEAD_PX;
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
-
-// Gives the scout car roughly a 1.7-body-length outer swept turning circle.
-pub(super) const SCOUT_CAR_MIN_TURN_RADIUS_PX: f32 = 22.9;
-pub(super) const SCOUT_CAR_ROUTE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 3.0;
-const SCOUT_CAR_SWEEP_SAMPLE_STEP_PX: f32 = config::TILE_SIZE as f32 * 0.125;
-const SCOUT_CAR_CLEARANCE_SCORE_MAX_PX: f32 = config::TILE_SIZE as f32 * 0.5;
-const SCOUT_CAR_SCORE_EPS: f32 = 1.0e-4;
-const SCOUT_CAR_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct ScoutCarMotionPlan {
@@ -89,6 +85,7 @@ pub(super) fn plan_scout_car_motion(
             pop_waypoints: 1,
         });
     }
+    let profile = car_motion_profile(e.kind)?;
     let route = vehicle_route_context(map, occ, e, current)?;
     if route.pre_pop_count >= e.movement.as_ref()?.path.len() {
         return Some(ScoutCarMotionPlan {
@@ -120,14 +117,14 @@ pub(super) fn plan_scout_car_motion(
         // forward-turn behavior, but let reverse compete with forward arcs for this local exit.
         let waypoint_behind =
             route.next_index > 0 && waypoint_is_behind(e.facing(), route.target, current);
-        for primitive in scout_car_primitives(route.reverse_waypoint.is_some(), waypoint_behind) {
+        for primitive in scout_car_primitives(profile, route.reverse_waypoint.is_some(), waypoint_behind) {
             let travel_distance =
                 primitive_travel_distance(current, &route, primitive, step_budget, e.facing());
             if travel_distance <= 0.01 {
                 continue;
             }
             let Some(candidate) =
-                scout_car_candidate(map, occ, e, current, primitive, travel_distance)
+                scout_car_candidate(profile, map, occ, e, current, primitive, travel_distance)
             else {
                 continue;
             };
@@ -139,9 +136,10 @@ pub(super) fn plan_scout_car_motion(
                 e.facing(),
                 &route,
                 &candidate,
+                profile,
                 front_blocked,
             );
-            if score + SCOUT_CAR_SCORE_EPS < best_score {
+            if score + profile.score_eps < best_score {
                 best = Some(candidate);
                 best_score = score;
             }
@@ -149,7 +147,7 @@ pub(super) fn plan_scout_car_motion(
     }
 
     let Some(candidate) = best.or_else(|| {
-        scout_car_outward_displacement_candidate(map, occ, e, current, &route, step_budget)
+        scout_car_outward_displacement_candidate(profile, map, occ, e, current, &route, step_budget)
     }) else {
         return Some(ScoutCarMotionPlan {
             pos: current,
@@ -349,12 +347,18 @@ fn vehicle_route_context(
 
 fn vehicle_route_lookahead_px(kind: EntityKind) -> f32 {
     match kind {
-        EntityKind::Tank | EntityKind::AntiTankGun => PIVOT_VEHICLE_LOOKAHEAD_PX,
-        _ => SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
+        EntityKind::Tank | EntityKind::AntiTankGun => pivot_drive_profile(kind).lookahead_px,
+        _ => car_motion_profile(kind)
+            .map(|profile| profile.route_lookahead_px)
+            .unwrap_or(SCOUT_CAR_ROUTE_LOOKAHEAD_PX),
     }
 }
 
-fn scout_car_primitives(reverse_only: bool, allow_reverse: bool) -> Vec<Primitive> {
+fn scout_car_primitives(
+    profile: CarMotionProfile,
+    reverse_only: bool,
+    allow_reverse: bool,
+) -> Vec<Primitive> {
     if reverse_only {
         return vec![Primitive {
             curvature: 0.0,
@@ -363,7 +367,7 @@ fn scout_car_primitives(reverse_only: bool, allow_reverse: bool) -> Vec<Primitiv
         }];
     }
 
-    let max = 1.0 / SCOUT_CAR_MIN_TURN_RADIUS_PX;
+    let max = 1.0 / profile.min_turn_radius_px;
     let mut primitives: Vec<_> = [
         0.0,
         max * 0.35,
@@ -417,6 +421,7 @@ fn primitive_travel_distance(
 }
 
 fn scout_car_candidate(
+    profile: CarMotionProfile,
     map: &Map,
     occ: &Occupancy,
     e: &Entity,
@@ -424,7 +429,7 @@ fn scout_car_candidate(
     primitive: Primitive,
     travel_distance: f32,
 ) -> Option<Candidate> {
-    let steps = (travel_distance / SCOUT_CAR_SWEEP_SAMPLE_STEP_PX)
+    let steps = (travel_distance / profile.sweep_sample_step_px)
         .ceil()
         .max(1.0) as u32;
     let mut min_clearance = f32::INFINITY;
@@ -438,7 +443,7 @@ fn scout_car_candidate(
         ) {
             return None;
         }
-        min_clearance = min_clearance.min(static_clearance_px(map, occ, e.kind, pos, facing));
+        min_clearance = min_clearance.min(static_clearance_px(profile, map, occ, e.kind, pos, facing));
         last_pos = pos;
         last_facing = facing;
     }
@@ -461,6 +466,7 @@ fn scout_car_candidate(
 }
 
 fn scout_car_outward_displacement_candidate(
+    profile: CarMotionProfile,
     map: &Map,
     occ: &Occupancy,
     e: &Entity,
@@ -471,7 +477,7 @@ fn scout_car_outward_displacement_candidate(
     if !budget.is_finite() || budget <= 0.01 || !e.facing().is_finite() {
         return None;
     }
-    let base_clearance = static_clearance_px(map, occ, e.kind, current, e.facing());
+    let base_clearance = static_clearance_px(profile, map, occ, e.kind, current, e.facing());
     let forward = (e.facing().cos(), e.facing().sin());
     let side = (-forward.1, forward.0);
     let distance = budget.min(config::TILE_SIZE as f32 * 0.25);
@@ -483,13 +489,13 @@ fn scout_car_outward_displacement_candidate(
         if !static_swept_segment_legal(map, occ, e.kind, current, candidate_pos, e.facing()) {
             continue;
         }
-        let clearance = static_clearance_px(map, occ, e.kind, candidate_pos, e.facing());
+        let clearance = static_clearance_px(profile, map, occ, e.kind, candidate_pos, e.facing());
         if clearance + 0.001 < base_clearance {
             continue;
         }
         let route_dist = distance_between(candidate_pos, route.lookahead);
         let score = route_dist - clearance * 2.0 + ordinal as f32 * 0.001;
-        if score + SCOUT_CAR_SCORE_EPS < best_score {
+        if score + profile.score_eps < best_score {
             best_score = score;
             best = Some(Candidate {
                 pos: candidate_pos,
@@ -520,7 +526,10 @@ fn static_swept_segment_legal(
     if !distance.is_finite() {
         return false;
     }
-    let steps = (distance / SCOUT_CAR_SWEEP_SAMPLE_STEP_PX).ceil().max(1.0) as u32;
+    let sweep_sample_step_px = car_motion_profile(kind)
+        .map(|profile| profile.sweep_sample_step_px)
+        .unwrap_or(config::TILE_SIZE as f32 * 0.125);
+    let steps = (distance / sweep_sample_step_px).ceil().max(1.0) as u32;
     for i in 0..=steps {
         let t = i as f32 / steps as f32;
         let pos = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
@@ -586,6 +595,7 @@ fn score_candidate(
     current_facing: f32,
     route: &RouteContext,
     candidate: &Candidate,
+    profile: CarMotionProfile,
     front_blocked: bool,
 ) -> f32 {
     let route_progress = distance_between(current, route.lookahead)
@@ -616,9 +626,9 @@ fn score_candidate(
     let current_alignment = angle_delta(current_heading, route_heading).abs();
     let alignment_improvement = current_alignment - travel_alignment;
     let clearance_penalty =
-        (SCOUT_CAR_CLEARANCE_SCORE_MAX_PX - candidate.min_static_clearance_px).max(0.0) * 0.85;
+        (profile.clearance_score_max_px - candidate.min_static_clearance_px).max(0.0) * 0.85;
     let steering_penalty =
-        candidate.primitive.curvature.abs() * SCOUT_CAR_MIN_TURN_RADIUS_PX * 1.25;
+        candidate.primitive.curvature.abs() * profile.min_turn_radius_px * 1.25;
     let reverse_penalty = if candidate.primitive.travel_sign < 0.0 {
         12.0
     } else {
@@ -834,7 +844,10 @@ fn waypoint_is_behind(facing: f32, waypoint: (f32, f32), current: (f32, f32)) ->
         return false;
     }
     let forward_desired = dy.atan2(dx);
-    angle_delta(facing, forward_desired).abs() > SCOUT_CAR_REVERSE_MIN_BEHIND_ANGLE_RAD
+    angle_delta(facing, forward_desired).abs()
+        > car_motion_profile(EntityKind::ScoutCar)
+            .map(|profile| profile.reverse_min_behind_angle_rad)
+            .unwrap_or(std::f32::consts::FRAC_PI_2)
 }
 
 fn same_waypoint(a: (f32, f32), b: (f32, f32)) -> bool {
@@ -890,6 +903,7 @@ fn point_at_distance(from: (f32, f32), to: (f32, f32), distance: f32) -> Option<
 }
 
 fn static_clearance_px(
+    profile: CarMotionProfile,
     map: &Map,
     occ: &Occupancy,
     kind: EntityKind,
@@ -904,14 +918,14 @@ fn static_clearance_px(
     }
 
     let mut clearance = 0.0;
-    while clearance <= SCOUT_CAR_CLEARANCE_SCORE_MAX_PX {
+    while clearance <= profile.clearance_score_max_px {
         let expanded = expanded_body(body, clearance + 2.0);
         if body_hits_static_blocker(map, occ, kind, expanded) {
             return clearance;
         }
         clearance += 2.0;
     }
-    SCOUT_CAR_CLEARANCE_SCORE_MAX_PX
+    profile.clearance_score_max_px
 }
 
 fn expanded_body(body: UnitBody, extra_px: f32) -> UnitBody {

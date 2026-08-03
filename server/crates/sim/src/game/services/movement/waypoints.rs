@@ -175,7 +175,7 @@ pub(super) fn advance_moving_units(
                         );
                         if rotated.is_finite() {
                             let error = angle_delta(rotated, intent.desired_facing).abs();
-                            budget *= pivot_drive_speed_scale(error);
+                            budget *= pivot_drive_speed_scale(kind, error);
                             budget *= traffic.throttle_scale;
                             new_facing = Some(rotated);
                             body_facing = rotated;
@@ -303,7 +303,7 @@ pub(super) fn advance_moving_units(
                     let same_tile = map.tile_of(x, y) == map.tile_of(wx, wy);
                     let close_nudge = is_pivot_vehicle && path_len == 1 && same_tile;
                     let (step_dir, step_budget) = if close_nudge {
-                        close_nudge_hull_axis_motion(path_dir, body_facing, budget)
+                        close_nudge_hull_axis_motion(kind, path_dir, body_facing, budget)
                     } else {
                         (path_dir, budget)
                     };
