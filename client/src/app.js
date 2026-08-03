@@ -79,6 +79,7 @@ import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 import { StressTestRunner } from "./stress_test.js";
 import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
 import { ChatOverlay } from "./chat_overlay.js";
+import { MapPreviewBridge } from "./map_preview_bridge.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -133,6 +134,7 @@ export class App {
     net = null,
     snapshotStreamLaunch = null,
     stressTestLaunch = null,
+    mapPreviewLaunch = null,
   } = {}) {
     /** @type {Net} connection opened on demand and retained across an active room + match. */
     this.net = net || new Net(wsUrl(), diagnostics);
@@ -148,12 +150,14 @@ export class App {
     this.connectionLostPositioner.mount(dom.connectionLostDrag, { restore: false });
     this.snapshotStreamLaunch = snapshotStreamLaunch;
     this.stressTestLaunch = stressTestLaunch;
+    this.mapPreviewLaunch = mapPreviewLaunch;
+    this.mapPreviewBridge = null;
     this.stressTestRunner = stressTestLaunch
       ? new StressTestRunner({ launch: stressTestLaunch })
       : null;
     this.devWatch = devWatchConfig();
     this.labCatalogLaunch = labCatalogRouteConfig();
-    this.labHandoffLaunch = labHandoffLaunchConfig();
+    this.labHandoffLaunch = mapPreviewLaunch || labHandoffLaunchConfig();
     this.labLaunch = labLaunchConfig();
     this.labVisualProfileState = resolveVisualProfileLaunch(this.labLaunch || this.labCatalogLaunch);
     this.replayLaunch = replayLaunchConfig();
@@ -860,6 +864,11 @@ export class App {
         onEditMap: () => this.openCurrentLabMapInEditor(),
       });
     }
+    if (this.mapPreviewLaunch) {
+      this.mapPreviewBridge?.destroy();
+      this.mapPreviewBridge = new MapPreviewBridge({ app: this, match: this.match, root: dom.gameScreen });
+      await this.mapPreviewBridge.initialize();
+    }
     diagnostics.mark("app.onStart.end");
   }
 
@@ -1111,6 +1120,8 @@ export class App {
   }
 
   destroyLabShell() {
+    this.mapPreviewBridge?.destroy();
+    this.mapPreviewBridge = null;
     this.setCleanPresentation(false);
     this.labPanel?.destroy();
     this.labClient?.destroy();

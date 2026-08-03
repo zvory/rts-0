@@ -93,7 +93,7 @@ export class MapEditorApp {
     opened.opener = null;
     try {
       const handoff = await createMapHandoff({
-        destination: "editor",
+        destination: "lab",
         authoredMap,
         materializedMap,
       });

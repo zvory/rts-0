@@ -26,8 +26,7 @@ import {
   STATS,
   isProducerBuilding,
 } from "./config.js";
-import { minimapTerrainStyleSignature } from "./minimap_terrain.js";
-import { paintMinimapTerrain } from "./minimap_map_painter.js";
+import { minimapTerrainColor, minimapTerrainStyleSignature } from "./minimap_terrain.js";
 import {
   artilleryFireRadiusTiles,
   artilleryMinFireRadiusTiles,
@@ -50,6 +49,7 @@ import {
   underAttackFlashEntityIds,
 } from "./minimap_alerts.js";
 import { createInlineSvgImage } from "./minimap_icon_image.js";
+import { captureMinimapPng } from "./minimap_capture.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
@@ -192,6 +192,7 @@ export class Minimap {
     this._artilleryIconImage = options.artilleryIconImage || null;
     this._artilleryIconReady = !!this._artilleryIconImage;
     this._artilleryIconLoadController = null;
+    this._capturePresentation = false;
     if (!this._artilleryIconImage && options.artilleryIconMarkup) {
       this._artilleryIconLoadController = typeof globalThis.AbortController === "function"
         ? new globalThis.AbortController()
@@ -313,9 +314,19 @@ export class Minimap {
     this._drawResourceLayer();
     this._drawPlayerOwnedEntityOutline(entities);
     this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
-    this._drawArtilleryFiringMarkers(now);
-    this._drawViewport();
-    this._drawPings(now);
+    if (!this._capturePresentation) {
+      this._drawArtilleryFiringMarkers(now);
+      this._drawViewport();
+      this._drawPings(now);
+    }
+  }
+
+  /** Render the production minimap at an exact square size without gameplay transients. */
+  capturePng(dimensions) {
+    return captureMinimapPng(this.canvas, this.ctx, dimensions, {
+      render: () => this.render(),
+      presentation: (value) => value == null ? this._capturePresentation : (this._capturePresentation = value),
+    });
   }
 
   /**
@@ -369,11 +380,18 @@ export class Minimap {
   }
 
   _paintTerrain(ctx, map) {
-    paintMinimapTerrain(ctx, map, {
-      scale: this._scale,
-      offX: this._offX,
-      offY: this._offY,
-    });
+    const ts = map.tileSize;
+    // Cell size in canvas px; +1 to avoid hairline seams between adjacent cells.
+    const cw = ts * this._scale + 1;
+    const ch = ts * this._scale + 1;
+    for (let ty = 0; ty < map.height; ty++) {
+      for (let tx = 0; tx < map.width; tx++) {
+        const code = map.terrain[ty * map.width + tx];
+        ctx.fillStyle = hex(minimapTerrainColor(code, tx, ty));
+        const p = this._worldToCanvas(tx * ts, ty * ts);
+        ctx.fillRect(p.x, p.y, cw, ch);
+      }
+    }
   }
 
   _drawTerrainLayer() {

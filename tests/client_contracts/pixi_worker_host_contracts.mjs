@@ -71,6 +71,28 @@ async function queueAndLifecycleContracts() {
     "fixed capture returns pixels read in the worker presentation task for the matching frame");
   adapter.exitFixedCapture();
 
+  const frame6 = assemble(assembler, 6);
+  const nextCapture = adapter.render(frame6);
+  worker.present(frame6);
+  assert((await nextCapture.settled).status === PRESENTATION_OUTCOME.PRESENTED);
+  const controller = new AbortController();
+  const abandonedPixels = adapter.readPresentedPixels(frame6.frameId, { signal: controller.signal });
+  const captureRequest = worker.messages.at(-1).payload;
+  controller.abort(new Error("planned framebuffer deadline"));
+  await assertRejects(abandonedPixels, "an aborted framebuffer read rejects instead of retaining an unbounded worker deferred");
+  worker.emit(response(RENDER_WORKER_RESPONSE.PRESENTED, frame6.generation, {
+    frameId: frame6.frameId,
+    captureId: captureRequest.captureId,
+    rgba: new Uint8Array([1, 2, 3, 255]).buffer,
+    width: 1,
+    height: 1,
+    workerUpdateMs: 1,
+    workerPresentMs: 1,
+    queueAgeMs: 1,
+    displayAgeMs: 1,
+  }));
+  assert(adapter.terminalFailure() == null, "a late response to an aborted framebuffer read is ignored");
+
   adapter.destroy();
   adapter.destroy();
   assert(worker.terminated === 1 && canvas.removed === 1 && root.children.length === 0,

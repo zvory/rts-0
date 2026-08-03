@@ -981,19 +981,26 @@ private Lab whose first `start` payload already contains the edited map at tick 
 `Edit map` transfers only an authoritative exported map. The handoff itself carries the current map
 in either direction; the editor does not maintain a separate browser-storage workspace.
 
-`/map-preview` is a launch-gated, capture-only consumer of the same one-use, two-minute editor
-handoff. It accepts no map data through query parameters or browser-evaluation calls. Its versioned
-bridge exposes only bounded 64–4096-pixel `world` and `minimap` PNG captures, with at most
-16,777,216 output pixels. World captures submit a clean full-map record to the Map Editor's existing
-Pixi worker, omit editor guides/sites/gameplay-overlay tinting, wait for doodad assets, and encode
-the worker's decoded RGBA rather than taking a DOM screenshot. Minimap captures use the same pure
-terrain painter called by the live `Minimap`; the capture page does not own a second terrain or
-minimap renderer. `scripts/map-preview.mjs` is the local Node/Chrome adapter: it validates and
-materializes an authored map with `MapEditorSession`, creates the bounded handoff on a loopback RTS
-server, calls the narrow bridge, validates the returned PNG dimensions, and writes the requested
-artifact. The Map Editor's `Preview PNGs` action creates the same validated handoff and opens this
-route, whose visible controls download 2048-pixel world and minimap PNGs through that same bridge.
-The page owns no authoring operations or recipe semantics.
+`/map-preview` is a launch-gated consumer of the same one-use, two-minute Lab handoff used by
+`Open in Lab`. It accepts no map data through query parameters or browser-evaluation calls. The
+server validates the authored and materialized maps, creates a private Lab, and sends an ordinary
+authoritative start payload and snapshot. The route then runs the normal `App`/`Match`, Pixi world
+renderer, and live `Minimap`, including server-materialized starting city centres, neutral bases,
+resources, and doodads; it does not maintain preview-only map rendering logic.
+
+Its versioned bridge exposes only bounded 64–4096-pixel `world` and square `minimap` PNG captures,
+with at most 16,777,216 output pixels. It enables reveal-all vision, suppresses app chrome, fits the
+complete map on initial load, and restores that fitted interactive preview after each export. World
+captures use Match's fixed-capture path, force renderer DPR 1 so requested dimensions mean output
+pixels on every display, wait for authoritative entity assets, and encode decoded renderer RGBA
+rather than taking a DOM screenshot. Minimap captures call `Minimap.capturePng`, which temporarily
+resizes the production minimap and omits only transient camera, ping, and artillery markers; terrain,
+resources, and authoritative entities remain. `scripts/map-preview.mjs` is the local Node/Chrome
+adapter: it validates and materializes an authored map with `MapEditorSession`, creates a bounded Lab
+handoff on a loopback RTS server, calls the narrow bridge under a browser-side deadline, validates
+the returned PNG dimensions, and writes the requested artifact. The Map Editor's `Preview PNGs`
+action uses the same handoff and route, whose visible controls call the same bridge. The page owns
+no authoring operations or recipe semantics.
 
 The editor's `Authoritative check` and `Route report` actions post the current exported map to
 `/api/map-authoring/check` and `/api/map-authoring/report`. The panel summarizes validity and base

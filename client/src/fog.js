@@ -80,6 +80,16 @@ export class Fog {
    * @param {ArrayLike<number>|null} serverExploredTiles server-authoritative exploration history
    */
   update(ownEntities, tileSize, serverVisibleTiles = null, serverExploredTiles = null) {
+    // Explicit reveal-all presentation (Lab/dev/capture) overrides the otherwise
+    // authoritative grids. Keep the snapshot grids in sync because the worker
+    // renderer consumes their serialized values rather than this object's methods.
+    if (this.revealAll) {
+      this._recordGridChanges(
+        this._fillGridIfChanged(this.visibleGrid, 1),
+        this._fillGridIfChanged(this.exploredGrid, 1),
+      );
+      return;
+    }
     const hasAuthoritativeGrids = serverVisibleTiles?.length === this.visibleGrid.length
       && serverExploredTiles?.length === this.exploredGrid.length;
     if (hasAuthoritativeGrids) {
@@ -98,13 +108,6 @@ export class Fog {
         }
       }
       this._recordGridChanges(visibleChanged, exploredChanged);
-      return;
-    }
-    if (this.revealAll) {
-      this._recordGridChanges(
-        this._fillGridIfChanged(this.visibleGrid, 1),
-        this._fillGridIfChanged(this.exploredGrid, 1),
-      );
       return;
     }
     if (serverVisibleTiles && serverVisibleTiles.length === this.visibleGrid.length) {

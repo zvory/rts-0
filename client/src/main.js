@@ -7,7 +7,6 @@ import {
 } from "./bootstrap.js";
 import { MapEditorApp } from "./map_editor_app.js";
 import { mapEditorLaunchConfig } from "./map_editor_launch.js";
-import { MapPreviewApp } from "./map_preview_app.js";
 import { mapPreviewLaunchConfig } from "./map_preview_launch.js";
 import { SnapshotStreamNet } from "./snapshot_stream_net.js";
 
@@ -19,21 +18,21 @@ async function start() {
   try {
     const stressTestLaunch = stressTestLaunchConfig();
     const snapshotStreamLaunch = stressTestLaunch || snapshotStreamLaunchConfig();
-    app = mapPreviewLaunchConfig()
-      ? new MapPreviewApp()
-      : mapEditorLaunchConfig()
-        ? new MapEditorApp()
-        : new App({
-          net: snapshotStreamLaunch
-            ? new SnapshotStreamNet({
-              id: snapshotStreamLaunch.id,
-              diagnostics,
-              autoStart: !stressTestLaunch,
-            })
-            : null,
-          snapshotStreamLaunch,
-          stressTestLaunch,
-        });
+    const mapPreviewLaunch = mapPreviewLaunchConfig();
+    app = mapEditorLaunchConfig()
+      ? new MapEditorApp()
+      : new App({
+        mapPreviewLaunch,
+        net: snapshotStreamLaunch
+          ? new SnapshotStreamNet({
+            id: snapshotStreamLaunch.id,
+            diagnostics,
+            autoStart: !stressTestLaunch,
+          })
+          : null,
+        snapshotStreamLaunch,
+        stressTestLaunch,
+      });
   } catch (error) {
     showRendererBootstrapError(error);
     return;

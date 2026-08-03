@@ -8,6 +8,8 @@ import { MapEditorSession } from "../client/src/map_editor_session.js";
 const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const DEFAULT_URL = "http://127.0.0.1:8080/";
 const READY_TIMEOUT_MS = 30_000;
+const HANDOFF_TIMEOUT_MS = 15_000;
+const CAPTURE_TIMEOUT_MS = 50_000;
 
 export function parseMapPreviewArgs(argv) {
   const options = {
@@ -19,6 +21,7 @@ export function parseMapPreviewArgs(argv) {
     padding: 24,
     url: DEFAULT_URL,
     chrome: process.env.CHROME || "",
+    browserDpr: 1,
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -44,6 +47,8 @@ export function parseMapPreviewArgs(argv) {
     else if (arg.startsWith("--url=")) options.url = arg.slice(6);
     else if (arg === "--chrome") options.chrome = value();
     else if (arg.startsWith("--chrome=")) options.chrome = arg.slice(9);
+    else if (arg === "--browser-dpr") options.browserDpr = numberInRange(value(), arg, 1, 4);
+    else if (arg.startsWith("--browser-dpr=")) options.browserDpr = numberInRange(arg.slice(14), "--browser-dpr", 1, 4);
     else if (arg === "--help" || arg === "-h") options.help = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
@@ -61,15 +66,24 @@ export async function renderMapPreview(options, dependencies = {}) {
   const authoredMap = JSON.parse(fs.readFileSync(options.map, "utf8"));
   const session = new MapEditorSession();
   session.loadAuthoredMap(authoredMap);
-  const handoff = await createPreviewHandoff(options.url, authoredMap, session.materialized(), dependencies.fetchImpl || fetch);
+  const handoff = await createPreviewHandoff(
+    options.url,
+    authoredMap,
+    session.materialized(),
+    dependencies.fetchImpl || fetch,
+    dependencies.handoffTimeoutMs || HANDOFF_TIMEOUT_MS,
+  );
   const chrome = findChrome(options.chrome);
   const loadPuppeteer = dependencies.loadPuppeteer || defaultPuppeteerLoader;
   const puppeteer = await loadPuppeteer();
   const browser = await puppeteer.launch({
     executablePath: chrome,
     headless: "new",
-    defaultViewport: { width: Math.min(options.width, 4096), height: Math.min(options.height, 4096), deviceScaleFactor: 1 },
-    args: ["--no-sandbox"],
+    defaultViewport: {
+      width: Math.min(options.width, 4096),
+      height: Math.min(options.height, 4096),
+      deviceScaleFactor: options.browserDpr,
+    },
   });
   try {
     const page = await browser.newPage();
@@ -84,9 +98,13 @@ export async function renderMapPreview(options, dependencies = {}) {
     }, { timeout: READY_TIMEOUT_MS });
     const status = await page.evaluate(() => globalThis.__rtsMapPreview.status());
     if (status.state !== "ready") throw new Error(status.error || "Map preview page failed to start.");
-    const result = await page.evaluate(
-      (request) => globalThis.__rtsMapPreview.call("capture", request),
-      { kind: options.kind, width: options.width, height: options.height, padding: options.padding },
+    const result = await withTimeout(
+      page.evaluate(
+        (request) => globalThis.__rtsMapPreview.call("capture", request),
+        { kind: options.kind, width: options.width, height: options.height, padding: options.padding },
+      ),
+      dependencies.captureTimeoutMs || CAPTURE_TIMEOUT_MS,
+      "Map preview browser capture timed out.",
     );
     if (pageErrors.length) throw new Error(`Map preview page error: ${pageErrors[0]}`);
     const prefix = "data:image/png;base64,";
@@ -113,13 +131,26 @@ export async function renderMapPreview(options, dependencies = {}) {
   }
 }
 
-export async function createPreviewHandoff(baseUrl, authoredMap, materializedMap, fetchImpl = fetch) {
-  const response = await fetchImpl(new URL("/api/map-handoffs", baseUrl), {
+export async function createPreviewHandoff(baseUrl, authoredMap, materializedMap, fetchImpl = fetch, timeoutMs = HANDOFF_TIMEOUT_MS) {
+  const timeout = numberInRange(timeoutMs, "handoff timeout", 1, 60_000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("Map preview handoff timed out.")), timeout);
+  let response;
+  let payload;
+  try {
+    response = await fetchImpl(new URL("/api/map-handoffs", baseUrl), {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ destination: "editor", authoredMap, materializedMap }),
-  });
-  const payload = await response.json().catch(() => ({}));
+      body: JSON.stringify({ destination: "lab", authoredMap, materializedMap }),
+      signal: controller.signal,
+    });
+    payload = await response.json().catch(() => ({}));
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("Map preview handoff timed out.");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!response.ok) throw new Error(payload?.error || `Map preview handoff failed (HTTP ${response.status}).`);
   if (!/^[a-f0-9]{32}$/.test(payload?.handoffId || "")) throw new Error("Map preview handoff returned an invalid id.");
   return payload;
@@ -159,6 +190,26 @@ function integer(value, label, { allowZero = false } = {}) {
   return parsed;
 }
 
+function numberInRange(value, label, minimum, maximum) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${label} requires a number from ${minimum} to ${maximum}`);
+  }
+  return parsed;
+}
+
+async function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), timeoutMs); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function readPngDimensions(bytes) {
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   if (!Buffer.isBuffer(bytes) || bytes.length < 24 || !bytes.subarray(0, 8).equals(signature) || bytes.toString("ascii", 12, 16) !== "IHDR") {
@@ -172,12 +223,13 @@ function usage() {
   node scripts/map-preview.mjs --map MAP.json --out PREVIEW.png [options]
 
 Options:
-  --kind world|minimap   Existing Pixi world renderer or shared minimap terrain renderer (default: world)
+  --kind world|minimap   Live Match world renderer or live Match minimap (default: world)
   --width N              Output width in pixels (default: 2048; capture page allows 64–4096)
   --height N             Output height in pixels (default: 2048; capture page allows 64–4096)
   --padding N            World-preview edge padding in pixels (default: 24)
   --url URL              Running local RTS server (default: ${DEFAULT_URL})
   --chrome PATH          Chrome/Chromium executable (or set CHROME)
+  --browser-dpr N        Browser device scale for DPR regression checks (default: 1)
 `;
 }
 
