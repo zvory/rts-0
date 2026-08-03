@@ -1,5 +1,6 @@
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
+use serde::Serialize;
 
 mod jeffs_ai;
 mod turtle;
@@ -21,7 +22,7 @@ const AI_2_1_SECOND_FACTORY_FLOAT_THRESHOLD: ResourceFloatThreshold = ResourceFl
     oil: 325,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub(crate) struct AiProfile {
     pub(crate) id: &'static str,
     pub(crate) workers: WorkerPolicy,
@@ -42,7 +43,7 @@ pub(crate) struct AiProfile {
     pub(crate) fast_tank_timing: Option<FastTankTimingPolicy>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct FastTankTimingPolicy {
     pub(crate) workers_before_barracks: usize,
     pub(crate) pump_jacks_before_barracks: usize,
@@ -54,7 +55,7 @@ pub(crate) struct FastTankTimingPolicy {
     pub(crate) preserve_during_defensive_panic: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct WorkerPolicy {
     pub(crate) steel_saturation_fraction: Ratio,
     pub(crate) steel_worker_cap: Option<usize>,
@@ -76,7 +77,7 @@ impl WorkerPolicy {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct Ratio {
     numerator: usize,
     denominator: usize,
@@ -101,7 +102,7 @@ impl Ratio {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct BuildingPolicy {
     pub(crate) barracks_curve: BarracksCurve,
     pub(crate) factory_target: usize,
@@ -109,7 +110,7 @@ pub(crate) struct BuildingPolicy {
     pub(crate) max_pending_per_kind: usize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct ExtraFactoryPolicy {
     pub(crate) target_count: usize,
     pub(crate) minimum_units: usize,
@@ -117,13 +118,13 @@ pub(crate) struct ExtraFactoryPolicy {
     pub(crate) resource_float: ResourceFloatThreshold,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct SurplusSteelProductionPolicy {
     pub(crate) reserve: u32,
     pub(crate) unit: EntityKind,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct ExpansionPolicy {
     pub(crate) target_city_centres: usize,
     pub(crate) required_complete_building: EntityKind,
@@ -139,7 +140,7 @@ pub(crate) struct ExpansionPolicy {
     pub(crate) remote_worker_assignment_fallback: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct BarracksCurve {
     pub(crate) before_steel_saturation: usize,
     pub(crate) after_steel_saturation: usize,
@@ -172,7 +173,7 @@ impl BarracksCurve {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct ProductionPolicy {
     pub(crate) queue_depth: usize,
     pub(crate) unit_priorities: &'static [EntityKind],
@@ -180,7 +181,7 @@ pub(crate) struct ProductionPolicy {
     pub(crate) balance_unit_priorities: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub(crate) struct AttackPolicy {
     pub(crate) first_attack_size: usize,
     pub(crate) wave_growth: usize,
@@ -191,14 +192,14 @@ pub(crate) struct AttackPolicy {
     pub(crate) required_unit: Option<EntityKind>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub(crate) struct DefensiveMachineGunnerPolicy {
     pub(crate) target_count: usize,
     pub(crate) perimeter_distance_tiles: f32,
     pub(crate) replacement_health_percent: Option<u8>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub(crate) struct TurtleDefensePolicy {
     pub(crate) max_chokes: usize,
     pub(crate) anti_tank_back_tiles: f32,
@@ -214,13 +215,13 @@ pub(crate) struct TurtleDefensePolicy {
     pub(crate) anti_tank_kinds: &'static [EntityKind],
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub(crate) struct FrontalWavePolicy {
     pub(crate) exclude_launched_ticks: Option<u32>,
     pub(crate) line_staging: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub(crate) struct ExpansionContainmentPolicy {
     pub(crate) tank_standoff_tiles: f32,
     pub(crate) scout_trailing_tiles: f32,
@@ -233,7 +234,7 @@ pub(crate) struct ExpansionContainmentPolicy {
     pub(crate) repush_regroup_radius_tiles: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub(crate) struct HomeAntiTankPolicy {
     pub(crate) defensive_tanks: usize,
     pub(crate) target_guns: usize,
@@ -249,7 +250,7 @@ impl FrontalWavePolicy {
     };
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub(crate) struct TechTransitionPolicy {
     pub(crate) resource_float: ResourceFloatThreshold,
     pub(crate) required_tech_path: &'static [EntityKind],
@@ -257,19 +258,19 @@ pub(crate) struct TechTransitionPolicy {
     pub(crate) attack: AttackPolicy,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct ResourceFloatThreshold {
     pub(crate) steel: u32,
     pub(crate) oil: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct ResourcePolicy {
     pub(crate) oil_after_steel_workers: usize,
     pub(crate) tank_adaptive: Option<TankResourcePolicy>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct TankResourcePolicy {
     pub(crate) max_oil_workers: usize,
     pub(crate) oil_workers_per_factory: usize,

@@ -24,3 +24,5 @@ rounded to 1/1024 of a world unit before compact `serde_json` encoding so harmle
 subpixel arithmetic does not masquerade as AI drift. Integer, string, ordering, and larger numeric
 changes remain visible in the lowercase `fnv1a64:<hex>` values; exact emitted `SimCommand` values
 remain in the fixture so command drift is reviewable without reversing a hash.
+The manifest's profile fingerprint is independently derived from an explicit serde policy record,
+not compiler-dependent Rust `Debug` text.

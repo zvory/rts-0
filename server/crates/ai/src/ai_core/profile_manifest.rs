@@ -173,18 +173,26 @@ fn profile_fingerprint(
     modules: &[&str],
     overlays: &[AiOverlayIdentity],
 ) -> String {
-    let mut text = format!(
-        "profile={profile:?}|label={label}|base={}|summary={summary}|modules={}",
-        base_profile_id.unwrap_or("-"),
-        modules.join(",")
-    );
-    for overlay in overlays {
-        text.push_str("|overlay=");
-        text.push_str(&overlay.id);
-        text.push(':');
-        text.push_str(&overlay.summary);
+    #[derive(Serialize)]
+    struct FingerprintInput<'a> {
+        profile: &'a AiProfile,
+        label: &'a str,
+        base_profile_id: Option<&'a str>,
+        summary: &'a str,
+        modules: &'a [&'a str],
+        overlays: &'a [AiOverlayIdentity],
     }
-    format!("fnv1a64:{:016x}", fnv1a64(text.as_bytes()))
+
+    let bytes = serde_json::to_vec(&FingerprintInput {
+        profile,
+        label,
+        base_profile_id,
+        summary,
+        modules,
+        overlays,
+    })
+    .expect("serialize canonical AI profile identity");
+    format!("fnv1a64:{:016x}", fnv1a64(&bytes))
 }
 
 fn fnv1a64(bytes: &[u8]) -> u64 {
@@ -222,5 +230,12 @@ mod tests {
 
         let turtle = profile_identity_by_id(AI_TURTLE_ID).expect("AI Turtle identity");
         assert_eq!(turtle.label, "AI Turtle");
+    }
+
+    #[test]
+    fn jeff_profile_fingerprint_uses_stable_canonical_data() {
+        let identity = profile_identity_by_id(JEFFS_AI_ID).expect("Jeff profile identity");
+
+        assert_eq!(identity.fingerprint, "fnv1a64:3436a18e103a6541");
     }
 }

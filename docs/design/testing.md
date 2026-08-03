@@ -34,6 +34,8 @@ digest. Compact serde JSON bytes and repository-owned FNV-1a64 fingerprints are 
 canonical representation. Fingerprinted floating-point values are rounded to 1/1024 of a world
 unit so CPU-specific subpixel arithmetic does not make the cross-platform gate flaky; exact
 commands remain unquantized in the transcript. Git or compiler identity is not behavior identity.
+Profile fingerprints likewise hash an explicit serde representation of the policy and manifest
+metadata; Rust `Debug` output is not a stable identity format.
 
 The ordinary gate compares ticks 0-3599, covering both nine-tick stagger offsets, opening economy,
 failed-site placement recovery, construction, production, staging, and first attack orders. With
