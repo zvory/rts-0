@@ -294,18 +294,19 @@ assert(
     assert(roadLayer.tankTreads.tiles.get("0:0")?.ctx.clearRects
       .some((rect) => rect.join(",") === "0,32,16,16"),
     "live tank treads clear road-tile pixels after stamping");
+    const roadDiagnostics = roadLayer.diagnostics().tankTreads;
     roadLayer.stampBatch([{
       id: 79,
       decalClass: "tankTreads",
       poses: [[160, 320, 0], [192, 320, 1252]],
     }]);
-    roadLayer.stampLiveTankTreads([], {
+    assert(roadLayer.stampLiveTankTreads([], {
       visibleRevision: 1,
       isVisible: (tx, ty) => tx === 1 && ty === 2,
-    });
-    assert(roadLayer.tankTreads.tiles.get("0:0")?.ctx.clearRects
-      .some((rect) => rect.join(",") === "16,32,16,16"),
-    "later-discovered authoritative tank trails also clear road-tile pixels");
+    }) === 0 &&
+      roadLayer.diagnostics().tankTreads.totalSegments === roadDiagnostics.totalSegments &&
+      roadLayer.diagnostics().tankTreads.textureUpdateCount === roadDiagnostics.textureUpdateCount,
+    "later-discovered authoritative road trails are discarded without raster or upload work");
     roadLayer.destroy();
     assert(decalLayer.stampBatch([{
       id: 77,

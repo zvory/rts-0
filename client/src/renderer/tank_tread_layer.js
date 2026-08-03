@@ -157,6 +157,10 @@ export class TankTreadLayer {
       for (const [tileIndex, segments] of segmentsByTile) {
         const tx = tileIndex % this.mapWidthTiles;
         const ty = Math.floor(tileIndex / this.mapWidthTiles);
+        if (this.roadTiles.has(tileIndex)) {
+          segmentsByTile.delete(tileIndex);
+          continue;
+        }
         if (!fog.isVisible(tx, ty)) continue;
         const clip = {
           x: tx * this.mapTileSize,
