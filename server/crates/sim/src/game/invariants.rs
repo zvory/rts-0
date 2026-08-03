@@ -436,15 +436,16 @@ impl Game {
                         location_context(&self.state.map, v.x, v.y)
                     );
                 }
-                // If a target_id is exposed, the target must be visible too.
+                // If a target_id is exposed, the target must be projected too. Checking the
+                // snapshot itself keeps this invariant aligned with projection policy, including
+                // public resource nodes and smoke/stealth visibility.
                 if let Some(tid) = v.target_id {
                     if let Some(t) = self.state.entities.get(tid) {
-                        // snapshot_for() projects through the living team's unioned fog, so the
-                        // invariant must judge target visibility through that same projection.
-                        let visible = self.snapshot_target_visible_to(pid, t, &live_fog);
                         assert!(
-                            visible,
-                            "invariant: tick {} snapshot for player {} exposes hidden target_id {}; target={}",
+                            snap.entities
+                                .binary_search_by_key(&tid, |candidate| candidate.id)
+                                .is_ok(),
+                            "invariant: tick {} snapshot for player {} exposes target_id {} without projecting its target; target={}",
                             self.state.tick,
                             pid,
                             tid,
@@ -462,14 +463,6 @@ impl Game {
             visible_players.push(player);
         }
         fog.union_for(player, &visible_players)
-    }
-
-    fn snapshot_target_visible_to(&self, player: u32, target: &Entity, fog: &Fog) -> bool {
-        // Resource nodes are static public map information and are projected even outside current
-        // fog. A target_id that names one therefore reveals no private entity identity or position.
-        target.is_node()
-            || self.same_team_owner(player, target.owner)
-            || fog.is_visible_world(player, target.pos_x, target.pos_y)
     }
 }
 
@@ -768,7 +761,7 @@ mod tests {
     use crate::game::map::Map;
     use crate::game::services::geometry::{building_rect_for_footprint, unit_body_with_facing};
     use crate::game::services::occupancy::footprint_center;
-    use crate::game::{Game, PlayerInit};
+    use crate::game::{systems, Game, PlayerInit};
     use crate::protocol::terrain;
 
     /// Steel patch placement must stay within City Centre distance bounds for any STEEL_PATCHES_PER_BASE.
@@ -824,7 +817,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_target_invariant_treats_static_resource_nodes_as_public() {
+    fn snapshot_target_invariant_accepts_projected_public_resource_target() {
         let players = [
             PlayerInit {
                 id: 1,
@@ -843,24 +836,69 @@ mod tests {
                 is_ai: true,
             },
         ];
-        let game = Game::new(&players, 0x1234_5678);
-        let fog = game.invariant_team_current_fog_for(1, &game.state.fog);
+        let mut game = Game::new_for_replay(&players, 0x1234_5678);
+        for tile in &mut game.state.map.terrain {
+            *tile = terrain::GRASS;
+        }
+        for id in game.state.entities.ids() {
+            game.state.entities.remove(id);
+        }
+
+        let observer_pos = game.state.map.tile_center(4, 4);
+        game.state
+            .entities
+            .spawn_unit(1, EntityKind::Rifleman, observer_pos.0, observer_pos.1)
+            .expect("observer should spawn");
+        let attacker_pos = game.state.map.tile_center(6, 4);
+        let attacker = game
+            .state
+            .entities
+            .spawn_unit(2, EntityKind::Tank, attacker_pos.0, attacker_pos.1)
+            .expect("visible enemy attacker should spawn");
+        let node_pos = game.state.map.tile_center(50, 50);
         let hidden_node = game
             .state
             .entities
-            .iter()
-            .find(|entity| {
-                entity.is_node()
-                    && !fog.is_visible_world(1, entity.pos_x, entity.pos_y)
-            })
-            .expect("opponent-side resource node outside player-one current fog");
+            .spawn_node(EntityKind::Steel, node_pos.0, node_pos.1)
+            .expect("hidden resource node should spawn");
+        {
+            let attacker = game
+                .state
+                .entities
+                .get_mut(attacker)
+                .expect("attacker should exist");
+            attacker.set_target_id(Some(hidden_node));
+        }
 
-        assert!(game.snapshot_target_visible_to(1, hidden_node, &fog));
-        assert!(game
-            .snapshot_for(1)
+        systems::recompute_supply(&mut game.state.players, &game.state.entities);
+        game.rebuild_final_spatial();
+        let player_ids = game
+            .state
+            .players
+            .iter()
+            .map(|player| player.id)
+            .collect::<Vec<_>>();
+        game.state
+            .fog
+            .recompute(&player_ids, &game.state.entities, &game.state.map);
+
+        let fog = game.invariant_team_current_fog_for(1, &game.state.fog);
+        assert!(!fog.is_visible_world(1, node_pos.0, node_pos.1));
+        let snapshot = game.snapshot_for(1);
+        assert_eq!(
+            snapshot
+                .entities
+                .iter()
+                .find(|entity| entity.id == attacker)
+                .expect("attacker should project")
+                .target_id,
+            Some(hidden_node)
+        );
+        assert!(snapshot
             .entities
             .iter()
-            .any(|entity| entity.id == hidden_node.id));
+            .any(|entity| entity.id == hidden_node));
+        game.assert_invariants();
     }
 
     #[test]
