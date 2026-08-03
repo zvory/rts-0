@@ -371,6 +371,10 @@ impl TankTrailStore {
         self.trail(id).map(|trail| trail.created_revision)
     }
 
+    pub(super) fn created_revisions(&self) -> impl Iterator<Item = u32> + '_ {
+        self.finalized.iter().map(|trail| trail.created_revision)
+    }
+
     pub(super) fn full_world_views_after(&self, after_revision: u32) -> Vec<TankTrailView> {
         self.finalized
             .iter()

@@ -251,13 +251,11 @@ impl GroundDecalStore {
             }
         }
         for id in newly_visible {
-            let Some(revision) =
-                self.record_revision(GroundDecalRevisionEntry::Discovered {
-                    player,
-                    id,
-                    tick: self.current_tick,
-                })
-            else {
+            let Some(revision) = self.record_revision(GroundDecalRevisionEntry::Discovered {
+                player,
+                id,
+                tick: self.current_tick,
+            }) else {
                 return;
             };
             self.discovered_by_player
@@ -271,17 +269,15 @@ impl GroundDecalStore {
             .get(&player)
             .cloned()
             .unwrap_or_default();
-        let newly_visible_trails = self
-            .tank_trails
-            .newly_fully_visible(player, fog, map, &known_trails);
+        let newly_visible_trails =
+            self.tank_trails
+                .newly_fully_visible(player, fog, map, &known_trails);
         for id in newly_visible_trails {
-            let Some(revision) =
-                self.record_revision(GroundDecalRevisionEntry::TrailDiscovered {
-                    player,
-                    id,
-                    tick: self.current_tick,
-                })
-            else {
+            let Some(revision) = self.record_revision(GroundDecalRevisionEntry::TrailDiscovered {
+                player,
+                id,
+                tick: self.current_tick,
+            }) else {
                 return;
             };
             self.discovered_trails_by_player
@@ -345,8 +341,16 @@ impl GroundDecalStore {
                 }
             }
         }
-        if !self.tank_trails.valid_checkpoint_state(map, player_ids, tick) {
+        if !self
+            .tank_trails
+            .valid_checkpoint_state(map, player_ids, tick)
+        {
             return false;
+        }
+        for revision in self.tank_trails.created_revisions() {
+            if revision > self.revision || !used_revisions.insert(revision) {
+                return false;
+            }
         }
         for (player, known) in &self.discovered_trails_by_player {
             if !player_ids.contains(player) {
@@ -563,11 +567,9 @@ mod tests {
             .unwrap();
 
         game.state.ground_decals.begin_tick(1);
-        game.state.ground_decals.update_tank_trails(
-            &game.state.entities,
-            &game.state.map,
-            1,
-        );
+        game.state
+            .ground_decals
+            .update_tank_trails(&game.state.entities, &game.state.map, 1);
         game.state
             .entities
             .get_mut(tank)
@@ -621,8 +623,7 @@ mod tests {
         }
         store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)), &map);
 
-        let (revision, after_revision, decals, trails) =
-            store.recent_views_for_players(&[1], 64);
+        let (revision, after_revision, decals, trails) = store.recent_views_for_players(&[1], 64);
         assert_eq!(after_revision, revision - 64);
         assert_eq!(decals.len(), 64);
         assert!(trails.is_empty());
@@ -707,16 +708,60 @@ mod tests {
         )
         .unwrap();
 
-        restored
-            .state
-            .ground_decals
-            .refresh_memory_for_player(
-                1,
-                &fog_with_visible_tile(1, Some(5)),
-                &restored.state.map,
-            );
+        restored.state.ground_decals.refresh_memory_for_player(
+            1,
+            &fog_with_visible_tile(1, Some(5)),
+            &restored.state.map,
+        );
 
         assert_eq!(restored.ground_decals_for_player(1, 0).1.len(), 1);
+    }
+
+    #[test]
+    fn checkpoint_round_trip_accepts_a_finalized_tank_trail() {
+        let mut game = one_player_game();
+        let tank = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::Tank, 96.0, 96.0)
+            .unwrap();
+        game.state.ground_decals.begin_tick(1);
+        game.state
+            .ground_decals
+            .update_tank_trails(&game.state.entities, &game.state.map, 1);
+        game.state
+            .entities
+            .get_mut(tank)
+            .unwrap()
+            .set_facing(std::f32::consts::FRAC_PI_2);
+        for tick in 2..=4 {
+            game.state.tick = tick;
+            game.state.ground_decals.begin_tick(tick);
+            game.state.ground_decals.update_tank_trails(
+                &game.state.entities,
+                &game.state.map,
+                tick,
+            );
+        }
+        crate::game::services::supply::recompute_supply(
+            &mut game.state.players,
+            &game.state.entities,
+        );
+
+        let payload = game.checkpoint_payload_text_for_test().unwrap();
+        let restored = Game::restore_checkpoint_payload_text_for_test(
+            &payload,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            restored
+                .ground_decals_for_observer(&ObserverView::Omniscient, 0)
+                .2
+                .len(),
+            1
+        );
     }
 
     #[test]
