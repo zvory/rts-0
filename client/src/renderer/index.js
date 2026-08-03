@@ -1116,7 +1116,7 @@ export class Renderer {
 
   /**
    * Draw the fog overlay from the Fog grids: unexplored = heavily dimmed, explored =
-   * dimmed at FOG_EXPLORED_ALPHA, visible = clear. Rendered in world space over the
+   * dimmed at MAIN_MAP_FOG_EXPLORED_ALPHA, visible = clear. Rendered in world space over the
    * whole map; merged into horizontal runs per row to keep the rect count low.
    * @private
    */
