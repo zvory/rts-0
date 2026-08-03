@@ -13,6 +13,7 @@ import {
   allocateMapEditorDoodadId,
   createDoodadDragStroke,
   createDoodadSprayStroke,
+  createTreePlacementFilter,
   doodadTypeFromSelection,
   doodadIdsWithinRadius,
   doodadIdsWithinRect,
@@ -21,7 +22,6 @@ import {
   isTreeDoodadType,
   MAP_EDITOR_MAX_DOODADS,
   MAP_EDITOR_TREE_MIN_SPACING,
-  spacedTreePlacements,
   symmetricDoodadPlacements,
 } from "./map_editor_doodads.js";
 import {
@@ -631,34 +631,39 @@ export class MapEditorViewport {
       height: (this.session.draft?.height || 0) * TILE_SIZE,
     };
     const typeIds = this.tool?.typeIds?.length ? this.tool.typeIds : [this.tool?.typeId];
-    const added = [];
+    const existingDoodads = this.session.draft?.doodads || [];
+    const typeSeed = allocateMapEditorDoodadId(existingDoodads);
+    const planned = [];
 
     if (typeIds.every(isTreeDoodadType)) {
+      const spacingFilter = createTreePlacementFilter(
+        existingDoodads,
+        MAP_EDITOR_TREE_MIN_SPACING,
+      );
       for (const point of points || []) {
         const group = symmetricDoodadPlacements(dimensions, [point], this.tool?.symmetry);
-        const candidates = spacedTreePlacements(
-          this.session.draft?.doodads,
-          group,
-          MAP_EDITOR_TREE_MIN_SPACING,
-        );
+        if (existingDoodads.length + planned.length + group.length > MAP_EDITOR_MAX_DOODADS) break;
+        const candidates = spacingFilter.acceptGroup(group);
         if (candidates.length !== group.length) continue;
-        if ((this.session.draft?.doodads?.length || 0) + group.length > MAP_EDITOR_MAX_DOODADS) break;
         const typeId = doodadTypeFromSelection(
           typeIds,
-          allocateMapEditorDoodadId(this.session.draft?.doodads || []),
+          typeSeed + planned.length,
         );
-        added.push(...this.session.placeDoodads(group, { typeId, color: this.tool?.color }));
+        planned.push(...candidates.map((placement) => ({
+          ...placement,
+          typeId,
+          color: this.tool?.color,
+        })));
       }
     } else {
       const placements = symmetricDoodadPlacements(dimensions, points, this.tool?.symmetry);
-      for (const placement of placements) {
-        const typeId = doodadTypeFromSelection(
-          typeIds,
-          allocateMapEditorDoodadId(this.session.draft?.doodads || []),
-        );
-        added.push(...this.session.placeDoodads([placement], { typeId, color: this.tool?.color }));
-      }
+      planned.push(...placements.map((placement, index) => ({
+        ...placement,
+        typeId: doodadTypeFromSelection(typeIds, typeSeed + index),
+        color: this.tool?.color,
+      })));
     }
+    const added = this.session.placeDoodadRecords(planned);
     if (added.length) this.queueDoodadPatch({ upserts: added });
   }
 

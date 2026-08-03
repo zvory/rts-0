@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 
 import {
   createDoodadDragStroke,
+  createTreePlacementFilter,
   doodadTypeFromSelection,
   extendDoodadDragStroke,
   MAP_EDITOR_DOODAD_TYPES,
   MAP_EDITOR_TREE_MIN_SPACING,
-  spacedTreePlacements,
 } from "../../client/src/map_editor_doodads.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { MAP_EDITOR_SYMMETRY, MapEditorSession } from "../../client/src/map_editor_session.js";
@@ -48,21 +48,49 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
   assert.deepEqual(partitionedPlacements, oncePlacements,
     "tree drag placement is independent of pointer-event subdivision");
   assert.equal(MAP_EDITOR_TREE_MIN_SPACING, 64, "tree brushes keep centres at least two tile widths apart");
-  assert.deepEqual(spacedTreePlacements([
+  const existingTreeFilter = createTreePlacementFilter([
     { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 64, y: 64 },
     { typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 300, y: 300 },
-  ], [
+  ]);
+  const accepted = [
     { x: 96, y: 64 },
     { x: 128, y: 64 },
     { x: 170, y: 64 },
-  ]), [
+  ].flatMap((placement) => existingTreeFilter.acceptGroup([placement]));
+  assert.deepEqual(accepted, [
     { x: 128, y: 64 },
   ], "tree drag and spray candidates cannot overlap existing or same-stroke trees inside two tiles");
+  const spacingFilter = createTreePlacementFilter([], MAP_EDITOR_TREE_MIN_SPACING);
+  assert.deepEqual(spacingFilter.acceptGroup([{ x: 64, y: 64 }, { x: 96, y: 64 }]), [],
+    "a conflicting symmetric group is rejected atomically");
+  assert.deepEqual(spacingFilter.acceptGroup([{ x: 96, y: 64 }]), [{ x: 96, y: 64 }],
+    "points from a rejected group do not poison later placement");
+  assert.deepEqual(spacingFilter.acceptGroup([{ x: 160, y: 64 }]), [{ x: 160, y: 64 }],
+    "the spacing index accepts a later point at the exact minimum distance");
   const treeMix = [MAP_EDITOR_DOODAD_TYPES.TREE_OAK, MAP_EDITOR_DOODAD_TYPES.TREE_PINE];
   assert(treeMix.includes(doodadTypeFromSelection(treeMix, 11)),
     "procedural tree placement chooses only from the selected species");
   assert.deepEqual(new Set(Array.from({ length: 32 }, (_, index) => doodadTypeFromSelection(treeMix, index + 1))), new Set(treeMix),
     "procedural placement varies across every species in the selected tree mix");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.draft.doodads = [
+    { id: 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 32, y: 32 },
+    { id: 3, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_PINE, x: 96, y: 32 },
+  ];
+  session.beginDoodadStroke("Placed mixed batch");
+  const added = session.placeDoodadRecords([
+    { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE, x: 160, y: 32 },
+    { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER, x: 224, y: 32 },
+  ]);
+  assert.deepEqual(added.map(({ id, typeId }) => ({ id, typeId })), [
+    { id: 2, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_SPRUCE },
+    { id: 4, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_ALDER },
+  ], "mixed-species batches retain smallest-free stable ids across existing holes");
+  session.cancelDoodadStroke();
 }
 
 {

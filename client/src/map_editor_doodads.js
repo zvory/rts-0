@@ -73,8 +73,7 @@ export function normalizeMapEditorDoodads(records, worldDimensions, { max = MAP_
 
 export function allocateMapEditorDoodadId(records, existing = null) {
   const used = existing || new Set((records || []).map((record) => positiveSafeInteger(record?.id)).filter(Boolean));
-  for (let id = 1; id <= MAX_U32; id += 1) if (!used.has(id)) return id;
-  return 0;
+  return firstAvailableDoodadId(used);
 }
 
 export function createMapEditorDoodads(draft, placements, {
@@ -83,18 +82,31 @@ export function createMapEditorDoodads(draft, placements, {
   max = MAP_EDITOR_MAX_DOODADS,
 } = {}) {
   if (!Array.isArray(draft?.doodads) || !Array.isArray(placements) || !isMapEditorDoodadType(typeId)) return [];
+  return createMapEditorDoodadRecords(
+    draft,
+    placements.map((placement) => ({ ...placement, typeId, color })),
+    { max },
+  );
+}
+
+export function createMapEditorDoodadRecords(draft, placements, {
+  max = MAP_EDITOR_MAX_DOODADS,
+} = {}) {
+  if (!Array.isArray(draft?.doodads) || !Array.isArray(placements)) return [];
   const dimensions = draftWorldDimensions(draft);
   const available = Math.max(0, Math.min(MAP_EDITOR_MAX_DOODADS, max) - draft.doodads.length);
   if (!dimensions || !available) return [];
   const used = new Set(draft.doodads.map((record) => record.id));
+  let nextId = firstAvailableDoodadId(used);
   const added = [];
   for (const placement of placements) {
     if (added.length >= available) break;
-    const fields = normalizedDoodadFields({ ...placement, typeId, color }, dimensions);
+    const fields = normalizedDoodadFields(placement, dimensions);
     if (!fields) continue;
-    const id = allocateMapEditorDoodadId(draft.doodads, used);
+    const id = nextId;
     if (!id) break;
     used.add(id);
+    nextId = firstAvailableDoodadId(used, id + 1);
     const record = { id, ...fields };
     draft.doodads.push(record);
     added.push(record);
@@ -221,21 +233,52 @@ export function extendDoodadDragStroke(stroke, point) {
   return placements;
 }
 
-export function spacedTreePlacements(records, placements, minSpacing = MAP_EDITOR_TREE_MIN_SPACING) {
+/** Build one spacing index for a placement update; rejected groups never enter the index. */
+export function createTreePlacementFilter(records, minSpacing = MAP_EDITOR_TREE_MIN_SPACING) {
   const spacing = Math.max(0, Number(minSpacing) || 0);
   const squared = spacing * spacing;
-  const retained = (records || [])
-    .filter((record) => isTreeDoodadType(record?.typeId))
-    .map(({ x, y }) => ({ x, y }));
-  const accepted = [];
-  for (const placement of placements || []) {
-    const point = finitePoint(placement);
-    if (!point) continue;
-    if (retained.some((other) => (other.x - point.x) ** 2 + (other.y - point.y) ** 2 < squared)) continue;
-    accepted.push(point);
-    retained.push(point);
+  const cellSize = Math.max(1, spacing);
+  const buckets = new Map();
+
+  const add = (point) => {
+    const key = treeSpacingBucketKey(point, cellSize);
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(point);
+    else buckets.set(key, [point]);
+  };
+  const conflicts = (point) => {
+    if (spacing <= 0) return false;
+    const cellX = Math.floor(point.x / cellSize);
+    const cellY = Math.floor(point.y / cellSize);
+    for (let y = cellY - 1; y <= cellY + 1; y += 1) {
+      for (let x = cellX - 1; x <= cellX + 1; x += 1) {
+        for (const other of buckets.get(`${x},${y}`) || []) {
+          if ((other.x - point.x) ** 2 + (other.y - point.y) ** 2 < squared) return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  for (const record of records || []) {
+    if (!isTreeDoodadType(record?.typeId)) continue;
+    const point = finitePoint(record);
+    if (point) add(point);
   }
-  return accepted;
+
+  return Object.freeze({
+    acceptGroup(placements) {
+      const candidates = (placements || []).map(finitePoint).filter(Boolean);
+      const pending = [];
+      for (const point of candidates) {
+        if (conflicts(point)) return [];
+        if (pending.some((other) => (other.x - point.x) ** 2 + (other.y - point.y) ** 2 < squared)) return [];
+        pending.push(point);
+      }
+      for (const point of pending) add(point);
+      return pending;
+    },
+  });
 }
 
 export function doodadTypeFromSelection(typeIds, seed = 1) {
@@ -289,6 +332,15 @@ function hashUnit(seed, index) {
   value = Math.imul(value, 0x735a2d97);
   value ^= value >>> 15;
   return (value >>> 0) / 0x100000000;
+}
+
+function treeSpacingBucketKey(point, cellSize) {
+  return `${Math.floor(point.x / cellSize)},${Math.floor(point.y / cellSize)}`;
+}
+
+function firstAvailableDoodadId(used, start = 1) {
+  for (let id = start; id <= MAX_U32; id += 1) if (!used.has(id)) return id;
+  return 0;
 }
 
 function normalizedWorldDimensions(value) {
