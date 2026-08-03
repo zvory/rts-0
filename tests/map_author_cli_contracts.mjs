@@ -6,6 +6,11 @@ import { spawnSync } from "node:child_process";
 
 import { buildMapFromRecipe, renderPreviewSvg, validateMap } from "../scripts/map-author.mjs";
 
+const repoRoot = new URL("../", import.meta.url);
+const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.rs", repoRoot), "utf8");
+const currentServerMapVersion = Number(serverMapSource.match(/CURRENT_MAP_VERSION:\s*u32\s*=\s*(\d+)/)?.[1]);
+assert(Number.isSafeInteger(currentServerMapVersion), "test reads the authoritative server map version");
+
 const recipe = {
   name: "CLI Contract",
   width: 32,
@@ -20,7 +25,7 @@ const recipe = {
 };
 
 const map = buildMapFromRecipe(recipe);
-assert.equal(map.version, 6);
+assert.equal(map.version, currentServerMapVersion);
 assert.equal(map.width, 32);
 assert.equal(map.height, 32);
 assert.equal(map.startLocations.length, 2);
@@ -41,6 +46,46 @@ const preview = renderPreviewSvg(map, { tilePixels: 3 });
 assert(preview.startsWith("<svg"));
 assert(preview.includes(">1</text>"));
 
+const malformedValidation = validateMap({
+  version: currentServerMapVersion,
+  width: 20,
+  height: 20,
+  terrain: {},
+  startLocations: [null],
+  baseSites: [{ x: 8, y: 8, steelPatches: -1, oilPatches: 10 }],
+  doodads: null,
+  stealthTiles: [{ x: "1", y: 2 }],
+  unsupportedRootField: true,
+});
+assert(malformedValidation.warnings.some((warning) => warning.includes("terrain has")));
+assert(malformedValidation.warnings.some((warning) => warning.includes("start location 0")));
+assert(malformedValidation.warnings.some((warning) => warning.includes("steelPatches")));
+assert(malformedValidation.warnings.some((warning) => warning.includes("oilPatches")));
+assert(malformedValidation.warnings.some((warning) => warning.includes("doodads must be an array")));
+assert(malformedValidation.warnings.some((warning) => warning.includes("stealthTiles[0]")));
+assert(malformedValidation.warnings.some((warning) => warning.includes("unsupportedRootField")));
+assert.deepEqual(validateMap(null).warnings, ["map must be a JSON object"]);
+
+const injectedPreview = renderPreviewSvg({
+  name: "Preview safety",
+  width: 2,
+  height: 2,
+  terrain: ["..", ".."],
+  startLocations: [],
+  baseSites: [{ x: '0\" onmouseover=\"alert(1)', y: 0 }],
+});
+assert(!injectedPreview.includes("onmouseover"), "preview omits non-numeric site coordinates");
+assert.throws(
+  () => buildMapFromRecipe({ width: 257, height: 1 }),
+  /at most 256 tiles/,
+  "recipe dimensions are bounded to the server-supported maximum",
+);
+assert.throws(
+  () => buildMapFromRecipe({ width: 12.5, height: 1 }),
+  /positive integers/,
+  "recipe dimensions are not silently truncated",
+);
+
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-map-author-test-"));
 try {
   const recipePath = path.join(tempRoot, "recipe.json");
@@ -49,7 +94,7 @@ try {
   fs.writeFileSync(recipePath, JSON.stringify(recipe));
 
   const build = spawnSync(process.execPath, ["scripts/map-author.mjs", "build", recipePath, "--output", mapPath], {
-    cwd: new URL("../", import.meta.url),
+    cwd: repoRoot,
     encoding: "utf8",
   });
   assert.equal(build.status, 0, build.stderr);
@@ -57,14 +102,14 @@ try {
   assert(fs.existsSync(mapPath));
 
   const validate = spawnSync(process.execPath, ["scripts/map-author.mjs", "validate", mapPath, "--symmetry", "halfTurn"], {
-    cwd: new URL("../", import.meta.url),
+    cwd: repoRoot,
     encoding: "utf8",
   });
   assert.equal(validate.status, 0, validate.stderr);
   assert(validate.stdout.includes("protected area"));
 
   const render = spawnSync(process.execPath, ["scripts/map-author.mjs", "preview", mapPath, "--output", previewPath], {
-    cwd: new URL("../", import.meta.url),
+    cwd: repoRoot,
     encoding: "utf8",
   });
   assert.equal(render.status, 0, render.stderr);

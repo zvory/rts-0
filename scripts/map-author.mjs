@@ -22,6 +22,27 @@ const KNOWN_TERRAIN = new Set([...Object.values(TERRAIN), ..."0123456789"]);
 const DEFAULT_STEEL_PATCHES = 12;
 const DEFAULT_OIL_PATCHES = 3;
 const CURRENT_MAP_VERSION = 6;
+const MAX_MAP_DIMENSION_TILES = 256;
+const MAX_STEEL_PATCHES_PER_BASE = 36;
+const MAX_OIL_PATCHES_PER_BASE = 9;
+const MAX_MAP_DOODADS = 4_096;
+const MAP_TILE_SIZE_PX = 32;
+const DOODAD_TYPES = new Set([
+  "tree.oak",
+  "tree.pine",
+  "tree.spruce",
+  "tree.alder",
+  "wildflower.single",
+  "wildflower.cluster",
+  "unit.tank_trap",
+]);
+const MAP_FIELDS = new Set([
+  "version", "name", "description", "width", "height", "terrain", "startLocations",
+  "baseSites", "_design", "doodads", "stealthTiles", "noVehicleTiles",
+]);
+const START_FIELDS = new Set(["x", "y"]);
+const BASE_FIELDS = new Set(["x", "y", "steelPatches", "oilPatches"]);
+const DOODAD_FIELDS = new Set(["id", "typeId", "x", "y", "color"]);
 const SVG_COLORS = Object.freeze({
   ".": "#668b4b",
   "#": "#77756f",
@@ -56,8 +77,12 @@ function terrainCharacter(material) {
   return character;
 }
 
-function locationKey({ x, y }) {
-  return `${x},${y}`;
+function locationKey(record) {
+  return `${record?.x},${record?.y}`;
+}
+
+function isUint32(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
 }
 
 function inBounds(width, height, x, y) {
@@ -262,9 +287,14 @@ function applyOperation(map, grid, operation, defaultSymmetry) {
 
 export function buildMapFromRecipe(recipe) {
   if (!recipe || typeof recipe !== "object") throw new Error("Recipe must be a JSON object");
-  const width = integer(recipe.width);
-  const height = integer(recipe.height);
-  if (width <= 0 || height <= 0) throw new Error("Recipe width and height must be positive integers");
+  const width = number(recipe.width);
+  const height = number(recipe.height);
+  if (!isUint32(width) || !isUint32(height) || width <= 0 || height <= 0) {
+    throw new Error("Recipe width and height must be positive integers");
+  }
+  if (width > MAX_MAP_DIMENSION_TILES || height > MAX_MAP_DIMENSION_TILES) {
+    throw new Error(`Recipe width and height must each be at most ${MAX_MAP_DIMENSION_TILES} tiles`);
+  }
   const background = terrainCharacter(recipe.background || "grass");
   const grid = Array.from({ length: height }, () => Array(width).fill(background));
   const map = {
@@ -289,6 +319,7 @@ export function buildMapFromRecipe(recipe) {
 function connectedRegions(map) {
   const width = integer(map.width);
   const height = integer(map.height);
+  if (width <= 0 || height <= 0 || width > MAX_MAP_DIMENSION_TILES || height > MAX_MAP_DIMENSION_TILES) return [];
   if (!Array.isArray(map.terrain) || map.terrain.length !== height) return [];
   const visited = new Uint8Array(Math.max(0, width * height));
   const regions = [];
@@ -321,7 +352,11 @@ function connectedRegions(map) {
 
 function terrainCounts(map) {
   const counts = new Map();
-  for (const character of (map.terrain || []).join("")) counts.set(character, (counts.get(character) || 0) + 1);
+  const rows = Array.isArray(map?.terrain) ? map.terrain : [];
+  for (const row of rows) {
+    if (typeof row !== "string") continue;
+    for (const character of row) counts.set(character, (counts.get(character) || 0) + 1);
+  }
   return Object.fromEntries([...counts.entries()].sort(([left], [right]) => left.localeCompare(right)));
 }
 
@@ -339,52 +374,146 @@ export function validateMap(map, { symmetry = "none" } = {}) {
   const warnings = [];
   const width = integer(map?.width);
   const height = integer(map?.height);
+  if (!map || typeof map !== "object" || Array.isArray(map)) {
+    return {
+      warnings: ["map must be a JSON object"],
+      summary: { width: 0, height: 0, starts: 0, bases: 0, regions: 0, largestRegionTiles: 0, passablePercent: 0, terrain: {} },
+    };
+  }
   if (map?.version !== CURRENT_MAP_VERSION) {
     warnings.push(`schema version is ${JSON.stringify(map?.version)}; the current server expects ${CURRENT_MAP_VERSION}`);
   }
-  if (width <= 0 || height <= 0) warnings.push("width and height should be positive integers");
+  if (!isUint32(map.width) || !isUint32(map.height) || width <= 0 || height <= 0) {
+    warnings.push("width and height must be positive unsigned integers");
+  } else if (width > MAX_MAP_DIMENSION_TILES || height > MAX_MAP_DIMENSION_TILES) {
+    warnings.push(`width and height must each be at most ${MAX_MAP_DIMENSION_TILES} tiles`);
+  }
+  for (const [field, value] of [["name", map.name], ["description", map.description], ["_design", map._design]]) {
+    if (typeof value !== "string") warnings.push(`${field} must be a string`);
+  }
+  for (const field of Object.keys(map)) {
+    if (!MAP_FIELDS.has(field)) warnings.push(`map has unsupported field ${JSON.stringify(field)}`);
+  }
   if (!Array.isArray(map?.terrain) || map.terrain.length !== height) warnings.push(`terrain has ${map?.terrain?.length ?? 0} rows; height is ${height}`);
-  for (let y = 0; y < (map?.terrain || []).length; y += 1) {
-    const row = map.terrain[y];
+  const terrainRows = Array.isArray(map.terrain) ? map.terrain : [];
+  for (let y = 0; y < terrainRows.length; y += 1) {
+    const row = terrainRows[y];
     if (typeof row !== "string" || [...row].length !== width) warnings.push(`terrain row ${y} does not contain ${width} tiles`);
     for (const character of typeof row === "string" ? row : "") {
       if (!KNOWN_TERRAIN.has(character)) warnings.push(`terrain row ${y} contains unknown character ${JSON.stringify(character)}`);
     }
   }
-  const starts = Array.isArray(map?.startLocations) ? map.startLocations : [];
-  const bases = Array.isArray(map?.baseSites) ? map.baseSites : [];
+  const starts = Array.isArray(map.startLocations) ? map.startLocations : [];
+  const bases = Array.isArray(map.baseSites) ? map.baseSites : [];
+  if (!Array.isArray(map.startLocations)) warnings.push("startLocations must be an array");
+  if (!Array.isArray(map.baseSites)) warnings.push("baseSites must be an array");
   if (starts.length < 1 || starts.length > 4) warnings.push(`map has ${starts.length} start locations; the current server accepts 1 to 4`);
   if (bases.length < 1 || bases.length > 32) warnings.push(`map has ${bases.length} base sites; the current server accepts 1 to 32`);
-  const baseKeys = new Set(bases.map(locationKey));
-  for (const start of starts) if (!baseKeys.has(locationKey(start))) warnings.push(`start (${start.x},${start.y}) is not also a base site`);
+  const validStarts = starts.filter((location) => location && isUint32(location.x) && isUint32(location.y));
+  const validBases = bases.filter((location) => location && isUint32(location.x) && isUint32(location.y));
+  const baseKeys = new Set(validBases.map(locationKey));
+  for (const start of validStarts) if (!baseKeys.has(locationKey(start))) warnings.push(`start (${start.x},${start.y}) is not also a base site`);
   for (const [kind, locations] of [["start", starts], ["base", bases]]) {
     const seen = new Set();
-    for (const location of locations) {
+    for (const [index, location] of locations.entries()) {
+      if (!location || typeof location !== "object" || !isUint32(location.x) || !isUint32(location.y)) {
+        warnings.push(`${kind} location ${index} must have unsigned integer x and y`);
+        continue;
+      }
       const key = locationKey(location);
       if (seen.has(key)) warnings.push(`${kind} location (${key}) is duplicated`);
       seen.add(key);
       if (!inBounds(width, height, location.x, location.y)) warnings.push(`${kind} location (${key}) is outside the map`);
+      const allowedFields = kind === "base" ? BASE_FIELDS : START_FIELDS;
+      for (const field of Object.keys(location)) {
+        if (!allowedFields.has(field)) warnings.push(`${kind} location ${index} has unsupported field ${JSON.stringify(field)}`);
+      }
     }
   }
-  const startKeys = new Set(starts.map(locationKey));
-  for (const site of bases) {
+  for (const [index, site] of bases.entries()) {
+    if (!site || typeof site !== "object") continue;
+    for (const [field, maximum] of [["steelPatches", MAX_STEEL_PATCHES_PER_BASE], ["oilPatches", MAX_OIL_PATCHES_PER_BASE]]) {
+      if (!isUint32(site[field]) || site[field] > maximum) {
+        warnings.push(`base site ${index} ${field} must be an unsigned integer from 0 to ${maximum}`);
+      }
+    }
+  }
+  const startKeys = new Set(validStarts.map(locationKey));
+  const terrainIsRectangular = terrainRows.length === height && terrainRows.every((row) => typeof row === "string" && [...row].length === width);
+  for (const site of validBases) {
+    if (!terrainIsRectangular || !inBounds(width, height, site.x, site.y)) continue;
     const blocked = blockedClearance(map, site, startKeys.has(locationKey(site)) ? 7 : 4);
     if (blocked) warnings.push(`base (${site.x},${site.y}) has ${blocked.reason} in its protected area at (${blocked.x},${blocked.y})`);
   }
-  const regions = connectedRegions(map);
-  if (regions.length > 1) warnings.push(`passable terrain has ${regions.length} disconnected regions (${regions.slice(0, 5).join(", ")} tiles${regions.length > 5 ? ", …" : ""})`);
-  if (symmetry === "halfTurn" && width > 0 && height > 0) {
-    let terrainMismatches = 0;
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        if (map.terrain[y]?.[x] !== map.terrain[height - 1 - y]?.[width - 1 - x]) terrainMismatches += 1;
+  for (const field of ["stealthTiles", "noVehicleTiles"]) {
+    const locations = map[field] === undefined ? [] : map[field];
+    if (!Array.isArray(locations)) {
+      warnings.push(`${field} must be an array`);
+      continue;
+    }
+    const seen = new Set();
+    for (const [index, location] of locations.entries()) {
+      if (!location || typeof location !== "object" || !isUint32(location.x) || !isUint32(location.y)) {
+        warnings.push(`${field}[${index}] must have unsigned integer x and y`);
+        continue;
+      }
+      const key = locationKey(location);
+      if (seen.has(key)) warnings.push(`${field}[${index}] duplicates (${key})`);
+      seen.add(key);
+      if (!inBounds(width, height, location.x, location.y)) warnings.push(`${field}[${index}] is outside the map at (${key})`);
+      for (const locationField of Object.keys(location)) {
+        if (!START_FIELDS.has(locationField)) warnings.push(`${field}[${index}] has unsupported field ${JSON.stringify(locationField)}`);
       }
     }
-    if (terrainMismatches) warnings.push(`terrain has ${Math.ceil(terrainMismatches / 2)} half-turn symmetry mismatches`);
-    for (const [kind, locations] of [["start", starts], ["base", bases]]) {
-      const keys = new Set(locations.map(locationKey));
-      const missing = locations.filter((location) => !keys.has(`${width - 1 - location.x},${height - 1 - location.y}`));
-      if (missing.length) warnings.push(`${kind} locations have ${missing.length} missing half-turn partners`);
+  }
+  const doodads = map.doodads === undefined ? [] : map.doodads;
+  if (!Array.isArray(doodads)) {
+    warnings.push("doodads must be an array");
+  } else {
+    if (doodads.length > MAX_MAP_DOODADS) warnings.push(`doodads must contain at most ${MAX_MAP_DOODADS} entries`);
+    const ids = new Set();
+    for (const [index, doodad] of doodads.entries()) {
+      if (!doodad || typeof doodad !== "object") {
+        warnings.push(`doodads[${index}] must be an object`);
+        continue;
+      }
+      for (const field of Object.keys(doodad)) {
+        if (!DOODAD_FIELDS.has(field)) warnings.push(`doodads[${index}] has unsupported field ${JSON.stringify(field)}`);
+      }
+      if (!isUint32(doodad.id) || doodad.id === 0 || ids.has(doodad.id)) warnings.push(`doodads[${index}].id must be a unique nonzero unsigned integer`);
+      ids.add(doodad.id);
+      if (!DOODAD_TYPES.has(doodad.typeId)) warnings.push(`doodads[${index}].typeId is not in the server catalog`);
+      if (!isUint32(doodad.x) || !isUint32(doodad.y)) {
+        warnings.push(`doodads[${index}] must have unsigned integer x and y`);
+      } else if (doodad.x >= width * MAP_TILE_SIZE_PX || doodad.y >= height * MAP_TILE_SIZE_PX) {
+        warnings.push(`doodads[${index}] is outside the map at (${doodad.x},${doodad.y})`);
+      }
+      if (doodad.typeId === "unit.tank_trap" && (doodad.x % MAP_TILE_SIZE_PX !== MAP_TILE_SIZE_PX / 2 || doodad.y % MAP_TILE_SIZE_PX !== MAP_TILE_SIZE_PX / 2)) {
+        warnings.push(`doodads[${index}] tank trap must be centered on a map tile`);
+      }
+      if (doodad.color != null) {
+        const isFlower = doodad.typeId === "wildflower.single" || doodad.typeId === "wildflower.cluster";
+        if (!isFlower) warnings.push(`doodads[${index}].color is only allowed for wildflowers`);
+        else if (typeof doodad.color !== "string" || !/^#[0-9a-f]{6}$/.test(doodad.color)) warnings.push(`doodads[${index}].color must use canonical lowercase #rrggbb`);
+      }
+    }
+  }
+  const regions = connectedRegions(map);
+  if (regions.length > 1) warnings.push(`passable terrain has ${regions.length} disconnected regions (${regions.slice(0, 5).join(", ")} tiles${regions.length > 5 ? ", …" : ""})`);
+  if (symmetry === "halfTurn") {
+    if (width > 0 && height > 0 && width <= MAX_MAP_DIMENSION_TILES && height <= MAX_MAP_DIMENSION_TILES && terrainIsRectangular) {
+      let terrainMismatches = 0;
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          if (map.terrain[y]?.[x] !== map.terrain[height - 1 - y]?.[width - 1 - x]) terrainMismatches += 1;
+        }
+      }
+      if (terrainMismatches) warnings.push(`terrain has ${Math.ceil(terrainMismatches / 2)} half-turn symmetry mismatches`);
+      for (const [kind, locations] of [["start", validStarts], ["base", validBases]]) {
+        const keys = new Set(locations.map(locationKey));
+        const missing = locations.filter((location) => !keys.has(`${width - 1 - location.x},${height - 1 - location.y}`));
+        if (missing.length) warnings.push(`${kind} locations have ${missing.length} missing half-turn partners`);
+      }
     }
   } else if (symmetry !== "none") {
     warnings.push(`symmetry check ${JSON.stringify(symmetry)} is not implemented`);
@@ -411,6 +540,10 @@ function xml(value) {
 }
 
 export function renderPreviewSvg(map, { tilePixels = 5 } = {}) {
+  if (!isUint32(map?.width) || !isUint32(map?.height) || map.width < 1 || map.height < 1
+    || map.width > MAX_MAP_DIMENSION_TILES || map.height > MAX_MAP_DIMENSION_TILES) {
+    throw new Error(`Preview width and height must be unsigned integers from 1 to ${MAX_MAP_DIMENSION_TILES}`);
+  }
   const scale = Math.max(1, integer(tilePixels, 5));
   const width = integer(map.width);
   const height = integer(map.height);
@@ -434,8 +567,14 @@ export function renderPreviewSvg(map, { tilePixels = 5 } = {}) {
       startX = endX;
     }
   }
-  const starts = new Set((map.startLocations || []).map(locationKey));
-  for (const [index, site] of (map.baseSites || []).entries()) {
+  const validStarts = Array.isArray(map.startLocations)
+    ? map.startLocations.filter((site) => Number.isFinite(site?.x) && Number.isFinite(site?.y))
+    : [];
+  const starts = new Set(validStarts.map(locationKey));
+  const baseSites = Array.isArray(map.baseSites)
+    ? map.baseSites.filter((site) => Number.isFinite(site?.x) && Number.isFinite(site?.y))
+    : [];
+  for (const [index, site] of baseSites.entries()) {
     const isStart = starts.has(locationKey(site));
     elements.push(`<circle cx="${site.x + 0.5}" cy="${site.y + 0.5}" r="${isStart ? 4.2 : 3.2}" fill="${isStart ? "#f36f38" : "#f2d057"}" stroke="#161b20" stroke-width="0.8"/>`);
     elements.push(`<text x="${site.x + 0.5}" y="${site.y + 1.7}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="3.4" font-weight="700" fill="#161b20">${index + 1}</text>`);
