@@ -3,52 +3,8 @@ import {
   COLORS,
   MAIN_MAP_FOG_EXPLORED_ALPHA,
   MAIN_MAP_FOG_UNEXPLORED_ALPHA,
-  STATS,
-  PLAYER_PALETTE,
-  RESOURCE_AMOUNTS,
-  ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
-  ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
-  isProducerBuilding,
 } from "../config.js";
-import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
-import {
-  DEPLOYED_WEAPON_ANIM_MS,
-  SWEEP_EVICT_FRAMES,
-  WEAPON_RECOIL_PX,
-  ZERO_OFFSET,
-} from "./palette.js";
-import {
-  angleDelta,
-  clamp01,
-  dashedLine,
-  drawAntiTankGun,
-  drawFacingWedge,
-  drawInfantryBase,
-  drawInfantryMachineGun,
-  drawInfantryRifle,
-  drawRotatedRect,
-  drawScoutCar,
-  drawTankFuelCue,
-  drawTankHull,
-  drawTankTracks,
-  finiteNumber,
-  hexToInt,
-  isVehicleBodyKind,
-  muzzleFlashRadius,
-  normRect,
-  polar,
-  recoilVector,
-  rectEdgePointTowardCenter,
-  smoothstep01,
-  tankBodyVisual,
-  weaponRecoilOffset,
-} from "./shared.js";
-import {
-  drawImpassableEdge,
-  isImpassableAt,
-  terrainColor,
-  terrainOverlayColor,
-} from "./terrain_palette.js";
+import { isImpassableAt } from "./terrain_palette.js";
 
 export function _drawFog(fog) {
   const g = this._fogGfx;

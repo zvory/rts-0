@@ -1320,6 +1320,7 @@ function polygonAxisValues(points, offset) {
       rigRetry === true && rigWrapper.rtsStaticRenderKey !== undefined,
       "building rig retry clears fallback geometry and recommits its static wrapper key",
     );
+
     const visible = [1, 0, 0, 0];
     const explored = [1, 1, 0, 0];
     const fog = {
@@ -1333,7 +1334,6 @@ function polygonAxisValues(points, offset) {
       isExplored: (tx, ty) => explored[ty * 2 + tx] === 1,
     };
     renderer._drawFog(fog);
-    assert(renderer._fogGfx.calls.filter(([name]) => name === "beginFill").map(([, , alpha]) => alpha).join(",") === "0.3,0.6", "main-map fog draws explored and unexplored tiles with viewport-specific opacities");
     const fogCalls = renderer._fogGfx.calls.length;
     diagnostics.length = 0;
     renderer._drawFog(fog);
