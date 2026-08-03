@@ -1,5 +1,6 @@
 import { PASSABLE, TERRAIN } from "./protocol.js";
 import {
+  createMapEditorDoodadRecords,
   createMapEditorDoodads,
   MAP_EDITOR_MAX_DOODADS,
   normalizeMapEditorDoodads,
@@ -393,11 +394,23 @@ export class MapEditorSession {
     if (!this.draft || !this.doodadStroke) return [];
     const bounded = (placements || []).filter((point) => draftContainsWorldPoint(this.draft, point));
     const added = createMapEditorDoodads(this.draft, bounded, options);
+    this.recordDoodadUpserts(added);
+    return added;
+  }
+
+  placeDoodadRecords(placements) {
+    if (!this.draft || !this.doodadStroke) return [];
+    const bounded = (placements || []).filter((point) => draftContainsWorldPoint(this.draft, point));
+    const added = createMapEditorDoodadRecords(this.draft, bounded);
+    this.recordDoodadUpserts(added);
+    return added;
+  }
+
+  recordDoodadUpserts(added) {
     for (const record of added) {
       this.doodadStroke.removedIds.delete(record.id);
       this.doodadStroke.upserts.set(record.id, clone(record));
     }
-    return added;
   }
 
   removeDoodads(ids) {

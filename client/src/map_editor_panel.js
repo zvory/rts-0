@@ -8,6 +8,7 @@ import {
   MAP_EDITOR_DOODAD_CATALOG,
   MAP_EDITOR_DOODAD_TYPES,
   MAP_EDITOR_MAX_DOODADS,
+  isTreeDoodadType,
   isWildflowerDoodadType,
 } from "./map_editor_doodads.js";
 import {
@@ -63,6 +64,7 @@ export class MapEditorPanel {
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
     this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.TREE_OAK;
+    this.selectedTreeTypes = new Set([MAP_EDITOR_DOODAD_TYPES.TREE_OAK]);
     this.doodadMode = "place";
     this.doodadColor = MAP_EDITOR_DEFAULT_FLOWER_COLOR;
     this.doodadRadius = 48;
@@ -513,26 +515,24 @@ export class MapEditorPanel {
   }
 
   renderDoodads() {
-    const section = group("Doodads");
+    const section = group(`Doodads (${this.session.draft.doodads.length} / ${MAP_EDITOR_MAX_DOODADS})`);
     const trees = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "tree");
     const flowers = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "wildflower");
     const neutralUnits = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "neutral-unit");
-    const treePalette = this.renderDoodadPalette(trees);
+    const treePalette = this.renderDoodadPalette(trees, { multiple: true });
     const flowerPalette = this.renderDoodadPalette(flowers);
     const neutralUnitPalette = this.renderDoodadPalette(neutralUnits);
 
     const tools = document.createElement("div");
     tools.className = "map-editor-palette";
     tools.append(
-      button("Place one", () => this.armDoodad("place"), {
+      button("Place / drag", () => this.armDoodad("place"), {
         active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "place",
       }),
-      button("Spray flowers", () => {
-        if (!isWildflowerDoodadType(this.selectedDoodadType)) {
-          this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE;
-        }
-        this.armDoodad("spray");
-      }, { active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "spray" }),
+      button("Spray", () => this.armDoodad("spray"), {
+        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "spray",
+        disabled: !isTreeDoodadType(this.selectedDoodadType) && !isWildflowerDoodadType(this.selectedDoodadType),
+      }),
       button("Remove doodads", () => this.armDoodad("remove"), {
         active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "remove",
       }),
@@ -562,7 +562,6 @@ export class MapEditorPanel {
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Wildflower spray density");
     section.append(
-      readout(`${this.session.draft.doodads.length}/${MAP_EDITOR_MAX_DOODADS} doodads. Tree species are visual variants of one semantic tree type; tank traps spawn as completed neutral units.`),
       readout("Trees"),
       treePalette,
       readout("Wildflowers"),
@@ -578,19 +577,32 @@ export class MapEditorPanel {
     return section;
   }
 
-  renderDoodadPalette(entries) {
+  renderDoodadPalette(entries, { multiple = false } = {}) {
     const palette = document.createElement("div");
     palette.className = "map-editor-palette map-editor-doodad-palette";
     for (const entry of entries) {
       palette.appendChild(button(entry.label, () => {
-        this.selectedDoodadType = entry.typeId;
-        if (!isWildflowerDoodadType(entry.typeId)) this.doodadMode = "place";
+        if (multiple) {
+          if (this.selectedTreeTypes.has(entry.typeId) && this.selectedTreeTypes.size > 1) {
+            this.selectedTreeTypes.delete(entry.typeId);
+            this.selectedDoodadType = this.selectedTreeTypes.values().next().value;
+          } else {
+            this.selectedTreeTypes.add(entry.typeId);
+            this.selectedDoodadType = entry.typeId;
+          }
+        } else this.selectedDoodadType = entry.typeId;
+        if (!multiple && !isWildflowerDoodadType(entry.typeId)) this.doodadMode = "place";
         this.armDoodad(this.doodadMode);
-        this.setStatus(`Placing ${entry.label.toLowerCase()}.`);
+        this.setStatus(multiple
+          ? `Tree mix: ${this.selectedTreeTypes.size} species selected.`
+          : `Placing ${entry.label.toLowerCase()}.`);
       }, {
-        active: this.viewport.tool?.kind === "doodad"
-          && !["remove", "erase"].includes(this.viewport.tool?.mode)
-          && this.selectedDoodadType === entry.typeId,
+        active: multiple
+          ? this.selectedTreeTypes.has(entry.typeId)
+          : this.viewport.tool?.kind === "doodad"
+            && !["remove", "erase"].includes(this.viewport.tool?.mode)
+            && this.selectedDoodadType === entry.typeId,
+        pressed: multiple ? this.selectedTreeTypes.has(entry.typeId) : null,
       }));
     }
     return palette;
@@ -682,6 +694,9 @@ export class MapEditorPanel {
       kind: "doodad",
       mode: this.doodadMode,
       typeId: this.selectedDoodadType,
+      typeIds: isTreeDoodadType(this.selectedDoodadType)
+        ? [...this.selectedTreeTypes]
+        : [this.selectedDoodadType],
       color: isWildflowerDoodadType(this.selectedDoodadType) ? this.doodadColor : null,
       radius: this.doodadRadius,
       density: this.doodadDensity,
@@ -1056,13 +1071,14 @@ function group(title) {
   return section;
 }
 
-function button(label, onClick, { disabled = false, active = false, title = "", className = "" } = {}) {
+function button(label, onClick, { disabled = false, active = false, pressed = null, title = "", className = "" } = {}) {
   const control = document.createElement("button");
   control.type = "button";
   control.className = `map-editor-button ${className}`.trim();
   control.textContent = label;
   control.disabled = !!disabled;
   control.dataset.active = active ? "true" : "false";
+  if (pressed != null) control.setAttribute("aria-pressed", String(!!pressed));
   if (title) control.title = title;
   control.addEventListener("click", onClick);
   return control;

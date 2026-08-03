@@ -2,6 +2,7 @@ import { DOODAD_TYPE, DOODAD_TYPE_IDS } from "./config.js";
 import { expandSymmetricPoints } from "./map_authoring/symmetry.js";
 
 export const MAP_EDITOR_MAX_DOODADS = 4096;
+export const MAP_EDITOR_TREE_MIN_SPACING = 64;
 export const MAP_EDITOR_DEFAULT_FLOWER_COLOR = "#e8b84a";
 export const MAP_EDITOR_DOODAD_TYPES = DOODAD_TYPE;
 export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
@@ -23,6 +24,10 @@ export function isMapEditorDoodadType(typeId) {
 
 export function isWildflowerDoodadType(typeId) {
   return typeof typeId === "string" && typeId.startsWith("wildflower.") && TYPE_IDS.has(typeId);
+}
+
+export function isTreeDoodadType(typeId) {
+  return typeof typeId === "string" && typeId.startsWith("tree.") && TYPE_IDS.has(typeId);
 }
 
 export function isTankTrapDoodadType(typeId) {
@@ -68,8 +73,7 @@ export function normalizeMapEditorDoodads(records, worldDimensions, { max = MAP_
 
 export function allocateMapEditorDoodadId(records, existing = null) {
   const used = existing || new Set((records || []).map((record) => positiveSafeInteger(record?.id)).filter(Boolean));
-  for (let id = 1; id <= MAX_U32; id += 1) if (!used.has(id)) return id;
-  return 0;
+  return firstAvailableDoodadId(used);
 }
 
 export function createMapEditorDoodads(draft, placements, {
@@ -78,18 +82,31 @@ export function createMapEditorDoodads(draft, placements, {
   max = MAP_EDITOR_MAX_DOODADS,
 } = {}) {
   if (!Array.isArray(draft?.doodads) || !Array.isArray(placements) || !isMapEditorDoodadType(typeId)) return [];
+  return createMapEditorDoodadRecords(
+    draft,
+    placements.map((placement) => ({ ...placement, typeId, color })),
+    { max },
+  );
+}
+
+export function createMapEditorDoodadRecords(draft, placements, {
+  max = MAP_EDITOR_MAX_DOODADS,
+} = {}) {
+  if (!Array.isArray(draft?.doodads) || !Array.isArray(placements)) return [];
   const dimensions = draftWorldDimensions(draft);
   const available = Math.max(0, Math.min(MAP_EDITOR_MAX_DOODADS, max) - draft.doodads.length);
   if (!dimensions || !available) return [];
   const used = new Set(draft.doodads.map((record) => record.id));
+  let nextId = firstAvailableDoodadId(used);
   const added = [];
   for (const placement of placements) {
     if (added.length >= available) break;
-    const fields = normalizedDoodadFields({ ...placement, typeId, color }, dimensions);
+    const fields = normalizedDoodadFields(placement, dimensions);
     if (!fields) continue;
-    const id = allocateMapEditorDoodadId(draft.doodads, used);
+    const id = nextId;
     if (!id) break;
     used.add(id);
+    nextId = firstAvailableDoodadId(used, id + 1);
     const record = { id, ...fields };
     draft.doodads.push(record);
     added.push(record);
@@ -183,6 +200,94 @@ export function extendDoodadSprayStroke(stroke, point) {
   return placements;
 }
 
+/** Stateful fixed-distance line sampler used by click-and-drag placement. */
+export function createDoodadDragStroke(point, { spacing = MAP_EDITOR_TREE_MIN_SPACING } = {}) {
+  const start = finitePoint(point);
+  if (!start) return null;
+  const normalizedSpacing = Math.max(4, Number(spacing) || MAP_EDITOR_TREE_MIN_SPACING);
+  return {
+    stroke: { last: start, distanceToNext: normalizedSpacing, spacing: normalizedSpacing },
+    placements: [start],
+  };
+}
+
+export function extendDoodadDragStroke(stroke, point) {
+  const end = finitePoint(point);
+  if (!stroke?.last || !end) return [];
+  const placements = [];
+  let from = stroke.last;
+  let dx = end.x - from.x;
+  let dy = end.y - from.y;
+  let remaining = Math.hypot(dx, dy);
+  while (remaining + 1e-9 >= stroke.distanceToNext) {
+    const ratio = stroke.distanceToNext / remaining;
+    from = { x: from.x + dx * ratio, y: from.y + dy * ratio };
+    placements.push({ x: Math.round(from.x), y: Math.round(from.y) });
+    dx = end.x - from.x;
+    dy = end.y - from.y;
+    remaining = Math.hypot(dx, dy);
+    stroke.distanceToNext = stroke.spacing;
+  }
+  stroke.distanceToNext -= remaining;
+  stroke.last = end;
+  return placements;
+}
+
+/** Build one spacing index for a placement update; rejected groups never enter the index. */
+export function createTreePlacementFilter(records, minSpacing = MAP_EDITOR_TREE_MIN_SPACING) {
+  const spacing = Math.max(0, Number(minSpacing) || 0);
+  const squared = spacing * spacing;
+  const cellSize = Math.max(1, spacing);
+  const buckets = new Map();
+
+  const add = (point) => {
+    const key = treeSpacingBucketKey(point, cellSize);
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(point);
+    else buckets.set(key, [point]);
+  };
+  const conflicts = (point) => {
+    if (spacing <= 0) return false;
+    const cellX = Math.floor(point.x / cellSize);
+    const cellY = Math.floor(point.y / cellSize);
+    for (let y = cellY - 1; y <= cellY + 1; y += 1) {
+      for (let x = cellX - 1; x <= cellX + 1; x += 1) {
+        for (const other of buckets.get(`${x},${y}`) || []) {
+          if ((other.x - point.x) ** 2 + (other.y - point.y) ** 2 < squared) return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  for (const record of records || []) {
+    if (!isTreeDoodadType(record?.typeId)) continue;
+    const point = finitePoint(record);
+    if (point) add(point);
+  }
+
+  return Object.freeze({
+    acceptGroup(placements) {
+      const candidates = (placements || []).map(finitePoint).filter(Boolean);
+      const pending = [];
+      for (const point of candidates) {
+        if (conflicts(point)) return [];
+        if (pending.some((other) => (other.x - point.x) ** 2 + (other.y - point.y) ** 2 < squared)) return [];
+        pending.push(point);
+      }
+      for (const point of pending) add(point);
+      return pending;
+    },
+  });
+}
+
+export function doodadTypeFromSelection(typeIds, seed = 1) {
+  const choices = [...new Set(typeIds || [])].filter(isMapEditorDoodadType);
+  if (!choices.length) return null;
+  const index = Math.floor(hashUnit(positiveSafeInteger(seed) || 1, choices.length) * choices.length);
+  return choices[Math.min(choices.length - 1, index)];
+}
+
 function normalizedDoodadFields(source, dimensions) {
   const typeId = String(source?.typeId || "");
   const sourceX = Number(source?.x);
@@ -227,6 +332,15 @@ function hashUnit(seed, index) {
   value = Math.imul(value, 0x735a2d97);
   value ^= value >>> 15;
   return (value >>> 0) / 0x100000000;
+}
+
+function treeSpacingBucketKey(point, cellSize) {
+  return `${Math.floor(point.x / cellSize)},${Math.floor(point.y / cellSize)}`;
+}
+
+function firstAvailableDoodadId(used, start = 1) {
+  for (let id = start; id <= MAX_U32; id += 1) if (!used.has(id)) return id;
+  return 0;
 }
 
 function normalizedWorldDimensions(value) {

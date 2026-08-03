@@ -11,10 +11,17 @@ import {
 } from "./map_authoring/layers.js";
 import {
   allocateMapEditorDoodadId,
+  createDoodadDragStroke,
   createDoodadSprayStroke,
+  createTreePlacementFilter,
+  doodadTypeFromSelection,
   doodadIdsWithinRadius,
   doodadIdsWithinRect,
+  extendDoodadDragStroke,
   extendDoodadSprayStroke,
+  isTreeDoodadType,
+  MAP_EDITOR_MAX_DOODADS,
+  MAP_EDITOR_TREE_MIN_SPACING,
   symmetricDoodadPlacements,
 } from "./map_editor_doodads.js";
 import {
@@ -106,6 +113,7 @@ export class MapEditorViewport {
     this.doodadSelectStart = null;
     this.doodadSelectEnd = null;
     this.doodadSprayStroke = null;
+    this.doodadDragStroke = null;
     this.doodadLastWorld = null;
     this.doodadBrushPoint = null;
     this.panPointerId = null;
@@ -506,6 +514,7 @@ export class MapEditorViewport {
       this.doodadPointerId = null;
       this.doodadPointerMode = null;
       this.doodadSprayStroke = null;
+      this.doodadDragStroke = null;
       this.doodadLastWorld = null;
       let changed = false;
       if (mode === "remove") {
@@ -563,7 +572,7 @@ export class MapEditorViewport {
       this.doodadPointerMode = "remove";
       this.drawOverlay();
     } else {
-      this.session.beginDoodadStroke(tool.mode === "erase" ? "Erased doodads" : tool.mode === "spray" ? "Sprayed wildflowers" : "Placed doodad");
+      this.session.beginDoodadStroke(tool.mode === "erase" ? "Erased doodads" : tool.mode === "spray" ? "Sprayed doodads" : "Placed doodads");
       this.doodadPointerMode = tool.mode;
       if (tool.mode === "spray") {
         const result = createDoodadSprayStroke(world, {
@@ -576,7 +585,9 @@ export class MapEditorViewport {
       } else if (tool.mode === "erase") {
         this.eraseDoodadsAt(world);
       } else {
-        this.placeDoodadPoints([world]);
+        const result = createDoodadDragStroke(world);
+        this.doodadDragStroke = result?.stroke || null;
+        this.placeDoodadPoints(result?.placements || []);
       }
     }
     this.doodadPointerId = event.pointerId;
@@ -592,6 +603,8 @@ export class MapEditorViewport {
     } else if (this.doodadPointerMode === "erase") {
       const spacing = Math.max(4, (Number(this.tool?.radius) || 48) / 2);
       for (const point of resampleWorldSegment(this.doodadLastWorld, world, spacing)) this.eraseDoodadsAt(point);
+    } else if (this.doodadPointerMode === "place" && this.doodadDragStroke && isTreeDoodadType(this.tool?.typeId)) {
+      this.placeDoodadPoints(extendDoodadDragStroke(this.doodadDragStroke, world));
     }
     this.doodadLastWorld = world;
   }
@@ -613,14 +626,44 @@ export class MapEditorViewport {
   }
 
   placeDoodadPoints(points) {
-    const placements = symmetricDoodadPlacements({
+    const dimensions = {
       width: (this.session.draft?.width || 0) * TILE_SIZE,
       height: (this.session.draft?.height || 0) * TILE_SIZE,
-    }, points, this.tool?.symmetry);
-    const added = this.session.placeDoodads(placements, {
-      typeId: this.tool?.typeId,
-      color: this.tool?.color,
-    });
+    };
+    const typeIds = this.tool?.typeIds?.length ? this.tool.typeIds : [this.tool?.typeId];
+    const existingDoodads = this.session.draft?.doodads || [];
+    const typeSeed = allocateMapEditorDoodadId(existingDoodads);
+    const planned = [];
+
+    if (typeIds.every(isTreeDoodadType)) {
+      const spacingFilter = createTreePlacementFilter(
+        existingDoodads,
+        MAP_EDITOR_TREE_MIN_SPACING,
+      );
+      for (const point of points || []) {
+        const group = symmetricDoodadPlacements(dimensions, [point], this.tool?.symmetry);
+        if (existingDoodads.length + planned.length + group.length > MAP_EDITOR_MAX_DOODADS) break;
+        const candidates = spacingFilter.acceptGroup(group);
+        if (candidates.length !== group.length) continue;
+        const typeId = doodadTypeFromSelection(
+          typeIds,
+          typeSeed + planned.length,
+        );
+        planned.push(...candidates.map((placement) => ({
+          ...placement,
+          typeId,
+          color: this.tool?.color,
+        })));
+      }
+    } else {
+      const placements = symmetricDoodadPlacements(dimensions, points, this.tool?.symmetry);
+      planned.push(...placements.map((placement, index) => ({
+        ...placement,
+        typeId: doodadTypeFromSelection(typeIds, typeSeed + index),
+        color: this.tool?.color,
+      })));
+    }
+    const added = this.session.placeDoodadRecords(planned);
     if (added.length) this.queueDoodadPatch({ upserts: added });
   }
 
@@ -938,8 +981,8 @@ function overlayPreviewColor(edit) {
 
 function doodadCommitLabel(mode) {
   if (mode === "erase") return "Doodads erased.";
-  if (mode === "spray") return "Wildflowers sprayed.";
-  return "Doodad placed.";
+  if (mode === "spray") return "Doodads sprayed.";
+  return "Doodads placed.";
 }
 
 function worldRect(from, to) {
