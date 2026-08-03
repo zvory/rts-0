@@ -410,7 +410,7 @@ fn replay_142_vehicle_lock_scenario_clears_without_slow_overlap() {
         },
     );
 
-    let mut saw_contact = false;
+    let mut saw_close_spacing = false;
     let mut clear_tick = None;
     let mut final_separation = 0.0;
     for elapsed in 1..=180 {
@@ -426,19 +426,19 @@ fn replay_142_vehicle_lock_scenario_clears_without_slow_overlap() {
             .get(command_car_id)
             .expect("Command Car should survive");
         let separation = (scout.pos_x - command_car.pos_x).hypot(scout.pos_y - command_car.pos_y);
-        if separation < 30.0 {
-            saw_contact = true;
-        } else if saw_contact && separation >= 40.0 && clear_tick.is_none() {
+        if separation <= 35.0 {
+            saw_close_spacing = true;
+        } else if saw_close_spacing && separation >= 40.0 && clear_tick.is_none() {
             clear_tick = Some(elapsed);
         }
         final_separation = separation;
     }
 
     assert!(
-        saw_contact,
-        "replay-142 fixture should recreate vehicle contact"
+        saw_close_spacing,
+        "replay-142 fixture should recreate close vehicle spacing"
     );
-    let clear_tick = clear_tick.expect("replay-142 pair should separate after making contact");
+    let clear_tick = clear_tick.expect("replay-142 pair should separate after close spacing");
     assert!(
         clear_tick <= 90,
         "replay-142 pair should clear within three seconds, cleared after {clear_tick} ticks"

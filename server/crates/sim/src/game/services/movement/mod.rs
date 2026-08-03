@@ -21,12 +21,14 @@ use crate::game::PlayerState;
 use crate::protocol::Event;
 
 mod armor_reaction;
+mod car_drive;
 mod collision;
 mod pivot_drive;
-mod scout_car;
 mod standability;
 mod steering;
 mod traffic;
+mod vehicle_profiles;
+mod vehicle_route;
 mod waypoints;
 
 #[cfg(test)]
@@ -45,7 +47,7 @@ const MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE: f32 =
 
 pub(crate) use collision::resolve_collisions;
 #[cfg(test)]
-use pivot_drive::TANK_BODY_TURN_RATE_RAD_PER_TICK;
+use vehicle_profiles::TANK_BODY_TURN_RATE_RAD_PER_TICK;
 pub(crate) use pivot_drive::{angle_delta, rotate_toward};
 pub(crate) use standability::is_collision_anchored;
 

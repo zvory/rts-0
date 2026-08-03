@@ -1,5 +1,5 @@
 {
-  "reason": "Merge doodad pathing with checkpointed ground decals",
+  "reason": "vehicle locomotion route/profile split renames scout-car drive module and extracts shared route/profile helpers",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -674,6 +674,10 @@
       "lines": 227
     },
     {
+      "path": "services/movement/car_drive.rs",
+      "lines": 738
+    },
+    {
       "path": "services/movement/collision.rs",
       "lines": 402
     },
@@ -684,10 +688,6 @@
     {
       "path": "services/movement/pivot_drive.rs",
       "lines": 346
-    },
-    {
-      "path": "services/movement/scout_car.rs",
-      "lines": 1028
     },
     {
       "path": "services/movement/standability.rs",
@@ -720,6 +720,14 @@
     {
       "path": "services/movement/traffic.rs",
       "lines": 49
+    },
+    {
+      "path": "services/movement/vehicle_profiles.rs",
+      "lines": 92
+    },
+    {
+      "path": "services/movement/vehicle_route.rs",
+      "lines": 359
     },
     {
       "path": "services/movement/waypoints.rs",
@@ -1364,6 +1372,12 @@
     {
       "source": "movement",
       "target": "geometry",
+      "path": "services/movement/car_drive.rs",
+      "line": 4
+    },
+    {
+      "source": "movement",
+      "target": "geometry",
       "path": "services/movement/collision.rs",
       "line": 4
     },
@@ -1376,7 +1390,7 @@
     {
       "source": "movement",
       "target": "geometry",
-      "path": "services/movement/scout_car.rs",
+      "path": "services/movement/vehicle_route.rs",
       "line": 6
     },
     {
@@ -1384,6 +1398,12 @@
       "target": "geometry",
       "path": "services/movement/waypoints.rs",
       "line": 10
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
+      "path": "services/movement/car_drive.rs",
+      "line": 5
     },
     {
       "source": "movement",
@@ -1406,12 +1426,6 @@
     {
       "source": "movement",
       "target": "occupancy",
-      "path": "services/movement/scout_car.rs",
-      "line": 10
-    },
-    {
-      "source": "movement",
-      "target": "occupancy",
       "path": "services/movement/standability.rs",
       "line": 5
     },
@@ -1424,6 +1438,12 @@
     {
       "source": "movement",
       "target": "occupancy",
+      "path": "services/movement/vehicle_route.rs",
+      "line": 10
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
       "path": "services/movement/waypoints.rs",
       "line": 13
     },
@@ -1432,6 +1452,12 @@
       "target": "scout_plane",
       "path": "services/movement/mod.rs",
       "line": 16
+    },
+    {
+      "source": "movement",
+      "target": "spatial",
+      "path": "services/movement/car_drive.rs",
+      "line": 6
     },
     {
       "source": "movement",
@@ -1454,12 +1480,6 @@
     {
       "source": "movement",
       "target": "spatial",
-      "path": "services/movement/scout_car.rs",
-      "line": 11
-    },
-    {
-      "source": "movement",
-      "target": "spatial",
       "path": "services/movement/steering.rs",
       "line": 5
     },
@@ -1472,14 +1492,20 @@
     {
       "source": "movement",
       "target": "standability",
-      "path": "services/movement/scout_car.rs",
-      "line": 12
+      "path": "services/movement/car_drive.rs",
+      "line": 7
     },
     {
       "source": "movement",
       "target": "standability",
       "path": "services/movement/standability.rs",
       "line": 6
+    },
+    {
+      "source": "movement",
+      "target": "standability",
+      "path": "services/movement/vehicle_route.rs",
+      "line": 11
     },
     {
       "source": "movement",

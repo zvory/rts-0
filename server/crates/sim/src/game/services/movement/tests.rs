@@ -23,7 +23,7 @@ use super::pivot_drive::{
     pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
     PIVOT_VEHICLE_LOOKAHEAD_PX, VEHICLE_REVERSE_GOAL_DISTANCE_PX,
 };
-use super::scout_car::{
+use super::car_drive::{
     scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
 };
 mod pivot_drive;

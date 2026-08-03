@@ -109,7 +109,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known bug: Scout Car follows a cardinal-first L path on open ground"]
     fn scenario_scout_car_begins_one_continuous_turn_toward_goal() {
         let setup =
             Game::new_scout_car_open_ground_l_path_scenario(EntityKind::ScoutCar, 1, 0x5150_0724)
