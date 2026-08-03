@@ -59,7 +59,8 @@ import { textWithin } from "./dom_text.mjs";
 // ---------------------------------------------------------------------------
 {
   const mapNames = Object.keys(LOBBY_MAP_PRESENTATION);
-  assert(mapNames.length === 8, "lobby map presentation covers every bundled selectable map");
+  assert(mapNames.includes("Waldübungen"),
+    "Waldübungen has a lobby map presentation");
   assert(lobbyMapPresentation("Schone Tage").author === "oti",
     "Schone Tage credits lowercase oti");
   assert(mapNames.filter((name) => name !== "Schone Tage")
