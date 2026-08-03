@@ -2,7 +2,6 @@
   "candidate": "tiger-i-pass-10-noguide-ref",
   "status": "active-experiment",
   "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-input-sheet.png",
-  "sourceSheetSvg": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-input-sheet.svg",
   "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-10-noguide-ref.md",
   "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2492-10dd-73b3-8d83-ad9d31bb5026/ig_01aa8f7d47cbcb61016a470fac19988190bf26b95d75885464.png",
   "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref.png",

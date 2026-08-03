@@ -1,6 +1,5 @@
-// Prototype no-shield anti-tank gun PNG atlas. The SVG rig remains the source
-// of anchors, setup visibility, facing, and recoil bindings; this atlas only
-// replaces the visible support-gun pixels with generated component sprites.
+// Production no-shield anti-tank gun PNG atlas. Raster-native rig metadata supplies
+// anchors, setup visibility, facing, and recoil bindings.
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -35,7 +34,7 @@ const WHEEL_NAMES = Object.freeze([
 const CARRIAGE_BASE_NAMES = Object.freeze([
   "axle",
   ...WHEEL_NAMES,
-  // Covered here to suppress the old shield SVG parts for this no-shield pass.
+  // The no-shield raster pass intentionally covers the retired shield part ids.
   "shield",
   "shieldStripe",
 ]);

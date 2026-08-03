@@ -23,7 +23,7 @@ import {
 } from "./prediction_runtime_startup.js";
 import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
 import { prepareRenderer } from "./renderer/preparation.js";
-import { ARTILLERY_RIG_SVG } from "./renderer/rigs/support_svg.js";
+import { liveUnitIconMarkupFor } from "./renderer/rigs/unit_icon_sources.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
 import { GroundDecalSync } from "./match_ground_decal_sync.js";
@@ -42,7 +42,7 @@ import { ClientIntent } from "./client_intent.js";
 import { CommandInteraction } from "./command_interaction.js";
 import { createControlPolicyProjection } from "./control_policy_projection.js";
 import { CAMERA, INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, S } from "./protocol.js";
+import { EVENT, KIND, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
 
@@ -326,7 +326,7 @@ export class Match {
         commandsEnabled: !!this.capabilities.commands.gameplay,
         clientIntent: this.clientIntent,
         controlPolicy: this.controlPolicy,
-        artilleryIconSvg: ARTILLERY_RIG_SVG,
+        artilleryIconMarkup: liveUnitIconMarkupFor(KIND.ARTILLERY),
       }),
     );
     this.noticePresenter = this._timeInit(

@@ -11,17 +11,10 @@ const fixturesDir = path.join(__dirname, "fixtures/svg");
 
 const fixtures = [
   ["rig-worker.svg", KIND.WORKER, []],
-  ["rig-rifleman.svg", KIND.RIFLEMAN, ["muzzle"]],
-  ["rig-machine-gunner.svg", KIND.MACHINE_GUNNER, ["muzzle", "bipod"]],
-  ["rig-anti-tank-gun.svg", KIND.ANTI_TANK_GUN, ["muzzle", "wheel"]],
-  ["rig-mortar-team.svg", KIND.MORTAR_TEAM, ["muzzle", "bipod"]],
-  ["rig-artillery.svg", KIND.ARTILLERY, ["muzzle", "wheel"]],
-  ["rig-scout-car.svg", KIND.SCOUT_CAR, ["muzzle"]],
   ["rig-command-car.svg", KIND.COMMAND_CAR, []],
   ["rig-ekat.svg", KIND.EKAT, []],
   ["rig-infantry-weapon.svg", KIND.RIFLEMAN, ["muzzle"]],
   ["rig-crew-weapon.svg", KIND.MACHINE_GUNNER, ["muzzle", "bipod"]],
-  ["rig-vehicle.svg", KIND.TANK, ["muzzle", "coaxMuzzle", "turret"]],
 ];
 
 test("authored SVG fixtures compile to normalized rig definitions", () => {
@@ -41,18 +34,21 @@ test("authored SVG fixtures compile to normalized rig definitions", () => {
 });
 
 test("metadata, anchors, paint, draw order, and animation bindings are extracted", () => {
-  const result = compileSvgRig(readFixture("rig-vehicle.svg"), { id: "tank.test", kind: KIND.TANK });
+  const result = compileSvgRig(readFixture("rig-infantry-weapon.svg"), { id: "rifleman.test", kind: KIND.RIFLEMAN });
   assert.equal(result.ok, true, JSON.stringify(result.errors));
-  assert.equal(result.definition.id, "tank.test");
-  assert.equal(result.definition.kind, KIND.TANK);
-  assert.deepEqual(result.definition.parts.map((part) => part.id).slice(0, 3), ["part.shadow", "part.track.left", "part.track.right"]);
-  assert.deepEqual(result.definition.anchors.muzzle, { x: 33.2, y: 0 });
-  assert.deepEqual(result.definition.anchors.coaxMuzzle, { x: 16.6, y: -5.55 });
-  assert.deepEqual(result.definition.parts.find((part) => part.id === "part.hull").paint.fill, "#5d7896");
-  const coaxBarrel = result.definition.parts.find((part) => part.id === "part.coaxBarrel");
-  assert.deepEqual(coaxBarrel.geometry, { type: "rect", x: 11.4, y: -6, width: 5.2, height: 0.9 });
-  assert.deepEqual(result.definition.parts.find((part) => part.id === "part.turret").tintSlot, "team-light");
-  assert.ok(result.definition.animations.some((binding) => binding.partId === "part.barrel" && binding.input === "weaponFacing"));
+  assert.equal(result.definition.id, "rifleman.test");
+  assert.equal(result.definition.kind, KIND.RIFLEMAN);
+  assert.deepEqual(result.definition.parts.map((part) => part.id).slice(0, 3), ["part.shadow", "part.body", "part.head"]);
+  assert.deepEqual(result.definition.anchors.muzzle, { x: 21, y: -7 });
+  assert.deepEqual(result.definition.parts.find((part) => part.id === "part.body").paint.fill, "#7188b4");
+  assert.deepEqual(result.definition.parts.find((part) => part.id === "part.rifle").geometry, {
+    type: "line",
+    from: { x: -2, y: -4 },
+    to: { x: 21, y: -7 },
+    strokeWidth: 2,
+  });
+  assert.deepEqual(result.definition.parts.find((part) => part.id === "part.body").tintSlot, "team");
+  assert.ok(result.definition.animations.some((binding) => binding.partId === "part.rifle" && binding.input === "weaponFacing"));
   assert.ok(result.definition.requiredRuntimeInputs.includes("weaponFacing"));
 });
 
