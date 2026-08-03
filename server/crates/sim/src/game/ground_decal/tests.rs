@@ -402,16 +402,11 @@ fn hidden_tank_trail_is_discovered_later_and_survives_checkpoint_restore() {
         &game.state.map,
     );
     assert!(game.ground_decals_for_player(2, 0).2.is_empty());
-    let fully_visible = Fog::from_checkpoint_grids(
-        4,
-        4,
-        BTreeMap::from([(2, vec![true; 16])]),
-        BTreeMap::new(),
-        BTreeMap::new(),
+    game.state.ground_decals.refresh_memory_for_player(
+        2,
+        &fog_with_visible_tile(2, Some(10)),
+        &game.state.map,
     );
-    game.state
-        .ground_decals
-        .refresh_memory_for_player(2, &fully_visible, &game.state.map);
     assert_eq!(game.ground_decals_for_player(2, 0).2.len(), 1);
 
     let payload = game.checkpoint_payload_text_for_test().unwrap();

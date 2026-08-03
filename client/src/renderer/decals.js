@@ -208,8 +208,9 @@ export class GroundDecalLayer {
     };
   }
 
-  stampLiveTankTreads(entities) {
-    return this.tankTreads.stampVisibleTankPoses(entities);
+  stampLiveTankTreads(entities, fog = null) {
+    return this.tankTreads.revealAuthoritativeTrails(fog) +
+      this.tankTreads.stampVisibleTankPoses(entities);
   }
 
   destroy() {
