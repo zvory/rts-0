@@ -16,8 +16,6 @@ import {
   LOBBY_BROWSER_REFRESH_INTERVAL_MS,
   MAX_LOBBY_TEAMS,
   Lobby,
-  PLAYABLE_FACTIONS,
-  betaFactionSelectEnabledForLocation,
   countdownSoundId,
   lobbyBrowserAutoRefreshEligible,
   shouldAcceptSpectatorDrop,
@@ -35,7 +33,7 @@ import {
   suggestLobbyName,
   validateLobbyName,
 } from "../../client/src/lobby_browser_view.js";
-import { AI_PROFILES, LobbyRosterView } from "../../client/src/lobby_view.js";
+import { AI_PROFILES, LobbyRosterView, PLAYABLE_FACTIONS } from "../../client/src/lobby_view.js";
 import {
   LOBBY_MAP_PRESENTATION,
   LobbyMapSelector,
@@ -94,6 +92,8 @@ import { textWithin } from "./dom_text.mjs";
 
     assert(!root.hidden && selector.triggerLabel.textContent === "Chokes",
       "custom map selector reflects the authoritative selected map");
+    assert(root.children[0] === selector.previewFigure && root.children[1] === selector.control,
+      "selected map preview renders above the dropdown control");
     assert(selector.optionButtons.length === maps.length,
       "custom map selector renders every server-advertised map name");
     selector.open();
@@ -117,11 +117,21 @@ import { textWithin } from "./dom_text.mjs";
     root.listeners.keydown({ key: "Escape", target: schoneTage, preventDefault() {} });
     assert(selector.popover.hidden && document.activeElement === selector.trigger,
       "Escape closes the selector and restores trigger focus");
-    selector.render({ maps, selectedMap: "Schone Tage", visible: true, disabled: true });
-    assert(selector.trigger.disabled && selector.popover.hidden,
-      "countdown-disabled selectors cannot remain open");
+    selector.render({ maps, selectedMap: "Chokes", visible: true, disabled: false, readOnly: true });
+    selector.open();
+    schoneTage.listeners.mouseenter();
+    schoneTage.click();
+    assert(
+      !selector.trigger.disabled && !selector.popover.hidden &&
+        root.classList.contains("is-readonly") &&
+        schoneTage.classList.contains("is-unavailable") &&
+        selected.join(",") === "Schone Tage" && selector.selectedMap === "Chokes" &&
+        selector.previewName.textContent === "Schone Tage",
+      "guest selectors browse previews but mark options unavailable and emit no selection",
+    );
+    selector.close();
     selector.render({ maps, selectedMap: "Schone Tage", visible: false, disabled: true });
-    assert(root.hidden, "guest and replay views hide the host selector");
+    assert(root.hidden, "hidden replay selectors remain unavailable");
 
     selector.destroy();
     assert(!document.listeners.pointerdown && !root.listeners.keydown,
@@ -148,26 +158,6 @@ import { textWithin } from "./dom_text.mjs";
       { id: "jeffs_ai", label: "Jeff's AI" },
     ],
     "lobby AI profile selector exposes both supported player opponents",
-  );
-  assert(
-    betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }),
-    "lobby faction select shows on beta host",
-  );
-  assert(
-    betaFactionSelectEnabledForLocation({ hostname: "localhost", pathname: "/" }),
-    "lobby faction select shows on local runserver host",
-  );
-  assert(
-    betaFactionSelectEnabledForLocation({ hostname: "127.0.0.1", pathname: "/" }),
-    "lobby faction select shows on loopback host",
-  );
-  assert(
-    betaFactionSelectEnabledForLocation({ hostname: "0.0.0.0", pathname: "/" }),
-    "lobby faction select shows on wildcard bind host",
-  );
-  assert(
-    !betaFactionSelectEnabledForLocation({ hostname: "bewegungskrieg.net", pathname: "/" }),
-    "lobby faction select stays hidden on mainline host",
   );
   const slots = teamSlotsForLobby([
     { id: 3, teamId: 1 },
@@ -312,6 +302,12 @@ import { textWithin } from "./dom_text.mjs";
     );
     assert(textWithin(root).includes("AI 2.1"), "host lobby labels AI seats as AI 2.1");
     assert(profileSelectors[0].children.length === 2, "host lobby exposes both player-facing AI profiles");
+    assert(!findFakes(root, (el) => String(el.className).includes("player-faction")).length,
+      "lobby seats do not render faction controls");
+    assert(!findFakes(root, (el) => String(el.className).includes("lobby-seat-meta")).length,
+      "lobby seats omit redundant human and AI profile metadata");
+    assert(!findFakes(root, (el) => String(el.className).includes("team-row-count")).length,
+      "team headers omit redundant member counts");
     assert(
       profileSelectors[0].children[1].value === "jeffs_ai" &&
         profileSelectors[0].children[1].textContent === "Jeff's AI",
@@ -367,9 +363,6 @@ import { textWithin } from "./dom_text.mjs";
     elSetupTitle: { textContent: "Match setup" },
     elPlayers: { innerHTML: "occupied" },
     elRoomDisplay: { textContent: "Old room" },
-    elMapSummary: { textContent: "Chokes", hidden: true },
-    elSeatsSummary: { textContent: "2 / 4" },
-    elObserversSummary: { textContent: "1" },
     btnJoin: { textContent: "Switch room" },
     btnCreateLobby: { hidden: true, disabled: true },
     btnReady: {
@@ -432,8 +425,6 @@ import { textWithin } from "./dom_text.mjs";
   assert(lobby.btnReady.textContent === "Ready" && lobby.btnReady["aria-pressed"] === "false",
     "lobby reset restores the ready button to inactive state");
   assert(lobby.btnStart.disabled, "lobby reset disables stale start control");
-  assert(lobby.elSeatsSummary.textContent === "0 / 4" && lobby.elObserversSummary.textContent === "0",
-    "lobby reset clears stale room summary counts");
   assert(cancelledRefreshes === 1 && clearedCountdown === 1 && hidReplayPrompt === 1,
     "lobby reset cancels in-flight refreshes and clears transient room UI");
   assert(renderedBrowser?.error === "" && statusText === "", "lobby reset redraws browser without stale errors");
@@ -446,7 +437,6 @@ import { textWithin } from "./dom_text.mjs";
   let cancelledRefreshes = 0;
   let statusText = "old";
   const root = { hidden: false, classList: fakeClassList() };
-  const seatsCell = { hidden: false };
   const lobby = Object.assign(Object.create(Lobby.prototype), {
     root,
     net: { playerId: 7 },
@@ -455,10 +445,6 @@ import { textWithin } from "./dom_text.mjs";
     elSetupTitle: { textContent: "" },
     elPlayers: { innerHTML: "" },
     elRoomDisplay: { textContent: "" },
-    elMapSummary: { textContent: "", hidden: true },
-    elSeatsSummary: { textContent: "" },
-    elSeatsSummaryCell: seatsCell,
-    elObserversSummary: { textContent: "" },
     btnReady: {
       hidden: false,
       textContent: "",
@@ -487,9 +473,6 @@ import { textWithin } from "./dom_text.mjs";
     },
     _reflectTeamPreset() {},
     _reflectCreateButton() {},
-    _betaFactionSelectEnabled() {
-      return false;
-    },
     _onJoined() {
       joined += 1;
     },
@@ -520,11 +503,8 @@ import { textWithin } from "./dom_text.mjs";
   assert(!lobby.btnStart.disabled && lobby.btnStart.textContent === "Start replay",
     "replay lobby hosts can start whenever the server says canStart");
   assert(joined === 1, "server-confirmed replay lobby entry triggers renderer preparation");
-  assert(mapSelectorArgs?.visible === false && mapSelectorArgs?.disabled,
-    "joined replay lobbies hide and disable map selection");
-  assert(seatsCell.hidden && lobby.elSeatsSummary.textContent === "",
-    "joined replay lobbies hide active-seat counts");
-  assert(lobby.elObserversSummary.textContent === "1", "joined replay lobbies count spectator occupants only");
+  assert(mapSelectorArgs?.visible && mapSelectorArgs?.disabled && mapSelectorArgs?.readOnly,
+    "joined replay lobbies show the selected map as read-only setup context");
   assert(rosterArgs?.spectatorOnly === true, "joined replay lobbies render the roster in spectator-only mode");
   assert(cancelledRefreshes === 1 && statusText === "", "joined replay lobby render clears pending browser state");
 }
@@ -541,10 +521,6 @@ import { textWithin } from "./dom_text.mjs";
     elSetupTitle: { textContent: "" },
     elPlayers: { innerHTML: "" },
     elRoomDisplay: { textContent: "" },
-    elMapSummary: { textContent: "", hidden: true },
-    elSeatsSummary: { textContent: "" },
-    elSeatsSummaryCell: { hidden: false },
-    elObserversSummary: { textContent: "" },
     btnReady: {
       hidden: false,
       textContent: "",
@@ -573,9 +549,6 @@ import { textWithin } from "./dom_text.mjs";
     },
     _reflectTeamPreset() {},
     _reflectCreateButton() {},
-    _betaFactionSelectEnabled() {
-      return false;
-    },
     setStatus() {},
   });
 
@@ -600,8 +573,6 @@ import { textWithin } from "./dom_text.mjs";
     ],
   });
 
-  assert(lobby.elSeatsSummary.textContent === "2 / 2",
-    "joined lobby summary uses selected map capacity");
   assert(rosterArgs?.maxPlayers === 2, "lobby roster receives selected map capacity");
   assert(cancelledRefreshes === 1, "normal lobby render cancels any pending browser refresh");
 }
@@ -894,10 +865,12 @@ import { textWithin } from "./dom_text.mjs";
     "manual room-name join controls stay outside the normal pre-join product path");
   assert(indexHtml.includes("#lobby-room and #lobby-join remain hidden compatibility controls"),
     "DOM contract documents room-name controls as hidden compatibility only");
-  assert(indexHtml.includes('id="lobby-lab-open"'),
-    "normal lobby exposes a direct lab entry affordance");
-  assert(indexHtml.includes('href="/lab"'),
-    "normal lobby lab entry opens the default lab scenario without URL overrides");
+  assert(!indexHtml.includes('id="lobby-lab-open"') && !indexHtml.includes("Shared Lab"),
+    "normal lobby omits the shared Lab shortcut");
+  assert(indexHtml.includes('class="lobby-map-setup lobby-joined-only"'),
+    "joined lobby places map setup in the right-side controls");
+  assert(indexHtml.includes('id="lobby-chat-panel"') && indexHtml.includes('id="lobby-chat-dock"'),
+    "joined lobby reserves a dedicated room-chat panel");
   assert(!indexHtml.includes('id="lobby-quickstart"'),
     "normal lobby does not render the legacy quickstart control");
   assert(!indexHtml.includes("Debug mode"),
@@ -1103,7 +1076,7 @@ import { textWithin } from "./dom_text.mjs";
       spectatorOnly: true,
     });
     const text = textWithin(root);
-    assert(text.includes("Replay lobby") && text.includes("1 viewer"),
+    assert(text.includes("Replay viewers"),
       "replay lobby roster renders a replay spectator-only section");
     assert(text.includes("Replay Host") && !text.includes("Hidden Active Seat"),
       "replay lobby roster renders only spectator occupants");

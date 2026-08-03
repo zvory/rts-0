@@ -71,14 +71,14 @@ src/
   hotkey_profiles.js # Local hotkey presets, custom profile storage, import/export
   hotkey_editor.js # Settings Hotkeys tab editor
   tab_menu.js # hold-Tab Auto-Build controls with optimistic state through authoritative acknowledgement
-  chat_overlay.js # App-owned lobby/game direct-text chat, channel hotkeys, fading presentation
+  chat_overlay.js # App-owned docked lobby chat plus game direct-text overlay
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   minimap_road_layer.js # Cached post-fog dotted road-marking overlay
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
   lobby_map_selector.js # Host map picker: minimap previews, creator credits, keyboard navigation
   lobby_browser_view.js # Pre-join lobby browser rows, state rendering, and age/status formatting
-  lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
+  lobby_view.js   # Lobby roster renderer: stacked teams, compact seat rows, spectators
   match_history.js # Lobby match-history table and replay launch affordance
   scoreboard.js   # Shared score/result formatting helpers
   status_badge.js # Compact network/frame status badge
@@ -211,15 +211,18 @@ failure emits one fixed saturation report and all later new signatures are suppr
 never inspect thrown-value properties or message payloads, survive reconnects for the lifetime of
 the `Net`, and cannot prevent delivery to later subscribers even if console or diagnostics throws.
 
-`App` owns one `ChatOverlay` for the lifetime of the socket and switches it between joined-lobby
-and game context. Enter opens a transparent single-line composer over the current screen; Enter
-sends and closes it, Escape cancels, and Tab cycles team/all only when the local active player has
-at least one teammate. Singleton-team 1v1/FFA players and spectators use all-chat. While the
-composer is focused, its capture listener consumes those keys and marks the match input surface
-interactive so gameplay hotkeys, the hold-Tab menu, camera input, and desktop cursor recapture do
-not compete with typing. Reliable deliveries render with `textContent`, keep at most six visible
-lines, and fade after eight wall-clock seconds. Replay context is read-only; replay seeks clear the
-transient lines before tick-timed messages resume.
+`App` owns one `ChatOverlay` for the lifetime of the socket and moves it between the joined-lobby
+chat column and game overlay context. Lobby chat keeps an all-chat composer visible, retains at
+most 50 messages only in the current browser while it remains in that room, and clears on room
+change; the server neither persists nor includes lobby messages in replays. In game, Enter opens a
+transparent single-line composer over the current screen; Enter sends and closes it, Escape
+cancels, and Tab cycles team/all only when the local active player has at least one teammate.
+Singleton-team 1v1/FFA players and spectators use all-chat. While the composer is focused, its
+capture listener consumes those keys and marks the match input surface interactive so gameplay
+hotkeys, the hold-Tab menu, camera input, and desktop cursor recapture do not compete with typing.
+Reliable game deliveries render with `textContent`, keep at most six visible lines, and fade after
+eight wall-clock seconds. Replay context is read-only; replay seeks clear the transient lines before
+tick-timed messages resume.
 
 `prediction_controller.js`
 ```js
@@ -1823,7 +1826,7 @@ faction catalog use the local player's faction id as the command-id prefix.
 descriptors with the Rust catalog dump for every client-exposed faction. Unknown valid faction ids
 fail closed in command-card data, so future factions do not inherit Kriegsia build, train, research,
 or ability buttons before their catalog is intentionally exposed. The client mirror is a checked
-projection, not lifecycle admission: lobby selectors must expose only playable human choices,
+projection, not lifecycle admission: the lobby currently exposes no faction selector,
 fixture-only ids remain test harness data, public AI controls do not expose a faction selector, and
 local prediction remains disabled for unsupported local faction ids such as the current Ekat slice.
 Generation is not required as long as the parity check remains a required gate comparing every
@@ -1857,15 +1860,17 @@ export class Lobby {
   // owns lobby state, manual pre-join browser refresh, latest-row join preflight,
   // ready/start/spectator role, and delegates browser DOM to lobby_browser_view.js and
   // joined-roster DOM to lobby_view.js.
-  // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
-  // buttons, and a custom map selector in the lobby summary row through Net setTeam/addAi/selectMap.
-  // Host options preview checked-in 512px production-minimap JPEGs on hover/focus and show a
-  // creator credit; guests and replay lobbies retain the plain selected-map label.
+  // The joined desktop lobby uses three columns: a narrower vertically stacked roster, match setup,
+  // and docked ephemeral room chat. Team cards use compact one-line seats and team-scoped AI add
+  // buttons; faction controls and redundant roster/summary counts are omitted.
+  // The selected map's checked-in 512px production-minimap JPEG and creator credit remain visible
+  // above the custom selector. Hosts can select; guests can open the same catalog and preview every
+  // option, but each row is marked unavailable and cannot change the authoritative map.
   // Name-field edits are debounced, persisted locally, and sent through Net.setName while joined.
   // Replay lobbies are keyed by explicit `kind: "replay"` metadata: the joined view hides
-  // Ready, team, faction, AI, map-selection, and active-seat controls, then shows only
-  // spectator occupants plus the host start control while the server reports canStart.
-  // The normal product lobby exposes an Open Lab route affordance instead of a debug setup toggle.
+  // Ready, team, faction, AI, map-selection, and active-seat controls, then shows the selected map,
+  // its preview, only spectator occupants, and the host start control while the server reports
+  // canStart.
   // Teams are layout groups only; player colors come from each player record.
   refreshLobbyBrowser()                  // one GET /api/lobbies request; never starts a timer
   joinReplayLobby(room)                  // lazily connect, then join a persisted replay lobby
@@ -2462,8 +2467,8 @@ Current areas:
 - `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
   command-free camera gesture helper for live input and replay/observer wrappers. Locked native-cursor routing sends clicks through both settings chrome and the game screen, and preserves pressed-button state across macOS drag events for routed pointer moves and gameplay selection drags.
 - `renderer`: `renderer/`.
-- `platform`: bootstrap, including the lobby Open Lab entry point to bare `/lab`, `/lab` catalog
-  route detection, direct launch URL parsing for scenario/map/seed and sanitized lab visual profile
+- `platform`: bootstrap, including `/lab` catalog route detection, direct launch URL parsing for
+  scenario/map/seed and sanitized lab visual profile
   ids, audio, combat audio, alerts, fog, camera, prediction settings, unit range settings,
   `report_window_aggregate.js`.
 

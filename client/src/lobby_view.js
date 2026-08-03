@@ -86,13 +86,11 @@ export class LobbyRosterView {
     spectatorOnly = false,
     playerCount,
     maxPlayers,
-    betaFactionSelect,
     onAddAi,
     onRemoveAi,
     onSetAiProfile,
     onSetTeam,
     onSetSpectator,
-    onSetFaction,
   }) {
     if (!this.root) return;
     this.root.innerHTML = "";
@@ -101,12 +99,10 @@ export class LobbyRosterView {
     const { seatedPlayers, spectatorPlayers } = splitLobbyPlayers(players);
     if (!spectatorOnly) {
       const slots = teamSlotsForLobby(seatedPlayers, maxPlayers);
-      const occupiedSlotCount = slots.filter((slot) => !slot.isNew).length;
       for (const slot of slots) {
         const teamPlayers = seatedPlayers.filter((player) => Number(player.teamId) === Number(slot.id));
         this.root.appendChild(this._buildTeamColumn({
           slot,
-          occupiedSlotCount,
           players: teamPlayers,
           allPlayers: players,
           myId,
@@ -115,13 +111,11 @@ export class LobbyRosterView {
           countdownActive,
           playerCount,
           maxPlayers,
-          betaFactionSelect,
           onAddAi,
           onRemoveAi,
           onSetAiProfile,
           onSetTeam,
           onSetSpectator,
-          onSetFaction,
         }));
       }
     }
@@ -140,7 +134,6 @@ export class LobbyRosterView {
 
   _buildTeamColumn({
     slot,
-    occupiedSlotCount,
     players,
     allPlayers,
     myId,
@@ -149,13 +142,11 @@ export class LobbyRosterView {
     countdownActive,
     playerCount,
     maxPlayers,
-    betaFactionSelect,
     onAddAi,
     onRemoveAi,
     onSetAiProfile,
     onSetTeam,
     onSetSpectator,
-    onSetFaction,
   }) {
     const section = document.createElement("section");
     section.className = "lobby-team-card team-row";
@@ -195,15 +186,11 @@ export class LobbyRosterView {
     kicker.className = "lobby-kicker";
     kicker.textContent = slot.isNew ? "Open slot" : "";
     const name = document.createElement("h2");
-    name.textContent = slot.isNew ? "New team" : occupiedSlotCount === 1 ? "Team" : `Team ${slot.id}`;
+    name.textContent = slot.isNew ? "New team" : `Team ${slot.id}`;
     if (kicker.textContent) title.appendChild(kicker);
     title.appendChild(name);
 
-    const count = document.createElement("span");
-    count.className = "lobby-team-count team-row-count";
-    count.textContent = String(players.length);
-
-    header.append(title, count);
+    header.appendChild(title);
     if (isHost && slot.isNew) {
       const add = document.createElement("button");
       add.type = "button";
@@ -226,10 +213,8 @@ export class LobbyRosterView {
         hostId,
         isHost,
         countdownActive,
-        betaFactionSelect,
         onRemoveAi,
         onSetAiProfile,
-        onSetFaction,
       }));
     }
     if (players.length === 0) {
@@ -249,10 +234,8 @@ export class LobbyRosterView {
     hostId,
     isHost,
     countdownActive,
-    betaFactionSelect,
     onRemoveAi,
     onSetAiProfile,
-    onSetFaction,
   }) {
     const row = document.createElement("div");
     row.className = "player-row lobby-seat";
@@ -288,24 +271,8 @@ export class LobbyRosterView {
     if (player.id === hostId) {
       tags.appendChild(tag("host", "Host"));
     }
-    if (player.isAi) {
-      tags.appendChild(tag("ai", "AI"));
-    }
     nameLine.appendChild(tags);
-    if (betaFactionSelect) {
-      nameLine.appendChild(this._buildFactionControl({
-        player,
-        myId,
-        countdownActive,
-        onSetFaction,
-      }));
-    }
-
-    const meta = document.createElement("div");
-    meta.className = "lobby-seat-meta";
-    meta.textContent = player.isAi ? aiProfileLabel(player.aiProfileId) : "Human player";
-
-    body.append(nameLine, meta);
+    body.appendChild(nameLine);
 
     const controls = document.createElement("div");
     controls.className = "lobby-seat-controls";
@@ -336,31 +303,6 @@ export class LobbyRosterView {
     select.disabled = countdownActive;
     select.addEventListener("change", () => {
       if (!select.disabled) onSetAiProfile?.(player.id, select.value);
-    });
-    return select;
-  }
-
-  _buildFactionControl({ player, myId, countdownActive, onSetFaction }) {
-    if (player.isAi) {
-      const label = document.createElement("span");
-      label.className = "player-faction-label";
-      label.textContent = factionLabel(player.factionId);
-      return label;
-    }
-
-    const select = document.createElement("select");
-    select.className = "player-faction-select";
-    select.setAttribute("aria-label", `${player.name || "Player"} faction`);
-    for (const entry of PLAYABLE_FACTIONS) {
-      const option = document.createElement("option");
-      option.value = entry.id;
-      option.textContent = entry.label;
-      select.appendChild(option);
-    }
-    select.value = playableFactionId(player.factionId);
-    select.disabled = countdownActive || player.id !== myId || player.isSpectator;
-    select.addEventListener("change", () => {
-      if (!select.disabled) onSetFaction?.(select.value);
     });
     return select;
   }
@@ -424,15 +366,8 @@ export class LobbyRosterView {
     const eye = document.createElement("span");
     eye.className = "lobby-observer-icon";
     eye.setAttribute("aria-hidden", "true");
-    const title = document.createElement("div");
-    const kicker = document.createElement("span");
-    kicker.className = "lobby-kicker";
-    kicker.textContent = spectatorOnly ? "Replay lobby" : "Observers";
-    const count = document.createElement("h2");
-    count.textContent = spectatorOnly
-      ? `${players.length} viewer${players.length === 1 ? "" : "s"}`
-      : `${players.length} spectator${players.length === 1 ? "" : "s"}`;
-    title.append(kicker, count);
+    const title = document.createElement("h2");
+    title.textContent = spectatorOnly ? "Replay viewers" : "Spectators";
     header.append(eye, title);
 
     const list = document.createElement("div");
@@ -490,16 +425,9 @@ export class LobbyRosterView {
     if (player.id === hostId) tags.appendChild(tag("host", "Host"));
     tags.appendChild(tag("spectator", "Spectator"));
     nameLine.appendChild(tags);
-    const meta = document.createElement("div");
-    meta.className = "lobby-seat-meta";
-    meta.textContent = spectatorOnly ? "Replay viewer" : "No command seat";
-    body.append(nameLine, meta);
+    body.appendChild(nameLine);
 
-    const state = document.createElement("span");
-    state.className = "player-ready spectator";
-    state.textContent = "Observing";
-
-    row.append(swatch, body, state);
+    row.append(swatch, body);
     return row;
   }
 }
@@ -517,26 +445,7 @@ export function playableAiProfileId(id) {
     : DEFAULT_AI_PROFILE_ID;
 }
 
-function aiProfileLabel(id) {
-  const fallback =
-    AI_PROFILES.find((entry) => entry.id === DEFAULT_AI_PROFILE_ID) || AI_PROFILES[0];
-  return (
-    AI_PROFILES.find((entry) => entry.id === playableAiProfileId(id))?.label ||
-    fallback?.label ||
-    "AI"
-  );
-}
-
 export const PLAYABLE_FACTIONS = Object.freeze([
   { id: "kriegsia", label: "Kriegsia" },
   { id: "ekat", label: "Ekat" },
 ]);
-
-function playableFactionId(factionId) {
-  return PLAYABLE_FACTIONS.some((entry) => entry.id === factionId) ? factionId : "kriegsia";
-}
-
-function factionLabel(factionId) {
-  const entry = PLAYABLE_FACTIONS.find((item) => item.id === factionId);
-  return entry ? entry.label : "Kriegsia";
-}

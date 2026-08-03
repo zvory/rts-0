@@ -99,12 +99,21 @@ try {
       hasModeSummary: !!document.querySelector("#lobby-mode-summary"),
       hasTeamMarks: !!document.querySelector("#lobby-players .lobby-team-mark"),
       hasLaunchCopy: /Launch|Ready check/.test(document.querySelector(".lobby-launch-panel")?.textContent || ""),
-      mapSelectorInSummary: !!document.querySelector(".lobby-status-grid #lobby-map-selector:not([hidden])"),
+      mapSelectorInSummary: !!document.querySelector(".lobby-room #lobby-map-selector:not([hidden])"),
       hasNativeMapSelect: !!document.querySelector("select#lobby-map"),
       mapSelectorInSidePanel: !!document.querySelector(".lobby-form #lobby-map-selector"),
       hasSidebarAddAi: !!document.querySelector("#lobby-add-ai"),
       statusText: document.querySelector("#lobby-status")?.textContent || "",
       seatDisplay: seat ? getComputedStyle(seat).display : "",
+      hasFactionControl: !!document.querySelector("#lobby-players .player-faction-select, #lobby-players .player-faction-label"),
+      hasSeatMeta: !!document.querySelector("#lobby-players .lobby-seat-meta"),
+      hasTeamCount: !!document.querySelector("#lobby-players .lobby-team-count"),
+      shellColumns: getComputedStyle(document.querySelector(".lobby-shell")).gridTemplateColumns,
+      lobbyChatVisible: getComputedStyle(document.querySelector("#lobby-chat-panel")).display === "grid",
+      chatDocked: document.querySelector("#lobby-chat-dock > #chat-overlay") != null,
+      mapPreviewBeforeDropdown:
+        document.querySelector("#lobby-map-selector")?.children[0]?.classList.contains("lobby-map-preview") &&
+        document.querySelector("#lobby-map-selector")?.children[1]?.classList.contains("lobby-map-control"),
     };
   });
   ok(teamUi.teamRows.some((text) => /Team/.test(text)) && teamUi.newTeamRows === 1,
@@ -116,11 +125,26 @@ try {
   ok(teamUi.draggableSeats >= 1, `host lobby seats are draggable (${teamUi.draggableSeats})`);
   ok(!teamUi.hasModeSummary && !teamUi.hasLaunchCopy && !teamUi.statusText,
     "lobby omits mode summary, launch header copy, and room/player status text");
-  ok(teamUi.mapSelectorInSummary && !teamUi.mapSelectorInSidePanel && !teamUi.hasNativeMapSelect,
-    "host custom map selector replaces the native select in the summary row");
+  ok(!teamUi.mapSelectorInSummary && teamUi.mapSelectorInSidePanel && !teamUi.hasNativeMapSelect,
+    "host custom map selector lives in the right-side match setup controls");
   ok(!teamUi.hasSidebarAddAi, "lobby keeps Add AI contextual to the team roster");
   ok(!teamUi.hasTeamMarks && teamUi.seatDisplay === "grid",
     `lobby teams have no color marks and player rows align with grid (${teamUi.seatDisplay})`);
+  ok(!teamUi.hasFactionControl && !teamUi.hasSeatMeta && !teamUi.hasTeamCount,
+    "dense roster omits faction controls, seat metadata, and team count badges");
+  ok(teamUi.lobbyChatVisible && teamUi.chatDocked && teamUi.shellColumns.split(" ").length === 3,
+    `joined desktop lobby uses roster, setup, and chat columns (${teamUi.shellColumns})`);
+  ok(teamUi.mapPreviewBeforeDropdown,
+    "map preview and creator credit render above the dropdown");
+
+  await page.type("#chat-input", "Lobby ready");
+  await page.click("#chat-send");
+  await page.waitForFunction(
+    () => Array.from(document.querySelectorAll("#chat-messages .chat-message"))
+      .some((line) => line.textContent?.includes("Lobby ready")),
+    { timeout: 5000 },
+  );
+  ok(true, "lobby chat sends through the room and renders in the docked panel");
 
   await page.click("#lobby-map-trigger");
   await page.hover('.lobby-map-option[data-map-name="Schone Tage"]');

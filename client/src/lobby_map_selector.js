@@ -46,6 +46,7 @@ export class LobbyMapSelector {
     this.maps = [];
     this.selectedMap = "";
     this.disabled = true;
+    this.readOnly = false;
     this.optionButtons = [];
     this.catalogKey = "";
 
@@ -83,6 +84,9 @@ export class LobbyMapSelector {
     this.chevron.setAttribute("aria-hidden", "true");
     this.trigger.append(this.triggerLabel, this.chevron);
 
+    this.control = document.createElement("div");
+    this.control.className = "lobby-map-control";
+
     this.popover = document.createElement("div");
     this.popover.className = "lobby-map-popover";
     this.popover.hidden = true;
@@ -118,17 +122,22 @@ export class LobbyMapSelector {
       this.previewCaption,
     );
 
-    this.popover.append(this.optionList, this.previewFigure);
-    this.root.replaceChildren(this.trigger, this.popover);
+    this.popover.appendChild(this.optionList);
+    this.control.append(this.trigger, this.popover);
+    this.root.replaceChildren(this.previewFigure, this.control);
   }
 
-  render({ maps = [], selectedMap = "", visible = false, disabled = false } = {}) {
+  render({ maps = [], selectedMap = "", visible = false, disabled = false, readOnly = false } = {}) {
     if (!this.root || !this.trigger) return;
     this.maps = Array.isArray(maps) ? maps.filter((entry) => String(entry?.name || "")) : [];
     this.selectedMap = String(selectedMap || this.maps[0]?.name || "");
     this.disabled = !!disabled;
+    this.readOnly = !!readOnly;
     this.root.hidden = !visible;
+    this.root.classList.toggle("is-readonly", this.readOnly);
     this.trigger.disabled = this.disabled;
+    this.trigger.setAttribute("aria-readonly", this.readOnly ? "true" : "false");
+    this.trigger.title = this.readOnly ? "Browse maps — only the host can change the selection" : "";
     this.triggerLabel.textContent = this.selectedMap || "Select map";
 
     const nextCatalogKey = this.maps.map((entry) => entry.name).join("\u0000");
@@ -165,7 +174,10 @@ export class LobbyMapSelector {
     for (const button of this.optionButtons) {
       const selected = button.dataset.mapName === this.selectedMap;
       button.classList.toggle("is-selected", selected);
+      button.classList.toggle("is-unavailable", this.readOnly);
       button.setAttribute("aria-selected", selected ? "true" : "false");
+      button.setAttribute("aria-disabled", this.readOnly ? "true" : "false");
+      button.title = this.readOnly ? "Only the host can select this map" : "";
     }
   }
 
@@ -217,7 +229,7 @@ export class LobbyMapSelector {
   }
 
   _select(name) {
-    if (this.disabled || !this.maps.some((entry) => entry.name === name)) return;
+    if (this.disabled || this.readOnly || !this.maps.some((entry) => entry.name === name)) return;
     this.selectedMap = name;
     this.triggerLabel.textContent = name;
     this._reflectSelection();

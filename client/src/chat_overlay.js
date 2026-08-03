@@ -2,6 +2,7 @@ import { S } from "./protocol.js";
 
 export const CHAT_FADE_MS = 8000;
 export const MAX_VISIBLE_CHAT_MESSAGES = 6;
+export const MAX_LOBBY_CHAT_MESSAGES = 50;
 
 function normalizedTeamId(player) {
   const teamId = Number(player?.teamId);
@@ -39,6 +40,8 @@ export class ChatOverlay {
     composer,
     channelLabel,
     input,
+    sendButton = null,
+    lobbyDock = null,
     windowLike = globalThis.window,
     documentLike = globalThis.document,
     fadeMs = CHAT_FADE_MS,
@@ -49,6 +52,11 @@ export class ChatOverlay {
     this.composer = composer;
     this.channelLabel = channelLabel;
     this.input = input;
+    this.sendButton = sendButton;
+    this.lobbyDock = lobbyDock;
+    this.floatingParent = this.root?.parentNode || null;
+    this.floatingNextSibling = this.root?.nextSibling || null;
+    this.docked = false;
     this.windowLike = windowLike;
     this.documentLike = documentLike;
     this.fadeMs = fadeMs;
@@ -62,14 +70,16 @@ export class ChatOverlay {
     this.timers = new Set();
     this.onChat = (message) => this.receive(message);
     this.onKeyDown = (event) => this.handleKeyDown(event);
+    this.onSend = () => this.sendCurrentMessage();
     this.net.on(S.CHAT, this.onChat);
     this.windowLike?.addEventListener?.("keydown", this.onKeyDown, true);
+    this.sendButton?.addEventListener?.("click", this.onSend);
   }
 
   setLobbyContext(payload) {
     const room = String(payload?.room || "");
     if (this.scope !== "lobby" || this.room !== room) {
-      this.closeComposer();
+      this.closeComposer({ force: true });
       this.clearMessages();
     }
     this.enabled = !!room;
@@ -79,11 +89,14 @@ export class ChatOverlay {
     this.channels = ["all"];
     this.channel = "all";
     this.onOpenChange = null;
+    this.dockInLobby();
+    if (this.composer) this.composer.hidden = false;
     this.sync();
   }
 
   setGameContext(payload, { onOpenChange = null } = {}) {
-    this.closeComposer();
+    this.closeComposer({ force: true });
+    this.restoreFloatingRoot();
     this.clearMessages();
     this.enabled = true;
     this.scope = "game";
@@ -101,7 +114,8 @@ export class ChatOverlay {
   }
 
   disable() {
-    this.closeComposer();
+    this.closeComposer({ force: true });
+    this.restoreFloatingRoot();
     this.enabled = false;
     this.room = "";
     this.clearMessages();
@@ -113,11 +127,19 @@ export class ChatOverlay {
     this.root.hidden = !this.enabled;
     this.root.dataset.scope = this.scope;
     if (this.channelLabel) this.channelLabel.textContent = `[${this.channel.toUpperCase()}]`;
-    if (this.input) this.input.placeholder = this.channel === "team" ? "Message allies…" : "Message all…";
+    if (this.input) {
+      this.input.placeholder = this.scope === "lobby"
+        ? "Message lobby…"
+        : this.channel === "team" ? "Message allies…" : "Message all…";
+    }
   }
 
   handleKeyDown(event) {
     if (!this.enabled || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (this.scope === "lobby" && this.docked) {
+      this.handleDockedLobbyKeyDown(event);
+      return;
+    }
     const open = this.composer && !this.composer.hidden;
     if (!open) {
       if (event.code !== "Enter" || this.readOnly || isTextEntry(event.target)) return;
@@ -141,9 +163,33 @@ export class ChatOverlay {
     }
     if (event.code !== "Enter" || event.isComposing) return;
     consume(event);
+    this.sendCurrentMessage();
+  }
+
+  handleDockedLobbyKeyDown(event) {
+    if (event.code === "Escape" && event.target === this.input) {
+      consume(event);
+      if (this.input) this.input.value = "";
+      this.input?.blur?.();
+      return;
+    }
+    if (event.code !== "Enter" || event.isComposing) return;
+    if (isTextEntry(event.target) && event.target !== this.input) return;
+    consume(event);
+    if (event.target !== this.input) {
+      this.input?.focus?.();
+      return;
+    }
+    this.sendCurrentMessage();
+  }
+
+  sendCurrentMessage() {
+    if (!this.enabled || this.readOnly) return;
     const text = String(this.input?.value || "").trim();
-    if (text) this.net.chatSend(this.channel, text);
-    this.closeComposer();
+    if (!text) return;
+    this.net.chatSend(this.channel, text);
+    if (this.input) this.input.value = "";
+    if (this.scope !== "lobby" || !this.docked) this.closeComposer();
   }
 
   openComposer() {
@@ -154,10 +200,11 @@ export class ChatOverlay {
     this.input?.focus?.();
   }
 
-  closeComposer() {
+  closeComposer({ force = false } = {}) {
     if (!this.composer || this.composer.hidden) return;
-    this.composer.hidden = true;
     if (this.input) this.input.value = "";
+    if (this.scope === "lobby" && this.docked && !force) return;
+    this.composer.hidden = true;
     this.onOpenChange?.(false);
   }
 
@@ -168,9 +215,13 @@ export class ChatOverlay {
     const prefix = message.channel === "team" ? "TEAM" : "ALL";
     line.textContent = `[${prefix}] ${String(message.senderName || "Commander")}: ${String(message.text || "")}`;
     this.messages.appendChild(line);
-    while (this.messages.children.length > MAX_VISIBLE_CHAT_MESSAGES) {
+    const maxMessages = this.scope === "lobby"
+      ? MAX_LOBBY_CHAT_MESSAGES
+      : MAX_VISIBLE_CHAT_MESSAGES;
+    while (this.messages.children.length > maxMessages) {
       this.messages.children[0].remove();
     }
+    if (this.scope === "lobby") return;
     const timer = this.windowLike.setTimeout(() => {
       this.timers.delete(timer);
       line.classList?.add?.("is-fading");
@@ -189,10 +240,30 @@ export class ChatOverlay {
     this.messages?.replaceChildren?.();
   }
 
+  dockInLobby() {
+    if (!this.root || !this.lobbyDock) return;
+    if (this.root.parentNode !== this.lobbyDock) this.lobbyDock.appendChild(this.root);
+    this.docked = true;
+  }
+
+  restoreFloatingRoot() {
+    if (!this.root || !this.docked) return;
+    if (this.floatingParent) {
+      if (this.floatingNextSibling?.parentNode === this.floatingParent) {
+        this.floatingParent.insertBefore(this.root, this.floatingNextSibling);
+      } else {
+        this.floatingParent.appendChild(this.root);
+      }
+    }
+    this.docked = false;
+  }
+
   destroy() {
-    this.closeComposer();
+    this.closeComposer({ force: true });
+    this.restoreFloatingRoot();
     this.clearMessages();
     this.net.off(S.CHAT, this.onChat);
     this.windowLike?.removeEventListener?.("keydown", this.onKeyDown, true);
+    this.sendButton?.removeEventListener?.("click", this.onSend);
   }
 }
