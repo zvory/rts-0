@@ -8,7 +8,7 @@ function deepFreeze(value) {
 export const COMMAND_CAR_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "command_car",
-  image: "/assets/rigs/command-car-packed-radio-preview/generated/command-car-packed-radio-stars-triangle-atlas-v3.png?v=large-triangle-stars-preview-3",
+  image: "/assets/rigs/command-car-packed-radio-preview/generated/command-car-packed-radio-stars-30-atlas-v4.png?v=stars-30-preview-4",
   runtimeColorAdjustment: {
     brightness: 90,
     saturation: 90,
@@ -19,9 +19,9 @@ export const COMMAND_CAR_PNG_RIG_ATLAS = deepFreeze({
     layout: "semantic",
     width: 1623,
     height: 1684,
-    sourceSheet: "command-car-packed-radio-stars-triangle-alpha-v3.png",
+    sourceSheet: "command-car-packed-radio-stars-30-alpha-v4.png",
     cells: ["sprite.fixed", "sprite.paint"],
-    imageVersion: "large-triangle-stars-preview-3",
+    imageVersion: "stars-30-preview-4",
   },
   iconComposition: {
     sprites: ["sprite.fixed", "sprite.paint"],
