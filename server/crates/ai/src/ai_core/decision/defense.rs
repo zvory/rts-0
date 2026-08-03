@@ -329,6 +329,116 @@ pub(super) fn defensive_machine_gunner_units(
     units
 }
 
+pub(super) fn defensive_rifleman_units(
+    observation: &AiObservation,
+    profile: &AiProfile,
+) -> Vec<u32> {
+    let Some(policy) = profile.rifleman_defense else {
+        return Vec::new();
+    };
+    if !observation.owned.iter().any(|entity| {
+        entity.kind == policy.activation_building && entity.is_complete && entity.hp > 0
+    }) {
+        return Vec::new();
+    }
+    actions::select_ready_combat_units(&observation.owned, &[EntityKind::Rifleman])
+}
+
+pub(super) fn stage_rifleman_defense(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    profile: &AiProfile,
+    map_analysis: Option<&AiMapAnalysis>,
+    enemy_base: EnemyBaseFact,
+    riflemen: &[u32],
+) -> Option<Vec<u32>> {
+    let policy = profile.rifleman_defense?;
+    let targets = rifleman_defense_targets(observation, map_analysis, enemy_base, policy);
+    if targets.is_empty() {
+        return None;
+    }
+    let units_by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|entity| (entity.id, entity))
+        .collect();
+    let reissue_distance2 =
+        squared(policy.reissue_distance_tiles.max(0.0) * observation.map.tile_size as f32);
+    let mut staged = Vec::new();
+    for unit_id in riflemen.iter().copied() {
+        let Some(unit) = units_by_id.get(&unit_id).copied() else {
+            continue;
+        };
+        // Entity ids are durable, so this remains stable when another defender
+        // temporarily drops out of the ready set to fight a local contact.
+        let target = targets[unit_id as usize % targets.len()];
+        if dist2(unit.x, unit.y, target.0, target.1) <= reissue_distance2 {
+            continue;
+        }
+        if let Some(units) = actions::attack_move_units(actions, [unit_id], target.0, target.1) {
+            staged.extend(units);
+        }
+    }
+    (!staged.is_empty()).then_some(staged)
+}
+
+fn rifleman_defense_targets(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    enemy_base: EnemyBaseFact,
+    policy: RiflemanDefensePolicy,
+) -> Vec<(f32, f32)> {
+    let tile_size = observation.map.tile_size as f32;
+    let own_start = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let mut bases: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|entity| {
+            entity.kind == EntityKind::CityCentre && entity.is_complete && entity.hp > 0
+        })
+        .collect();
+    bases.sort_by(|left, right| {
+        dist2(left.x, left.y, own_start.0, own_start.1)
+            .total_cmp(&dist2(right.x, right.y, own_start.0, own_start.1))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+
+    let mut targets = Vec::new();
+    for base in bases {
+        let origin = (base.x, base.y);
+        let direction =
+            normalized_direction(origin, (enemy_base.x, enemy_base.y)).unwrap_or((1.0, 0.0));
+        let flank = (-direction.1, direction.0);
+        let forward = policy.perimeter_distance_tiles * tile_size;
+        let lateral = policy.perimeter_distance_tiles * 0.6 * tile_size;
+        for offset in [
+            (direction.0 * forward, direction.1 * forward),
+            (
+                direction.0 * forward * 0.75 + flank.0 * lateral,
+                direction.1 * forward * 0.75 + flank.1 * lateral,
+            ),
+            (
+                direction.0 * forward * 0.75 - flank.0 * lateral,
+                direction.1 * forward * 0.75 - flank.1 * lateral,
+            ),
+        ] {
+            targets.push(clamp_to_map(
+                (origin.0 + offset.0, origin.1 + offset.1),
+                observation.map,
+            ));
+        }
+    }
+
+    if let Some(analysis) = map_analysis {
+        for choke in analysis.base_chokes_for_player(observation.player_id, policy.max_main_chokes)
+        {
+            targets.push(choke.own_approach_world);
+            targets.push(choke.center_world);
+        }
+    }
+    targets
+}
+
 pub(super) fn machine_gunner_meets_replacement_health(hp: u32, threshold: u8) -> bool {
     let max_hp = config::unit_stats(EntityKind::MachineGunner)
         .map(|stats| stats.hp)
@@ -1024,5 +1134,93 @@ impl LocalDefenseGeometry {
 
     fn base_dist2(&self, entity: &AiEntitySummary) -> f32 {
         dist2(entity.x, entity.y, self.own_base.0, self.own_base.1)
+    }
+}
+
+#[cfg(test)]
+mod rifleman_defense_tests {
+    use super::*;
+    use crate::ai_core::observation::AiEconomy;
+    use crate::ai_core::profiles::JEFFS_AI;
+
+    fn entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
+        AiEntitySummary {
+            id,
+            owner: 1,
+            kind,
+            x,
+            y,
+            hp: 100,
+            state: AiEntityState::Idle,
+            is_complete: true,
+            production_queue_len: None,
+            production_kind: None,
+            latched_node: None,
+            target_id: None,
+            free_for_combat: kind.is_unit(),
+        }
+    }
+
+    fn observation(owned: Vec<AiEntitySummary>) -> AiObservation {
+        AiObservation {
+            player_id: 1,
+            tick: 1_000,
+            map: AiMapSummary {
+                width: 64,
+                height: 64,
+                tile_size: 32,
+            },
+            economy: AiEconomy {
+                steel: 700,
+                oil: 100,
+                supply_used: 30,
+                supply_cap: 100,
+            },
+            own_start_tile: (8, 8),
+            players: Vec::new(),
+            owned,
+            resources: Vec::new(),
+            visible_allies: Vec::new(),
+            visible_enemies: Vec::new(),
+            pending_builds: Vec::new(),
+            upgrades: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn jeff_reserves_surplus_riflemen_after_factory_completion() {
+        let rifleman = entity(2, EntityKind::Rifleman, 300.0, 300.0);
+        let before_factory = observation(vec![rifleman.clone()]);
+        assert!(defensive_rifleman_units(&before_factory, &JEFFS_AI).is_empty());
+
+        let after_factory =
+            observation(vec![rifleman, entity(3, EntityKind::Factory, 350.0, 350.0)]);
+        assert_eq!(defensive_rifleman_units(&after_factory, &JEFFS_AI), vec![2]);
+    }
+
+    #[test]
+    fn rifle_defense_covers_main_and_expansion_approaches() {
+        let observation = observation(vec![
+            entity(10, EntityKind::CityCentre, 272.0, 272.0),
+            entity(11, EntityKind::CityCentre, 1_200.0, 1_000.0),
+        ]);
+        let enemy = EnemyBaseFact {
+            player_id: 2,
+            start_tile: (55, 55),
+            x: 1_776.0,
+            y: 1_776.0,
+        };
+        let targets = rifleman_defense_targets(
+            &observation,
+            None,
+            enemy,
+            JEFFS_AI.rifleman_defense.unwrap(),
+        );
+        assert_eq!(targets.len(), 6);
+        assert!(targets
+            .iter()
+            .all(|(x, y)| *x >= 0.0 && *y >= 0.0 && *x <= 2_048.0 && *y <= 2_048.0));
+        assert!(targets.iter().any(|(x, _)| *x < 800.0));
+        assert!(targets.iter().any(|(x, _)| *x > 1_000.0));
     }
 }

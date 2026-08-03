@@ -13,7 +13,7 @@ use crate::ai_core::observation::{
 };
 use crate::ai_core::profiles::{
     AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy,
-    ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    ProductionPolicy, ResourcePolicy, RiflemanDefensePolicy, TechTransitionPolicy, WorkerPolicy,
 };
 use crate::ai_shared;
 use crate::config;
@@ -37,11 +37,11 @@ mod turtle;
 
 use self::defense::{
     defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
-    defensive_panic_response, home_defensive_tank_is_positioned, local_defense_target,
-    local_defense_units, machine_gunner_meets_replacement_health,
+    defensive_panic_response, defensive_rifleman_units, home_defensive_tank_is_positioned,
+    local_defense_target, local_defense_units, machine_gunner_meets_replacement_health,
     stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
-    stage_home_machine_gunner_screen, stage_main_steel_defensive_line, DefensivePanicPlan,
-    DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
+    stage_home_machine_gunner_screen, stage_main_steel_defensive_line, stage_rifleman_defense,
+    DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
@@ -755,9 +755,11 @@ where
     }
 
     let defensive_machine_gunners = defensive_machine_gunner_units(observation, profile);
+    let defensive_riflemen = defensive_rifleman_units(observation, profile);
     let defensive_machine_gunner_units: BTreeSet<u32> =
         defensive_machine_gunners.iter().copied().collect();
     let mut frontal_exclusions = defensive_machine_gunner_units.clone();
+    frontal_exclusions.extend(defensive_riflemen.iter().copied());
     if let Some(tank_id) = memory.home_defensive_tank {
         frontal_exclusions.insert(tank_id);
     }
@@ -821,7 +823,27 @@ where
             .copied()
             .filter(|id| !local_defense_assigned.contains(id))
             .collect();
+        let defensive_riflemen_available: Vec<u32> = defensive_riflemen
+            .iter()
+            .copied()
+            .filter(|id| !local_defense_assigned.contains(id))
+            .collect();
         let turtle_defense_active = profile.turtle_defense.is_some();
+
+        if !handled_local_defense && !defensive_riflemen_available.is_empty() {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                if let Some(units) = stage_rifleman_defense(
+                    &mut actions,
+                    observation,
+                    profile,
+                    map_analysis,
+                    enemy_base,
+                    &defensive_riflemen_available,
+                ) {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
 
         if !handled_local_defense && turtle_defense_active {
             if let Some(policy) = profile.turtle_defense {
