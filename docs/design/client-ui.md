@@ -806,6 +806,10 @@ without embedding image content. Portable setup export/import uses the bridge's 
 `exportSetup`/`importSetup` methods and keeps checkpoint bytes out of CLI results. Replay bytes bypass
 the browser and normal WebSocket result through the capability-gated private-server handoff; the
 daemon writes only bounded artifacts and alias sidecars under `target/interact/lab/`.
+Media commands retain the session's CSS viewport dimensions but temporarily raise the default
+capture density: DPR 4 for PNG screenshots and DPR 2 for real-time recordings, fixed-step videos,
+and sampled time lapses. An explicit media viewport DPR overrides that default, and every capture
+restores the prior session viewport when it settles.
 Visual delivery is deliberately not owned by that per-worktree lifecycle. Before returning a
 Tailnet URL, the daemon validates the artifact and copies it into the machine-level
 `tailnet-preview` service on stable port 8091. The preview server has no idle timeout, and each
@@ -823,10 +827,12 @@ and actionable regardless of that success-response option.
 The daemon publishes its startup checkout commit as optional IPC v1 state/probe metadata. The CLI
 refreshes a mismatched daemon only through an atomic idle-only shutdown request; active scenes are
 preserved behind `daemonCheckoutMismatch`, while `status` and `shutdown` remain usable.
-Real-time recording consumes raw Chrome DevTools screencast frames and assigns them to cumulative
-30 FPS monotonic-wall-clock slots before streaming H.264. Its manifest records raw event/timestamp
-gaps and exact source-frame reuse; it warns below 80% source-slot coverage. `record-start` can also
-resume authoritative time atomically after the initial frame through its bounded `resumeSpeed`.
+Real-time recording uses raw Chrome DevTools screencast events as its composition cadence and takes
+non-overlapping physical-resolution PNG source frames from the persistent page. It assigns the
+newest source to cumulative 30 FPS monotonic-wall-clock slots before streaming H.264. Its manifest
+records raw event/timestamp gaps and exact source-frame reuse; it warns below 80% source-slot
+coverage. `record-start` can also resume authoritative time atomically after the initial physical
+frame through its bounded `resumeSpeed`.
 Fixed capture likewise streams up to 1,800 rendered PNG buffers into H.264, retains at most six
 representative PNGs, and keeps per-frame ticks/hashes in the manifest instead of the CLI response.
 

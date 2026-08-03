@@ -129,7 +129,8 @@ export async function checkMediaCapabilities({
 
 // Chrome's screencast timestamps describe compositor events, not a complete video timeline.
 // This recorder deliberately uses one authority: cumulative elapsed monotonic wall time mapped
-// to 30 FPS slots. Each slot receives the newest acknowledged CDP frame, and any reuse is counted.
+// to 30 FPS slots. Each slot receives the newest physical-resolution region frame, and any reuse
+// is counted.
 export async function createWallClockRecorder({ page, outputPath, clip, scale, tools, maxDurationMs, timeoutMs = 15_000 }: {
   page: Page;
   outputPath: string;
@@ -141,15 +142,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
 }) {
   const fps = RECORDING_LIMITS.fps;
   const client = await page.createCDPSession();
-  const viewport = page.viewport?.() || { deviceScaleFactor: 1 };
-  const dpr = Number(viewport.deviceScaleFactor) || 1;
-  const crop = {
-    x: Math.max(0, Math.round(clip.x * dpr)),
-    y: Math.max(0, Math.round(clip.y * dpr)),
-    width: Math.max(2, Math.round(clip.width * dpr)),
-    height: Math.max(2, Math.round(clip.height * dpr)),
-  };
-  const encoder = createPngMp4Encoder({ outputPath, fps, crop, scale, tools });
+  const encoder = createPngMp4Encoder({ outputPath, fps, scale, tools });
   let currentFrame: Buffer|null = null;
   let currentFrameId = 0;
   let rawEvents = 0;
@@ -160,6 +153,8 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
   let startedNs: bigint | null = null;
   let interval: NodeJS.Timeout | undefined;
   let stopping = false;
+  let capturePromise: Promise<void> | null = null;
+  let captureError: InteractRecordingError | null = null;
   let slotsQueued = 0;
   const sourceFramesUsed = new Set<number>();
   const maximumSlots = Math.max(1, Math.ceil(maxDurationMs * fps / 1000));
@@ -167,6 +162,25 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
   let firstFrameReject!: (error: InteractRecordingError) => void;
   const firstFrame = new Promise<void>((resolve, reject) => { firstFrameResolve = resolve; firstFrameReject = reject; });
 
+  const capturePhysicalRegionFrame = () => {
+    if (capturePromise || captureError || stopping) return;
+    capturePromise = (async () => {
+      const buffer = Buffer.from(await page.screenshot({
+        type: "png",
+        clip,
+        captureBeyondViewport: false,
+      }) || []);
+      if (buffer.length === 0) throw new InteractRecordingError("recordingEmpty", "Chrome returned an empty physical recording frame.");
+      currentFrame = buffer;
+      currentFrameId += 1;
+      firstFrameResolve();
+    })().catch((error) => {
+      captureError = error instanceof InteractRecordingError
+        ? error
+        : new InteractRecordingError("recordingCaptureFailed", `Chrome could not capture a physical recording frame: ${error instanceof Error ? error.message : String(error)}`);
+      firstFrameReject(captureError);
+    }).finally(() => { capturePromise = null; });
+  };
   const onFrame = ({ data, metadata = {}, sessionId }: {
     data: string;
     metadata?: { timestamp?: number };
@@ -174,8 +188,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
   }) => {
     void client.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
     if (stopping) return;
-    const buffer = Buffer.from(data || "", "base64");
-    if (buffer.length === 0) return;
+    if (!data) return;
     rawEvents += 1;
     if (startedNs != null) recordingEvents += 1;
     const timestamp = Number(metadata.timestamp);
@@ -184,9 +197,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
       if (lastChromeTimestamp != null) largestChromeGapMs = Math.max(largestChromeGapMs, (timestamp - lastChromeTimestamp) * 1000);
       lastChromeTimestamp = timestamp;
     }
-    currentFrame = buffer;
-    currentFrameId += 1;
-    firstFrameResolve();
+    capturePhysicalRegionFrame();
   };
   client.on("Page.screencastFrame", onFrame);
   try {
@@ -239,6 +250,8 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
       stopping = true;
       client.off("Page.screencastFrame", onFrame);
       try {
+        await capturePromise;
+        if (captureError) throw captureError;
         try {
           await client.send("Page.stopScreencast");
         } finally {
@@ -286,6 +299,7 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
       clearInterval(interval);
       stopping = true;
       client.off("Page.screencastFrame", onFrame);
+      await capturePromise?.catch(() => {});
       await client.send("Page.stopScreencast").catch(() => {});
       await client.detach?.().catch(() => {});
       await encoder.abort();

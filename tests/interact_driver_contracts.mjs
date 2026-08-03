@@ -10,6 +10,8 @@ import {
   InteractDriverError,
   DRIVER_STATES,
   generatedRoomId,
+  INTERACT_MEDIA_DPR,
+  mediaCaptureViewport,
   safeToken,
   transitionDriverState,
   validateWorkspaceRoot,
@@ -42,6 +44,22 @@ try {
 
 assert.equal(safeToken("safe_room-2", "fallback"), "safe_room-2", "safe Interact names are retained");
 assert.equal(safeToken("../escape", "fallback"), "fallback", "unsafe Interact names are rejected");
+assert.deepEqual(INTERACT_MEDIA_DPR, { screenshot: 4, video: 2 }, "Interact media uses high-resolution capture defaults");
+assert.deepEqual(
+  mediaCaptureViewport(null, { width: 1440, height: 900, deviceScaleFactor: 1 }, INTERACT_MEDIA_DPR.screenshot),
+  { width: 1440, height: 900, deviceScaleFactor: 4 },
+  "screenshots retain the current CSS viewport dimensions while defaulting to DPR 4",
+);
+assert.deepEqual(
+  mediaCaptureViewport({ width: 1000, height: 700 }, { width: 1440, height: 900, deviceScaleFactor: 1 }, INTERACT_MEDIA_DPR.video),
+  { width: 1000, height: 700, deviceScaleFactor: 2 },
+  "videos apply DPR 2 when a requested viewport omits its DPR",
+);
+assert.deepEqual(
+  mediaCaptureViewport({ width: 1000, height: 700, deviceScaleFactor: 3 }, null, INTERACT_MEDIA_DPR.video),
+  { width: 1000, height: 700, deviceScaleFactor: 3 },
+  "an explicit media DPR still overrides the capture default",
+);
 assert.match(generatedRoomId("0123456789abcdef"), /^interact-lab-[A-Za-z0-9_-]+$/, "generated rooms stay protocol-safe");
 const oversizedLogLine = `2026-07-11 INFO client network report ${"detail=".repeat(200)} final-marker`;
 const boundedLogLine = boundLogLine(oversizedLogLine);

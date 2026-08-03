@@ -141,7 +141,7 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   screenshot: descriptor("Capture a readiness-checked selected-renderer PNG and return its shareable Tailnet Preview URL.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,subjects?:(alias|u32)[]}", {
     variants: ["presentation=clean hides UI chrome", "presentation=normal retains visible Lab panels and game UI", "response.preview.url is the user-delivery URL; local capture paths are withheld"],
-    defaults: ["name=scene", "presentation=clean", "viewport=current viewport", "subjects=[]"], bounds: ["0-400 subjects", "name 1-48 safe-token characters", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
+    defaults: ["name=scene", "presentation=clean", "viewport=current dimensions at DPR 4", "subjects=[]"], bounds: ["0-400 subjects", "name 1-48 safe-token characters", "capture viewport 320-2048 x 240-2048", "DPR >0 and <=4", "24 detailed subject summaries"],
     example: { sessionId: "<lab-session-id>", name: "subject", presentation: "clean", subjects: ["subject"] },
   }),
   status: descriptor("Inspect daemon/session state; remains available across checkout mismatch.", "{sessionId?:string}", {
@@ -168,7 +168,7 @@ const COMMAND_RECORDS = Object.freeze({
   "record-start": descriptor("Start one real-time clean-presentation H.264 recording.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:{x,y,width,height},scale?:number,resumeSpeed?:number}", {
     recordable: false,
     variants: ["resumeSpeed atomically resumes authoritative time after the recorder has its initial frame"],
-    defaults: ["name=recording", "maxDurationMs=10000", "viewport=current", "crop=game viewport", "scale=1", "resumeSpeed=omitted"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "resumeSpeed 0.01-16", "one active recorder", "64 MiB output"],
+    defaults: ["name=recording", "maxDurationMs=10000", "viewport=current dimensions at DPR 2", "crop=game viewport", "scale=1", "resumeSpeed=omitted"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "DPR >0 and <=4", "scale 0.25-1", "resumeSpeed 0.01-16", "one active recorder", "64 MiB output"],
     example: { sessionId: "<lab-session-id>", name: "motion", maxDurationMs: 10000, resumeSpeed: 1 },
   }),
   "record-stop": descriptor("Finalize the active real-time recording and return shareable Tailnet video/contact-sheet previews.", "{sessionId:string}", {
@@ -183,7 +183,7 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence and return a Tailnet video preview.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
     timeoutClass: "lifecycle-media",
-    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "six retained representative PNGs", "Tailnet video/contact-sheet preview", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
+    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current dimensions at DPR 2"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "DPR >0 and <=4", "six retained representative PNGs", "Tailnet video/contact-sheet preview", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
     example: { sessionId: "<lab-session-id>", name: "motion-fixed", fps: 30, frameCount: 60 },
   }),
   "capture-cancel": descriptor("Request cancellation of the active fixed-step or time-lapse capture.", "{sessionId:string}", {
@@ -234,22 +234,22 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   "game-screenshot": descriptor("Capture a readiness-checked match PNG with UI visible by default.", "{sessionId:string,name?:token,presentation?:\"normal\"|\"clean\",viewport?:viewport,region?:\"viewport\"|\"minimap\"|\"tab-menu\"|crop,subjects?:u32[]}", {
     variants: ["region=viewport captures the whole game screen", "region=minimap captures the minimap", "region=tab-menu captures the visible hold-Tab sidebar", "a crop is relative to the game viewport", "presentation=clean captures only the rendered battlefield", "response.preview.url is the user-delivery URL"],
-    defaults: ["name=game", "presentation=normal", "viewport=current", "region=viewport", "subjects=[]"],
-    bounds: ["0-400 unique subject ids", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
+    defaults: ["name=game", "presentation=normal", "viewport=current dimensions at DPR 4", "region=viewport", "subjects=[]"],
+    bounds: ["0-400 unique subject ids", "capture viewport 320-2048 x 240-2048", "DPR >0 and <=4", "24 detailed subject summaries"],
     example: { sessionId: "<game-session-id>", name: "opening-ui", presentation: "normal" },
   }),
   "game-record-start": descriptor("Start one real-time H.264 recording with match UI visible by default.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:crop,region?:\"viewport\"|\"minimap\"|crop,scale?:number,presentation?:\"normal\"|\"clean\"}", {
     recordable: false,
     variants: ["presentation=normal retains the HUD and overlays", "presentation=clean records only the battlefield"],
-    defaults: ["name=game", "maxDurationMs=10000", "viewport=current", "region=viewport", "scale=1", "presentation=normal"],
-    bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
+    defaults: ["name=game", "maxDurationMs=10000", "viewport=current dimensions at DPR 2", "region=viewport", "scale=1", "presentation=normal"],
+    bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "DPR >0 and <=4", "scale 0.25-1", "one active recorder", "64 MiB output"],
     example: { sessionId: "<game-session-id>", name: "opening-move", maxDurationMs: 10000, presentation: "normal" },
   }),
   "game-capture-timelapse": descriptor("Capture sampled AI-vs-AI spectator frames as a compact H.264 time-lapse.", "{sessionId:string,name?:token,maxDurationMs?:int,sampleEveryMs?:int,fps?:int,speed?:number,viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,presentation?:\"normal\"|\"clean\"}", {
     timeoutClass: "lifecycle-media", recordable: false,
     variants: ["stops when the match concludes or maxDurationMs expires", "region=viewport|minimap|custom crop", "use game camera overview first for a whole-map battlefield time-lapse"],
-    defaults: ["name=timelapse", "maxDurationMs=60000", "sampleEveryMs=1000", "fps=30", "speed=8", "region=viewport", "presentation=normal"],
-    bounds: ["AI-vs-AI spectator session only", "duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "at most 1800 frames", "64 MiB output"],
+    defaults: ["name=timelapse", "maxDurationMs=60000", "sampleEveryMs=1000", "fps=30", "speed=8", "viewport=current dimensions at DPR 2", "region=viewport", "presentation=normal"],
+    bounds: ["AI-vs-AI spectator session only", "duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "DPR >0 and <=4", "at most 1800 frames", "64 MiB output"],
     example: { sessionId: "<game-session-id>", name: "whole-map", maxDurationMs: 120000, sampleEveryMs: 1000, speed: 8, region: "viewport" },
   }),
   "scenario-open": descriptor("Open or recover one authored server-backed dev scenario for observation and media capture.", "{workspaceRoot?:string,id:token,unit:token,count:int,blocker?:token,case?:token,viewport?:viewport}", {
@@ -278,22 +278,22 @@ const COMMAND_RECORDS = Object.freeze({
   }),
   "scenario-screenshot": descriptor("Capture a readiness-checked dev-scenario PNG with a clean battlefield by default.", "{sessionId:string,name?:token,presentation?:\"clean\"|\"normal\",viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,subjects?:u32[]}", {
     variants: ["region=viewport|minimap|custom crop", "presentation=normal retains the HUD", "response.preview.url is the user-delivery URL"],
-    defaults: ["name=scenario", "presentation=clean", "viewport=current", "region=viewport", "subjects=[]"],
-    bounds: ["0-400 unique subject ids", "capture viewport 320-2048 x 240-2048", "24 detailed subject summaries"],
+    defaults: ["name=scenario", "presentation=clean", "viewport=current dimensions at DPR 4", "region=viewport", "subjects=[]"],
+    bounds: ["0-400 unique subject ids", "capture viewport 320-2048 x 240-2048", "DPR >0 and <=4", "24 detailed subject summaries"],
     example: { sessionId: "<scenario-session-id>", name: "before", presentation: "clean" },
   }),
   "scenario-record-start": descriptor("Start one real-time H.264 dev-scenario recording with a clean battlefield by default.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:crop,region?:\"viewport\"|\"minimap\"|crop,scale?:number,presentation?:\"clean\"|\"normal\"}", {
     recordable: false,
     variants: ["presentation=clean records only the battlefield", "presentation=normal retains the HUD and overlays"],
-    defaults: ["name=scenario", "maxDurationMs=10000", "viewport=current", "region=viewport", "scale=1", "presentation=clean"],
-    bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "scale 0.25-1", "one active recorder", "64 MiB output"],
+    defaults: ["name=scenario", "maxDurationMs=10000", "viewport=current dimensions at DPR 2", "region=viewport", "scale=1", "presentation=clean"],
+    bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "DPR >0 and <=4", "scale 0.25-1", "one active recorder", "64 MiB output"],
     example: { sessionId: "<scenario-session-id>", name: "full-run", maxDurationMs: 10000 },
   }),
   "scenario-capture-timelapse": descriptor("Capture sampled dev-scenario frames as a compact H.264 time-lapse and contact sheet.", "{sessionId:string,name?:token,maxDurationMs?:int,sampleEveryMs?:int,fps?:int,speed?:number,viewport?:viewport,region?:\"viewport\"|\"minimap\"|crop,presentation?:\"clean\"|\"normal\"}", {
     timeoutClass: "lifecycle-media", recordable: false,
     variants: ["stops when the scenario concludes or maxDurationMs expires", "region=viewport|minimap|custom crop", "use dev-scenario camera overview first for a whole-map time-lapse"],
-    defaults: ["name=timelapse", "maxDurationMs=60000", "sampleEveryMs=1000", "fps=30", "speed=8", "region=viewport", "presentation=clean"],
-    bounds: ["duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "at most 1800 frames", "64 MiB output"],
+    defaults: ["name=timelapse", "maxDurationMs=60000", "sampleEveryMs=1000", "fps=30", "speed=8", "viewport=current dimensions at DPR 2", "region=viewport", "presentation=clean"],
+    bounds: ["duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "DPR >0 and <=4", "at most 1800 frames", "64 MiB output"],
     example: { sessionId: "<scenario-session-id>", name: "pathing", maxDurationMs: 30000, sampleEveryMs: 500, speed: 4 },
   }),
 });

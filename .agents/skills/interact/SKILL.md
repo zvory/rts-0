@@ -43,9 +43,11 @@ move, order, build, or send arbitrary input. Scenario media defaults to `present
    focus without padding uses the intentionally close 32-world-pixel default. Use `select` before a
    capture when selection rings, range overlays, support-weapon cones, or the selected-unit HUD are
    part of the review; pass an empty reference/id list to clear browser-local selection.
-4. Run `screenshot` with a safe name, a bounded viewport such as 1000×700 at DPR 1, and any subject
-   aliases. Use `presentation: "clean"` to hide UI chrome or `presentation: "normal"` to retain
-   visible Lab panels and game UI.
+4. Run `screenshot` with a safe name, a bounded viewport such as 1000×700, and any subject aliases.
+   Screenshots default to DPR 4 while retaining the session's CSS viewport dimensions. Videos
+   (`record-start`, `capture-fixed`, and time lapses) default to DPR 2. An explicit viewport DPR
+   overrides the media default. Use `presentation: "clean"` to hide UI chrome or
+   `presentation: "normal"` to retain visible Lab panels and game UI.
    Game screenshots and recordings also accept `region:"viewport"`, `region:"minimap"`, or a
    viewport-relative `{x,y,width,height}` region. Minimap capture requires normal presentation.
 5. For an AI-vs-AI time lapse, open with `spectate:[ai,ai]`. Use `game camera` with
