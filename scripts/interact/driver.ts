@@ -386,7 +386,6 @@ export class InteractDriver {
 
   async time(control: JsonObject) { return this.call("time", control); }
   async vision(vision: JsonObject) { return this.call("vision", { vision }); }
-
   async inspect(query: JsonObject = {}) { return this.call("inspect", query); }
   async select(entityIds: number[]) { return this.call("select", { entityIds }); }
   async camera(command: JsonObject) { return this.call("camera", command); }
