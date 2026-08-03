@@ -79,7 +79,7 @@ import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 import { StressTestRunner } from "./stress_test.js";
 import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
 import { ChatOverlay } from "./chat_overlay.js";
-import { MapPreviewBridge } from "./map_preview_bridge.js";
+import { MAP_PREVIEW_CAMERA_MIN_ZOOM, MapPreviewBridge } from "./map_preview_bridge.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -831,6 +831,7 @@ export class App {
         observerAnalysisOverlayPreferences: this.observerAnalysisOverlayPreferences,
         aiDiagnosticsPanelPreferences: this.aiDiagnosticsPanelPreferences,
         capabilities,
+        cameraMinZoom: this.mapPreviewLaunch ? MAP_PREVIEW_CAMERA_MIN_ZOOM : undefined,
         cameraMaxZoom: labMetadata ? CAMERA.labMaxZoom : undefined,
         labMetadata,
         labClient: this.labClient,

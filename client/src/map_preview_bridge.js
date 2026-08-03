@@ -8,6 +8,10 @@ export const MAP_PREVIEW_LIMITS = Object.freeze({
   captureTimeoutMs: 45_000,
 });
 
+// A 256×256 authored map is 8192 world pixels wide. This floor lets even the
+// smallest bounded export frame that entire map while remaining positive.
+export const MAP_PREVIEW_CAMERA_MIN_ZOOM = 1 / 4096;
+
 export class MapPreviewBridge {
   constructor({
     app,
@@ -99,7 +103,10 @@ export class MapPreviewBridge {
       signal.throwIfAborted();
       const capture = match.enterFixedCapture();
       fixedCapture = true;
-      const frame = await match.renderFixedCaptureFrame(capture.visualStartMs + 16);
+      const frame = await awaitWithSignal(
+        match.renderFixedCaptureFrame(capture.visualStartMs + 16),
+        signal,
+      );
       signal.throwIfAborted();
       const pixels = await match.renderer.readPresentedPixels(frame.rendererFrame, { signal });
       signal.throwIfAborted();
@@ -298,6 +305,25 @@ async function runWithDeadline(operation, timeoutMs) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function awaitWithSignal(promise, signal) {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      callback(value);
+    };
+    const onAbort = () => finish(reject, signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    Promise.resolve(promise).then(
+      (value) => finish(resolve, value),
+      (error) => finish(reject, error),
+    );
+  });
 }
 
 function boundedTimeout(value) {

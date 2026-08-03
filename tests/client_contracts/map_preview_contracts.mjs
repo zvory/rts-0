@@ -3,12 +3,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { Camera } from "../../client/src/camera.js";
 import { mapPreviewLaunchConfig } from "../../client/src/map_preview_launch.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { Fog } from "../../client/src/fog.js";
 import { captureMinimapPng } from "../../client/src/minimap_capture.js";
 import {
   analyzeRgba,
+  MAP_PREVIEW_CAMERA_MIN_ZOOM,
   MAP_PREVIEW_LIMITS,
   MapPreviewBridge,
   normalizeCaptureRequest,
@@ -52,6 +54,34 @@ assert.deepEqual(analyzeRgba(Uint8Array.from([0, 0, 0, 255, 1, 2, 3, 255])), {
   dominantColorPixels: 1,
   nonDominantPixels: 1,
 });
+
+{
+  const outputPixels = 2048;
+  const padding = 32;
+  const worldPixels = 256 * 32;
+  const corners = [
+    { x: 0, y: 0 },
+    { x: worldPixels, y: 0 },
+    { x: worldPixels, y: worldPixels },
+    { x: 0, y: worldPixels },
+  ];
+  const normalCamera = new Camera(outputPixels, outputPixels);
+  normalCamera.setMapBounds(worldPixels, worldPixels);
+  normalCamera.fitWorldPoints(corners, { paddingCssPx: padding });
+  assert.equal(normalCamera.zoom, 0.4, "the normal live camera retains its gameplay zoom floor");
+  assert.ok(outputPixels / normalCamera.zoom < worldPixels, "the gameplay floor cannot frame a 256×256 map");
+
+  const previewCamera = new Camera(outputPixels, outputPixels, { minZoom: MAP_PREVIEW_CAMERA_MIN_ZOOM });
+  previewCamera.setMapBounds(worldPixels, worldPixels);
+  previewCamera.fitWorldPoints(corners, { paddingCssPx: padding });
+  assert.equal(previewCamera.zoom, (outputPixels - padding * 2) / worldPixels);
+  assert.ok(outputPixels / previewCamera.zoom >= worldPixels,
+    "the preview-only camera floor fits every edge of a 256×256 map at the default export size");
+  const appSource = fs.readFileSync(new URL("../../client/src/app.js", import.meta.url), "utf8");
+  const matchSource = fs.readFileSync(new URL("../../client/src/match.js", import.meta.url), "utf8");
+  assert.match(appSource, /cameraMinZoom: this\.mapPreviewLaunch \? MAP_PREVIEW_CAMERA_MIN_ZOOM : undefined/);
+  assert.match(matchSource, /minZoom: options\.cameraMinZoom \?\? autoSpectatorCameraMinZoom/);
+}
 
 {
   const fog = new Fog(2, 2);
@@ -163,20 +193,39 @@ try {
   };
   globalThis.requestAnimationFrame = (callback) => { queueMicrotask(callback); return 1; };
   try {
-    const fixture = createBridgeFixture({ renderDelayMs: 15 });
+    let resolveLateFrame;
+    const lateFrame = new Promise((resolve) => { resolveLateFrame = resolve; });
+    const fixture = createBridgeFixture({ renderPromise: lateFrame });
     const bridge = new MapPreviewBridge({ ...fixture, captureTimeoutMs: 2 });
-    await assert.rejects(
-      bridge.call("capture", { kind: "world", width: 64, height: 64, padding: 0 }),
-      /timed out/,
-    );
-    assert.equal(fixture.match.exitCount, 1, "timed-out fixed capture exits before rejection");
-    assert.equal(fixture.match.resizeCount, 2, "timed-out capture restores renderer, then fitted preview, before rejection");
-    const stable = { exits: fixture.match.exitCount, resizes: fixture.match.resizeCount, fits: fixture.camera.fitCalls.length };
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await Promise.race([
+      assert.rejects(
+        bridge.call("capture", { kind: "world", width: 64, height: 64, padding: 0 }),
+        /timed out/,
+      ),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("capture deadline did not settle")), 100)),
+    ]);
+    assert.equal(fixture.renderer.readCalls, 0,
+      "deadline rejection does not continue into framebuffer readback");
+    assert.equal(bridge.captureActive, false, "deadline releases the capture lock");
+    assert.equal(fixture.match.exitCount, 1, "hung fixed capture exits before rejection");
+    assert.equal(fixture.match.resizeCount, 2, "hung capture restores renderer, then fitted preview, before rejection");
+    const stable = {
+      exits: fixture.match.exitCount,
+      resizes: fixture.match.resizeCount,
+      fits: fixture.camera.fitCalls.length,
+      reads: fixture.renderer.readCalls,
+    };
+    resolveLateFrame({ rendererFrame: 9 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     assert.deepEqual(
-      { exits: fixture.match.exitCount, resizes: fixture.match.resizeCount, fits: fixture.camera.fitCalls.length },
+      {
+        exits: fixture.match.exitCount,
+        resizes: fixture.match.resizeCount,
+        fits: fixture.camera.fitCalls.length,
+        reads: fixture.renderer.readCalls,
+      },
       stable,
-      "no timed-out capture continues mutating presentation after the caller regains control",
+      "late fixed-frame completion cannot mutate restored preview state",
     );
   } finally {
     globalThis.ImageData = savedImageData2;
@@ -243,7 +292,7 @@ try {
   assert.equal(browserClosed, true, "browser closes after a hung page evaluation");
 }
 
-function createBridgeFixture({ renderDelayMs = 0 } = {}) {
+function createBridgeFixture({ renderPromise = null } = {}) {
   const rgba = new Uint8Array(64 * 64 * 4);
   for (let index = 0; index < rgba.length; index += 4) {
     rgba[index] = (index / 4) % 2;
@@ -268,11 +317,13 @@ function createBridgeFixture({ renderDelayMs = 0 } = {}) {
   };
   const renderer = {
     resizeCalls: [],
+    readCalls: 0,
     resize(...args) { this.resizeCalls.push(args); },
     captureReadiness() {
       return { ready: true, failedAssets: [], pendingAssets: [], renderErrors: [], missingTextureSubjectIds: [] };
     },
     async readPresentedPixels(frameId) {
+      this.readCalls += 1;
       assert.equal(frameId, 9);
       return { width: 64, height: 64, rgba };
     },
@@ -306,7 +357,7 @@ function createBridgeFixture({ renderDelayMs = 0 } = {}) {
     handleResize() { this.resizeCount += 1; },
     enterFixedCapture() { return { visualStartMs: 100 }; },
     async renderFixedCaptureFrame() {
-      if (renderDelayMs) await new Promise((resolve) => setTimeout(resolve, renderDelayMs));
+      if (renderPromise) return renderPromise;
       return { rendererFrame: 9 };
     },
     exitFixedCapture() { this.exitCount += 1; },
