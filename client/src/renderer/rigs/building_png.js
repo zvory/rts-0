@@ -137,6 +137,9 @@ function atlas(spec) {
       frame: frame(frameWidth),
     },
   ];
+  const bodyParts = ["part.base", "part.tint"];
+  const shadowParts = [];
+  let nextColumn = 2;
   if (silhouetteShadow) {
     sprites.push({
       id: "sprite.shadow",
@@ -144,8 +147,10 @@ function atlas(spec) {
       sourceParts: ["part.shadow"],
       tintSlot: "fixed",
       drawOrder: 0,
-      frame: frame(frameWidth * 2),
+      frame: frame(frameWidth * nextColumn),
     });
+    shadowParts.push("part.shadow");
+    nextColumn += 1;
   }
   if (emblem) {
     sprites.push({
@@ -154,10 +159,12 @@ function atlas(spec) {
       sourceParts: ["part.emblem"],
       tintSlot: "team",
       drawOrder: 12,
-      frame: frame(frameWidth * 3),
+      frame: frame(frameWidth * nextColumn),
     });
+    bodyParts.push("part.emblem");
+    nextColumn += 1;
   }
-  const columns = 2 + Number(silhouetteShadow) + Number(emblem);
+  const columns = nextColumn;
   return deepFreeze({
     enabled: true,
     unit: kind,
@@ -173,6 +180,10 @@ function atlas(spec) {
       rows: 1,
       width: frameWidth * columns,
       height: frameHeight,
+    },
+    routes: {
+      body: bodyParts,
+      shadow: shadowParts,
     },
     sprites,
   });

@@ -57,19 +57,6 @@ import {
   terrainOverlayColor,
 } from "./terrain_palette.js";
 
-const PERSPECTIVE_BUILDING_BODY_PARTS = Object.freeze(["part.base", "part.tint"]);
-const PERSPECTIVE_BUILDING_EMBLEM_BODY_PARTS = Object.freeze([
-  ...PERSPECTIVE_BUILDING_BODY_PARTS,
-  "part.emblem",
-]);
-const PERSPECTIVE_BUILDING_SHADOW_PARTS = Object.freeze(["part.shadow"]);
-
-function perspectiveBuildingBodyParts(atlas) {
-  return atlas?.sprites?.some((sprite) => sprite.animationPart === "part.emblem")
-    ? PERSPECTIVE_BUILDING_EMBLEM_BODY_PARTS
-    : PERSPECTIVE_BUILDING_BODY_PARTS;
-}
-
 export function _drawBuilding(e, colorByOwner, state) {
   const stat = STATS[e.kind] || {};
   const ts = (this._map && this._map.tileSize) || 32;
@@ -95,8 +82,9 @@ export function _drawBuilding(e, colorByOwner, state) {
   const usePngRig = !!(pngDefinition && pngAtlas && pngAtlasTexture);
   const definition = usePngRig ? pngDefinition : svgDefinition;
 
-  const usePngSilhouetteShadow = usePngRig
-    && pngAtlas.sprites.some((sprite) => sprite.animationPart === "part.shadow");
+  const pngBodyParts = pngAtlas?.routes?.body;
+  const pngShadowParts = pngAtlas?.routes?.shadow;
+  const usePngSilhouetteShadow = usePngRig && pngShadowParts.length > 0;
   if (usePngSilhouetteShadow) {
     renderPngUnitRig(this, e, colorByOwner, state, pngDefinition, {
       atlas: pngAtlas,
@@ -104,7 +92,7 @@ export function _drawBuilding(e, colorByOwner, state) {
       routes: [{
         poolName: "buildingPngShadows",
         layerName: "buildingShadows",
-        parts: PERSPECTIVE_BUILDING_SHADOW_PARTS,
+        parts: pngShadowParts,
       }],
       alpha: bodyAlpha,
     });
@@ -143,9 +131,9 @@ export function _drawBuilding(e, colorByOwner, state) {
       g.rtsStaticRenderKey = bodyKey;
     }
   } else {
-    // Production PNG bodies use one fixed full-color layer plus one extracted
-    // cream-paint mask tinted at runtime. SVG rigs remain the loading and
-    // asset-failure fallback; imperative geometry covers compile failures.
+    // Production PNG bodies use one fixed full-color layer plus team-tinted
+    // paint and optional emblem layers. SVG rigs remain the loading and asset-
+    // failure fallback; imperative geometry covers compile failures.
     if (definition) {
       if (usePngRig) {
         renderPngUnitRig(this, e, colorByOwner, state, definition, {
@@ -154,7 +142,7 @@ export function _drawBuilding(e, colorByOwner, state) {
           routes: [{
             poolName: "buildingRigs",
             layerName: "buildings",
-            parts: usePngSilhouetteShadow ? perspectiveBuildingBodyParts(pngAtlas) : undefined,
+            parts: pngBodyParts,
           }],
           alpha: bodyAlpha,
         });
