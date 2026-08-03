@@ -1,9 +1,11 @@
 import { MOVEMENT_PATH_DIAGNOSTICS } from "./protocol.js";
 
-export function initializeMatchDisplayPreferences(match, options = {}) {
+export function configureMatchDisplayPreferences(match, options = {}) {
   if (!match?.state) return;
   match.onUnitRangesEnabledChange = options.onUnitRangesEnabledChange;
   match.onHealthBarsAlwaysEnabledChange = options.onHealthBarsAlwaysEnabledChange;
+  match.onUnitRangeToggle = match.toggleUnitRangeOverlays.bind(match);
+  match.onHealthBarToggle = () => toggleHealthBars(match);
   match.state.showUnitRangesEnabled = options.unitRangesEnabled !== false;
   match.state.showHealthBarsAlwaysEnabled = !!options.healthBarsAlwaysEnabled;
 }

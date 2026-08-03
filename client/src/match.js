@@ -69,7 +69,7 @@ import {
   handleInteractiveMenuStateChange as updateInteractiveMenuCapture,
 } from "./match_cursor_capture.js";
 import {
-  initializeMatchDisplayPreferences,
+  configureMatchDisplayPreferences,
   toggleDebugPaths,
   toggleUnitRanges,
 } from "./match_settings_toggles.js";
@@ -269,7 +269,7 @@ export class Match {
       net: this.net, state: this.state, labClient: this.labClient,
       resetPresentation: () => this.resetGroundDecalPresentation(),
     });
-    initializeMatchDisplayPreferences(this, options);
+    configureMatchDisplayPreferences(this, options);
     this.controlPolicy = this._timeInit(
       "match.controlPolicy",
       () => createControlPolicyProjection(this.labControlPolicy),
@@ -431,7 +431,6 @@ export class Match {
     this.onUnpauseGame = this.requestUnpauseGame.bind(this);
     this.onPointerLockToggle = this.togglePointerLock.bind(this);
     this.onDebugPathToggle = this.toggleDebugPathOverlays.bind(this);
-    this.onUnitRangeToggle = this.toggleUnitRangeOverlays.bind(this);
     this.onExclusiveFullscreenToggle = () =>
       this.onExclusiveFullscreenEnabledChange?.(!this.exclusiveFullscreenEnabled);
     this.onPointerLockChange = this.handlePointerLockChange.bind(this);

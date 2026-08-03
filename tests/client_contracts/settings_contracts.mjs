@@ -32,6 +32,9 @@ import {
   writeAlwaysShowHealthBarsEnabled,
 } from "../../client/src/health_bar_settings.js";
 import {
+  configureMatchDisplayPreferences,
+} from "../../client/src/match_settings_toggles.js";
+import {
   HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PROFILE_SCHEMA_VERSION,
@@ -245,6 +248,35 @@ function hotkeyService() {
     assert(readAlwaysShowHealthBarsEnabled(storage), "always-show health bars persists enabled state");
     writeAlwaysShowHealthBarsEnabled(false, storage);
     assert(!readAlwaysShowHealthBarsEnabled(storage), "always-show health bars clears its override when disabled");
+    const unavailableStorage = {
+      getItem() { throw new Error("storage unavailable"); },
+      setItem() { throw new Error("storage unavailable"); },
+    };
+    assert(!readAlwaysShowHealthBarsEnabled(unavailableStorage), "health-bar storage read failures use the safe default");
+    writeAlwaysShowHealthBarsEnabled(true, unavailableStorage);
+  }
+
+  {
+    const state = {};
+    let synced = 0;
+    let notified = null;
+    const match = {
+      state,
+      syncSettingsToggleUi() { synced += 1; },
+      toggleUnitRangeOverlays() {},
+    };
+    configureMatchDisplayPreferences(match, {
+      unitRangesEnabled: false,
+      healthBarsAlwaysEnabled: true,
+      onHealthBarsAlwaysEnabledChange(enabled) { notified = enabled; },
+    });
+    assert(!state.showUnitRangesEnabled, "match display preferences initialize unit ranges");
+    assert(state.showHealthBarsAlwaysEnabled, "match display preferences initialize health bars");
+
+    match.onHealthBarToggle();
+    assert(!state.showHealthBarsAlwaysEnabled, "match health-bar toggle updates display state");
+    assert(synced === 1, "match health-bar toggle refreshes settings UI");
+    assert(notified === false, "match health-bar toggle publishes the new preference");
   }
 
   withFakeSettingsDocument(() => {

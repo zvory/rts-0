@@ -70,6 +70,7 @@ const frameInputs = {
     feedbackOwnerId: 1,
     feedbackOwnerIds: [1],
     showUnitRangesEnabled: true,
+    showHealthBarsAlwaysEnabled: true,
     commandFeedback: [{ kind: "move", x: 30, y: 30 }],
     enemyAntiTankGunThreats: () => [
       {
@@ -182,6 +183,10 @@ assert(
 assert(
   engine.renders[0].options.feedbackView.enemyAntiTankGunThreats()[1]?.threatMemory === false,
   "Pixi receives live anti-tank warning state from the immutable presentation frame",
+);
+assert(
+  engine.renders[0].options.feedbackView.showHealthBarsAlwaysEnabled === true,
+  "Pixi receives the always-show health-bar preference from the immutable presentation frame",
 );
 
 const nextFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 516, sourceTick: 10, groundDecals: [], groundDecalRevision: 0 });

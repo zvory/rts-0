@@ -1,5 +1,4 @@
 import { buildBackToLobbyAction, buildGiveUpAction, buildPauseAction, buildSettingsTabs } from "./settings_panels.js";
-import { toggleHealthBars } from "./match_settings_toggles.js";
 import { MOVEMENT_PATH_DIAGNOSTICS } from "./protocol.js";
 
 export function buildMatchSettingsContextForMatch(match) {
@@ -22,7 +21,7 @@ export function buildMatchSettingsContextForMatch(match) {
     onPointerLockToggle: match.onPointerLockToggle,
     onDebugPathToggle: match.onDebugPathToggle,
     onUnitRangeToggle: match.onUnitRangeToggle,
-    onHealthBarToggle: () => toggleHealthBars(match),
+    onHealthBarToggle: match.onHealthBarToggle,
     onExclusiveFullscreenToggle: match.onExclusiveFullscreenToggle,
     exclusiveFullscreenEnabled: match.exclusiveFullscreenEnabled,
     livePauseActionLabel: () => match.livePauseActionLabel(),

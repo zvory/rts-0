@@ -85,6 +85,7 @@ const feedback = {
   feedbackOwnerIds: [1],
   issueAsOwnerId: 1,
   showUnitRangesEnabled: true,
+  showHealthBarsAlwaysEnabled: true,
   showSelectedFieldOfFireEnabled: false,
   debugPathOverlaysEnabled: false,
   showAllDebugPathOverlays: false,
@@ -205,6 +206,12 @@ assert(
 assert(
   frame.layers.tacticalFeedback.some((record) => record.type === "formationMovePreview" && record.points.length === 2 && record.slots.length === 1),
   "formation stroke and destination slots cross the backend-neutral tactical-feedback boundary",
+);
+assert(
+  frame.layers.tacticalFeedback.some((record) => (
+    record.type === "feedbackContext" && record.showHealthBarsAlwaysEnabled === true
+  )),
+  "always-show health-bar preference crosses the backend-neutral feedback boundary",
 );
 assert(frame.layers.screenOverlay[0]?.type === "marquee", "screen marquee crosses through the screen overlay layer");
 assert(frame.layers.fogGatedWorld[0].selected === true, "visual selected state is resolved before the backend boundary");

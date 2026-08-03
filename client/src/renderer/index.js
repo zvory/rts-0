@@ -1201,7 +1201,7 @@ export class Renderer {
     this.app?.ticker?.stop?.();
 
     // Per-id pooled display objects across every layer. HP bars are containers
-    // whose two immutable Graphics children must be released with the pool entry.
+    // whose immutable Graphics children must be released with the pool entry.
     for (const key of Object.keys(this._pools)) {
       const pool = this._pools[key];
       for (const g of pool.values()) {

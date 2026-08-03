@@ -1,17 +1,19 @@
 const ALWAYS_SHOW_HEALTH_BARS_STORAGE_KEY = "rts.healthBars.alwaysShow";
 
-export function readAlwaysShowHealthBarsEnabled(storage = globalThis.localStorage) {
+export function readAlwaysShowHealthBarsEnabled(storage = undefined) {
   try {
-    return storage?.getItem(ALWAYS_SHOW_HEALTH_BARS_STORAGE_KEY) === "1";
+    const target = storage === undefined ? globalThis.localStorage : storage;
+    return target?.getItem(ALWAYS_SHOW_HEALTH_BARS_STORAGE_KEY) === "1";
   } catch {
     return false;
   }
 }
 
-export function writeAlwaysShowHealthBarsEnabled(enabled, storage = globalThis.localStorage) {
+export function writeAlwaysShowHealthBarsEnabled(enabled, storage = undefined) {
   try {
-    if (enabled) storage?.setItem(ALWAYS_SHOW_HEALTH_BARS_STORAGE_KEY, "1");
-    else storage?.removeItem(ALWAYS_SHOW_HEALTH_BARS_STORAGE_KEY);
+    const target = storage === undefined ? globalThis.localStorage : storage;
+    if (enabled) target?.setItem(ALWAYS_SHOW_HEALTH_BARS_STORAGE_KEY, "1");
+    else target?.removeItem(ALWAYS_SHOW_HEALTH_BARS_STORAGE_KEY);
   } catch {
     // Storage failures only make this preference session-local.
   }
