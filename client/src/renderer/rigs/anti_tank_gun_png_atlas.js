@@ -1,5 +1,7 @@
 // Production no-shield anti-tank gun PNG atlas. Raster-native rig metadata supplies
 // anchors, setup visibility, facing, and recoil bindings.
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -12,7 +14,7 @@ const TRAIL_BACK_OFFSET = -17.1;
 const TRAIL_LATERAL_OFFSET = 17;
 const TRAIL_ROTATION = Math.PI / 9;
 const TRAIL_CENTER_COUNTER_ROTATION = (Math.PI * 5 / 18) - TRAIL_ROTATION;
-const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 90, saturation: 90 });
+const TEAM_TINT_ADJUSTMENT = PRODUCTION_RASTER_COLOR_TARGET;
 
 const WHEEL_NAMES = Object.freeze([
   "wheel.left.body",

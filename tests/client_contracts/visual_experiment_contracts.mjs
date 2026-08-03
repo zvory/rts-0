@@ -7,6 +7,7 @@ import { COLORS } from "../../client/src/config.js";
 import { buildFrameEntityViews } from "../../client/src/frame_entity_views.js";
 import { KIND, STATE } from "../../client/src/protocol.js";
 import { Renderer } from "../../client/src/renderer/index.js";
+import { PRODUCTION_RASTER_COLOR_TARGET } from "../../client/src/renderer/rigs/color_adjustment.js";
 import { createLivePngRigAtlases } from "../../client/src/renderer/rigs/png_routing.js";
 import { pngAtlasRouteCoverage } from "../../client/src/renderer/rigs/png_runtime.js";
 import {
@@ -214,6 +215,7 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   );
   assert(
     !atlas.bakedColorAdjustment &&
+      atlas.runtimeColorAdjustment === PRODUCTION_RASTER_COLOR_TARGET &&
       atlas.runtimeColorAdjustment?.brightness === 90 &&
       atlas.runtimeColorAdjustment?.saturation === 90 &&
       atlas.runtimeColorAdjustment?.hue === 100,

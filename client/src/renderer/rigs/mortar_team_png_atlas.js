@@ -1,5 +1,7 @@
 // Production wheeled mortar PNG atlas. Raster-native metadata supplies anchors,
 // setup visibility, facing, and recoil bindings.
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -8,7 +10,7 @@ function deepFreeze(value) {
 }
 
 const PPU = 17.8;
-const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 90, saturation: 90 });
+const TEAM_TINT_ADJUSTMENT = PRODUCTION_RASTER_COLOR_TARGET;
 
 const WHEEL_LEFT_NAMES = Object.freeze([
   "wheel.left.body",

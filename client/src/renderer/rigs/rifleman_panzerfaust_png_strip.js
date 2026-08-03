@@ -1,3 +1,5 @@
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -37,11 +39,7 @@ export const RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP = deepFreeze({
     saturation: 100,
     hue: 100,
   },
-  targetColorAdjustment: {
-    brightness: 90,
-    saturation: 90,
-    hue: 100,
-  },
+  targetColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
   source: {
     launcherSource: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/idle-runtime.png",
     launcherLayer: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/launcher-main-layer.png",

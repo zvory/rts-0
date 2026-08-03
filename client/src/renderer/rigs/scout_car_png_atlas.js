@@ -1,3 +1,5 @@
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -41,11 +43,7 @@ export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
     w: 650,
     h: 339,
   },
-  runtimeColorAdjustment: {
-    brightness: 90,
-    saturation: 90,
-    hue: 100,
-  },
+  runtimeColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
   viewBox: {
     x: -40,
     y: -32,

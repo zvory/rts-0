@@ -4,6 +4,12 @@ export const NEUTRAL_COLOR_ADJUSTMENT = Object.freeze({
   hue: 100,
 });
 
+export const PRODUCTION_RASTER_COLOR_TARGET = Object.freeze({
+  brightness: 90,
+  saturation: 90,
+  hue: 100,
+});
+
 const EPSILON = 0.001;
 
 export function normalizeColorAdjustment(value, fallback = NEUTRAL_COLOR_ADJUSTMENT) {

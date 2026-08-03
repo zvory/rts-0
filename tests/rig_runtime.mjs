@@ -34,7 +34,10 @@ import {
   FRAME_STRIP_TARGET_COLOR_ADJUSTMENT,
   frameStripRuntimeColorAdjustment,
 } from "../client/src/renderer/rigs/frame_strip_color_profile.js";
-import { relativeColorAdjustment } from "../client/src/renderer/rigs/color_adjustment.js";
+import {
+  PRODUCTION_RASTER_COLOR_TARGET,
+  relativeColorAdjustment,
+} from "../client/src/renderer/rigs/color_adjustment.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/machine_gunner_png_strip.js";
 import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../client/src/renderer/rigs/rifleman_png_strip.js";
@@ -1164,16 +1167,20 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
 });
 
 test("frame-strip color profile applies shared and per-strip targets only when not already baked", () => {
-  const productionUnitAdjustment = {
-    brightness: 90,
-    saturation: 90,
-    hue: 100,
-  };
-  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP), productionUnitAdjustment);
-  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP), productionUnitAdjustment);
+  assert.equal(RIFLEMAN_PNG_FRAME_STRIP.targetColorAdjustment, PRODUCTION_RASTER_COLOR_TARGET);
+  assert.equal(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP.targetColorAdjustment, PRODUCTION_RASTER_COLOR_TARGET);
+  assert.equal(MACHINE_GUNNER_PNG_FRAME_STRIP.targetColorAdjustment, PRODUCTION_RASTER_COLOR_TARGET);
+  assert.deepEqual(
+    frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP),
+    PRODUCTION_RASTER_COLOR_TARGET,
+  );
+  assert.deepEqual(
+    frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP),
+    PRODUCTION_RASTER_COLOR_TARGET,
+  );
   assert.deepEqual(
     frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP),
-    productionUnitAdjustment,
+    PRODUCTION_RASTER_COLOR_TARGET,
   );
   assert.deepEqual(frameStripRuntimeColorAdjustment({}), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
 });
