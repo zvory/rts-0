@@ -354,8 +354,10 @@ export class UnitRigInstance {
 `UnitRigInstance` owns one Pixi container and one graphics child per normalized rig part, redraws
 primitive geometry with sampled transforms and tint slots, and tears down all owned children through
 `destroy()`. Live rig routing is per-kind through `_liveRigDefinitionsByKind`. Worker, Golem,
-Command Car, and Ekat still compile authored SVG sources. Rifleman, loaded Panzerfaust, Machine
-Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Scout Plane, and Tank instead use
+Command Car, and Ekat still compile authored SVG sources as raster metadata and fallback layers.
+Command Car renders its body from a production PNG atlas while preserving SVG effects; Rifleman,
+loaded Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Scout Plane,
+and Tank use
 raster-native normalized metadata plus their production PNG frame strip or atlas. Missing rig
 definitions and missing production PNG textures fail closed; raster units never fall back to a
 duplicate SVG depiction. Shadow and body parts route through separate live pools so normal unit and
@@ -2165,9 +2167,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   buildings layer; shadows remain imperative draws, production progress bars, queue labels, and
   icons remain imperative draws on the building overlays layer, and construction/deconstruction
   status uses the shared HP bar layer.
-- Units: SVG-authored rigs remain for Worker, Golem, Command Car, and Ekat. Production PNG strips
+- Units: SVG-authored rigs remain authoritative for Worker, Golem, and Ekat. Production PNG strips
   or atlases are authoritative for Rifleman, loaded Panzerfaust, Machine Gunner, Anti-Tank Gun,
-  Mortar Team, Artillery, Scout Car, Scout Plane, and Tank. Rifleman and Machine Gunner PNG movement frames advance only when
+  Mortar Team, Artillery, Scout Car, Scout Plane, Command Car, and Tank. Command Car uses a
+  team-tinted outer body over a fixed gold radio deck and rank-star layer while retaining its native
+  SVG shadow and Breakthrough aura. Rifleman and Machine Gunner PNG movement frames advance only when
   a fresh authoritative movement sample arrives or their rendered position changes. Observed movement
   remains latched for 100 ms so 60 FPS rendering does not alternate movement and idle art between
   30 Hz snapshots; paused, blocked, or otherwise stationary units then return to idle art while firing
