@@ -71,8 +71,8 @@ impl Fog {
                 .and_then(|grid| grid.get(tile as usize))
                 .copied()
                 .unwrap_or(false);
-            visibility.reveal_only = terrain_reveal_only
-                || map.world_point_is_stealth(entity.pos_x, entity.pos_y);
+            visibility.reveal_only =
+                terrain_reveal_only || map.world_point_is_stealth(entity.pos_x, entity.pos_y);
             visibility.terrain_reveal_only = terrain_reveal_only;
         }
 

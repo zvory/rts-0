@@ -165,6 +165,8 @@ mod tests {
                 oil_patches: 9,
             }],
             doodads: Vec::new(),
+            stealth_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
         };
 
         let serialized = serde_json::to_value(&data).expect("checkpoint map data serializes");
@@ -187,6 +189,8 @@ mod tests {
             serde_json::from_value(encoded).expect("checkpoint map data parses");
         assert_eq!(parsed.base_sites, data.base_sites);
         assert!(parsed.doodads.is_empty());
+        assert!(parsed.stealth_tiles.is_empty());
+        assert!(parsed.no_vehicle_tiles.is_empty());
     }
 
     #[test]

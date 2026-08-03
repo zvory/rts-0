@@ -70,7 +70,29 @@ pub(super) fn resource_counts(
     Ok(counts)
 }
 
-pub(super) fn canonical_tiles(
+pub(super) fn canonical_overlays(
+    draft: &LabMapDraft,
+    name: &str,
+) -> Result<(Vec<(u32, u32)>, Vec<(u32, u32)>), LabError> {
+    Ok((
+        canonical_tiles(
+            &draft.stealth_tiles,
+            draft.width,
+            draft.height,
+            "stealthTiles",
+            name,
+        )?,
+        canonical_tiles(
+            &draft.no_vehicle_tiles,
+            draft.width,
+            draft.height,
+            "noVehicleTiles",
+            name,
+        )?,
+    ))
+}
+
+fn canonical_tiles(
     tiles: &[MapTile],
     width: u32,
     height: u32,

@@ -71,9 +71,9 @@ pub struct Map {
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
     pub doodads: Vec<MapDoodad>,
     /// Canonical sparse tile coordinates granting unit concealment.
-    pub(crate) stealth_tiles: Vec<(u32, u32)>,
+    pub stealth_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
-    pub(crate) no_vehicle_tiles: Vec<(u32, u32)>,
+    pub no_vehicle_tiles: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

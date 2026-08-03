@@ -21,6 +21,7 @@ import {
   mapEditorSymmetrySupported,
   moveSymmetricDraftLocation,
   protectDraftBaseTerrain,
+  symmetricMapTiles,
   symmetricTerrainTiles,
 } from "./map_editor_session.js";
 
@@ -587,8 +588,7 @@ export class MapEditorViewport {
   paintTiles(tiles) {
     const dimensions = this.session.draft;
     if (this.tool?.kind === "overlay") {
-      const symmetric = symmetricTerrainTiles(dimensions, tiles, TERRAIN.GRASS, this.tool?.symmetry)
-        .map(({ x, y }) => ({ x, y }));
+      const symmetric = symmetricMapTiles(dimensions, tiles, this.tool?.symmetry);
       if (this.session.paintOverlayTiles(symmetric, this.tool.edit).length) this.drawOverlay();
       return;
     }

@@ -129,8 +129,8 @@ impl Fog {
             for (index, (explored, visible)) in
                 explored_grid.iter_mut().zip(visible_grid).enumerate()
             {
-                *explored = *explored
-                    || (*visible && !terrain_reveal_only_tiles.contains(&(index as u32)));
+                *explored =
+                    *explored || (*visible && !terrain_reveal_only_tiles.contains(&(index as u32)));
             }
         }
         Fog {

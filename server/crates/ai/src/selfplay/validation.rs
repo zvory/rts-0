@@ -149,6 +149,8 @@ mod tests {
             terrain: vec![0; 8 * 4],
             resources: Vec::new(),
             doodads: Vec::new(),
+            stealth_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
         };
         assert!(validate_entity_on_map(wide.clone(), 255.0, 127.0).is_ok());
         assert!(validate_entity_on_map(wide, 10.0, 128.0).is_err());
@@ -160,6 +162,8 @@ mod tests {
             terrain: vec![0; 4 * 8],
             resources: Vec::new(),
             doodads: Vec::new(),
+            stealth_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
         };
         assert!(validate_entity_on_map(tall.clone(), 10.0, 200.0).is_ok());
         assert!(validate_entity_on_map(tall, 128.0, 10.0).is_err());

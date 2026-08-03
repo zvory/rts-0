@@ -895,9 +895,21 @@ mod planned_actions {
                     }
                     planner::OrderIntent::AttackCluster(targets) => {
                         if immediate_unit_can_replace(entities, player, unit) {
-                            let targets = attack_cluster_targets_for_unit(
-                                map, entities, teams, fog, smokes, player, unit, &targets,
-                            );
+                            let targets: Vec<_> = targets
+                                .into_iter()
+                                .filter(|target| {
+                                    attack_target_valid(
+                                        map,
+                                        entities,
+                                        teams,
+                                        fog,
+                                        smokes,
+                                        player,
+                                        &[unit],
+                                        *target,
+                                    )
+                                })
+                                .collect();
                             if !targets.is_empty() {
                                 if let Some(e) = entities.get_mut(unit) {
                                     e.clear_queued_orders();
@@ -1261,34 +1273,6 @@ fn tank_trap_cluster_targets(
             .then_with(|| a.0.cmp(&b.0))
     });
     targets.into_iter().map(|(id, _)| id).collect()
-}
-
-fn attack_cluster_targets_for_unit(
-    map: &Map,
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    player: u32,
-    unit: u32,
-    targets: &[u32],
-) -> Vec<u32> {
-    targets
-        .iter()
-        .copied()
-        .filter(|target| {
-            world_query::unit_explicit_attack_target_valid(
-                map,
-                entities,
-                teams,
-                fog,
-                Some(smokes),
-                player,
-                unit,
-                *target,
-            )
-        })
-        .collect()
 }
 
 fn deconstruct_target_valid(

@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
-    LabScenarioBaseSite, LabScenarioLabMetadata, LabScenarioTile, MapDoodad,
+    LabScenarioBaseSite, LabScenarioLabMetadata, LabScenarioTile, MapDoodad, MapTile,
 };
 use serde_json::json;
 
@@ -65,6 +65,8 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
                 ],
                 base_sites: Vec::new(),
                 doodads: Vec::new(),
+                stealth_tiles: Vec::new(),
+                no_vehicle_tiles: Vec::new(),
             },
         },
         metadata: LabCheckpointScenarioMetadata {
@@ -434,6 +436,29 @@ fn lab_replay_artifact_rejects_doodads_outside_rectangular_map_height() {
         .expect_err("a doodad below the 3x2 map must be rejected");
 
     assert!(error.to_string().contains("96x64px map"));
+}
+
+#[test]
+fn lab_replay_artifact_rejects_invalid_sparse_overlay_tiles() {
+    for (tiles, expected) in [
+        (vec![MapTile { x: 0, y: 2 }], "out-of-bounds tile"),
+        (
+            vec![MapTile { x: 1, y: 0 }, MapTile { x: 0, y: 0 }],
+            "not canonical",
+        ),
+        (
+            vec![MapTile { x: 1, y: 0 }, MapTile { x: 1, y: 0 }],
+            "duplicate tiles",
+        ),
+    ] {
+        let mut artifact = valid_artifact();
+        artifact.initial_setup.map.data.stealth_tiles = tiles;
+
+        let error = validate_lab_replay_artifact(&artifact)
+            .expect_err("invalid sparse overlay tiles must be rejected at the protocol boundary");
+
+        assert!(error.to_string().contains(expected), "error was: {error}");
+    }
 }
 
 #[test]

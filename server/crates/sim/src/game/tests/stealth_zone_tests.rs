@@ -110,10 +110,7 @@ fn scout_car_waits_for_hidden_rifle_fire_and_the_reveal_reaction_delay() {
         revealed.vision_only,
         "a firing unit in stealth should use the transient reveal presentation"
     );
-    let rifle_tile = game
-        .state
-        .map
-        .tile_of(revealed.x, revealed.y);
+    let rifle_tile = game.state.map.tile_of(revealed.x, revealed.y);
     let rifle_tile_index = (rifle_tile.1 * game.state.map.width + rifle_tile.0) as usize;
     assert_eq!(
         scout_snapshot.visible_tiles[rifle_tile_index], 1,
