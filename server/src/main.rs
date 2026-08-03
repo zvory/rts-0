@@ -30,6 +30,7 @@ mod dev_scenario_pages;
 mod interact_lab_artifacts;
 #[cfg(test)]
 mod main_replay_tests;
+mod map_authoring_analysis;
 mod map_handoffs;
 mod player_activity;
 mod player_name;
@@ -111,7 +112,6 @@ const PLAYER_INACTIVITY_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 /// accepting connections and exit cleanly before the platform sends its final shutdown signal.
 const DEPLOY_DRAIN_TIMEOUT: Duration = Duration::from_secs(295);
 
-/// Shared application state handed to every request via axum's `State` extractor.
 #[derive(Clone)]
 struct AppState {
     lobby: Lobby,
@@ -178,8 +178,7 @@ async fn main() {
         stress_tests,
     };
     let shutdown_lobby = state.lobby.clone();
-    // Static files for everything except `/ws`; unknown app routes fall back to `index.html` so the
-    // single-page client loads, but missing asset URLs stay 404 so packaging errors are visible.
+    // Unknown app routes fall back to `index.html`; missing asset URLs stay 404.
     let static_service = client_assets::service(&client_dir, state.clone());
 
     let app = Router::new()
@@ -241,6 +240,7 @@ async fn main() {
             "/api/map-handoffs/{handoff_id}",
             post(map_handoffs::consume_handler),
         )
+        .merge(map_authoring_analysis::routes())
         .route("/maps/catalog", get(map_catalog_handler))
         .route(
             "/api/lobbies",

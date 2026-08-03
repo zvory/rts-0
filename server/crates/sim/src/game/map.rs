@@ -12,6 +12,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+mod analysis;
 mod authored;
 mod base_resources;
 mod data;
@@ -26,6 +27,9 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+pub use analysis::{
+    analyze_authored_json, check_authored_json, AuthoredMapCheck, AuthoredMapReport,
+};
 pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 

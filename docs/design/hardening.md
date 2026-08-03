@@ -17,6 +17,13 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   bound integer world-pixel coordinates to the map, reject color on trees, and accept only optional
   canonical lowercase `#rrggbb` wildflower colors. Authored maps and handoff DTOs deny unknown
   fields, and the existing 512 KiB authored-map and 4 MiB Lab setup caps apply before mutation.
+- **Map authoring analysis bounds** (`map_authoring_analysis.rs` and
+  `game/map/analysis.rs`): `/api/map-authoring/check` and `/api/map-authoring/report` accept at most
+  512 KiB of UTF-8 authored-map JSON, pass it through the live materializer, and retain its
+  256-by-256 tile, 32-base, 4,096-doodad, and sparse-overlay limits. Static route searches have a
+  deterministic per-query state budget derived from the bounded map dimensions and run on the
+  blocking worker pool rather than a room or async-networking task. The endpoints return analysis
+  only and never persist or launch the submitted map.
 - **Client stress-test report caps** (`stress_tests.rs`): the public client-only benchmark POST is
   capped at 2 MiB before JSON extraction and validates its fixed schema/workload, scalar lengths,
   duration/status, bounded profiler tables, and 750 KiB SVG limit. Server-issued unguessable run ids
