@@ -80,12 +80,12 @@ final-head preflight, push/status, and PR lifecycle.
 ## Handoff Expectations
 
 Report the final fast-check list, where the two invocations occur, how failures prove no push/status
-happened, and the focused test command. Tell the Phase 2 agent which function provides changed paths
-or CI classification so review-tier logic can reuse it without creating a second registry.
+happened, and the focused test command. Tell the Phase 2 agent where existing PR metadata is loaded,
+where the final reviewed-head status is posted, and how a different review base reaches the bounded
+changed-path manifest.
 
 ## Deferred
 
 - Cargo or nextest preflight.
 - Running selected functional suites automatically.
-- Review model routing.
 - Incremental post-CI review.
