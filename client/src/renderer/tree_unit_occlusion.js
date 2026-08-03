@@ -13,6 +13,11 @@ const FOREST_OUTLINE_POOL_NAMES = Object.freeze([
  * Enemy admission remains server/fog-owned: this pass only sees the filtered entity list.
  */
 export function _drawTreeOccludedUnitOutlines(entities, state, colorByOwner, options = {}) {
+  // Outline rig instances are retained while their ordinary unit remains alive. Hide their
+  // filtered parents up front, then reactivate only the units still occluded this frame.
+  if (this._forestUnitOutlineGroups) {
+    for (const entry of this._forestUnitOutlineGroups.values()) entry.group.visible = false;
+  }
   if (!this._doodads || !Array.isArray(entities)) return 0;
   let count = 0;
   for (const entity of entities) {

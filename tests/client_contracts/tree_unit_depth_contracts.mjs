@@ -218,6 +218,16 @@ try {
     FOREST_UNIT_FILL_ALPHA,
     "the production forest group uses the selected fill opacity",
   );
+  assert.equal(
+    renderer._drawTreeOccludedUnitOutlines([], {}, colorByOwner),
+    0,
+    "a frame without occluded units draws no forest silhouettes",
+  );
+  assert.equal(forestEntry.group.visible, false,
+    "retained per-unit filter groups are inactive when their unit is no longer occluded");
+  renderer._attachForestUnitOutline(unit(501, 2, KIND.RIFLEMAN, 100, 74), colorByOwner);
+  assert.equal(forestEntry.group.visible, true,
+    "drawing a forest silhouette reactivates its retained filter group");
   const forestFilter = forestEntry.filter;
   const stealthFilter = renderer._stealthUnitOutlineFilter;
   renderer.destroy();
