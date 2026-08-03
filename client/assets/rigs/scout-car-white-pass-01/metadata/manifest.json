@@ -1,0 +1,20 @@
+{
+  "candidate": "scout-car-white-pass-01",
+  "generationMode": "built-in image generation precise-object-edit",
+  "prompt": "client/assets/rigs/scout-car-white-pass-01/metadata/generation-prompt.txt",
+  "editReference": "client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas-source.png",
+  "generatedSource": "client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-source.png",
+  "alphaSource": "client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-alpha.png",
+  "runtimeAtlas": "client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png",
+  "runtimeAtlasSize": [656, 504],
+  "runtime": {
+    "bodyTintSlot": "team-light",
+    "gunTintSlot": "fixed",
+    "colorAdjustment": {
+      "brightness": 90,
+      "saturation": 90,
+      "hue": 100
+    }
+  },
+  "notes": "The complete white-painted body includes fixed dark tires, outlines, cabin floor, steering wheel, and mechanical detail. Runtime multiply tint colors the white material while dark pixels remain dark. The rear machine gun remains its own fixed-color animated sprite. Shadows and forest-reveal outlines remain renderer-derived."
+}

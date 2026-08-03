@@ -18,7 +18,7 @@
   "launcherMask": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/launcher-main-mask.png",
   "launcherLayer": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/launcher-main-layer.png",
   "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/rifleman-panzerfaust-composited-strip.png",
-  "runtimeColorAdjustment": {"brightness": 70, "saturation": 100, "hue": 100},
+  "runtimeColorAdjustment": {"brightness": 90, "saturation": 90, "hue": 100},
   "motion": [
     {"frame": 0, "rotationDegrees": 0, "offset": {"x": 0, "y": 0}},
     {"frame": 1, "rotationDegrees": -3, "offset": {"x": -1, "y": -1}},

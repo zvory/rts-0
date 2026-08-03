@@ -40,7 +40,7 @@ for (const [label, strip, variant] of [
   assert(strip.firingRecoilPx === runtime.firingRecoilPx, `${label} firing recoil offset matches the manifest`);
   assert(strip.tintSlot === runtime.tintSlot, `${label} tint slot matches the manifest`);
   assert(JSON.stringify(strip.bakedColorAdjustment) === JSON.stringify(runtime.bakedColorAdjustment), `${label} baked color adjustment matches the manifest`);
-  assert(JSON.stringify(strip.targetColorAdjustment) === JSON.stringify(runtime.targetColorAdjustment), `${label} darker runtime color target matches the manifest`);
+  assert(JSON.stringify(strip.targetColorAdjustment) === JSON.stringify(runtime.targetColorAdjustment), `${label} runtime color target matches the manifest`);
   assert(strip.source.runtimeStrip === variant.runtimeStrip, `${label} source metadata points at its checked-in runtime strip`);
   assert(repoPathFromClientAssetUrl(strip.image) === variant.runtimeStrip, `${label} runtime URL maps back to the checked-in strip`);
   const runtimeStripSize = readPngDimensions(variant.runtimeStrip);

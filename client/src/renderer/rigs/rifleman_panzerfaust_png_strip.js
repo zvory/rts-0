@@ -38,8 +38,8 @@ export const RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP = deepFreeze({
     hue: 100,
   },
   targetColorAdjustment: {
-    brightness: 70,
-    saturation: 100,
+    brightness: 90,
+    saturation: 90,
     hue: 100,
   },
   source: {

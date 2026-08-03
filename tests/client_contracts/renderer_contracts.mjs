@@ -83,10 +83,12 @@ assert(
         .includes('fill="#e46d0f"'),
     "unit icon resolver applies the live rig tint palette to SVG-authored portraits",
   );
+  const scoutCarIcon = liveUnitIconMarkupFor(KIND.SCOUT_CAR, { teamColor: "#d55e00" });
   assert(
-    liveUnitIconMarkupFor(KIND.SCOUT_CAR, { teamColor: "#d55e00" })
-      .includes('viewBox="658 1 656 339"'),
-    "unit icon resolver selects the owning team's baked Scout Car palette frame",
+    scoutCarIcon.includes("scout-car-white-atlas.png") &&
+      scoutCarIcon.includes('viewBox="0 0 656 339"') &&
+      scoutCarIcon.includes('flood-color="#d55e00"'),
+    "unit icon resolver applies the owning team tint to the white Scout Car frame",
   );
   assert(
     liveUnitIconMarkupFor(KIND.SCOUT_PLANE)

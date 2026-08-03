@@ -11,6 +11,11 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
   "enabled": true,
   "unit": "tank",
   "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass11-white-dim30",
+  "runtimeColorAdjustment": {
+    "brightness": 128.57142857142858,
+    "saturation": 112.5,
+    "hue": 100
+  },
   "iconVisibleBounds": {
     "x": 54,
     "y": 116,

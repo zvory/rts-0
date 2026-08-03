@@ -1159,16 +1159,16 @@ test("machine gunner PNG frame strip maps setup progress to deploy frames", () =
 });
 
 test("frame-strip color profile applies shared and per-strip targets only when not already baked", () => {
-  const dimmedRiflemanAdjustment = {
-    brightness: 70,
-    saturation: 100,
+  const productionUnitAdjustment = {
+    brightness: 90,
+    saturation: 90,
     hue: 100,
   };
-  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
-  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP), dimmedRiflemanAdjustment);
+  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PNG_FRAME_STRIP), productionUnitAdjustment);
+  assert.deepEqual(frameStripRuntimeColorAdjustment(RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP), productionUnitAdjustment);
   assert.deepEqual(
     frameStripRuntimeColorAdjustment(MACHINE_GUNNER_PNG_FRAME_STRIP),
-    { brightness: 70, saturation: 100, hue: 100 },
+    productionUnitAdjustment,
   );
   assert.deepEqual(frameStripRuntimeColorAdjustment({}), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
 });

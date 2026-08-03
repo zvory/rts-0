@@ -8,7 +8,7 @@ function deepFreeze(value) {
 }
 
 const PPU = 17.8;
-const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 78, saturation: 92 });
+const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 90, saturation: 90 });
 
 const WHEEL_LEFT_NAMES = Object.freeze([
   "wheel.left.body",

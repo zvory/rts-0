@@ -63,7 +63,7 @@
     "firingRecoilPx": 4,
     "tintSlot": "team-light",
     "bakedColorAdjustment": {"brightness": 100, "saturation": 100, "hue": 100},
-    "targetColorAdjustment": {"brightness": 70, "saturation": 100, "hue": 100},
+    "targetColorAdjustment": {"brightness": 90, "saturation": 90, "hue": 100},
     "normal": {
       "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png?v=recoil-review-1-rgba8",
       "imageVersion": "recoil-review-1-rgba8",

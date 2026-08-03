@@ -3,7 +3,7 @@
 
 import fs from "node:fs";
 import { assert, assertApprox } from "./assertions.mjs";
-import { COLORS, PLAYER_PALETTE } from "../../client/src/config.js";
+import { COLORS } from "../../client/src/config.js";
 import { buildFrameEntityViews } from "../../client/src/frame_entity_views.js";
 import { KIND, STATE } from "../../client/src/protocol.js";
 import { Renderer } from "../../client/src/renderer/index.js";
@@ -205,28 +205,23 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   const atlas = createLivePngRigAtlases().get(KIND.SCOUT_CAR);
   assert(atlas?.enabled, "scout car PNG atlas is registered for live rendering");
   assert(
-    atlas.image.includes("/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas-adjusted.png"),
-    "scout car PNG atlas uses the checked-in worker-ready adjusted team-color asset",
+    atlas.image.includes("/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png"),
+    "scout car PNG atlas uses the checked-in white-painted runtime-tint asset",
   );
   assert(
-    atlas.bakedColorAdjustment?.brightness === 90 &&
-      atlas.bakedColorAdjustment?.saturation === 90 &&
-      atlas.bakedColorAdjustment?.hue === 100 &&
-      atlas.runtimeColorAdjustment?.brightness === 100 &&
-      atlas.runtimeColorAdjustment?.saturation === 100 &&
+    !atlas.bakedColorAdjustment &&
+      atlas.runtimeColorAdjustment?.brightness === 90 &&
+      atlas.runtimeColorAdjustment?.saturation === 90 &&
       atlas.runtimeColorAdjustment?.hue === 100,
-    "scout car PNG atlas records its baked dampening and requires no runtime color pass",
-  );
-  assert(
-    JSON.stringify(atlas.grid?.palette) === JSON.stringify(PLAYER_PALETTE),
-    "scout car PNG atlas maps its palette frames to the normal player palette",
+    "scout car PNG atlas applies the shared runtime color target to its white source",
   );
   const bodySprite = atlas.sprites.find((sprite) => sprite.id === "sprite.body");
   const gunSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.rearMachineGun");
   assert(
-    bodySprite?.tintSlot === "fixed" &&
-      JSON.stringify(Object.keys(bodySprite.paletteFrames || {})) === JSON.stringify(PLAYER_PALETTE),
-    "scout car PNG body keeps fixed pre-colored frames for every player color",
+    bodySprite?.tintSlot === "team-light" &&
+      !bodySprite.paletteFrames &&
+      bodySprite.frame,
+    "scout car PNG body uses one white-painted frame with runtime team tint",
   );
   assert(
     gunSprite?.tintSlot === "fixed" &&
@@ -291,14 +286,14 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   const basePlateSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.basePlate.deployed");
   assert(
     carriageSprite?.tintSlot === "team-light" &&
-      carriageSprite.tintAdjustment?.brightness === 78 &&
-      carriageSprite.tintAdjustment?.saturation === 92,
+      carriageSprite.tintAdjustment?.brightness === 90 &&
+      carriageSprite.tintAdjustment?.saturation === 90,
     "mortar PNG carriage keeps the off-white frame team-tinted in lab render preview",
   );
   assert(
     tubeSprite?.tintSlot === "team-light" &&
-      tubeSprite.tintAdjustment?.brightness === 78 &&
-      tubeSprite.tintAdjustment?.saturation === 92,
+      tubeSprite.tintAdjustment?.brightness === 90 &&
+      tubeSprite.tintAdjustment?.saturation === 90,
     "mortar PNG tube and barrel assembly are team-tinted in lab render preview",
   );
   assert(

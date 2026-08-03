@@ -5,19 +5,6 @@ function deepFreeze(value) {
   return value;
 }
 
-const TEAM_FRAME_COLORS = Object.freeze([
-  "#0072b2",
-  "#d55e00",
-  "#009e73",
-  "#cc79a7",
-  "#56b4e9",
-  "#e69f00",
-  "#f0e442",
-  "#7e57c2",
-]);
-
-const ATLAS_PADDING = 1;
-const ATLAS_COLUMNS = 2;
 const GUN_RENDER_SCALE_X = 1.1;
 const GUN_RENDER_SCALE_Y = 1.32;
 const BODY_FRAME_BASE = Object.freeze({
@@ -36,57 +23,27 @@ const GUN_FRAME_BASE = Object.freeze({
   pixelsPerUnitX: 23.42312925170068 / GUN_RENDER_SCALE_X,
   pixelsPerUnitY: 22.278481012658226 / GUN_RENDER_SCALE_Y,
 });
-const TEAM_CELL_WIDTH = BODY_FRAME_BASE.w;
-const TEAM_CELL_HEIGHT = BODY_FRAME_BASE.h + GUN_FRAME_BASE.h;
 const GUN_X_OFFSET = Math.floor((BODY_FRAME_BASE.w - GUN_FRAME_BASE.w) / 2);
-
-function paletteFrame(color, part) {
-  const index = TEAM_FRAME_COLORS.indexOf(color);
-  const col = index % ATLAS_COLUMNS;
-  const row = Math.floor(index / ATLAS_COLUMNS);
-  const cellX = ATLAS_PADDING + col * (TEAM_CELL_WIDTH + ATLAS_PADDING);
-  const cellY = ATLAS_PADDING + row * (TEAM_CELL_HEIGHT + ATLAS_PADDING);
-  if (part === "body") {
-    return {
-      x: cellX,
-      y: cellY,
-      ...BODY_FRAME_BASE,
-    };
-  }
-  return {
-    x: cellX + GUN_X_OFFSET,
-    y: cellY + BODY_FRAME_BASE.h,
-    ...GUN_FRAME_BASE,
-  };
-}
-
-function paletteFrames(part) {
-  const frames = {};
-  for (const color of TEAM_FRAME_COLORS) frames[color] = paletteFrame(color, part);
-  return frames;
-}
-
-const BODY_PALETTE_FRAMES = paletteFrames("body");
-const GUN_NEUTRAL_FRAME = paletteFrame("#0072b2", "rearMachineGun");
+const BODY_FRAME = Object.freeze({ x: 0, y: 0, ...BODY_FRAME_BASE });
+const GUN_NEUTRAL_FRAME = Object.freeze({
+  x: GUN_X_OFFSET,
+  y: BODY_FRAME_BASE.h,
+  ...GUN_FRAME_BASE,
+});
 
 export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "scout_car",
-  image: "/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas-adjusted.png?v=pass02-team-halfres-rgba8-adjusted",
+  image: "/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png?v=white-runtime-tint-pass01",
   iconVisibleBounds: {
     x: 4,
     y: 1,
     w: 650,
     h: 339,
   },
-  bakedColorAdjustment: {
+  runtimeColorAdjustment: {
     brightness: 90,
     saturation: 90,
-    hue: 100,
-  },
-  runtimeColorAdjustment: {
-    brightness: 100,
-    saturation: 100,
     hue: 100,
   },
   viewBox: {
@@ -97,15 +54,14 @@ export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
   },
   grid: {
     layout: "semantic",
-    width: 1315,
-    height: 2021,
-    sourceSheet: "client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png",
+    width: 656,
+    height: 504,
+    sourceSheet: "client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-alpha.png",
     cells: [
       "sprite.body",
       "sprite.rearMachineGun",
     ],
-    palette: TEAM_FRAME_COLORS,
-    imageVersion: "pass02-team-halfres-rgba8",
+    imageVersion: "white-runtime-tint-pass01",
   },
   frames: {},
   sprites: [
@@ -124,10 +80,9 @@ export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
         "part.hoodLine",
         "part.noseTick",
       ],
-      tintSlot: "fixed",
+      tintSlot: "team-light",
       drawOrder: 20,
-      frame: BODY_PALETTE_FRAMES["#0072b2"],
-      paletteFrames: BODY_PALETTE_FRAMES,
+      frame: BODY_FRAME,
     },
     {
       id: "sprite.rearMachineGun",

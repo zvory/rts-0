@@ -20,7 +20,7 @@ const TRAIL_LATERAL_SHIFT_RATIO = 0.1;
 const DEPLOYED_TRAIL_LATERAL_LENGTH_RATIO = 0.1;
 const DEPLOYED_TRAIL_ROTATION = 0.54;
 const PACKED_TRAIL_ROTATION = 0.22;
-const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 82, saturation: 90 });
+const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 90, saturation: 90 });
 
 const WHEEL_NAMES = Object.freeze([
   "wheel.left.body",

@@ -1,0 +1,9 @@
+Use case: precise-object-edit
+Asset type: production top-down RTS vehicle sprite source sheet
+Input image: the accepted blue Scout Car source body and neutral rear machine gun are the edit target and authoritative geometry/material reference.
+Primary request: repaint only every blue-painted vehicle surface into bright neutral matte white military paint with light neutral-gray shading, suitable for runtime multiply tinting into team colors.
+Preserve exactly: the vehicle silhouette, proportions, orthographic top-down camera angle, orientation, framing, panel geometry, highlights, seams, wear, tire shapes and tread, dark outlines, cabin floor, steering wheel, and all other dark mechanical details. Keep the separate rear machine gun black/dark neutral metal and geometrically unchanged.
+Backdrop: preserve the perfectly flat solid #ff00ff chroma-key background everywhere outside the sprites, with no gradients, shadows, floor plane, texture, reflections, labels, borders, or extra objects.
+Color constraints: all formerly blue paint must become neutral white or light neutral gray; no blue, cream, beige, colored accents, insignia, text, or team colors. Dark rubber and black/gray metal must remain dark and untinted.
+Composition: keep the vehicle body above and separate machine gun below in the same positions and scale. Do not crop any part.
+Avoid: geometry changes, restyling, new details, cast shadows, glow, halo, magenta contamination inside the sprites, watermark, text.

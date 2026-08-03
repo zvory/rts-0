@@ -12,7 +12,7 @@ const TRAIL_BACK_OFFSET = -17.1;
 const TRAIL_LATERAL_OFFSET = 17;
 const TRAIL_ROTATION = Math.PI / 9;
 const TRAIL_CENTER_COUNTER_ROTATION = (Math.PI * 5 / 18) - TRAIL_ROTATION;
-const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 70, saturation: 90 });
+const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 90, saturation: 90 });
 
 const WHEEL_NAMES = Object.freeze([
   "wheel.left.body",
