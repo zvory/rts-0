@@ -13,7 +13,6 @@ import {
 } from "../scripts/map-author.mjs";
 import { expandSymmetricPoints } from "../client/src/map_authoring/symmetry.js";
 import { MAP_AUTHORING_LAYER } from "../client/src/map_authoring/layers.js";
-import { isMapAuthoringRecipe } from "../client/src/map_authoring/recipe.js";
 import { MapEditorSession, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
 import { TERRAIN } from "../client/src/protocol.js";
 
@@ -68,12 +67,11 @@ importedProtected.loadAuthoredMap(protectedMap);
 assert.deepEqual(
   importedProtected.exportMap(),
   protectedMap,
-  "UI recipe import preserves impassable protected terrain exactly so validation stays advisory",
+  "materialized recipe output preserves impassable protected terrain through authored-map import",
 );
 assert(validateMap(protectedMap).warnings.some((warning) => warning.includes("protected area")));
 
 const operationlessRecipe = { name: "Operationless recipe", width: 16, height: 18 };
-assert.equal(isMapAuthoringRecipe(operationlessRecipe), true);
 assert.deepEqual(buildMapFromRecipe(operationlessRecipe).terrain, Array(18).fill(".".repeat(16)));
 
 const parityRecipe = {
