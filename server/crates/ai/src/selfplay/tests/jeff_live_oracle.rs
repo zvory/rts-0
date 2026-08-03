@@ -309,8 +309,8 @@ fn compare_transcripts(
     for index in 0..horizon as usize {
         compare_tick(
             expected_manifest,
-            &expected_ticks[index],
-            &actual_ticks[index],
+            expected_ticks[index],
+            actual_ticks[index],
         )?;
     }
     Ok(())
@@ -496,7 +496,7 @@ fn fingerprint<T: Serialize + ?Sized>(value: &T) -> String {
 }
 
 fn fnv1a64(bytes: &[u8]) -> u64 {
-    let mut hash = 0xcbf_29ce4_8422_2325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
         hash = hash.wrapping_mul(0x100_0000_01b3);
