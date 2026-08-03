@@ -500,12 +500,21 @@ value must match the current branch before the docs-only skip can push or post s
 resulting branch diff against `origin/main` contains only `.md` files, including Markdown files
 outside `docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts a
 successful `adversarial-quality-pass` status, and writes a docs-only skip report into the PR body.
-Any non-Markdown changed file keeps the normal adversarial quality pass requirement. After a
-non-Markdown review formats and commits its final local head, that same preflight runs again before
-the quality pass may push or post a success status. A failed pre-review check launches no Codex or
-GitHub mutation; a failed final-head check leaves the local correction head intact but unpushed and
-without a success status. Dry runs print both preflight positions and their commands without running
-Codex or mutable GitHub operations.
+Any non-Markdown changed file keeps the normal adversarial quality pass requirement. A successful
+Full or Incremental pass records the wrapper-owned `<!-- rts-agent-pr:reviewed-head:v1
+sha=<40-lowercase-hex> -->` marker beside `Review-Mode` and `Review-Base` in the PR body; child
+JSON never selects that SHA. On a rerun for an existing PR, the helper uses Incremental review only
+when that one strict marker names a locally present strict ancestor with a successful exact-SHA
+`adversarial-quality-pass` status, the PR still targets the expected base, and the correction range
+contains no merge commit. It then sends the child only that anchor-to-`HEAD` manifest while keeping
+the checkout available for interaction review. Missing, malformed, duplicate, untrusted, failed, or
+unavailable status data, non-ancestor/missing commits, merges, and unexpected bases use Full; the
+same verified anchor equal to `HEAD` launches no child and reposts no status, while retaining the
+prior durable report. After a non-Markdown review formats and commits its final local head, that
+same preflight runs again before the quality pass may push or post a success status. A failed
+pre-review check launches no Codex or GitHub mutation; a failed final-head check leaves the local
+correction head intact but unpushed and without a success status. Dry runs print both preflight
+positions and their commands without running Codex or mutable GitHub operations.
 
 Rust formatting is intentionally not a CI test gate. The repository pins Rust and rustfmt in
 `rust-toolchain.toml`; the final quality pass invoked by `scripts/agent-pr.sh` runs

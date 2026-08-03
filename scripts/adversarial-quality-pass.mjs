@@ -13,6 +13,7 @@ const DEFAULT_REMOTE = "origin";
 const DEFAULT_CODEX_COMMAND = "codex";
 const DEFAULT_GH_BIN = "gh";
 const VERDICTS = new Set(["passed_unchanged", "improved", "improved_with_concerns"]);
+const REVIEW_MODES = new Set(["full", "incremental", "already-reviewed"]);
 export const QUALITY_PASS_ENV = "RTS_ADVERSARIAL_QUALITY_PASS";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -35,6 +36,10 @@ Options:
   --schema FILE               JSON schema passed to Codex.
   --report-file FILE          JSON report output path. Default: temp file.
   --markdown-report-file FILE Optional Markdown report output path for PR audit trails.
+  --existing-pr-body-file FILE Existing open PR body used to recover a reviewed-head anchor.
+  --existing-pr-base BRANCH  Existing open PR target branch for anchor validation.
+  --expected-base BRANCH     Expected PR target branch. Default: derived from --base.
+  --review-metadata-file FILE Wrapper-owned selected review mode/base output path.
   --codex-command COMMAND     Codex CLI command. Default: codex.
   --codex-model MODEL         Optional model passed to Codex CLI.
   --gh-bin COMMAND            GitHub CLI command. Default: gh.
@@ -55,6 +60,8 @@ export function parseArgs(argv) {
     context: DEFAULT_CONTEXT,
     dryRun: false,
     fetchBase: true,
+    existingPrBase: "",
+    existingPrBodyFile: "",
     ghBin: DEFAULT_GH_BIN,
     headBranch: "",
     help: false,
@@ -63,8 +70,10 @@ export function parseArgs(argv) {
     push: false,
     remote: DEFAULT_REMOTE,
     reportFile: "",
+    reviewMetadataFile: "",
     repoRoot: defaultRepoRoot,
     schemaFile: defaultSchemaFile,
+    expectedBase: "",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -95,6 +104,14 @@ export function parseArgs(argv) {
       options.reportFile = path.resolve(value("--report-file"));
     } else if (arg === "--markdown-report-file" || arg.startsWith("--markdown-report-file=")) {
       options.markdownReportFile = path.resolve(value("--markdown-report-file"));
+    } else if (arg === "--existing-pr-body-file" || arg.startsWith("--existing-pr-body-file=")) {
+      options.existingPrBodyFile = path.resolve(value("--existing-pr-body-file"));
+    } else if (arg === "--existing-pr-base" || arg.startsWith("--existing-pr-base=")) {
+      options.existingPrBase = value("--existing-pr-base");
+    } else if (arg === "--expected-base" || arg.startsWith("--expected-base=")) {
+      options.expectedBase = value("--expected-base");
+    } else if (arg === "--review-metadata-file" || arg.startsWith("--review-metadata-file=")) {
+      options.reviewMetadataFile = path.resolve(value("--review-metadata-file"));
     } else if (arg === "--codex-command" || arg.startsWith("--codex-command=")) {
       options.codexCommand = value("--codex-command");
     } else if (arg === "--codex-model" || arg.startsWith("--codex-model=")) {
@@ -129,12 +146,121 @@ function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function expectedBaseFromRef(baseRef) {
+  const trimmed = cleanString(baseRef);
+  const slash = trimmed.lastIndexOf("/");
+  return slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
+}
+
+export function reviewedHeadMarker(sha) {
+  return `<!-- rts-agent-pr:reviewed-head:v1 sha=${sha} -->`;
+}
+
+export function parseReviewedHeadMarker(body) {
+  const wrappers = String(body || "").match(/<!-- rts-agent-pr:v1 -->[\s\S]*?<!-- \/rts-agent-pr -->/g) || [];
+  if (wrappers.length !== 1) {
+    return { sha: "", reason: "missing wrapper-owned reviewed-head marker" };
+  }
+  const wrapper = wrappers[0];
+  if (!/^Agent-Owned: true$/m.test(wrapper)) {
+    return { sha: "", reason: "reviewed-head wrapper is not agent-owned" };
+  }
+  const markers = wrapper.match(/<!-- rts-agent-pr:reviewed-head:v1[\s\S]*?-->/g) || [];
+  if (markers.length === 0) {
+    return { sha: "", reason: "missing reviewed-head marker" };
+  }
+  if (markers.length !== 1) {
+    return { sha: "", reason: "duplicate reviewed-head markers" };
+  }
+  const match = /^<!-- rts-agent-pr:reviewed-head:v1 sha=([0-9a-f]{40}) -->$/.exec(markers[0]);
+  if (!match) {
+    return { sha: "", reason: "malformed reviewed-head marker" };
+  }
+  return { sha: match[1], reason: "" };
+}
+
+function fullReview({ baseRef, reason }) {
+  return {
+    mode: "full",
+    label: "Full",
+    reviewBase: baseRef,
+    reviewedHead: "",
+    reason,
+  };
+}
+
+// Keep mode selection small and dependency-injected so the safety fallbacks have direct coverage
+// without relying on a live GitHub PR fixture.
+export function selectReviewMode({
+  baseRef,
+  currentHead,
+  existingPrBodyFile = "",
+  existingPrBase = "",
+  expectedBase = "",
+  getSuccessfulStatus,
+  commitExists,
+  isAncestor,
+  hasMergeCommit,
+}) {
+  if (!existingPrBodyFile) {
+    return fullReview({ baseRef, reason: "new PR has no reviewed-head anchor" });
+  }
+  if (cleanString(existingPrBase) !== cleanString(expectedBase || expectedBaseFromRef(baseRef))) {
+    return fullReview({ baseRef, reason: "existing PR targets an unexpected base branch" });
+  }
+
+  const marker = parseReviewedHeadMarker(existingPrBodyFile);
+  if (!marker.sha) {
+    return fullReview({ baseRef, reason: marker.reason });
+  }
+
+  try {
+    if (!getSuccessfulStatus(marker.sha)) {
+      return fullReview({ baseRef, reason: "reviewed-head lacks a successful adversarial-quality-pass status" });
+    }
+  } catch {
+    return fullReview({ baseRef, reason: "GitHub status lookup failed" });
+  }
+  if (!commitExists(marker.sha)) {
+    return fullReview({ baseRef, reason: "reviewed-head is missing locally" });
+  }
+  if (marker.sha === currentHead) {
+    return {
+      mode: "already-reviewed",
+      label: "Already Reviewed",
+      reviewBase: marker.sha,
+      reviewedHead: marker.sha,
+      reason: "current HEAD already has the verified reviewed-head anchor",
+    };
+  }
+  if (!isAncestor(marker.sha, currentHead)) {
+    return fullReview({ baseRef, reason: "reviewed-head is not an ancestor of HEAD" });
+  }
+  if (hasMergeCommit(marker.sha, currentHead)) {
+    return fullReview({ baseRef, reason: "the correction range contains a merge commit" });
+  }
+  return {
+    mode: "incremental",
+    label: "Incremental",
+    reviewBase: marker.sha,
+    reviewedHead: marker.sha,
+    reason: "verified reviewed-head has a simple linear correction range",
+  };
+}
+
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
-export function renderPrompt({ baseRef, headRef, reviewInputs = [] }) {
+export function renderPrompt({ baseRef, headRef, reviewMode = "full", reviewedHead = "", reviewInputs = [] }) {
   const exclusions = excludedRawPaths(reviewInputs);
+  const incrementalInstruction = reviewMode === "incremental"
+    ? `
+This is an incremental review. The branch was fully reviewed through ${reviewedHead}. Review only the
+new correction range from ${baseRef} to ${headRef}, plus how that correction interacts with the
+already reviewed result. Do not reopen unchanged earlier branch work for a second pass.
+`
+    : "";
   return `You are the final autonomous quality pass for this branch.
 
 Assume no human will review this and no further agent will clean it up. Your job is to leave the
@@ -147,6 +273,10 @@ Review the human-authored parts of the diff from ${baseRef} to ${headRef}. Gener
 oversized artifacts are deliberately represented only by bounded metadata below. Do not print,
 decode, cat, git-show, or git-diff their raw contents. Review their generators, source inputs,
 tests, and compact metadata instead.
+
+Review mode: ${reviewMode === "incremental" ? "Incremental" : "Full"}.
+Review base: ${baseRef}.
+${incrementalInstruction}
 
 Changed-path metadata:
 ${renderReviewInputManifest(reviewInputs)}
@@ -364,6 +494,17 @@ class Runner {
     return result.stdout.trim();
   }
 
+  runSucceeds(command, args, options = {}) {
+    const result = spawnSync(command, args, {
+      cwd: options.cwd,
+      env: { ...process.env, ...this.env, ...(options.env || {}) },
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    if (result.error) throw result.error;
+    return result.status === 0;
+  }
+
   runInherit(command, args, options = {}) {
     const result = spawnSync(command, args, {
       cwd: options.cwd,
@@ -440,6 +581,44 @@ class Runner {
     this.runInherit(options.ghBin, args, { cwd: options.repoRoot });
   }
 
+  hasSuccessfulStatus(options, sha) {
+    const raw = this.runCapture(options.ghBin, [
+      "api",
+      `repos/:owner/:repo/commits/${sha}/statuses?per_page=100`,
+    ], { cwd: options.repoRoot });
+    const statuses = JSON.parse(raw);
+    if (!Array.isArray(statuses)) {
+      throw new Error("GitHub status lookup did not return an array");
+    }
+    return statuses.some((status) => status?.context === options.context && status?.state === "success");
+  }
+
+  chooseReviewMode(options, repoRoot, currentHead) {
+    const existingPrBody = options.existingPrBodyFile
+      ? fs.readFileSync(options.existingPrBodyFile, "utf8")
+      : "";
+    return selectReviewMode({
+      baseRef: options.baseRef,
+      currentHead,
+      existingPrBodyFile: options.existingPrBodyFile ? existingPrBody : "",
+      existingPrBase: options.existingPrBase,
+      expectedBase: options.expectedBase || expectedBaseFromRef(options.baseRef),
+      getSuccessfulStatus: (sha) => this.hasSuccessfulStatus(options, sha),
+      commitExists: (sha) => this.runSucceeds("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: repoRoot }),
+      isAncestor: (ancestor, descendant) => this.runSucceeds(
+        "git",
+        ["merge-base", "--is-ancestor", ancestor, descendant],
+        { cwd: repoRoot },
+      ),
+      hasMergeCommit: (ancestor, descendant) => Boolean(this.git(["rev-list", "--merges", `${ancestor}..${descendant}`], repoRoot)),
+    });
+  }
+
+  writeReviewMetadata(options, metadata) {
+    if (!options.reviewMetadataFile) return;
+    fs.writeFileSync(options.reviewMetadataFile, `${JSON.stringify(metadata, null, 2)}\n`);
+  }
+
   run(options) {
     if (options.help) {
       this.stdout.write(usage());
@@ -455,10 +634,16 @@ class Runner {
     });
     const reportFile = options.reportFile || path.join(os.tmpdir(), `rts-adversarial-quality-pass-${process.pid}.json`);
     const gitCommonDir = this.gitCommonDir(repoRoot);
-    const buildReviewInvocation = () => {
-      const reviewInputs = collectReviewInputs({ repoRoot, baseRef: options.baseRef });
+    const buildReviewInvocation = (selection) => {
+      const reviewInputs = collectReviewInputs({ repoRoot, baseRef: selection.reviewBase });
       return {
-        prompt: renderPrompt({ baseRef: options.baseRef, headRef: "HEAD", reviewInputs }),
+        prompt: renderPrompt({
+          baseRef: selection.reviewBase,
+          headRef: "HEAD",
+          reviewMode: selection.mode,
+          reviewedHead: selection.reviewedHead,
+          reviewInputs,
+        }),
         codexArgs: buildCodexArgs({
           repoRoot,
           gitCommonDir,
@@ -470,7 +655,8 @@ class Runner {
     };
 
     if (options.dryRun) {
-      const { prompt, codexArgs } = buildReviewInvocation();
+      const selection = fullReview({ baseRef: options.baseRef, reason: "dry run assumes a new PR" });
+      const { prompt, codexArgs } = buildReviewInvocation(selection);
       this.log(`quality-pass: would run ${options.codexCommand} ${codexArgs.map(shellQuote).join(" ")}`);
       this.runPreflight(repoRoot, options.baseRef, { dryRun: true });
       if (options.push) {
@@ -490,10 +676,28 @@ class Runner {
     if (options.fetchBase) {
       this.gitInherit(buildFetchArgs({ remote: options.remote, baseRef: options.baseRef }), repoRoot);
     }
+    const beforeHead = this.git(["rev-parse", "HEAD"], repoRoot);
+    const selection = this.chooseReviewMode(options, repoRoot, beforeHead);
+    if (!REVIEW_MODES.has(selection.mode)) {
+      throw new Error(`quality pass selected unsupported review mode: ${selection.mode}`);
+    }
+    if (selection.mode === "full") {
+      this.log(`quality-pass: using Full review (${selection.reason})`);
+    } else if (selection.mode === "already-reviewed") {
+      this.log("quality-pass: HEAD is already verified as reviewed; skipping Codex, push, and status");
+      this.writeReviewMetadata(options, {
+        mode: selection.label,
+        reviewBase: selection.reviewBase,
+        reviewedHead: beforeHead,
+        preservePriorReport: true,
+      });
+      return;
+    } else {
+      this.log(`quality-pass: using Incremental review from ${selection.reviewBase}`);
+    }
     // Collect after fetching so metadata, exclusions, and the base ref inspected by Codex all
     // describe the same repository state.
-    const { prompt, codexArgs } = buildReviewInvocation();
-    const beforeHead = this.git(["rev-parse", "HEAD"], repoRoot);
+    const { prompt, codexArgs } = buildReviewInvocation(selection);
 
     this.log(`quality-pass: running Codex final quality pass for ${headBranch}`);
     this.runInherit(options.codexCommand, codexArgs, {
@@ -522,6 +726,12 @@ class Runner {
     if (options.markdownReportFile) {
       fs.writeFileSync(options.markdownReportFile, markdownReport(report));
     }
+    this.writeReviewMetadata(options, {
+      mode: selection.label,
+      reviewBase: selection.reviewBase,
+      reviewedHead: finalHead,
+      preservePriorReport: false,
+    });
 
     if (options.push) {
       this.gitInherit(["push", "-u", options.remote, `HEAD:refs/heads/${headBranch}`], repoRoot);
