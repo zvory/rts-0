@@ -164,7 +164,7 @@ impl SelfPlayRunner {
                     snapshot,
                     alive_player_ids: &alive,
                 };
-                for command in script.commands(view) {
+                for command in script.commands(view, self.game.worker_retreat_commands_for(pid)) {
                     commands.push((pid, script.name(), command));
                 }
             }

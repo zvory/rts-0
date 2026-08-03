@@ -24,10 +24,10 @@ A* tie-breaking must remain stable; avoid hash-order-dependent simulation behavi
 **Live-controller transcript parity.** The schema-1 Jeff oracle in
 `server/crates/ai/fixtures/jeff_live_oracle_v1.jsonl` answers a different question from command-log
 replay: it reruns the actual `AiController` and proves that the controller generates the same
-ordered command batches from the same fog-filtered inputs. Its test-only host mirrors the current
-AI-only portion of `lobby/live_tick.rs`: two `jeffs_ai` controllers run in player order on authored
-`Chokes` with seed `0x4a45_4646`, every controller result is collected before any command is
-enqueued, and `primary_base_alive_players()` supplies the objective-alive set. The transcript keeps
+ordered command batches from the same fog-filtered inputs. Its test-only host calls the same
+`CanonicalAiTickDriver` as `lobby/live_tick.rs`: two `jeffs_ai` controllers run in player order on
+authored `Chokes` with seed `0x4a45_4646`, every controller result is collected before any command
+is enqueued, and the starting-primary-base policy supplies the objective-alive set. The transcript keeps
 every empty call, exact retreat input and emitted `SimCommand`, current-tick decision trace,
 post-tick command-log delta, recipient-event digest, objective-alive IDs, and per-player snapshot
 digest. Compact serde JSON bytes and repository-owned FNV-1a64 fingerprints are the stable
@@ -57,11 +57,11 @@ It writes `server/crates/ai/target/jeff-live-oracle/candidate-v1.jsonl`; ordinar
 or bless fixtures. The checked-in schema-1 fixture is immutable during the AI SDK refactors and
 must not be regenerated to hide a mismatch.
 
-This first oracle deliberately mirrors rather than shares the production host sequence, so it
-cannot detect a future edit made only in `lobby/live_tick.rs`. The offline profile-backed tools
-also still differ from live cadence, placement, filtering, and retreat injection. The next AI SDK
-phase must close both gaps by extracting one shared tick driver used by live, offline, and oracle
-hosts while the frozen transcript proves that production behavior survived the cutover.
+Because the oracle, production room, matchup/arena/balance tools, `LiveSelfPlay`, normal real-AI
+tests, and the live-AI performance host share this driver, host orchestration changes are now
+covered by the immutable fixture. Offline harnesses retain tick, outcome, scorecard, replay,
+metrics, and artifact ownership; the driver owns only alive-policy selection, immutable pre-tick
+AI inputs, retreat injection, collect-before-enqueue ordering, and stable enqueue order.
 
 **Derived-state rebuild coverage.** The test-only `Game` rebuild seam clears the persistent
 `PathingService` cache and rebuilds the final spatial index from authoritative entities at a tick
@@ -82,13 +82,16 @@ AI arena runs that end with no winner because of elimination remain unresolved e
 they are not scored using the tick-cap army-value tiebreak. An arena run is rejected when distinct
 candidate and baseline requests resolve to the same concrete profile for a seed.
 
-**Profile-backed coverage.** The long profile-backed tests spawn AI-profile players through the
-self-play adapter and run matches headlessly under `RTS_FULL_AI_TESTS=1 cargo nextest run
+**Profile-backed coverage.** The long profile-backed tests spawn production `AiController`s through
+the canonical tick driver and run matches headlessly under `RTS_FULL_AI_TESTS=1 cargo nextest run
 --config-file .config/nextest.toml --manifest-path server/Cargo.toml --profile default`. The
-profiles gather steel and oil, construct supply and tech structures, train Riflemen, Scout Cars, and
-Tanks, and launch attack-move waves at public enemy start tiles. The self-play adapter owns
-harness-only state such as pending build intents, failed build spots, and staging/attack guards
-needed to interpret fog-filtered snapshots without duplicating profile strategy logic. The harness
+profiles gather steel and oil, construct supply and tech structures, train Riflemen and
+profile-appropriate vehicles, and launch attack-move waves at public enemy start tiles. The
+canonical AI 2.1 mirror requires Tank production but does not require every player to produce a
+Scout Car; Jeff's separate timing retains its explicit Scout Car requirement. `AiController` is the sole owner of
+pending build intents, failed build spots, static analysis, placement, decision memory, and
+staging/attack guards. The only remaining profile-backed scripted fixture is a thin controller
+adapter with a clearly named economy-only command filter; it owns none of that state. The harness
 checks per-tick invariants for invalid resources, supply overflow, malformed entity snapshots,
 out-of-bounds positions, and non-finite progress values. It also enforces progress deadlines so a
 stuck economy/tech/combat loop fails as a deadlock instead of timing out silently.

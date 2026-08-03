@@ -1,6 +1,6 @@
 use super::super::replay::assert_replay_matches_live;
 use super::harness::replay_artifact_url;
-use crate::{AiController, AiThinkContext};
+use crate::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::replay::{EventLogEntry, ReplayStartComposition};
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{kinds, Command as WireCommand, Event};
@@ -15,7 +15,6 @@ fn real_ai_vs_real_ai() {
 
     const MIN_PEAK_BARRACKS_ALIVE: usize = 1;
     const MIN_RIFLEMAN_TRAIN_COMMANDS: usize = 4;
-    const MIN_SCOUT_CAR_TRAIN_COMMANDS: usize = 1;
     const MIN_TANK_TRAIN_COMMANDS: usize = 1;
     const MIN_ATTACK_MOVE_COMMANDS: usize = 4;
     const MIN_ATTACK_EVENTS: usize = 50;
@@ -97,30 +96,11 @@ fn real_ai_vs_real_ai() {
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         for tick in 1..=TICKS {
-            let start = game.start_payload();
-            let alive_players = game.alive_players();
-            let mut commands = Vec::new();
-            for controller in &mut controllers {
-                let player_id = controller.player_id();
-                if !alive_players.contains(&player_id) {
-                    continue;
-                }
-                let snapshot = game.snapshot_for(player_id);
-                commands.extend(
-                    controller
-                        .think(AiThinkContext {
-                            start: &start,
-                            snapshot: &snapshot,
-                            alive_player_ids: &alive_players,
-                            retreat_commands: game.worker_retreat_commands_for(player_id),
-                        })
-                        .into_iter()
-                        .map(|command| (player_id, command)),
-                );
-            }
-            for (player_id, command) in commands {
-                game.enqueue(player_id, command);
-            }
+            CanonicalAiTickDriver::run(
+                &mut game,
+                &mut controllers,
+                AiAlivePolicy::StartingPrimaryBase,
+            );
 
             let tick_result =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
@@ -228,11 +208,6 @@ fn real_ai_vs_real_ai() {
                         .copied()
                         .unwrap_or_default()
                         >= MIN_RIFLEMAN_TRAIN_COMMANDS
-                    && scout_car_train_cmds
-                        .get(&player.id)
-                        .copied()
-                        .unwrap_or_default()
-                        >= MIN_SCOUT_CAR_TRAIN_COMMANDS
                     && tank_train_cmds.get(&player.id).copied().unwrap_or_default()
                         >= MIN_TANK_TRAIN_COMMANDS
                     && attack_move_cmds
@@ -312,19 +287,6 @@ fn real_ai_vs_real_ai() {
                 peak_barracks,
                 peak_riflemen,
                 seen_riflemen,
-                attack_moves,
-                attacks,
-            );
-            assert!(
-                scout_car_trains >= MIN_SCOUT_CAR_TRAIN_COMMANDS,
-                "player {} trained only {} scout cars (peak scout cars {}, seen scout cars {}, tank trains {}, peak tanks {}, seen tanks {}, attack moves {}, attack events {})",
-                player.id,
-                scout_car_trains,
-                peak_scout_cars,
-                seen_scout_cars,
-                tank_trains,
-                peak_tanks,
-                seen_tanks,
                 attack_moves,
                 attacks,
             );

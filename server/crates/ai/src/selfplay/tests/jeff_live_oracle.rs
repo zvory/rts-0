@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::ai_core::profile_manifest::profile_identity_by_id;
 use crate::ai_core::profiles::JEFFS_AI_ID;
-use crate::{AiController, AiThinkContext};
+use crate::live::{AiAlivePolicy, AiController, AiControllerTickInvocation, CanonicalAiTickDriver};
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
 use rts_sim::game::replay::CommandLogEntry;
@@ -196,62 +196,44 @@ fn run_transcript(horizon: u32) -> Vec<TranscriptRecord> {
     let mut command_log_cursor = 0usize;
     for _ in 0..horizon {
         let tick = game.tick_count();
-        let start = game.start_payload();
-        let alive_player_ids = game.primary_base_alive_players();
-        let mut controller_records = Vec::with_capacity(controllers.len());
-        let mut pending_commands = Vec::new();
-
-        // This intentionally mirrors lobby/live_tick.rs: collect every controller result in
-        // controller order before enqueueing any result.
-        for controller in &mut controllers {
-            let player_id = controller.player_id();
-            if !alive_player_ids.contains(&player_id) {
-                controller_records.push(ControllerRecord {
-                    player_id,
-                    profile_id: controller.profile_id().to_string(),
+        let report = CanonicalAiTickDriver::run_with_report(
+            &mut game,
+            &mut controllers,
+            AiAlivePolicy::StartingPrimaryBase,
+        );
+        let alive_player_ids = report.alive_player_ids.clone();
+        let controller_records = report
+            .controllers
+            .into_iter()
+            .map(|controller| match controller.invocation {
+                AiControllerTickInvocation::SkippedDead => ControllerRecord {
+                    player_id: controller.player_id,
+                    profile_id: controller.profile_id.to_string(),
                     invocation: Invocation::SkippedDead,
                     snapshot_fingerprint: None,
                     retreat_commands: Vec::new(),
                     emitted_commands: Vec::new(),
                     decision_trace: None,
-                });
-                continue;
-            }
-            let snapshot = game.snapshot_for(player_id);
-            let snapshot_fingerprint = fingerprint(&snapshot);
-            let retreat_commands = game.worker_retreat_commands_for(player_id);
-            let emitted_commands = controller.think(AiThinkContext {
-                start: &start,
-                snapshot: &snapshot,
-                alive_player_ids: &alive_player_ids,
-                retreat_commands: retreat_commands.clone(),
-            });
-            let decision_trace = controller
-                .latest_decision_trace()
-                .filter(|trace| trace.trace_tick == tick)
-                .map(|trace| TraceRecord {
-                    tick: trace.trace_tick,
-                    lines: trace.lines,
-                });
-            pending_commands.extend(
-                emitted_commands
-                    .iter()
-                    .cloned()
-                    .map(|command| (player_id, command)),
-            );
-            controller_records.push(ControllerRecord {
-                player_id,
-                profile_id: controller.profile_id().to_string(),
-                invocation: Invocation::Invoked,
-                snapshot_fingerprint: Some(snapshot_fingerprint),
-                retreat_commands,
-                emitted_commands,
-                decision_trace,
-            });
-        }
-        for (player_id, command) in pending_commands {
-            game.enqueue(player_id, command);
-        }
+                },
+                AiControllerTickInvocation::Invoked {
+                    snapshot,
+                    retreat_commands,
+                    emitted_commands,
+                    decision_trace,
+                } => ControllerRecord {
+                    player_id: controller.player_id,
+                    profile_id: controller.profile_id.to_string(),
+                    invocation: Invocation::Invoked,
+                    snapshot_fingerprint: Some(fingerprint(&snapshot)),
+                    retreat_commands,
+                    emitted_commands,
+                    decision_trace: decision_trace.map(|trace| TraceRecord {
+                        tick: trace.trace_tick,
+                        lines: trace.lines,
+                    }),
+                },
+            })
+            .collect();
 
         let recipient_events = game.tick();
         let command_log = game.command_log();
