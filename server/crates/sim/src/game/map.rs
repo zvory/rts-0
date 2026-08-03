@@ -496,6 +496,7 @@ mod tests {
     mod overlays;
     mod schone_tage;
     mod terrain_variants;
+    mod waldubungen;
 
     #[test]
     fn hardcoded_map_loads_for_every_supported_player_count() {
