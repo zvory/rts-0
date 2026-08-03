@@ -38,6 +38,7 @@ struct RouteContext {
     lookahead: (f32, f32),
     route_dir: (f32, f32),
     final_goal: (f32, f32),
+    direct_goal_is_clear: bool,
     reverse_waypoint: Option<(f32, f32)>,
 }
 
@@ -115,8 +116,9 @@ pub(super) fn plan_scout_car_motion(
         // A behind-the-car intermediate route point is often the pathfinder telling the car to
         // back out of a pocket before continuing. Keep distant final clicks on the established
         // forward-turn behavior, but let reverse compete with forward arcs for this local exit.
-        let waypoint_behind =
-            route.next_index > 0 && waypoint_is_behind(e.facing(), route.target, current);
+        let waypoint_behind = route.next_index > 0
+            && !route.direct_goal_is_clear
+            && waypoint_is_behind(e.facing(), route.target, current);
         for primitive in scout_car_primitives(profile, route.reverse_waypoint.is_some(), waypoint_behind) {
             let travel_distance =
                 primitive_travel_distance(current, &route, primitive, step_budget, e.facing());
@@ -316,14 +318,20 @@ fn vehicle_route_context(
         .path_goal()
         .or_else(|| path.first().copied())
         .unwrap_or(target);
-    let lookahead =
-        if !static_standability::unit_static_segment_standable(map, occ, e.kind, current, target) {
-            target
-        } else {
-            point_at_distance(current, target, vehicle_route_lookahead_px(e.kind)).unwrap_or(target)
-        };
+    let direct_goal_is_clear = car_motion_profile(e.kind).is_some_and(|profile| {
+        clear_car_direct_goal_route(profile, map, occ, e.kind, current, final_goal)
+    });
+    let route_focus = if direct_goal_is_clear { final_goal } else { target };
+    let lookahead = if !direct_goal_is_clear
+        && !static_standability::unit_static_segment_standable(map, occ, e.kind, current, target)
+    {
+        target
+    } else {
+        point_at_distance(current, route_focus, vehicle_route_lookahead_px(e.kind))
+            .unwrap_or(route_focus)
+    };
     let route_dir = unit_direction(current, lookahead)
-        .or_else(|| unit_direction(current, target))
+        .or_else(|| unit_direction(current, route_focus))
         .or_else(|| unit_direction(current, final_goal))?;
     let reverse_waypoint =
         if pre_pop_count == 0 && matches!(e.kind, EntityKind::ScoutCar | EntityKind::CommandCar) {
@@ -341,6 +349,7 @@ fn vehicle_route_context(
         lookahead,
         route_dir,
         final_goal,
+        direct_goal_is_clear,
         reverse_waypoint,
     })
 }
@@ -536,6 +545,39 @@ fn static_swept_segment_legal(
         if !static_standability::unit_static_standable_with_facing(
             map, occ, kind, pos.0, pos.1, facing,
         ) {
+            return false;
+        }
+    }
+    true
+}
+
+fn clear_car_direct_goal_route(
+    profile: CarMotionProfile,
+    map: &Map,
+    occ: &Occupancy,
+    kind: EntityKind,
+    from: (f32, f32),
+    to: (f32, f32),
+) -> bool {
+    let Some(route_dir) = unit_direction(from, to) else {
+        return false;
+    };
+    let distance = distance_between(from, to);
+    if !distance.is_finite() || distance <= ARRIVE_EPS {
+        return false;
+    }
+    let facing = route_dir.1.atan2(route_dir.0);
+    if !facing.is_finite() {
+        return false;
+    }
+    let steps = (distance / profile.sweep_sample_step_px).ceil().max(1.0) as u32;
+    for i in 0..=steps {
+        let t = i as f32 / steps as f32;
+        let pos = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
+        if static_clearance_px(profile, map, occ, kind, pos, facing)
+            + 0.001
+            < profile.clearance_score_max_px
+        {
             return false;
         }
     }
