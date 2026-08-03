@@ -18,6 +18,10 @@ pub struct LabMapDraft {
     pub stealth_tiles: Vec<MapTile>,
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub damage_reduction_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub slow_movement_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -93,6 +97,10 @@ pub struct LabCheckpointScenarioMapData {
     pub stealth_tiles: Vec<MapTile>,
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub damage_reduction_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub slow_movement_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -167,6 +175,8 @@ mod tests {
             doodads: Vec::new(),
             stealth_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
         };
 
         let serialized = serde_json::to_value(&data).expect("checkpoint map data serializes");
@@ -191,6 +201,8 @@ mod tests {
         assert!(parsed.doodads.is_empty());
         assert!(parsed.stealth_tiles.is_empty());
         assert!(parsed.no_vehicle_tiles.is_empty());
+        assert!(parsed.damage_reduction_tiles.is_empty());
+        assert!(parsed.slow_movement_tiles.is_empty());
     }
 
     #[test]

@@ -24,7 +24,7 @@
 .map-editor-layer-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
+  gap: 2px 4px;
 }
 
 .map-editor-layer-toggle {
@@ -33,7 +33,7 @@
   gap: 5px;
   align-items: center;
   min-width: 0;
-  padding: 4px 6px;
+  padding: 2px 5px;
   border: 1px solid rgba(208, 184, 132, 0.18);
   border-radius: 4px;
   color: #e7dfce;

@@ -24,6 +24,11 @@ pub const MAP_TERRAIN_MUD_C: u8 = 16;
 pub const MAP_TERRAIN_FROSTED_GROUND: u8 = 17;
 
 pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
+pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 = 0.5;
+const DAMAGE_REDUCTION_TILE_DAMAGE_NUMERATOR: u32 = 1;
+const DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR: u32 = 2;
+pub const DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER: f32 =
+    DAMAGE_REDUCTION_TILE_DAMAGE_NUMERATOR as f32 / DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR as f32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TerrainKind {
@@ -71,6 +76,26 @@ pub fn movement_speed_multiplier(_kind: EntityKind, terrain: TerrainKind) -> f32
     match terrain {
         TerrainKind::Open => 1.0,
         TerrainKind::Road => ROAD_MOVEMENT_SPEED_MULTIPLIER,
+    }
+}
+
+/// Multiplier on movement while the unit center occupies an authored slow-movement tile.
+pub fn slow_movement_tile_multiplier(active: bool) -> f32 {
+    if active {
+        SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER
+    } else {
+        1.0
+    }
+}
+
+/// Halve incoming damage while the target center occupies an authored reduction tile.
+/// Integer damage rounds up so a non-zero hit always remains meaningful.
+pub fn damage_after_reduction_tile(damage: u32, active: bool) -> u32 {
+    if active {
+        damage / DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR
+            + u32::from(!damage.is_multiple_of(DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR))
+    } else {
+        damage
     }
 }
 
@@ -175,5 +200,16 @@ mod tests {
             assert_eq!(concealment_modifier(kind, TerrainKind::Open), 1.0);
             assert_eq!(concealment_modifier(kind, TerrainKind::Road), 1.0);
         }
+    }
+
+    #[test]
+    fn authored_overlay_multipliers_are_exact_and_nonzero_damage_stays_nonzero() {
+        assert_eq!(slow_movement_tile_multiplier(false), 1.0);
+        assert_eq!(slow_movement_tile_multiplier(true), 0.5);
+        assert_eq!(damage_after_reduction_tile(100, true), 50);
+        assert_eq!(damage_after_reduction_tile(99, true), 50);
+        assert_eq!(damage_after_reduction_tile(1, true), 1);
+        assert_eq!(damage_after_reduction_tile(0, true), 0);
+        assert_eq!(damage_after_reduction_tile(99, false), 99);
     }
 }

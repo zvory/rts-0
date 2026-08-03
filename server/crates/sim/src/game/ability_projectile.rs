@@ -6,6 +6,7 @@ use crate::game::ability_runtime::{
     AbilityWorldObjectStore,
 };
 use crate::game::entity::EntityStore;
+use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::teams::TeamRelations;
 use serde::{Deserialize, Serialize};
@@ -134,6 +135,7 @@ impl AbilityProjectile {
 
     pub(super) fn advance(
         &mut self,
+        map: &Map,
         entities: &mut EntityStore,
         teams: &TeamRelations,
         spatial: &SpatialIndex,
@@ -154,7 +156,7 @@ impl AbilityProjectile {
             self.ticks_out = self.ticks_out.saturating_add(1);
         }
 
-        apply_projectile_hits(self, start, next, entities, teams, spatial, tick);
+        apply_projectile_hits(self, start, next, map, entities, teams, spatial, tick);
 
         if reached_target {
             match self.leg {
@@ -232,10 +234,12 @@ fn step_toward(start: (f32, f32), target: (f32, f32), speed: f32) -> ((f32, f32)
     ((start.0 + dx * scale, start.1 + dy * scale), false, speed)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_projectile_hits(
     projectile: &mut AbilityProjectile,
     start: (f32, f32),
     end: (f32, f32),
+    map: &Map,
     entities: &mut EntityStore,
     teams: &TeamRelations,
     spatial: &SpatialIndex,
@@ -266,7 +270,9 @@ fn apply_projectile_hits(
     for (id, _) in hits {
         projectile.hits_for_current_leg().insert(id);
         if let Some(target) = entities.get_mut(id) {
-            target.apply_damage(projectile.damage, Some((projectile.owner, start, tick)));
+            let damage =
+                map.damage_after_reduction_tile(target.pos_x, target.pos_y, projectile.damage);
+            target.apply_damage(damage, Some((projectile.owner, start, tick)));
         }
     }
 }
@@ -304,7 +310,13 @@ mod tests {
 
     fn tick_runtime(runtime: &mut AbilityRuntime, entities: &mut EntityStore, tick: u32) {
         let spatial = SpatialIndex::build(entities, 32, 32);
-        runtime.tick_projectiles(entities, &teams(), &spatial, tick);
+        let map = Map {
+            width: 32,
+            height: 32,
+            terrain: vec![crate::protocol::terrain::GRASS; 32 * 32],
+            ..Map::default()
+        };
+        runtime.tick_projectiles(&map, entities, &teams(), &spatial, tick);
         runtime.tick(entities, tick);
     }
 

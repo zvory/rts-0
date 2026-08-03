@@ -743,17 +743,17 @@ try {
     `MAP EDITOR: top Tools section exposes bounded framing, step, and percentage zoom controls (${JSON.stringify(editorUi.zoom)})`,
   );
   ok(
-    editorUi.layers.length === 6 && editorUi.layers.every((layer) => layer.checked && layer.description) &&
+    editorUi.layers.length === 8 && editorUi.layers.every((layer) => layer.checked && layer.description) &&
       editorUi.layers.every((layer) => layer.title === `${layer.label} — ${layer.description}`) &&
       editorUi.layerPanel?.outsideTools && editorUi.layerPanel.columns === 2 &&
       editorUi.layerPanel.height < 180 && editorUi.layerPanel.maxToggleHeight < 32 &&
       editorUi.layerPanel.movePreservedSize &&
-      ["Terrain & bases", "Stealth", "No vehicles", "Trees", "Gameplay doodads", "Decorative doodads"]
+      ["Terrain & bases", "Stealth", "No vehicles", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)) &&
-      ["Paint stealth", "Paint no vehicles", "Erase stealth", "Erase no vehicles"]
+      ["Paint stealth", "Paint no vehicles", "Paint damage reduction", "Paint slowed movement", "Erase stealth", "Erase no vehicles", "Erase damage reduction", "Erase slowed movement"]
         .every((label) => editorUi.overlayTools.includes(label)) &&
       !editorUi.overlayTools.includes("Forest") && !editorUi.overlayTools.includes("Erase both"),
-    `MAP EDITOR: compact floating Layers panel exposes six independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
+    `MAP EDITOR: compact floating Layers panel exposes eight independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
   );
   await editorPage.click("input[aria-label='Show Stealth']");
   await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === false);

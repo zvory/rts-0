@@ -152,6 +152,8 @@ mod tests {
             doodads: Vec::new(),
             stealth_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
         };
         assert!(validate_entity_on_map(wide.clone(), 255.0, 127.0).is_ok());
         assert!(validate_entity_on_map(wide, 10.0, 128.0).is_err());
@@ -165,6 +167,8 @@ mod tests {
             doodads: Vec::new(),
             stealth_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
         };
         assert!(validate_entity_on_map(tall.clone(), 10.0, 200.0).is_ok());
         assert!(validate_entity_on_map(tall, 128.0, 10.0).is_err());

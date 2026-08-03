@@ -170,16 +170,24 @@ function paintTerrain(draft, tiles, protectedTerrain) {
 function paintOverlays(draft, tiles, edit) {
   const stealth = new Map((draft.stealthTiles || []).map((tile) => [locationKey(tile), tile]));
   const noVehicle = new Map((draft.noVehicleTiles || []).map((tile) => [locationKey(tile), tile]));
+  const damageReduction = new Map((draft.damageReductionTiles || []).map((tile) => [locationKey(tile), tile]));
+  const slowMovement = new Map((draft.slowMovementTiles || []).map((tile) => [locationKey(tile), tile]));
   const overlayPatch = [];
   for (const tile of tiles) {
     const key = locationKey(tile);
-    const before = `${stealth.has(key)}:${noVehicle.has(key)}`;
+    const before = `${stealth.has(key)}:${noVehicle.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}`;
     applyOverlayEdit(stealth, key, tile, edit.stealth);
     applyOverlayEdit(noVehicle, key, tile, edit.noVehicle);
-    if (before !== `${stealth.has(key)}:${noVehicle.has(key)}`) overlayPatch.push({ x: tile.x, y: tile.y });
+    applyOverlayEdit(damageReduction, key, tile, edit.damageReduction);
+    applyOverlayEdit(slowMovement, key, tile, edit.slowMovement);
+    if (before !== `${stealth.has(key)}:${noVehicle.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}`) {
+      overlayPatch.push({ x: tile.x, y: tile.y });
+    }
   }
   draft.stealthTiles = [...stealth.values()];
   draft.noVehicleTiles = [...noVehicle.values()];
+  draft.damageReductionTiles = [...damageReduction.values()];
+  draft.slowMovementTiles = [...slowMovement.values()];
   return { overlayPatch };
 }
 

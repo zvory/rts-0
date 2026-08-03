@@ -188,7 +188,8 @@ fn estimate_segment_ticks(
             let (tx, ty) = map.tile_of(x as f32, y as f32);
             let multiplier = terrain::TerrainKind::from_map_code(map.terrain_at(tx, ty))
                 .map(|terrain| f64::from(terrain::movement_speed_multiplier(kind, terrain)))
-                .unwrap_or(1.0);
+                .unwrap_or(1.0)
+                * f64::from(map.slow_movement_multiplier_at(x as f32, y as f32));
             sample_distance / (base_speed * multiplier)
         })
         .sum()

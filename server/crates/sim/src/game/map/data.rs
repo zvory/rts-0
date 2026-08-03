@@ -19,4 +19,6 @@ pub struct AuthoredMapData {
     pub doodads: Vec<MapDoodad>,
     pub stealth_tiles: Vec<(u32, u32)>,
     pub no_vehicle_tiles: Vec<(u32, u32)>,
+    pub damage_reduction_tiles: Vec<(u32, u32)>,
+    pub slow_movement_tiles: Vec<(u32, u32)>,
 }

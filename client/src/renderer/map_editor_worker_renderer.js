@@ -7,7 +7,7 @@ import {
 } from "../map_authoring/layers.js";
 import { DOODAD_TYPE } from "../config.js";
 import { drawTankTrap } from "./buildings.js";
-import { gfxCircle, gfxFill, gfxNoFill, gfxRect, gfxReset, gfxStroke, gfxStrokePaths } from "./native_graphics.js";
+import { gfxCircle, gfxFill, gfxFillStrokePath, gfxNoFill, gfxRect, gfxReset, gfxStroke, gfxStrokePaths } from "./native_graphics.js";
 
 export class MapEditorWorkerRenderer {
   constructor(renderer) {
@@ -157,20 +157,7 @@ export class MapEditorWorkerRenderer {
     gfxReset(this.overlay.clear());
     for (const label of this.labels) label.destroy();
     this.labels = [];
-    if (this.layerVisibility[MAP_AUTHORING_LAYER.STEALTH]) {
-      for (const tile of overlay.stealthTiles || []) {
-        gfxStroke(this.overlay, 1, 0x5ed19a, 0.72);
-        gfxRect(gfxFill(this.overlay, 0x2d8c64, 0.24), tile.x * 32, tile.y * 32, 32, 32);
-        gfxNoFill(this.overlay);
-      }
-    }
-    if (this.layerVisibility[MAP_AUTHORING_LAYER.NO_VEHICLE]) {
-      for (const tile of overlay.noVehicleTiles || []) {
-        gfxStroke(this.overlay, 2, 0xf2b866, 0.88);
-        gfxRect(gfxFill(this.overlay, 0xc26a2e, 0.12), tile.x * 32 + 2, tile.y * 32 + 2, 28, 28);
-        gfxNoFill(this.overlay);
-      }
-    }
+    drawGameplayOverlays(this.overlay, overlay, this.layerVisibility);
     gfxStrokePaths(this.overlay, overlay.gridPaths, 1, 0xffffff, 0.08);
     if (overlay.guides.length) gfxStrokePaths(this.overlay, overlay.guides, 2, 0xffd878, 0.82);
     if (overlay.guideCentre) {
@@ -237,6 +224,99 @@ export class MapEditorWorkerRenderer {
     this.overlay.destroy();
     this.renderer.destroy();
   }
+}
+
+const OVERLAY_VISUALS = Object.freeze({
+  stealth: Object.freeze({ color: 0x2f9f78, icon: drawClosedEye }),
+  noVehicle: Object.freeze({ color: 0xd94b45, icon: drawNoEntry }),
+  damageReduction: Object.freeze({ color: 0x3e82d7, icon: drawHalfShield }),
+  slowMovement: Object.freeze({ color: 0x8b5fc7, icon: drawMiredBoot }),
+});
+
+function drawGameplayOverlays(graphics, overlay, visibility) {
+  const byTile = new Map();
+  const add = (kind, tiles, layer) => {
+    if (!visibility[layer]) return;
+    for (const tile of tiles || []) {
+      const key = `${tile.x}:${tile.y}`;
+      const entry = byTile.get(key) || { x: tile.x, y: tile.y, effects: [] };
+      entry.effects.push(kind);
+      byTile.set(key, entry);
+    }
+  };
+  add("stealth", overlay.stealthTiles, MAP_AUTHORING_LAYER.STEALTH);
+  add("noVehicle", overlay.noVehicleTiles, MAP_AUTHORING_LAYER.NO_VEHICLE);
+  add("damageReduction", overlay.damageReductionTiles, MAP_AUTHORING_LAYER.DAMAGE_REDUCTION);
+  add("slowMovement", overlay.slowMovementTiles, MAP_AUTHORING_LAYER.SLOW_MOVEMENT);
+
+  for (const tile of byTile.values()) {
+    const shared = tile.effects.length > 1;
+    for (let index = 0; index < tile.effects.length; index += 1) {
+      const kind = tile.effects[index];
+      const visual = OVERLAY_VISUALS[kind];
+      const cell = shared
+        ? { x: tile.x * 32 + 1 + (index % 2) * 15, y: tile.y * 32 + 1 + Math.floor(index / 2) * 15, size: 14 }
+        : { x: tile.x * 32 + 2, y: tile.y * 32 + 2, size: 28 };
+      gfxStroke(graphics, shared ? 1 : 1.5, visual.color, 0.96);
+      gfxRect(gfxFill(graphics, visual.color, shared ? 0.34 : 0.25), cell.x, cell.y, cell.size, cell.size);
+      gfxNoFill(graphics);
+      visual.icon(graphics, cell.x + cell.size / 2, cell.y + cell.size / 2, cell.size * 0.72);
+    }
+  }
+}
+
+function drawNoEntry(graphics, cx, cy, size) {
+  const radius = size * 0.38;
+  gfxStroke(graphics, Math.max(1.2, size * 0.12), 0xffffff, 0.96);
+  gfxCircle(graphics, cx, cy, radius);
+  gfxStrokePaths(graphics, [[[cx - radius * 0.7, cy + radius * 0.7], [cx + radius * 0.7, cy - radius * 0.7]]], Math.max(1.2, size * 0.13), 0xffffff, 0.96);
+}
+
+function drawClosedEye(graphics, cx, cy, size) {
+  const radius = size * 0.43;
+  const paths = [
+    [[cx - radius, cy - radius * 0.12], [cx - radius * 0.5, cy + radius * 0.25], [cx, cy + radius * 0.34], [cx + radius * 0.5, cy + radius * 0.25], [cx + radius, cy - radius * 0.12]],
+    [[cx - radius * 0.55, cy + radius * 0.22], [cx - radius * 0.72, cy + radius * 0.58]],
+    [[cx, cy + radius * 0.33], [cx, cy + radius * 0.72]],
+    [[cx + radius * 0.55, cy + radius * 0.22], [cx + radius * 0.72, cy + radius * 0.58]],
+  ];
+  gfxStrokePaths(graphics, paths, Math.max(1.1, size * 0.11), 0xffffff, 0.96);
+}
+
+function drawHalfShield(graphics, cx, cy, size) {
+  const radius = size * 0.43;
+  const shield = [
+    [cx - radius * 0.72, cy - radius * 0.78],
+    [cx, cy - radius],
+    [cx + radius * 0.72, cy - radius * 0.78],
+    [cx + radius * 0.62, cy + radius * 0.12],
+    [cx, cy + radius],
+    [cx - radius * 0.62, cy + radius * 0.12],
+  ];
+  const leftHalf = [shield[0], shield[1], [cx, cy + radius], shield[5]];
+  gfxFillStrokePath(graphics, leftHalf, { fill: { color: 0xffffff, alpha: 0.42 }, close: true });
+  gfxFillStrokePath(graphics, shield, { stroke: { width: Math.max(1.1, size * 0.1), color: 0xffffff, alpha: 0.96 }, close: true });
+  gfxStrokePaths(graphics, [[[cx, cy - radius], [cx, cy + radius]]], Math.max(1, size * 0.08), 0xffffff, 0.9);
+}
+
+function drawMiredBoot(graphics, cx, cy, size) {
+  const radius = size * 0.45;
+  const boot = [
+    [cx - radius * 0.62, cy - radius],
+    [cx + radius * 0.05, cy - radius],
+    [cx + radius * 0.05, cy + radius * 0.12],
+    [cx + radius * 0.82, cy + radius * 0.38],
+    [cx + radius * 0.82, cy + radius * 0.7],
+    [cx - radius * 0.62, cy + radius * 0.7],
+  ];
+  gfxFillStrokePath(graphics, boot, {
+    fill: { color: 0xffffff, alpha: 0.28 },
+    stroke: { width: Math.max(1.1, size * 0.1), color: 0xffffff, alpha: 0.96 },
+    close: true,
+  });
+  gfxStrokePaths(graphics, [
+    [[cx - radius, cy + radius * 0.72], [cx - radius * 0.55, cy + radius * 0.55], [cx - radius * 0.1, cy + radius * 0.72], [cx + radius * 0.35, cy + radius * 0.55], [cx + radius, cy + radius * 0.72]],
+  ], Math.max(1, size * 0.09), 0xffffff, 0.9);
 }
 
 function isTankTrap(record) {

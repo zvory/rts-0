@@ -226,6 +226,18 @@ fn validate_materialized_binding(
     if !tiles_match(&authored.no_vehicle_tiles, &materialized.no_vehicle_tiles) {
         return Err("Authored and materialized no-vehicle tiles do not match.".to_string());
     }
+    if !tiles_match(
+        &authored.damage_reduction_tiles,
+        &materialized.damage_reduction_tiles,
+    ) {
+        return Err("Authored and materialized damage-reduction tiles do not match.".to_string());
+    }
+    if !tiles_match(
+        &authored.slow_movement_tiles,
+        &materialized.slow_movement_tiles,
+    ) {
+        return Err("Authored and materialized slow-movement tiles do not match.".to_string());
+    }
     if !locations_match(&authored.starts, &materialized.starts)
         || !base_sites_match(authored, &materialized.base_sites)
     {
@@ -284,7 +296,7 @@ fn error_response(status: StatusCode, error: String) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rts_server::protocol::{terrain, LabBaseSite, LabMapTile, MapDoodad};
+    use rts_server::protocol::{terrain, LabBaseSite, LabMapTile, MapDoodad, MapTile};
 
     fn valid_request() -> CreateMapHandoffRequest {
         let authored_map: serde_json::Value =
@@ -324,6 +336,8 @@ mod tests {
                 doodads: Vec::new(),
                 stealth_tiles: Vec::new(),
                 no_vehicle_tiles: Vec::new(),
+                damage_reduction_tiles: Vec::new(),
+                slow_movement_tiles: Vec::new(),
             },
         }
     }
@@ -378,6 +392,39 @@ mod tests {
         assert!(validate_request(&request)
             .expect_err("mismatched doodads must fail")
             .contains("doodads do not match"));
+    }
+
+    #[test]
+    fn handoff_validation_binds_all_sparse_gameplay_layers_exactly() {
+        let fields = [
+            ("stealthTiles", "stealth"),
+            ("noVehicleTiles", "no-vehicle"),
+            ("damageReductionTiles", "damage-reduction"),
+            ("slowMovementTiles", "slow-movement"),
+        ];
+        for (field, expected_error) in fields {
+            let mut request = valid_request();
+            request.authored_map[field] = serde_json::json!([{"x": 20, "y": 20}]);
+            let tile = MapTile { x: 20, y: 20 };
+            match field {
+                "stealthTiles" => request.materialized_map.stealth_tiles.push(tile),
+                "noVehicleTiles" => request.materialized_map.no_vehicle_tiles.push(tile),
+                "damageReductionTiles" => {
+                    request.materialized_map.damage_reduction_tiles.push(tile)
+                }
+                "slowMovementTiles" => request.materialized_map.slow_movement_tiles.push(tile),
+                _ => unreachable!(),
+            }
+            assert_eq!(validate_request(&request), Ok(()));
+
+            request.materialized_map.stealth_tiles.clear();
+            request.materialized_map.no_vehicle_tiles.clear();
+            request.materialized_map.damage_reduction_tiles.clear();
+            request.materialized_map.slow_movement_tiles.clear();
+            assert!(validate_request(&request)
+                .expect_err("mismatched overlay materialization must fail")
+                .contains(expected_error));
+        }
     }
 
     #[test]
@@ -478,6 +525,8 @@ mod tests {
             doodads: Vec::new(),
             stealth_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
         };
 
         assert_eq!(validate_request(&request), Ok(()));

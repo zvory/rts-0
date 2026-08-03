@@ -48,6 +48,8 @@ export function buildMapFromRecipe(recipe) {
     doodads: [],
     stealthTiles: [],
     noVehicleTiles: [],
+    damageReductionTiles: [],
+    slowMovementTiles: [],
   };
   for (const operation of recipe.operations || []) {
     validateRecipeSymmetry(operation.symmetry ?? defaultSymmetry, map);

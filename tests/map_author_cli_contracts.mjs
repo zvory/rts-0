@@ -42,6 +42,8 @@ assert.equal(map.startLocations.length, 2);
 assert.equal(map.baseSites.length, 2);
 assert.deepEqual(map.stealthTiles, []);
 assert.deepEqual(map.noVehicleTiles, []);
+assert.deepEqual(map.damageReductionTiles, []);
+assert.deepEqual(map.slowMovementTiles, []);
 for (let y = 0; y < map.height; y += 1) {
   for (let x = 0; x < map.width; x += 1) {
     assert.equal(map.terrain[y][x], map.terrain[map.height - 1 - y][map.width - 1 - x]);

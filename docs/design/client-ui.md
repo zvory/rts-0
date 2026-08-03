@@ -1007,15 +1007,18 @@ edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
-The Gameplay overlays palette paints or erases Stealth and No vehicles independently. There is no
-Forest tile or combined Forest paint tool; authors who want both semantics paint both layers. The
-viewport shows stealth in green and vehicle exclusion in orange, including intentional overlap;
+The Gameplay overlays palette paints or erases Stealth, No vehicles, Damage reduction, and Slowed
+movement independently. There is no Forest tile or combined Forest paint tool; authors who want
+multiple semantics paint each layer. The viewport uses green, red, blue, and purple respectively,
+with a closed eye, no-entry sign, half shield, and mired boot on every affected tile. A single
+effect uses the full tile; overlapping effects subdivide into stable 2x2 icon cells so all four
+remain legible without hiding one another. Damage reduction and slowed movement are both 50%;
 overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON import/export, and
 Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
 
-The editor's compact floating Layers panel independently toggles six presentation-only authoring
-layers in a two-column grid: Terrain & bases, Stealth, No vehicles, Trees, Gameplay doodads, and
-Decorative doodads. Full labels and descriptions remain available through accessible checkbox names
+The editor's compact floating Layers panel independently toggles eight presentation-only authoring
+layers in a two-column grid: Terrain & bases, Stealth, No vehicles, Damage reduction, Slowed
+movement, Trees, Gameplay doodads, and Decorative doodads. Full labels and descriptions remain available through accessible checkbox names
 and hover tooltips when narrow panel geometry truncates visible text. Tank Traps are gameplay
 doodads; wildflowers are decorative doodads. Visibility never mutates the draft, export, undo
 history, or handoff. The shared pure `map_authoring/layers.js` vocabulary also drives

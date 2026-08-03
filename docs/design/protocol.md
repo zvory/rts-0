@@ -538,7 +538,9 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // on wildflowers.
     doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ],
     stealthTiles: [ { x: u32, y: u32 } ],
-    noVehicleTiles: [ { x: u32, y: u32 } ]
+    noVehicleTiles: [ { x: u32, y: u32 } ],
+    damageReductionTiles: [ { x: u32, y: u32 } ],
+    slowMovementTiles: [ { x: u32, y: u32 } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
 }
@@ -1422,7 +1424,9 @@ POST /api/map-handoffs
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
     doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[],
     stealthTiles: LabMapTile[],
-    noVehicleTiles: LabMapTile[]
+    noVehicleTiles: LabMapTile[],
+    damageReductionTiles: LabMapTile[],
+    slowMovementTiles: LabMapTile[]
   }
 }
 -> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
@@ -1433,8 +1437,9 @@ POST /api/map-handoffs/{handoffId}
 ```
 `AuthoredMapV6` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
-`doodads`, `stealthTiles`, and `noVehicleTiles` arrays. Overlay records are bounded, unique,
-in-bounds tile-coordinate pairs; the layers remain independent.
+`doodads`, `stealthTiles`, `noVehicleTiles`, `damageReductionTiles`, and `slowMovementTiles`
+arrays. Overlay records are bounded, unique, in-bounds tile-coordinate pairs; the four layers
+remain independent and may overlap.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
@@ -1449,7 +1454,9 @@ while leaving the rest of their tile traversable. Wildflowers have no collision 
 Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
 setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
 rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
-schema-v6 map overlays supply stealth and vehicle exclusion independently.
+schema-v6 map overlays independently supply stealth, vehicle exclusion, 50% incoming-damage
+reduction, and 50% movement speed. The damage and movement effects are selected from the tile
+beneath the entity centre.
 Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
 count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
 doodads to `materializedMap`. Records are capped at 64, expire after two
@@ -1482,7 +1489,9 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }],
       doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }],
       stealthTiles: [{ x: u32, y: u32 }],
-      noVehicleTiles: [{ x: u32, y: u32 }]
+      noVehicleTiles: [{ x: u32, y: u32 }],
+      damageReductionTiles: [{ x: u32, y: u32 }],
+      slowMovementTiles: [{ x: u32, y: u32 }]
     }
   },
   metadata: {

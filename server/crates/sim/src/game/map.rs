@@ -74,6 +74,10 @@ pub struct Map {
     pub stealth_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
     pub no_vehicle_tiles: Vec<(u32, u32)>,
+    /// Canonical sparse tile coordinates halving incoming damage to occupants.
+    pub damage_reduction_tiles: Vec<(u32, u32)>,
+    /// Canonical sparse tile coordinates halving occupant movement speed.
+    pub slow_movement_tiles: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -199,6 +203,8 @@ impl Map {
         hash = doodads::hash_materialized(hash, &self.doodads);
         hash = hash_tiles(hash, b"stealth", &self.stealth_tiles);
         hash = hash_tiles(hash, b"no-vehicle", &self.no_vehicle_tiles);
+        hash = hash_tiles(hash, b"damage-reduction", &self.damage_reduction_tiles);
+        hash = hash_tiles(hash, b"slow-movement", &self.slow_movement_tiles);
         format!("{hash:016x}")
     }
 
@@ -295,6 +301,16 @@ impl Map {
     }
 
     #[inline]
+    pub(crate) fn is_damage_reduction_tile(&self, x: u32, y: u32) -> bool {
+        self.damage_reduction_tiles.binary_search(&(x, y)).is_ok()
+    }
+
+    #[inline]
+    pub(crate) fn is_slow_movement_tile(&self, x: u32, y: u32) -> bool {
+        self.slow_movement_tiles.binary_search(&(x, y)).is_ok()
+    }
+
+    #[inline]
     pub(crate) fn world_point_is_stealth(&self, x: f32, y: f32) -> bool {
         self.contains_world_point(x, y) && {
             let (tx, ty) = self.tile_of(x, y);
@@ -302,11 +318,33 @@ impl Map {
         }
     }
 
-    pub(crate) fn protocol_overlay_tiles(&self) -> (Vec<MapTile>, Vec<MapTile>) {
+    #[inline]
+    pub(crate) fn damage_after_reduction_tile(&self, x: f32, y: f32, damage: u32) -> u32 {
+        let active = self.contains_world_point(x, y) && {
+            let (tx, ty) = self.tile_of(x, y);
+            self.is_damage_reduction_tile(tx, ty)
+        };
+        terrain_rules::damage_after_reduction_tile(damage, active)
+    }
+
+    #[inline]
+    pub(crate) fn slow_movement_multiplier_at(&self, x: f32, y: f32) -> f32 {
+        let active = self.contains_world_point(x, y) && {
+            let (tx, ty) = self.tile_of(x, y);
+            self.is_slow_movement_tile(tx, ty)
+        };
+        terrain_rules::slow_movement_tile_multiplier(active)
+    }
+
+    pub(crate) fn protocol_overlay_tiles(
+        &self,
+    ) -> (Vec<MapTile>, Vec<MapTile>, Vec<MapTile>, Vec<MapTile>) {
         let convert = |tiles: &[(u32, u32)]| tiles.iter().map(|&(x, y)| MapTile { x, y }).collect();
         (
             convert(&self.stealth_tiles),
             convert(&self.no_vehicle_tiles),
+            convert(&self.damage_reduction_tiles),
+            convert(&self.slow_movement_tiles),
         )
     }
 

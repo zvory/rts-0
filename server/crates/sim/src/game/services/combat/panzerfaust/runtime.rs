@@ -26,7 +26,7 @@ pub(in crate::game::services::combat) fn tick_states(
     tick: u32,
 ) {
     let los = LineOfSight::with_smoke(map, smokes);
-    shots.resolve_due(entities, teams, fog, smokes, events, tick);
+    shots.resolve_due(map, entities, teams, fog, smokes, events, tick);
     for id in entities.ids() {
         let Some(state) = entities.get(id).and_then(panzerfaust_state) else {
             continue;

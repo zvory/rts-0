@@ -370,13 +370,13 @@ pub(crate) fn run_tick(
     });
     crate::perf::timed(perf.as_deref_mut(), "artillery_impacts", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-        artillery_shells.resolve_due(entities, &teams, fog, events, tick, |x, y| {
+        artillery_shells.resolve_due(map, entities, &teams, fog, events, tick, |x, y| {
             ground_decals.create_artillery_impact(map, x, y);
         });
     });
     crate::perf::timed(perf.as_deref_mut(), "ability_runtime", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-        ability_runtime.tick_projectiles(entities, &teams, &post_movement.spatial, tick);
+        ability_runtime.tick_projectiles(map, entities, &teams, &post_movement.spatial, tick);
         ability_runtime.tick(entities, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "death", || {

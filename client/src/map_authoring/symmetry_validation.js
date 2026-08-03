@@ -30,6 +30,8 @@ export function mapSymmetryWarnings(map, symmetry = MAP_AUTHORING_SYMMETRY.NONE)
   pushLocationWarnings(warnings, "base locations", map.baseSites, dimensions, symmetry, baseResourcesEqual);
   pushLocationWarnings(warnings, "stealth tiles", map.stealthTiles, dimensions, symmetry);
   pushLocationWarnings(warnings, "no-vehicle tiles", map.noVehicleTiles, dimensions, symmetry);
+  pushLocationWarnings(warnings, "damage-reduction tiles", map.damageReductionTiles, dimensions, symmetry);
+  pushLocationWarnings(warnings, "slow-movement tiles", map.slowMovementTiles, dimensions, symmetry);
   pushDoodadWarnings(warnings, map.doodads, dimensions, symmetry);
   return warnings;
 }

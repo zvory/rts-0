@@ -237,6 +237,8 @@ fn map_from_materialized(map: AuthoredMapData) -> Map {
         doodads: map.doodads,
         stealth_tiles: map.stealth_tiles,
         no_vehicle_tiles: map.no_vehicle_tiles,
+        damage_reduction_tiles: map.damage_reduction_tiles,
+        slow_movement_tiles: map.slow_movement_tiles,
     }
 }
 

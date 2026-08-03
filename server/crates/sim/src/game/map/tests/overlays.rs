@@ -17,8 +17,38 @@ fn authored_map_with_overlays(
         "doodads": [],
         "stealthTiles": stealth_tiles,
         "noVehicleTiles": no_vehicle_tiles,
+        "damageReductionTiles": [],
+        "slowMovementTiles": [],
     })
     .to_string()
+}
+
+#[test]
+fn reduction_and_slow_layers_are_independent_and_may_overlap_every_other_overlay() {
+    let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+        serde_json::json!([{"x": 18, "y": 18}]),
+        serde_json::json!([{"x": 18, "y": 18}]),
+    ))
+    .expect("test map JSON");
+    authored["damageReductionTiles"] = serde_json::json!([
+        {"x": 18, "y": 18}, {"x": 19, "y": 18}
+    ]);
+    authored["slowMovementTiles"] = serde_json::json!([
+        {"x": 18, "y": 18}, {"x": 20, "y": 18}
+    ]);
+    let map = Map::from_authored_json(1, &authored.to_string(), 0)
+        .expect("four independent authored overlays");
+
+    assert_eq!(map.damage_reduction_tiles, vec![(18, 18), (19, 18)]);
+    assert_eq!(map.slow_movement_tiles, vec![(18, 18), (20, 18)]);
+    let center = map.tile_center(18, 18);
+    assert_eq!(map.damage_after_reduction_tile(center.0, center.1, 100), 50);
+    assert_eq!(map.slow_movement_multiplier_at(center.0, center.1), 0.5);
+    assert_ne!(map.materialized_hash(), {
+        let mut without_reduction = map.clone();
+        without_reduction.damage_reduction_tiles.clear();
+        without_reduction.materialized_hash()
+    });
 }
 
 #[test]

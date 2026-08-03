@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::ability_projectile::{AbilityProjectile, AbilityProjectileSpec};
 use crate::game::entity::EntityStore;
+use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::teams::TeamRelations;
 use serde::{Deserialize, Serialize};
@@ -449,6 +450,7 @@ impl AbilityRuntime {
 
     pub(in crate::game) fn tick_projectiles(
         &mut self,
+        map: &Map,
         entities: &mut EntityStore,
         teams: &TeamRelations,
         spatial: &SpatialIndex,
@@ -456,7 +458,7 @@ impl AbilityRuntime {
     ) {
         let mut active = Vec::with_capacity(self.projectiles.len());
         for mut projectile in std::mem::take(&mut self.projectiles) {
-            let keep = projectile.advance(entities, teams, spatial, tick);
+            let keep = projectile.advance(map, entities, teams, spatial, tick);
             if keep {
                 projectile.sync_visual_object(&mut self.world_objects);
                 active.push(projectile);

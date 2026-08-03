@@ -127,10 +127,12 @@ pub(super) fn apply_damage(
         ),
         _ => dmg,
     };
-    let effective_dmg = entities
+    let entrenched_dmg = entities
         .get(shot_victim)
         .map(|victim| entrenchment_combat::reduce_direct_damage(victim, unentrenched_dmg))
         .unwrap_or(unentrenched_dmg);
+    let effective_dmg =
+        map.damage_after_reduction_tile(shot_victim_pos.0, shot_victim_pos.1, entrenched_dmg);
     let damaged = if primary_missed {
         false
     } else if let Some(v) = entities.get_mut(shot_victim) {
@@ -179,7 +181,9 @@ pub(super) fn apply_damage(
             if primary_missed {
                 unentrenched_dmg
             } else {
-                effective_dmg
+                // Tile cover protects this victim without draining the projectile's downstream
+                // overpenetration energy; each later candidate samples its own tile separately.
+                entrenched_dmg
             },
             attacker_owner,
             ax,
@@ -310,7 +314,7 @@ fn apply_overpenetration(
         let effective_dmg = entities
             .get(id)
             .map(|e| {
-                combat_rules::effective_damage_with_facing_for_weapon(
+                let damage = combat_rules::effective_damage_with_facing_for_weapon(
                     weapon_profile,
                     e.kind,
                     splash_dmg,
@@ -318,7 +322,8 @@ fn apply_overpenetration(
                     Some(e.facing()),
                     (e.pos_x, e.pos_y),
                     (ax, ay),
-                )
+                );
+                map.damage_after_reduction_tile(e.pos_x, e.pos_y, damage)
             })
             .unwrap_or(0);
         if effective_dmg == 0 {

@@ -117,6 +117,8 @@ export class MapEditorSession {
       doodads: map.doodads,
       stealthTiles: map.stealthTiles,
       noVehicleTiles: map.noVehicleTiles,
+      damageReductionTiles: map.damageReductionTiles,
+      slowMovementTiles: map.slowMovementTiles,
     });
     this.markSaved({ notify: false });
     this.notify("initialized");
@@ -138,6 +140,8 @@ export class MapEditorSession {
       doodads: data.doodads,
       stealthTiles: data.stealthTiles,
       noVehicleTiles: data.noVehicleTiles,
+      damageReductionTiles: data.damageReductionTiles,
+      slowMovementTiles: data.slowMovementTiles,
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -171,6 +175,8 @@ export class MapEditorSession {
       doodads: [],
       stealthTiles: [],
       noVehicleTiles: [],
+      damageReductionTiles: [],
+      slowMovementTiles: [],
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -475,6 +481,8 @@ export class MapEditorSession {
       doodads: draft.doodads.map(copyDoodad),
       stealthTiles: draft.stealthTiles.map(copyLocation),
       noVehicleTiles: draft.noVehicleTiles.map(copyLocation),
+      damageReductionTiles: draft.damageReductionTiles.map(copyLocation),
+      slowMovementTiles: draft.slowMovementTiles.map(copyLocation),
     };
   }
 
@@ -669,6 +677,8 @@ export function authoredMapFromMaterialized({
   doodads = [],
   stealthTiles = [],
   noVehicleTiles = [],
+  damageReductionTiles = [],
+  slowMovementTiles = [],
 }) {
   const mapWidth = Math.max(1, Math.trunc(Number(width)) || 1);
   const mapHeight = Math.max(1, Math.trunc(Number(height)) || 1);
@@ -693,6 +703,8 @@ export function authoredMapFromMaterialized({
     doodads: normalizeDraftDoodads(doodads, dimensions),
     stealthTiles: normalizeOverlayTiles(stealthTiles, dimensions),
     noVehicleTiles: normalizeOverlayTiles(noVehicleTiles, dimensions),
+    damageReductionTiles: normalizeOverlayTiles(damageReductionTiles, dimensions),
+    slowMovementTiles: normalizeOverlayTiles(slowMovementTiles, dimensions),
   };
   normalizeDraft(draft);
   return draft;
@@ -705,7 +717,9 @@ export function materializedMapsEqual(left, right) {
     && sameBaseSiteSet(left.baseSites, right.baseSites)
     && sameDoodadSet(left.doodads, right.doodads)
     && sameLocationSet(left.stealthTiles, right.stealthTiles)
-    && sameLocationSet(left.noVehicleTiles, right.noVehicleTiles);
+    && sameLocationSet(left.noVehicleTiles, right.noVehicleTiles)
+    && sameLocationSet(left.damageReductionTiles, right.damageReductionTiles)
+    && sameLocationSet(left.slowMovementTiles, right.slowMovementTiles);
 }
 
 function normalizeDraft(draft) {
@@ -734,6 +748,8 @@ function normalizeDraft(draft) {
   draft.doodads = normalizeDraftDoodads(draft.doodads, dimensions);
   draft.stealthTiles = normalizeOverlayTiles(draft.stealthTiles, dimensions);
   draft.noVehicleTiles = normalizeOverlayTiles(draft.noVehicleTiles, dimensions);
+  draft.damageReductionTiles = normalizeOverlayTiles(draft.damageReductionTiles, dimensions);
+  draft.slowMovementTiles = normalizeOverlayTiles(draft.slowMovementTiles, dimensions);
 }
 
 function migrateLegacyDraft(source) {
@@ -747,6 +763,8 @@ function migrateLegacyDraft(source) {
       doodads: Array.isArray(source?.doodads) ? source.doodads : [],
       stealthTiles: Array.isArray(source?.stealthTiles) ? source.stealthTiles : [],
       noVehicleTiles: Array.isArray(source?.noVehicleTiles) ? source.noVehicleTiles : [],
+      damageReductionTiles: Array.isArray(source?.damageReductionTiles) ? source.damageReductionTiles : [],
+      slowMovementTiles: Array.isArray(source?.slowMovementTiles) ? source.slowMovementTiles : [],
     };
   }
   const sites = Array.isArray(source?.sites) ? source.sites : [];
@@ -771,6 +789,8 @@ function migrateLegacyDraft(source) {
     doodads: [],
     stealthTiles: [],
     noVehicleTiles: [],
+    damageReductionTiles: [],
+    slowMovementTiles: [],
   };
 }
 
@@ -807,6 +827,8 @@ function resizeDraftCentered(source, width, height) {
     doodads,
     stealthTiles: (source.stealthTiles || []).map(shiftTile),
     noVehicleTiles: (source.noVehicleTiles || []).map(shiftTile),
+    damageReductionTiles: (source.damageReductionTiles || []).map(shiftTile),
+    slowMovementTiles: (source.slowMovementTiles || []).map(shiftTile),
   };
   if (startLocations.some((location) => !draftLocationTileWithinClearance(draft, location, MAP_EDITOR_MAIN_CLEARANCE_TILES))) {
     return draftEditError("Resize would move a start location inside the map edge clearance.");

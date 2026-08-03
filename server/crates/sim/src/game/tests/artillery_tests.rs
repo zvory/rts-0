@@ -704,6 +704,7 @@ fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
         .artillery_shells
         .schedule(1, 1, x, y, game.state.tick);
     game.state.artillery_shells.resolve_due(
+        &game.state.map,
         &mut game.state.entities,
         &teams,
         &game.state.fog,
