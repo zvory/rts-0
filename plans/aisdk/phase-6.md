@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 5 merges.
+- [x] Done.
 
 ## Objective
 
@@ -63,14 +63,14 @@ No protocol, client, balance, `Game`, simulation validation, or command-result c
 
 ## Implementation Checklist
 
-- [ ] Add typed helpers for the concrete reference/current-AI operations.
-- [ ] Add honest local blockers and mutation-free local failure.
-- [ ] Preserve independent reservations and call-ordered emission.
-- [ ] Add `UnitGroup` only where a real tactical consumer benefits.
-- [ ] Route bounded existing-AI action call sites through the shared implementation now.
-- [ ] Preserve command shapes/order, queue flags, traces, budgets, and compatibility quirks.
-- [ ] Update the outside-crate reference strategy to use the completed author path.
-- [ ] Pass the unchanged Phase 1 transcript and mark the phase done.
+- [x] Add typed helpers for the concrete reference/current-AI operations.
+- [x] Add honest local blockers and mutation-free local failure.
+- [x] Preserve independent reservations and call-ordered emission.
+- [x] Add `UnitGroup` only where a real tactical consumer benefits.
+- [x] Route bounded existing-AI action call sites through the shared implementation now.
+- [x] Preserve command shapes/order, queue flags, traces, budgets, and compatibility quirks.
+- [x] Update the outside-crate reference strategy to use the completed author path.
+- [x] Pass the unchanged Phase 1 transcript and mark the phase done.
 
 ## Verification
 

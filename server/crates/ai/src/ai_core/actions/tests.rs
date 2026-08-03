@@ -118,8 +118,37 @@ fn facts_from_observation(observation: &AiObservation) -> AiFacts {
 fn committed_steel_is_reserved_from_budget() {
     let budget = SpendBudget::with_committed_steel(150, 0, 0, 10, 100);
 
-    assert_eq!(budget.steel, 50);
+    assert_eq!(budget.steel(), 50);
     assert!(!budget.can_afford_building(EntityKind::Depot));
+}
+
+#[test]
+fn compatibility_context_does_not_apply_the_public_strategy_cap() {
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 10,
+        },
+        Vec::new(),
+        Vec::new(),
+    );
+    let facts = facts_from_observation(&observation);
+    let mut ctx = context_from_facts(&facts, &observation);
+    let command_count = crate::sdk::MAX_ACTIONS_PER_STEP + 1;
+
+    for id in 0..command_count as u32 {
+        ctx.emit_action(AiActionRequest::Move {
+            units: vec![id],
+            x: 0.0,
+            y: 0.0,
+            queued: false,
+        });
+    }
+
+    assert_eq!(ctx.command_trace().len(), command_count);
+    assert_eq!(ctx.into_commands().len(), command_count);
 }
 
 #[test]
@@ -168,7 +197,7 @@ fn build_action_reserves_worker_and_cost() {
         })
     );
     assert!(ctx.reservations().worker_reserved(10));
-    assert_eq!(ctx.budget().steel, 0);
+    assert_eq!(ctx.budget().steel(), 0);
     assert!(matches!(
         ctx.into_commands().as_slice(),
         [Command::Build { units, building, tile_x: 8, tile_y: 8, .. }]
@@ -208,7 +237,13 @@ fn second_build_action_cannot_reuse_same_worker() {
     };
 
     assert!(try_build(&mut ctx, &[&workers], request()).is_some());
+    let budget = *ctx.budget();
+    let reservations = ctx.reservations().clone();
+    let trace = ctx.command_trace().to_vec();
     assert!(try_build(&mut ctx, &[&workers], request()).is_none());
+    assert_eq!(*ctx.budget(), budget);
+    assert_eq!(ctx.reservations(), &reservations);
+    assert_eq!(ctx.command_trace(), trace);
     assert_eq!(ctx.into_commands().len(), 1);
 }
 

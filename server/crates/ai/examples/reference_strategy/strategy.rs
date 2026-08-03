@@ -1,5 +1,5 @@
 use rts_ai::sdk::{
-    AiActionRequest, AiActions, AiFrame, AiRulebook, AiStrategy, EntityKind, WorldQueries,
+    AiActions, AiFrame, AiRulebook, AiStrategy, EntityKind, UnitGroup, WorldQueries,
 };
 
 /// A deliberately small opening that demonstrates the public SDK lifecycle.
@@ -51,11 +51,7 @@ impl AiStrategy for ReferenceStrategy {
                 workers.first(),
                 queries.known_resources(EntityKind::Steel).next(),
             ) {
-                let _ = actions.submit(AiActionRequest::Gather {
-                    units: vec![worker],
-                    node: node.id,
-                    queued: false,
-                });
+                let _ = actions.gather(&[worker], &[node.id], false);
             }
         }
 
@@ -63,13 +59,10 @@ impl AiStrategy for ReferenceStrategy {
         // frame ordering makes the second worker deterministic and keeps it separate from mining.
         if !self.scout_dispatched && self.steps >= 2 {
             if let (Some(&scout), Some((x, y))) = (workers.get(1), self.enemy_start) {
-                if actions.submit(AiActionRequest::AttackMove {
-                    units: vec![scout],
-                    x,
-                    y,
-                    queued: false,
-                }) {
-                    self.scout_dispatched = true;
+                if let Ok(group) = UnitGroup::new([scout]) {
+                    if actions.attack_move(&group, x, y, false).is_ok() {
+                        self.scout_dispatched = true;
+                    }
                 }
             }
         }

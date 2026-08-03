@@ -8,8 +8,8 @@ same simulation validation and replay path as built-in AIs.
 The runnable specimen is
 [`server/crates/ai/examples/reference_strategy/strategy.rs`](../server/crates/ai/examples/reference_strategy/strategy.rs).
 It uses only public SDK imports, including `AiRulebook` and `WorldQueries` for faction rules and
-known-world selection plus `AiActionRequest`, `AiActions`, `AiFrame`, `AiStrategy`, and
-`EntityKind`. Run the complete canonical host example with:
+known-world selection plus `AiActions`, `AiFrame`, `AiStrategy`, `EntityKind`, and `UnitGroup`.
+Run the complete canonical host example with:
 
 ```bash
 cargo run --manifest-path server/Cargo.toml -p rts-ai --example reference_strategy
@@ -51,12 +51,23 @@ legal, clear, placeable, reachable, or accepted, and hidden dynamic state is nev
 
 ## Emit actions
 
-Create requests in `step` by calling `AiActions::submit`. Requests are retained in call order up to
-the documented per-step bound, translated after `step` returns, and then processed as ordinary
-commands; a `true` return means only that the request was retained, not that the simulation
-accepted or completed it. The specimen gathers steel with one worker and later attack-moves a
-different worker toward a public enemy start, tolerating missing workers, resources, or opponents
-without panicking.
+Call typed helpers on the `AiActions` supplied to `step`. The builder supports `paid_build`,
+`resume_build`, `train`, `research`, `gather`, `move_group`, `attack_move`, `attack`,
+`hold_position`, and `setup_anti_tank_guns`. Tactical helpers take a `UnitGroup`, which sorts and
+deduplicates IDs and rejects an empty group. Worker, resource-node, and producer candidate slices
+stay in caller order so priority remains explicit.
+
+The builder reserves same-think Steel, Oil, Supply, actors, resource nodes, and producers before
+emission. Those three ID namespaces are independent. A helper returns `ActionError` with a local
+`ActionBlocker` for a fact it can establish, and any such return leaves budget, reservations,
+emitted actions, and trace unchanged. An `Ok` means only that the action was emitted into this
+local batch; the simulation may still ignore it through ordinary validation. The builder makes no
+claim of command acceptance, legality, completion, or simulation atomicity.
+
+The specimen gathers steel with one worker and later attack-moves a different `UnitGroup` toward a
+public enemy start, tolerating missing workers, resources, or opponents without panicking. Actions
+are retained in helper-call order up to the per-think cap and translated to ordinary commands only
+after `step` returns.
 
 The external integration test compiles the strategy without access to `rts_ai` internals, checks
 the lifecycle cadence, runs the same seeded matchup twice, compares ordered command logs, observes
@@ -70,15 +81,6 @@ cargo nextest run --config-file .config/nextest.toml \
   -p rts-ai --test sdk_external
 ```
 
-## Concrete next API needs
-
-The specimen keeps the remaining action-construction friction visible for the next SDK phase.
-
-Typed per-think actions, in priority order:
-
-1. `gather` and `attack_move` helpers that accept typed candidates, preserve caller order, and
-   prevent one unit from receiving conflicting same-think assignments.
-2. `train`, `build`, and `research` helpers with same-think resource/supply budgets and explicit
-   reservations shared across helper calls.
-3. Local blocker results such as missing producer, known prerequisite, known resource, or action
-   capacity; emission success must remain distinct from simulation acceptance or completion.
+Upgrade costs remain owned by the simulation; `research` consults that existing definition for
+local affordability without publishing a duplicate rule table. Cross-tick goals, command receipts,
+task status, automatic planning, and completion inference remain outside this SDK.
