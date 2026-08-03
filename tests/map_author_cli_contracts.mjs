@@ -14,7 +14,6 @@ import {
 import { expandSymmetricPoints } from "../client/src/map_authoring/symmetry.js";
 import { MAP_AUTHORING_LAYER } from "../client/src/map_authoring/layers.js";
 import { isMapAuthoringRecipe } from "../client/src/map_authoring/recipe.js";
-import { MapEditorPanel } from "../client/src/map_editor_panel.js";
 import { MapEditorSession, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
 import { TERRAIN } from "../client/src/protocol.js";
 
@@ -289,7 +288,7 @@ assert.throws(() => buildMapFromRecipe({ width: "12", height: 1 }), /positive in
 assert.throws(
   () => buildMapFromRecipe({ width: 15, height: 16 }),
   /at least 16 tiles/,
-  "recipe dimensions share the editor's minimum instead of failing only after UI import",
+  "recipe dimensions share the editor's minimum",
 );
 const boundedResources = buildMapFromRecipe({
   width: 16,
@@ -297,11 +296,11 @@ const boundedResources = buildMapFromRecipe({
   operations: [{ type: "base", at: [8, 8], steelPatches: 100, oilPatches: -2 }],
 });
 assert.deepEqual(boundedResources.baseSites, [{ x: 8, y: 8, steelPatches: 36, oilPatches: 0 }],
-  "recipe resource counts use the same canonical bounds as editor import");
-const boundedResourcesUi = new MapEditorSession({ storage: null });
-boundedResourcesUi.loadAuthoredMap(boundedResources);
-assert.deepEqual(boundedResourcesUi.exportMap(), boundedResources,
-  "canonical recipe resource output is byte-for-byte stable through the UI adapter");
+  "recipe resource counts use the authored-map canonical bounds");
+const generatedMapSession = new MapEditorSession({ storage: null });
+generatedMapSession.loadAuthoredMap(boundedResources);
+assert.deepEqual(generatedMapSession.exportMap(), boundedResources,
+  "canonical recipe output is byte-for-byte stable as a materialized map import");
 assert.throws(
   () => buildMapFromRecipe({
     width: 32,
@@ -328,18 +327,7 @@ assert.throws(
   "a compact pathological path is rejected before geometry materialization",
 );
 assert(performance.now() - complexityStartedAt < 1_000,
-  "path complexity rejection stays fast enough for the synchronous browser adapter");
-const uiComplexityStatuses = [];
-const uiComplexityPanel = {
-  recipeText: JSON.stringify(pathologicalPathRecipe),
-  loadMapData(value) { buildMapFromRecipe(value); },
-  setStatus(message, error = false) { uiComplexityStatuses.push({ message, error }); },
-};
-assert.equal(MapEditorPanel.prototype.applyRecipeText.call(uiComplexityPanel), false);
-assert.deepEqual(uiComplexityStatuses, [{
-  message: "Could not apply recipe: Recipe operation 0 points must contain at most 2048 entries",
-  error: true,
-}], "the browser adapter reports the same canonical complexity error as Node");
+  "path complexity rejection stays fast enough for synchronous CLI materialization");
 assert.throws(
   () => buildMapFromRecipe({
     width: 16,

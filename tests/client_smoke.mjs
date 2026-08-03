@@ -692,6 +692,7 @@ try {
       clearanceSection: [...document.querySelectorAll(".map-editor-readout")]
         .find((node) => node.textContent === "Bases and starts reserve a passable grass area.")
         ?.closest("fieldset")?.querySelector("legend")?.textContent || "",
+      hasRecipeTextarea: Boolean(document.querySelector("textarea[aria-label='Map recipe JSON']")),
     };
   });
   ok(
@@ -732,14 +733,15 @@ try {
   await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === true);
   ok(true, "MAP EDITOR: layer checkbox changes reach the live worker presentation path");
   ok(
-    editorUi.actionButtons.includes("Load map or recipe JSON") &&
-      editorUi.actionButtons.includes("Apply recipe JSON") &&
+    editorUi.actionButtons.includes("Load map JSON") &&
       editorUi.actionButtons.includes("Export map JSON") &&
       editorUi.actionButtons.includes("Authoritative check") &&
       editorUi.actionButtons.includes("Route report") &&
+      !editorUi.actionButtons.includes("Apply recipe JSON") &&
+      !editorUi.hasRecipeTextarea &&
       !editorUi.actionButtons.includes("Save on this device") &&
       !editorUi.actionButtons.includes("Load saved map"),
-    `MAP EDITOR: explicit JSON file actions replace browser workspace controls (${editorUi.actionButtons.join("/")})`,
+    `MAP EDITOR: materialized map JSON actions omit agent recipe controls (${editorUi.actionButtons.join("/")})`,
   );
   ok(
     editorUi.maxScroll > 0 && editorUi.beforeScrollTop > 0 && editorUi.beforeScrollTop === editorUi.afterScrollTop,

@@ -1,6 +1,5 @@
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
-import { buildMapFromRecipe, isMapAuthoringRecipe } from "./map_authoring/recipe.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import {
@@ -80,13 +79,6 @@ export class MapEditorPanel {
     this.analysisAbortController = null;
     this.analysisTimeoutId = null;
     this.analysisMapFingerprint = null;
-    this.recipeText = JSON.stringify({
-      name: "Recipe map",
-      width: session.draft?.width || MAP_EDITOR_DEFAULT_SIZE,
-      height: session.draft?.height || MAP_EDITOR_DEFAULT_SIZE,
-      symmetry: "none",
-      operations: [],
-    }, null, 2);
     this.status = "";
     this.statusError = false;
     this.analysisStatusOwned = false;
@@ -606,17 +598,8 @@ export class MapEditorPanel {
 
   renderActions() {
     const section = group("Save and test");
-    const recipe = document.createElement("textarea");
-    recipe.value = this.recipeText;
-    recipe.rows = 10;
-    recipe.maxLength = MAP_EDITOR_MAX_JSON_BYTES;
-    recipe.spellcheck = false;
-    recipe.setAttribute("aria-label", "Map recipe JSON");
-    recipe.addEventListener("input", () => { this.recipeText = recipe.value; });
     section.append(
-      button("Load map or recipe JSON", () => this.chooseJsonFile()),
-      field("Recipe JSON", recipe),
-      button("Apply recipe JSON", () => this.applyRecipeText()),
+      button("Load map JSON", () => this.chooseJsonFile()),
       button("Export map JSON", () => this.exportJson()),
       button(this.analysisPending && this.analysisKind === "check" ? "Checking…" : "Authoritative check", () => void this.runAuthoritativeAnalysis("check"), {
         disabled: this.analysisPending,
@@ -631,7 +614,7 @@ export class MapEditorPanel {
         disabled: this.pending,
         className: "map-editor-primary",
       }),
-      readout("Recipe JSON uses the same fill, rectangle, blob, stroke, road, base, start, and symmetry operations as the map-author CLI. Opening Lab validates the resulting map on the server and starts a fresh ordinary Lab."),
+      readout("Opening Lab validates the current map on the server and starts a fresh ordinary Lab."),
       readout("Preview PNGs opens the existing game renderer with 2048 px world and minimap downloads."),
     );
     if (this.analysisResult) section.appendChild(renderAnalysisResult(this.analysisKind, this.analysisResult));
@@ -796,29 +779,12 @@ export class MapEditorPanel {
   }
 
   loadMapData(map) {
-    const recipe = isMapAuthoringRecipe(map);
-    this.session.loadAuthoredMap(recipe ? buildMapFromRecipe(map) : map);
+    if (!Array.isArray(map?.terrain)) throw new Error("Map JSON needs a terrain array.");
+    this.session.loadAuthoredMap(map);
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
     MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
     this.viewport.armTool(null);
-    return recipe ? "recipe" : "map";
-  }
-
-  applyRecipeText() {
-    try {
-      if (this.recipeText.length > MAP_EDITOR_MAX_JSON_BYTES) throw new Error("Recipe JSON must be 2 MB or smaller.");
-      const value = JSON.parse(this.recipeText);
-      if (!isMapAuthoringRecipe(value)) {
-        throw new Error("Recipe JSON needs width and height; operations may be omitted or an array.");
-      }
-      this.loadMapData(value);
-      this.setStatus(`Applied recipe for ${this.session.draft.name}.`);
-      return true;
-    } catch (error) {
-      this.setStatus(`Could not apply recipe: ${error.message || error}`, true);
-      return false;
-    }
   }
 
   async runAuthoritativeAnalysis(kind) {
@@ -932,8 +898,8 @@ export class MapEditorPanel {
       }
       if (typeof file?.text !== "function") throw new Error("The selected file could not be read.");
       const text = await file.text();
-      const kind = this.loadMapData(JSON.parse(text));
-      this.setStatus(`Loaded ${kind === "recipe" ? "recipe " : ""}${name}.`);
+      this.loadMapData(JSON.parse(text));
+      this.setStatus(`Loaded ${name}.`);
     } catch (error) {
       this.setStatus(`Could not load ${name}: ${error.message || error}`, true);
     }

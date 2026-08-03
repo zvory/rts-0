@@ -101,7 +101,6 @@ import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
 import { authoritativeAnalysisSummary, MapEditorPanel } from "../../client/src/map_editor_panel.js";
-import { buildMapFromRecipe } from "../../client/src/map_authoring/recipe.js";
 import { defaultMapAuthoringLayerVisibility } from "../../client/src/map_authoring/layers.js";
 import {
   canonicalDoodadColor,
@@ -264,38 +263,21 @@ assert(
 
   const recipe = {
     name: "UI Recipe",
-    description: "Exercises every original CLI operation through local import.",
     width: 32,
     height: 32,
-    symmetry: "halfTurn",
-    operations: [
-      { type: "fill", material: "3" },
-      { type: "rect", material: "grass", from: [2, 2], to: [5, 6] },
-      { type: "blob", material: "0", center: [8, 10], radius: [3, 2], roughness: 0.2, seed: 5 },
-      { type: "stroke", material: "6", points: [[3, 20], [12, 18]], width: 3, roughness: 0.5, seed: 9 },
-      { type: "road", points: [[2, 15], [13, 12]], width: 4 },
-      { type: "base", at: [8, 8] },
-      { type: "start", at: [10, 10] },
-    ],
+    operations: [],
   };
   await MapEditorPanel.prototype.loadJsonFile.call(panel, {
     name: "recipe.json",
     size: 2048,
     async text() { return JSON.stringify(recipe); },
   });
-  assert.deepEqual(
-    session.exportMap(),
-    buildMapFromRecipe(recipe),
-    "the UI local-import surface applies the same complete recipe implementation as the CLI",
-  );
-  assert.deepEqual(statuses.pop(), { message: "Loaded recipe recipe.json.", error: false });
-
-  panel.recipeText = JSON.stringify({ name: "Inline recipe", width: 18, height: 16 });
-  assert.equal(MapEditorPanel.prototype.applyRecipeText.call(panel), true);
-  assert.equal(session.exportMap().name, "Inline recipe");
-  assert.deepEqual(session.exportMap().terrain, Array(16).fill(".".repeat(18)),
-    "the inline UI accepts recipes whose operations array is omitted");
-  assert.deepEqual(statuses.pop(), { message: "Applied recipe for Inline recipe.", error: false });
+  assert.equal(session.exportMap().name, oneVOneNoTerrainMap.name,
+    "recipe input does not replace the current human-authored map");
+  assert.deepEqual(statuses.pop(), {
+    message: "Could not load recipe.json: Map JSON needs a terrain array.",
+    error: true,
+  });
 
   await MapEditorPanel.prototype.loadJsonFile.call(panel, {
     name: "broken.json",

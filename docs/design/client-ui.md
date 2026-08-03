@@ -931,7 +931,7 @@ export class MapEditorSession {
 ```
 `map_authoring/` is the single implementation of authoring geometry, symmetry, advisory symmetry
 checking, authored-map limits, layer vocabulary/classification, and recipe materialization. Browser pointer
-gestures and `scripts/map-author.mjs` recipes are adapters over its pure ESM operations; the package
+gestures and CLI recipes are separate adapters over its pure ESM operations; the package
 does not access the DOM, Pixi, Node filesystem APIs, or simulation state. UI-only input/history and
 CLI-only file/argument handling stay outside it.
 
@@ -953,19 +953,18 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. Its separate floating Options, Layers, and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
-status, local authored-map or recipe JSON import, map JSON export, and Lab handoff; Layers owns
+status, local authored-map JSON import/export, and Lab handoff; Layers owns
 presentation visibility; Tools owns terrain paint, start/base locations, and doodad authoring. The
 top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
 zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
-base locations, and provides undo/redo, local JSON import/map export, and centered resize. Recipe
-imports and the in-page recipe JSON textarea apply the shared fill, rectangle, blob, stroke, road,
-base, start, and symmetry operations. An omitted `operations` field means an empty operation list;
-rich per-operation visual recipe controls remain deferred. Recipe/import normalization preserves
-authored terrain verbatim, including impassable terrain in a protected base footprint, so the
-advisory and authoritative checks can report the author's actual input. Interactive rock/water
+base locations, and provides undo/redo, local map JSON import/export, and centered resize. The editor
+accepts only materialized authored maps containing terrain; agent-authored recipes remain a
+`scripts/map-author.mjs build` CLI input and are not a Map Editor document type. Import normalization
+preserves authored terrain verbatim, including impassable terrain in a protected base footprint, so
+the advisory and authoritative checks can report the author's actual input. Interactive rock/water
 painting is still rejected in protected footprints, and moving or adding a location makes its
 footprint passable. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
