@@ -311,7 +311,11 @@ const approvedCurrentFactionFiles = new Set([
   // Traffic helpers preserve the existing current-roster vehicle body classes extracted from
   // pivot_drive.rs; they do not admit units or choose a player faction.
   "server/crates/sim/src/game/services/movement/traffic.rs",
-  "server/crates/sim/src/game/services/movement/scout_car.rs",
+  // Car-drive/profile/route helpers preserve existing current-roster vehicle movement policy;
+  // they do not admit units or choose a player faction.
+  "server/crates/sim/src/game/services/movement/car_drive.rs",
+  "server/crates/sim/src/game/services/movement/vehicle_profiles.rs",
+  "server/crates/sim/src/game/services/movement/vehicle_route.rs",
   "server/crates/sim/src/game/services/movement/standability.rs",
   "server/crates/sim/src/game/services/movement/waypoints.rs",
   // Setup and artillery command execution is still global-kind based.
