@@ -264,6 +264,7 @@ pub(super) fn stage_main_steel_defensive_line(
         enemy_base,
         distance_tiles,
         EXPANSION_DEFENSIVE_LINE_SPACING_TILES,
+        ready_units.len(),
     )
 }
 
@@ -274,6 +275,7 @@ pub(super) fn stage_main_steel_defensive_line_with_spacing(
     enemy_base: EnemyBaseFact,
     distance_tiles: f32,
     lateral_spacing_tiles: f32,
+    formation_slots: usize,
 ) -> Option<Vec<u32>> {
     let assignments = main_steel_defensive_line_assignments(
         observation,
@@ -281,6 +283,7 @@ pub(super) fn stage_main_steel_defensive_line_with_spacing(
         enemy_base,
         distance_tiles,
         lateral_spacing_tiles,
+        formation_slots,
     )?;
     let units_by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
@@ -487,6 +490,7 @@ pub(super) fn stage_defensive_machine_gunner_perimeter(
         enemy_base,
         policy.perimeter_distance_tiles,
         policy.lateral_spacing_tiles,
+        policy.target_count,
     )
 }
 
@@ -504,6 +508,7 @@ pub(super) fn stage_home_machine_gunner_screen(
         enemy_base,
         distance_tiles,
         lateral_spacing_tiles,
+        ready_units.len(),
     )?;
     let by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
@@ -546,6 +551,7 @@ pub(super) fn stage_home_anti_tank_line(
         enemy_base,
         policy.anti_tank_position_tiles,
         policy.lateral_spacing_tiles,
+        units.len(),
     )?;
     let by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
@@ -615,6 +621,7 @@ pub(super) fn home_defensive_tank_is_positioned(
         enemy_base,
         distance_tiles,
         EXPANSION_DEFENSIVE_LINE_SPACING_TILES,
+        1,
     )
     .and_then(|assignments| assignments.into_iter().next()) else {
         return false;
@@ -649,6 +656,7 @@ pub(super) fn stage_home_defensive_tank(
         enemy_base,
         distance_tiles,
         EXPANSION_DEFENSIVE_LINE_SPACING_TILES,
+        1,
     )?
     .into_iter()
     .next()?;
@@ -868,6 +876,7 @@ pub(super) fn main_steel_defensive_line_assignments(
     enemy_base: EnemyBaseFact,
     distance_tiles: f32,
     lateral_spacing_tiles: f32,
+    formation_slots: usize,
 ) -> Option<Vec<DefensiveLineAssignment>> {
     if ready_units.is_empty() {
         return None;
@@ -892,7 +901,7 @@ pub(super) fn main_steel_defensive_line_assignments(
     let mut units = ready_units.to_vec();
     units.sort_unstable();
     units.dedup();
-    let center_index = (units.len().saturating_sub(1)) as f32 * 0.5;
+    let center_index = (formation_slots.max(units.len()).saturating_sub(1)) as f32 * 0.5;
 
     let assignments = units
         .into_iter()
