@@ -4,6 +4,12 @@ export const NEUTRAL_COLOR_ADJUSTMENT = Object.freeze({
   hue: 100,
 });
 
+export const PRODUCTION_RASTER_COLOR_TARGET = Object.freeze({
+  brightness: 90,
+  saturation: 90,
+  hue: 100,
+});
+
 const EPSILON = 0.001;
 
 export function normalizeColorAdjustment(value, fallback = NEUTRAL_COLOR_ADJUSTMENT) {
@@ -22,6 +28,16 @@ export function isNeutralColorAdjustment(adjustment) {
     nearly(normalized.saturation, 100) &&
     nearly(normalized.hue, 100)
   );
+}
+
+export function relativeColorAdjustment(target, baked = NEUTRAL_COLOR_ADJUSTMENT) {
+  const normalizedTarget = normalizeColorAdjustment(target);
+  const normalizedBaked = normalizeColorAdjustment(baked);
+  return normalizeColorAdjustment({
+    brightness: ratioPercent(normalizedTarget.brightness, normalizedBaked.brightness),
+    saturation: ratioPercent(normalizedTarget.saturation, normalizedBaked.saturation),
+    hue: relativeHuePercent(normalizedTarget.hue, normalizedBaked.hue),
+  });
 }
 
 export function applyColorAdjustmentToRgba(data, adjustment) {
@@ -80,6 +96,14 @@ function luminance(r, g, b) {
 
 function positivePercent(value, fallback) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function ratioPercent(target, baked) {
+  return baked > 0 ? (target * 100) / baked : target;
+}
+
+function relativeHuePercent(target, baked) {
+  return 100 + target - baked;
 }
 
 function clampByte(value) {

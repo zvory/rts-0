@@ -3,6 +3,7 @@ import {
   applyColorAdjustmentToRgba,
   isNeutralColorAdjustment,
   normalizeColorAdjustment,
+  relativeColorAdjustment,
 } from "./color_adjustment.js";
 
 export const NEUTRAL_FRAME_STRIP_COLOR_ADJUSTMENT = NEUTRAL_COLOR_ADJUSTMENT;
@@ -16,11 +17,7 @@ export const FRAME_STRIP_TARGET_COLOR_ADJUSTMENT = Object.freeze({
 export function frameStripRuntimeColorAdjustment(strip, target = FRAME_STRIP_TARGET_COLOR_ADJUSTMENT) {
   const baked = normalizeFrameStripColorAdjustment(strip?.bakedColorAdjustment);
   const desired = normalizeFrameStripColorAdjustment(strip?.targetColorAdjustment ?? target, target);
-  return normalizeFrameStripColorAdjustment({
-    brightness: ratioPercent(desired.brightness, baked.brightness),
-    saturation: ratioPercent(desired.saturation, baked.saturation),
-    hue: ratioPercent(desired.hue, baked.hue),
-  });
+  return relativeColorAdjustment(desired, baked);
 }
 
 export function normalizeFrameStripColorAdjustment(value, fallback = NEUTRAL_FRAME_STRIP_COLOR_ADJUSTMENT) {
@@ -33,8 +30,4 @@ export function isNeutralFrameStripColorAdjustment(adjustment) {
 
 export function applyFrameStripColorAdjustmentToRgba(data, adjustment) {
   return applyColorAdjustmentToRgba(data, adjustment);
-}
-
-function ratioPercent(target, baked) {
-  return baked > 0 ? (target * 100) / baked : target;
 }

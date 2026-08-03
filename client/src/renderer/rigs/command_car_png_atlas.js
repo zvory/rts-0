@@ -1,3 +1,5 @@
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -9,11 +11,7 @@ export const COMMAND_CAR_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "command_car",
   image: "/assets/rigs/command-car-packed-radio-preview/generated/command-car-packed-radio-stars-30-atlas-v4.png?v=stars-30-preview-4",
-  runtimeColorAdjustment: {
-    brightness: 90,
-    saturation: 90,
-    hue: 100,
-  },
+  runtimeColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
   viewBox: { x: -36, y: -28, width: 72, height: 56 },
   grid: {
     layout: "semantic",

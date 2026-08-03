@@ -11,5 +11,5 @@ does not shrink as the weapon rotates. The largest pose in each group fits withi
 The pipeline does not consult older green art, transfer masks, color guides, or compact silhouettes.
 
 Frames 0–5 are carry movement, frame 6 repeats the first carry pose, frames 7–11 deploy, and frames
-12–14 fire. The client applies the shared `team-light` tint and 70% target brightness used by the
-Rifleman strip.
+12–14 fire. The client applies the shared `team-light` tint and the common 90% brightness and
+saturation target used by the other white-source production units.

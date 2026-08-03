@@ -1,3 +1,5 @@
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -34,11 +36,7 @@ export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
     saturation: 100,
     hue: 100,
   },
-  targetColorAdjustment: {
-    brightness: 70,
-    saturation: 100,
-    hue: 100,
-  },
+  targetColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
   packedFacing: "body",
   setupForwardAngle: Math.PI / 2,
   source: {

@@ -1,3 +1,5 @@
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -23,11 +25,7 @@ export const SCOUT_PLANE_PNG_FRAME_STRIP = deepFreeze({
   fps: 12,
   worldScale: 0.065,
   tintSlot: "team-light",
-  targetColorAdjustment: {
-    brightness: 69,
-    saturation: 73,
-    hue: 100,
-  },
+  targetColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
   source: {
     generatedSource: "client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-source.png",
     alphaSource: "client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png",

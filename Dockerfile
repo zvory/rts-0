@@ -73,8 +73,7 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png \
     && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png \
     && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png \
-    && test -s ./client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas.png \
-    && test -s ./client/assets/rigs/scout-car-pass-02-team/generated/scout-car-pass-02-team-atlas-adjusted.png \
+    && test -s ./client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png \
     && test -s ./client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png \
     && test -s ./client/assets/rigs/tank-ps1/tank-atlas.png
 

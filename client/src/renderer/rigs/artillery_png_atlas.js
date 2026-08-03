@@ -1,6 +1,8 @@
 // Production modular A-19 artillery PNG atlas. Raster-native metadata supplies setup
 // visibility, carriage/weapon facing, recoil, muzzle flash, and anchors. Both trails
 // use the same owner-team tint as the carriage.
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -20,7 +22,7 @@ const TRAIL_LATERAL_SHIFT_RATIO = 0.1;
 const DEPLOYED_TRAIL_LATERAL_LENGTH_RATIO = 0.1;
 const DEPLOYED_TRAIL_ROTATION = 0.54;
 const PACKED_TRAIL_ROTATION = 0.22;
-const TEAM_TINT_ADJUSTMENT = Object.freeze({ brightness: 82, saturation: 90 });
+const TEAM_TINT_ADJUSTMENT = PRODUCTION_RASTER_COLOR_TARGET;
 
 const WHEEL_NAMES = Object.freeze([
   "wheel.left.body",

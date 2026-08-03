@@ -2228,7 +2228,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   temporarily colors the left trail purple and frames both full trail crops in black for
   pivot/origin inspection. It uses
   raster-native setup/facing/recoil metadata and a native Pixi muzzle-flash overlay.
-  The Anti-Tank Gun uses toned-down team tinting, with most firing recoil on the barrel assembly
+  The Anti-Tank Gun uses the shared 90% brightness/saturation team tint target, with most firing recoil on the barrel assembly
   and only subtle kick on the frame and legs. Adjusted frame-strip color texture loading falls back to the raw Pixi
   asset path when image, canvas, pixel-read, or texture creation fails. When browser image
   dimensions are unavailable, full strip dimensions come from frame metadata. Deployed Machine Gunners use `firingFrames` during active recoil, with the visual-effect buffer's linear recoil phase advancing the clip through rest, recoil, and reset frames. Setup and deployed frame-strip poses take priority over movement frames
@@ -2300,8 +2300,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   12 ticks with Methamphetamines. The wind-up soldier was uniformly scaled to 60 percent linear
   size so its neutral-white pixel area matches the walking soldier before the shared team tint.
   Both white-base
-  Rifleman strips use a 70% brightness target before team tinting to stay closer to the Machine
-  Gunner's tonal weight. Their torso-centered sprite origin sits 10 world pixels ahead of the raw
+  Rifleman strips use the shared 90% brightness/saturation target before team tinting so production
+  unit paint has a consistent tonal weight. Their torso-centered sprite origin sits 10 world pixels ahead of the raw
   frame center. Frame 4 is shown only for the opening 20% of the recoil envelope (about 84 ms for
   a rifle shot) and shifts the whole sprite four world pixels backward before returning to the
   standing or movement pose.
@@ -2318,12 +2318,15 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   PNG frame-strip units use a shared load-time color profile target in
   `renderer/rigs/frame_strip_color_profile.js`; each strip records any brightness/saturation already
   baked into its checked-in runtime PNG, and raw strips receive the missing delta once when the
-  texture loads. Individual strips can set a lower or higher target when their generated source art
-  needs unit-specific visual matching.
-  PNG atlas rigs can also declare a worker-safe `runtimeColorAdjustment`. The Scout Car's historical
-  90% brightness/saturation treatment is baked into its checked-in worker-ready PNG by
-  `scripts/generate-color-adjusted-rig-assets.mjs`; its descriptor records that baked profile and
-  uses a neutral runtime adjustment, preserving the prior browser-decoded pixels exactly.
+  texture loads. Production white-source units converge on the Command Car's 90% brightness and
+  saturation target; baked source adjustments are compensated at runtime so they reach that same
+  rendered target without regenerating otherwise accepted art.
+  PNG atlas rigs can also declare a worker-safe `runtimeColorAdjustment`. Scout Car uses one
+  complete white-painted body frame with dark rubber, cabin, outlines, and mechanical detail left
+  in the same generated image; the ordinary `team-light` multiply tint recolors the white material
+  while naturally leaving those dark pixels dark. Its separately animated rear machine gun remains
+  fixed neutral metal, and its 90% brightness/saturation target is applied at runtime rather than
+  baked into owner-specific palette frames.
   Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
   machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
   TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the
