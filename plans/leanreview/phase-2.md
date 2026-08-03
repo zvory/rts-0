@@ -1,4 +1,4 @@
-# Phase 2 - Conservative Review Tiers
+# Phase 2 - Incremental CI-Fix Review
 
 ## Phase Status
 
@@ -6,74 +6,90 @@
 
 ## Objective
 
-Stop every non-docs PR from inheriting the user's global Sol High configuration. Choose an explicit
-model and reasoning effort from a deliberately small, conservative changed-path classifier while
-keeping Sol High on the repository surfaces where a missed authority, secrecy, or workflow problem
-is expensive.
+Avoid re-reviewing an unchanged full branch after a deterministic CI correction. Preserve the first
+full adversarial pass, then use a verified prior reviewed head as the base for one simple linear
+follow-up range; anything ambiguous returns to the current full review.
 
-## Tier Contract
+## Review Modes
 
-The implementation may refine exact path spelling against current `origin/main`, but must preserve
-these semantics:
+### Full
 
-| Tier | Explicit child configuration | Intended scope |
-| --- | --- | --- |
-| Low | `gpt-5.6-terra`, `medium` | Explicitly allowlisted presentation assets, styles, and other narrow mechanical surfaces with no executable or contract code. |
-| Normal | `gpt-5.6-terra`, `high` | Default for all non-Markdown changes not proven low-risk or classified high-risk. |
-| High | `gpt-5.6-sol`, `high` | Authority/security/fog, wire protocol, simulation seam/tick path, lobby/connection boundaries, CI/PR-review machinery, and the classifier itself. |
+Use the existing `origin/main...HEAD` branch review when opening a non-Markdown PR or whenever a
+safe incremental anchor cannot be proven. The resulting final head receives the normal
+`adversarial-quality-pass` success status and becomes the recorded reviewed head.
 
-Markdown-only changes retain the existing skip and do not enter this classifier. Mixed or unknown
-paths default to Normal; any High path raises the whole diff to High; Low applies only when every
-non-Markdown path is explicitly low-risk.
+### Incremental
+
+Use `reviewedHead..HEAD` only when all of these conditions hold:
+
+- the existing open PR body contains a strictly parsed wrapper-owned reviewed-head SHA;
+- GitHub reports a successful `adversarial-quality-pass` status on that exact SHA;
+- the SHA exists locally and is a strict ancestor of current `HEAD`;
+- every commit after the reviewed head is single-parent, so no merge or rewritten-history case is
+  hidden in the range; and
+- the range is non-empty and the PR still targets the expected base branch.
+
+The prompt must state that the earlier branch was fully reviewed, name the verified anchor, and ask
+for correctness and architecture review of the new range plus its interaction with the already
+reviewed result. It must not invite a second pass over unchanged earlier code.
+
+### Already Reviewed
+
+When current `HEAD` exactly equals the verified reviewed head and its success status is still
+present, do not launch Codex or repost the status. Preserve the existing durable quality report and
+continue only the ordinary PR metadata/auto-merge lifecycle that is still needed.
 
 ## Work
 
-- Implement one short pure classifier over the already collected changed paths. Prefer a small
-  function beside existing workflow code over a new configuration format.
-- Reuse `tests/select-suites.mjs --ci-policy` only for its existing broad classification; do not add
-  review-risk semantics to the CI suite selector unless doing so clearly removes duplication.
-- Keep the High rules tied to current repository invariants:
-  - protocol/compact snapshot mirrors and protocol design tooling;
-  - fog projection, per-player filtering, hardening, and untrusted-input boundaries;
-  - `Game` API/tick orchestration and room/lobby/connection authority;
-  - agent PR, adversarial pass, branch-protection/CI workflow, and review-risk classifier code.
-- Keep Low deliberately narrow. Asset manifests or generators that execute code, deploy packaging,
-  generated protocol/config artifacts, and mixed asset/code changes must not qualify merely because
-  they contain assets.
-- Extend `buildCodexArgs` to pass both `--model` and an explicit
-  `model_reasoning_effort="..."` config override. The child must not silently inherit either field
-  from global user configuration.
-- Add the tier, model, effort, and one short reason to the normalized JSON/Markdown report and PR
-  body. Keep the report useful for audit without adding token counts or session persistence.
-- Print the selected tier before launching Codex so a mistaken route is visible immediately.
-- Provide a narrowly scoped environment or CLI override only if existing tests need deterministic
-  injection; do not make ordinary callers manually select a tier.
-- Update `docs/design/testing.md` and `docs/pr-first-workflow.md` with the tier contract and
-  conservative fallback.
+- Add a wrapper-owned machine-readable reviewed-head marker to the PR body after a successful full
+  or incremental pass. Do not let child-authored JSON choose this SHA.
+- On an existing PR, parse the marker strictly, query the commit status for that exact SHA, and
+  validate local ancestry/history before choosing a mode.
+- Keep the marker useful after an agent manually pushes a CI fix: the existing PR body, not the
+  current remote PR head alone, identifies the earlier reviewed anchor.
+- Extend the quality-pass invocation with an explicit review mode and review base. Reuse the
+  existing bounded changed-path manifest relative to that base rather than inventing a second diff
+  collector.
+- In incremental mode, keep the complete repository available for context while limiting the
+  requested review and changed-path metadata to the correction range.
+- After Codex changes, formatting, and Phase 1 final-head preflight succeed, post the success status
+  on the actual final head and replace the marker with that final SHA.
+- Fall back to Full on missing/malformed marker, missing or unsuccessful status, missing commit,
+  non-ancestor history, any merge commit in the range, unexpected base, or GitHub lookup failure.
+  Log one concise fallback reason without treating normal first review as an error.
+- Keep the current model and reasoning behavior unchanged. This phase must not add model routing,
+  effort overrides, or path-risk tiers.
+- Record wrapper-owned `Review mode` and `Review base` lines in the durable PR report. Do not append
+  an unbounded history of prior reports.
+- Update `docs/design/testing.md` and `docs/pr-first-workflow.md`, including the corrected CI-recovery
+  instruction: a pushed linear fix may use the prior body marker, while ambiguous history receives
+  a full pass.
 
 ## Expected Touch Points
 
+- `scripts/agent-pr.sh`
 - `scripts/adversarial-quality-pass.mjs`
-- `scripts/adversarial-quality-pass.schema.json`
-- `scripts/agent-pr.sh` only if it must forward classifier input
 - `tests/adversarial_quality_pass.mjs`
 - `docs/design/testing.md`
 - `docs/pr-first-workflow.md`
 
 ## Required Tests
 
-- An all-low allowlist fixture selects Terra Medium.
-- An ordinary client or server implementation fixture selects Terra High.
-- Each high-risk contract family selects Sol High.
-- Mixed Low plus Normal selects Normal; mixed Low/Normal plus High selects High.
-- An unknown path selects Normal.
-- Markdown-only handling still skips the child entirely.
-- Generated executable artifacts, deploy files, and workflow/classifier changes cannot be
-  accidentally classified Low.
-- Generated Codex arguments contain explicit model and effort even when the parent environment or
-  user config says Sol High.
-- JSON normalization, Markdown rendering, status posting, and existing reports remain compatible
-  with the added audit fields.
+- A new non-Markdown PR always uses Full mode.
+- A prior marker plus successful status and a simple descendant fix selects Incremental mode with
+  the prior SHA as the review base.
+- A manually pushed fix is still anchored from the prior PR-body marker rather than mistaken for an
+  already reviewed remote head.
+- Current `HEAD` equal to the verified reviewed head launches no Codex child and preserves the prior
+  report.
+- Missing, malformed, failed, or forged marker/status combinations select Full mode.
+- A non-ancestor SHA, merge commit, changed base, or GitHub lookup failure selects Full mode.
+- Incremental changed-path metadata excludes unchanged earlier branch work and the prompt forbids
+  reopening that work while still permitting interaction checks.
+- A Codex-modified incremental result records and posts status on the actual final SHA, not the old
+  anchor or pre-review head.
+- Markdown-only skip, Phase 1 preflights, clean-worktree enforcement, push/status ordering, and
+  report rendering remain green.
 
 ## Verification
 
@@ -85,20 +101,21 @@ non-Markdown path is explicitly low-risk.
 
 ## Manual Test Focus
 
-Use dry-run fixtures or disposable branches representing asset-only, ordinary client code, and a
-protocol/fog/workflow change. Confirm the launch line and report show Terra Medium, Terra High, and
-Sol High respectively, and confirm changing the user's global model setting does not alter the
-selected child configuration.
+Use a disposable PR fixture or dry-run harness to exercise three cases: first full review, one
+linear correction after a recorded successful head, and a merge/rebase-shaped correction. Confirm
+the second case presents only the correction range to the child, the third falls back to Full, and
+a fourth no-change rerun launches no child.
 
 ## Handoff Expectations
 
-Report the exact Low and High path families, the conservative fallback behavior, the child CLI
-arguments, and where tier metadata appears in the PR body. Tell the Phase 3 agent how to add focused
-verification context without disturbing classifier inputs or the bounded changed-path manifest.
+Report the marker format, status/ancestry checks, exact Full fallback conditions, no-change behavior,
+and how the incremental base reaches the prompt and input manifest. Tell the Phase 3 agent where to
+add focused verification context without changing the reviewed-head decision or reopening the full
+branch during an incremental pass.
 
 ## Deferred
 
-- Per-task model benchmarking or automatic promotion based on review outcome.
-- Luna routing, `xhigh`, `max`, or pro-mode review.
-- Token-budget enforcement and usage telemetry.
-- Incremental post-CI delta review.
+- Incremental review across merge commits, rebases, or rewritten history.
+- Searching multiple historical statuses when the recorded anchor is invalid.
+- Model selection or reasoning-effort routing.
+- Token accounting, budgets, or persisted child sessions.

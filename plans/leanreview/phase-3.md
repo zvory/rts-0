@@ -57,8 +57,8 @@ evidence gap from a known sandbox limitation.
   preserving offline focused checks.
 - The prompt tells the child to report a specific unverified behavior, not generic `EPERM` or
   sandbox concern text.
-- Fake Codex review, push/status ordering, tier selection, Markdown skip, and Phase 1 preflights
-  remain green.
+- Fake Codex review, full/incremental/no-change selection, push/status ordering, Markdown skip, and
+  Phase 1 preflights remain green.
 
 ## Verification
 
@@ -79,9 +79,9 @@ residual-risk statement rather than an attempted listener launch or generic sand
 
 Report the verification-text bound, the exact allowed/forbidden validation boundary, and how the
 report distinguishes real evidence gaps from known sandbox limitations. The final handoff should
-recommend observing the next ordinary PR batch for preventable CI failures, selected review tiers,
-and sandbox-noise reports; do not propose another implementation phase unless that evidence shows a
-specific remaining waste.
+recommend observing the next ordinary PR batch for preventable CI failures, full versus incremental
+review counts, and sandbox-noise reports; do not propose another implementation phase unless that
+evidence shows a specific remaining waste.
 
 ## Deferred
 

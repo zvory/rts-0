@@ -7,9 +7,9 @@ or building a generalized cost-management system. The evidence motivating this p
 of 13 inspected failed PR runs included a deterministic source-size, faction/architecture, or
 deploy-asset failure that existing local checks could catch; 23 of 39 recent code PRs were improved
 by adversarial review; and 20 of 40 recent reports mentioned sandbox or listener limitations. The
-plan therefore keeps adversarial review, moves cheap failures ahead of it, spends the strongest
-review model only on high-risk changes, and stops asking the review sandbox to perform validation it
-cannot complete.
+plan therefore keeps adversarial review, moves cheap checks ahead of it, reviews only the new
+correction after a proven successful full review, and stops asking the review sandbox to perform
+validation it cannot complete.
 
 ## Overall Constraints
 
@@ -18,10 +18,12 @@ cannot complete.
 - Optimize only the normal owned-PR path in `scripts/agent-pr.sh` and
   `scripts/adversarial-quality-pass.mjs`. Do not introduce a service, dashboard, scheduler, model
   benchmark framework, or generalized workflow engine.
-- Reuse existing policy scripts and changed-path information. New code should be a small pure
-  classifier or orchestration helper with focused tests, not a second suite-selection registry.
-- Keep the Markdown-only adversarial skip. Unknown non-Markdown paths must receive at least the
-  normal review tier rather than silently taking the cheapest path.
+- Reuse existing policy scripts, PR metadata, commit ancestry, and the existing
+  `adversarial-quality-pass` commit status. Do not add a local review cache, database, service, or
+  second suite-selection registry.
+- Keep the Markdown-only adversarial skip. The first review of every non-Markdown PR remains a full
+  branch review; incremental mode is allowed only after proving a prior reviewed head and a simple
+  descendant correction range, otherwise fall back to the full review.
 - Preserve the clean-worktree requirement, bounded review-input manifest, final-head status,
   durable PR-body report, auto-merge behavior, and full CI gate.
 - Keep the adversarial child sandbox at `workspace-write`. Phase 3 removes impossible validation
@@ -49,13 +51,13 @@ command and output, while deliberately excluding Rust compilation, full suites, 
 servers. Prove with fake Codex/GitHub tests that an invalid branch spends no review tokens and an
 invalid review-produced head is never pushed or marked successful.
 
-### [Phase 2 - Conservative Review Tiers](phase-2.md)
+### [Phase 2 - Incremental CI-Fix Review](phase-2.md)
 
-Classify non-Markdown diffs into a small low, normal, or high-risk review tier using changed paths
-and conservative defaults. Run low-risk work on Terra Medium, normal work on Terra High, and the
-authority/security/contract and workflow surfaces on Sol High, passing model and effort explicitly
-to the child CLI. Record the selected tier and reason in the durable report so misclassification can
-be audited without creating a model-evaluation project.
+Record the successfully reviewed head on the PR and reuse it only after verifying its GitHub status
+and ancestry. On a simple linear CI-fix rerun, review `reviewed-head..HEAD` and tell the child not to
+reopen unchanged code from the already reviewed branch; if the head is already reviewed, launch no
+child at all. Fall back to the current full-branch review for missing or invalid markers, ancestry
+breaks, merges, rebases, or any other ambiguous history.
 
 ### [Phase 3 - Sandbox-Honest Verification](phase-3.md)
 
@@ -68,7 +70,7 @@ not supplied and cannot be produced offline, the report must name that specific 
 ## Phase Index
 
 1. [Phase 1 - Cheap Final-Head Preflight](phase-1.md)
-2. [Phase 2 - Conservative Review Tiers](phase-2.md)
+2. [Phase 2 - Incremental CI-Fix Review](phase-2.md)
 3. [Phase 3 - Sandbox-Honest Verification](phase-3.md)
 
 ## Success Measures
@@ -78,8 +80,11 @@ to create a control group.
 
 - Branches failing one of the selected fast checks stop before the first adversarial Codex launch.
 - A review-produced final head failing the same checks is not pushed and receives no success status.
-- Every non-docs adversarial report records a tier, model, effort, and short classification reason.
-- Ordinary changes no longer inherit the user's global Sol High configuration by accident.
+- Every initial non-docs PR receives the current full-branch review and records its reviewed head.
+- A proven linear CI-fix rerun reviews only the new range, while a rerun on the already reviewed head
+  launches no child.
+- Missing status, invalid metadata, non-ancestor history, or merge commits conservatively trigger a
+  full review.
 - Reports no longer contain generic `EPERM`, localhost-listener, browser-launch, or Interact-launch
   concerns caused solely by the known `workspace-write` sandbox.
 - Full-gate failure rate and adversarial improvement rate remain visible through existing PR and
@@ -89,13 +94,12 @@ to create a control group.
 
 - Eliminating adversarial review, skipping the full GitHub gate, or auto-merging after local checks.
 - Predicting exact token cost, enforcing a token budget, or persisting child-session transcripts.
-- Incremental review of only the post-CI delta; that is a useful later optimization, but it is not
-  required for these three solid wins.
-- Automatically choosing the implementing agent's model or changing the user's global Codex
-  configuration.
+- Automatically choosing or overriding the adversarial model, reasoning effort, or the implementing
+  agent's global Codex configuration.
+- Incremental review across rebases, merges, rewritten history, or an unproven earlier review.
 - Expanding review sandbox permissions or teaching the child to operate Interact/browser tooling.
-- Building an exhaustive path-risk ontology. The classifier should remain short, conservative, and
-  easy to delete or adjust.
+- Building a review database, reconstructing historical reports, or retaining an unbounded chain of
+  review summaries in the PR body.
 
 ## Implementation Process
 
