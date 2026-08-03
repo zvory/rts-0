@@ -92,6 +92,8 @@ fn start_payload_for_terrain(
             doodads: Vec::new(),
             stealth_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
         },
         players: starts
             .iter()
@@ -663,6 +665,8 @@ fn resource_mappings_prefer_reachable_components_over_cross_wall_distance() {
             doodads: Vec::new(),
             stealth_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
         },
         players: vec![
             PlayerStart {
@@ -744,6 +748,8 @@ fn analysis_key_tracks_static_map_start_and_resource_identity() {
             doodads: Vec::new(),
             stealth_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
         },
         players: vec![PlayerStart {
             id: 1,

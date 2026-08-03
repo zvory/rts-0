@@ -1,4 +1,69 @@
 use super::*;
+use crate::rules::terrain::TerrainKind;
+
+#[test]
+fn authored_damage_reduction_tile_halves_direct_weapon_damage() {
+    let (mut entities, attacker, victim) = rifleman_with_enemy();
+    let mut map = open_map(16);
+    let victim_pos = entities
+        .get(victim)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .expect("victim");
+    map.damage_reduction_tiles = vec![map.tile_of(victim_pos.0, victim_pos.1)];
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
+    let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+    let mut rng = SmallRng::seed_from_u64(0);
+    let blockers = ShotBlockerIndex::build(&map, &entities);
+    let weapon = entities
+        .get(attacker)
+        .and_then(|entity| combat_rules::default_weapon_profile(entity.kind))
+        .expect("rifleman weapon");
+    let raw_damage = 20;
+    let expected_uncovered = entities
+        .get(victim)
+        .map(|entity| {
+            combat_rules::effective_damage_with_facing_for_weapon(
+                weapon,
+                entity.kind,
+                raw_damage,
+                Some(TerrainKind::Open),
+                Some(entity.facing()),
+                victim_pos,
+                (100.0, 100.0),
+            )
+        })
+        .expect("victim");
+    let before = entities.get(victim).expect("victim").hp;
+
+    let outcome = apply_damage(
+        &map,
+        &mut entities,
+        &blockers,
+        &teams,
+        &mut events,
+        &fog,
+        &smokes,
+        &mut rng,
+        attacker,
+        victim,
+        weapon,
+        raw_damage,
+        1,
+        100.0,
+        100.0,
+        victim_pos.0,
+        victim_pos.1,
+        64.0,
+        0.0,
+        10,
+    );
+
+    assert!(outcome.is_some());
+    let after = entities.get(victim).expect("victim").hp;
+    assert_eq!(before - after, expected_uncovered.saturating_add(1) / 2);
+}
 
 fn mark_entrenched(entities: &mut EntityStore, id: u32) {
     entities

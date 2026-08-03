@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
+use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{Event, NoticeSeverity};
@@ -82,8 +83,10 @@ impl PanzerfaustShotStore {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(in crate::game) fn resolve_due(
         &mut self,
+        map: &Map,
         entities: &mut EntityStore,
         teams: &TeamRelations,
         fog: &Fog,
@@ -95,7 +98,7 @@ impl PanzerfaustShotStore {
         let due = std::mem::take(&mut self.shots);
         for shot in due {
             if shot.impact_tick <= tick {
-                resolve(entities, teams, fog, smokes, events, &shot, tick);
+                resolve(map, entities, teams, fog, smokes, events, &shot, tick);
             } else {
                 pending.push(shot);
             }
@@ -104,7 +107,9 @@ impl PanzerfaustShotStore {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve(
+    map: &Map,
     entities: &mut EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -138,6 +143,7 @@ fn resolve(
             combat::weapon_profile(combat::WeaponKind::PanzerfaustLoadedShot)
                 .is_some_and(combat::weapon_triggers_tank_armor_reaction);
         let damage = combat::panzerfaust_loaded_shot_damage(victim_kind, Some(TerrainKind::Open));
+        let damage = map.damage_after_reduction_tile(victim_pos.0, victim_pos.1, damage);
         let source_pos = (shot.source_x, shot.source_y);
         let attribution = teams
             .is_enemy_owner(shot.owner, victim_owner)
@@ -222,8 +228,15 @@ mod tests {
         let fog = Fog::new(24, 24);
         let smokes = SmokeCloudStore::new();
         let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+        let map = Map {
+            width: 24,
+            height: 24,
+            terrain: vec![crate::protocol::terrain::GRASS; 24 * 24],
+            ..Map::default()
+        };
 
         shots.resolve_due(
+            &map,
             &mut entities,
             &teams,
             &fog,

@@ -53,6 +53,10 @@ pub struct LabCheckpointScenarioMapData {
     pub stealth_tiles: Vec<MapTile>,
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub damage_reduction_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub slow_movement_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -90,7 +94,8 @@ pub struct LabCheckpointScenarioSource {
 
 impl LabCheckpointScenarioMap {
     pub(super) fn from_map(map: &Map, metadata: &MapMetadata) -> Self {
-        let (stealth_tiles, no_vehicle_tiles) = map.protocol_overlay_tiles();
+        let (stealth_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
+            map.protocol_overlay_tiles();
         Self {
             name: metadata.name.clone(),
             schema_version: metadata.schema_version,
@@ -121,6 +126,8 @@ impl LabCheckpointScenarioMap {
                 doodads: map.doodads.clone(),
                 stealth_tiles,
                 no_vehicle_tiles,
+                damage_reduction_tiles,
+                slow_movement_tiles,
             },
         }
     }
@@ -164,6 +171,16 @@ impl LabCheckpointScenarioMap {
                 .collect(),
             no_vehicle_tiles: data
                 .no_vehicle_tiles
+                .into_iter()
+                .map(|tile| (tile.x, tile.y))
+                .collect(),
+            damage_reduction_tiles: data
+                .damage_reduction_tiles
+                .into_iter()
+                .map(|tile| (tile.x, tile.y))
+                .collect(),
+            slow_movement_tiles: data
+                .slow_movement_tiles
                 .into_iter()
                 .map(|tile| (tile.x, tile.y))
                 .collect(),
@@ -293,6 +310,20 @@ impl LabCheckpointScenarioMap {
             width,
             height,
             "noVehicleTiles",
+            &self.name,
+        )?;
+        validate_overlay_tiles(
+            &self.data.damage_reduction_tiles,
+            width,
+            height,
+            "damageReductionTiles",
+            &self.name,
+        )?;
+        validate_overlay_tiles(
+            &self.data.slow_movement_tiles,
+            width,
+            height,
+            "slowMovementTiles",
             &self.name,
         )?;
         Ok(())

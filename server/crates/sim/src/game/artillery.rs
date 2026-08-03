@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
+use crate::game::map::Map;
 use crate::game::services::geometry::RectBody;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{Event, NoticeSeverity};
@@ -42,8 +43,10 @@ impl ArtilleryShellStore {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn resolve_due(
         &mut self,
+        map: &Map,
         entities: &mut EntityStore,
         teams: &TeamRelations,
         fog: &Fog,
@@ -56,7 +59,7 @@ impl ArtilleryShellStore {
         for shell in due {
             if shell.impact_tick <= tick {
                 on_impact(shell.x, shell.y);
-                resolve_shell(entities, teams, fog, events, &shell, tick);
+                resolve_shell(map, entities, teams, fog, events, &shell, tick);
             } else {
                 pending.push(shell);
             }
@@ -66,6 +69,7 @@ impl ArtilleryShellStore {
 }
 
 fn resolve_shell(
+    map: &Map,
     entities: &mut EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -104,6 +108,7 @@ fn resolve_shell(
             target,
             artillery_damage(target.kind, d2, inner2, outer2),
         );
+        let damage = map.damage_after_reduction_tile(target.pos_x, target.pos_y, damage);
         if damage == 0 {
             continue;
         }
@@ -315,7 +320,7 @@ mod tests {
             impact_tick: 0,
         };
 
-        resolve_shell(&mut entities, &teams, &fog, &mut events, &shell, 10);
+        resolve_shell(&map, &mut entities, &teams, &fog, &mut events, &shell, 10);
 
         let after = entities.get(victim).expect("victim should survive").hp;
         let inner = config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32;

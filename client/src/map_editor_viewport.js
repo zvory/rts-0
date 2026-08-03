@@ -355,6 +355,8 @@ export class MapEditorViewport {
       sites,
       stealthTiles: structuredCloneSafe(draft.stealthTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
+      damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),
+      slowMovementTiles: structuredCloneSafe(draft.slowMovementTiles || []),
       paintPreview: this.paintPreviewRecord(),
       doodadBrushPreview: this.doodadBrushPreviewRecord?.() || null,
     };
@@ -858,10 +860,10 @@ function terrainPreviewColor(code) {
 }
 
 function overlayPreviewColor(edit) {
-  if (edit?.stealth === false && edit?.noVehicle === false) return 0xff6f6f;
-  if (edit?.stealth === true && edit?.noVehicle === true) return 0x81c784;
   if (edit?.stealth != null) return 0x5ed19a;
-  return 0xf2b866;
+  if (edit?.noVehicle != null) return 0xf26a5a;
+  if (edit?.damageReduction != null) return 0x6da8ff;
+  return 0xb276e8;
 }
 
 function doodadCommitLabel(mode) {

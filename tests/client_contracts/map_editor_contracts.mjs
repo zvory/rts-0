@@ -101,7 +101,7 @@ import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
 import { authoritativeAnalysisSummary, MapEditorPanel } from "../../client/src/map_editor_panel.js";
-import { defaultMapAuthoringLayerVisibility } from "../../client/src/map_authoring/layers.js";
+import { defaultMapAuthoringLayerVisibility, MAP_AUTHORING_LAYER } from "../../client/src/map_authoring/layers.js";
 import {
   canonicalDoodadColor,
   createDoodadSprayStroke,
@@ -664,9 +664,18 @@ assert(
   session.beginOverlayStroke("Excluded vehicles");
   assert.deepEqual(session.paintOverlayTiles(overlap, { noVehicle: true }), overlap);
   assert.equal(session.commitOverlayStroke(), true);
+  session.beginOverlayStroke("Reduced damage");
+  assert.deepEqual(session.paintOverlayTiles(overlap, { damageReduction: true }), overlap);
+  assert.equal(session.commitOverlayStroke(), true);
+  session.beginOverlayStroke("Slowed movement");
+  assert.deepEqual(session.paintOverlayTiles(overlap, { slowMovement: true }), overlap);
+  assert.equal(session.commitOverlayStroke(), true);
   assert.deepEqual(session.materialized().stealthTiles, overlap);
   assert.deepEqual(session.materialized().noVehicleTiles, overlap,
     "independent authoring tools may intentionally overlap their sparse semantic layers");
+  assert.deepEqual(session.materialized().damageReductionTiles, overlap);
+  assert.deepEqual(session.materialized().slowMovementTiles, overlap,
+    "all four gameplay layers may intentionally share one tile");
 
   session.beginOverlayStroke("Made long grass");
   assert.deepEqual(session.paintOverlayTiles([overlap[1]], { noVehicle: false }), [overlap[1]]);
@@ -679,6 +688,20 @@ assert(
   assert.equal(session.undo(), true);
   assert.deepEqual(session.materialized().noVehicleTiles, overlap,
     "overlay strokes participate in the editor's normal undo history");
+  assert.deepEqual(session.materialized().slowMovementTiles, overlap,
+    "undo leaves unrelated overlay layers intact");
+}
+
+{
+  const visibility = defaultMapAuthoringLayerVisibility();
+  assert.equal(visibility[MAP_AUTHORING_LAYER.DAMAGE_REDUCTION], true);
+  assert.equal(visibility[MAP_AUTHORING_LAYER.SLOW_MOVEMENT], true);
+  const rendererSource = fs.readFileSync(new URL("../../client/src/renderer/map_editor_worker_renderer.js", import.meta.url), "utf8");
+  for (const symbol of ["drawClosedEye", "drawNoEntry", "drawHalfShield", "drawMiredBoot"]) {
+    assert(rendererSource.includes(`function ${symbol}`), `${symbol} should remain an explicit per-tile editor symbol`);
+  }
+  assert(rendererSource.includes("tile.effects.length > 1"),
+    "overlapping gameplay icons should switch into shared tile cells");
 }
 
 {

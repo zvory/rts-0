@@ -2,6 +2,8 @@ export const MAP_AUTHORING_LAYER = Object.freeze({
   BASE: "base",
   STEALTH: "stealth",
   NO_VEHICLE: "no-vehicle",
+  DAMAGE_REDUCTION: "damage-reduction",
+  SLOW_MOVEMENT: "slow-movement",
   TREES: "trees",
   GAMEPLAY_DOODADS: "gameplay-doodads",
   DECORATIVE_DOODADS: "decorative-doodads",
@@ -22,6 +24,16 @@ export const MAP_AUTHORING_LAYERS = Object.freeze([
     id: MAP_AUTHORING_LAYER.NO_VEHICLE,
     label: "No vehicles",
     description: "Tiles blocked to vehicles",
+  }),
+  Object.freeze({
+    id: MAP_AUTHORING_LAYER.DAMAGE_REDUCTION,
+    label: "Damage reduction",
+    description: "Tiles that halve incoming damage",
+  }),
+  Object.freeze({
+    id: MAP_AUTHORING_LAYER.SLOW_MOVEMENT,
+    label: "Slowed movement",
+    description: "Tiles that halve movement speed",
   }),
   Object.freeze({
     id: MAP_AUTHORING_LAYER.TREES,

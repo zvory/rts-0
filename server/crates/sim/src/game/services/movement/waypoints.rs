@@ -121,7 +121,12 @@ pub(super) fn advance_moving_units(
                 .unwrap_or(1.0)
         };
         let mut speed = config::unit_stats(kind)
-            .map(|s| s.speed * speed_multiplier * terrain_speed_multiplier)
+            .map(|s| {
+                s.speed
+                    * speed_multiplier
+                    * terrain_speed_multiplier
+                    * map.slow_movement_multiplier_at(x, y)
+            })
             .unwrap_or(0.0);
         if let Some((wx, wy)) = movement_target {
             speed *= ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick);

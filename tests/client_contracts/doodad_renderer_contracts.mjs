@@ -168,21 +168,23 @@ try {
       guideCentre: null,
       sites: [{ x: 16, y: 16, color: 0x4ec9ff, radius: 7, label: "S1", selected: false }],
       stealthTiles: [{ x: 1, y: 1 }],
-      noVehicleTiles: [{ x: 2, y: 2 }],
+      noVehicleTiles: [{ x: 1, y: 1 }],
+      damageReductionTiles: [{ x: 1, y: 1 }],
+      slowMovementTiles: [{ x: 1, y: 1 }],
       paintPreview: null,
       doodadBrushPreview: { x: 20, y: 20, radius: 12, mode: "spray", typeId: "wildflower.single", color: "#ffffff" },
     },
   });
   assert.equal(editor.tankTraps.size, 1, "the editor draws authored Tank Traps with the live entity geometry");
   assert.equal(editorRenderer.layers.buildings.children.length, 1, "Tank Trap previews use the building layer");
-  assert.deepEqual(latestDrawRectWidths(editor.overlay), [32, 28],
-    "independent semantic layers both draw when visible");
+  assert.deepEqual(latestDrawRectWidths(editor.overlay), [14, 14, 14, 14],
+    "four overlapping semantic layers subdivide the tile instead of hiding one another");
   editor._applyLayerVisibility({
     ...defaultMapAuthoringLayerVisibility(),
     [MAP_AUTHORING_LAYER.STEALTH]: false,
   });
-  assert.deepEqual(latestDrawRectWidths(editor.overlay), [28],
-    "hiding stealth leaves the no-vehicle layer visible");
+  assert.deepEqual(latestDrawRectWidths(editor.overlay), [14, 14, 14],
+    "hiding stealth leaves all three independent gameplay layers visible");
   editor._applyLayerVisibility(defaultMapAuthoringLayerVisibility());
   editor._applyLayerVisibility({
     ...defaultMapAuthoringLayerVisibility(),
@@ -237,7 +239,7 @@ function latestDrawRectWidths(graphics) {
   return graphics.calls.slice(lastClear + 1)
     .filter(([kind]) => kind === "drawRect")
     .map(([, , , width]) => width)
-    .filter((width) => width === 32 || width === 28);
+    .filter((width) => width === 28 || width === 14);
 }
 
 console.log("✅ doodad_renderer_contracts.mjs: static assets, layering, wind, editor updates, and teardown passed");

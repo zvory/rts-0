@@ -64,6 +64,8 @@ fn map_draft() -> LabMapDraft {
         }],
         stealth_tiles: Vec::new(),
         no_vehicle_tiles: Vec::new(),
+        damage_reduction_tiles: Vec::new(),
+        slow_movement_tiles: Vec::new(),
         doodads: vec![
             MapDoodad {
                 id: 9,
@@ -248,6 +250,8 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
         base_sites: Vec::new(),
         stealth_tiles: Vec::new(),
         no_vehicle_tiles: Vec::new(),
+        damage_reduction_tiles: Vec::new(),
+        slow_movement_tiles: Vec::new(),
         doodads: Vec::new(),
     };
 

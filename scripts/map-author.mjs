@@ -41,6 +41,7 @@ const DOODAD_TYPES = new Set([
 const MAP_FIELDS = new Set([
   "version", "name", "description", "width", "height", "terrain", "startLocations",
   "baseSites", "_design", "doodads", "stealthTiles", "noVehicleTiles",
+  "damageReductionTiles", "slowMovementTiles",
 ]);
 const START_FIELDS = new Set(["x", "y"]);
 const BASE_FIELDS = new Set(["x", "y", "steelPatches", "oilPatches"]);
@@ -206,7 +207,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
     const blocked = blockedClearance(map, site, startKeys.has(locationKey(site)) ? 7 : 4);
     if (blocked) warnings.push(`base (${site.x},${site.y}) has ${blocked.reason} in its protected area at (${blocked.x},${blocked.y})`);
   }
-  for (const field of ["stealthTiles", "noVehicleTiles"]) {
+  for (const field of ["stealthTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
     const locations = map[field] === undefined ? [] : map[field];
     if (!Array.isArray(locations)) {
       warnings.push(`${field} must be an array`);
@@ -330,8 +331,24 @@ export function renderPreviewSvg(map, { tilePixels = 5, layers = "all" } = {}) {
     visible: visibility[MAP_AUTHORING_LAYER.NO_VEHICLE],
     width,
     height,
-    fill: "#c26a2e",
-    stroke: "#f2b866",
+    fill: "#d94b45",
+    stroke: "#ffaaa5",
+  });
+  appendSemanticTileLayer(elements, map.damageReductionTiles, {
+    id: MAP_AUTHORING_LAYER.DAMAGE_REDUCTION,
+    visible: visibility[MAP_AUTHORING_LAYER.DAMAGE_REDUCTION],
+    width,
+    height,
+    fill: "#3e82d7",
+    stroke: "#a9ccff",
+  });
+  appendSemanticTileLayer(elements, map.slowMovementTiles, {
+    id: MAP_AUTHORING_LAYER.SLOW_MOVEMENT,
+    visible: visibility[MAP_AUTHORING_LAYER.SLOW_MOVEMENT],
+    width,
+    height,
+    fill: "#8b5fc7",
+    stroke: "#d9bfff",
   });
   appendDoodadLayers(elements, map.doodads, visibility, width, height);
   const validStarts = Array.isArray(map.startLocations)

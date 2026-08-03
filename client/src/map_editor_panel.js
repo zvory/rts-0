@@ -426,8 +426,12 @@ export class MapEditorPanel {
     const tools = [
       ["Paint stealth", { stealth: true }, "stealth tiles"],
       ["Paint no vehicles", { noVehicle: true }, "no-vehicle tiles"],
+      ["Paint damage reduction", { damageReduction: true }, "damage-reduction tiles"],
+      ["Paint slowed movement", { slowMovement: true }, "slow-movement tiles"],
       ["Erase stealth", { stealth: false }, "stealth erasure"],
       ["Erase no vehicles", { noVehicle: false }, "no-vehicle erasure"],
+      ["Erase damage reduction", { damageReduction: false }, "damage-reduction erasure"],
+      ["Erase slowed movement", { slowMovement: false }, "slow-movement erasure"],
     ];
     for (const [label, edit, status] of tools) {
       palette.appendChild(button(label, () => {
@@ -439,8 +443,8 @@ export class MapEditorPanel {
       }));
     }
     section.append(
-      readout(`${this.session.draft.stealthTiles.length} stealth tiles; ${this.session.draft.noVehicleTiles.length} no-vehicle tiles.`),
-      readout("Stealth and vehicle exclusion are independent map semantics. Paint or erase each layer explicitly."),
+      readout(`${this.session.draft.stealthTiles.length} stealth; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
+      readout("Each gameplay effect is an independent layer. Damage reduction and slowed movement are both 50%."),
       palette,
     );
     return section;

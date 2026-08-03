@@ -422,6 +422,8 @@ mod tests {
             doodads: vec![],
             stealth_tiles: vec![],
             no_vehicle_tiles: vec![],
+            damage_reduction_tiles: vec![],
+            slow_movement_tiles: vec![],
         };
         let (hx, hy) = (
             10.5 * config::TILE_SIZE as f32,

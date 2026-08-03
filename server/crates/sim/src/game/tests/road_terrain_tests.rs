@@ -62,6 +62,51 @@ fn every_road_variant_applies_the_authoritative_movement_speed_multiplier() {
     }
 }
 
+#[test]
+fn authored_slow_tiles_halve_movement_and_stack_with_roads() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: "kriegsia".to_string(),
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = Game::new_for_replay(&players, 0x5100_7001);
+    game.state.map.terrain.fill(terrain::GRASS);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
+    }
+    let slow_tile = (20, 20);
+    let slow_road_tile = (20, 24);
+    let road_index = game.state.map.index(slow_road_tile.0, slow_road_tile.1);
+    game.state.map.terrain[road_index] = terrain::ROAD_HORIZONTAL;
+    game.state.map.slow_movement_tiles = vec![slow_tile, slow_road_tile];
+    let slow_start = game.state.map.tile_center(slow_tile.0, slow_tile.1);
+    let slow_road_start = game
+        .state
+        .map
+        .tile_center(slow_road_tile.0, slow_road_tile.1);
+    let slow = spawn_moving_rifleman(&mut game, slow_start);
+    let slow_road = spawn_moving_rifleman(&mut game, slow_road_start);
+
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    game.tick();
+
+    let base_speed = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman stats")
+        .speed;
+    assert_moved_distance(&game, slow, slow_start, base_speed * 0.5, "slow tile");
+    assert_moved_distance(
+        &game,
+        slow_road,
+        slow_road_start,
+        base_speed * crate::rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER * 0.5,
+        "slow road tile",
+    );
+}
+
 fn spawn_moving_rifleman(game: &mut Game, start: (f32, f32)) -> u32 {
     let id = game
         .state

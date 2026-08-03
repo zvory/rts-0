@@ -305,6 +305,12 @@ pub struct MapInfo {
     /// Sparse tile overlay blocked only for vehicle-body movement.
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
+    /// Sparse tile overlay that halves incoming damage to occupants.
+    #[serde(default)]
+    pub damage_reduction_tiles: Vec<MapTile>,
+    /// Sparse tile overlay that halves occupant movement speed.
+    #[serde(default)]
+    pub slow_movement_tiles: Vec<MapTile>,
 }
 
 /// A canonical map tile coordinate used by sparse authored overlays.

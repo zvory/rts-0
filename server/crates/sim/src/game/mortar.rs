@@ -322,7 +322,11 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         let effective = entities
             .get(id)
             .map(|target| {
-                entrenchment_combat::reduce_area_damage(target, mortar_damage(target.kind, base))
+                let damage = entrenchment_combat::reduce_area_damage(
+                    target,
+                    mortar_damage(target.kind, base),
+                );
+                map.damage_after_reduction_tile(target.pos_x, target.pos_y, damage)
             })
             .unwrap_or(0);
         if effective == 0 {

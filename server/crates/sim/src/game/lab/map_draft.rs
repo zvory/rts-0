@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
-use crate::game::map::{BaseResourceCounts, Map};
-use crate::protocol::{LabBaseSite, LabMapDraft, LabMapTile, MapTile};
+use crate::game::map::{doodads, BaseResourceCounts, Map};
+use crate::protocol::{LabBaseSite, LabMapDraft, LabMapTile, MapDoodad, MapTile};
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 use super::LabError;
 
 pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
-    let (stealth_tiles, no_vehicle_tiles) = map.protocol_overlay_tiles();
+    let (stealth_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
+        map.protocol_overlay_tiles();
     LabMapDraft {
         name: name.to_string(),
         width: map.width,
@@ -34,6 +35,8 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
         doodads: map.doodads.clone(),
         stealth_tiles,
         no_vehicle_tiles,
+        damage_reduction_tiles,
+        slow_movement_tiles,
     }
 }
 
@@ -70,8 +73,25 @@ pub(super) fn resource_counts(
     Ok(counts)
 }
 
+pub(super) fn canonical_doodads(
+    width: u32,
+    height: u32,
+    records: Vec<MapDoodad>,
+    name: &str,
+) -> Result<Vec<MapDoodad>, LabError> {
+    doodads::canonicalize(width, height, records).map_err(|reason| LabError::InvalidMap {
+        name: name.to_string(),
+        reason,
+    })
+}
+
 type TileCoordinates = Vec<(u32, u32)>;
-type CanonicalOverlays = (TileCoordinates, TileCoordinates);
+type CanonicalOverlays = (
+    TileCoordinates,
+    TileCoordinates,
+    TileCoordinates,
+    TileCoordinates,
+);
 
 pub(super) fn canonical_overlays(
     draft: &LabMapDraft,
@@ -90,6 +110,20 @@ pub(super) fn canonical_overlays(
             draft.width,
             draft.height,
             "noVehicleTiles",
+            name,
+        )?,
+        canonical_tiles(
+            &draft.damage_reduction_tiles,
+            draft.width,
+            draft.height,
+            "damageReductionTiles",
+            name,
+        )?,
+        canonical_tiles(
+            &draft.slow_movement_tiles,
+            draft.width,
+            draft.height,
+            "slowMovementTiles",
             name,
         )?,
     ))

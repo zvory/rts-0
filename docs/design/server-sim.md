@@ -532,7 +532,7 @@ store a separate authoritative command stream, but they must not infer live stat
 Map policy:
 
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  permanent base sites, sparse stealth/no-vehicle tiles, and tree-trunk collision/path cost on every tick, while start/export
+  permanent base sites, four sparse gameplay-overlay tile sets, and tree-trunk collision/path cost on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
 - `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, base-site bodies, or doodad bodies. It
@@ -546,9 +546,9 @@ Map policy:
   a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `width`, `height`,
   `playerCount`, and `materializedMapHash` against the supplied map. `materializedMapHash` is a
   stable hash over the materialized live `Map` fields (`width`, `height`, row-major terrain,
-  selected starts, base sites/resource counts, canonical doodads, and both sparse gameplay overlays).
+  selected starts, base sites/resource counts, canonical doodads, and all four sparse gameplay overlays).
   Explicit empty doodad and overlay lists preserve the equivalent legacy materialized hash. Populated
-  stealth and no-vehicle layers use distinct hash tags. If any binding fact
+  stealth, no-vehicle, damage-reduction, and slow-movement layers use distinct hash tags. If any binding fact
   differs, the importer rejects the payload; it must not fall back to regenerating a map from seed
   or silently accepting a nearby map.
 
@@ -559,6 +559,11 @@ outline-only presentation, and one-second counterfire reaction delay. The terrai
 lit when ordinary sight already covers it; only a tile lacking ordinary sight stays presentation-dark.
 Concealed deaths do not publish positional death events or global death decals. No-vehicle tiles seed
 vehicle-body occupancy only, so vehicles path around them while infantry can traverse the same tile.
+Damage-reduction tiles halve incoming direct, area, loaded-shot, overpenetration, and ability-projectile
+damage after existing weapon/armor/facing and entrenchment policy, rounding a non-zero odd result up.
+Slow-movement tiles apply a 0.5x movement-budget multiplier from the unit-centre tile and multiply
+normally with road, upgrade, breakthrough, and ability movement modifiers. All four sparse layers
+are independent and may overlap at one coordinate.
 
 Field map for Phase 2 DTO conversion:
 
