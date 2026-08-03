@@ -146,7 +146,7 @@ fn armored_production_reserve_met(
     let Some(timing) = profile.fast_tank_timing else {
         return true;
     };
-    let (city_steel, city_oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
+    let (depot_steel, depot_oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
     // A queued Factory unit has already paid its cost. Do not require Jeff to
     // bank that same armored reserve a second time or continuous production
     // would make the expansion gate unreachable.
@@ -166,8 +166,8 @@ fn armored_production_reserve_met(
         };
         rts_rules::economy::cost(next_unit)
     };
-    observation.economy.steel >= city_steel.saturating_add(unit_steel)
-        && observation.economy.oil >= city_oil.saturating_add(unit_oil)
+    observation.economy.steel >= depot_steel.saturating_add(unit_steel)
+        && observation.economy.oil >= depot_oil.saturating_add(unit_oil)
 }
 
 #[allow(clippy::too_many_arguments)]

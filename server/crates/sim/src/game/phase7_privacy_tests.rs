@@ -92,15 +92,15 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
             .expect("resource depot should spawn");
     }
 
-    let ally_city_pos = game.state.map.tile_center(15, 2);
+    let ally_depot_pos = game.state.map.tile_center(15, 2);
     let ally_resource_depot = game
         .state
         .entities
         .spawn_building(
             2,
             EntityKind::ResourceDepot,
-            ally_city_pos.0,
-            ally_city_pos.1,
+            ally_depot_pos.0,
+            ally_depot_pos.1,
             true,
         )
         .expect("ally producing resource depot should spawn");
