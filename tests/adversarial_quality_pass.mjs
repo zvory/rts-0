@@ -281,6 +281,9 @@ try {
   const finalHeadCodexCalledMarker = path.join(tempRoot, "final-head-codex-called.txt");
   const finalHeadStatusCapture = path.join(tempRoot, "final-head-gh-api.txt");
   const finalHeadBody = path.join(tempRoot, "final-head-pr-body.md");
+  const rewrittenPreflightCodexCalledMarker = path.join(tempRoot, "rewritten-preflight-codex-called.txt");
+  const rewrittenPreflightStatusCapture = path.join(tempRoot, "rewritten-preflight-gh-api.txt");
+  const rewrittenPreflightBody = path.join(tempRoot, "rewritten-preflight-pr-body.md");
   fs.mkdirSync(binPath, { recursive: true });
 
   writeExecutable(
@@ -317,6 +320,13 @@ if [ "\${CODEX_MUTATE_AGENT_PR:-}" = "1" ]; then
 fi
 if [ "\${CODEX_CREATE_INVALID_FINAL_HEAD:-}" = "1" ]; then
   printf 'fixture source-size violation\\n' > source-size-invalid.js
+fi
+if [ "\${CODEX_REWRITE_PREFLIGHT_TO_REJECT:-}" = "1" ]; then
+  cat > scripts/agent-pr-preflight.mjs <<'PREFLIGHT'
+#!/usr/bin/env node
+console.error("fixture rewritten preflight rejection");
+process.exit(1);
+PREFLIGHT
 fi
 cat >"$report_file" <<'JSON'
 {
@@ -578,6 +588,43 @@ done
     run("git", ["ls-remote", "--heads", "origin", "zvorygin/final-head-preflight-reject"], { cwd: workPath }).stdout,
     "",
     "invalid final head must not push the reviewed branch",
+  );
+
+  run("git", ["checkout", "main"], { cwd: workPath });
+  run("git", ["checkout", "-b", "zvorygin/reviewed-preflight-source"], { cwd: workPath });
+  fs.writeFileSync(path.join(workPath, "candidate.js"), "export const candidate = true;\n");
+  run("git", ["add", "candidate.js"], { cwd: workPath });
+  run("git", ["commit", "-m", "Branch for reviewed preflight source"], { cwd: workPath });
+  const rewrittenPreflightFailure = spawnSync(
+    "scripts/agent-pr.sh",
+    ["--owner", "tester", "--verification", "reviewed-preflight fixture"],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        AGENT_GH_API_CAPTURE: rewrittenPreflightStatusCapture,
+        AGENT_PR_BODY_CAPTURE: rewrittenPreflightBody,
+        CODEX_CALLED_MARKER: rewrittenPreflightCodexCalledMarker,
+        CODEX_REWRITE_PREFLIGHT_TO_REJECT: "1",
+        GH_BIN: path.join(binPath, "gh"),
+        PATH: `${binPath}:${process.env.PATH}`,
+      }),
+    },
+  );
+  assert.notEqual(
+    rewrittenPreflightFailure.status,
+    0,
+    `rewritten final-head preflight unexpectedly passed\nstdout:\n${rewrittenPreflightFailure.stdout}\nstderr:\n${rewrittenPreflightFailure.stderr}`,
+  );
+  assert.match(`${rewrittenPreflightFailure.stdout}\n${rewrittenPreflightFailure.stderr}`, /fixture rewritten preflight rejection/);
+  assert.match(fs.readFileSync(rewrittenPreflightCodexCalledMarker, "utf8"), /codex called/);
+  assert.equal(fs.existsSync(rewrittenPreflightStatusCapture), false, "rewritten final preflight must not post status");
+  assert.equal(fs.existsSync(rewrittenPreflightBody), false, "rewritten final preflight must not create a PR");
+  assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Run adversarial quality pass/);
+  assert.equal(
+    run("git", ["ls-remote", "--heads", "origin", "zvorygin/reviewed-preflight-source"], { cwd: workPath }).stdout,
+    "",
+    "rewritten final preflight must not push the reviewed branch",
   );
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });

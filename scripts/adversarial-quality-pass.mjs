@@ -5,7 +5,6 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { runPreflight } from "./agent-pr-preflight.mjs";
 import { collectReviewInputs, excludedRawPaths, renderReviewInputManifest } from "./review-inputs.mjs";
 
 const DEFAULT_BASE_REF = "origin/main";
@@ -413,6 +412,18 @@ class Runner {
     this.runInherit(path.join(repoRoot, "scripts", "format-touched-rust.sh"), ["--base", baseRef], { cwd: repoRoot });
   }
 
+  runPreflight(repoRoot, baseRef, { dryRun = false } = {}) {
+    const args = [
+      path.join(repoRoot, "scripts", "agent-pr-preflight.mjs"),
+      "--repo",
+      repoRoot,
+      "--base",
+      baseRef,
+    ];
+    if (dryRun) args.push("--dry-run");
+    this.runInherit(process.execPath, args, { cwd: repoRoot });
+  }
+
   postStatus(options, headSha, report) {
     const args = [
       "api",
@@ -461,12 +472,7 @@ class Runner {
     if (options.dryRun) {
       const { prompt, codexArgs } = buildReviewInvocation();
       this.log(`quality-pass: would run ${options.codexCommand} ${codexArgs.map(shellQuote).join(" ")}`);
-      runPreflight({
-        repoRoot,
-        baseRef: options.baseRef,
-        dryRun: true,
-        log: (message) => this.log(message),
-      });
+      this.runPreflight(repoRoot, options.baseRef, { dryRun: true });
       if (options.push) {
         this.log(`quality-pass: would push HEAD to ${options.remote}/${headBranch}`);
       }
@@ -501,15 +507,18 @@ class Runner {
     const report = normalizeReport(fs.readFileSync(reportFile, "utf8"));
     this.formatTouchedRust(repoRoot, options.baseRef);
     const autoCommitted = this.commitDirtyFinalState(repoRoot, report);
-    const finalHead = this.git(["rev-parse", "HEAD"], repoRoot);
+    const reviewedHead = this.git(["rev-parse", "HEAD"], repoRoot);
     if (autoCommitted) {
-      this.log(`quality-pass: committed final dirty state at ${finalHead}`);
-    } else if (finalHead !== beforeHead) {
-      this.log(`quality-pass: Codex committed final state at ${finalHead}`);
+      this.log(`quality-pass: committed final dirty state at ${reviewedHead}`);
+    } else if (reviewedHead !== beforeHead) {
+      this.log(`quality-pass: Codex committed final state at ${reviewedHead}`);
     } else {
       this.log("quality-pass: final state unchanged");
     }
-    runPreflight({ repoRoot, baseRef: options.baseRef, log: (message) => this.log(message) });
+    // Execute the helper from disk so a review-time fix to its implementation is itself what
+    // verifies the final committed head before any external mutation.
+    this.runPreflight(repoRoot, options.baseRef);
+    const finalHead = this.git(["rev-parse", "HEAD"], repoRoot);
     if (options.markdownReportFile) {
       fs.writeFileSync(options.markdownReportFile, markdownReport(report));
     }
