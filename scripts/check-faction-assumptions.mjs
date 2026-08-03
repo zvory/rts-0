@@ -220,6 +220,9 @@ const approvedCurrentFactionFiles = new Set([
   // Kriegsia-only AI resource scanner; non-Kriegsia AI remains unsupported by public lobby flow.
   "server/crates/ai/src/ai_core/resource_availability.rs",
   "server/crates/ai/src/ai_shared.rs",
+  // The SDK frame adapter converts the protocol's dedicated remembered-anti-tank-gun records back
+  // into the typed kind that the wire record omits. Keep this exception at one occurrence.
+  "server/crates/ai/src/sdk/frame.rs",
   "server/crates/ai/src/selfplay/milestones.rs",
   "server/crates/ai/src/selfplay/pending_build.rs",
   "server/crates/ai/src/selfplay/player_view.rs",
@@ -418,6 +421,7 @@ const approvedSpecialCaseBudgets = new Map([
   // Entrenchment Phase 1 adds one Training Centre research entry and its negative Ekat assertion.
   // Stewardship Phase 3 moved ability and upgrade identity into this authoritative catalog owner;
   // the typed enum declarations and catalog rows intentionally raise the owner-file baseline.
+  ["server/crates/ai/src/sdk/frame.rs", 1],
   ["server/crates/rules/src/faction.rs", 121],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],

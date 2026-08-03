@@ -615,6 +615,7 @@ mod tests {
             .iter_mut()
             .find(|entity| entity.owner == 1 && entity.kind == "city_centre")
             .expect("player one starts with a city centre");
+        let producer_kind = owned_producer.kind.parse::<EntityKind>().unwrap();
         owned_producer.build_progress = Some(0.5);
         owned_producer.build_active = false;
         owned_producer.prod_upgrade = Some(UpgradeKind::TankUnlock.to_protocol_str().to_string());
@@ -635,7 +636,7 @@ mod tests {
         let owned = frame
             .owned()
             .iter()
-            .find(|entity| entity.kind == EntityKind::CityCentre)
+            .find(|entity| entity.kind == producer_kind)
             .unwrap();
         assert_eq!(
             owned.completion,
@@ -654,7 +655,7 @@ mod tests {
         let enemy = frame
             .visible_enemies()
             .iter()
-            .find(|entity| entity.kind == EntityKind::CityCentre)
+            .find(|entity| entity.kind == producer_kind)
             .unwrap();
         assert_eq!(enemy.production.unwrap().queue_len, None);
         assert_eq!(enemy.production.unwrap().waiting_for_resources, None);
