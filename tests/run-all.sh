@@ -598,6 +598,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/minimap_input_contracts.mjs"
   run_suite_bg "JS rectangular map asset contracts" \
     node "$SCRIPT_DIR/rectangular_map_asset_contracts.mjs"
+  run_suite_bg "JS map author CLI contracts" \
+    node "$SCRIPT_DIR/map_author_cli_contracts.mjs"
   run_suite_bg "Interact artifact contracts" \
     node "$SCRIPT_DIR/interact_artifact_contracts.mjs"
   run_suite_bg "Interact bulk contracts" \
