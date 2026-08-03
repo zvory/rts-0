@@ -99,8 +99,9 @@ try {
       hasModeSummary: !!document.querySelector("#lobby-mode-summary"),
       hasTeamMarks: !!document.querySelector("#lobby-players .lobby-team-mark"),
       hasLaunchCopy: /Launch|Ready check/.test(document.querySelector(".lobby-launch-panel")?.textContent || ""),
-      mapSelectInSummary: !!document.querySelector(".lobby-status-grid #lobby-map:not([hidden])"),
-      mapSelectInSidePanel: !!document.querySelector(".lobby-form #lobby-map"),
+      mapSelectorInSummary: !!document.querySelector(".lobby-status-grid #lobby-map-selector:not([hidden])"),
+      hasNativeMapSelect: !!document.querySelector("select#lobby-map"),
+      mapSelectorInSidePanel: !!document.querySelector(".lobby-form #lobby-map-selector"),
       hasSidebarAddAi: !!document.querySelector("#lobby-add-ai"),
       statusText: document.querySelector("#lobby-status")?.textContent || "",
       seatDisplay: seat ? getComputedStyle(seat).display : "",
@@ -115,11 +116,38 @@ try {
   ok(teamUi.draggableSeats >= 1, `host lobby seats are draggable (${teamUi.draggableSeats})`);
   ok(!teamUi.hasModeSummary && !teamUi.hasLaunchCopy && !teamUi.statusText,
     "lobby omits mode summary, launch header copy, and room/player status text");
-  ok(teamUi.mapSelectInSummary && !teamUi.mapSelectInSidePanel,
-    "host map selector renders in the summary row instead of the setup panel");
+  ok(teamUi.mapSelectorInSummary && !teamUi.mapSelectorInSidePanel && !teamUi.hasNativeMapSelect,
+    "host custom map selector replaces the native select in the summary row");
   ok(!teamUi.hasSidebarAddAi, "lobby keeps Add AI contextual to the team roster");
   ok(!teamUi.hasTeamMarks && teamUi.seatDisplay === "grid",
     `lobby teams have no color marks and player rows align with grid (${teamUi.seatDisplay})`);
+
+  await page.click("#lobby-map-trigger");
+  await page.hover('.lobby-map-option[data-map-name="Schone Tage"]');
+  await page.waitForFunction(() => {
+    const image = document.querySelector(".lobby-map-preview img");
+    return image?.naturalWidth === 512 && image?.naturalHeight === 512;
+  }, { timeout: 5000 });
+  const mapPreview = await page.evaluate(() => ({
+    name: document.querySelector(".lobby-map-preview figcaption strong")?.textContent || "",
+    author: document.querySelector(".lobby-map-preview figcaption span")?.textContent || "",
+    src: document.querySelector(".lobby-map-preview img")?.getAttribute("src") || "",
+  }));
+  ok(mapPreview.name === "Schone Tage" && mapPreview.author === "Created by oti"
+    && mapPreview.src.endsWith("/assets/map-previews/schone-tage.jpg"),
+  `map hover shows the authoritative preview and creator (${JSON.stringify(mapPreview)})`);
+  await page.click('.lobby-map-option[data-map-name="Schone Tage"]');
+  await page.waitForFunction(
+    () => document.querySelector("#lobby-map-trigger")?.textContent?.includes("Schone Tage"),
+    { timeout: 5000 },
+  );
+  ok(true, "custom map option updates through the authoritative lobby selection");
+  await page.click("#lobby-map-trigger");
+  await page.click('.lobby-map-option[data-map-name="Chokes"]');
+  await page.waitForFunction(
+    () => document.querySelector("#lobby-map-trigger")?.textContent?.includes("Chokes"),
+    { timeout: 5000 },
+  );
 
   await page.click("#lobby-ready");
   await page.waitForFunction(() => { const b = document.querySelector("#lobby-start"); return b && !b.disabled; }, { timeout: 5000 });

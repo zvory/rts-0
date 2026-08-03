@@ -24,6 +24,7 @@ import {
   splitLobbyPlayers,
   teamSlotsForLobby,
 } from "./lobby_view.js";
+import { LobbyMapSelector } from "./lobby_map_selector.js";
 
 const NAME_STORAGE_KEY = "rts.playerName";
 const NAME_UPDATE_DEBOUNCE_MS = 250;
@@ -148,7 +149,12 @@ export class Lobby {
     this.btnReady = rootEl.querySelector("#lobby-ready");
     this.btnStart = rootEl.querySelector("#lobby-start");
     this.elStatus = rootEl.querySelector("#lobby-status");
-    this.selMap = rootEl.querySelector("#lobby-map");
+    this.mapSelector = new LobbyMapSelector(rootEl.querySelector("#lobby-map-selector"), {
+      onSelect: (map) => {
+        const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+        if (isHost && !this._countdownActive) this.net.selectMap(map);
+      },
+    });
     this.rosterView = new LobbyRosterView(this.elPlayers);
     this.browserView = new LobbyBrowserView(rootEl.querySelector("#lobby-browser"));
     this.createModal = new LobbyCreateModal(rootEl, {
@@ -269,6 +275,7 @@ export class Lobby {
   /** Hide the lobby screen (main.js reveals the game screen). */
   hide() {
     this.root.hidden = true;
+    this.mapSelector?.close();
     this._browserActivityTracking = false;
     this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
   }
@@ -299,6 +306,7 @@ export class Lobby {
     this._lastSentName = "";
     this._clearCountdown();
     this._hideReplayPrompt(false);
+    this.mapSelector?.clear();
     if (this.elPlayers) this.elPlayers.innerHTML = "";
     this._reflectSummary("", []);
     this._reflectJoinedState(false);
@@ -369,15 +377,6 @@ export class Lobby {
       this._flushNameUpdate();
       this.net.start();
     });
-
-    // Map selector: host-only. Non-hosts see the selected map as a label.
-    if (this.selMap) {
-      this.selMap.addEventListener("change", () => {
-        const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
-        if (!isHost || this.selMap.disabled) return;
-        this.net.selectMap(this.selMap.value);
-      });
-    }
 
   }
 
@@ -578,6 +577,7 @@ export class Lobby {
     this._cancelNameUpdate();
     this.browserView?.destroy();
     this.createModal?.destroy();
+    this.mapSelector?.destroy();
     this._clearCountdown();
     this._hideReplayPrompt(false);
     this._replayPrompt?.root.remove();
@@ -665,36 +665,19 @@ export class Lobby {
     const entry = this._availableMaps.find((e) => e.name === this._selectedMap);
     const label = entry ? entry.name : (this._selectedMap || "Chokes");
     if (this._isReplayLobby()) {
-      if (this.selMap) {
-        this.selMap.disabled = true;
-        this.selMap.hidden = true;
-      }
+      this.mapSelector?.render({ visible: false, disabled: true });
       if (this.elMapSummary) {
         this.elMapSummary.textContent = label;
         this.elMapSummary.hidden = false;
       }
       return;
     }
-    if (this.selMap) {
-      // Rebuild the option list only when the available maps have changed.
-      // Each entry is {name, description, minPlayers, maxPlayers}; name is the stable key.
-      const currentOptions = Array.from(this.selMap.options).map((o) => o.value);
-      const mapsChanged =
-        currentOptions.length !== this._availableMaps.length ||
-        currentOptions.some((v, i) => v !== this._availableMaps[i].name);
-      if (mapsChanged) {
-        this.selMap.innerHTML = "";
-        for (const entry of this._availableMaps) {
-          const opt = document.createElement("option");
-          opt.value = entry.name;
-          opt.textContent = entry.name;
-          this.selMap.appendChild(opt);
-        }
-      }
-      this.selMap.value = this._selectedMap;
-      this.selMap.disabled = this._countdownActive || !isHost;
-      this.selMap.hidden = !isHost;
-    }
+    this.mapSelector?.render({
+      maps: this._availableMaps,
+      selectedMap: this._selectedMap,
+      visible: isHost,
+      disabled: this._countdownActive || !isHost,
+    });
     if (this.elMapSummary) {
       this.elMapSummary.textContent = label;
       this.elMapSummary.hidden = isHost;
