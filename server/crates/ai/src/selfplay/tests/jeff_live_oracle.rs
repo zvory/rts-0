@@ -301,10 +301,18 @@ fn compare_transcripts(
             json(actual_manifest)
         ));
     }
-    if expected_ticks.len() < horizon as usize || actual_ticks.len() < horizon as usize {
+    if expected_ticks.len() != expected_manifest.full_horizon as usize {
         return Err(format!(
-            "classification=post_tick_drift scenario={FIXTURE_ID} tick=length expected_records={} actual_records={} required_horizon={horizon}\nfixture metadata={}",
-            expected_ticks.len(), actual_ticks.len(), json(expected_manifest)
+            "classification=post_tick_drift scenario={FIXTURE_ID} tick=fixture_length expected_records={} declared_full_horizon={}\nfixture metadata={}",
+            expected_ticks.len(),
+            expected_manifest.full_horizon,
+            json(expected_manifest)
+        ));
+    }
+    if actual_ticks.len() != horizon as usize {
+        return Err(format!(
+            "classification=post_tick_drift scenario={FIXTURE_ID} tick=actual_length actual_records={} required_horizon={horizon}\nfixture metadata={}",
+            actual_ticks.len(), json(expected_manifest)
         ));
     }
     for index in 0..horizon as usize {
@@ -753,5 +761,30 @@ mod comparator_tests {
         assert!(compare_transcripts(&expected, &post, 1)
             .unwrap_err()
             .contains("classification=post_tick_drift"));
+    }
+
+    #[test]
+    fn jeff_live_oracle_rejects_fixture_and_actual_length_drift() {
+        let expected = sample_transcript(moves());
+
+        let mut missing_fixture_tick = decode_round_trip(&expected);
+        missing_fixture_tick.pop();
+        let failure = compare_transcripts(&missing_fixture_tick, &expected, 1).unwrap_err();
+        assert!(failure.contains("tick=fixture_length"));
+        assert!(failure.contains("expected_records=0"));
+        assert!(failure.contains("declared_full_horizon=1"));
+
+        let mut extra_fixture_tick = decode_round_trip(&expected);
+        extra_fixture_tick.push(expected[1].clone());
+        let failure = compare_transcripts(&extra_fixture_tick, &expected, 1).unwrap_err();
+        assert!(failure.contains("tick=fixture_length"));
+        assert!(failure.contains("expected_records=2"));
+
+        let mut extra_actual_tick = decode_round_trip(&expected);
+        extra_actual_tick.push(expected[1].clone());
+        let failure = compare_transcripts(&expected, &extra_actual_tick, 1).unwrap_err();
+        assert!(failure.contains("tick=actual_length"));
+        assert!(failure.contains("actual_records=2"));
+        assert!(failure.contains("required_horizon=1"));
     }
 }
