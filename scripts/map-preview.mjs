@@ -23,6 +23,7 @@ export function parseMapPreviewArgs(argv) {
     url: DEFAULT_URL,
     chrome: process.env.CHROME || "",
     browserDpr: 1,
+    jpegQuality: 88,
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -50,13 +51,19 @@ export function parseMapPreviewArgs(argv) {
     else if (arg.startsWith("--chrome=")) options.chrome = arg.slice(9);
     else if (arg === "--browser-dpr") options.browserDpr = numberInRange(value(), arg, 1, 4);
     else if (arg.startsWith("--browser-dpr=")) options.browserDpr = numberInRange(arg.slice(14), "--browser-dpr", 1, 4);
+    else if (arg === "--jpeg-quality") options.jpegQuality = integerInRange(value(), arg, 1, 100);
+    else if (arg.startsWith("--jpeg-quality=")) options.jpegQuality = integerInRange(arg.slice(15), "--jpeg-quality", 1, 100);
     else if (arg === "--help" || arg === "-h") options.help = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
   if (!options.help) {
     if (!options.map) throw new Error("--map is required");
     if (!options.out) throw new Error("--out is required");
-    if (!options.out.toLowerCase().endsWith(".png")) throw new Error("--out must use a .png extension");
+    const extension = path.extname(options.out).toLowerCase();
+    if (!new Set([".png", ".jpg", ".jpeg"]).has(extension)) {
+      throw new Error("--out must use a .png, .jpg, or .jpeg extension");
+    }
+    options.format = extension === ".png" ? "png" : "jpeg";
     if (!new Set(["world", "minimap"]).has(options.kind)) throw new Error("--kind must be world or minimap");
     options.url = localServerUrl(options.url);
   }
@@ -108,10 +115,22 @@ export async function renderMapPreview(options, dependencies = {}) {
       "Map preview browser capture timed out.",
     );
     if (pageErrors.length) throw new Error(`Map preview page error: ${pageErrors[0]}`);
-    const prefix = "data:image/png;base64,";
-    if (!String(result?.pngDataUrl).startsWith(prefix)) throw new Error("Map preview page returned no PNG.");
-    const bytes = Buffer.from(result.pngDataUrl.slice(prefix.length), "base64");
-    const dimensions = readPngDimensions(bytes);
+    const pngPrefix = "data:image/png;base64,";
+    if (!String(result?.pngDataUrl).startsWith(pngPrefix)) throw new Error("Map preview page returned no PNG.");
+    const pngBytes = Buffer.from(result.pngDataUrl.slice(pngPrefix.length), "base64");
+    const pngDimensions = readPngDimensions(pngBytes);
+    if (pngDimensions.width !== options.width || pngDimensions.height !== options.height) {
+      throw new Error(`Map preview returned ${pngDimensions.width}x${pngDimensions.height}, expected ${options.width}x${options.height}.`);
+    }
+    let bytes = pngBytes;
+    let dimensions = pngDimensions;
+    if (options.format === "jpeg") {
+      const jpegDataUrl = await encodeJpegDataUrl(page, result.pngDataUrl, options.jpegQuality);
+      const jpegPrefix = "data:image/jpeg;base64,";
+      if (!String(jpegDataUrl).startsWith(jpegPrefix)) throw new Error("Map preview page returned no JPEG.");
+      bytes = Buffer.from(jpegDataUrl.slice(jpegPrefix.length), "base64");
+      dimensions = readJpegDimensions(bytes);
+    }
     if (dimensions.width !== options.width || dimensions.height !== options.height) {
       throw new Error(`Map preview returned ${dimensions.width}x${dimensions.height}, expected ${options.width}x${options.height}.`);
     }
@@ -121,6 +140,7 @@ export async function renderMapPreview(options, dependencies = {}) {
       map: path.resolve(options.map),
       out: options.out,
       kind: options.kind,
+      format: options.format,
       width: dimensions.width,
       height: dimensions.height,
       bytes: bytes.length,
@@ -185,6 +205,34 @@ function numberInRange(value, label, minimum, maximum) {
   return parsed;
 }
 
+function integerInRange(value, label, minimum, maximum) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${label} requires an integer from ${minimum} to ${maximum}`);
+  }
+  return parsed;
+}
+
+async function encodeJpegDataUrl(page, pngDataUrl, jpegQuality) {
+  return page.evaluate(async ({ source, quality }) => {
+    const image = await new Promise((resolve, reject) => {
+      const candidate = new Image();
+      candidate.onload = () => resolve(candidate);
+      candidate.onerror = () => reject(new Error("Could not decode captured minimap PNG."));
+      candidate.src = source;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Could not create JPEG conversion canvas.");
+    context.fillStyle = "#11110f";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0);
+    return canvas.toDataURL("image/jpeg", quality / 100);
+  }, { source: pngDataUrl, quality: jpegQuality });
+}
+
 async function withTimeout(promise, timeoutMs, message) {
   let timer;
   try {
@@ -205,9 +253,36 @@ export function readPngDimensions(bytes) {
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
+export function readJpegDimensions(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 11 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+    throw new Error("Map preview returned malformed JPEG bytes.");
+  }
+  const startOfFrameMarkers = new Set([
+    0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7,
+    0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,
+  ]);
+  let offset = 2;
+  while (offset < bytes.length) {
+    while (bytes[offset] === 0xff) offset += 1;
+    const marker = bytes[offset];
+    offset += 1;
+    if (marker === 0xd9 || marker === 0xda || offset + 2 > bytes.length) break;
+    const segmentLength = bytes.readUInt16BE(offset);
+    if (segmentLength < 2 || offset + segmentLength > bytes.length) break;
+    if (startOfFrameMarkers.has(marker) && segmentLength >= 7) {
+      return {
+        width: bytes.readUInt16BE(offset + 5),
+        height: bytes.readUInt16BE(offset + 3),
+      };
+    }
+    offset += segmentLength;
+  }
+  throw new Error("Map preview JPEG has no dimensions.");
+}
+
 function usage() {
   return `Usage:
-  node scripts/map-preview.mjs --map MAP.json --out PREVIEW.png [options]
+  node scripts/map-preview.mjs --map MAP.json --out PREVIEW.png|PREVIEW.jpg [options]
 
 Options:
   --kind world|minimap   Live Match world renderer or live Match minimap (default: world)
@@ -217,6 +292,7 @@ Options:
   --url URL              Running local RTS server (default: ${DEFAULT_URL})
   --chrome PATH          Chrome/Chromium executable (or set CHROME)
   --browser-dpr N        Browser device scale for DPR regression checks (default: 1)
+  --jpeg-quality N       JPEG quality from 1 to 100 (default: 88)
 `;
 }
 

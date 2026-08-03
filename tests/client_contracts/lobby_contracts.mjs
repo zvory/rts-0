@@ -36,6 +36,11 @@ import {
   validateLobbyName,
 } from "../../client/src/lobby_browser_view.js";
 import { AI_PROFILES, LobbyRosterView } from "../../client/src/lobby_view.js";
+import {
+  LOBBY_MAP_PRESENTATION,
+  LobbyMapSelector,
+  lobbyMapPresentation,
+} from "../../client/src/lobby_map_selector.js";
 
 import { textWithin } from "./dom_text.mjs";
 
@@ -54,6 +59,76 @@ import { textWithin } from "./dom_text.mjs";
 // ---------------------------------------------------------------------------
 // Lobby team UI helpers
 // ---------------------------------------------------------------------------
+{
+  const mapNames = Object.keys(LOBBY_MAP_PRESENTATION);
+  assert(mapNames.length === 7, "lobby map presentation covers every bundled selectable map");
+  assert(lobbyMapPresentation("Schone Tage").author === "oti",
+    "Schone Tage credits lowercase oti");
+  assert(mapNames.filter((name) => name !== "Schone Tage")
+    .every((name) => lobbyMapPresentation(name).author === "Alex"),
+  "all other bundled maps credit Alex");
+  assert(mapNames.every((name) => lobbyMapPresentation(name).preview.endsWith(".jpg")),
+    "bundled lobby previews use high-DPR JPEG assets");
+}
+
+{
+  const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");
+  const selectorStyles = fs.readFileSync(
+    new URL("../../client/lobby_map_selector.css", import.meta.url),
+    "utf8",
+  );
+  assert(indexHtml.includes('href="/lobby_map_selector.css"'),
+    "the client shell loads the map selector's dedicated stylesheet");
+  assert(selectorStyles.includes(".lobby-map-popover") && selectorStyles.includes("@media (max-width: 720px)"),
+    "the dedicated map selector stylesheet owns desktop and mobile popover layout");
+}
+
+{
+  withFakeDocument(() => {
+    const selected = [];
+    const root = document.createElement("div");
+    root.contains = (target) => target === root;
+    const selector = new LobbyMapSelector(root, { onSelect: (name) => selected.push(name) });
+    const maps = Object.keys(LOBBY_MAP_PRESENTATION).map((name) => ({ name }));
+    selector.render({ maps, selectedMap: "Chokes", visible: true, disabled: false });
+
+    assert(!root.hidden && selector.triggerLabel.textContent === "Chokes",
+      "custom map selector reflects the authoritative selected map");
+    assert(selector.optionButtons.length === maps.length,
+      "custom map selector renders every server-advertised map name");
+    selector.open();
+    const schoneTage = selector.optionButtons.find((button) => button.dataset.mapName === "Schone Tage");
+    schoneTage.listeners.mouseenter();
+    assert(selector.previewImage.src.endsWith("/schone-tage.jpg"),
+      "hovering a map shows its bundled 512px minimap preview");
+    assert(selector.previewAuthor.textContent === "Created by oti",
+      "hovered preview shows the requested lowercase creator credit");
+    schoneTage.listeners.focus();
+    assert(selector.previewName.textContent === "Schone Tage",
+      "keyboard focus updates the same preview as mouse hover");
+    schoneTage.click();
+    assert(selected.join(",") === "Schone Tage" && selector.popover.hidden,
+      "choosing a custom option emits its stable map name and closes the popover");
+
+    selector.trigger.listeners.click();
+    root.listeners.keydown({ key: "ArrowDown", target: selector.trigger, preventDefault() {} });
+    assert(document.activeElement === schoneTage,
+      "keyboard opening focuses the selected map option");
+    root.listeners.keydown({ key: "Escape", target: schoneTage, preventDefault() {} });
+    assert(selector.popover.hidden && document.activeElement === selector.trigger,
+      "Escape closes the selector and restores trigger focus");
+    selector.render({ maps, selectedMap: "Schone Tage", visible: true, disabled: true });
+    assert(selector.trigger.disabled && selector.popover.hidden,
+      "countdown-disabled selectors cannot remain open");
+    selector.render({ maps, selectedMap: "Schone Tage", visible: false, disabled: true });
+    assert(root.hidden, "guest and replay views hide the host selector");
+
+    selector.destroy();
+    assert(!document.listeners.pointerdown && !root.listeners.keydown,
+      "custom map selector removes document and root listeners on destroy");
+  });
+}
+
 {
   assert(MAX_LOBBY_TEAMS === 4, "lobby exposes four host-managed team slots");
   assert(countdownSoundId("Drei!", 0, 3) === "countdown_drei", "countdown maps Drei to the first voice cue");
@@ -306,7 +381,7 @@ import { textWithin } from "./dom_text.mjs";
       },
     },
     btnStart: { disabled: false, classList: fakeClassList() },
-    selMap: null,
+    mapSelector: { clear() {}, render() {} },
     browserView: { rows: [{ room: "Fresh lobby" }] },
     _joined: true,
     _ready: true,
@@ -366,6 +441,7 @@ import { textWithin } from "./dom_text.mjs";
 
 {
   let rosterArgs = null;
+  let mapSelectorArgs = null;
   let joined = 0;
   let cancelledRefreshes = 0;
   let statusText = "old";
@@ -393,7 +469,7 @@ import { textWithin } from "./dom_text.mjs";
       },
     },
     btnStart: { disabled: true, textContent: "", classList: fakeClassList() },
-    selMap: { disabled: false, hidden: false, options: [], value: "" },
+    mapSelector: { render(args) { mapSelectorArgs = args; } },
     rosterView: {
       render(args) {
         rosterArgs = args;
@@ -444,7 +520,8 @@ import { textWithin } from "./dom_text.mjs";
   assert(!lobby.btnStart.disabled && lobby.btnStart.textContent === "Start replay",
     "replay lobby hosts can start whenever the server says canStart");
   assert(joined === 1, "server-confirmed replay lobby entry triggers renderer preparation");
-  assert(lobby.selMap.hidden && lobby.selMap.disabled, "joined replay lobbies hide map selection");
+  assert(mapSelectorArgs?.visible === false && mapSelectorArgs?.disabled,
+    "joined replay lobbies hide and disable map selection");
   assert(seatsCell.hidden && lobby.elSeatsSummary.textContent === "",
     "joined replay lobbies hide active-seat counts");
   assert(lobby.elObserversSummary.textContent === "1", "joined replay lobbies count spectator occupants only");
@@ -478,7 +555,7 @@ import { textWithin } from "./dom_text.mjs";
       },
     },
     btnStart: { disabled: true, textContent: "", classList: fakeClassList() },
-    selMap: null,
+    mapSelector: { render() {} },
     rosterView: {
       render(args) {
         rosterArgs = args;

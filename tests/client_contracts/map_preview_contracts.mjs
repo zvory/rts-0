@@ -19,9 +19,11 @@ import {
 import {
   createPreviewHandoff,
   parseMapPreviewArgs,
+  readJpegDimensions,
   readPngDimensions,
   renderMapPreview,
 } from "../../scripts/map-preview.mjs";
+import { LOBBY_MAP_PRESENTATION } from "../../client/src/lobby_map_selector.js";
 
 const handoffId = "0123456789abcdef0123456789abcdef";
 
@@ -286,6 +288,32 @@ try {
   pngHeader.writeUInt32BE(640, 16);
   pngHeader.writeUInt32BE(360, 20);
   assert.deepEqual(readPngDimensions(pngHeader), { width: 640, height: 360 });
+  const jpegHeader = Buffer.alloc(21);
+  Buffer.from([0xff, 0xd8, 0xff, 0xc0]).copy(jpegHeader);
+  jpegHeader.writeUInt16BE(17, 4);
+  jpegHeader[6] = 8;
+  jpegHeader.writeUInt16BE(512, 7);
+  jpegHeader.writeUInt16BE(512, 9);
+  assert.deepEqual(readJpegDimensions(jpegHeader), { width: 512, height: 512 });
+  const jpegOptions = parseMapPreviewArgs([
+    "--map", "server/assets/maps/schone-tage.json",
+    "--out", "target/map-preview.jpg",
+    "--kind", "minimap",
+    "--width", "512",
+    "--height", "512",
+    "--browser-dpr", "2",
+    "--jpeg-quality", "91",
+  ]);
+  assert.equal(jpegOptions.format, "jpeg");
+  assert.equal(jpegOptions.jpegQuality, 91);
+  assert.throws(
+    () => parseMapPreviewArgs(["--map", "map.json", "--out", "map.webp"]),
+    /\.png, \.jpg, or \.jpeg/,
+  );
+  assert.throws(
+    () => parseMapPreviewArgs(["--map", "map.json", "--out", "map.jpg", "--jpeg-quality", "101"]),
+    /integer from 1 to 100/,
+  );
   const cliSource = fs.readFileSync(new URL("../../scripts/map-preview.mjs", import.meta.url), "utf8");
   const mainSource = fs.readFileSync(new URL("../../client/src/main.js", import.meta.url), "utf8");
   const appSource = fs.readFileSync(new URL("../../client/src/app.js", import.meta.url), "utf8");
@@ -330,6 +358,74 @@ try {
     captureTimeoutMs: 2,
   }), /browser capture timed out/);
   assert.equal(browserClosed, true, "browser closes after a hung page evaluation");
+}
+
+{
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "rts-map-preview-jpeg-contract-"));
+  const out = path.join(temporary, "preview.jpg");
+  const pngHeader = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(pngHeader);
+  pngHeader.write("IHDR", 12, "ascii");
+  pngHeader.writeUInt32BE(512, 16);
+  pngHeader.writeUInt32BE(512, 20);
+  const jpegHeader = Buffer.alloc(21);
+  Buffer.from([0xff, 0xd8, 0xff, 0xc0]).copy(jpegHeader);
+  jpegHeader.writeUInt16BE(17, 4);
+  jpegHeader[6] = 8;
+  jpegHeader.writeUInt16BE(512, 7);
+  jpegHeader.writeUInt16BE(512, 9);
+  const evaluations = [];
+  const page = {
+    on() {},
+    async goto() {},
+    async waitForFunction() {},
+    async evaluate(fn) {
+      const source = String(fn);
+      evaluations.push(source);
+      if (source.includes(".status()")) return { state: "ready" };
+      if (source.includes('__rtsMapPreview.call("capture"')) {
+        return { pngDataUrl: `data:image/png;base64,${pngHeader.toString("base64")}` };
+      }
+      return `data:image/jpeg;base64,${jpegHeader.toString("base64")}`;
+    },
+  };
+  const result = await renderMapPreview(parseMapPreviewArgs([
+    "--map", "server/assets/maps/schone-tage.json",
+    "--out", out,
+    "--kind", "minimap",
+    "--width", "512",
+    "--height", "512",
+    "--chrome", "/bin/sh",
+  ]), {
+    fetchImpl: async () => ({ ok: true, json: async () => ({ handoffId }) }),
+    loadPuppeteer: async () => ({ launch: async () => ({
+      async newPage() { return page; },
+      async close() {},
+    }) }),
+  });
+  assert.equal(result.format, "jpeg");
+  assert.deepEqual(readJpegDimensions(fs.readFileSync(out)), { width: 512, height: 512 });
+  assert.equal(evaluations.length, 3, "JPEG export transcodes the authoritative PNG in the preview browser");
+}
+
+{
+  const authoredMaps = fs.readdirSync(new URL("../../server/assets/maps/", import.meta.url))
+    .filter((file) => file.endsWith(".json"))
+    .map((file) => JSON.parse(fs.readFileSync(new URL(`../../server/assets/maps/${file}`, import.meta.url), "utf8")))
+    .filter((map) => map.version === 6);
+  assert.deepEqual(
+    authoredMaps.map((map) => map.name).sort(),
+    Object.keys(LOBBY_MAP_PRESENTATION).sort(),
+    "every selectable authored map has one lobby presentation entry",
+  );
+  for (const [name, presentation] of Object.entries(LOBBY_MAP_PRESENTATION)) {
+    const asset = new URL(`../../client${presentation.preview}`, import.meta.url);
+    assert.equal(fs.existsSync(asset), true, `${name} has a checked-in lobby preview asset`);
+    const bytes = fs.readFileSync(asset);
+    assert.deepEqual(readJpegDimensions(bytes), { width: 512, height: 512 },
+      `${name} lobby preview is exactly 512x512`);
+    assert.ok(bytes.length > 10_000, `${name} lobby preview contains nontrivial minimap detail`);
+  }
 }
 
 function createBridgeFixture({ renderPromise = null } = {}) {

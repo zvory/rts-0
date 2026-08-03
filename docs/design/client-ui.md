@@ -10,6 +10,7 @@ replays. `Match` owns the only animation-frame loop.
 ```
 index.html        # PINNED — #app + module entry + screens markup; no main-thread Pixi script
 styles.css        # HUD, lobby, menus, command card
+lobby_map_selector.css # Custom lobby map picker layout and responsive preview popover
 live_pause.css    # live-match pause overlay and actions
 assets/decals/    # SVG decal source art plus generated worker-decodable PNG mask atlas
 src/
@@ -75,6 +76,7 @@ src/
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   minimap_road_layer.js # Cached post-fog dotted road-marking overlay
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
+  lobby_map_selector.js # Host map picker: minimap previews, creator credits, keyboard navigation
   lobby_browser_view.js # Pre-join lobby browser rows, state rendering, and age/status formatting
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
   match_history.js # Lobby match-history table and replay launch affordance
@@ -1056,7 +1058,10 @@ resizes the production minimap and omits only transient camera, ping, and artill
 resources, and authoritative entities remain. `scripts/map-preview.mjs` is the local Node/Chrome
 adapter: it validates and materializes an authored map with `MapEditorSession`, creates a bounded Lab
 handoff on a loopback RTS server, calls the narrow bridge under a browser-side deadline, validates
-the returned PNG dimensions, and writes the requested artifact. The Map Editor's `Preview PNGs`
+the returned PNG dimensions, and writes the requested artifact. Its output extension may be PNG or
+JPEG; JPEG output is transcoded in the already-running preview browser after validating the
+authoritative PNG, with bounded `--jpeg-quality`. A 512×512 minimap export displayed at 256 CSS
+pixels is the lobby's 2×/high-DPR preview convention. The Map Editor's `Preview PNGs`
 action uses the same handoff and route, whose visible controls call the same bridge. The page owns
 no authoring operations or recipe semantics.
 
@@ -1853,7 +1858,9 @@ export class Lobby {
   // ready/start/spectator role, and delegates browser DOM to lobby_browser_view.js and
   // joined-roster DOM to lobby_view.js.
   // Host lobby controls expose grouped team cards, per-seat team assignment, team-scoped AI add
-  // buttons, and a map selector in the lobby summary row through Net setTeam/addAi/selectMap.
+  // buttons, and a custom map selector in the lobby summary row through Net setTeam/addAi/selectMap.
+  // Host options preview checked-in 512px production-minimap JPEGs on hover/focus and show a
+  // creator credit; guests and replay lobbies retain the plain selected-map label.
   // Name-field edits are debounced, persisted locally, and sent through Net.setName while joined.
   // Replay lobbies are keyed by explicit `kind: "replay"` metadata: the joined view hides
   // Ready, team, faction, AI, map-selection, and active-seat controls, then shows only
