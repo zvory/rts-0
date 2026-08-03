@@ -1,5 +1,12 @@
 import { isUnit } from "../protocol.js";
+import { _tintFor } from "./entities.js";
 import { liveRigKeyForEntity } from "./rigs/live_routing.js";
+import { createUnitOutlineFilter, FOREST_UNIT_FILL_ALPHA } from "./unit_outline_filter.js";
+
+const FOREST_OUTLINE_POOL_NAMES = Object.freeze([
+  "forestUnitOutlineRigs",
+  "forestUnitOutlineRigOverlays",
+]);
 
 /**
  * Duplicate the actual presented unit rig into a filtered surface when a canopy occludes it.
@@ -20,6 +27,7 @@ export function _drawTreeOccludedUnitOutlines(entities, state, colorByOwner, opt
       unitPool: "forestUnitOutlineRigs",
       overlayPool: "forestUnitOutlineRigOverlays",
       errorPrefix: "forestUnitOutline",
+      teamFill: true,
     })) count += 1;
   }
   this._recordRenderDiagnostic?.("renderer.doodads.forestUnitOutlines", count);
@@ -63,9 +71,49 @@ function drawActualUnitOutline(entity, state, colorByOwner, options) {
       visualOverride: options.visualUnitOverrides?.get?.(entity.id) || null,
       visualFrameStrip: options.visualFrameStripOverrides?.get?.(liveRigKeyForEntity(entity)) || null,
     });
+    if (options.teamFill) this._attachForestUnitOutline?.(entity, colorByOwner);
     return true;
   } catch (error) {
     this._recordRenderError?.(`${options.errorPrefix}:${entity.kind || "unknown"}`, error);
     return false;
   }
+}
+
+/** Group a unit's body and overlay before filtering so only the combined silhouette gets an edge. */
+export function _attachForestUnitOutline(entity, colorByOwner) {
+  if (entity?.id == null || !this.layers?.forestUnitOutlines) return null;
+  const teamColor = _tintFor(entity.owner, colorByOwner);
+  let entry = this._forestUnitOutlineGroups?.get?.(entity.id);
+  if (!entry || entry.teamColor !== teamColor) {
+    if (entry) this._destroyForestUnitOutlineGroup(entity.id);
+    const group = new PIXI.Container();
+    const filter = createUnitOutlineFilter(PIXI, {
+      fillColor: teamColor,
+      fillAlpha: FOREST_UNIT_FILL_ALPHA,
+    });
+    group.filters = [filter];
+    this.layers.forestUnitOutlines.addChild(group);
+    entry = { group, filter, teamColor };
+    this._forestUnitOutlineGroups.set(entity.id, entry);
+  }
+  entry.group.visible = true;
+  entry.group.zIndex = Number.isFinite(entity.y) ? entity.y : 0;
+  for (const poolName of FOREST_OUTLINE_POOL_NAMES) {
+    const container = this._liveRigPools?.[poolName]?.get?.(entity.id)?.container;
+    if (!container || container.parent === entry.group) continue;
+    container.parent?.removeChild?.(container);
+    entry.group.addChild(container);
+  }
+  return entry;
+}
+
+export function _destroyForestUnitOutlineGroup(id) {
+  const entry = this._forestUnitOutlineGroups?.get?.(id);
+  if (!entry) return false;
+  entry.group.filters = null;
+  entry.filter.destroy?.();
+  entry.group.parent?.removeChild?.(entry.group);
+  entry.group.destroy?.();
+  this._forestUnitOutlineGroups.delete(id);
+  return true;
 }
