@@ -106,7 +106,6 @@ import {
   canonicalDoodadColor,
   createDoodadSprayStroke,
   createMapEditorDoodads,
-  doodadIdsWithinRect,
   extendDoodadSprayStroke,
   MAP_EDITOR_DOODAD_CATALOG,
   MAP_EDITOR_DOODAD_TYPES,
@@ -1249,8 +1248,6 @@ assert(
       doodads: [{ id: 1, typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 30, y: 40 }],
     },
     overlay: {
-      doodadSelections: [{ id: 1, x: 30, y: 40 }],
-      doodadSelectionBox: { x: 20, y: 20, width: 30, height: 40 },
       doodadBrushPreview: { x: 40, y: 50, radius: 48, mode: "erase", typeId: null, color: null },
     },
   });
@@ -1292,8 +1289,6 @@ assert(
   const viewport = {
     doodadPointerId: 17,
     doodadPointerMode: "spray",
-    doodadSelectStart: null,
-    doodadSelectEnd: null,
     doodadSprayStroke: {},
     doodadLastWorld: { x: 50, y: 60 },
     paintPointerId: null,
@@ -1308,69 +1303,6 @@ assert(
   assert.deepEqual(session.materialized().doodads, [], "pointercancel rolls back an in-progress doodad stroke");
   assert.equal(session.undoStack.length, 0, "a cancelled doodad stroke never enters history");
   assert.deepEqual(statuses, [{ message: "Doodad edit cancelled.", error: false }]);
-}
-
-{
-  const session = new MapEditorSession({ storage: null });
-  session.initializeBlank({ size: 16, playerCount: 1 });
-  session.beginDoodadStroke("Placed selection fixtures");
-  session.placeDoodads([
-    { x: 40, y: 60 },
-    { x: 100, y: 120 },
-    { x: 180, y: 200 },
-  ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
-  session.commitDoodadStroke();
-  const statuses = [];
-  const viewport = {
-    session,
-    selectedDoodadIds: new Set(),
-    doodadSelectStart: { x: 150, y: 150 },
-    doodadSelectEnd: { x: 20, y: 40 },
-    onStatus(message, error) { statuses.push({ message, error }); },
-    drawOverlay() {},
-  };
-  const selected = MapEditorViewport.prototype.finishDoodadBoxSelection.call(viewport);
-  assert.deepEqual(selected, [1, 2], "remove mode selects every doodad inside a drag box in either direction");
-  assert.equal(session.doodadStroke, null, "box selection never starts a move/edit transaction");
-  const changed = MapEditorViewport.prototype.deleteSelectedDoodads.call(viewport);
-  assert.equal(changed, true);
-  assert.deepEqual(session.draft.doodads.map((record) => record.id), [3],
-    "delete selection removes the whole box-selected group without moving surviving doodads");
-  assert.deepEqual(statuses, [
-    { message: "2 doodads selected for removal.", error: false },
-    { message: "2 doodads deleted.", error: false },
-  ]);
-}
-
-{
-  const session = new MapEditorSession({ storage: null });
-  session.initializeBlank({ size: 16, playerCount: 1 });
-  session.beginDoodadStroke("Placed fixtures");
-  session.placeDoodads([
-    { x: 40, y: 60 },
-    { x: 100, y: 120 },
-  ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
-  session.commitDoodadStroke();
-  session.beginDoodadStroke("Active spray");
-  session.placeDoodads([{ x: 180, y: 200 }], {
-    typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE,
-    color: "#ef739d",
-  });
-  const statuses = [];
-  const viewport = {
-    session,
-    selectedDoodadIds: new Set([1, 2]),
-    onStatus(message, error) { statuses.push({ message, error }); },
-    drawOverlay() {},
-  };
-  assert.equal(MapEditorViewport.prototype.deleteSelectedDoodads.call(viewport), false,
-    "selection deletion refuses to merge into another active doodad edit");
-  assert.deepEqual(session.draft.doodads.map((record) => record.id), [1, 2, 3]);
-  assert(session.doodadStroke, "the active edit remains open for its pointer lifecycle to finish");
-  assert.deepEqual(statuses, [{
-    message: "Finish the current doodad edit before deleting the selection.", error: true,
-  }]);
-  session.cancelDoodadStroke();
 }
 
 {
@@ -1396,7 +1328,6 @@ assert(
 {
   const calls = [];
   const viewport = {
-    selectedDoodadIds: new Set(),
     rebuildTerrain() { calls.push("terrain"); },
     rebuildDoodads() { calls.push("doodads"); },
     queueDoodadPatch(update) { calls.push(["patch", update]); },
@@ -1414,9 +1345,7 @@ assert(
 
 {
   const calls = [];
-  const selectedDoodadIds = new Set([1]);
   const viewport = {
-    selectedDoodadIds,
     rebuildTerrain() { calls.push("terrain"); },
     rebuildDoodads() { calls.push("doodads"); },
     drawOverlay() { calls.push("overlay"); },
@@ -1425,8 +1354,6 @@ assert(
     reason: "loaded",
     draft: { doodads: [{ id: 1 }] },
   });
-  assert.equal(viewport.selectedDoodadIds.size, 0,
-    "loading a different map clears selection even when it reuses a selected doodad id");
   assert.deepEqual(calls, ["terrain", "doodads", "overlay"]);
 }
 
@@ -1457,9 +1384,6 @@ assert(
   ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
   assert.deepEqual(added.map(({ x, y }) => ({ x, y })), [{ x: 1800, y: 500 }],
     "rectangular doodad placement uses width and height independently");
-  assert.deepEqual(doodadIdsWithinRect(session.draft.doodads, { x: 100, y: 400 }, { x: 1900, y: 700 }), [added[0].id],
-    "box removal selects doodads across the full wide-map axis without moving them");
-
   const updates = [];
   const viewport = {
     session,

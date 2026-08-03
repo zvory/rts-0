@@ -181,16 +181,6 @@ export class MapEditorWorkerRenderer {
     if (this.layerVisibility[MAP_AUTHORING_LAYER.BASE]) {
       for (const site of overlay.sites) this._drawSite(site);
     }
-    for (const selection of overlay.doodadSelections || []) {
-      gfxStroke(this.overlay, 2, 0xfff4ba, 0.96);
-      gfxCircle(this.overlay, selection.x, selection.y, 15);
-    }
-    if (overlay.doodadSelectionBox) {
-      const box = overlay.doodadSelectionBox;
-      gfxStroke(this.overlay, 2, 0xfff4ba, 0.96);
-      gfxRect(gfxFill(this.overlay, 0xfff4ba, 0.12), box.x, box.y, box.width, box.height);
-      gfxNoFill(this.overlay);
-    }
     if (overlay.doodadBrushPreview) {
       const preview = overlay.doodadBrushPreview;
       const color = preview.mode === "erase" ? 0xff6f6f : 0xc5ef8a;

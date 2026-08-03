@@ -696,7 +696,7 @@ try {
         .map((option) => option.textContent),
       doodadToolLabels: [...document.querySelectorAll(".map-editor-palette button")]
         .map((button) => button.textContent?.trim() || "")
-        .filter((label) => ["Remove doodads", "Erase brush", "Delete selection", "Select / move"].includes(label)),
+        .filter((label) => ["Place", "Spray", "Erase", "Remove doodads", "Erase brush", "Delete selection", "Select / move"].includes(label)),
       blankMapWidth: (() => {
         const input = document.querySelector("input[aria-label='Map width']");
         return input && {
@@ -796,11 +796,11 @@ try {
     "MAP EDITOR: symmetry, independent blank-map dimensions, and grass-clearance controls are presented correctly",
   );
   ok(
-    editorUi.doodadToolLabels.includes("Remove doodads") &&
-      editorUi.doodadToolLabels.includes("Erase brush") &&
-      editorUi.doodadToolLabels.includes("Delete selection") &&
-      !editorUi.doodadToolLabels.includes("Select / move"),
-    `MAP EDITOR: doodad tools expose box removal and the erase brush without move (${editorUi.doodadToolLabels.join(", ")})`,
+    editorUi.doodadToolLabels.includes("Place") &&
+      editorUi.doodadToolLabels.includes("Spray") &&
+      editorUi.doodadToolLabels.includes("Erase") &&
+      !editorUi.doodadToolLabels.some((label) => ["Remove doodads", "Erase brush", "Delete selection", "Select / move"].includes(label)),
+    `MAP EDITOR: doodad tools expose only place, spray, and erase (${editorUi.doodadToolLabels.join(", ")})`,
   );
   await editorPage.setViewport({ width: 600, height: 360 });
   const mobileLayers = await editorPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => {

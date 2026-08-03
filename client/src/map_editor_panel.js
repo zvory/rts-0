@@ -8,6 +8,7 @@ import {
   MAP_EDITOR_DOODAD_CATALOG,
   MAP_EDITOR_DOODAD_TYPES,
   MAP_EDITOR_MAX_DOODADS,
+  MAP_EDITOR_MAX_SPRAY_DENSITY,
   isTreeDoodadType,
   isWildflowerDoodadType,
 } from "./map_editor_doodads.js";
@@ -526,20 +527,16 @@ export class MapEditorPanel {
     const tools = document.createElement("div");
     tools.className = "map-editor-palette";
     tools.append(
-      button("Place / drag", () => this.armDoodad("place"), {
+      button("Place", () => this.armDoodad("place"), {
         active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "place",
       }),
       button("Spray", () => this.armDoodad("spray"), {
         active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "spray",
         disabled: !isTreeDoodadType(this.selectedDoodadType) && !isWildflowerDoodadType(this.selectedDoodadType),
       }),
-      button("Remove doodads", () => this.armDoodad("remove"), {
-        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "remove",
-      }),
-      button("Erase brush", () => this.armDoodad("erase"), {
+      button("Erase", () => this.armDoodad("erase"), {
         active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "erase",
       }),
-      button("Delete selection", () => this.viewport.deleteSelectedDoodads()),
     );
 
     const color = document.createElement("input");
@@ -557,10 +554,10 @@ export class MapEditorPanel {
       this.doodadRadius = value;
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Doodad brush radius");
-    const density = numericInput(this.doodadDensity, 1, 12, (value) => {
+    const density = numericInput(this.doodadDensity, 1, MAP_EDITOR_MAX_SPRAY_DENSITY, (value) => {
       this.doodadDensity = value;
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
-    }, "Wildflower spray density");
+    }, "Doodad spray density");
     section.append(
       readout("Trees"),
       treePalette,
@@ -572,7 +569,7 @@ export class MapEditorPanel {
       field("Flower color", color),
       field("Brush radius (world px)", radius),
       field("Spray density", density),
-      readout("Symmetry applies when creating doodads. Remove doodads uses a drag box; Delete/Backspace removes everything selected."),
+      readout("Place adds one doodad. Spray and erase work continuously while held; symmetry applies when creating doodads."),
     );
     return section;
   }
@@ -689,7 +686,7 @@ export class MapEditorPanel {
   }
 
   armDoodad(mode) {
-    this.doodadMode = ["place", "spray", "remove", "erase"].includes(mode) ? mode : "place";
+    this.doodadMode = ["place", "spray", "erase"].includes(mode) ? mode : "place";
     this.viewport.armTool({
       kind: "doodad",
       mode: this.doodadMode,

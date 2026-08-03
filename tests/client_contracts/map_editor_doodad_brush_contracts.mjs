@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 
 import {
-  createDoodadDragStroke,
-  createTreePlacementFilter,
+  createDoodadSprayStroke,
   doodadTypeFromSelection,
-  extendDoodadDragStroke,
+  extendDoodadSprayStroke,
   MAP_EDITOR_DOODAD_TYPES,
-  MAP_EDITOR_TREE_MIN_SPACING,
+  MAP_EDITOR_MAX_SPRAY_DENSITY,
 } from "../../client/src/map_editor_doodads.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { MAP_EDITOR_SYMMETRY, MapEditorSession } from "../../client/src/map_editor_session.js";
@@ -34,39 +33,21 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
     MAP_EDITOR_DOODAD_TYPES.TREE_PINE,
     MAP_EDITOR_DOODAD_TYPES.TREE_ALDER,
   ], "the spray tool carries the complete selected tree-species set");
-  assert.equal(viewport.tool.density, 4, "tree spray retains the low default density");
+  assert.equal(viewport.tool.density, 4, "tree spray retains the selected density");
+  MapEditorPanel.prototype.armDoodad.call(panel, "remove");
+  assert.equal(viewport.tool.mode, "place", "the palette no longer arms the removed box-selection tool");
 }
 
 {
-  const once = createDoodadDragStroke({ x: 100, y: 100 });
-  const oncePlacements = [...once.placements, ...extendDoodadDragStroke(once.stroke, { x: 300, y: 100 })];
-  const partitioned = createDoodadDragStroke({ x: 100, y: 100 });
-  const partitionedPlacements = [...partitioned.placements];
-  for (const x of [115, 160, 215, 300]) {
-    partitionedPlacements.push(...extendDoodadDragStroke(partitioned.stroke, { x, y: 100 }));
-  }
-  assert.deepEqual(partitionedPlacements, oncePlacements,
-    "tree drag placement is independent of pointer-event subdivision");
-  assert.equal(MAP_EDITOR_TREE_MIN_SPACING, 64, "tree brushes keep centres at least two tile widths apart");
-  const existingTreeFilter = createTreePlacementFilter([
-    { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK, x: 64, y: 64 },
-    { typeId: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE, x: 300, y: 300 },
-  ]);
-  const accepted = [
-    { x: 96, y: 64 },
-    { x: 128, y: 64 },
-    { x: 170, y: 64 },
-  ].flatMap((placement) => existingTreeFilter.acceptGroup([placement]));
-  assert.deepEqual(accepted, [
-    { x: 128, y: 64 },
-  ], "tree drag and spray candidates cannot overlap existing or same-stroke trees inside two tiles");
-  const spacingFilter = createTreePlacementFilter([], MAP_EDITOR_TREE_MIN_SPACING);
-  assert.deepEqual(spacingFilter.acceptGroup([{ x: 64, y: 64 }, { x: 96, y: 64 }]), [],
-    "a conflicting symmetric group is rejected atomically");
-  assert.deepEqual(spacingFilter.acceptGroup([{ x: 96, y: 64 }]), [{ x: 96, y: 64 }],
-    "points from a rejected group do not poison later placement");
-  assert.deepEqual(spacingFilter.acceptGroup([{ x: 160, y: 64 }]), [{ x: 160, y: 64 }],
-    "the spacing index accepts a later point at the exact minimum distance");
+  const dense = createDoodadSprayStroke({ x: 100, y: 100 }, {
+    radius: 256,
+    density: MAP_EDITOR_MAX_SPRAY_DENSITY,
+    seed: 23,
+  });
+  assert.equal(dense.stroke.density, MAP_EDITOR_MAX_SPRAY_DENSITY,
+    "the spray sampler accepts the full editor density range");
+  assert(extendDoodadSprayStroke(dense.stroke, { x: 356, y: 100 }).length > 100,
+    "the expanded density range produces substantially denser strokes");
   const treeMix = [MAP_EDITOR_DOODAD_TYPES.TREE_OAK, MAP_EDITOR_DOODAD_TYPES.TREE_PINE];
   assert(treeMix.includes(doodadTypeFromSelection(treeMix, 11)),
     "procedural tree placement chooses only from the selected species");
@@ -114,9 +95,11 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
     { x: 128, y: 96 },
   ]);
   assert.deepEqual(updates[0].upserts.map(({ x, y }) => ({ x, y })), [
-    { x: 64, y: 96 },
-    { x: 128, y: 96 },
-  ], "mixed-tree placement filters too-close candidates");
+    { x: 64, y: 96 }, { x: 80, y: 96 }, { x: 128, y: 96 },
+  ], "tree spray accepts dense candidates instead of imposing a local spacing cap");
+  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 64, y: 96 }]);
+  assert.deepEqual(updates[1].upserts.map(({ x, y }) => ({ x, y })), [{ x: 64, y: 96 }],
+    "a repeated tree spray adds another doodad at the same location");
   assert(updates[0].upserts.every(({ typeId }) => viewport.tool.typeIds.includes(typeId)),
     "mixed-tree placement uses only selected species");
   session.cancelDoodadStroke();
@@ -125,10 +108,10 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
 {
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 16, playerCount: 1 });
-  session.beginDoodadStroke("Placed spacing fixture");
+  session.beginDoodadStroke("Placed density fixture");
   session.placeDoodads([{ x: 64, y: 96 }], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
   session.commitDoodadStroke();
-  session.beginDoodadStroke("Placed symmetric mixed trees");
+  session.beginDoodadStroke("Sprayed symmetric mixed trees");
   const updates = [];
   const viewport = {
     session,
@@ -141,13 +124,48 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
     queueDoodadPatch(update) { updates.push(structuredClone(update)); },
   };
   MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 80, y: 96 }]);
-  assert.deepEqual(session.draft.doodads.map(({ x, y }) => ({ x, y })), [{ x: 64, y: 96 }],
-    "tree spacing rejects an entire symmetric group when any counterpart is blocked");
-  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 160, y: 160 }]);
   assert.deepEqual(updates[0].upserts.map(({ x, y }) => ({ x, y })), [
+    { x: 80, y: 96 }, { x: 431, y: 415 },
+  ], "a dense tree spray keeps both members of a symmetry group even beside existing trees");
+  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 160, y: 160 }]);
+  assert.deepEqual(updates[1].upserts.map(({ x, y }) => ({ x, y })), [
     { x: 160, y: 160 }, { x: 351, y: 351 },
-  ], "an unblocked symmetric tree group is placed in full");
-  assert.equal(new Set(updates[0].upserts.map(({ typeId }) => typeId)).size, 1,
+  ], "a repeated symmetric spray adds another complete group");
+  assert.equal(new Set(updates[1].upserts.map(({ typeId }) => typeId)).size, 1,
     "mirrored trees use the same species from the selected mix");
+  session.cancelDoodadStroke();
+}
+
+{
+  const viewport = {
+    doodadPointerMode: "place",
+    doodadLastWorld: { x: 40, y: 50 },
+    placeDoodadPoints() { throw new Error("place must not continue while dragging"); },
+  };
+  MapEditorViewport.prototype.continueDoodadPointer.call(viewport, { x: 100, y: 120 });
+  assert.deepEqual(viewport.doodadLastWorld, { x: 100, y: 120 },
+    "place is click-only; moving the pointer does not add a drag trail");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.beginDoodadStroke("Placed symmetric erase fixture");
+  session.placeDoodads([
+    { x: 80, y: 96 }, { x: 431, y: 415 }, { x: 256, y: 96 },
+  ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
+  session.commitDoodadStroke();
+  session.beginDoodadStroke("Erased symmetric doodads");
+  const updates = [];
+  const viewport = {
+    session,
+    tool: { radius: 4, symmetry: MAP_EDITOR_SYMMETRY.HALF_TURN },
+    queueDoodadPatch(update) { updates.push(structuredClone(update)); },
+  };
+  MapEditorViewport.prototype.eraseDoodadsAt.call(viewport, { x: 80, y: 96 });
+  assert.deepEqual(updates, [{ removedIds: [1, 2] }],
+    "erase mirrors its brush through the active doodad symmetry");
+  assert.deepEqual(session.draft.doodads.map(({ id }) => id), [3],
+    "symmetric erase preserves doodads outside either brush position");
   session.cancelDoodadStroke();
 }
