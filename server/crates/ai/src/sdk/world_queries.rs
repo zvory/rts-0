@@ -202,7 +202,11 @@ impl<'a> WorldQueries<'a> {
             .any(|entity| entity.latched_resource == Some(id))
             || self.current_entities().any(|entity| {
                 entity.kind == EntityKind::PumpJack
-                    && point_overlaps_building(resource.position, entity)
+                    && point_overlaps_building(
+                        resource.position,
+                        entity,
+                        self.frame.map().tile_size,
+                    )
             });
         Some(if conflict {
             KnownResourceState::KnownConflict
@@ -463,11 +467,11 @@ fn is_passable(terrain: AiTerrain) -> bool {
     )
 }
 
-fn point_overlaps_building(point: (f32, f32), building: &AiEntity) -> bool {
+fn point_overlaps_building(point: (f32, f32), building: &AiEntity, tile_size: u32) -> bool {
     let Some(stats) = rts_rules::balance::building_stats(building.kind) else {
         return false;
     };
-    let tile_size = rts_rules::balance::TILE_SIZE as f32;
+    let tile_size = tile_size as f32;
     let half_w = stats.foot_w as f32 * tile_size * 0.5;
     let half_h = stats.foot_h as f32 * tile_size * 0.5;
     point.0 >= building.position.0 - half_w - POINT_IN_RECT_EPS_PX
@@ -485,6 +489,7 @@ mod tests {
         footprint_placeable_from_snapshot, occupied_tiles_from_snapshot,
     };
     use rts_sim::game::{Game, PlayerInit};
+    use rts_sim::protocol::{self, states, ResourceNode};
 
     fn players() -> Vec<PlayerInit> {
         vec![
@@ -526,6 +531,52 @@ mod tests {
         assert_eq!(
             queries.world_to_tile(queries.tile_center(tile).unwrap()),
             Some(tile)
+        );
+    }
+
+    #[test]
+    fn resource_conflicts_use_the_frame_tile_size() {
+        let game = Game::new_without_ai_controllers(&players(), 52);
+        let mut start = game.start_payload();
+        let mut snapshot = game.snapshot_for(1);
+        start.map.tile_size = rts_rules::balance::TILE_SIZE * 2;
+
+        let pump_x = 128.0;
+        let pump_y = 128.0;
+        let resource_id = 999_999;
+        let resource_position = (pump_x + 24.0, pump_y);
+        start.map.resources.push(ResourceNode {
+            id: resource_id,
+            kind: protocol::kinds::OIL.to_string(),
+            x: resource_position.0,
+            y: resource_position.1,
+        });
+        snapshot.entities.push(protocol::EntityView::new(
+            999_998,
+            1,
+            protocol::kind_to_wire(EntityKind::PumpJack),
+            pump_x,
+            pump_y,
+            50,
+            50,
+            states::IDLE,
+        ));
+
+        let frame = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2])).unwrap();
+        let queries = WorldQueries::new(&frame);
+        let pump = queries
+            .owned()
+            .iter()
+            .find(|entity| entity.id == 999_998)
+            .unwrap();
+        assert!(!point_overlaps_building(
+            resource_position,
+            pump,
+            rts_rules::balance::TILE_SIZE,
+        ));
+        assert_eq!(
+            queries.known_resource_state(resource_id),
+            Some(KnownResourceState::KnownConflict)
         );
     }
 
