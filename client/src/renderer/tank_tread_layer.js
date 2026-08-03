@@ -9,9 +9,9 @@ const MIN_CONTACT_MOTION = 3;
 const UPLOAD_INTERVAL_MS = 100;
 
 /**
- * Best-effort permanent tread pixels derived only from owned tank poses already present in normal
- * snapshots. This intentionally has no protocol or checkpoint representation: driving adds zero
- * network bytes and reconnects may omit earlier cosmetic tracks.
+ * Renders checkpointed authoritative tread chunks plus an immediate owned-tank preview derived
+ * from ordinary entity snapshots. The preview only masks finalization latency; server chunks are
+ * the durable source used after reconnects, replay seeks, and later fog discovery.
  */
 export class TankTreadLayer {
   constructor({
@@ -26,6 +26,7 @@ export class TankTreadLayer {
     this.recordDiagnostic = recordDiagnostic;
     this.tiles = new Map();
     this.poses = new Map();
+    this.authoritativeTrailIds = new Set();
     this.worldWidth = 0;
     this.worldHeight = 0;
     this.nextUploadAt = 0;
@@ -82,6 +83,41 @@ export class TankTreadLayer {
     return stamped;
   }
 
+  stampAuthoritativeTrails(trails) {
+    if (!Array.isArray(trails) || this.worldWidth <= 0 || this.worldHeight <= 0) return 0;
+    const dirty = new Set();
+    let accepted = 0;
+    let stamped = 0;
+    for (const trail of trails) {
+      if (!Number.isSafeInteger(trail?.id) || trail.id <= 0) continue;
+      if (this.authoritativeTrailIds.has(trail.id)) {
+        accepted += 1;
+        continue;
+      }
+      const poses = unpackAuthoritativePoses(trail.poses);
+      if (poses.length < 2) continue;
+      let previous = treadPose(poses[0].x, poses[0].y, poses[0].facing);
+      for (let index = 1; index < poses.length; index += 1) {
+        const pose = poses[index];
+        const current = treadPose(pose.x, pose.y, pose.facing, previous);
+        if (this._stampSegment(treadSegment(previous, current, trail.id ^ index), dirty)) {
+          stamped += 1;
+        }
+        previous = current;
+      }
+      this.authoritativeTrailIds.add(trail.id);
+      accepted += 1;
+    }
+    if (stamped > 0) {
+      for (const tile of dirty) tile.texture?.source?.update?.();
+      this.totalSegments += stamped;
+      this.textureUpdateCount += dirty.size;
+      this.recordDiagnostic?.("renderer.tankTreads.authoritativeSegments", stamped);
+      this.recordDiagnostic?.("renderer.tankTreads.tileUploads", dirty.size);
+    }
+    return accepted;
+  }
+
   diagnostics() {
     return {
       tileCount: this.tiles.size,
@@ -93,6 +129,7 @@ export class TankTreadLayer {
 
   destroy() {
     this.poses.clear();
+    this.authoritativeTrailIds.clear();
     this.nextUploadAt = 0;
     for (const tile of this.tiles.values()) {
       if (tile.sprite?.parent && typeof tile.sprite.parent.removeChild === "function") {
@@ -154,6 +191,23 @@ export class TankTreadLayer {
     this.tiles.set(key, tile);
     return tile;
   }
+}
+
+function unpackAuthoritativePoses(records) {
+  const poses = [];
+  for (const record of Array.isArray(records) ? records : []) {
+    if (!Array.isArray(record) || record.length !== 3 ||
+        !Number.isInteger(record[0]) || !Number.isInteger(record[1]) ||
+        !Number.isInteger(record[2]) || record[0] < 0 || record[0] > 0xffff ||
+        record[1] < 0 || record[1] > 0xffff || record[2] < -0x8000 ||
+        record[2] > 0x7fff) continue;
+    poses.push({
+      x: record[0] / 4,
+      y: record[1] / 4,
+      facing: record[2] * Math.PI / 32767,
+    });
+  }
+  return poses;
 }
 
 function finitePose(entity) {

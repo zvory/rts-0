@@ -95,17 +95,21 @@ export class GroundDecalLayer {
 
   stampBatch(decals, { onError = null } = {}) {
     if (!this.ctx || !Array.isArray(decals) || decals.length === 0) return 0;
+    const trails = decals.filter((decal) => decal?.decalClass === "tankTreads");
+    const ordinary = decals.filter((decal) => decal?.decalClass !== "tankTreads");
+    const trailStamped = this.tankTreads.stampAuthoritativeTrails(trails);
+    if (ordinary.length === 0) return trailStamped;
     if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.FAILED) {
       throw this.assetLoadError || new Error("ground decal PNG atlas is unavailable");
     }
     if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.PENDING) {
-      this.recordDiagnostic?.("renderer.groundDecals.awaitingAtlas", decals.length);
-      return 0;
+      this.recordDiagnostic?.("renderer.groundDecals.awaitingAtlas", ordinary.length);
+      return trailStamped;
     }
     const batch = this._queuedUntilAssets.length > 0
-      ? this._queuedUntilAssets.splice(0).concat(decals)
-      : decals;
-    return this._stampDecodedBatch(batch, { onError });
+      ? this._queuedUntilAssets.splice(0).concat(ordinary)
+      : ordinary;
+    return trailStamped + this._stampDecodedBatch(batch, { onError });
   }
 
   _beginAssetLoad() {

@@ -54,6 +54,7 @@ export class GroundDecalSync {
           revision,
           afterRevision: delta.afterRevision,
           decals: delta.decals,
+          tankTrails: delta.tankTrails,
         },
         {
           players: this.state?.players,

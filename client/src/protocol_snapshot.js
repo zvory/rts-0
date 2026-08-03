@@ -87,8 +87,10 @@ export function decodeCompactSnapshot(raw) {
 
 function decodeCompactGroundDecalDelta(record, revision) {
   if (record == null) return null;
-  const fields = readArray(record, "groundDecalDelta", 2);
-  if (fields.length !== 2) throw new Error("groundDecalDelta field count mismatch");
+  const fields = readArray(record, "groundDecalDelta", 3);
+  if (fields.length !== 2 && fields.length !== 3) {
+    throw new Error("groundDecalDelta field count mismatch");
+  }
   const afterRevision = readU32(fields[0], "groundDecalDelta.afterRevision");
   if (afterRevision > revision) {
     throw new Error("groundDecalDelta.afterRevision exceeds groundDecalRevision");
@@ -98,7 +100,30 @@ function decodeCompactGroundDecalDelta(record, revision) {
     "groundDecalDelta.decals",
     MAX_COMPACT_GROUND_DECALS,
   ).map(decodeCompactGroundDecal);
-  return { afterRevision, decals };
+  const tankTrails = fields.length === 3
+    ? readArray(fields[2], "groundDecalDelta.tankTrails", MAX_COMPACT_GROUND_DECALS)
+      .map(decodeCompactTankTrail)
+    : [];
+  return { afterRevision, decals, tankTrails };
+}
+
+function decodeCompactTankTrail(record, index) {
+  const fields = readArray(record, `tank trail ${index}`, 2);
+  if (fields.length !== 2) throw new Error(`tank trail ${index} field count mismatch`);
+  const poses = readArray(fields[1], `tank trail ${index}.poses`, 64).map((pose, poseIndex) => {
+    const values = readArray(pose, `tank trail ${index}.pose ${poseIndex}`, 3);
+    if (values.length !== 3) throw new Error(`tank trail ${index}.pose field count mismatch`);
+    const x = readU32(values[0], "tankTrail.pose.x");
+    const y = readU32(values[1], "tankTrail.pose.y");
+    const facing = readNumber(values[2], "tankTrail.pose.facing");
+    if (x > 0xffff || y > 0xffff || !Number.isInteger(facing) ||
+        facing < -0x8000 || facing > 0x7fff) {
+      throw new Error(`tank trail ${index}.pose is out of range`);
+    }
+    return [x, y, facing];
+  });
+  if (poses.length < 2) throw new Error(`tank trail ${index} requires two poses`);
+  return { id: readU32(fields[0], "tankTrail.id"), poses };
 }
 
 function decodeCompactGroundDecal(record, index) {

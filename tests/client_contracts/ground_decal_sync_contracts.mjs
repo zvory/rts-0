@@ -276,6 +276,12 @@ assert(
       decalLayer.diagnostics().tankTreads.tileCount === 1 &&
       layer.children[1].texture.sourceUpdateCount === 1,
     "treads upload one bounded tile without modifying the whole-map permanent decal texture");
+    assert(decalLayer.stampBatch([{
+      id: 77,
+      decalClass: "tankTreads",
+      poses: [[160, 320, 0], [224, 320, 2048]],
+    }]) === 1 && decalLayer.diagnostics().tankTreads.totalSegments === 2,
+    "checkpointed trail chunks paint through the same tiled tread layer as the live preview");
 
     const trenchLayer = new TrenchDecalLayer({ layer: new PIXI.Container() });
     trenchLayer.resetForMap(map);
