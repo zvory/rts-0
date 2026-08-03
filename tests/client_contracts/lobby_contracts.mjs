@@ -72,6 +72,18 @@ import { textWithin } from "./dom_text.mjs";
 }
 
 {
+  const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");
+  const selectorStyles = fs.readFileSync(
+    new URL("../../client/lobby_map_selector.css", import.meta.url),
+    "utf8",
+  );
+  assert(indexHtml.includes('href="/lobby_map_selector.css"'),
+    "the client shell loads the map selector's dedicated stylesheet");
+  assert(selectorStyles.includes(".lobby-map-popover") && selectorStyles.includes("@media (max-width: 720px)"),
+    "the dedicated map selector stylesheet owns desktop and mobile popover layout");
+}
+
+{
   withFakeDocument(() => {
     const selected = [];
     const root = document.createElement("div");

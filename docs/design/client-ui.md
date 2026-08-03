@@ -10,6 +10,7 @@ replays. `Match` owns the only animation-frame loop.
 ```
 index.html        # PINNED — #app + module entry + screens markup; no main-thread Pixi script
 styles.css        # HUD, lobby, menus, command card
+lobby_map_selector.css # Custom lobby map picker layout and responsive preview popover
 live_pause.css    # live-match pause overlay and actions
 assets/decals/    # SVG decal source art plus generated worker-decodable PNG mask atlas
 src/

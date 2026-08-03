@@ -5,7 +5,7 @@
   "exceptions": [
     {
       "path": "client/styles.css",
-      "lines": 5718,
+      "lines": 5715,
       "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; keep ratcheting until those responsibilities have an evidence-backed split."
     },
     {
