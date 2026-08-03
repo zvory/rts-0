@@ -121,9 +121,11 @@ impl Game {
                 player,
                 e,
                 projection::EntityProjectionContext {
+                    map: Some(&self.state.map),
                     fog,
                     actionable_fog,
                     private_detail_fog: Some(&self.state.fog),
+                    concealment_fog: Some(&self.state.fog),
                     private_detail_projection,
                     smokes: Some(&self.state.smokes),
                     fogged,
@@ -346,9 +348,11 @@ impl Game {
                 player,
                 entity,
                 projection::EntityProjectionContext {
+                    map: Some(&self.state.map),
                     fog,
                     actionable_fog: Some(fog),
                     private_detail_fog: Some(&self.state.fog),
+                    concealment_fog: Some(&self.state.fog),
                     private_detail_projection: projection::PrivateDetailProjection::SelectedOwners(
                         selected_players,
                     ),

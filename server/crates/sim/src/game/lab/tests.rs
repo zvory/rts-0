@@ -62,6 +62,8 @@ fn map_draft() -> LabMapDraft {
             steel_patches: 7,
             oil_patches: 2,
         }],
+        stealth_tiles: Vec::new(),
+        no_vehicle_tiles: Vec::new(),
         doodads: vec![
             MapDoodad {
                 id: 9,
@@ -244,6 +246,8 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
             .map(|&(x, y)| LabMapTile { x, y })
             .collect(),
         base_sites: Vec::new(),
+        stealth_tiles: Vec::new(),
+        no_vehicle_tiles: Vec::new(),
         doodads: Vec::new(),
     };
 

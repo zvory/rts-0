@@ -420,6 +420,8 @@ mod tests {
             terrain: vec![terrain::GRASS; 64 * 64],
             resources: vec![],
             doodads: vec![],
+            stealth_tiles: vec![],
+            no_vehicle_tiles: vec![],
         };
         let (hx, hy) = (
             10.5 * config::TILE_SIZE as f32,

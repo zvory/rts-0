@@ -18,6 +18,10 @@ const UNIT_RIG_POOL_FAMILIES = Object.freeze([
     "forestUnitOutlineRigs",
     "forestUnitOutlineRigOverlays",
   ]),
+  Object.freeze([
+    "stealthUnitOutlineRigs",
+    "stealthUnitOutlineRigOverlays",
+  ]),
 ]);
 const UNIT_RIG_POOL_FAMILY_BY_NAME = new Map();
 for (const family of UNIT_RIG_POOL_FAMILIES) {

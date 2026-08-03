@@ -1,4 +1,4 @@
-const FOREST_OUTLINE_VERTEX = `
+const UNIT_OUTLINE_VERTEX = `
 in vec2 aPosition;
 out vec2 vTextureCoord;
 
@@ -23,7 +23,7 @@ void main(void) {
 }
 `;
 
-const FOREST_OUTLINE_FRAGMENT = `
+const UNIT_OUTLINE_FRAGMENT = `
 in vec2 vTextureCoord;
 out vec4 finalColor;
 
@@ -49,25 +49,25 @@ void main(void) {
 }
 `;
 
-/** Build one layer-level post-process that derives a white outline from merged rig alpha. */
-export function createForestOutlineFilter(pixi = globalThis.PIXI) {
+/** Derive a white outer edge from the alpha of the actual rendered unit rig. */
+export function createUnitOutlineFilter(pixi = globalThis.PIXI) {
   if (
     typeof pixi?.Filter !== "function"
     || typeof pixi?.GlProgram?.from !== "function"
     || typeof pixi?.UniformGroup !== "function"
   ) {
-    throw new Error("Pixi forest outlines require Filter, GlProgram, and UniformGroup support");
+    throw new Error("Pixi unit outlines require Filter, GlProgram, and UniformGroup support");
   }
   const filter = new pixi.Filter({
     glProgram: pixi.GlProgram.from({
-      vertex: FOREST_OUTLINE_VERTEX,
-      fragment: FOREST_OUTLINE_FRAGMENT,
-      name: "forest-unit-outline",
+      vertex: UNIT_OUTLINE_VERTEX,
+      fragment: UNIT_OUTLINE_FRAGMENT,
+      name: "unit-alpha-outline",
     }),
     resources: {
-      forestOutlineUniforms: new pixi.UniformGroup({
+      outlineUniforms: new pixi.UniformGroup({
         uThickness: { value: 1.65, type: "f32" },
-        uAlpha: { value: 0.94, type: "f32" },
+        uAlpha: { value: 0.96, type: "f32" },
       }),
     },
   });

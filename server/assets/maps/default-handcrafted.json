@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "width": 126,
   "height": 126,
   "name": "Chokes",
@@ -225,5 +225,7 @@
       "oilPatches": 3
     }
   ],
+  "stealthTiles": [],
+  "noVehicleTiles": [],
   "doodads": []
 }

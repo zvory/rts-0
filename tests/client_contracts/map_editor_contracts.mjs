@@ -305,7 +305,7 @@ assert(
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
-  assert.equal(session.exportMap().version, 5);
+  assert.equal(session.exportMap().version, 6);
   assert.deepEqual({ width: materialized.width, height: materialized.height }, { width: 126, height: 126 });
   assert.equal(session.exportMap().layouts, undefined, "flat map data has no layout matrix");
   assert.equal(materialized.starts.length, 2);
@@ -575,8 +575,32 @@ assert(
   };
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(legacy);
-  assert.equal(session.exportMap().version, 5, "local v2 maps migrate into current flat map data");
+  assert.equal(session.exportMap().version, 6, "local v2 maps migrate into current flat map data");
   assert.equal(session.exportMap().layouts, undefined);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const forest = [{ x: 14, y: 14 }, { x: 15, y: 14 }];
+  session.beginOverlayStroke("Painted forest");
+  assert.deepEqual(session.paintOverlayTiles(forest, { stealth: true, noVehicle: true }), forest);
+  assert.equal(session.commitOverlayStroke(), true);
+  assert.deepEqual(session.materialized().stealthTiles, forest);
+  assert.deepEqual(session.materialized().noVehicleTiles, forest,
+    "the Forest tool authors both sparse gameplay layers");
+
+  session.beginOverlayStroke("Made long grass");
+  assert.deepEqual(session.paintOverlayTiles([forest[1]], { noVehicle: false }), [forest[1]]);
+  assert.equal(session.commitOverlayStroke(), true);
+  assert.deepEqual(session.materialized().stealthTiles, forest,
+    "removing vehicle exclusion leaves independent stealth cover intact");
+  assert.deepEqual(session.materialized().noVehicleTiles, [forest[0]]);
+  assert.deepEqual(session.exportMap().stealthTiles, forest,
+    "authored exports retain sparse coordinate pairs rather than a full tile layer");
+  assert.equal(session.undo(), true);
+  assert.deepEqual(session.materialized().noVehicleTiles, forest,
+    "overlay strokes participate in the editor's normal undo history");
 }
 
 {
@@ -989,7 +1013,7 @@ assert(
   const request = [];
   await createMapHandoff({
     destination: "lab",
-    authoredMap: { version: 5 },
+    authoredMap: { version: 6 },
     materializedMap: { width: 32, height: 16, starts: [], baseSites: [], doodads: [] },
     fetchImpl: async (_url, init) => {
       request.push(JSON.parse(init.body));
@@ -1097,7 +1121,7 @@ assert(
 {
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
-  assert.equal(session.exportMap().version, 5);
+  assert.equal(session.exportMap().version, 6);
   assert.deepEqual(session.materialized().doodads, []);
   session.beginDoodadStroke("Sprayed flowers");
   const added = session.placeDoodads([{ x: 100, y: 120 }, { x: 140, y: 150 }], {

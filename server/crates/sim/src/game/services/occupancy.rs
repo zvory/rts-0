@@ -23,6 +23,7 @@ pub(crate) struct Occupancy<'a> {
 struct OccupancyData {
     all_ground_blocked: Vec<bool>,
     vehicle_body_blocked: Vec<bool>,
+    building_blocked: Vec<bool>,
     tree_path_cost: Vec<bool>,
     tree_trunks_by_tile: Vec<Vec<(f32, f32)>>,
     all_ground_clearance_tiles: Vec<u16>,
@@ -45,9 +46,15 @@ impl OccupancyData {
         let cells = map.width.saturating_mul(map.height) as usize;
         let mut all_ground_blocked = vec![false; cells];
         let mut vehicle_body_blocked = vec![false; cells];
+        let mut building_blocked = vec![false; cells];
         let mut tank_trap_tiles = vec![false; cells];
         let mut tree_path_cost = vec![false; cells];
         let mut tree_trunks_by_tile = vec![Vec::new(); cells];
+        for &(tx, ty) in &map.no_vehicle_tiles {
+            if tx < map.width && ty < map.height {
+                vehicle_body_blocked[(ty * map.width + tx) as usize] = true;
+            }
+        }
         for doodad in &map.doodads {
             if !crate::game::map::doodads::is_tree(doodad) {
                 continue;
@@ -69,8 +76,14 @@ impl OccupancyData {
                 if tx < map.width && ty < map.height {
                     let idx = (ty * map.width + tx) as usize;
                     match static_blocker_class(e.kind) {
-                        StaticBlockerClass::AllGround => all_ground_blocked[idx] = true,
-                        StaticBlockerClass::VehicleBodyOnly => vehicle_body_blocked[idx] = true,
+                        StaticBlockerClass::AllGround => {
+                            all_ground_blocked[idx] = true;
+                            building_blocked[idx] = true;
+                        }
+                        StaticBlockerClass::VehicleBodyOnly => {
+                            vehicle_body_blocked[idx] = true;
+                            building_blocked[idx] = true;
+                        }
                         StaticBlockerClass::None => {}
                     }
                     if e.kind == EntityKind::TankTrap {
@@ -114,6 +127,7 @@ impl OccupancyData {
         OccupancyData {
             all_ground_blocked,
             vehicle_body_blocked,
+            building_blocked,
             tree_path_cost,
             tree_trunks_by_tile,
             all_ground_clearance_tiles,
@@ -217,7 +231,7 @@ impl Occupancy<'_> {
             return false;
         }
         let idx = (ty as u32 * self.map.width + tx as u32) as usize;
-        self.data.all_ground_blocked[idx] || self.data.vehicle_body_blocked[idx]
+        self.data.building_blocked[idx]
     }
 
     pub(crate) fn passable_for_kind(&self, tx: i32, ty: i32, kind: EntityKind) -> bool {
@@ -525,6 +539,24 @@ mod tests {
             before.static_fingerprint_for_kind(EntityKind::Tank),
             after.static_fingerprint_for_kind(EntityKind::Tank),
             "vehicle-body fingerprint should include Tank Trap blockers"
+        );
+    }
+
+    #[test]
+    fn authored_no_vehicle_tiles_block_vehicle_bodies_but_not_infantry() {
+        let mut map = flat_test_map(16);
+        map.no_vehicle_tiles = vec![(7, 8)];
+        let occupancy = Occupancy::build(&map, &EntityStore::new());
+
+        assert!(occupancy.passable_for_kind(7, 8, EntityKind::Rifleman));
+        assert!(!occupancy.passable_for_kind(7, 8, EntityKind::ScoutCar));
+        assert!(
+            !occupancy.building_blocked_at_tile(7, 8),
+            "vehicle-exclusion terrain must not masquerade as a structure footprint",
+        );
+        assert_eq!(
+            occupancy.clearance_at_tile_for_movement_body(7, 8, MovementBodyClass::VehicleBody),
+            0,
         );
     }
 

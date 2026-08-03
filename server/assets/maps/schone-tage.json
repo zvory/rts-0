@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "width": 166,
   "height": 166,
   "name": "Schone Tage",
@@ -233,5 +233,7 @@
       "oilPatches": 3
     }
   ],
+  "stealthTiles": [],
+  "noVehicleTiles": [],
   "doodads": []
 }

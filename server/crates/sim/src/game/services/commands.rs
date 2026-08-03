@@ -295,8 +295,11 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
-                let target_valid =
-                    attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
+                let target_valid = attack_target_valid(
+                    attack_query(map, entities, &teams, fog, smokes, player),
+                    &units,
+                    target,
+                );
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -325,7 +328,11 @@ pub(in crate::game) fn apply_commands(
                 let targets =
                     tank_trap_cluster_targets(entities, &teams, fog, smokes, player, target);
                 let target_valid = !targets.is_empty()
-                    && attack_target_valid(entities, &teams, fog, smokes, player, &units, target);
+                    && attack_target_valid(
+                        attack_query(map, entities, &teams, fog, smokes, player),
+                        &units,
+                        target,
+                    );
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
@@ -874,11 +881,7 @@ mod planned_actions {
                     planner::OrderIntent::AttackTarget(target) => {
                         if immediate_unit_can_replace(entities, player, unit)
                             && attack_target_valid(
-                                entities,
-                                teams,
-                                fog,
-                                smokes,
-                                player,
+                                attack_query(map, entities, teams, fog, smokes, player),
                                 &[unit],
                                 target,
                             )
@@ -892,9 +895,16 @@ mod planned_actions {
                     }
                     planner::OrderIntent::AttackCluster(targets) => {
                         if immediate_unit_can_replace(entities, player, unit) {
-                            let targets = attack_cluster_targets_for_unit(
-                                entities, teams, fog, smokes, player, unit, &targets,
-                            );
+                            let targets: Vec<_> = targets
+                                .into_iter()
+                                .filter(|target| {
+                                    attack_target_valid(
+                                        attack_query(map, entities, teams, fog, smokes, player),
+                                        &[unit],
+                                        *target,
+                                    )
+                                })
+                                .collect();
                             if !targets.is_empty() {
                                 if let Some(e) = entities.get_mut(unit) {
                                     e.clear_queued_orders();
@@ -1058,11 +1068,7 @@ mod planned_actions {
                         match &intent {
                             OrderIntent::Attack(attack)
                                 if !attack_target_valid(
-                                    entities,
-                                    teams,
-                                    fog,
-                                    smokes,
-                                    player,
+                                    attack_query(map, entities, teams, fog, smokes, player),
                                     &[unit],
                                     attack.target,
                                 ) =>
@@ -1179,26 +1185,26 @@ mod planned_actions {
         }
     }
 }
-fn attack_target_valid(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
+fn attack_query<'a>(
+    map: &'a Map,
+    entities: &'a EntityStore,
+    teams: &'a TeamRelations,
+    fog: &'a Fog,
+    smokes: &'a SmokeCloudStore,
     player: u32,
+) -> world_query::ExplicitAttackQuery<'a> {
+    world_query::ExplicitAttackQuery::new(map, entities, teams, fog, Some(smokes), player)
+}
+
+fn attack_target_valid(
+    query: world_query::ExplicitAttackQuery<'_>,
     units: &[u32],
     target: u32,
 ) -> bool {
-    units.iter().copied().any(|unit| {
-        world_query::unit_explicit_attack_target_valid(
-            entities,
-            teams,
-            fog,
-            Some(smokes),
-            player,
-            unit,
-            target,
-        )
-    })
+    units
+        .iter()
+        .copied()
+        .any(|unit| world_query::unit_explicit_attack_target_valid(query, unit, target))
 }
 
 fn tank_trap_cluster_targets(
@@ -1255,32 +1261,6 @@ fn tank_trap_cluster_targets(
             .then_with(|| a.0.cmp(&b.0))
     });
     targets.into_iter().map(|(id, _)| id).collect()
-}
-
-fn attack_cluster_targets_for_unit(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    player: u32,
-    unit: u32,
-    targets: &[u32],
-) -> Vec<u32> {
-    targets
-        .iter()
-        .copied()
-        .filter(|target| {
-            world_query::unit_explicit_attack_target_valid(
-                entities,
-                teams,
-                fog,
-                Some(smokes),
-                player,
-                unit,
-                *target,
-            )
-        })
-        .collect()
 }
 
 fn deconstruct_target_valid(

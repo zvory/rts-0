@@ -41,7 +41,7 @@ pub use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, ActionCapabilities,
     AttackReveal, AutoBuildSettingsSnapshot, CommandCapabilities, DebugPathPoint, DebugPathView,
     DiagnosticCapabilities, EntityView, Event, GroundDecalDelta, GroundDecalView, InitialCamera,
-    LabStartMetadata, LabStartRole, LabVisionMode, MapInfo, MatchControlCapabilities,
+    LabStartMetadata, LabStartRole, LabVisionMode, MapInfo, MapTile, MatchControlCapabilities,
     MovementPathDiagnosticScope, NoticeSeverity, ObserverViewSelection, OrderPlanMarker,
     PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedAntiTankGunView,
     RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,

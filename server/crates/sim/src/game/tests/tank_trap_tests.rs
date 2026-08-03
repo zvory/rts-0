@@ -296,6 +296,7 @@ fn tank_trap_can_be_damaged_and_removed_by_death_cleanup() {
         .map(|player| (player.id, Vec::new()))
         .collect();
     services::death::death_system(
+        &game.state.map,
         &mut game.state.entities,
         &game.state.fog,
         &game.state.smokes,

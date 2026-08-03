@@ -32,6 +32,8 @@ fn main() {
         starts: vec![(6, 6), (57, 57)],
         base_sites: vec![(6, 6), (57, 57)],
         base_resource_counts: Default::default(),
+        stealth_tiles: Vec::new(),
+        no_vehicle_tiles: Vec::new(),
         doodads: Vec::new(),
     };
     let mut game = Game::new_with_random_ai_profiles_and_map_metadata(

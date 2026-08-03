@@ -28,6 +28,8 @@ fn pending_tracker_start_payload() -> StartPayload {
             terrain: vec![terrain::GRASS; 96 * 96],
             resources: Vec::new(),
             doodads: Vec::new(),
+            stealth_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
         },
         players: vec![PlayerStart {
             id: 1,

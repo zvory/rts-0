@@ -607,11 +607,14 @@ impl Game {
         let teams = self.team_relations();
         self.state.anti_tank_gun_memory.refresh(
             player_ids,
-            &self.state.entities,
-            &self.state.fog,
-            &self.state.smokes,
-            &teams,
-            self.state.tick,
+            anti_tank_gun_memory::ObservationContext::new(
+                &self.state.entities,
+                &self.state.fog,
+                &self.state.map,
+                &self.state.smokes,
+                &teams,
+                self.state.tick,
+            ),
         );
     }
 
@@ -665,6 +668,7 @@ impl Game {
         self.state.fog.stamp_firing_reveal_sources_with_smoke(
             &self.state.firing_reveals,
             &self.state.entities,
+            &self.state.map,
             &self.state.smokes,
         );
         let viewer_sources = player_ids

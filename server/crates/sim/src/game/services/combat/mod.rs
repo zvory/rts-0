@@ -454,6 +454,23 @@ pub(in crate::game) fn combat_system(
                     }
                     mortar_shells
                         .schedule_autocast(events, fog, teams, owner, id, px, py, tx, ty, tick);
+                    if map.world_point_is_stealth(px, py) {
+                        let victim_owner = entities.get(tid).map_or(0, |target| target.owner);
+                        let player_ids = events.keys().copied().collect::<Vec<_>>();
+                        record_firing_reveals_for_victim_team(
+                            firing_reveals,
+                            player_ids,
+                            fog,
+                            map,
+                            teams,
+                            victim_owner,
+                            owner,
+                            id,
+                            (px, py),
+                            tick,
+                            cd_reset,
+                        );
+                    }
                     if let Some(e) = entities.get_mut(id) {
                         e.set_weapon_cooldown(weapon_profile.id, cd_reset);
                     }
@@ -490,6 +507,7 @@ pub(in crate::game) fn combat_system(
                                 firing_reveals,
                                 player_ids,
                                 fog,
+                                map,
                                 teams,
                                 shot.victim_owner,
                                 owner,

@@ -8,7 +8,7 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 //   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
 //   → selection-rings → world-Y-sorted units/tree-canopies
-//   → post-processed forest-unit-outlines → smokes → hp-bars → fog → visual-sample-labels
+//   → forest-unit-outlines → smokes → hp-bars → fog → stealth-unit-outlines → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → above-fog-hp-bars
 //   → feedback/miss-toasts → placement-ghost → drag-box
 //
@@ -90,8 +90,11 @@ import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
 import { _drawResource } from "./resources.js";
 import { DoodadLayer } from "./doodad_layer.js";
-import { createForestOutlineFilter } from "./forest_outline_filter.js";
-import { _drawTreeOccludedUnitOutlines } from "./tree_unit_occlusion.js";
+import { createUnitOutlineFilter } from "./unit_outline_filter.js";
+import {
+  _drawStealthUnitOutlines,
+  _drawTreeOccludedUnitOutlines,
+} from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
 import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
 import {
@@ -177,8 +180,10 @@ export class Renderer {
       this.world.addChild(c);
     }
     this.layers.units.sortableChildren = true;
-    this._forestOutlineFilter = createForestOutlineFilter(PIXI);
-    this.layers.forestUnitOutlines.filters = [this._forestOutlineFilter];
+    this._forestUnitOutlineFilter = createUnitOutlineFilter(PIXI);
+    this._stealthUnitOutlineFilter = createUnitOutlineFilter(PIXI);
+    this.layers.forestUnitOutlines.filters = [this._forestUnitOutlineFilter];
+    this.layers.stealthUnitOutlines.filters = [this._stealthUnitOutlineFilter];
     this._assetReadiness = new Map();
     this._doodads = new DoodadLayer({
       pixi: PIXI,
@@ -313,6 +318,8 @@ export class Renderer {
       liveShotRevealRigEffects: new Map(),
       forestUnitOutlineRigs: new Map(),
       forestUnitOutlineRigOverlays: new Map(),
+      stealthUnitOutlineRigs: new Map(),
+      stealthUnitOutlineRigOverlays: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
@@ -326,6 +333,8 @@ export class Renderer {
       liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
       forestUnitOutlineRigs: { poolName: "forestUnitOutlineRigs", layerName: "forestUnitOutlines" },
       forestUnitOutlineRigOverlays: { poolName: "forestUnitOutlineRigOverlays", layerName: "forestUnitOutlines" },
+      stealthUnitOutlineRigs: { poolName: "stealthUnitOutlineRigs", layerName: "stealthUnitOutlines" },
+      stealthUnitOutlineRigOverlays: { poolName: "stealthUnitOutlineRigOverlays", layerName: "stealthUnitOutlines" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
@@ -631,7 +640,7 @@ export class Renderer {
       this._unitRenderContexts.clear();
       for (const e of regularEntities) {
         liveIds.add(e.id);
-        if (isUnit(e.kind)) {
+        if (isUnit(e.kind) && !e.visionOnly) {
           this._drawEntitySafely("unit", e, "units", () => {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
@@ -652,6 +661,15 @@ export class Renderer {
         }),
       );
     });
+    time("renderer.stealthUnitOutlines", () => {
+      this._drawSafely(
+        "stealthUnitOutlines",
+        () => this._drawStealthUnitOutlines(regularEntities, state, colorByOwner, {
+          visualUnitOverrides: visualUnitOverrideMap,
+          visualFrameStripOverrides: visualFrameStripOverrideMap,
+        }),
+      );
+    });
     // Selection rings are in a layer below units, so selected units stay readable
     // while the ring remains visible around the silhouette. Forest outlines and HP
     // bars stay above the unit layer.
@@ -659,7 +677,8 @@ export class Renderer {
       for (const e of regularEntities) {
         liveIds.add(e.id);
         this._drawSafely(`selectionHp:${e.kind || "unknown"}`, () => {
-          this._drawSelectionAndHp(e, selection, feedbackView);
+          if (e.visionOnly) this._drawAboveFogHp(e);
+          else this._drawSelectionAndHp(e, selection, feedbackView);
         });
       }
     });
@@ -1187,8 +1206,11 @@ export class Renderer {
       }
     }
     this.layers.forestUnitOutlines.filters = null;
-    this._forestOutlineFilter?.destroy?.();
-    this._forestOutlineFilter = null;
+    this.layers.stealthUnitOutlines.filters = null;
+    this._forestUnitOutlineFilter?.destroy?.();
+    this._stealthUnitOutlineFilter?.destroy?.();
+    this._forestUnitOutlineFilter = null;
+    this._stealthUnitOutlineFilter = null;
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
     destroyRendererTextureMap(this._visualFrameStripTextures);
@@ -1289,6 +1311,7 @@ Object.assign(Renderer.prototype, {
   _tankMotionVisual,
   _frameStripMovementVisual,
   _drawUnit,
+  _drawStealthUnitOutlines,
   _drawTreeOccludedUnitOutlines,
   _rigRenderContextFor,
   _drawShotRevealUnit,

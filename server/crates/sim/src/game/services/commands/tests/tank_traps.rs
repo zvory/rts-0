@@ -86,6 +86,7 @@ fn tank_trap_cluster_attack_captures_visible_traps_inside_four_tiles() {
     let mut lingering_sight = Vec::new();
     let mut ground_decals = crate::game::ground_decal::GroundDecalStore::new();
     crate::game::services::death::death_system(
+        &map,
         &mut entities,
         &fog,
         &SmokeCloudStore::new(),

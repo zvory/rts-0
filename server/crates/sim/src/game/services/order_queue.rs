@@ -435,7 +435,18 @@ fn pop_next_valid_intent(
                 let mut targets = std::iter::once(attack.target)
                     .chain(attack.remaining_targets)
                     .filter(|target| {
-                        attack_intent_valid(entities, teams, fog, Some(smokes), owner, id, *target)
+                        attack_intent_valid(
+                            world_query::ExplicitAttackQuery {
+                                map,
+                                entities,
+                                teams,
+                                fog,
+                                smokes: Some(smokes),
+                                attacker_owner: owner,
+                            },
+                            id,
+                            *target,
+                        )
                     })
                     .collect::<Vec<_>>();
                 if !targets.is_empty() {
@@ -556,27 +567,21 @@ fn setup_anti_tank_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: 
 }
 
 fn attack_intent_valid(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: Option<&SmokeCloudStore>,
-    owner: u32,
+    query: world_query::ExplicitAttackQuery<'_>,
     attacker: u32,
     target: u32,
 ) -> bool {
-    let Some(unit) = entities.get(attacker) else {
+    let Some(unit) = query.entities.get(attacker) else {
         return false;
     };
-    if unit.owner != owner || !unit.is_unit() || !unit.can_attack() {
+    if unit.owner != query.attacker_owner || !unit.is_unit() || !unit.can_attack() {
         return false;
     }
-    world_query::unit_explicit_attack_target_valid(
-        entities, teams, fog, smokes, owner, attacker, target,
-    )
+    world_query::unit_explicit_attack_target_valid(query, attacker, target)
 }
 
 fn attack_order_complete(
-    _map: &Map,
+    map: &Map,
     entities: &EntityStore,
     teams: &TeamRelations,
     fog: &Fog,
@@ -585,11 +590,14 @@ fn attack_order_complete(
     target: u32,
 ) -> bool {
     if !attack_intent_valid(
-        entities,
-        teams,
-        fog,
-        Some(smokes),
-        attacker.owner,
+        world_query::ExplicitAttackQuery {
+            map,
+            entities,
+            teams,
+            fog,
+            smokes: Some(smokes),
+            attacker_owner: attacker.owner,
+        },
         attacker.id,
         target,
     ) {

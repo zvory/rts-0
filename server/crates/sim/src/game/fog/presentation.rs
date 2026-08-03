@@ -35,7 +35,7 @@ impl Fog {
         let mut union = vec![false; cells];
         let mut explored_union = vec![false; cells];
         for player in players {
-            let reveal_only_tiles = self.firing_reveal_only_tiles(*player);
+            let reveal_only_tiles = self.terrain_reveal_only_tiles(*player);
             if let Some(grid) = self.grids.get(player) {
                 for (index, (dst, src)) in union.iter_mut().zip(grid.iter()).enumerate() {
                     if !reveal_only_tiles.contains(&(index as u32)) {
@@ -68,7 +68,7 @@ impl Fog {
                 let Some(grid) = self.grids.get(source) else {
                     continue;
                 };
-                let reveal_only_tiles = self.firing_reveal_only_tiles(*source);
+                let reveal_only_tiles = self.terrain_reveal_only_tiles(*source);
                 for (index, (dst, src)) in current_union.iter_mut().zip(grid.iter()).enumerate() {
                     if !reveal_only_tiles.contains(&(index as u32)) {
                         *dst = *dst || *src;
@@ -96,14 +96,14 @@ impl Fog {
         self.accumulate_explored_for_viewers(&viewer_sources);
     }
 
-    fn firing_reveal_only_tiles(&self, player: u32) -> BTreeSet<u32> {
+    fn terrain_reveal_only_tiles(&self, player: u32) -> BTreeSet<u32> {
         self.firing_reveal_visibility
             .get(&player)
             .into_iter()
             .flat_map(|by_entity| by_entity.values())
             .filter_map(|visibility| {
                 visibility
-                    .reveal_only
+                    .terrain_reveal_only
                     .then_some(visibility.revealed_tile)
                     .flatten()
             })

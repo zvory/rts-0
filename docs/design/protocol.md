@@ -536,7 +536,9 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // objects such as unit.tank_trap are omitted so their positions arrive only through
     // fog-filtered entity snapshots. Coordinates are integer world pixels. color is allowed only
     // on wildflowers.
-    doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ]
+    doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ],
+    stealthTiles: [ { x: u32, y: u32 } ],
+    noVehicleTiles: [ { x: u32, y: u32 } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
 }
@@ -794,6 +796,10 @@ both legality and reaction bypass. Repeated shots extend one stable reveal
 episode, so move orders or transient target switches cannot restart the same episode's reaction
 deadline. Tile-level provenance covers colocated entities and remains tied to the stamped tile when
 the firing entity moves before the next fog rebuild.
+A firing unit concealed by `stealthTiles` is projected with `visionOnly` and rendered as the white
+alpha edge of its current production rig/frame rather than full-color unit art. Its ordinary damaged-unit HP bar remains visible above fog. Firing
+reveal provenance distinguishes concealment from terrain visibility: if the recipient already sees
+the ground, `visibleTiles` remains clear instead of drawing a dark square over the stealth tile.
 Artillery Fire creates the same kind of actionable temporary live fog for every enemy player,
 subject to normal smoke suppression, when the shell is launched. The reveal exposes the firing gun
 as a normal snapshot entity without exposing the target point, its terrain tile, surrounding
@@ -976,9 +982,10 @@ the current orbit center and source Command Car id; enemy projections that can s
 this state. Scout Plane
 entities are not selectable or commandable by normal clients, and runtime movement is driven by the
 server-side Command Car ability lifecycle.
-`visionOnly` is a legacy/special projection flag for non-owned units/buildings that are sent as
-render-only intel rather than normal visibility. Current lingering death sight is ordinary
-temporary team sight and does not set `visionOnly`. Clients must not select `visionOnly` entities.
+`visionOnly` is a special projection flag for non-owned render-only intel rather than normal
+visibility. Stealth firing reveals use it to select outline-only above-fog presentation. Current
+lingering death sight is ordinary temporary team sight and does not set it. Clients must not select
+`visionOnly` entities.
 In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 The optional compact `n` prediction fields are present only for live active player snapshots.
 Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
@@ -1403,7 +1410,7 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV5,
+  authoredMap: AuthoredMapV6,
   materializedMap: {
     name: string,
     width: u32,
@@ -1411,18 +1418,21 @@ POST /api/map-handoffs
     terrain: u8[],
     starts: LabMapTile[],
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
-    doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[]
+    doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[],
+    stealthTiles: LabMapTile[],
+    noVehicleTiles: LabMapTile[]
   }
 }
 -> { handoffId: 32-lowercase-hex, expiresInMs: 120000 }
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV5 }
+ | { destination: "editor", authoredMap: AuthoredMapV6 }
 ```
-`AuthoredMapV5` declares independent `width` and `height` tile dimensions, whose product must
+`AuthoredMapV6` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
-`doodads` arrays.
+`doodads`, `stealthTiles`, and `noVehicleTiles` arrays. Overlay records are bounded, unique,
+in-bounds tile-coordinate pairs; the layers remain independent.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
@@ -1436,7 +1446,8 @@ is forbidden. Wildflower color is optional and, when present, must be canonical 
 while leaving the rest of their tile traversable. Wildflowers have no collision or pathing effect.
 Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
 setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
-rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior in schema v5.
+rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
+schema-v6 map overlays supply stealth and vehicle exclusion independently.
 Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
 count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
 doodads to `materializedMap`. Records are capped at 64, expire after two
@@ -1467,7 +1478,9 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       terrain: u8[],
       starts: [{ x: u32, y: u32 }],
       baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }],
-      doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }]
+      doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }],
+      stealthTiles: [{ x: u32, y: u32 }],
+      noVehicleTiles: [{ x: u32, y: u32 }]
     }
   },
   metadata: {

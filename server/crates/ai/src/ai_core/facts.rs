@@ -438,6 +438,8 @@ mod tests {
                 terrain: vec![terrain::GRASS; 64 * 64],
                 resources: Vec::new(),
                 doodads: Vec::new(),
+                stealth_tiles: Vec::new(),
+                no_vehicle_tiles: Vec::new(),
             },
             players: vec![PlayerStart {
                 id: 1,

@@ -83,9 +83,10 @@ pub struct Fog {
     explored_grids: HashMap<u32, Vec<bool>>,
     /// Sampled firing-reveal provenance, rebuilt atomically with `grids`.
     ///
-    /// The nested keys are viewer id -> revealed entity id. `reveal_only` means the entity's
-    /// tile was dark immediately before its firing reveal was stamped. Combat uses this instead
-    /// of trying to infer provenance from the flattened actionable grid.
+    /// The nested keys are viewer id -> revealed entity id. `reveal_only` means the entity needs
+    /// its firing reveal for targeting; `terrain_reveal_only` separately records whether the tile
+    /// itself was dark before the stamp. Combat uses this instead of inferring provenance from the
+    /// flattened actionable grid.
     firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
 }
 
@@ -111,13 +112,13 @@ impl Fog {
         // firing-reveal stamps are intentionally presentation-dark and must stay unexplored when
         // a replay, Lab rewind, or checkpoint restore rebuilds this state.
         for (&player, visible_grid) in &grids {
-            let reveal_only_tiles = firing_reveal_visibility
+            let terrain_reveal_only_tiles = firing_reveal_visibility
                 .get(&player)
                 .into_iter()
                 .flat_map(|by_entity| by_entity.values())
                 .filter_map(|visibility| {
                     visibility
-                        .reveal_only
+                        .terrain_reveal_only
                         .then_some(visibility.revealed_tile)
                         .flatten()
                 })
@@ -128,7 +129,8 @@ impl Fog {
             for (index, (explored, visible)) in
                 explored_grid.iter_mut().zip(visible_grid).enumerate()
             {
-                *explored = *explored || (*visible && !reveal_only_tiles.contains(&(index as u32)));
+                *explored =
+                    *explored || (*visible && !terrain_reveal_only_tiles.contains(&(index as u32)));
             }
         }
         Fog {

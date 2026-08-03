@@ -54,9 +54,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`.
   `validateScenario` previews bounds without mutating the room or accepting client server paths.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
-- Map handoffs cap 64 one-use records for two minutes; reverse uses `LabMapDraft`.
-  Schema-v5 maps carry canonical `doodads[]` (cap 4,096); trees have tiny trunks,
-  flowers are inert, and Tank Traps spawn as neutral entities.
+- Map handoffs cap 64 two-minute records. Schema-v6 `LabMapDraft` carries canonical `doodads[]`
+  (cap 4,096) plus sparse `stealthTiles[]` and `noVehicleTiles[]`; Tank Traps become neutral entities.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**

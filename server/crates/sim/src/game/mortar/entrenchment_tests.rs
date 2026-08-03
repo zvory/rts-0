@@ -54,13 +54,16 @@ fn mortar_outer_area_damage_is_reduced_against_entrenched_infantry() {
     };
 
     resolve(
-        &mut entities,
-        &teams,
-        &fog,
-        &mut events,
-        &mut firing_reveals,
+        MortarResolutionContext {
+            entities: &mut entities,
+            teams: &teams,
+            fog: &fog,
+            map: &map,
+            events: &mut events,
+            firing_reveals: &mut firing_reveals,
+            tick: 10,
+        },
         &shell,
-        10,
     );
 
     let after = entities.get(victim).expect("victim should survive").hp;

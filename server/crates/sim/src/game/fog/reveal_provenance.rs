@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::game::entity::{EntityStore, FiringRevealEpisode};
 use crate::game::firing_reveal::FiringRevealSource;
+use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 
@@ -10,7 +11,11 @@ use super::{stamp_point, Fog};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(in crate::game) struct FiringRevealVisibility {
     pub(in crate::game) episode_started_at_tick: u32,
+    /// The reveal is required to target the entity, including a unit concealed on ordinarily
+    /// visible stealth terrain.
     pub(in crate::game) reveal_only: bool,
+    /// The stamped tile itself lacked ordinary sight and must stay presentation-dark.
+    pub(in crate::game) terrain_reveal_only: bool,
     /// Row-major tile stamped by this source in the current fog result.
     ///
     /// Provenance must follow the tile, not just the firing entity: another entity standing on
@@ -24,6 +29,7 @@ impl Fog {
         &mut self,
         sources: &[FiringRevealSource],
         store: &EntityStore,
+        map: &Map,
         smokes: &SmokeCloudStore,
     ) {
         self.firing_reveal_visibility.clear();
@@ -33,6 +39,7 @@ impl Fog {
             let visibility = FiringRevealVisibility {
                 episode_started_at_tick: source.started_at_tick(),
                 reveal_only: false,
+                terrain_reveal_only: false,
                 revealed_tile: None,
             };
             self.firing_reveal_visibility
@@ -58,12 +65,15 @@ impl Fog {
                 continue;
             };
             visibility.revealed_tile = Some(tile);
-            visibility.reveal_only = !self
+            let terrain_reveal_only = !self
                 .grids
                 .get(&source.viewer())
                 .and_then(|grid| grid.get(tile as usize))
                 .copied()
                 .unwrap_or(false);
+            visibility.reveal_only =
+                terrain_reveal_only || map.world_point_is_stealth(entity.pos_x, entity.pos_y);
+            visibility.terrain_reveal_only = terrain_reveal_only;
         }
 
         let width = self.width;
@@ -83,11 +93,7 @@ impl Fog {
     }
 
     /// The active reveal episode for `entity_id`, whether or not ordinary sight also sees it.
-    pub(in crate::game) fn active_firing_reveal_episode(
-        &self,
-        viewer: u32,
-        entity_id: u32,
-    ) -> Option<u32> {
+    pub(crate) fn active_firing_reveal_episode(&self, viewer: u32, entity_id: u32) -> Option<u32> {
         self.firing_reveal_visibility
             .get(&viewer)?
             .get(&entity_id)

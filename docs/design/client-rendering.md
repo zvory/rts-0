@@ -212,11 +212,12 @@ Each descriptor is `{id, order, space, visibilityPolicy, depthPolicy}`. Later wo
 namespaced metadata but cannot rename/reorder layers or weaken visibility policy.
 Within Pixi's fog-gated world, tree canopies and unit body/overlay/effect containers share
 back-to-front world-Y ordering; tree understory and shadows remain below them, while selection, HP,
-and fog remain above. Any received unit occluded by a tree is rendered into a dedicated filter
-surface above the canopy. One Pixi post-process samples the merged alpha of the unit rigs on that
-surface and emits only a white outer silhouette, avoiding per-part outline geometry. This applies
-equally to friendly, allied, and visible enemy units, but the pass only consumes already-admitted
-entities and therefore cannot reveal an enemy hidden by fog.
+and fog remain above. Any received ordinary unit occluded by a tree gets a white outer edge derived
+from the alpha of its current production rig/frame above the canopy. Authoritative `visionOnly`
+stealth reveals omit that rig from the normal full-color layer, redraw the same current production
+rig into a filtered above-fog outline layer, and keep damaged-unit HP above it. The filter samples
+alpha only and never copies faction-colored pixels. These passes consume only already-admitted
+entities and therefore cannot reveal a hidden enemy.
 
 `frame_recovery.js` samples one projection and visual time, updates fog, builds feedback, reconciles
 one monotonic ground-decal revision, assembles one frame, and calls `renderer.render(frame)`.

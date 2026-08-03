@@ -112,6 +112,16 @@ export class MapEditorWorkerRenderer {
     gfxReset(this.overlay.clear());
     for (const label of this.labels) label.destroy();
     this.labels = [];
+    for (const tile of overlay.stealthTiles || []) {
+      gfxStroke(this.overlay, 1, 0x5ed19a, 0.72);
+      gfxRect(gfxFill(this.overlay, 0x2d8c64, 0.24), tile.x * 32, tile.y * 32, 32, 32);
+      gfxNoFill(this.overlay);
+    }
+    for (const tile of overlay.noVehicleTiles || []) {
+      gfxStroke(this.overlay, 2, 0xf2b866, 0.88);
+      gfxRect(gfxFill(this.overlay, 0xc26a2e, 0.12), tile.x * 32 + 2, tile.y * 32 + 2, 28, 28);
+      gfxNoFill(this.overlay);
+    }
     gfxStrokePaths(this.overlay, overlay.gridPaths, 1, 0xffffff, 0.08);
     if (overlay.guides.length) gfxStrokePaths(this.overlay, overlay.guides, 2, 0xffd878, 0.82);
     if (overlay.guideCentre) {

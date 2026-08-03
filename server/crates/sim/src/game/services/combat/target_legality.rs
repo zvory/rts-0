@@ -54,6 +54,15 @@ pub(super) fn direct_fire_target_legal(
     if !targetable {
         return false;
     }
+    if crate::rules::projection::entity_hidden_by_stealth_from_team(
+        attacker_owner,
+        target_entity,
+        map,
+        fog,
+        teams,
+    ) {
+        return false;
+    }
     let end = (target_entity.pos_x, target_entity.pos_y);
     let target_team_visible =
         crate::rules::projection::team_visible_world(attacker_owner, end.0, end.1, fog, teams);
@@ -160,6 +169,10 @@ fn target_has_legal_shot(
     py: f32,
     target: &Entity,
 ) -> bool {
+    if crate::rules::projection::entity_hidden_by_stealth_from_team(owner, target, map, fog, teams)
+    {
+        return false;
+    }
     let target_team_visible =
         crate::rules::projection::team_visible_world(owner, target.pos_x, target.pos_y, fog, teams);
     let smoke_melee_visibility = entities

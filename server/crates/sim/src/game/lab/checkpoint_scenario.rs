@@ -6,7 +6,7 @@ use super::{LabEntityIdRemap, LabError};
 use crate::game::map::{BaseResourceCounts, Map};
 use crate::game::Game;
 use crate::game::MapMetadata;
-use crate::protocol::{terrain, validate_map_doodads, MapDoodad};
+use crate::protocol::{terrain, validate_map_doodads, MapDoodad, MapTile};
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
@@ -49,6 +49,10 @@ pub struct LabCheckpointScenarioMapData {
     pub base_sites: Vec<LabScenarioBaseSite>,
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
+    #[serde(default)]
+    pub stealth_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub no_vehicle_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -86,6 +90,7 @@ pub struct LabCheckpointScenarioSource {
 
 impl LabCheckpointScenarioMap {
     pub(super) fn from_map(map: &Map, metadata: &MapMetadata) -> Self {
+        let (stealth_tiles, no_vehicle_tiles) = map.protocol_overlay_tiles();
         Self {
             name: metadata.name.clone(),
             schema_version: metadata.schema_version,
@@ -114,6 +119,8 @@ impl LabCheckpointScenarioMap {
                     })
                     .collect(),
                 doodads: map.doodads.clone(),
+                stealth_tiles,
+                no_vehicle_tiles,
             },
         }
     }
@@ -150,6 +157,16 @@ impl LabCheckpointScenarioMap {
                 .collect(),
             base_resource_counts,
             doodads: data.doodads,
+            stealth_tiles: data
+                .stealth_tiles
+                .into_iter()
+                .map(|tile| (tile.x, tile.y))
+                .collect(),
+            no_vehicle_tiles: data
+                .no_vehicle_tiles
+                .into_iter()
+                .map(|tile| (tile.x, tile.y))
+                .collect(),
         };
         if map.materialized_hash() != self.materialized_hash {
             return Err(LabError::InvalidMap {
@@ -264,8 +281,50 @@ impl LabCheckpointScenarioMap {
                 reason: format!("checkpoint scenario map {reason}"),
             },
         )?;
+        validate_overlay_tiles(
+            &self.data.stealth_tiles,
+            width,
+            height,
+            "stealthTiles",
+            &self.name,
+        )?;
+        validate_overlay_tiles(
+            &self.data.no_vehicle_tiles,
+            width,
+            height,
+            "noVehicleTiles",
+            &self.name,
+        )?;
         Ok(())
     }
+}
+
+fn validate_overlay_tiles(
+    tiles: &[MapTile],
+    width: u32,
+    height: u32,
+    field: &str,
+    name: &str,
+) -> Result<(), LabError> {
+    let mut seen = HashSet::with_capacity(tiles.len());
+    for tile in tiles {
+        if tile.x >= width || tile.y >= height || !seen.insert((tile.x, tile.y)) {
+            return Err(LabError::InvalidMap {
+                name: name.to_string(),
+                reason: format!("checkpoint scenario map {field} is invalid"),
+            });
+        }
+    }
+    if tiles
+        .windows(2)
+        .any(|pair| (pair[0].x, pair[0].y) >= (pair[1].x, pair[1].y))
+    {
+        return Err(LabError::InvalidMap {
+            name: name.to_string(),
+            reason: format!("checkpoint scenario map {field} is not canonical"),
+        });
+    }
+    Ok(())
 }
 
 fn validate_lab_checkpoint_scenario_shape(

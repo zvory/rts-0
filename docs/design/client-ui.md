@@ -884,6 +884,7 @@ export class MapEditorSession {
   loadAuthoredMap(source, options?)
   mutate(label, mutation), undo(), redo()
   beginTerrainStroke(label?), paintTerrainTiles(tiles, terrain), commitTerrainStroke()
+  beginOverlayStroke(label?), paintOverlayTiles(tiles, edit), commitOverlayStroke()
   materialized(), exportMap()
   mapOverlay()
 }
@@ -914,7 +915,7 @@ Options loads bundled JSON from `/maps/catalog` and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
 base locations, and provides undo/redo, local JSON import/export, and centered resize. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
-shifts start/base locations with the centered source map. Authored v5 maps and materialized Lab
+shifts start/base locations with the centered source map. Authored v6 maps and materialized Lab
 handoffs carry explicit `width` and `height`; loading bundled or locally imported older square maps
 derives those axes from their terrain rows. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
@@ -944,6 +945,12 @@ edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
+The Gameplay overlays palette paints Forest (stealth plus no-vehicle), Stealth only, No vehicles
+only, or erases either/both layers. The viewport shows stealth in green and vehicle exclusion in
+orange, including overlap; overlay strokes use the same brush/box, symmetry, undo/redo, resize,
+local JSON import/export, and Lab handoff paths as terrain. Sparse coordinate pairs remain
+authoritative.
+
 The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Trees are placed singly and
 share one mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed
 singly or sprayed with a chosen tint. Tank Traps snap to tile centres and materialize at match setup
@@ -951,8 +958,9 @@ as completed owner-0 Tank Trap entities, so they use the live rendering, fog, co
 deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved: the
 removal tool box-selects any number of doodads for deletion, and a separate erase brush removes
 doodads continuously. Symmetry applies when creating doodads, while delete and undo/redo apply to
-all authored doodads. Trees do not yet change line of sight, cover, or combat damage, and
-wildflowers remain mechanically inert.
+all authored doodads. Trees retain only their tiny trunk collision; a forest's stealth and vehicle
+exclusion come from independent gameplay overlays. Trees do not change line of sight, cover, or
+combat damage, and wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
 The bounded server record expires after two minutes and is consumed once. Lab consumption creates a
@@ -2108,12 +2116,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   selected. Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values
-  draw first, so a southern tree or unit naturally covers a northern one. When any received unit
-  intersects a tree canopy in front of it, its rig is rendered into a dedicated filter surface
-  above the canopy. A Pixi post-process samples the merged sprite/rig alpha and emits only a white
-  outer silhouette, rather than outlining individual rig parts. Friendly, allied, and visible enemy
-  units use the same treatment. This readability pass uses only already-admitted entities and does
-  not reveal enemies, hidden entities, shadows, status bars, or selection/effect overlays.
+  draw first, so a southern tree or unit naturally covers a northern one. When any received ordinary
+  unit intersects a tree canopy in front of it, the renderer redraws that unit's current production
+  rig/frame into an alpha-only filter that emits its white outer edge above the canopy. Friendly,
+  allied, and visible enemy units use the same treatment. Authoritative `visionOnly` stealth reveals
+  omit their rig from the normal full-color layer and route the same current rig/frame through a
+  dedicated filtered outline layer above fog and canopies; damaged reveal HP stays above fog as
+  well. These readability passes use only already-admitted entities and do not reveal hidden enemies.
   When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
   Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
@@ -2195,9 +2204,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   tube/barrel assembly, fixed-color tire overlays, and separate carriage/tube recoil bindings.
   Mortar impact events that include a shooter reveal show the mortar briefly above fog for players
   whose units or buildings were hit by indirect fire.
-  Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
-  the fog overlay and excluded from local fog-source computation and selection/command hit-testing.
-  Current death-vision entities are normal visible entities and do not use this flag.
+  Unit entities marked `visionOnly` by the server omit full-color unit art and draw only the white
+  alpha edge of their current production rig/frame above fog, with damaged HP above it. They remain excluded from local fog-source
+  computation and selection/command hit-testing. Current death-vision entities are normal visible
+  entities and do not use this flag.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a single HP-layer status bar whose
   fill reflects current HP rather than changing authoritative construction progress;

@@ -541,6 +541,7 @@ impl Game {
             .map(|tile| (tile.x, tile.y))
             .collect();
         let base_resource_counts = map_draft::resource_counts(&draft, name)?;
+        let (stealth_tiles, no_vehicle_tiles) = map_draft::canonical_overlays(&draft, name)?;
         let doodads =
             doodads::canonicalize(draft.width, draft.height, draft.doodads).map_err(|reason| {
                 LabError::InvalidMap {
@@ -574,7 +575,6 @@ impl Game {
                 &mut occupied_sites,
             )?;
         }
-
         let map = Map {
             width: draft.width,
             height: draft.height,
@@ -583,6 +583,8 @@ impl Game {
             base_sites,
             base_resource_counts,
             doodads,
+            stealth_tiles,
+            no_vehicle_tiles,
         };
         let map_metadata = MapMetadata {
             name: name.to_string(),

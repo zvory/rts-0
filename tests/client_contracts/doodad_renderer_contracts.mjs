@@ -106,8 +106,10 @@ try {
       && LAYERS.indexOf("selectionRings") < unitIndex
       && LAYERS.indexOf("forestUnitOutlines") > unitIndex
       && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("hpBars")
-      && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("fog"),
-    "trees and units share one depth layer while selection stays below units and forest outlines stay below HP and fog",
+      && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("fog")
+      && LAYERS.indexOf("stealthUnitOutlines") > LAYERS.indexOf("fog")
+      && LAYERS.indexOf("stealthUnitOutlines") < LAYERS.indexOf("aboveFogHpBars"),
+    "tree outlines stay below HP/fog while stealth reveal outlines and HP remain above fog",
   );
 
   layer.destroy();

@@ -276,7 +276,7 @@ assert.equal(inspection.kinds.size, 2, "inspection kind filters are bounded and 
 assert.equal(inspection.limit, 400, "inspection result limits support the large-scene operational bound");
 assert.equal(INTERACT_LIMITS.focusEntities, 400, "bridge camera focus shares the 400-reference bound");
 assert.equal(INTERACT_LIMITS.captureSubjects, 400, "bridge readiness checks share the 400-subject bound");
-assert.equal(INTERACT_BRIDGE_VERSION, 6, "browser-local selection increments the Lab bridge version");
+assert.equal(INTERACT_BRIDGE_VERSION, 7, "Lab vision control increments the bridge version");
 assert.equal(inspection.cameraViewport, false, "inspection viewport filtering is opt-in");
 assert.equal(normalizeInspectionQuery({ cameraViewport: true }).cameraViewport, true, "inspection accepts the bounded camera viewport filter");
 

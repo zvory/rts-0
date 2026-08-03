@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub use rts_contract::{validate_map_doodads, MapDoodad};
+pub use rts_contract::{validate_map_doodads, MapDoodad, MapTile};
 use rts_contract::{InitialCamera, LabVisionMode};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -14,6 +14,10 @@ pub struct LabMapDraft {
     pub base_sites: Vec<LabBaseSite>,
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
+    #[serde(default)]
+    pub stealth_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub no_vehicle_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -85,6 +89,10 @@ pub struct LabCheckpointScenarioMapData {
     pub base_sites: Vec<LabScenarioBaseSite>,
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
+    #[serde(default)]
+    pub stealth_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub no_vehicle_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -157,6 +165,8 @@ mod tests {
                 oil_patches: 9,
             }],
             doodads: Vec::new(),
+            stealth_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
         };
 
         let serialized = serde_json::to_value(&data).expect("checkpoint map data serializes");
@@ -179,6 +189,8 @@ mod tests {
             serde_json::from_value(encoded).expect("checkpoint map data parses");
         assert_eq!(parsed.base_sites, data.base_sites);
         assert!(parsed.doodads.is_empty());
+        assert!(parsed.stealth_tiles.is_empty());
+        assert!(parsed.no_vehicle_tiles.is_empty());
     }
 
     #[test]

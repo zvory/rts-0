@@ -21,6 +21,8 @@ fn start_payload() -> StartPayload {
             terrain: vec![0; 64 * 64],
             resources: Vec::new(),
             doodads: Vec::new(),
+            stealth_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
         },
         players: vec![
             PlayerStart {

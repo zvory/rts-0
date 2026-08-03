@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "width": 126,
   "height": 126,
   "name": "1v1 No Terrain",
@@ -169,5 +169,7 @@
       "oilPatches": 3
     }
   ],
+  "stealthTiles": [],
+  "noVehicleTiles": [],
   "doodads": []
 }

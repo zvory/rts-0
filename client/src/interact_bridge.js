@@ -16,7 +16,7 @@ import {
 } from "./interact_selection.js";
 
 export const INTERACT_BRIDGE_KEY = "__rtsInteract";
-export const INTERACT_BRIDGE_VERSION = 6;
+export const INTERACT_BRIDGE_VERSION = 7;
 export const INTERACT_LIMITS = Object.freeze({
   inspectEntities: 400,
   inspectPlayers: 16,
@@ -135,6 +135,7 @@ export class InteractBridge {
       case "remove": return this.remove(input);
       case "order": return this.order(input);
       case "time": return this.time(input);
+      case "vision": return this.vision(input);
       case "inspect": return this.inspect(input);
       case "select": return this.select(input);
       case "camera": return this.camera(input);
@@ -291,6 +292,22 @@ export class InteractBridge {
     }
     const active = this.app?.match || match;
     return { roomTime: projectRoomTime(active.roomTimeControls?.roomTimeState), snapshotTick: active.state.tick };
+  }
+
+  async vision(input) {
+    const { labClient } = this.session();
+    const mode = String(input?.vision?.mode || "");
+    const vision = mode === "all"
+      ? { mode: "all" }
+      : mode === "team"
+        ? { mode: "team", teamId: positiveInt(input?.vision?.teamId, "vision.teamId") }
+        : null;
+    if (!vision) throw bridgeError("invalidInput", "vision.mode must be all or team.");
+    const result = await this.mutate(
+      () => labClient.setVision(vision),
+      () => JSON.stringify(labClient.state?.vision || null) === JSON.stringify(vision),
+    );
+    return { result: projectLabResult(result), vision };
   }
 
   inspect(query) {

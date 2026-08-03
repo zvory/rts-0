@@ -297,6 +297,20 @@ pub struct MapInfo {
     /// snapshots instead.
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
+    /// Sparse tile overlay whose unit occupants are concealed from enemies until revealed.
+    #[serde(default)]
+    pub stealth_tiles: Vec<MapTile>,
+    /// Sparse tile overlay blocked only for vehicle-body movement.
+    #[serde(default)]
+    pub no_vehicle_tiles: Vec<MapTile>,
+}
+
+/// A canonical map tile coordinate used by sparse authored overlays.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MapTile {
+    pub x: u32,
+    pub y: u32,
 }
 
 /// A server-validated map object authored in integer world pixels.

@@ -21,6 +21,7 @@ import {
   mapEditorSymmetrySupported,
   moveSymmetricDraftLocation,
   protectDraftBaseTerrain,
+  symmetricMapTiles,
   symmetricTerrainTiles,
 } from "./map_editor_session.js";
 
@@ -250,7 +251,7 @@ export class MapEditorViewport {
 
   applySessionSnapshot(snapshot) {
     if (!snapshot?.draft) return;
-    if (snapshot.reason !== "terrainStroke" && snapshot.reason !== "doodadStroke") {
+    if (!["terrainStroke", "doodadStroke", "overlayStroke"].includes(snapshot.reason)) {
       this.rebuildTerrain();
     }
     if (snapshot.reason === "doodadStroke" && snapshot.doodadPatch) {
@@ -360,6 +361,8 @@ export class MapEditorViewport {
       guides,
       guideCentre,
       sites,
+      stealthTiles: structuredCloneSafe(draft.stealthTiles || []),
+      noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
       paintPreview: this.paintPreviewRecord(),
       doodadSelections: this.doodadSelectionRecords?.() || [],
       doodadSelectionBox: this.doodadSelectionBoxRecord?.() || null,
@@ -391,12 +394,13 @@ export class MapEditorViewport {
   }
 
   paintPreviewRecord() {
-    if (this.tool?.kind !== "terrain" || this.tool.shape !== "box" || !this.paintStartTile || !this.lastPaintTile) return null;
+    if (!["terrain", "overlay"].includes(this.tool?.kind) || this.tool.shape !== "box" || !this.paintStartTile || !this.lastPaintTile) return null;
     const x0 = Math.min(this.paintStartTile.x, this.lastPaintTile.x) * TILE_SIZE;
     const y0 = Math.min(this.paintStartTile.y, this.lastPaintTile.y) * TILE_SIZE;
     const width = (Math.abs(this.lastPaintTile.x - this.paintStartTile.x) + 1) * TILE_SIZE;
     const height = (Math.abs(this.lastPaintTile.y - this.paintStartTile.y) + 1) * TILE_SIZE;
-    return { x: x0, y: y0, width, height, color: terrainPreviewColor(this.tool.terrain) };
+    const color = this.tool.kind === "overlay" ? overlayPreviewColor(this.tool.edit) : terrainPreviewColor(this.tool.terrain);
+    return { x: x0, y: y0, width, height, color };
   }
 
   siteRecord(site, color, radius, label, selected = false) {
@@ -424,12 +428,16 @@ export class MapEditorViewport {
     }
     const tile = this.eventTile(event, { kind: this.tool.kind });
     if (!tile) return;
-    if (this.tool.kind === "terrain") {
+    if (this.tool.kind === "terrain" || this.tool.kind === "overlay") {
       this.paintPointerId = event.pointerId;
       this.paintStartTile = tile;
       this.lastPaintTile = tile;
       const action = this.tool.shape === "box" ? "Filled" : "Painted";
-      this.session.beginTerrainStroke(`${action} ${terrainLabel(this.tool.terrain)} terrain`);
+      if (this.tool.kind === "terrain") {
+        this.session.beginTerrainStroke(`${action} ${terrainLabel(this.tool.terrain)} terrain`);
+      } else {
+        this.session.beginOverlayStroke(`${action} ${this.tool.label || "map overlay"}`);
+      }
       if (this.tool.shape === "box") this.drawOverlay();
       else this.paintLine(tile, tile);
       event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -454,7 +462,7 @@ export class MapEditorViewport {
       }
       if (event.pointerId === this.doodadPointerId) return;
     }
-    if (event.pointerId !== this.paintPointerId || this.tool?.kind !== "terrain") return;
+    if (event.pointerId !== this.paintPointerId || !["terrain", "overlay"].includes(this.tool?.kind)) return;
     const tile = this.eventTile(event);
     if (!tile || !this.lastPaintTile) return;
     if (this.tool.shape !== "box") this.paintLine(this.lastPaintTile, tile);
@@ -502,7 +510,7 @@ export class MapEditorViewport {
       if (!cancelled) {
         const tile = this.eventTile(event);
         if (tile) this.lastPaintTile = tile;
-        if (this.tool?.kind === "terrain" && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
+        if (["terrain", "overlay"].includes(this.tool?.kind) && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
           this.paintBox(this.paintStartTile, this.lastPaintTile);
         }
       }
@@ -510,11 +518,16 @@ export class MapEditorViewport {
       this.lastPaintTile = null;
       this.paintStartTile = null;
       let changed = false;
-      if (cancelled) this.session.cancelTerrainStroke();
+      if (this.tool?.kind === "overlay") {
+        if (cancelled) this.session.cancelOverlayStroke();
+        else changed = this.session.commitOverlayStroke();
+      } else if (cancelled) this.session.cancelTerrainStroke();
       else changed = this.session.commitTerrainStroke();
       this.drawOverlay();
       this.onStatus(
-        cancelled ? "Terrain paint cancelled." : changed ? "Terrain paint committed." : "Protected bases remain grass.",
+        cancelled
+          ? (this.tool?.kind === "overlay" ? "Overlay paint cancelled." : "Terrain paint cancelled.")
+          : changed ? "Map paint committed." : "No map tiles changed.",
         !cancelled && !changed,
       );
     }
@@ -612,6 +625,11 @@ export class MapEditorViewport {
 
   paintTiles(tiles) {
     const dimensions = this.session.draft;
+    if (this.tool?.kind === "overlay") {
+      const symmetric = symmetricMapTiles(dimensions, tiles, this.tool?.symmetry);
+      if (this.session.paintOverlayTiles(symmetric, this.tool.edit).length) this.drawOverlay();
+      return;
+    }
     const changes = this.session.paintTerrainTiles(
       symmetricTerrainTiles(dimensions, tiles, this.tool.terrain, this.tool?.symmetry),
       this.tool.terrain,
@@ -906,6 +924,13 @@ function terrainPreviewColor(code) {
   if (code === TERRAIN.ROCK) return 0xa69a82;
   if (code === TERRAIN.WATER) return 0x4b9bd0;
   return 0x6d9f58;
+}
+
+function overlayPreviewColor(edit) {
+  if (edit?.stealth === false && edit?.noVehicle === false) return 0xff6f6f;
+  if (edit?.stealth === true && edit?.noVehicle === true) return 0x81c784;
+  if (edit?.stealth != null) return 0x5ed19a;
+  return 0xf2b866;
 }
 
 function doodadCommitLabel(mode) {

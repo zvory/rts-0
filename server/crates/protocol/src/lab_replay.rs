@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     terrain, validate_map_doodads, Command, LabCheckpointScenarioV1, LabScenarioEntityIdRemap,
-    LabSpawnEntitySpec, LabUpdateSpec, LabVisionMode, TeamId, MAP_TILE_SIZE_PX,
+    LabSpawnEntitySpec, LabUpdateSpec, LabVisionMode, MapTile, TeamId, MAP_TILE_SIZE_PX,
 };
 use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
 
@@ -749,6 +749,59 @@ fn validate_map_container(
         .ok_or_else(|| invalid(format!("{label}.map.data world-pixel dimensions overflow")))?;
     validate_map_doodads(&scenario.map.data.doodads, world_width_px, world_height_px)
         .map_err(|reason| invalid(format!("{label}.map.data {reason}")))?;
+    validate_overlay_tiles(
+        label,
+        "stealthTiles",
+        &scenario.map.data.stealth_tiles,
+        width,
+        height,
+        tile_count,
+    )?;
+    validate_overlay_tiles(
+        label,
+        "noVehicleTiles",
+        &scenario.map.data.no_vehicle_tiles,
+        width,
+        height,
+        tile_count,
+    )?;
+    Ok(())
+}
+
+fn validate_overlay_tiles(
+    label: &str,
+    field: &str,
+    tiles: &[MapTile],
+    width: u32,
+    height: u32,
+    tile_count: usize,
+) -> Result<(), LabReplayValidationError> {
+    if tiles.len() > tile_count {
+        return Err(invalid(format!(
+            "{label}.map.data.{field} count exceeds the map tile count"
+        )));
+    }
+    let mut seen = HashSet::with_capacity(tiles.len());
+    for tile in tiles {
+        if tile.x >= width || tile.y >= height {
+            return Err(invalid(format!(
+                "{label}.map.data.{field} contains an out-of-bounds tile"
+            )));
+        }
+        if !seen.insert((tile.x, tile.y)) {
+            return Err(invalid(format!(
+                "{label}.map.data.{field} contains duplicate tiles"
+            )));
+        }
+    }
+    if tiles
+        .windows(2)
+        .any(|pair| (pair[0].x, pair[0].y) >= (pair[1].x, pair[1].y))
+    {
+        return Err(invalid(format!(
+            "{label}.map.data.{field} is not canonical"
+        )));
+    }
     Ok(())
 }
 

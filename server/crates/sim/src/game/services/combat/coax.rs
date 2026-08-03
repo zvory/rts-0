@@ -124,6 +124,7 @@ pub(super) fn fire_tank_coax_system(
                 firing_reveals,
                 player_ids,
                 fog,
+                map,
                 teams,
                 shot.victim_owner,
                 snapshot.owner,
