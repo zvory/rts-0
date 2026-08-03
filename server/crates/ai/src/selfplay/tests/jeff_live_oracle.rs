@@ -18,6 +18,7 @@ const FULL_HORIZON: u32 = 9_000;
 const MAP_NAME: &str = "Chokes";
 const FIXTURE_PATH: &str = "fixtures/jeff_live_oracle_v1.jsonl";
 const CANDIDATE_ENV: &str = "RTS_GENERATE_JEFF_ORACLE_CANDIDATE";
+const FINGERPRINT_FLOAT_STEPS_PER_UNIT: f64 = 1_024.0;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "record", rename_all = "snake_case")]
@@ -171,10 +172,10 @@ fn run_transcript(horizon: u32) -> Vec<TranscriptRecord> {
         schema_version: SCHEMA_VERSION,
         fixture_id: FIXTURE_ID.to_string(),
         canonical_encoding:
-            "UTF-8 JSON Lines; serde struct field order; one compact JSON object and LF per record"
+            "UTF-8 JSON Lines; serde struct field order; fingerprint floats rounded to 1/1024; one compact JSON object and LF per record"
                 .to_string(),
         hash_algorithm:
-            "FNV-1a 64 over serde_json canonical record bytes, lowercase hex with fnv1a64 prefix"
+            "FNV-1a 64 over canonical serde_json values, lowercase hex with fnv1a64 prefix"
                 .to_string(),
         seed: FIXTURE_SEED,
         full_horizon: FULL_HORIZON,
@@ -491,8 +492,39 @@ fn read_jsonl(path: &Path) -> Result<Vec<TranscriptRecord>, String> {
 }
 
 fn fingerprint<T: Serialize + ?Sized>(value: &T) -> String {
-    let bytes = serde_json::to_vec(value).expect("serialize canonical fingerprint input");
+    let mut canonical = serde_json::to_value(value).expect("serialize fingerprint input");
+    canonicalize_fingerprint_value(&mut canonical);
+    let bytes = serde_json::to_vec(&canonical).expect("serialize canonical fingerprint input");
     format!("fnv1a64:{:016x}", fnv1a64(&bytes))
+}
+
+fn canonicalize_fingerprint_value(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Array(values) => {
+            for value in values {
+                canonicalize_fingerprint_value(value);
+            }
+        }
+        serde_json::Value::Object(fields) => {
+            for value in fields.values_mut() {
+                canonicalize_fingerprint_value(value);
+            }
+        }
+        serde_json::Value::Number(number) if number.is_f64() => {
+            let Some(value) = number.as_f64() else {
+                return;
+            };
+            let quantized = (value * FINGERPRINT_FLOAT_STEPS_PER_UNIT).round()
+                / FINGERPRINT_FLOAT_STEPS_PER_UNIT;
+            let quantized = if quantized == 0.0 { 0.0 } else { quantized };
+            *number = serde_json::Number::from_f64(quantized)
+                .expect("finite simulation float in oracle fingerprint");
+        }
+        serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::String(_) => {}
+    }
 }
 
 fn fnv1a64(bytes: &[u8]) -> u64 {
@@ -631,6 +663,28 @@ mod comparator_tests {
     #[test]
     fn jeff_live_oracle_fnv1a64_matches_the_published_test_vector() {
         assert_eq!(fnv1a64(b"hello"), 0xa430_d846_80aa_bd0b);
+    }
+
+    #[test]
+    fn jeff_live_oracle_quantizes_subpixel_float_noise_only() {
+        let baseline = serde_json::json!({
+            "position": 100.125,
+            "integer": 7,
+            "nested": [20.5, { "facing": -0.0 }],
+        });
+        let subpixel_noise = serde_json::json!({
+            "position": 100.125_2,
+            "integer": 7,
+            "nested": [20.500_2, { "facing": 0.0 }],
+        });
+        let meaningful_change = serde_json::json!({
+            "position": 100.13,
+            "integer": 7,
+            "nested": [20.5, { "facing": 0.0 }],
+        });
+
+        assert_eq!(fingerprint(&baseline), fingerprint(&subpixel_noise));
+        assert_ne!(fingerprint(&baseline), fingerprint(&meaningful_change));
     }
 
     #[test]

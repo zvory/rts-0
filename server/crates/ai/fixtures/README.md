@@ -19,7 +19,8 @@ directory. The checked-in fixture must not be regenerated to make Phases 2-8 ref
 changing it requires a separately approved production behavior change with a transcript review.
 
 Canonical records are compact UTF-8 JSON Lines with one LF-terminated serde struct record per
-line. Field order is the Rust schema declaration order. Fingerprints are lowercase
-`fnv1a64:<hex>` values computed over the compact `serde_json` bytes of the named value; the exact
-emitted `SimCommand` values remain in the fixture so command drift is reviewable without reversing
-a hash.
+line. Field order is the Rust schema declaration order. Fingerprinted floating-point values are
+rounded to 1/1024 of a world unit before compact `serde_json` encoding so harmless CPU-specific
+subpixel arithmetic does not masquerade as AI drift. Integer, string, ordering, and larger numeric
+changes remain visible in the lowercase `fnv1a64:<hex>` values; exact emitted `SimCommand` values
+remain in the fixture so command drift is reviewable without reversing a hash.

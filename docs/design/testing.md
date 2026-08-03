@@ -31,7 +31,9 @@ enqueued, and `primary_base_alive_players()` supplies the objective-alive set. T
 every empty call, exact retreat input and emitted `SimCommand`, current-tick decision trace,
 post-tick command-log delta, recipient-event digest, objective-alive IDs, and per-player snapshot
 digest. Compact serde JSON bytes and repository-owned FNV-1a64 fingerprints are the stable
-canonical representation; Git or compiler identity is not behavior identity.
+canonical representation. Fingerprinted floating-point values are rounded to 1/1024 of a world
+unit so CPU-specific subpixel arithmetic does not make the cross-platform gate flaky; exact
+commands remain unquantized in the transcript. Git or compiler identity is not behavior identity.
 
 The ordinary gate compares ticks 0-3599, covering both nine-tick stagger offsets, opening economy,
 failed-site placement recovery, construction, production, staging, and first attack orders. With
