@@ -9,9 +9,11 @@ fn waldubungen_is_selectable_with_its_authored_start_resources() {
         .expect("Waldübungen should be listed");
     assert_eq!((entry.min_players, entry.max_players), (1, 2));
 
-    let map = Map::load("Waldübungen", 2, 0x1234_5678)
+    let mut map = Map::load("Waldübungen", 2, 0x1234_5678)
         .expect("Waldübungen should load for two active players");
     assert_eq!((map.width, map.height), (192, 126));
+    map.starts.sort_unstable();
+    assert_eq!(map.starts, [(42, 9), (149, 116)]);
 
     let northwest_start = map.resource_counts_at((42, 9));
     assert_eq!((northwest_start.steel_patches, northwest_start.oil_patches), (4, 4));
