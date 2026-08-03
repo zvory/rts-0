@@ -1028,15 +1028,16 @@ history, or handoff. The shared pure `map_authoring/layers.js` vocabulary also d
 isolate any comma-separated subset.
 
 The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Tree species are independently
-toggleable visual variants: click-drag placement and the low-density spray choose among the selected
-species and keep tree centres at least two tiles apart. All trees share one mechanical tree semantic
-with a tiny authoritative trunk; wildflowers can be placed singly or sprayed with a chosen tint.
+toggleable visual variants. Place adds one selected doodad; spray continuously adds selected trees or
+chosen-tint wildflowers at 1–256 density, without a per-location tree-density limit. Repeating a
+spray adds more in-bounds doodads until the authored-map cap of 4,096 is reached. Erase continuously
+removes doodads in its brush. All trees share one mechanical tree semantic with a tiny authoritative
+trunk; wildflowers can be placed singly or sprayed with a chosen tint.
 Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
-deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved: the
-removal tool box-selects any number of doodads for deletion, and a separate erase brush removes
-doodads continuously. Symmetry applies when creating doodads, while delete and undo/redo apply to
-all authored doodads. Trees retain only their tiny trunk collision; a dense tree grouping's stealth and vehicle
+deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved; the
+erase brush removes them continuously. Symmetry applies when placing and erasing doodads, while undo/redo
+apply to all authored doodads. Trees retain only their tiny trunk collision; a dense tree grouping's stealth and vehicle
 exclusion come from independent gameplay overlays. Trees do not change line of sight, cover, or
 combat damage, and wildflowers remain mechanically inert.
 

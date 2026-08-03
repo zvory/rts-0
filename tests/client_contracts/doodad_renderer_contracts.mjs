@@ -170,8 +170,6 @@ try {
       stealthTiles: [{ x: 1, y: 1 }],
       noVehicleTiles: [{ x: 2, y: 2 }],
       paintPreview: null,
-      doodadSelections: [{ id: 8, x: 4, y: 5 }],
-      doodadSelectionBox: { x: 0, y: 0, width: 10, height: 12 },
       doodadBrushPreview: { x: 20, y: 20, radius: 12, mode: "spray", typeId: "wildflower.single", color: "#ffffff" },
     },
   });

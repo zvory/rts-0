@@ -2,7 +2,7 @@ import { DOODAD_TYPE, DOODAD_TYPE_IDS } from "./config.js";
 import { expandSymmetricPoints } from "./map_authoring/symmetry.js";
 
 export const MAP_EDITOR_MAX_DOODADS = 4096;
-export const MAP_EDITOR_TREE_MIN_SPACING = 64;
+export const MAP_EDITOR_MAX_SPRAY_DENSITY = 256;
 export const MAP_EDITOR_DEFAULT_FLOWER_COLOR = "#e8b84a";
 export const MAP_EDITOR_DOODAD_TYPES = DOODAD_TYPE;
 export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
@@ -139,21 +139,6 @@ export function doodadIdsWithinRadius(records, point, radius) {
   }).map((record) => record.id);
 }
 
-export function doodadIdsWithinRect(records, from, to) {
-  const x0 = Number(from?.x);
-  const y0 = Number(from?.y);
-  const x1 = Number(to?.x);
-  const y1 = Number(to?.y);
-  if (![x0, y0, x1, y1].every(Number.isFinite)) return [];
-  const minX = Math.min(x0, x1);
-  const maxX = Math.max(x0, x1);
-  const minY = Math.min(y0, y1);
-  const maxY = Math.max(y0, y1);
-  return (records || [])
-    .filter((record) => record.x >= minX && record.x <= maxX && record.y >= minY && record.y <= maxY)
-    .map((record) => record.id);
-}
-
 export function symmetricDoodadPlacements(worldDimensions, points, symmetry = "none") {
   const dimensions = normalizedWorldDimensions(worldDimensions);
   return dimensions
@@ -166,7 +151,7 @@ export function createDoodadSprayStroke(point, { radius = 48, density = 4, seed 
   const start = finitePoint(point);
   if (!start) return null;
   const normalizedRadius = Math.max(4, Math.min(256, Number(radius) || 48));
-  const normalizedDensity = Math.max(1, Math.min(12, Math.trunc(Number(density)) || 4));
+  const normalizedDensity = Math.max(1, Math.min(MAP_EDITOR_MAX_SPRAY_DENSITY, Math.trunc(Number(density)) || 4));
   const stroke = {
     last: start,
     distanceToNext: spraySpacing(normalizedRadius, normalizedDensity),
@@ -200,87 +185,6 @@ export function extendDoodadSprayStroke(stroke, point) {
   return placements;
 }
 
-/** Stateful fixed-distance line sampler used by click-and-drag placement. */
-export function createDoodadDragStroke(point, { spacing = MAP_EDITOR_TREE_MIN_SPACING } = {}) {
-  const start = finitePoint(point);
-  if (!start) return null;
-  const normalizedSpacing = Math.max(4, Number(spacing) || MAP_EDITOR_TREE_MIN_SPACING);
-  return {
-    stroke: { last: start, distanceToNext: normalizedSpacing, spacing: normalizedSpacing },
-    placements: [start],
-  };
-}
-
-export function extendDoodadDragStroke(stroke, point) {
-  const end = finitePoint(point);
-  if (!stroke?.last || !end) return [];
-  const placements = [];
-  let from = stroke.last;
-  let dx = end.x - from.x;
-  let dy = end.y - from.y;
-  let remaining = Math.hypot(dx, dy);
-  while (remaining + 1e-9 >= stroke.distanceToNext) {
-    const ratio = stroke.distanceToNext / remaining;
-    from = { x: from.x + dx * ratio, y: from.y + dy * ratio };
-    placements.push({ x: Math.round(from.x), y: Math.round(from.y) });
-    dx = end.x - from.x;
-    dy = end.y - from.y;
-    remaining = Math.hypot(dx, dy);
-    stroke.distanceToNext = stroke.spacing;
-  }
-  stroke.distanceToNext -= remaining;
-  stroke.last = end;
-  return placements;
-}
-
-/** Build one spacing index for a placement update; rejected groups never enter the index. */
-export function createTreePlacementFilter(records, minSpacing = MAP_EDITOR_TREE_MIN_SPACING) {
-  const spacing = Math.max(0, Number(minSpacing) || 0);
-  const squared = spacing * spacing;
-  const cellSize = Math.max(1, spacing);
-  const buckets = new Map();
-
-  const add = (point) => {
-    const key = treeSpacingBucketKey(point, cellSize);
-    const bucket = buckets.get(key);
-    if (bucket) bucket.push(point);
-    else buckets.set(key, [point]);
-  };
-  const conflicts = (point) => {
-    if (spacing <= 0) return false;
-    const cellX = Math.floor(point.x / cellSize);
-    const cellY = Math.floor(point.y / cellSize);
-    for (let y = cellY - 1; y <= cellY + 1; y += 1) {
-      for (let x = cellX - 1; x <= cellX + 1; x += 1) {
-        for (const other of buckets.get(`${x},${y}`) || []) {
-          if ((other.x - point.x) ** 2 + (other.y - point.y) ** 2 < squared) return true;
-        }
-      }
-    }
-    return false;
-  };
-
-  for (const record of records || []) {
-    if (!isTreeDoodadType(record?.typeId)) continue;
-    const point = finitePoint(record);
-    if (point) add(point);
-  }
-
-  return Object.freeze({
-    acceptGroup(placements) {
-      const candidates = (placements || []).map(finitePoint).filter(Boolean);
-      const pending = [];
-      for (const point of candidates) {
-        if (conflicts(point)) return [];
-        if (pending.some((other) => (other.x - point.x) ** 2 + (other.y - point.y) ** 2 < squared)) return [];
-        pending.push(point);
-      }
-      for (const point of pending) add(point);
-      return pending;
-    },
-  });
-}
-
 export function doodadTypeFromSelection(typeIds, seed = 1) {
   const choices = [...new Set(typeIds || [])].filter(isMapEditorDoodadType);
   if (!choices.length) return null;
@@ -311,7 +215,7 @@ function tileCenter(worldCoordinate) {
 }
 
 function spraySpacing(radius, density) {
-  return Math.max(4, radius / (density * 0.75));
+  return Math.max(1, radius / (density * 0.75));
 }
 
 function sprayPlacement(stroke, centre) {
@@ -332,10 +236,6 @@ function hashUnit(seed, index) {
   value = Math.imul(value, 0x735a2d97);
   value ^= value >>> 15;
   return (value >>> 0) / 0x100000000;
-}
-
-function treeSpacingBucketKey(point, cellSize) {
-  return `${Math.floor(point.x / cellSize)},${Math.floor(point.y / cellSize)}`;
 }
 
 function firstAvailableDoodadId(used, start = 1) {
