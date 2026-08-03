@@ -6,9 +6,10 @@ export async function createMapHandoff({
   materializedMap,
   fetchImpl = globalThis.fetch?.bind(globalThis),
   timeoutMs = 15_000,
+  collectionUrl = HANDOFF_COLLECTION_URL,
 }) {
   if (!fetchImpl) throw new Error("Map handoffs require fetch support.");
-  const { response, payload } = await boundedJsonFetch(fetchImpl, HANDOFF_COLLECTION_URL, {
+  const { response, payload } = await boundedJsonFetch(fetchImpl, collectionUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ destination, authoredMap, materializedMap }),

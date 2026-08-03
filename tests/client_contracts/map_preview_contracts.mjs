@@ -287,7 +287,16 @@ try {
   pngHeader.writeUInt32BE(360, 20);
   assert.deepEqual(readPngDimensions(pngHeader), { width: 640, height: 360 });
   const cliSource = fs.readFileSync(new URL("../../scripts/map-preview.mjs", import.meta.url), "utf8");
+  const mainSource = fs.readFileSync(new URL("../../client/src/main.js", import.meta.url), "utf8");
+  const appSource = fs.readFileSync(new URL("../../client/src/app.js", import.meta.url), "utf8");
   assert.doesNotMatch(cliSource, /--no-sandbox/, "CLI keeps Chrome's sandbox enabled");
+  assert.match(mainSource, /const stressTestLaunch = mapPreviewLaunch \? null : stressTestLaunchConfig\(\)/,
+    "map preview takes precedence over the stress-test transport");
+  assert.match(mainSource, /const snapshotStreamLaunch = mapPreviewLaunch\s+\? null/,
+    "map preview takes precedence over offline snapshot streams");
+  assert.match(appSource, /this\.replayLaunch = mapPreviewLaunch \? null : replayLaunchConfig\(\)/);
+  assert.match(appSource, /this\.matchLaunch = mapPreviewLaunch \? null : matchLaunchConfig\(\)/,
+    "map preview's one-use handoff takes precedence over unrelated replay and match launches");
 }
 
 {

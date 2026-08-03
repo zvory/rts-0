@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createMapHandoff } from "../client/src/map_editor_handoff.js";
 import { MapEditorSession } from "../client/src/map_editor_session.js";
 
 const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -132,28 +133,14 @@ export async function renderMapPreview(options, dependencies = {}) {
 }
 
 export async function createPreviewHandoff(baseUrl, authoredMap, materializedMap, fetchImpl = fetch, timeoutMs = HANDOFF_TIMEOUT_MS) {
-  const timeout = numberInRange(timeoutMs, "handoff timeout", 1, 60_000);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error("Map preview handoff timed out.")), timeout);
-  let response;
-  let payload;
-  try {
-    response = await fetchImpl(new URL("/api/map-handoffs", baseUrl), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-      body: JSON.stringify({ destination: "lab", authoredMap, materializedMap }),
-      signal: controller.signal,
-    });
-    payload = await response.json().catch(() => ({}));
-  } catch (error) {
-    if (controller.signal.aborted) throw new Error("Map preview handoff timed out.");
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!response.ok) throw new Error(payload?.error || `Map preview handoff failed (HTTP ${response.status}).`);
-  if (!/^[a-f0-9]{32}$/.test(payload?.handoffId || "")) throw new Error("Map preview handoff returned an invalid id.");
-  return payload;
+  return createMapHandoff({
+    destination: "lab",
+    authoredMap,
+    materializedMap,
+    fetchImpl,
+    timeoutMs: numberInRange(timeoutMs, "handoff timeout", 1, 60_000),
+    collectionUrl: new URL("/api/map-handoffs", baseUrl),
+  });
 }
 
 function localServerUrl(value) {

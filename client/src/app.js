@@ -162,13 +162,15 @@ export class App {
     this.stressTestRunner = stressTestLaunch
       ? new StressTestRunner({ launch: stressTestLaunch })
       : null;
-    this.devWatch = devWatchConfig();
-    this.labCatalogLaunch = labCatalogRouteConfig();
+    // A dedicated preview URL may be opened from or pasted into a URL carrying unrelated launch
+    // parameters. Its one-use handoff is the only launch authority on this route.
+    this.devWatch = mapPreviewLaunch ? null : devWatchConfig();
+    this.labCatalogLaunch = mapPreviewLaunch ? null : labCatalogRouteConfig();
     this.labHandoffLaunch = mapPreviewLaunch || labHandoffLaunchConfig();
-    this.labLaunch = labLaunchConfig();
+    this.labLaunch = mapPreviewLaunch ? null : labLaunchConfig();
     this.labVisualProfileState = resolveVisualProfileLaunch(this.labLaunch || this.labCatalogLaunch);
-    this.replayLaunch = replayLaunchConfig();
-    this.matchLaunch = matchLaunchConfig();
+    this.replayLaunch = mapPreviewLaunch ? null : replayLaunchConfig();
+    this.matchLaunch = mapPreviewLaunch ? null : matchLaunchConfig();
     this.rendererBackendBundle = rendererBackendBundle;
     /**
      * Audio engine. Long-lived across matches: the AudioContext is unlocked
