@@ -754,6 +754,8 @@ test("command car PNG atlas keeps its native shadow and Breakthrough aura", () =
   const [shadowRoute, unitRoute] = liveRigRoutesFor(KIND.COMMAND_CAR);
   const shadowCoverage = pngAtlasRouteCoverage(definition, COMMAND_CAR_PNG_RIG_ATLAS, shadowRoute);
   const unitCoverage = pngAtlasRouteCoverage(definition, COMMAND_CAR_PNG_RIG_ATLAS, unitRoute);
+  const atlasUrl = new URL(COMMAND_CAR_PNG_RIG_ATLAS.image, "http://localhost");
+  const atlasSize = readPngDimensions(`client${atlasUrl.pathname}`);
 
   assert.deepEqual(shadowCoverage.coveredParts, []);
   assert.deepEqual(shadowCoverage.missingParts, ["part.shadow"]);
@@ -763,13 +765,30 @@ test("command car PNG atlas keeps its native shadow and Breakthrough aura", () =
   assert.deepEqual(COMMAND_CAR_PNG_RIG_ATLAS.grid.cells, ["sprite.fixed", "sprite.paint"]);
   assert.equal(COMMAND_CAR_PNG_RIG_ATLAS.sprites[0].tintSlot, "fixed");
   assert.equal(COMMAND_CAR_PNG_RIG_ATLAS.sprites[1].tintSlot, "team-light");
+  assert.equal(atlasUrl.searchParams.get("v"), COMMAND_CAR_PNG_RIG_ATLAS.grid.imageVersion);
+  assert.deepEqual(atlasSize, {
+    width: COMMAND_CAR_PNG_RIG_ATLAS.grid.width,
+    height: COMMAND_CAR_PNG_RIG_ATLAS.grid.height,
+  });
+  for (const sprite of COMMAND_CAR_PNG_RIG_ATLAS.sprites) {
+    assert.equal(
+      sprite.frame.x + sprite.frame.w <= atlasSize.width,
+      true,
+      `${sprite.id} stays within the command car atlas width`,
+    );
+    assert.equal(
+      sprite.frame.y + sprite.frame.h <= atlasSize.height,
+      true,
+      `${sprite.id} stays within the command car atlas height`,
+    );
+  }
 });
 
 test("command car PNG icon preserves fixed details while tinting the team paint", () => {
   const icon = liveUnitIconMarkupFor(KIND.COMMAND_CAR, { teamColor: "#d55e00" });
 
   assert.equal(icon.includes('data-unit-icon-source="png-atlas-composition"'), true);
-  assert.equal(icon.includes("command-car-packed-radio-stars-triangle-atlas-v3.png"), true);
+  assert.equal(icon.includes("command-car-packed-radio-stars-30-atlas-v4.png"), true);
   assert.equal(
     icon.includes('data-unit-icon-component="sprite.fixed" transform="translate(0 0) rotate(0)">'),
     true,
@@ -1390,7 +1409,13 @@ function readMachineGunnerPngManifest() {
 }
 
 function readPngDimensions(repoRelativePath) {
-  const buffer = fs.readFileSync(path.join(repoRoot, repoRelativePath));
+  const buffer = Buffer.alloc(24);
+  const file = fs.openSync(path.join(repoRoot, repoRelativePath), "r");
+  try {
+    assert.equal(fs.readSync(file, buffer, 0, buffer.length, 0), buffer.length);
+  } finally {
+    fs.closeSync(file);
+  }
   assert.equal(buffer.toString("hex", 0, 8), "89504e470d0a1a0a");
   assert.equal(buffer.toString("ascii", 12, 16), "IHDR");
   return {

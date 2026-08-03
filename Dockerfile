@@ -58,7 +58,7 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream \
     && test -s ./client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png \
     && test -s ./client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png \
-    && test -s ./client/assets/rigs/command-car-packed-radio-preview/generated/command-car-packed-radio-stars-triangle-atlas-v3.png \
+    && test -s ./client/assets/rigs/command-car-packed-radio-preview/generated/command-car-packed-radio-stars-30-atlas-v4.png \
     && test -s ./client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png \
     && test -s ./client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png \
     && test -s ./client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png \
