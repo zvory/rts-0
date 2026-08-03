@@ -446,16 +446,7 @@ pub(super) fn expansion_site_candidate_better(
     let Some(current) = current else {
         return true;
     };
-    candidate
-        .oil_in_range
-        .cmp(&current.oil_in_range)
-        .then_with(|| candidate.steel_in_range.cmp(&current.steel_in_range))
-        .then_with(|| {
-            expansion_approach_exposure_order(
-                candidate.approach_exposure,
-                current.approach_exposure,
-            )
-        })
+    expansion_approach_exposure_order(candidate.approach_exposure, current.approach_exposure)
         .then_with(|| {
             current
                 .max_resource_distance2
@@ -517,4 +508,42 @@ pub(super) fn resource_is_near_player_start(
         let center = tile_center(player.start_tile, observation.map.tile_size);
         dist2(resource.x, resource.y, center.0, center.1) <= radius2
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn site_candidate(
+        tile: (u32, u32),
+        steel_in_range: usize,
+        oil_in_range: usize,
+        own_distance2: f32,
+        approach_exposure: f32,
+    ) -> ExpansionSiteCandidate {
+        ExpansionSiteCandidate {
+            tile,
+            steel_in_range,
+            oil_in_range,
+            max_resource_distance2: 100.0,
+            sum_resource_distance2: 500.0,
+            own_distance2,
+            approach_exposure: Some(approach_exposure),
+        }
+    }
+
+    #[test]
+    fn extra_resource_patches_do_not_beat_a_safer_closer_expansion() {
+        let safer_closer = site_candidate((20, 20), 8, 2, 400.0, 0.2);
+        let aggressive_richer = site_candidate((80, 80), 12, 3, 3_600.0, 0.8);
+
+        assert!(expansion_site_candidate_better(
+            safer_closer,
+            Some(aggressive_richer)
+        ));
+        assert!(!expansion_site_candidate_better(
+            aggressive_richer,
+            Some(safer_closer)
+        ));
+    }
 }
