@@ -42,6 +42,7 @@ import {
   pngAtlasRouteCoverage,
 } from "../client/src/renderer/rigs/png_runtime.js";
 import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/anti_tank_gun_png_atlas.js";
+import { COMMAND_CAR_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/command_car_png_atlas.js";
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/mortar_team_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
 import {
@@ -745,6 +746,22 @@ test("tank PNG atlas route splits native shadow, fuel cue, and muzzle flash meta
     unit.parts.size,
     "PNG rig batches account for exactly one redraw diagnostic per sprite",
   );
+});
+
+test("command car PNG atlas keeps its native shadow and Breakthrough aura", () => {
+  const definition = createLiveRigDefinitions().get(KIND.COMMAND_CAR);
+  const [shadowRoute, unitRoute] = liveRigRoutesFor(KIND.COMMAND_CAR);
+  const shadowCoverage = pngAtlasRouteCoverage(definition, COMMAND_CAR_PNG_RIG_ATLAS, shadowRoute);
+  const unitCoverage = pngAtlasRouteCoverage(definition, COMMAND_CAR_PNG_RIG_ATLAS, unitRoute);
+
+  assert.deepEqual(shadowCoverage.coveredParts, []);
+  assert.deepEqual(shadowCoverage.missingParts, ["part.shadow"]);
+  assert.equal(unitCoverage.coveredParts.includes("part.hull"), true);
+  assert.equal(unitCoverage.coveredParts.includes("part.cabin"), true);
+  assert.deepEqual(unitCoverage.missingParts, ["part.breakthroughAura"]);
+  assert.deepEqual(COMMAND_CAR_PNG_RIG_ATLAS.grid.cells, ["sprite.fixed", "sprite.paint"]);
+  assert.equal(COMMAND_CAR_PNG_RIG_ATLAS.sprites[0].tintSlot, "fixed");
+  assert.equal(COMMAND_CAR_PNG_RIG_ATLAS.sprites[1].tintSlot, "team-light");
 });
 
 test("PNG route coverage keeps mutable and Set part selections independent", () => {
