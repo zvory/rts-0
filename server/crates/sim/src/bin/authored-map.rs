@@ -99,6 +99,24 @@ fn read_bounded(reader: impl Read, source: &str) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|_| "map JSON must be UTF-8".to_string())
 }
 
+fn print_json(value: &impl Serialize) {
+    serde_json::to_writer(std::io::stdout(), value)
+        .expect("serializing CLI output should not fail");
+    println!();
+}
+
+fn print_usage() {
+    eprintln!(
+        "usage: authored-map <check|report> <map.json|->\n\
+         \n\
+         check   validate with the live authored-map materializer and print a JSON summary\n\
+         report  additionally report rifleman/scout-car routes between every base pair\n\
+         \n\
+         Use - as the path to read authored map JSON from stdin. Output is stable JSON; map\n\
+         validation failures also use JSON and exit with status 1."
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -120,22 +138,4 @@ mod tests {
             .expect_err("limit plus one should fail");
         assert!(error.contains("input limit"), "{error}");
     }
-}
-
-fn print_json(value: &impl Serialize) {
-    serde_json::to_writer(std::io::stdout(), value)
-        .expect("serializing CLI output should not fail");
-    println!();
-}
-
-fn print_usage() {
-    eprintln!(
-        "usage: authored-map <check|report> <map.json|->\n\
-         \n\
-         check   validate with the live authored-map materializer and print a JSON summary\n\
-         report  additionally report rifleman/scout-car routes between every base pair\n\
-         \n\
-         Use - as the path to read authored map JSON from stdin. Output is stable JSON; map\n\
-         validation failures also use JSON and exit with status 1."
-    );
 }
