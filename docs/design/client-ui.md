@@ -49,7 +49,7 @@ src/
   renderer/worker_rehydration.js # revisioned map/grid/decal worker-owned staging
   renderer/map_editor_worker_renderer.js # Map Editor Pixi display objects behind the same worker
   renderer/decals.js # GroundDecalLayer permanent decal texture, stamping, diagnostics, teardown
-  renderer/tank_tread_layer.js # authoritative trail chunks plus low-latency owned-tank preview
+  renderer/tank_tread_layer.js # approximate authoritative history plus precise visible-tank tracks
   renderer/decals/ # SVG source manifest, generated PNG atlas metadata, worker-safe loader, deterministic selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
@@ -478,17 +478,18 @@ late async asset loads through `Renderer.destroy()` / rematch cleanup.
 ```js
 export class TankTreadLayer {
   resetForMap(map)
-  stampOwnedTankPoses(entities, owner)
+  stampVisibleTankPoses(entities)
   stampAuthoritativeTrails(trails)
   diagnostics()
   destroy()
 }
 ```
-`TankTreadLayer` paints checkpointed authoritative trail chunks learned through the normal durable
-ground-mark discovery cursor. It also derives a low-latency preview from owned tank
-`x`/`y`/`facing` poses already present in ordinary snapshots; that preview is cosmetic latency
-masking, not the historical authority. Reconnects, replay seeks, and later visits to previously
-fogged ground rebuild from server trail chunks. Pixels persist in lazily allocated
+`TankTreadLayer` paints approximate checkpointed trail history learned through the normal durable
+ground-mark discovery cursor. It derives precise live tracks for every tank currently present in
+the client's fog-filtered entity snapshots, using its `x`/`y`/`facing` poses; those client-retained
+pixels are presentation state rather than historical server authority. Reconnects, replay seeks,
+and later visits to previously fogged ground rebuild a coarser but directionally representative
+version from server trail chunks. Pixels persist in lazily allocated
 512-world-pixel tiles (256×256 texels); only touched tiles upload, and all tile
 canvases/textures/sprites are destroyed with the ground-decal layer. Preview contact poses are
 accumulated between bounded 10 Hz uploads; the swept-contact raster fills the complete intervening
@@ -2014,10 +2015,11 @@ terrain and resources):
 - Mortar impacts stamp a compact, air-burst-style starburst with a small dark center; artillery
   impacts stamp a larger starburst scaled to their authoritative impact radius. Both are neutral
   earth/charcoal marks, with no source owner or hidden-source recovery.
-- Moving or pivoting tanks leave paired tread marks from server-authoritative, checkpointed sparse
-  hull-pose chunks. Chunks are discovered through physical fog like other durable ground marks, so
-  a player later visiting unseen ground learns the historical tracks without learning them through
-  fog. Owned visible poses provide only an immediate local preview. The contact model advances
+- Moving or pivoting tanks leave paired tread marks. Every currently visible tank paints precise
+  client-local marks from ordinary fog-filtered entity poses, while the server retains a coarsely
+  quantized and hard-capped historical approximation for refreshes and later discovery. Historical
+  chunks are discovered through physical fog like other durable ground marks, so a player later
+  visiting unseen ground learns the tracks without learning them through fog. The contact model advances
   independent belt phases, stamps the full long contact patch, and paints additional shear during
   pivots. Separate 512-world-pixel tread tiles avoid repeatedly uploading the whole-map
   death/impact canvas during continuous movement.

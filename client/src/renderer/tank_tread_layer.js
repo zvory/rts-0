@@ -9,9 +9,9 @@ const MIN_CONTACT_MOTION = 3;
 const UPLOAD_INTERVAL_MS = 100;
 
 /**
- * Renders checkpointed authoritative tread chunks plus an immediate owned-tank preview derived
- * from ordinary entity snapshots. The preview only masks finalization latency; server chunks are
- * the durable source used after reconnects, replay seeks, and later fog discovery.
+ * Renders approximate checkpointed tread history plus precise live marks for every tank currently
+ * present in this client's fog-filtered entity view. Server chunks restore approximate history
+ * after reconnects, replay seeks, and later fog discovery.
  */
 export class TankTreadLayer {
   constructor({
@@ -43,18 +43,16 @@ export class TankTreadLayer {
     return true;
   }
 
-  stampOwnedTankPoses(entities, ownership) {
+  stampVisibleTankPoses(entities) {
     if (!Array.isArray(entities) ||
         this.worldWidth <= 0 || this.worldHeight <= 0) return 0;
-    const isOwned = ownerPredicate(ownership);
-    if (!isOwned) return 0;
     const now = globalThis.performance?.now?.() ?? Date.now();
     if (now < this.nextUploadAt) return 0;
     const seen = new Set();
     const dirty = new Set();
     let stamped = 0;
     for (const entity of entities) {
-      if (entity?.kind !== KIND.TANK || !isOwned(entity.owner) || entity.hp <= 0 ||
+      if (entity?.kind !== KIND.TANK || entity.hp <= 0 ||
           !Number.isSafeInteger(entity.id) || !finitePose(entity)) continue;
       seen.add(entity.id);
       const previous = this.poses.get(entity.id);
@@ -212,20 +210,6 @@ function unpackAuthoritativePoses(records) {
 
 function finitePose(entity) {
   return Number.isFinite(entity.x) && Number.isFinite(entity.y) && Number.isFinite(entity.facing);
-}
-
-function ownerPredicate(ownership) {
-  if (Number.isInteger(ownership) && ownership > 0) {
-    return (owner) => Number(owner) === ownership;
-  }
-  if (ownership && (typeof ownership.isFeedbackOwner === "function" ||
-      typeof ownership.isOwnOwner === "function" ||
-      typeof ownership.canControlOwner === "function")) {
-    return (owner) => (Number.isInteger(ownership.playerId) &&
-      Number(owner) === ownership.playerId) || !!ownership.isFeedbackOwner?.(owner) ||
-      !!ownership.isOwnOwner?.(owner) || !!ownership.canControlOwner?.(owner);
-  }
-  return null;
 }
 
 function treadPose(x, y, facing, previous = null) {

@@ -586,7 +586,7 @@ export class Renderer {
         "groundDecals",
         () => {
           const count = this._drawGroundDecals(Array.isArray(reconciledGroundDecals) ? reconciledGroundDecals : state);
-          this._groundDecals?.stampLiveTankTreads?.(entities, feedbackView);
+          this._groundDecals?.stampLiveTankTreads?.(entities);
           stagedGroundDecals = Array.isArray(reconciledGroundDecals)
             && reconciledGroundDecals.length > 0
             && count === reconciledGroundDecals.length;

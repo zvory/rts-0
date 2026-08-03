@@ -9,20 +9,22 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::protocol::TankTrailView;
 
-const QUARTER_PIXELS: f32 = 4.0;
-const HEADING_SCALE: f32 = i16::MAX as f32 / std::f32::consts::PI;
-const SAMPLE_TRAVEL_PX: f32 = 24.0;
-const SAMPLE_TURN_RAD: f32 = 0.1;
+const POSITION_QUANTUM_PX: f32 = 4.0;
+const HEADING_SCALE: f32 = i8::MAX as f32 / std::f32::consts::PI;
+const HEADING_WIRE_SCALE: f32 = i16::MAX as f32 / std::f32::consts::PI;
+const SAMPLE_TRAVEL_PX: f32 = 64.0;
+const SAMPLE_TURN_RAD: f32 = 0.25;
 const TRACK_HALF_LENGTH_PX: f32 = 25.0;
 const TRACK_HALF_WIDTH_PX: f32 = 16.0;
 const TURN_CONTACT_RADIUS_PX: f32 = 29.0;
 const MAX_ACTIVE_POSES: usize = 8;
-const MAX_CENTER_SPAN_PX: f32 = 192.0;
+const MAX_CENTER_SPAN_PX: f32 = 512.0;
+const MAX_FINALIZED_TRAILS: usize = 4_096;
 const STOP_SETTLE_TICKS: u32 = 2;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
-struct TankTrailPose((u16, u16, i16));
+struct TankTrailPose((u16, u16, i8));
 
 impl TankTrailPose {
     fn from_world(x: f32, y: f32, facing: f32, map: &Map) -> Option<Self> {
@@ -33,31 +35,31 @@ impl TankTrailPose {
         {
             return None;
         }
-        let x_quarter_px = (x * QUARTER_PIXELS).round();
-        let y_quarter_px = (y * QUARTER_PIXELS).round();
-        if x_quarter_px < 0.0
-            || x_quarter_px > u16::MAX as f32
-            || y_quarter_px < 0.0
-            || y_quarter_px > u16::MAX as f32
+        let x_quantized = (x / POSITION_QUANTUM_PX).round();
+        let y_quantized = (y / POSITION_QUANTUM_PX).round();
+        if x_quantized < 0.0
+            || x_quantized > u16::MAX as f32
+            || y_quantized < 0.0
+            || y_quantized > u16::MAX as f32
         {
             return None;
         }
         let heading = normalize_angle(facing);
         Some(Self((
-            x_quarter_px as u16,
-            y_quarter_px as u16,
+            x_quantized as u16,
+            y_quantized as u16,
             (heading * HEADING_SCALE)
                 .round()
-                .clamp(i16::MIN as f32, i16::MAX as f32) as i16,
+                .clamp(i8::MIN as f32, i8::MAX as f32) as i8,
         )))
     }
 
     fn x(self) -> f32 {
-        self.0 .0 as f32 / QUARTER_PIXELS
+        self.0 .0 as f32 * POSITION_QUANTUM_PX
     }
 
     fn y(self) -> f32 {
-        self.0 .1 as f32 / QUARTER_PIXELS
+        self.0 .1 as f32 * POSITION_QUANTUM_PX
     }
 
     fn heading(self) -> f32 {
@@ -66,9 +68,9 @@ impl TankTrailPose {
 
     fn wire(self) -> [i32; 3] {
         [
-            i32::from(self.0 .0),
-            i32::from(self.0 .1),
-            i32::from(self.0 .2),
+            i32::from(self.0 .0) * 16,
+            i32::from(self.0 .1) * 16,
+            (self.heading() * HEADING_WIRE_SCALE).round() as i32,
         ]
     }
 }
@@ -108,10 +110,10 @@ impl TrailBounds {
             }
         }
         Some(Self {
-            min_x_quarter_px: (min_x * QUARTER_PIXELS).floor() as i32,
-            min_y_quarter_px: (min_y * QUARTER_PIXELS).floor() as i32,
-            max_x_quarter_px: (max_x * QUARTER_PIXELS).ceil() as i32,
-            max_y_quarter_px: (max_y * QUARTER_PIXELS).ceil() as i32,
+            min_x_quarter_px: (min_x * 4.0).floor() as i32,
+            min_y_quarter_px: (min_y * 4.0).floor() as i32,
+            max_x_quarter_px: (max_x * 4.0).ceil() as i32,
+            max_y_quarter_px: (max_y * 4.0).ceil() as i32,
         })
     }
 
@@ -328,6 +330,10 @@ impl TankTrailStore {
         map: &Map,
         tick: u32,
     ) -> Vec<PendingTankTrail> {
+        if self.finalized.len() >= MAX_FINALIZED_TRAILS {
+            self.active_by_tank.clear();
+            return Vec::new();
+        }
         let observations = entities
             .iter()
             .filter(|entity| entity.kind == EntityKind::Tank && entity.hp > 0)
@@ -416,7 +422,7 @@ impl TankTrailStore {
         created_revision: u32,
         map: &Map,
     ) -> bool {
-        if id == 0 || id != self.next_id {
+        if id == 0 || id != self.next_id || self.finalized.len() >= MAX_FINALIZED_TRAILS {
             return false;
         }
         let Some(next_id) = self.next_id.checked_add(1) else {
@@ -437,6 +443,9 @@ impl TankTrailStore {
     }
 
     pub(super) fn next_id(&self) -> Option<u32> {
+        if self.finalized.len() >= MAX_FINALIZED_TRAILS {
+            return None;
+        }
         self.next_id.checked_add(1).map(|_| self.next_id)
     }
 
@@ -508,7 +517,7 @@ impl TankTrailStore {
         player_ids: &BTreeSet<u32>,
         tick: u32,
     ) -> bool {
-        if self.next_id == 0 || self.finalized.len() >= u32::MAX as usize {
+        if self.next_id == 0 || self.finalized.len() > MAX_FINALIZED_TRAILS {
             return false;
         }
         for (index, trail) in self.finalized.iter().enumerate() {
@@ -555,11 +564,11 @@ fn pose_valid(pose: TankTrailPose, map: &Map) -> bool {
 }
 
 fn encode_poses(poses: &[TankTrailPose]) -> String {
-    let mut bytes = Vec::with_capacity(poses.len() * 6);
+    let mut bytes = Vec::with_capacity(poses.len() * 5);
     for pose in poses {
         bytes.extend_from_slice(&pose.0 .0.to_le_bytes());
         bytes.extend_from_slice(&pose.0 .1.to_le_bytes());
-        bytes.extend_from_slice(&pose.0 .2.to_le_bytes());
+        bytes.push(pose.0 .2 as u8);
     }
     STANDARD_NO_PAD.encode(bytes)
 }
@@ -568,16 +577,16 @@ fn decode_poses<E: serde::de::Error>(encoded: &str) -> Result<Vec<TankTrailPose>
     let bytes = STANDARD_NO_PAD
         .decode(encoded)
         .map_err(|_| E::custom("invalid tank trail pose encoding"))?;
-    if !bytes.len().is_multiple_of(6) {
+    if !bytes.len().is_multiple_of(5) {
         return Err(E::custom("invalid tank trail pose byte length"));
     }
     Ok(bytes
-        .chunks_exact(6)
+        .chunks_exact(5)
         .map(|bytes| {
             TankTrailPose((
                 u16::from_le_bytes([bytes[0], bytes[1]]),
                 u16::from_le_bytes([bytes[2], bytes[3]]),
-                i16::from_le_bytes([bytes[4], bytes[5]]),
+                bytes[4] as i8,
             ))
         })
         .collect())
@@ -644,19 +653,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pose_is_six_bytes_and_serializes_as_one_compact_tuple() {
+    fn pose_is_six_bytes_in_memory_and_five_bytes_in_checkpoints() {
         let pose = TankTrailPose((400, 404, -12));
         assert_eq!(std::mem::size_of::<TankTrailPose>(), 6);
         assert_eq!(serde_json::to_string(&pose).unwrap(), "[400,404,-12]");
+        assert_eq!(
+            STANDARD_NO_PAD.decode(encode_poses(&[pose])).unwrap().len(),
+            5
+        );
     }
 
     #[test]
     fn sampling_is_sparse_but_preserves_pivots() {
-        let origin = TankTrailPose((400, 400, 0));
-        let short_travel = TankTrailPose((495, 400, 0));
-        let full_travel = TankTrailPose((496, 400, 0));
-        let small_turn = TankTrailPose((400, 400, (0.09 * HEADING_SCALE) as i16));
-        let sampled_turn = TankTrailPose((400, 400, (0.11 * HEADING_SCALE) as i16));
+        let origin = TankTrailPose((100, 100, 0));
+        let short_travel = TankTrailPose((115, 100, 0));
+        let full_travel = TankTrailPose((116, 100, 0));
+        let small_turn = TankTrailPose((100, 100, (0.20 * HEADING_SCALE) as i8));
+        let sampled_turn = TankTrailPose((100, 100, (0.30 * HEADING_SCALE) as i8));
 
         assert!(!sample_needed(origin, short_travel));
         assert!(sample_needed(origin, full_travel));
@@ -666,11 +679,11 @@ mod tests {
 
     #[test]
     fn packed_heading_preserves_an_in_place_pivot() {
-        let a = TankTrailPose((400, 400, 0));
+        let a = TankTrailPose((100, 100, 0));
         let b = TankTrailPose((
-            400,
-            400,
-            (std::f32::consts::FRAC_PI_2 * HEADING_SCALE).round() as i16,
+            100,
+            100,
+            (std::f32::consts::FRAC_PI_2 * HEADING_SCALE).round() as i8,
         ));
         assert!(contact_motion(a, b) > 40.0);
         assert_eq!(a.wire()[..2], b.wire()[..2]);
@@ -679,10 +692,10 @@ mod tests {
 
     #[test]
     fn finalized_chunk_bounds_include_the_oriented_track_footprint() {
-        let poses = vec![TankTrailPose((400, 400, 0)), TankTrailPose((440, 400, 0))];
+        let poses = vec![TankTrailPose((25, 25, 0)), TankTrailPose((35, 25, 0))];
         let bounds = TrailBounds::from_poses(&poses).unwrap();
         assert!(bounds.min_x_quarter_px <= 300);
-        assert!(bounds.max_x_quarter_px >= 540);
+        assert!(bounds.max_x_quarter_px >= 660);
         assert!(bounds.min_y_quarter_px <= 336);
         assert!(bounds.max_y_quarter_px >= 464);
     }
@@ -690,7 +703,7 @@ mod tests {
     #[test]
     fn checkpoint_accepts_an_active_chunk_at_the_runtime_pose_limit() {
         let map = Map::generate(1, 7);
-        let pose = TankTrailPose((400, 400, 0));
+        let pose = TankTrailPose((25, 25, 0));
         let mut store = TankTrailStore::new();
         store.active_by_tank.insert(
             7,
@@ -707,7 +720,7 @@ mod tests {
     #[test]
     fn checkpoint_encoding_packs_poses_and_rebuilds_derived_bounds() {
         let map = Map::generate(1, 7);
-        let poses = vec![TankTrailPose((400, 400, 0)), TankTrailPose((496, 400, 0))];
+        let poses = vec![TankTrailPose((25, 25, 0)), TankTrailPose((41, 25, 0))];
         let pending = TankTrailStore::pending(poses).unwrap();
         let mut store = TankTrailStore::new();
         assert!(store.commit(pending, 1, 7, &map));
@@ -720,5 +733,31 @@ mod tests {
         let restored: TankTrailStore = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.view(1), store.view(1));
         assert_eq!(restored.finalized[0].bounds, store.finalized[0].bounds);
+    }
+
+    #[test]
+    fn finalized_history_has_a_hard_memory_ceiling() {
+        let map = Map::generate(1, 7);
+        let poses = vec![TankTrailPose((25, 25, 0)), TankTrailPose((41, 25, 0))];
+        let pending = TankTrailStore::pending(poses).unwrap();
+        let mut store = TankTrailStore::new();
+        assert!(store.commit(pending.clone(), 1, 1, &map));
+        let prototype = store.finalized[0].clone();
+        store.finalized = (1..=MAX_FINALIZED_TRAILS)
+            .map(|id| FinalizedTankTrail {
+                id: id as u32,
+                created_revision: id as u32,
+                ..prototype.clone()
+            })
+            .collect();
+        store.next_id = MAX_FINALIZED_TRAILS as u32 + 1;
+
+        assert!(store.next_id().is_none());
+        assert!(!store.commit(
+            pending,
+            MAX_FINALIZED_TRAILS as u32 + 1,
+            MAX_FINALIZED_TRAILS as u32 + 1,
+            &map,
+        ));
     }
 }

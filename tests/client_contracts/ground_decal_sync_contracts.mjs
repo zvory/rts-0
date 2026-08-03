@@ -267,11 +267,11 @@ assert(
     }]);
     assert(decalLayer.texture.sourceUpdateCount === 1 && decalLayer.texture.textureUpdateCount === 0,
       "ground decals upload dynamic canvas pixels through Pixi v8 TextureSource.update");
-    const tank = { id: 40, kind: KIND.TANK, owner: 1, hp: 100, x: 40, y: 80, facing: 0 };
-    assert(decalLayer.stampLiveTankTreads([tank], 1) === 0,
-      "the first owned tank pose initializes best-effort tread contact without painting");
-    assert(decalLayer.stampLiveTankTreads([{ ...tank, x: 48, facing: 0.12 }], 1) === 1,
-      "existing snapshot poses alone paint owned tank translation and pivot contact");
+    const tank = { id: 40, kind: KIND.TANK, owner: 2, hp: 100, x: 40, y: 80, facing: 0 };
+    assert(decalLayer.stampLiveTankTreads([tank]) === 0,
+      "the first visible enemy tank pose initializes tread contact without painting");
+    assert(decalLayer.stampLiveTankTreads([{ ...tank, x: 48, facing: 0.12 }]) === 1,
+      "ordinary fog-filtered poses paint precise live tracks for every visible tank");
     assert(decalLayer.texture.sourceUpdateCount === 1 &&
       decalLayer.diagnostics().tankTreads.tileCount === 1 &&
       layer.children[1].texture.sourceUpdateCount === 1,
