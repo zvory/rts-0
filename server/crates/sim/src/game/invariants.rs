@@ -441,8 +441,7 @@ impl Game {
                     if let Some(t) = self.state.entities.get(tid) {
                         // snapshot_for() projects through the living team's unioned fog, so the
                         // invariant must judge target visibility through that same projection.
-                        let visible = self.same_team_owner(pid, t.owner)
-                            || live_fog.is_visible_world(pid, t.pos_x, t.pos_y);
+                        let visible = self.snapshot_target_visible_to(pid, t, &live_fog);
                         assert!(
                             visible,
                             "invariant: tick {} snapshot for player {} exposes hidden target_id {}; target={}",
@@ -463,6 +462,14 @@ impl Game {
             visible_players.push(player);
         }
         fog.union_for(player, &visible_players)
+    }
+
+    fn snapshot_target_visible_to(&self, player: u32, target: &Entity, fog: &Fog) -> bool {
+        // Resource nodes are static public map information and are projected even outside current
+        // fog. A target_id that names one therefore reveals no private entity identity or position.
+        target.is_node()
+            || self.same_team_owner(player, target.owner)
+            || fog.is_visible_world(player, target.pos_x, target.pos_y)
     }
 }
 
@@ -814,6 +821,46 @@ mod tests {
         ];
         let game = Game::new(&players, 0x1234_5678);
         game.assert_invariants();
+    }
+
+    #[test]
+    fn snapshot_target_invariant_treats_static_resource_nodes_as_public() {
+        let players = [
+            PlayerInit {
+                id: 1,
+                team_id: 1,
+                faction_id: "kriegsia".to_string(),
+                name: "A".into(),
+                color: "#fff".into(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                team_id: 2,
+                faction_id: "kriegsia".to_string(),
+                name: "B".into(),
+                color: "#000".into(),
+                is_ai: true,
+            },
+        ];
+        let game = Game::new(&players, 0x1234_5678);
+        let fog = game.invariant_team_current_fog_for(1, &game.state.fog);
+        let hidden_node = game
+            .state
+            .entities
+            .iter()
+            .find(|entity| {
+                entity.is_node()
+                    && !fog.is_visible_world(1, entity.pos_x, entity.pos_y)
+            })
+            .expect("opponent-side resource node outside player-one current fog");
+
+        assert!(game.snapshot_target_visible_to(1, hidden_node, &fog));
+        assert!(game
+            .snapshot_for(1)
+            .entities
+            .iter()
+            .any(|entity| entity.id == hidden_node.id));
     }
 
     #[test]
