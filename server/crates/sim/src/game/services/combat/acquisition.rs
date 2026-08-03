@@ -145,12 +145,14 @@ pub(super) fn resolve_target_for_weapon(
         if let Some(e) = entities.get(self_id) {
             if let Some(target) = e.order().attack_target() {
                 if world_query::unit_explicit_attack_target_valid(
-                    map,
-                    entities,
-                    teams,
-                    fog,
-                    Some(smokes),
-                    owner,
+                    world_query::ExplicitAttackQuery {
+                        map,
+                        entities,
+                        teams,
+                        fog,
+                        smokes: Some(smokes),
+                        attacker_owner: owner,
+                    },
                     self_id,
                     target,
                 ) {

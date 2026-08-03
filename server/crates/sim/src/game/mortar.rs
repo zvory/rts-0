@@ -217,14 +217,16 @@ impl MortarShellStore {
             if shell.impact_tick <= tick {
                 on_impact(shell.x, shell.y);
                 resolve(
-                    entities,
-                    teams,
-                    fog,
-                    map,
-                    events,
-                    firing_reveals,
+                    MortarResolutionContext {
+                        entities,
+                        teams,
+                        fog,
+                        map,
+                        events,
+                        firing_reveals,
+                        tick,
+                    },
                     &shell,
-                    tick,
                 );
             } else {
                 pending.push(shell);
@@ -268,16 +270,26 @@ fn emit_launch(
     }
 }
 
-fn resolve(
-    entities: &mut EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    map: &Map,
-    events: &mut HashMap<u32, Vec<Event>>,
-    firing_reveals: &mut Vec<FiringRevealSource>,
-    shell: &MortarShell,
+struct MortarResolutionContext<'a> {
+    entities: &'a mut EntityStore,
+    teams: &'a TeamRelations,
+    fog: &'a Fog,
+    map: &'a Map,
+    events: &'a mut HashMap<u32, Vec<Event>>,
+    firing_reveals: &'a mut Vec<FiringRevealSource>,
     tick: u32,
-) {
+}
+
+fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
+    let MortarResolutionContext {
+        entities,
+        teams,
+        fog,
+        map,
+        events,
+        firing_reveals,
+        tick,
+    } = context;
     let outer_radius = config::MORTAR_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
     let inner_radius = config::MORTAR_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
     let outer2 = outer_radius * outer_radius;

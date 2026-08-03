@@ -212,16 +212,29 @@ pub(crate) fn is_explicit_attack_targetable(
         && candidate.hp > 0
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct ExplicitAttackQuery<'a> {
+    pub(crate) map: &'a Map,
+    pub(crate) entities: &'a EntityStore,
+    pub(crate) teams: &'a TeamRelations,
+    pub(crate) fog: &'a Fog,
+    pub(crate) smokes: Option<&'a SmokeCloudStore>,
+    pub(crate) attacker_owner: u32,
+}
+
 pub(crate) fn unit_explicit_attack_target_valid(
-    map: &Map,
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: Option<&SmokeCloudStore>,
-    attacker_owner: u32,
+    query: ExplicitAttackQuery<'_>,
     attacker_id: u32,
     target_id: u32,
 ) -> bool {
+    let ExplicitAttackQuery {
+        map,
+        entities,
+        teams,
+        fog,
+        smokes,
+        attacker_owner,
+    } = query;
     let Some(attacker) = entities.get(attacker_id) else {
         return false;
     };

@@ -8,8 +8,8 @@ use crate::protocol::Event;
 use super::events::{emit_launch, LaunchEvent};
 use super::{
     mirror_weapon_to_body, panzerfaust_state, panzerfaust_target_fireable,
-    panzerfaust_target_in_range, panzerfaust_target_valid, set_panzerfaust_state, Fog, LineOfSight,
-    Map, PanzerfaustFireContext, ShotBlockerIndex, SmokeCloudStore, TeamRelations,
+    panzerfaust_target_in_range, panzerfaust_target_valid, set_panzerfaust_state, world_query, Fog,
+    LineOfSight, Map, PanzerfaustFireContext, ShotBlockerIndex, SmokeCloudStore, TeamRelations,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -92,8 +92,18 @@ fn tick_windup(
         cancel_windup(entities, id);
         return;
     };
-    if !panzerfaust_target_valid(map, entities, teams, fog, smokes, owner, id, target)
-        || !panzerfaust_target_in_range(map, entities, id, target)
+    if !panzerfaust_target_valid(
+        world_query::ExplicitAttackQuery {
+            map,
+            entities,
+            teams,
+            fog,
+            smokes: Some(smokes),
+            attacker_owner: owner,
+        },
+        id,
+        target,
+    ) || !panzerfaust_target_in_range(map, entities, id, target)
         || !panzerfaust_target_fireable(
             &PanzerfaustFireContext::new(map, entities, blockers, teams, los, fog, smokes),
             id,

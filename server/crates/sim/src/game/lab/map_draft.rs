@@ -70,10 +70,13 @@ pub(super) fn resource_counts(
     Ok(counts)
 }
 
+type TileCoordinates = Vec<(u32, u32)>;
+type CanonicalOverlays = (TileCoordinates, TileCoordinates);
+
 pub(super) fn canonical_overlays(
     draft: &LabMapDraft,
     name: &str,
-) -> Result<(Vec<(u32, u32)>, Vec<(u32, u32)>), LabError> {
+) -> Result<CanonicalOverlays, LabError> {
     Ok((
         canonical_tiles(
             &draft.stealth_tiles,

@@ -208,12 +208,14 @@ fn direct_fire_legality_rejects_anti_tank_gun_shots_at_infantry() {
         }
         assert!(
             !crate::game::services::world_query::unit_explicit_attack_target_valid(
-                &map,
-                &entities,
-                &default_team_relations(),
-                &fog,
-                Some(&smokes),
-                1,
+                crate::game::services::world_query::ExplicitAttackQuery {
+                    map: &map,
+                    entities: &entities,
+                    teams: &default_team_relations(),
+                    fog: &fog,
+                    smokes: Some(&smokes),
+                    attacker_owner: 1,
+                },
                 attacker,
                 target,
             ),
@@ -326,12 +328,14 @@ fn direct_fire_legality_waits_for_sampled_smoke_melee_visibility() {
     ));
     assert!(
         !crate::game::services::world_query::unit_explicit_attack_target_valid(
-            &map,
-            &entities,
-            &teams,
-            &fog,
-            Some(&smokes),
-            1,
+            crate::game::services::world_query::ExplicitAttackQuery {
+                map: &map,
+                entities: &entities,
+                teams: &teams,
+                fog: &fog,
+                smokes: Some(&smokes),
+                attacker_owner: 1,
+            },
             attacker,
             target,
         ),
