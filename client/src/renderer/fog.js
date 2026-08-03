@@ -1,54 +1,10 @@
 import { gfxFillCurrentPath, gfxReset } from "./native_graphics.js";
 import {
   COLORS,
-  FOG_EXPLORED_ALPHA,
-  FOG_UNEXPLORED_ALPHA,
-  STATS,
-  PLAYER_PALETTE,
-  RESOURCE_AMOUNTS,
-  ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
-  ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
-  isProducerBuilding,
+  MAIN_MAP_FOG_EXPLORED_ALPHA,
+  MAIN_MAP_FOG_UNEXPLORED_ALPHA,
 } from "../config.js";
-import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
-import {
-  DEPLOYED_WEAPON_ANIM_MS,
-  SWEEP_EVICT_FRAMES,
-  WEAPON_RECOIL_PX,
-  ZERO_OFFSET,
-} from "./palette.js";
-import {
-  angleDelta,
-  clamp01,
-  dashedLine,
-  drawAntiTankGun,
-  drawFacingWedge,
-  drawInfantryBase,
-  drawInfantryMachineGun,
-  drawInfantryRifle,
-  drawRotatedRect,
-  drawScoutCar,
-  drawTankFuelCue,
-  drawTankHull,
-  drawTankTracks,
-  finiteNumber,
-  hexToInt,
-  isVehicleBodyKind,
-  muzzleFlashRadius,
-  normRect,
-  polar,
-  recoilVector,
-  rectEdgePointTowardCenter,
-  smoothstep01,
-  tankBodyVisual,
-  weaponRecoilOffset,
-} from "./shared.js";
-import {
-  drawImpassableEdge,
-  isImpassableAt,
-  terrainColor,
-  terrainOverlayColor,
-} from "./terrain_palette.js";
+import { isImpassableAt } from "./terrain_palette.js";
 
 export function _drawFog(fog) {
   const g = this._fogGfx;
@@ -95,10 +51,10 @@ export function _drawFog(fog) {
     if (runs.length === 0) continue;
     const color = level === 2 ? COLORS.fogUnexplored : COLORS.fogExplored;
     const alpha = level === 2
-      ? FOG_UNEXPLORED_ALPHA
+      ? MAIN_MAP_FOG_UNEXPLORED_ALPHA
       : level === 3
-        ? FOG_UNEXPLORED_ALPHA * 0.56
-        : FOG_EXPLORED_ALPHA;
+        ? MAIN_MAP_FOG_UNEXPLORED_ALPHA * 0.56
+        : MAIN_MAP_FOG_EXPLORED_ALPHA;
     for (const [x, y, width, height] of runs) g.rect(x, y, width, height);
     gfxFillCurrentPath(g, color, alpha);
   }

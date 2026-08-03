@@ -21,12 +21,13 @@ import {
 import {
   ABILITIES,
   COLORS,
-  FOG_EXPLORED_ALPHA,
-  FOG_UNEXPLORED_ALPHA,
+  MINIMAP_FOG_EXPLORED_ALPHA,
+  MINIMAP_FOG_UNEXPLORED_ALPHA,
   STATS,
   isProducerBuilding,
 } from "./config.js";
 import { minimapTerrainColor, minimapTerrainStyleSignature } from "./minimap_terrain.js";
+import { MinimapRoadLayer } from "./minimap_road_layer.js";
 import {
   artilleryFireRadiusTiles,
   artilleryMinFireRadiusTiles,
@@ -175,6 +176,11 @@ export class Minimap {
     this._terrainLayer = null;
     this._terrainLayerCtx = null;
     this._terrainLayerSignature = null;
+    this._roadMarkingLayer = new MinimapRoadLayer({
+      createCanvas: () => this._createStaticCanvas(),
+      onInvalidation: (prev, next) => this._recordMinimapInvalidation("road", prev, next),
+      onDiagnostic: (label) => this._recordMinimapDiagnostic(label),
+    });
     this._resourceLayer = null;
     this._resourceLayerCtx = null;
     this._resourceLayerSignature = null;
@@ -260,6 +266,7 @@ export class Minimap {
 
   _invalidateStaticLayers() {
     this._terrainLayerSignature = null;
+    this._roadMarkingLayer.invalidate();
     this._resourceLayerSignature = null;
     this._fogLayerSignature = null;
   }
@@ -311,6 +318,10 @@ export class Minimap {
     this._drawTerrainLayer();
     this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
     this._drawFog();
+    this._roadMarkingLayer.draw({
+      ctx: this.ctx, map: this._renderMap(), size: this.size,
+      scale: this._scale, offX: this._offX, offY: this._offY,
+      presentation: this._canvasPresentationSignature() });
     this._drawResourceLayer();
     this._drawPlayerOwnedEntityOutline(entities);
     this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
@@ -615,7 +626,7 @@ export class Minimap {
         const impassable = isImpassableTerrainCode(map.terrain[i]);
         const explored = useGrids ? exploredGrid[i] === 1 : fog.isExplored(tx, ty);
         const fillStyle = explored ? exploredFill : unexploredFill;
-        const alpha = (explored ? FOG_EXPLORED_ALPHA : FOG_UNEXPLORED_ALPHA)
+        const alpha = (explored ? MINIMAP_FOG_EXPLORED_ALPHA : MINIMAP_FOG_UNEXPLORED_ALPHA)
           * (impassable ? IMPASSABLE_FOG_SCALE : 1);
         if (runStart >= 0 && runFillStyle === fillStyle && runAlpha === alpha) {
           continue;
@@ -663,8 +674,8 @@ export class Minimap {
       style: [
         COLORS.fogExplored,
         COLORS.fogUnexplored,
-        FOG_EXPLORED_ALPHA,
-        FOG_UNEXPLORED_ALPHA,
+        MINIMAP_FOG_EXPLORED_ALPHA,
+        MINIMAP_FOG_UNEXPLORED_ALPHA,
         IMPASSABLE_FOG_SCALE,
       ].join(","),
     };
@@ -981,6 +992,7 @@ export class Minimap {
     this._terrainLayer = null;
     this._terrainLayerCtx = null;
     this._terrainLayerSignature = null;
+    this._roadMarkingLayer.destroy();
     this._resourceLayer = null;
     this._resourceLayerCtx = null;
     this._resourceLayerSignature = null;

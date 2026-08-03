@@ -124,5 +124,6 @@ export function _sweep() {
       }
     }
   }
+  for (const id of evict) this._destroyForestUnitOutlineGroup?.(id);
   for (const id of evict) this._unseen.delete(id);
 }

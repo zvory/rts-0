@@ -92,6 +92,8 @@ import { _drawResource } from "./resources.js";
 import { DoodadLayer } from "./doodad_layer.js";
 import { createUnitOutlineFilter } from "./unit_outline_filter.js";
 import {
+  _attachForestUnitOutline,
+  _destroyForestUnitOutlineGroup,
   _drawStealthUnitOutlines,
   _drawTreeOccludedUnitOutlines,
 } from "./tree_unit_occlusion.js";
@@ -180,9 +182,9 @@ export class Renderer {
       this.world.addChild(c);
     }
     this.layers.units.sortableChildren = true;
-    this._forestUnitOutlineFilter = createUnitOutlineFilter(PIXI);
+    this.layers.forestUnitOutlines.sortableChildren = true;
+    this._forestUnitOutlineGroups = new Map();
     this._stealthUnitOutlineFilter = createUnitOutlineFilter(PIXI);
-    this.layers.forestUnitOutlines.filters = [this._forestUnitOutlineFilter];
     this.layers.stealthUnitOutlines.filters = [this._stealthUnitOutlineFilter];
     this._assetReadiness = new Map();
     this._doodads = new DoodadLayer({
@@ -1114,7 +1116,7 @@ export class Renderer {
 
   /**
    * Draw the fog overlay from the Fog grids: unexplored = heavily dimmed, explored =
-   * dimmed at FOG_EXPLORED_ALPHA, visible = clear. Rendered in world space over the
+   * dimmed at MAIN_MAP_FOG_EXPLORED_ALPHA, visible = clear. Rendered in world space over the
    * whole map; merged into horizontal runs per row to keep the rect count low.
    * @private
    */
@@ -1205,11 +1207,11 @@ export class Renderer {
         pool.clear();
       }
     }
-    this.layers.forestUnitOutlines.filters = null;
+    for (const id of [...this._forestUnitOutlineGroups.keys()]) {
+      this._destroyForestUnitOutlineGroup(id);
+    }
     this.layers.stealthUnitOutlines.filters = null;
-    this._forestUnitOutlineFilter?.destroy?.();
     this._stealthUnitOutlineFilter?.destroy?.();
-    this._forestUnitOutlineFilter = null;
     this._stealthUnitOutlineFilter = null;
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
@@ -1311,6 +1313,8 @@ Object.assign(Renderer.prototype, {
   _tankMotionVisual,
   _frameStripMovementVisual,
   _drawUnit,
+  _attachForestUnitOutline,
+  _destroyForestUnitOutlineGroup,
   _drawStealthUnitOutlines,
   _drawTreeOccludedUnitOutlines,
   _rigRenderContextFor,

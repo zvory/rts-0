@@ -16,6 +16,8 @@ export const COLORS = Object.freeze({
   roadShoulder: 0x5a4934,
   roadShoulderDark: 0x40352a,
   roadLine: 0xd0aa32,
+  minimapRoad: 0x000000,
+  minimapRoadLine: 0xf1cb43,
   grid: 0x000000,
   steel: 0x9a9a9a,
   oil: 0x111111,
@@ -52,8 +54,14 @@ export const TERRAIN_VARIANT_PALETTES = Object.freeze({
   [TERRAIN.FROSTED_GROUND]: Object.freeze({ base: 0x646b5e, alt: 0x70766a, details: [0x92978d, 0x4f5749], pattern: "frost" }),
 });
 
-export const FOG_EXPLORED_ALPHA = 0.48;
-export const FOG_UNEXPLORED_ALPHA = 0.8;
+// Main-map fog stays lighter than the compact minimap wash so roads, base clearings,
+// and terrain remain legible while the viewport still distinguishes explored and unseen ground.
+export const MAIN_MAP_FOG_EXPLORED_ALPHA = 0.30;
+export const MAIN_MAP_FOG_UNEXPLORED_ALPHA = 0.60;
+
+// Minimap tuning remains darker so the compact map preserves its at-a-glance fog boundary.
+export const MINIMAP_FOG_EXPLORED_ALPHA = 0.48;
+export const MINIMAP_FOG_UNEXPLORED_ALPHA = 0.8;
 
 export const CAMERA = Object.freeze({
   minZoom: 0.4,

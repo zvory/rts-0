@@ -71,6 +71,7 @@ src/
   chat_overlay.js # App-owned lobby/game direct-text chat, channel hotkeys, fading presentation
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
+  minimap_road_layer.js # Cached post-fog dotted road-marking overlay
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
   lobby_browser_view.js # Pre-join lobby browser rows, state rendering, and age/status formatting
   lobby_view.js   # Lobby roster renderer: team columns, seat rows, spectators
@@ -2096,6 +2097,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 [client-rendering.md](client-rendering.md) and its active
 [rendering parity ledger](rendering-parity.md).
 
+- Minimap roads use a pure-black surface and draw the authored marked-road tiles as small yellow centerline dots above fog, keeping the route network legible in unexplored territory. The dotted overlay is a cached static layer; bare road tiles widen the black surface without adding markings.
 - Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through City Centre), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass. Positional under-attack alerts use a 2.2-second red pulse with a crisp white inner rim. The nearest local owned unit or building at the alert position strobes its icon interior between white and its team color in 300-millisecond phases for the same duration; the resolved entity keeps flashing if it moves.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
@@ -2166,11 +2168,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values
   draw first, so a southern tree or unit naturally covers a northern one. When any received ordinary
   unit intersects a tree canopy in front of it, the renderer redraws that unit's current production
-  rig/frame into an alpha-only filter that emits its white outer edge above the canopy. Friendly,
-  allied, and visible enemy units use the same treatment. Authoritative `visionOnly` stealth reveals
+  rig/frame into an alpha-only filter that emits a white outer edge and an 85%-opacity flat
+  owner/team-color silhouette above the canopy. Friendly, allied, and visible enemy units use their
+  respective owner colors. Authoritative `visionOnly` stealth reveals
   omit their rig from the normal full-color layer and route the same current rig/frame through a
-  dedicated filtered outline layer above fog and canopies; damaged reveal HP stays above fog as
-  well. These readability passes use only already-admitted entities and do not reveal hidden enemies.
+  dedicated white-edge-only filtered outline layer above fog and canopies; damaged reveal HP stays
+  above fog as well. These readability passes use only already-admitted entities and do not reveal
+  hidden enemies.
   When the in-match Game settings
   tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
   Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw

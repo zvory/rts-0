@@ -8,7 +8,10 @@ import {
   _drawStealthUnitOutlines,
   _drawTreeOccludedUnitOutlines,
 } from "../../client/src/renderer/tree_unit_occlusion.js";
-import { createUnitOutlineFilter } from "../../client/src/renderer/unit_outline_filter.js";
+import {
+  createUnitOutlineFilter,
+  FOREST_UNIT_FILL_ALPHA,
+} from "../../client/src/renderer/unit_outline_filter.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
 const restorePixi = installFakePixi();
@@ -43,6 +46,7 @@ try {
     unit(5, 3, KIND.TANK, 101, 71, 36),
   ];
   const outlineCalls = [];
+  const teamFillCalls = [];
   const state = { playerId: 1 };
   const colorByOwner = new Map([[1, 0x0072b2], [2, 0xd55e00], [3, 0xcc79a7]]);
   const renderContexts = new Map(entities.map((entity) => [entity.id, {
@@ -55,6 +59,9 @@ try {
     _doodads: doodads,
     _drawUnit(entity, colors, renderState, pools) {
       outlineCalls.push({ entity, colors, renderState, pools });
+    },
+    _attachForestUnitOutline(entity, colors) {
+      teamFillCalls.push([entity.id, colors.get(entity.owner)]);
     },
     _recordRenderDiagnostic() {},
     _recordRenderError(_label, error) { throw error; },
@@ -69,6 +76,8 @@ try {
   );
   assert.deepEqual(outlineCalls.map((call) => call.entity.id), [1, 2, 5],
     "in-front units remain unchanged and reveal-only units use their dedicated pass");
+  assert.deepEqual(teamFillCalls, [[1, 0x0072b2], [2, 0xd55e00], [5, 0xcc79a7]],
+    "forest silhouettes receive each visible unit's actual owner color");
   for (const call of outlineCalls) {
     assert.equal(call.colors, colorByOwner);
     assert.equal(call.renderState, state);
@@ -86,6 +95,7 @@ try {
     }
   }
   outlineCalls.length = 0;
+  teamFillCalls.length = 0;
   assert.equal(
     _drawTreeOccludedUnitOutlines.call(
       outlineRenderer,
@@ -114,8 +124,13 @@ try {
     "stealth reveals reuse the real animated rifleman frame rather than proxy geometry");
   assert.equal("renderContext" in outlineCalls[0].pools, false,
     "a reveal-only unit builds its normal production render context in the outline pass");
+  assert.deepEqual(teamFillCalls, [[1, 0x0072b2], [2, 0xd55e00]],
+    "stealth reveals do not add a team fill after the preceding forest pass");
 
-  const filter = createUnitOutlineFilter(PIXI);
+  const filter = createUnitOutlineFilter(PIXI, {
+    fillColor: 0x0072b2,
+    fillAlpha: FOREST_UNIT_FILL_ALPHA,
+  });
   const fragment = filter.options.glProgram.options.fragment;
   assert.match(fragment, /texture\(uTexture, vTextureCoord\)\.a/,
     "the filter reads the rendered unit's real alpha");
@@ -123,6 +138,8 @@ try {
     "the filter emits only the silhouette's outer edge");
   assert.doesNotMatch(fragment, /texture\([^;]+\)\.rgb/,
     "the filter never copies faction-colored pixels from the duplicated rig");
+  assert.match(fragment, /uFillColor \* fillAlpha/,
+    "the fill is a flat owner color masked by the production rig alpha");
   assert.match(fragment, /out vec4 finalColor;/,
     "the WebGL2 shader declares an explicit fragment output");
   assert.doesNotMatch(fragment, /\b(?:texture2D|gl_FragColor)\b/,
@@ -130,7 +147,17 @@ try {
   assert.equal(filter.padding, 3, "the filter surface leaves room for the expanded silhouette");
   assert.equal(filter.resources.outlineUniforms.uniforms.uThickness.value, 1.65,
     "the outline uses the configured compact sampling radius through a Pixi uniform group");
+  assert.equal(filter.resources.outlineUniforms.uniforms.uFillAlpha.value, 0.85,
+    "forest silhouettes use the selected 85% fill opacity");
+  const fillChannels = Array.from(filter.resources.outlineUniforms.uniforms.uFillColor.value);
+  assert(fillChannels.every((value, index) => (
+    Math.abs(value - [0, 114 / 255, 178 / 255][index]) < 1e-6
+  )), "the shader receives normalized owner-color channels");
   filter.destroy();
+  const whiteOnlyFilter = createUnitOutlineFilter(PIXI);
+  assert.equal(whiteOnlyFilter.resources.outlineUniforms.uniforms.uFillAlpha.value, 0,
+    "the default filter remains white-edge-only for authoritative stealth reveals");
+  whiteOnlyFilter.destroy();
 
   const hpCalls = [];
   _drawAboveFogHp.call({
@@ -157,8 +184,8 @@ try {
     "the production renderer keeps forest outlines above canopies in a dedicated layer");
   assert(renderer.layers.stealthUnitOutlines,
     "the production renderer keeps reveal-only outlines above fog in a dedicated layer");
-  assert.equal(renderer.layers.forestUnitOutlines.filters.length, 1,
-    "forest outlines filter the actual production rig alpha");
+  assert.equal(renderer.layers.forestUnitOutlines.filters ?? null, null,
+    "forest outlines avoid a shared filter because owner colors vary per unit");
   assert.equal(renderer.layers.stealthUnitOutlines.filters.length, 1,
     "stealth reveals filter the actual production rig alpha above fog");
   assert(renderer._liveRigPools.forestUnitOutlineRigs instanceof Map);
@@ -166,10 +193,45 @@ try {
   renderer._drawMissingTexture({ id: 808, x: 10, y: 83 }, "units");
   assert.equal(renderer._pools.units.get(808).zIndex, 83,
     "Graphics fallback unit bodies use the same world-Y depth key");
-  const forestFilter = renderer._forestUnitOutlineFilter;
+  const forestBody = new PIXI.Container();
+  const forestOverlay = new PIXI.Container();
+  renderer.layers.forestUnitOutlines.addChild(forestBody);
+  renderer.layers.forestUnitOutlines.addChild(forestOverlay);
+  renderer._liveRigPools.forestUnitOutlineRigs.set(501, {
+    container: forestBody,
+    destroy() { this.container.parent?.removeChild?.(this.container); },
+  });
+  renderer._liveRigPools.forestUnitOutlineRigOverlays.set(501, {
+    container: forestOverlay,
+    destroy() { this.container.parent?.removeChild?.(this.container); },
+  });
+  const forestEntry = renderer._attachForestUnitOutline(
+    unit(501, 2, KIND.RIFLEMAN, 100, 74),
+    colorByOwner,
+  );
+  assert.deepEqual(forestEntry.group.children, [forestBody, forestOverlay],
+    "body and overlay are filtered together so internal rig seams do not gain white edges");
+  assert.equal(forestEntry.group.zIndex, 74,
+    "per-unit outline groups retain world-Y ordering");
+  assert.equal(
+    forestEntry.filter.resources.outlineUniforms.uniforms.uFillAlpha.value,
+    FOREST_UNIT_FILL_ALPHA,
+    "the production forest group uses the selected fill opacity",
+  );
+  assert.equal(
+    renderer._drawTreeOccludedUnitOutlines([], {}, colorByOwner),
+    0,
+    "a frame without occluded units draws no forest silhouettes",
+  );
+  assert.equal(forestEntry.group.visible, false,
+    "retained per-unit filter groups are inactive when their unit is no longer occluded");
+  renderer._attachForestUnitOutline(unit(501, 2, KIND.RIFLEMAN, 100, 74), colorByOwner);
+  assert.equal(forestEntry.group.visible, true,
+    "drawing a forest silhouette reactivates its retained filter group");
+  const forestFilter = forestEntry.filter;
   const stealthFilter = renderer._stealthUnitOutlineFilter;
   renderer.destroy();
-  assert.equal(forestFilter.destroyed, true, "forest outline filter is released on teardown");
+  assert.equal(forestFilter.destroyed, true, "per-unit forest outline filters are released on teardown");
   assert.equal(stealthFilter.destroyed, true, "stealth outline filter is released on teardown");
 } finally {
   restorePixi();

@@ -1,8 +1,6 @@
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxStrokeLine, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
-  FOG_EXPLORED_ALPHA,
-  FOG_UNEXPLORED_ALPHA,
   STATS,
   RESOURCE_AMOUNTS,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,

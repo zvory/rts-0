@@ -1,8 +1,6 @@
 import { gfxNoFill, gfxEllipse, gfxPoly, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
-  FOG_EXPLORED_ALPHA,
-  FOG_UNEXPLORED_ALPHA,
   STATS,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
