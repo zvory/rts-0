@@ -13,6 +13,7 @@ import {
 } from "../scripts/map-author.mjs";
 import { expandSymmetricPoints } from "../client/src/map_authoring/symmetry.js";
 import { isMapAuthoringRecipe } from "../client/src/map_authoring/recipe.js";
+import { MapEditorPanel } from "../client/src/map_editor_panel.js";
 import { MapEditorSession, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
 import { TERRAIN } from "../client/src/protocol.js";
 
@@ -272,6 +273,79 @@ assert.throws(
   /more than 4 start locations/,
   "the shared engine rejects a fifth start before either adapter can silently truncate it",
 );
+const pathologicalPathRecipe = {
+  name: "Compact pathological path",
+  width: 256,
+  height: 256,
+  operations: [{
+    type: "road",
+    points: Array.from({ length: 10_000 }, (_, index) => index % 2 ? [255, 255] : [0, 0]),
+    width: 1,
+  }],
+};
+const complexityStartedAt = performance.now();
+assert.throws(
+  () => buildMapFromRecipe(pathologicalPathRecipe),
+  /points must contain at most 2048 entries/,
+  "a compact pathological path is rejected before geometry materialization",
+);
+assert(performance.now() - complexityStartedAt < 1_000,
+  "path complexity rejection stays fast enough for the synchronous browser adapter");
+const uiComplexityStatuses = [];
+const uiComplexityPanel = {
+  recipeText: JSON.stringify(pathologicalPathRecipe),
+  loadMapData(value) { buildMapFromRecipe(value); },
+  setStatus(message, error = false) { uiComplexityStatuses.push({ message, error }); },
+};
+assert.equal(MapEditorPanel.prototype.applyRecipeText.call(uiComplexityPanel), false);
+assert.deepEqual(uiComplexityStatuses, [{
+  message: "Could not apply recipe: Recipe operation 0 points must contain at most 2048 entries",
+  error: true,
+}], "the browser adapter reports the same canonical complexity error as Node");
+assert.throws(
+  () => buildMapFromRecipe({
+    width: 16,
+    height: 16,
+    operations: Array.from({ length: 1_025 }, () => ({ type: "fill", material: "grass" })),
+  }),
+  /operations must contain at most 1024 entries/,
+  "operation count is bounded before the first operation runs",
+);
+assert.throws(
+  () => buildMapFromRecipe({
+    width: 16,
+    height: 16,
+    operations: [{ type: "paintTiles", character: ".", tiles: Array(65_537).fill({ x: 0, y: 0 }) }],
+  }),
+  /tiles must contain at most 65536 entries/,
+  "one explicit tile list cannot exceed a complete maximum-size map",
+);
+assert.throws(
+  () => buildMapFromRecipe({
+    width: 16,
+    height: 16,
+    operations: Array.from({ length: 5 }, () => ({
+      type: "overlayTiles",
+      tiles: Array(65_536).fill({ x: 0, y: 0 }),
+      edit: { stealth: true },
+    })),
+  }),
+  /explicit tiles must total at most 262144 entries/,
+  "explicit tile lists also share one recipe-wide bound",
+);
+assert.throws(
+  () => buildMapFromRecipe({
+    width: 256,
+    height: 256,
+    operations: [{
+      type: "road",
+      points: Array.from({ length: 125 }, (_, index) => [index % 256, index % 256]),
+      width: 1,
+    }],
+  }),
+  /estimated work exceeds the 8388608-unit limit/,
+  "bounded point arrays still cannot multiply into excessive tile/segment work",
+);
 
 {
   const calls = [];
@@ -308,6 +382,15 @@ try {
   assert.equal(build.status, 0, build.stderr);
   assert(build.stdout.includes("map was not rejected"), "build reports advisory warnings without failing");
   assert(fs.existsSync(mapPath));
+
+  const pathologicalPath = path.join(tempRoot, "pathological-recipe.json");
+  fs.writeFileSync(pathologicalPath, JSON.stringify(pathologicalPathRecipe));
+  const pathologicalBuild = spawnSync(process.execPath, [
+    "scripts/map-author.mjs", "build", pathologicalPath, "--output", mapPath,
+  ], { cwd: repoRoot, encoding: "utf8", timeout: 2_000 });
+  assert.equal(pathologicalBuild.status, 1);
+  assert.match(pathologicalBuild.stderr, /points must contain at most 2048 entries/,
+    "the Node CLI exposes the shared complexity error instead of entering geometry work");
 
   const validate = spawnSync(process.execPath, ["scripts/map-author.mjs", "validate", mapPath, "--symmetry", "halfTurn"], {
     cwd: repoRoot,

@@ -4,6 +4,11 @@ import {
   AUTHORED_MAP_MAX_DIMENSION_TILES,
   AUTHORED_MAP_MAX_START_LOCATIONS,
   AUTHORED_MAP_MIN_DIMENSION_TILES,
+  MAP_AUTHORING_RECIPE_MAX_EXPLICIT_TILES_PER_OPERATION,
+  MAP_AUTHORING_RECIPE_MAX_OPERATIONS,
+  MAP_AUTHORING_RECIPE_MAX_PATH_POINTS,
+  MAP_AUTHORING_RECIPE_MAX_TOTAL_EXPLICIT_TILES,
+  MAP_AUTHORING_RECIPE_MAX_WORK_UNITS,
 } from "./limits.js";
 import { MAP_AUTHORING_SYMMETRY, symmetrySupported } from "./symmetry.js";
 
@@ -34,6 +39,7 @@ export function buildMapFromRecipe(recipe) {
   if (recipe.operations !== undefined && !Array.isArray(recipe.operations)) {
     throw new Error("Recipe operations must be an array when provided");
   }
+  validateRecipeComplexity(recipe.operations || [], { width, height });
   const defaultSymmetry = recipe.symmetry || MAP_AUTHORING_SYMMETRY.NONE;
   validateRecipeSymmetry(defaultSymmetry, { width, height });
   const background = terrainCharacter(recipe.background || "grass");
@@ -57,6 +63,60 @@ export function buildMapFromRecipe(recipe) {
     validateRecipeLocationCounts(map);
   }
   return map;
+}
+
+/** Reject recipes whose synchronous materialization cost exceeds the shared UI/CLI budget. */
+export function validateRecipeComplexity(operations, dimensions) {
+  if (operations.length > MAP_AUTHORING_RECIPE_MAX_OPERATIONS) {
+    throw new Error(`Recipe operations must contain at most ${MAP_AUTHORING_RECIPE_MAX_OPERATIONS} entries`);
+  }
+  const mapArea = dimensions.width * dimensions.height;
+  let explicitTileCount = 0;
+  let workUnits = 0;
+  for (let index = 0; index < operations.length; index += 1) {
+    const operation = operations[index];
+    if (!operation || typeof operation !== "object" || Array.isArray(operation)) {
+      throw new Error(`Recipe operation ${index} must be a JSON object`);
+    }
+    const type = String(operation.type || "");
+    if (type === "stroke" || type === "road") {
+      if (!Array.isArray(operation.points)) {
+        throw new Error(`Recipe operation ${index} points must be an array`);
+      }
+      if (operation.points.length > MAP_AUTHORING_RECIPE_MAX_PATH_POINTS) {
+        throw new Error(
+          `Recipe operation ${index} points must contain at most ${MAP_AUTHORING_RECIPE_MAX_PATH_POINTS} entries`,
+        );
+      }
+      // pathTiles tests every candidate tile against every segment. Charging the full map is a
+      // conservative, input-only bound that is cheap to compute before geometry materialization.
+      workUnits += mapArea * (Math.max(1, operation.points.length) + 4);
+    } else if (type === "fill") {
+      workUnits += mapArea;
+    } else if (type === "rect" || type === "blob") {
+      workUnits += mapArea * 5;
+    } else if (type === "paintTiles" || type === "overlayTiles") {
+      const count = Array.isArray(operation.tiles) ? operation.tiles.length : 0;
+      if (count > MAP_AUTHORING_RECIPE_MAX_EXPLICIT_TILES_PER_OPERATION) {
+        throw new Error(
+          `Recipe operation ${index} tiles must contain at most ${MAP_AUTHORING_RECIPE_MAX_EXPLICIT_TILES_PER_OPERATION} entries`,
+        );
+      }
+      explicitTileCount += count;
+      if (explicitTileCount > MAP_AUTHORING_RECIPE_MAX_TOTAL_EXPLICIT_TILES) {
+        throw new Error(
+          `Recipe explicit tiles must total at most ${MAP_AUTHORING_RECIPE_MAX_TOTAL_EXPLICIT_TILES} entries`,
+        );
+      }
+      // The largest supported symmetry orbit has four copies.
+      workUnits += count * 5;
+    } else {
+      workUnits += 4;
+    }
+    if (workUnits > MAP_AUTHORING_RECIPE_MAX_WORK_UNITS) {
+      throw new Error(`Recipe estimated work exceeds the ${MAP_AUTHORING_RECIPE_MAX_WORK_UNITS}-unit limit`);
+    }
+  }
 }
 
 function validateRecipeLocationCounts(map) {
