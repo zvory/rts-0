@@ -15,14 +15,6 @@ import { MAP_AUTHORING_SYMMETRY, symmetrySupported } from "./symmetry.js";
 export const CURRENT_AUTHORED_MAP_VERSION = 6;
 export const MAX_AUTHORED_MAP_DIMENSION_TILES = AUTHORED_MAP_MAX_DIMENSION_TILES;
 
-export function isMapAuthoringRecipe(value) {
-  return !!value && typeof value === "object" && !Array.isArray(value)
-    && !Array.isArray(value.terrain)
-    && Object.hasOwn(value, "width")
-    && Object.hasOwn(value, "height")
-    && (value.operations === undefined || Array.isArray(value.operations));
-}
-
 export function buildMapFromRecipe(recipe) {
   if (!recipe || typeof recipe !== "object" || Array.isArray(recipe)) throw new Error("Recipe must be a JSON object");
   const width = recipe.width;
