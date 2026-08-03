@@ -100,7 +100,7 @@ import fs from "node:fs";
 import { TERRAIN } from "../../client/src/protocol.js";
 import { createMapHandoff } from "../../client/src/map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
-import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
+import { authoritativeAnalysisSummary, MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { buildMapFromRecipe } from "../../client/src/map_authoring/recipe.js";
 import {
   canonicalDoodadColor,
@@ -289,6 +289,13 @@ assert(
   );
   assert.deepEqual(statuses.pop(), { message: "Loaded recipe recipe.json.", error: false });
 
+  panel.recipeText = JSON.stringify({ name: "Inline recipe", width: 18, height: 16 });
+  assert.equal(MapEditorPanel.prototype.applyRecipeText.call(panel), true);
+  assert.equal(session.exportMap().name, "Inline recipe");
+  assert.deepEqual(session.exportMap().terrain, Array(16).fill(".".repeat(18)),
+    "the inline UI accepts recipes whose operations array is omitted");
+  assert.deepEqual(statuses.pop(), { message: "Applied recipe for Inline recipe.", error: false });
+
   await MapEditorPanel.prototype.loadJsonFile.call(panel, {
     name: "broken.json",
     size: 12,
@@ -328,6 +335,63 @@ assert(
   }
   assert.equal(session.hasUnsavedChanges, false, "exporting the current map clears the unsaved-change warning");
   assert.match(statuses.at(-1).message, /^Exported .+\.json\.$/);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 24, playerCount: 2 });
+  const requests = [];
+  const statuses = [];
+  const panel = {
+    session,
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      if (url.endsWith("/report")) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              valid: true,
+              analyzedRouteCount: 2,
+              unanalyzedRouteCount: 1,
+              routes: [
+                { analyzed: true, reachable: true },
+                { analyzed: true, reachable: false },
+                { analyzed: false, reachable: false, failureReason: "analysisBudgetExhausted" },
+              ],
+            };
+          },
+        };
+      }
+      return {
+        ok: true,
+        async json() { return { valid: true, baseSites: [{}, {}], startLocations: [{}, {}] }; },
+      };
+    },
+    analysisPending: false,
+    analysisKind: null,
+    analysisResult: null,
+    setStatus(message, error = false) { statuses.push({ message, error }); },
+    render() { this.renders = (this.renders || 0) + 1; },
+  };
+  const check = await MapEditorPanel.prototype.runAuthoritativeAnalysis.call(panel, "check");
+  assert.equal(check.valid, true);
+  assert.equal(requests[0].url, "/api/map-authoring/check");
+  assert.equal(requests[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(requests[0].options.body), session.exportMap());
+  assert.deepEqual(statuses.at(-1), { message: "Authoritative check passed: 2 bases, 2 starts.", error: false });
+
+  const report = await MapEditorPanel.prototype.runAuthoritativeAnalysis.call(panel, "report");
+  assert.equal(report.unanalyzedRouteCount, 1);
+  assert.deepEqual(statuses.at(-1), {
+    message: "Route report: 2 analyzed, 1 unreachable; 1 unanalyzed/truncated.",
+    error: false,
+  }, "unanalyzed rows are called out and excluded from unreachable routes");
+  assert.equal(authoritativeAnalysisSummary("report", report), statuses.at(-1).message);
+  assert.equal(
+    authoritativeAnalysisSummary("report", { valid: true, routes: [] }),
+    "Route report: unknown analyzed, 0 unreachable; unknown unanalyzed/truncated.",
+  );
 }
 
 {

@@ -889,7 +889,8 @@ export class MapEditorSession {
   mapOverlay()
 }
 ```
-`map_authoring/` is the single implementation of authoring geometry and symmetry. Browser pointer
+`map_authoring/` is the single implementation of authoring geometry, symmetry, advisory symmetry
+checking, and recipe materialization. Browser pointer
 gestures and `scripts/map-author.mjs` recipes are adapters over its pure ESM operations; the package
 does not access the DOM, Pixi, Node filesystem APIs, or simulation state. UI-only input/history and
 CLI-only file/argument handling stay outside it.
@@ -919,8 +920,13 @@ Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
 base locations, and provides undo/redo, local JSON import/map export, and centered resize. Recipe
-imports apply the shared fill, rectangle, blob, stroke, road, base, start, and symmetry operations,
-then load their result through the ordinary authored-map normalization path. Resize
+imports and the in-page recipe JSON textarea apply the shared fill, rectangle, blob, stroke, road,
+base, start, and symmetry operations. An omitted `operations` field means an empty operation list;
+rich per-operation visual recipe controls remain deferred. Recipe/import normalization preserves
+authored terrain verbatim, including impassable terrain in a protected base footprint, so the
+advisory and authoritative checks can report the author's actual input. Interactive rock/water
+painting is still rejected in protected footprints, and moving or adding a location makes its
+footprint passable. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
 shifts start/base locations with the centered source map. Authored v6 maps and materialized Lab
 handoffs carry explicit `width` and `height`; loading bundled or locally imported older square maps
@@ -988,6 +994,13 @@ server, calls the narrow bridge, validates the returned PNG dimensions, and writ
 artifact. The Map Editor's `Preview PNGs` action creates the same validated handoff and opens this
 route, whose visible controls download 2048-pixel world and minimap PNGs through that same bridge.
 The page owns no authoring operations or recipe semantics.
+
+The editor's `Authoritative check` and `Route report` actions post the current exported map to
+`/api/map-authoring/check` and `/api/map-authoring/report`. The panel summarizes validity and base
+counts or route/unreachable counts, while one collapsed `<details>` element exposes the complete
+JSON response as a single text node. `scripts/map-author.mjs check|report <map.json>` is the matching
+thin Node adapter over the `authored-map` Rust binary; neither adapter reimplements materialization
+or pathing.
 
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no

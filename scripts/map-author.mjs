@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   AUTHORING_PASSABLE_CHARACTERS as PASSABLE,
@@ -12,9 +13,12 @@ import {
   CURRENT_AUTHORED_MAP_VERSION as CURRENT_MAP_VERSION,
   MAX_AUTHORED_MAP_DIMENSION_TILES as MAX_MAP_DIMENSION_TILES,
 } from "../client/src/map_authoring/recipe.js";
+import { mapSymmetryWarnings } from "../client/src/map_authoring/symmetry_validation.js";
 
 export { buildMapFromRecipe } from "../client/src/map_authoring/recipe.js";
 
+const SCRIPT_FILE = fileURLToPath(import.meta.url);
+const REPO_ROOT = path.resolve(path.dirname(SCRIPT_FILE), "..");
 const MAX_STEEL_PATCHES_PER_BASE = 36;
 const MAX_OIL_PATCHES_PER_BASE = 9;
 const MAX_MAP_DOODADS = 4_096;
@@ -251,24 +255,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
   }
   const regions = connectedRegions(map);
   if (regions.length > 1) warnings.push(`passable terrain has ${regions.length} disconnected regions (${regions.slice(0, 5).join(", ")} tiles${regions.length > 5 ? ", …" : ""})`);
-  if (symmetry === "halfTurn") {
-    if (width > 0 && height > 0 && width <= MAX_MAP_DIMENSION_TILES && height <= MAX_MAP_DIMENSION_TILES && terrainIsRectangular) {
-      let terrainMismatches = 0;
-      for (let y = 0; y < height; y += 1) {
-        for (let x = 0; x < width; x += 1) {
-          if (map.terrain[y]?.[x] !== map.terrain[height - 1 - y]?.[width - 1 - x]) terrainMismatches += 1;
-        }
-      }
-      if (terrainMismatches) warnings.push(`terrain has ${Math.ceil(terrainMismatches / 2)} half-turn symmetry mismatches`);
-      for (const [kind, locations] of [["start", validStarts], ["base", validBases]]) {
-        const keys = new Set(locations.map(locationKey));
-        const missing = locations.filter((location) => !keys.has(`${width - 1 - location.x},${height - 1 - location.y}`));
-        if (missing.length) warnings.push(`${kind} locations have ${missing.length} missing half-turn partners`);
-      }
-    }
-  } else if (symmetry !== "none") {
-    warnings.push(`symmetry check ${JSON.stringify(symmetry)} is not implemented`);
-  }
+  warnings.push(...mapSymmetryWarnings(map, symmetry));
   const area = Math.max(1, width * height);
   const terrain = terrainCounts(map);
   const passableTiles = Object.entries(terrain).reduce((sum, [character, count]) => sum + (PASSABLE.has(character) ? count : 0), 0);
@@ -380,6 +367,8 @@ function usage() {
   return `Usage:
   node scripts/map-author.mjs build <recipe.json> --output <map.json>
   node scripts/map-author.mjs validate <map.json> [--symmetry halfTurn]
+  node scripts/map-author.mjs check <map.json>
+  node scripts/map-author.mjs report <map.json>
   node scripts/map-author.mjs preview <map.json> --output <preview.svg> [--tile-pixels 5]
 
 Recipe operations:
@@ -395,7 +384,22 @@ is advisory and never rejects a readable map.
 `;
 }
 
-export function runCli(argv = process.argv.slice(2)) {
+export function runAuthoritativeMapTool(command, mapFile, {
+  spawnSyncImpl = spawnSync,
+  stdout = (value) => process.stdout.write(value),
+  stderr = (value) => process.stderr.write(value),
+} = {}) {
+  const result = spawnSyncImpl("cargo", [
+    "run", "--quiet", "--manifest-path", "server/Cargo.toml", "-p", "rts-sim",
+    "--bin", "authored-map", "--", command, path.resolve(mapFile),
+  ], { cwd: REPO_ROOT, encoding: "utf8" });
+  if (result.error) throw result.error;
+  if (result.stdout) stdout(result.stdout);
+  if (result.stderr) stderr(result.stderr);
+  return Number.isInteger(result.status) ? result.status : 1;
+}
+
+export function runCli(argv = process.argv.slice(2), dependencies = {}) {
   const [command, ...rest] = argv;
   const { positional, options } = parseOptions(rest);
   if (!command || command === "help" || options.help) {
@@ -416,6 +420,10 @@ export function runCli(argv = process.argv.slice(2)) {
     printValidation(validateMap(readJson(positional[0]), { symmetry: options.symmetry || "none" }));
     return 0;
   }
+  if (command === "check" || command === "report") {
+    if (positional.length !== 1) throw new Error(`${command} needs exactly one <map.json>`);
+    return (dependencies.runAuthoritativeMapTool || runAuthoritativeMapTool)(command, positional[0]);
+  }
   if (command === "preview") {
     if (!positional[0] || !options.output) throw new Error("preview needs <map.json> and --output <preview.svg>");
     const map = readJson(positional[0]);
@@ -426,7 +434,7 @@ export function runCli(argv = process.argv.slice(2)) {
   throw new Error(`Unknown command ${JSON.stringify(command)}\n\n${usage()}`);
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === SCRIPT_FILE;
 if (isMain) {
   try {
     process.exitCode = runCli();

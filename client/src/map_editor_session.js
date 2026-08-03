@@ -712,7 +712,6 @@ function normalizeDraft(draft) {
   draft.doodads = normalizeDraftDoodads(draft.doodads, dimensions);
   draft.stealthTiles = normalizeOverlayTiles(draft.stealthTiles, dimensions);
   draft.noVehicleTiles = normalizeOverlayTiles(draft.noVehicleTiles, dimensions);
-  protectDraftBaseTerrain(draft);
 }
 
 function migrateLegacyDraft(source) {
@@ -797,6 +796,7 @@ function resizeDraftCentered(source, width, height) {
     startKeys.has(locationKey(location)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES,
   ))) return draftEditError("Resize would move a base site inside the map edge clearance.");
   normalizeDraft(draft);
+  protectDraftBaseTerrain(draft);
   return { ok: true, draft };
 }
 

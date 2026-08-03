@@ -6,7 +6,10 @@ export const MAX_AUTHORED_MAP_DIMENSION_TILES = 256;
 
 export function isMapAuthoringRecipe(value) {
   return !!value && typeof value === "object" && !Array.isArray(value)
-    && Array.isArray(value.operations) && !Array.isArray(value.terrain);
+    && !Array.isArray(value.terrain)
+    && Object.hasOwn(value, "width")
+    && Object.hasOwn(value, "height")
+    && (value.operations === undefined || Array.isArray(value.operations));
 }
 
 export function buildMapFromRecipe(recipe) {
@@ -18,6 +21,9 @@ export function buildMapFromRecipe(recipe) {
   }
   if (width > MAX_AUTHORED_MAP_DIMENSION_TILES || height > MAX_AUTHORED_MAP_DIMENSION_TILES) {
     throw new Error(`Recipe width and height must each be at most ${MAX_AUTHORED_MAP_DIMENSION_TILES} tiles`);
+  }
+  if (recipe.operations !== undefined && !Array.isArray(recipe.operations)) {
+    throw new Error("Recipe operations must be an array when provided");
   }
   const defaultSymmetry = recipe.symmetry || MAP_AUTHORING_SYMMETRY.NONE;
   validateRecipeSymmetry(defaultSymmetry, { width, height });

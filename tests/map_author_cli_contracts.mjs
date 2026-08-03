@@ -4,7 +4,15 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { buildMapFromRecipe, renderPreviewSvg, validateMap } from "../scripts/map-author.mjs";
+import {
+  buildMapFromRecipe,
+  renderPreviewSvg,
+  runAuthoritativeMapTool,
+  runCli,
+  validateMap,
+} from "../scripts/map-author.mjs";
+import { expandSymmetricPoints } from "../client/src/map_authoring/symmetry.js";
+import { isMapAuthoringRecipe } from "../client/src/map_authoring/recipe.js";
 import { MapEditorSession, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
 import { TERRAIN } from "../client/src/protocol.js";
 
@@ -44,6 +52,29 @@ const validation = validateMap(map, { symmetry: "halfTurn" });
 assert(validation.warnings.some((warning) => warning.includes("protected area")), "blocked base clearance is advisory");
 assert(!validation.warnings.some((warning) => warning.includes("symmetry mismatches")), "generated terrain preserves symmetry");
 
+const protectedRecipe = {
+  name: "Advisory protected terrain",
+  width: 32,
+  height: 32,
+  operations: [
+    { type: "start", at: [12, 12] },
+    { type: "blob", material: "water", center: [12, 12], radius: 1, roughness: 0 },
+  ],
+};
+const protectedMap = buildMapFromRecipe(protectedRecipe);
+const importedProtected = new MapEditorSession({ storage: null });
+importedProtected.loadAuthoredMap(protectedMap);
+assert.deepEqual(
+  importedProtected.exportMap(),
+  protectedMap,
+  "UI recipe import preserves impassable protected terrain exactly so validation stays advisory",
+);
+assert(validateMap(protectedMap).warnings.some((warning) => warning.includes("protected area")));
+
+const operationlessRecipe = { name: "Operationless recipe", width: 16, height: 18 };
+assert.equal(isMapAuthoringRecipe(operationlessRecipe), true);
+assert.deepEqual(buildMapFromRecipe(operationlessRecipe).terrain, Array(18).fill(".".repeat(16)));
+
 const parityRecipe = {
   name: "Shared operation parity",
   width: 32,
@@ -77,6 +108,56 @@ const radial = buildMapFromRecipe({
   operations: [{ type: "rect", material: "water", from: [2, 3], to: [2, 3] }],
 });
 for (const [x, y] of [[2, 3], [12, 2], [13, 12], [3, 13]]) assert.equal(radial.terrain[y][x], "~");
+assert(!validateMap(radial, { symmetry: "radial" }).warnings.some((warning) => warning.includes("symmetry")));
+for (const symmetry of ["horizontal", "vertical", "halfTurn", "threeWay", "radial", "diagonalMain", "diagonalAnti"]) {
+  const generated = buildMapFromRecipe({
+    name: `${symmetry} terrain`, width: 32, height: 32, symmetry,
+    operations: [{ type: "rect", material: "water", from: [4, 7], to: [6, 9] }],
+  });
+  assert(!validateMap(generated, { symmetry }).warnings.some((warning) => warning.includes("symmetry")),
+    `${symmetry} recipe output passes its shared symmetry check`);
+}
+
+const wrongRoadOrientation = buildMapFromRecipe({
+  name: "Wrong road orientation",
+  width: 32,
+  height: 32,
+  symmetry: "horizontal",
+  operations: [{ type: "rect", material: "road-diagonal-nw-se", from: [3, 4], to: [3, 4] }],
+});
+wrongRoadOrientation.terrain[27] = `${".".repeat(3)}\\${".".repeat(28)}`;
+assert(validateMap(wrongRoadOrientation, { symmetry: "horizontal" }).warnings
+  .some((warning) => warning.includes("terrain") && warning.includes("symmetry")),
+"symmetry checks require the correctly transformed marked-road orientation");
+
+const radialLocations = expandSymmetricPoints({ width: 32, height: 32 }, [{ x: 10, y: 11 }], "radial");
+const radialDoodads = expandSymmetricPoints({ width: 1024, height: 1024 }, [{ x: 100, y: 120 }], "radial")
+  .map((point, index) => ({ id: index + 1, typeId: "tree.oak", ...point }));
+const layeredRadial = {
+  version: currentServerMapVersion,
+  name: "Layered radial",
+  description: "",
+  _design: "symmetry fixture",
+  width: 32,
+  height: 32,
+  terrain: Array(32).fill(".".repeat(32)),
+  startLocations: radialLocations,
+  baseSites: radialLocations.map((point) => ({ ...point, steelPatches: 4, oilPatches: 1 })),
+  doodads: radialDoodads,
+  stealthTiles: radialLocations,
+  noVehicleTiles: radialLocations,
+};
+assert(!validateMap(layeredRadial, { symmetry: "radial" }).warnings.some((warning) => warning.includes("symmetry")));
+layeredRadial.terrain[10] = `${".".repeat(9)}#${".".repeat(22)}`;
+layeredRadial.baseSites[0].steelPatches = 5;
+layeredRadial.startLocations.pop();
+layeredRadial.stealthTiles.pop();
+layeredRadial.noVehicleTiles.pop();
+layeredRadial.doodads.pop();
+const layeredWarnings = validateMap(layeredRadial, { symmetry: "radial" }).warnings;
+for (const layer of ["terrain", "start locations", "base locations", "stealth tiles", "no-vehicle tiles", "doodads"]) {
+  assert(layeredWarnings.some((warning) => warning.includes(layer)), `${layer} symmetry is checked`);
+}
 
 const preview = renderPreviewSvg(map, { tilePixels: 3 });
 assert(preview.startsWith("<svg"));
@@ -122,6 +203,27 @@ assert.throws(
   "recipe dimensions are not silently truncated",
 );
 assert.throws(() => buildMapFromRecipe({ width: "12", height: 1 }), /positive integers/);
+
+{
+  const calls = [];
+  const stdout = [];
+  const status = runAuthoritativeMapTool("check", "maps/example.json", {
+    spawnSyncImpl(command, args, options) {
+      calls.push({ command, args, options });
+      return { status: 0, stdout: '{"valid":true}\n', stderr: "" };
+    },
+    stdout: (value) => stdout.push(value),
+  });
+  assert.equal(status, 0);
+  assert.equal(calls[0].command, "cargo");
+  assert.deepEqual(calls[0].args.slice(-4, -1), ["authored-map", "--", "check"]);
+  assert.equal(path.basename(calls[0].args.at(-1)), "example.json");
+  assert.deepEqual(stdout, ['{"valid":true}\n']);
+  assert.equal(runCli(["report", "map.json"], {
+    runAuthoritativeMapTool(command, file) { calls.push({ command, file }); return 7; },
+  }), 7);
+  assert.deepEqual(calls.at(-1), { command: "report", file: "map.json" });
+}
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-map-author-test-"));
 try {
