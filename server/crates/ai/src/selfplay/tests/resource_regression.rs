@@ -233,7 +233,7 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
             };
             commands.extend(
                 script
-                    .commands(view)
+                    .commands(view, game.worker_retreat_commands_for(pid))
                     .into_iter()
                     .map(|command| (pid, command)),
             );

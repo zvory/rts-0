@@ -34,7 +34,7 @@ pub use replay::{
 const MAX_TICKS: u32 = 9_600;
 const MAX_STALL_TICKS: u32 = 1_800;
 const SAMPLE_EVERY_TICKS: u32 = 30;
-const THINK_INTERVAL: u32 = 6;
+const SYNTHETIC_SCRIPT_THINK_INTERVAL: u32 = 6;
 const ATTACK_REISSUE_TICKS: u32 = 120;
 pub(crate) const SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS: u32 = 3_600;
 const SELFPLAY_FAILURE_DIR: &str = "selfplay-failures";

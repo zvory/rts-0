@@ -14,7 +14,7 @@ use crate::protocol::{default_snapshot_codec, encode_snapshot_frame, Event, Snap
 use crate::structured_log::SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
-use rts_ai::{AiController, AiThinkContext};
+use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::perf;
 use tracing_subscriber::EnvFilter;
@@ -461,30 +461,7 @@ fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
 }
 
 fn enqueue_live_ai_commands(game: &mut Game, controllers: &mut [AiController]) {
-    let start = game.start_payload();
-    let alive = game.alive_players();
-    let mut commands = Vec::new();
-    for controller in controllers {
-        let player_id = controller.player_id();
-        if !alive.contains(&player_id) {
-            continue;
-        }
-        let snapshot = game.snapshot_for(player_id);
-        commands.extend(
-            controller
-                .think(AiThinkContext {
-                    start: &start,
-                    snapshot: &snapshot,
-                    alive_player_ids: &alive,
-                    retreat_commands: game.worker_retreat_commands_for(player_id),
-                })
-                .into_iter()
-                .map(|command| (player_id, command)),
-        );
-    }
-    for (player_id, command) in commands {
-        game.enqueue(player_id, command);
-    }
+    CanonicalAiTickDriver::run(game, controllers, AiAlivePolicy::StartingPrimaryBase);
 }
 
 fn four_ai_players() -> Vec<PlayerInit> {

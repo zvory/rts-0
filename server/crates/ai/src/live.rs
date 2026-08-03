@@ -22,6 +22,7 @@ use crate::selfplay::player_view::{
 use rand::Rng;
 use rts_protocol::{ObserverMapAnalysisDiagnostics, ObserverMapAnalysisLayer};
 use rts_sim::game::command::SimCommand;
+use rts_sim::game::Game;
 use rts_sim::protocol::{Snapshot, StartPayload};
 
 const DECISION_INTERVAL: u32 = 9;
@@ -71,6 +72,128 @@ pub struct AiThinkContext<'a> {
     pub snapshot: &'a Snapshot,
     pub alive_player_ids: &'a [u32],
     pub retreat_commands: Vec<SimCommand>,
+}
+
+/// Selects the host-owned elimination policy used to decide which controllers run this tick.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AiAlivePolicy {
+    /// Normal mixed-player matches eliminate a player when they have no surviving units.
+    Normal,
+    /// AI-only observation matches remain active while their starting primary base survives.
+    StartingPrimaryBase,
+}
+
+/// One controller invocation captured before any emitted command is enqueued.
+#[derive(Clone, Debug, PartialEq)]
+pub enum AiControllerTickInvocation {
+    SkippedDead,
+    Invoked {
+        snapshot: Snapshot,
+        retreat_commands: Vec<SimCommand>,
+        emitted_commands: Vec<SimCommand>,
+        decision_trace: Option<AiDecisionTraceSnapshot>,
+    },
+}
+
+/// Ordered evidence from one canonical pre-simulation AI tick.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CanonicalAiTickReport {
+    pub tick: u32,
+    pub alive_player_ids: Vec<u32>,
+    pub controllers: Vec<AiControllerTickReport>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct AiControllerTickReport {
+    pub player_id: u32,
+    pub profile_id: &'static str,
+    pub invocation: AiControllerTickInvocation,
+}
+
+/// Canonical live/offline AI host orchestration.
+///
+/// The driver captures every controller's immutable pre-tick inputs and result in controller
+/// order, then enqueues all results in that same order. It deliberately does not advance the
+/// simulation or decide when a match ends.
+pub struct CanonicalAiTickDriver;
+
+impl CanonicalAiTickDriver {
+    pub fn run(
+        game: &mut Game,
+        controllers: &mut [AiController],
+        alive_policy: AiAlivePolicy,
+    ) -> CanonicalAiTickReport {
+        let tick = game.tick_count();
+        let start = game.start_payload();
+        let alive_player_ids = match alive_policy {
+            AiAlivePolicy::Normal => game.alive_players(),
+            AiAlivePolicy::StartingPrimaryBase => game.primary_base_alive_players(),
+        };
+        let mut reports = Vec::with_capacity(controllers.len());
+
+        for controller in controllers {
+            let player_id = controller.player_id();
+            let profile_id = controller.profile_id();
+            if !alive_player_ids.contains(&player_id) {
+                reports.push(AiControllerTickReport {
+                    player_id,
+                    profile_id,
+                    invocation: AiControllerTickInvocation::SkippedDead,
+                });
+                continue;
+            }
+            let snapshot = game.snapshot_for(player_id);
+            let retreat_commands = game.worker_retreat_commands_for(player_id);
+            let (emitted_commands, decision_trace) = Self::run_prepared_controller(
+                controller,
+                AiThinkContext {
+                    start: &start,
+                    snapshot: &snapshot,
+                    alive_player_ids: &alive_player_ids,
+                    retreat_commands: retreat_commands.clone(),
+                },
+            );
+            reports.push(AiControllerTickReport {
+                player_id,
+                profile_id,
+                invocation: AiControllerTickInvocation::Invoked {
+                    snapshot,
+                    retreat_commands,
+                    emitted_commands,
+                    decision_trace,
+                },
+            });
+        }
+
+        for report in &reports {
+            if let AiControllerTickInvocation::Invoked {
+                emitted_commands, ..
+            } = &report.invocation
+            {
+                for command in emitted_commands {
+                    game.enqueue(report.player_id, command.clone());
+                }
+            }
+        }
+
+        CanonicalAiTickReport {
+            tick,
+            alive_player_ids,
+            controllers: reports,
+        }
+    }
+
+    pub(crate) fn run_prepared_controller(
+        controller: &mut AiController,
+        context: AiThinkContext<'_>,
+    ) -> (Vec<SimCommand>, Option<AiDecisionTraceSnapshot>) {
+        let tick = context.snapshot.tick;
+        let commands = controller.think(context);
+        let trace = controller
+            .latest_decision_trace()
+            .filter(|trace| trace.trace_tick == tick);
+        (commands, trace)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -398,6 +521,7 @@ fn truncate_decision_trace_line(mut line: String) -> String {
 mod tests {
     use super::*;
     use rand::SeedableRng;
+    use rts_sim::game::PlayerInit;
     use rts_sim::protocol::{terrain, MapInfo, PlayerStart, ResourceNode};
 
     fn cache_test_start_payload() -> StartPayload {
@@ -439,6 +563,136 @@ mod tests {
                 start_tile_y: 1,
             }],
         }
+    }
+
+    fn driver_test_players() -> Vec<PlayerInit> {
+        vec![
+            PlayerInit {
+                id: 1,
+                team_id: 1,
+                faction_id: "kriegsia".to_string(),
+                name: "AI One".to_string(),
+                color: "#111111".to_string(),
+                is_ai: true,
+            },
+            PlayerInit {
+                id: 2,
+                team_id: 2,
+                faction_id: "kriegsia".to_string(),
+                name: "AI Two".to_string(),
+                color: "#222222".to_string(),
+                is_ai: true,
+            },
+        ]
+    }
+
+    #[test]
+    fn canonical_driver_selects_host_alive_policy_and_skips_eliminated_controllers() {
+        let players = driver_test_players();
+        let mut normal_game = Game::new_without_ai_controllers(&players, 7);
+        let expected_normal = normal_game.alive_players();
+        let mut controllers = vec![AiController::new(2), AiController::new(99)];
+        let normal =
+            CanonicalAiTickDriver::run(&mut normal_game, &mut controllers, AiAlivePolicy::Normal);
+        assert_eq!(normal.alive_player_ids, expected_normal);
+        assert_eq!(normal.controllers[0].player_id, 2);
+        assert!(matches!(
+            normal.controllers[0].invocation,
+            AiControllerTickInvocation::Invoked { .. }
+        ));
+        assert!(matches!(
+            normal.controllers[1].invocation,
+            AiControllerTickInvocation::SkippedDead
+        ));
+
+        let mut ai_only_game = Game::new_without_ai_controllers(&players, 7);
+        let expected_primary_base = ai_only_game.primary_base_alive_players();
+        let mut ai_only_controllers = vec![AiController::new(1), AiController::new(2)];
+        let ai_only = CanonicalAiTickDriver::run(
+            &mut ai_only_game,
+            &mut ai_only_controllers,
+            AiAlivePolicy::StartingPrimaryBase,
+        );
+        assert_eq!(ai_only.alive_player_ids, expected_primary_base);
+    }
+
+    #[test]
+    fn canonical_driver_preserves_controller_order_inputs_and_staggered_traces() {
+        let players = driver_test_players();
+        let mut game = Game::new_without_ai_controllers(&players, 11);
+        let mut controllers = vec![AiController::new(2), AiController::new(1)];
+
+        for tick in 0u32..10 {
+            let before_one = game.snapshot_for(1);
+            let before_two = game.snapshot_for(2);
+            let report = CanonicalAiTickDriver::run(
+                &mut game,
+                &mut controllers,
+                AiAlivePolicy::StartingPrimaryBase,
+            );
+            assert_eq!(
+                report
+                    .controllers
+                    .iter()
+                    .map(|controller| controller.player_id)
+                    .collect::<Vec<_>>(),
+                vec![2, 1]
+            );
+            for controller in &report.controllers {
+                let AiControllerTickInvocation::Invoked {
+                    snapshot,
+                    decision_trace,
+                    ..
+                } = &controller.invocation
+                else {
+                    panic!("starting controller unexpectedly skipped");
+                };
+                let expected_snapshot = if controller.player_id == 1 {
+                    &before_one
+                } else {
+                    &before_two
+                };
+                assert_eq!(snapshot, expected_snapshot);
+                assert_eq!(
+                    decision_trace.is_some(),
+                    tick.wrapping_add(controller.player_id)
+                        .is_multiple_of(DECISION_INTERVAL)
+                );
+            }
+            game.tick();
+        }
+    }
+
+    #[test]
+    fn canonical_prepared_driver_keeps_retreats_on_non_decision_ticks() {
+        let players = driver_test_players();
+        let game = Game::new_without_ai_controllers(&players, 13);
+        let start = game.start_payload();
+        let snapshot = game.snapshot_for(1);
+        assert!(!snapshot
+            .tick
+            .wrapping_add(1)
+            .is_multiple_of(DECISION_INTERVAL));
+        let retreat = SimCommand::Move {
+            units: vec![42],
+            x: 64.0,
+            y: 96.0,
+            queued: false,
+        };
+        let mut controller = AiController::new(1);
+
+        let (commands, trace) = CanonicalAiTickDriver::run_prepared_controller(
+            &mut controller,
+            AiThinkContext {
+                start: &start,
+                snapshot: &snapshot,
+                alive_player_ids: &[1, 2],
+                retreat_commands: vec![retreat.clone()],
+            },
+        );
+
+        assert_eq!(commands, vec![retreat]);
+        assert_eq!(trace, None);
     }
 
     #[test]

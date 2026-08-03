@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{AiController, AiThinkContext};
+use crate::{AiAlivePolicy, AiController, AiControllerTickInvocation, CanonicalAiTickDriver};
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{Command as WireCommand, Event};
@@ -59,43 +59,36 @@ fn live_ai_two_vs_two_keeps_allied_controllers_independent_and_non_hostile() {
     let mut command_log_cursor = 0usize;
 
     for _ in 0..TICKS {
-        let start = game.start_payload();
-        let alive_players = game.alive_players();
-        let mut commands = Vec::new();
-        for controller in &mut controllers {
-            let player_id = controller.player_id();
-            if !alive_players.contains(&player_id) {
+        let report = CanonicalAiTickDriver::run(
+            &mut game,
+            &mut controllers,
+            AiAlivePolicy::StartingPrimaryBase,
+        );
+        for controller in report.controllers {
+            let AiControllerTickInvocation::Invoked {
+                snapshot,
+                emitted_commands,
+                ..
+            } = controller.invocation
+            else {
                 continue;
-            }
-            let snapshot = game.snapshot_for(player_id);
+            };
             for entity in &snapshot.entities {
                 if entity.owner != 0 {
                     entity_owner.insert(entity.id, entity.owner);
                 }
             }
-            commands.extend(
-                controller
-                    .think(AiThinkContext {
-                        start: &start,
-                        snapshot: &snapshot,
-                        alive_player_ids: &alive_players,
-                        retreat_commands: game.worker_retreat_commands_for(player_id),
-                    })
-                    .into_iter()
-                    .map(|command| (player_id, command)),
-            );
-        }
-
-        for (player_id, command) in commands {
-            if let Command::Attack { target, .. } = &command {
-                if let Some(target_owner) = entity_owner.get(target) {
-                    assert!(
-                        game.is_enemy_player(player_id, *target_owner),
-                        "AI player {player_id} issued direct attack against allied player {target_owner}"
-                    );
+            for command in emitted_commands {
+                if let Command::Attack { target, .. } = &command {
+                    if let Some(target_owner) = entity_owner.get(target) {
+                        assert!(
+                            game.is_enemy_player(controller.player_id, *target_owner),
+                            "AI player {} issued direct attack against allied player {target_owner}",
+                            controller.player_id
+                        );
+                    }
                 }
             }
-            game.enqueue(player_id, command);
         }
 
         let tick_events = game.tick();

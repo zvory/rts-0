@@ -12,7 +12,7 @@ use super::snapshots::union_events;
 use crate::protocol::{
     Event, ObserverAnalysisAiDiagnostics, ObserverAnalysisPayload, PlayerScore, ServerMessage,
 };
-use rts_ai::{AiController, AiThinkContext};
+use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::replay::ReplayStartComposition;
 use rts_sim::game::Game;
 use rts_sim::game::ObserverView;
@@ -182,30 +182,12 @@ impl LiveTickDriver<'_> {
             if self.ai_controllers.is_empty() {
                 return;
             }
-            let start = game.start_payload();
-            let alive_player_ids = self.outcome_alive_players(game);
-            let mut commands = Vec::new();
-            for controller in self.ai_controllers.iter_mut() {
-                let player_id = controller.player_id();
-                if !alive_player_ids.contains(&player_id) {
-                    continue;
-                }
-                let snapshot = game.snapshot_for(player_id);
-                commands.extend(
-                    controller
-                        .think(AiThinkContext {
-                            start: &start,
-                            snapshot: &snapshot,
-                            alive_player_ids: &alive_player_ids,
-                            retreat_commands: game.worker_retreat_commands_for(player_id),
-                        })
-                        .into_iter()
-                        .map(|command| (player_id, command)),
-                );
-            }
-            for (player_id, command) in commands {
-                game.enqueue(player_id, command);
-            }
+            let alive_policy = if ai_only_match(self.match_player_count, self.ai_player_count) {
+                AiAlivePolicy::StartingPrimaryBase
+            } else {
+                AiAlivePolicy::Normal
+            };
+            CanonicalAiTickDriver::run(game, self.ai_controllers, alive_policy);
         });
     }
 

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 1 merges.
+- [x] Done.
 
 ## Objective
 
@@ -76,16 +76,16 @@ the old offline baseline are intentional.
 
 ## Implementation Checklist
 
-- [ ] Extract one shared AI tick driver and route the live host and Phase 1 oracle through it first.
-- [ ] Replace normal `ProfileBackedScript` state with a thin canonical-controller adapter.
-- [ ] Inject retreat commands and preserve collect-before-enqueue ordering offline.
-- [ ] Use production cadence, build search, stage suppression, and trace semantics everywhere.
-- [ ] Keep synthetic scripts explicit and separate from normal profile execution.
-- [ ] Remove duplicated profile state and helper code.
-- [ ] Record deterministic old-to-new offline baseline changes.
-- [ ] Pass the unchanged normal and full Phase 1 transcript fixture.
-- [ ] Update AI/testing design documentation.
-- [ ] Mark this phase done in the implementation commit.
+- [x] Extract one shared AI tick driver and route the live host and Phase 1 oracle through it first.
+- [x] Replace normal `ProfileBackedScript` state with a thin canonical-controller adapter.
+- [x] Inject retreat commands and preserve collect-before-enqueue ordering offline.
+- [x] Use production cadence, build search, stage suppression, and trace semantics everywhere.
+- [x] Keep synthetic scripts explicit and separate from normal profile execution.
+- [x] Remove duplicated profile state and helper code.
+- [x] Record deterministic old-to-new offline baseline changes.
+- [x] Pass the unchanged normal and full Phase 1 transcript fixture.
+- [x] Update AI/testing design documentation.
+- [x] Mark this phase done in the implementation commit.
 
 ## Verification
 

@@ -7,11 +7,12 @@ use std::sync::OnceLock;
 
 use serde::Serialize;
 
-use super::player_view::PlayerView;
-use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use super::SELFPLAY_ARTIFACT_DIR;
 use crate::ai_core::profiles::{profile_by_id, required_profiles};
-use crate::live::DEFAULT_LIVE_PROFILE_ID;
+use crate::live::{
+    AiAlivePolicy, AiController, AiControllerTickInvocation, CanonicalAiTickDriver,
+    DEFAULT_LIVE_PROFILE_ID,
+};
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{
     replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayOutcome,
@@ -366,9 +367,9 @@ pub fn run_profile_matchup_result(
     let replay_start = ReplayStartComposition::capture(&game, server_build_sha())?;
     let start = game.start_payload();
     let mut objective = StartingCityCentreObjective::capture(&game, &start, &players)?;
-    let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-        Box::new(ProfileBackedScript::new(1, profile_a.id)),
-        Box::new(ProfileBackedScript::new(2, profile_b.id)),
+    let mut controllers = vec![
+        AiController::with_profile_id(1, profile_a.id),
+        AiController::with_profile_id(2, profile_b.id),
     ];
     let mut event_log = Vec::new();
     let mut first_damage_tick = None;
@@ -378,38 +379,37 @@ pub fn run_profile_matchup_result(
     let mut ai_trace_tail = Vec::new();
 
     while game.tick_count() < options.max_ticks {
-        let objective_alive = objective.alive_player_ids();
         let tick = game.tick_count();
-        let mut commands = Vec::new();
-        for script in &mut scripts {
-            let player_id = script.player_id();
-            let snapshot = game.snapshot_for(player_id);
-            scorecard.observe_snapshot(tick, player_id, &snapshot);
-            let view = PlayerView {
-                player_id,
-                tick,
-                start: &start,
-                snapshot: &snapshot,
-                alive_player_ids: &objective_alive,
+        let report = CanonicalAiTickDriver::run(
+            &mut game,
+            &mut controllers,
+            AiAlivePolicy::StartingPrimaryBase,
+        );
+        for controller in report.controllers {
+            let AiControllerTickInvocation::Invoked {
+                snapshot,
+                emitted_commands,
+                decision_trace,
+                ..
+            } = controller.invocation
+            else {
+                continue;
             };
-            for command in script.commands(view) {
-                commands.push((player_id, command));
+            scorecard.observe_snapshot(tick, controller.player_id, &snapshot);
+            for command in &emitted_commands {
+                scorecard.observe_command(tick, controller.player_id, command, &snapshot);
             }
-            if let Some(lines) = script.last_trace_lines() {
+            if let Some(trace) = decision_trace {
                 ai_trace_tail.push(ProfileMatchupTraceEntry {
                     tick,
-                    player_id,
-                    profile: script.name().to_string(),
-                    lines: lines.to_vec(),
+                    player_id: controller.player_id,
+                    profile: controller.profile_id.to_string(),
+                    lines: trace.lines,
                 });
                 if ai_trace_tail.len() > PROFILE_MATCHUP_TRACE_TAIL {
                     ai_trace_tail.remove(0);
                 }
             }
-        }
-        for (player_id, command) in commands {
-            scorecard.observe_command(tick, player_id, &command, &game.snapshot_for(player_id));
-            game.enqueue(player_id, command);
         }
 
         scorecard.observe_full_snapshot(&game.snapshot_full_for(players[0].id));

@@ -132,7 +132,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
         };
         commands.extend(
             script
-                .commands(view)
+                .commands(view, game.worker_retreat_commands_for(pid))
                 .into_iter()
                 .map(|command| (pid, command)),
         );
@@ -206,7 +206,7 @@ fn assert_scripted_runs_identical_for_ticks(
             };
             commands_a.extend(
                 script
-                    .commands(view)
+                    .commands(view, game_a.worker_retreat_commands_for(pid))
                     .into_iter()
                     .map(|command| (pid, command)),
             );
@@ -226,7 +226,7 @@ fn assert_scripted_runs_identical_for_ticks(
             };
             commands_b.extend(
                 script
-                    .commands(view)
+                    .commands(view, game_b.worker_retreat_commands_for(pid))
                     .into_iter()
                     .map(|command| (pid, command)),
             );

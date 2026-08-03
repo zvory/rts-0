@@ -34,11 +34,14 @@ Internal observer launch URLs may still use both IDs. For example, a spectator c
 
 ### Where it runs
 
-rts-ai owns one AiController per AI player, while Game remains AI-free. The room task invokes each
-controller before game.tick(), gives it the same fog-filtered snapshot_for(player) and public
-start payload available to that player, then enqueues ordinary SimCommands. AI actions therefore
-go through the same validation, costs, supply, placement, and fog rules as human commands; the AI
-has no simulation authority of its own.
+rts-ai owns one AiController per AI player, while Game remains AI-free. The
+`CanonicalAiTickDriver` is the one normal live/offline profile host: before `game.tick()` it chooses
+the host-requested normal or starting-primary-base alive policy, captures each controller's public
+start payload, fog-filtered `snapshot_for(player)`, and worker-retreat input in stable controller
+order, collects every result before enqueueing any, then enqueues ordinary `SimCommand`s in that
+same order. The driver does not tick the game or own outcome, networking, replay, scoring, or
+artifact policy. AI actions therefore go through the same validation, costs, supply, placement,
+and fog rules as human commands; the AI has no simulation authority of its own.
 
 Outbound attacks use public enemy start tiles. Direct attack targets are limited to currently
 visible entities. The worker direct-hit retreat reflex projects recent own-worker damage into
@@ -128,19 +131,30 @@ production, and combat.
 ### Self-play and arena tools
 
 The test-only schema-1 Jeff live-controller oracle freezes command generation separately from
-simulation replay. It drives two production `AiController`s in player order on authored `Chokes`
-with seed `0x4a45_4646`, captures both stagger offsets and every empty/result batch before enqueue,
-then fingerprints the fog-filtered inputs, recipient events, and post-tick player views while
-preserving exact retreat and emitted commands. The normal test compares a 3,600-tick prefix; the
+simulation replay. It drives two production `AiController`s through the same
+`CanonicalAiTickDriver` used by the room, in player order on authored `Chokes` with seed
+`0x4a45_4646`. It captures both stagger offsets and every empty/result batch before enqueue, then
+fingerprints the fog-filtered inputs, recipient events, and post-tick player views while preserving
+exact retreat and emitted commands. The normal test compares a 3,600-tick prefix; the
 `RTS_FULL_AI_TESTS=1` tier compares the full 9,000-tick fixture. The fixture and candidate policy
 are documented in `server/crates/ai/fixtures/README.md` and the testing design.
 
-This oracle currently mirrors the live host sequence rather than sharing it. It therefore freezes
-the controller plus that mirror but cannot catch a change made only to `lobby/live_tick.rs`.
-Likewise, `ProfileBackedScript` remains an offline adapter with different cadence, placement
-search, filtering, memory, and no live worker-retreat injection. The next AI SDK phase must replace
-those duplicated host paths with one shared tick driver, using this immutable transcript to prove
-that the live cutover changes no Jeff behavior.
+Matchup, arena, balance, `LiveSelfPlay`, real-AI tests, and live-AI performance hosts all use that
+driver. `ProfileBackedScript` survives only as a thin `AiController` adapter for synthetic mixed
+script fixtures; its economy-only variant is an explicitly named command-filtering wrapper. It
+owns no profile decision memory, map cache, pending builds, placement search, combat-stage state,
+or cadence. Synthetic `WorkerRushScript` and `MineOnlyScript` retain their explicitly scoped
+six-tick harness cadence.
+
+This cutover intentionally changes historical offline output. The old adapter invoked both players
+at tick zero and then player 1/2 at ticks 5/4 modulo six, used the default away-from-center build
+search, and injected no retreat reflex. Canonical invocations begin at ticks 8/7 and repeat every
+nine ticks, traces exist only on those decision ticks, retreat commands remain first even between
+decisions, and production placement/stage suppression applies. In the canonical seed-7
+`jeffs_ai` versus `ai_2_1` 9,000-tick lane, the first applied commands are player 2 at tick 8 and
+player 1 at tick 9; representative first builds are AI 2.1 Barracks `(115,12)` at tick 476 and
+Jeff Pump Jack `(9,14)` at tick 513. The lane reaches the tick cap as a draw and its replay verifies
+exactly; these values document the new tooling baseline, not a balance guarantee.
 
 The ai-matchup binary runs one fixed-horizon profile-versus-profile match until a starting City
 Centre objective win or the tick cap. A match with no objective winner at the default 25,000-tick
