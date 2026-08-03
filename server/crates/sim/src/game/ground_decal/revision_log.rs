@@ -103,11 +103,7 @@ impl GroundDecalRevisionLog {
         Some(next)
     }
 
-    pub(super) fn valid(
-        &self,
-        store: &GroundDecalStore,
-        used_revision_count: usize,
-    ) -> bool {
+    pub(super) fn valid(&self, store: &GroundDecalStore, used_revision_count: usize) -> bool {
         if usize::try_from(store.revision).ok() != Some(used_revision_count)
             || self.0.len() != used_revision_count
             || self.0.iter().any(|entry| entry.tick() > store.current_tick)
@@ -137,13 +133,11 @@ impl GroundDecalRevisionLog {
                     .tank_trails
                     .created_revision(*id)
                     .is_some_and(|revision| revision == entry_revision),
-                GroundDecalRevisionEntry::TrailDiscovered { player, id, .. } => {
-                    store
-                        .discovered_trails_by_player
-                        .get(player)
-                        .and_then(|known| known.get(id))
-                        .is_some_and(|known_revision| *known_revision == entry_revision)
-                }
+                GroundDecalRevisionEntry::TrailDiscovered { player, id, .. } => store
+                    .discovered_trails_by_player
+                    .get(player)
+                    .and_then(|known| known.get(id))
+                    .is_some_and(|known_revision| *known_revision == entry_revision),
             }
         })
     }

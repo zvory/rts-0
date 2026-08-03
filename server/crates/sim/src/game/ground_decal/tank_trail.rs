@@ -10,16 +10,13 @@ use crate::protocol::TankTrailView;
 mod checkpoint;
 mod geometry;
 
-use geometry::{TankTrailSpatialIndex, TrailBounds};
+use geometry::{contact_motion, shortest_angle_delta, TankTrailSpatialIndex, TrailBounds};
 
 const POSITION_QUANTUM_PX: f32 = 4.0;
 const HEADING_SCALE: f32 = i8::MAX as f32 / std::f32::consts::PI;
 const HEADING_WIRE_SCALE: f32 = i16::MAX as f32 / std::f32::consts::PI;
 const SAMPLE_TRAVEL_PX: f32 = 64.0;
 const SAMPLE_TURN_RAD: f32 = 0.25;
-const TRACK_HALF_LENGTH_PX: f32 = 25.0;
-const TRACK_HALF_WIDTH_PX: f32 = 16.0;
-const TURN_CONTACT_RADIUS_PX: f32 = 29.0;
 const MAX_ACTIVE_POSES: usize = 8;
 const MAX_CENTER_SPAN_PX: f32 = 512.0;
 const MAX_FINALIZED_TRAILS: usize = 4_096;
@@ -156,16 +153,21 @@ impl TankTrailStore {
             .iter()
             .filter(|entity| entity.kind == EntityKind::Tank && entity.hp > 0)
             .filter_map(|entity| {
-                TankTrailPose::from_world(entity.pos_x, entity.pos_y, entity.facing(), map)
-                    .map(|pose| (entity.id, entity.owner, pose))
+                TankTrailPose::from_world(entity.pos_x, entity.pos_y, entity.facing(), map).map(
+                    |pose| {
+                        let (dx, dy) = entity.movement_delta();
+                        let moved_this_tick = dx.hypot(dy) > 0.05;
+                        (entity.id, entity.owner, pose, moved_this_tick)
+                    },
+                )
             })
             .collect::<Vec<_>>();
         let alive = observations
             .iter()
-            .map(|(id, _, _)| *id)
+            .map(|(id, _, _, _)| *id)
             .collect::<BTreeSet<_>>();
         let mut pending = Vec::new();
-        for (tank_id, owner, pose) in observations {
+        for (tank_id, owner, pose, moved_this_tick) in observations {
             let Some(mut active) = self.active_by_tank.remove(&tank_id) else {
                 self.active_by_tank.insert(
                     tank_id,
@@ -178,7 +180,12 @@ impl TankTrailStore {
                 );
                 continue;
             };
-            if contact_motion(active.last_observed, pose) > 0.05 {
+            // Checkpoint poses are quantized to four world pixels. At normal speed a diagonally
+            // moving tank can legitimately retain the same packed pose for two ticks, so packed
+            // pose equality alone must not classify it as stopped and fragment its trail. The
+            // movement system's post-tick delta supplies the unquantized translation evidence;
+            // packed contact motion still catches pivots and collision shoves.
+            if moved_this_tick || contact_motion(active.last_observed, pose) > 0.05 {
                 active.last_motion_tick = tick;
             }
             active.last_observed = pose;
@@ -235,7 +242,7 @@ impl TankTrailStore {
                 }
                 active.poses = continuity
                     .filter(|last| {
-                        center_span(&[ *last, active.last_observed]) <= MAX_CENTER_SPAN_PX
+                        center_span(&[*last, active.last_observed]) <= MAX_CENTER_SPAN_PX
                     })
                     .map_or_else(
                         || vec![active.last_observed],
@@ -447,11 +454,6 @@ fn trail_fully_visible(trail: &FinalizedTankTrail, player: u32, fog: &Fog, map: 
     (min_ty..=max_ty).all(|ty| (min_tx..=max_tx).all(|tx| fog.is_visible(player, tx, ty)))
 }
 
-fn contact_motion(a: TankTrailPose, b: TankTrailPose) -> f32 {
-    let travel = (b.x() - a.x()).hypot(b.y() - a.y());
-    travel + shortest_angle_delta(a.heading(), b.heading()).abs() * TURN_CONTACT_RADIUS_PX
-}
-
 fn sample_needed(a: TankTrailPose, b: TankTrailPose) -> bool {
     (b.x() - a.x()).hypot(b.y() - a.y()) >= SAMPLE_TRAVEL_PX
         || shortest_angle_delta(a.heading(), b.heading()).abs() >= SAMPLE_TURN_RAD
@@ -480,20 +482,8 @@ fn center_span(poses: &[TankTrailPose]) -> f32 {
     (max_x - min_x).max(max_y - min_y)
 }
 
-fn world_pose_bounds(x: f32, y: f32, heading: f32) -> (f32, f32, f32, f32) {
-    let cos = heading.cos().abs();
-    let sin = heading.sin().abs();
-    let extent_x = TRACK_HALF_LENGTH_PX * cos + TRACK_HALF_WIDTH_PX * sin;
-    let extent_y = TRACK_HALF_LENGTH_PX * sin + TRACK_HALF_WIDTH_PX * cos;
-    (x - extent_x, y - extent_y, x + extent_x, y + extent_y)
-}
-
 fn normalize_angle(angle: f32) -> f32 {
     angle.sin().atan2(angle.cos())
-}
-
-fn shortest_angle_delta(from: f32, to: f32) -> f32 {
-    normalize_angle(to - from)
 }
 
 #[cfg(test)]

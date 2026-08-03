@@ -5,9 +5,29 @@ use serde::{Deserialize, Serialize};
 use crate::config;
 use crate::game::map::Map;
 
-use super::{
-    contact_motion, shortest_angle_delta, world_pose_bounds, FinalizedTankTrail, TankTrailPose,
-};
+use super::{FinalizedTankTrail, TankTrailPose};
+
+const TRACK_HALF_LENGTH_PX: f32 = 25.0;
+const TRACK_HALF_WIDTH_PX: f32 = 16.0;
+const TURN_CONTACT_RADIUS_PX: f32 = 29.0;
+
+pub(super) fn contact_motion(a: TankTrailPose, b: TankTrailPose) -> f32 {
+    let travel = (b.x() - a.x()).hypot(b.y() - a.y());
+    travel + shortest_angle_delta(a.heading(), b.heading()).abs() * TURN_CONTACT_RADIUS_PX
+}
+
+pub(super) fn shortest_angle_delta(from: f32, to: f32) -> f32 {
+    let delta = to - from;
+    delta.sin().atan2(delta.cos())
+}
+
+fn world_pose_bounds(x: f32, y: f32, heading: f32) -> (f32, f32, f32, f32) {
+    let cos = heading.cos().abs();
+    let sin = heading.sin().abs();
+    let extent_x = TRACK_HALF_LENGTH_PX * cos + TRACK_HALF_WIDTH_PX * sin;
+    let extent_y = TRACK_HALF_LENGTH_PX * sin + TRACK_HALF_WIDTH_PX * cos;
+    (x - extent_x, y - extent_y, x + extent_x, y + extent_y)
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

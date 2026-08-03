@@ -248,6 +248,9 @@ assert(
 
 {
   const restorePixi = installFakePixi();
+  const priorPerformance = globalThis.performance;
+  let now = 0;
+  globalThis.performance = { now: () => now };
   try {
     const map = { width: 4, height: 4, tileSize: 32 };
     const layer = new PIXI.Container();
@@ -289,12 +292,20 @@ assert(
     }]) === 1 && decalLayer.diagnostics().tankTreads.totalSegments === 2,
     "unseen checkpointed trail chunks still paint through the tiled tread layer");
 
+    now = 40;
+    decalLayer.stampLiveTankTreads([]);
+    now = 80;
+    assert(decalLayer.stampLiveTankTreads([{ ...tank, x: 96 }]) === 0 &&
+      decalLayer.tankTreads.poses.get(tank.id)?.x === 96,
+    "a tank that leaves fog is forgotten even between uploads, so reappearance starts a new trail");
+
     const trenchLayer = new TrenchDecalLayer({ layer: new PIXI.Container() });
     trenchLayer.resetForMap(map);
     trenchLayer.drawSnapshot([{ id: 2, x: 64, y: 64, radiusTiles: 0.375 }], { tileSize: 32 });
     assert(trenchLayer.texture.sourceUpdateCount === 1 && trenchLayer.texture.textureUpdateCount === 0,
       "trenches upload dynamic canvas pixels through Pixi v8 TextureSource.update");
   } finally {
+    globalThis.performance = priorPerformance;
     restorePixi();
   }
 }

@@ -44,7 +44,7 @@ struct PlayerCheckpointRef<'a, T> {
 }
 
 const CHECKPOINT_SCHEMA: &str = "rts.gameCheckpoint";
-const CHECKPOINT_VERSION: u32 = 2;
+const CHECKPOINT_VERSION: u32 = rts_contract::GAME_CHECKPOINT_CURRENT_VERSION;
 // Construction funding and tank-trail ownership are authoritative state. Keep older payloads
 // outside this compatibility boundary instead of silently guessing missing fields.
 const SIM_SCHEMA_VERSION: u32 = 4;

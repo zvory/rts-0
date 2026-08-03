@@ -47,9 +47,8 @@ pub use rts_contract::{
     RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
     RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState, ScoutPlaneStateView, SmokeCloudView,
     Snapshot, SnapshotNetStatus, StartPayload, TankTrailView, TeamId, TrenchView,
-    VisibilityCapabilities,
-    DEFAULT_FACTION_ID, MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX,
-    MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
+    VisibilityCapabilities, DEFAULT_FACTION_ID, GAME_CHECKPOINT_CURRENT_VERSION,
+    MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
 pub use server_message::ServerMessage;
 

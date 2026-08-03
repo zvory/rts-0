@@ -362,12 +362,9 @@ fn section_counts(snapshot: &Snapshot) -> BTreeMap<&'static str, u32> {
     insert_count(
         &mut counts,
         SECTION_GROUND_DECALS,
-        snapshot
-            .ground_decal_delta
-            .as_ref()
-            .map_or(0, |delta| {
-                delta.decals.len().saturating_add(delta.tank_trails.len())
-            }),
+        snapshot.ground_decal_delta.as_ref().map_or(0, |delta| {
+            delta.decals.len().saturating_add(delta.tank_trails.len())
+        }),
     );
     insert_count(
         &mut counts,

@@ -112,9 +112,7 @@ pub(super) fn encode_poses(poses: &[TankTrailPose]) -> String {
     STANDARD_NO_PAD.encode(bytes)
 }
 
-pub(super) fn decode_poses<E: serde::de::Error>(
-    encoded: &str,
-) -> Result<Vec<TankTrailPose>, E> {
+pub(super) fn decode_poses<E: serde::de::Error>(encoded: &str) -> Result<Vec<TankTrailPose>, E> {
     let bytes = STANDARD_NO_PAD
         .decode(encoded)
         .map_err(|_| E::custom("invalid tank trail pose encoding"))?;

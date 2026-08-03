@@ -6,7 +6,9 @@ use crate::{
     terrain, validate_map_doodads, Command, LabCheckpointScenarioV1, LabScenarioEntityIdRemap,
     LabSpawnEntitySpec, LabUpdateSpec, LabVisionMode, MapTile, TeamId, MAP_TILE_SIZE_PX,
 };
-use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
+use rts_contract::{
+    GAME_CHECKPOINT_CURRENT_VERSION, LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND,
+};
 
 pub const LAB_REPLAY_ARTIFACT_SCHEMA: &str = "rts.labReplay";
 pub const LAB_REPLAY_ARTIFACT_KIND: &str = "labReplay";
@@ -816,9 +818,9 @@ fn validate_checkpoint_header(
         )));
     }
     let version = required_u32(checkpoint, "version", label)?;
-    if version != 1 {
+    if version != GAME_CHECKPOINT_CURRENT_VERSION {
         return Err(invalid(format!(
-            "{label}.checkpointPayload version must be 1"
+            "{label}.checkpointPayload version must be {GAME_CHECKPOINT_CURRENT_VERSION}"
         )));
     }
     Ok(())

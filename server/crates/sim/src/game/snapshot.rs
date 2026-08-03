@@ -240,11 +240,12 @@ impl Game {
             ground_decal_views.len() + tank_trail_views.len()
                 <= MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA
         );
-        let ground_decal_delta = (ground_decal_after_revision < ground_decal_revision).then_some(GroundDecalDelta {
-            after_revision: ground_decal_after_revision,
-            decals: ground_decal_views,
-            tank_trails: tank_trail_views,
-        });
+        let ground_decal_delta =
+            (ground_decal_after_revision < ground_decal_revision).then_some(GroundDecalDelta {
+                after_revision: ground_decal_after_revision,
+                decals: ground_decal_views,
+                tank_trails: tank_trail_views,
+            });
 
         Snapshot {
             tick: self.state.tick,

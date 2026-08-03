@@ -9,6 +9,7 @@ const MIN_CONTACT_MOTION = 3;
 const UPLOAD_INTERVAL_MS = 100;
 const COVERAGE_CELL_WORLD_SIZE = 8;
 const COVERAGE_HEADING_BINS = 32;
+const MAX_LIVE_COVERAGE_CELLS = 65_536;
 
 /**
  * Renders approximate checkpointed tread history plus precise live marks for every tank currently
@@ -50,14 +51,26 @@ export class TankTreadLayer {
     if (!Array.isArray(entities) ||
         this.worldWidth <= 0 || this.worldHeight <= 0) return 0;
     const now = globalThis.performance?.now?.() ?? Date.now();
-    if (now < this.nextUploadAt) return 0;
-    const seen = new Set();
+    const visibleTanks = entities.filter((entity) => entity?.kind === KIND.TANK && entity.hp > 0 &&
+      Number.isSafeInteger(entity.id) && finitePose(entity));
+    const seen = new Set(visibleTanks.map((entity) => entity.id));
+    // Visibility is authoritative even between the bounded texture uploads. Forget a tank as soon
+    // as it leaves the projected entity set so a brief fog/smoke gap can never be bridged by an
+    // inferred trail when the same id reappears.
+    for (const id of this.poses.keys()) {
+      if (!seen.has(id)) this.poses.delete(id);
+    }
+    if (now < this.nextUploadAt) {
+      for (const entity of visibleTanks) {
+        if (!this.poses.has(entity.id)) {
+          this.poses.set(entity.id, treadPose(entity.x, entity.y, entity.facing));
+        }
+      }
+      return 0;
+    }
     const dirty = new Set();
     let stamped = 0;
-    for (const entity of entities) {
-      if (entity?.kind !== KIND.TANK || entity.hp <= 0 ||
-          !Number.isSafeInteger(entity.id) || !finitePose(entity)) continue;
-      seen.add(entity.id);
+    for (const entity of visibleTanks) {
       const previous = this.poses.get(entity.id);
       const current = treadPose(entity.x, entity.y, entity.facing, previous);
       if (!previous) {
@@ -73,9 +86,6 @@ export class TankTreadLayer {
         this._rememberLiveCoverage(segment);
       }
       this.poses.set(entity.id, current);
-    }
-    for (const id of this.poses.keys()) {
-      if (!seen.has(id)) this.poses.delete(id);
     }
     if (stamped > 0) {
       this.nextUploadAt = now + UPLOAD_INTERVAL_MS;
@@ -186,6 +196,10 @@ export class TankTreadLayer {
   _rememberLiveCoverage(segment) {
     for (const pose of coveragePoses(segment)) {
       this.liveCoverage.add(coverageKey(pose.x, pose.y, pose.facing, this.worldWidth));
+    }
+    while (this.liveCoverage.size > MAX_LIVE_COVERAGE_CELLS) {
+      const oldest = this.liveCoverage.values().next().value;
+      this.liveCoverage.delete(oldest);
     }
   }
 
