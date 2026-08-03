@@ -93,17 +93,6 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
 }
 
 {
-  const profile = getVisualProfile("terrain-blend-showcase");
-  assert(profile?.terrainPreviewReveal === true, "terrain showcase requests a fog-free Lab-only review");
-  assert(
-    profile.initialCamera?.focus?.x === 2016 &&
-      profile.initialCamera?.focus?.y === 2016 &&
-      profile.initialCamera?.framingScale === 0.58,
-    "terrain showcase uses the 1v1 terrain-matrix framing",
-  );
-}
-
-{
   assert(getVisualProfile("unit-rig-overrides-1") === null, "retired Tank SVG override profile is no longer registered");
   assert(visualUnitRigCandidateIds().length === 0, "raster units do not retain checked-in SVG candidates");
   const unitOverrides = TEST_WORKER_OVERRIDES;

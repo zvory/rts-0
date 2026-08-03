@@ -151,13 +151,6 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     staticSamples: TRENCH_VARIANTS_1_STATIC_SAMPLES,
   }),
   Object.freeze({
-    id: "terrain-blend-showcase",
-    label: "Terrain blend showcase",
-    description: "Fog-free Lab framing for the production stochastic terrain transition matrix.",
-    initialCamera: cameraSnapshot(2016, 2016, 0.58),
-    terrainPreviewReveal: true,
-  }),
-  Object.freeze({
     id: "rifleman-recoil-strip-1",
     label: "Rifleman recoil strip 1",
     description: "Local checked-in profile for previewing Rifleman firing recoil frames in the render-preview lab scenario.",
