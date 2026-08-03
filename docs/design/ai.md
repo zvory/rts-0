@@ -51,12 +51,48 @@ rts-ai may depend on the public simulation API, rules, protocol, and contract cr
 import the server shell, lobby internals, transport layer, or private simulation modules. New AI
 observations must be added as a public fog-respecting Game or snapshot surface.
 
+### Typed authoring SDK
+
+`rts_ai::sdk` is the supported Rust authoring seam for custom strategies. An `AiController` built
+with `AiController::with_strategy(player, Box<dyn AiStrategy>)` runs in the same canonical driver
+as profile controllers. The object-safe `AiStrategy: Send` lifecycle calls `initialize` exactly
+once immediately before the first `step`; both calls occur only on the player's normal nine-tick,
+staggered decision cadence. Strategies have no required constructor, async lifecycle, associated
+types, checkpoint contract, or direct simulation access.
+
+`AiFrame` is an owned, read-only normalization of public start data, the player's
+`snapshot_for(player)` result, the host-selected alive-player set, and controller-inferred
+submitted-build bookkeeping. The frame adapter is the only production path that parses raw
+start/snapshot DTOs into strategy-visible kind, state, production, upgrade, terrain, resource, and
+memory facts. Its collections use stable id ordering; completed upgrades and submitted builds are
+additionally sorted and deduplicated.
+Owned entities, currently visible allies, currently visible enemies, and remembered contacts are
+separate collections. A remembered contact is stale last-seen knowledge, never a current target.
+
+Static resource locations are public, but `AiResourceAmount::Unknown` is retained until a
+recipient-scoped resource delta or visible node reveals a quantity. The public frame never exposes
+the historical synthetic `remaining = 1` value or the policy-derived `free_for_combat` flag.
+Likewise, `AiBuildObservation` means only that this controller inferred an outstanding submitted
+build; it is not an accepted, legal, or active-build receipt.
+
+`AiActions` retains at most 256 `AiActionRequest`s in call order for one step. The Phase 3 action
+vocabulary covers move, attack-move, direct attack, gather, build, train, research, hold-position,
+and Anti-Tank Gun setup. The host translates finalized requests into ordinary `SimCommand`s only
+after the strategy returns; canonical controller ordering, all-controller observation before any
+enqueue, worker-retreat-first ordering, normal command validation, and replay logging are
+unchanged. Rich planners, reservations, budgets, task handles, acceptance results, and uncommon
+actions are intentionally not part of this seam yet.
+
 ### Shared decision core
 
-Each controller runs on a staggered cadence and constructs a constrained snapshot-backed
-AiObservation. The generic decision loop applies the selected AiProfile policy and emits ordinary
-commands through the shared action helpers. A local per-think budget prevents resource and supply
-overcommitment.
+Each controller runs on a staggered cadence and constructs the typed `AiFrame`. Built-in profiles
+run through the crate-private `LegacyProfileStrategy`, which projects that frame back into the
+internal `AiObservation` before the generic decision loop applies the selected `AiProfile` policy.
+That compatibility projection alone preserves the historical false `is_ai` value, synthetic
+unknown-resource amount, `free_for_combat` derivation, and old sorting/filtering rules; these quirks
+are not represented as truthful SDK facts. The direct legacy observation constructor remains only
+as a test oracle for field-for-field projection checks. Existing shared action helpers and their
+local per-think budget continue to prevent resource and supply overcommitment.
 
 The core also owns static map analysis derived only from StartPayload map terrain, start tiles, and
 static resource nodes. When nearby steel is split into fields around the City Centre, defensive

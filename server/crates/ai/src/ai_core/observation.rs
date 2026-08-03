@@ -1,10 +1,22 @@
+#[cfg(test)]
 use std::collections::BTreeMap;
 
+#[cfg(test)]
 use rts_rules;
-use rts_sim::game::entity::{EntityKind, NEUTRAL};
-use rts_sim::game::upgrade::{self, UpgradeKind};
+use rts_sim::game::entity::EntityKind;
+#[cfg(test)]
+use rts_sim::game::entity::NEUTRAL;
+#[cfg(test)]
+use rts_sim::game::upgrade;
+use rts_sim::game::upgrade::UpgradeKind;
 use rts_sim::game::TeamId;
+#[cfg(test)]
 use rts_sim::protocol::{states, EntityView, Snapshot, StartPayload};
+
+use crate::sdk::{
+    AiBuildObservationPhase, AiCompletion, AiEntity as SdkEntity, AiEntityState as SdkEntityState,
+    AiFrame, AiResourceAmount,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct AiMapSummary {
@@ -44,6 +56,7 @@ pub(crate) enum AiEntityState {
 }
 
 impl AiEntityState {
+    #[cfg(test)]
     pub(crate) fn from_protocol_state(state: &str) -> Self {
         match state {
             states::IDLE => Self::Idle,
@@ -128,16 +141,104 @@ pub(crate) struct AiObservation {
 }
 
 impl AiObservation {
-    #[allow(dead_code)]
+    pub(crate) fn from_frame(frame: &AiFrame) -> Option<Self> {
+        let own_start_tile = frame
+            .players()
+            .iter()
+            .find(|player| player.id == frame.player_id())?
+            .start_tile;
+        let players = frame
+            .players()
+            .iter()
+            .map(|player| AiPlayerSummary {
+                id: player.id,
+                team_id: player.team_id,
+                start_tile: player.start_tile,
+                // Historical profile observations intentionally ignored the start-payload flag.
+                is_ai: false,
+                is_alive: player.is_alive,
+            })
+            .collect();
+        let owned = frame.owned().iter().map(project_entity).collect();
+        let visible_allies = frame.visible_allies().iter().map(project_entity).collect();
+        let visible_enemies = frame.visible_enemies().iter().map(project_entity).collect();
+        let resources = frame
+            .resources()
+            .iter()
+            .map(|resource| AiResourceSummary {
+                id: resource.id,
+                kind: resource.kind,
+                x: resource.position.0,
+                y: resource.position.1,
+                // Compatibility-only synthetic availability. Public SDK consumers see Unknown.
+                remaining: match resource.remaining {
+                    AiResourceAmount::Unknown => 1,
+                    AiResourceAmount::Known(remaining) => remaining,
+                },
+            })
+            .collect();
+        let pending_builds = frame
+            .submitted_builds()
+            .iter()
+            .map(|build| AiBuildIntent {
+                worker_id: build.worker_id,
+                kind: build.kind,
+                tile_x: build.tile_x,
+                tile_y: build.tile_y,
+                phase: match build.phase {
+                    AiBuildObservationPhase::TravelingToSite => AiBuildIntentPhase::ToSite,
+                },
+            })
+            .collect();
+
+        Some(Self {
+            player_id: frame.player_id(),
+            tick: frame.tick(),
+            map: AiMapSummary {
+                width: frame.map().width,
+                height: frame.map().height,
+                tile_size: frame.map().tile_size,
+            },
+            economy: AiEconomy {
+                steel: frame.economy().steel,
+                oil: frame.economy().oil,
+                supply_used: frame.economy().supply_used,
+                supply_cap: frame.economy().supply_cap,
+            },
+            own_start_tile,
+            players,
+            owned,
+            resources,
+            visible_allies,
+            visible_enemies,
+            pending_builds,
+            upgrades: frame.completed_upgrades().to_vec(),
+        })
+    }
+
+    #[cfg(test)]
     pub(crate) fn from_selfplay_snapshot(
         start: &StartPayload,
         snapshot: &Snapshot,
         player_id: u32,
         pending_builds: impl IntoIterator<Item = AiBuildIntent>,
     ) -> Option<Self> {
-        Self::from_snapshot_with_alive(start, snapshot, player_id, pending_builds, None)
+        let pending_builds = pending_builds.into_iter().collect::<Vec<_>>();
+        let direct = Self::from_snapshot_with_alive(
+            start,
+            snapshot,
+            player_id,
+            pending_builds.iter().copied(),
+            None,
+        );
+        let projected = AiFrame::from_host(start, snapshot, player_id, pending_builds, None)
+            .as_ref()
+            .and_then(Self::from_frame);
+        assert_eq!(projected, direct);
+        direct
     }
 
+    #[cfg(test)]
     pub(crate) fn from_snapshot_with_alive(
         start: &StartPayload,
         snapshot: &Snapshot,
@@ -299,6 +400,38 @@ impl AiObservation {
     }
 }
 
+fn project_entity(entity: &SdkEntity) -> AiEntitySummary {
+    let state = match entity.state {
+        SdkEntityState::Idle => AiEntityState::Idle,
+        SdkEntityState::Move => AiEntityState::Move,
+        SdkEntityState::Attack => AiEntityState::Attack,
+        SdkEntityState::Gather => AiEntityState::Gather,
+        SdkEntityState::Build => AiEntityState::Build,
+        SdkEntityState::Train => AiEntityState::Train,
+        SdkEntityState::Construct => AiEntityState::Construct,
+        SdkEntityState::Dead => AiEntityState::Dead,
+        SdkEntityState::Unknown => AiEntityState::Unknown,
+    };
+    AiEntitySummary {
+        id: entity.id,
+        owner: entity.owner,
+        kind: entity.kind,
+        x: entity.position.0,
+        y: entity.position.1,
+        hp: entity.health.current,
+        state,
+        is_complete: matches!(entity.completion, AiCompletion::Complete),
+        production_queue_len: entity.production.map(|production| production.queue_len),
+        production_kind: entity
+            .production
+            .and_then(|production| production.current_kind),
+        latched_node: entity.latched_resource,
+        target_id: entity.target,
+        free_for_combat: snapshot_free_for_combat(state, entity.target),
+    }
+}
+
+#[cfg(test)]
 fn entity_owner_is_enemy(
     players: &[AiPlayerSummary],
     player_id: u32,
@@ -313,6 +446,7 @@ fn entity_owner_is_enemy(
             .unwrap_or(false)
 }
 
+#[cfg(test)]
 fn entity_owner_is_ally(players: &[AiPlayerSummary], own_team_id: TeamId, owner: u32) -> bool {
     own_team_id != 0
         && players
@@ -323,6 +457,7 @@ fn entity_owner_is_ally(players: &[AiPlayerSummary], own_team_id: TeamId, owner:
 }
 
 impl AiEntitySummary {
+    #[cfg(test)]
     fn from_entity_view(view: &EntityView) -> Option<Self> {
         let kind: EntityKind = view.kind.parse().ok()?;
         let state = AiEntityState::from_protocol_state(&view.state);
@@ -348,6 +483,7 @@ impl AiEntitySummary {
 }
 
 impl AiResourceSummary {
+    #[cfg(test)]
     fn from_entity_view(view: &EntityView) -> Option<Self> {
         let kind: EntityKind = view.kind.parse().ok()?;
         kind.is_node().then_some(Self {
@@ -360,6 +496,7 @@ impl AiResourceSummary {
     }
 }
 
+#[cfg(test)]
 fn production_queue_len(kind: EntityKind, queue_len: usize) -> Option<usize> {
     (!rts_rules::economy::trainable_units(kind).is_empty()
         || !upgrade::researchable_upgrades(kind).is_empty())
