@@ -27,6 +27,7 @@ import {
   isProducerBuilding,
 } from "./config.js";
 import { minimapTerrainColor, minimapTerrainStyleSignature } from "./minimap_terrain.js";
+import { MinimapRoadLayer } from "./minimap_road_layer.js";
 import {
   artilleryFireRadiusTiles,
   artilleryMinFireRadiusTiles,
@@ -174,6 +175,11 @@ export class Minimap {
     this._terrainLayer = null;
     this._terrainLayerCtx = null;
     this._terrainLayerSignature = null;
+    this._roadMarkingLayer = new MinimapRoadLayer({
+      createCanvas: () => this._createStaticCanvas(),
+      onInvalidation: (prev, next) => this._recordMinimapInvalidation("road", prev, next),
+      onDiagnostic: (label) => this._recordMinimapDiagnostic(label),
+    });
     this._resourceLayer = null;
     this._resourceLayerCtx = null;
     this._resourceLayerSignature = null;
@@ -258,6 +264,7 @@ export class Minimap {
 
   _invalidateStaticLayers() {
     this._terrainLayerSignature = null;
+    this._roadMarkingLayer.invalidate();
     this._resourceLayerSignature = null;
     this._fogLayerSignature = null;
   }
@@ -309,6 +316,10 @@ export class Minimap {
     this._drawTerrainLayer();
     this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
     this._drawFog();
+    this._roadMarkingLayer.draw({
+      ctx: this.ctx, map: this._renderMap(), size: this.size,
+      scale: this._scale, offX: this._offX, offY: this._offY,
+      presentation: this._canvasPresentationSignature() });
     this._drawResourceLayer();
     this._drawPlayerOwnedEntityOutline(entities);
     this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
@@ -969,6 +980,7 @@ export class Minimap {
     this._terrainLayer = null;
     this._terrainLayerCtx = null;
     this._terrainLayerSignature = null;
+    this._roadMarkingLayer.destroy();
     this._resourceLayer = null;
     this._resourceLayerCtx = null;
     this._resourceLayerSignature = null;
