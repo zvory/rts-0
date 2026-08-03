@@ -50,7 +50,6 @@ import {
   underAttackFlashEntityIds,
 } from "./minimap_alerts.js";
 import { createInlineSvgImage } from "./minimap_icon_image.js";
-import { captureMinimapPng } from "./minimap_capture.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
 
@@ -198,7 +197,6 @@ export class Minimap {
     this._artilleryIconImage = options.artilleryIconImage || null;
     this._artilleryIconReady = !!this._artilleryIconImage;
     this._artilleryIconLoadController = null;
-    this._capturePresentation = false;
     if (!this._artilleryIconImage && options.artilleryIconMarkup) {
       this._artilleryIconLoadController = typeof globalThis.AbortController === "function"
         ? new globalThis.AbortController()
@@ -300,7 +298,7 @@ export class Minimap {
   // --- Rendering -------------------------------------------------------------
 
   /** Draw the full minimap for the current frame. */
-  render(frameViews = null, { profiler = null } = {}) {
+  render(frameViews = null, { profiler = null, capturePresentation = false } = {}) {
     this._profiler = profiler || null;
     const ctx = this.ctx;
     if (!ctx) return;
@@ -325,19 +323,9 @@ export class Minimap {
     this._drawResourceLayer();
     this._drawPlayerOwnedEntityOutline(entities);
     this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
-    if (!this._capturePresentation) {
-      this._drawArtilleryFiringMarkers(now);
-      this._drawViewport();
-      this._drawPings(now);
-    }
-  }
-
-  /** Render the production minimap at an exact square size without gameplay transients. */
-  capturePng(dimensions) {
-    return captureMinimapPng(this.canvas, this.ctx, dimensions, {
-      render: () => this.render(),
-      presentation: (value) => value == null ? this._capturePresentation : (this._capturePresentation = value),
-    });
+    if (!capturePresentation) this._drawArtilleryFiringMarkers(now);
+    if (!capturePresentation) this._drawViewport();
+    if (!capturePresentation) this._drawPings(now);
   }
 
   /**

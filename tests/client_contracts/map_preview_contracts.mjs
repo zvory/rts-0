@@ -6,7 +6,7 @@ import path from "node:path";
 import { mapPreviewLaunchConfig } from "../../client/src/map_preview_launch.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { Fog } from "../../client/src/fog.js";
-import { Minimap } from "../../client/src/minimap.js";
+import { captureMinimapPng } from "../../client/src/minimap_capture.js";
 import {
   analyzeRgba,
   MAP_PREVIEW_LIMITS,
@@ -67,10 +67,11 @@ assert.deepEqual(analyzeRgba(Uint8Array.from([0, 0, 0, 255, 1, 2, 3, 255])), {
   const minimap = {
     canvas: { width: 220, height: 220, toDataURL: () => "data:image/png;base64,minimap" },
     ctx: { getImageData: () => ({ data: Uint8ClampedArray.from([1, 2, 3, 255]) }) },
-    _capturePresentation: false,
-    render() { calls.push({ width: this.canvas.width, capture: this._capturePresentation }); },
+    render(_frameViews, { capturePresentation = false } = {}) {
+      calls.push({ width: this.canvas.width, capture: capturePresentation });
+    },
   };
-  const result = Minimap.prototype.capturePng.call(minimap, { width: 1, height: 1 });
+  const result = captureMinimapPng(minimap, { width: 1, height: 1 });
   assert.equal(result.pngDataUrl, "data:image/png;base64,minimap");
   assert.deepEqual(calls, [
     { width: 1, capture: true },
@@ -285,9 +286,10 @@ function createBridgeFixture({ renderDelayMs = 0 } = {}) {
   };
   const minimap = {
     captureCalls: [],
-    capturePng(request) {
-      this.captureCalls.push(request);
-      return { pngDataUrl: "data:image/png;base64,minimap", rgba };
+    canvas: { width: 220, height: 220, toDataURL: () => "data:image/png;base64,minimap" },
+    ctx: { getImageData: () => ({ data: rgba }) },
+    render(_frameViews, { capturePresentation = false } = {}) {
+      if (capturePresentation) this.captureCalls.push({ width: this.canvas.width, height: this.canvas.height });
     },
   };
   const match = {

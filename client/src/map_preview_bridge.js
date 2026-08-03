@@ -1,3 +1,5 @@
+import { captureMinimapPng } from "./minimap_capture.js";
+
 export const MAP_PREVIEW_LIMITS = Object.freeze({
   minDimension: 64,
   maxDimension: 4096,
@@ -119,7 +121,7 @@ export class MapPreviewBridge {
     const match = this.match;
     signal.throwIfAborted();
     match.fog?.setRevealAll?.(true);
-    const pixels = match.minimap.capturePng({ width: request.width, height: request.height });
+    const pixels = captureMinimapPng(match.minimap, { width: request.width, height: request.height });
     signal.throwIfAborted();
     const content = analyzeRgba(pixels.rgba);
     assertNonblank(content);

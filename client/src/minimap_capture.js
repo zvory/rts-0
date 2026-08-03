@@ -1,18 +1,14 @@
-/** Exact-size PNG export lifecycle shared by UI and automation through Minimap.capturePng. */
-export function captureMinimapPng(canvas, ctx, { width, height }, lifecycle) {
+/** Render the production minimap at an exact square size without gameplay transients. */
+export function captureMinimapPng(minimap, { width, height }) {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || width !== height) {
     throw new RangeError("Minimap PNG capture requires matching positive integer dimensions.");
   }
-  const original = {
-    width: canvas.width,
-    height: canvas.height,
-    presentation: lifecycle.presentation(),
-  };
+  const { canvas, ctx } = minimap;
+  const original = { width: canvas.width, height: canvas.height };
   try {
-    lifecycle.presentation(true);
     canvas.width = width;
     canvas.height = height;
-    lifecycle.render();
+    minimap.render(null, { capturePresentation: true });
     return Object.freeze({
       width,
       height,
@@ -22,7 +18,6 @@ export function captureMinimapPng(canvas, ctx, { width, height }, lifecycle) {
   } finally {
     canvas.width = original.width;
     canvas.height = original.height;
-    lifecycle.presentation(original.presentation);
-    lifecycle.render();
+    minimap.render();
   }
 }
