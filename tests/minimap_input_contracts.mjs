@@ -7,6 +7,7 @@ import { CommandInteraction } from "../client/src/command_interaction.js";
 import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import { Minimap } from "../client/src/minimap.js";
 import { runMinimapAttackAlertContracts } from "./minimap_attack_alert_contracts.mjs";
+import { runMinimapRoadContracts } from "./minimap_road_contracts.mjs";
 import {
   ABILITIES,
   ARTILLERY_BLANKET_RADIUS_TILES,
@@ -1531,7 +1532,6 @@ function pointerEvent(canvas, clientX, clientY, {
   );
   minimap.destroy();
 }
-
 // Destroy unregisters the zone so rematches cannot double-fire stale minimap handlers.
 {
   const h = minimapHarness();
@@ -1539,7 +1539,6 @@ function pointerEvent(canvas, clientX, clientY, {
   h.minimap.destroy();
   assert(!h.router.pointerDown(lockedEvent(150, 250, 0)), "minimap zone is unregistered after destroy");
 }
-
 runMinimapAttackAlertContracts();
-
+runMinimapRoadContracts();
 console.log("minimap_input_contracts: ok");
