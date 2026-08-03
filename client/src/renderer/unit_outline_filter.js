@@ -25,6 +25,7 @@ void main(void) {
 
 const UNIT_OUTLINE_FRAGMENT = `
 in vec2 vTextureCoord;
+out vec4 finalColor;
 
 uniform sampler2D uTexture;
 uniform highp vec4 uInputSize;
@@ -33,25 +34,29 @@ uniform float uAlpha;
 
 void main(void) {
   vec2 texel = uInputSize.zw * uThickness;
-  float centerAlpha = texture2D(uTexture, vTextureCoord).a;
+  float centerAlpha = texture(uTexture, vTextureCoord).a;
   float neighborAlpha = 0.0;
-  neighborAlpha = max(neighborAlpha, texture2D(uTexture, vTextureCoord + vec2( texel.x, 0.0)).a);
-  neighborAlpha = max(neighborAlpha, texture2D(uTexture, vTextureCoord + vec2(-texel.x, 0.0)).a);
-  neighborAlpha = max(neighborAlpha, texture2D(uTexture, vTextureCoord + vec2(0.0,  texel.y)).a);
-  neighborAlpha = max(neighborAlpha, texture2D(uTexture, vTextureCoord + vec2(0.0, -texel.y)).a);
-  neighborAlpha = max(neighborAlpha, texture2D(uTexture, vTextureCoord + vec2( texel.x,  texel.y)).a);
-  neighborAlpha = max(neighborAlpha, texture2D(uTexture, vTextureCoord + vec2(-texel.x,  texel.y)).a);
-  neighborAlpha = max(neighborAlpha, texture2D(uTexture, vTextureCoord + vec2( texel.x, -texel.y)).a);
-  neighborAlpha = max(neighborAlpha, texture2D(uTexture, vTextureCoord + vec2(-texel.x, -texel.y)).a);
+  neighborAlpha = max(neighborAlpha, texture(uTexture, vTextureCoord + vec2( texel.x, 0.0)).a);
+  neighborAlpha = max(neighborAlpha, texture(uTexture, vTextureCoord + vec2(-texel.x, 0.0)).a);
+  neighborAlpha = max(neighborAlpha, texture(uTexture, vTextureCoord + vec2(0.0,  texel.y)).a);
+  neighborAlpha = max(neighborAlpha, texture(uTexture, vTextureCoord + vec2(0.0, -texel.y)).a);
+  neighborAlpha = max(neighborAlpha, texture(uTexture, vTextureCoord + vec2( texel.x,  texel.y)).a);
+  neighborAlpha = max(neighborAlpha, texture(uTexture, vTextureCoord + vec2(-texel.x,  texel.y)).a);
+  neighborAlpha = max(neighborAlpha, texture(uTexture, vTextureCoord + vec2( texel.x, -texel.y)).a);
+  neighborAlpha = max(neighborAlpha, texture(uTexture, vTextureCoord + vec2(-texel.x, -texel.y)).a);
   float outlineAlpha = max(0.0, neighborAlpha - centerAlpha) * uAlpha;
-  gl_FragColor = vec4(vec3(outlineAlpha), outlineAlpha);
+  finalColor = vec4(vec3(outlineAlpha), outlineAlpha);
 }
 `;
 
 /** Derive a white outer edge from the alpha of the actual rendered unit rig. */
 export function createUnitOutlineFilter(pixi = globalThis.PIXI) {
-  if (typeof pixi?.Filter !== "function" || typeof pixi?.GlProgram?.from !== "function") {
-    throw new Error("Pixi unit outlines require Filter and GlProgram support");
+  if (
+    typeof pixi?.Filter !== "function"
+    || typeof pixi?.GlProgram?.from !== "function"
+    || typeof pixi?.UniformGroup !== "function"
+  ) {
+    throw new Error("Pixi unit outlines require Filter, GlProgram, and UniformGroup support");
   }
   const filter = new pixi.Filter({
     glProgram: pixi.GlProgram.from({
@@ -60,10 +65,10 @@ export function createUnitOutlineFilter(pixi = globalThis.PIXI) {
       name: "unit-alpha-outline",
     }),
     resources: {
-      outlineUniforms: {
+      outlineUniforms: new pixi.UniformGroup({
         uThickness: { value: 1.65, type: "f32" },
         uAlpha: { value: 0.96, type: "f32" },
-      },
+      }),
     },
   });
   filter.padding = 3;

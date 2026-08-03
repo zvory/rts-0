@@ -117,12 +117,20 @@ try {
 
   const filter = createUnitOutlineFilter(PIXI);
   const fragment = filter.options.glProgram.options.fragment;
-  assert.match(fragment, /texture2D\(uTexture, vTextureCoord\)\.a/,
+  assert.match(fragment, /texture\(uTexture, vTextureCoord\)\.a/,
     "the filter reads the rendered unit's real alpha");
   assert.match(fragment, /neighborAlpha - centerAlpha/,
     "the filter emits only the silhouette's outer edge");
-  assert.doesNotMatch(fragment, /texture2D\([^;]+\)\.rgb/,
+  assert.doesNotMatch(fragment, /texture\([^;]+\)\.rgb/,
     "the filter never copies faction-colored pixels from the duplicated rig");
+  assert.match(fragment, /out vec4 finalColor;/,
+    "the WebGL2 shader declares an explicit fragment output");
+  assert.doesNotMatch(fragment, /\b(?:texture2D|gl_FragColor)\b/,
+    "the Pixi v8 WebGL2 shader does not use legacy GLSL output or sampling syntax");
+  assert.equal(filter.padding, 3, "the filter surface leaves room for the expanded silhouette");
+  assert.equal(filter.resources.outlineUniforms.uniforms.uThickness.value, 1.65,
+    "the outline uses the configured compact sampling radius through a Pixi uniform group");
+  filter.destroy();
 
   const hpCalls = [];
   _drawAboveFogHp.call({

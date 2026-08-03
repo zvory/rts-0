@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::game::entity::{Entity, EntityKind, EntityStore, WeaponSetup};
 use crate::game::fog::Fog;
+use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::protocol::RememberedAntiTankGunView;
@@ -26,42 +27,66 @@ pub(crate) struct AntiTankGunMemory {
     entries: HashMap<(u32, u32), AntiTankGunMemoryEntry>,
 }
 
-impl AntiTankGunMemory {
-    pub(crate) fn refresh(
-        &mut self,
-        player_ids: &[u32],
-        entities: &EntityStore,
-        fog: &Fog,
-        smokes: &SmokeCloudStore,
-        teams: &TeamRelations,
+pub(in crate::game) struct ObservationContext<'a> {
+    entities: &'a EntityStore,
+    fog: &'a Fog,
+    map: &'a Map,
+    smokes: &'a SmokeCloudStore,
+    teams: &'a TeamRelations,
+    tick: u32,
+}
+
+impl<'a> ObservationContext<'a> {
+    pub(in crate::game) fn new(
+        entities: &'a EntityStore,
+        fog: &'a Fog,
+        map: &'a Map,
+        smokes: &'a SmokeCloudStore,
+        teams: &'a TeamRelations,
         tick: u32,
-    ) {
+    ) -> Self {
+        Self {
+            entities,
+            fog,
+            map,
+            smokes,
+            teams,
+            tick,
+        }
+    }
+}
+
+impl AntiTankGunMemory {
+    pub(crate) fn refresh(&mut self, player_ids: &[u32], context: ObservationContext<'_>) {
         for &player_id in player_ids {
-            self.refresh_player(player_id, entities, fog, smokes, teams, tick);
+            self.refresh_player(player_id, &context);
         }
     }
 
-    fn refresh_player(
-        &mut self,
-        player_id: u32,
-        entities: &EntityStore,
-        fog: &Fog,
-        smokes: &SmokeCloudStore,
-        teams: &TeamRelations,
-        tick: u32,
-    ) {
-        let team_players = teams.same_team_player_ids(player_id);
+    fn refresh_player(&mut self, player_id: u32, context: &ObservationContext<'_>) {
+        let team_players = context.teams.same_team_player_ids(player_id);
         let mut observed_ids = HashSet::new();
-        for entity in entities.iter() {
-            let visible = team_players.iter().copied().any(|team_player| {
-                projection::entity_visible_to_with_smoke(team_player, entity, fog, smokes)
+        for entity in context.entities.iter() {
+            let visible = !projection::entity_hidden_by_stealth_from_team(
+                player_id,
+                entity,
+                context.map,
+                context.fog,
+                context.teams,
+            ) && team_players.iter().copied().any(|team_player| {
+                projection::entity_visible_to_with_smoke(
+                    team_player,
+                    entity,
+                    context.fog,
+                    context.smokes,
+                )
             });
             if !visible {
                 continue;
             }
             observed_ids.insert(entity.id);
             let key = (player_id, entity.id);
-            match memory_entry_for_visible_enemy(player_id, entity, teams, tick) {
+            match memory_entry_for_visible_enemy(player_id, entity, context.teams, context.tick) {
                 Some(entry) => {
                     self.entries.insert(key, entry);
                 }
@@ -76,9 +101,11 @@ impl AntiTankGunMemory {
                 return true;
             }
             let remembered_position_visible = team_players.iter().copied().any(|team_player| {
-                fog.is_visible_without_firing_reveal_world(team_player, memory.x, memory.y)
+                context
+                    .fog
+                    .is_visible_without_firing_reveal_world(team_player, memory.x, memory.y)
             });
-            !remembered_position_visible || smokes.point_inside(memory.x, memory.y)
+            !remembered_position_visible || context.smokes.point_inside(memory.x, memory.y)
         });
     }
 
