@@ -2,10 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::protocol::TankTrailView;
+use crate::rules::leaves_tank_treads;
 
 mod checkpoint;
 mod geometry;
@@ -151,7 +152,7 @@ impl TankTrailStore {
         }
         let observations = entities
             .iter()
-            .filter(|entity| entity.kind == EntityKind::Tank && entity.hp > 0)
+            .filter(|entity| leaves_tank_treads(entity.kind) && entity.hp > 0)
             .filter_map(|entity| {
                 TankTrailPose::from_world(entity.pos_x, entity.pos_y, entity.facing(), map).map(
                     |pose| {

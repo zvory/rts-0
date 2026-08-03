@@ -5,9 +5,7 @@ use super::types::Phase;
 use super::RoomTask;
 use crate::protocol::ServerMessage;
 use rts_sim::game::{Game, ObserverView};
-
 const REQUEST_INTERVAL: Duration = Duration::from_millis(500);
-
 impl RoomTask {
     pub(super) fn on_request_ground_decals(
         &mut self,
@@ -63,7 +61,6 @@ impl RoomTask {
         );
     }
 }
-
 fn projected_delta(
     game: &Game,
     explicit_view: Option<&ObserverView>,
