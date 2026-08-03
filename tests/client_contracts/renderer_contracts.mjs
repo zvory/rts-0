@@ -1087,7 +1087,6 @@ function polygonAxisValues(points, offset) {
     const buildingsIndex = renderer.world.children.indexOf(renderer.layers.buildings);
     const hpIndex = renderer.world.children.indexOf(renderer.layers.hpBars);
     assert(rig && renderer.layers.buildings.children.includes(rig), "SVG building rig renders on the buildings layer");
-    assert(!renderer._iconPool, "building renderer omits legacy abbreviation labels");
     assert(
       !renderer._pools.buildingOverlays.has(entity.id),
       "under-construction building does not draw a separate building overlay progress bar",

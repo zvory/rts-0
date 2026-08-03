@@ -105,6 +105,7 @@ try {
 
   renderer._drawBuilding(entity, colorByOwner, state);
   const fallback = renderer._liveRigPools.buildingRigs.get(entity.id);
+  assert(!renderer._iconPool, "building renderer omits legacy abbreviation labels");
   assert(
     typeof fallback?.matches === "function",
     "building uses its SVG rig while the production atlas is unavailable",
