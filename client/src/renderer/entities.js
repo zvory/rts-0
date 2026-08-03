@@ -134,9 +134,11 @@ export function _vehicleShadow(g, cx, cy, body, facing) {
   gfxNoFill(g);
 }
 
-export function _drawSelectionAndHp(e, selection, state) {
+export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
   const selected = selection.has(e.id);
-  const damaged = e.maxHp && e.hp < e.maxHp;
+  const hasHealth = Number.isFinite(e.maxHp) && e.maxHp > 0;
+  const damaged = hasHealth && Number.isFinite(e.hp) && e.hp < e.maxHp;
+  const alwaysShow = !!state?.showHealthBarsAlwaysEnabled;
   const progressStatus = buildingProgressStatus(e);
 
   if (selected) {
@@ -164,21 +166,22 @@ export function _drawSelectionAndHp(e, selection, state) {
     gfxEllipse(g, 0, 0, ring.rx, ring.ry);
   }
 
-  if (progressStatus || damaged || selected) {
+  if (progressStatus || (hasHealth && (damaged || selected || alwaysShow))) {
     const g = this._hpBarSlot(e.id);
-    this._hpBar(g, e, progressStatus);
+    this._hpBar(g, e, progressStatus, ownerColor);
   }
 }
 
-export function _drawAboveFogHp(e) {
+export function _drawAboveFogHp(e, state, ownerColor = null) {
+  const hasHealth = Number.isFinite(e?.maxHp) && e.maxHp > 0;
   const damaged = Number.isFinite(e?.hp)
-    && Number.isFinite(e?.maxHp)
-    && e.maxHp > 0
+    && hasHealth
     && e.hp < e.maxHp;
   if (e?.aboveFogReveal !== true && e?.visionOnly !== true) return;
-  if (!damaged) return;
+  if (!hasHealth) return;
+  if (!damaged && !state?.showHealthBarsAlwaysEnabled) return;
   const g = this._hpBarSlot(e.id, "aboveFogHpBars");
-  this._hpBar(g, e);
+  this._hpBar(g, e, null, ownerColor);
 }
 
 export function _hpBarSlot(id, poolName = "hpBars") {
@@ -188,7 +191,8 @@ export function _hpBarSlot(id, poolName = "hpBars") {
     container = new PIXI.Container();
     container.rtsBackground = new PIXI.Graphics();
     container.rtsFill = new PIXI.Graphics();
-    container.addChild(container.rtsBackground, container.rtsFill);
+    container.rtsTicks = new PIXI.Graphics();
+    container.addChild(container.rtsBackground, container.rtsFill, container.rtsTicks);
     pool.set(id, container);
     this.layers[poolName].addChild(container);
     this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.created.${poolName}`);
@@ -238,7 +242,7 @@ export function _ringRadius(e) {
   return { rx: r, ry: r * 0.68, cy: r * 0.36 };
 }
 
-export function _hpBar(g, e, status = null) {
+export function _hpBar(g, e, status = null, ownerColor = null) {
   if (!e.maxHp && !status) return;
   const frac = clamp01(status ? status.fraction : e.hp / e.maxHp);
   const stat = STATS[e.kind] || {};
@@ -263,21 +267,31 @@ export function _hpBar(g, e, status = null) {
   }
   const barW = halfW * 2;
   const barH = 4;
-  const geometryKey = `${halfW}|${barH}`;
+  const maxHp = Number.isFinite(e.maxHp) && e.maxHp > 0 ? e.maxHp : 0;
+  const segmentCount = Math.max(1, Math.round(maxHp / 15));
+  const dividerCount = segmentCount - 1;
+  const geometryKey = `${halfW}|${barH}|${segmentCount}`;
   if (g.rtsGeometryKey !== geometryKey) {
     g.rtsGeometryKey = geometryKey;
     g.rtsBackground.clear().rect(-halfW - 1, -1, barW + 2, barH + 2).fill({ color: COLORS.hpBack, alpha: 0.9 });
     g.rtsFill.clear().rect(0, 0, barW, barH).fill(0xffffff);
     g.rtsFill.position.x = -halfW;
+    g.rtsTicks.clear();
+    for (let i = 1; i <= dividerCount; i++) {
+      const x = -halfW + barW * (i / segmentCount);
+      g.rtsTicks.rect(x - 0.375, 0, 0.75, barH);
+    }
+    if (dividerCount > 0) g.rtsTicks.fill({ color: 0x000000, alpha: 0.95 });
   }
   g.position.set(e.x, topY);
 
-  let color = COLORS.hpGood;
+  let color = Number.isFinite(ownerColor)
+    ? ownerColor
+    : hexToInt(typeof e.teamColor === "string" ? e.teamColor : "#9aa0a8");
   if (status?.kind === "deconstruction") {
     color = COLORS.hpMid;
-  } else if (status?.kind !== "construction") {
-    if (frac <= 0.33) color = COLORS.hpLow;
-    else if (frac <= 0.66) color = COLORS.hpMid;
+  } else if (status?.kind === "construction") {
+    color = COLORS.hpGood;
   }
   g.rtsFill.tint = color;
   g.rtsFill.scale.set(frac, 1);

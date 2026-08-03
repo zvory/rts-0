@@ -1,4 +1,5 @@
 import { buildBackToLobbyAction, buildGiveUpAction, buildPauseAction, buildSettingsTabs } from "./settings_panels.js";
+import { toggleHealthBars } from "./match_settings_toggles.js";
 import { MOVEMENT_PATH_DIAGNOSTICS } from "./protocol.js";
 
 export function buildMatchSettingsContextForMatch(match) {
@@ -21,6 +22,7 @@ export function buildMatchSettingsContextForMatch(match) {
     onPointerLockToggle: match.onPointerLockToggle,
     onDebugPathToggle: match.onDebugPathToggle,
     onUnitRangeToggle: match.onUnitRangeToggle,
+    onHealthBarToggle: () => toggleHealthBars(match),
     onExclusiveFullscreenToggle: match.onExclusiveFullscreenToggle,
     exclusiveFullscreenEnabled: match.exclusiveFullscreenEnabled,
     livePauseActionLabel: () => match.livePauseActionLabel(),
@@ -47,6 +49,7 @@ export function buildMatchSettingsContext({
   onPointerLockToggle,
   onDebugPathToggle,
   onUnitRangeToggle,
+  onHealthBarToggle,
   onExclusiveFullscreenToggle,
   exclusiveFullscreenEnabled,
   livePauseActionLabel,
@@ -109,6 +112,14 @@ export function buildMatchSettingsContext({
             enabled: !!state.showUnitRangesEnabled,
           }),
           onToggle: onUnitRangeToggle,
+        } : null,
+        healthBars: state ? {
+          state: () => ({
+            hidden: false,
+            available: true,
+            enabled: !!state.showHealthBarsAlwaysEnabled,
+          }),
+          onToggle: onHealthBarToggle,
         } : null,
         exclusiveFullscreen: {
           state: () => ({

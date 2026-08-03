@@ -715,8 +715,9 @@ export class Renderer {
       for (const e of regularEntities) {
         liveIds.add(e.id);
         this._drawSafely(`selectionHp:${e.kind || "unknown"}`, () => {
-          if (e.visionOnly) this._drawAboveFogHp(e);
-          else this._drawSelectionAndHp(e, selection, feedbackView);
+          const ownerColor = this._tintFor(e.owner, colorByOwner);
+          if (e.visionOnly) this._drawAboveFogHp(e, feedbackView, ownerColor);
+          else this._drawSelectionAndHp(e, selection, feedbackView, ownerColor);
         });
       }
     });
@@ -728,7 +729,7 @@ export class Renderer {
             visualOverride: visualUnitOverrideMap.get(e.id) || null,
             visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
           });
-          this._drawAboveFogHp(e);
+          this._drawAboveFogHp(e, feedbackView, this._tintFor(e.owner, colorByOwner));
         });
       }
     });

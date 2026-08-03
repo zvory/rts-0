@@ -32,9 +32,13 @@ import {
 } from "./bootstrap.js";
 import { Match } from "./match.js";
 import { MatchHistory, requestReplayRoom } from "./match_history.js";
-import { applyMatchUnitRanges } from "./match_settings_toggles.js";
+import { applyMatchHealthBars, applyMatchUnitRanges } from "./match_settings_toggles.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
+import {
+  readAlwaysShowHealthBarsEnabled,
+  writeAlwaysShowHealthBarsEnabled,
+} from "./health_bar_settings.js";
 import {
   applyExclusiveFullscreen,
   exclusiveFullscreenSupported,
@@ -273,6 +277,7 @@ export class App {
     this.pendingCameraView = null;
     this.predictionEnabled = readPredictionEnabled();
     this.unitRangesEnabled = readUnitRangesEnabled();
+    this.healthBarsAlwaysEnabled = readAlwaysShowHealthBarsEnabled();
     this.exclusiveFullscreenEnabled = exclusiveFullscreenSupported() &&
       readExclusiveFullscreenEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
@@ -836,10 +841,12 @@ export class App {
         onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
         unitRangesEnabled: this.unitRangesEnabled,
+        healthBarsAlwaysEnabled: this.healthBarsAlwaysEnabled,
         exclusiveFullscreenEnabled: this.exclusiveFullscreenEnabled,
         autoSpectatorEnabled: interactAutoSpectatorEnabled(),
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
+        onHealthBarsAlwaysEnabledChange: (enabled) => this.setHealthBarsAlwaysEnabled(enabled),
         onExclusiveFullscreenEnabledChange: (enabled) =>
           this.setExclusiveFullscreenEnabled(enabled),
         onAutoSpectatorEnabledChange: (enabled) => this.setAutoSpectatorEnabled(enabled),
@@ -1189,6 +1196,13 @@ export class App {
             }),
             onToggle: () => this.setUnitRangesEnabled(!this.unitRangesEnabled),
           },
+          healthBars: {
+            state: () => ({
+              enabled: this.healthBarsAlwaysEnabled,
+              available: true,
+            }),
+            onToggle: () => this.setHealthBarsAlwaysEnabled(!this.healthBarsAlwaysEnabled),
+          },
           exclusiveFullscreen: {
             state: () => ({
               hidden: !exclusiveFullscreenSupported(),
@@ -1223,6 +1237,20 @@ export class App {
     this.unitRangesEnabled = !!enabled;
     writeUnitRangesEnabled(this.unitRangesEnabled);
     applyMatchUnitRanges(this.match, this.unitRangesEnabled);
+    if (this.settings?.isOpen()) {
+      if (this.match && typeof this.match.mountSettings === "function") {
+        this.match.mountSettings({ keepOpen: true });
+      } else {
+        this.mountLobbySettings();
+        this.settings.open({ focus: false });
+      }
+    }
+  }
+
+  setHealthBarsAlwaysEnabled(enabled) {
+    this.healthBarsAlwaysEnabled = !!enabled;
+    writeAlwaysShowHealthBarsEnabled(this.healthBarsAlwaysEnabled);
+    applyMatchHealthBars(this.match, this.healthBarsAlwaysEnabled);
     if (this.settings?.isOpen()) {
       if (this.match && typeof this.match.mountSettings === "function") {
         this.match.mountSettings({ keepOpen: true });

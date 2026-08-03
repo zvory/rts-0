@@ -69,7 +69,7 @@ import {
   handleInteractiveMenuStateChange as updateInteractiveMenuCapture,
 } from "./match_cursor_capture.js";
 import {
-  applyInitialUnitRanges,
+  initializeMatchDisplayPreferences,
   toggleDebugPaths,
   toggleUnitRanges,
 } from "./match_settings_toggles.js";
@@ -159,7 +159,6 @@ export class Match {
     this.settings = options.settings || null;
     this.backToLobbyHandler = options.onBackToLobby || null;
     this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
-    this.onUnitRangesEnabledChange = options.onUnitRangesEnabledChange;
     this.onExclusiveFullscreenEnabledChange =
       options.onExclusiveFullscreenEnabledChange || null;
     this.exclusiveFullscreenEnabled = !!options.exclusiveFullscreenEnabled;
@@ -270,7 +269,7 @@ export class Match {
       net: this.net, state: this.state, labClient: this.labClient,
       resetPresentation: () => this.resetGroundDecalPresentation(),
     });
-    applyInitialUnitRanges(this.state, options.unitRangesEnabled);
+    initializeMatchDisplayPreferences(this, options);
     this.controlPolicy = this._timeInit(
       "match.controlPolicy",
       () => createControlPolicyProjection(this.labControlPolicy),

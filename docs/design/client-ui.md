@@ -28,6 +28,7 @@ src/
   prediction_frame.js # allowlisted composition of sparse owned pose/progress prediction patches
   prediction_settings.js # localStorage-backed prediction toggle
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
+  health_bar_settings.js # localStorage-backed always-show HP-bar toggle (damaged-only by default)
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_runtime_reset.js # shared clearing of state derived from one authoritative timeline
@@ -1217,8 +1218,9 @@ context, conflict resolution prefers that command's grid key before falling back
 The long-lived `SettingsContainer` is constructed by `App` with `#settings-button` and the
 `#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
 spectator, and replay contexts through dependency-injected collaborators. The stable rendered ids
-inside the settings mount point are `#pointer-lock-toggle`, `#debug-path-toggle`, and
-`#give-up-open` plus live-match action `#live-pause-open`; they may not exist until their owning
+inside the settings mount point are `#pointer-lock-toggle`, `#unit-range-toggle`,
+`#always-show-health-bars-toggle`, `#debug-path-toggle`, and `#give-up-open` plus live-match action
+`#live-pause-open`; they may not exist until their owning
 tab/action is visible. Live controllable matches mount a separate `#tab-menu-button` hamburger and
 `#tab-menu` Auto-Build panel under `#game-screen`; the hamburger never replaces, moves, or aliases
 the Settings gear. `Match` owns `LivePauseOverlay` under `#game-screen` for reliable
@@ -2230,7 +2232,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   are removed when an entity id no longer needs them. The SVG and PNG runtimes share one
   sampled render context per entity draw so renderer-local motion state advances once. Units use low-detail hard-edged silhouettes tinted by player color, a dark
   drop shadow, dark outline, HP bar above when damaged/selected, and glowing selection ring when
-  selected. Entrenched units retain their player-color tint while scaling down. Occupied trenches add
+  selected. The Game settings toggle can instead keep every visible entity's HP bar on, including
+  at full health; damaged-only remains the default. Normal HP fills use the owning player's color,
+  and black internal dividers split the span into `round(maxHp / 15)` whole cells (at least one).
+  Any remainder is distributed across those cells rather than drawing a fractional final cell, so
+  each cell represents approximately 15 HP. Construction and deconstruction keep their existing
+  status colors on the shared bar layer. Entrenched units retain
+  their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values
   draw first, so a southern tree or unit naturally covers a northern one. When any received ordinary

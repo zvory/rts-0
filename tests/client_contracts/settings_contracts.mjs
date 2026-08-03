@@ -28,6 +28,10 @@ import {
   writeUnitRangesEnabled,
 } from "../../client/src/unit_range_settings.js";
 import {
+  readAlwaysShowHealthBarsEnabled,
+  writeAlwaysShowHealthBarsEnabled,
+} from "../../client/src/health_bar_settings.js";
+import {
   HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PROFILE_SCHEMA_VERSION,
@@ -236,11 +240,17 @@ function hotkeyService() {
     assert(!readUnitRangesEnabled(storage), "unit range setting persists disabled state");
     writeUnitRangesEnabled(true, storage);
     assert(readUnitRangesEnabled(storage), "unit range setting clears override when re-enabled");
+    assert(!readAlwaysShowHealthBarsEnabled(storage), "always-show health bars defaults off");
+    writeAlwaysShowHealthBarsEnabled(true, storage);
+    assert(readAlwaysShowHealthBarsEnabled(storage), "always-show health bars persists enabled state");
+    writeAlwaysShowHealthBarsEnabled(false, storage);
+    assert(!readAlwaysShowHealthBarsEnabled(storage), "always-show health bars clears its override when disabled");
   }
 
   withFakeSettingsDocument(() => {
     let predictionToggled = false;
     let unitRangeToggled = false;
+    let healthBarsToggled = false;
     const [gameTab] = buildSettingsTabs({
       game: {
         kind: "match",
@@ -251,6 +261,10 @@ function hotkeyService() {
         unitRanges: {
           state: () => ({ enabled: true, available: true }),
           onToggle: () => { unitRangeToggled = true; },
+        },
+        healthBars: {
+          state: () => ({ enabled: false, available: true }),
+          onToggle: () => { healthBarsToggled = true; },
         },
       },
     }).filter((tab) => tab.id === "game");
@@ -266,6 +280,11 @@ function hotkeyService() {
     assert(rangeToggle.textContent === "Show Unit Ranges: on", "settings: unit range toggle uses expected label");
     rangeToggle.listeners.click();
     assert(unitRangeToggled, "settings: unit range control calls injected toggle");
+    const healthBarToggle = findFakeById(root, "always-show-health-bars-toggle");
+    assert(healthBarToggle, "settings: game tab renders always-show health bars control with pinned id");
+    assert(healthBarToggle.textContent === "Always Show HP Bars: off", "settings: health bars default to damaged-only");
+    healthBarToggle.listeners.click();
+    assert(healthBarsToggled, "settings: health bar control calls injected toggle");
   });
 
   withFakeSettingsDocument(() => {
