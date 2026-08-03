@@ -7,8 +7,6 @@ use rts_sim::game::entity::NEUTRAL;
 use rts_sim::game::upgrade;
 use rts_sim::protocol::{states, EntityView, Snapshot, StartPayload};
 
-use crate::ai_core::observation::AiBuildIntent;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AiEconomy {
     pub steel: u32,
@@ -105,15 +103,22 @@ pub struct AiHealth {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AiCompletion {
     Complete,
-    UnderConstruction { progress: f32, active: bool },
+    UnderConstruction {
+        progress: f32,
+        /// Known only for entities owned by the frame's player.
+        active: Option<bool>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AiProduction {
-    pub queue_len: usize,
+    /// Owner/allied queue detail; `None` for opponents.
+    pub queue_len: Option<usize>,
     pub current_kind: Option<EntityKind>,
+    pub current_upgrade: Option<UpgradeKind>,
     pub progress: Option<f32>,
-    pub waiting_for_resources: bool,
+    /// Owner/allied payment state; `None` for opponents.
+    pub waiting_for_resources: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -237,7 +242,7 @@ impl AiFrame {
         start: &StartPayload,
         snapshot: &Snapshot,
         player_id: u32,
-        submitted_builds: impl IntoIterator<Item = AiBuildIntent>,
+        submitted_builds: impl IntoIterator<Item = AiBuildObservation>,
         alive_player_ids: Option<&[u32]>,
     ) -> Option<Self> {
         let own = start.players.iter().find(|player| player.id == player_id)?;
@@ -261,7 +266,7 @@ impl AiFrame {
             .entities
             .iter()
             .filter(|entity| entity.owner == player_id)
-            .filter_map(normalize_entity)
+            .filter_map(|entity| normalize_entity(entity, true, true))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         owned.sort_by_key(|entity| entity.id);
@@ -271,7 +276,7 @@ impl AiFrame {
             .filter(|entity| entity.owner != NEUTRAL && entity.owner != player_id)
             .filter(|entity| !entity.vision_only)
             .filter(|entity| is_ally(&players, team_id, entity.owner))
-            .filter_map(normalize_entity)
+            .filter_map(|entity| normalize_entity(entity, false, true))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         visible_allies.sort_by_key(|entity| entity.id);
@@ -281,7 +286,7 @@ impl AiFrame {
             .filter(|entity| entity.owner != NEUTRAL && entity.owner != player_id)
             .filter(|entity| !entity.vision_only)
             .filter(|entity| is_enemy(&players, player_id, team_id, entity.owner))
-            .filter_map(normalize_entity)
+            .filter_map(|entity| normalize_entity(entity, false, false))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         visible_enemies.sort_by_key(|entity| entity.id);
@@ -365,16 +370,7 @@ impl AiFrame {
         remembered_contacts.sort_by_key(|contact| (contact.id, contact.observed_tick));
         remembered_contacts.dedup_by_key(|contact| contact.id);
 
-        let mut submitted_builds = submitted_builds
-            .into_iter()
-            .map(|intent| AiBuildObservation {
-                worker_id: intent.worker_id,
-                kind: intent.kind,
-                tile_x: intent.tile_x,
-                tile_y: intent.tile_y,
-                phase: AiBuildObservationPhase::TravelingToSite,
-            })
-            .collect::<Vec<_>>();
+        let mut submitted_builds = submitted_builds.into_iter().collect::<Vec<_>>();
         submitted_builds.sort_unstable();
         submitted_builds.dedup();
         let mut completed_upgrades = snapshot
@@ -419,7 +415,11 @@ impl AiFrame {
     }
 }
 
-fn normalize_entity(view: &EntityView) -> Option<AiEntity> {
+fn normalize_entity(
+    view: &EntityView,
+    completion_activity_known: bool,
+    production_details_known: bool,
+) -> Option<AiEntity> {
     let kind = view.kind.parse::<EntityKind>().ok()?;
     let state = match view.state.as_str() {
         states::IDLE => AiEntityState::Idle,
@@ -449,14 +449,15 @@ fn normalize_entity(view: &EntityView) -> Option<AiEntity> {
             .map_or(AiCompletion::Complete, |progress| {
                 AiCompletion::UnderConstruction {
                     progress,
-                    active: view.build_active,
+                    active: completion_activity_known.then_some(view.build_active),
                 }
             }),
         production: can_produce.then_some(AiProduction {
-            queue_len: view.prod_queue.unwrap_or(0) as usize,
+            queue_len: production_details_known.then_some(view.prod_queue.unwrap_or(0) as usize),
             current_kind: view.prod_kind.as_deref().and_then(|id| id.parse().ok()),
+            current_upgrade: view.prod_upgrade.as_deref().and_then(|id| id.parse().ok()),
             progress: view.prod_progress,
-            waiting_for_resources: view.prod_waiting,
+            waiting_for_resources: production_details_known.then_some(view.prod_waiting),
         }),
         latched_resource: view.latched_node,
         target: view.target_id,
@@ -601,5 +602,71 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn redacted_entity_details_remain_unknown_without_changing_legacy_projection() {
+        let game = Game::new_without_ai_controllers(&players(), 47);
+        let start = game.start_payload();
+        let mut snapshot = game.snapshot_for(1);
+
+        let owned_producer = snapshot
+            .entities
+            .iter_mut()
+            .find(|entity| entity.owner == 1 && entity.kind == "city_centre")
+            .expect("player one starts with a city centre");
+        owned_producer.build_progress = Some(0.5);
+        owned_producer.build_active = false;
+        owned_producer.prod_upgrade = Some(UpgradeKind::TankUnlock.to_protocol_str().to_string());
+
+        let hidden_enemy = game
+            .snapshot_full_for(1)
+            .entities
+            .into_iter()
+            .find(|entity| entity.owner == 2 && entity.kind == "city_centre")
+            .expect("player two starts with a city centre");
+        assert!(!snapshot
+            .entities
+            .iter()
+            .any(|entity| entity.id == hidden_enemy.id));
+        snapshot.entities.push(hidden_enemy);
+
+        let frame = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2])).unwrap();
+        let owned = frame
+            .owned()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::CityCentre)
+            .unwrap();
+        assert_eq!(
+            owned.completion,
+            AiCompletion::UnderConstruction {
+                progress: 0.5,
+                active: Some(false),
+            }
+        );
+        assert_eq!(owned.production.unwrap().queue_len, Some(0));
+        assert_eq!(
+            owned.production.unwrap().current_upgrade,
+            Some(UpgradeKind::TankUnlock)
+        );
+        assert_eq!(owned.production.unwrap().waiting_for_resources, Some(false));
+
+        let enemy = frame
+            .visible_enemies()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::CityCentre)
+            .unwrap();
+        assert_eq!(enemy.production.unwrap().queue_len, None);
+        assert_eq!(enemy.production.unwrap().waiting_for_resources, None);
+
+        let projected = crate::ai_core::observation::AiObservation::from_frame(&frame);
+        let direct = crate::ai_core::observation::AiObservation::from_snapshot_with_alive(
+            &start,
+            &snapshot,
+            1,
+            [],
+            Some(&[1, 2]),
+        );
+        assert_eq!(projected, direct);
     }
 }

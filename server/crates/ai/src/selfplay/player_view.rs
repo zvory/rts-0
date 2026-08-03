@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use crate::ai_core::observation::{AiBuildIntent, AiObservation};
 use crate::ai_shared;
 use crate::config;
-use crate::sdk::AiFrame;
+use crate::sdk::{AiBuildObservation, AiFrame};
 use rts_rules;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::protocol::{kinds, EntityView, MapInfo, Snapshot, StartPayload};
@@ -35,7 +35,7 @@ impl PlayerView<'_> {
             self.start,
             self.snapshot,
             self.player_id,
-            pending_builds,
+            pending_builds.into_iter().map(AiBuildObservation::from),
             Some(self.alive_player_ids),
         )?;
         AiObservation::from_frame(&frame)

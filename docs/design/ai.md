@@ -66,12 +66,16 @@ submitted-build bookkeeping. The frame adapter is the only production path that 
 start/snapshot DTOs into strategy-visible kind, state, production, upgrade, terrain, resource, and
 memory facts. Its collections use stable id ordering; completed upgrades and submitted builds are
 additionally sorted and deduplicated.
+Active production identifies either its typed unit kind or its typed research upgrade when one is
+present in the recipient snapshot.
 Owned entities, currently visible allies, currently visible enemies, and remembered contacts are
 separate collections. A remembered contact is stale last-seen knowledge, never a current target.
 
 Static resource locations are public, but `AiResourceAmount::Unknown` is retained until a
 recipient-scoped resource delta or visible node reveals a quantity. The public frame never exposes
 the historical synthetic `remaining = 1` value or the policy-derived `free_for_combat` flag.
+Opponent production queue length/payment state and non-owned construction activity are likewise
+`None`, rather than false or zero, because those details are redacted by the player snapshot.
 Likewise, `AiBuildObservation` means only that this controller inferred an outstanding submitted
 build; it is not an accepted, legal, or active-build receipt.
 

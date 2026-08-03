@@ -337,7 +337,7 @@ impl AiController {
             context.start,
             context.snapshot,
             self.player,
-            pending_builds.clone(),
+            pending_builds.iter().copied().map(Into::into),
             Some(context.alive_player_ids),
         ) else {
             return commands;
@@ -412,15 +412,11 @@ impl AiController {
             trace_tick: tick,
             lines: bounded_decision_trace_lines(decision.trace.format_lines()),
         });
-        let legacy_commands =
-            self.filter_repeated_stage_commands(tick, &decision.intents, decision.commands);
-        let mut actions = AiActions::new();
-        for command in legacy_commands {
-            if let Some(request) = legacy_command_to_action(command) {
-                actions.submit(request);
-            }
-        }
-        commands.extend(actions.into_requests().into_iter().map(action_to_command));
+        commands.extend(self.filter_repeated_stage_commands(
+            tick,
+            &decision.intents,
+            decision.commands,
+        ));
         self.pending_builds.record_commands(tick, &commands);
         commands
     }
@@ -643,83 +639,6 @@ fn action_to_command(request: AiActionRequest) -> SimCommand {
             y,
             queued,
         },
-    }
-}
-
-fn legacy_command_to_action(command: SimCommand) -> Option<AiActionRequest> {
-    match command {
-        SimCommand::Move {
-            units,
-            x,
-            y,
-            queued,
-        } => Some(AiActionRequest::Move {
-            units,
-            x,
-            y,
-            queued,
-        }),
-        SimCommand::AttackMove {
-            units,
-            x,
-            y,
-            queued,
-        } => Some(AiActionRequest::AttackMove {
-            units,
-            x,
-            y,
-            queued,
-        }),
-        SimCommand::Attack {
-            units,
-            target,
-            queued,
-        } => Some(AiActionRequest::Attack {
-            units,
-            target,
-            queued,
-        }),
-        SimCommand::Gather {
-            units,
-            node,
-            queued,
-        } => Some(AiActionRequest::Gather {
-            units,
-            node,
-            queued,
-        }),
-        SimCommand::Build {
-            units,
-            building,
-            tile_x,
-            tile_y,
-            queued,
-        } => Some(AiActionRequest::Build {
-            units,
-            building,
-            tile_x,
-            tile_y,
-            queued,
-        }),
-        SimCommand::Train { building, unit } => Some(AiActionRequest::Train { building, unit }),
-        SimCommand::Research { building, upgrade } => {
-            Some(AiActionRequest::Research { building, upgrade })
-        }
-        SimCommand::HoldPosition { units, queued } => {
-            Some(AiActionRequest::HoldPosition { units, queued })
-        }
-        SimCommand::SetupAntiTankGuns {
-            units,
-            x,
-            y,
-            queued,
-        } => Some(AiActionRequest::SetupAntiTankGuns {
-            units,
-            x,
-            y,
-            queued,
-        }),
-        _ => None,
     }
 }
 

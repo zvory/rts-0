@@ -14,8 +14,8 @@ use rts_sim::game::TeamId;
 use rts_sim::protocol::{states, EntityView, Snapshot, StartPayload};
 
 use crate::sdk::{
-    AiBuildObservationPhase, AiCompletion, AiEntity as SdkEntity, AiEntityState as SdkEntityState,
-    AiFrame, AiResourceAmount,
+    AiBuildObservation, AiBuildObservationPhase, AiCompletion, AiEntity as SdkEntity,
+    AiEntityState as SdkEntityState, AiFrame, AiResourceAmount,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,6 +94,20 @@ impl AiBuildIntent {
             tile_x,
             tile_y,
             phase: AiBuildIntentPhase::ToSite,
+        }
+    }
+}
+
+impl From<AiBuildIntent> for AiBuildObservation {
+    fn from(intent: AiBuildIntent) -> Self {
+        Self {
+            worker_id: intent.worker_id,
+            kind: intent.kind,
+            tile_x: intent.tile_x,
+            tile_y: intent.tile_y,
+            phase: match intent.phase {
+                AiBuildIntentPhase::ToSite => AiBuildObservationPhase::TravelingToSite,
+            },
         }
     }
 }
@@ -231,9 +245,15 @@ impl AiObservation {
             pending_builds.iter().copied(),
             None,
         );
-        let projected = AiFrame::from_host(start, snapshot, player_id, pending_builds, None)
-            .as_ref()
-            .and_then(Self::from_frame);
+        let projected = AiFrame::from_host(
+            start,
+            snapshot,
+            player_id,
+            pending_builds.into_iter().map(AiBuildObservation::from),
+            None,
+        )
+        .as_ref()
+        .and_then(Self::from_frame);
         assert_eq!(projected, direct);
         direct
     }
@@ -421,7 +441,9 @@ fn project_entity(entity: &SdkEntity) -> AiEntitySummary {
         hp: entity.health.current,
         state,
         is_complete: matches!(entity.completion, AiCompletion::Complete),
-        production_queue_len: entity.production.map(|production| production.queue_len),
+        production_queue_len: entity
+            .production
+            .map(|production| production.queue_len.unwrap_or(0)),
         production_kind: entity
             .production
             .and_then(|production| production.current_kind),
