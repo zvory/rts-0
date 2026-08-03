@@ -201,6 +201,8 @@ export class App {
       composer: dom.chatComposer,
       channelLabel: dom.chatChannel,
       input: dom.chatInput,
+      sendButton: dom.chatSend,
+      lobbyDock: dom.lobbyChatDock,
     });
     this.rendererPreparationSlot = new RendererPreparationSlot({
       onCountdownReady: (countdownId) => this.net.matchLoadReady(countdownId),
@@ -516,7 +518,7 @@ export class App {
   }
 
   onBranchStagingForChat(payload) {
-    this.chat?.setLobbyContext(payload);
+    this.chat?.setLobbyContext(payload, { docked: false });
   }
 
   applyMatchLaunchAction(action) {

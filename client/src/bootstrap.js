@@ -332,11 +332,13 @@ export const dom = {
   devBanner: document.getElementById("dev-banner"),
   devLinks: document.getElementById("dev-links"),
   roomTimeControls: document.getElementById("room-time-controls"),
+  lobbyChatDock: document.getElementById("lobby-chat-dock"),
   chatOverlay: document.getElementById("chat-overlay"),
   chatMessages: document.getElementById("chat-messages"),
   chatComposer: document.getElementById("chat-composer"),
   chatChannel: document.getElementById("chat-channel"),
   chatInput: document.getElementById("chat-input"),
+  chatSend: document.getElementById("chat-send"),
 };
 
 export function formatScore(value) {
