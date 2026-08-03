@@ -357,7 +357,7 @@ export function renderPreviewSvg(map, { tilePixels = 5, layers = "all" } = {}) {
 function appendSemanticTileLayer(elements, records, { id, visible, width, height, fill, stroke }) {
   if (!visible) return;
   elements.push(`<g data-layer="${id}" fill="${fill}" fill-opacity="0.3" stroke="${stroke}" stroke-width="0.08">`);
-  for (const tile of records || []) {
+  for (const tile of Array.isArray(records) ? records : []) {
     if (!Number.isInteger(tile?.x) || !Number.isInteger(tile?.y) || !inBounds(width, height, tile.x, tile.y)) continue;
     elements.push(`<rect x="${tile.x}" y="${tile.y}" width="1" height="1"/>`);
   }
@@ -366,8 +366,9 @@ function appendSemanticTileLayer(elements, records, { id, visible, width, height
 
 function appendDoodadLayers(elements, records, visibility, width, height) {
   const grouped = new Map(MAP_AUTHORING_LAYER_IDS.map((id) => [id, []]));
-  for (const record of records || []) {
-    if (!Number.isFinite(record?.x) || !Number.isFinite(record?.y)
+  for (const record of Array.isArray(records) ? records : []) {
+    if (!DOODAD_TYPES.has(record?.typeId)
+      || !Number.isFinite(record?.x) || !Number.isFinite(record?.y)
       || record.x < 0 || record.y < 0 || record.x >= width * MAP_TILE_SIZE_PX || record.y >= height * MAP_TILE_SIZE_PX) continue;
     grouped.get(mapAuthoringDoodadLayer(record.typeId))?.push(record);
   }

@@ -257,8 +257,24 @@ const injectedPreview = renderPreviewSvg({
   terrain: ["..", ".."],
   startLocations: [],
   baseSites: [{ x: '0\" onmouseover=\"alert(1)', y: 0 }],
+  stealthTiles: {},
+  noVehicleTiles: null,
+  doodads: {},
 });
 assert(!injectedPreview.includes("onmouseover"), "preview omits non-numeric site coordinates");
+assert(injectedPreview.includes('data-layer="stealth"'),
+  "preview tolerates advisory-invalid optional layer collections");
+const unsupportedDoodadPreview = renderPreviewSvg({
+  name: "Unsupported doodad safety",
+  width: 2,
+  height: 2,
+  terrain: ["..", ".."],
+  startLocations: [],
+  baseSites: [],
+  doodads: [{ id: 1, typeId: "unsupported.doodad", x: 16, y: 16 }],
+});
+assert(!unsupportedDoodadPreview.includes("<path"),
+  "preview omits doodads outside the server-backed authoring catalog");
 assert.throws(
   () => buildMapFromRecipe({ width: 257, height: 1 }),
   /at most 256 tiles/,
