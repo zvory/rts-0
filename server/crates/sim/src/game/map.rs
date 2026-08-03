@@ -454,6 +454,7 @@ mod tests {
     mod base_limits;
     mod doodads;
     mod four_player;
+    mod open_basin;
     mod overlays;
     mod schone_tage;
     mod terrain_variants;
@@ -578,6 +579,28 @@ mod tests {
             assert_eq!(map.width, 166);
             assert_eq!(map.starts.len(), player_count);
             assert_eq!(map.base_sites.len(), 16);
+        }
+    }
+
+    #[test]
+    fn every_catalog_map_materializes_for_its_advertised_player_counts() {
+        for entry in Map::list_available() {
+            for player_count in entry.min_players..=entry.max_players {
+                let map = Map::load(&entry.name, player_count as usize, 0x1234_5678)
+                    .unwrap_or_else(|error| {
+                        panic!(
+                            "catalog map {:?} failed to load for {player_count} player(s): {error}",
+                            entry.name
+                        )
+                    });
+                assert_eq!(map.starts.len(), player_count as usize);
+                assert_eq!(
+                    map.terrain.len(),
+                    (map.width * map.height) as usize,
+                    "catalog map {:?} materialized an invalid terrain grid",
+                    entry.name
+                );
+            }
         }
     }
 
