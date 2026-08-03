@@ -6,6 +6,10 @@ import { TERRAIN } from "./protocol.js";
 import { MapEditorPixiPresentationAdapter } from "./renderer/map_editor_presentation_adapter.js";
 import { lineTiles } from "./map_authoring/geometry.js";
 import {
+  defaultMapAuthoringLayerVisibility,
+  MAP_AUTHORING_LAYER_IDS,
+} from "./map_authoring/layers.js";
+import {
   allocateMapEditorDoodadId,
   createDoodadSprayStroke,
   doodadIdsWithinRadius,
@@ -117,6 +121,7 @@ export class MapEditorViewport {
     this.pendingTerrainUpdate = null;
     this.pendingOverlay = null;
     this.pendingDoodadUpdate = null;
+    this.layerVisibility = defaultMapAuthoringLayerVisibility();
     this.presentationInFlight = null;
     this.presentationStopped = false;
     this.visualTimeMs = 0;
@@ -162,6 +167,21 @@ export class MapEditorViewport {
       ? symmetry
       : MAP_EDITOR_SYMMETRY.NONE;
     this.drawOverlay();
+  }
+
+  setLayerVisibility(layerId, visible) {
+    if (!MAP_AUTHORING_LAYER_IDS.includes(layerId)) {
+      throw new RangeError(`Unsupported Map Editor layer ${JSON.stringify(layerId)}`);
+    }
+    const next = !!visible;
+    if (this.layerVisibility[layerId] === next) return false;
+    this.layerVisibility[layerId] = next;
+    this.drawOverlay();
+    return true;
+  }
+
+  layerVisibilitySnapshot() {
+    return { ...this.layerVisibility };
   }
 
   setSelectedBase(locationIndex) {
@@ -775,6 +795,7 @@ export class MapEditorViewport {
         terrainUpdate: this.pendingTerrainUpdate,
         doodadUpdate: this.pendingDoodadUpdate,
         overlay: this.pendingOverlay,
+        layerVisibility: this.layerVisibility,
         visualTimeMs: this.visualTimeMs,
       }));
     } catch (error) {

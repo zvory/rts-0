@@ -146,8 +146,9 @@ so it never opens a WebSocket or constructs `App`, `Match`, `GameState`, Lab con
 orders, replay controls, or a simulation clock. It reuses the normal worker-owned Pixi `Renderer`, terrain cache,
 `Camera`, map schema, and player palette, but `MapEditorViewport` never constructs Pixi or reaches
 into renderer layers/application state. Input, hit math, session edits, and camera stay on the main
-thread; `MapEditorPresentationV1` carries revisioned terrain replacement/patch data and detached
-grid, symmetry, start/base, selection, label, and paint-preview records. The main-thread adapter owns
+thread; `MapEditorPresentationV2` carries revisioned terrain replacement/patch data, complete
+authoring-layer visibility, and detached grid, symmetry, start/base, selection, label, and
+paint-preview records. The main-thread adapter owns
 the stable transferred HTML canvas while the same Pixi module worker owns display objects, ordered
 resize, present, and teardown. The removed
 `map-editor.html` implementation and Lab-embedded editor are not compatibility routes.
@@ -913,7 +914,7 @@ export class MapEditorSession {
 }
 ```
 `map_authoring/` is the single implementation of authoring geometry, symmetry, advisory symmetry
-checking, authored-map limits, and recipe materialization. Browser pointer
+checking, authored-map limits, layer vocabulary/classification, and recipe materialization. Browser pointer
 gestures and `scripts/map-author.mjs` recipes are adapters over its pure ESM operations; the package
 does not access the DOM, Pixi, Node filesystem APIs, or simulation state. UI-only input/history and
 CLI-only file/argument handling stay outside it.
@@ -985,11 +986,18 @@ edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
-The Gameplay overlays palette paints Forest (stealth plus no-vehicle), Stealth only, No vehicles
-only, or erases either/both layers. The viewport shows stealth in green and vehicle exclusion in
-orange, including overlap; overlay strokes use the same brush/box, symmetry, undo/redo, resize,
-local JSON import/export, and Lab handoff paths as terrain. Sparse coordinate pairs remain
-authoritative.
+The Gameplay overlays palette paints or erases Stealth and No vehicles independently. There is no
+Forest tile or combined Forest paint tool; authors who want both semantics paint both layers. The
+viewport shows stealth in green and vehicle exclusion in orange, including intentional overlap;
+overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON import/export, and
+Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
+
+The editor's Visible layers section independently toggles six presentation-only authoring layers:
+Terrain & bases, Stealth, No vehicles, Trees, Gameplay doodads, and Decorative doodads. Tank Traps
+are gameplay doodads; wildflowers are decorative doodads. Visibility never mutates the draft,
+export, undo history, or handoff. The shared pure `map_authoring/layers.js` vocabulary also drives
+`map-author.mjs preview --layers <csv>`, whose SVG preview shows every layer by default and can
+isolate any comma-separated subset.
 
 The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Trees are placed singly and
 share one mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed
@@ -998,7 +1006,7 @@ as completed owner-0 Tank Trap entities, so they use the live rendering, fog, co
 deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved: the
 removal tool box-selects any number of doodads for deletion, and a separate erase brush removes
 doodads continuously. Symmetry applies when creating doodads, while delete and undo/redo apply to
-all authored doodads. Trees retain only their tiny trunk collision; a forest's stealth and vehicle
+all authored doodads. Trees retain only their tiny trunk collision; a dense tree grouping's stealth and vehicle
 exclusion come from independent gameplay overlays. Trees do not change line of sight, cover, or
 combat damage, and wildflowers remain mechanically inert.
 

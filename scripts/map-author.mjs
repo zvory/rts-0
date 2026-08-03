@@ -9,6 +9,12 @@ import {
   AUTHORING_TERRAIN_CHARACTERS as KNOWN_TERRAIN,
 } from "../client/src/map_authoring/operations.js";
 import {
+  MAP_AUTHORING_LAYER,
+  MAP_AUTHORING_LAYER_IDS,
+  mapAuthoringDoodadLayer,
+  mapAuthoringLayerVisibilityFromSelection,
+} from "../client/src/map_authoring/layers.js";
+import {
   buildMapFromRecipe,
   CURRENT_AUTHORED_MAP_VERSION as CURRENT_MAP_VERSION,
   MAX_AUTHORED_MAP_DIMENSION_TILES as MAX_MAP_DIMENSION_TILES,
@@ -278,7 +284,7 @@ function xml(value) {
   return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-export function renderPreviewSvg(map, { tilePixels = 5 } = {}) {
+export function renderPreviewSvg(map, { tilePixels = 5, layers = "all" } = {}) {
   if (!isUint32(map?.width) || !isUint32(map?.height) || map.width < 1 || map.height < 1
     || map.width > MAX_MAP_DIMENSION_TILES || map.height > MAX_MAP_DIMENSION_TILES) {
     throw new Error(`Preview width and height must be unsigned integers from 1 to ${MAX_MAP_DIMENSION_TILES}`);
@@ -288,24 +294,46 @@ export function renderPreviewSvg(map, { tilePixels = 5 } = {}) {
   const height = integer(map.height);
   const pixelWidth = width * scale;
   const pixelHeight = height * scale;
+  const visibility = mapAuthoringLayerVisibilityFromSelection(layers);
   const elements = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${pixelWidth}" height="${pixelHeight}" viewBox="0 0 ${width} ${height}">`,
     `<title>${xml(map.name || "Map preview")}</title>`,
-    `<rect width="${width}" height="${height}" fill="${SVG_COLORS["."]}"/>`,
   ];
-  for (let y = 0; y < height; y += 1) {
-    const row = map.terrain?.[y] || "";
-    let startX = 0;
-    while (startX < width) {
-      const character = row[startX];
-      let endX = startX + 1;
-      while (endX < width && row[endX] === character) endX += 1;
-      if (character !== ".") {
-        elements.push(`<rect x="${startX}" y="${y}" width="${endX - startX}" height="1" fill="${SVG_COLORS[character] || "#ff00ff"}"/>`);
+  if (visibility[MAP_AUTHORING_LAYER.BASE]) {
+    elements.push(`<g data-layer="${MAP_AUTHORING_LAYER.BASE}">`);
+    elements.push(`<rect width="${width}" height="${height}" fill="${SVG_COLORS["."]}"/>`);
+    for (let y = 0; y < height; y += 1) {
+      const row = map.terrain?.[y] || "";
+      let startX = 0;
+      while (startX < width) {
+        const character = row[startX];
+        let endX = startX + 1;
+        while (endX < width && row[endX] === character) endX += 1;
+        if (character !== ".") {
+          elements.push(`<rect x="${startX}" y="${y}" width="${endX - startX}" height="1" fill="${SVG_COLORS[character] || "#ff00ff"}"/>`);
+        }
+        startX = endX;
       }
-      startX = endX;
     }
+    elements.push("</g>");
   }
+  appendSemanticTileLayer(elements, map.stealthTiles, {
+    id: MAP_AUTHORING_LAYER.STEALTH,
+    visible: visibility[MAP_AUTHORING_LAYER.STEALTH],
+    width,
+    height,
+    fill: "#2d8c64",
+    stroke: "#5ed19a",
+  });
+  appendSemanticTileLayer(elements, map.noVehicleTiles, {
+    id: MAP_AUTHORING_LAYER.NO_VEHICLE,
+    visible: visibility[MAP_AUTHORING_LAYER.NO_VEHICLE],
+    width,
+    height,
+    fill: "#c26a2e",
+    stroke: "#f2b866",
+  });
+  appendDoodadLayers(elements, map.doodads, visibility, width, height);
   const validStarts = Array.isArray(map.startLocations)
     ? map.startLocations.filter((site) => Number.isFinite(site?.x) && Number.isFinite(site?.y))
     : [];
@@ -313,13 +341,59 @@ export function renderPreviewSvg(map, { tilePixels = 5 } = {}) {
   const baseSites = Array.isArray(map.baseSites)
     ? map.baseSites.filter((site) => Number.isFinite(site?.x) && Number.isFinite(site?.y))
     : [];
-  for (const [index, site] of baseSites.entries()) {
-    const isStart = starts.has(locationKey(site));
-    elements.push(`<circle cx="${site.x + 0.5}" cy="${site.y + 0.5}" r="${isStart ? 4.2 : 3.2}" fill="${isStart ? "#f36f38" : "#f2d057"}" stroke="#161b20" stroke-width="0.8"/>`);
-    elements.push(`<text x="${site.x + 0.5}" y="${site.y + 1.7}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="3.4" font-weight="700" fill="#161b20">${index + 1}</text>`);
+  if (visibility[MAP_AUTHORING_LAYER.BASE]) {
+    elements.push(`<g data-layer="${MAP_AUTHORING_LAYER.BASE}" data-part="sites">`);
+    for (const [index, site] of baseSites.entries()) {
+      const isStart = starts.has(locationKey(site));
+      elements.push(`<circle cx="${site.x + 0.5}" cy="${site.y + 0.5}" r="${isStart ? 4.2 : 3.2}" fill="${isStart ? "#f36f38" : "#f2d057"}" stroke="#161b20" stroke-width="0.8"/>`);
+      elements.push(`<text x="${site.x + 0.5}" y="${site.y + 1.7}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="3.4" font-weight="700" fill="#161b20">${index + 1}</text>`);
+    }
+    elements.push("</g>");
   }
   elements.push("</svg>");
   return `${elements.join("\n")}\n`;
+}
+
+function appendSemanticTileLayer(elements, records, { id, visible, width, height, fill, stroke }) {
+  if (!visible) return;
+  elements.push(`<g data-layer="${id}" fill="${fill}" fill-opacity="0.3" stroke="${stroke}" stroke-width="0.08">`);
+  for (const tile of records || []) {
+    if (!Number.isInteger(tile?.x) || !Number.isInteger(tile?.y) || !inBounds(width, height, tile.x, tile.y)) continue;
+    elements.push(`<rect x="${tile.x}" y="${tile.y}" width="1" height="1"/>`);
+  }
+  elements.push("</g>");
+}
+
+function appendDoodadLayers(elements, records, visibility, width, height) {
+  const grouped = new Map(MAP_AUTHORING_LAYER_IDS.map((id) => [id, []]));
+  for (const record of records || []) {
+    if (!Number.isFinite(record?.x) || !Number.isFinite(record?.y)
+      || record.x < 0 || record.y < 0 || record.x >= width * MAP_TILE_SIZE_PX || record.y >= height * MAP_TILE_SIZE_PX) continue;
+    grouped.get(mapAuthoringDoodadLayer(record.typeId))?.push(record);
+  }
+  for (const id of [
+    MAP_AUTHORING_LAYER.TREES,
+    MAP_AUTHORING_LAYER.GAMEPLAY_DOODADS,
+    MAP_AUTHORING_LAYER.DECORATIVE_DOODADS,
+  ]) {
+    if (!visibility[id]) continue;
+    elements.push(`<g data-layer="${id}">`);
+    for (const record of grouped.get(id) || []) elements.push(renderDoodadSvg(record, id));
+    elements.push("</g>");
+  }
+}
+
+function renderDoodadSvg(record, layerId) {
+  const x = Math.round(record.x / MAP_TILE_SIZE_PX * 1000) / 1000;
+  const y = Math.round(record.y / MAP_TILE_SIZE_PX * 1000) / 1000;
+  if (layerId === MAP_AUTHORING_LAYER.TREES) {
+    return `<circle cx="${x}" cy="${y}" r="1.15" fill="#315f36" stroke="#b3d57a" stroke-width="0.16"/>`;
+  }
+  if (layerId === MAP_AUTHORING_LAYER.DECORATIVE_DOODADS) {
+    const color = /^#[0-9a-f]{6}$/.test(record.color || "") ? record.color : "#e8b84a";
+    return `<circle cx="${x}" cy="${y}" r="0.24" fill="${color}" stroke="#fff4d9" stroke-width="0.06"/>`;
+  }
+  return `<path d="M ${x - 0.45} ${y - 0.45} L ${x + 0.45} ${y + 0.45} M ${x + 0.45} ${y - 0.45} L ${x - 0.45} ${y + 0.45}" stroke="#ded5bd" stroke-width="0.2"/>`;
 }
 
 function parseOptions(args) {
@@ -369,7 +443,7 @@ function usage() {
   node scripts/map-author.mjs validate <map.json> [--symmetry halfTurn]
   node scripts/map-author.mjs check <map.json>
   node scripts/map-author.mjs report <map.json>
-  node scripts/map-author.mjs preview <map.json> --output <preview.svg> [--tile-pixels 5]
+  node scripts/map-author.mjs preview <map.json> --output <preview.svg> [--tile-pixels 5] [--layers <csv>]
 
 Recipe operations:
   {"type":"blob","material":"water","center":[40,80],"radius":[18,10],"roughness":0.35,"seed":1}
@@ -381,6 +455,9 @@ Recipe operations:
 Recipe symmetry supports none, horizontal, vertical, halfTurn, threeWay, radial, diagonalMain,
 and diagonalAnti. Quarter-turn, three-way, and diagonal symmetry require a square map. Validation
 is advisory and never rejects a readable map.
+
+Preview layers: ${MAP_AUTHORING_LAYER_IDS.join(", ")}. Omit --layers (or use all) to show every
+layer; pass a comma-separated subset to isolate authoring layers.
 `;
 }
 
@@ -426,8 +503,12 @@ export function runCli(argv = process.argv.slice(2), dependencies = {}) {
   }
   if (command === "preview") {
     if (!positional[0] || !options.output) throw new Error("preview needs <map.json> and --output <preview.svg>");
+    if (options.layers === true) throw new Error("preview --layers needs a comma-separated layer list or all");
     const map = readJson(positional[0]);
-    const output = writeFile(options.output, renderPreviewSvg(map, { tilePixels: options["tile-pixels"] }));
+    const output = writeFile(options.output, renderPreviewSvg(map, {
+      tilePixels: options["tile-pixels"],
+      layers: options.layers,
+    }));
     process.stdout.write(`Wrote ${output}\n`);
     return 0;
   }

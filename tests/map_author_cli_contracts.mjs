@@ -12,6 +12,7 @@ import {
   validateMap,
 } from "../scripts/map-author.mjs";
 import { expandSymmetricPoints } from "../client/src/map_authoring/symmetry.js";
+import { MAP_AUTHORING_LAYER } from "../client/src/map_authoring/layers.js";
 import { isMapAuthoringRecipe } from "../client/src/map_authoring/recipe.js";
 import { MapEditorPanel } from "../client/src/map_editor_panel.js";
 import { MapEditorSession, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
@@ -208,6 +209,27 @@ const preview = renderPreviewSvg(map, { tilePixels: 3 });
 assert(preview.startsWith("<svg"));
 assert(preview.includes(">1</text>"));
 
+const layeredPreviewMap = {
+  ...map,
+  stealthTiles: [{ x: 1, y: 2 }],
+  noVehicleTiles: [{ x: 3, y: 4 }],
+  doodads: [
+    { id: 1, typeId: "tree.oak", x: 64, y: 64 },
+    { id: 2, typeId: "unit.tank_trap", x: 80, y: 80 },
+    { id: 3, typeId: "wildflower.single", x: 96, y: 96, color: "#c58af9" },
+  ],
+};
+const layeredPreview = renderPreviewSvg(layeredPreviewMap);
+for (const layer of Object.values(MAP_AUTHORING_LAYER)) {
+  assert(layeredPreview.includes(`data-layer="${layer}"`), `default CLI preview includes ${layer}`);
+}
+const stealthPreview = renderPreviewSvg(layeredPreviewMap, { layers: MAP_AUTHORING_LAYER.STEALTH });
+assert(stealthPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.STEALTH}"`));
+assert(!stealthPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.BASE}"`));
+assert(!stealthPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.TREES}"`));
+assert.throws(() => renderPreviewSvg(layeredPreviewMap, { layers: "forest" }), /Unsupported map authoring layer/,
+  "the CLI does not preserve Forest as a combined-layer alias");
+
 const malformedValidation = validateMap({
   version: currentServerMapVersion,
   width: 20,
@@ -399,12 +421,17 @@ try {
   assert.equal(validate.status, 0, validate.stderr);
   assert(validate.stdout.includes("protected area"));
 
-  const render = spawnSync(process.execPath, ["scripts/map-author.mjs", "preview", mapPath, "--output", previewPath], {
+  const render = spawnSync(process.execPath, [
+    "scripts/map-author.mjs", "preview", mapPath, "--output", previewPath, "--layers", "stealth",
+  ], {
     cwd: repoRoot,
     encoding: "utf8",
   });
   assert.equal(render.status, 0, render.stderr);
-  assert(fs.readFileSync(previewPath, "utf8").startsWith("<svg"));
+  const previewSvg = fs.readFileSync(previewPath, "utf8");
+  assert(previewSvg.startsWith("<svg"));
+  assert(previewSvg.includes('data-layer="stealth"') && !previewSvg.includes('data-layer="base"'),
+    "CLI --layers forwards the exact preview layer selection");
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });
 }
