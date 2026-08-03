@@ -25,6 +25,8 @@ then refresh the capsule's section list if structure changed.
 Read the relevant design doc only when changing cross-file contracts (protocol ⇄ client,
 `Game` API, balance mirror, fog rules). Otherwise, the capsule + the code is enough.
 
+Do not commit maps created only to test or preview a change unless the user explicitly asks.
+
 For new unit work, start with [docs/new-unit-checklist.md](../new-unit-checklist.md), then read the
 task-specific capsules it references as each phase begins.
 

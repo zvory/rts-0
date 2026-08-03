@@ -23,18 +23,18 @@ const profiledLabLaunchUrl = interactLaunchUrl({
   mode: "lab",
   baseUrl: "http://localhost/",
   room: "interact-lab-test",
-  map: "terrain-blend-showcase",
+  map: "1v1",
   opponent: "ai_2_1",
   renderer: "pixi",
   seed: "424242",
   scenario: "blank",
-  visualProfile: "terrain-blend-showcase",
+  visualProfile: "trench-variants-1",
   devScenario: { id: "", unit: "", count: 1, blocker: "", case: "" },
 });
 
 assert.equal(
   new URL(profiledLabLaunchUrl).searchParams.get("visualProfile"),
-  "terrain-blend-showcase",
+  "trench-variants-1",
   "the Interact Lab driver can select one bounded checked-in visual profile",
 );
 
