@@ -360,7 +360,10 @@ impl GameCheckpointV1 {
         )?;
 
         let player_ids = validate_players(&self.players, self.tick)?;
-        if !self.ground_decals.valid_checkpoint_state(map, &player_ids) {
+        if !self
+            .ground_decals
+            .valid_checkpoint_state(map, &player_ids, self.tick)
+        {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "groundDecals",
             });

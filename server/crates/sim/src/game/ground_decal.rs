@@ -4,16 +4,18 @@ use crate::config;
 use crate::game::entity::EntityKind;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
-use crate::protocol::{self, GroundDecalView};
+use crate::protocol::{self, GroundDecalView, TankTrailView};
 use crate::rules::{artillery_ground_decal_source_kind, mortar_ground_decal_source_kind};
 use serde::{Deserialize, Serialize};
 
 mod revision_log;
 mod spatial_index;
+mod tank_trail;
 mod types;
 
 use revision_log::{GroundDecalRevisionEntry, GroundDecalRevisionLog};
 use spatial_index::GroundDecalSpatialIndex;
+use tank_trail::TankTrailStore;
 use types::{
     deserialize_source_kind, serialize_source_kind, valid_class_and_source, GroundDecalClass,
 };
@@ -61,8 +63,14 @@ impl GroundDecal {
 pub(crate) struct GroundDecalStore {
     next_id: u32,
     revision: u32,
+    #[serde(default)]
+    current_tick: u32,
     decals: Vec<GroundDecal>,
     discovered_by_player: BTreeMap<u32, BTreeMap<u32, u32>>,
+    #[serde(default)]
+    tank_trails: TankTrailStore,
+    #[serde(default)]
+    discovered_trails_by_player: BTreeMap<u32, BTreeMap<u32, u32>>,
     revision_log: GroundDecalRevisionLog,
     #[serde(skip)]
     spatial_index: GroundDecalSpatialIndex,
@@ -79,10 +87,39 @@ impl GroundDecalStore {
         Self {
             next_id: 1,
             revision: 0,
+            current_tick: 0,
             decals: Vec::new(),
             discovered_by_player: BTreeMap::new(),
+            tank_trails: TankTrailStore::new(),
+            discovered_trails_by_player: BTreeMap::new(),
             revision_log: GroundDecalRevisionLog::default(),
             spatial_index: GroundDecalSpatialIndex::new(),
+        }
+    }
+
+    pub(crate) fn begin_tick(&mut self, tick: u32) {
+        self.current_tick = tick;
+    }
+
+    pub(crate) fn update_tank_trails(
+        &mut self,
+        entities: &crate::game::entity::EntityStore,
+        map: &Map,
+        tick: u32,
+    ) {
+        for pending in self.tank_trails.update(entities, map, tick) {
+            let Some(id) = self.tank_trails.next_id() else {
+                return;
+            };
+            let Some(revision) = self.record_revision(GroundDecalRevisionEntry::TrailCreated {
+                id,
+                tick: self.current_tick,
+            }) else {
+                return;
+            };
+            if !self.tank_trails.commit(pending, id, revision, map) {
+                return;
+            }
         }
     }
 
@@ -156,7 +193,10 @@ impl GroundDecalStore {
         }
         self.spatial_index.ensure(&self.decals);
         let id = self.next_id;
-        let created_revision = self.record_revision(GroundDecalRevisionEntry::Created { id })?;
+        let created_revision = self.record_revision(GroundDecalRevisionEntry::Created {
+            id,
+            tick: self.current_tick,
+        })?;
         self.next_id = self.next_id.checked_add(1).unwrap_or(0);
         self.decals.push(GroundDecal {
             id,
@@ -177,7 +217,7 @@ impl GroundDecalStore {
         Some(id)
     }
 
-    pub(crate) fn refresh_memory_for_player(&mut self, player: u32, fog: &Fog) {
+    pub(crate) fn refresh_memory_for_player(&mut self, player: u32, fog: &Fog, map: &Map) {
         self.spatial_index.ensure(&self.decals);
         let mut newly_visible = BTreeSet::new();
         if let Some((width, visible)) = fog.visible_grid_for(player) {
@@ -212,11 +252,39 @@ impl GroundDecalStore {
         }
         for id in newly_visible {
             let Some(revision) =
-                self.record_revision(GroundDecalRevisionEntry::Discovered { player, id })
+                self.record_revision(GroundDecalRevisionEntry::Discovered {
+                    player,
+                    id,
+                    tick: self.current_tick,
+                })
             else {
                 return;
             };
             self.discovered_by_player
+                .entry(player)
+                .or_default()
+                .insert(id, revision);
+        }
+
+        let known_trails = self
+            .discovered_trails_by_player
+            .get(&player)
+            .cloned()
+            .unwrap_or_default();
+        let newly_visible_trails = self
+            .tank_trails
+            .newly_fully_visible(player, fog, map, &known_trails);
+        for id in newly_visible_trails {
+            let Some(revision) =
+                self.record_revision(GroundDecalRevisionEntry::TrailDiscovered {
+                    player,
+                    id,
+                    tick: self.current_tick,
+                })
+            else {
+                return;
+            };
+            self.discovered_trails_by_player
                 .entry(player)
                 .or_default()
                 .insert(id, revision);
@@ -227,8 +295,9 @@ impl GroundDecalStore {
         &self,
         map: &crate::game::map::Map,
         player_ids: &BTreeSet<u32>,
+        tick: u32,
     ) -> bool {
-        if self.next_id == 0 {
+        if self.next_id == 0 || self.current_tick != tick {
             return false;
         }
         let mut ids = BTreeSet::new();
@@ -276,10 +345,30 @@ impl GroundDecalStore {
                 }
             }
         }
+        if !self.tank_trails.valid_checkpoint_state(map, player_ids, tick) {
+            return false;
+        }
+        for (player, known) in &self.discovered_trails_by_player {
+            if !player_ids.contains(player) {
+                return false;
+            }
+            for (id, revision) in known {
+                if !self.tank_trails.contains(*id)
+                    || *revision == 0
+                    || *revision > self.revision
+                    || !used_revisions.insert(*revision)
+                {
+                    return false;
+                }
+            }
+        }
         self.revision_log.valid(
             self.revision,
+            self.current_tick,
             &self.decals,
             &self.discovered_by_player,
+            &self.tank_trails,
+            &self.discovered_trails_by_player,
             used_revisions.len(),
         )
     }
@@ -409,35 +498,97 @@ mod tests {
         let map = one_player_game().state.map;
         store.create_mortar_impact(&map, 48.0, 48.0).unwrap();
 
-        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None));
-        assert_eq!(store.views_for_players_after(&[2], 0), (0, Vec::new()));
-        assert_eq!(store.recent_views_for_players(&[2], 64), (0, 0, Vec::new()));
+        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None), &map);
+        assert_eq!(
+            store.views_for_players_after(&[2], 0),
+            (0, Vec::new(), Vec::new())
+        );
+        assert_eq!(
+            store.recent_views_for_players(&[2], 64),
+            (0, 0, Vec::new(), Vec::new())
+        );
 
-        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, Some(5)));
-        let (revision, decals) = store.views_for_players_after(&[2], 0);
+        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, Some(5)), &map);
+        let (revision, decals, trails) = store.views_for_players_after(&[2], 0);
         assert!(revision > 0);
         assert_eq!(decals.len(), 1);
+        assert!(trails.is_empty());
         assert_eq!(decals[0].decal_class, "mortarBlast");
-        let (fast_revision, fast_after, fast_decals) = store.recent_views_for_players(&[2], 64);
+        let (fast_revision, fast_after, fast_decals, fast_trails) =
+            store.recent_views_for_players(&[2], 64);
         assert_eq!(fast_revision, revision);
         assert_eq!(fast_after, 0);
         assert_eq!(fast_decals, decals);
+        assert!(fast_trails.is_empty());
         assert_eq!(
             decals[0].owner, 0,
             "impact decals must not leak firing owner"
         );
         assert_eq!(
             store.views_for_players_after(&[2], revision),
-            (revision, Vec::new())
+            (revision, Vec::new(), Vec::new())
         );
 
-        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, Some(5)));
+        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, Some(5)), &map);
         assert_eq!(store.revision_for_players(&[2]), revision);
+        store.begin_tick(1);
         assert_eq!(
             store.recent_views_for_players(&[2], 64),
-            (fast_revision, fast_after, fast_decals),
-            "the same bounded tail repeats until later revisions roll it out"
+            (fast_revision, fast_revision, Vec::new(), Vec::new()),
+            "a later tick advertises the cursor without repeating old rows"
         );
+    }
+
+    #[test]
+    fn current_tick_delta_cursor_skips_hidden_global_revision_gaps() {
+        assert_eq!(
+            revision_log::current_delta_after_for_test(50, &[10, 50], &[50], 64),
+            10,
+            "the delta must begin at the perspective cursor, not global revision 49"
+        );
+        assert_eq!(
+            revision_log::current_delta_after_for_test(50, &[10, 50], &[], 64),
+            50,
+            "ticks with no newly entitled rows should carry no delta"
+        );
+    }
+
+    #[test]
+    fn in_place_pivot_finalizes_as_one_sparse_trail_chunk() {
+        let mut game = one_player_game();
+        let tank = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::Tank, 96.0, 96.0)
+            .unwrap();
+
+        game.state.ground_decals.begin_tick(1);
+        game.state.ground_decals.update_tank_trails(
+            &game.state.entities,
+            &game.state.map,
+            1,
+        );
+        game.state
+            .entities
+            .get_mut(tank)
+            .unwrap()
+            .set_facing(std::f32::consts::FRAC_PI_2);
+        for tick in 2..=4 {
+            game.state.ground_decals.begin_tick(tick);
+            game.state.ground_decals.update_tank_trails(
+                &game.state.entities,
+                &game.state.map,
+                tick,
+            );
+        }
+
+        assert_eq!(game.state.ground_decals.tank_trails.finalized_len(), 1);
+        let (_, decals, trails) = game.state.ground_decals.full_world_views_after(0);
+        assert!(decals.is_empty());
+        assert_eq!(trails.len(), 1);
+        assert_eq!(trails[0].poses.len(), 2);
+        assert_eq!(trails[0].poses[0][..2], trails[0].poses[1][..2]);
+        assert_ne!(trails[0].poses[0][2], trails[0].poses[1][2]);
     }
 
     #[test]
@@ -445,10 +596,13 @@ mod tests {
         let mut store = GroundDecalStore::new();
         let map = one_player_game().state.map;
         store.create_artillery_impact(&map, 48.0, 48.0).unwrap();
-        store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
-        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None));
+        store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)), &map);
+        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None), &map);
 
-        assert_eq!(store.views_for_players_after(&[2], 0), (0, Vec::new()));
+        assert_eq!(
+            store.views_for_players_after(&[2], 0),
+            (0, Vec::new(), Vec::new())
+        );
         assert!(store.recent_views_for_players(&[2], 64).2.is_empty());
         assert_eq!(store.views_for_players_after(&[1], 0).1.len(), 1);
         assert_eq!(store.recent_views_for_players(&[1], 64).2.len(), 1);
@@ -465,11 +619,13 @@ mod tests {
                 .create_mortar_impact(&map, 48.0 + offset as f32 * 0.01, 48.0)
                 .unwrap();
         }
-        store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
+        store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)), &map);
 
-        let (revision, after_revision, decals) = store.recent_views_for_players(&[1], 64);
+        let (revision, after_revision, decals, trails) =
+            store.recent_views_for_players(&[1], 64);
         assert_eq!(after_revision, revision - 64);
         assert_eq!(decals.len(), 64);
+        assert!(trails.is_empty());
         assert_eq!(
             decals,
             store.views_for_players_after(&[1], after_revision).1,
@@ -554,7 +710,11 @@ mod tests {
         restored
             .state
             .ground_decals
-            .refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
+            .refresh_memory_for_player(
+                1,
+                &fog_with_visible_tile(1, Some(5)),
+                &restored.state.map,
+            );
 
         assert_eq!(restored.ground_decals_for_player(1, 0).1.len(), 1);
     }

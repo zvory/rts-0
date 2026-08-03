@@ -384,7 +384,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `matchCountdown` | `countdownId: u32`, `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. Active human clients begin warming their renderer when they become ready, then acknowledge this exact nonzero countdown generation with `matchLoadReady` once warmup completes. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, and rejects new joins. At expiry it sends `start` only if every active human acknowledged; otherwise it returns the room to editable lobby state and broadcasts `<name> failed to load the game.` Spectators and AI do not block launch. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
-| `groundDecals` | `requestId: u32`, `revision: u32`, `decals: GroundDecalView[]` — reliable fog/observer-scoped delta response. `requestId` echoes the request so stale pre-seek or pre-view-change responses cannot enter the current cache. Each row carries `id`, `decalClass`, `sourceKind`, `x`, `y`, `owner`, `seed`, and optional `facing`, `weaponFacing`, or `radiusTiles`. |
+| `groundDecals` | `requestId: u32`, `revision: u32`, `decals: GroundDecalView[]`, `tankTrails: TankTrailView[]` — reliable fog/observer-scoped delta response. `requestId` echoes the request so stale pre-seek or pre-view-change responses cannot enter the current cache. A trail row carries an immutable chunk `id` and sparse `[xQuarterPx, yQuarterPx, headingI16]` poses; clients reconstruct the swept left/right tread footprint. Ordinary decal rows carry `id`, `decalClass`, `sourceKind`, `x`, `y`, `owner`, `seed`, and optional `facing`, `weaponFacing`, or `radiusTiles`. |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
 | `roomTimeSeekStarted` | `controllerId: u32`, `fromTick: u32`, `targetTick: u32` — reliable broadcast to every replay viewer immediately before an accepted shared replay seek resets timeline-derived presentation and begins incremental fast-forward. Rejected and rate-limited seeks do not emit it. |
 | `livePauseState` | `Live match pause state` (see 2.6). |
@@ -817,7 +817,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 50. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 51. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -843,10 +843,12 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 50,
+  "v": 51,
   "gr": groundDecalRevision, // omitted when zero
-  "gd": [afterRevision, [    // omitted when no discovered/created revision exists
+  "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
+  ], [
+    [trailId, [[xQuarterPx, yQuarterPx, headingI16], ...]]
   ]],
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "ab": [paused, reserveSteel, reserveOil], // omitted when no real player is projected

@@ -33,6 +33,7 @@ pub enum ServerMessage {
         request_id: u32,
         revision: u32,
         decals: Vec<GroundDecalView>,
+        tank_trails: Vec<TankTrailView>,
     },
     /// Shared room-controlled time cursor/state. Sent latest-only outside snapshot cadence.
     RoomTimeState(RoomTimeState),
@@ -137,6 +138,10 @@ mod tests {
                 weapon_facing: None,
                 radius_tiles: Some(1.5),
             }],
+            tank_trails: vec![TankTrailView {
+                id: 8,
+                poses: vec![[128, 256, 0], [160, 256, 1024]],
+            }],
         };
         let wire = serde_json::to_value(message).unwrap();
         assert_eq!(wire["t"], "groundDecals");
@@ -144,5 +149,6 @@ mod tests {
         assert_eq!(wire["revision"], 9);
         assert_eq!(wire["decals"][0]["decalClass"], "mortarBlast");
         assert_eq!(wire["decals"][0]["radiusTiles"], 1.5);
+        assert_eq!(wire["tankTrails"][0]["poses"][1][0], 160);
     }
 }

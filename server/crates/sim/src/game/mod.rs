@@ -61,7 +61,8 @@ use crate::config;
 use crate::protocol::{
     AutoBuildSettingsSnapshot, Event, GroundDecalDelta, GroundDecalView, MapInfo,
     PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ResourceDelta,
-    ResourceNode, Snapshot, StartPayload, DEFAULT_FACTION_ID, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
+    ResourceNode, Snapshot, StartPayload, TankTrailView, DEFAULT_FACTION_ID,
+    MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
@@ -233,6 +234,7 @@ impl Game {
         mut perf: Option<&mut crate::perf::TickPerf>,
     ) -> Vec<(u32, Vec<Event>)> {
         self.state.tick = self.state.tick.wrapping_add(1);
+        self.state.ground_decals.begin_tick(self.state.tick);
         self.derived.advance_pathing_tick(self.state.tick);
         self.state.smokes.retain_active(self.state.tick);
         let player_ids = self.state.player_ids();
@@ -281,6 +283,11 @@ impl Game {
             perf.as_deref_mut(),
         );
         self.derived.set_final_spatial(final_spatial);
+        self.state.ground_decals.update_tank_trails(
+            &self.state.entities,
+            &self.state.map,
+            self.state.tick,
+        );
         world_combat::record_activity(
             &events,
             self.state.tick,
@@ -325,7 +332,7 @@ impl Game {
         &self,
         player: u32,
         after_revision: u32,
-    ) -> (u32, Vec<GroundDecalView>) {
+    ) -> (u32, Vec<GroundDecalView>, Vec<TankTrailView>) {
         self.state
             .ground_decals
             .views_for_players_after(&[player], after_revision)
@@ -336,7 +343,7 @@ impl Game {
         &self,
         view: &ObserverView,
         after_revision: u32,
-    ) -> (u32, Vec<GroundDecalView>) {
+    ) -> (u32, Vec<GroundDecalView>, Vec<TankTrailView>) {
         match view {
             ObserverView::Omniscient => self
                 .state
@@ -637,7 +644,7 @@ impl Game {
             let fog = self.team_current_fog_for(player, &self.state.fog);
             self.state
                 .ground_decals
-                .refresh_memory_for_player(player, &fog);
+                .refresh_memory_for_player(player, &fog, &self.state.map);
         }
     }
 
