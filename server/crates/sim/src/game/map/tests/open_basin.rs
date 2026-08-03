@@ -44,8 +44,8 @@ fn open_basin_is_selectable_and_retains_its_authored_sites() {
 
 #[test]
 fn open_basin_is_rotationally_symmetric() {
-    let map =
-        Map::load("Open Basin", 2, 0x1234_5678).expect("Open Basin should load for symmetry checks");
+    let map = Map::load("Open Basin", 2, 0x1234_5678)
+        .expect("Open Basin should load for symmetry checks");
 
     for y in 0..map.height as usize {
         for x in 0..map.width as usize {
