@@ -436,16 +436,16 @@ impl Game {
                         location_context(&self.state.map, v.x, v.y)
                     );
                 }
-                // If a target_id is exposed, the target must be visible too.
+                // If a target_id is exposed, the target must be projected too. Checking the
+                // snapshot itself keeps this invariant aligned with projection policy, including
+                // public resource nodes and smoke/stealth visibility.
                 if let Some(tid) = v.target_id {
                     if let Some(t) = self.state.entities.get(tid) {
-                        // snapshot_for() projects through the living team's unioned fog, so the
-                        // invariant must judge target visibility through that same projection.
-                        let visible = self.same_team_owner(pid, t.owner)
-                            || live_fog.is_visible_world(pid, t.pos_x, t.pos_y);
                         assert!(
-                            visible,
-                            "invariant: tick {} snapshot for player {} exposes hidden target_id {}; target={}",
+                            snap.entities
+                                .binary_search_by_key(&tid, |candidate| candidate.id)
+                                .is_ok(),
+                            "invariant: tick {} snapshot for player {} exposes target_id {} without projecting its target; target={}",
                             self.state.tick,
                             pid,
                             tid,
