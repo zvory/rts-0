@@ -507,7 +507,8 @@ rest of the match.
 Pixels persist in lazily allocated 512-world-pixel tiles (256×256 texels); only touched tiles
 upload, and all tile canvases/textures/sprites are destroyed with the ground-decal layer. Preview
 contact poses are accumulated between bounded 10 Hz uploads; the swept-contact raster fills the
-complete intervening motion.
+complete intervening motion. Tread pigment is deliberately faint, and every live or later-discovered
+trail stamp clears road-tile pixels so paved surfaces never retain tank tracks.
 
 `renderer/trenches.js`
 ```js
@@ -2099,7 +2100,8 @@ terrain and resources):
   chunks are discovered through physical fog like other durable ground marks, so a player later
   visiting unseen ground learns the tracks without learning them through fog. The contact model advances
   independent belt phases, stamps the full long contact patch, and paints additional shear during
-  pivots. Separate 512-world-pixel tread tiles avoid repeatedly uploading the whole-map
+  pivots. Marks use a faint translucent earth tint and are cleared at road-tile boundaries for both
+  live and later-discovered history. Separate 512-world-pixel tread tiles avoid repeatedly uploading the whole-map
   death/impact canvas during continuous movement.
 - `GameState` retains normalized records keyed by stable server id and queues only newly learned
   records. Match stages the pending batch before presentation assembly and releases it only after a
