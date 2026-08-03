@@ -1,5 +1,5 @@
-import { KIND } from "../../protocol.js";
 import { STATS } from "../../config.js";
+import { KIND } from "../../protocol.js";
 import { RIG_SCHEMA_VERSION, validateRigDefinition } from "./schema.js";
 
 const IDENTITY_TRANSFORM = Object.freeze({ x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 });

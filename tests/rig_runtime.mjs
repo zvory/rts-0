@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { STATS } from "../client/src/config.js";
 import { KIND, SETUP, STATE } from "../client/src/protocol.js";
 import { _rigRenderContextFor } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
@@ -48,10 +47,6 @@ import { MORTAR_TEAM_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/mortar_te
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
 import { liveUnitIconMarkupFor } from "../client/src/renderer/rigs/unit_icon_sources.js";
 import {
-  createBuildingPngRigAtlases,
-  createBuildingPngRigDefinitions,
-} from "../client/src/renderer/rigs/building_png.js";
-import {
   COMMAND_CAR_RIG_SVG,
   EKAT_RIG_SVG,
 } from "../client/src/renderer/rigs/vehicle_svg.js";
@@ -62,7 +57,6 @@ import {
   fakeFrameStripTexture,
   makeRigRenderer,
 } from "./helpers/rig_renderer_harness.mjs";
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 const fixturesDir = path.join(__dirname, "fixtures/svg");
@@ -828,71 +822,6 @@ test("PNG route coverage keeps mutable and Set part selections independent", () 
   });
   assert.deepEqual(turretCoverage.coveredParts, ["part.turret"]);
   assert.deepEqual(turretCoverage.missingParts, []);
-});
-
-test("B2/B3/B4/B7 building PNG atlases cover the distinct Kriegsia set at footprint scale", () => {
-  const expectedFootprints = new Map([
-    [KIND.CITY_CENTRE, [3, 3]],
-    [KIND.BARRACKS, [3, 2]],
-    [KIND.TRAINING_CENTRE, [3, 2]],
-    [KIND.RESEARCH_COMPLEX, [3, 3]],
-    [KIND.FACTORY, [3, 3]],
-    [KIND.STEELWORKS, [3, 3]],
-    [KIND.PUMP_JACK, [1, 1]],
-  ]);
-  const definitions = createBuildingPngRigDefinitions();
-  const atlases = createBuildingPngRigAtlases();
-  assert.equal(definitions.size, expectedFootprints.size);
-  assert.equal(atlases.size, expectedFootprints.size);
-  assert.equal(definitions.has(KIND.DEPOT), false);
-  assert.equal(atlases.has(KIND.DEPOT), false);
-  assert.equal(definitions.has(KIND.TANK_TRAP), false);
-  assert.equal(atlases.has(KIND.TANK_TRAP), false);
-
-  for (const [kind, [footW, footH]] of expectedFootprints) {
-    const definition = definitions.get(kind);
-    const atlas = atlases.get(kind);
-    const route = { parts: ["part.base", "part.tint"] };
-    assert.ok(definition, `missing building PNG definition for ${kind}`);
-    assert.ok(atlas, `missing building PNG atlas for ${kind}`);
-    assert.equal(pngAtlasCanRenderRoute(definition, atlas, route), true);
-    assert.deepEqual(pngAtlasRouteCoverage(definition, atlas, route).missingParts, []);
-    assert.equal(STATS[kind].footW, footW);
-    assert.equal(STATS[kind].footH, footH);
-    assert.equal(atlas.viewBox.width, STATS[kind].footW * 32);
-    assert.equal(atlas.viewBox.height, STATS[kind].footH * 32);
-    const hasSilhouetteShadow = [
-      KIND.CITY_CENTRE,
-      KIND.BARRACKS,
-      KIND.TRAINING_CENTRE,
-      KIND.FACTORY,
-      KIND.RESEARCH_COMPLEX,
-      KIND.STEELWORKS,
-    ].includes(kind);
-    const expectedSpriteCount = hasSilhouetteShadow ? 3 : 2;
-    assert.equal(atlas.sprites.length, expectedSpriteCount);
-    assert.deepEqual(
-      atlas.sprites.map((sprite) => sprite.tintSlot),
-      hasSilhouetteShadow
-        ? ["fixed", "team", "fixed"]
-        : ["fixed", "team"],
-    );
-
-    if (hasSilhouetteShadow) {
-      const shadowRoute = { parts: ["part.shadow"] };
-      assert.equal(pngAtlasCanRenderRoute(definition, atlas, shadowRoute), true);
-      assert.deepEqual(pngAtlasRouteCoverage(definition, atlas, shadowRoute).missingParts, []);
-    }
-
-    const assetPath = atlas.image.split("?", 1)[0].replace(/^\/assets\//, "client/assets/");
-    const absoluteAssetPath = path.join(repoRoot, assetPath);
-    assert.equal(fs.existsSync(absoluteAssetPath), true, `missing ${assetPath}`);
-    assert.deepEqual(
-      readPngDimensions(assetPath),
-      { width: atlas.grid.width, height: atlas.grid.height },
-      `${assetPath} dimensions must match its runtime atlas grid`,
-    );
-  }
 });
 
 test("tank PNG atlas keeps cannon recoil on the generated barrel sprite", () => {

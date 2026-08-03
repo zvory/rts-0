@@ -32,6 +32,7 @@ await import("./client_contracts/machine_gunner_white_strip_contracts.mjs");
 await import("./client_contracts/rifleman_png_strip_contracts.mjs");
 await import("./client_contracts/launch_url_contracts.mjs");
 await import("./client_contracts/renderer_contracts.mjs");
+await import("./client_contracts/building_png_renderer_contracts.mjs");
 await import("./client_contracts/fog_presentation_contracts.mjs");
 await import("./client_contracts/terrain_variant_contracts.mjs");
 await import("./client_contracts/terrain_blend_contracts.mjs");
