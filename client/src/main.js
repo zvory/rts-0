@@ -8,10 +8,6 @@ import {
 import { MapEditorApp } from "./map_editor_app.js";
 import { mapEditorLaunchConfig } from "./map_editor_launch.js";
 import { SnapshotStreamNet } from "./snapshot_stream_net.js";
-import {
-  createSelectedBackendBundle,
-  showRendererBootstrapError,
-} from "./renderer/backend_selection.js";
 
 async function start() {
   const analyticsConsent = new AnalyticsConsent();
@@ -24,7 +20,6 @@ async function start() {
     app = mapEditorLaunchConfig()
       ? new MapEditorApp()
       : new App({
-        rendererBackendBundle: await createSelectedBackendBundle(),
         net: snapshotStreamLaunch
           ? new SnapshotStreamNet({
             id: snapshotStreamLaunch.id,
@@ -48,6 +43,15 @@ async function start() {
     showRendererBootstrapError(error);
     app.destroy?.();
   }
+}
+
+function showRendererBootstrapError(_error) {
+  const target = globalThis.document?.getElementById?.("toast")
+    || globalThis.document?.getElementById?.("app");
+  if (!target) return;
+  target.textContent = "The game client could not start.";
+  target.hidden = false;
+  target.setAttribute?.("role", "alert");
 }
 
 void start();

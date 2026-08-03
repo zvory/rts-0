@@ -93,7 +93,7 @@ import {
   const slot = new RendererPreparationSlot();
   const state = slot.warm(async () => ({
     destroy() { destroyed += 1; },
-  }), { compatibilityKey: "babylon" });
+  }), { compatibilityKey: "alternate" });
   await state.promise;
   const transferred = await slot.settleForStart({
     reuse: true,
@@ -148,14 +148,14 @@ import {
   });
   await settleRendererPreparationForStart(slot, {
     lab: true,
-    compatibilityKey: "babylon",
+    compatibilityKey: "alternate",
   });
   assertDeepEqual(
     reuseDecisions,
     [
       { reuse: true, compatibilityKey: "pixi" },
       { reuse: true, compatibilityKey: "pixi" },
-      { reuse: false, compatibilityKey: "babylon" },
+      { reuse: false, compatibilityKey: "alternate" },
     ],
     "every start settles the slot; compatible live and replay matches may adopt its renderer",
   );

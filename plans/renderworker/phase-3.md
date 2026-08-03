@@ -33,8 +33,8 @@ performance win, then verify the merged commit has deployed to beta for the user
 - Replace the default Pixi backend bundle with the worker host. Normal live play, replay, spectator,
   Lab, fixed capture, stress tests, and Map Editor all use it; retain no direct `Renderer.create`,
   main-thread `PIXI.Application`, hidden canvas, or query-selected sync path.
-- Keep existing explicit Babylon selection behavior outside the worker host. A failed Pixi worker
-  must not switch to Babylon or another canvas renderer.
+- A failed Pixi worker must remain a bounded visible error and must not switch to another canvas
+  renderer.
 - Delete obsolete main-thread Pixi adapter/construction code and update the architecture checker so
   future code cannot import the worker-owned renderer or Pixi runtime from a main-thread client
   area. Tests may instantiate narrow pure renderer helpers, but production code has one Pixi owner.

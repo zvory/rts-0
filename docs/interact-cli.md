@@ -5,9 +5,8 @@ inspects small authoritative Lab scenes. The `game` namespace opens either one i
 human-vs-AI match or a spectator-only AI-vs-AI match for bounded inspection, screenshots, real-time
 video, and sampled time-lapse video. The observation-only `dev-scenario` namespace opens the existing
 server-authored dev scenarios for screenshots, before/after stills, real-time video, and sampled
-time lapses. All three
-start this worktree's normal Rust server and a headless client using Pixi by default; `open` accepts
-`renderer:"babylon"` in every namespace. Interact never edits source files.
+time lapses. All three start this worktree's normal Rust server and a headless client using the
+production Pixi renderer. Interact never edits source files.
 
 Interact requires Node 22.18 or newer and runs its TypeScript source directly through Node's
 built-in type stripping; there is no compile or generated-output step. Install the repository-owned
@@ -22,7 +21,6 @@ final argument must be one JSON object:
 
 ```bash
 node scripts/interact/cli.mjs lab open '{"viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
-node scripts/interact/cli.mjs lab open '{"renderer":"babylon","viewport":{"width":1000,"height":700,"deviceScaleFactor":1}}'
 node scripts/interact/cli.mjs lab catalog '{"sessionId":"<id>","categories":["players","units","commands"]}'
 node scripts/interact/cli.mjs lab spawn '{"sessionId":"<id>","spawns":[{"owner":1,"kind":"rifleman","x":960,"y":960,"alias":"subject"}]}'
 node scripts/interact/cli.mjs lab update '{"sessionId":"<id>","updates":[{"operation":"move","entity":"subject","x":1100,"y":960}]}'
