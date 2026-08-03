@@ -765,6 +765,83 @@ mod tests {
     }
 
     #[test]
+    fn hidden_tank_trail_is_discovered_later_and_survives_checkpoint_restore() {
+        let players = [
+            PlayerInit {
+                id: 1,
+                team_id: 1,
+                faction_id: "kriegsia".to_string(),
+                name: "One".to_string(),
+                color: "#fff".to_string(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                team_id: 2,
+                faction_id: "kriegsia".to_string(),
+                name: "Two".to_string(),
+                color: "#000".to_string(),
+                is_ai: false,
+            },
+        ];
+        let mut game = Game::new(&players, 7);
+        let tank = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::Tank, 96.0, 96.0)
+            .unwrap();
+        game.state.ground_decals.begin_tick(1);
+        game.state
+            .ground_decals
+            .update_tank_trails(&game.state.entities, &game.state.map, 1);
+        game.state
+            .entities
+            .get_mut(tank)
+            .unwrap()
+            .set_facing(std::f32::consts::FRAC_PI_2);
+        for tick in 2..=4 {
+            game.state.tick = tick;
+            game.state.ground_decals.begin_tick(tick);
+            game.state.ground_decals.update_tank_trails(
+                &game.state.entities,
+                &game.state.map,
+                tick,
+            );
+        }
+        crate::game::services::supply::recompute_supply(
+            &mut game.state.players,
+            &game.state.entities,
+        );
+
+        game.state.ground_decals.refresh_memory_for_player(
+            2,
+            &fog_with_visible_tile(2, None),
+            &game.state.map,
+        );
+        assert!(game.ground_decals_for_player(2, 0).2.is_empty());
+        let fully_visible = Fog::from_checkpoint_grids(
+            4,
+            4,
+            BTreeMap::from([(2, vec![true; 16])]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        );
+        game.state
+            .ground_decals
+            .refresh_memory_for_player(2, &fully_visible, &game.state.map);
+        assert_eq!(game.ground_decals_for_player(2, 0).2.len(), 1);
+
+        let payload = game.checkpoint_payload_text_for_test().unwrap();
+        let restored = Game::restore_checkpoint_payload_text_for_test(
+            &payload,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        )
+        .unwrap();
+        assert_eq!(restored.ground_decals_for_player(2, 0).2.len(), 1);
+    }
+
+    #[test]
     fn checkpoint_rejects_noncanonical_blast_radius() {
         let mut game = one_player_game();
         game.state
