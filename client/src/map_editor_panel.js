@@ -29,6 +29,7 @@ const MAP_CATALOG_URL = "/maps/catalog";
 const MAP_EDITOR_MAX_JSON_BYTES = 2 * 1024 * 1024;
 const MAP_EDITOR_OPTIONS_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
 const MAP_EDITOR_TOOLS_STORAGE_KEY = "rts.mapEditor.tools.window.v1";
+const MAP_EDITOR_LAYERS_STORAGE_KEY = "rts.mapEditor.layers.window.v1";
 const MAP_EDITOR_ANALYSIS_TIMEOUT_MS = 20_000;
 
 export class MapEditorPanel {
@@ -92,15 +93,24 @@ export class MapEditorPanel {
     this.destroyed = false;
     this.optionsEl = this.createPanelElement("map-editor-options-window", "Map Editor options");
     this.toolsEl = this.createPanelElement("map-editor-tools-window", "Map Editor tools");
+    this.layersEl = this.createPanelElement("map-editor-layers-window", "Map Editor layers");
     this.el = this.optionsEl;
-    root.append(this.optionsEl, this.toolsEl);
+    root.append(this.optionsEl, this.layersEl, this.toolsEl);
     this.optionsWindowChrome = new LabPanelWindowChrome(this.optionsEl, {
       storageKey: MAP_EDITOR_OPTIONS_STORAGE_KEY,
       panelLabel: "map editor options",
+      minWidth: 220,
     });
     this.toolsWindowChrome = new LabPanelWindowChrome(this.toolsEl, {
       storageKey: MAP_EDITOR_TOOLS_STORAGE_KEY,
       panelLabel: "map editor tools",
+      minWidth: 220,
+    });
+    this.layersWindowChrome = new LabPanelWindowChrome(this.layersEl, {
+      storageKey: MAP_EDITOR_LAYERS_STORAGE_KEY,
+      panelLabel: "map editor layers",
+      minWidth: 220,
+      minHeight: 120,
     });
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);
@@ -147,6 +157,7 @@ export class MapEditorPanel {
   render() {
     if (this.destroyed) return;
     this.renderOptionsWindow();
+    this.renderLayersWindow();
     this.renderToolsWindow();
   }
 
@@ -191,7 +202,6 @@ export class MapEditorPanel {
     } else {
       body.append(
         this.renderZoom(),
-        this.renderLayers(),
         this.renderTerrain(),
         this.renderMapOverlays(),
         this.renderDoodads(),
@@ -200,6 +210,20 @@ export class MapEditorPanel {
     }
     this.toolsEl.append(header, body, this.toolsWindowChrome.renderResizeHandle());
     restorePanelScroll(body, scroll);
+  }
+
+  renderLayersWindow() {
+    this.layersEl.replaceChildren();
+    const header = this.layersWindowChrome.renderHeader({
+      kicker: "Layers",
+      collapseLabel: "map editor layers panel",
+    });
+    header.classList.add("map-editor-header");
+    const body = document.createElement("div");
+    body.className = "lab-panel-body map-editor-panel-body map-editor-layers-body";
+    if (!this.session.draft) body.appendChild(readout("Preparing editor…"));
+    else body.appendChild(this.renderLayers());
+    this.layersEl.append(header, body, this.layersWindowChrome.renderResizeHandle());
   }
 
   renderZoom() {
@@ -244,9 +268,9 @@ export class MapEditorPanel {
   }
 
   renderLayers() {
-    const section = group("Visible layers");
     const list = document.createElement("div");
     list.className = "map-editor-layer-list";
+    list.setAttribute("aria-label", "Visible layers");
     const visibility = this.viewport.layerVisibilitySnapshot();
     for (const layer of MAP_AUTHORING_LAYERS) {
       const input = document.createElement("input");
@@ -256,6 +280,7 @@ export class MapEditorPanel {
       input.addEventListener("change", () => this.viewport.setLayerVisibility(layer.id, input.checked));
       const label = document.createElement("label");
       label.className = "map-editor-layer-toggle";
+      label.title = `${layer.label} — ${layer.description}`;
       const text = document.createElement("span");
       text.textContent = layer.label;
       const description = document.createElement("small");
@@ -263,8 +288,7 @@ export class MapEditorPanel {
       label.append(input, text, description);
       list.appendChild(label);
     }
-    section.appendChild(list);
-    return section;
+    return list;
   }
 
   renderMapSource() {
@@ -992,8 +1016,10 @@ export class MapEditorPanel {
     this.unsubscribeCamera?.();
     this.optionsWindowChrome.destroy();
     this.toolsWindowChrome.destroy();
+    this.layersWindowChrome.destroy();
     this.optionsEl.remove();
     this.toolsEl.remove();
+    this.layersEl.remove();
   }
 }
 

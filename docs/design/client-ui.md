@@ -937,10 +937,11 @@ save/open uses the bounded lab replay artifact path instead of the legacy `expor
 authoritative map-only payload, creates a server-validated editor handoff, and navigates away; no Lab
 entity, resource, order, timeline, or replay state crosses that boundary.
 
-`MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
+`MapEditorApp` owns the dedicated editor. Its separate floating Options, Layers, and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
-status, local authored-map or recipe JSON import, map JSON export, and Lab handoff; Tools owns terrain paint, start/base locations, and
-doodad authoring. The top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
+status, local authored-map or recipe JSON import, map JSON export, and Lab handoff; Layers owns
+presentation visibility; Tools owns terrain paint, start/base locations, and doodad authoring. The
+top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
 zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
@@ -994,10 +995,12 @@ viewport shows stealth in green and vehicle exclusion in orange, including inten
 overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON import/export, and
 Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
 
-The editor's Visible layers section independently toggles six presentation-only authoring layers:
-Terrain & bases, Stealth, No vehicles, Trees, Gameplay doodads, and Decorative doodads. Tank Traps
-are gameplay doodads; wildflowers are decorative doodads. Visibility never mutates the draft,
-export, undo history, or handoff. The shared pure `map_authoring/layers.js` vocabulary also drives
+The editor's compact floating Layers panel independently toggles six presentation-only authoring
+layers in a two-column grid: Terrain & bases, Stealth, No vehicles, Trees, Gameplay doodads, and
+Decorative doodads. Full labels and descriptions remain available through accessible checkbox names
+and hover tooltips when narrow panel geometry truncates visible text. Tank Traps are gameplay
+doodads; wildflowers are decorative doodads. Visibility never mutates the draft, export, undo
+history, or handoff. The shared pure `map_authoring/layers.js` vocabulary also drives
 `map-author.mjs preview --layers <csv>`, whose SVG preview shows every layer by default and can
 isolate any comma-separated subset.
 

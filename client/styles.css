@@ -1914,7 +1914,7 @@ input[type="text"]:focus {
   width: min(360px, calc(100vw - 24px));
 }
 .lab-panel[data-windowed="true"] {
-  min-height: min(220px, calc(100vh - 24px));
+  min-height: min(var(--lab-panel-window-min-height, 220px), calc(100vh - 24px));
 }
 .lab-panel[data-collapsed="true"] {
   height: auto !important;

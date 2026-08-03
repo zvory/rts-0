@@ -583,10 +583,15 @@ try {
   const editorUi = await editorPage.evaluate(() => {
     const optionsWindow = document.querySelector(".map-editor-options-window");
     const toolsWindow = document.querySelector(".map-editor-tools-window");
+    const layersWindow = document.querySelector(".map-editor-layers-window");
     const panel = toolsWindow?.querySelector(".map-editor-panel-body");
     const water = document.querySelector(".map-editor-terrain-button[data-terrain=water]");
     const optionsRect = optionsWindow?.getBoundingClientRect();
     const panelRect = toolsWindow?.getBoundingClientRect();
+    const layersRect = layersWindow?.getBoundingClientRect();
+    const layersMoveHandle = layersWindow?.querySelector(".lab-panel-drag-handle");
+    layersMoveHandle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    const movedLayersRect = layersWindow?.getBoundingClientRect();
     const noInitialStatus = document.querySelector(".map-editor-status") === null;
     water?.scrollIntoView({ block: "center" });
     const beforeScrollTop = panel?.scrollTop ?? -1;
@@ -594,6 +599,7 @@ try {
     const refreshedPanel = document.querySelector(".map-editor-tools-window .map-editor-panel-body");
     const floatingChrome = [
       [optionsWindow, "map editor options"],
+      [layersWindow, "map editor layers"],
       [toolsWindow, "map editor tools"],
     ].every(([panelWindow, label]) =>
       panelWindow?.querySelector(".lab-panel-drag-handle")?.getAttribute("aria-label") === `Move ${label} panel`
@@ -609,8 +615,14 @@ try {
         .map((header) => header.textContent?.trim() || ""),
       floatingChrome,
       noInitialStatus,
-      panelsDoNotOverlap: optionsRect && panelRect && optionsRect.right <= panelRect.left,
-      withinViewport: panelRect && panelRect.bottom <= window.innerHeight - 11,
+      panelsDoNotOverlap: [optionsRect, layersRect, panelRect].every(Boolean) && [
+        [optionsRect, layersRect],
+        [optionsRect, panelRect],
+        [layersRect, panelRect],
+      ].every(([a, b]) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top),
+      withinViewport: [optionsRect, layersRect, panelRect].every((rect) => rect &&
+        rect.left >= 8 && rect.right <= window.innerWidth - 8 &&
+        rect.top >= 8 && rect.bottom <= window.innerHeight - 8),
       noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
         .every((node) => node.scrollWidth <= node.clientWidth),
       actionButtons: [...document.querySelectorAll(".map-editor-options-window button")]
@@ -630,8 +642,22 @@ try {
       layers: [...document.querySelectorAll(".map-editor-layer-toggle")].map((label) => ({
         label: label.querySelector("span")?.textContent || "",
         description: label.querySelector("small")?.textContent || "",
+        title: label.title,
         checked: !!label.querySelector("input[type=checkbox]")?.checked,
       })),
+      layerPanel: (() => {
+        const list = layersWindow?.querySelector(".map-editor-layer-list");
+        const toggles = [...list?.querySelectorAll(".map-editor-layer-toggle") || []];
+        return layersWindow && list && layersRect && {
+          outsideTools: !toolsWindow?.contains(list),
+          columns: getComputedStyle(list).gridTemplateColumns.split(" ").length,
+          height: layersRect.height,
+          maxToggleHeight: Math.max(...toggles.map((toggle) => toggle.getBoundingClientRect().height)),
+          movePreservedSize: Math.abs(movedLayersRect.left - layersRect.left - 24) <= 1 &&
+            Math.abs(movedLayersRect.width - layersRect.width) <= 1 &&
+            Math.abs(movedLayersRect.height - layersRect.height) <= 1,
+        };
+      })(),
       overlayTools: (() => {
         const section = [...document.querySelectorAll(".map-editor-group")]
           .find((node) => node.querySelector("legend")?.textContent === "Gameplay overlays");
@@ -670,15 +696,16 @@ try {
   });
   ok(
     editorUi.headers.some((header) => header.includes("Options")) &&
+      editorUi.headers.some((header) => header.includes("Layers")) &&
       editorUi.headers.some((header) => header.includes("Tools")) &&
       editorUi.noInitialStatus &&
       editorUi.terrainPreviews.length === 18 &&
       editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0),
-    `MAP EDITOR: separate Options/Tools panels omit initial status slop and show all 18 terrain previews (headers=${editorUi.headers.join("/")}, previews=${editorUi.terrainPreviews.length})`,
+    `MAP EDITOR: separate Options/Layers/Tools panels omit initial status slop and show all 18 terrain previews (headers=${editorUi.headers.join("/")}, previews=${editorUi.terrainPreviews.length})`,
   );
   ok(
     editorUi.floatingChrome && editorUi.panelsDoNotOverlap && editorUi.withinViewport && editorUi.noHorizontalOverflow,
-    "MAP EDITOR: accessible floating panels do not overlap and terrain/start-base pickers stay within the viewport",
+    "MAP EDITOR: three accessible floating panels do not overlap and terrain/start-base pickers stay within the viewport",
   );
   ok(
     editorUi.zoom?.firstSection &&
@@ -688,12 +715,16 @@ try {
   );
   ok(
     editorUi.layers.length === 6 && editorUi.layers.every((layer) => layer.checked && layer.description) &&
+      editorUi.layers.every((layer) => layer.title === `${layer.label} — ${layer.description}`) &&
+      editorUi.layerPanel?.outsideTools && editorUi.layerPanel.columns === 2 &&
+      editorUi.layerPanel.height < 180 && editorUi.layerPanel.maxToggleHeight < 32 &&
+      editorUi.layerPanel.movePreservedSize &&
       ["Terrain & bases", "Stealth", "No vehicles", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)) &&
       ["Paint stealth", "Paint no vehicles", "Erase stealth", "Erase no vehicles"]
         .every((label) => editorUi.overlayTools.includes(label)) &&
       !editorUi.overlayTools.includes("Forest") && !editorUi.overlayTools.includes("Erase both"),
-    `MAP EDITOR: six independent visible layers replace combined Forest authoring (${JSON.stringify(editorUi.layers)})`,
+    `MAP EDITOR: compact floating Layers panel exposes six independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
   );
   await editorPage.click("input[aria-label='Show Stealth']");
   await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === false);
@@ -740,6 +771,22 @@ try {
       editorUi.doodadToolLabels.includes("Delete selection") &&
       !editorUi.doodadToolLabels.includes("Select / move"),
     `MAP EDITOR: doodad tools expose box removal and the erase brush without move (${editorUi.doodadToolLabels.join(", ")})`,
+  );
+  await editorPage.setViewport({ width: 600, height: 360 });
+  const mobileLayers = await editorPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => {
+    const body = document.querySelector(".map-editor-layers-body");
+    const lastToggle = body?.querySelector(".map-editor-layer-toggle:last-child");
+    if (body) body.scrollTop = body.scrollHeight;
+    const bodyRect = body?.getBoundingClientRect();
+    const lastRect = lastToggle?.getBoundingClientRect();
+    resolve({
+      scrollable: body && body.scrollHeight > body.clientHeight && getComputedStyle(body).overflowY === "auto",
+      lastToggleReachable: bodyRect && lastRect && lastRect.bottom <= bodyRect.bottom + 1,
+    });
+  })));
+  ok(
+    mobileLayers.scrollable && mobileLayers.lastToggleReachable,
+    `MAP EDITOR: short mobile Layers panel scrolls to every toggle (${JSON.stringify(mobileLayers)})`,
   );
   await editorPage.close();
 

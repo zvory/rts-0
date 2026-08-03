@@ -21,6 +21,12 @@ export class LabPanelWindowChrome {
     this.storage = options.storage ?? this.windowObj?.localStorage ?? null;
     this.storageKey = options.storageKey || DEFAULT_STORAGE_KEY;
     this.panelLabel = String(options.panelLabel || "lab controls").trim() || "panel";
+    this.minWidth = finitePositive(options.minWidth) || MIN_WIDTH;
+    const configuredMinHeight = finitePositive(options.minHeight);
+    this.minHeight = configuredMinHeight || MIN_HEIGHT;
+    if (configuredMinHeight) {
+      this.el.style.setProperty?.("--lab-panel-window-min-height", `${configuredMinHeight}px`);
+    }
     this.renderListeners = [];
     this.windowListeners = [];
     this.activeListeners = [];
@@ -246,7 +252,7 @@ export class LabPanelWindowChrome {
     const viewport = this.viewport();
     const rect = this.el.getBoundingClientRect?.();
     const width = parsePixels(this.el.style.width) || finitePositive(rect?.width) || defaultWidth(viewport);
-    const height = parsePixels(this.el.style.height) || finitePositive(rect?.height) || defaultHeight(viewport);
+    const height = parsePixels(this.el.style.height) || finitePositive(rect?.height) || defaultHeight(viewport, this.minHeight);
     const left = finiteNumber(rect?.left) ?? parsePixels(this.el.style.left) ?? defaultLeft(viewport, width);
     const top = finiteNumber(rect?.top) ?? parsePixels(this.el.style.top) ?? DEFAULT_TOP;
     return this.constrainGeometry({ left, top, width, height });
@@ -257,10 +263,10 @@ export class LabPanelWindowChrome {
     const margin = DEFAULT_MARGIN;
     const maxWidth = Math.max(1, viewport.width - margin * 2);
     const maxHeight = Math.max(1, viewport.height - margin * 2);
-    const minWidth = Math.min(MIN_WIDTH, maxWidth);
-    const minHeight = Math.min(MIN_HEIGHT, maxHeight);
+    const minWidth = Math.min(this.minWidth, maxWidth);
+    const minHeight = Math.min(this.minHeight, maxHeight);
     const width = clamp(finitePositive(geometry.width) || defaultWidth(viewport), minWidth, maxWidth);
-    const height = clamp(finitePositive(geometry.height) || defaultHeight(viewport), minHeight, maxHeight);
+    const height = clamp(finitePositive(geometry.height) || defaultHeight(viewport, this.minHeight), minHeight, maxHeight);
     const maxLeft = Math.max(margin, viewport.width - width - margin);
     const maxTop = Math.max(margin, viewport.height - height - margin);
     return {
@@ -424,10 +430,10 @@ function defaultWidth(viewport) {
   return Math.min(DEFAULT_WIDTH, Math.max(1, viewport.width - DEFAULT_MARGIN * 2));
 }
 
-function defaultHeight(viewport) {
+function defaultHeight(viewport, minHeight = MIN_HEIGHT) {
   return Math.min(
     DEFAULT_MAX_HEIGHT,
-    Math.max(MIN_HEIGHT, finitePositive(viewport.height - DEFAULT_COMMAND_CARD_CLEARANCE) || DEFAULT_HEIGHT),
+    Math.max(minHeight, finitePositive(viewport.height - DEFAULT_COMMAND_CARD_CLEARANCE) || DEFAULT_HEIGHT),
   );
 }
 
