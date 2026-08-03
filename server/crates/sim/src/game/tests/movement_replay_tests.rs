@@ -89,11 +89,17 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
             true,
         )
         .expect("player resource depot should spawn");
-    let (enemy_cc_x, enemy_cc_y) =
+    let (enemy_resource_depot_x, enemy_resource_depot_y) =
         services::occupancy::footprint_center(&game.state.map, EntityKind::ResourceDepot, 24, 4);
     game.state
         .entities
-        .spawn_building(2, EntityKind::ResourceDepot, enemy_cc_x, enemy_cc_y, true)
+        .spawn_building(
+            2,
+            EntityKind::ResourceDepot,
+            enemy_resource_depot_x,
+            enemy_resource_depot_y,
+            true,
+        )
         .expect("enemy resource depot should spawn");
 
     let node = game

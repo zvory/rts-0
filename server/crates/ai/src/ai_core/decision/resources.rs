@@ -139,14 +139,18 @@ pub(super) fn target_steel_workers_for_profile(
         return base_target.min(expansion.pre_expansion_steel_worker_cap);
     }
 
-    let expanded_target = base_target.max(completed_cc_steel_saturation_target(observation));
+    let expanded_target = base_target.max(completed_resource_depot_steel_saturation_target(
+        observation,
+    ));
     expansion
         .post_expansion_steel_worker_cap
         .map(|cap| expanded_target.min(cap))
         .unwrap_or(expanded_target)
 }
 
-pub(super) fn completed_cc_steel_saturation_target(observation: &AiObservation) -> usize {
+pub(super) fn completed_resource_depot_steel_saturation_target(
+    observation: &AiObservation,
+) -> usize {
     resource_availability(observation).current_steel_saturation_target()
 }
 

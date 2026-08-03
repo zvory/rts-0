@@ -426,7 +426,7 @@ fn third_party_combat_does_not_make_hidden_shooter_actionable() {
         .entities
         .spawn_unit(1, EntityKind::Worker, observer_pos.0, observer_pos.1)
         .expect("observer worker should spawn");
-    let victim_cc = game
+    let victim_resource_depot = game
         .state
         .entities
         .spawn_building(
@@ -444,8 +444,8 @@ fn third_party_combat_does_not_make_hidden_shooter_actionable() {
         .expect("shooter anti-tank gun should spawn");
     deploy_anti_tank_gun_toward(&mut game, shooter, target_pos);
     if let Some(shooter_entity) = game.state.entities.get_mut(shooter) {
-        shooter_entity.set_order(Order::attack(victim_cc));
-        shooter_entity.set_target_id(Some(victim_cc));
+        shooter_entity.set_order(Order::attack(victim_resource_depot));
+        shooter_entity.set_target_id(Some(victim_resource_depot));
     }
     refresh_visibility_for_test(&mut game);
 

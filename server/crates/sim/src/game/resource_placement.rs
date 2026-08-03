@@ -67,23 +67,24 @@ pub(crate) fn nearest_oil_patch_tile_center(
     occupied_oil_tiles: &BTreeSet<ResourceTile>,
     blocked_pump_jack_tiles: &BTreeSet<ResourceTile>,
 ) -> (f32, f32, ResourceTile) {
-    let accepts = |tile: ResourceTile, center_x: f32, center_y: f32, enforce_cc_distance: bool| {
-        if !tile_has_one_tile_resource_gap(tile, occupied_oil_tiles) {
-            return false;
-        }
-        if blocked_pump_jack_tiles.contains(&tile) {
-            return false;
-        }
-        if !enforce_cc_distance {
-            return true;
-        }
+    let accepts =
+        |tile: ResourceTile, center_x: f32, center_y: f32, enforce_start_distance: bool| {
+            if !tile_has_one_tile_resource_gap(tile, occupied_oil_tiles) {
+                return false;
+            }
+            if blocked_pump_jack_tiles.contains(&tile) {
+                return false;
+            }
+            if !enforce_start_distance {
+                return true;
+            }
 
-        let ts = config::TILE_SIZE as f32;
-        let dist_tiles =
-            ((center_x - anchor_x).powi(2) + (center_y - anchor_y).powi(2)).sqrt() / ts;
-        (config::START_RESOURCE_MIN_DIST_TILES..=config::START_RESOURCE_MAX_DIST_TILES)
-            .contains(&dist_tiles)
-    };
+            let ts = config::TILE_SIZE as f32;
+            let dist_tiles =
+                ((center_x - anchor_x).powi(2) + (center_y - anchor_y).powi(2)).sqrt() / ts;
+            (config::START_RESOURCE_MIN_DIST_TILES..=config::START_RESOURCE_MAX_DIST_TILES)
+                .contains(&dist_tiles)
+        };
 
     nearest_resource_tile_center(map, x, y, |tile, cx, cy| accepts(tile, cx, cy, true))
         .or_else(|| {

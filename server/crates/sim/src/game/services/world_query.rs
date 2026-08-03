@@ -82,7 +82,7 @@ pub(crate) fn completed_building_kinds(entities: &EntityStore, player: u32) -> V
 
 /// Whether a resource node is mineable by `player` because a completed home-base mining anchor
 /// (Resource Depot or Zamok) is close enough to receive attached-mining income from that node.
-pub(crate) fn resource_has_completed_mining_cc(
+pub(crate) fn resource_has_completed_mining_anchor_for_player(
     entities: &EntityStore,
     player: u32,
     node: u32,
@@ -474,13 +474,13 @@ mod tests {
         let s = store_with_two_players();
         let p2_rifleman = s.iter().find(|e| e.owner == 2).unwrap();
         let p1_worker = s.iter().find(|e| e.owner == 1 && e.is_unit()).unwrap();
-        let p1_cc = s.iter().find(|e| e.owner == 1 && e.is_building()).unwrap();
+        let p1_building = s.iter().find(|e| e.owner == 1 && e.is_building()).unwrap();
         let teams = ffa_teams();
         // P1 attacker can target the P2 rifleman.
         assert!(is_enemy_targetable(p2_rifleman, &teams, 1, p1_worker.id));
         // ... but not their own worker (self) or their own building.
         assert!(!is_enemy_targetable(p1_worker, &teams, 1, p1_worker.id));
-        assert!(!is_enemy_targetable(p1_cc, &teams, 1, p1_worker.id));
+        assert!(!is_enemy_targetable(p1_building, &teams, 1, p1_worker.id));
     }
 
     #[test]
@@ -538,7 +538,7 @@ mod tests {
                 100.0,
             )
             .unwrap();
-        let unfinished_cc = s
+        let unfinished_resource_depot = s
             .spawn_building(
                 2,
                 EntityKind::ResourceDepot,
@@ -556,12 +556,24 @@ mod tests {
             )
             .unwrap();
 
-        assert!(resource_has_completed_mining_cc(&s, 1, near));
-        assert!(resource_has_completed_mining_cc(&s, 1, forgiving));
-        assert!(resource_has_completed_mining_cc(&s, 2, zamok_near));
-        assert!(!resource_has_completed_mining_cc(&s, 1, far));
-        assert!(!resource_has_completed_mining_cc(&s, 2, unfinished_near));
-        s.remove(unfinished_cc);
-        assert!(!resource_has_completed_mining_cc(&s, 2, unfinished_near));
+        assert!(resource_has_completed_mining_anchor_for_player(&s, 1, near));
+        assert!(resource_has_completed_mining_anchor_for_player(
+            &s, 1, forgiving
+        ));
+        assert!(resource_has_completed_mining_anchor_for_player(
+            &s, 2, zamok_near
+        ));
+        assert!(!resource_has_completed_mining_anchor_for_player(&s, 1, far));
+        assert!(!resource_has_completed_mining_anchor_for_player(
+            &s,
+            2,
+            unfinished_near
+        ));
+        s.remove(unfinished_resource_depot);
+        assert!(!resource_has_completed_mining_anchor_for_player(
+            &s,
+            2,
+            unfinished_near
+        ));
     }
 }

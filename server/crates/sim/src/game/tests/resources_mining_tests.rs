@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn gather_command_accepts_live_steel_without_nearby_completed_cc() {
+fn gather_command_accepts_live_steel_without_nearby_completed_mining_anchor() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -315,7 +315,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
 }
 
 #[test]
-fn active_mining_waits_and_resumes_when_nearby_cc_is_rebuilt() {
+fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
