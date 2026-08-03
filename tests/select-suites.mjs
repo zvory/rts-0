@@ -159,6 +159,7 @@ function isPhaseRunnerWorkflowPath(pathname) {
 function isQualityPassWorkflowPath(pathname) {
   return (
     pathname === "scripts/adversarial-quality-pass.mjs" ||
+    pathname === "scripts/agent-pr-preflight.mjs" ||
     pathname === "scripts/adversarial-quality-pass.schema.json" ||
     pathname === "scripts/patch-note-outbox.mjs" ||
     pathname === "scripts/ensure-node-deps.sh" ||
@@ -552,6 +553,7 @@ function verify() {
     [["scripts/phase-runner-agents.mjs"], ["agent-workflow-phase-runner"]],
     [["scripts/phase-runner-result.schema.json"], ["agent-workflow-phase-runner"]],
     [["scripts/adversarial-quality-pass.mjs"], ["agent-workflow-quality-pass"]],
+    [["scripts/agent-pr-preflight.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/adversarial-quality-pass.schema.json"], ["agent-workflow-quality-pass"]],
     [["scripts/patch-note-outbox.mjs"], ["agent-workflow-quality-pass"]],
     [["scripts/agent-pr.sh"], ["agent-workflow-quality-pass"]],
