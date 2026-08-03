@@ -10,6 +10,7 @@ import { Fog } from "../../client/src/fog.js";
 import { captureMinimapPng } from "../../client/src/minimap_capture.js";
 import {
   analyzeRgba,
+  installMapPreviewStartupStatus,
   MAP_PREVIEW_CAMERA_MIN_ZOOM,
   MAP_PREVIEW_LIMITS,
   MapPreviewBridge,
@@ -30,6 +31,18 @@ assert.deepEqual(
   { handoffId, error: "" },
 );
 assert.match(mapPreviewLaunchConfig({ pathname: "/map-preview", search: "?handoff=../map" }).error, /valid one-use handoff/);
+
+{
+  const startup = installMapPreviewStartupStatus();
+  assert.equal(startup.status().state, "starting");
+  startup.fail(new Error("handoff expired"));
+  assert.deepEqual(
+    { state: startup.status().state, error: startup.status().error },
+    { state: "failed", error: "handoff expired" },
+    "startup failures remain machine-readable for the preview CLI",
+  );
+  delete globalThis.__rtsMapPreview;
+}
 
 assert.deepEqual(normalizeCaptureRequest({ kind: "world", width: 1200, height: 800, padding: 40 }), {
   kind: "world", width: 1200, height: 800, padding: 40,
@@ -161,7 +174,23 @@ globalThis.devicePixelRatio = 2;
 try {
   const fixture = createBridgeFixture();
   const bridge = new MapPreviewBridge({ ...fixture, captureTimeoutMs: 1000 });
-  await bridge.initialize();
+  let releaseInitialization;
+  globalThis.requestAnimationFrame = (callback) => {
+    releaseInitialization = () => queueMicrotask(callback);
+    return 1;
+  };
+  const initialization = bridge.initialize();
+  assert.equal(bridge.status().state, "starting", "capture is not advertised before initial fitting settles");
+  await assert.rejects(
+    bridge.call("capture", { kind: "world", width: 64, height: 64, padding: 0 }),
+    /still starting/,
+  );
+  releaseInitialization();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  releaseInitialization();
+  await initialization;
+  globalThis.requestAnimationFrame = (callback) => { queueMicrotask(callback); return 1; };
+  assert.equal(bridge.status().state, "ready");
   assert.ok(fixture.app.cleanCalls.every(Boolean), "initial preview hides app chrome");
   assert.equal(fixture.camera.fitCalls.length, 1, "initial preview fits the complete map before any export");
 
@@ -197,6 +226,7 @@ try {
     const lateFrame = new Promise((resolve) => { resolveLateFrame = resolve; });
     const fixture = createBridgeFixture({ renderPromise: lateFrame });
     const bridge = new MapPreviewBridge({ ...fixture, captureTimeoutMs: 2 });
+    await bridge.initialize();
     await Promise.race([
       assert.rejects(
         bridge.call("capture", { kind: "world", width: 64, height: 64, padding: 0 }),
@@ -208,7 +238,8 @@ try {
       "deadline rejection does not continue into framebuffer readback");
     assert.equal(bridge.captureActive, false, "deadline releases the capture lock");
     assert.equal(fixture.match.exitCount, 1, "hung fixed capture exits before rejection");
-    assert.equal(fixture.match.resizeCount, 2, "hung capture restores renderer, then fitted preview, before rejection");
+    assert.equal(fixture.match.resizeCount, 3,
+      "hung capture restores renderer, then fitted preview, after the initial preview resize");
     const stable = {
       exits: fixture.match.exitCount,
       resizes: fixture.match.resizeCount,

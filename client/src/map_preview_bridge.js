@@ -12,6 +12,27 @@ export const MAP_PREVIEW_LIMITS = Object.freeze({
 // smallest bounded export frame that entire map while remaining positive.
 export const MAP_PREVIEW_CAMERA_MIN_ZOOM = 1 / 4096;
 
+/** Expose bounded startup progress before an authoritative Match exists. */
+export function installMapPreviewStartupStatus(initialError = "") {
+  let error = String(initialError || "");
+  const bridge = Object.freeze({
+    status: () => Object.freeze({
+      version: 2,
+      state: error ? "failed" : "starting",
+      authoritative: false,
+      error,
+      map: null,
+      limits: MAP_PREVIEW_LIMITS,
+    }),
+    fail(reason) {
+      error = boundedErrorMessage(reason);
+      globalThis.__rtsMapPreview = bridge;
+    },
+  });
+  globalThis.__rtsMapPreview = bridge;
+  return bridge;
+}
+
 export class MapPreviewBridge {
   constructor({
     app,
@@ -32,24 +53,33 @@ export class MapPreviewBridge {
     this.captureTimeoutMs = boundedTimeout(captureTimeoutMs);
     this.captureActive = false;
     this.destroyed = false;
+    this.startupState = "starting";
+    this.startupError = "";
     this.originalRevealAll = !!match.fog?.revealAll;
     this.controls = null;
   }
 
   async initialize() {
-    this.documentObj.body.classList.add("map-preview-mode");
-    this.documentObj.title = "Map Preview · Bewegungskrieg";
-    this.app.setCleanPresentation(true);
-    this.match.fog?.setRevealAll?.(true);
-    this.controls = createPreviewControls({
-      documentObj: this.documentObj,
-      root: this.root,
-      mapName: this.match.state.map?.name || "Map",
-      capture: (kind) => this.download(kind),
-    });
     globalThis.__rtsMapPreview = this;
-    await this.restoreInitialPreview();
-    return this.status();
+    try {
+      this.documentObj.body.classList.add("map-preview-mode");
+      this.documentObj.title = "Map Preview · Bewegungskrieg";
+      this.app.setCleanPresentation(true);
+      this.match.fog?.setRevealAll?.(true);
+      this.controls = createPreviewControls({
+        documentObj: this.documentObj,
+        root: this.root,
+        mapName: this.match.state.map?.name || "Map",
+        capture: (kind) => this.download(kind),
+      });
+      await this.restoreInitialPreview();
+      this.startupState = "ready";
+      return this.status();
+    } catch (error) {
+      this.startupState = "failed";
+      this.startupError = boundedErrorMessage(error);
+      throw error;
+    }
   }
 
   status() {
@@ -57,8 +87,9 @@ export class MapPreviewBridge {
     const entities = this.match?.state?.entitiesInterpolated?.(1) || [];
     return Object.freeze({
       version: 2,
-      state: this.destroyed ? "destroyed" : "ready",
+      state: this.destroyed ? "destroyed" : this.startupState,
       authoritative: true,
+      error: this.startupError,
       map: map ? Object.freeze({
         name: String(map.name || "Map"),
         width: map.width,
@@ -73,6 +104,9 @@ export class MapPreviewBridge {
   async call(method, input = {}) {
     if (method !== "capture") throw new RangeError("Map preview bridge supports only capture.");
     if (this.destroyed) throw new Error("Map preview bridge is destroyed.");
+    if (this.startupState !== "ready") {
+      throw new Error(this.startupError || "Map preview is still starting.");
+    }
     if (this.captureActive) throw new Error("A map preview capture is already active.");
     const request = normalizeCaptureRequest(input);
     this.captureActive = true;
@@ -362,4 +396,10 @@ function createPreviewControls({ documentObj, root, mapName, capture }) {
 
 function slug(value) {
   return String(value || "map").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "map";
+}
+
+function boundedErrorMessage(value) {
+  return String(value?.message || value || "Map preview failed to start.")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .slice(0, 500);
 }

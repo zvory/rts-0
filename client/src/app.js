@@ -79,7 +79,11 @@ import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 import { StressTestRunner } from "./stress_test.js";
 import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
 import { ChatOverlay } from "./chat_overlay.js";
-import { MAP_PREVIEW_CAMERA_MIN_ZOOM, MapPreviewBridge } from "./map_preview_bridge.js";
+import {
+  installMapPreviewStartupStatus,
+  MAP_PREVIEW_CAMERA_MIN_ZOOM,
+  MapPreviewBridge,
+} from "./map_preview_bridge.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -152,6 +156,9 @@ export class App {
     this.stressTestLaunch = stressTestLaunch;
     this.mapPreviewLaunch = mapPreviewLaunch;
     this.mapPreviewBridge = null;
+    this.mapPreviewStartupStatus = mapPreviewLaunch
+      ? installMapPreviewStartupStatus(mapPreviewLaunch.error)
+      : null;
     this.stressTestRunner = stressTestLaunch
       ? new StressTestRunner({ launch: stressTestLaunch })
       : null;
@@ -335,6 +342,7 @@ export class App {
       else if (this.matchLaunch) this.maybeAutoJoinMatchLaunch();
       else this.maybeAutoJoinDevWatch();
     } catch (err) {
+      this.failMapPreviewStartup(err);
       this.stressTestRunner?.fail("The Hellhole workload could not be loaded.");
       this.showConnectionLost();
     }
@@ -391,6 +399,7 @@ export class App {
 
   async prepareLabHandoff() {
     if (this.labHandoffLaunch?.error) {
+      this.failMapPreviewStartup(this.labHandoffLaunch.error);
       this.showConnectionWarning(this.labHandoffLaunch.error);
       return false;
     }
@@ -408,6 +417,7 @@ export class App {
       };
       return true;
     } catch (error) {
+      this.failMapPreviewStartup(error);
       this.showConnectionWarning(error.message || String(error));
       return false;
     }
@@ -601,6 +611,7 @@ export class App {
    */
   onError(m) {
     const msg = m && m.msg ? m.msg : "Server error";
+    this.failMapPreviewStartup(msg);
     if (msg.endsWith("failed to load the game.")) this.releaseCountdownRendererPreparation();
     this.interactBridge?.noteLaunchError?.(msg);
     this.showToast(msg);
@@ -656,6 +667,7 @@ export class App {
   onClose() {
     this.stopHeartbeat();
     this.socketOpen = false;
+    if (!this.match) this.failMapPreviewStartup("The map preview connection closed before startup completed.");
     this.chat?.disable();
     this.rendererPreparationSlot?.discard?.();
     if (this.intentionalIdleDisconnect) {
@@ -697,6 +709,7 @@ export class App {
     void startPromise.catch((error) => {
       if (generation !== this.matchStartGeneration) return;
       this.destroyLabShell();
+      this.failMapPreviewStartup(error);
       this.matchLaunchFailed = true;
       diagnostics.mark("app.onStart.failed", { message: error?.message || String(error) });
       console.error("[rts-app] match start failed", error);
@@ -1130,6 +1143,11 @@ export class App {
     this.labPanel = null;
     this.labClient = null;
     this.labControlPolicy = null;
+  }
+
+  failMapPreviewStartup(error) {
+    if (!this.mapPreviewLaunch || this.mapPreviewBridge?.status?.().state === "ready") return;
+    this.mapPreviewStartupStatus?.fail(error);
   }
 
   destroyInteractBridge() {
