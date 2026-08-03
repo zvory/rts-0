@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 3 merges.
+- [x] Done.
 
 ## Objective
 
@@ -44,14 +44,14 @@ or AI 2.1 policy.
 
 ## Implementation Checklist
 
-- [ ] Add a nontrivial public-SDK-only reference strategy.
-- [ ] Run it through the canonical production runtime and ordinary simulation validation.
-- [ ] Cover lifecycle, cross-tick memory, economic action, and tactical action.
-- [ ] Add a concise runnable author guide.
-- [ ] Fix only demonstrated Phase 3 API friction.
-- [ ] List concrete rule/query and action-helper gaps for Phases 5 and 6.
-- [ ] Pass the unchanged Phase 1 Jeff transcript.
-- [ ] Mark this phase done in the implementation commit.
+- [x] Add a nontrivial public-SDK-only reference strategy.
+- [x] Run it through the canonical production runtime and ordinary simulation validation.
+- [x] Cover lifecycle, cross-tick memory, economic action, and tactical action.
+- [x] Add a concise runnable author guide.
+- [x] Fix only demonstrated Phase 3 API friction.
+- [x] List concrete rule/query and action-helper gaps for Phases 5 and 6.
+- [x] Pass the unchanged Phase 1 Jeff transcript.
+- [x] Mark this phase done in the implementation commit.
 
 ## Verification
 

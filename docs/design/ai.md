@@ -87,6 +87,12 @@ enqueue, worker-retreat-first ordering, normal command validation, and replay lo
 unchanged. Rich planners, reservations, budgets, task handles, acceptance results, and uncommon
 actions are intentionally not part of this seam yet.
 
+The public-SDK-only [reference strategy](../ai-authoring.md) is the executable authoring specimen.
+It runs through `AiController::with_strategy` and the canonical driver, gathers with one worker,
+uses cross-tick memory to dispatch a separate attack-move scout, and is covered by deterministic
+command-log and replay checks. Its documented rule/query and action-helper gaps are the bounded
+inputs to the next SDK phases; the example is not a selectable profile or a strength claim.
+
 ### Shared decision core
 
 Each controller runs on a staggered cadence and constructs the typed `AiFrame`. Built-in profiles

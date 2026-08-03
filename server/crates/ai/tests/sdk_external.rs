@@ -1,8 +1,18 @@
 use std::sync::{Arc, Mutex};
 
-use rts_ai::sdk::{AiActionRequest, AiActions, AiFrame, AiStrategy};
+use rts_ai::sdk::{AiActions, AiFrame, AiStrategy};
 use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
+use rts_sim::game::replay::{replay_commands, CommandLogEntry};
 use rts_sim::game::{Game, PlayerInit};
+use rts_sim::protocol::{self, Snapshot};
+
+#[path = "../examples/reference_strategy/strategy.rs"]
+mod reference_strategy;
+
+use reference_strategy::ReferenceStrategy;
+
+const SEED: u32 = 0xA15D_0004;
+const TICKS: u32 = 36;
 
 #[derive(Default)]
 struct LifecycleLog {
@@ -10,29 +20,116 @@ struct LifecycleLog {
     stepped_at: Vec<u32>,
 }
 
-struct RecordingStrategy {
+struct LifecycleProbe<S> {
+    inner: S,
     log: Arc<Mutex<LifecycleLog>>,
 }
 
-impl AiStrategy for RecordingStrategy {
+impl<S: AiStrategy> AiStrategy for LifecycleProbe<S> {
     fn initialize(&mut self, frame: &AiFrame) {
         self.log.lock().unwrap().initialized_at.push(frame.tick());
+        self.inner.initialize(frame);
     }
 
     fn step(&mut self, frame: &AiFrame, actions: &mut AiActions) {
         self.log.lock().unwrap().stepped_at.push(frame.tick());
-        let units = frame
-            .owned()
-            .iter()
-            .take(1)
-            .map(|entity| entity.id)
-            .collect();
-        actions.submit(AiActionRequest::Move {
-            units,
-            x: 32.0,
-            y: 32.0,
-            queued: false,
-        });
+        self.inner.step(frame, actions);
+    }
+}
+
+struct ReferenceRun {
+    commands: Vec<CommandLogEntry>,
+    final_snapshot: Snapshot,
+    starting_loadouts: Vec<rts_sim::game::PlayerStartingLoadout>,
+    lifecycle: Arc<Mutex<LifecycleLog>>,
+}
+
+#[test]
+fn reference_strategy_is_deterministic_and_replayable_through_canonical_runtime() {
+    let first = run_reference_match();
+    let second = run_reference_match();
+
+    assert_eq!(first.commands, second.commands);
+    assert_eq!(first.final_snapshot, second.final_snapshot);
+
+    let lifecycle = first.lifecycle.lock().unwrap();
+    assert_eq!(lifecycle.initialized_at, vec![8]);
+    assert_eq!(lifecycle.stepped_at, vec![8, 17, 26, 35]);
+    drop(lifecycle);
+
+    let gather = first
+        .commands
+        .iter()
+        .find_map(|entry| match &entry.command {
+            protocol::Command::Gather { units, node, .. } => Some((units[0], *node)),
+            _ => None,
+        })
+        .expect("reference strategy should issue an economic gather action");
+    let scout = first
+        .commands
+        .iter()
+        .find_map(|entry| match &entry.command {
+            protocol::Command::AttackMove { units, .. } => Some(units[0]),
+            _ => None,
+        })
+        .expect("reference strategy should issue a tactical attack-move action");
+    assert_ne!(gather.0, scout);
+
+    let gatherer = first
+        .final_snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == gather.0)
+        .expect("gatherer should remain owner-visible");
+    assert_ne!(gatherer.state, protocol::states::IDLE);
+    let scouting_worker = first
+        .final_snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == scout)
+        .expect("scout should remain owner-visible");
+    assert_ne!(scouting_worker.state, protocol::states::IDLE);
+
+    let replay = replay_commands(
+        &players(),
+        &first.commands,
+        TICKS,
+        SEED,
+        &first.starting_loadouts,
+    )
+    .expect("ordinary replay should accept the canonical command log");
+    let replay_snapshot = replay
+        .final_snapshots
+        .iter()
+        .find(|snapshot| snapshot.player_id == 1)
+        .expect("replay should include the strategy player's view");
+    assert_eq!(replay_snapshot.snapshot, first.final_snapshot);
+}
+
+fn run_reference_match() -> ReferenceRun {
+    let lifecycle = Arc::new(Mutex::new(LifecycleLog::default()));
+    let strategy: Box<dyn AiStrategy> = Box::new(LifecycleProbe {
+        inner: ReferenceStrategy::default(),
+        log: lifecycle.clone(),
+    });
+    let mut controllers = vec![AiController::with_strategy(1, strategy)];
+    let mut game = Game::new_without_ai_controllers(&players(), SEED);
+
+    for _ in 0..TICKS {
+        CanonicalAiTickDriver::run(
+            &mut game,
+            &mut controllers,
+            AiAlivePolicy::StartingPrimaryBase,
+        );
+        game.tick();
+    }
+
+    assert_eq!(controllers[0].profile_id(), "custom_strategy");
+    ReferenceRun {
+        commands: game.command_log().to_vec(),
+        final_snapshot: game.snapshot_for(1),
+        starting_loadouts: game.starting_loadouts().to_vec(),
+        lifecycle,
     }
 }
 
@@ -42,40 +139,17 @@ fn players() -> Vec<PlayerInit> {
             id: 1,
             team_id: 1,
             faction_id: "kriegsia".to_string(),
-            name: "Custom".to_string(),
-            color: "#111111".to_string(),
+            name: "SDK reference".to_string(),
+            color: "#4cc9f0".to_string(),
             is_ai: true,
         },
         PlayerInit {
             id: 2,
             team_id: 2,
             faction_id: "kriegsia".to_string(),
-            name: "Opponent".to_string(),
-            color: "#222222".to_string(),
+            name: "Passive opponent".to_string(),
+            color: "#f72585".to_string(),
             is_ai: true,
         },
     ]
-}
-
-#[test]
-fn public_strategy_runs_once_initialized_on_canonical_cadence() {
-    let log = Arc::new(Mutex::new(LifecycleLog::default()));
-    let strategy: Box<dyn AiStrategy> = Box::new(RecordingStrategy { log: log.clone() });
-    let mut controllers = vec![AiController::with_strategy(1, strategy)];
-    let mut game = Game::new_without_ai_controllers(&players(), 31);
-
-    for _ in 0..20 {
-        CanonicalAiTickDriver::run(
-            &mut game,
-            &mut controllers,
-            AiAlivePolicy::StartingPrimaryBase,
-        );
-        game.tick();
-    }
-
-    let log = log.lock().unwrap();
-    assert_eq!(log.initialized_at, vec![8]);
-    assert_eq!(log.stepped_at, vec![8, 17]);
-    assert_eq!(controllers[0].profile_id(), "custom_strategy");
-    assert_eq!(game.command_log().len(), 2);
 }
