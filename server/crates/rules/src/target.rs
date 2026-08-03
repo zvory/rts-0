@@ -287,7 +287,7 @@ mod tests {
                 },
             ),
             (
-                EntityKind::CityCentre,
+                EntityKind::ResourceDepot,
                 ExpectedTargetFacts {
                     is_unit: false,
                     is_building: true,
@@ -357,7 +357,7 @@ mod tests {
                 },
             ),
             (
-                EntityKind::ResearchComplex,
+                EntityKind::EngineeringComplex,
                 ExpectedTargetFacts {
                     is_unit: false,
                     is_building: true,

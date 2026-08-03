@@ -30,7 +30,7 @@ impl<S: AiStrategy> AiStrategy for LifecycleProbe<S> {
         let rules = AiRulebook::for_frame(frame).expect("reference faction should have a rulebook");
         assert!(rules.can_gather(EntityKind::Worker));
         assert_eq!(
-            rules.entity(EntityKind::CityCentre).unwrap().builders,
+            rules.entity(EntityKind::ResourceDepot).unwrap().builders,
             vec![EntityKind::Worker]
         );
         let queries = WorldQueries::new(frame);

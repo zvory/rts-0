@@ -164,7 +164,7 @@ export function _drawBuilding(e, colorByOwner, state) {
       // Player-tinted roof/yard slabs, all neutral geometry.
       gfxStroke(g, 0);
       gfxFill(g, tint, bodyAlpha * 0.82);
-      if (e.kind === KIND.CITY_CENTRE) {
+      if (e.kind === KIND.RESOURCE_DEPOT) {
         gfxRect(g, x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
         gfxRect(g, x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
         gfxFill(g, 0x1a1712, bodyAlpha * 0.7);

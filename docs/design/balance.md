@@ -388,7 +388,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   authoritative movement/collision body, so it neither reserves nor blocks ground pathing. The
   client mirror uses a 48x34 px body and 17 px render size. Command Cars keep Breakthrough and add
   Scout Plane on the `C` grid slot; after Scout Plane research completes, the ability launches
-  instantly from the selected Command Car without a City Centre requirement. Each Command Car
+  instantly from the selected Command Car without a Resource Depot requirement. Each Command Car
   tracks its own 30-second cooldown; active
   sorties are otherwise independent and every plane contributes aerial sight.
 - Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
@@ -432,25 +432,25 @@ profiles and explicit activation/autocast policy instead of being folded into de
   brown rim. The selected-unit panel reports existing-trench reuse, researched dig-in availability,
   and occupied benefits as a player-facing status only; the server remains authoritative for actual
   occupation and combat modifiers.
-- **AT Guns** (R&D Complex research, protocol id `anti_tank_gun_unlock`): costs 100 steel /
+- **AT Guns** (Engineering Complex research, protocol id `anti_tank_gun_unlock`): costs 100 steel /
   50 oil and takes 300 ticks (~10s). Once complete, that player can train Anti-Tank Guns from Gun
-  Works. AT Guns keeps its own R&D command-card slot while incomplete.
-- **Artillery** (R&D Complex research, protocol id `artillery_unlock`): costs 200 steel / 100 oil
-  and takes 750 ticks (~25s). It has its own permanent R&D slot and requires AT Guns either
-  completed or earlier in that R&D Complex's queue when ordered. Research begins only after the
+  Works. AT Guns keeps its own Engineering Complex command-card slot while incomplete.
+- **Artillery** (Engineering Complex research, protocol id `artillery_unlock`): costs 200 steel / 100 oil
+  and takes 750 ticks (~25s). It has its own permanent Engineering Complex slot and requires AT Guns either
+  completed or earlier in that Engineering Complex's queue when ordered. Research begins only after the
   earlier AT Guns item completes. Once complete, that player can train Artillery from Gun Works.
-- **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
+- **Tank Production** (Engineering Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works; Command Cars require only a
-  completed R&D Complex and do not require Tank Production.
-- **Mortar Autocast** (R&D Complex research, protocol id `mortar_autocast`): costs 150 steel /
+  completed Engineering Complex and do not require Tank Production.
+- **Mortar Autocast** (Engineering Complex research, protocol id `mortar_autocast`): costs 150 steel /
   150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
   can still turn autocast off per selected Mortar Team.
-- **Smoke Plus** (R&D Complex research, protocol id `smoke_plus`): costs 150 steel / 150 oil and
+- **Smoke Plus** (Engineering Complex research, protocol id `smoke_plus`): costs 150 steel / 150 oil and
   takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
   cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
-- **Scout Plane** (R&D Complex research, protocol id `scout_plane_unlock`): costs 50 steel /
+- **Scout Plane** (Engineering Complex research, protocol id `scout_plane_unlock`): costs 50 steel /
   100 oil and takes 600 ticks (~20s). Once complete, Command Cars owned by that player can use
   their Scout Plane ability.
 - Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
@@ -484,7 +484,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   tiles, and heals Ekat to full HP. Existing prototype combat abilities remain directly available
   until the Ekat tech-unlock building slice replaces them.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability once their
-  player completes an R&D Complex; no completed Gun Works is required. Each scout car holds up to
+  player completes an Engineering Complex; no completed Gun Works is required. Each scout car holds up to
   2 Smoke charges and has unlimited lifetime uses. Smoke has no steel or oil cost and no activation
   cooldown, so both stored charges can be cast back-to-back. Spending the first charge starts a
   sequential recharge queue: one missing charge returns after 15 seconds, and a second missing
@@ -526,19 +526,19 @@ profiles and explicit activation/autocast policy instead of being folded into de
   every edge. Both map JSON assets use terrain row strings, flat `startLocations`, and flat
   `baseSites`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 6`,
-  one City Centre at the player's start tile, 12 steel patches with 625 steel each split into
+  one Resource Depot at the player's start tile, 12 steel patches with 625 steel each split into
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 962 oil
   each nearby. Each base therefore holds 7,500 steel and 2,886 oil, a 2.599:1 Steel/Oil ratio (the
   nearest whole-unit node capacity to the 2.6:1 target).
 - Supply: every active player has an intrinsic `300` supply allowance, which is also the hard cap.
-  Buildings do not provide supply: City Centres, Zamoks, and legacy fixture/replay Depots all grant
+  Buildings do not provide supply: Resource Depots, Zamoks, and legacy fixture/replay Depots all grant
   `+0`. Supply remains an army-size limit without forcing expansion or supply-building chores.
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2`) is deposited directly into the
-  player's economy only if the resource node is within `MINING_CC_RANGE_TILES = 11.0` tiles of a
-  completed home-base mining anchor owned by that player: City Centre for Kriegsia, or Zamok for
+  player's economy only if the resource node is within `MINING_ANCHOR_RANGE_TILES = 11.0` tiles of a
+  completed home-base mining anchor owned by that player: Resource Depot for Kriegsia, or Zamok for
   Ekat. Workers deposit the base load; Golems deposit four times the base load.
-  Starting resources are placed within `CC_RESOURCE_MAX_DIST_TILES = 7.0`, giving City Centres a
+  Starting resources are placed within `START_RESOURCE_MAX_DIST_TILES = 7.0`, giving Resource Depots a
   four-tile mining buffer around the authored/base resource cluster. If no completed mining
   anchor is close enough, gatherers ignore new gather orders for that steel patch and active miners
   scatter roughly one tile away from the patch. When a patch empties the gatherer goes idle (no
@@ -564,7 +564,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Starting and expansion resources: every authored base site gets 12 steel patches and 3 oil
   patches. Map schema v3 stores flat `startLocations` and `baseSites`: the number of start
   locations limits player count, while every base site remains present in every match. A player
-  receives a City Centre, workers, and the normal resource cluster at an assigned start; unclaimed
+  receives a Resource Depot, workers, and the normal resource cluster at an assigned start; unclaimed
   starts and all other base sites keep their resource clusters as neutral expansion locations.
   The seed only determines player-to-start assignment, never which base sites exist. This lets a
   map have any safe bounded number of base locations without assigning natural sites to players or
@@ -580,12 +580,12 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 108 | 1.52 | 9    | 150 | 40  | 6   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in R&D Complex |
-| artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in R&D Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
+| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 108 | 1.52 | 9    | 150 | 40  | 6   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in Engineering Complex |
+| artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
-| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a City Centre requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
-| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
-| command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed R&D Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a Resource Depot requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
+| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
+| command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
@@ -594,16 +594,16 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| city_centre                | City Centre        | 300 | 1     | 450 steel + 100 oil | 3x3  | 750       | trains workers; no supply; players start with one free |
+| resource_depot                | Resource Depot        | 300 | 1     | 450 steel + 100 oil | 3x3  | 750       | trains workers; no supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
-| barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a City Centre |
-| training_centre            | Training Centre    | 200 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Mortar Autocast, Smoke Plus, and Scout Plane; requires a City Centre and Training Centre |
-| factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a City Centre and Training Centre |
-| steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a City Centre and Training Centre |
+| barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
+| training_centre            | Training Centre    | 200 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a Resource Depot and Barracks |
+| engineering_complex           | Engineering Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Mortar Autocast, Smoke Plus, and Scout Plane; requires a Resource Depot and Training Centre |
+| factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a Resource Depot and Training Centre |
+| steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a completed trap captures every currently visible completed trap within 4 tiles as one cluster-clear order; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
-| pump_jack                  | Pump Jack          | 50  | 1     | 100 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; may be built at any distance, but mines 2 oil per 40 ticks only while its patch is within the 11-tile mining range of an owned or allied completed City Centre/Zamok; ejects friendly footprint occupants when its builder arrives; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
+| pump_jack                  | Pump Jack          | 50  | 1     | 100 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; may be built at any distance, but mines 2 oil per 40 ticks only while its patch is within the 11-tile mining range of an owned or allied completed Resource Depot/Zamok; ejects friendly footprint occupants when its builder arrives; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

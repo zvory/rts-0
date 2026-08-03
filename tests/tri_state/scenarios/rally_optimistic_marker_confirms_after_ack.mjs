@@ -17,7 +17,7 @@ export default scenario("rally_optimistic_marker_confirms_after_ack", {
   },
   network: { mode: "direct" },
   steps: [
-    selectOwn("city_centre", 0),
+    selectOwn("resource_depot", 0),
     setClientSnapshotDelivery(false),
     issue("setRally", { dx: 160, dy: 80, kind: "attackMove" }),
     capture("optimistic-rally-issued"),

@@ -580,6 +580,6 @@ pub enum GatherPhase {
     WaitingForAnchor,
     /// Standing on the node, accumulating harvest ticks.
     Harvesting,
-    /// Walking back to the home City Centre with a load.
+    /// Walking back to the home Resource Depot with a load.
     ToHome,
 }

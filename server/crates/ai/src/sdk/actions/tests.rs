@@ -116,7 +116,7 @@ fn reserved_candidate_blocker_identifies_the_known_candidate() {
 fn reservations_are_independent_and_conflicts_are_mutation_free() {
     let mut batch = actions(500, 500, 20);
     batch.resource_ids.extend([7, 8]);
-    batch.owned_kinds.insert(7, EntityKind::CityCentre);
+    batch.owned_kinds.insert(7, EntityKind::ResourceDepot);
     assert_eq!(batch.gather(&[7], &[7], false), Ok((7, 7)));
     assert_eq!(batch.train(&[7], EntityKind::Worker), Ok(7));
     assert_eq!(
@@ -160,7 +160,7 @@ fn reservations_are_independent_and_conflicts_are_mutation_free() {
 #[test]
 fn typed_helpers_preserve_mixed_call_order_and_flags() {
     let mut batch = actions(10_000, 10_000, 100);
-    batch.owned_kinds.insert(20, EntityKind::CityCentre);
+    batch.owned_kinds.insert(20, EntityKind::ResourceDepot);
     batch.owned_kinds.insert(21, EntityKind::TrainingCentre);
     batch.resource_ids.insert(30);
     batch

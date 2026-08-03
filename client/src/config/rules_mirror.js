@@ -39,7 +39,7 @@ export const COMMAND_CAR_BODY = Object.freeze({
 });
 
 // Gatherers can mine a resource only when a completed home-base mining anchor is within range.
-export const MINING_CC_RANGE_TILES = 11.0;
+export const MINING_ANCHOR_RANGE_TILES = 11.0;
 export const OIL_LOAD = 2;
 export const HARVEST_TICKS = 40;
 export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20;
@@ -137,17 +137,17 @@ export const STATS = Object.freeze({
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 150, oil: 40 }, supply: 6, buildTicks: 440,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    upgradeRequiresText: "Requires research in R&D Complex" },
+    upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 10,
     rangeTiles: MORTAR_RANGE_TILES, minRangeTiles: MORTAR_MIN_RANGE_TILES,
     cost: { steel: 100, oil: 40 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS,
-    description: "Indirect fire, extremely inaccurate without vision. Upgrade auto cast in R&D." },
+    description: "Indirect fire, extremely inaccurate without vision. Upgrade auto cast in Engineering Complex." },
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 13.5, sight: 7, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
     cost: { steel: 150, oil: 50 }, supply: 4, buildTicks: TICK_HZ * 20,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
-    upgradeRequiresText: "Requires research in R&D Complex" },
+    upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 15, body: SCOUT_CAR_BODY,
     rangeTiles: 7, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.SCOUT_PLANE]: { label: "Scout Plane", icon: "SP", size: 17, sight: 19, body: SCOUT_PLANE_BODY,
@@ -156,26 +156,26 @@ export const STATS = Object.freeze({
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 9, body: TANK_BODY,
     rangeTiles: 5, cost: { steel: 425, oil: 150 }, supply: 8, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
-    upgradeRequiresText: "Requires research in R&D Complex" },
+    upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 12.6, sight: 8, body: COMMAND_CAR_BODY,
     rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
-    requires: KIND.RESEARCH_COMPLEX },
+    requires: KIND.ENGINEERING_COMPLEX },
   [KIND.EKAT]: { label: "Ekat", icon: "EK", size: 10, sight: 12,
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
-  [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 1,
+  [KIND.RESOURCE_DEPOT]: { label: "Resource Depot", icon: "RD", footW: 3, footH: 3, sight: 1,
     cost: { steel: 450, oil: 100 }, buildTicks: 750, trains: [KIND.WORKER] },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 300, trains: [] },
   [KIND.BARRACKS]: { label: "Barracks", icon: "BK", footW: 3, footH: 2, sight: 1,
-    cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.PANZERFAUST], requires: KIND.CITY_CENTRE },
+    cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.PANZERFAUST], requires: KIND.RESOURCE_DEPOT },
   [KIND.TRAINING_CENTRE]: { label: "Training Centre", icon: "TC", footW: 3, footH: 2, sight: 1,
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.METHAMPHETAMINES, UPGRADE.PANZERFAUSTS, UPGRADE.ENTRENCHMENT],
-    requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
-  [KIND.RESEARCH_COMPLEX]: { label: "R&D Complex", icon: "RD", footW: 3, footH: 3, sight: 1,
+    requires: [KIND.RESOURCE_DEPOT, KIND.BARRACKS] },
+  [KIND.ENGINEERING_COMPLEX]: { label: "Engineering Complex", icon: "EC", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 15, trains: [],
     researches: [
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
@@ -186,15 +186,15 @@ export const STATS = Object.freeze({
       UPGRADE.SMOKE_PLUS,
       UPGRADE.SCOUT_PLANE_UNLOCK,
     ],
-    requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
+    requires: [KIND.RESOURCE_DEPOT, KIND.TRAINING_CENTRE] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 1,
     cost: { steel: 125, oil: 125 }, buildTicks: 749,
     trains: [KIND.SCOUT_CAR, KIND.TANK, KIND.COMMAND_CAR],
-    requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
+    requires: [KIND.RESOURCE_DEPOT, KIND.TRAINING_CENTRE] },
   [KIND.STEELWORKS]: { label: "Gun Works", icon: "GW", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 100 }, buildTicks: 599,
     trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY],
-    requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
+    requires: [KIND.RESOURCE_DEPOT, KIND.TRAINING_CENTRE] },
   [KIND.TANK_TRAP]: { label: "Tank Trap", icon: "TT", footW: 1, footH: 1, sight: 0,
     cost: { steel: 30, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
     requires: KIND.TRAINING_CENTRE,
@@ -204,7 +204,7 @@ export const STATS = Object.freeze({
     description:
       "Build on an oil patch. " +
       `Extracts ${OIL_LOAD} Oil every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s while within ` +
-      `${MINING_CC_RANGE_TILES} tiles of a completed friendly City Centre or Zamok.` },
+      `${MINING_ANCHOR_RANGE_TILES} tiles of a completed friendly Resource Depot or Zamok.` },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },
@@ -224,7 +224,7 @@ export const ABILITIES = Object.freeze({
     charges: SCOUT_CAR_SMOKE_CHARGES,
     chargeRechargeTicks: SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS,
     cost: SMOKE_ABILITY_COST,
-    techRequirement: KIND.RESEARCH_COMPLEX,
+    techRequirement: KIND.ENGINEERING_COMPLEX,
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,
     upgradedRadiusTiles: SMOKE_PLUS_CLOUD_RADIUS_TILES,
@@ -419,7 +419,7 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 100, oil: 50 }),
     researchTicks: ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Anti-Tank Gun training",
-    researchedAt: KIND.RESEARCH_COMPLEX,
+    researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
   [UPGRADE.ARTILLERY_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.ARTILLERY_UNLOCK,
@@ -428,7 +428,7 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 200, oil: 100 }),
     researchTicks: ARTILLERY_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Artillery training",
-    researchedAt: KIND.RESEARCH_COMPLEX,
+    researchedAt: KIND.ENGINEERING_COMPLEX,
     requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     requiresText: "Requires AT Guns",
   }),
@@ -439,7 +439,7 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 100, oil: 150 }),
     researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
     description: "Reduce Artillery Fire minimum radius from 6 to 3 tiles",
-    researchedAt: KIND.RESEARCH_COMPLEX,
+    researchedAt: KIND.ENGINEERING_COMPLEX,
     requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
     requiresText: "Requires Artillery",
   }),
@@ -450,7 +450,7 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 150, oil: 100 }),
     researchTicks: TANK_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Tank training",
-    researchedAt: KIND.RESEARCH_COMPLEX,
+    researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
   [UPGRADE.MORTAR_AUTOCAST]: Object.freeze({
     upgrade: UPGRADE.MORTAR_AUTOCAST,
@@ -459,7 +459,7 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 150, oil: 150 }),
     researchTicks: MORTAR_AUTOCAST_RESEARCH_TICKS,
     description: "Enable Mortar Team autocast by default",
-    researchedAt: KIND.RESEARCH_COMPLEX,
+    researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
   [UPGRADE.SMOKE_PLUS]: Object.freeze({
     upgrade: UPGRADE.SMOKE_PLUS,
@@ -468,7 +468,7 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 150, oil: 150 }),
     researchTicks: SMOKE_PLUS_RESEARCH_TICKS,
     description: "Double Scout Car Smoke radius and duration",
-    researchedAt: KIND.RESEARCH_COMPLEX,
+    researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
   [UPGRADE.SCOUT_PLANE_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.SCOUT_PLANE_UNLOCK,
@@ -477,7 +477,7 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 50, oil: 100 }),
     researchTicks: SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
     description: "Unlock the Command Car Scout Plane ability",
-    researchedAt: KIND.RESEARCH_COMPLEX,
+    researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
 });
 
@@ -492,11 +492,11 @@ export const RESOURCE_AMOUNTS = Object.freeze({
 
 // What a worker can build (command card when a worker is selected).
 export const WORKER_BUILDABLE = Object.freeze([
-  KIND.CITY_CENTRE,
+  KIND.RESOURCE_DEPOT,
   KIND.PUMP_JACK,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
-  KIND.RESEARCH_COMPLEX,
+  KIND.ENGINEERING_COMPLEX,
   KIND.FACTORY,
   KIND.STEELWORKS,
   KIND.TANK_TRAP,

@@ -126,7 +126,7 @@ pub(crate) struct SurplusSteelProductionPolicy {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct ExpansionPolicy {
-    pub(crate) target_city_centres: usize,
+    pub(crate) target_resource_depots: usize,
     pub(crate) required_complete_building: EntityKind,
     pub(crate) defensive_unit: EntityKind,
     pub(crate) defensive_unit_count: usize,
@@ -284,7 +284,7 @@ const BASE_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
 const TANK_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
-    EntityKind::ResearchComplex,
+    EntityKind::EngineeringComplex,
     EntityKind::Factory,
 ];
 
@@ -344,7 +344,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         }),
     },
     expansion: Some(ExpansionPolicy {
-        target_city_centres: 2,
+        target_resource_depots: 2,
         required_complete_building: EntityKind::TrainingCentre,
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 4,

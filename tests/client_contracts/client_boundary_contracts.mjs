@@ -53,9 +53,9 @@ import { ClientIntent } from "../../client/src/client_intent.js";
     resourceId: 200,
     resourceX: 64,
     resourceY: 96,
-    ccId: 3,
-    ccX: 48,
-    ccY: 48,
+    anchorId: 3,
+    anchorX: 48,
+    anchorY: 48,
     inRange: true,
   });
   assert(intent.resourceMiningPreview?.resourceId === 200, "ClientIntent owns resource hover previews");

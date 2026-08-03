@@ -21,10 +21,10 @@ import { ABILITY, KIND, LAB_ROLE, SETUP, UPGRADE } from "../client/src/protocol.
 const kriegsiaCommandId = (family, subject) => factionCommandId("kriegsia", family, subject);
 const ekatCommandId = (family, subject) => factionCommandId(EKAT_FACTION_ID, family, subject);
 
-const researchComplex = {
+const engineeringComplex = {
   id: 10,
   owner: 1,
-  kind: KIND.RESEARCH_COMPLEX,
+  kind: KIND.ENGINEERING_COMPLEX,
 };
 
 function testGroupCooldownClocks(values, totalTicks) {
@@ -41,7 +41,7 @@ function testGroupCooldownClocks(values, totalTicks) {
 function rAndDCard(upgrades = [], prodUpgradeQueue = []) {
   return buildCommandCardDescriptors({
     playerId: 1,
-    selection: [{ ...researchComplex, prodUpgradeQueue }],
+    selection: [{ ...engineeringComplex, prodUpgradeQueue }],
     resources: { steel: 1000, oil: 1000 },
     upgrades,
     playerHasCompleteKind: () => true,
@@ -100,15 +100,15 @@ function buttonSlots(card) {
 }
 
 {
-  const emptyResearchComplex = { ...researchComplex, id: 11, prodUpgradeQueue: [] };
-  const queuedResearchComplex = {
-    ...researchComplex,
+  const emptyEngineeringComplex = { ...engineeringComplex, id: 11, prodUpgradeQueue: [] };
+  const queuedEngineeringComplex = {
+    ...engineeringComplex,
     id: 12,
     prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
   };
   const card = buildCommandCardDescriptors({
     playerId: 1,
-    selection: [emptyResearchComplex, queuedResearchComplex],
+    selection: [emptyEngineeringComplex, queuedEngineeringComplex],
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
     playerHasCompleteKind: () => true,
@@ -116,23 +116,23 @@ function buttonSlots(card) {
   });
   assert.equal(
     card.slots[1].intent.buildingId,
-    queuedResearchComplex.id,
+    queuedEngineeringComplex.id,
     "dependent research should target the selected building that owns its queued prerequisite",
   );
 }
 
 {
-  const selectedResearchComplex = { ...researchComplex, id: 11, prodUpgradeQueue: [] };
-  const otherResearchComplex = {
-    ...researchComplex,
+  const selectedEngineeringComplex = { ...engineeringComplex, id: 11, prodUpgradeQueue: [] };
+  const otherEngineeringComplex = {
+    ...engineeringComplex,
     id: 12,
     prodUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
     prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
   };
   const card = buildCommandCardDescriptors({
     playerId: 1,
-    selection: [selectedResearchComplex],
-    currentEntities: [selectedResearchComplex, otherResearchComplex],
+    selection: [selectedEngineeringComplex],
+    currentEntities: [selectedEngineeringComplex, otherEngineeringComplex],
     resources: { steel: 1000, oil: 1000 },
     upgrades: [],
     playerHasCompleteKind: () => true,
@@ -196,7 +196,7 @@ function buttonSlots(card) {
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
-  assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.CITY_CENTRE));
+  assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.RESOURCE_DEPOT));
   assert.equal(buildCard.slots[0].slotIndex, 0);
   assert.equal(buildCard.slots[0].hotkey, "Q");
   assert.equal(buildCard.slots[1].commandId, kriegsiaCommandId("build", KIND.PUMP_JACK));
@@ -220,7 +220,7 @@ function buttonSlots(card) {
   }], "worker build menu dispatch stays descriptor-driven");
   assert.deepEqual(buildCard.slots[0].intent, {
     type: "beginPlacement",
-    building: KIND.CITY_CENTRE,
+    building: KIND.RESOURCE_DEPOT,
   }, "worker build dispatch keeps placement intent in the descriptor");
   assert.deepEqual(buildCard.slots[8].intent, {
     type: "closeCommandCardMenu",
@@ -292,10 +292,10 @@ function buttonSlots(card) {
 }
 
 {
-  const cityCentre = { id: 27, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
-  const cityCentreCard = buildCommandCardDescriptors({
+  const resourceDepot = { id: 27, owner: 1, kind: KIND.RESOURCE_DEPOT, buildProgress: null };
+  const resourceDepotCard = buildCommandCardDescriptors({
     playerId: 1,
-    selection: [cityCentre],
+    selection: [resourceDepot],
     resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
     upgrades: [],
     playerHasCompleteKind: (kind) => kind === KIND.STEELWORKS,
@@ -303,9 +303,9 @@ function buttonSlots(card) {
   });
   const scoutPlaneCommandId = kriegsiaCommandId("train", KIND.SCOUT_PLANE);
   assert.deepEqual(
-    commandCardActivationCandidates(cityCentreCard, scoutPlaneCommandId),
+    commandCardActivationCandidates(resourceDepotCard, scoutPlaneCommandId),
     [],
-    "City Centre no longer exposes Scout Plane production",
+    "Resource Depot no longer exposes Scout Plane production",
   );
 }
 
@@ -619,19 +619,19 @@ function buttonSlots(card) {
     "mixed-army-support",
     "command-car",
     "artillery",
-    "city-centre-train",
+    "resource-depot-train",
     "barracks-train",
     "factory-train",
     "gun-works-train",
     "training-centre",
-    "research-complex",
-    "research-complex-at-guns",
+    "engineering-complex",
+    "engineering-complex-at-guns",
     "ekat-unit",
     "ekat-zamok-train",
   ]);
   assert(
     catalog.some((entry) =>
-      entry.id === "research-complex-at-guns" &&
+      entry.id === "engineering-complex-at-guns" &&
         entry.card.slots.some((slot) =>
           slot?.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
         )
@@ -648,11 +648,11 @@ function buttonSlots(card) {
     "command-card context catalog samples Ekat abilities so direct hotkeys can discover them",
   );
   assert.deepEqual(WORKER_BUILDABLE, [
-    KIND.CITY_CENTRE,
+    KIND.RESOURCE_DEPOT,
     KIND.PUMP_JACK,
     KIND.BARRACKS,
     KIND.TRAINING_CENTRE,
-    KIND.RESEARCH_COMPLEX,
+    KIND.ENGINEERING_COMPLEX,
     KIND.FACTORY,
     KIND.STEELWORKS,
     KIND.TANK_TRAP,

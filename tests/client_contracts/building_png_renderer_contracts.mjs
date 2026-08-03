@@ -18,19 +18,19 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const expectedFootprints = new Map([
-  [KIND.CITY_CENTRE, [3, 3]],
+  [KIND.RESOURCE_DEPOT, [3, 3]],
   [KIND.BARRACKS, [3, 2]],
   [KIND.TRAINING_CENTRE, [3, 2]],
-  [KIND.RESEARCH_COMPLEX, [3, 3]],
+  [KIND.ENGINEERING_COMPLEX, [3, 3]],
   [KIND.FACTORY, [3, 3]],
   [KIND.STEELWORKS, [3, 3]],
   [KIND.PUMP_JACK, [1, 1]],
 ]);
 const silhouetteShadowKinds = new Set([
-  KIND.CITY_CENTRE,
+  KIND.RESOURCE_DEPOT,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
-  KIND.RESEARCH_COMPLEX,
+  KIND.ENGINEERING_COMPLEX,
   KIND.FACTORY,
   KIND.STEELWORKS,
 ]);

@@ -131,7 +131,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            researchable_upgrades(EntityKind::ResearchComplex),
+            researchable_upgrades(EntityKind::EngineeringComplex),
             vec![
                 UpgradeKind::AntiTankGunUnlock,
                 UpgradeKind::ArtilleryUnlock,
@@ -143,9 +143,9 @@ mod tests {
             ]
         );
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));
-        assert!(researchable_upgrades(EntityKind::ResearchComplex)
+        assert!(researchable_upgrades(EntityKind::EngineeringComplex)
             .contains(&UpgradeKind::ArtilleryUnlock));
-        assert!(researchable_upgrades(EntityKind::ResearchComplex)
+        assert!(researchable_upgrades(EntityKind::EngineeringComplex)
             .contains(&UpgradeKind::BallisticTables));
     }
 

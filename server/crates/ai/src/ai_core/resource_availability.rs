@@ -19,7 +19,7 @@ pub(crate) struct ResourceNodeAvailability {
     pub(crate) remaining: u32,
     pub(crate) has_remaining: bool,
     pub(crate) mineable_now: bool,
-    pub(crate) nearest_completed_mining_city_centre: Option<u32>,
+    pub(crate) nearest_completed_mining_resource_depot: Option<u32>,
     pub(crate) latched_worker_count: usize,
     pub(crate) extractor_count: usize,
     pub(crate) occupied: bool,
@@ -42,7 +42,7 @@ impl ResourceAvailability {
         observation: &AiObservation,
         pre_reserved_nodes: &BTreeSet<u32>,
     ) -> Self {
-        let completed_city_centres = completed_city_centres(observation);
+        let completed_resource_depots = completed_resource_depots(observation);
         let latched_workers_by_node = latched_workers_by_node(observation);
         let pump_jacks = active_pump_jacks(observation);
         let mut occupied_by_kind = BTreeMap::new();
@@ -54,17 +54,19 @@ impl ResourceAvailability {
             .resources
             .iter()
             .map(|resource| {
-                let nearest_completed_mining_city_centre = nearest_completed_mining_city_centre(
-                    resource.x,
-                    resource.y,
-                    &completed_city_centres,
-                );
+                let nearest_completed_mining_resource_depot =
+                    nearest_completed_mining_resource_depot(
+                        resource.x,
+                        resource.y,
+                        &completed_resource_depots,
+                    );
                 let latched_worker_count = latched_workers_by_node
                     .get(&resource.id)
                     .copied()
                     .unwrap_or(0);
                 let has_remaining = resource.remaining > 0;
-                let mineable_now = has_remaining && nearest_completed_mining_city_centre.is_some();
+                let mineable_now =
+                    has_remaining && nearest_completed_mining_resource_depot.is_some();
                 let extractor_count = if resource.kind == EntityKind::Oil {
                     pump_jacks
                         .iter()
@@ -106,7 +108,7 @@ impl ResourceAvailability {
                     remaining: resource.remaining,
                     has_remaining,
                     mineable_now,
-                    nearest_completed_mining_city_centre,
+                    nearest_completed_mining_resource_depot,
                     latched_worker_count,
                     extractor_count,
                     occupied,
@@ -200,22 +202,22 @@ impl ResourceAvailability {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct MiningCityCentre {
+struct MiningResourceDepot {
     id: u32,
     x: f32,
     y: f32,
 }
 
-fn completed_city_centres(observation: &AiObservation) -> Vec<MiningCityCentre> {
+fn completed_resource_depots(observation: &AiObservation) -> Vec<MiningResourceDepot> {
     observation
         .owned
         .iter()
         .filter(|entity| {
-            entity.kind == EntityKind::CityCentre
+            entity.kind == EntityKind::ResourceDepot
                 && entity.is_complete
                 && entity.state != AiEntityState::Dead
         })
-        .map(|entity| MiningCityCentre {
+        .map(|entity| MiningResourceDepot {
             id: entity.id,
             x: entity.x,
             y: entity.y,
@@ -258,18 +260,18 @@ fn pump_jack_overlaps_resource(pump: &AiEntitySummary, resource: &AiResourceSumm
         && resource.y <= pump.y + half_h + POINT_IN_RECT_EPS_PX
 }
 
-fn nearest_completed_mining_city_centre(
+fn nearest_completed_mining_resource_depot(
     x: f32,
     y: f32,
-    city_centres: &[MiningCityCentre],
+    resource_depots: &[MiningResourceDepot],
 ) -> Option<u32> {
-    let range_px = config::MINING_CC_RANGE_TILES * config::TILE_SIZE as f32;
+    let range_px = config::MINING_ANCHOR_RANGE_TILES * config::TILE_SIZE as f32;
     let range2 = range_px * range_px + 0.01;
-    city_centres
+    resource_depots
         .iter()
-        .filter_map(|cc| {
-            let d = dist2(x, y, cc.x, cc.y);
-            (d <= range2).then_some((cc.id, d))
+        .filter_map(|resource_depot| {
+            let d = dist2(x, y, resource_depot.x, resource_depot.y);
+            (d <= range2).then_some((resource_depot.id, d))
         })
         .min_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
         .map(|(id, _)| id)
@@ -338,8 +340,8 @@ mod tests {
         }
     }
 
-    fn city_centre(id: u32, x: f32, y: f32, complete: bool) -> AiEntitySummary {
-        let mut entity = entity(id, EntityKind::CityCentre, x, y);
+    fn resource_depot(id: u32, x: f32, y: f32, complete: bool) -> AiEntitySummary {
+        let mut entity = entity(id, EntityKind::ResourceDepot, x, y);
         entity.is_complete = complete;
         entity
     }
@@ -377,15 +379,15 @@ mod tests {
     }
 
     #[test]
-    fn resource_in_completed_city_centre_range_is_mineable() {
+    fn resource_in_completed_resource_depot_range_is_mineable() {
         let mut observation = observation();
         let ts = config::TILE_SIZE as f32;
-        observation.owned = vec![city_centre(10, 100.0, 100.0, true)];
+        observation.owned = vec![resource_depot(10, 100.0, 100.0, true)];
         observation.resources = vec![
             resource(
                 2,
                 EntityKind::Steel,
-                100.0 + config::MINING_CC_RANGE_TILES * ts,
+                100.0 + config::MINING_ANCHOR_RANGE_TILES * ts,
                 100.0,
                 100,
             ),
@@ -393,7 +395,7 @@ mod tests {
                 1,
                 EntityKind::Steel,
                 100.0,
-                100.0 + (config::MINING_CC_RANGE_TILES + 0.25) * ts,
+                100.0 + (config::MINING_ANCHOR_RANGE_TILES + 0.25) * ts,
                 100,
             ),
         ];
@@ -408,15 +410,15 @@ mod tests {
             availability
                 .node(2)
                 .unwrap()
-                .nearest_completed_mining_city_centre,
+                .nearest_completed_mining_resource_depot,
             Some(10)
         );
     }
 
     #[test]
-    fn incomplete_city_centre_does_not_make_resource_mineable() {
+    fn incomplete_resource_depot_does_not_make_resource_mineable() {
         let mut observation = observation();
-        observation.owned = vec![city_centre(10, 100.0, 100.0, false)];
+        observation.owned = vec![resource_depot(10, 100.0, 100.0, false)];
         observation.resources = vec![resource(1, EntityKind::Oil, 100.0, 100.0, 100)];
 
         let availability = ResourceAvailability::from_observation(&observation, &BTreeSet::new());
@@ -426,7 +428,7 @@ mod tests {
             availability
                 .node(1)
                 .unwrap()
-                .nearest_completed_mining_city_centre,
+                .nearest_completed_mining_resource_depot,
             None
         );
         assert!(!availability.has_free_mineable_oil());
@@ -435,7 +437,7 @@ mod tests {
     #[test]
     fn depleted_resource_is_not_free_or_mineable() {
         let mut observation = observation();
-        observation.owned = vec![city_centre(10, 100.0, 100.0, true)];
+        observation.owned = vec![resource_depot(10, 100.0, 100.0, true)];
         observation.resources = vec![resource(1, EntityKind::Steel, 100.0, 100.0, 0)];
 
         let availability = ResourceAvailability::from_observation(&observation, &BTreeSet::new());
@@ -454,7 +456,7 @@ mod tests {
     fn latched_workers_and_pre_reserved_nodes_count_as_occupied_not_free() {
         let mut observation = observation();
         observation.owned = vec![
-            city_centre(10, 100.0, 100.0, true),
+            resource_depot(10, 100.0, 100.0, true),
             worker(20, Some(1)),
             worker(21, Some(1)),
         ];
@@ -485,7 +487,7 @@ mod tests {
     fn pump_jack_counts_oil_as_occupied_extractor() {
         let mut observation = observation();
         observation.owned = vec![
-            city_centre(10, 100.0, 100.0, true),
+            resource_depot(10, 100.0, 100.0, true),
             pump_jack(20, 100.0, 100.0, false),
         ];
         observation.resources = vec![
@@ -521,7 +523,7 @@ mod tests {
     fn completed_pump_jack_counts_as_live_extractor_only_with_remaining_oil() {
         let mut observation = observation();
         observation.owned = vec![
-            city_centre(10, 100.0, 100.0, true),
+            resource_depot(10, 100.0, 100.0, true),
             pump_jack(20, 100.0, 100.0, true),
             pump_jack(21, 132.0, 100.0, true),
         ];
@@ -547,11 +549,11 @@ mod tests {
     }
 
     #[test]
-    fn nearest_city_centre_tie_breaks_by_id() {
+    fn nearest_resource_depot_tie_breaks_by_id() {
         let mut observation = observation();
         observation.owned = vec![
-            city_centre(11, 90.0, 100.0, true),
-            city_centre(10, 110.0, 100.0, true),
+            resource_depot(11, 90.0, 100.0, true),
+            resource_depot(10, 110.0, 100.0, true),
         ];
         observation.resources = vec![resource(1, EntityKind::Steel, 100.0, 100.0, 100)];
 
@@ -561,7 +563,7 @@ mod tests {
             availability
                 .node(1)
                 .unwrap()
-                .nearest_completed_mining_city_centre,
+                .nearest_completed_mining_resource_depot,
             Some(10)
         );
     }

@@ -35,8 +35,14 @@ fn hidden_enemy_at_gun_fixture() -> (Game, u32, u32) {
 
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            target_pos.0,
+            target_pos.1,
+            true,
+        )
+        .expect("resource depot should spawn");
     let tank = game
         .state
         .entities
@@ -75,8 +81,14 @@ fn hidden_enemy_tank_fixture() -> (Game, u32, u32) {
 
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            target_pos.0,
+            target_pos.1,
+            true,
+        )
+        .expect("resource depot should spawn");
     let tank = game
         .state
         .entities
@@ -111,8 +123,14 @@ fn hidden_enemy_at_gun_with_counter_fixture() -> (Game, u32, u32) {
 
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            target_pos.0,
+            target_pos.1,
+            true,
+        )
+        .expect("resource depot should spawn");
     let counter_at = game
         .state
         .entities
@@ -411,8 +429,14 @@ fn third_party_combat_does_not_make_hidden_shooter_actionable() {
     let victim_cc = game
         .state
         .entities
-        .spawn_building(3, EntityKind::CityCentre, target_pos.0, target_pos.1, true)
-        .expect("victim city centre should spawn");
+        .spawn_building(
+            3,
+            EntityKind::ResourceDepot,
+            target_pos.0,
+            target_pos.1,
+            true,
+        )
+        .expect("victim resource depot should spawn");
     let shooter = game
         .state
         .entities

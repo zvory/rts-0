@@ -13,7 +13,7 @@ struct ResourceRegressionEvidence {
     pre_expansion_steel_gather_tick: Option<u32>,
     first_pump_jack_build_tick: Option<u32>,
     first_mineable_oil_tick: Option<u32>,
-    first_second_completed_city_centre_tick: Option<u32>,
+    first_second_completed_resource_depot_tick: Option<u32>,
 }
 
 const POINT_IN_RECT_EPS_PX: f32 = 0.001;
@@ -48,12 +48,12 @@ fn gather_node_kind(start: &StartPayload, node: u32) -> Option<EntityKind> {
         .and_then(|resource| resource.kind.parse().ok())
 }
 
-fn completed_city_centres(snapshot: &Snapshot, player_id: u32) -> Vec<&EntityView> {
+fn completed_resource_depots(snapshot: &Snapshot, player_id: u32) -> Vec<&EntityView> {
     snapshot
         .entities
         .iter()
         .filter(|entity| entity.owner == player_id)
-        .filter(|entity| kind_of(entity) == Some(EntityKind::CityCentre))
+        .filter(|entity| kind_of(entity) == Some(EntityKind::ResourceDepot))
         .filter(|entity| is_complete(entity))
         .collect()
 }
@@ -78,7 +78,7 @@ fn resource_remaining(start: &StartPayload, snapshot: &Snapshot, node: u32) -> u
         })
 }
 
-fn resource_mineable_by_completed_city_centre(
+fn resource_mineable_by_completed_resource_depot(
     start: &StartPayload,
     snapshot: &Snapshot,
     player_id: u32,
@@ -95,13 +95,13 @@ fn resource_mineable_by_completed_city_centre(
     if resource_remaining(start, snapshot, node) == 0 {
         return false;
     }
-    let range_px = config::MINING_CC_RANGE_TILES * start.map.tile_size as f32;
+    let range_px = config::MINING_ANCHOR_RANGE_TILES * start.map.tile_size as f32;
     let range2 = range_px * range_px + 0.01;
-    completed_city_centres(snapshot, player_id)
+    completed_resource_depots(snapshot, player_id)
         .iter()
-        .any(|cc| {
-            let dx = cc.x - resource.x;
-            let dy = cc.y - resource.y;
+        .any(|resource_depot| {
+            let dx = resource_depot.x - resource.x;
+            let dy = resource_depot.y - resource.y;
             dx * dx + dy * dy <= range2
         })
 }
@@ -132,7 +132,12 @@ fn has_free_mineable_resource(
     start.map.resources.iter().any(|resource| {
         resource.kind.parse::<EntityKind>().ok() == Some(kind)
             && !occupied_nodes.contains(&resource.id)
-            && resource_mineable_by_completed_city_centre(start, snapshot, player_id, resource.id)
+            && resource_mineable_by_completed_resource_depot(
+                start,
+                snapshot,
+                player_id,
+                resource.id,
+            )
     })
 }
 
@@ -207,10 +212,12 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
             .map(|player| (player.id, game.snapshot_for(player.id)))
             .collect();
         let player_one_snapshot = &snapshots[&1];
-        if evidence.first_second_completed_city_centre_tick.is_none()
-            && completed_city_centres(player_one_snapshot, 1).len() >= 2
+        if evidence
+            .first_second_completed_resource_depot_tick
+            .is_none()
+            && completed_resource_depots(player_one_snapshot, 1).len() >= 2
         {
-            evidence.first_second_completed_city_centre_tick = Some(tick);
+            evidence.first_second_completed_resource_depot_tick = Some(tick);
         }
         if evidence.first_mineable_oil_tick.is_none()
             && has_free_mineable_resource(&start, player_one_snapshot, 1, EntityKind::Oil)
@@ -285,7 +292,7 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
                         panic!("Pump Jack build at tick {tick} did not overlap a live oil patch");
                     };
                     assert!(
-                        resource_mineable_by_completed_city_centre(
+                        resource_mineable_by_completed_resource_depot(
                             &start,
                             player_one_snapshot,
                             1,
@@ -321,17 +328,19 @@ fn profile_backed_ai_prefers_mineable_steel_over_known_non_mineable_oil() {
 }
 
 #[test]
-fn profile_backed_ai_assigns_oil_after_expansion_city_centre_completes() {
+fn profile_backed_ai_assigns_oil_after_expansion_resource_depot_completes() {
     if crate::skip_unless_full_ai(
-        "profile_backed_ai_assigns_oil_after_expansion_city_centre_completes",
+        "profile_backed_ai_assigns_oil_after_expansion_resource_depot_completes",
     ) {
         return;
     }
     let evidence = run_resource_regression_profile(9_000);
 
     assert!(
-        evidence.first_second_completed_city_centre_tick.is_some(),
-        "expected AI 1.0 economy progression to complete an expansion City Centre"
+        evidence
+            .first_second_completed_resource_depot_tick
+            .is_some(),
+        "expected AI 1.0 economy progression to complete an expansion Resource Depot"
     );
     assert!(
         evidence.first_mineable_oil_tick.is_some(),

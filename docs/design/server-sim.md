@@ -70,7 +70,7 @@ impl Game {
     /// exposure imbalance, and finally a deterministic seed-influenced tie break. No player-count
     /// layouts or player-owned natural groups exist in authored maps. Generated oil clusters place each oil patch on a unique passable tile
     /// center near the intended layout, keep one tile between oil patches, and reject sites whose
-    /// Pump Jack footprint would collide with non-oil resources while preserving City Centre
+    /// Pump Jack footprint would collide with non-oil resources while preserving Resource Depot
     /// resource-distance bounds. Schema-v5 doodads are catalog-validated and id-canonicalized.
     /// Tree species share a 4.5px authoritative circular trunk used by exact unit standability;
     /// tree tiles receive a finite path-avoidance cost but remain traversable outside the trunk.
@@ -227,7 +227,7 @@ the serde `Command` from `rts-protocol` so replay JSON stays wire-compatible. `S
 `Snapshot`, `Event`, and `PlayerScore` are also serde types from `rts-protocol`.
 
 `PlayerInit.is_ai` marks a computer-controlled player. AI players are full players in every
-respect (they get a start position, City Centre, workers, economy, and count toward
+respect (they get a start position, Resource Depot, workers, economy, and count toward
 win/elimination); the only difference is they have no socket. `Game` does not own AI controllers;
 the room task or tool harness asks `rts-ai` controllers for ordinary `SimCommand`s and enqueues
 them through this API before ticking — see §8.
@@ -1260,7 +1260,7 @@ before the gun can engage them.
 
 Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, stops to fire, and repaths if the same target moves out of range; it never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward.
 
-After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the R&D Complex, Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a City Centre requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
+After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the Engineering Complex, Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a Resource Depot requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
 Group move formation assignment checks cached reachability components before issuing per-unit goals,
 avoiding command-time A* probes outside the move coordinator pathing budget. A blocked or unreachable
@@ -1594,7 +1594,7 @@ Allocation rules:
 - Target/resource orders apply to every selected compatible owned unit after the target has passed
   issue-time validation. Every live steel node is a valid gather target regardless of current
   mining-anchor coverage. A gatherer travels to the patch and waits there, retaining its active
-  gather order without claiming the mining slot, until an owned completed City Centre or Zamok is
+  gather order without claiming the mining slot, until an owned completed Resource Depot or Zamok is
   in range; losing that coverage while harvesting returns the gatherer to the same waiting state.
   Occupied resource nodes are still valid gather targets; when a gatherer
   arrives and the patch is already occupied, the economy service redirects it to the nearest

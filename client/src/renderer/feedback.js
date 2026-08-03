@@ -12,7 +12,7 @@ import {
   MORTAR_FIELD_OF_FIRE_RAD,
   MORTAR_MIN_RANGE_TILES,
   MORTAR_RANGE_TILES,
-  MINING_CC_RANGE_TILES,
+  MINING_ANCHOR_RANGE_TILES,
   isProducerBuilding,
 } from "../config.js";
 import {
@@ -125,13 +125,13 @@ function drawBuildPlacementPreview(g, view, p, ts) {
     gfxStrokePaths(g, gridPaths, 1, color, 0.4);
   }
 
-  if (p.building !== KIND.CITY_CENTRE && p.building !== KIND.ZAMOK) return;
+  if (p.building !== KIND.RESOURCE_DEPOT && p.building !== KIND.ZAMOK) return;
 
   const x0 = p.tileX * ts;
   const y0 = p.tileY * ts;
   const cx = x0 + w / 2;
   const cy = y0 + h / 2;
-  const rangePx = MINING_CC_RANGE_TILES * ts;
+  const rangePx = MINING_ANCHOR_RANGE_TILES * ts;
   const rangeSq = rangePx * rangePx;
   const resourceColor = 0x4aa3ff;
   for (const node of view.map?.resources || []) {
@@ -1183,15 +1183,15 @@ export function _drawResourceMiningPreview(view) {
   if (!view || !view.resourceMiningPreview) return;
   const g = this._feedbackGfx;
   const p = view.resourceMiningPreview;
-  const ccStat = STATS[KIND.CITY_CENTRE] || {};
+  const anchorStat = STATS[KIND.RESOURCE_DEPOT] || {};
   const ts = (this._map && this._map.tileSize) || 32;
-  const ccEndpoint = rectEdgePointTowardCenter(
+  const anchorEndpoint = rectEdgePointTowardCenter(
     p.resourceX,
     p.resourceY,
-    p.ccX,
-    p.ccY,
-    ((ccStat.footW || 3) * ts) / 2,
-    ((ccStat.footH || 3) * ts) / 2,
+    p.anchorX,
+    p.anchorY,
+    ((anchorStat.footW || 3) * ts) / 2,
+    ((anchorStat.footH || 3) * ts) / 2,
   );
 
   if (p.inRange) {
@@ -1202,7 +1202,7 @@ export function _drawResourceMiningPreview(view) {
     return;
   }
 
-  dashedLine(g, p.resourceX, p.resourceY, ccEndpoint.x, ccEndpoint.y, 14, 9, 2.5, 0xd64d45, 0.9);
+  dashedLine(g, p.resourceX, p.resourceY, anchorEndpoint.x, anchorEndpoint.y, 14, 9, 2.5, 0xd64d45, 0.9);
 }
 
 export function _drawMuzzleFlashes(state) {

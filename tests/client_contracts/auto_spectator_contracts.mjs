@@ -162,7 +162,7 @@ function createHarness({ enabled = false, players = null, viewport = null } = {}
 
 {
   const { director, entities } = createHarness();
-  entities.set(1, { id: 1, owner: 1, kind: KIND.CITY_CENTRE, x: 2000, y: 2000 });
+  entities.set(1, { id: 1, owner: 1, kind: KIND.RESOURCE_DEPOT, x: 2000, y: 2000 });
   director.observeSnapshot({
     tick: 1,
     events: [{ e: EVENT.ARTILLERY_IMPACT, x: 2110, y: 2000, radiusTiles: 2 }],

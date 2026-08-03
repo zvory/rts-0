@@ -480,8 +480,8 @@ impl Game {
         spawn_tank_trap_pathing_wall(&mut entities, traps)?;
         if let Some((x, y)) = enemy_base {
             entities
-                .spawn_building(2, EntityKind::CityCentre, x, y, true)
-                .ok_or_else(|| "failed to spawn remote enemy City Centre".to_string())?;
+                .spawn_building(2, EntityKind::ResourceDepot, x, y, true)
+                .ok_or_else(|| "failed to spawn remote enemy Resource Depot".to_string())?;
         }
         let units = spawn_tank_trap_pathing_unit(&mut entities, unit, unit_start)?;
         let player_id = 1;

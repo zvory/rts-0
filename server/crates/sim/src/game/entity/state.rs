@@ -396,7 +396,7 @@ pub struct WorkerState {
     /// Present only if round-trip harvesting is reintroduced.
     pub carry: Option<CarryState>,
     /// Reserved drop-off target for future round-trip harvesting.
-    pub home_city_centre: Option<u32>,
+    pub home_resource_depot: Option<u32>,
 }
 
 /// Resource-node state. Present only on steel/oil nodes.

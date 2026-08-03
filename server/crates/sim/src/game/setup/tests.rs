@@ -45,7 +45,7 @@ fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
     );
     assert_eq!(owned_kind_count(&game, 2, EntityKind::Depot), 1);
     assert_eq!(owned_kind_count(&game, 2, EntityKind::ScoutCar), 1);
-    assert_eq!(owned_kind_count(&game, 2, EntityKind::CityCentre), 0);
+    assert_eq!(owned_kind_count(&game, 2, EntityKind::ResourceDepot), 0);
     assert_eq!(owned_kind_count(&game, 2, EntityKind::Worker), 0);
 
     let loadout = game
@@ -102,7 +102,7 @@ fn unknown_faction_start_and_commands_fail_closed() {
         ),
         (0, 0, 0)
     );
-    assert_eq!(owned_kind_count(&game, 1, EntityKind::CityCentre), 0);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::ResourceDepot), 0);
     let loadout = &game.starting_loadouts()[0];
     assert_eq!(loadout.loadout_id, "unknown_faction.invalid");
     assert_eq!((loadout.starting_steel, loadout.starting_oil), (0, 0));
@@ -113,15 +113,15 @@ fn unknown_faction_start_and_commands_fail_closed() {
         .entities
         .spawn_unit(1, EntityKind::Worker, x, y)
         .unwrap();
-    let city_centre = game
+    let resource_depot = game
         .state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, x + 96.0, y, true)
+        .spawn_building(1, EntityKind::ResourceDepot, x + 96.0, y, true)
         .unwrap();
-    let research_complex = game
+    let engineering_complex = game
         .state
         .entities
-        .spawn_building(1, EntityKind::ResearchComplex, x + 192.0, y, true)
+        .spawn_building(1, EntityKind::EngineeringComplex, x + 192.0, y, true)
         .unwrap();
     let artillery = game
         .state
@@ -150,11 +150,11 @@ fn unknown_faction_start_and_commands_fail_closed() {
             queued: false,
         },
         SimCommand::Train {
-            building: city_centre,
+            building: resource_depot,
             unit: EntityKind::Worker,
         },
         SimCommand::Research {
-            building: research_complex,
+            building: engineering_complex,
             upgrade: upgrade::UpgradeKind::TankUnlock,
         },
         SimCommand::Gather {
@@ -190,15 +190,15 @@ fn unknown_faction_start_and_commands_fail_closed() {
     assert!(game
         .state
         .entities
-        .get(city_centre)
-        .expect("city centre")
+        .get(resource_depot)
+        .expect("resource depot")
         .prod_queue()
         .is_empty());
     assert!(game
         .state
         .entities
-        .get(research_complex)
-        .expect("research complex")
+        .get(engineering_complex)
+        .expect("engineering complex")
         .research_queue()
         .is_empty());
     let artillery = game.state.entities.get(artillery).expect("artillery");
@@ -243,7 +243,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         );
         assert_eq!(player.supply_used, config::STARTING_WORKERS);
         assert_eq!(
-            owned_kind_count(&game, player.id, EntityKind::CityCentre),
+            owned_kind_count(&game, player.id, EntityKind::ResourceDepot),
             1
         );
         assert_eq!(
@@ -418,7 +418,7 @@ fn authored_base_resource_counts_control_spawned_patch_totals() {
 }
 
 #[test]
-fn base_steel_patches_split_across_both_sides_of_city_centre() {
+fn base_steel_patches_split_across_both_sides_of_resource_depot() {
     let players = [
         (1, super::teams::normalize_team_id(1, 1)),
         (2, super::teams::normalize_team_id(2, 2)),

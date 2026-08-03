@@ -143,7 +143,7 @@ typed action vocabulary and shared local per-think budget and reservation implem
 prevent resource and supply overcommitment without changing compatibility policy.
 
 The core also owns static map analysis derived only from StartPayload map terrain, start tiles, and
-static resource nodes. When nearby steel is split into fields around the City Centre, defensive
+static resource nodes. When nearby steel is split into fields around the Resource Depot, defensive
 staging and Rifleman raid readiness use the field on the map-center side, falling back to the full
 steel cluster for degenerate layouts. Start and resource-cluster mappings prefer candidates in the same reachable
 terrain component when component identity is known, with distance as the fallback for unknown
@@ -161,7 +161,7 @@ the same static analysis, and renders the observer layers over terrain as SVG. I
 renders the exact detected choke tiles rather than choke bounding rectangles.
 
 The economy model is also observation-owned. A resource node is mineable only when it has
-resources remaining, is in range of a completed owned City Centre, is unoccupied by a latched
+resources remaining, is in range of a completed owned Resource Depot, is unoccupied by a latched
 worker or owned Pump Jack, and is not already reserved for the current think. Steel assignments
 emit Gather; oil assignments build Pump Jacks through the usual paid-building path. Expansion
 planning can still see known-but-not-yet-mineable resources without assigning workers to them.
@@ -180,7 +180,7 @@ panic does not override an already-active tech transition, so tank pressure cont
 path during pressure.
 
 AI 2.1 is the promoted pressure profile. It fully saturates steel, adds up to twelve oil workers,
-keeps an eight-supply buffer, opens one Barracks, expands to two City Centres, and reserves four
+keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. At a larger resource float it
 adds a second Factory. Frontal waves stage in cohorts so newly produced units do not immediately

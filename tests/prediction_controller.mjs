@@ -141,12 +141,12 @@ function assert(cond, msg) {
   prediction.applyAuthoritativeSnapshot({
     tick: 7,
     netStatus: { lastSimConsumedClientSeq: 0 },
-    entities: [{ id: 20, owner: 1, kind: "city_centre", prodQueue: 2 }],
+    entities: [{ id: 20, owner: 1, kind: "resource_depot", prodQueue: 2 }],
   });
   prediction.applyAuthoritativeSnapshot({
     tick: 7,
     netStatus: { lastSimConsumedClientSeq: 0 },
-    entities: [{ id: 20, owner: 1, kind: "city_centre", prodQueue: 2 }],
+    entities: [{ id: 20, owner: 1, kind: "resource_depot", prodQueue: 2 }],
   });
   prediction.issueCommand({ c: "train", building: 20, unit: "worker" });
   const match = {
@@ -863,7 +863,7 @@ function sentSeqs(sent) {
     entities: [{
       id: 30,
       owner: 1,
-      kind: "city_centre",
+      kind: "resource_depot",
       rallyPlan: [{ kind: "move", x: 100, y: 100 }],
     }],
     netStatus: { lastSimConsumedClientSeq: 0 },
@@ -877,7 +877,7 @@ function sentSeqs(sent) {
     entities: [{
       id: 30,
       owner: 1,
-      kind: "city_centre",
+      kind: "resource_depot",
       rallyPlan: [
         { kind: "move", x: 100, y: 100 },
         { kind: "attackMove", x: 160, y: 180 },
@@ -918,7 +918,7 @@ function sentSeqs(sent) {
     oil: 0,
     supplyUsed: 1,
     supplyCap: 10,
-    entities: [{ id: 30, owner: 1, kind: "city_centre", x: 64, y: 64, hp: 500, maxHp: 500 }],
+    entities: [{ id: 30, owner: 1, kind: "resource_depot", x: 64, y: 64, hp: 500, maxHp: 500 }],
     events: [],
   });
   state.setSelection([30]);

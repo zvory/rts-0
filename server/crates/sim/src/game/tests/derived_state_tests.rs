@@ -343,19 +343,35 @@ fn movement_economy_checkpoint_preserves_active_paths_and_debug_projection() {
 fn movement_economy_checkpoint_preserves_harvesting_state_and_resource_projection() {
     let players = phase5_players();
     let mut baseline = empty_flat_game(&players);
-    let cc_pos = footprint_center(&baseline.state.map, EntityKind::CityCentre, 8, 8);
+    let resource_depot_pos = footprint_center(&baseline.state.map, EntityKind::ResourceDepot, 8, 8);
     baseline
         .state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
-        .expect("city centre should spawn");
-    let enemy_cc = footprint_center(&baseline.state.map, EntityKind::CityCentre, 40, 40);
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_pos.0,
+            resource_depot_pos.1,
+            true,
+        )
+        .expect("resource depot should spawn");
+    let enemy_resource_depot =
+        footprint_center(&baseline.state.map, EntityKind::ResourceDepot, 40, 40);
     baseline
         .state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, enemy_cc.0, enemy_cc.1, true)
-        .expect("enemy city centre should spawn");
-    let node_pos = (cc_pos.0 + config::TILE_SIZE as f32 * 3.0, cc_pos.1);
+        .spawn_building(
+            2,
+            EntityKind::ResourceDepot,
+            enemy_resource_depot.0,
+            enemy_resource_depot.1,
+            true,
+        )
+        .expect("enemy resource depot should spawn");
+    let node_pos = (
+        resource_depot_pos.0 + config::TILE_SIZE as f32 * 3.0,
+        resource_depot_pos.1,
+    );
     let node = baseline
         .state
         .entities
@@ -427,24 +443,37 @@ fn movement_economy_checkpoint_preserves_harvesting_state_and_resource_projectio
 fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progress() {
     let players = phase5_players();
     let mut baseline = empty_flat_game(&players);
-    let cc_pos = footprint_center(&baseline.state.map, EntityKind::CityCentre, 5, 5);
+    let resource_depot_pos = footprint_center(&baseline.state.map, EntityKind::ResourceDepot, 5, 5);
     baseline
         .state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
-        .expect("city centre should spawn");
-    let enemy_cc = footprint_center(&baseline.state.map, EntityKind::CityCentre, 43, 43);
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_pos.0,
+            resource_depot_pos.1,
+            true,
+        )
+        .expect("resource depot should spawn");
+    let enemy_resource_depot =
+        footprint_center(&baseline.state.map, EntityKind::ResourceDepot, 43, 43);
     baseline
         .state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, enemy_cc.0, enemy_cc.1, true)
-        .expect("enemy city centre should spawn");
-    let (city_centre_tile_x, city_centre_tile_y) = (12, 8);
-    let city_centre_site = footprint_center(
+        .spawn_building(
+            2,
+            EntityKind::ResourceDepot,
+            enemy_resource_depot.0,
+            enemy_resource_depot.1,
+            true,
+        )
+        .expect("enemy resource depot should spawn");
+    let (resource_depot_tile_x, resource_depot_tile_y) = (12, 8);
+    let resource_depot_site = footprint_center(
         &baseline.state.map,
-        EntityKind::CityCentre,
-        city_centre_tile_x,
-        city_centre_tile_y,
+        EntityKind::ResourceDepot,
+        resource_depot_tile_x,
+        resource_depot_tile_y,
     );
     let build_worker = baseline
         .state
@@ -452,8 +481,8 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
         .spawn_unit(
             1,
             EntityKind::Worker,
-            city_centre_site.0,
-            city_centre_site.1,
+            resource_depot_site.0,
+            resource_depot_site.1,
         )
         .expect("build worker should spawn");
     let trap_pos = footprint_center(&baseline.state.map, EntityKind::TankTrap, 20, 8);
@@ -480,9 +509,9 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
         1,
         Command::Build {
             units: vec![build_worker],
-            building: EntityKind::CityCentre,
-            tile_x: city_centre_tile_x,
-            tile_y: city_centre_tile_y,
+            building: EntityKind::ResourceDepot,
+            tile_x: resource_depot_tile_x,
+            tile_y: resource_depot_tile_y,
             queued: false,
         },
     );
@@ -509,7 +538,7 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
         .state
         .entities
         .iter()
-        .find(|entity| entity.kind == EntityKind::CityCentre && entity.under_construction())
+        .find(|entity| entity.kind == EntityKind::ResourceDepot && entity.under_construction())
         .map(|entity| entity.id)
         .expect("build command should spawn a scaffold before checkpoint");
     assert!(
@@ -550,8 +579,8 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
             .is_some_and(|entity| entity.construction_cost_paid()),
         "checkpoint import should preserve the scaffold refund receipt"
     );
-    let finish_ticks = config::building_stats(EntityKind::CityCentre)
-        .expect("city centre stats")
+    let finish_ticks = config::building_stats(EntityKind::ResourceDepot)
+        .expect("resource depot stats")
         .build_ticks
         .max(crate::game::entity::tank_trap_deconstruction_ticks())
         + 4;
@@ -579,18 +608,31 @@ fn movement_economy_checkpoint_preserves_construction_and_deconstruction_progres
 fn movement_economy_checkpoint_preserves_production_research_rally_and_allocator_continuity() {
     let players = phase5_players();
     let mut baseline = empty_flat_game(&players);
-    let cc_pos = footprint_center(&baseline.state.map, EntityKind::CityCentre, 5, 5);
+    let resource_depot_pos = footprint_center(&baseline.state.map, EntityKind::ResourceDepot, 5, 5);
     baseline
         .state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
-        .expect("city centre should spawn");
-    let enemy_cc = footprint_center(&baseline.state.map, EntityKind::CityCentre, 43, 43);
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_pos.0,
+            resource_depot_pos.1,
+            true,
+        )
+        .expect("resource depot should spawn");
+    let enemy_resource_depot =
+        footprint_center(&baseline.state.map, EntityKind::ResourceDepot, 43, 43);
     baseline
         .state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, enemy_cc.0, enemy_cc.1, true)
-        .expect("enemy city centre should spawn");
+        .spawn_building(
+            2,
+            EntityKind::ResourceDepot,
+            enemy_resource_depot.0,
+            enemy_resource_depot.1,
+            true,
+        )
+        .expect("enemy resource depot should spawn");
     let barracks_pos = footprint_center(&baseline.state.map, EntityKind::Barracks, 10, 8);
     let barracks = baseline
         .state

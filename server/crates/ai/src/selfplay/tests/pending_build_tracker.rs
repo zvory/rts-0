@@ -104,7 +104,7 @@ fn pending_build_tracker_keeps_moving_worker_past_stale_window() {
         10,
         &[Command::Build {
             units: vec![2],
-            building: EntityKind::CityCentre,
+            building: EntityKind::ResourceDepot,
             tile_x: 48,
             tile_y: 70,
             queued: false,
@@ -130,7 +130,7 @@ fn pending_build_tracker_expires_stuck_worker() {
         10,
         &[Command::Build {
             units: vec![2],
-            building: EntityKind::CityCentre,
+            building: EntityKind::ResourceDepot,
             tile_x: 48,
             tile_y: 70,
             queued: false,
@@ -144,5 +144,5 @@ fn pending_build_tracker_expires_stuck_worker() {
     tracker.observe(pending_tracker_view(stale_tick, &start, &stale_snapshot));
 
     assert!(tracker.intents().is_empty());
-    assert!(tracker.failed(EntityKind::CityCentre, 48, 70));
+    assert!(tracker.failed(EntityKind::ResourceDepot, 48, 70));
 }

@@ -69,7 +69,7 @@ async function soloStart(room) {
     const { c, start, snap } = await soloStart(room);
     const own = snap.entities.filter((e) => e.owner === c.playerId);
     const ownWorkers = own.filter((e) => e.kind === "worker");
-    const ownCityCentres = own.filter((e) => e.kind === "city_centre");
+    const ownResourceDepots = own.filter((e) => e.kind === "resource_depot");
     const visibleTiles = (snap.visibleTiles || []).filter(Boolean).length;
     ok(start.playerId === c.playerId && start.spectator === false,
        `SOLO START: start is stamped as host player (start=${start.playerId}, welcome=${c.playerId}, spectator=${start.spectator})`);
@@ -79,8 +79,8 @@ async function soloStart(room) {
        `SOLO START: snapshot carries host supply (${snap.supplyUsed}/${snap.supplyCap})`);
     ok(visibleTiles > 0,
        `SOLO START: snapshot carries authoritative visible tiles (${visibleTiles})`);
-    ok(ownCityCentres.length === 1 && ownWorkers.length === 6,
-       `SOLO START: host sees normal selectable base units (cc=${ownCityCentres.length}, workers=${ownWorkers.length}, own=${own.length})`);
+    ok(ownResourceDepots.length === 1 && ownWorkers.length === 6,
+       `SOLO START: host sees normal selectable base units (resource_depot=${ownResourceDepots.length}, workers=${ownWorkers.length}, own=${own.length})`);
     c.ws.close();
   }
 
@@ -89,7 +89,7 @@ async function soloStart(room) {
     const room = "reg-build-" + Math.floor(performance.now());
     const { c, snap } = await soloStart(room);
     const worker = snap.entities.find((e) => e.owner === c.playerId && e.kind === "worker");
-    c.command({ c: "build", units: [worker.id], building: "city_centre", tileX: 4294967295, tileY: 0 });
+    c.command({ c: "build", units: [worker.id], building: "resource_depot", tileX: 4294967295, tileY: 0 });
     const tickBefore = c.lastSnapshot.tick;
     await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore, 3000, "post-overflow snapshot");
     const alive = c.lastSnapshot && c.lastSnapshot.tick > tickBefore;
@@ -101,14 +101,14 @@ async function soloStart(room) {
   {
     const room = "reg-command-seq-" + Math.floor(performance.now());
     const { c, snap } = await soloStart(room);
-    const cityCentre = snap.entities.find((e) => e.owner === c.playerId && e.kind === "city_centre");
-    c.send({ t: "command", cmd: { c: "train", building: cityCentre.id, unit: "worker" } });
+    const resourceDepot = snap.entities.find((e) => e.owner === c.playerId && e.kind === "resource_depot");
+    c.send({ t: "command", cmd: { c: "train", building: resourceDepot.id, unit: "worker" } });
     const tickBefore = c.lastSnapshot.tick;
     const after = await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore + 5, 3000, "post-unsequenced command snapshots");
-    const ccAfter = after.entities.find((e) => e.id === cityCentre.id);
-    ok(after.steel === snap.steel && !ccAfter?.prodKind && !ccAfter?.prodQueue,
-       `COMMAND SEQ: unsequenced train was ignored (steel=${after.steel}, prod=${ccAfter?.prodKind || "none"})`);
-    c.command({ c: "train", building: cityCentre.id, unit: "worker" });
+    const resourceDepotAfter = after.entities.find((e) => e.id === resourceDepot.id);
+    ok(after.steel === snap.steel && !resourceDepotAfter?.prodKind && !resourceDepotAfter?.prodQueue,
+       `COMMAND SEQ: unsequenced train was ignored (steel=${after.steel}, prod=${resourceDepotAfter?.prodKind || "none"})`);
+    c.command({ c: "train", building: resourceDepot.id, unit: "worker" });
     const executed = await c.waitFor(
       (m) => m.t === "snapshot" && m.netStatus?.lastSimConsumedClientSeq >= 1,
       3000,
@@ -146,7 +146,7 @@ async function soloStart(room) {
   {
     const room = "reg-forged-command-meta-" + Math.floor(performance.now());
     const { c, snap } = await soloStart(room);
-    const cityCentre = snap.entities.find((e) => e.owner === c.playerId && e.kind === "city_centre");
+    const resourceDepot = snap.entities.find((e) => e.owner === c.playerId && e.kind === "resource_depot");
     c.send({
       t: "command",
       clientSeq: 1,
@@ -154,7 +154,7 @@ async function soloStart(room) {
       lastSimConsumedClientSeq: 1,
       cmd: {
         c: "train",
-        building: cityCentre.id + 1000000,
+        building: resourceDepot.id + 1000000,
         unit: "worker",
         accepted: true,
         lastSimConsumedClientSeq: 1,
@@ -165,8 +165,8 @@ async function soloStart(room) {
       3000,
       "forged command metadata ack",
     );
-    const ccAfter = after.entities.find((e) => e.id === cityCentre.id);
-    ok(!ccAfter?.prodKind && !ccAfter?.prodQueue,
+    const resourceDepotAfter = after.entities.find((e) => e.id === resourceDepot.id);
+    ok(!resourceDepotAfter?.prodKind && !resourceDepotAfter?.prodQueue,
        "COMMAND META: forged accepted metadata did not bypass server command validation");
     c.ws.close();
   }

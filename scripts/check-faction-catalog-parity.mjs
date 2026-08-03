@@ -47,7 +47,7 @@ import {
   EKAT_TELEPORT_RANGE_TILES,
   FACTION_CATALOGS,
   HARVEST_TICKS,
-  MINING_CC_RANGE_TILES,
+  MINING_ANCHOR_RANGE_TILES,
   METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS,
   MORTAR_FIRE_COOLDOWN_TICKS,
   MORTAR_FIELD_OF_FIRE_RAD,
@@ -199,7 +199,7 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "ekatTeleportCooldownTicks",
   "ekatTeleportRangeTiles",
   "harvestTicks",
-  "miningCcRangeTiles",
+  "miningAnchorRangeTiles",
   "mortarFieldOfFireRad",
   "mortarFireCooldownTicks",
   "mortarInnerRadiusTiles",
@@ -546,7 +546,7 @@ assertSortedObjectKeys(
 
 const clientConstants = {
   tickHz: TICK_HZ,
-  miningCcRangeTiles: MINING_CC_RANGE_TILES,
+  miningAnchorRangeTiles: MINING_ANCHOR_RANGE_TILES,
   oilLoad: OIL_LOAD,
   harvestTicks: HARVEST_TICKS,
   antiTankGunDeployedRangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,

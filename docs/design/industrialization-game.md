@@ -34,7 +34,7 @@ Important parts of the economy include:
 - machine tools;
 - consumer goods;
 - labor dynamics;
-- R&D spending;
+- Engineering Complex spending;
 - external markets, including exports;
 - subsidies;
 - natural resources, including coal, gas, iron, and non-ferrous metals.
@@ -52,7 +52,7 @@ industrialization path to what is available instead of following the same build 
 ## Out of scope
 
 The game is not about politics or war. You are not responsible for the military, hospitals, or
-education. You can choose to put more money into R&D, but you do not manage the education system
+education. You can choose to put more money into Engineering Complex, but you do not manage the education system
 behind it.
 
 You also do not manage individual factories or a geographic map. The player's job is national-scale

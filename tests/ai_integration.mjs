@@ -125,11 +125,11 @@ const { ok } = assertions;
   ok(sa && sai && (sa.startTileX !== sai.startTileX || sa.startTileY !== sai.startTileY),
      `human and AI start at distinct tiles`);
 
-  // The match is live: confirm the human keeps receiving snapshots and its City Centre is present. (The
+  // The match is live: confirm the human keeps receiving snapshots and its Resource Depot is present. (The
   // AI's economy/attack behavior is covered by the Rust unit test — fog hides the AI base from
   // the human here, so there's nothing fast to observe over the wire beyond a running match.)
   const firstSnap = await A.waitFor((m) => m.t === "snapshot" && m.entities.length > 0, 3000, "first snapshot");
-  ok(firstSnap.entities.some((e) => e.owner === A.playerId && e.kind === "city_centre"), "human owns its City Centre in-match");
+  ok(firstSnap.entities.some((e) => e.owner === A.playerId && e.kind === "resource_depot"), "human owns its Resource Depot in-match");
   const tick0 = firstSnap.tick;
   const advancedSnap = await A.waitNext((m) => m.t === "snapshot" && m.tick > tick0, 3000, "advancing snapshot");
   ok(advancedSnap.tick > tick0, `match advancing (tick ${tick0} -> ${advancedSnap.tick})`);

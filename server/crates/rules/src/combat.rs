@@ -304,12 +304,12 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         EntityKind::ScoutPlane
         | EntityKind::CommandCar
         | EntityKind::Ekat
-        | EntityKind::CityCentre
+        | EntityKind::ResourceDepot
         | EntityKind::Zamok
         | EntityKind::Depot
         | EntityKind::Barracks
         | EntityKind::TrainingCentre
-        | EntityKind::ResearchComplex
+        | EntityKind::EngineeringComplex
         | EntityKind::Factory
         | EntityKind::Steelworks
         | EntityKind::TankTrap
@@ -799,12 +799,12 @@ mod tests {
             (EntityKind::Tank, Some(WeaponKind::TankCannon)),
             (EntityKind::CommandCar, None),
             (EntityKind::Ekat, None),
-            (EntityKind::CityCentre, None),
+            (EntityKind::ResourceDepot, None),
             (EntityKind::Zamok, None),
             (EntityKind::Depot, None),
             (EntityKind::Barracks, None),
             (EntityKind::TrainingCentre, None),
-            (EntityKind::ResearchComplex, None),
+            (EntityKind::EngineeringComplex, None),
             (EntityKind::Factory, None),
             (EntityKind::Steelworks, None),
             (EntityKind::TankTrap, None),
@@ -1215,7 +1215,7 @@ mod tests {
                 TargetThreatRole::AntiArmorThreat,
             ),
             (
-                EntityKind::CityCentre,
+                EntityKind::ResourceDepot,
                 true,
                 false,
                 TargetThreatRole::Ordinary,

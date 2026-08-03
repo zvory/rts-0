@@ -21,14 +21,14 @@ function buildingSpec(kind, frameWidth, frameHeight, image, silhouetteShadow = t
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
-  buildingSpec(KIND.CITY_CENTRE, 384, 384,
-    "/assets/rigs/buildings-b7-team-paint-refined-preview/city_centre-atlas.png?v=b7-team-paint-refined-preview-01"),
+  buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
+    "/assets/rigs/buildings-b7-team-paint-refined-preview/resource_depot-atlas.png?v=b7-team-paint-refined-preview-01"),
   buildingSpec(KIND.BARRACKS, 384, 256,
     "/assets/rigs/buildings-b7-team-paint-refined-preview/barracks-atlas.png?v=b7-team-paint-refined-preview-01"),
   buildingSpec(KIND.TRAINING_CENTRE, 384, 256,
     "/assets/rigs/buildings-b7-team-paint-refined-preview/training_centre-atlas.png?v=b7-team-paint-refined-preview-01"),
-  buildingSpec(KIND.RESEARCH_COMPLEX, 384, 384,
-    "/assets/rigs/buildings-b4-selected-pass-01/research_complex-atlas.png?v=b4-selected-01"),
+  buildingSpec(KIND.ENGINEERING_COMPLEX, 384, 384,
+    "/assets/rigs/buildings-b4-selected-pass-01/engineering_complex-atlas.png?v=b4-selected-01"),
   buildingSpec(KIND.FACTORY, 384, 384,
     "/assets/rigs/buildings-b3-corrected-preview/factory-atlas.png?v=b3-corrected-03"),
   buildingSpec(KIND.STEELWORKS, 384, 384,

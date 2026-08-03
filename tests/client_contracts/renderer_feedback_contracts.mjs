@@ -90,7 +90,7 @@ import { RecordingGraphics, installFakePixi } from "./pixi_fakes.mjs";
     {
       id: 901,
       owner: 2,
-      kind: KIND.CITY_CENTRE,
+      kind: KIND.RESOURCE_DEPOT,
       x: 96,
       y: 96,
       rallyPlan: [{ kind: "move", x: 180, y: 160 }],
@@ -586,7 +586,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     },
   };
   const feedbackIntent = {
-    placement: { building: KIND.CITY_CENTRE, tileX: 2, tileY: 3, valid: true },
+    placement: { building: KIND.RESOURCE_DEPOT, tileX: 2, tileY: 3, valid: true },
     labToolPreview: { toolId: "tool-1", kind: "unitSpawn", x: 120, y: 120 },
     labRuler: {
       start: { x: 64, y: 96 },
@@ -623,9 +623,9 @@ function nearPoint(call, point, epsilon = 0.001) {
       resourceId: 200,
       resourceX: 80,
       resourceY: 112,
-      ccId: 3,
-      ccX: 220,
-      ccY: 220,
+      anchorId: 3,
+      anchorX: 220,
+      anchorY: 220,
       inRange: false,
     },
     liveCommandFeedback(now) {
@@ -640,7 +640,7 @@ function nearPoint(call, point, epsilon = 0.001) {
   });
 
   assert(feedbackView.playerId === 1, "feedback view exposes player id");
-  assert(feedbackView.placement?.building === KIND.CITY_CENTRE, "feedback view exposes placement shape");
+  assert(feedbackView.placement?.building === KIND.RESOURCE_DEPOT, "feedback view exposes placement shape");
   assert(feedbackView.commandFeedback.length === 1, "feedback view exposes live command feedback");
   assert(commandFeedbackNow === 1500, "feedback view samples live feedback at the requested frame time");
   assert(feedbackView.liveCommandFeedback(999) === feedbackView.commandFeedback, "feedback view returns stable command feedback for the frame");
@@ -1373,7 +1373,7 @@ function nearPoint(call, point, epsilon = 0.001) {
   const buildingPreview = new RecordingGraphics();
   drawLabToolPreview(buildingPreview, {
     kind: "spawnEntity",
-    payload: { kind: KIND.CITY_CENTRE, owner: 1 },
+    payload: { kind: KIND.RESOURCE_DEPOT, owner: 1 },
     x: 160,
     y: 160,
   }, 32);

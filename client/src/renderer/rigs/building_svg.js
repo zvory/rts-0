@@ -8,13 +8,13 @@
 // Unit geometry is borrowed and scaled where it reinforces the building's role.
 
 // ---------------------------------------------------------------------------
-// City Centre — 3×3 (96×96)
+// Resource Depot — 3×3 (96×96)
 // Grand command seat. Trapezoidal hall widening toward the base, flanking
 // wings, central tower spire, and gold command medallions (borrowed from the
 // Command Car badge motif).
 // ---------------------------------------------------------------------------
 
-export const CITY_CENTRE_BUILDING_SVG = `<svg viewBox="-48 -48 96 96" data-rts-rig-kind="city_centre" data-rts-rig-version="1" data-rts-origin="center">
+export const RESOURCE_DEPOT_BUILDING_SVG = `<svg viewBox="-48 -48 96 96" data-rts-rig-kind="resource_depot" data-rts-rig-version="1" data-rts-origin="center">
   <rect id="part.base" x="-48" y="-48" width="96" height="96" fill="#2b2a23" stroke="#1a1712" stroke-width="2" />
   <polygon id="part.hall" points="-30,-40 30,-40 38,38 -38,38" fill="#6d89b8" fill-opacity="0.88" data-rts-tint="team" />
   <rect id="part.wing.left" x="-48" y="-22" width="20" height="52" fill="#6d89b8" fill-opacity="0.78" data-rts-tint="team-light-soft" />
@@ -127,13 +127,13 @@ export const TRAINING_CENTRE_BUILDING_SVG = `<svg viewBox="-48 -32 96 64" data-r
 </svg>`;
 
 // ---------------------------------------------------------------------------
-// R&D Complex — 3×3 (96×96)
+// Engineering Complex — 3×3 (96×96)
 // Octagonal building (angular, modern-science silhouette). Three lab-bench
 // rows in the upper section, a research dome in the lower section,
 // and two antennae at the roof line.
 // ---------------------------------------------------------------------------
 
-export const RESEARCH_COMPLEX_BUILDING_SVG = `<svg viewBox="-48 -48 96 96" data-rts-rig-kind="research_complex" data-rts-rig-version="1" data-rts-origin="center">
+export const ENGINEERING_COMPLEX_BUILDING_SVG = `<svg viewBox="-48 -48 96 96" data-rts-rig-kind="engineering_complex" data-rts-rig-version="1" data-rts-origin="center">
   <rect id="part.base" x="-48" y="-48" width="96" height="96" fill="#2b2a23" stroke="#1a1712" stroke-width="2" />
   <polygon id="part.building" points="-30,-46 30,-46 46,-14 46,14 30,46 -30,46 -46,14 -46,-14" fill="#6d89b8" fill-opacity="0.85" data-rts-tint="team" />
   <rect id="part.lab.a" x="-22" y="-34" width="44" height="6" fill="#1a1712" fill-opacity="0.48" />

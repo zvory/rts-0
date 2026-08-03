@@ -4,7 +4,7 @@ pub(super) const PRODUCTION_BUILDINGS: [EntityKind; 4] = [
     EntityKind::Factory,
     EntityKind::Steelworks,
     EntityKind::Barracks,
-    EntityKind::CityCentre,
+    EntityKind::ResourceDepot,
 ];
 
 pub(super) fn should_build_extra_factory(
@@ -197,7 +197,7 @@ pub(super) fn production_building_order(unit_priorities: &[EntityKind]) -> Vec<E
             }
         }
     }
-    order.retain(|kind| *kind != EntityKind::CityCentre);
+    order.retain(|kind| *kind != EntityKind::ResourceDepot);
     order
 }
 

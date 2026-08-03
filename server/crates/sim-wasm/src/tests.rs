@@ -98,7 +98,16 @@ fn construction_view(id: u32, owner: u32, fraction: f32, active: bool) -> Entity
 }
 
 fn production_view(id: u32, owner: u32, fraction: f32) -> EntityView {
-    let mut entity = EntityView::new(id, owner, "city_centre", 300.0, 300.0, 1000, 1000, "idle");
+    let mut entity = EntityView::new(
+        id,
+        owner,
+        "resource_depot",
+        300.0,
+        300.0,
+        1000,
+        1000,
+        "idle",
+    );
     entity.prod_kind = Some("worker".to_string());
     entity.prod_progress = Some(fraction);
     entity.prod_queue = Some(1);
@@ -109,7 +118,7 @@ fn research_view(id: u32, owner: u32, fraction: f32) -> EntityView {
     let mut entity = EntityView::new(
         id,
         owner,
-        "research_complex",
+        "engineering_complex",
         400.0,
         400.0,
         500,

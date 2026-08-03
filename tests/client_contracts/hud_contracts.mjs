@@ -814,11 +814,11 @@ withFakeHudDocument(({ FakeElement }) => {
   }));
   assert(commandButtons(mixedLabCard).length === 0, "mixed-owner lab selections stay non-commandable");
 
-  const p2CityCentre = { id: 701, owner: 2, kind: KIND.CITY_CENTRE, buildProgress: null };
+  const p2ResourceDepot = { id: 701, owner: 2, kind: KIND.RESOURCE_DEPOT, buildProgress: null };
   const p2TrainingCentre = { id: 702, owner: 2, kind: KIND.TRAINING_CENTRE, buildProgress: null };
   const p2Barracks = { id: 703, owner: 2, kind: KIND.BARRACKS, buildProgress: null };
   const p2Steelworks = { id: 704, owner: 2, kind: KIND.STEELWORKS, buildProgress: null };
-  const p2Entities = [p2CityCentre, p2TrainingCentre, p2Barracks, p2Steelworks];
+  const p2Entities = [p2ResourceDepot, p2TrainingCentre, p2Barracks, p2Steelworks];
   let p2Selection = [p2Barracks];
   const p2LabHudState = {
     playerId: 1,
@@ -896,19 +896,19 @@ withFakeHudDocument(({ FakeElement }) => {
   );
 
   const worker = { id: 10, owner: 1, kind: KIND.WORKER };
-  const cityCentre = { id: 11, owner: 1, kind: KIND.CITY_CENTRE };
+  const resourceDepot = { id: 11, owner: 1, kind: KIND.RESOURCE_DEPOT };
   const buildCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [worker],
-    entities: [worker, cityCentre],
+    entities: [worker, resourceDepot],
     commandCardMode: "workerBuild",
     resources: { steel: 175, oil: 0 },
   }));
   assert(buildCard.kind === "workerBuild", "worker build menu should use build descriptor card");
   assert(buildCard.slots.length === 9, "worker build card keeps a 3x3 grid");
   assert(buildCard.slots[0].intent.type === "beginPlacement", "worker build button should start placement");
-  assert(buildCard.slots[0].commandId === defaultFactionCommandId("build", KIND.CITY_CENTRE), "worker build button should expose stable command identity");
+  assert(buildCard.slots[0].commandId === defaultFactionCommandId("build", KIND.RESOURCE_DEPOT), "worker build button should expose stable command identity");
   assert(buildCard.slots[0].slotIndex === 0, "worker build button should expose rendered slot index");
-  assert(buildCard.slots[0].label === "City Centre", "worker build first slot should stay City Centre");
+  assert(buildCard.slots[0].label === "Resource Depot", "worker build first slot should stay Resource Depot");
   assert(buildCard.slots[0].hotkey === "Q", "worker build hotkey Q should be preserved");
   assert(buildCard.slots[0].unaffordable, "unaffordable build buttons stay clickable for feedback");
   assert(buildCard.slots[0].enabled, "unaffordable build buttons enter placement and wait at the site");
@@ -970,7 +970,7 @@ withFakeHudDocument(({ FakeElement }) => {
 
   const workerScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [worker, scoutPlane],
-    entities: [worker, cityCentre, scoutPlane],
+    entities: [worker, resourceDepot, scoutPlane],
   }));
   assert(
     buttonByAction(workerScoutPlaneCard, "move")?.enabled &&
@@ -1049,7 +1049,7 @@ withFakeHudDocument(({ FakeElement }) => {
   };
   const trainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks, producingBarracks],
-    entities: [cityCentre, barracks, producingBarracks],
+    entities: [resourceDepot, barracks, producingBarracks],
     resources: { steel: 60, oil: 10 },
   }));
   assert(trainCard.kind === "train", "production building should use train descriptor card");
@@ -1087,7 +1087,7 @@ withFakeHudDocument(({ FakeElement }) => {
   producingBarracks.prodRepeatKinds = [KIND.RIFLEMAN, KIND.MACHINE_GUNNER];
   const repeatingTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks, producingBarracks],
-    entities: [cityCentre, barracks, producingBarracks],
+    entities: [resourceDepot, barracks, producingBarracks],
     resources: { steel: 60, oil: 0 },
   }));
   assert(
@@ -1099,10 +1099,10 @@ withFakeHudDocument(({ FakeElement }) => {
   delete producingBarracks.prodRepeatKinds;
 
   const supplyReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [cityCentre],
-    entities: [cityCentre],
+    selection: [resourceDepot],
+    entities: [resourceDepot],
     resources: { steel: 100, oil: 0, supplyUsed: 9, supplyCap: 10 },
-    optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
+    optimisticProduction: [{ building: resourceDepot.id, unit: KIND.WORKER, optimisticQueue: 1 }],
   }));
   assert(supplyReservedTrainCard.slots[0].enabled, "pending train optimism should still permit another manual queue entry");
   assert(supplyReservedTrainCard.slots[0].unaffordable, "supply-blocked train button should stay clickable for feedback");
@@ -1113,21 +1113,21 @@ withFakeHudDocument(({ FakeElement }) => {
   );
 
   const steelReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [cityCentre],
-    entities: [cityCentre],
+    selection: [resourceDepot],
+    entities: [resourceDepot],
     resources: { steel: 75, oil: 0, supplyUsed: 4, supplyCap: 10 },
-    optimisticProduction: [{ building: cityCentre.id, unit: KIND.WORKER, optimisticQueue: 1 }],
+    optimisticProduction: [{ building: resourceDepot.id, unit: KIND.WORKER, optimisticQueue: 1 }],
   }));
   assert(steelReservedTrainCard.slots[0].enabled, "pending train optimism should still permit another manual queue entry");
   assert(steelReservedTrainCard.slots[0].title.startsWith("Queue now; production waits for resources"), "resource-blocked train tooltip should explain waiting");
 
-  const scoutPlaneCityCentre = { id: 70, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
-  const cityCentreScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [scoutPlaneCityCentre],
-    entities: [scoutPlaneCityCentre],
+  const scoutPlaneResourceDepot = { id: 70, owner: 1, kind: KIND.RESOURCE_DEPOT, buildProgress: null };
+  const resourceDepotScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutPlaneResourceDepot],
+    entities: [scoutPlaneResourceDepot],
     resources: { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 },
   }));
-  assert(!cityCentreScoutPlaneCard.slots.some((slot) => slot?.label === "Scout Plane"), "City Centre no longer exposes Scout Plane training");
+  assert(!resourceDepotScoutPlaneCard.slots.some((slot) => slot?.label === "Scout Plane"), "Resource Depot no longer exposes Scout Plane training");
 
   const commandCar = {
     id: 74,
@@ -1140,7 +1140,7 @@ withFakeHudDocument(({ FakeElement }) => {
   };
   const scoutPlaneResources = { steel: 50, oil: 75, supplyUsed: 0, supplyCap: 10 };
   const researchedScoutPlane = { resources: scoutPlaneResources, upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK] };
-  const commandCarScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({ selection: [commandCar], entities: [scoutPlaneCityCentre, commandCar], ...researchedScoutPlane }));
+  const commandCarScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({ selection: [commandCar], entities: [scoutPlaneResourceDepot, commandCar], ...researchedScoutPlane }));
   const scoutPlaneAbility = buttonByLabel(commandCarScoutPlaneCard, "Scout Plane");
   assert(scoutPlaneAbility.slotIndex === 8, "Command Car Scout Plane ability should use the C slot");
   assert(scoutPlaneAbility.commandId === defaultFactionCommandId("ability", ABILITY.SCOUT_PLANE), "Scout Plane ability should expose stable ability identity");
@@ -1153,17 +1153,17 @@ withFakeHudDocument(({ FakeElement }) => {
   const unresearchedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({ selection: [commandCar], entities: [commandCar], resources: scoutPlaneResources }));
   const unresearchedScoutPlane = buttonByLabel(unresearchedScoutPlaneCard, "Scout Plane");
   assert(!unresearchedScoutPlane.enabled, "Scout Plane ability should stay locked before research");
-  assert(unresearchedScoutPlane.title === "Requires Scout Plane", "locked Scout Plane ability should name its R&D requirement");
+  assert(unresearchedScoutPlane.title === "Requires Scout Plane", "locked Scout Plane ability should name its Engineering Complex requirement");
 
-  const noCityCentreScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
+  const noResourceDepotScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [commandCar], entities: [commandCar], ...researchedScoutPlane,
     playerHasCompleteKind: (kind) => kind === KIND.FACTORY,
   }));
-  const noCityCentreScoutPlane = buttonByLabel(noCityCentreScoutPlaneCard, "Scout Plane");
-  assert(noCityCentreScoutPlane.enabled, "Scout Plane ability should not require a completed City Centre");
+  const noResourceDepotScoutPlane = buttonByLabel(noResourceDepotScoutPlaneCard, "Scout Plane");
+  assert(noResourceDepotScoutPlane.enabled, "Scout Plane ability should not require a completed Resource Depot");
 
   const oilBlockedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [commandCar], entities: [scoutPlaneCityCentre, commandCar],
+    selection: [commandCar], entities: [scoutPlaneResourceDepot, commandCar],
     resources: { steel: 50, oil: 74, supplyUsed: 0, supplyCap: 10 },
     upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK],
   }));
@@ -1181,7 +1181,7 @@ withFakeHudDocument(({ FakeElement }) => {
     scoutPlane: { sourceCommandCar: commandCar.id },
   };
   const activeScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [commandCar], entities: [scoutPlaneCityCentre, commandCar, activeScoutPlane],
+    selection: [commandCar], entities: [scoutPlaneResourceDepot, commandCar, activeScoutPlane],
     ...researchedScoutPlane,
   }));
   const activeIndependentScoutPlane = buttonByLabel(activeScoutPlaneCard, "Scout Plane");
@@ -1194,7 +1194,7 @@ withFakeHudDocument(({ FakeElement }) => {
   };
   const mixedScoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [commandCar, secondCommandCar], ...researchedScoutPlane,
-    entities: [scoutPlaneCityCentre, commandCar, secondCommandCar, activeScoutPlane],
+    entities: [scoutPlaneResourceDepot, commandCar, secondCommandCar, activeScoutPlane],
   }));
   const mixedScoutPlaneAbility = buttonByLabel(mixedScoutPlaneCard, "Scout Plane");
   assert(mixedScoutPlaneAbility.enabled, "selected ready Command Cars can launch while another sortie is active");
@@ -1207,25 +1207,25 @@ withFakeHudDocument(({ FakeElement }) => {
     abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2,
       chargeRechargeLeft: TICK_HZ * 7.5 }],
   };
-  const smokeResearchComplex = {
+  const smokeEngineeringComplex = {
     id: 29,
     owner: 1,
-    kind: KIND.RESEARCH_COMPLEX,
+    kind: KIND.ENGINEERING_COMPLEX,
   };
   const lockedAbilityCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutCar],
-    entities: [{ ...smokeResearchComplex, buildProgress: 0.5 }, scoutCar],
+    entities: [{ ...smokeEngineeringComplex, buildProgress: 0.5 }, scoutCar],
   }));
   const lockedSmoke = buttonByAction(lockedAbilityCard, "ability");
-  assert(!lockedSmoke.enabled, "Smoke should be disabled until the player completes an R&D Complex");
-  assert(lockedSmoke.title === "Requires R&D Complex", "locked Smoke should explain its R&D requirement");
+  assert(!lockedSmoke.enabled, "Smoke should be disabled until the player completes an Engineering Complex");
+  assert(lockedSmoke.title === "Requires Engineering Complex", "locked Smoke should explain its Engineering Complex requirement");
   assert(
-    lockedSmoke.tooltipHtml.includes("Requires R&D Complex"),
-    "locked Smoke hover content should explain its R&D requirement",
+    lockedSmoke.tooltipHtml.includes("Requires Engineering Complex"),
+    "locked Smoke hover content should explain its Engineering Complex requirement",
   );
   const abilityCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutCar],
-    entities: [smokeResearchComplex, scoutCar],
+    entities: [smokeEngineeringComplex, scoutCar],
     commandTarget: { kind: "ability", ability: ABILITY.SMOKE },
   }));
   const smoke = buttonByAction(abilityCard, "ability");
@@ -1312,7 +1312,7 @@ withFakeHudDocument(({ FakeElement }) => {
   const upgradeCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [steelworks],
     entities: [
-      { id: 51, owner: 1, kind: KIND.CITY_CENTRE },
+      { id: 51, owner: 1, kind: KIND.RESOURCE_DEPOT },
       { id: 52, owner: 1, kind: KIND.TRAINING_CENTRE },
       steelworks,
     ],
@@ -1320,18 +1320,18 @@ withFakeHudDocument(({ FakeElement }) => {
   }));
   const antiTankGun = buttonByLabel(upgradeCard, "Anti-Tank Gun");
   assert(antiTankGun && !antiTankGun.enabled, "upgrade-gated unit should be disabled before research");
-  assert(antiTankGun.title.startsWith("Requires research in R&D Complex"), "upgrade-gated unit tooltip should name R&D research");
-  assert(!buttonByLabel(upgradeCard, "AT Guns"), "Gun Works should not expose R&D research");
+  assert(antiTankGun.title.startsWith("Requires research in Engineering Complex"), "upgrade-gated unit tooltip should name Engineering Complex research");
+  assert(!buttonByLabel(upgradeCard, "AT Guns"), "Gun Works should not expose Engineering Complex research");
   const artilleryResearchId = defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK);
   assert(!commandButtons(upgradeCard).some((button) => button.commandId === artilleryResearchId), "Gun Works should not expose Artillery research");
 
-  const researchComplex = { id: 53, owner: 1, kind: KIND.RESEARCH_COMPLEX, buildProgress: null };
+  const engineeringComplex = { id: 53, owner: 1, kind: KIND.ENGINEERING_COMPLEX, buildProgress: null };
   const researchCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [researchComplex],
+    selection: [engineeringComplex],
     entities: [
-      { id: 51, owner: 1, kind: KIND.CITY_CENTRE },
+      { id: 51, owner: 1, kind: KIND.RESOURCE_DEPOT },
       { id: 52, owner: 1, kind: KIND.TRAINING_CENTRE },
-      researchComplex,
+      engineeringComplex,
     ],
     resources: { steel: 200, oil: 200 },
   }));
@@ -1340,15 +1340,15 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(atGuns.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
   assert(atGuns.intent.type === "research", "upgrade button should carry research intent");
   const lockedArtillery = buttonByLabel(researchCard, "Artillery");
-  assert(lockedArtillery && !lockedArtillery.enabled, "R&D should keep Artillery visible but locked before AT Guns");
+  assert(lockedArtillery && !lockedArtillery.enabled, "Engineering Complex should keep Artillery visible but locked before AT Guns");
   assert(lockedArtillery.slotIndex !== atGuns.slotIndex, "Artillery should keep a slot separate from AT Guns");
-  assert(!buttonByLabel(researchCard, "Unlock Artillery"), "R&D should not expose a separate Artillery unlock");
+  assert(!buttonByLabel(researchCard, "Unlock Artillery"), "Engineering Complex should not expose a separate Artillery unlock");
   const artilleryResearchCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [researchComplex],
+    selection: [engineeringComplex],
     entities: [
-      { id: 51, owner: 1, kind: KIND.CITY_CENTRE },
+      { id: 51, owner: 1, kind: KIND.RESOURCE_DEPOT },
       { id: 52, owner: 1, kind: KIND.TRAINING_CENTRE },
-      researchComplex,
+      engineeringComplex,
     ],
     resources: { steel: 500, oil: 500 },
     upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
@@ -1461,15 +1461,15 @@ withFakeHudDocument(({ FakeElement }) => {
       icon: "SMK",
       label: "Smoke",
       enabled: false,
-      title: "Requires R&D Complex",
+      title: "Requires Engineering Complex",
       tooltipHtml:
         `<span class="cmd-tooltip-title">Smoke</span>` +
-        `<span class="cmd-tooltip-desc">Requires R&D Complex</span>`,
+        `<span class="cmd-tooltip-desc">Requires Engineering Complex</span>`,
       onClick() {},
     });
     assert(button.disabled, "locked Smoke command should remain disabled");
     assert(
-      button.innerHTML.includes("Requires R&D Complex"),
+      button.innerHTML.includes("Requires Engineering Complex"),
       "locked Smoke button should render its requirement in visible hover content",
     );
   });

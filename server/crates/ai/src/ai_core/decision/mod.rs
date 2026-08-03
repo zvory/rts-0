@@ -47,7 +47,7 @@ use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
     EconomyProposal, OilDemandSignal,
 };
-use self::expansion::{plan_expansion, try_build_expansion_city_centre, ExpansionBlocker};
+use self::expansion::{plan_expansion, try_build_expansion_resource_depot, ExpansionBlocker};
 use self::frontal::{issue_frontal_wave, plan_frontal_wave, sync_containment_recovery};
 use self::geometry::footprint_top_left_for_center;
 pub(crate) use self::memory::AiDecisionMemory;
@@ -168,7 +168,7 @@ where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
     memory.ensure_profile(profile);
-    memory.sync_incomplete_city_centres(observation);
+    memory.sync_incomplete_resource_depots(observation);
     memory
         .pending_upgrades
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
@@ -216,18 +216,18 @@ where
     idle_builders.sort_unstable();
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
-    if let Some((tile_x, tile_y)) = city_centre_to_resume(observation, memory) {
+    if let Some((tile_x, tile_y)) = resource_depot_to_resume(observation, memory) {
         if actions::try_resume_construction_at(
             &mut actions,
             &builder_pools,
-            EntityKind::CityCentre,
+            EntityKind::ResourceDepot,
             tile_x,
             tile_y,
         )
         .is_some()
         {
             intents.push(AiIntent::ResumeConstruction {
-                kind: EntityKind::CityCentre,
+                kind: EntityKind::ResourceDepot,
             });
         }
     }
@@ -258,7 +258,7 @@ where
     });
 
     if should_build_expansion_from_economy_manager(&economy_manager_output) {
-        if try_build_expansion_city_centre(
+        if try_build_expansion_resource_depot(
             observation,
             &facts,
             &mut actions,
@@ -269,14 +269,14 @@ where
         .is_some()
         {
             intents.push(AiIntent::Build {
-                kind: EntityKind::CityCentre,
+                kind: EntityKind::ResourceDepot,
             });
         } else if expansion_plan.blockers.is_empty() {
             expansion_plan.blockers.push(ExpansionBlocker::NoValidSite);
         }
     }
     let save_for_unplanned_expansion =
-        save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
+        save_for_expansion && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0;
 
     let economy_plan = economy_manager_output.plan.clone();
     let mut skipped_workers = BTreeSet::new();
@@ -329,7 +329,7 @@ where
         for trained in actions::train_units(
             &mut actions,
             TrainUnitsRequest {
-                buildings: facts.production_buildings(EntityKind::CityCentre),
+                buildings: facts.production_buildings(EntityKind::ResourceDepot),
                 unit_priorities: &[EntityKind::Worker],
                 completed_building_kinds: facts.complete_building_kinds(),
                 completed_upgrades: facts.completed_upgrades(),
@@ -959,20 +959,20 @@ fn planned_train_in_intents(intents: &[AiIntent], kind: EntityKind) -> bool {
         .any(|intent| matches!(intent, AiIntent::Train { kind: trained } if *trained == kind))
 }
 
-fn city_centre_to_resume(
+fn resource_depot_to_resume(
     observation: &AiObservation,
     memory: &AiDecisionMemory,
 ) -> Option<(u32, u32)> {
     observation
         .owned
         .iter()
-        .filter(|site| site.kind == EntityKind::CityCentre && !site.is_complete)
+        .filter(|site| site.kind == EntityKind::ResourceDepot && !site.is_complete)
         .find_map(|site| {
-            if !memory.city_centre_is_safe_to_resume(site.id, observation.tick) {
+            if !memory.resource_depot_is_safe_to_resume(site.id, observation.tick) {
                 return None;
             }
-            let (tile_x, tile_y) = city_centre_site_tile(observation, site)?;
-            if city_centre_has_assigned_builder(observation, site.id, tile_x, tile_y) {
+            let (tile_x, tile_y) = resource_depot_site_tile(observation, site)?;
+            if resource_depot_has_assigned_builder(observation, site.id, tile_x, tile_y) {
                 None
             } else {
                 Some((tile_x, tile_y))
@@ -980,7 +980,7 @@ fn city_centre_to_resume(
         })
 }
 
-fn city_centre_has_assigned_builder(
+fn resource_depot_has_assigned_builder(
     observation: &AiObservation,
     site_id: u32,
     tile_x: u32,
@@ -991,11 +991,13 @@ fn city_centre_has_assigned_builder(
             && entity.state == AiEntityState::Build
             && entity.target_id == Some(site_id)
     }) || observation.pending_builds.iter().any(|intent| {
-        intent.kind == EntityKind::CityCentre && intent.tile_x == tile_x && intent.tile_y == tile_y
+        intent.kind == EntityKind::ResourceDepot
+            && intent.tile_x == tile_x
+            && intent.tile_y == tile_y
     })
 }
 
-fn city_centre_site_tile(
+fn resource_depot_site_tile(
     observation: &AiObservation,
     site: &AiEntitySummary,
 ) -> Option<(u32, u32)> {
@@ -1012,8 +1014,8 @@ fn city_centre_site_tile(
         (site.x / tile_size).floor() as u32,
         (site.y / tile_size).floor() as u32,
     );
-    let (tile_x, tile_y) = footprint_top_left_for_center(center_tile, EntityKind::CityCentre)?;
-    let stats = config::building_stats(EntityKind::CityCentre)?;
+    let (tile_x, tile_y) = footprint_top_left_for_center(center_tile, EntityKind::ResourceDepot)?;
+    let stats = config::building_stats(EntityKind::ResourceDepot)?;
     (tile_x <= observation.map.width.saturating_sub(stats.foot_w)
         && tile_y <= observation.map.height.saturating_sub(stats.foot_h))
     .then_some((tile_x, tile_y))
@@ -1043,7 +1045,7 @@ fn oil_demand_signal(
 }
 
 fn should_build_expansion_from_economy_manager(output: &EconomyManagerOutput) -> bool {
-    output.proposes(EconomyProposal::BuildExpansionCityCentre)
+    output.proposes(EconomyProposal::BuildExpansionResourceDepot)
 }
 
 fn turtle_should_delay_tech_for_entrenchment(

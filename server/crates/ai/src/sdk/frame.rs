@@ -620,8 +620,8 @@ mod tests {
         let owned_producer = snapshot
             .entities
             .iter_mut()
-            .find(|entity| entity.owner == 1 && entity.kind == "city_centre")
-            .expect("player one starts with a city centre");
+            .find(|entity| entity.owner == 1 && entity.kind == "resource_depot")
+            .expect("player one starts with a resource depot");
         let producer_kind = owned_producer.kind.parse::<EntityKind>().unwrap();
         owned_producer.build_progress = Some(0.5);
         owned_producer.build_active = false;
@@ -631,8 +631,8 @@ mod tests {
             .snapshot_full_for(1)
             .entities
             .into_iter()
-            .find(|entity| entity.owner == 2 && entity.kind == "city_centre")
-            .expect("player two starts with a city centre");
+            .find(|entity| entity.owner == 2 && entity.kind == "resource_depot")
+            .expect("player two starts with a resource depot");
         assert!(!snapshot
             .entities
             .iter()

@@ -28,13 +28,13 @@ fn players() -> [PlayerInit; 2] {
 fn destroyed_producer_refunds_paid_work_but_not_unpaid_queue_entries() {
     let mut game =
         Game::new_for_replay_with_starting_resources(&players(), 5_000, 5_000, 0xD1E5_0001);
-    let city_centre = game
+    let resource_depot = game
         .state
         .entities
         .iter()
-        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::ResourceDepot)
         .map(|entity| entity.id)
-        .expect("player city centre should exist");
+        .expect("player resource depot should exist");
     let (starting_steel, starting_oil, starting_supply) = game
         .state
         .players
@@ -47,7 +47,7 @@ fn destroyed_producer_refunds_paid_work_but_not_unpaid_queue_entries() {
         game.enqueue(
             1,
             Command::Train {
-                building: city_centre,
+                building: resource_depot,
                 unit: EntityKind::Worker,
             },
         );
@@ -59,8 +59,8 @@ fn destroyed_producer_refunds_paid_work_but_not_unpaid_queue_entries() {
     let producer = game
         .state
         .entities
-        .get(city_centre)
-        .expect("city centre should survive production tick");
+        .get(resource_depot)
+        .expect("resource depot should survive production tick");
     assert_eq!(producer.prod_queue().len(), 2);
     assert!(producer.prod_queue()[0].progress > 0);
     assert!(producer.prod_queue()[0].paid);
@@ -79,13 +79,13 @@ fn destroyed_producer_refunds_paid_work_but_not_unpaid_queue_entries() {
         let entity = game
             .state
             .entities
-            .get_mut(city_centre)
-            .expect("city centre should exist before destruction");
+            .get_mut(resource_depot)
+            .expect("resource depot should exist before destruction");
         entity.apply_damage(entity.max_hp, None);
     }
     game.tick();
 
-    assert!(game.state.entities.get(city_centre).is_none());
+    assert!(game.state.entities.get(resource_depot).is_none());
     let player = game
         .state
         .players

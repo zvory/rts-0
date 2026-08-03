@@ -17,7 +17,7 @@ export default scenario("train_optimistic_queue_confirms_after_ack", {
   },
   network: { mode: "direct" },
   steps: [
-    selectOwn("city_centre", 0),
+    selectOwn("resource_depot", 0),
     setClientSnapshotDelivery(false),
     issue("train", { unit: "worker" }),
     capture("optimistic-train-issued"),

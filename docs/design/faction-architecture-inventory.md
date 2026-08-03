@@ -57,7 +57,7 @@ The current production catalog is in `server/crates/rules/src/defs.rs`:
 
 - Units: Worker, Golem, Rifleman, Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team,
   Artillery, Scout Car, Scout Plane, Tank, Command Car, and Ekat.
-- Buildings: City Centre, Zamok, Depot, Barracks, Training Centre, R&D Complex, Factory, Gun
+- Buildings: Resource Depot, Zamok, Depot, Barracks, Training Centre, Engineering Complex, Factory, Gun
   Works, Tank Trap, and Pump Jack. Tank Trap construction is server-authoritative after Training
   Centre eligibility and is exposed through the mirrored worker build menu; Pump Jack construction
   is a contextual worker build on live oil patches and is not exposed through the generic build menu.
@@ -90,8 +90,8 @@ through catalog-aware cost/loadout helpers or update that approved inventory del
 
 The standard Kriegsia match start is defined by the `kriegsia.standard` faction loadout in
 `server/crates/rules/src/faction.rs` and assembled by `server/crates/sim/src/game/setup.rs`: each
-player gets one completed City Centre, six Workers in a ring, nearby Steel/Oil resource clusters,
-starting Steel and Oil, and supply from the City Centre. Unknown non-empty faction ids receive no
+player gets one completed Resource Depot, six Workers in a ring, nearby Steel/Oil resource clusters,
+starting Steel and Oil, and supply from the Resource Depot. Unknown non-empty faction ids receive no
 catalog loadout, starting entities, starting Steel/Oil, or Kriegsia supply credit; lifecycle owners
 must validate before building a `Game`.
 
@@ -109,23 +109,23 @@ APIs.
 
 ## Current Tech Tree
 
-Workers can place City Centre and Supply Depot immediately, and can place Pump Jacks contextually on
-live oil patches with no tech requirement. Barracks requires a completed City Centre; Training
-Centre requires a completed City Centre and Barracks; R&D Complex, Factory, and Gun Works require a
-completed City Centre and Training Centre; Tank Trap requires a completed Training Centre. City
+Workers can place Resource Depot and Supply Depot immediately, and can place Pump Jacks contextually on
+live oil patches with no tech requirement. Barracks requires a completed Resource Depot; Training
+Centre requires a completed Resource Depot and Barracks; Engineering Complex, Factory, and Gun Works require a
+completed Resource Depot and Training Centre; Tank Trap requires a completed Training Centre. City
 Centre trains Workers. Barracks trains Riflemen immediately and Machine
 Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately,
-Command Cars once an R&D Complex is complete, and Tanks after Tank Production research. Gun Works
+Command Cars once an Engineering Complex is complete, and Tanks after Tank Production research. Gun Works
 trains Mortar Teams immediately, Anti-Tank Guns after AT Guns research, and Artillery after
 Artillery research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
-`client/src/config.js`. Training Centre researches Methamphetamines. R&D Complex researches
+`client/src/config.js`. Training Centre researches Methamphetamines. Engineering Complex researches
 AT Guns, Artillery, Tank Production, Mortar Autocast, and Smoke Plus; Artillery requires
 AT Guns.
-Each dependency may already be complete or earlier in the same R&D queue when its dependent is
+Each dependency may already be complete or earlier in the same Engineering Complex queue when its dependent is
 ordered, while completion still gates the actual unlock. Tank Production unlocks Tanks; Command
-Cars require the R&D Complex itself but no completed research. The current Ekat tech tree starts
+Cars require the Engineering Complex itself but no completed research. The current Ekat tech tree starts
 with Zamok training Golems;
 Golem-converted tech buildings are still planned work.
 
@@ -141,7 +141,7 @@ metadata. `client/src/config.js` is the checked client projection, while
 and `server/crates/sim/src/rules/projection.rs` own execution and projection hooks. Protocol
 ability vocabulary and compact codes remain mirrored through `server/crates/protocol/src/lib.rs`
 and `client/src/protocol.js`.
-Scout Car Smoke requires the owning player to retain a completed R&D Complex; the command card
+Scout Car Smoke requires the owning player to retain a completed Engineering Complex; the command card
 keeps the ability visible but disabled with the missing-tech reason until that building is present.
 
 ## Current Client Command Cards
@@ -156,7 +156,7 @@ client-exposed descriptor data against the Rust catalog dump.
 ## Current AI Coupling
 
 AI is Kriegsia-only through the public lobby seat flow. The AI decision layer assumes Workers gather
-Steel directly and build Pump Jacks for Oil, City Centres anchor bases and expansions,
+Steel directly and build Pump Jacks for Oil, Resource Depots anchor bases and expansions,
 Barracks/Factory/Gun Works drive production, Tanks influence oil demand, and Steel/Oil/Supply
 budgets are fixed fields. Public `addAi` requests
 do not accept a faction id and always create Kriegsia AI seats; non-Kriegsia AI support needs an

@@ -81,7 +81,7 @@ pub(crate) fn completed_building_kinds(entities: &EntityStore, player: u32) -> V
 }
 
 /// Whether a resource node is mineable by `player` because a completed home-base mining anchor
-/// (City Centre or Zamok) is close enough to receive attached-mining income from that node.
+/// (Resource Depot or Zamok) is close enough to receive attached-mining income from that node.
 pub(crate) fn resource_has_completed_mining_cc(
     entities: &EntityStore,
     player: u32,
@@ -116,7 +116,7 @@ fn resource_has_completed_mining_anchor(
     }
     nearest_completed_mining_anchor(entities, resource.pos_x, resource.pos_y, accepts_owner)
         .map(|(_, dist2)| {
-            let range_px = config::MINING_CC_RANGE_TILES * config::TILE_SIZE as f32;
+            let range_px = config::MINING_ANCHOR_RANGE_TILES * config::TILE_SIZE as f32;
             dist2 <= range_px * range_px + 0.01
         })
         .unwrap_or(false)
@@ -155,17 +155,17 @@ fn nearest_completed_mining_anchor(
 }
 
 fn is_home_base_mining_anchor(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::CityCentre | EntityKind::Zamok)
+    matches!(kind, EntityKind::ResourceDepot | EntityKind::Zamok)
 }
 
-/// Town halls (City Centres) owned by `player`, in any construction state.
+/// Town halls (Resource Depots) owned by `player`, in any construction state.
 /// Reserved for the AI GG/leave predicate (Phase 6.4) and future faction-aware queries.
 #[allow(dead_code)]
 pub(crate) fn town_halls(
     entities: &EntityStore,
     player: u32,
 ) -> impl Iterator<Item = &Entity> + '_ {
-    owned_buildings(entities, player).filter(|e| e.kind == EntityKind::CityCentre)
+    owned_buildings(entities, player).filter(|e| e.kind == EntityKind::ResourceDepot)
 }
 
 /// Whether `player` still has at least one town hall (any state). Centralized so the
@@ -419,8 +419,8 @@ mod tests {
 
     fn store_with_two_players() -> EntityStore {
         let mut s = EntityStore::default();
-        // P1: city centre (complete), barracks (under construction), worker.
-        s.spawn_building(1, EntityKind::CityCentre, 100.0, 100.0, true)
+        // P1: resource depot (complete), barracks (under construction), worker.
+        s.spawn_building(1, EntityKind::ResourceDepot, 100.0, 100.0, true)
             .unwrap();
         s.spawn_building(1, EntityKind::Barracks, 200.0, 100.0, false)
             .unwrap();
@@ -443,7 +443,7 @@ mod tests {
         assert!(!has_town_hall(&s, 2));
         // Completed-kinds excludes the in-progress barracks.
         let ck = completed_building_kinds(&s, 1);
-        assert!(ck.contains(&EntityKind::CityCentre));
+        assert!(ck.contains(&EntityKind::ResourceDepot));
         assert!(!ck.contains(&EntityKind::Barracks));
         // All-kinds includes it.
         let ak = owned_building_kinds(&s, 1);
@@ -513,36 +513,36 @@ mod tests {
     fn resource_mining_requires_completed_home_base_anchor_in_range() {
         let ts = config::TILE_SIZE as f32;
         let mut s = EntityStore::default();
-        s.spawn_building(1, EntityKind::CityCentre, 100.0, 100.0, true)
+        s.spawn_building(1, EntityKind::ResourceDepot, 100.0, 100.0, true)
             .unwrap();
         s.spawn_building(2, EntityKind::Zamok, 500.0, 100.0, true)
             .unwrap();
         let near = s
             .spawn_node(
                 EntityKind::Steel,
-                100.0 + config::MINING_CC_RANGE_TILES * ts,
+                100.0 + config::MINING_ANCHOR_RANGE_TILES * ts,
                 100.0,
             )
             .unwrap();
         let forgiving = s
             .spawn_node(
                 EntityKind::Steel,
-                100.0 + (config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * ts,
+                100.0 + (config::START_RESOURCE_MAX_DIST_TILES + 1.5) * ts,
                 100.0,
             )
             .unwrap();
         let far = s
             .spawn_node(
                 EntityKind::Steel,
-                100.0 + (config::MINING_CC_RANGE_TILES + 0.25) * ts,
+                100.0 + (config::MINING_ANCHOR_RANGE_TILES + 0.25) * ts,
                 100.0,
             )
             .unwrap();
         let unfinished_cc = s
             .spawn_building(
                 2,
-                EntityKind::CityCentre,
-                100.0 + config::MINING_CC_RANGE_TILES * ts,
+                EntityKind::ResourceDepot,
+                100.0 + config::MINING_ANCHOR_RANGE_TILES * ts,
                 300.0,
                 false,
             )
@@ -551,7 +551,7 @@ mod tests {
         let zamok_near = s
             .spawn_node(
                 EntityKind::Oil,
-                500.0 + config::MINING_CC_RANGE_TILES * ts,
+                500.0 + config::MINING_ANCHOR_RANGE_TILES * ts,
                 100.0,
             )
             .unwrap();

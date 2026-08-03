@@ -43,7 +43,7 @@ impl AiStrategy for ReferenceStrategy {
             .collect::<Vec<_>>();
 
         let expansion_steel = rules
-            .cost(EntityKind::CityCentre)
+            .cost(EntityKind::ResourceDepot)
             .map(|cost| cost.steel)
             .unwrap_or(u32::MAX);
         if rules.can_gather(EntityKind::Worker) && frame.economy().steel < expansion_steel {

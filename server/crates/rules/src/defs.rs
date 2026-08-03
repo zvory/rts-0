@@ -61,7 +61,7 @@ impl TechRequirement {
     }
 }
 
-const CITY_CENTRE_UNITS: &[EntityKind] = &[EntityKind::Worker];
+const RESOURCE_DEPOT_UNITS: &[EntityKind] = &[EntityKind::Worker];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::Rifleman,
@@ -78,16 +78,16 @@ const FACTORY_UNITS: &[EntityKind] = &[
     EntityKind::Tank,
     EntityKind::CommandCar,
 ];
-const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
-const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
-    &[EntityKind::CityCentre, EntityKind::Barracks];
+const RESOURCE_DEPOT_REQUIRED: &[EntityKind] = &[EntityKind::ResourceDepot];
+const RESOURCE_DEPOT_AND_BARRACKS_REQUIRED: &[EntityKind] =
+    &[EntityKind::ResourceDepot, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
-const CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED: &[EntityKind] =
-    &[EntityKind::CityCentre, EntityKind::TrainingCentre];
+const RESOURCE_DEPOT_AND_TRAINING_CENTRE_REQUIRED: &[EntityKind] =
+    &[EntityKind::ResourceDepot, EntityKind::TrainingCentre];
 const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
 const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
-const RESEARCH_COMPLEX_REQUIRED: &[EntityKind] = &[EntityKind::ResearchComplex];
-const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
+const ENGINEERING_COMPLEX_REQUIRED: &[EntityKind] = &[EntityKind::EngineeringComplex];
+const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::ResourceDepot, EntityKind::TrainingCentre];
 
 pub const UNITS: &[UnitDef] = &[
     UnitDef {
@@ -107,7 +107,7 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
-        trained_at: Some(EntityKind::CityCentre),
+        trained_at: Some(EntityKind::ResourceDepot),
         train_requirement: TechRequirement::All(&[]),
     },
     UnitDef {
@@ -328,7 +328,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
         trained_at: Some(EntityKind::Factory),
-        train_requirement: TechRequirement::All(RESEARCH_COMPLEX_REQUIRED),
+        train_requirement: TechRequirement::All(ENGINEERING_COMPLEX_REQUIRED),
     },
     UnitDef {
         kind: EntityKind::Ekat,
@@ -354,7 +354,7 @@ pub const UNITS: &[UnitDef] = &[
 
 pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
-        kind: EntityKind::CityCentre,
+        kind: EntityKind::ResourceDepot,
         stats: balance::BuildingStats {
             hp: 300,
             sight_tiles: 1,
@@ -369,7 +369,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
-        trains: CITY_CENTRE_UNITS,
+        trains: RESOURCE_DEPOT_UNITS,
         build_requires: &[],
     },
     BuildingDef {
@@ -427,7 +427,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: BARRACKS_UNITS,
-        build_requires: CITY_CENTRE_REQUIRED,
+        build_requires: RESOURCE_DEPOT_REQUIRED,
     },
     BuildingDef {
         kind: EntityKind::TrainingCentre,
@@ -446,7 +446,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: &[],
-        build_requires: CITY_CENTRE_AND_BARRACKS_REQUIRED,
+        build_requires: RESOURCE_DEPOT_AND_BARRACKS_REQUIRED,
     },
     BuildingDef {
         kind: EntityKind::Factory,
@@ -468,7 +468,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         build_requires: FACTORY_REQUIRED,
     },
     BuildingDef {
-        kind: EntityKind::ResearchComplex,
+        kind: EntityKind::EngineeringComplex,
         stats: balance::BuildingStats {
             hp: 165,
             sight_tiles: 1,
@@ -484,7 +484,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: &[],
-        build_requires: CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED,
+        build_requires: RESOURCE_DEPOT_AND_TRAINING_CENTRE_REQUIRED,
     },
     BuildingDef {
         kind: EntityKind::Steelworks,
@@ -641,13 +641,13 @@ mod tests {
         assert_eq!(
             buildings,
             vec![
-                EntityKind::CityCentre,
+                EntityKind::ResourceDepot,
                 EntityKind::Zamok,
                 EntityKind::Depot,
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
                 EntityKind::Factory,
-                EntityKind::ResearchComplex,
+                EntityKind::EngineeringComplex,
                 EntityKind::Steelworks,
                 EntityKind::TankTrap,
                 EntityKind::PumpJack,
@@ -655,8 +655,8 @@ mod tests {
         );
 
         assert_eq!(
-            building_def(EntityKind::CityCentre).unwrap().trains,
-            CITY_CENTRE_UNITS
+            building_def(EntityKind::ResourceDepot).unwrap().trains,
+            RESOURCE_DEPOT_UNITS
         );
         assert_eq!(
             building_def(EntityKind::Barracks).unwrap().trains,
@@ -793,9 +793,9 @@ mod tests {
     }
 
     #[test]
-    fn research_complex_uses_requested_independent_stats() {
-        let stats = building_def(EntityKind::ResearchComplex)
-            .expect("research complex def")
+    fn engineering_complex_uses_requested_independent_stats() {
+        let stats = building_def(EntityKind::EngineeringComplex)
+            .expect("engineering complex def")
             .stats;
 
         assert_eq!(stats.hp, 165);
