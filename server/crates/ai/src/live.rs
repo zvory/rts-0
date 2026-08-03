@@ -15,7 +15,7 @@ use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
 };
 use crate::ai_shared;
-use crate::sdk::{AiActionRequest, AiActions, AiFrame, AiStrategy, KnownBuildSite, WorldQueries};
+use crate::sdk::{AiActions, AiFrame, AiStrategy, KnownBuildSite, WorldQueries};
 use crate::selfplay::pending_build::PendingBuildTracker;
 use crate::selfplay::player_view::PlayerView;
 use rand::Rng;
@@ -358,9 +358,14 @@ impl AiController {
                 strategy.initialize(&frame);
                 self.strategy_initialized = true;
             }
-            let mut actions = AiActions::new();
+            let mut actions = AiActions::for_frame(&frame);
             strategy.step(&frame, &mut actions);
-            commands.extend(actions.into_requests().into_iter().map(action_to_command));
+            commands.extend(
+                actions
+                    .into_requests()
+                    .into_iter()
+                    .map(crate::action_emitter::emit_request),
+            );
             self.pending_builds.record_commands(tick, &commands);
             return commands;
         }
@@ -560,82 +565,6 @@ impl AiController {
             }
         }
         filtered
-    }
-}
-
-fn action_to_command(request: AiActionRequest) -> SimCommand {
-    match request {
-        AiActionRequest::Move {
-            units,
-            x,
-            y,
-            queued,
-        } => SimCommand::Move {
-            units,
-            x,
-            y,
-            queued,
-        },
-        AiActionRequest::AttackMove {
-            units,
-            x,
-            y,
-            queued,
-        } => SimCommand::AttackMove {
-            units,
-            x,
-            y,
-            queued,
-        },
-        AiActionRequest::Attack {
-            units,
-            target,
-            queued,
-        } => SimCommand::Attack {
-            units,
-            target,
-            queued,
-        },
-        AiActionRequest::Gather {
-            units,
-            node,
-            queued,
-        } => SimCommand::Gather {
-            units,
-            node,
-            queued,
-        },
-        AiActionRequest::Build {
-            units,
-            building,
-            tile_x,
-            tile_y,
-            queued,
-        } => SimCommand::Build {
-            units,
-            building,
-            tile_x,
-            tile_y,
-            queued,
-        },
-        AiActionRequest::Train { building, unit } => SimCommand::Train { building, unit },
-        AiActionRequest::Research { building, upgrade } => {
-            SimCommand::Research { building, upgrade }
-        }
-        AiActionRequest::HoldPosition { units, queued } => {
-            SimCommand::HoldPosition { units, queued }
-        }
-        AiActionRequest::SetupAntiTankGuns {
-            units,
-            x,
-            y,
-            queued,
-        } => SimCommand::SetupAntiTankGuns {
-            units,
-            x,
-            y,
-            queued,
-        },
     }
 }
 
@@ -882,12 +811,8 @@ mod tests {
 
         impl AiStrategy for MoveStrategy {
             fn step(&mut self, _frame: &AiFrame, actions: &mut AiActions) {
-                actions.submit(AiActionRequest::Move {
-                    units: vec![7],
-                    x: 128.0,
-                    y: 160.0,
-                    queued: false,
-                });
+                let group = crate::sdk::UnitGroup::new([7]).unwrap();
+                actions.move_group(&group, 128.0, 160.0, false).unwrap();
             }
         }
 

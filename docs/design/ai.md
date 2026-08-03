@@ -79,19 +79,35 @@ Opponent production queue length/payment state and non-owned construction activi
 Likewise, `AiBuildObservation` means only that this controller inferred an outstanding submitted
 build; it is not an accepted, legal, or active-build receipt.
 
-`AiActions` retains at most 256 `AiActionRequest`s in call order for one step. The Phase 3 action
-vocabulary covers move, attack-move, direct attack, gather, build, train, research, hold-position,
-and Anti-Tank Gun setup. The host translates finalized requests into ordinary `SimCommand`s only
-after the strategy returns; canonical controller ordering, all-controller observation before any
-enqueue, worker-retreat-first ordering, normal command validation, and replay logging are
-unchanged. Rich planners, reservations, budgets, task handles, acceptance results, and uncommon
-actions are intentionally not part of this seam yet.
+`AiActions` is a typed per-think builder that retains at most 256 emitted actions in helper-call
+order. Its supported helpers are paid explicit-site build, resume-without-repay, train, research,
+gather, move, attack-move, direct attack, Hold Position, and Anti-Tank Gun setup. `UnitGroup`
+canonicalizes tactical unit IDs into a sorted, deduplicated, non-empty set; caller-ordered worker,
+resource-node, and producer candidate lists are not normalized.
+
+The builder tracks Steel, Oil, and free Supply plus independent actor, resource-node, and producer
+reservation namespaces. Every helper completes local preflight before changing the budget,
+reservations, batch, or trace. `ActionError` exposes an `ActionBlocker` only for locally known
+facts: empty input, unsupported kind, no compatible producer, insufficient same-think budget, an
+already reserved id, no known candidate, or the action cap. Local success means only that an
+SDK-owned action was emitted. It is not simulation acceptance, legality, completion, or atomicity,
+and there are no intent IDs or task statuses.
+
+The runtime emitter is the sole translator from SDK-owned actions to ordinary `SimCommand`s after
+the strategy returns. Built-in profiles share the same budget/reservation implementations, typed
+accumulation, and emitter behind their compatibility action context. Their tactical helpers retain
+the historical lack of automatic tactical reservations, while production/economy paths retain
+worker and resource-node candidate order, producer order, Pump Jack payment, resume semantics,
+queue flags, command traces, and Jeff's Steel-only cross-tick submitted-build commitment. Canonical
+controller ordering, all-controller observation before enqueue, worker-retreat-first ordering,
+normal simulation validation, and replay logging are unchanged. The builder is deliberately not a
+planner, task system, command receipt, or cross-tick scheduler.
 
 The public-SDK-only [reference strategy](../ai-authoring.md) is the executable authoring specimen.
-It runs through `AiController::with_strategy` and the canonical driver, gathers with one worker,
-uses cross-tick memory to dispatch a separate attack-move scout, and is covered by deterministic
-command-log and replay checks. Its remaining action-helper gaps are the bounded input to the next
-SDK phase; the example is not a selectable profile or a strength claim.
+It runs through `AiController::with_strategy` and the canonical driver, gathers with one reserved
+worker, uses `UnitGroup` plus cross-tick memory to dispatch a separate attack-move scout, and is
+covered by deterministic command-log and replay checks. The example is not a selectable profile or
+a strength claim.
 
 `AiRulebook` binds the authoritative `rts-rules` faction catalog to a strategy frame. Its bounded
 answers cover catalog order and availability, costs, supply, production time, health, footprint,
@@ -122,8 +138,9 @@ internal `AiObservation` before the generic decision loop applies the selected `
 That compatibility projection alone preserves the historical false `is_ai` value, synthetic
 unknown-resource amount, `free_for_combat` derivation, and old sorting/filtering rules; these quirks
 are not represented as truthful SDK facts. The direct legacy observation constructor remains only
-as a test oracle for field-for-field projection checks. Existing shared action helpers and their
-local per-think budget continue to prevent resource and supply overcommitment.
+as a test oracle for field-for-field projection checks. Existing action helpers use the SDK-owned
+typed action vocabulary and shared local per-think budget and reservation implementations to
+prevent resource and supply overcommitment without changing compatibility policy.
 
 The core also owns static map analysis derived only from StartPayload map terrain, start tiles, and
 static resource nodes. When nearby steel is split into fields around the City Centre, defensive

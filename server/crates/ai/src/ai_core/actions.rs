@@ -4,137 +4,21 @@ use crate::ai_core::facts::{AiFacts, ProductionBuildingFact};
 use crate::ai_core::observation::{AiEntityState, AiEntitySummary, AiResourceSummary};
 use crate::ai_shared;
 use crate::config;
+use crate::sdk::actions::{ActionBudget, ActionReservations, AiActionRequest};
+use crate::sdk::MAX_ACTIONS_PER_STEP;
 use rts_rules;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::{self, UpgradeKind};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct SpendBudget {
-    steel: u32,
-    oil: u32,
-    free_supply: u32,
-}
-
-impl SpendBudget {
-    pub(crate) fn new(steel: u32, oil: u32, supply_used: u32, supply_cap: u32) -> Self {
-        Self::with_committed_steel(steel, oil, supply_used, supply_cap, 0)
-    }
-
-    pub(crate) fn with_committed_steel(
-        steel: u32,
-        oil: u32,
-        supply_used: u32,
-        supply_cap: u32,
-        committed_steel: u32,
-    ) -> Self {
-        Self {
-            steel: steel.saturating_sub(committed_steel),
-            oil,
-            free_supply: supply_cap.saturating_sub(supply_used),
-        }
-    }
-
-    pub(crate) fn free_supply(&self) -> u32 {
-        self.free_supply
-    }
-
-    pub(crate) fn steel(&self) -> u32 {
-        self.steel
-    }
-
-    pub(crate) fn oil(&self) -> u32 {
-        self.oil
-    }
-
-    pub(crate) fn can_afford_unit(&self, kind: EntityKind) -> bool {
-        if config::unit_stats(kind).is_none() {
-            return false;
-        }
-        let (steel, oil) = rts_rules::economy::cost(kind);
-        let supply = rts_rules::economy::supply_cost(kind);
-        self.steel >= steel && self.oil >= oil && self.free_supply >= supply
-    }
-
-    pub(crate) fn reserve_unit(&mut self, kind: EntityKind) -> bool {
-        if config::unit_stats(kind).is_none() {
-            return false;
-        }
-        let (steel, oil) = rts_rules::economy::cost(kind);
-        let supply = rts_rules::economy::supply_cost(kind);
-        self.reserve_cost(steel, oil, supply)
-    }
-
-    pub(crate) fn can_afford_building(&self, kind: EntityKind) -> bool {
-        if config::building_stats(kind).is_none() {
-            return false;
-        }
-        let (steel, oil) = rts_rules::economy::cost(kind);
-        self.steel >= steel && self.oil >= oil
-    }
-
-    pub(crate) fn reserve_building(&mut self, kind: EntityKind) -> bool {
-        if config::building_stats(kind).is_none() {
-            return false;
-        }
-        let (steel, oil) = rts_rules::economy::cost(kind);
-        self.reserve_cost(steel, oil, 0)
-    }
-
-    pub(crate) fn reserve_upgrade(&mut self, kind: UpgradeKind) -> bool {
-        let definition = upgrade::definition(kind);
-        self.reserve_cost(definition.cost_steel, definition.cost_oil, 0)
-    }
-
-    fn reserve_cost(&mut self, steel: u32, oil: u32, supply: u32) -> bool {
-        if self.steel < steel || self.oil < oil || self.free_supply < supply {
-            return false;
-        }
-        self.steel -= steel;
-        self.oil -= oil;
-        self.free_supply -= supply;
-        true
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct AiReservations {
-    workers: BTreeSet<u32>,
-    resource_nodes: BTreeSet<u32>,
-    production_buildings: BTreeSet<u32>,
-}
-
-impl AiReservations {
-    pub(crate) fn reserve_worker(&mut self, worker: u32) -> bool {
-        self.workers.insert(worker)
-    }
-
-    pub(crate) fn worker_reserved(&self, worker: u32) -> bool {
-        self.workers.contains(&worker)
-    }
-
-    pub(crate) fn reserve_resource_node(&mut self, node: u32) -> bool {
-        self.resource_nodes.insert(node)
-    }
-
-    pub(crate) fn resource_node_reserved(&self, node: u32) -> bool {
-        self.resource_nodes.contains(&node)
-    }
-
-    fn reserve_production_building(&mut self, building: u32) -> bool {
-        self.production_buildings.insert(building)
-    }
-
-    fn production_building_reserved(&self, building: u32) -> bool {
-        self.production_buildings.contains(&building)
-    }
-}
+pub(crate) type SpendBudget = ActionBudget;
+pub(crate) type AiReservations = ActionReservations;
 
 pub(crate) struct AiActionContext<'a> {
     _facts: &'a AiFacts,
     budget: SpendBudget,
     reservations: AiReservations,
-    emitted: Vec<Command>,
+    emitted: Vec<AiActionRequest>,
     command_trace: Vec<String>,
 }
 
@@ -161,13 +45,20 @@ impl<'a> AiActionContext<'a> {
         &self.command_trace
     }
 
-    pub(crate) fn emit_command(&mut self, command: Command) {
+    pub(crate) fn emit_action(&mut self, action: AiActionRequest) {
+        if self.emitted.len() >= MAX_ACTIONS_PER_STEP {
+            return;
+        }
+        let command = crate::action_emitter::emit_request(action.clone());
         self.command_trace.push(command_trace_label(&command));
-        self.emitted.push(command);
+        self.emitted.push(action);
     }
 
     pub(crate) fn into_commands(self) -> Vec<Command> {
         self.emitted
+            .into_iter()
+            .map(crate::action_emitter::emit_request)
+            .collect()
     }
 
     pub(crate) fn reserve_worker_from_pools(&mut self, worker_pools: &[&[u32]]) -> Option<u32> {
@@ -191,10 +82,11 @@ pub(crate) struct ReservationCounts {
 
 impl AiReservations {
     pub(crate) fn counts(&self) -> ReservationCounts {
+        let counts = ActionReservations::snapshot_counts(self);
         ReservationCounts {
-            workers: self.workers.len(),
-            resource_nodes: self.resource_nodes.len(),
-            production_buildings: self.production_buildings.len(),
+            workers: counts.actors,
+            resource_nodes: counts.resource_nodes,
+            production_buildings: counts.producers,
         }
     }
 }
@@ -463,7 +355,7 @@ pub(crate) fn try_build_at(
     if !ctx.budget.reserve_building(building) {
         return None;
     }
-    ctx.emit_command(Command::Build {
+    ctx.emit_action(AiActionRequest::Build {
         units: vec![worker],
         building,
         tile_x,
@@ -488,7 +380,7 @@ pub(crate) fn try_resume_construction_at(
     tile_y: u32,
 ) -> Option<BuildAction> {
     let worker = ctx.reserve_worker_from_pools(worker_pools)?;
-    ctx.emit_command(Command::Build {
+    ctx.emit_action(AiActionRequest::Build {
         units: vec![worker],
         building,
         tile_x,
@@ -543,7 +435,7 @@ pub(crate) fn try_research_upgrade(
         return None;
     }
     ctx.reservations.reserve_production_building(building.id);
-    ctx.emit_command(Command::Research {
+    ctx.emit_action(AiActionRequest::Research {
         building: building.id,
         upgrade,
     });
@@ -592,7 +484,7 @@ pub(crate) fn train_units(
         }
         ctx.reservations.reserve_production_building(building.id);
         *current_counts.entry(unit).or_default() += 1;
-        ctx.emit_command(Command::Train {
+        ctx.emit_action(AiActionRequest::Train {
             building: building.id,
             unit,
         });
@@ -738,7 +630,7 @@ pub(crate) fn assign_workers_to_resource(
         ctx.reservations.reserve_worker(worker.id);
         ctx.reservations.reserve_resource_node(node);
         if let Some((tile_x, tile_y)) = pump_jack_site {
-            ctx.emit_command(Command::Build {
+            ctx.emit_action(AiActionRequest::Build {
                 units: vec![worker.id],
                 building: EntityKind::PumpJack,
                 tile_x,
@@ -746,7 +638,7 @@ pub(crate) fn assign_workers_to_resource(
                 queued: false,
             });
         } else {
-            ctx.emit_command(Command::Gather {
+            ctx.emit_action(AiActionRequest::Gather {
                 units: vec![worker.id],
                 node,
                 queued: false,
@@ -785,7 +677,7 @@ pub(crate) fn attack_move_units(
     if units.is_empty() {
         return None;
     }
-    ctx.emit_command(Command::AttackMove {
+    ctx.emit_action(AiActionRequest::AttackMove {
         units: units.clone(),
         x,
         y,
@@ -816,7 +708,7 @@ pub(crate) fn move_units_with_queue(
     if units.is_empty() {
         return None;
     }
-    ctx.emit_command(Command::Move {
+    ctx.emit_action(AiActionRequest::Move {
         units: units.clone(),
         x,
         y,
@@ -838,7 +730,7 @@ pub(crate) fn setup_anti_tank_guns(
     if units.is_empty() {
         return None;
     }
-    ctx.emit_command(Command::SetupAntiTankGuns {
+    ctx.emit_action(AiActionRequest::SetupAntiTankGuns {
         units: units.clone(),
         x,
         y,
@@ -857,7 +749,7 @@ pub(crate) fn hold_position_units(
     if units.is_empty() {
         return None;
     }
-    ctx.emit_command(Command::HoldPosition {
+    ctx.emit_action(AiActionRequest::HoldPosition {
         units: units.clone(),
         queued: false,
     });
@@ -875,7 +767,7 @@ pub(crate) fn attack_units(
     if units.is_empty() {
         return None;
     }
-    ctx.emit_command(Command::Attack {
+    ctx.emit_action(AiActionRequest::Attack {
         units: units.clone(),
         target,
         queued: false,

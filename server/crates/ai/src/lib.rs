@@ -3,6 +3,7 @@
 //! This crate depends on the public simulation API and emits ordinary [`SimCommand`]s. The
 //! simulation crate does not depend on this crate.
 
+mod action_emitter;
 pub mod ai_core;
 pub mod sdk;
 pub mod selfplay;

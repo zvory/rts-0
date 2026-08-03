@@ -118,7 +118,7 @@ fn facts_from_observation(observation: &AiObservation) -> AiFacts {
 fn committed_steel_is_reserved_from_budget() {
     let budget = SpendBudget::with_committed_steel(150, 0, 0, 10, 100);
 
-    assert_eq!(budget.steel, 50);
+    assert_eq!(budget.steel(), 50);
     assert!(!budget.can_afford_building(EntityKind::Depot));
 }
 
@@ -168,7 +168,7 @@ fn build_action_reserves_worker_and_cost() {
         })
     );
     assert!(ctx.reservations().worker_reserved(10));
-    assert_eq!(ctx.budget().steel, 0);
+    assert_eq!(ctx.budget().steel(), 0);
     assert!(matches!(
         ctx.into_commands().as_slice(),
         [Command::Build { units, building, tile_x: 8, tile_y: 8, .. }]
@@ -208,7 +208,13 @@ fn second_build_action_cannot_reuse_same_worker() {
     };
 
     assert!(try_build(&mut ctx, &[&workers], request()).is_some());
+    let budget = *ctx.budget();
+    let reservations = ctx.reservations().clone();
+    let trace = ctx.command_trace().to_vec();
     assert!(try_build(&mut ctx, &[&workers], request()).is_none());
+    assert_eq!(*ctx.budget(), budget);
+    assert_eq!(ctx.reservations(), &reservations);
+    assert_eq!(ctx.command_trace(), trace);
     assert_eq!(ctx.into_commands().len(), 1);
 }
 
