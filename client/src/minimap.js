@@ -21,8 +21,8 @@ import {
 import {
   ABILITIES,
   COLORS,
-  FOG_EXPLORED_ALPHA,
-  FOG_UNEXPLORED_ALPHA,
+  MINIMAP_FOG_EXPLORED_ALPHA,
+  MINIMAP_FOG_UNEXPLORED_ALPHA,
   STATS,
   isProducerBuilding,
 } from "./config.js";
@@ -614,7 +614,7 @@ export class Minimap {
         const impassable = isImpassableTerrainCode(map.terrain[i]);
         const explored = useGrids ? exploredGrid[i] === 1 : fog.isExplored(tx, ty);
         const fillStyle = explored ? exploredFill : unexploredFill;
-        const alpha = (explored ? FOG_EXPLORED_ALPHA : FOG_UNEXPLORED_ALPHA)
+        const alpha = (explored ? MINIMAP_FOG_EXPLORED_ALPHA : MINIMAP_FOG_UNEXPLORED_ALPHA)
           * (impassable ? IMPASSABLE_FOG_SCALE : 1);
         if (runStart >= 0 && runFillStyle === fillStyle && runAlpha === alpha) {
           continue;
@@ -662,8 +662,8 @@ export class Minimap {
       style: [
         COLORS.fogExplored,
         COLORS.fogUnexplored,
-        FOG_EXPLORED_ALPHA,
-        FOG_UNEXPLORED_ALPHA,
+        MINIMAP_FOG_EXPLORED_ALPHA,
+        MINIMAP_FOG_UNEXPLORED_ALPHA,
         IMPASSABLE_FOG_SCALE,
       ].join(","),
     };

@@ -1,8 +1,8 @@
 import { gfxFillCurrentPath, gfxReset } from "./native_graphics.js";
 import {
   COLORS,
-  FOG_EXPLORED_ALPHA,
-  FOG_UNEXPLORED_ALPHA,
+  MAIN_MAP_FOG_EXPLORED_ALPHA,
+  MAIN_MAP_FOG_UNEXPLORED_ALPHA,
   STATS,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
@@ -95,10 +95,10 @@ export function _drawFog(fog) {
     if (runs.length === 0) continue;
     const color = level === 2 ? COLORS.fogUnexplored : COLORS.fogExplored;
     const alpha = level === 2
-      ? FOG_UNEXPLORED_ALPHA
+      ? MAIN_MAP_FOG_UNEXPLORED_ALPHA
       : level === 3
-        ? FOG_UNEXPLORED_ALPHA * 0.56
-        : FOG_EXPLORED_ALPHA;
+        ? MAIN_MAP_FOG_UNEXPLORED_ALPHA * 0.56
+        : MAIN_MAP_FOG_EXPLORED_ALPHA;
     for (const [x, y, width, height] of runs) g.rect(x, y, width, height);
     gfxFillCurrentPath(g, color, alpha);
   }
