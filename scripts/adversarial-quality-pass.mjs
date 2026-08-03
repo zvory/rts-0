@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { runPreflight } from "./agent-pr-preflight.mjs";
 import { collectReviewInputs, excludedRawPaths, renderReviewInputManifest } from "./review-inputs.mjs";
 
 const DEFAULT_BASE_REF = "origin/main";
@@ -460,6 +461,12 @@ class Runner {
     if (options.dryRun) {
       const { prompt, codexArgs } = buildReviewInvocation();
       this.log(`quality-pass: would run ${options.codexCommand} ${codexArgs.map(shellQuote).join(" ")}`);
+      runPreflight({
+        repoRoot,
+        baseRef: options.baseRef,
+        dryRun: true,
+        log: (message) => this.log(message),
+      });
       if (options.push) {
         this.log(`quality-pass: would push HEAD to ${options.remote}/${headBranch}`);
       }
@@ -502,6 +509,7 @@ class Runner {
     } else {
       this.log("quality-pass: final state unchanged");
     }
+    runPreflight({ repoRoot, baseRef: options.baseRef, log: (message) => this.log(message) });
     if (options.markdownReportFile) {
       fs.writeFileSync(options.markdownReportFile, markdownReport(report));
     }

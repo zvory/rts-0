@@ -231,8 +231,18 @@ run_quality_pass() {
   if [ "$DRY_RUN" = "1" ]; then
     if git rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1 && is_docs_only_change; then
       echo "agent-pr: would skip scripts/adversarial-quality-pass.mjs for docs-only branch $HEAD_BRANCH"
+      echo "agent-pr: would push HEAD to origin/$HEAD_BRANCH"
+      echo "agent-pr: would post $QUALITY_CONTEXT status on final HEAD"
     else
-      echo "agent-pr: would run scripts/adversarial-quality-pass.mjs for $HEAD_BRANCH"
+      scripts/adversarial-quality-pass.mjs \
+        --base "origin/$BASE_BRANCH" \
+        --head-branch "$HEAD_BRANCH" \
+        --report-file "$quality_report_json" \
+        --markdown-report-file "$quality_report_md" \
+        --gh-bin "$GH_BIN" \
+        --push \
+        --post-status \
+        --dry-run
     fi
     return
   fi
@@ -271,6 +281,11 @@ run_quality_pass() {
 }
 
 archive_completed_plans
+if [ "$DRY_RUN" = "1" ]; then
+  node scripts/agent-pr-preflight.mjs --repo "$repo_root" --base "origin/$BASE_BRANCH" --dry-run
+else
+  node scripts/agent-pr-preflight.mjs --repo "$repo_root" --base "origin/$BASE_BRANCH"
+fi
 run_quality_pass
 
 needs_human="false"

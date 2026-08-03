@@ -300,7 +300,8 @@ canary runs own a private server; the browser shard passes its existing loopback
   names, sanitized worktree/log slugs, executor model inheritance, and generated `codex exec`
   arguments.
 - Agent PR / adversarial quality workflow: run `node tests/adversarial_quality_pass.mjs` when
-  changing `scripts/adversarial-quality-pass.mjs`, its schema, or agent PR wiring. Patch-note copy
+  changing `scripts/adversarial-quality-pass.mjs`, `scripts/agent-pr-preflight.mjs`, its schema, or
+  agent PR wiring. Patch-note copy
   is authored by the implementing agent rather than a second Codex pass. When useful, the agent
   stages up to 1,800 characters in the ignored Git-common-dir outbox with
   `node scripts/patch-note-outbox.mjs stage --change "<change>"`. Root npm dependencies are
@@ -325,8 +326,8 @@ canary runs own a private server; the browser shard passes its existing loopback
   branches, defined as every changed file ending in `.md` regardless of directory, must skip Codex
   adversarial review while still pushing the branch, posting the `adversarial-quality-pass` success
   status, and recording a docs-only skip report in the PR body. Include
-  `bash -n scripts/agent-pr.sh tests/run-all.sh && node --check scripts/adversarial-quality-pass.mjs`
-  for shell and JS syntax coverage.
+  `bash -n scripts/agent-pr.sh tests/run-all.sh && node --check scripts/adversarial-quality-pass.mjs &&
+  node --check scripts/agent-pr-preflight.mjs` for shell and JS syntax coverage.
 - Net-report incident packaging: run `node tests/net_report_log_parser.mjs` when changing
   `scripts/parse-net-report-logs.mjs` or `scripts/net-report-incident-package.mjs`. Run
   `node tests/net_report_incident_capture.mjs` when changing `scripts/capture-net-incident.mjs`.
@@ -490,13 +491,21 @@ checks local Markdown links in `docs/` and `plans/`.
 The `PR ownership` workflow validates owned agent PR metadata for `zvorygin/*` branches with
 `scripts/check-pr-ownership.sh`.
 
-`scripts/agent-pr.sh` reuses the changed-file policy before opening or updating an owned PR. A
-supplied `--head` value must match the current branch before the docs-only skip can push or post
-status. When the resulting branch diff against `origin/main`
-contains only `.md` files, including Markdown
-files outside `docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts
-a successful `adversarial-quality-pass` status, and writes a docs-only skip report into the PR body.
-Any non-Markdown changed file keeps the normal adversarial quality pass requirement.
+`scripts/agent-pr.sh` reuses the changed-file policy before opening or updating an owned PR. After
+plan archival has fetched the final base, it runs `scripts/agent-pr-preflight.mjs` before either
+docs-only handling or Codex. The fixed, deliberately cheap list is `git diff --check
+origin/main...HEAD`, docs health, source-file sizes, selector verification, faction assumptions, and
+deploy assets; it excludes Cargo, nextest, live servers, browsers, and Interact. A supplied `--head`
+value must match the current branch before the docs-only skip can push or post status. When the
+resulting branch diff against `origin/main` contains only `.md` files, including Markdown files
+outside `docs/`, it skips the Codex adversarial quality pass but still pushes the branch, posts a
+successful `adversarial-quality-pass` status, and writes a docs-only skip report into the PR body.
+Any non-Markdown changed file keeps the normal adversarial quality pass requirement. After a
+non-Markdown review formats and commits its final local head, that same preflight runs again before
+the quality pass may push or post a success status. A failed pre-review check launches no Codex or
+GitHub mutation; a failed final-head check leaves the local correction head intact but unpushed and
+without a success status. Dry runs print both preflight positions and their commands without running
+Codex or mutable GitHub operations.
 
 Rust formatting is intentionally not a CI test gate. The repository pins Rust and rustfmt in
 `rust-toolchain.toml`; the final quality pass invoked by `scripts/agent-pr.sh` runs

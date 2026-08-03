@@ -8,6 +8,13 @@ The normal agent lifecycle is:
 4. Open or update the owned PR with `scripts/agent-pr.sh --verification "..."`.
    Before the quality pass, the helper archives any plan newly completed by the branch and commits
    that move, so the archive lands in the final phase PR rather than as a post-merge local change.
+   It then runs the same deterministic preflight before docs-only classification or Codex, and the
+   quality pass repeats it on its formatted, committed final local head before either push or
+   success status. The list is intentionally limited to `git diff --check origin/main...HEAD`,
+   docs health, source-file sizes, selector verification, faction assumptions, and deploy assets;
+   it is not a replacement for the GitHub full gate. A named failed command stops the lifecycle:
+   before review it means no Codex, push, PR mutation, auto-merge, or success status; after review
+   it leaves the local corrected head available for another fix but still unpushed and unmarked.
    The adversarial pass receives compact metadata instead of raw generated, binary, or oversized
    artifact bodies. It reviews the corresponding generator, authored inputs, and tests. This keeps large
    checkpoint and snapshot-stream refreshes from overflowing the helper or dominating review.
@@ -61,6 +68,9 @@ compiling or running specific tests. Do not add a separate diagnostic workflow f
 
 ## Recovery states
 
+- Preflight failed: fix the exact named local check and rerun `scripts/agent-pr.sh --verification
+  "..."`. A pre-review failure has not launched Codex or changed GitHub; a final-head failure has
+  kept the reviewed local commit but has not pushed it or posted success.
 - CI failed: inspect the failing check from the PR or `gh pr checks <pr>`.
   Fix the branch in its worktree, run the smallest relevant local verification,
   commit, push, and rerun `scripts/agent-pr.sh --verification "..."` so the PR

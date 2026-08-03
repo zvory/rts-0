@@ -18,6 +18,7 @@ import {
   resolveHeadBranch,
   statusDescription,
 } from "../scripts/adversarial-quality-pass.mjs";
+import { preflightCommands } from "../scripts/agent-pr-preflight.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -42,6 +43,18 @@ assert.equal(options.push, true);
 assert.equal(options.markdownReportFile, "/tmp/adversarial-quality-pass.md");
 
 assert.throws(() => parseArgs(["--unknown"]), /unknown argument/);
+
+assert.deepEqual(
+  preflightCommands("origin/main").map(({ command, args }) => [command, ...args]),
+  [
+    ["git", "diff", "--check", "origin/main...HEAD"],
+    ["node", "scripts/check-docs-health.mjs"],
+    ["node", "scripts/check-source-file-sizes.mjs"],
+    ["node", "tests/select-suites.mjs", "--verify"],
+    ["node", "scripts/check-faction-assumptions.mjs"],
+    ["node", "scripts/check-deploy-assets.mjs"],
+  ],
+);
 
 const prompt = renderPrompt({
   baseRef: "origin/main",
@@ -207,13 +220,45 @@ function copyWorkflowScripts(targetRepo) {
     "review-inputs.mjs",
     "archive-completed-plans.mjs",
     "plan-phase-status.mjs",
+    "agent-pr-preflight.mjs",
     "adversarial-quality-pass.mjs",
     "adversarial-quality-pass.schema.json",
     "format-touched-rust.sh",
   ]) {
     fs.copyFileSync(path.join(repoRoot, "scripts", script), path.join(targetScripts, script));
   }
-  fs.copyFileSync(path.join(repoRoot, "tests", "select-suites.mjs"), path.join(targetTests, "select-suites.mjs"));
+  for (const check of [
+    "check-docs-health.mjs",
+    "check-source-file-sizes.mjs",
+    "check-faction-assumptions.mjs",
+    "check-deploy-assets.mjs",
+  ]) {
+    writeExecutable(
+      path.join(targetScripts, check),
+      `#!/usr/bin/env node
+import fs from "node:fs";
+if (process.argv[1].endsWith("check-source-file-sizes.mjs") && fs.existsSync("source-size-invalid.js")) {
+  console.error("fixture source-size policy violation");
+  process.exit(1);
+}
+console.log("fixture ${check} passed");
+`,
+    );
+  }
+  writeExecutable(
+    path.join(targetTests, "select-suites.mjs"),
+    `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes("--ci-policy")) {
+  const files = args.slice(args.indexOf("--ci-policy") + 1);
+  const docsOnly = files.length > 0 && files.every((file) => file.endsWith(".md"));
+  console.log("ci_class=" + (docsOnly ? "docs_only" : "full"));
+  console.log("docs_only=" + docsOnly);
+  process.exit(0);
+}
+if (args.includes("--verify")) console.log("fixture selector verification passed");
+`,
+  );
   fs.chmodSync(path.join(targetScripts, "agent-pr.sh"), 0o755);
   fs.chmodSync(path.join(targetScripts, "archive-completed-plans.mjs"), 0o755);
   fs.chmodSync(path.join(targetScripts, "adversarial-quality-pass.mjs"), 0o755);
@@ -230,6 +275,12 @@ try {
   const codexCalledMarker = path.join(tempRoot, "codex-called.txt");
   const docsOnlyCodexCalledMarker = path.join(tempRoot, "docs-only-codex-called.txt");
   const docsOnlyStatusCapture = path.join(tempRoot, "docs-only-gh-api.txt");
+  const qualityStatusCapture = path.join(tempRoot, "quality-gh-api.txt");
+  const preReviewCodexCalledMarker = path.join(tempRoot, "pre-review-codex-called.txt");
+  const preReviewStatusCapture = path.join(tempRoot, "pre-review-gh-api.txt");
+  const finalHeadCodexCalledMarker = path.join(tempRoot, "final-head-codex-called.txt");
+  const finalHeadStatusCapture = path.join(tempRoot, "final-head-gh-api.txt");
+  const finalHeadBody = path.join(tempRoot, "final-head-pr-body.md");
   fs.mkdirSync(binPath, { recursive: true });
 
   writeExecutable(
@@ -264,6 +315,9 @@ fi
 if [ "\${CODEX_MUTATE_AGENT_PR:-}" = "1" ]; then
   printf '\\n# fixture codex mutation\\n' >> scripts/agent-pr.sh
 fi
+if [ "\${CODEX_CREATE_INVALID_FINAL_HEAD:-}" = "1" ]; then
+  printf 'fixture source-size violation\\n' > source-size-invalid.js
+fi
 cat >"$report_file" <<'JSON'
 {
   "verdict": "improved",
@@ -281,7 +335,7 @@ JSON
     `#!/usr/bin/env bash
 set -euo pipefail
 if [ "$1" = "api" ]; then
-  if [ -n "\${AGENT_GH_API_CAPTURE:-}" ]; then
+  if [[ "$*" == *"/statuses/"* ]] && [ -n "\${AGENT_GH_API_CAPTURE:-}" ]; then
     printf '%s\\n' "$*" >>"$AGENT_GH_API_CAPTURE"
   fi
   exit 0
@@ -343,6 +397,36 @@ done
   run("git", ["commit", "-m", "Initial"], { cwd: workPath });
   run("git", ["remote", "add", "origin", originPath], { cwd: workPath });
   run("git", ["push", "-u", "origin", "main"], { cwd: workPath });
+
+  run("git", ["checkout", "-b", "zvorygin/pre-review-preflight-reject"], { cwd: workPath });
+  fs.writeFileSync(path.join(workPath, "source-size-invalid.js"), "fixture source-size violation\n");
+  run("git", ["add", "source-size-invalid.js"], { cwd: workPath });
+  run("git", ["commit", "-m", "Invalid preflight branch"], { cwd: workPath });
+  const preReviewFailure = spawnSync(
+    "scripts/agent-pr.sh",
+    ["--owner", "tester", "--verification", "pre-review fixture"],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        AGENT_GH_API_CAPTURE: preReviewStatusCapture,
+        CODEX_CALLED_MARKER: preReviewCodexCalledMarker,
+        GH_BIN: path.join(binPath, "gh"),
+        PATH: `${binPath}:${process.env.PATH}`,
+      }),
+    },
+  );
+  assert.notEqual(preReviewFailure.status, 0);
+  assert.match(`${preReviewFailure.stdout}\n${preReviewFailure.stderr}`, /failed `node scripts\/check-source-file-sizes\.mjs`/);
+  assert.equal(fs.existsSync(preReviewCodexCalledMarker), false, "pre-review failure must not invoke Codex");
+  assert.equal(fs.existsSync(preReviewStatusCapture), false, "pre-review failure must not post status");
+  assert.equal(
+    run("git", ["ls-remote", "--heads", "origin", "zvorygin/pre-review-preflight-reject"], { cwd: workPath }).stdout,
+    "",
+    "pre-review failure must not push the branch",
+  );
+
+  run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/quality-report-body"], { cwd: workPath });
   fs.appendFileSync(path.join(workPath, "README.md"), "implementation branch docs change\n");
   fs.writeFileSync(path.join(workPath, "--implementation.rs"), "branch change\n");
@@ -351,9 +435,10 @@ done
   run("git", ["add", "--", "README.md", "--implementation.rs", "server/src/branch.rs"], { cwd: workPath });
   run("git", ["commit", "-m", "Change branch"], { cwd: workPath });
 
-  run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture"], {
+  const qualityPassRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture"], {
     cwd: workPath,
     env: {
+      AGENT_GH_API_CAPTURE: qualityStatusCapture,
       AGENT_PR_BODY_CAPTURE: capturedBody,
       CODEX_CALLED_MARKER: codexCalledMarker,
       CODEX_MUTATE_AGENT_PR: "1",
@@ -361,6 +446,13 @@ done
       PATH: `${binPath}:${process.env.PATH}`,
     },
   });
+
+  const preflightMarker = "agent-pr preflight: running git diff --check origin/main...HEAD";
+  const firstPreflight = qualityPassRun.stdout.indexOf(preflightMarker);
+  const reviewStart = qualityPassRun.stdout.indexOf("quality-pass: running Codex final quality pass");
+  const finalPreflight = qualityPassRun.stdout.indexOf(preflightMarker, firstPreflight + 1);
+  assert(firstPreflight >= 0 && reviewStart > firstPreflight && finalPreflight > reviewStart);
+  assert.equal(qualityPassRun.stdout.split(preflightMarker).length - 1, 2);
 
   const body = fs.readFileSync(capturedBody, "utf8");
   assert.match(body, /<!-- rts-agent-pr:v1 -->/);
@@ -370,8 +462,32 @@ done
   assert.match(body, /Captured report body\./);
   assert.match(body, /- embedded the quality-pass report/);
   assert.match(fs.readFileSync(codexCalledMarker, "utf8"), /codex called/);
+  assert.equal((fs.readFileSync(qualityStatusCapture, "utf8").match(/statuses\//g) ?? []).length, 1);
   assert.equal(fs.readFileSync(path.join(workPath, "server", "src", "branch.rs"), "utf8"), "fn main() {}\n");
   assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Run adversarial quality pass/);
+
+  const workflowDryRun = run("scripts/agent-pr.sh", ["--dry-run", "--owner", "tester", "--verification", "dry-run fixture"], {
+    cwd: workPath,
+    env: {
+      GH_BIN: path.join(binPath, "gh"),
+      PATH: `${binPath}:${process.env.PATH}`,
+    },
+  });
+  const dryPreflightMarker = "agent-pr preflight: would run git diff --check origin/main...HEAD";
+  const dryInitialPreflight = workflowDryRun.stdout.indexOf(dryPreflightMarker);
+  const dryReview = workflowDryRun.stdout.indexOf("quality-pass: would run codex");
+  const dryFinalPreflight = workflowDryRun.stdout.indexOf(dryPreflightMarker, dryInitialPreflight + 1);
+  const dryPush = workflowDryRun.stdout.indexOf("quality-pass: would push HEAD");
+  const dryStatus = workflowDryRun.stdout.indexOf("quality-pass: would post adversarial-quality-pass status");
+  const dryPrLifecycle = workflowDryRun.stdout.indexOf("agent-pr: would run:");
+  assert(
+    dryInitialPreflight >= 0 &&
+      dryReview > dryInitialPreflight &&
+      dryFinalPreflight > dryReview &&
+      dryPush > dryFinalPreflight &&
+      dryStatus > dryPush &&
+      dryPrLifecycle > dryStatus,
+  );
 
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/docs-only-quality-skip"], { cwd: workPath });
@@ -399,7 +515,7 @@ done
   assert.equal(fs.existsSync(docsOnlyCodexCalledMarker), false, "mismatched --head should not invoke Codex");
   assert.equal(fs.existsSync(docsOnlyStatusCapture), false, "mismatched --head should not post status");
 
-  run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Docs-only quality skip", "--verification", "docs fixture"], {
+  const docsOnlyRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Docs-only quality skip", "--verification", "docs fixture"], {
     cwd: workPath,
     env: {
       AGENT_GH_API_CAPTURE: docsOnlyStatusCapture,
@@ -410,6 +526,7 @@ done
     },
   });
 
+  assert.equal(docsOnlyRun.stdout.split(preflightMarker).length - 1, 1);
   assert.equal(fs.existsSync(docsOnlyCodexCalledMarker), false, "docs-only PR should not invoke Codex");
   const docsBody = fs.readFileSync(docsOnlyBody, "utf8");
   assert.match(docsBody, /<!-- rts-agent-pr:v1 -->/);
@@ -424,6 +541,44 @@ done
   assert.equal(fs.existsSync(path.join(workPath, "plans", "fixture")), false);
   assert.equal(fs.existsSync(path.join(workPath, "plans", "archive", "fixture", "phase-1.md")), true);
   assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Archive completed plan: fixture/);
+
+  run("git", ["checkout", "main"], { cwd: workPath });
+  run("git", ["checkout", "-b", "zvorygin/final-head-preflight-reject"], { cwd: workPath });
+  fs.writeFileSync(path.join(workPath, "candidate.js"), "export const candidate = true;\n");
+  run("git", ["add", "candidate.js"], { cwd: workPath });
+  run("git", ["commit", "-m", "Branch for invalid final head"], { cwd: workPath });
+  const finalHeadFailure = spawnSync(
+    "scripts/agent-pr.sh",
+    ["--owner", "tester", "--verification", "final-head fixture"],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        AGENT_GH_API_CAPTURE: finalHeadStatusCapture,
+        AGENT_PR_BODY_CAPTURE: finalHeadBody,
+        CODEX_CALLED_MARKER: finalHeadCodexCalledMarker,
+        CODEX_CREATE_INVALID_FINAL_HEAD: "1",
+        GH_BIN: path.join(binPath, "gh"),
+        PATH: `${binPath}:${process.env.PATH}`,
+      }),
+    },
+  );
+  assert.notEqual(
+    finalHeadFailure.status,
+    0,
+    `final-head preflight unexpectedly passed\nstdout:\n${finalHeadFailure.stdout}\nstderr:\n${finalHeadFailure.stderr}`,
+  );
+  assert.match(`${finalHeadFailure.stdout}\n${finalHeadFailure.stderr}`, /failed `node scripts\/check-source-file-sizes\.mjs`/);
+  assert.match(fs.readFileSync(finalHeadCodexCalledMarker, "utf8"), /codex called/);
+  assert.equal(fs.existsSync(finalHeadStatusCapture), false, "invalid final head must not post status");
+  assert.equal(fs.existsSync(finalHeadBody), false, "invalid final head must not create a PR");
+  assert.equal(fs.existsSync(path.join(workPath, "source-size-invalid.js")), true);
+  assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Run adversarial quality pass/);
+  assert.equal(
+    run("git", ["ls-remote", "--heads", "origin", "zvorygin/final-head-preflight-reject"], { cwd: workPath }).stdout,
+    "",
+    "invalid final head must not push the reviewed branch",
+  );
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });
 }
