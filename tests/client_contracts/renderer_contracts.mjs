@@ -85,9 +85,7 @@ assert(
   );
   const scoutCarIcon = liveUnitIconMarkupFor(KIND.SCOUT_CAR, { teamColor: "#d55e00" });
   assert(
-    scoutCarIcon.includes("scout-car-white-atlas.png") &&
-      scoutCarIcon.includes('viewBox="0 0 656 339"') &&
-      scoutCarIcon.includes('flood-color="#d55e00"'),
+    ["scout-car-white-atlas.png", 'viewBox="0 0 656 339"', 'flood-color="#d55e00"'].every((fragment) => scoutCarIcon.includes(fragment)),
     "unit icon resolver applies the owning team tint to the white Scout Car frame",
   );
   assert(
