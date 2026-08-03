@@ -19,17 +19,17 @@ use crate::game::PlayerState;
 use crate::protocol::Event;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
 
+use super::car_drive::plan_scout_car_motion;
 use super::pivot_drive::{
     angle_delta, close_nudge_hull_axis_motion, distance_between, normalize_angle,
     pivot_drive_intent, pivot_drive_speed_scale, rotate_toward, vehicle_body_turn_rate,
     vehicle_oil_starves_movement, vehicle_traffic_adjustment,
 };
-use super::car_drive::plan_scout_car_motion;
-use super::vehicle_route::route_accepts_waypoint;
 use super::standability::{
     footing_profile, requires_weapon_setup, unit_static_standable, FootingProfile,
 };
 use super::steering::{inject_sidestep, steered_candidate, steering_path_dir};
+use super::vehicle_route::route_accepts_waypoint;
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
 
 const TANK_ROTATION_UNJAM_EPS: f32 = 1.0e-4;

@@ -224,6 +224,11 @@ pub fn fires_while_moving(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::Tank | EntityKind::ScoutCar)
 }
 
+/// Whether this unit's tracked running gear leaves durable tread marks while moving.
+pub fn leaves_tank_treads(kind: EntityKind) -> bool {
+    kind == EntityKind::Tank
+}
+
 /// Durable terrain-mark presentation category for an entity death.
 pub fn death_ground_decal_class(kind: EntityKind) -> Option<&'static str> {
     match kind {
@@ -280,6 +285,17 @@ mod tests {
                 MovementBodyClass::InfantryLike
             };
             assert_eq!(movement_body_class(kind), expected, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn only_tracked_tanks_leave_tread_marks() {
+        for kind in EntityKind::ALL {
+            assert_eq!(
+                leaves_tank_treads(kind),
+                kind == EntityKind::Tank,
+                "{kind:?}"
+            );
         }
     }
 

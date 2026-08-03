@@ -149,10 +149,10 @@ impl Game {
     pub fn snapshot_for_with_options(&self, player: u32, options: SnapshotOptions) -> Snapshot;
 
     /// Request fog-safe durable ground marks learned by one player after a prior cursor.
-    pub fn ground_decals_for_player(&self, player: u32, after_revision: u32) -> (u32, Vec<GroundDecalView>);
+    pub fn ground_decals_for_player(&self, player: u32, after_revision: u32) -> (u32, Vec<GroundDecalView>, Vec<TankTrailView>);
 
     /// Request durable marks for an accepted selected-player union or omniscient observer view.
-    pub fn ground_decals_for_observer(&self, view: &ObserverView, after_revision: u32) -> (u32, Vec<GroundDecalView>);
+    pub fn ground_decals_for_observer(&self, view: &ObserverView, after_revision: u32) -> (u32, Vec<GroundDecalView>, Vec<TankTrailView>);
 
     /// Build a read-only privileged observer projection. `Omniscient` exposes the complete
     /// world/all-owner private detail; `Players` combines selected real-player perspectives.
@@ -298,7 +298,7 @@ architecture failures.
 | `firing_reveals` | `authoritative/serialized` | Serialize active firing-reveal sources with stable episode-start and expiry ticks. | Anti-Tank Gun and artillery/mortar reveal logic records temporary actionable sight. Repeated shots extend one continuous episode without changing its start; the next 15 Hz fog sample stamps active sources into viewer fog until a later sample observes expiry. |
 | `smokes` | `authoritative/serialized` | Serialize the full `SmokeCloudStore`, including next id, active clouds, pending clouds, locations, radii, spawn/due/expiry ticks. | Smoke blocks line of sight, combat projection, and the next authoritative fog sample; `tick_inner` retains active smoke and systems may resolve pending smoke. |
 | `trenches` | `authoritative/serialized` | Serialize the full `TrenchStore`, including deterministic trench ids, terrain positions, discovery/memory data, and any store allocator state. | Trenches are persistent neutral terrain outside `EntityStore`; entrenchment services create/discover/update them and snapshots project current plus remembered trench terrain. |
-| `ground_decals` | `authoritative/serialized` | Serialize compact typed append-only mark rows, stable id allocator, global revision, the creation/discovery revision log, and per-player first-discovery revisions; rebuild the derived tile index after restore. | Death and delayed mortar/artillery impact resolution create deterministic presentation records without a gameplay-facing row cap. Current team fog queries indexed visible tiles to discover marks; snapshots derive a fog-scoped 64-revision repeated tail from the bounded revision-log suffix, while reliable requests repair older accepted player/observer projection ranges. |
+| `ground_decals` | `authoritative/serialized` | Serialize compact typed append-only mark rows, checkpointed active tank trails, immutable finalized trail chunks, stable id allocators, the shared global revision and creation/discovery log, and per-player first-discovery revisions; rebuild derived tile indexes after restore. Historical tank trails are explicitly approximate and capped at 4,096 finalized chunks so cosmetic evidence cannot grow server memory without bound. | Death and delayed mortar/artillery impacts create ordinary records. Visible tanks paint precise client-local tracks from fog-filtered entity snapshots. The server separately samples approximate historical poses at 4-world-pixel/8-bit-heading precision after material travel or rotation, finalizes spatially bounded chunks, and clients reconstruct their swept left/right tread footprint after refresh or later discovery. A trail becomes discoverable only when current team fog covers its complete swept-footprint bounds. Snapshots carry only the current tick's bounded, fog-scoped revisions through the existing ground-decal delta; reliable requests repair older accepted player/observer ranges. |
 | `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
 | `mortar_shells` | `authoritative/serialized` | Serialize all scheduled mortar impacts with owner, attacker, impact point, and impact tick. | `MortarShellStore::schedule` records delayed impacts; later ticks resolve area damage/events even if the firing mortar dies before impact. |
 | `artillery_shells` | `authoritative/serialized` | Serialize all scheduled artillery impacts with their owners, source data, impact points, and impact ticks. | The artillery store mirrors the delayed-shell contract used by the tick pipeline; dropping it would cancel future area damage and reveal/event output. |
@@ -454,7 +454,7 @@ container-supplied `Map`, and rebuilds derived state before returning a live `Ga
 entity DTOs by id so normalized payload text does not depend on entity-store iteration order, and
 rejects payloads above the same v1 byte limit enforced by import.
 
-The payload schema is named `rts.gameCheckpoint` and starts at version `1`. Field names are
+The payload schema is named `rts.gameCheckpoint`; the current emitted version is `2`. Field names are
 camelCase. DTOs must be explicit Rust types with serde support; do not serialize private
 `GameState`, `Entity`, store, service, or snapshot internals directly as the stable persisted
 contract. Persisted DTOs should use strict deserialization (`deny_unknown_fields` or an equivalent
@@ -467,11 +467,11 @@ Top-level shape:
 ```json
 {
   "schema": "rts.gameCheckpoint",
-  "version": 1,
+  "version": 2,
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 3,
+    "simSchemaVersion": 4,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -606,7 +606,7 @@ Validation model and bounds:
   Map-bearing containers additionally cap canonical static doodads at 4,096 records and validate
   their fixed catalog strings, optional color shape, ids, ordering, and integer world bounds.
 - Version and feature checks happen before field validation: `schema == "rts.gameCheckpoint"`,
-  `version == 1`, supported `compatibility.simSchemaVersion`, known required features, and a
+  `version == 2`, supported `compatibility.simSchemaVersion`, known required features, and a
   compatible RNG algorithm are mandatory.
 - Count caps for version 1: at most 8 players, 2,000 entities, 1,024 pending commands, 200,000
   command-log entries when a replay container explicitly allows command history, 256 total active
@@ -634,14 +634,14 @@ id, dangling reference, field path, or invariant that failed, is logged or expos
 tooling. The importer must validate all of this before constructing a live `Game`; partially
 constructed state is not allowed to escape.
 
-Compatibility policy for version 1 is strict. Same-version readers may add optional compatibility
+Compatibility policy is strict. Same-version readers may add optional compatibility
 metadata only when old readers can ignore it without changing authoritative state. Adding,
 removing, renaming, or changing the meaning of authoritative fields requires a new checkpoint
 version and either an explicit migrator or a stable rejection reason. Existing replay and lab assets
 remain on their current schemas until their phases introduce containers around this payload.
-Simulation schema 2 adds the authoritative construction-cost payment receipt; schema 1 payloads are
-rejected because their unfinished scaffolds cannot be refunded safely. Bundled lab checkpoint assets
-use schema 2 and contain no in-progress construction that needs a receipt backfill.
+Simulation schema 2 adds the authoritative construction-cost payment receipt; schema 4 adds compact,
+owner-attributed approximate tank-trail history. Checkpoint version 1 and simulation schemas before 4
+are rejected rather than guessing at missing authoritative trail ownership or converting old rows.
 
 The canonical Hellhole server benchmark is a direct `Game`-API harness, not a live room. Running
 `scripts/hellhole-perf-harness.sh` restores `fixed-roster-hellhole`, issues its deterministic Lab

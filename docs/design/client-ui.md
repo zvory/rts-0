@@ -49,6 +49,7 @@ src/
   renderer/worker_rehydration.js # revisioned map/grid/decal worker-owned staging
   renderer/map_editor_worker_renderer.js # Map Editor Pixi display objects behind the same worker
   renderer/decals.js # GroundDecalLayer permanent decal texture, stamping, diagnostics, teardown
+  renderer/tank_tread_layer.js # approximate authoritative history plus precise visible-tank tracks
   renderer/decals/ # SVG source manifest, generated PNG atlas metadata, worker-safe loader, deterministic selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
@@ -472,6 +473,27 @@ exposes total stamped decals, queued decals, texture update
 count, texture dimensions/downsample, child count, and asset-load status for stress checks. The
 renderer tears down the decal sprite, texture, canvas, tint scratch canvas, loaded atlas masks, and
 late async asset loads through `Renderer.destroy()` / rematch cleanup.
+
+`renderer/tank_tread_layer.js`
+```js
+export class TankTreadLayer {
+  resetForMap(map)
+  stampVisibleTankPoses(entities)
+  stampAuthoritativeTrails(trails)
+  diagnostics()
+  destroy()
+}
+```
+`TankTreadLayer` paints approximate checkpointed trail history learned through the normal durable
+ground-mark discovery cursor. It derives precise live tracks for every tank currently present in
+the client's fog-filtered entity snapshots, using its `x`/`y`/`facing` poses; those client-retained
+pixels are presentation state rather than historical server authority. Reconnects, replay seeks,
+and later visits to previously fogged ground rebuild a coarser but directionally representative
+version from server trail chunks. Pixels persist in lazily allocated
+512-world-pixel tiles (256×256 texels); only touched tiles upload, and all tile
+canvases/textures/sprites are destroyed with the ground-decal layer. Preview contact poses are
+accumulated between bounded 10 Hz uploads; the swept-contact raster fills the complete intervening
+motion.
 
 `renderer/trenches.js`
 ```js
@@ -1993,6 +2015,14 @@ terrain and resources):
 - Mortar impacts stamp a compact, air-burst-style starburst with a small dark center; artillery
   impacts stamp a larger starburst scaled to their authoritative impact radius. Both are neutral
   earth/charcoal marks, with no source owner or hidden-source recovery.
+- Moving or pivoting tanks leave paired tread marks. Every currently visible tank paints precise
+  client-local marks from ordinary fog-filtered entity poses, while the server retains a coarsely
+  quantized and hard-capped historical approximation for refreshes and later discovery. Historical
+  chunks are discovered through physical fog like other durable ground marks, so a player later
+  visiting unseen ground learns the tracks without learning them through fog. The contact model advances
+  independent belt phases, stamps the full long contact patch, and paints additional shear during
+  pivots. Separate 512-world-pixel tread tiles avoid repeatedly uploading the whole-map
+  death/impact canvas during continuous movement.
 - `GameState` retains normalized records keyed by stable server id and queues only newly learned
   records. Match stages the pending batch before presentation assembly and releases it only after a
   successful backend presentation; Pixi stamps detached frame records and never consumes the
@@ -2003,10 +2033,10 @@ terrain and resources):
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.
 - `Renderer.groundDecalDiagnostics()` exposes the permanent layer's stamped count, pending count,
-  texture update count, texture dimensions/downsample, layer child count, and asset-load status for
-  contract tests and local profiling.
-- `Renderer.destroy()` clears the decal texture/canvases and cancels late atlas loads so rematches
-  start with a fresh blank decal layer.
+  texture update count, texture dimensions/downsample, layer child count, asset-load status, and
+  tread tile/segment/upload counts for contract tests and local profiling.
+- `Renderer.destroy()` clears the decal and tread-tile textures/canvases and cancels late atlas
+  loads so rematches start with a fresh blank decal layer.
 
 Trench terrain rendering (`renderer/trenches.js`; layer `trenches` between ground decals and
 resources):

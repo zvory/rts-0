@@ -248,9 +248,13 @@ assert(
 
 {
   const restorePixi = installFakePixi();
+  const priorPerformance = globalThis.performance;
+  let now = 0;
+  globalThis.performance = { now: () => now };
   try {
     const map = { width: 4, height: 4, tileSize: 32 };
-    const decalLayer = new GroundDecalLayer({ layer: new PIXI.Container() });
+    const layer = new PIXI.Container();
+    const decalLayer = new GroundDecalLayer({ layer });
     decalLayer.resetForMap(map);
     decalLayer.assetStatus = "ready";
     decalLayer.stampBatch([{
@@ -266,6 +270,34 @@ assert(
     }]);
     assert(decalLayer.texture.sourceUpdateCount === 1 && decalLayer.texture.textureUpdateCount === 0,
       "ground decals upload dynamic canvas pixels through Pixi v8 TextureSource.update");
+    const tank = { id: 40, kind: KIND.TANK, owner: 2, hp: 100, x: 40, y: 80, facing: 0 };
+    assert(decalLayer.stampLiveTankTreads([tank]) === 0,
+      "the first visible enemy tank pose initializes tread contact without painting");
+    assert(decalLayer.stampLiveTankTreads([{ ...tank, x: 48, facing: 0.12 }]) === 1,
+      "ordinary fog-filtered poses paint precise live tracks for every visible tank");
+    assert(decalLayer.texture.sourceUpdateCount === 1 &&
+      decalLayer.diagnostics().tankTreads.tileCount === 1 &&
+      layer.children[1].texture.sourceUpdateCount === 1,
+    "treads upload one bounded tile without modifying the whole-map permanent decal texture");
+    assert(decalLayer.stampBatch([{
+      id: 77,
+      decalClass: "tankTreads",
+      poses: [[160, 320, 0], [192, 320, 1252]],
+    }]) === 1 && decalLayer.diagnostics().tankTreads.totalSegments === 1,
+    "authoritative history already painted precisely from live poses does not darken twice");
+    assert(decalLayer.stampBatch([{
+      id: 78,
+      decalClass: "tankTreads",
+      poses: [[256, 256, 0], [320, 256, 0]],
+    }]) === 1 && decalLayer.diagnostics().tankTreads.totalSegments === 2,
+    "unseen checkpointed trail chunks still paint through the tiled tread layer");
+
+    now = 40;
+    decalLayer.stampLiveTankTreads([]);
+    now = 80;
+    assert(decalLayer.stampLiveTankTreads([{ ...tank, x: 96 }]) === 0 &&
+      decalLayer.tankTreads.poses.get(tank.id)?.x === 96,
+    "a tank that leaves fog is forgotten even between uploads, so reappearance starts a new trail");
 
     const trenchLayer = new TrenchDecalLayer({ layer: new PIXI.Container() });
     trenchLayer.resetForMap(map);
@@ -273,6 +305,7 @@ assert(
     assert(trenchLayer.texture.sourceUpdateCount === 1 && trenchLayer.texture.textureUpdateCount === 0,
       "trenches upload dynamic canvas pixels through Pixi v8 TextureSource.update");
   } finally {
+    globalThis.performance = priorPerformance;
     restorePixi();
   }
 }

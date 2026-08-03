@@ -12,6 +12,7 @@ import {
   rgba,
 } from "./decals/selection.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
+import { TankTreadLayer } from "./tank_tread_layer.js";
 
 export const GROUND_DECAL_TEXTURE_WORLD_SCALE = 4;
 
@@ -60,6 +61,7 @@ export class GroundDecalLayer {
     this._assetLoadGeneration = 0;
     this._queuedUntilAssets = [];
     this._tintScratch = null;
+    this.tankTreads = new TankTreadLayer({ layer, pixi, createCanvas, recordDiagnostic });
     this.totalStamped = 0;
     this.textureUpdateCount = 0;
   }
@@ -85,6 +87,7 @@ export class GroundDecalLayer {
     this.sprite = new this.pixi.Sprite(this.texture);
     this.sprite.scale.set(this.downsample);
     this.layer.addChild(this.sprite);
+    this.tankTreads.resetForMap(map);
     this.recordDiagnostic?.("renderer.groundDecals.displayObjects", this.displayObjectCount());
     this._beginAssetLoad();
     return true;
@@ -92,17 +95,21 @@ export class GroundDecalLayer {
 
   stampBatch(decals, { onError = null } = {}) {
     if (!this.ctx || !Array.isArray(decals) || decals.length === 0) return 0;
+    const trails = decals.filter((decal) => decal?.decalClass === "tankTreads");
+    const ordinary = decals.filter((decal) => decal?.decalClass !== "tankTreads");
+    const trailStamped = this.tankTreads.stampAuthoritativeTrails(trails);
+    if (ordinary.length === 0) return trailStamped;
     if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.FAILED) {
       throw this.assetLoadError || new Error("ground decal PNG atlas is unavailable");
     }
     if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.PENDING) {
-      this.recordDiagnostic?.("renderer.groundDecals.awaitingAtlas", decals.length);
-      return 0;
+      this.recordDiagnostic?.("renderer.groundDecals.awaitingAtlas", ordinary.length);
+      return trailStamped;
     }
     const batch = this._queuedUntilAssets.length > 0
-      ? this._queuedUntilAssets.splice(0).concat(decals)
-      : decals;
-    return this._stampDecodedBatch(batch, { onError });
+      ? this._queuedUntilAssets.splice(0).concat(ordinary)
+      : ordinary;
+    return trailStamped + this._stampDecodedBatch(batch, { onError });
   }
 
   _beginAssetLoad() {
@@ -197,10 +204,16 @@ export class GroundDecalLayer {
       downsample: this.downsample,
       layerChildCount: this.displayObjectCount(),
       assetStatus: this.assetStatus,
+      tankTreads: this.tankTreads.diagnostics(),
     };
   }
 
+  stampLiveTankTreads(entities) {
+    return this.tankTreads.stampVisibleTankPoses(entities);
+  }
+
   destroy() {
+    this.tankTreads.destroy();
     this._assetLoadGeneration += 1;
     this.assetLoadPromise = null;
     this.assetLoadError = null;

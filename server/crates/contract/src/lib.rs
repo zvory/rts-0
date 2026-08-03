@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 
 pub type TeamId = u32;
 pub const DEFAULT_FACTION_ID: &str = "kriegsia";
+/// Current version of the embedded authoritative `rts.gameCheckpoint` payload.
+pub const GAME_CHECKPOINT_CURRENT_VERSION: u32 = 2;
 /// Maximum raw submitted ids in an ordinary multi-unit command.
 pub const MAX_UNITS_PER_COMMAND: usize = 256;
 /// Maximum raw submitted ids in a Lab command that bypasses ordinary command limits.
@@ -689,6 +691,16 @@ pub struct GroundDecalView {
     pub radius_tiles: Option<f32>,
 }
 
+/// One immutable, spatially bounded tank-trail chunk. Coordinates are absolute quarter-pixels;
+/// the third component is a signed i16 heading encoded in an i32 protocol slot, mapping
+/// `[-32767, 32767]` to `[-pi, pi]`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TankTrailView {
+    pub id: u32,
+    pub poses: Vec<[i32; 3]>,
+}
+
 /// A complete perspective-scoped decal range `(after_revision, snapshot revision]`. Clients may
 /// advance their retained cursor only when they already cover `after_revision`; otherwise the
 /// rows are still safe to present and the reliable repair path fills the gap.
@@ -697,6 +709,8 @@ pub struct GroundDecalView {
 pub struct GroundDecalDelta {
     pub after_revision: u32,
     pub decals: Vec<GroundDecalView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tank_trails: Vec<TankTrailView>,
 }
 
 /// Server-side transport and scheduling health attached to every snapshot.

@@ -16,7 +16,7 @@ fn checkpoint_payload(
 ) -> String {
     serde_json::to_string(&json!({
         "schema": "rts.gameCheckpoint",
-        "version": 1,
+        "version": GAME_CHECKPOINT_CURRENT_VERSION,
         "mapBinding": {
             "name": "Chokes",
             "schemaVersion": 2,
@@ -242,6 +242,22 @@ fn lab_replay_artifact_rejects_oversized_nested_checkpoint_payload() {
         .expect_err("nested checkpoint cap should fail");
 
     assert!(err.to_string().contains("checkpointPayload"));
+}
+
+#[test]
+fn lab_replay_artifact_rejects_a_stale_embedded_checkpoint_version() {
+    let mut artifact = valid_artifact();
+    let mut checkpoint: serde_json::Value =
+        serde_json::from_str(&artifact.initial_setup.checkpoint_payload).unwrap();
+    checkpoint["version"] = json!(GAME_CHECKPOINT_CURRENT_VERSION - 1);
+    artifact.initial_setup.checkpoint_payload = serde_json::to_string(&checkpoint).unwrap();
+
+    let err = validate_lab_replay_artifact(&artifact)
+        .expect_err("stale authoritative checkpoint schemas must fail closed");
+
+    assert!(err.to_string().contains(&format!(
+        "version must be {GAME_CHECKPOINT_CURRENT_VERSION}"
+    )));
 }
 
 #[test]

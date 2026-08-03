@@ -222,8 +222,12 @@ impl Game {
             .views_for(player, fog, fogged, memory_players);
 
         let player_resources = self.player_resource_snapshots(player_resource_projection);
-        let (ground_decal_revision, ground_decal_after_revision, ground_decal_views) = if omniscient
-        {
+        let (
+            ground_decal_revision,
+            ground_decal_after_revision,
+            ground_decal_views,
+            tank_trail_views,
+        ) = if omniscient {
             self.state
                 .ground_decals
                 .recent_full_world_views(MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA)
@@ -232,11 +236,16 @@ impl Game {
                 .ground_decals
                 .recent_views_for_players(memory_players, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA)
         };
-        debug_assert!(ground_decal_views.len() <= MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA);
-        let ground_decal_delta = (ground_decal_revision > 0).then_some(GroundDecalDelta {
-            after_revision: ground_decal_after_revision,
-            decals: ground_decal_views,
-        });
+        debug_assert!(
+            ground_decal_views.len() + tank_trail_views.len()
+                <= MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA
+        );
+        let ground_decal_delta =
+            (ground_decal_after_revision < ground_decal_revision).then_some(GroundDecalDelta {
+                after_revision: ground_decal_after_revision,
+                decals: ground_decal_views,
+                tank_trails: tank_trail_views,
+            });
 
         Snapshot {
             tick: self.state.tick,

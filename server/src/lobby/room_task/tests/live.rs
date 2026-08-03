@@ -61,7 +61,8 @@ fn ground_decal_repair_responds_in_game_and_lobby_requests_do_not_consume_the_li
             request_id: 2,
             revision: 0,
             decals,
-        }) if decals.is_empty()
+            tank_trails,
+        }) if decals.is_empty() && tank_trails.is_empty()
     ));
     assert!(task.ground_decal_request_times.contains_key(&1));
 }

@@ -6,6 +6,7 @@ import {
   GROUND_DECAL_CLASS,
   GroundDecalBuffer,
   normalizeAuthoritativeGroundDecal,
+  normalizeAuthoritativeTankTrail,
 } from "../../client/src/state_ground_decals.js";
 import { stampGroundDecal } from "../../client/src/renderer/decals.js";
 import { EVENT, KIND } from "../../client/src/protocol.js";
@@ -30,6 +31,25 @@ function authoritativeRecord(id, overrides = {}) {
     seed: id + 100,
     ...overrides,
   };
+}
+
+{
+  const trail = normalizeAuthoritativeTankTrail({
+    id: 9,
+    poses: [[400, 800, 0], [432, 800, 4096]],
+  });
+  assert(trail?.decalClass === GROUND_DECAL_CLASS.TANK_TREADS && trail.poses.length === 2,
+    "packed authoritative tank trails retain their checkpointed pose sequence");
+  const buffer = new GroundDecalBuffer();
+  const applied = buffer.applyAuthoritativeBatch({
+    revision: 1,
+    decals: [],
+    tankTrails: [{ id: 9, poses: [[400, 800, 0], [432, 800, 4096]] }],
+  });
+  assert(applied.queued === 1 && buffer.consumePending()[0]?.decalClass === "tankTreads",
+    "authoritative trail chunks enter the same durable presentation queue as decals");
+  assert(!normalizeAuthoritativeTankTrail({ id: 10, poses: [[-1, 0, 0], [0, 0, 0]] }),
+    "out-of-range packed trail poses are rejected");
 }
 
 {

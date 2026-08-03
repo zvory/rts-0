@@ -70,7 +70,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       0.2,
       null,
       null,
-    ]]],
+    ]], [[44, [[1024, 1152, 0], [1088, 1152, 4096]]]]],
     n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 7, 42],
     e: [
       [
@@ -407,8 +407,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     decoded.groundDecalDelta.afterRevision === 12 &&
       decoded.groundDecalDelta.decals[0].id === 901 &&
       decoded.groundDecalDelta.decals[0].sourceKind === KIND.RIFLEMAN &&
-      decoded.groundDecalDelta.decals[0].facing === 0.2,
-    "bounded ground decal delta decodes with its covered-after cursor",
+      decoded.groundDecalDelta.decals[0].facing === 0.2 &&
+      decoded.groundDecalDelta.tankTrails[0].id === 44 &&
+      decoded.groundDecalDelta.tankTrails[0].poses[1][2] === 4096,
+    "bounded ground-mark delta decodes decals and packed tank trails with its covered-after cursor",
   );
   assert(
     decoded.visibleTiles.join(",") === "1,1,0,0,0,1",

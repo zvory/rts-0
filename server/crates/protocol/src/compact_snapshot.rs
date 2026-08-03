@@ -16,7 +16,7 @@ use rts_contract::{
     AbilityCooldownView, AbilityObjectOwnerStateView, AbilityObjectView, AttackReveal,
     DebugPathView, EntityView, Event, GroundDecalView, OrderPlanMarker, RememberedAntiTankGunView,
     RememberedBuildingView, ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus,
-    TrenchView,
+    TankTrailView, TrenchView,
 };
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
@@ -81,6 +81,11 @@ impl Serialize for CompactSnapshot<'_> {
                         .decals
                         .iter()
                         .map(CompactGroundDecal)
+                        .collect::<Vec<_>>(),
+                    delta
+                        .tank_trails
+                        .iter()
+                        .map(CompactTankTrail)
                         .collect::<Vec<_>>(),
                 ),
             )?;
@@ -357,10 +362,9 @@ fn section_counts(snapshot: &Snapshot) -> BTreeMap<&'static str, u32> {
     insert_count(
         &mut counts,
         SECTION_GROUND_DECALS,
-        snapshot
-            .ground_decal_delta
-            .as_ref()
-            .map_or(0, |delta| delta.decals.len()),
+        snapshot.ground_decal_delta.as_ref().map_or(0, |delta| {
+            delta.decals.len().saturating_add(delta.tank_trails.len())
+        }),
     );
     insert_count(
         &mut counts,
@@ -567,6 +571,21 @@ impl Serialize for CompactGroundDecal<'_> {
         seq.serialize_element(&decal.facing)?;
         seq.serialize_element(&decal.weapon_facing)?;
         seq.serialize_element(&decal.radius_tiles)?;
+        seq.end()
+    }
+}
+
+struct CompactTankTrail<'a>(&'a TankTrailView);
+
+impl Serialize for CompactTankTrail<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let trail = self.0;
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        seq.serialize_element(&trail.id)?;
+        seq.serialize_element(&trail.poses)?;
         seq.end()
     }
 }
@@ -1391,6 +1410,10 @@ mod tests {
                     weapon_facing: None,
                     radius_tiles: None,
                 }],
+                tank_trails: vec![TankTrailView {
+                    id: 8,
+                    poses: vec![[128, 256, 0], [160, 256, 1024]],
+                }],
             }),
             world_combat_position: None,
             steel: 0,
@@ -1418,6 +1441,8 @@ mod tests {
         assert_eq!(value["gd"][1][0][0], 7);
         assert_eq!(value["gd"][1][0][1], "infantry");
         assert_eq!(value["gd"][1][0][2], kind_code("rifleman"));
+        assert_eq!(value["gd"][2][0][0], 8);
+        assert_eq!(value["gd"][2][0][1][1][0], 160);
         snapshot.ground_decal_revision = 0;
         snapshot.ground_decal_delta = None;
         let value = compact_snapshot_value(&snapshot).unwrap();

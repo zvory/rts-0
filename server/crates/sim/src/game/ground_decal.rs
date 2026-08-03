@@ -4,16 +4,18 @@ use crate::config;
 use crate::game::entity::EntityKind;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
-use crate::protocol::{self, GroundDecalView};
+use crate::protocol::{self, GroundDecalView, TankTrailView};
 use crate::rules::{artillery_ground_decal_source_kind, mortar_ground_decal_source_kind};
 use serde::{Deserialize, Serialize};
 
 mod revision_log;
 mod spatial_index;
+mod tank_trail;
 mod types;
 
 use revision_log::{GroundDecalRevisionEntry, GroundDecalRevisionLog};
 use spatial_index::GroundDecalSpatialIndex;
+use tank_trail::TankTrailStore;
 use types::{
     deserialize_source_kind, serialize_source_kind, valid_class_and_source, GroundDecalClass,
 };
@@ -61,8 +63,14 @@ impl GroundDecal {
 pub(crate) struct GroundDecalStore {
     next_id: u32,
     revision: u32,
+    #[serde(default)]
+    current_tick: u32,
     decals: Vec<GroundDecal>,
     discovered_by_player: BTreeMap<u32, BTreeMap<u32, u32>>,
+    #[serde(default)]
+    tank_trails: TankTrailStore,
+    #[serde(default)]
+    discovered_trails_by_player: BTreeMap<u32, BTreeMap<u32, u32>>,
     revision_log: GroundDecalRevisionLog,
     #[serde(skip)]
     spatial_index: GroundDecalSpatialIndex,
@@ -79,10 +87,39 @@ impl GroundDecalStore {
         Self {
             next_id: 1,
             revision: 0,
+            current_tick: 0,
             decals: Vec::new(),
             discovered_by_player: BTreeMap::new(),
+            tank_trails: TankTrailStore::new(),
+            discovered_trails_by_player: BTreeMap::new(),
             revision_log: GroundDecalRevisionLog::default(),
             spatial_index: GroundDecalSpatialIndex::new(),
+        }
+    }
+
+    pub(crate) fn begin_tick(&mut self, tick: u32) {
+        self.current_tick = tick;
+    }
+
+    pub(crate) fn update_tank_trails(
+        &mut self,
+        entities: &crate::game::entity::EntityStore,
+        map: &Map,
+        tick: u32,
+    ) {
+        for pending in self.tank_trails.update(entities, map, tick) {
+            let Some(id) = self.tank_trails.next_id() else {
+                return;
+            };
+            let Some(revision) = self.record_revision(GroundDecalRevisionEntry::TrailCreated {
+                id,
+                tick: self.current_tick,
+            }) else {
+                return;
+            };
+            if !self.tank_trails.commit(pending, id, revision, map) {
+                return;
+            }
         }
     }
 
@@ -156,7 +193,10 @@ impl GroundDecalStore {
         }
         self.spatial_index.ensure(&self.decals);
         let id = self.next_id;
-        let created_revision = self.record_revision(GroundDecalRevisionEntry::Created { id })?;
+        let created_revision = self.record_revision(GroundDecalRevisionEntry::Created {
+            id,
+            tick: self.current_tick,
+        })?;
         self.next_id = self.next_id.checked_add(1).unwrap_or(0);
         self.decals.push(GroundDecal {
             id,
@@ -177,7 +217,7 @@ impl GroundDecalStore {
         Some(id)
     }
 
-    pub(crate) fn refresh_memory_for_player(&mut self, player: u32, fog: &Fog) {
+    pub(crate) fn refresh_memory_for_player(&mut self, player: u32, fog: &Fog, map: &Map) {
         self.spatial_index.ensure(&self.decals);
         let mut newly_visible = BTreeSet::new();
         if let Some((width, visible)) = fog.visible_grid_for(player) {
@@ -211,12 +251,36 @@ impl GroundDecalStore {
             }
         }
         for id in newly_visible {
-            let Some(revision) =
-                self.record_revision(GroundDecalRevisionEntry::Discovered { player, id })
-            else {
+            let Some(revision) = self.record_revision(GroundDecalRevisionEntry::Discovered {
+                player,
+                id,
+                tick: self.current_tick,
+            }) else {
                 return;
             };
             self.discovered_by_player
+                .entry(player)
+                .or_default()
+                .insert(id, revision);
+        }
+
+        let known_trails = self
+            .discovered_trails_by_player
+            .get(&player)
+            .cloned()
+            .unwrap_or_default();
+        let newly_visible_trails =
+            self.tank_trails
+                .newly_fully_visible(player, fog, map, &known_trails);
+        for id in newly_visible_trails {
+            let Some(revision) = self.record_revision(GroundDecalRevisionEntry::TrailDiscovered {
+                player,
+                id,
+                tick: self.current_tick,
+            }) else {
+                return;
+            };
+            self.discovered_trails_by_player
                 .entry(player)
                 .or_default()
                 .insert(id, revision);
@@ -227,8 +291,9 @@ impl GroundDecalStore {
         &self,
         map: &crate::game::map::Map,
         player_ids: &BTreeSet<u32>,
+        tick: u32,
     ) -> bool {
-        if self.next_id == 0 {
+        if self.next_id == 0 || self.current_tick != tick {
             return false;
         }
         let mut ids = BTreeSet::new();
@@ -276,12 +341,32 @@ impl GroundDecalStore {
                 }
             }
         }
-        self.revision_log.valid(
-            self.revision,
-            &self.decals,
-            &self.discovered_by_player,
-            used_revisions.len(),
-        )
+        if !self
+            .tank_trails
+            .valid_checkpoint_state(map, player_ids, tick)
+        {
+            return false;
+        }
+        for revision in self.tank_trails.created_revisions() {
+            if revision > self.revision || !used_revisions.insert(revision) {
+                return false;
+            }
+        }
+        for (player, known) in &self.discovered_trails_by_player {
+            if !player_ids.contains(player) {
+                return false;
+            }
+            for (id, revision) in known {
+                if !self.tank_trails.contains(*id)
+                    || *revision == 0
+                    || *revision > self.revision
+                    || !used_revisions.insert(*revision)
+                {
+                    return false;
+                }
+            }
+        }
+        self.revision_log.valid(self, used_revisions.len())
     }
 }
 
@@ -354,277 +439,4 @@ fn decal_visible_to_player(decal: &GroundDecal, player: u32, fog: &Fog) -> bool 
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::game::{Game, ObserverView, PlayerInit};
-    use crate::rules::death_ground_decal_class;
-
-    fn one_player_game() -> Game {
-        Game::new(
-            &[PlayerInit {
-                id: 1,
-                team_id: 1,
-                faction_id: "kriegsia".to_string(),
-                name: "One".to_string(),
-                color: "#fff".to_string(),
-                is_ai: false,
-            }],
-            7,
-        )
-    }
-
-    fn fog_with_visible_tile(player: u32, visible_index: Option<usize>) -> Fog {
-        let mut grid = vec![false; 16];
-        if let Some(index) = visible_index {
-            grid[index] = true;
-        }
-        Fog::from_checkpoint_grids(
-            4,
-            4,
-            BTreeMap::from([(player, grid)]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-    }
-
-    #[test]
-    fn store_keeps_marks_beyond_the_old_beta_cap() {
-        let mut store = GroundDecalStore::new();
-        let map = one_player_game().state.map;
-        for _ in 0..4_097 {
-            assert!(store.create_mortar_impact(&map, 32.0, 32.0).is_some());
-        }
-        assert_eq!(store.decals.first().map(|decal| decal.id), Some(1));
-        assert_eq!(store.decals.last().map(|decal| decal.id), Some(4_097));
-    }
-
-    #[test]
-    fn stored_mark_has_no_heap_owned_vocabulary() {
-        assert!(std::mem::size_of::<GroundDecal>() <= 64);
-    }
-
-    #[test]
-    fn hidden_mark_is_sent_only_after_first_physical_discovery() {
-        let mut store = GroundDecalStore::new();
-        let map = one_player_game().state.map;
-        store.create_mortar_impact(&map, 48.0, 48.0).unwrap();
-
-        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None));
-        assert_eq!(store.views_for_players_after(&[2], 0), (0, Vec::new()));
-        assert_eq!(store.recent_views_for_players(&[2], 64), (0, 0, Vec::new()));
-
-        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, Some(5)));
-        let (revision, decals) = store.views_for_players_after(&[2], 0);
-        assert!(revision > 0);
-        assert_eq!(decals.len(), 1);
-        assert_eq!(decals[0].decal_class, "mortarBlast");
-        let (fast_revision, fast_after, fast_decals) = store.recent_views_for_players(&[2], 64);
-        assert_eq!(fast_revision, revision);
-        assert_eq!(fast_after, 0);
-        assert_eq!(fast_decals, decals);
-        assert_eq!(
-            decals[0].owner, 0,
-            "impact decals must not leak firing owner"
-        );
-        assert_eq!(
-            store.views_for_players_after(&[2], revision),
-            (revision, Vec::new())
-        );
-
-        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, Some(5)));
-        assert_eq!(store.revision_for_players(&[2]), revision);
-        assert_eq!(
-            store.recent_views_for_players(&[2], 64),
-            (fast_revision, fast_after, fast_decals),
-            "the same bounded tail repeats until later revisions roll it out"
-        );
-    }
-
-    #[test]
-    fn player_delta_is_fog_safe_while_full_world_gets_created_marks() {
-        let mut store = GroundDecalStore::new();
-        let map = one_player_game().state.map;
-        store.create_artillery_impact(&map, 48.0, 48.0).unwrap();
-        store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
-        store.refresh_memory_for_player(2, &fog_with_visible_tile(2, None));
-
-        assert_eq!(store.views_for_players_after(&[2], 0), (0, Vec::new()));
-        assert!(store.recent_views_for_players(&[2], 64).2.is_empty());
-        assert_eq!(store.views_for_players_after(&[1], 0).1.len(), 1);
-        assert_eq!(store.recent_views_for_players(&[1], 64).2.len(), 1);
-        assert_eq!(store.full_world_views_after(0).1.len(), 1);
-        assert_eq!(store.recent_full_world_views(64).2.len(), 1);
-    }
-
-    #[test]
-    fn recent_player_delta_is_revision_bounded_and_complete_after_its_cursor() {
-        let mut store = GroundDecalStore::new();
-        let map = one_player_game().state.map;
-        for offset in 0..70 {
-            store
-                .create_mortar_impact(&map, 48.0 + offset as f32 * 0.01, 48.0)
-                .unwrap();
-        }
-        store.refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
-
-        let (revision, after_revision, decals) = store.recent_views_for_players(&[1], 64);
-        assert_eq!(after_revision, revision - 64);
-        assert_eq!(decals.len(), 64);
-        assert_eq!(
-            decals,
-            store.views_for_players_after(&[1], after_revision).1,
-            "the advertised range must contain every entitled row after its cursor"
-        );
-        assert!(decals.iter().all(|decal| decal.owner == 0));
-    }
-
-    #[test]
-    fn game_checkpoint_round_trip_preserves_marks_and_discovery_revisions() {
-        let players = [
-            PlayerInit {
-                id: 1,
-                team_id: 1,
-                faction_id: "kriegsia".to_string(),
-                name: "One".to_string(),
-                color: "#fff".to_string(),
-                is_ai: false,
-            },
-            PlayerInit {
-                id: 2,
-                team_id: 2,
-                faction_id: "kriegsia".to_string(),
-                name: "Two".to_string(),
-                color: "#000".to_string(),
-                is_ai: false,
-            },
-        ];
-        let mut game = Game::new(&players, 0xdec0_1234);
-        let source = game
-            .state
-            .entities
-            .iter()
-            .find(|entity| entity.owner == 1 && death_ground_decal_class(entity.kind).is_some())
-            .expect("player one worker")
-            .clone();
-        game.state
-            .ground_decals
-            .create_death(
-                source.kind,
-                source.pos_x,
-                source.pos_y,
-                source.owner,
-                Some(source.facing()),
-                source.weapon_facing(),
-            )
-            .unwrap();
-        game.refresh_ground_decal_memory(&[1, 2]);
-        let before_player = game.ground_decals_for_player(1, 0);
-        let before_full = game.ground_decals_for_observer(&ObserverView::Omniscient, 0);
-        assert_eq!(before_player.1.len(), 1);
-
-        let payload = game.checkpoint_payload_text_for_test().unwrap();
-        let restored = Game::restore_checkpoint_payload_text_for_test(
-            &payload,
-            game.state.map.clone(),
-            game.map_metadata().clone(),
-        )
-        .unwrap();
-        assert_eq!(restored.ground_decals_for_player(1, 0), before_player);
-        assert_eq!(
-            restored.ground_decals_for_observer(&ObserverView::Omniscient, 0),
-            before_full
-        );
-    }
-
-    #[test]
-    fn checkpoint_restore_rebuilds_spatial_discovery_index() {
-        let mut game = one_player_game();
-        game.state
-            .ground_decals
-            .create_mortar_impact(&game.state.map, 48.0, 48.0)
-            .unwrap();
-        let payload = game.checkpoint_payload_text_for_test().unwrap();
-        let mut restored = Game::restore_checkpoint_payload_text_for_test(
-            &payload,
-            game.state.map.clone(),
-            game.map_metadata().clone(),
-        )
-        .unwrap();
-
-        restored
-            .state
-            .ground_decals
-            .refresh_memory_for_player(1, &fog_with_visible_tile(1, Some(5)));
-
-        assert_eq!(restored.ground_decals_for_player(1, 0).1.len(), 1);
-    }
-
-    #[test]
-    fn checkpoint_rejects_noncanonical_blast_radius() {
-        let mut game = one_player_game();
-        game.state
-            .ground_decals
-            .create_mortar_impact(&game.state.map, 48.0, 48.0)
-            .unwrap();
-        let payload = game.checkpoint_payload_text_for_test().unwrap();
-        let mut value: serde_json::Value = serde_json::from_str(&payload).unwrap();
-        value["groundDecals"]["decals"][0]["radiusTiles"] = serde_json::json!(999.0);
-        let malformed = serde_json::to_string(&value).unwrap();
-        let result = Game::restore_checkpoint_payload_text_for_test(
-            &malformed,
-            game.state.map.clone(),
-            game.map_metadata().clone(),
-        );
-        assert!(
-            result.is_err(),
-            "noncanonical blast radii must reject restore"
-        );
-    }
-
-    #[test]
-    fn checkpoint_rejects_noncanonical_revision_gaps() {
-        let mut game = one_player_game();
-        game.state
-            .ground_decals
-            .create_mortar_impact(&game.state.map, 48.0, 48.0)
-            .unwrap();
-        let payload = game.checkpoint_payload_text_for_test().unwrap();
-        let mut value: serde_json::Value = serde_json::from_str(&payload).unwrap();
-        value["groundDecals"]["revision"] = serde_json::json!(u32::MAX);
-        let malformed = serde_json::to_string(&value).unwrap();
-        let result = Game::restore_checkpoint_payload_text_for_test(
-            &malformed,
-            game.state.map.clone(),
-            game.map_metadata().clone(),
-        );
-        assert!(result.is_err(), "revision gaps must reject restore");
-    }
-
-    #[test]
-    fn edge_blasts_keep_checkpoint_state_canonical() {
-        let mut game = one_player_game();
-        game.state
-            .ground_decals
-            .create_mortar_impact(&game.state.map, -16.0, 48.0)
-            .unwrap();
-        assert!(
-            game.state
-                .ground_decals
-                .create_mortar_impact(&game.state.map, -200.0, 48.0)
-                .is_none(),
-            "a fully off-map blast has no visible mark to retain"
-        );
-
-        let payload = game.checkpoint_payload_text_for_test().unwrap();
-        let restored = Game::restore_checkpoint_payload_text_for_test(
-            &payload,
-            game.state.map.clone(),
-            game.map_metadata().clone(),
-        );
-
-        assert!(
-            restored.is_ok(),
-            "a legal edge impact must not make the server's own checkpoint unrestorable"
-        );
-    }
-}
+mod tests;

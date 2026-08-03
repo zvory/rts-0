@@ -5,9 +5,7 @@ use super::types::Phase;
 use super::RoomTask;
 use crate::protocol::ServerMessage;
 use rts_sim::game::{Game, ObserverView};
-
 const REQUEST_INTERVAL: Duration = Duration::from_millis(500);
-
 impl RoomTask {
     pub(super) fn on_request_ground_decals(
         &mut self,
@@ -49,7 +47,7 @@ impl RoomTask {
             ),
             Phase::Lobby | Phase::BranchStaging(_) => return,
         };
-        let (revision, decals) = response;
+        let (revision, decals, tank_trails) = response;
         send_or_log(
             &self.room,
             player_id,
@@ -58,18 +56,22 @@ impl RoomTask {
                 request_id,
                 revision,
                 decals,
+                tank_trails,
             },
         );
     }
 }
-
 fn projected_delta(
     game: &Game,
     explicit_view: Option<&ObserverView>,
     active_seat: Option<u32>,
     full_world: bool,
     after_revision: u32,
-) -> (u32, Vec<crate::protocol::GroundDecalView>) {
+) -> (
+    u32,
+    Vec<crate::protocol::GroundDecalView>,
+    Vec<crate::protocol::TankTrailView>,
+) {
     if full_world {
         return game.ground_decals_for_observer(&ObserverView::Omniscient, after_revision);
     }

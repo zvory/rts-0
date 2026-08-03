@@ -7,6 +7,7 @@ export const GROUND_DECAL_CLASS = Object.freeze({
   BUILDING_SCORCH: "buildingScorch",
   MORTAR_BLAST: "mortarBlast",
   ARTILLERY_BLAST: "artilleryBlast",
+  TANK_TREADS: "tankTreads",
 });
 
 const TWO_PI = Math.PI * 2;
@@ -24,18 +25,18 @@ export class GroundDecalBuffer {
     this.authoritativeDecals = new Map();
   }
 
-  applyAuthoritativeBatch({ revision, decals } = {}, context = {}) {
+  applyAuthoritativeBatch({ revision, decals, tankTrails } = {}, context = {}) {
     if (!Number.isInteger(revision) || revision < 0 || revision > 0xffffffff) {
       return { accepted: false, queued: 0 };
     }
     if (revision < this.authoritativeRevision) return { accepted: false, queued: 0 };
 
-    const queued = this._queueDecals(decals, context);
+    const queued = this._queueMarks(decals, tankTrails, context);
     this.authoritativeRevision = revision;
     return { accepted: true, queued };
   }
 
-  applySnapshotDelta({ revision, afterRevision, decals } = {}, context = {}) {
+  applySnapshotDelta({ revision, afterRevision, decals, tankTrails } = {}, context = {}) {
     if (!Number.isInteger(revision) || revision < 0 || revision > 0xffffffff) {
       return { accepted: false, complete: false, queued: 0 };
     }
@@ -46,19 +47,28 @@ export class GroundDecalBuffer {
       return { accepted: false, complete: false, queued: 0 };
     }
 
-    const queued = this._queueDecals(decals, context);
+    const queued = this._queueMarks(decals, tankTrails, context);
     const complete = afterRevision <= this.authoritativeRevision;
     if (complete) this.authoritativeRevision = revision;
     return { accepted: true, complete, queued };
   }
 
-  _queueDecals(records, context) {
+  _queueMarks(records, tankTrails, context) {
     let queued = 0;
     for (const record of Array.isArray(records) ? records : []) {
       const decal = normalizeAuthoritativeGroundDecal(record, context);
-      if (!decal || this.authoritativeDecals.has(decal.id)) continue;
-      this.authoritativeDecals.set(decal.id, decal);
+      const key = decal?.id;
+      if (!decal || this.authoritativeDecals.has(key)) continue;
+      this.authoritativeDecals.set(key, decal);
       this._pending.push(decal);
+      queued += 1;
+    }
+    for (const record of Array.isArray(tankTrails) ? tankTrails : []) {
+      const trail = normalizeAuthoritativeTankTrail(record);
+      const key = trail && `tread:${trail.id}`;
+      if (!trail || this.authoritativeDecals.has(key)) continue;
+      this.authoritativeDecals.set(key, trail);
+      this._pending.push(trail);
       queued += 1;
     }
     return queued;
@@ -120,6 +130,22 @@ export class GroundDecalBuffer {
     return this._pending.length;
   }
 
+}
+
+export function normalizeAuthoritativeTankTrail(record) {
+  if (!record || !Number.isSafeInteger(record.id) || record.id <= 0 ||
+      !Array.isArray(record.poses) || record.poses.length < 2 || record.poses.length > 64) {
+    return null;
+  }
+  const poses = [];
+  for (const pose of record.poses) {
+    if (!Array.isArray(pose) || pose.length !== 3 ||
+        !Number.isInteger(pose[0]) || pose[0] < 0 || pose[0] > 0xffff ||
+        !Number.isInteger(pose[1]) || pose[1] < 0 || pose[1] > 0xffff ||
+        !Number.isInteger(pose[2]) || pose[2] < -0x8000 || pose[2] > 0x7fff) return null;
+    poses.push([pose[0], pose[1], pose[2]]);
+  }
+  return { id: record.id, decalClass: GROUND_DECAL_CLASS.TANK_TREADS, poses };
 }
 
 export function normalizeAuthoritativeGroundDecal(record, {
