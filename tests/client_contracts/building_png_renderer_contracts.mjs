@@ -34,6 +34,13 @@ const silhouetteShadowKinds = new Set([
   KIND.FACTORY,
   KIND.STEELWORKS,
 ]);
+const emblemKinds = new Set([
+  KIND.BARRACKS,
+  KIND.TRAINING_CENTRE,
+  KIND.RESEARCH_COMPLEX,
+  KIND.FACTORY,
+  KIND.STEELWORKS,
+]);
 const definitions = createBuildingPngRigDefinitions();
 const atlases = createBuildingPngRigAtlases();
 strictAssert.equal(definitions.size, expectedFootprints.size);
@@ -45,23 +52,66 @@ for (const excludedKind of [KIND.DEPOT, KIND.TANK_TRAP]) {
 for (const [kind, footprint] of expectedFootprints) {
   const definition = definitions.get(kind);
   const atlas = atlases.get(kind);
-  const bodyRoute = { parts: ["part.base", "part.tint"] };
   strictAssert.ok(definition, `missing building PNG definition for ${kind}`);
   strictAssert.ok(atlas, `missing building PNG atlas for ${kind}`);
-  strictAssert.equal(pngAtlasCanRenderRoute(definition, atlas, bodyRoute), true);
-  strictAssert.deepEqual(pngAtlasRouteCoverage(definition, atlas, bodyRoute).missingParts, []);
   strictAssert.deepEqual([STATS[kind].footW, STATS[kind].footH], footprint);
   strictAssert.deepEqual(
     [atlas.viewBox.width, atlas.viewBox.height],
     footprint.map((tiles) => tiles * 32),
   );
   const hasSilhouetteShadow = silhouetteShadowKinds.has(kind);
+  const hasEmblem = emblemKinds.has(kind);
+  const expectedBodyParts = ["part.base", "part.tint", ...(hasEmblem ? ["part.emblem"] : [])];
+  const expectedShadowParts = hasSilhouetteShadow ? ["part.shadow"] : [];
+  strictAssert.deepEqual(atlas.routes.body, expectedBodyParts);
+  strictAssert.deepEqual(atlas.routes.shadow, expectedShadowParts);
+  strictAssert.equal(Object.isFrozen(atlas.routes), true);
+  strictAssert.equal(Object.isFrozen(atlas.routes.body), true);
+  strictAssert.equal(Object.isFrozen(atlas.routes.shadow), true);
+  strictAssert.equal(pngAtlasCanRenderRoute(definition, atlas, { parts: atlas.routes.body }), true);
+  strictAssert.deepEqual(
+    pngAtlasRouteCoverage(definition, atlas, { parts: atlas.routes.body }).missingParts,
+    [],
+  );
+  strictAssert.deepEqual(
+    atlas.sprites.map((sprite) => sprite.id),
+    [
+      "sprite.base",
+      "sprite.tint",
+      ...(hasSilhouetteShadow ? ["sprite.shadow"] : []),
+      ...(hasEmblem ? ["sprite.emblem"] : []),
+    ],
+  );
   strictAssert.deepEqual(
     atlas.sprites.map((sprite) => sprite.tintSlot),
-    hasSilhouetteShadow ? ["fixed", "team", "fixed"] : ["fixed", "team"],
+    [
+      "fixed",
+      "team",
+      ...(hasSilhouetteShadow ? ["fixed"] : []),
+      ...(hasEmblem ? ["team"] : []),
+    ],
   );
+  strictAssert.deepEqual(
+    new Set(atlas.sprites.flatMap((sprite) => sprite.sourceParts)),
+    new Set(definition.parts.map((part) => part.id)),
+  );
+  strictAssert.equal(atlas.grid.columns, atlas.sprites.length);
+  for (const [column, sprite] of atlas.sprites.entries()) {
+    strictAssert.equal(sprite.frame.x, column * sprite.frame.w);
+    strictAssert.ok(sprite.frame.x >= 0 && sprite.frame.y >= 0, `${kind}.${sprite.id} frame starts in grid`);
+    strictAssert.ok(
+      sprite.frame.x + sprite.frame.w <= atlas.grid.width
+        && sprite.frame.y + sprite.frame.h <= atlas.grid.height,
+      `${kind}.${sprite.id} frame fits grid`,
+    );
+  }
+  strictAssert.equal(definition.parts.some((part) => part.id === "part.emblem"), hasEmblem);
+  if (hasEmblem) {
+    strictAssert.equal(definition.parts.find((part) => part.id === "part.emblem")?.tintSlot, "team");
+    strictAssert.equal(atlas.sprites.find((sprite) => sprite.id === "sprite.emblem")?.tintSlot, "team");
+  }
   if (hasSilhouetteShadow) {
-    const shadowRoute = { parts: ["part.shadow"] };
+    const shadowRoute = { parts: atlas.routes.shadow };
     strictAssert.equal(pngAtlasCanRenderRoute(definition, atlas, shadowRoute), true);
     strictAssert.deepEqual(pngAtlasRouteCoverage(definition, atlas, shadowRoute).missingParts, []);
   }
@@ -126,14 +176,15 @@ try {
     "loaded building atlas replaces the temporary SVG instance in the shared body pool",
   );
   assert(fallback._destroyed === true, "building atlas promotion destroys the replaced SVG instance");
-  assert(body.parts.size === 2, "building PNG body route draws fixed-color and team-tint sprites");
+  assert(body.parts.size === 3, "emblem building PNG body route draws base, team tint, and emblem sprites");
   assert(shadow?.parts.size === 1, "perspective building PNG routes its silhouette shadow separately");
   assert(body.container.alpha === 0.45, "building PNG preserves scaffold transparency");
   assert(shadow.container.alpha === 0.45, "building silhouette shadow preserves scaffold transparency");
   assert(
     body.parts.get("sprite.base")?.display.tint === 0xffffff
-      && body.parts.get("sprite.tint")?.display.tint === 0xc85050,
-    "building PNG applies the owning player's color only to its team-tint sprite",
+      && body.parts.get("sprite.tint")?.display.tint === 0xc85050
+      && body.parts.get("sprite.emblem")?.display.tint === 0xc85050,
+    "building PNG applies the owning player's color to both the paint and white-keyed emblem sprites",
   );
   assert(
     renderer._pools.buildingShadows.get(entity.id)?.visible === false,
