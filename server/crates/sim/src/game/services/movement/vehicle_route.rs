@@ -144,7 +144,11 @@ pub(super) fn vehicle_route_context(
     let direct_goal_is_clear = car_motion_profile(e.kind).is_some_and(|profile| {
         clear_car_direct_goal_route(profile, map, occ, e.kind, current, final_goal)
     });
-    let route_focus = if direct_goal_is_clear { final_goal } else { target };
+    let route_focus = if direct_goal_is_clear {
+        final_goal
+    } else {
+        target
+    };
     let lookahead = if !direct_goal_is_clear
         && !static_standability::unit_static_segment_standable(map, occ, e.kind, current, target)
     {
@@ -263,8 +267,7 @@ fn clear_car_direct_goal_route(
     for i in 0..=steps {
         let t = i as f32 / steps as f32;
         let pos = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
-        if static_clearance_px(profile, map, occ, kind, pos, facing)
-            + 0.001
+        if static_clearance_px(profile, map, occ, kind, pos, facing) + 0.001
             < profile.clearance_score_max_px
         {
             return false;

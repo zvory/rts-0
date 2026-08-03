@@ -114,7 +114,9 @@ pub(super) fn plan_scout_car_motion(
         let waypoint_behind = route.next_index > 0
             && !route.direct_goal_is_clear
             && waypoint_is_behind(e.facing(), route.target, current);
-        for primitive in scout_car_primitives(profile, route_reverse_waypoint.is_some(), waypoint_behind) {
+        for primitive in
+            scout_car_primitives(profile, route_reverse_waypoint.is_some(), waypoint_behind)
+        {
             let travel_distance =
                 primitive_travel_distance(current, &route, primitive, step_budget, e.facing());
             if travel_distance <= 0.01 {
@@ -280,7 +282,8 @@ fn scout_car_candidate(
         ) {
             return None;
         }
-        min_clearance = min_clearance.min(static_clearance_px(profile, map, occ, e.kind, pos, facing));
+        min_clearance =
+            min_clearance.min(static_clearance_px(profile, map, occ, e.kind, pos, facing));
         last_pos = pos;
         last_facing = facing;
     }
@@ -436,8 +439,7 @@ fn score_candidate(
     let alignment_improvement = current_alignment - travel_alignment;
     let clearance_penalty =
         (profile.clearance_score_max_px - candidate.min_static_clearance_px).max(0.0) * 0.85;
-    let steering_penalty =
-        candidate.primitive.curvature.abs() * profile.min_turn_radius_px * 1.25;
+    let steering_penalty = candidate.primitive.curvature.abs() * profile.min_turn_radius_px * 1.25;
     let reverse_penalty = if candidate.primitive.travel_sign < 0.0 {
         12.0
     } else {

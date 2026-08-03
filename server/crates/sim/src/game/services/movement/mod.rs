@@ -46,10 +46,10 @@ const MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE: f32 =
     config::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER - 1.0;
 
 pub(crate) use collision::resolve_collisions;
-#[cfg(test)]
-use vehicle_profiles::TANK_BODY_TURN_RATE_RAD_PER_TICK;
 pub(crate) use pivot_drive::{angle_delta, rotate_toward};
 pub(crate) use standability::is_collision_anchored;
+#[cfg(test)]
+use vehicle_profiles::TANK_BODY_TURN_RATE_RAD_PER_TICK;
 
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
