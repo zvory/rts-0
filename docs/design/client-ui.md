@@ -486,6 +486,7 @@ export class TankTreadLayer {
   resetForMap(map)
   stampVisibleTankPoses(entities)
   stampAuthoritativeTrails(trails)
+  revealAuthoritativeTrails(fog)
   diagnostics()
   destroy()
 }
@@ -495,11 +496,18 @@ ground-mark discovery cursor. It derives precise live tracks for every tank curr
 the client's fog-filtered entity snapshots, using its `x`/`y`/`facing` poses; those client-retained
 pixels are presentation state rather than historical server authority. Reconnects, replay seeks,
 and later visits to previously fogged ground rebuild a coarser but directionally representative
-version from server trail chunks. Pixels persist in lazily allocated
-512-world-pixel tiles (256×256 texels); only touched tiles upload, and all tile
-canvases/textures/sprites are destroyed with the ground-decal layer. Preview contact poses are
-accumulated between bounded 10 Hz uploads; the swept-contact raster fills the complete intervening
-motion.
+version from server trail chunks. Received chunks are cached as geometry first: each render pass
+permanently stamps only the 32-world-pixel map tiles that current authoritative fog marks visible,
+using a hard canvas clip so the reveal ends exactly at tile boundaries. A chunk can therefore be
+present in client memory before all of its pixels are eligible to appear. The exact set of
+client-stamped tiles is presentation state and is not separately checkpointed by the server.
+Pending historical geometry is reconsidered only when fog visibility changes or a new chunk
+arrives, and each stamped tile bucket is discarded immediately instead of being rescanned for the
+rest of the match.
+Pixels persist in lazily allocated 512-world-pixel tiles (256×256 texels); only touched tiles
+upload, and all tile canvases/textures/sprites are destroyed with the ground-decal layer. Preview
+contact poses are accumulated between bounded 10 Hz uploads; the swept-contact raster fills the
+complete intervening motion.
 
 `renderer/trenches.js`
 ```js

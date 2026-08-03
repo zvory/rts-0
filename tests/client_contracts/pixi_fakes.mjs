@@ -295,6 +295,8 @@ export function installFakePixi() {
 function fakeCanvasContext(canvas) {
   return {
     canvas,
+    clipRects: [],
+    pendingRect: null,
     imageSmoothingEnabled: true,
     fillStyle: "",
     strokeStyle: "",
@@ -319,6 +321,8 @@ function fakeCanvasContext(canvas) {
     lineTo() {},
     arc() {},
     ellipse() {},
+    rect(x, y, width, height) { this.pendingRect = [x, y, width, height]; },
+    clip() { if (this.pendingRect) this.clipRects.push(this.pendingRect); },
     fill() {},
     stroke() {},
   };

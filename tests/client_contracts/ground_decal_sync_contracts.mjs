@@ -289,8 +289,32 @@ assert(
       id: 78,
       decalClass: "tankTreads",
       poses: [[256, 256, 0], [320, 256, 0]],
-    }]) === 1 && decalLayer.diagnostics().tankTreads.totalSegments === 2,
-    "unseen checkpointed trail chunks still paint through the tiled tread layer");
+    }]) === 1 && decalLayer.diagnostics().tankTreads.totalSegments === 1,
+    "unseen checkpointed trail chunks cache without painting outside current vision");
+    let visibilityChecks = 0;
+    const firstDiscoveryFog = {
+      visibleRevision: 1,
+      isVisible: (tx, ty) => {
+        visibilityChecks += 1;
+        return tx === 2 && ty === 2;
+      },
+    };
+    assert(decalLayer.stampLiveTankTreads([], firstDiscoveryFog) === 1 &&
+      decalLayer.diagnostics().tankTreads.totalSegments === 2 &&
+      decalLayer.tankTreads.tiles.get("0:0")?.ctx.clipRects.at(-1)?.join(",") === "32,32,16,16",
+    "authoritative history paints only through the newly visible 32px world-tile clip");
+    const checksAfterDiscovery = visibilityChecks;
+    assert(decalLayer.stampLiveTankTreads([], firstDiscoveryFog) === 0 &&
+      decalLayer.diagnostics().tankTreads.totalSegments === 2 &&
+      visibilityChecks === checksAfterDiscovery,
+    "an unchanged fog revision neither rescans history nor darkens an already stamped tile");
+    const expandedFog = {
+      visibleRevision: 2,
+      isVisible: (tx, ty) => (tx === 2 || tx === 1) && ty === 2,
+    };
+    assert(decalLayer.stampLiveTankTreads([], expandedFog) === 1 &&
+      decalLayer.diagnostics().tankTreads.totalSegments === 3,
+    "cached authoritative geometry expands into an adjacent tile as vision discovers it");
 
     now = 40;
     decalLayer.stampLiveTankTreads([]);

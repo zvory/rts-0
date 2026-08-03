@@ -360,7 +360,7 @@ impl TankTrailStore {
             .collect()
     }
 
-    pub(super) fn newly_fully_visible(
+    pub(super) fn newly_partially_visible(
         &mut self,
         player: u32,
         fog: &Fog,
@@ -383,14 +383,15 @@ impl TankTrailStore {
                 }
             }
         }
+        // Product-approved cosmetic exception: a disclosed historical chunk may expose nearby
+        // hidden tread geometry, but never live entities or commands. The client still clips every
+        // committed pixel to authoritative visible tiles. Admitting the immutable source geometry
+        // on first contact lets that local clip expand with fog instead of waiting for the chunk's
+        // whole swept AABB and reintroducing visible pop-in.
         candidates
             .into_iter()
             .filter(|id| !known.contains_key(id))
             .filter(|id| self.owner(*id) != Some(player))
-            .filter(|id| {
-                self.trail(*id)
-                    .is_some_and(|trail| trail_fully_visible(trail, player, fog, map))
-            })
             .collect()
     }
 
@@ -446,13 +447,6 @@ impl TankTrailStore {
 
 fn pose_valid(pose: TankTrailPose, map: &Map) -> bool {
     pose.0 .2 != i8::MIN && map.contains_world_point(pose.x(), pose.y())
-}
-
-fn trail_fully_visible(trail: &FinalizedTankTrail, player: u32, fog: &Fog, map: &Map) -> bool {
-    let Some((min_tx, min_ty, max_tx, max_ty)) = trail.bounds.tile_range(map) else {
-        return false;
-    };
-    (min_ty..=max_ty).all(|ty| (min_tx..=max_tx).all(|tx| fog.is_visible(player, tx, ty)))
 }
 
 fn sample_needed(a: TankTrailPose, b: TankTrailPose) -> bool {

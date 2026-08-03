@@ -271,7 +271,7 @@ impl GroundDecalStore {
             .unwrap_or_default();
         let newly_visible_trails =
             self.tank_trails
-                .newly_fully_visible(player, fog, map, &known_trails);
+                .newly_partially_visible(player, fog, map, &known_trails);
         for id in newly_visible_trails {
             let Some(revision) = self.record_revision(GroundDecalRevisionEntry::TrailDiscovered {
                 player,

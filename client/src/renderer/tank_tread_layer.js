@@ -30,9 +30,15 @@ export class TankTreadLayer {
     this.tiles = new Map();
     this.poses = new Map();
     this.authoritativeTrailIds = new Set();
+    this.authoritativeTrails = new Map();
     this.liveCoverage = new Set();
     this.worldWidth = 0;
     this.worldHeight = 0;
+    this.mapTileSize = 32;
+    this.mapWidthTiles = 0;
+    this.mapHeightTiles = 0;
+    this.authoritativeRevealDirty = false;
+    this.lastVisibleFogRevision = null;
     this.nextUploadAt = 0;
     this.totalSegments = 0;
     this.textureUpdateCount = 0;
@@ -44,6 +50,9 @@ export class TankTreadLayer {
     const tileSize = Number.isFinite(map?.tileSize) ? map.tileSize : 32;
     this.worldWidth = Math.max(1, (map?.width || 1) * tileSize);
     this.worldHeight = Math.max(1, (map?.height || 1) * tileSize);
+    this.mapTileSize = tileSize;
+    this.mapWidthTiles = Math.max(1, map?.width || 1);
+    this.mapHeightTiles = Math.max(1, map?.height || 1);
     return true;
   }
 
@@ -100,9 +109,7 @@ export class TankTreadLayer {
 
   stampAuthoritativeTrails(trails) {
     if (!Array.isArray(trails) || this.worldWidth <= 0 || this.worldHeight <= 0) return 0;
-    const dirty = new Set();
     let accepted = 0;
-    let stamped = 0;
     for (const trail of trails) {
       if (!Number.isSafeInteger(trail?.id) || trail.id <= 0) continue;
       if (this.authoritativeTrailIds.has(trail.id)) {
@@ -111,23 +118,56 @@ export class TankTreadLayer {
       }
       const poses = unpackAuthoritativePoses(trail.poses);
       if (poses.length < 2) continue;
+      const segments = [];
       let previous = treadPose(poses[0].x, poses[0].y, poses[0].facing);
       for (let index = 1; index < poses.length; index += 1) {
         const pose = poses[index];
         const current = treadPose(pose.x, pose.y, pose.facing, previous);
         const segment = treadSegment(previous, current, trail.id ^ index);
-        if (this._consumeLiveCoverage(segment)) {
-          previous = current;
-          continue;
-        }
-        if (this._stampSegment(segment, dirty)) {
-          stamped += 1;
-        }
+        if (!this._consumeLiveCoverage(segment)) segments.push(segment);
         previous = current;
       }
+      const segmentsByTile = this._segmentsByMapTile(segments);
       this.authoritativeTrailIds.add(trail.id);
+      if (segmentsByTile.size > 0) this.authoritativeTrails.set(trail.id, segmentsByTile);
+      this.authoritativeRevealDirty = true;
       accepted += 1;
     }
+    return accepted;
+  }
+
+  revealAuthoritativeTrails(fog = null) {
+    if (typeof fog?.isVisible !== "function" || this.authoritativeTrails.size === 0 ||
+        this.worldWidth <= 0 || this.worldHeight <= 0) {
+      return 0;
+    }
+    const fogRevision = Number.isSafeInteger(fog.visibleRevision)
+      ? fog.visibleRevision
+      : Number.isSafeInteger(fog.revision) ? fog.revision : null;
+    if (!this.authoritativeRevealDirty && fogRevision !== null &&
+        fogRevision === this.lastVisibleFogRevision) return 0;
+    const dirty = new Set();
+    let stamped = 0;
+    for (const [trailId, segmentsByTile] of this.authoritativeTrails) {
+      for (const [tileIndex, segments] of segmentsByTile) {
+        const tx = tileIndex % this.mapWidthTiles;
+        const ty = Math.floor(tileIndex / this.mapWidthTiles);
+        if (!fog.isVisible(tx, ty)) continue;
+        const clip = {
+          x: tx * this.mapTileSize,
+          y: ty * this.mapTileSize,
+          width: this.mapTileSize,
+          height: this.mapTileSize,
+        };
+        for (const segment of segments) {
+          if (this._stampSegment(segment, dirty, clip)) stamped += 1;
+        }
+        segmentsByTile.delete(tileIndex);
+      }
+      if (segmentsByTile.size === 0) this.authoritativeTrails.delete(trailId);
+    }
+    this.authoritativeRevealDirty = false;
+    this.lastVisibleFogRevision = fogRevision;
     if (stamped > 0) {
       for (const tile of dirty) tile.texture?.source?.update?.();
       this.totalSegments += stamped;
@@ -135,7 +175,7 @@ export class TankTreadLayer {
       this.recordDiagnostic?.("renderer.tankTreads.authoritativeSegments", stamped);
       this.recordDiagnostic?.("renderer.tankTreads.tileUploads", dirty.size);
     }
-    return accepted;
+    return stamped;
   }
 
   diagnostics() {
@@ -150,8 +190,11 @@ export class TankTreadLayer {
   destroy() {
     this.poses.clear();
     this.authoritativeTrailIds.clear();
+    this.authoritativeTrails.clear();
     this.liveCoverage.clear();
     this.nextUploadAt = 0;
+    this.authoritativeRevealDirty = false;
+    this.lastVisibleFogRevision = null;
     for (const tile of this.tiles.values()) {
       if (tile.sprite?.parent && typeof tile.sprite.parent.removeChild === "function") {
         tile.sprite.parent.removeChild(tile.sprite);
@@ -164,11 +207,38 @@ export class TankTreadLayer {
     this.tiles.clear();
     this.worldWidth = 0;
     this.worldHeight = 0;
+    this.mapTileSize = 32;
+    this.mapWidthTiles = 0;
+    this.mapHeightTiles = 0;
     this.totalSegments = 0;
     this.textureUpdateCount = 0;
   }
 
-  _stampSegment(segment, dirty) {
+  _segmentsByMapTile(segments) {
+    const byTile = new Map();
+    for (const segment of segments) {
+      const minX = Math.max(0, Math.min(segment.previousX, segment.x) - SEGMENT_PADDING);
+      const minY = Math.max(0, Math.min(segment.previousY, segment.y) - SEGMENT_PADDING);
+      const maxX = Math.min(this.worldWidth, Math.max(segment.previousX, segment.x) + SEGMENT_PADDING);
+      const maxY = Math.min(this.worldHeight, Math.max(segment.previousY, segment.y) + SEGMENT_PADDING);
+      const firstTx = Math.floor(minX / this.mapTileSize);
+      const firstTy = Math.floor(minY / this.mapTileSize);
+      const lastTx = Math.floor(Math.max(minX, maxX - 0.001) / this.mapTileSize);
+      const lastTy = Math.floor(Math.max(minY, maxY - 0.001) / this.mapTileSize);
+      for (let ty = firstTy; ty <= lastTy; ty += 1) {
+        for (let tx = firstTx; tx <= lastTx; tx += 1) {
+          if (tx < 0 || ty < 0 || tx >= this.mapWidthTiles || ty >= this.mapHeightTiles) continue;
+          const tileIndex = ty * this.mapWidthTiles + tx;
+          const bucket = byTile.get(tileIndex) || [];
+          bucket.push(segment);
+          byTile.set(tileIndex, bucket);
+        }
+      }
+    }
+    return byTile;
+  }
+
+  _stampSegment(segment, dirty, clip = null) {
     const minX = Math.max(0, Math.min(segment.previousX, segment.x) - SEGMENT_PADDING);
     const minY = Math.max(0, Math.min(segment.previousY, segment.y) - SEGMENT_PADDING);
     const maxX = Math.min(this.worldWidth, Math.max(segment.previousX, segment.x) + SEGMENT_PADDING);
@@ -184,6 +254,16 @@ export class TankTreadLayer {
         if (!tile) continue;
         tile.ctx.save();
         tile.ctx.translate(-(tx * TILE_WORLD_SIZE) / DOWNSAMPLE, -(ty * TILE_WORLD_SIZE) / DOWNSAMPLE);
+        if (clip) {
+          tile.ctx.beginPath();
+          tile.ctx.rect(
+            clip.x / DOWNSAMPLE,
+            clip.y / DOWNSAMPLE,
+            clip.width / DOWNSAMPLE,
+            clip.height / DOWNSAMPLE,
+          );
+          tile.ctx.clip();
+        }
         stampTankTreads(tile.ctx, segment, DOWNSAMPLE);
         tile.ctx.restore();
         dirty.add(tile);
