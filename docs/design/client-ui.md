@@ -2324,8 +2324,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   alpha edge of their current production rig/frame above fog, with damaged HP above it. They remain excluded from local fog-source
   computation and selection/command hit-testing. Current death-vision entities are normal visible
   entities and do not use this flag.
-- Buildings: footprint-sized blocky field structures with neutral geometry and plain
-  two-letter stencils; under construction → translucent with a single HP-layer status bar whose
+- Buildings: selected structures render from footprint-scaled PNG atlases with fixed-color art,
+  broad white-painted team-tint surfaces, and silhouette-derived shadows. They do not overlay
+  abbreviation stencils; their art and silhouette carry the gameplay identity. Tank Traps remain
+  procedural neutral steel hedgehogs. Under construction → translucent with a single HP-layer status bar whose
   fill reflects current HP rather than changing authoritative construction progress;
   production → small top-edge progress bar. Tank Trap deconstruction uses that same HP-layer status
   bar and drains from full to empty via `deconstructProgress`. Tank Traps render as neutral steel I-beam

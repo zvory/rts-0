@@ -1,8 +1,8 @@
-# B2 distinct-building generation prompt
+# B2 Pump Jack generation handoff
 
-Generated with the built-in ImageGen workflow. Each request used the corresponding approved B1
-building as the viewpoint/style reference plus the production Rifleman/Machine Gunner, Tank, and
-Anti-Tank Gun raster assets as material, outline, and team-paint references.
+Generated with the built-in ImageGen workflow as part of the B2 distinct-building pass. Only the
+selected Pump Jack source and derivatives remain in this handoff; later passes superseded the other
+B2 building variants.
 
 ## Shared constraints
 
@@ -16,16 +16,7 @@ Anti-Tank Gun raster assets as material, outline, and team-paint references.
   insignia, people, vehicles, watermark, or extra buildings.
 - Strong functional silhouette readable at small RTS scale.
 
-## Functional silhouette briefs
+## Functional silhouette brief
 
-| Kind | Footprint | Dominant brief |
-| --- | --- | --- |
-| City Centre | 3x3 | Symmetric civic hall, broad stair, arched entrance, dominant command tower/cupola |
-| Barracks | 3x2 | Long low quarters block, repeated narrow windows, centered porch, dormitory wings |
-| Vehicle Works | 3x3 | Twin garage bays with two separate worn concrete lanes reaching the footprint edge |
-| Training Centre | 3x2 | U-shaped low building around an open parade ground with three shooting targets |
-| Research Complex | 3x3 | Compact lab dominated by a large rooftop radar dish, radio mast, and skylights |
-| Steelworks | 3x3 | Oversized exposed H-frame press, ram, rollers, and flywheel protruding through the front |
-| Pump Jack | 1x1 | Freestanding beam pump and concrete pad only; no enclosing building or shed |
-
-Supply Depot and Tank Trap were intentionally excluded.
+The 1x1 Pump Jack is a freestanding beam pump and concrete pad only, with no enclosing building or
+shed. Supply Depot and Tank Trap were intentionally excluded from the generation pass.

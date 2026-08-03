@@ -1087,12 +1087,84 @@ function polygonAxisValues(points, offset) {
     const buildingsIndex = renderer.world.children.indexOf(renderer.layers.buildings);
     const hpIndex = renderer.world.children.indexOf(renderer.layers.hpBars);
     assert(rig && renderer.layers.buildings.children.includes(rig), "SVG building rig renders on the buildings layer");
+    assert(!renderer._iconPool, "building renderer omits legacy abbreviation labels");
     assert(
       !renderer._pools.buildingOverlays.has(entity.id),
       "under-construction building does not draw a separate building overlay progress bar",
     );
     assert(hpBackRects.length === 1 && hpFillRects.length === 1, "under-construction building keeps stable construction status geometry on the HP bar layer");
     assert(hpIndex > buildingsIndex, "HP-layer construction status renders above SVG building bodies");
+  } finally {
+    restorePixi();
+  }
+}
+
+{
+  const restorePixi = installFakePixi();
+  try {
+    const parent = {
+      clientWidth: 640,
+      clientHeight: 480,
+      appendChild(view) {
+        view.parentNode = this;
+      },
+      removeChild(view) {
+        view.parentNode = null;
+      },
+    };
+    const renderer = await Renderer.create(parent);
+    renderer._map = { tileSize: 32 };
+    const entity = {
+      id: 506,
+      owner: 2,
+      kind: KIND.BARRACKS,
+      x: 160,
+      y: 160,
+      hp: 100,
+      maxHp: 400,
+      state: "idle",
+      buildProgress: 0.42,
+    };
+    const colorByOwner = new Map([[2, 0xc85050]]);
+    const state = {
+      playerId: 99,
+      players: [{ id: 2, color: "#c85050" }],
+      spectator: true,
+    };
+
+    renderer._drawBuilding(entity, colorByOwner, state);
+    const fallback = renderer._liveRigPools.buildingRigs.get(entity.id);
+    assert(
+      typeof fallback?.matches === "function",
+      "building uses its SVG rig while the production atlas is unavailable",
+    );
+
+    for (const seen of Object.values(renderer._seen)) seen.clear();
+    renderer._buildingPngRigAtlasTextures.set(
+      KIND.BARRACKS,
+      PIXI.Texture.from("barracks-building-atlas-test-texture"),
+    );
+    renderer._drawBuilding(entity, colorByOwner, state);
+    renderer._sweep();
+
+    const body = renderer._liveRigPools.buildingRigs.get(entity.id);
+    const shadow = renderer._liveRigPools.buildingPngShadows.get(entity.id);
+    assert(
+      body !== fallback && typeof body?.matchesPngAtlasRig === "function",
+      "loaded building atlas replaces the temporary SVG instance in the shared body pool",
+    );
+    assert(body.parts.size === 2, "building PNG body route draws fixed-color and team-tint sprites");
+    assert(shadow?.parts.size === 1, "perspective building PNG routes its silhouette shadow separately");
+    assert(body.container.alpha === 0.45, "building PNG preserves scaffold transparency");
+    assert(shadow.container.alpha === 0.45, "building silhouette shadow preserves scaffold transparency");
+    assert(
+      body.parts.get("sprite.tint")?.display.tint === 0xc85050,
+      "building PNG applies the owning player's color only to its team-tint sprite",
+    );
+    assert(
+      renderer._pools.buildingShadows.get(entity.id)?.visible === false,
+      "silhouette shadow replaces the temporary footprint shadow after the atlas loads",
+    );
   } finally {
     restorePixi();
   }

@@ -283,36 +283,6 @@ export function _hpBar(g, e, status = null) {
   g.rtsFill.scale.set(frac, 1);
 }
 
-export function _icon(e, cx, cy, size, alpha) {
-  if (!this._iconPool) this._iconPool = new Map();
-  let t = this._iconPool.get(e.id);
-  const glyph = (STATS[e.kind] && STATS[e.kind].icon) || "?";
-  if (!t) {
-    t = new PIXI.Text({ text: glyph, style: {
-      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-      fontSize: 24,
-      fill: 0xd8d0b0,
-      align: "center",
-      fontWeight: "700",
-    } });
-    t.anchor.set(0.5);
-    this._iconPool.set(e.id, t);
-    this.layers.buildings.addChild(t);
-    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.iconText");
-  } else {
-    this._recordRenderDiagnostic?.("renderer.pixi.displayObject.reused.iconText");
-  }
-  if (t.text !== glyph) t.text = glyph;
-  t.visible = true;
-  t.alpha = 0.78 * alpha;
-  t.position.set(cx, cy);
-  // Scale the (fixed-size) glyph to roughly fit the footprint.
-  const s = (size * 0.95) / 24;
-  t.scale.set(s);
-  // Track on the buildings pool's seen-set so the sweep keeps it alive.
-  this._seen.buildings.add(e.id);
-}
-
 export function _queueLabel(e, cx, cy, count, bodyAlpha) {
   if (!this._queueLabelPool) this._queueLabelPool = new Map();
   let t = this._queueLabelPool.get(e.id);

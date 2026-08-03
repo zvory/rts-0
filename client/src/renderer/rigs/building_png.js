@@ -1,4 +1,5 @@
 import { KIND } from "../../protocol.js";
+import { STATS } from "../../config.js";
 import { RIG_SCHEMA_VERSION, validateRigDefinition } from "./schema.js";
 
 const IDENTITY_TRANSFORM = Object.freeze({ x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 });
@@ -12,27 +13,28 @@ const INVISIBLE_PAINT = Object.freeze({
   strokeOpacity: 1,
 });
 const PLACEHOLDER_GEOMETRY = Object.freeze({ type: "rect", x: 0, y: 0, width: 1, height: 1 });
+const RUNTIME_TILE_SIZE = 32;
+
+function buildingSpec(kind, frameWidth, frameHeight, image, silhouetteShadow = true) {
+  return Object.freeze({ kind, frameWidth, frameHeight, image, silhouetteShadow });
+}
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
-  [KIND.CITY_CENTRE, "city_centre", 3, 3, 384, 384],
-  [KIND.BARRACKS, "barracks", 3, 2, 384, 256],
-  [KIND.TRAINING_CENTRE, "training_centre", 3, 2, 384, 256],
-  [KIND.RESEARCH_COMPLEX, "research_complex", 3, 3, 384, 384],
-  [KIND.FACTORY, "factory", 3, 3, 384, 384],
-  [KIND.STEELWORKS, "steelworks", 3, 3, 384, 384],
-  [KIND.PUMP_JACK, "pump_jack", 1, 1, 128, 128],
-]);
-const B3_BUILDING_KINDS = new Set([
-  KIND.FACTORY,
-]);
-const B4_BUILDING_KINDS = new Set([
-  KIND.RESEARCH_COMPLEX,
-  KIND.STEELWORKS,
-]);
-const SILHOUETTE_SHADOW_KINDS = new Set([
-  ...B3_BUILDING_KINDS,
-  ...B4_BUILDING_KINDS,
+  buildingSpec(KIND.CITY_CENTRE, 384, 384,
+    "/assets/rigs/buildings-b7-team-paint-refined-preview/city_centre-atlas.png?v=b7-team-paint-refined-preview-01"),
+  buildingSpec(KIND.BARRACKS, 384, 256,
+    "/assets/rigs/buildings-b7-team-paint-refined-preview/barracks-atlas.png?v=b7-team-paint-refined-preview-01"),
+  buildingSpec(KIND.TRAINING_CENTRE, 384, 256,
+    "/assets/rigs/buildings-b7-team-paint-refined-preview/training_centre-atlas.png?v=b7-team-paint-refined-preview-01"),
+  buildingSpec(KIND.RESEARCH_COMPLEX, 384, 384,
+    "/assets/rigs/buildings-b4-selected-pass-01/research_complex-atlas.png?v=b4-selected-01"),
+  buildingSpec(KIND.FACTORY, 384, 384,
+    "/assets/rigs/buildings-b3-corrected-preview/factory-atlas.png?v=b3-corrected-03"),
+  buildingSpec(KIND.STEELWORKS, 384, 384,
+    "/assets/rigs/buildings-b4-selected-pass-01/steelworks-atlas.png?v=b4-selected-01"),
+  buildingSpec(KIND.PUMP_JACK, 128, 128,
+    "/assets/rigs/buildings-b2-distinct-pass-01/pump_jack-atlas.png?v=b2-distinct-01", false),
 ]);
 
 function deepFreeze(value) {
@@ -54,11 +56,21 @@ function part(id, drawOrder, tintSlot, opacity = 1) {
   };
 }
 
-function definition(kind, footW, footH) {
-  const width = footW * 32;
-  const height = footH * 32;
+function buildingFootprint(kind) {
+  const { footW, footH } = STATS[kind] || {};
+  if (!Number.isInteger(footW) || footW <= 0 || !Number.isInteger(footH) || footH <= 0) {
+    throw new TypeError(`Missing building footprint for PNG rig ${kind}`);
+  }
+  return { footW, footH };
+}
+
+function definition(spec) {
+  const { kind, silhouetteShadow } = spec;
+  const { footW, footH } = buildingFootprint(kind);
+  const width = footW * RUNTIME_TILE_SIZE;
+  const height = footH * RUNTIME_TILE_SIZE;
   const parts = [part("part.base", 10, "fixed"), part("part.tint", 11, "team")];
-  if (SILHOUETTE_SHADOW_KINDS.has(kind)) parts.push(part("part.shadow", 0, "fixed", 0.3));
+  if (silhouetteShadow) parts.push(part("part.shadow", 0, "fixed", 0.3));
   const validation = validateRigDefinition({
     id: `${kind}.building-raster`,
     kind,
@@ -82,9 +94,11 @@ function definition(kind, footW, footH) {
   return deepFreeze(validation.definition);
 }
 
-function atlas(kind, slug, footW, footH, frameWidth, frameHeight) {
-  const worldWidth = footW * 32;
-  const worldHeight = footH * 32;
+function atlas(spec) {
+  const { kind, frameWidth, frameHeight, image, silhouetteShadow } = spec;
+  const { footW, footH } = buildingFootprint(kind);
+  const worldWidth = footW * RUNTIME_TILE_SIZE;
+  const worldHeight = footH * RUNTIME_TILE_SIZE;
   const frame = (x) => ({
     x,
     y: 0,
@@ -95,16 +109,6 @@ function atlas(kind, slug, footW, footH, frameWidth, frameHeight) {
     pixelsPerUnitX: frameWidth / worldWidth,
     pixelsPerUnitY: frameHeight / worldHeight,
   });
-  const assetPass = B3_BUILDING_KINDS.has(kind)
-    ? "buildings-b3-corrected-preview"
-    : B4_BUILDING_KINDS.has(kind)
-      ? "buildings-b4-selected-pass-01"
-      : "buildings-b2-distinct-pass-01";
-  const assetVersion = B3_BUILDING_KINDS.has(kind)
-    ? "b3-corrected-03"
-    : B4_BUILDING_KINDS.has(kind)
-      ? "b4-selected-01"
-      : "b2-distinct-01";
   const sprites = [
     {
       id: "sprite.base",
@@ -123,7 +127,7 @@ function atlas(kind, slug, footW, footH, frameWidth, frameHeight) {
       frame: frame(frameWidth),
     },
   ];
-  if (SILHOUETTE_SHADOW_KINDS.has(kind)) {
+  if (silhouetteShadow) {
     sprites.push({
       id: "sprite.shadow",
       animationPart: "part.shadow",
@@ -133,11 +137,11 @@ function atlas(kind, slug, footW, footH, frameWidth, frameHeight) {
       frame: frame(frameWidth * 2),
     });
   }
-  const columns = SILHOUETTE_SHADOW_KINDS.has(kind) ? 3 : 2;
+  const columns = silhouetteShadow ? 3 : 2;
   return deepFreeze({
     enabled: true,
     unit: kind,
-    image: `/assets/rigs/${assetPass}/${slug}-atlas.png?v=${assetVersion}`,
+    image,
     viewBox: {
       x: -worldWidth / 2,
       y: -worldHeight / 2,
@@ -156,9 +160,9 @@ function atlas(kind, slug, footW, footH, frameWidth, frameHeight) {
 
 const BUILDING_PNG_DEFINITIONS = new Map();
 const BUILDING_PNG_ATLASES = new Map();
-for (const [kind, slug, footW, footH, frameWidth, frameHeight] of BUILDING_PNG_SPECS) {
-  BUILDING_PNG_DEFINITIONS.set(kind, definition(kind, footW, footH));
-  BUILDING_PNG_ATLASES.set(kind, atlas(kind, slug, footW, footH, frameWidth, frameHeight));
+for (const spec of BUILDING_PNG_SPECS) {
+  BUILDING_PNG_DEFINITIONS.set(spec.kind, definition(spec));
+  BUILDING_PNG_ATLASES.set(spec.kind, atlas(spec));
 }
 
 export function createBuildingPngRigDefinitions() {

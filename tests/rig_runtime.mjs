@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { STATS } from "../client/src/config.js";
 import { KIND, SETUP, STATE } from "../client/src/protocol.js";
 import { _rigRenderContextFor } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
@@ -829,7 +830,7 @@ test("PNG route coverage keeps mutable and Set part selections independent", () 
   assert.deepEqual(turretCoverage.missingParts, []);
 });
 
-test("B2/B3/B4 building PNG atlases cover the distinct Kriegsia set at footprint scale", () => {
+test("B2/B3/B4/B7 building PNG atlases cover the distinct Kriegsia set at footprint scale", () => {
   const expectedFootprints = new Map([
     [KIND.CITY_CENTRE, [3, 3]],
     [KIND.BARRACKS, [3, 2]],
@@ -856,9 +857,14 @@ test("B2/B3/B4 building PNG atlases cover the distinct Kriegsia set at footprint
     assert.ok(atlas, `missing building PNG atlas for ${kind}`);
     assert.equal(pngAtlasCanRenderRoute(definition, atlas, route), true);
     assert.deepEqual(pngAtlasRouteCoverage(definition, atlas, route).missingParts, []);
-    assert.equal(atlas.viewBox.width, footW * 32);
-    assert.equal(atlas.viewBox.height, footH * 32);
+    assert.equal(STATS[kind].footW, footW);
+    assert.equal(STATS[kind].footH, footH);
+    assert.equal(atlas.viewBox.width, STATS[kind].footW * 32);
+    assert.equal(atlas.viewBox.height, STATS[kind].footH * 32);
     const hasSilhouetteShadow = [
+      KIND.CITY_CENTRE,
+      KIND.BARRACKS,
+      KIND.TRAINING_CENTRE,
       KIND.FACTORY,
       KIND.RESEARCH_COMPLEX,
       KIND.STEELWORKS,
@@ -879,7 +885,13 @@ test("B2/B3/B4 building PNG atlases cover the distinct Kriegsia set at footprint
     }
 
     const assetPath = atlas.image.split("?", 1)[0].replace(/^\/assets\//, "client/assets/");
-    assert.equal(fs.existsSync(path.join(repoRoot, assetPath)), true, `missing ${assetPath}`);
+    const absoluteAssetPath = path.join(repoRoot, assetPath);
+    assert.equal(fs.existsSync(absoluteAssetPath), true, `missing ${assetPath}`);
+    assert.deepEqual(
+      readPngDimensions(assetPath),
+      { width: atlas.grid.width, height: atlas.grid.height },
+      `${assetPath} dimensions must match its runtime atlas grid`,
+    );
   }
 });
 

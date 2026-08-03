@@ -29,7 +29,6 @@ import {
   _drawSelectionAndHp,
   _hpBar,
   _hpBarSlot,
-  _icon,
   _ownerColors,
   _queueLabel,
   _ringRadius,
@@ -285,7 +284,7 @@ export class Renderer {
     // Ids touched this frame, per pool, so we can hide stale entries afterwards.
     this._seen = {};
     for (const key of Object.keys(this._pools)) this._seen[key] = new Set();
-    // Consecutive-frames-unseen counter per id (across all pools + icons), so we
+    // Consecutive-frames-unseen counter per id across all pools, so we
     // hide briefly but evict after a grace period — server ids are never reused.
     this._unseen = new Map();
     // Local animation state for deployed-weapon setup / teardown visuals.
@@ -1126,13 +1125,6 @@ export class Renderer {
    * construction/deconstruction can supply their own progress fraction.
    * @private
    */
-  // --- Icon glyphs (pooled Text) -------------------------------------------
-
-  /**
-   * Draw / reposition the building's icon glyph. PIXI.Text objects are pooled by
-   * entity id on the buildings layer alongside the footprint Graphics.
-   * @private
-   */
   /**
    * Show/hide the queued-unit count label for a building. Pooled by entity id.
    * @private
@@ -1177,7 +1169,7 @@ export class Renderer {
   // --- Pool maintenance ----------------------------------------------------
 
   /**
-   * Hide every pooled object (per layer + icons) whose id was not touched this
+   * Hide every pooled object whose id was not touched this
    * frame. We hide rather than destroy during a brief grace period so entities
    * that flicker out of vision for a frame reuse their slot; once an id has been
    * unseen for SWEEP_EVICT_FRAMES we destroy its objects and drop the map
@@ -1203,11 +1195,6 @@ export class Renderer {
         g.destroy(key === "hpBars" || key === "aboveFogHpBars" ? { children: true } : undefined);
       }
       pool.clear();
-    }
-    // Pooled icon Text objects.
-    if (this._iconPool) {
-      for (const t of this._iconPool.values()) t.destroy();
-      this._iconPool.clear();
     }
     if (this._queueLabelPool) {
       for (const t of this._queueLabelPool.values()) t.destroy();
@@ -1352,7 +1339,6 @@ Object.assign(Renderer.prototype, {
   _ringRadius,
   _hpBar,
   _hpBarSlot,
-  _icon,
   _queueLabel,
   _drawFog,
   _fogLevel,

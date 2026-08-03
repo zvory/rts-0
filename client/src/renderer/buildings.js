@@ -187,8 +187,6 @@ export function _drawBuilding(e, colorByOwner, state) {
       g.rtsStaticRenderKey = bodyKey;
     }
 
-    // Stencil label — pooled Text reused per building id (see _icon).
-    this._icon(e, e.x, e.y, Math.min(w, h) * 0.5, bodyAlpha);
   }
 
   const hasProductionProgress = typeof e.prodProgress === "number" && e.prodProgress > 0;
