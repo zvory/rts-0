@@ -59,11 +59,9 @@ export const TERRAIN_VARIANT_PALETTES = Object.freeze({
 export const MAIN_MAP_FOG_EXPLORED_ALPHA = 0.30;
 export const MAIN_MAP_FOG_UNEXPLORED_ALPHA = 0.60;
 
-// Stable minimap tuning. Keep these aliases until every consumer uses the explicit minimap names.
+// Minimap tuning remains darker so the compact map preserves its at-a-glance fog boundary.
 export const MINIMAP_FOG_EXPLORED_ALPHA = 0.48;
 export const MINIMAP_FOG_UNEXPLORED_ALPHA = 0.8;
-export const FOG_EXPLORED_ALPHA = MINIMAP_FOG_EXPLORED_ALPHA;
-export const FOG_UNEXPLORED_ALPHA = MINIMAP_FOG_UNEXPLORED_ALPHA;
 
 export const CAMERA = Object.freeze({
   minZoom: 0.4,

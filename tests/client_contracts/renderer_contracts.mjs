@@ -1,6 +1,10 @@
 import { assert } from "./assertions.mjs";
 import { FrameProfiler } from "../../client/src/frame_profiler.js";
-import { COLORS } from "../../client/src/config.js";
+import {
+  COLORS,
+  MAIN_MAP_FOG_EXPLORED_ALPHA,
+  MAIN_MAP_FOG_UNEXPLORED_ALPHA,
+} from "../../client/src/config.js";
 import { KIND, STATE, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { createRigRenderContext, rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
@@ -1334,6 +1338,16 @@ function polygonAxisValues(points, offset) {
       isExplored: (tx, ty) => explored[ty * 2 + tx] === 1,
     };
     renderer._drawFog(fog);
+    const fogFillAlphas = renderer._fogGfx.calls
+      .filter(([name]) => name === "beginFill")
+      .map(([, , alpha]) => alpha);
+    assert(
+      fogFillAlphas.join(",") === [
+        MAIN_MAP_FOG_EXPLORED_ALPHA,
+        MAIN_MAP_FOG_UNEXPLORED_ALPHA,
+      ].join(","),
+      "main-map fog draws explored and unexplored tiles with viewport-specific opacities",
+    );
     const fogCalls = renderer._fogGfx.calls.length;
     diagnostics.length = 0;
     renderer._drawFog(fog);
