@@ -90,7 +90,7 @@ export const ENTRENCHMENT_AREA_DAMAGE_REDUCTION = 0.25;
 export const ENTRENCHMENT_TRENCH_RADIUS_TILES = 0.375;
 export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 10;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
-export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 20;
+export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 15;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const SCOUT_PLANE_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
@@ -436,7 +436,7 @@ export const UPGRADES = Object.freeze({
     upgrade: UPGRADE.BALLISTIC_TABLES,
     label: "Artillery Fire Control",
     icon: "AFC",
-    cost: Object.freeze({ steel: 100, oil: 150 }),
+    cost: Object.freeze({ steel: 50, oil: 100 }),
     researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
     description: "Reduce Artillery Fire minimum radius from 6 to 3 tiles",
     researchedAt: KIND.ENGINEERING_COMPLEX,
