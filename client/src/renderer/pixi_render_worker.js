@@ -165,7 +165,7 @@ async function initialize(message) {
 async function waitForRendererAssets() {
   const deadline = performance.now() + 15_000;
   while (true) {
-    const readiness = renderer.captureReadiness({});
+    const readiness = renderer.startupAssetReadiness();
     if (readiness.failedAssets.length > 0) {
       const first = readiness.failedAssets[0];
       throw new Error(`Pixi worker asset ${first.id} failed: ${first.message || "unknown error"}`);

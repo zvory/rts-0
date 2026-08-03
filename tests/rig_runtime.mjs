@@ -57,7 +57,6 @@ import {
   fakeFrameStripTexture,
   makeRigRenderer,
 } from "./helpers/rig_renderer_harness.mjs";
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 const fixturesDir = path.join(__dirname, "fixtures/svg");

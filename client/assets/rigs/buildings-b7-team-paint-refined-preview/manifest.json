@@ -1,0 +1,12 @@
+{
+  "id": "buildings-b7-team-paint-refined-preview",
+  "generator": "built-in ImageGen precise-object edits",
+  "background": "magenta chroma keyed to alpha",
+  "runtime": "fixed base, material-aware white team-tint mask, and silhouette shadow atlas frames",
+  "status": "selected runtime art",
+  "buildings": {
+    "city_centre": { "label": "City Center reduced team paint", "footprint": [3, 3], "frame": [384, 384] },
+    "barracks": { "label": "Barracks team-painted steel roofs and brick front", "footprint": [3, 2], "frame": [384, 256] },
+    "training_centre": { "label": "Training Center accepted B6", "footprint": [3, 2], "frame": [384, 256] }
+  }
+}

@@ -29,7 +29,6 @@ import {
   _drawSelectionAndHp,
   _hpBar,
   _hpBarSlot,
-  _icon,
   _ownerColors,
   _queueLabel,
   _ringRadius,
@@ -88,6 +87,10 @@ import {
 import { createLivePngRigAtlases, loadPngRigAtlasTexture } from "./rigs/png_routing.js";
 import { createLiveFrameStrips, loadFrameStripTexture } from "./rigs/frame_strip_routing.js";
 import { createBuildingRigDefinitions } from "./rigs/building_routing.js";
+import {
+  createBuildingPngRigAtlases,
+  createBuildingPngRigDefinitions,
+} from "./rigs/building_png.js";
 import { _drawResource } from "./resources.js";
 import { DoodadLayer } from "./doodad_layer.js";
 import { createUnitOutlineFilter } from "./unit_outline_filter.js";
@@ -281,7 +284,7 @@ export class Renderer {
     // Ids touched this frame, per pool, so we can hide stale entries afterwards.
     this._seen = {};
     for (const key of Object.keys(this._pools)) this._seen[key] = new Set();
-    // Consecutive-frames-unseen counter per id (across all pools + icons), so we
+    // Consecutive-frames-unseen counter per id across all pools, so we
     // hide briefly but evict after a grace period — server ids are never reused.
     this._unseen = new Map();
     // Local animation state for deployed-weapon setup / teardown visuals.
@@ -309,6 +312,10 @@ export class Renderer {
     this._visualFrameStripTextures = new Map();
     this._visualFrameStripTextureLoads = new Map();
     this._buildingRigDefinitions = createBuildingRigDefinitions();
+    this._buildingPngRigDefinitions = createBuildingPngRigDefinitions();
+    this._buildingPngRigAtlasesByKind = createBuildingPngRigAtlases();
+    this._buildingPngRigAtlasTextures = new Map();
+    this._loadBuildingPngRigAtlases();
     this._liveRigPools = {
       liveUnitRigShadows: new Map(),
       liveUnitRigs: new Map(),
@@ -322,6 +329,7 @@ export class Renderer {
       forestUnitOutlineRigOverlays: new Map(),
       stealthUnitOutlineRigs: new Map(),
       stealthUnitOutlineRigOverlays: new Map(),
+      buildingPngShadows: new Map(),
       buildingRigs: new Map(),
     };
     this._liveRigRoutes = {
@@ -337,6 +345,7 @@ export class Renderer {
       forestUnitOutlineRigOverlays: { poolName: "forestUnitOutlineRigOverlays", layerName: "forestUnitOutlines" },
       stealthUnitOutlineRigs: { poolName: "stealthUnitOutlineRigs", layerName: "stealthUnitOutlines" },
       stealthUnitOutlineRigOverlays: { poolName: "stealthUnitOutlineRigOverlays", layerName: "stealthUnitOutlines" },
+      buildingPngShadows: { poolName: "buildingPngShadows", layerName: "buildingShadows" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
     for (const key of Object.keys(this._liveRigPools)) this._seen[key] = new Set();
@@ -403,8 +412,22 @@ export class Renderer {
     }
   }
 
-  _trackVisualAsset(id, promise, { kind = "", source = "asset" } = {}) {
-    const record = { id, kind, source, status: "pending", message: "" };
+  _loadBuildingPngRigAtlases() {
+    for (const [kind, atlas] of this._buildingPngRigAtlasesByKind || []) {
+      this._trackVisualAsset(`building-png:${kind}`, loadPngRigAtlasTexture(PIXI, atlas)
+        .then((texture) => {
+          return this._storeLoadedTexture(this._buildingPngRigAtlasTextures, kind, texture);
+        })
+        .catch((err) => {
+          if (this._destroyed) return;
+          console.warn(`RTS building PNG atlas disabled for ${kind}: ${err?.message || err}`);
+          throw err;
+        }), { kind, source: "buildingPngAtlas", required: false });
+    }
+  }
+
+  _trackVisualAsset(id, promise, { kind = "", source = "asset", required = true } = {}) {
+    const record = { id, kind, source, required, status: "pending", message: "" };
     this._assetReadiness.set(id, record);
     record.promise = Promise.resolve(promise).then(
       (value) => {
@@ -419,6 +442,18 @@ export class Renderer {
       },
     );
     return record.promise;
+  }
+
+  startupAssetReadiness() {
+    const assets = [...this._assetReadiness.values()];
+    const pendingAssets = assets.filter((asset) => asset.status === "pending");
+    const failedAssets = assets.filter((asset) => asset.required && asset.status === "failed");
+    return {
+      ready: pendingAssets.length === 0 && failedAssets.length === 0,
+      failedAssets,
+      fallbackAssets: assets.filter((asset) => !asset.required && asset.status === "failed"),
+      pendingAssets,
+    };
   }
 
   captureReadiness({ subjectIds = [], subjectKinds = [] } = {}) {
@@ -1102,13 +1137,6 @@ export class Renderer {
    * construction/deconstruction can supply their own progress fraction.
    * @private
    */
-  // --- Icon glyphs (pooled Text) -------------------------------------------
-
-  /**
-   * Draw / reposition the building's icon glyph. PIXI.Text objects are pooled by
-   * entity id on the buildings layer alongside the footprint Graphics.
-   * @private
-   */
   /**
    * Show/hide the queued-unit count label for a building. Pooled by entity id.
    * @private
@@ -1153,7 +1181,7 @@ export class Renderer {
   // --- Pool maintenance ----------------------------------------------------
 
   /**
-   * Hide every pooled object (per layer + icons) whose id was not touched this
+   * Hide every pooled object whose id was not touched this
    * frame. We hide rather than destroy during a brief grace period so entities
    * that flicker out of vision for a frame reuse their slot; once an id has been
    * unseen for SWEEP_EVICT_FRAMES we destroy its objects and drop the map
@@ -1179,11 +1207,6 @@ export class Renderer {
         g.destroy(key === "hpBars" || key === "aboveFogHpBars" ? { children: true } : undefined);
       }
       pool.clear();
-    }
-    // Pooled icon Text objects.
-    if (this._iconPool) {
-      for (const t of this._iconPool.values()) t.destroy();
-      this._iconPool.clear();
     }
     if (this._queueLabelPool) {
       for (const t of this._queueLabelPool.values()) t.destroy();
@@ -1215,6 +1238,7 @@ export class Renderer {
     this._stealthUnitOutlineFilter?.destroy?.();
     this._stealthUnitOutlineFilter = null;
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
+    destroyRendererTextureMap(this._buildingPngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
     destroyRendererTextureMap(this._visualFrameStripTextures);
     this._visualFrameStripTextureLoads?.clear?.();
@@ -1327,7 +1351,6 @@ Object.assign(Renderer.prototype, {
   _ringRadius,
   _hpBar,
   _hpBarSlot,
-  _icon,
   _queueLabel,
   _drawFog,
   _fogLevel,

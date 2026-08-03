@@ -1,0 +1,10 @@
+{
+  "id": "buildings-b2-distinct-pass-01",
+  "generator": "built-in ImageGen",
+  "background": "#ff00ff",
+  "runtime": "two-frame atlas: fixed full-color base, then grayscale cream-paint team-tint mask",
+  "status": "selected Pump Jack handoff; other B2 variants superseded",
+  "buildings": {
+    "pump_jack": { "footprint": [1, 1], "frame": [128, 128], "tintMaskPercent": 24.8 }
+  }
+}

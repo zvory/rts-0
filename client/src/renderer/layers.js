@@ -32,7 +32,7 @@ export const LAYERS = [
 export function _sweep() {
   // Tally which ids were touched in any pool this frame, then bump/reset the
   // shared per-id unseen counter so an id alive in one layer isn't evicted
-  // from another (e.g. a building's footprint + its icon).
+  // from another (e.g. a building's body + its production overlay).
   const seenAny = new Set();
   for (const key of Object.keys(this._seen)) {
     for (const id of this._seen[key]) seenAny.add(id);
@@ -43,7 +43,6 @@ export function _sweep() {
   for (const key of Object.keys(this._pools)) {
     for (const id of this._pools[key].keys()) ids.add(id);
   }
-  if (this._iconPool) for (const id of this._iconPool.keys()) ids.add(id);
   if (this._queueLabelPool) for (const id of this._queueLabelPool.keys()) ids.add(id);
   if (this._liveRigPools) {
     for (const pool of Object.values(this._liveRigPools)) {
@@ -73,21 +72,6 @@ export function _sweep() {
       } else {
         g.visible = false;
         this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.hidden.${key}`);
-      }
-    }
-  }
-  if (this._iconPool) {
-    const seen = this._seen.buildings;
-    for (const [id, t] of this._iconPool) {
-      if (seen.has(id)) continue;
-      if (evict.has(id)) {
-        this.layers.buildings.removeChild(t);
-        t.destroy();
-        this._iconPool.delete(id);
-        this._recordRenderDiagnostic?.("renderer.pixi.displayObject.destroyed.iconText");
-      } else {
-        t.visible = false;
-        this._recordRenderDiagnostic?.("renderer.pixi.displayObject.hidden.iconText");
       }
     }
   }
