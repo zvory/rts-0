@@ -85,6 +85,7 @@ assert.throws(
   /positive integers/,
   "recipe dimensions are not silently truncated",
 );
+assert.throws(() => buildMapFromRecipe({ width: "12", height: 1 }), /positive integers/);
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rts-map-author-test-"));
 try {

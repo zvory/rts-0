@@ -287,8 +287,8 @@ function applyOperation(map, grid, operation, defaultSymmetry) {
 
 export function buildMapFromRecipe(recipe) {
   if (!recipe || typeof recipe !== "object") throw new Error("Recipe must be a JSON object");
-  const width = number(recipe.width);
-  const height = number(recipe.height);
+  const width = recipe.width;
+  const height = recipe.height;
   if (!isUint32(width) || !isUint32(height) || width <= 0 || height <= 0) {
     throw new Error("Recipe width and height must be positive integers");
   }
@@ -519,7 +519,8 @@ export function validateMap(map, { symmetry = "none" } = {}) {
     warnings.push(`symmetry check ${JSON.stringify(symmetry)} is not implemented`);
   }
   const area = Math.max(1, width * height);
-  const passableTiles = Object.entries(terrainCounts(map)).reduce((sum, [character, count]) => sum + (PASSABLE.has(character) ? count : 0), 0);
+  const terrain = terrainCounts(map);
+  const passableTiles = Object.entries(terrain).reduce((sum, [character, count]) => sum + (PASSABLE.has(character) ? count : 0), 0);
   return {
     warnings,
     summary: {
@@ -530,7 +531,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
       regions: regions.length,
       largestRegionTiles: regions[0] || 0,
       passablePercent: Math.round(passableTiles / area * 1000) / 10,
-      terrain: terrainCounts(map),
+      terrain,
     },
   };
 }
