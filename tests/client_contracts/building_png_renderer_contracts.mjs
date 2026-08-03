@@ -34,6 +34,13 @@ const silhouetteShadowKinds = new Set([
   KIND.FACTORY,
   KIND.STEELWORKS,
 ]);
+const emblemKinds = new Set([
+  KIND.BARRACKS,
+  KIND.TRAINING_CENTRE,
+  KIND.RESEARCH_COMPLEX,
+  KIND.FACTORY,
+  KIND.STEELWORKS,
+]);
 const definitions = createBuildingPngRigDefinitions();
 const atlases = createBuildingPngRigAtlases();
 strictAssert.equal(definitions.size, expectedFootprints.size);
@@ -56,10 +63,21 @@ for (const [kind, footprint] of expectedFootprints) {
     footprint.map((tiles) => tiles * 32),
   );
   const hasSilhouetteShadow = silhouetteShadowKinds.has(kind);
+  const hasEmblem = emblemKinds.has(kind);
   strictAssert.deepEqual(
-    atlas.sprites.map((sprite) => sprite.tintSlot),
-    hasSilhouetteShadow ? ["fixed", "team", "fixed"] : ["fixed", "team"],
+    atlas.sprites.map((sprite) => sprite.id),
+    [
+      "sprite.base",
+      "sprite.tint",
+      ...(hasSilhouetteShadow ? ["sprite.shadow"] : []),
+      ...(hasEmblem ? ["sprite.emblem"] : []),
+    ],
   );
+  strictAssert.equal(definition.parts.some((part) => part.id === "part.emblem"), hasEmblem);
+  if (hasEmblem) {
+    strictAssert.equal(definition.parts.find((part) => part.id === "part.emblem")?.tintSlot, "team");
+    strictAssert.equal(atlas.sprites.find((sprite) => sprite.id === "sprite.emblem")?.tintSlot, "team");
+  }
   if (hasSilhouetteShadow) {
     const shadowRoute = { parts: ["part.shadow"] };
     strictAssert.equal(pngAtlasCanRenderRoute(definition, atlas, shadowRoute), true);
@@ -126,14 +144,15 @@ try {
     "loaded building atlas replaces the temporary SVG instance in the shared body pool",
   );
   assert(fallback._destroyed === true, "building atlas promotion destroys the replaced SVG instance");
-  assert(body.parts.size === 2, "building PNG body route draws fixed-color and team-tint sprites");
+  assert(body.parts.size === 3, "emblem building PNG body route draws base, team tint, and emblem sprites");
   assert(shadow?.parts.size === 1, "perspective building PNG routes its silhouette shadow separately");
   assert(body.container.alpha === 0.45, "building PNG preserves scaffold transparency");
   assert(shadow.container.alpha === 0.45, "building silhouette shadow preserves scaffold transparency");
   assert(
     body.parts.get("sprite.base")?.display.tint === 0xffffff
-      && body.parts.get("sprite.tint")?.display.tint === 0xc85050,
-    "building PNG applies the owning player's color only to its team-tint sprite",
+      && body.parts.get("sprite.tint")?.display.tint === 0xc85050
+      && body.parts.get("sprite.emblem")?.display.tint === 0xc85050,
+    "building PNG applies the owning player's color to both the paint and white-keyed emblem sprites",
   );
   assert(
     renderer._pools.buildingShadows.get(entity.id)?.visible === false,

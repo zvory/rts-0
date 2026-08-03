@@ -58,7 +58,17 @@ import {
 } from "./terrain_palette.js";
 
 const PERSPECTIVE_BUILDING_BODY_PARTS = Object.freeze(["part.base", "part.tint"]);
+const PERSPECTIVE_BUILDING_EMBLEM_BODY_PARTS = Object.freeze([
+  ...PERSPECTIVE_BUILDING_BODY_PARTS,
+  "part.emblem",
+]);
 const PERSPECTIVE_BUILDING_SHADOW_PARTS = Object.freeze(["part.shadow"]);
+
+function perspectiveBuildingBodyParts(atlas) {
+  return atlas?.sprites?.some((sprite) => sprite.animationPart === "part.emblem")
+    ? PERSPECTIVE_BUILDING_EMBLEM_BODY_PARTS
+    : PERSPECTIVE_BUILDING_BODY_PARTS;
+}
 
 export function _drawBuilding(e, colorByOwner, state) {
   const stat = STATS[e.kind] || {};
@@ -144,7 +154,7 @@ export function _drawBuilding(e, colorByOwner, state) {
           routes: [{
             poolName: "buildingRigs",
             layerName: "buildings",
-            parts: usePngSilhouetteShadow ? PERSPECTIVE_BUILDING_BODY_PARTS : undefined,
+            parts: usePngSilhouetteShadow ? perspectiveBuildingBodyParts(pngAtlas) : undefined,
           }],
           alpha: bodyAlpha,
         });
