@@ -25,7 +25,10 @@ struct TankTrailPose((u16, u16, i16));
 
 impl TankTrailPose {
     fn from_world(x: f32, y: f32, facing: f32, map: &Map) -> Option<Self> {
-        if !x.is_finite() || !y.is_finite() || !facing.is_finite() || !map.contains_world_point(x, y)
+        if !x.is_finite()
+            || !y.is_finite()
+            || !facing.is_finite()
+            || !map.contains_world_point(x, y)
         {
             return None;
         }
@@ -49,22 +52,22 @@ impl TankTrailPose {
     }
 
     fn x(self) -> f32 {
-        self.0.0 as f32 / QUARTER_PIXELS
+        self.0 .0 as f32 / QUARTER_PIXELS
     }
 
     fn y(self) -> f32 {
-        self.0.1 as f32 / QUARTER_PIXELS
+        self.0 .1 as f32 / QUARTER_PIXELS
     }
 
     fn heading(self) -> f32 {
-        self.0.2 as f32 / HEADING_SCALE
+        self.0 .2 as f32 / HEADING_SCALE
     }
 
     fn wire(self) -> [i32; 3] {
         [
-            i32::from(self.0.0),
-            i32::from(self.0.1),
-            i32::from(self.0.2),
+            i32::from(self.0 .0),
+            i32::from(self.0 .1),
+            i32::from(self.0 .2),
         ]
     }
 }
@@ -152,7 +155,12 @@ impl FinalizedTankTrail {
     fn to_view(&self) -> TankTrailView {
         TankTrailView {
             id: self.id,
-            poses: self.poses.iter().copied().map(TankTrailPose::wire).collect(),
+            poses: self
+                .poses
+                .iter()
+                .copied()
+                .map(TankTrailPose::wire)
+                .collect(),
         }
     }
 }
@@ -264,7 +272,10 @@ impl TankTrailStore {
                 active.last_motion_tick = tick;
             }
             active.last_observed = pose;
-            if active.poses.last().is_some_and(|last| sample_needed(*last, pose))
+            if active
+                .poses
+                .last()
+                .is_some_and(|last| sample_needed(*last, pose))
             {
                 if active.poses.len() >= MAX_ACTIVE_POSES
                     || center_span_with(&active.poses, pose) > MAX_CENTER_SPAN_PX
@@ -435,7 +446,7 @@ impl TankTrailStore {
                 && active.owner != 0
                 && player_ids.contains(&active.owner)
                 && !active.poses.is_empty()
-                && active.poses.len() < MAX_ACTIVE_POSES
+                && active.poses.len() <= MAX_ACTIVE_POSES
                 && active.last_motion_tick <= tick
                 && pose_valid(active.last_observed, map)
                 && active.poses.iter().all(|pose| pose_valid(*pose, map))
@@ -498,12 +509,7 @@ fn world_pose_bounds(x: f32, y: f32, heading: f32) -> (f32, f32, f32, f32) {
     let sin = heading.sin().abs();
     let extent_x = TRACK_HALF_LENGTH_PX * cos + TRACK_HALF_WIDTH_PX * sin;
     let extent_y = TRACK_HALF_LENGTH_PX * sin + TRACK_HALF_WIDTH_PX * cos;
-    (
-        x - extent_x,
-        y - extent_y,
-        x + extent_x,
-        y + extent_y,
-    )
+    (x - extent_x, y - extent_y, x + extent_x, y + extent_y)
 }
 
 fn normalize_angle(angle: f32) -> f32 {
@@ -554,14 +560,28 @@ mod tests {
 
     #[test]
     fn finalized_chunk_bounds_include_the_oriented_track_footprint() {
-        let poses = vec![
-            TankTrailPose((400, 400, 0)),
-            TankTrailPose((440, 400, 0)),
-        ];
+        let poses = vec![TankTrailPose((400, 400, 0)), TankTrailPose((440, 400, 0))];
         let bounds = TrailBounds::from_poses(&poses).unwrap();
         assert!(bounds.min_x_quarter_px <= 300);
         assert!(bounds.max_x_quarter_px >= 540);
         assert!(bounds.min_y_quarter_px <= 336);
         assert!(bounds.max_y_quarter_px >= 464);
+    }
+
+    #[test]
+    fn checkpoint_accepts_an_active_chunk_at_the_runtime_pose_limit() {
+        let map = Map::generate(1, 7);
+        let pose = TankTrailPose((400, 400, 0));
+        let mut store = TankTrailStore::new();
+        store.active_by_tank.insert(
+            7,
+            ActiveTankTrail {
+                owner: 1,
+                poses: vec![pose; MAX_ACTIVE_POSES],
+                last_observed: pose,
+                last_motion_tick: 3,
+            },
+        );
+        assert!(store.valid_checkpoint_state(&map, &BTreeSet::from([1]), 3));
     }
 }
