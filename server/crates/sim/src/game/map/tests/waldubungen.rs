@@ -16,9 +16,15 @@ fn waldubungen_is_selectable_with_its_authored_start_resources() {
     assert_eq!(map.starts, [(42, 9), (149, 116)]);
 
     let northwest_start = map.resource_counts_at((42, 9));
-    assert_eq!((northwest_start.steel_patches, northwest_start.oil_patches), (4, 4));
+    assert_eq!(
+        (northwest_start.steel_patches, northwest_start.oil_patches),
+        (4, 4)
+    );
     let southeast_start = map.resource_counts_at((149, 116));
-    assert_eq!((southeast_start.steel_patches, southeast_start.oil_patches), (12, 3));
+    assert_eq!(
+        (southeast_start.steel_patches, southeast_start.oil_patches),
+        (12, 3)
+    );
 
     assert!(
         Map::load("Waldübungen", 3, 0x1234_5678).is_err(),
