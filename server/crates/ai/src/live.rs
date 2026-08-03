@@ -85,10 +85,10 @@ pub enum AiAlivePolicy {
 
 /// One controller invocation captured before any emitted command is enqueued.
 #[derive(Clone, Debug, PartialEq)]
-pub enum AiControllerTickInvocation {
+pub(crate) enum AiControllerTickInvocation {
     SkippedDead,
     Invoked {
-        snapshot: Snapshot,
+        snapshot: Box<Snapshot>,
         retreat_commands: Vec<SimCommand>,
         emitted_commands: Vec<SimCommand>,
         decision_trace: Option<AiDecisionTraceSnapshot>,
@@ -97,14 +97,14 @@ pub enum AiControllerTickInvocation {
 
 /// Ordered evidence from one canonical pre-simulation AI tick.
 #[derive(Clone, Debug, PartialEq)]
-pub struct CanonicalAiTickReport {
+pub(crate) struct CanonicalAiTickReport {
     pub tick: u32,
     pub alive_player_ids: Vec<u32>,
     pub controllers: Vec<AiControllerTickReport>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct AiControllerTickReport {
+pub(crate) struct AiControllerTickReport {
     pub player_id: u32,
     pub profile_id: &'static str,
     pub invocation: AiControllerTickInvocation,
@@ -118,69 +118,92 @@ pub struct AiControllerTickReport {
 pub struct CanonicalAiTickDriver;
 
 impl CanonicalAiTickDriver {
-    pub fn run(
+    pub fn run(game: &mut Game, controllers: &mut [AiController], alive_policy: AiAlivePolicy) {
+        Self::run_inner(game, controllers, alive_policy, false);
+    }
+
+    /// Runs the canonical tick path and retains its pre-tick inputs and controller outputs.
+    ///
+    /// Normal hosts should use [`Self::run`]. Reports retain full per-player snapshots and clone
+    /// commands that are also enqueued, so this path is intended for tests and offline tooling
+    /// that consume that evidence.
+    pub(crate) fn run_with_report(
         game: &mut Game,
         controllers: &mut [AiController],
         alive_policy: AiAlivePolicy,
     ) -> CanonicalAiTickReport {
+        Self::run_inner(game, controllers, alive_policy, true)
+            .expect("report capture was requested")
+    }
+
+    fn run_inner(
+        game: &mut Game,
+        controllers: &mut [AiController],
+        alive_policy: AiAlivePolicy,
+        capture_report: bool,
+    ) -> Option<CanonicalAiTickReport> {
         let tick = game.tick_count();
         let start = game.start_payload();
         let alive_player_ids = match alive_policy {
             AiAlivePolicy::Normal => game.alive_players(),
             AiAlivePolicy::StartingPrimaryBase => game.primary_base_alive_players(),
         };
-        let mut reports = Vec::with_capacity(controllers.len());
+        let mut pending_commands = Vec::with_capacity(controllers.len());
+        let mut reports = capture_report.then(|| Vec::with_capacity(controllers.len()));
 
         for controller in controllers {
             let player_id = controller.player_id();
             let profile_id = controller.profile_id();
             if !alive_player_ids.contains(&player_id) {
-                reports.push(AiControllerTickReport {
-                    player_id,
-                    profile_id,
-                    invocation: AiControllerTickInvocation::SkippedDead,
-                });
+                if let Some(reports) = reports.as_mut() {
+                    reports.push(AiControllerTickReport {
+                        player_id,
+                        profile_id,
+                        invocation: AiControllerTickInvocation::SkippedDead,
+                    });
+                }
                 continue;
             }
             let snapshot = game.snapshot_for(player_id);
             let retreat_commands = game.worker_retreat_commands_for(player_id);
-            let (emitted_commands, decision_trace) = Self::run_prepared_controller(
-                controller,
-                AiThinkContext {
-                    start: &start,
-                    snapshot: &snapshot,
-                    alive_player_ids: &alive_player_ids,
-                    retreat_commands: retreat_commands.clone(),
-                },
-            );
-            reports.push(AiControllerTickReport {
-                player_id,
-                profile_id,
-                invocation: AiControllerTickInvocation::Invoked {
-                    snapshot,
-                    retreat_commands,
-                    emitted_commands,
-                    decision_trace,
-                },
+            let reported_retreat_commands = capture_report.then(|| retreat_commands.clone());
+            let emitted_commands = controller.think(AiThinkContext {
+                start: &start,
+                snapshot: &snapshot,
+                alive_player_ids: &alive_player_ids,
+                retreat_commands,
             });
+            let decision_trace = capture_report
+                .then(|| controller.latest_decision_trace())
+                .flatten()
+                .filter(|trace| trace.trace_tick == tick);
+            if let Some(reports) = reports.as_mut() {
+                reports.push(AiControllerTickReport {
+                    player_id,
+                    profile_id,
+                    invocation: AiControllerTickInvocation::Invoked {
+                        snapshot: Box::new(snapshot),
+                        retreat_commands: reported_retreat_commands
+                            .expect("report capture was requested"),
+                        emitted_commands: emitted_commands.clone(),
+                        decision_trace,
+                    },
+                });
+            }
+            pending_commands.push((player_id, emitted_commands));
         }
 
-        for report in &reports {
-            if let AiControllerTickInvocation::Invoked {
-                emitted_commands, ..
-            } = &report.invocation
-            {
-                for command in emitted_commands {
-                    game.enqueue(report.player_id, command.clone());
-                }
+        for (player_id, commands) in pending_commands {
+            for command in commands {
+                game.enqueue(player_id, command);
             }
         }
 
-        CanonicalAiTickReport {
+        reports.map(|controllers| CanonicalAiTickReport {
             tick,
             alive_player_ids,
-            controllers: reports,
-        }
+            controllers,
+        })
     }
 
     pub(crate) fn run_prepared_controller(
@@ -592,8 +615,11 @@ mod tests {
         let mut normal_game = Game::new_without_ai_controllers(&players, 7);
         let expected_normal = normal_game.alive_players();
         let mut controllers = vec![AiController::new(2), AiController::new(99)];
-        let normal =
-            CanonicalAiTickDriver::run(&mut normal_game, &mut controllers, AiAlivePolicy::Normal);
+        let normal = CanonicalAiTickDriver::run_with_report(
+            &mut normal_game,
+            &mut controllers,
+            AiAlivePolicy::Normal,
+        );
         assert_eq!(normal.alive_player_ids, expected_normal);
         assert_eq!(normal.controllers[0].player_id, 2);
         assert!(matches!(
@@ -608,7 +634,7 @@ mod tests {
         let mut ai_only_game = Game::new_without_ai_controllers(&players, 7);
         let expected_primary_base = ai_only_game.primary_base_alive_players();
         let mut ai_only_controllers = vec![AiController::new(1), AiController::new(2)];
-        let ai_only = CanonicalAiTickDriver::run(
+        let ai_only = CanonicalAiTickDriver::run_with_report(
             &mut ai_only_game,
             &mut ai_only_controllers,
             AiAlivePolicy::StartingPrimaryBase,
@@ -625,7 +651,7 @@ mod tests {
         for tick in 0u32..10 {
             let before_one = game.snapshot_for(1);
             let before_two = game.snapshot_for(2);
-            let report = CanonicalAiTickDriver::run(
+            let report = CanonicalAiTickDriver::run_with_report(
                 &mut game,
                 &mut controllers,
                 AiAlivePolicy::StartingPrimaryBase,
@@ -652,7 +678,7 @@ mod tests {
                 } else {
                     &before_two
                 };
-                assert_eq!(snapshot, expected_snapshot);
+                assert_eq!(snapshot.as_ref(), expected_snapshot);
                 assert_eq!(
                     decision_trace.is_some(),
                     tick.wrapping_add(controller.player_id)
@@ -660,6 +686,34 @@ mod tests {
                 );
             }
             game.tick();
+        }
+    }
+
+    #[test]
+    fn canonical_driver_report_capture_does_not_change_execution() {
+        let players = driver_test_players();
+        let mut normal_game = Game::new_without_ai_controllers(&players, 17);
+        let mut reported_game = Game::new_without_ai_controllers(&players, 17);
+        let mut normal_controllers = vec![AiController::new(1), AiController::new(2)];
+        let mut reported_controllers = vec![AiController::new(1), AiController::new(2)];
+
+        for _ in 0..12 {
+            CanonicalAiTickDriver::run(
+                &mut normal_game,
+                &mut normal_controllers,
+                AiAlivePolicy::StartingPrimaryBase,
+            );
+            CanonicalAiTickDriver::run_with_report(
+                &mut reported_game,
+                &mut reported_controllers,
+                AiAlivePolicy::StartingPrimaryBase,
+            );
+            assert_eq!(normal_game.command_log(), reported_game.command_log());
+            assert_eq!(normal_game.tick(), reported_game.tick());
+            assert_eq!(
+                normal_game.snapshot_full_for(1),
+                reported_game.snapshot_full_for(1)
+            );
         }
     }
 

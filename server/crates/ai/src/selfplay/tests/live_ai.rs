@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{AiAlivePolicy, AiController, AiControllerTickInvocation, CanonicalAiTickDriver};
+use crate::live::{AiAlivePolicy, AiController, AiControllerTickInvocation, CanonicalAiTickDriver};
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{Command as WireCommand, Event};
@@ -59,7 +59,7 @@ fn live_ai_two_vs_two_keeps_allied_controllers_independent_and_non_hostile() {
     let mut command_log_cursor = 0usize;
 
     for _ in 0..TICKS {
-        let report = CanonicalAiTickDriver::run(
+        let report = CanonicalAiTickDriver::run_with_report(
             &mut game,
             &mut controllers,
             AiAlivePolicy::StartingPrimaryBase,

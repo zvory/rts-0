@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::ai_core::profile_manifest::profile_identity_by_id;
 use crate::ai_core::profiles::JEFFS_AI_ID;
-use crate::{AiAlivePolicy, AiController, AiControllerTickInvocation, CanonicalAiTickDriver};
+use crate::live::{AiAlivePolicy, AiController, AiControllerTickInvocation, CanonicalAiTickDriver};
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::map::Map;
 use rts_sim::game::replay::CommandLogEntry;
@@ -196,7 +196,7 @@ fn run_transcript(horizon: u32) -> Vec<TranscriptRecord> {
     let mut command_log_cursor = 0usize;
     for _ in 0..horizon {
         let tick = game.tick_count();
-        let report = CanonicalAiTickDriver::run(
+        let report = CanonicalAiTickDriver::run_with_report(
             &mut game,
             &mut controllers,
             AiAlivePolicy::StartingPrimaryBase,

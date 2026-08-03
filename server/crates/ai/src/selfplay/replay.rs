@@ -380,7 +380,7 @@ pub fn run_profile_matchup_result(
 
     while game.tick_count() < options.max_ticks {
         let tick = game.tick_count();
-        let report = CanonicalAiTickDriver::run(
+        let report = CanonicalAiTickDriver::run_with_report(
             &mut game,
             &mut controllers,
             AiAlivePolicy::StartingPrimaryBase,

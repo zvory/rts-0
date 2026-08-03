@@ -16,8 +16,8 @@ mod live;
 pub use live::{
     canonical_live_profile_id, is_player_live_profile_id, live_profile_label,
     random_live_profile_id, resolve_live_profile_id_for_match, AiAlivePolicy, AiController,
-    AiControllerTickInvocation, AiControllerTickReport, AiDecisionTraceSnapshot, AiThinkContext,
-    CanonicalAiTickDriver, CanonicalAiTickReport, DEFAULT_LIVE_PROFILE_ID, LIVE_PROFILE_IDS,
+    AiDecisionTraceSnapshot, AiThinkContext, CanonicalAiTickDriver, DEFAULT_LIVE_PROFILE_ID,
+    LIVE_PROFILE_IDS,
 };
 
 #[cfg(test)]
