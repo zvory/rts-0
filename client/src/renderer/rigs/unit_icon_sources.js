@@ -111,7 +111,7 @@ function atlasPortrait(atlas, teamColor) {
       sheetWidth: atlas.grid.width,
       sheetHeight: atlas.grid.height,
       components: composition,
-      teamTint: true,
+      teamTint: composition.some((component) => component.teamTint),
     };
   }
 
@@ -167,6 +167,7 @@ function atlasComposition(atlas) {
       rotation: transform.rotation,
       pivotX: transform.pivotX,
       pivotY: transform.pivotY,
+      teamTint: sprite.tintSlot !== "fixed",
     });
   }
   return components;
@@ -274,13 +275,13 @@ function composedRasterIconMarkup({
         `<feBlend in="SourceGraphic" in2="maskedTeamColor" mode="multiply" />` +
       `</filter></defs>`
     : "";
-  const groupFilter = teamTint ? ` filter="url(#${tintId})"` : "";
   const layers = safeComponents.map((component) => {
     const frame = component.frame;
     const rotation = component.rotation * 180 / Math.PI;
+    const layerFilter = component.teamTint ? ` filter="url(#${tintId})"` : "";
     return (
       `<g data-unit-icon-component="${component.id}" ` +
-        `transform="translate(${number(component.x)} ${number(component.y)}) rotate(${number(rotation)})">` +
+        `transform="translate(${number(component.x)} ${number(component.y)}) rotate(${number(rotation)})"${layerFilter}>` +
         `<g transform="scale(${component.scaleX} ${component.scaleY})">` +
           `<svg x="${number(component.renderX)}" y="${number(component.renderY)}" ` +
             `width="${number(component.w)}" height="${number(component.h)}" ` +
@@ -300,7 +301,7 @@ function composedRasterIconMarkup({
       `viewBox="${number(viewFrame.x)} ${number(viewFrame.y)} ${number(viewFrame.w)} ${number(viewFrame.h)}" ` +
       `preserveAspectRatio="xMidYMid meet" style="overflow:hidden">` +
       tintFilter +
-      `<g${groupFilter}>${layers}</g>` +
+      `<g>${layers}</g>` +
     `</svg>`
   );
 }
@@ -338,6 +339,7 @@ function normalizedCompositionComponent(component) {
   const localY = Math.min(originWorldY, farWorldY);
   return {
     id: component.id,
+    teamTint: component.teamTint === true,
     frame: {
       x: finiteNumber(frame.x),
       y: finiteNumber(frame.y),

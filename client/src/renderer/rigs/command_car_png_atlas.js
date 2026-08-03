@@ -23,6 +23,9 @@ export const COMMAND_CAR_PNG_RIG_ATLAS = deepFreeze({
     cells: ["sprite.fixed", "sprite.paint"],
     imageVersion: "large-triangle-stars-preview-3",
   },
+  iconComposition: {
+    sprites: ["sprite.fixed", "sprite.paint"],
+  },
   frames: {},
   sprites: [
     {

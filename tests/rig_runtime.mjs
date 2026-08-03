@@ -45,6 +45,7 @@ import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/anti_ta
 import { COMMAND_CAR_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/command_car_png_atlas.js";
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/mortar_team_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
+import { liveUnitIconMarkupFor } from "../client/src/renderer/rigs/unit_icon_sources.js";
 import {
   COMMAND_CAR_RIG_SVG,
   EKAT_RIG_SVG,
@@ -762,6 +763,24 @@ test("command car PNG atlas keeps its native shadow and Breakthrough aura", () =
   assert.deepEqual(COMMAND_CAR_PNG_RIG_ATLAS.grid.cells, ["sprite.fixed", "sprite.paint"]);
   assert.equal(COMMAND_CAR_PNG_RIG_ATLAS.sprites[0].tintSlot, "fixed");
   assert.equal(COMMAND_CAR_PNG_RIG_ATLAS.sprites[1].tintSlot, "team-light");
+});
+
+test("command car PNG icon preserves fixed details while tinting the team paint", () => {
+  const icon = liveUnitIconMarkupFor(KIND.COMMAND_CAR, { teamColor: "#d55e00" });
+
+  assert.equal(icon.includes('data-unit-icon-source="png-atlas-composition"'), true);
+  assert.equal(icon.includes("command-car-packed-radio-stars-triangle-atlas-v3.png"), true);
+  assert.equal(
+    icon.includes('data-unit-icon-component="sprite.fixed" transform="translate(0 0) rotate(0)">'),
+    true,
+  );
+  assert.equal(
+    icon.includes(
+      'data-unit-icon-component="sprite.paint" transform="translate(0 0) rotate(0)" ' +
+        'filter="url(#unit-icon-tint-d55e00)">',
+    ),
+    true,
+  );
 });
 
 test("PNG route coverage keeps mutable and Set part selections independent", () => {
