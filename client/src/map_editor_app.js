@@ -68,6 +68,7 @@ export class MapEditorApp {
       session: this.session,
       viewport: this.viewport,
       onOpenLab: (map) => this.openInLab(map),
+      onOpenPreview: (map) => this.openPreview(map),
     });
     this.panel = panel;
     if (this.launch.error) this.panel.setStatus(this.launch.error, true);
@@ -84,6 +85,25 @@ export class MapEditorApp {
     url.searchParams.set("handoff", handoff.handoffId);
     this.allowUnload = true;
     window.location.assign(url.toString());
+  }
+
+  async openPreview({ authoredMap, materializedMap }) {
+    const opened = window.open("about:blank", "_blank");
+    if (!opened) throw new Error("The browser blocked the map preview window. Allow pop-ups and try again.");
+    opened.opener = null;
+    try {
+      const handoff = await createMapHandoff({
+        destination: "editor",
+        authoredMap,
+        materializedMap,
+      });
+      const url = new URL("/map-preview", this.locationObj.href);
+      url.searchParams.set("handoff", handoff.handoffId);
+      opened.location.replace(url.toString());
+    } catch (error) {
+      opened.close();
+      throw error;
+    }
   }
 
   destroy() {

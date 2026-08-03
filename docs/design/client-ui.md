@@ -113,6 +113,8 @@ src/
   map_editor_app.js # Dedicated `/map-editor` lifecycle; never constructs Net, Match, or GameState
   map_editor_launch.js # Bounded editor route/handoff query parsing
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
+  map_preview_app.js # Capture-only authored-map route composed around existing renderers
+  map_preview_bridge.js # Bounded world/minimap PNG capture surface
   map_editor_session.js # Flat authored-map state, undo/redo, and stroke transactions
   map_authoring/ # Pure browser/Node geometry, symmetry, and serializable map operations shared by the editor and CLI
   map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, JSON files, and Lab launch
@@ -972,6 +974,21 @@ The bounded server record expires after two minutes and is consumed once. Lab co
 private Lab whose first `start` payload already contains the edited map at tick zero; returning through
 `Edit map` transfers only an authoritative exported map. The handoff itself carries the current map
 in either direction; the editor does not maintain a separate browser-storage workspace.
+
+`/map-preview` is a launch-gated, capture-only consumer of the same one-use, two-minute editor
+handoff. It accepts no map data through query parameters or browser-evaluation calls. Its versioned
+bridge exposes only bounded 64–4096-pixel `world` and `minimap` PNG captures, with at most
+16,777,216 output pixels. World captures submit a clean full-map record to the Map Editor's existing
+Pixi worker, omit editor guides/sites/gameplay-overlay tinting, wait for doodad assets, and encode
+the worker's decoded RGBA rather than taking a DOM screenshot. Minimap captures use the same pure
+terrain painter called by the live `Minimap`; the capture page does not own a second terrain or
+minimap renderer. `scripts/map-preview.mjs` is the local Node/Chrome adapter: it validates and
+materializes an authored map with `MapEditorSession`, creates the bounded handoff on a loopback RTS
+server, calls the narrow bridge, validates the returned PNG dimensions, and writes the requested
+artifact. The Map Editor's `Preview PNGs` action creates the same validated handoff and opens this
+route, whose visible controls download 2048-pixel world and minimap PNGs through that same bridge.
+The page owns no authoring operations or recipe semantics.
+
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.

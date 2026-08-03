@@ -26,7 +26,8 @@ import {
   STATS,
   isProducerBuilding,
 } from "./config.js";
-import { minimapTerrainColor, minimapTerrainStyleSignature } from "./minimap_terrain.js";
+import { minimapTerrainStyleSignature } from "./minimap_terrain.js";
+import { paintMinimapTerrain } from "./minimap_map_painter.js";
 import {
   artilleryFireRadiusTiles,
   artilleryMinFireRadiusTiles,
@@ -368,18 +369,11 @@ export class Minimap {
   }
 
   _paintTerrain(ctx, map) {
-    const ts = map.tileSize;
-    // Cell size in canvas px; +1 to avoid hairline seams between adjacent cells.
-    const cw = ts * this._scale + 1;
-    const ch = ts * this._scale + 1;
-    for (let ty = 0; ty < map.height; ty++) {
-      for (let tx = 0; tx < map.width; tx++) {
-        const code = map.terrain[ty * map.width + tx];
-        ctx.fillStyle = hex(minimapTerrainColor(code, tx, ty));
-        const p = this._worldToCanvas(tx * ts, ty * ts);
-        ctx.fillRect(p.x, p.y, cw, ch);
-      }
-    }
+    paintMinimapTerrain(ctx, map, {
+      scale: this._scale,
+      offX: this._offX,
+      offY: this._offY,
+    });
   }
 
   _drawTerrainLayer() {

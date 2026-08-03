@@ -34,12 +34,14 @@ export class MapEditorPanel {
     session,
     viewport,
     onOpenLab,
+    onOpenPreview,
     fetchImpl = globalThis.fetch?.bind(globalThis),
   }) {
     this.root = root;
     this.session = session;
     this.viewport = viewport;
     this.onOpenLab = onOpenLab;
+    this.onOpenPreview = onOpenPreview;
     this.fetchImpl = fetchImpl;
     this.catalog = [];
     this.catalogSkipped = [];
@@ -521,11 +523,15 @@ export class MapEditorPanel {
     section.append(
       button("Load map or recipe JSON", () => this.chooseJsonFile()),
       button("Export map JSON", () => this.exportJson()),
+      button(this.pending ? "Preparing preview…" : "Preview PNGs", () => void this.openPreview(), {
+        disabled: this.pending,
+      }),
       button(this.pending ? "Opening Lab…" : "Open in Lab", () => void this.openLab(), {
         disabled: this.pending,
         className: "map-editor-primary",
       }),
       readout("Recipe JSON uses the same fill, rectangle, blob, stroke, road, base, start, and symmetry operations as the map-author CLI. Opening Lab validates the resulting map on the server and starts a fresh ordinary Lab."),
+      readout("Preview PNGs opens the existing game renderer with 2048 px world and minimap downloads."),
     );
     return section;
   }
@@ -758,6 +764,23 @@ export class MapEditorPanel {
         authoredMap: this.session.exportMap(),
         materializedMap: this.session.materialized(),
       });
+    } catch (error) {
+      this.pending = false;
+      this.setStatus(error.message || String(error), true);
+    }
+  }
+
+  async openPreview() {
+    if (this.pending) return;
+    this.pending = true;
+    this.setStatus("Validating map and preparing PNG previews…");
+    try {
+      await this.onOpenPreview?.({
+        authoredMap: this.session.exportMap(),
+        materializedMap: this.session.materialized(),
+      });
+      this.pending = false;
+      this.setStatus("Opened the PNG preview page.");
     } catch (error) {
       this.pending = false;
       this.setStatus(error.message || String(error), true);

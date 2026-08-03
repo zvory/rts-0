@@ -21,6 +21,24 @@ export class MapEditorPixiPresentationAdapter {
     return this.host.presentEditor(record);
   }
 
+  readPresentedPixels(frameId) {
+    if (this.destroyed) throw new Error("Map Editor Pixi adapter is destroyed.");
+    return this.host.readPresentedPixels(frameId);
+  }
+
+  captureReadiness() {
+    return this.host.captureReadiness();
+  }
+
+  enterFixedCapture() {
+    if (this.destroyed) throw new Error("Map Editor Pixi adapter is destroyed.");
+    this.host.enterFixedCapture();
+  }
+
+  exitFixedCapture() {
+    this.host.exitFixedCapture();
+  }
+
   resize(width, height) {
     this.host.resize(width, height);
   }
