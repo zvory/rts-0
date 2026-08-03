@@ -15,8 +15,8 @@ Runtime review treatment remains temporary:
 - the left trail receives a fixed purple tint;
 - both complete trail crop frames carry a black rectangular border;
 - the mounting-ring center is the origin for each trail;
-- the SVG Artillery rig remains authoritative for setup visibility, carriage
-  and weapon facing, recoil, muzzle flash, and gameplay anchors.
+- raster-native Artillery metadata remains authoritative for setup visibility,
+  carriage and weapon facing, recoil, muzzle flash, and gameplay anchors.
 
 Generated with the built-in image-generation tool on a removable magenta key,
 then converted locally to alpha with soft matte and despill. The exact prompt is

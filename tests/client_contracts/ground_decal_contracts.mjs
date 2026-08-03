@@ -192,4 +192,23 @@ function authoritativeRecord(id, overrides = {}) {
   state.applyAuthoritativeGroundDecals({ revision: 3, decals: [authoritativeRecord(700)] });
   assert(state.consumePendingGroundDecals().length === 0,
     "overlapping authoritative deltas do not stamp a stable id twice");
+
+  const gap = state.groundDecals.applySnapshotDelta(
+    {
+      afterRevision: 8,
+      revision: 10,
+      decals: [authoritativeRecord(702)],
+    },
+    { players: state.players, tileSize: state.map.tileSize },
+  );
+  assert(gap.accepted && !gap.complete && state.groundDecals.authoritativeRevision === 3,
+    "a snapshot range gap does not advance the complete authoritative cursor");
+  assert(state.consumePendingGroundDecals().length === 1,
+    "fog-entitled rows from a gapped snapshot still appear immediately");
+  state.applyAuthoritativeGroundDecals({
+    revision: 10,
+    decals: [authoritativeRecord(700), authoritativeRecord(701), authoritativeRecord(702)],
+  });
+  assert(state.consumePendingGroundDecals().length === 0,
+    "repairing a gapped range does not repaint a fast-path row already retained by stable id");
 }

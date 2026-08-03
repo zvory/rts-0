@@ -130,9 +130,15 @@ export class MapEditorWorkerRenderer {
       gfxNoFill(this.overlay);
     }
     for (const site of overlay.sites) this._drawSite(site);
-    if (overlay.doodadSelection) {
+    for (const selection of overlay.doodadSelections || []) {
       gfxStroke(this.overlay, 2, 0xfff4ba, 0.96);
-      gfxCircle(this.overlay, overlay.doodadSelection.x, overlay.doodadSelection.y, 15);
+      gfxCircle(this.overlay, selection.x, selection.y, 15);
+    }
+    if (overlay.doodadSelectionBox) {
+      const box = overlay.doodadSelectionBox;
+      gfxStroke(this.overlay, 2, 0xfff4ba, 0.96);
+      gfxRect(gfxFill(this.overlay, 0xfff4ba, 0.12), box.x, box.y, box.width, box.height);
+      gfxNoFill(this.overlay);
     }
     if (overlay.doodadBrushPreview) {
       const preview = overlay.doodadBrushPreview;

@@ -1,33 +1,10 @@
-import { KIND } from "../../protocol.js";
-import { TANK_RIG_SVG } from "./tank_svg.js";
 import { compileSvgRig } from "./svg_importer.js";
 
 const CANDIDATE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-const TANK_CANNON_BARREL_LENGTH = 33.2;
-const TANK_CANNON_FLASH_LEAD = 8.8;
-const TANK_CANNON_RECOIL_SCALE = "-0.0301204819";
-const LONG_CANNON_BARREL_LENGTH = 39.2;
 
-export const VISUAL_UNIT_RIG_CANDIDATE_SOURCES = Object.freeze([
-  Object.freeze({
-    id: "tank-low-profile",
-    label: "Low profile tank",
-    kind: KIND.TANK,
-    svgText: tankLowProfileSvg(),
-  }),
-  Object.freeze({
-    id: "tank-wide-turret",
-    label: "Wide turret tank",
-    kind: KIND.TANK,
-    svgText: tankWideTurretSvg(),
-  }),
-  Object.freeze({
-    id: "tank-long-cannon",
-    label: "Long cannon tank",
-    kind: KIND.TANK,
-    svgText: tankLongCannonSvg(),
-  }),
-]);
+// Raster units no longer ship duplicate SVG candidates. Keep the generic compiler for local
+// experiments supplied by tests or future profiles that target an SVG-authored unit.
+export const VISUAL_UNIT_RIG_CANDIDATE_SOURCES = Object.freeze([]);
 
 export function visualUnitRigCandidateIds() {
   return VISUAL_UNIT_RIG_CANDIDATE_SOURCES.map((candidate) => candidate.id);
@@ -65,72 +42,6 @@ export function compileVisualUnitRigCandidates(entries = VISUAL_UNIT_RIG_CANDIDA
     }));
   }
   return { definitions, errors, metadata };
-}
-
-function tankLowProfileSvg() {
-  let svg = TANK_RIG_SVG;
-  svg = replaceOnce(
-    svg,
-    'points="-23.2,-11.4 19.2,-11.4 25.2,-7.4 25.2,7.4 19.2,11.4 -23.2,11.4 -25.2,7.4 -25.2,-7.4"',
-    'points="-26,-9.2 18,-9.2 27,-5.8 27,5.8 18,9.2 -26,9.2 -29,5.8 -29,-5.8"',
-  );
-  svg = replaceOnce(
-    svg,
-    'x="-8.072" y="-6.48" width="18.144" height="12.96"',
-    'x="-10.5" y="-5.4" width="22" height="10.8"',
-  );
-  svg = replaceOnce(
-    svg,
-    'x="14.7" y="-9.72" width="7" height="19.44"',
-    'x="17.8" y="-7.8" width="7.4" height="15.6"',
-  );
-  return svg;
-}
-
-function tankWideTurretSvg() {
-  let svg = TANK_RIG_SVG;
-  svg = replaceOnce(
-    svg,
-    'x="-8.072" y="-6.48" width="18.144" height="12.96"',
-    'x="-12.6" y="-7.5" width="26.4" height="15"',
-  );
-  svg = replaceOnce(
-    svg,
-    'x="-16.49" y="-5.904" width="28.98" height="11.808"',
-    'x="-19" y="-6.9" width="34" height="13.8"',
-  );
-  svg = replaceOnce(
-    svg,
-    'stroke="#241d17" stroke-width="5"',
-    'stroke="#241d17" stroke-width="6.2"',
-  );
-  return svg;
-}
-
-function tankLongCannonSvg() {
-  const longCannonLength = formatRigNumber(LONG_CANNON_BARREL_LENGTH);
-  const baseFlashCenter = formatRigNumber(TANK_CANNON_BARREL_LENGTH + TANK_CANNON_FLASH_LEAD);
-  const longFlashCenter = formatRigNumber(LONG_CANNON_BARREL_LENGTH + TANK_CANNON_FLASH_LEAD);
-  let svg = TANK_RIG_SVG;
-  svg = replaceOnce(svg, `x2="${formatRigNumber(TANK_CANNON_BARREL_LENGTH)}"`, `x2="${longCannonLength}"`);
-  svg = replaceOnce(
-    svg,
-    `recoilPx:transform.scaleX:${TANK_CANNON_RECOIL_SCALE}:0`,
-    `recoilPx:transform.scaleX:${formatRigNumber(-1 / LONG_CANNON_BARREL_LENGTH)}:0`,
-  );
-  svg = replaceOnce(svg, `id="anchor.muzzle" cx="${formatRigNumber(TANK_CANNON_BARREL_LENGTH)}"`, `id="anchor.muzzle" cx="${longCannonLength}"`);
-  svg = svg
-    .replaceAll(`weaponFacingCos:transform.x:${baseFlashCenter}:0`, `weaponFacingCos:transform.x:${longFlashCenter}:0`)
-    .replaceAll(`weaponFacingSin:transform.y:${baseFlashCenter}:0`, `weaponFacingSin:transform.y:${longFlashCenter}:0`);
-  return svg;
-}
-
-function replaceOnce(source, needle, replacement) {
-  return source.includes(needle) ? source.replace(needle, replacement) : source;
-}
-
-function formatRigNumber(value) {
-  return Number(value.toFixed(12)).toString();
 }
 
 function candidateError(code, path, message) {

@@ -11,6 +11,8 @@ pub const DEFAULT_FACTION_ID: &str = "kriegsia";
 pub const MAX_UNITS_PER_COMMAND: usize = 256;
 /// Maximum raw submitted ids in a Lab command that bypasses ordinary command limits.
 pub const LAB_MAX_UNITS_PER_COMMAND: usize = 4_096;
+/// Maximum durable ground-mark records repeated in one recipient-scoped snapshot delta.
+pub const MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA: usize = 64;
 
 fn is_false(value: &bool) -> bool {
     !*value
@@ -537,6 +539,10 @@ pub struct Snapshot {
     /// Recipient-scoped cursor for reliable, request-driven ground decal reconciliation.
     #[serde(default)]
     pub ground_decal_revision: u32,
+    /// Bounded, fog-scoped tail of decals discovered after `after_revision`. Repeated snapshots
+    /// make this fast path safe when latest-only snapshot delivery replaces an older frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ground_decal_delta: Option<GroundDecalDelta>,
     /// Coarse world combat area shared identically with every recipient for directional ambience.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub world_combat_position: Option<[f32; 2]>,
@@ -681,6 +687,16 @@ pub struct GroundDecalView {
     pub weapon_facing: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub radius_tiles: Option<f32>,
+}
+
+/// A complete perspective-scoped decal range `(after_revision, snapshot revision]`. Clients may
+/// advance their retained cursor only when they already cover `after_revision`; otherwise the
+/// rows are still safe to present and the reliable repair path fills the gap.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GroundDecalDelta {
+    pub after_revision: u32,
+    pub decals: Vec<GroundDecalView>,
 }
 
 /// Server-side transport and scheduling health attached to every snapshot.

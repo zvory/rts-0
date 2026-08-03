@@ -1,7 +1,6 @@
-// Prototype modular A-19 artillery PNG atlas. The SVG rig remains the source
-// of setup visibility, carriage/weapon facing, recoil, muzzle flash, and
-// anchors. This atlas replaces only the visible carriage, trails, and weapon
-// assembly pixels. Both trails use the same owner-team tint as the carriage.
+// Production modular A-19 artillery PNG atlas. Raster-native metadata supplies setup
+// visibility, carriage/weapon facing, recoil, muzzle flash, and anchors. Both trails
+// use the same owner-team tint as the carriage.
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);

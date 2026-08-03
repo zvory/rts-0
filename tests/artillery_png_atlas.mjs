@@ -5,20 +5,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIND, SETUP, STATE } from "../client/src/protocol.js";
 import { ARTILLERY_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/artillery_png_atlas.js";
-import { liveRigRoutesFor } from "../client/src/renderer/rigs/live_routing.js";
+import { createLiveRigDefinitions, liveRigRoutesFor } from "../client/src/renderer/rigs/live_routing.js";
 import { pngAtlasRouteCoverage } from "../client/src/renderer/rigs/png_runtime.js";
 import { createLivePngRigAtlases } from "../client/src/renderer/rigs/png_routing.js";
-import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
-import { ARTILLERY_RIG_SVG } from "../client/src/renderer/rigs/support_svg.js";
 import { fakeAtlasTexture, makeRigRenderer } from "./helpers/rig_renderer_harness.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 assert.equal(createLivePngRigAtlases().get(KIND.ARTILLERY), ARTILLERY_PNG_RIG_ATLAS);
 assert.match(ARTILLERY_PNG_RIG_ATLAS.image, /artillery-a19-pass-03/);
-const result = compileSvgRig(ARTILLERY_RIG_SVG, { expectedKind: KIND.ARTILLERY });
-assert.equal(result.ok, true, JSON.stringify(result.errors));
-const definition = result.definition;
+const definition = createLiveRigDefinitions().get(KIND.ARTILLERY);
+assert.ok(definition);
 const [, unitRoute] = liveRigRoutesFor(KIND.ARTILLERY);
 assert.deepEqual(
   pngAtlasRouteCoverage(definition, ARTILLERY_PNG_RIG_ATLAS, unitRoute).missingParts,

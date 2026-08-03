@@ -1,6 +1,5 @@
-// Prototype wheeled mortar PNG atlas. The SVG rig remains the source of
-// anchors, setup visibility, facing, and recoil bindings; this atlas replaces
-// the visible weapon pixels with generated carriage and tube component sprites.
+// Production wheeled mortar PNG atlas. Raster-native metadata supplies anchors,
+// setup visibility, facing, and recoil bindings.
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);

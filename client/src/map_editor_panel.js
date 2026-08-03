@@ -23,6 +23,7 @@ import {
 } from "./map_editor_session.js";
 
 const MAP_CATALOG_URL = "/maps/catalog";
+const MAP_EDITOR_MAX_JSON_BYTES = 2 * 1024 * 1024;
 const MAP_EDITOR_OPTIONS_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
 const MAP_EDITOR_TOOLS_STORAGE_KEY = "rts.mapEditor.tools.window.v1";
 
@@ -31,14 +32,12 @@ export class MapEditorPanel {
     root,
     session,
     viewport,
-    workspaceId = "default",
     onOpenLab,
     fetchImpl = globalThis.fetch?.bind(globalThis),
   }) {
     this.root = root;
     this.session = session;
     this.viewport = viewport;
-    this.workspaceId = workspaceId;
     this.onOpenLab = onOpenLab;
     this.fetchImpl = fetchImpl;
     this.catalog = [];
@@ -453,13 +452,13 @@ export class MapEditorPanel {
         }
         this.armDoodad("spray");
       }, { active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "spray" }),
-      button("Select / move", () => this.armDoodad("select"), {
-        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "select",
+      button("Remove doodads", () => this.armDoodad("remove"), {
+        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "remove",
       }),
       button("Erase brush", () => this.armDoodad("erase"), {
         active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "erase",
       }),
-      button("Delete selected", () => this.viewport.deleteSelectedDoodad()),
+      button("Delete selection", () => this.viewport.deleteSelectedDoodads()),
     );
 
     const color = document.createElement("input");
@@ -493,7 +492,7 @@ export class MapEditorPanel {
       field("Flower color", color),
       field("Brush radius (world px)", radius),
       field("Spray density", density),
-      readout("Symmetry applies when creating doodads. Drag selected doodads to move them; Delete/Backspace removes the selection."),
+      readout("Symmetry applies when creating doodads. Remove doodads uses a drag box; Delete/Backspace removes everything selected."),
     );
     return section;
   }
@@ -509,7 +508,7 @@ export class MapEditorPanel {
         this.setStatus(`Placing ${entry.label.toLowerCase()}.`);
       }, {
         active: this.viewport.tool?.kind === "doodad"
-          && !["select", "erase"].includes(this.viewport.tool?.mode)
+          && !["remove", "erase"].includes(this.viewport.tool?.mode)
           && this.selectedDoodadType === entry.typeId,
       }));
     }
@@ -519,8 +518,7 @@ export class MapEditorPanel {
   renderActions() {
     const section = group("Save and test");
     section.append(
-      button("Save on this device", () => this.saveLocal()),
-      button("Load saved map", () => this.loadLocal()),
+      button("Load map JSON", () => this.chooseJsonFile()),
       button("Export map JSON", () => this.exportJson()),
       button(this.pending ? "Opening Lab…" : "Open in Lab", () => void this.openLab(), {
         disabled: this.pending,
@@ -587,7 +585,7 @@ export class MapEditorPanel {
   }
 
   armDoodad(mode) {
-    this.doodadMode = ["place", "spray", "select", "erase"].includes(mode) ? mode : "place";
+    this.doodadMode = ["place", "spray", "remove", "erase"].includes(mode) ? mode : "place";
     this.viewport.armTool({
       kind: "doodad",
       mode: this.doodadMode,
@@ -703,14 +701,30 @@ export class MapEditorPanel {
     if (this.session.redo()) this.setStatus("Redid the map edit.");
   }
 
-  saveLocal() {
-    const ok = this.session.saveLocal(this.workspaceId);
-    this.setStatus(ok ? "Saved this workspace on this device." : "Local storage is unavailable.", !ok);
+  chooseJsonFile() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (file) void this.loadJsonFile(file);
+    }, { once: true });
+    input.click();
   }
 
-  loadLocal() {
-    const ok = this.session.loadLocal(this.workspaceId);
-    this.setStatus(ok ? "Loaded the saved workspace." : "No saved workspace was found.", !ok);
+  async loadJsonFile(file) {
+    const name = String(file?.name || "selected file");
+    try {
+      if (Number(file?.size) > MAP_EDITOR_MAX_JSON_BYTES) {
+        throw new Error("Map JSON files must be 2 MB or smaller.");
+      }
+      if (typeof file?.text !== "function") throw new Error("The selected file could not be read.");
+      const text = await file.text();
+      this.loadMapData(JSON.parse(text));
+      this.setStatus(`Loaded ${name}.`);
+    } catch (error) {
+      this.setStatus(`Could not load ${name}: ${error.message || error}`, true);
+    }
   }
 
   exportJson() {
@@ -725,6 +739,7 @@ export class MapEditorPanel {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
+      this.session.markSaved();
       this.setStatus(`Exported ${anchor.download}.`);
     } catch (error) {
       this.setStatus(error.message || String(error), true);
@@ -739,7 +754,6 @@ export class MapEditorPanel {
       await this.onOpenLab?.({
         authoredMap: this.session.exportMap(),
         materializedMap: this.session.materialized(),
-        workspaceId: this.workspaceId,
       });
     } catch (error) {
       this.pending = false;

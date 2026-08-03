@@ -59,6 +59,18 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     s: [42, 100, 25, 3, 10],
     ab: [true, 250, 150],
     gr: 17,
+    gd: [12, [[
+      901,
+      "infantry",
+      KIND_CODE[KIND.RIFLEMAN],
+      256,
+      288,
+      2,
+      77,
+      0.2,
+      null,
+      null,
+    ]]],
     n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 7, 42],
     e: [
       [
@@ -392,6 +404,13 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   );
   assert(decoded.groundDecalRevision === 17, "ground decal revision decodes from the compact snapshot");
   assert(
+    decoded.groundDecalDelta.afterRevision === 12 &&
+      decoded.groundDecalDelta.decals[0].id === 901 &&
+      decoded.groundDecalDelta.decals[0].sourceKind === KIND.RIFLEMAN &&
+      decoded.groundDecalDelta.decals[0].facing === 0.2,
+    "bounded ground decal delta decodes with its covered-after cursor",
+  );
+  assert(
     decoded.visibleTiles.join(",") === "1,1,0,0,0,1",
     "compact snapshot decodes server visibility grid",
   );
@@ -418,6 +437,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   );
   assert(weaponEventDecoded.groundDecalRevision === 0,
     "missing compact ground decal revision defaults to zero");
+  assert(weaponEventDecoded.groundDecalDelta === null,
+    "missing compact ground decal delta defaults to null");
   assert(
     weaponEventDecoded.events[0].weaponKind === WEAPON_KIND.TANK_CANNON,
     "six-slot compact attack event decodes weaponKind",
@@ -583,6 +604,28 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
         e: new Array(20001),
       }),
     "compact snapshot enforces entity count bounds",
+  );
+  assertThrows(
+    () => decodeServerMessage({
+      t: "snapshot",
+      v: COMPACT_SNAPSHOT_VERSION,
+      s: [1, 0, 0, 0, 0],
+      e: [],
+      gr: 4,
+      gd: [5, []],
+    }),
+    "compact snapshot rejects a decal delta base beyond its advertised revision",
+  );
+  assertThrows(
+    () => decodeServerMessage({
+      t: "snapshot",
+      v: COMPACT_SNAPSHOT_VERSION,
+      s: [1, 0, 0, 0, 0],
+      e: [],
+      gr: 65,
+      gd: [0, new Array(65)],
+    }),
+    "compact snapshot enforces the ground decal delta bound",
   );
   assertThrows(
     () =>

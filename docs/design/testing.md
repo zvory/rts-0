@@ -258,10 +258,15 @@ canary runs own a private server; the browser shard passes its existing loopback
   changing `scripts/adversarial-quality-pass.mjs`, its schema, or agent PR wiring. Patch-note copy
   is authored by the implementing agent rather than a second Codex pass. When useful, the agent
   stages up to 1,800 characters in the ignored Git-common-dir outbox with
-  `node scripts/patch-note-outbox.mjs stage --change "<change>"`. Supplying both `--before` and
+  `node scripts/patch-note-outbox.mjs stage --change "<change>"`. Root npm dependencies are
+  prepared by `scripts/ensure-node-deps.sh`, which atomically installs each package/lockfile pair
+  once under the shared cache and links the active worktree's `node_modules` to it. The canonical
+  test runner and post-merge patch-note delivery both use that helper, so npm-backed repository
+  tools do not depend on another worktree having run tests first. Supplying both `--before` and
   `--after` composes equal-sized PNG files or Interact preview URLs into a labeled four-second
   H.264 MP4, with each frame held for two seconds. The media is probed and capped below Discord's
-  default 10 MiB attachment limit. `scripts/wait-pr.sh` attempts delivery only after proving the PR
+  default 10 MiB attachment limit. `scripts/wait-pr.sh` hydrates the refreshed main checkout and
+  attempts delivery only after proving the PR
   head is reachable from `origin/main`; webhook errors retain the outbox entry and do not fail the
   successful merge. Per-destination receipts avoid resending after an ordinary partial failure.
   Outbox tests cover copy bounds, exact media composition, byte integrity, partial delivery, and
@@ -402,11 +407,11 @@ changed-file mapping selects the skipped behavior.
 ## 12. PR CI contract
 
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.
-It is an aggregate check over split coverage jobs for server binary build, Rust policy/lint, four
+It is an aggregate check over split coverage jobs for server binary build, Rust policy/lint, two
 complementary Rust nextest partitions, live Node, and two complementary browser/tri-state shards on
-pull requests targeting `main` and on pushes to `main`. The four nextest jobs use complementary
-`slice:1/4` through `slice:4/4` partitions, so their union runs the same Rust test set as the local
-gate. The dev-scenario `experimental_*_clear_time_matrix` tests are manual measurements because they
+pull requests targeting `main` and on pushes to `main`. The two nextest jobs use complementary
+`slice:1/2` and `slice:2/2` partitions, so their union runs the same Rust test set as the local gate.
+The dev-scenario `experimental_*_clear_time_matrix` tests are manual measurements because they
 print clear-time tables without asserting behavior; invoke them explicitly through their ignored-test
 filter when collecting movement measurements. The browser shards divide
 the current PR coverage into client smoke plus phase 0.5, and phases 2.5 plus 5; each shard gets an

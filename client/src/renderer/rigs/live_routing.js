@@ -1,31 +1,20 @@
 import { KIND } from "../../protocol.js";
-import { SCOUT_PLANE_PARTS, SCOUT_PLANE_RIG_SVG } from "./aircraft_svg.js";
-import {
-  LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG,
-  MACHINE_GUNNER_RIG_SVG,
-  RIFLEMAN_RIG_SVG,
-} from "./infantry_svg.js";
 import { compileSvgRig } from "./svg_importer.js";
 import {
-  ANTI_TANK_GUN_PARTS,
-  ANTI_TANK_GUN_RIG_SVG,
-  ARTILLERY_PARTS,
-  ARTILLERY_RIG_SVG,
-  MORTAR_TEAM_PARTS,
-  MORTAR_TEAM_RIG_SVG,
-} from "./support_svg.js";
-import { TANK_RIG_SVG } from "./tank_svg.js";
+  LOADED_RIFLEMAN_RIG_KEY,
+  RASTER_RIG_DEFINITIONS,
+  RASTER_RIG_PARTS,
+  rasterRigKinds,
+} from "./raster_rig_definitions.js";
 import {
   COMMAND_CAR_PARTS,
   COMMAND_CAR_RIG_SVG,
   EKAT_PARTS,
   EKAT_RIG_SVG,
-  SCOUT_CAR_PARTS,
-  SCOUT_CAR_RIG_SVG,
 } from "./vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "./worker_svg.js";
 
-export const LOADED_RIFLEMAN_RIG_KEY = "rifleman.panzerfaustLoaded";
+export { LOADED_RIFLEMAN_RIG_KEY, isRasterRigKey } from "./raster_rig_definitions.js";
 
 const DEFAULT_POOL_PROFILE = Object.freeze({
   familyKey: "liveUnit",
@@ -79,18 +68,9 @@ const ROUTE_PLAN_CACHE = new Map([
 ]);
 
 const LIVE_RIG_SOURCES = Object.freeze([
-  [KIND.ANTI_TANK_GUN, ANTI_TANK_GUN_RIG_SVG],
-  [KIND.ARTILLERY, ARTILLERY_RIG_SVG],
   [KIND.COMMAND_CAR, COMMAND_CAR_RIG_SVG],
   [KIND.EKAT, EKAT_RIG_SVG],
   [KIND.GOLEM, GOLEM_RIG_SVG],
-  [KIND.MACHINE_GUNNER, MACHINE_GUNNER_RIG_SVG],
-  [KIND.MORTAR_TEAM, MORTAR_TEAM_RIG_SVG],
-  [LOADED_RIFLEMAN_RIG_KEY, LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG],
-  [KIND.RIFLEMAN, RIFLEMAN_RIG_SVG],
-  [KIND.SCOUT_CAR, SCOUT_CAR_RIG_SVG],
-  [KIND.SCOUT_PLANE, SCOUT_PLANE_RIG_SVG],
-  [KIND.TANK, TANK_RIG_SVG],
   [KIND.WORKER, WORKER_RIG_SVG],
 ]);
 
@@ -113,122 +93,13 @@ const WORKER_UNIT_PARTS = Object.freeze([
   "part.busyIndicator",
 ]);
 
-const TANK_UNIT_PARTS = Object.freeze([
-  "part.track.left",
-  "part.track.right",
-  "part.tread.left.0",
-  "part.tread.left.1",
-  "part.tread.left.2",
-  "part.tread.left.3",
-  "part.tread.left.4",
-  "part.tread.left.5",
-  "part.tread.left.6",
-  "part.tread.left.7",
-  "part.tread.left.8",
-  "part.tread.right.0",
-  "part.tread.right.1",
-  "part.tread.right.2",
-  "part.tread.right.3",
-  "part.tread.right.4",
-  "part.tread.right.5",
-  "part.tread.right.6",
-  "part.tread.right.7",
-  "part.tread.right.8",
-  "part.hull",
-  "part.hull.shadow",
-  "part.hull.nose",
-  "part.hull.noseShadow",
-  "part.barrel",
-  "part.coaxBarrel",
-  "part.turret",
-  "part.noseTick",
-  "part.fuelCue.box",
-  "part.fuelCue.x1",
-  "part.fuelCue.x2",
-]);
-
-const TANK_EFFECT_PARTS = Object.freeze([
-  "part.tank.flashCone",
-  "part.tank.flashCore",
-  "part.tank.flashGlow",
-]);
-
-const RIFLEMAN_UNIT_PARTS = Object.freeze([
-  "part.body",
-  "part.head",
-  "part.shoulders",
-  "part.rifle.barrel",
-  "part.rifle.hand",
-]);
-
-const MACHINE_GUNNER_UNIT_PARTS = Object.freeze([
-  "part.body",
-  "part.head",
-  "part.shoulders",
-  "part.mg.main",
-  "part.mg.stock",
-  "part.mg.receiver",
-  "part.mg.topPlate",
-  "part.mg.shroud",
-  "part.mg.slot.0",
-  "part.mg.slot.1",
-  "part.mg.slot.2",
-  "part.mg.slot.3",
-  "part.mg.muzzleTick",
-  "part.mg.grip",
-  "part.mg.bipod",
-  "part.mg.muzzleCap",
-]);
-
-const PANZERFAUST_UNIT_PARTS = Object.freeze([
-  "part.body",
-  "part.head",
-  "part.shoulders",
-  "part.pzf.sling",
-  "part.pzf.tube",
-  "part.pzf.rear",
-  "part.pzf.warhead",
-  "part.pzf.teamBand",
-  "part.pzf.grip",
-]);
-
 const LIVE_RIG_PARTS = Object.freeze({
-  [KIND.ANTI_TANK_GUN]: Object.freeze({
-    shadow: ANTI_TANK_GUN_PARTS.shadow,
-    unit: ANTI_TANK_GUN_PARTS.weapon,
-  }),
-  [KIND.ARTILLERY]: Object.freeze({
-    shadow: ARTILLERY_PARTS.shadow,
-    unit: ARTILLERY_PARTS.weapon,
-  }),
+  ...RASTER_RIG_PARTS,
   [KIND.COMMAND_CAR]: COMMAND_CAR_PARTS,
   [KIND.EKAT]: EKAT_PARTS,
   [KIND.GOLEM]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
     unit: GOLEM_UNIT_PARTS,
-  }),
-  [KIND.MACHINE_GUNNER]: Object.freeze({
-    shadow: Object.freeze(["part.shadow"]),
-    unit: MACHINE_GUNNER_UNIT_PARTS,
-  }),
-  [KIND.MORTAR_TEAM]: Object.freeze({
-    shadow: MORTAR_TEAM_PARTS.shadow,
-    unit: MORTAR_TEAM_PARTS.weapon,
-  }),
-  [LOADED_RIFLEMAN_RIG_KEY]: Object.freeze({
-    shadow: Object.freeze(["part.shadow"]),
-    unit: PANZERFAUST_UNIT_PARTS,
-  }),
-  [KIND.RIFLEMAN]: Object.freeze({
-    shadow: Object.freeze(["part.shadow"]),
-    unit: RIFLEMAN_UNIT_PARTS,
-  }),
-  [KIND.SCOUT_CAR]: SCOUT_CAR_PARTS,
-  [KIND.SCOUT_PLANE]: SCOUT_PLANE_PARTS,
-  [KIND.TANK]: Object.freeze({
-    shadow: Object.freeze(["part.shadow"]),
-    unit: TANK_UNIT_PARTS,
-    effects: TANK_EFFECT_PARTS,
   }),
   [KIND.WORKER]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),
@@ -237,7 +108,7 @@ const LIVE_RIG_PARTS = Object.freeze({
 });
 
 export function createLiveRigDefinitions() {
-  const definitions = new Map();
+  const definitions = new Map(RASTER_RIG_DEFINITIONS);
   for (const [kind, svgText] of LIVE_RIG_SOURCES) {
     const expectedKind = kind === LOADED_RIFLEMAN_RIG_KEY ? KIND.RIFLEMAN : kind;
     const compiled = compileSvgRig(svgText, { expectedKind });
@@ -250,6 +121,7 @@ export function createLiveRigDefinitions() {
 export function liveRigKinds() {
   return [
     KIND.PANZERFAUST,
+    ...rasterRigKinds().filter((kind) => kind !== LOADED_RIFLEMAN_RIG_KEY),
     ...LIVE_RIG_SOURCES
       .map(([kind]) => kind)
       .filter((kind) => kind !== LOADED_RIFLEMAN_RIG_KEY),
@@ -307,7 +179,7 @@ export function liveRigRoutesFor(kind, pools = {}) {
  * @typedef {object} RoutePlan
  * @property {readonly LiveRigRoute[]} routes Ordered immutable render routes.
  * @property {ReadonlySet<string>} allParts Stable union used as an animation-stage cache key.
- * @property {readonly string[]} poolNames Complete active SVG pool set.
+ * @property {readonly string[]} poolNames Complete active rig pool set.
  * @property {string|null} familyKey
  * @property {LiveRigRoute|null} shadowRoute
  * @property {string} overlayPoolName

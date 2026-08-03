@@ -8,8 +8,8 @@ import {
   allocateMapEditorDoodadId,
   createDoodadSprayStroke,
   doodadIdsWithinRadius,
+  doodadIdsWithinRect,
   extendDoodadSprayStroke,
-  nearestMapEditorDoodad,
   symmetricDoodadPlacements,
 } from "./map_editor_doodads.js";
 import {
@@ -94,11 +94,12 @@ export class MapEditorViewport {
     this.tool = null;
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
     this.selectedBaseIndex = null;
-    this.selectedDoodadId = null;
+    this.selectedDoodadIds = new Set();
     this.paintPointerId = null;
     this.doodadPointerId = null;
     this.doodadPointerMode = null;
-    this.doodadDragOffset = null;
+    this.doodadSelectStart = null;
+    this.doodadSelectEnd = null;
     this.doodadSprayStroke = null;
     this.doodadLastWorld = null;
     this.doodadBrushPoint = null;
@@ -169,17 +170,24 @@ export class MapEditorViewport {
     this.drawOverlay();
   }
 
-  deleteSelectedDoodad() {
-    if (!this.selectedDoodadId) {
-      this.onStatus("Select a doodad first.", true);
+  deleteSelectedDoodads() {
+    if (!this.selectedDoodadIds.size) {
+      this.onStatus("Box-select doodads first.", true);
       return false;
     }
-    this.session.beginDoodadStroke("Deleted doodad");
-    this.session.removeDoodads([this.selectedDoodadId]);
+    const count = this.selectedDoodadIds.size;
+    if (!this.session.beginDoodadStroke(count === 1 ? "Deleted doodad" : `Deleted ${count} doodads`)) {
+      this.onStatus("Finish the current doodad edit before deleting the selection.", true);
+      return false;
+    }
+    this.session.removeDoodads(this.selectedDoodadIds);
     const changed = this.session.commitDoodadStroke();
-    this.selectedDoodadId = null;
+    this.selectedDoodadIds.clear();
     this.drawOverlay();
-    this.onStatus(changed ? "Doodad deleted." : "Doodad was already absent.", !changed);
+    this.onStatus(
+      changed ? `${count} doodad${count === 1 ? "" : "s"} deleted.` : "Selected doodads were already absent.",
+      !changed,
+    );
     return changed;
   }
 
@@ -251,8 +259,11 @@ export class MapEditorViewport {
     } else {
       this.rebuildDoodads();
     }
-    if (this.selectedDoodadId && !snapshot.draft.doodads?.some((record) => record.id === this.selectedDoodadId)) {
-      this.selectedDoodadId = null;
+    if (snapshot.reason === "initialized" || snapshot.reason === "loaded") {
+      this.selectedDoodadIds.clear();
+    } else {
+      const existingDoodadIds = new Set((snapshot.draft.doodads || []).map((record) => record.id));
+      this.selectedDoodadIds = new Set([...this.selectedDoodadIds].filter((id) => existingDoodadIds.has(id)));
     }
     this.drawOverlay();
   }
@@ -353,18 +364,25 @@ export class MapEditorViewport {
       stealthTiles: structuredCloneSafe(draft.stealthTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
       paintPreview: this.paintPreviewRecord(),
-      doodadSelection: this.doodadSelectionRecord?.() || null,
+      doodadSelections: this.doodadSelectionRecords?.() || [],
+      doodadSelectionBox: this.doodadSelectionBoxRecord?.() || null,
       doodadBrushPreview: this.doodadBrushPreviewRecord?.() || null,
     };
   }
 
-  doodadSelectionRecord() {
-    const record = this.session.draft?.doodads?.find((candidate) => candidate.id === this.selectedDoodadId);
-    return record ? { id: record.id, x: record.x, y: record.y } : null;
+  doodadSelectionRecords() {
+    return (this.session.draft?.doodads || [])
+      .filter((record) => this.selectedDoodadIds.has(record.id))
+      .map((record) => ({ id: record.id, x: record.x, y: record.y }));
+  }
+
+  doodadSelectionBoxRecord() {
+    if (this.tool?.kind !== "doodad" || this.tool.mode !== "remove" || !this.doodadSelectStart || !this.doodadSelectEnd) return null;
+    return worldRect(this.doodadSelectStart, this.doodadSelectEnd);
   }
 
   doodadBrushPreviewRecord() {
-    if (this.tool?.kind !== "doodad" || !this.doodadBrushPoint || this.tool.mode === "select") return null;
+    if (this.tool?.kind !== "doodad" || !this.doodadBrushPoint || this.tool.mode === "remove") return null;
     return {
       x: this.doodadBrushPoint.x,
       y: this.doodadBrushPoint.y,
@@ -401,7 +419,7 @@ export class MapEditorViewport {
     }
     if (event.button !== 0 || !this.tool) return;
     if (this.tool.kind === "doodad") {
-      const world = this.eventWorld(event);
+      const world = this.eventWorld(event, { clamp: this.tool.mode === "remove" });
       if (!world) return;
       this.doodadBrushPoint = world;
       this.beginDoodadPointer(event, world);
@@ -436,7 +454,7 @@ export class MapEditorViewport {
       return;
     }
     if (this.tool?.kind === "doodad") {
-      const world = this.eventWorld(event);
+      const world = this.eventWorld(event, { clamp: this.tool.mode === "remove" });
       if (world) {
         this.doodadBrushPoint = world;
         if (event.pointerId === this.doodadPointerId) this.continueDoodadPointer(world);
@@ -460,21 +478,32 @@ export class MapEditorViewport {
     if (event.pointerId === this.doodadPointerId) {
       const cancelled = event.type === "pointercancel";
       if (!cancelled) {
-        const world = this.eventWorld(event);
+        const world = this.eventWorld(event, { clamp: this.tool?.mode === "remove" });
         if (world) this.continueDoodadPointer(world);
       }
       const mode = this.doodadPointerMode;
       this.doodadPointerId = null;
       this.doodadPointerMode = null;
-      this.doodadDragOffset = null;
       this.doodadSprayStroke = null;
       this.doodadLastWorld = null;
-      const changed = cancelled ? (this.session.cancelDoodadStroke(), false) : this.session.commitDoodadStroke();
+      let changed = false;
+      if (mode === "remove") {
+        if (cancelled) {
+          this.doodadSelectStart = null;
+          this.doodadSelectEnd = null;
+        } else {
+          this.finishDoodadBoxSelection();
+        }
+      } else {
+        changed = cancelled ? (this.session.cancelDoodadStroke(), false) : this.session.commitDoodadStroke();
+      }
       this.drawOverlay();
-      this.onStatus(
-        cancelled ? "Doodad edit cancelled." : changed ? doodadCommitLabel(mode) : "No doodads changed.",
-        !cancelled && !changed,
-      );
+      if (mode !== "remove") {
+        this.onStatus(
+          cancelled ? "Doodad edit cancelled." : changed ? doodadCommitLabel(mode) : "No doodads changed.",
+          !cancelled && !changed,
+        );
+      }
     }
     if (event.pointerId === this.paintPointerId) {
       const cancelled = event.type === "pointercancel";
@@ -507,14 +536,11 @@ export class MapEditorViewport {
 
   beginDoodadPointer(event, world) {
     const tool = this.tool;
-    if (tool.mode === "select") {
-      const selected = nearestMapEditorDoodad(this.session.draft?.doodads || [], world, 24 / this.camera.zoom);
-      this.selectedDoodadId = selected?.id || null;
+    if (tool.mode === "remove") {
+      this.doodadSelectStart = world;
+      this.doodadSelectEnd = world;
+      this.doodadPointerMode = "remove";
       this.drawOverlay();
-      if (!selected) return;
-      this.session.beginDoodadStroke("Moved doodad");
-      this.doodadPointerMode = "move";
-      this.doodadDragOffset = { x: selected.x - world.x, y: selected.y - world.y };
     } else {
       this.session.beginDoodadStroke(tool.mode === "erase" ? "Erased doodads" : tool.mode === "spray" ? "Sprayed wildflowers" : "Placed doodad");
       this.doodadPointerMode = tool.mode;
@@ -538,12 +564,8 @@ export class MapEditorViewport {
   }
 
   continueDoodadPointer(world) {
-    if (this.doodadPointerMode === "move" && this.selectedDoodadId) {
-      const moved = this.session.moveDoodad(this.selectedDoodadId, {
-        x: world.x + (this.doodadDragOffset?.x || 0),
-        y: world.y + (this.doodadDragOffset?.y || 0),
-      });
-      if (moved) this.queueDoodadPatch({ upserts: [moved] });
+    if (this.doodadPointerMode === "remove") {
+      this.doodadSelectEnd = world;
     } else if (this.doodadPointerMode === "spray" && this.doodadSprayStroke) {
       this.placeDoodadPoints(extendDoodadSprayStroke(this.doodadSprayStroke, world));
     } else if (this.doodadPointerMode === "erase") {
@@ -551,6 +573,22 @@ export class MapEditorViewport {
       for (const point of resampleWorldSegment(this.doodadLastWorld, world, spacing)) this.eraseDoodadsAt(point);
     }
     this.doodadLastWorld = world;
+  }
+
+  finishDoodadBoxSelection() {
+    const ids = doodadIdsWithinRect(
+      this.session.draft?.doodads || [],
+      this.doodadSelectStart,
+      this.doodadSelectEnd,
+    );
+    this.selectedDoodadIds = new Set(ids);
+    this.doodadSelectStart = null;
+    this.doodadSelectEnd = null;
+    this.onStatus(
+      ids.length ? `${ids.length} doodad${ids.length === 1 ? "" : "s"} selected for removal.` : "No doodads in selection.",
+      false,
+    );
+    return ids;
   }
 
   placeDoodadPoints(points) {
@@ -573,7 +611,7 @@ export class MapEditorViewport {
     );
     const removed = this.session.removeDoodads(ids);
     if (removed.length) this.queueDoodadPatch({ removedIds: removed });
-    if (removed.includes(this.selectedDoodadId)) this.selectedDoodadId = null;
+    for (const id of removed) this.selectedDoodadIds.delete(id);
   }
 
   paintLine(from, to) {
@@ -685,13 +723,13 @@ export class MapEditorViewport {
 
   handleKey(event, pressed) {
     if (isTextEntry(event.target)) return;
-    if (pressed && (event.code === "Delete" || event.code === "Backspace") && this.selectedDoodadId) {
-      this.deleteSelectedDoodad();
+    if (pressed && (event.code === "Delete" || event.code === "Backspace") && this.selectedDoodadIds.size) {
+      this.deleteSelectedDoodads();
       event.preventDefault();
       return;
     }
-    if (pressed && event.code === "Escape" && this.selectedDoodadId) {
-      this.selectedDoodadId = null;
+    if (pressed && event.code === "Escape" && this.selectedDoodadIds.size) {
+      this.selectedDoodadIds.clear();
       this.drawOverlay();
       event.preventDefault();
       return;
@@ -896,10 +934,18 @@ function overlayPreviewColor(edit) {
 }
 
 function doodadCommitLabel(mode) {
-  if (mode === "move") return "Doodad moved.";
   if (mode === "erase") return "Doodads erased.";
   if (mode === "spray") return "Wildflowers sprayed.";
   return "Doodad placed.";
+}
+
+function worldRect(from, to) {
+  return {
+    x: Math.min(from.x, to.x),
+    y: Math.min(from.y, to.y),
+    width: Math.abs(to.x - from.x),
+    height: Math.abs(to.y - from.y),
+  };
 }
 
 function resampleWorldSegment(from, to, spacing) {

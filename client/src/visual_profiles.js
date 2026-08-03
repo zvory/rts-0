@@ -94,32 +94,6 @@ const TRENCH_VARIANTS_1_STATIC_SAMPLES = Object.freeze([
   }),
 ]);
 
-const UNIT_RIG_OVERRIDES_1 = Object.freeze([
-  Object.freeze({
-    id: "tank-by-entity",
-    label: "A Low",
-    candidateId: "tank-low-profile",
-    selector: Object.freeze({ entityId: 126 }),
-  }),
-  Object.freeze({
-    id: "tank-by-ordinal",
-    label: "B Wide",
-    candidateId: "tank-wide-turret",
-    selector: Object.freeze({ kind: KIND.TANK, owner: 1, ordinal: 2 }),
-  }),
-  Object.freeze({
-    id: "tank-by-nearest",
-    label: "C Long",
-    candidateId: "tank-long-cannon",
-    selector: Object.freeze({
-      kind: KIND.TANK,
-      owner: 1,
-      nearest: Object.freeze({ x: 1884, y: 2032 }),
-      maxDistance: 64,
-    }),
-  }),
-]);
-
 const RIFLEMAN_RECOIL_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
   Object.freeze({
     id: "rifleman-recoil-strip",
@@ -182,13 +156,6 @@ const VISUAL_PROFILE_ENTRIES = Object.freeze([
     description: "Fog-free Lab framing for the production stochastic terrain transition matrix.",
     initialCamera: cameraSnapshot(2016, 2016, 0.58),
     terrainPreviewReveal: true,
-  }),
-  Object.freeze({
-    id: "unit-rig-overrides-1",
-    label: "Unit rig overrides 1",
-    description: "Local checked-in profile for comparing real Tank rig candidates in the render-preview lab scenario.",
-    initialCamera: cameraSnapshot(2040, 1950, 0.9),
-    unitOverrides: UNIT_RIG_OVERRIDES_1,
   }),
   Object.freeze({
     id: "rifleman-recoil-strip-1",

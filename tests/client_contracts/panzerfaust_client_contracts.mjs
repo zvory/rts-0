@@ -8,7 +8,6 @@ import {
   createLiveRigDefinitions,
   liveRigKeyForEntity,
 } from "../../client/src/renderer/rigs/live_routing.js";
-import { createRigRenderContext, sampleRigAnimation } from "../../client/src/renderer/rigs/animation.js";
 
 const start = {
   playerId: 1,
@@ -109,18 +108,7 @@ const start = {
   const spentKey = liveRigKeyForEntity(spentEntity);
   const loadedDefinition = definitions.get(loadedKey);
   const spentDefinition = definitions.get(spentKey);
-  const loaded = sampleRigAnimation(
-    loadedDefinition,
-    loadedEntity,
-    createRigRenderContext(loadedEntity),
-  );
-  const spent = sampleRigAnimation(
-    spentDefinition,
-    spentEntity,
-    createRigRenderContext(spentEntity),
-  );
-
   assert(loadedKey !== spentKey, "loaded and spent Panzerfausts route to different live rigs");
-  assert(loaded.parts["part.pzf.warhead"].visible === true, "loaded Panzerfaust rig shows the warhead");
-  assert(spent.parts["part.pzf.warhead"] === undefined, "spent Panzerfaust immediately returns to normal Rifleman art");
+  assert(loadedDefinition.id === "rifleman.panzerfaust-loaded.raster", "loaded Panzerfaust uses raster-native metadata");
+  assert(spentDefinition.id === "rifleman.raster", "spent Panzerfaust immediately returns to normal Rifleman raster art");
 }

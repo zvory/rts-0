@@ -6,12 +6,135 @@ import { TrenchDecalLayer } from "../../client/src/renderer/trenches.js";
 import { KIND, msg } from "../../client/src/protocol.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
+const inlineDecal = (id, overrides = {}) => ({
+  id,
+  decalClass: "infantry",
+  sourceKind: KIND.RIFLEMAN,
+  x: 32 + id,
+  y: 48,
+  owner: 1,
+  seed: id,
+  ...overrides,
+});
+
 assert(
   JSON.stringify(msg.requestGroundDecals(3, 7)) === JSON.stringify({
     t: "requestGroundDecals", requestId: 3, afterRevision: 7,
   }),
   "ground-decal request builder mirrors the reliable wire contract",
 );
+
+{
+  const requests = [];
+  const timers = [];
+  const cleared = new Set();
+  const buffer = new GroundDecalBuffer();
+  const context = { players: [{ id: 1, color: "#4878c8" }], tileSize: 32 };
+  const state = {
+    groundDecals: buffer,
+    applyAuthoritativeGroundDecals: (message) => buffer.applyAuthoritativeBatch(message, context),
+    resetAuthoritativeGroundDecals: () => buffer.clear(),
+  };
+  const sync = new GroundDecalSync({
+    net: {
+      requestGroundDecals(requestId, afterRevision) {
+        requests.push({ requestId, afterRevision });
+        return true;
+      },
+    },
+    state,
+    retryDelaysMs: [10],
+    setTimer(fn, ms) { const id = timers.length; timers.push({ fn, ms }); return id; },
+    clearTimer(id) { cleared.add(id); },
+  });
+
+  sync.observeSnapshot(2, { afterRevision: 0, decals: [inlineDecal(20)] });
+  assert(buffer.authoritativeRevision === 2 && buffer.pendingCount === 1 && requests.length === 0,
+    "a contiguous snapshot decal delta advances immediately without repair");
+  sync.observeSnapshot(2, { afterRevision: 0, decals: [inlineDecal(20)] });
+  assert(buffer.pendingCount === 1,
+    "a repeated snapshot decal delta is idempotent by stable decal id");
+  sync.observeSnapshot(3, {
+    afterRevision: 1,
+    decals: [inlineDecal(20), inlineDecal(21)],
+  });
+  assert(buffer.authoritativeRevision === 3 && buffer.pendingCount === 2,
+    "an overlapping covered range advances and queues only the newly learned row");
+
+  sync.observeSnapshot(70, { afterRevision: 6, decals: [inlineDecal(22)] });
+  assert(buffer.authoritativeRevision === 3 && buffer.pendingCount === 3,
+    "a forward gap presents entitled recent rows without claiming missing cache coverage");
+  assert(requests.length === 1 && requests[0].afterRevision === 3,
+    "a forward gap falls back to repair from the last complete cursor");
+  sync.observeSnapshot(70, { afterRevision: 6, decals: [inlineDecal(22)] });
+  assert(requests.length === 1 && buffer.pendingCount === 3,
+    "repeated gapped deltas coalesce repair and do not duplicate presentation rows");
+
+  sync.observeSnapshot(70, {
+    afterRevision: 3,
+    decals: [inlineDecal(22), inlineDecal(23)],
+  });
+  assert(buffer.authoritativeRevision === 70 && buffer.pendingCount === 4,
+    "a later covering delta can satisfy the outstanding repair target");
+  assert(sync.outstandingRequestId === null && cleared.has(0),
+    "catching up through the fast path cancels the obsolete repair retry");
+
+  sync.reset({ resetPresentation: false });
+  sync.observeSnapshot(80, { afterRevision: 70, decals: [inlineDecal(24)] });
+  assert(buffer.authoritativeRevision === 0 && buffer.pendingCount === 0,
+    "the first queued snapshot after a perspective reset cannot inject old-view inline rows");
+  assert(requests.at(-1).afterRevision === 0,
+    "perspective replacement still uses correlated repair from zero");
+  sync.observeSnapshot(81, { afterRevision: 70, decals: [inlineDecal(25)] });
+  assert(buffer.authoritativeRevision === 0 && buffer.pendingCount === 0,
+    "all queued old-perspective snapshot tails stay blocked until correlated repair");
+  assert(requests.length === 2,
+    "additional queued snapshots coalesce behind the perspective repair");
+  assert(sync.applyResponse({
+    requestId: requests.at(-1).requestId,
+    revision: 1,
+    decals: [inlineDecal(26)],
+  }), "the correlated repair establishes replacement perspective authority");
+  assert(buffer.authoritativeRevision === 1 && buffer.pendingCount === 1 &&
+    buffer.authoritativeDecals.has(26) && !buffer.authoritativeDecals.has(24) &&
+    !buffer.authoritativeDecals.has(25),
+  "old-perspective inline rows never enter the replacement cache");
+  sync.destroy();
+}
+
+{
+  const requests = [];
+  const buffer = new GroundDecalBuffer();
+  const sync = new GroundDecalSync({
+    net: {
+      requestGroundDecals(requestId, afterRevision) {
+        requests.push({ requestId, afterRevision });
+        return true;
+      },
+    },
+    state: {
+      groundDecals: buffer,
+      applyAuthoritativeGroundDecals: (message) => buffer.applyAuthoritativeBatch(message),
+      resetAuthoritativeGroundDecals: () => buffer.clear(),
+    },
+    setTimer() { return 1; },
+    clearTimer() {},
+  });
+
+  sync.reset();
+  sync.observeSnapshot(0);
+  assert(requests.length === 1 && requests[0].afterRevision === 0,
+    "a zero-revision reset still requests correlated perspective authority");
+  sync.observeSnapshot(0);
+  assert(sync.outstandingRequestId === requests[0].requestId,
+    "repeated zero-revision snapshots cannot cancel the establishing repair");
+  sync.observeSnapshot(2, { afterRevision: 0, decals: [inlineDecal(27)] });
+  assert(buffer.pendingCount === 0,
+    "a later queued old snapshot stays blocked after an initial zero-revision snapshot");
+  assert(sync.applyResponse({ requestId: requests[0].requestId, revision: 0, decals: [] }),
+    "a zero-revision correlated response settles the replacement perspective");
+  sync.destroy();
+}
 
 {
   const requests = [];

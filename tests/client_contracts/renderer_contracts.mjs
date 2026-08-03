@@ -5,6 +5,7 @@ import { KIND, STATE, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
 import { createRigRenderContext, rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
 import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
+import { inlineSvgImageSources } from "../../client/src/minimap_icon_image.js";
 import { TrenchDecalLayer, _drawOccupiedTrenches, _drawTrenches } from "../../client/src/renderer/trenches.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
@@ -37,6 +38,22 @@ assert(
 );
 
 {
+  const requested = [];
+  const controller = new AbortController();
+  const markup = '<svg><image href="/assets/artillery.png" /><image href="/assets/artillery.png" /></svg>';
+  const inlined = await inlineSvgImageSources(markup, async (href, { signal }) => {
+    requested.push(href);
+    assert(signal === controller.signal, "minimap icon source loading receives the teardown signal");
+    return "data:image/png;base64,cG5n";
+  }, { signal: controller.signal });
+  assert(requested.join(",") === "/assets/artillery.png", "minimap icon source loading is deduplicated");
+  assert(
+    (inlined.match(/data:image\/png;base64,cG5n/g) || []).length === 2 && !inlined.includes('/assets/artillery.png'),
+    "minimap icon markup embeds every raster source before becoming an image",
+  );
+}
+
+{
   const riflemanIcon = liveUnitIconMarkupFor(KIND.RIFLEMAN);
   assert(
     riflemanIcon.includes('data-unit-icon-source="frame-strip"') &&
@@ -64,7 +81,7 @@ assert(
       .includes('fill="#d55e00"') &&
       liveUnitIconMarkupFor(KIND.EKAT, { teamColor: "#d55e00" })
         .includes('fill="#e46d0f"'),
-    "unit icon resolver applies the live rig tint palette to SVG fallback portraits",
+    "unit icon resolver applies the live rig tint palette to SVG-authored portraits",
   );
   assert(
     liveUnitIconMarkupFor(KIND.SCOUT_CAR, { teamColor: "#d55e00" })
@@ -109,7 +126,7 @@ assert(
     workerIcon.includes('class="unit-rig-icon"') &&
       !workerIcon.includes("anchor.") &&
       !workerIcon.includes("bounds."),
-    "unit icon resolver retains the clean authored SVG fallback when no live PNG exists",
+    "unit icon resolver retains clean authored SVG portraits for SVG-only units",
   );
   assert(liveUnitIconMarkupFor("not_a_unit") === "", "unit icon resolver leaves unknown kinds to HUD fallback");
 }
@@ -826,7 +843,7 @@ assert(
       unitStrip?.frameTextures?.length === unitStrip?.strip?.frameCount,
       "Scout Plane frame strip exposes one runtime texture per declared frame",
     );
-    assert(shadowRig?.parts.has("part.shadow"), "Scout Plane frame-strip rendering keeps the separate SVG shadow route");
+    assert(shadowRig?.parts.has("part.shadow"), "Scout Plane frame-strip rendering keeps the separate native shadow route");
     assert(
       ring.rx === 31 && ring.ry === 24 && ring.cy === 2,
       "Scout Plane selection ring uses the mirrored 48x34 aircraft body with vehicle-body padding",
@@ -856,6 +873,7 @@ assert(
     };
     const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
+    renderer._liveFrameStripTextures.set(KIND.RIFLEMAN, PIXI.Texture.from("rifleman-strip-test-texture"));
     const entity = {
       id: 506,
       owner: 1,
@@ -876,24 +894,18 @@ assert(
 
     renderer._drawUnit(entity, colorByOwner, state);
 
-    const unitRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+    const unitStrip = renderer._liveRigPools.liveUnitRigs.get(entity.id);
     const shadowRig = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
-    const bodyCalls = unitRig?.parts.get("part.body")?.display.calls || [];
     const shadowCalls = shadowRig?.parts.get("part.shadow")?.display.calls || [];
 
-    assert(unitRig?.container.zIndex === entity.y, "SVG unit bodies use world-Y depth");
-    assert(unitRig?.container.scaleX === 0.85 && unitRig.container.scaleY === 0.85,
-      "occupied infantry rig scales down while in a trench");
+    assert(unitStrip?.container.zIndex === entity.y, "PNG infantry bodies use world-Y depth");
+    assert(unitStrip?.container.scaleX === 0.85 && unitStrip.container.scaleY === 0.85,
+      "occupied infantry frame strip scales down while in a trench");
     assert(shadowRig?.container.scaleX === 0.85 && shadowRig.container.scaleY === 0.85,
-      "occupied infantry shadow scales with the unit rig");
-    assert(
-      bodyCalls.some((call) => call[0] === "beginFill" && call[1] === 0x4878c8),
-      "occupied infantry rig keeps the team-colored body fill",
-    );
-    assert(
-      !bodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
-      "occupied infantry rig does not draw a dirt tint overlay on visible body parts",
-    );
+      "occupied infantry shadow scales with the frame strip");
+    const occupiedTint = unitStrip?.sprite?.tint;
+    assert(Number.isInteger(occupiedTint) && occupiedTint !== COLORS.trenchDirt,
+      "occupied infantry frame strip keeps its palette tint instead of trench dirt");
     assert(
       !shadowCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
       "occupied infantry rig does not tint the separate shadow route",
@@ -949,20 +961,10 @@ assert(
       trenches: [{ id: 80, x: 260, y: 160, radiusTiles: 0.375 }],
     });
 
-    let lastClearIndex = -1;
-    for (let i = bodyCalls.length - 1; i >= 0; i -= 1) {
-      if (bodyCalls[i][0] === "clear") {
-        lastClearIndex = i;
-        break;
-      }
-    }
-    const latestBodyCalls = bodyCalls.slice(lastClearIndex + 1);
-    assert(unitRig.container.scaleX === 1 && unitRig.container.scaleY === 1,
-      "infantry rig returns to normal scale after leaving a trench");
-    assert(
-      !latestBodyCalls.some((call) => call[0] === "beginFill" && call[1] === COLORS.trenchDirt),
-      "infantry rig clears the dirt tint overlay after leaving a trench",
-    );
+    assert(unitStrip.container.scaleX === 1 && unitStrip.container.scaleY === 1,
+      "infantry frame strip returns to normal scale after leaving a trench");
+    assert(unitStrip.sprite.tint === occupiedTint,
+      "infantry frame strip keeps the team tint after leaving a trench");
     assert(emptyDrawn === 0, "empty trenches do not draw the occupied berm overlay");
   } finally {
     restorePixi();
@@ -984,6 +986,7 @@ assert(
     };
     const renderer = await Renderer.create(parent);
     renderer._map = { tileSize: 32 };
+    renderer._livePngRigAtlasTextures.set(KIND.ARTILLERY, PIXI.Texture.from("artillery-atlas-test-texture"));
     const entity = {
       id: 507,
       owner: 1,

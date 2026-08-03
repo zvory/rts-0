@@ -34,7 +34,7 @@
     "Frames 1-4 cycle only while the authoritative client entity state is move.",
     "The source sheet was generated with the rifleman facing south to preserve the long rifle silhouette, then the runtime frames were rotated 90 degrees left so the existing frame-strip renderer can continue treating source art as east-facing.",
     "Frame 5 is the firing recoil peak and frame 6 is a partial recovery pose; both are derived from the idle frame and shifted backward along the rifle axis.",
-    "The old SVG rifleman rig remains available for the shadow route and fallback while the PNG texture loads.",
+    "Raster-native metadata supplies the shadow route; the production strip has no vector-art fallback.",
     "The runtime strip already has the shared frame-strip baseline baked in, equivalent to ImageMagick -modulate 170,118,100, so the client load-time color-profile delta is identity for this pass."
   ]
 }

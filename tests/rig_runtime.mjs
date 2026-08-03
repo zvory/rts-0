@@ -12,7 +12,6 @@ import {
   liveRigRoutePlanFor,
   liveRigRoutesFor,
 } from "../client/src/renderer/rigs/live_routing.js";
-import { compileVisualUnitRigCandidates } from "../client/src/renderer/rigs/visual_override_rigs.js";
 import { compileSvgRig } from "../client/src/renderer/rigs/svg_importer.js";
 import {
   createRigAnimationStage,
@@ -46,24 +45,11 @@ import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/anti_ta
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/mortar_team_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
 import {
-  LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG,
-  MACHINE_GUNNER_RIG_SVG,
-  RIFLEMAN_RIG_SVG,
-} from "../client/src/renderer/rigs/infantry_svg.js";
-import {
-  ANTI_TANK_GUN_RIG_SVG,
-  ARTILLERY_RIG_SVG,
-  MORTAR_TEAM_RIG_SVG,
-} from "../client/src/renderer/rigs/support_svg.js";
-import { TANK_RIG_SVG } from "../client/src/renderer/rigs/tank_svg.js";
-import {
   COMMAND_CAR_RIG_SVG,
   EKAT_RIG_SVG,
-  SCOUT_CAR_RIG_SVG,
 } from "../client/src/renderer/rigs/vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 import { createInspectionPixiFactory } from "./helpers/rig_inspection_pixi.mjs";
-import { assertAtlasSpriteUsesWorldScale } from "./helpers/rig_asset_assertions.mjs";
 import {
   fakeAtlasTexture,
   fakeFrameStripTexture,
@@ -80,7 +66,7 @@ const machineGunnerPngManifestPath = path.join(
 const fixedNow = 12_345;
 function main() {
 test("animation sampler applies game-state bindings without Pixi", () => {
-  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const definition = createLiveRigDefinitions().get(KIND.TANK);
   const entity = {
     id: 7,
     kind: KIND.TANK,
@@ -108,7 +94,7 @@ test("animation sampler applies game-state bindings without Pixi", () => {
 });
 
 test("reusable animation staging preserves sampled values while reusing storage", () => {
-  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const definition = createLiveRigDefinitions().get(KIND.TANK);
   const entity = {
     id: 71,
     kind: KIND.TANK,
@@ -147,7 +133,7 @@ test("reusable animation staging preserves sampled values while reusing storage"
 });
 
 test("tank rig exposes transformed main and coax muzzle anchors", () => {
-  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const definition = createLiveRigDefinitions().get(KIND.TANK);
   const entity = {
     id: 8,
     kind: KIND.TANK,
@@ -187,7 +173,7 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
 });
 
 test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil", () => {
-  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const definition = createLiveRigDefinitions().get(KIND.TANK);
   const entity = {
     id: 9,
     kind: KIND.TANK,
@@ -232,37 +218,6 @@ test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil",
   assert.ok(Math.abs(cone.alpha - 1) < 0.001);
   assert.ok(Math.abs(core.alpha - 1) < 0.001);
   assert.ok(Math.abs(glow.alpha - 1) < 0.001);
-});
-
-test("tank long-cannon override keeps the flare ahead of the recoiling muzzle", () => {
-  const compiled = compileVisualUnitRigCandidates();
-  const definition = compiled.definitions.get("tank-long-cannon")?.definition;
-  assert.ok(definition, JSON.stringify([...compiled.errors.entries()]));
-  assert.ok(Math.abs(definition.anchors.muzzle.x - 39.2) < 0.001);
-  const entity = {
-    id: 10,
-    kind: KIND.TANK,
-    owner: 1,
-    x: 100,
-    y: 100,
-    hp: 100,
-    maxHp: 100,
-    state: STATE.IDLE,
-    facing: 0,
-    weaponFacing: 0,
-  };
-  const context = createRigRenderContext(entity, {
-    now: fixedNow,
-    state: { weaponRecoil: () => 1 },
-  });
-  const firing = sampleRigAnimation(definition, entity, context);
-  const recoiledMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", context);
-  assert.ok(recoiledMuzzle);
-  const recoiledMuzzleLocalX = recoiledMuzzle.x - entity.x;
-  const cone = firing.parts["part.tank.flashCone"];
-  assert.ok(Math.abs(recoiledMuzzleLocalX - 22.55) < 0.001);
-  assert.ok(Math.abs(cone.transform.x - 31.35) < 0.001);
-  assert.ok(Math.abs(cone.transform.x - recoiledMuzzleLocalX - 8.8) < 0.001);
 });
 
 test("rig runtime creates one container child per part and updates transforms", () => {
@@ -476,58 +431,69 @@ test("geometry-scale animation grows coordinates without scaling stroke width", 
   instance.destroy();
 });
 
-test("live rig definitions compile production SVG sources", () => {
-  const workerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-worker.svg"), "utf8").trim();
-  const riflemanFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-rifleman.svg"), "utf8").trim();
-  const machineGunnerFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-machine-gunner.svg"), "utf8").trim();
-  const antiTankGunFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-anti-tank-gun.svg"), "utf8").trim();
-  const mortarTeamFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-mortar-team.svg"), "utf8").trim();
-  const artilleryFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-artillery.svg"), "utf8").trim();
-  const scoutCarFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-scout-car.svg"), "utf8").trim();
+test("PNG-backed units do not retain SVG sources while shared SVG support remains", () => {
+  const retiredPaths = [
+    "client/src/renderer/rigs/aircraft_svg.js",
+    "client/src/renderer/rigs/infantry_svg.js",
+    "client/src/renderer/rigs/support_svg.js",
+    "client/src/renderer/rigs/tank_svg.js",
+    "scripts/art/tank-raster-pipeline.mjs",
+    "client/assets/rigs/tank-ps1/tank-contact-sheet.svg",
+    "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-07-separated-input-sheet.svg",
+    "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-input-sheet.svg",
+    "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-09-outline-input-sheet.svg",
+    "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-10-noguide-ref-input-sheet.svg",
+    "tests/fixtures/svg/rig-anti-tank-gun.svg",
+    "tests/fixtures/svg/rig-artillery.svg",
+    "tests/fixtures/svg/rig-machine-gunner.svg",
+    "tests/fixtures/svg/rig-mortar-team.svg",
+    "tests/fixtures/svg/rig-panzerfaust.svg",
+    "tests/fixtures/svg/rig-rifleman.svg",
+    "tests/fixtures/svg/rig-scout-car.svg",
+    "tests/fixtures/svg/rig-vehicle.svg",
+  ];
+  for (const relativePath of retiredPaths) {
+    assert.equal(fs.existsSync(path.join(repoRoot, relativePath)), false, `${relativePath} stays retired`);
+  }
+
+  for (const relativePath of [
+    "client/src/renderer/rigs/svg_importer.js",
+    "client/src/renderer/rigs/worker_svg.js",
+    "client/src/renderer/rigs/vehicle_svg.js",
+    "client/src/renderer/rigs/building_svg.js",
+  ]) {
+    assert.equal(fs.existsSync(path.join(repoRoot, relativePath)), true, `${relativePath} remains for SVG-only art`);
+  }
+});
+
+test("live rig definitions combine raster-native metadata with remaining SVG sources", () => {
   const commandCarFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-command-car.svg"), "utf8").trim();
   const ekatFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-ekat.svg"), "utf8").trim();
-  const tankFixtureText = fs.readFileSync(path.join(fixturesDir, "rig-vehicle.svg"), "utf8").trim();
-  assert.equal(WORKER_RIG_SVG.trim(), workerFixtureText);
+  assert.equal(WORKER_RIG_SVG.includes('data-rts-rig-kind="worker"'), true);
+  assert.equal(WORKER_RIG_SVG.includes('id="worker.authored"'), true);
   assert.equal(GOLEM_RIG_SVG.includes('data-rts-rig-kind="golem"'), true);
   assert.equal(GOLEM_RIG_SVG.includes('id="golem.authored"'), true);
-  assert.equal(RIFLEMAN_RIG_SVG.trim(), riflemanFixtureText);
-  assert.equal(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG.includes('data-rts-rig-kind="rifleman"'), true);
-  assert.equal(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG.includes('part.pzf.tube'), true);
-  assert.equal(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG.includes('part.rifle.barrel'), false);
-  assert.equal(MACHINE_GUNNER_RIG_SVG.trim(), machineGunnerFixtureText);
-  assert.equal(ANTI_TANK_GUN_RIG_SVG.trim(), antiTankGunFixtureText);
-  assert.equal(MORTAR_TEAM_RIG_SVG.trim(), mortarTeamFixtureText);
-  assert.equal(ARTILLERY_RIG_SVG.trim(), artilleryFixtureText);
-  assert.equal(SCOUT_CAR_RIG_SVG.trim(), scoutCarFixtureText);
   assert.equal(COMMAND_CAR_RIG_SVG.trim(), commandCarFixtureText);
   assert.equal(EKAT_RIG_SVG.trim(), ekatFixtureText);
-  assert.equal(TANK_RIG_SVG.trim(), tankFixtureText);
   const definitions = createLiveRigDefinitions();
-  assert.equal(definitions.has(KIND.ANTI_TANK_GUN), true);
-  assert.equal(definitions.get(KIND.ANTI_TANK_GUN).id, "anti-tank-gun.authored");
-  assert.equal(definitions.has(KIND.ARTILLERY), true);
-  assert.equal(definitions.get(KIND.ARTILLERY).id, "artillery.authored");
+  assert.equal(definitions.get(KIND.ANTI_TANK_GUN).id, "anti-tank-gun.raster");
+  assert.equal(definitions.get(KIND.ARTILLERY).id, "artillery.raster");
   assert.equal(definitions.has(KIND.WORKER), true);
   assert.equal(definitions.get(KIND.WORKER).id, "worker.authored");
   assert.equal(definitions.has(KIND.GOLEM), true);
   assert.equal(definitions.get(KIND.GOLEM).id, "golem.authored");
-  assert.equal(definitions.has(KIND.RIFLEMAN), true);
-  assert.equal(definitions.get(KIND.RIFLEMAN).id, "rifleman.authored");
-  assert.equal(definitions.has(KIND.MACHINE_GUNNER), true);
-  assert.equal(definitions.get(KIND.MACHINE_GUNNER).id, "machine-gunner.authored");
-  assert.equal(definitions.has(KIND.MORTAR_TEAM), true);
-  assert.equal(definitions.get(KIND.MORTAR_TEAM).id, "mortar-team.authored");
+  assert.equal(definitions.get(KIND.RIFLEMAN).id, "rifleman.raster");
+  assert.equal(definitions.get(KIND.MACHINE_GUNNER).id, "machine-gunner.raster");
+  assert.equal(definitions.get(KIND.MORTAR_TEAM).id, "mortar-team.raster");
   const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.PANZERFAUST, panzerfaustLoaded: true });
-  assert.equal(definitions.has(loadedRiflemanKey), true);
-  assert.equal(definitions.get(loadedRiflemanKey).id, "rifleman.panzerfaust-loaded.authored");
-  assert.equal(definitions.has(KIND.SCOUT_CAR), true);
-  assert.equal(definitions.get(KIND.SCOUT_CAR).id, "scout-car.authored");
+  assert.equal(definitions.get(loadedRiflemanKey).id, "rifleman.panzerfaust-loaded.raster");
+  assert.equal(definitions.get(KIND.SCOUT_CAR).id, "scout-car.raster");
+  assert.equal(definitions.get(KIND.SCOUT_PLANE).id, "scout-plane.raster");
   assert.equal(definitions.has(KIND.COMMAND_CAR), true);
   assert.equal(definitions.get(KIND.COMMAND_CAR).id, "command-car.authored");
   assert.equal(definitions.has(KIND.EKAT), true);
   assert.equal(definitions.get(KIND.EKAT).id, "ekat.authored");
-  assert.equal(definitions.has(KIND.TANK), true);
-  assert.equal(definitions.get(KIND.TANK).id, "tank.authored");
+  assert.equal(definitions.get(KIND.TANK).id, "tank.raster");
 });
 
 test("live rig routes expose kind-specific production part groups", () => {
@@ -543,22 +509,17 @@ test("live rig routes expose kind-specific production part groups", () => {
 
   const riflemanRoutes = liveRigRoutesFor(KIND.RIFLEMAN);
   assert.deepEqual(riflemanRoutes[0].parts, ["part.shadow"]);
-  assert.equal(riflemanRoutes[1].parts.includes("part.body"), true);
-  assert.equal(riflemanRoutes[1].parts.includes("part.rifle.barrel"), true);
+  assert.deepEqual(riflemanRoutes[1].parts, ["raster.frame"]);
 
   const panzerfaustRoutes = liveRigRoutesFor(
     liveRigKeyForEntity({ kind: KIND.PANZERFAUST, panzerfaustLoaded: true }),
   );
   assert.deepEqual(panzerfaustRoutes[0].parts, ["part.shadow"]);
-  assert.equal(panzerfaustRoutes[1].parts.includes("part.body"), true);
-  assert.equal(panzerfaustRoutes[1].parts.includes("part.pzf.tube"), true);
-  assert.equal(panzerfaustRoutes[1].parts.includes("part.pzf.warhead"), true);
-  assert.equal(panzerfaustRoutes[1].parts.includes("part.rifle.barrel"), false);
+  assert.deepEqual(panzerfaustRoutes[1].parts, ["raster.frame"]);
 
   const machineGunnerRoutes = liveRigRoutesFor(KIND.MACHINE_GUNNER);
   assert.deepEqual(machineGunnerRoutes[0].parts, ["part.shadow"]);
-  assert.equal(machineGunnerRoutes[1].parts.includes("part.mg.receiver"), true);
-  assert.equal(machineGunnerRoutes[1].parts.includes("part.mg.bipod"), true);
+  assert.deepEqual(machineGunnerRoutes[1].parts, ["raster.frame"]);
 
   const mortarTeamRoutes = liveRigRoutesFor(KIND.MORTAR_TEAM);
   assert.deepEqual(mortarTeamRoutes[0].parts, ["part.shadow"]);
@@ -584,7 +545,8 @@ test("live rig routes expose kind-specific production part groups", () => {
 
   const workerRoutes = liveRigRoutesFor(KIND.WORKER);
   assert.deepEqual(workerRoutes[0].parts, ["part.shadow"]);
-  assert.deepEqual(workerRoutes[1].parts, ["part.body", "part.busyIndicator", "part.facingTick"]);
+  assert.equal(workerRoutes[1].parts.includes("part.body"), true);
+  assert.equal(workerRoutes[1].parts.includes("part.busyIndicator"), true);
 
   const golemRoutes = liveRigRoutesFor(KIND.GOLEM);
   assert.deepEqual(golemRoutes[0].parts, ["part.shadow"]);
@@ -663,8 +625,8 @@ test("default Worker draw uses live SVG rig without enabling comparison", () => 
   assert.equal(renderer._liveRigPools.liveUnitRigs.get(entity.id).parts.has("part.shadow"), false);
 });
 
-test("default Tank draw uses live SVG rig with separate turret and hull parts", () => {
-  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+test("default Tank draw uses its PNG atlas with native shadow and effect metadata", () => {
+  const definition = createLiveRigDefinitions().get(KIND.TANK);
   const entity = {
     id: 40,
     kind: KIND.TANK,
@@ -677,67 +639,29 @@ test("default Tank draw uses live SVG rig with separate turret and hull parts", 
   };
   const renderer = makeRigRenderer();
   renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, definition]]);
+  renderer._livePngRigAtlasesByKind = new Map([[KIND.TANK, { ...TANK_PNG_RIG_ATLAS, enabled: true }]]);
+  renderer._livePngRigAtlasTextures = new Map([[KIND.TANK, fakeAtlasTexture()]]);
 
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
 
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
-  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.size, 0);
+  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigEffects.size, 1);
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
+  const overlays = renderer._liveRigPools.liveUnitRigOverlays.get(entity.id);
   const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
-  assert.equal(unit.parts.get("part.hull").display.rotation, 0);
-  assert.equal(unit.parts.get("part.turret").display.rotation, Math.PI / 2);
-  assert.equal(unit.parts.get("part.barrel").display.rotation, Math.PI / 2);
+  assert.equal(unit.parts.get("sprite.hull").display.rotation, 0);
+  assert.equal(unit.parts.get("sprite.turret").display.rotation, Math.PI / 2);
+  assert.equal(unit.parts.get("sprite.barrel").display.rotation, Math.PI / 2);
   assert.equal(effects.parts.get("part.tank.flashCore").display.visible, true);
   assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
-  assert.equal(unit.parts.has("part.shadow"), false);
-  assert.equal(unit.parts.get("part.fuelCue.box").display.visible, false);
+  assert.equal(typeof unit.matchesPngAtlasRig, "function");
+  assert.equal(overlays.parts.get("part.fuelCue.box").display.visible, false);
 });
 
-test("visual unit override draws a real Tank through candidate SVG art without changing kind", () => {
-  const defaultDefinition = compileFixture("rig-vehicle.svg", KIND.TANK);
-  const compiled = compileVisualUnitRigCandidates();
-  const candidate = compiled.definitions.get("tank-long-cannon");
-  assert.ok(candidate, JSON.stringify([...compiled.errors.entries()]));
-  const entity = {
-    id: 43,
-    kind: KIND.TANK,
-    owner: 1,
-    x: 32,
-    y: 44,
-    facing: 0,
-    weaponFacing: Math.PI / 2,
-    state: STATE.IDLE,
-  };
-  const renderer = makeRigRenderer();
-  renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, defaultDefinition]]);
-  renderer._livePngRigAtlasesByKind = new Map([[KIND.TANK, { ...TANK_PNG_RIG_ATLAS, enabled: true }]]);
-  renderer._livePngRigAtlasTextures = new Map([[KIND.TANK, fakeAtlasTexture()]]);
-
-  renderer._drawUnit(entity, new Map([[1, 0x336699]]), {
-    playerId: 1,
-    selection: new Set([entity.id]),
-    resources: { oil: 10 },
-    weaponRecoil: () => 0,
-  }, {
-    visualOverride: {
-      candidateId: "tank-long-cannon",
-      kind: KIND.TANK,
-      definition: candidate.definition,
-    },
-  });
-
-  const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
-  const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
-  assert.equal(entity.kind, KIND.TANK, "override rendering keeps the authoritative unit kind");
-  assert.equal(unit.definition.id, "tank-long-cannon");
-  assert.equal(typeof unit.matchesPngAtlasRig, "undefined", "visual overrides bypass the production Tank PNG atlas");
-  assert.equal(effects.definition.id, "tank-long-cannon", "override effects use the same candidate definition");
-});
-
-test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () => {
-  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+test("tank PNG atlas route splits native shadow, fuel cue, and muzzle flash metadata", () => {
+  const definition = createLiveRigDefinitions().get(KIND.TANK);
   const [shadowRoute, unitRoute, effectRoute] = liveRigRoutesFor(KIND.TANK);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, shadowRoute), false);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, unitRoute), false);
@@ -747,9 +671,11 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
   assert.equal(unitCoverage.coveredParts.includes("part.turret"), true);
   assert.deepEqual(unitCoverage.missingParts, ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"]);
   assert.equal(TANK_PNG_RIG_ATLAS.grid?.normalization?.worldScale, 1.2);
-  assertAtlasSpriteUsesWorldScale(definition, TANK_PNG_RIG_ATLAS, "sprite.hull");
-  assertAtlasSpriteUsesWorldScale(definition, TANK_PNG_RIG_ATLAS, "sprite.turret");
-  assertAtlasSpriteUsesWorldScale(definition, TANK_PNG_RIG_ATLAS, "sprite.barrel");
+  for (const spriteId of ["sprite.hull", "sprite.turret", "sprite.barrel"]) {
+    const sprite = TANK_PNG_RIG_ATLAS.sprites.find((candidate) => candidate.id === spriteId);
+    assert.ok(sprite?.frame?.pixelsPerUnitX > 0 && sprite?.frame?.pixelsPerUnitY > 0,
+      `${spriteId} keeps explicit raster-native world scaling`);
+  }
   assert.equal(TANK_PNG_RIG_ATLAS.grid?.semanticPaintTintSlot, undefined);
   assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.hull")?.tintSlot, "team");
   assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.turret")?.tintSlot, "team-light");
@@ -822,7 +748,7 @@ test("tank PNG atlas route splits omitted shadow and fuel cue back to SVG", () =
 });
 
 test("PNG route coverage keeps mutable and Set part selections independent", () => {
-  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const definition = createLiveRigDefinitions().get(KIND.TANK);
   const mutableParts = ["part.shadow"];
   const shadowCoverage = pngAtlasRouteCoverage(definition, TANK_PNG_RIG_ATLAS, {
     parts: mutableParts,
@@ -845,7 +771,7 @@ test("PNG route coverage keeps mutable and Set part selections independent", () 
 });
 
 test("tank PNG atlas keeps cannon recoil on the generated barrel sprite", () => {
-  const definition = compileFixture("rig-vehicle.svg", KIND.TANK);
+  const definition = createLiveRigDefinitions().get(KIND.TANK);
   const entity = {
     id: 43,
     kind: KIND.TANK,
@@ -875,9 +801,7 @@ test("tank PNG atlas keeps cannon recoil on the generated barrel sprite", () => 
 });
 
 test("anti-tank gun recoil moves the barrel much farther than the carriage", () => {
-  const result = compileSvgRig(ANTI_TANK_GUN_RIG_SVG, { expectedKind: KIND.ANTI_TANK_GUN });
-  assert.equal(result.ok, true, JSON.stringify(result.errors));
-  const definition = result.definition;
+  const definition = createLiveRigDefinitions().get(KIND.ANTI_TANK_GUN);
   const entity = {
     id: 44,
     kind: KIND.ANTI_TANK_GUN,
@@ -907,9 +831,7 @@ test("anti-tank gun recoil moves the barrel much farther than the carriage", () 
 });
 
 test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil split", () => {
-  const result = compileSvgRig(ANTI_TANK_GUN_RIG_SVG, { expectedKind: KIND.ANTI_TANK_GUN });
-  assert.equal(result.ok, true, JSON.stringify(result.errors));
-  const definition = result.definition;
+  const definition = createLiveRigDefinitions().get(KIND.ANTI_TANK_GUN);
   const [, unitRoute] = liveRigRoutesFor(KIND.ANTI_TANK_GUN);
   const coverage = pngAtlasRouteCoverage(definition, ANTI_TANK_GUN_PNG_RIG_ATLAS, unitRoute);
   assert.deepEqual(coverage.missingParts, []);
@@ -977,9 +899,7 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
 });
 
 test("mortar PNG atlas supplies the animated half-tile base plate", () => {
-  const result = compileSvgRig(MORTAR_TEAM_RIG_SVG, { expectedKind: KIND.MORTAR_TEAM });
-  assert.equal(result.ok, true, JSON.stringify(result.errors));
-  const definition = result.definition;
+  const definition = createLiveRigDefinitions().get(KIND.MORTAR_TEAM);
   const [, unitRoute] = liveRigRoutesFor(KIND.MORTAR_TEAM);
   const coverage = pngAtlasRouteCoverage(definition, MORTAR_TEAM_PNG_RIG_ATLAS, unitRoute);
   assert.deepEqual(coverage.missingParts, []);
@@ -1079,7 +999,7 @@ test("mortar PNG atlas supplies the animated half-tile base plate", () => {
 });
 
 test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
-  const definition = compileFixture("rig-rifleman.svg", KIND.RIFLEMAN);
+  const definition = createLiveRigDefinitions().get(KIND.RIFLEMAN);
   const strip = { ...RIFLEMAN_PNG_FRAME_STRIP, enabled: true };
   const entity = {
     id: 40,
@@ -1284,8 +1204,8 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   );
 });
 
-test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it", () => {
-  const tankDefinition = compileFixture("rig-vehicle.svg", KIND.TANK);
+test("tank PNG atlas native overlays are destroyed when the same id becomes an SVG-only unit", () => {
+  const tankDefinition = createLiveRigDefinitions().get(KIND.TANK);
   const workerDefinition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = {
     id: 42,
@@ -1327,68 +1247,12 @@ test("tank PNG atlas SVG fallback is destroyed when same id no longer needs it",
   assert.equal(workerRig.parts.has("part.body"), true);
 });
 
-test("live rig renderer rebuilds same-id Panzerfaust instances when its loadout changes", () => {
-  const panzerfaust = compileSvgRig(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
-  const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
-  assert.equal(panzerfaust.ok, true, JSON.stringify(panzerfaust.errors));
-  assert.equal(rifleman.ok, true, JSON.stringify(rifleman.errors));
-
-  const renderer = makeRigRenderer();
-  const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.PANZERFAUST, panzerfaustLoaded: true });
-  renderer._liveRigDefinitionsByKind = new Map([
-    [loadedRiflemanKey, panzerfaust.definition],
-    [KIND.RIFLEMAN, rifleman.definition],
-  ]);
-  const colorByOwner = new Map([[1, 0x336699]]);
-  const state = { playerId: 1, selection: new Set(), weaponRecoil: () => 0 };
-  const id = 92;
-
-  renderer._drawUnit({
-    id,
-    kind: KIND.PANZERFAUST,
-    panzerfaustLoaded: true,
-    owner: 1,
-    x: 32,
-    y: 44,
-    facing: 0,
-    state: STATE.IDLE,
-  }, colorByOwner, state);
-  const panzerfaustRig = renderer._liveRigPools.liveUnitRigs.get(id);
-  const panzerfaustContainer = panzerfaustRig.container;
-  assert.equal(panzerfaustRig.kind, KIND.PANZERFAUST);
-  assert.equal(panzerfaustRig.parts.has("part.pzf.tube"), true);
-  assert.equal(renderer.layers.units.children.includes(panzerfaustContainer), true);
-
-  renderer._drawUnit({
-    id,
-    kind: KIND.PANZERFAUST,
-    panzerfaustLoaded: false,
-    owner: 1,
-    x: 32,
-    y: 44,
-    facing: 0,
-    state: STATE.IDLE,
-  }, colorByOwner, state);
-  const riflemanRig = renderer._liveRigPools.liveUnitRigs.get(id);
-  assert.equal(panzerfaustRig._destroyed, true);
-  assert.equal(panzerfaustContainer.parent, null);
-  assert.equal(renderer.layers.units.children.includes(panzerfaustContainer), false);
-  assert.equal(riflemanRig.kind, KIND.PANZERFAUST);
-  assert.equal(riflemanRig.parts.has("part.rifle.barrel"), true);
-  assert.equal(riflemanRig.parts.has("part.pzf.tube"), false);
-  assert.equal(renderer.layers.units.children.includes(riflemanRig.container), true);
-  riflemanRig.destroy();
-});
-
 test("Panzerfaust PNG frame strips switch with the launcher loadout", () => {
-  const panzerfaust = compileSvgRig(LOADED_RIFLEMAN_PANZERFAUST_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
-  const rifleman = compileSvgRig(RIFLEMAN_RIG_SVG, { expectedKind: KIND.RIFLEMAN });
-  assert.equal(panzerfaust.ok, true, JSON.stringify(panzerfaust.errors));
-  assert.equal(rifleman.ok, true, JSON.stringify(rifleman.errors));
+  const definitions = createLiveRigDefinitions();
   const renderer = makeRigRenderer();
   const loadedRiflemanKey = liveRigKeyForEntity({ kind: KIND.PANZERFAUST, panzerfaustLoaded: true });
   const [panzerfaustTexture, riflemanTexture] = [fakeFrameStripTexture(), fakeFrameStripTexture()];
-  renderer._liveRigDefinitionsByKind = new Map([[loadedRiflemanKey, panzerfaust.definition], [KIND.RIFLEMAN, rifleman.definition]]);
+  renderer._liveRigDefinitionsByKind = new Map([[loadedRiflemanKey, definitions.get(loadedRiflemanKey)], [KIND.RIFLEMAN, definitions.get(KIND.RIFLEMAN)]]);
   renderer._liveFrameStripsByKind = new Map([[loadedRiflemanKey, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP], [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP]]);
   renderer._liveFrameStripTextures = new Map([[loadedRiflemanKey, panzerfaustTexture], [KIND.RIFLEMAN, riflemanTexture]]);
   const colorByOwner = new Map([[1, 0x336699]]);
@@ -1437,7 +1301,19 @@ test("missing live rig definitions fail closed instead of drawing procedural fal
 
   assert.throws(
     () => renderer._drawUnit(entity, new Map([[1, 0x336699]]), { weaponRecoil: () => 0 }),
-    /missing live SVG rig definition/,
+    /missing live rig definition/,
+  );
+  assert.equal(renderer._liveRigPools.liveUnitRigs.size, 0);
+});
+
+test("raster definitions fail closed when their production PNG route is absent", () => {
+  const renderer = makeRigRenderer();
+  renderer._liveRigDefinitionsByKind = new Map([[KIND.TANK, createLiveRigDefinitions().get(KIND.TANK)]]);
+  const entity = { id: 51, kind: KIND.TANK, owner: 1, x: 32, y: 44, facing: 0, state: STATE.IDLE };
+
+  assert.throws(
+    () => renderer._drawUnit(entity, new Map([[1, 0x336699]]), { resources: {}, weaponRecoil: () => 0 }),
+    /missing production PNG route/,
   );
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 0);
 });

@@ -1,6 +1,11 @@
 import { SNAPSHOT_MS, STATS } from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
-import { liveRigDefinitionFor, liveRigKeyForEntity, liveRigRoutePlanFor } from "./rigs/live_routing.js";
+import {
+  isRasterRigKey,
+  liveRigDefinitionFor,
+  liveRigKeyForEntity,
+  liveRigRoutePlanFor,
+} from "./rigs/live_routing.js";
 import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
 import { createRigRenderContext, sampleRigAnimationInto } from "./rigs/animation.js";
@@ -169,18 +174,21 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const rigKey = liveRigKeyForEntity(e);
   const definition = visualOverride?.definition || liveRigDefinitionFor(this._liveRigDefinitionsByKind, rigKey);
   if (!definition) {
-    throw new Error(`missing live SVG rig definition for unit kind ${e.kind}`);
+    throw new Error(`missing live rig definition for unit kind ${e.kind}`);
   }
 
   const routePlan = liveRigRoutePlanFor(rigKey, pools);
   if (routePlan.routes.length === 0) {
-    throw new Error(`missing live SVG rig route for unit kind ${e.kind}`);
+    throw new Error(`missing live rig route for unit kind ${e.kind}`);
   }
 
   const visualFrameStrip = !visualOverride ? pools.visualFrameStrip || null : null;
   const frameStrip = visualFrameStrip?.strip || (visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, rigKey));
   const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(rigKey) || null;
-  if (frameStrip && frameStripTexture) {
+  if (frameStrip && !frameStripTexture) {
+    throw new Error(`missing live PNG frame-strip texture for unit kind ${e.kind}`);
+  }
+  if (frameStrip) {
     const renderContext = pools.renderContext || this._rigRenderContextFor?.(e, colorByOwner, state) || {};
     applyRigAlpha(renderContext, pools.alpha);
     const frameStripMovement = pools.renderContext ? null : this._frameStripMovementVisual?.(e, state);
@@ -216,7 +224,13 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
 
   const pngAtlas = visualOverride ? null : livePngRigAtlasFor(this._livePngRigAtlasesByKind, rigKey);
   const pngAtlasTexture = this._livePngRigAtlasTextures?.get?.(rigKey) ?? null;
-  if (pngAtlas && pngAtlasTexture) {
+  if (!visualOverride && isRasterRigKey(rigKey) && !frameStrip && !pngAtlas) {
+    throw new Error(`missing production PNG route for unit kind ${e.kind}`);
+  }
+  if (pngAtlas && !pngAtlasTexture) {
+    throw new Error(`missing live PNG atlas texture for unit kind ${e.kind}`);
+  }
+  if (pngAtlas) {
     const renderContext = pools.renderContext || this._rigRenderContextFor?.(e, colorByOwner, state) || {};
     applyRigAlpha(renderContext, pools.alpha);
     rememberRigRenderContext(this, e, pools, renderContext);

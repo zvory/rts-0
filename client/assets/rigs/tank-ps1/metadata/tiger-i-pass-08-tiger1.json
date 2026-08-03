@@ -2,7 +2,6 @@
   "candidate": "tiger-i-pass-08-tiger1",
   "status": "saved-experiment",
   "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-input-sheet.png",
-  "sourceSheetSvg": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1-input-sheet.svg",
   "prompt": "client/assets/rigs/tank-ps1/metadata/prompt-tiger-i-pass-08-tiger1.md",
   "builtInImageGenSource": "/Users/az/.codex/generated_images/019f2492-10dd-73b3-8d83-ad9d31bb5026/ig_0d981a9b2592ff7b016a46e125c5b4819780be437492c3a886.png",
   "candidateSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-08-tiger1.png",

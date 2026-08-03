@@ -185,7 +185,7 @@
         "part.tread.left.8"
       ],
       "renderParts": [],
-      "description": "empty no-track placeholder used only to suppress SVG track parts"
+      "description": "empty no-track placeholder used to keep track sprites transparent"
     },
     {
       "id": "sprite.hull",
@@ -214,6 +214,5 @@
       "description": "separate main cannon barrel"
     }
   ],
-  "sourceSvg": "client/assets/rigs/tank-ps1/tank-contact-sheet.svg",
   "sourcePng": "client/assets/rigs/tank-ps1/tank-contact-sheet.png"
 }

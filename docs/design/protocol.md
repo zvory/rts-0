@@ -674,6 +674,10 @@ transport decode:
   t: "snapshot",
   tick: u32,
   groundDecalRevision: u32,      // recipient-scoped durable-ground-mark discovery cursor
+  groundDecalDelta?: {           // repeated complete tail (afterRevision, revision]
+    afterRevision: u32,
+    decals: GroundDecalView[]    // at most 64 fog/observer-entitled rows
+  },
   worldCombatPosition?: [f32, f32], // coarse global combat area; omitted when inactive
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
@@ -717,11 +721,21 @@ store with compact typed rows and a derived spatial discovery index. A mark beco
 player only when its point or blast footprint is physically visible in that player's current team
 fog; firing ownership and transient event delivery do not by themselves reveal an impact hidden
 in fog. `groundDecalRevision` is the latest discovery revision for the projected player union (or
-the global cursor for omniscient views). Clients compare it with their cache and send
-`requestGroundDecals`; the reliable response contains only marks first discovered after
-`afterRevision`, or marks created after that cursor for omniscient views. Full requests from zero
-repair late joins, reconnects, seeks, and view changes. The client cache is an optimization:
-checkpointed server rows and discovery revisions are the authority.
+the global cursor for omniscient views). Ordinary snapshots also repeat a bounded
+`groundDecalDelta` covering every entitled row in `(afterRevision, groundDecalRevision]`, where the
+rolling cursor spans at most 64 global creation/discovery revisions. The server builds that tail
+from its revision log in bounded time and applies the same active-player, selected-player-union, or
+omniscient projection used by the snapshot; the fast path never sends a mark that perspective has
+not discovered. Stable decal ids make repeated/overlapping tails idempotent. A client advances its
+complete cache cursor only when it already covers `afterRevision`; it may display entitled rows
+from a gapped tail immediately while requesting the missing range.
+
+`requestGroundDecals` remains the reliable repair path for late joins, reconnects, seeks,
+perspective changes, missed revisions beyond the rolling tail, and renderer/cache recovery. Its
+response contains only marks first discovered after `afterRevision`, or marks created after that
+cursor for omniscient views. Full requests from zero rebuild the selected perspective. The client
+cache is an optimization: checkpointed server rows, the revision log, and discovery revisions are
+the authority.
 
 For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
 server-authoritative union of current fog grids contributed by living teammates on the recipient's
@@ -803,7 +817,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 49. `client/src/net.js` calls
+`messagepack-compact`, codec version 1, compact snapshot version 50. `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
 before dispatching `S.SNAPSHOT`.
@@ -829,8 +843,11 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 49,
+  "v": 50,
   "gr": groundDecalRevision, // omitted when zero
+  "gd": [afterRevision, [    // omitted when no discovered/created revision exists
+    [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
+  ]],
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "ab": [paused, reserveSteel, reserveOil], // omitted when no real player is projected
   "e": [

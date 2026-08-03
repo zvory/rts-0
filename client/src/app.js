@@ -401,7 +401,6 @@ export class App {
         publicRoom: "map-editor",
         map: "Map Editor handoff",
         scenario: "",
-        workspaceId: this.labHandoffLaunch.workspaceId,
         banner: "lab from Map Editor",
       };
       return true;
@@ -894,7 +893,7 @@ export class App {
     const result = await this.labClient?.exportMap();
     const map = result?.outcome?.map;
     if (!result?.ok || !map) throw new Error(result?.error || "The current Lab map could not be exported.");
-    const session = new MapEditorSession({ storage: null });
+    const session = new MapEditorSession();
     session.loadAuthoredMap(authoredMapFromMaterialized({
       ...map,
       description: "Map imported from Lab.",
@@ -906,7 +905,6 @@ export class App {
     });
     const url = new URL("/map-editor", window.location.href);
     url.searchParams.set("handoff", handoff.handoffId);
-    url.searchParams.set("workspace", this.labLaunch?.workspaceId || "default");
     this.allowUnloadWithoutWarning = true;
     window.location.assign(url.toString());
   }

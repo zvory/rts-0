@@ -383,6 +383,7 @@ mod tests {
         Snapshot {
             tick,
             ground_decal_revision: 0,
+            ground_decal_delta: None,
             world_combat_position: None,
             steel: 100,
             oil: 25,

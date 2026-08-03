@@ -113,10 +113,10 @@ src/
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   launch_url.js   # Namespaced rtsLaunch URL parsing and pure lobby automation decisions
   map_editor_app.js # Dedicated `/map-editor` lifecycle; never constructs Net, Match, or GameState
-  map_editor_launch.js # Bounded editor route/handoff/workspace query parsing
+  map_editor_launch.js # Bounded editor route/handoff query parsing
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
-  map_editor_session.js # Flat authored-map state, local storage, undo/redo, stroke transactions
-  map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, save/export, and Lab launch
+  map_editor_session.js # Flat authored-map state, undo/redo, and stroke transactions
+  map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, JSON files, and Lab launch
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
@@ -350,17 +350,20 @@ export class UnitRigInstance {
 ```
 `UnitRigInstance` owns one Pixi container and one graphics child per normalized rig part, redraws
 primitive geometry with sampled transforms and tint slots, and tears down all owned children through
-`destroy()`. Live rig routing is per-kind through `_liveRigDefinitionsByKind` and covers Worker,
-Rifleman, Machine Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Tank, Command Car, and
-Ekat. Missing or invalid unit rig definitions fail through the renderer's soft missing-texture guard
-rather than falling back to a procedural unit branch. Shadow and body parts route through separate
-live pools so normal unit and shot-reveal layer ordering stays intact.
+`destroy()`. Live rig routing is per-kind through `_liveRigDefinitionsByKind`. Worker, Golem,
+Command Car, and Ekat still compile authored SVG sources. Rifleman, loaded Panzerfaust, Machine
+Gunner, Anti-Tank Gun, Mortar Team, Artillery, Scout Car, Scout Plane, and Tank instead use
+raster-native normalized metadata plus their production PNG frame strip or atlas. Missing rig
+definitions and missing production PNG textures fail closed; raster units never fall back to a
+duplicate SVG depiction. Shadow and body parts route through separate live pools so normal unit and
+shot-reveal layer ordering stays intact.
 
 Local lab visual profiles may supply per-entity unit rig overrides to `Renderer.render` through
 `visualUnitOverrides`. The renderer resolves those rules against the current frame's real unit
 entities with local-only selectors, validates candidate ids through the checked-in
-`renderer/rigs/visual_override_rigs.js` registry, and then passes the candidate SVG rig definition
-through the same `renderLiveUnitRig` runtime path. Overrides never change `entity.kind`, snapshots,
+`renderer/rigs/visual_override_rigs.js` registry, and then passes the candidate rig definition
+through the same `renderLiveUnitRig` runtime path. The checked-in registry is currently empty; the
+generic compiler remains available for local experiments on SVG-authored units. Overrides never change `entity.kind`, snapshots,
 selection ids, command targeting, HP bars, fog, minimap inputs, or scenario authoring data; broken
 selectors or candidate rigs publish local diagnostics and fall back to the normal live rig for that
 unit.
@@ -376,41 +379,36 @@ SVG unit art workflow:
 - Runtime contract changes are accepted through schema, importer, animation, renderer smoke, and
   architecture tests rather than static design previews.
 
-Prototype raster rig workflow:
-- Support-weapon and vehicle rendering may opt into PNG atlases through `renderer/rigs/*_png_atlas.js`,
-  `png_routing.js`, and `png_runtime.js`. The SVG rig remains authoritative for anchors,
-  animation bindings, part ids, recoil, facing, and route split; the PNG atlas only supplies
-  pixels for those sampled parts. Command-card and selection-panel portraits use an atlas's
+Raster rig workflow:
+- PNG-backed units are defined by `renderer/rigs/raster_rig_definitions.js`, frame-strip metadata,
+  or `renderer/rigs/*_png_atlas.js`, then routed through `png_routing.js`, `png_runtime.js`, and the
+  shared rig animation sampler. Raster-native metadata owns anchors, animation bindings, semantic
+  part ids, recoil, facing, shadows, effects, and route splits; no SVG source or vector-art fallback
+  exists for those units. Command-card and selection-panel portraits use an atlas's
   assembled reference when available; setup-capable component-only atlases declare an explicit
   deployed composition so the UI shows the complete set-up silhouette, including support legs,
-  instead of reverting to the authored SVG silhouette. The current tank atlas is an enabled visual experiment, not final
+  instead of substituting different art. The current tank atlas is an enabled visual experiment, not final
   art: it uses the pass-11 white-painted Tiger I hull/body, turret/coax, and separate main-barrel
   cells while transparent track frames suppress track rendering. The separate barrel cell maps to
-  `part.barrel`, so the PNG rig keeps the original SVG cannon recoil scale instead of merging that
+  `part.barrel`, so raster-native metadata keeps cannon recoil separate instead of merging that
   motion into the turret. The active `pass11-white-dim30` atlas is an imagegen repaint of pass 10;
   it keeps the no-guide semantic sheet, bakes 30% lower brightness and 20% lower saturation, relies
-  on visible-alpha postprocessing plus 1.2x world-scale compensation to size generated components
-  against the SVG rig bounds, and intentionally applies runtime team tint over the dimmed white base
+  on visible-alpha postprocessing plus explicit 1.2x world-scale compensation, and intentionally applies runtime team tint over the dimmed white base
   using the semantic atlas tint slots. Mortar Team rendering uses a generated three-cell M2
   4.2-inch-inspired wheeled mortar sheet: assembled reference, team-tinted carriage/frame and
-  tube/barrel assembly, plus fixed-color tire overlays. The carriage sprite follows the SVG
-  carriage recoil binding while the separate tube sprite follows the stronger weapon recoil
+  tube/barrel assembly, plus fixed-color tire overlays. The carriage sprite follows the
+  raster-native carriage recoil binding while the separate tube sprite follows the stronger weapon recoil
   binding. The deployed Mortar Team also uses an image-generated square base-plate PNG in the unit
   atlas. Its white-painted source receives the owning player's runtime team tint. The keyed and
   tightly cropped 128px source is postprocessed to exactly 16x16 world pixels (half a tile), draws
   below the carriage with its center offset 20 world pixels rearward, scales from zero to full size
-  with setup progress, and shrinks during teardown; the SVG part supplies animation bindings only
-  and has no visible paint. See
-  [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the methodology, rejected imagegen
-  passes, and next validation work.
-- `scripts/art/tank-raster-pipeline.mjs` builds the tank contact sheet, records the exact prompt
-  under `client/assets/rigs/tank-ps1/metadata/prompt.md`, and rewrites the atlas metadata after an
-  image-generation pass. The current prototype uses semantic grouped cells: complete tank reference
-  without tracks, drop shadow, or fuel icon; an empty track suppressor; hull assembly; turret/coax
-  assembly; separate main barrel; and one unused empty guide cell.
-- Keep the source sheet, generated pass, alpha atlas, prompt, and manifest together under
-  `client/assets/rigs/tank-ps1/` so raster iterations remain reproducible. The renderer falls back
-  to the SVG rig until the atlas texture loads or if the atlas load fails.
+  with setup progress, and shrinks during teardown; raster-native metadata supplies its animation
+  bindings. See
+  [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the asset-authority boundary,
+  production inventory, and validation contract.
+- Keep generated PNG sources, the production derivative, prompt, and manifest together under each
+  `client/assets/rigs/` unit directory. Retired SVG contact sheets and their generator are not part
+  of the production asset contract.
 - Browser-facing rig PNGs use 8-bit channels and fit within a 2048x2048 texture ceiling, enforced
   by `scripts/check-deploy-assets.mjs`. Oversized generated sources may remain checked in beside a
   downsampled production derivative; runtime frame geometry and scale preserve world-space size.
@@ -439,16 +437,19 @@ export class GroundDecalBuffer {
 }
 export function normalizeAuthoritativeGroundDecal(record, context?)
 ```
-Snapshots advertise only the requesting perspective's `groundDecalRevision`. `GroundDecalSync`
-coalesces that signal into one reliable `requestGroundDecals { requestId, afterRevision }` repair at a time and
-retries with bounded backoff until the retained cache reaches the advertised revision. The echoed
-request id rejects delayed responses from a prior replay tick or vision perspective. Responses
-contain only decals first discovered by that perspective after the supplied revision. The buffer
-normalizes and deduplicates those stable server ids, retains their records for renderer rehydration,
-and queues each newly learned mark once. Replay seeks and observer-view changes clear both the
-cache and painted presentation, then resynchronize from revision zero after the replacement
-perspective snapshot arrives. Transient combat events still drive short-lived effects and audio,
-but are not used to create permanent decals.
+Snapshots advertise the requesting perspective's `groundDecalRevision` and repeat a fog-safe,
+64-revision `groundDecalDelta { afterRevision, decals }` tail. `GroundDecalSync` applies a
+contiguous or overlapping tail immediately; stable ids deduplicate repeats, and the buffer retains
+pending rows across skipped or failed presentation frames. A forward gap may queue the entitled
+rows for immediate display but cannot advance the complete cache cursor. In that case
+`GroundDecalSync` coalesces the mismatch into one reliable
+`requestGroundDecals { requestId, afterRevision }` repair and retries with bounded backoff. A later
+covering snapshot tail cancels an obsolete outstanding repair. The echoed repair request id rejects
+delayed responses from a prior replay tick or vision perspective. Replay seeks and observer-view
+changes clear both the cache and painted presentation, block possibly pre-reset inline tails until
+a correlated repair establishes the replacement authority, then resynchronize from revision zero.
+Transient combat events still drive short-lived
+effects and audio, but are not used to create permanent decals.
 
 `renderer/decals.js`
 ```js
@@ -884,7 +885,7 @@ export class MapEditorSession {
   mutate(label, mutation), undo(), redo()
   beginTerrainStroke(label?), paintTerrainTiles(tiles, terrain), commitTerrainStroke()
   beginOverlayStroke(label?), paintOverlayTiles(tiles, edit), commitOverlayStroke()
-  materialized(), exportMap(), saveLocal(key), loadLocal(key)
+  materialized(), exportMap()
   mapOverlay()
 }
 ```
@@ -906,16 +907,16 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
-status, local save/load, export, and Lab handoff; Tools owns terrain paint, start/base locations, and
+status, local JSON import/export, and Lab handoff; Tools owns terrain paint, start/base locations, and
 doodad authoring. The top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
 zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
-base locations, and provides undo/redo, local save/load, centered resize, and JSON export. Resize
+base locations, and provides undo/redo, local JSON import/export, and centered resize. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
 shifts start/base locations with the centered source map. Authored v6 maps and materialized Lab
-handoffs carry explicit `width` and `height`; loading bundled or locally saved older square maps
+handoffs carry explicit `width` and `height`; loading bundled or locally imported older square maps
 derives those axes from their terrain rows. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
 player starts there. The selected starting or neutral base exposes integer Steel (0–36) and Oil
@@ -947,21 +948,25 @@ texture per tile.
 The Gameplay overlays palette paints Forest (stealth plus no-vehicle), Stealth only, No vehicles
 only, or erases either/both layers. The viewport shows stealth in green and vehicle exclusion in
 orange, including overlap; overlay strokes use the same brush/box, symmetry, undo/redo, resize,
-local-save, export, and Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
+local JSON import/export, and Lab handoff paths as terrain. Sparse coordinate pairs remain
+authoritative.
 
 The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Trees are placed singly and
 share one mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed
 singly or sprayed with a chosen tint. Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
-deconstruction, and vehicle-pathing behavior. Symmetry, move, delete, and undo/redo apply to all
-authored doodads. Trees remain visual/trunk doodads; a forest's stealth and vehicle exclusion come
-from independent gameplay overlays. Wildflowers remain mechanically inert.
+deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved: the
+removal tool box-selects any number of doodads for deletion, and a separate erase brush removes
+doodads continuously. Symmetry applies when creating doodads, while delete and undo/redo apply to
+all authored doodads. Trees retain only their tiny trunk collision; a forest's stealth and vehicle
+exclusion come from independent gameplay overlays. Trees do not change line of sight, cover, or
+combat damage, and wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
 The bounded server record expires after two minutes and is consumed once. Lab consumption creates a
 private Lab whose first `start` payload already contains the edited map at tick zero; returning through
-`Edit map` transfers only an authoritative exported map. A bounded `workspace` id keeps the editor's
-local map workspace available across the round trip when browser storage is available.
+`Edit map` transfers only an authoritative exported map. The handoff itself carries the current map
+in either direction; the editor does not maintain a separate browser-storage workspace.
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
 transport or match authority.
@@ -1268,7 +1273,7 @@ fog fallback, minimap blips, HUD selection/tech checks, renderer feedback, and o
 should accept the injected frame view when called from the RAF path and fall back to `GameState`
 queries only for direct module tests or event handlers outside the frame. Static resource nodes with
 no remaining resources are omitted from frame-local entity views and minimap blips. Minimap
-artillery firing indicators render as 30x24 SVG rig images without an extra surrounding ring.
+artillery firing indicators render as 30x24 PNG-backed icon markup without an extra surrounding ring.
 Selected worker units do not draw weapon range indicators, even when their frame-local view exposes
 weapon range metadata. Entrenched units render as smaller, trench-tinted rig instances without a
 separate occupied-infantry trench ring in the selection layer. Trench ground decals render at half
@@ -1978,9 +1983,10 @@ overlay container as smoke clouds, below selection rings and HP bars):
 
 Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `decals` between
 terrain and resources):
-- Decals are checkpointed server state. Snapshots expose a fog-safe, perspective-scoped revision;
-  the client requests stable records after its applied revision, so late join, reconnect, and
-  replay seek reconstruct already-discovered battlefield marks without replaying transient events.
+- Decals are checkpointed server state. Snapshots expose a fog-safe, perspective-scoped revision
+  plus a bounded repeated tail for immediate ordinary discovery. Reliable range requests repair
+  late joins, reconnects, replay seeks, perspective changes, missed revisions, and cache recovery
+  without replaying transient events.
 - Infantry deaths stamp translucent player-tinted SVG paint masks. Vehicle and support-weapon
   deaths stamp neutral charcoal hull-shaped scorch masks with smaller, subdued player-colored paint
   fragments. Destroyed buildings stamp neutral charcoal rectangles exactly matching their rendered
@@ -1992,8 +1998,9 @@ terrain and resources):
 - `GameState` retains normalized records keyed by stable server id and queues only newly learned
   records. Match stages the pending batch before presentation assembly and releases it only after a
   successful backend presentation; Pixi stamps detached frame records and never consumes the
-  shared queue. A skipped snapshot merely leaves a revision mismatch that the reliable repair path
-  resolves. The client never infers hidden deaths or impacts.
+  shared queue. Repeated snapshot tails and stable ids make skipped presentation frames harmless;
+  a skipped network range beyond the bounded tail leaves a revision mismatch that the reliable
+  repair path resolves. The client never infers hidden deaths or impacts.
 - The renderer stamps each new-decal batch into one downsampled texture, updates that texture once
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.
@@ -2034,7 +2041,7 @@ selection rings):
 - The render layer is cleared each frame so expired clouds vanish automatically when they drop from
   the next snapshot.
 
-### 4.2 Rendering & look (PixiJS, SVG rigs — neutral PS1 field-command style)
+### 4.2 Rendering & look (PixiJS rigs — neutral PS1 field-command style)
 
 This section owns the current Pixi look and module behavior. Renderer-neutral camera,
 presentation, ownership, capture, backend, parity-gate, and benchmark contracts live in
@@ -2078,30 +2085,32 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   buildings layer; shadows remain imperative draws, production progress bars, queue labels, and
   icons remain imperative draws on the building overlays layer, and construction/deconstruction
   status uses the shared HP bar layer.
-- Units: SVG-authored rig parts rendered into Pixi containers, with fully covered routes optionally
-  rendered from a PNG atlas. Rifleman and Machine Gunner PNG movement frames advance only when
+- Units: SVG-authored rigs remain for Worker, Golem, Command Car, and Ekat. Production PNG strips
+  or atlases are authoritative for Rifleman, loaded Panzerfaust, Machine Gunner, Anti-Tank Gun,
+  Mortar Team, Artillery, Scout Car, Scout Plane, and Tank. Rifleman and Machine Gunner PNG movement frames advance only when
   a fresh authoritative movement sample arrives or their rendered position changes. Observed movement
   remains latched for 100 ms so 60 FPS rendering does not alternate movement and idle art between
   30 Hz snapshots; paused, blocked, or otherwise stationary units then return to idle art while firing
   recoil frames remain active. The Anti-Tank Gun uses a composed white-base PNG atlas for its
-  carriage, barrel assembly, and deployed trail legs while retaining the SVG rig as its animation
-  anchor source. Artillery likewise uses a modular A-19 PNG atlas for two independent trails, its
+  carriage, barrel assembly, and deployed trail legs, with raster-native metadata supplying its
+  animation and anchors. Artillery likewise uses a modular A-19 PNG atlas for two independent trails, its
   frame/wheels, and its visibly elevated bulky barrel/recoil assembly; the current pass-03 review
   pitches the complete weapon assembly toward the elevated camera so its muzzle face and recoil
   depth remain legible from the above-view camera. It
   temporarily colors the left trail purple and frames both full trail crops in black for
   pivot/origin inspection. It uses
-  the existing SVG Artillery rig for setup/facing/recoil animation and the muzzle-flash overlay.
+  raster-native setup/facing/recoil metadata and a native Pixi muzzle-flash overlay.
   The Anti-Tank Gun uses toned-down team tinting, with most firing recoil on the barrel assembly
   and only subtle kick on the frame and legs. Adjusted frame-strip color texture loading falls back to the raw Pixi
   asset path when image, canvas, pixel-read, or texture creation fails. When browser image
   dimensions are unavailable, full strip dimensions come from frame metadata. Deployed Machine Gunners use `firingFrames` during active recoil, with the visual-effect buffer's linear recoil phase advancing the clip through rest, recoil, and reset frames. Setup and deployed frame-strip poses take priority over movement frames
   while support weapons are deployed or tearing down. When a setup/deployed Machine Gunner snapshot
-  lacks `weaponFacing`, the frame-strip setup forward-angle offset is applied to the unit body facing. When an enabled atlas is rendering, routes omitted from a partial PNG
-  atlas continue through the SVG runtime; otherwise the normal SVG route remains intact. If visual
+  lacks `weaponFacing`, the frame-strip setup forward-angle offset is applied to the unit body facing.
+  Native Pixi shadows, status cues, and weapon effects may occupy routes that an atlas intentionally
+  does not cover. If visual
   override registry or selector resolution throws, the renderer records diagnostics, publishes
-  local visual-profile errors, and renders the normal unit art for that frame. SVG fallback entries
-  are removed when an entity id no longer needs them. Both runtimes share one
+  local visual-profile errors, and renders the normal unit art for that frame. Stale routed instances
+  are removed when an entity id no longer needs them. The SVG and PNG runtimes share one
   sampled render context per entity draw so renderer-local motion state advances once. Units use low-detail hard-edged silhouettes tinted by player color, a dark
   drop shadow, dark outline, HP bar above when damaged/selected, and glowing selection ring when
   selected. Entrenched units retain their player-color tint while scaling down. Occupied trenches add
@@ -2145,7 +2154,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
   main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: modular
-  A-19 PNG components animated from the SVG-authored support-weapon rig).
+  A-19 PNG components animated from raster-native support-weapon metadata).
   Riflemen normally carry a rifle; Panzerfausts with `panzerfaustLoaded: true` carry a tube launcher
   with a team-colored band and switch immediately to normal rifle art after launch. While
   `panzerfaustWindupProgress` is present, the loaded strip selects its three authored
@@ -2244,7 +2253,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   above the fog overlay, and neither path writes to `GameState`, snapshots, fog-source entity lists,
   selection, command targeting, minimap blips, or scenario authoring data.
 - Local lab visual profiles may also pass per-instance real-unit visual overrides to
-  `Renderer.render`. These override only the candidate SVG rig definition used by real unit drawing,
+  `Renderer.render`. The generic override compiler remains available for SVG-authored units, but
+  the checked-in candidate registry is empty and PNG-backed units do not carry duplicate vector
+  candidates. Overrides replace only the candidate rig definition used by real unit drawing,
   keep runtime inputs such as movement, facing, weapon facing, recoil, setup state, occupied-trench
   tint, selection, HP bars, fog, and shot reveals on the real entity, and are resolved from checked-in
   profile/candidate registries rather than URL-provided assets.
@@ -2253,7 +2264,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   active—for example, a loaded Panzerfaust override stops matching as soon as
   `panzerfaustLoaded` flips false at launch—then normal live frame-strip routing resumes for the same
   entity id. These swaps remain local to that lab session; server state, selection, fog, HP bars,
-  and the fallback SVG shadow route remain unchanged.
+  and the native shadow route remain unchanged.
 - Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
