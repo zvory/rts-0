@@ -1232,8 +1232,8 @@ entry and a role-matrix justification.
 calls it from the Command Car `scoutPlane` ability after validating a selected owned Command Car,
 player resources, and that Command Car's cooldown. The helper records the
 source Command Car, spawns the plane there, flies it to the clicked point, starts a 20-second total
-lifetime at launch, and despawns it when that timer expires whether or not it reached the orbit. Scout Plane sorties have no City
-Centre dependency or return leg. Live fog recompute stamps Scout Plane sight as team aerial vision that ignores terrain
+lifetime at launch, and despawns it when that timer expires whether or not it reached the orbit. Scout Plane sorties have no Resource
+Depot dependency or return leg. Live fog recompute stamps Scout Plane sight as team aerial vision that ignores terrain
 and building line-of-sight blockers while still using active smoke clouds as blockers.
 
 `game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.

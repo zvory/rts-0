@@ -188,8 +188,8 @@ join an already-launched wave.
 
 AI Turtle shares AI 2.1 worker, oil, supply, and first-Barracks cadence, but uses a two-Rifleman
 opening and does not launch frontal waves. During its opening oil hold, it does not train workers
-toward suppressed oil assignments. It prioritizes a Training Centre, an early second City
-Centre, Entrenchment, support technology, Machine Gunners, and Anti-Tank Guns. It identifies up
+toward suppressed oil assignments. It prioritizes a Training Centre, an early second Resource
+Depot, Entrenchment, support technology, Machine Gunners, and Anti-Tank Guns. It identifies up
 to three own-base chokepoints from the static map analysis, caps Machine Gunner production by
 planned choke-line staffing, staffs the active enemy-facing lines with Machine Gunners, and places
 Anti-Tank Guns on an own-side backline. Its staged intents include the two-Rifleman opening. The profile prioritizes
@@ -240,8 +240,8 @@ player 1 at tick 9; representative first builds are AI 2.1 Barracks `(115,12)` a
 Jeff Pump Jack `(9,14)` at tick 513. The lane reaches the tick cap as a draw and its replay verifies
 exactly; these values document the new tooling baseline, not a balance guarantee.
 
-The ai-matchup binary runs one fixed-horizon profile-versus-profile match until a starting City
-Centre objective win or the tick cap. A match with no objective winner at the default 25,000-tick
+The ai-matchup binary runs one fixed-horizon profile-versus-profile match until a starting Resource
+Depot objective win or the tick cap. A match with no objective winner at the default 25,000-tick
 horizon is a draw.
 
     cd server
