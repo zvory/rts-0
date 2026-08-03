@@ -82,16 +82,16 @@ fn cancel_unfinished_building_refunds_full_cost_and_releases_builder() {
 fn cancel_unworked_scaffold_refunds_owner_and_rejects_enemy() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (site_x, site_y) = footprint_center(&map, EntityKind::ResearchComplex, 8, 8);
+    let (site_x, site_y) = footprint_center(&map, EntityKind::EngineeringComplex, 8, 8);
     let site = entities
-        .spawn_building(1, EntityKind::ResearchComplex, site_x, site_y, false)
+        .spawn_building(1, EntityKind::EngineeringComplex, site_x, site_y, false)
         .expect("research scaffold should spawn");
     let mut players = vec![player_state(1), player_state(2)];
-    let cost = rules::economy::resource_cost(EntityKind::ResearchComplex);
+    let cost = rules::economy::resource_cost(EntityKind::EngineeringComplex);
     let starting_steel = players[0].steel;
     let starting_oil = players[0].oil;
     assert!(players[0].spend_cost(cost));
-    players[0].record_entity_created(EntityKind::ResearchComplex);
+    players[0].record_entity_created(EntityKind::EngineeringComplex);
     assert!(entities
         .get_mut(site)
         .expect("site should exist")

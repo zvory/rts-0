@@ -143,7 +143,7 @@ typed action vocabulary and shared local per-think budget and reservation implem
 prevent resource and supply overcommitment without changing compatibility policy.
 
 The core also owns static map analysis derived only from StartPayload map terrain, start tiles, and
-static resource nodes. When nearby steel is split into fields around the City Centre, defensive
+static resource nodes. When nearby steel is split into fields around the Resource Depot, defensive
 staging and Rifleman raid readiness use the field on the map-center side, falling back to the full
 steel cluster for degenerate layouts. Start and resource-cluster mappings prefer candidates in the same reachable
 terrain component when component identity is known, with distance as the fallback for unknown
@@ -161,7 +161,7 @@ the same static analysis, and renders the observer layers over terrain as SVG. I
 renders the exact detected choke tiles rather than choke bounding rectangles.
 
 The economy model is also observation-owned. A resource node is mineable only when it has
-resources remaining, is in range of a completed owned City Centre, is unoccupied by a latched
+resources remaining, is in range of a completed owned Resource Depot, is unoccupied by a latched
 worker or owned Pump Jack, and is not already reserved for the current think. Steel assignments
 emit Gather; oil assignments build Pump Jacks through the usual paid-building path. Expansion
 planning can still see known-but-not-yet-mineable resources without assigning workers to them.
@@ -180,7 +180,7 @@ panic does not override an already-active tech transition, so tank pressure cont
 path during pressure.
 
 AI 2.1 is the promoted pressure profile. It fully saturates steel, adds up to twelve oil workers,
-keeps an eight-supply buffer, opens one Barracks, expands to two City Centres, and reserves four
+keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. At a larger resource float it
 adds a second Factory. Frontal waves stage in cohorts so newly produced units do not immediately
@@ -188,8 +188,8 @@ join an already-launched wave.
 
 AI Turtle shares AI 2.1 worker, oil, supply, and first-Barracks cadence, but uses a two-Rifleman
 opening and does not launch frontal waves. During its opening oil hold, it does not train workers
-toward suppressed oil assignments. It prioritizes a Training Centre, an early second City
-Centre, Entrenchment, support technology, Machine Gunners, and Anti-Tank Guns. It identifies up
+toward suppressed oil assignments. It prioritizes a Training Centre, an early second Resource
+Depot, Entrenchment, support technology, Machine Gunners, and Anti-Tank Guns. It identifies up
 to three own-base chokepoints from the static map analysis, caps Machine Gunner production by
 planned choke-line staffing, staffs the active enemy-facing lines with Machine Gunners, and places
 Anti-Tank Guns on an own-side backline. Its staged intents include the two-Rifleman opening. The profile prioritizes
@@ -240,8 +240,8 @@ player 1 at tick 9; representative first builds are AI 2.1 Barracks `(115,12)` a
 Jeff Pump Jack `(9,14)` at tick 513. The lane reaches the tick cap as a draw and its replay verifies
 exactly; these values document the new tooling baseline, not a balance guarantee.
 
-The ai-matchup binary runs one fixed-horizon profile-versus-profile match until a starting City
-Centre objective win or the tick cap. A match with no objective winner at the default 25,000-tick
+The ai-matchup binary runs one fixed-horizon profile-versus-profile match until a starting Resource
+Depot objective win or the tick cap. A match with no objective winner at the default 25,000-tick
 horizon is a draw.
 
     cd server

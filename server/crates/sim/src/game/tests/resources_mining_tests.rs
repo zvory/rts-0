@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn gather_command_accepts_live_steel_without_nearby_completed_cc() {
+fn gather_command_accepts_live_steel_without_nearby_completed_mining_anchor() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -18,19 +18,19 @@ fn gather_command_accepts_live_steel_without_nearby_completed_cc() {
         .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
         .expect("starting worker");
-    let cc = game
+    let resource_depot = game
         .state
         .entities
         .iter()
-        .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
-        .expect("starting City Centre");
+        .find(|e| e.owner == 1 && e.kind == EntityKind::ResourceDepot)
+        .expect("starting Resource Depot");
     let world = game.state.map.world_width_px();
-    let far_x = if cc.pos_x < world * 0.5 {
+    let far_x = if resource_depot.pos_x < world * 0.5 {
         world - config::TILE_SIZE as f32 * 0.5
     } else {
         config::TILE_SIZE as f32 * 0.5
     };
-    let far_y = if cc.pos_y < world * 0.5 {
+    let far_y = if resource_depot.pos_y < world * 0.5 {
         world - config::TILE_SIZE as f32 * 0.5
     } else {
         config::TILE_SIZE as f32 * 0.5
@@ -54,7 +54,7 @@ fn gather_command_accepts_live_steel_without_nearby_completed_cc() {
     let worker_entity = game.state.entities.get(worker).expect("worker survives");
     assert!(
         matches!(worker_entity.order(), Order::Gather(_)),
-        "worker should retain gather intent for a live patch outside City Centre mining range"
+        "worker should retain gather intent for a live patch outside Resource Depot mining range"
     );
     assert_eq!(
         worker_entity.gather_phase(),
@@ -315,7 +315,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
 }
 
 #[test]
-fn active_mining_waits_and_resumes_when_nearby_cc_is_rebuilt() {
+fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -377,17 +377,17 @@ fn active_mining_waits_and_resumes_when_nearby_cc_is_rebuilt() {
             .get(worker)
             .and_then(|e| e.gather_phase()),
         Some(GatherPhase::Harvesting),
-        "worker should reach and latch the starting patch before the City Centre is removed"
+        "worker should reach and latch the starting patch before the Resource Depot is removed"
     );
 
-    let (cc, cc_pos) = game
+    let (resource_depot, resource_depot_pos) = game
         .state
         .entities
         .iter()
-        .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
+        .find(|e| e.owner == 1 && e.kind == EntityKind::ResourceDepot)
         .map(|e| (e.id, (e.pos_x, e.pos_y)))
-        .expect("starting City Centre");
-    game.state.entities.remove(cc);
+        .expect("starting Resource Depot");
+    game.state.entities.remove(resource_depot);
     let steel_before = game.state.players.iter().find(|p| p.id == 1).unwrap().steel;
 
     game.tick();
@@ -421,20 +421,26 @@ fn active_mining_waits_and_resumes_when_nearby_cc_is_rebuilt() {
     let steel_after = game.state.players.iter().find(|p| p.id == 1).unwrap().steel;
     assert_eq!(
         steel_after, steel_before,
-        "mining should not continue without a City Centre"
+        "mining should not continue without a Resource Depot"
     );
     assert!(
         matches!(
             game.state.entities.get(worker).map(|e| e.order()),
             Some(Order::Gather(_))
         ),
-        "worker should keep waiting without City Centre coverage"
+        "worker should keep waiting without Resource Depot coverage"
     );
 
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, cc_pos.0, cc_pos.1, true)
-        .expect("replacement City Centre");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_pos.0,
+            resource_depot_pos.1,
+            true,
+        )
+        .expect("replacement Resource Depot");
     game.tick();
 
     assert_eq!(
@@ -487,7 +493,7 @@ fn resource_snapshots_include_remaining_even_through_fog() {
 }
 
 /// Every player must receive the same relative resource layout, and all starting resources
-/// must fall within the configured min/max distance from the City Centre.
+/// must fall within the configured min/max distance from the Resource Depot.
 #[test]
 fn spawn_resource_distances_are_fair_and_symmetric() {
     let counts = [1, 2, 3, 4];
@@ -506,35 +512,35 @@ fn spawn_resource_distances_are_fair_and_symmetric() {
 
         let mut all_player_dists: Vec<Vec<(EntityKind, f32)>> = Vec::new();
         for p in &game.state.players {
-            let cc = game
+            let resource_depot = game
                 .state
                 .entities
                 .iter()
-                .find(|e| e.owner == p.id && e.kind == EntityKind::CityCentre)
-                .expect("City Centre exists for every player");
+                .find(|e| e.owner == p.id && e.kind == EntityKind::ResourceDepot)
+                .expect("Resource Depot exists for every player");
 
             let mut dists = Vec::new();
             for e in game.state.entities.iter() {
                 if e.owner != 0 || (!e.is_node()) {
                     continue;
                 }
-                let d_x = e.pos_x - cc.pos_x;
-                let d_y = e.pos_y - cc.pos_y;
+                let d_x = e.pos_x - resource_depot.pos_x;
+                let d_y = e.pos_y - resource_depot.pos_y;
                 let dist_tiles = (d_x * d_x + d_y * d_y).sqrt() / config::TILE_SIZE as f32;
 
                 // Only consider nodes that belong to this player's start cluster.
-                if dist_tiles <= config::CC_RESOURCE_MAX_DIST_TILES + 1.0 {
+                if dist_tiles <= config::START_RESOURCE_MAX_DIST_TILES + 1.0 {
                     dists.push((e.kind, dist_tiles));
                     assert!(
-                        dist_tiles >= config::CC_RESOURCE_MIN_DIST_TILES,
-                        "player {} has a {:?} node too close ({:.2} tiles) to their City Centre",
+                        dist_tiles >= config::START_RESOURCE_MIN_DIST_TILES,
+                        "player {} has a {:?} node too close ({:.2} tiles) to their Resource Depot",
                         p.id,
                         e.kind,
                         dist_tiles
                     );
                     assert!(
-                        dist_tiles <= config::CC_RESOURCE_MAX_DIST_TILES,
-                        "player {} has a {:?} node too far ({:.2} tiles) from their City Centre",
+                        dist_tiles <= config::START_RESOURCE_MAX_DIST_TILES,
+                        "player {} has a {:?} node too far ({:.2} tiles) from their Resource Depot",
                         p.id,
                         e.kind,
                         dist_tiles

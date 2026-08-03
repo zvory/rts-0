@@ -73,7 +73,7 @@ impl Game {
             }
         };
         let builder_start = map.tile_center(build_tile.0 + 1, build_tile.1 - 1);
-        let city_centre_pos = map.tile_center(start_x, center_y + 10);
+        let resource_depot_pos = map.tile_center(start_x, center_y + 10);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = start_tile;
         }
@@ -82,12 +82,12 @@ impl Game {
         entities
             .spawn_building(
                 1,
-                EntityKind::CityCentre,
-                city_centre_pos.0,
-                city_centre_pos.1,
+                EntityKind::ResourceDepot,
+                resource_depot_pos.0,
+                resource_depot_pos.1,
                 true,
             )
-            .ok_or_else(|| "failed to spawn prerequisite City Centre".to_string())?;
+            .ok_or_else(|| "failed to spawn prerequisite Resource Depot".to_string())?;
         let mover = entities
             .spawn_unit(1, EntityKind::Worker, mover_start.0, mover_start.1)
             .ok_or_else(|| "failed to spawn moving worker".to_string())?;

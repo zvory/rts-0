@@ -186,7 +186,7 @@ RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml \
 ```
 
 For manual profile-vs-profile balance checks, use the fixed-horizon matchup CLI. It runs one
-directed match until a starting City Centre objective win or the tick cap and reports the winner,
+directed match until a starting Resource Depot objective win or the tick cap and reports the winner,
 first damage, first attacks, first tanks, command counts, and final army/base counts. No winner by
 the default 25,000-tick horizon is a draw; army value and other material metrics are diagnostics,
 not tiebreakers.

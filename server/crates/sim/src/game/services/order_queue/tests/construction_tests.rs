@@ -4,10 +4,17 @@ use super::*;
 fn queued_build_skips_occupied_scaffold_and_promotes_next_order() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 16, 16);
     let site = entities
         .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
@@ -22,9 +29,14 @@ fn queued_build_skips_occupied_scaffold_and_promotes_next_order() {
         builder.set_target_id(Some(site));
     }
     let queued_worker = entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 96.0,
+            resource_depot_y,
+        )
         .expect("queued worker should spawn");
-    let fallback = (cc_x + 160.0, cc_y);
+    let fallback = (resource_depot_x + 160.0, resource_depot_y);
     {
         let worker = entities
             .get_mut(queued_worker)

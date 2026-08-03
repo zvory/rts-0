@@ -392,7 +392,10 @@ fn replay_142_vehicle_lock_scenario_clears_without_slow_overlap() {
         owned_kind_count(&setup.game, 1, EntityKind::MachineGunner),
         1
     );
-    assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::CityCentre), 1);
+    assert_eq!(
+        owned_kind_count(&setup.game, 1, EntityKind::ResourceDepot),
+        1
+    );
 
     let mut game = setup.game;
     while game.tick_count() < setup.issue_after_ticks {

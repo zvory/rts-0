@@ -8,7 +8,7 @@ import {
   ARTILLERY_MIN_RANGE_TILES,
   ARTILLERY_BLANKET_RADIUS_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
-  MINING_CC_RANGE_TILES,
+  MINING_ANCHOR_RANGE_TILES,
   MORTAR_MIN_RANGE_TILES,
   MORTAR_RANGE_TILES,
   SMOKE_ABILITY_COST,
@@ -71,7 +71,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
 // Config
 // ---------------------------------------------------------------------------
 {
-  assert(MINING_CC_RANGE_TILES === 11, "client mirrors the server mining City Centre range");
+  assert(MINING_ANCHOR_RANGE_TILES === 11, "client mirrors the server mining Resource Depot range");
   assert(
     MORTAR_MIN_RANGE_TILES === 5 && MORTAR_RANGE_TILES === 17,
     "client mirrors the server mortar five-to-seventeen-tile range band",
@@ -81,10 +81,10 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "client mirrors the server Tank Trap cluster attack radius",
   );
   assert(
-    STATS[KIND.CITY_CENTRE].cost.steel === 450 &&
-      STATS[KIND.CITY_CENTRE].cost.oil === 100 &&
-      STATS[KIND.CITY_CENTRE].buildTicks === 750,
-    "City Centre cost and build time mirror server",
+    STATS[KIND.RESOURCE_DEPOT].cost.steel === 450 &&
+      STATS[KIND.RESOURCE_DEPOT].cost.oil === 100 &&
+      STATS[KIND.RESOURCE_DEPOT].buildTicks === 750,
+    "Resource Depot cost and build time mirror server",
   );
   assert(STATS[KIND.WORKER].buildTicks === 495, "Worker build time mirrors server");
   assert(
@@ -111,8 +111,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Scout Plane stats mirror the approved ability-launched unit contract",
   );
   assert(
-    !STATS[KIND.CITY_CENTRE].trains.includes(KIND.SCOUT_PLANE) &&
-      !trainableUnitsForFaction("kriegsia", KIND.CITY_CENTRE).includes(KIND.SCOUT_PLANE) &&
+    !STATS[KIND.RESOURCE_DEPOT].trains.includes(KIND.SCOUT_PLANE) &&
+      !trainableUnitsForFaction("kriegsia", KIND.RESOURCE_DEPOT).includes(KIND.SCOUT_PLANE) &&
       ABILITIES[ABILITY.SCOUT_PLANE].carriers.includes(KIND.COMMAND_CAR) &&
       ABILITIES[ABILITY.SCOUT_PLANE].hotkey === "C" &&
       ABILITIES[ABILITY.SCOUT_PLANE].requires == null &&
@@ -127,21 +127,21 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Training Centre should expose all server-side build prerequisites",
   );
   assert(
-    STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.CITY_CENTRE),
-    "Training Centre should require a City Centre in the command card",
+    STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.RESOURCE_DEPOT),
+    "Training Centre should require a Resource Depot in the command card",
   );
   assert(
     STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.BARRACKS),
     "Training Centre should require a Barracks in the command card",
   );
   assert(
-    STATS[KIND.BARRACKS].requires === KIND.CITY_CENTRE,
-    "Barracks should require a City Centre in the command card",
+    STATS[KIND.BARRACKS].requires === KIND.RESOURCE_DEPOT,
+    "Barracks should require a Resource Depot in the command card",
   );
   assert(STATS[KIND.TRAINING_CENTRE].cost.steel === 100 && STATS[KIND.TRAINING_CENTRE].cost.oil === 25 && STATS[KIND.TRAINING_CENTRE].buildTicks === 560, "Training Centre cost and build time mirror server");
   assert(
-    STATS[KIND.FACTORY].requires.includes(KIND.CITY_CENTRE),
-    "Vehicle Works should require a City Centre in the command card",
+    STATS[KIND.FACTORY].requires.includes(KIND.RESOURCE_DEPOT),
+    "Vehicle Works should require a Resource Depot in the command card",
   );
   assert(
     STATS[KIND.FACTORY].requires.includes(KIND.TRAINING_CENTRE),
@@ -166,14 +166,14 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assert(STATS[KIND.SCOUT_CAR].sight === 15, "Scout Car sight radius mirrors server");
   assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
   assert(
-    ABILITIES[ABILITY.SMOKE].techRequirement === KIND.RESEARCH_COMPLEX,
-    "Scout Car smoke should require a completed R&D Complex",
+    ABILITIES[ABILITY.SMOKE].techRequirement === KIND.ENGINEERING_COMPLEX,
+    "Scout Car smoke should require a completed Engineering Complex",
   );
   assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow steelworks protocol kind");
   assert(KIND_CODE[KIND.ARTILLERY] === 16, "Artillery compact kind code should be reserved");
-  assert(KIND_CODE[KIND.RESEARCH_COMPLEX] === 17, "R&D Complex compact kind code should be reserved");
+  assert(KIND_CODE[KIND.ENGINEERING_COMPLEX] === 17, "Engineering Complex compact kind code should be reserved");
   assert(KIND_CODE[KIND.COMMAND_CAR] === 18, "Command Car compact kind code should be reserved");
   assert(KIND_CODE[KIND.EKAT] === 19, "Ekat compact kind code should be reserved");
   assert(KIND_CODE[KIND.ZAMOK] === 20, "Zamok compact kind code should be reserved");
@@ -325,19 +325,19 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Gun Works should require Training Centre tech in the command card",
   );
   assert(
-    STATS[KIND.RESEARCH_COMPLEX].label === "R&D Complex" &&
-      STATS[KIND.RESEARCH_COMPLEX].footW === 3 &&
-      STATS[KIND.RESEARCH_COMPLEX].footH === 3,
-    "R&D Complex should be a 3x3 command-card building",
+    STATS[KIND.ENGINEERING_COMPLEX].label === "Engineering Complex" &&
+      STATS[KIND.ENGINEERING_COMPLEX].footW === 3 &&
+      STATS[KIND.ENGINEERING_COMPLEX].footH === 3,
+    "Engineering Complex should be a 3x3 command-card building",
   );
   assert(
-    STATS[KIND.RESEARCH_COMPLEX].cost.steel === 100 &&
-      STATS[KIND.RESEARCH_COMPLEX].cost.oil === 100 &&
-      STATS[KIND.RESEARCH_COMPLEX].buildTicks === 450,
-    "R&D Complex cost and build time mirror server",
+    STATS[KIND.ENGINEERING_COMPLEX].cost.steel === 100 &&
+      STATS[KIND.ENGINEERING_COMPLEX].cost.oil === 100 &&
+      STATS[KIND.ENGINEERING_COMPLEX].buildTicks === 450,
+    "Engineering Complex cost and build time mirror server",
   );
   assertDeepEqual(
-    STATS[KIND.RESEARCH_COMPLEX].researches,
+    STATS[KIND.ENGINEERING_COMPLEX].researches,
     [
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
@@ -347,7 +347,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADE.SMOKE_PLUS,
       UPGRADE.SCOUT_PLANE_UNLOCK,
     ],
-    "R&D Complex should expose the AT Guns, Artillery, and Fire Control chain before its independent research",
+    "Engineering Complex should expose the AT Guns, Artillery, and Fire Control chain before its independent research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -433,12 +433,12 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Artillery Fire Control exposes its 100/150 cost, 20-second duration, Artillery prerequisite, and radius effect",
   );
   assert(
-    STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in R&D Complex",
-    "Anti-Tank Gun training should explain the R&D Complex research requirement",
+    STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in Engineering Complex",
+    "Anti-Tank Gun training should explain the Engineering Complex research requirement",
   );
   assert(
-    STATS[KIND.TANK].upgradeRequiresText === "Requires research in R&D Complex",
-    "Tank training should explain the R&D Complex research requirement",
+    STATS[KIND.TANK].upgradeRequiresText === "Requires research in Engineering Complex",
+    "Tank training should explain the Engineering Complex research requirement",
   );
   assert(
     STATS[KIND.TANK_TRAP].label === "Tank Trap" &&
@@ -464,7 +464,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
-    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
+    { owner: playerId, kind: KIND.RESOURCE_DEPOT, buildProgress: null },
     { owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: 0.5 },
   ];
   assert(
@@ -472,7 +472,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Vehicle Works should not unlock while the Training Centre is still under construction",
   );
   const underConstructionBarracks = [
-    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
+    { owner: playerId, kind: KIND.RESOURCE_DEPOT, buildProgress: null },
     { owner: playerId, kind: KIND.BARRACKS, buildProgress: 0.5 },
   ];
   assert(
@@ -480,7 +480,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Training Centre should not unlock while the Barracks is still under construction",
   );
   const completedTrainingCentre = [
-    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
+    { owner: playerId, kind: KIND.RESOURCE_DEPOT, buildProgress: null },
     { owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: null },
   ];
   assert(
@@ -963,7 +963,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     assert(commandCarButton?.dataset.hotkey === "E", "Command Car training should occupy the top-right E slot");
     assert(
       commandCarButton && !commandCarButton.disabled && commandCarButton.className.includes("primary-disabled"),
-      "Command Car training should keep its primary action disabled while allowing auto-build allocation before an R&D Complex exists",
+      "Command Car training should keep its primary action disabled while allowing auto-build allocation before an Engineering Complex exists",
     );
     assert(
       commandCarButton?.dataset.contextAction === "true",
@@ -1038,23 +1038,23 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
 
     renderedButtons.length = 0;
-    const completedResearchComplex = {
+    const completedEngineeringComplex = {
       id: 780,
       owner: playerId,
-      kind: KIND.RESEARCH_COMPLEX,
+      kind: KIND.ENGINEERING_COMPLEX,
       buildProgress: null,
     };
-    factoryHud.state.entitiesInterpolated = () => [selectedFactory, completedResearchComplex];
+    factoryHud.state.entitiesInterpolated = () => [selectedFactory, completedEngineeringComplex];
     renderCommandCard(factoryHud);
     const stillLockedTankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
     const unlockedCommandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
     assert(
       stillLockedTankButton && stillLockedTankButton.className.includes("primary-disabled"),
-      "a completed R&D Complex should not unlock Tank training without Tank Production",
+      "a completed Engineering Complex should not unlock Tank training without Tank Production",
     );
     assert(
       unlockedCommandCarButton && !unlockedCommandCarButton.disabled,
-      "a completed R&D Complex should enable Command Car training without Tank Production",
+      "a completed Engineering Complex should enable Command Car training without Tank Production",
     );
 
     renderedButtons.length = 0;
@@ -1085,8 +1085,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     const separateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
     assert(
-      mortarButton?.innerHTML.includes("Indirect fire, extremely inaccurate without vision. Upgrade auto cast in R&D."),
-      "Mortar Team tooltip should explain indirect fire inaccuracy and R&D autocast",
+      mortarButton?.innerHTML.includes("Indirect fire, extremely inaccurate without vision. Upgrade auto cast in Engineering Complex."),
+      "Mortar Team tooltip should explain indirect fire inaccuracy and Engineering Complex autocast",
     );
     assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
     assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
@@ -1094,51 +1094,51 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     assert(!separateArtilleryResearchButton, "Separate Artillery research should not appear in Gun Works");
 
     renderedButtons.length = 0;
-    const selectedResearchComplex = {
+    const selectedEngineeringComplex = {
       id: 80,
       owner: playerId,
-      kind: KIND.RESEARCH_COMPLEX,
+      kind: KIND.ENGINEERING_COMPLEX,
       buildProgress: null,
     };
-    const rdHud = Object.create(HUD.prototype);
-    rdHud.state = {
+    const engineeringHud = Object.create(HUD.prototype);
+    engineeringHud.state = {
       playerId,
       resources: { steel: 500, oil: 500 },
       upgrades: [],
-      selectedEntities: () => [selectedResearchComplex],
-      entitiesInterpolated: () => [selectedResearchComplex],
+      selectedEntities: () => [selectedEngineeringComplex],
+      entitiesInterpolated: () => [selectedEngineeringComplex],
     };
-    rdHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
-    rdHud._cardSig = null;
-    rdHud._trainRoundRobin = new Map();
-    rdHud._cancelRoundRobin = new Map();
-    rdHud._resourceIcons = {};
-    renderCommandCard(rdHud);
-    const rdAtGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG"));
-    const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
-    const rdArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    const rdSeparateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
-    const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
-    const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
-    const rdSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
-    const rdScoutPlaneButton = renderedButtons.find((button) => button.innerHTML.includes("SP+"));
-    assert(rdAtGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in R&D Complex");
-    assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot before AT Guns");
-    assert(rdArtilleryResearchButton?.disabled, "Artillery should be disabled before AT Guns is complete or queued");
-    assert(rdArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in R&D Complex");
-    assert(rdArtilleryFireControlButton?.disabled, "Artillery Fire Control should require Artillery");
-    assert(rdArtilleryFireControlButton?.title === "Requires Artillery", "Artillery Fire Control should name its prerequisite");
-    assert(rdTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in R&D Complex");
-    assert(rdMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in R&D Complex");
-    assert(rdSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in R&D Complex");
-    assert(rdScoutPlaneButton?.dataset.hotkey === "Z", "Scout Plane research should appear in R&D Complex");
-    assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "R&D Complex should not expose Command Car research");
-    assert(!rdSeparateArtilleryResearchButton, "R&D Complex should not expose separate Artillery research");
+    engineeringHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
+    engineeringHud._cardSig = null;
+    engineeringHud._trainRoundRobin = new Map();
+    engineeringHud._cancelRoundRobin = new Map();
+    engineeringHud._resourceIcons = {};
+    renderCommandCard(engineeringHud);
+    const engineeringAtGunsResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ATG"));
+    const engineeringArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
+    const engineeringArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
+    const engineeringSeparateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const engineeringTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
+    const engineeringMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
+    const engineeringSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
+    const engineeringScoutPlaneButton = renderedButtons.find((button) => button.innerHTML.includes("SP+"));
+    assert(engineeringAtGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in Engineering Complex");
+    assert(engineeringArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot before AT Guns");
+    assert(engineeringArtilleryResearchButton?.disabled, "Artillery should be disabled before AT Guns is complete or queued");
+    assert(engineeringArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in Engineering Complex");
+    assert(engineeringArtilleryFireControlButton?.disabled, "Artillery Fire Control should require Artillery");
+    assert(engineeringArtilleryFireControlButton?.title === "Requires Artillery", "Artillery Fire Control should name its prerequisite");
+    assert(engineeringTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in Engineering Complex");
+    assert(engineeringMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in Engineering Complex");
+    assert(engineeringSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in Engineering Complex");
+    assert(engineeringScoutPlaneButton?.dataset.hotkey === "Z", "Scout Plane research should appear in Engineering Complex");
+    assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "Engineering Complex should not expose Command Car research");
+    assert(!engineeringSeparateArtilleryResearchButton, "Engineering Complex should not expose separate Artillery research");
 
     renderedButtons.length = 0;
-    selectedResearchComplex.prodUpgradeQueue = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
-    rdHud._cardSig = null;
-    renderCommandCard(rdHud);
+    selectedEngineeringComplex.prodUpgradeQueue = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
+    engineeringHud._cardSig = null;
+    renderCommandCard(engineeringHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
     const atGunsUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     assert(unlockedArtilleryResearchButton?.dataset.hotkey === "W", "Artillery should retain the W slot");
@@ -1146,12 +1146,12 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     assert(atGunsUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Artillery after AT Guns is queued");
 
     renderedButtons.length = 0;
-    selectedResearchComplex.prodUpgradeQueue = [
+    selectedEngineeringComplex.prodUpgradeQueue = [
       UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
     ];
-    rdHud._cardSig = null;
-    renderCommandCard(rdHud);
+    engineeringHud._cardSig = null;
+    renderCommandCard(engineeringHud);
     const unlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable when Artillery is queued");
 
@@ -1159,13 +1159,13 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     const playedNotices = [];
     let placements = 0;
     const selectedWorker = { id: 90, owner: playerId, kind: KIND.WORKER };
-    const completedCityCentre = { id: 91, owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null };
+    const completedResourceDepot = { id: 91, owner: playerId, kind: KIND.RESOURCE_DEPOT, buildProgress: null };
     const shortResourceHud = Object.create(HUD.prototype);
     shortResourceHud.state = {
       playerId,
       resources: { steel: 100, oil: 0 },
       selectedEntities: () => [selectedWorker],
-      entitiesInterpolated: () => [selectedWorker, completedCityCentre],
+      entitiesInterpolated: () => [selectedWorker, completedResourceDepot],
       beginPlacement() {
         placements += 1;
       },

@@ -24,7 +24,7 @@ Avoid: realism, illustration detail, embossed plaque, coin, badge backing, picto
 | --- | --- | --- |
 | Vehicle Works | a generic 1940s medium tank in a very simple horizontal side silhouette: one continuous track block, one hull block, one turret block, and one short cannon barrel | `buildings-b3-corrected-preview/generated/runtime/factory-base.png` |
 | Gun Works | a generic field-artillery cannon in a very simple side silhouette: two large wheels, one compact carriage, and one long elevated barrel | `buildings-b4-selected-pass-01/generated/runtime/steelworks-base.png` |
-| R&D Complex | a classic atomic symbol reduced to thick simple geometry: one central nucleus, three broad intersecting orbital loops, and exactly eight large round electron dots | `buildings-b4-selected-pass-01/generated/runtime/research_complex-base.png` |
+| Engineering Complex | a classic atomic symbol reduced to thick simple geometry: one central nucleus, three broad intersecting orbital loops, and exactly eight large round electron dots | `buildings-b4-selected-pass-01/generated/runtime/engineering_complex-base.png` |
 | Barracks | two generic bolt-action rifles reduced to unmistakable chunky silhouettes, crossed diagonally in a balanced X | `buildings-b7-team-paint-refined-preview/generated/runtime/barracks-base.png` |
 | Training Centre | one generic light machine gun with a short box magazine and one Panzerfaust-style launcher with a large conical warhead, both reduced to chunky silhouettes and crossed diagonally in a balanced X | `buildings-b7-team-paint-refined-preview/generated/runtime/training_centre-base.png` |
 

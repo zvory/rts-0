@@ -749,19 +749,19 @@ mod tests {
 
     #[test]
     fn research_buildings_are_available_to_production_facts() {
-        let mut research_complex = EntityView::new(
+        let mut engineering_complex = EntityView::new(
             40,
             1,
-            rts_sim::protocol::kind_to_wire(EntityKind::ResearchComplex),
+            rts_sim::protocol::kind_to_wire(EntityKind::EngineeringComplex),
             128.0,
             128.0,
             1,
             1,
             states::IDLE,
         );
-        research_complex.prod_queue = Some(0);
+        engineering_complex.prod_queue = Some(0);
         let mut snapshot = empty_snapshot(88);
-        snapshot.entities = vec![research_complex];
+        snapshot.entities = vec![engineering_complex];
         let start = start_payload();
 
         let observation = AiObservation::from_selfplay_snapshot(&start, &snapshot, 1, []).unwrap();
@@ -771,7 +771,7 @@ mod tests {
             .find(|entity| entity.id == 40)
             .unwrap();
 
-        assert_eq!(building.kind, EntityKind::ResearchComplex);
+        assert_eq!(building.kind, EntityKind::EngineeringComplex);
         assert_eq!(building.production_queue_len, Some(0));
     }
 

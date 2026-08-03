@@ -176,7 +176,7 @@ fn stable_rust_public_surface_compiles() {
     assert!(!terrain::is_known(18));
     assert_eq!(kinds::WORKER, "worker");
     assert_eq!(kinds::SCOUT_PLANE, "scout_plane");
-    assert_eq!(kinds::CITY_CENTRE, "city_centre");
+    assert_eq!(kinds::RESOURCE_DEPOT, "resource_depot");
     assert_eq!(kinds::STEEL, "steel");
     assert_eq!(states::IDLE, "idle");
     assert_eq!(states::ATTACK, "attack");

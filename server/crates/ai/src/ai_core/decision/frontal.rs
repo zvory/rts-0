@@ -504,14 +504,14 @@ fn update_enemy_main_state(
     let visible_main = observation
         .visible_enemies
         .iter()
-        .filter(|enemy| enemy.kind == EntityKind::CityCentre)
+        .filter(|enemy| enemy.kind == EntityKind::ResourceDepot)
         .filter(|enemy| dist2(enemy.x, enemy.y, enemy_base.x, enemy_base.y) <= main_radius2)
         .min_by_key(|enemy| enemy.id);
-    if let Some(city_centre) = visible_main {
-        memory.enemy_main_city_centre = Some(city_centre.id);
+    if let Some(resource_depot) = visible_main {
+        memory.enemy_main_resource_depot = Some(resource_depot.id);
         return;
     }
-    if memory.enemy_main_city_centre.is_none() {
+    if memory.enemy_main_resource_depot.is_none() {
         return;
     }
     let confirmation_radius2 = (14.0 * tile_size).powi(2);
@@ -555,17 +555,17 @@ fn update_enemy_natural_state(
     }
     let tile_size = observation.map.tile_size as f32;
     let natural_radius2 = (8.0 * tile_size) * (8.0 * tile_size);
-    let main_exclusion2 = (config::CC_RESOURCE_MAX_DIST_TILES * tile_size)
-        * (config::CC_RESOURCE_MAX_DIST_TILES * tile_size);
+    let main_exclusion2 = (config::START_RESOURCE_MAX_DIST_TILES * tile_size)
+        * (config::START_RESOURCE_MAX_DIST_TILES * tile_size);
     let visible_natural = observation
         .visible_enemies
         .iter()
-        .filter(|enemy| enemy.kind == EntityKind::CityCentre)
+        .filter(|enemy| enemy.kind == EntityKind::ResourceDepot)
         .filter(|enemy| dist2(enemy.x, enemy.y, enemy_base.x, enemy_base.y) > main_exclusion2)
         .filter(|enemy| dist2(enemy.x, enemy.y, natural.0, natural.1) <= natural_radius2)
         .min_by_key(|enemy| enemy.id);
-    if let Some(city_centre) = visible_natural {
-        memory.enemy_natural_city_centre = Some(city_centre.id);
+    if let Some(resource_depot) = visible_natural {
+        memory.enemy_natural_resource_depot = Some(resource_depot.id);
         return;
     }
     // At the containment anchor the Tanks sit 13.5 tiles from the resource
@@ -664,7 +664,7 @@ fn enemy_natural_edge(
     enemy_base: EnemyBaseFact,
 ) -> Option<(f32, f32)> {
     let tile_size = observation.map.tile_size as f32;
-    let start_exclusion = (config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * tile_size;
+    let start_exclusion = (config::START_RESOURCE_MAX_DIST_TILES + 1.5) * tile_size;
     let start_exclusion2 = start_exclusion * start_exclusion;
     observation
         .resources
@@ -787,9 +787,9 @@ fn visible_strategic_building_target_within_tiles(
         .filter(|enemy| enemy.kind.is_building())
         .map(|enemy| {
             let priority = match enemy.kind {
-                EntityKind::CityCentre => 0,
+                EntityKind::ResourceDepot => 0,
                 EntityKind::Factory | EntityKind::Steelworks => 1,
-                EntityKind::ResearchComplex | EntityKind::TrainingCentre => 2,
+                EntityKind::EngineeringComplex | EntityKind::TrainingCentre => 2,
                 _ => 3,
             };
             (
@@ -983,10 +983,11 @@ mod tests {
     }
 
     #[test]
-    fn main_city_centre_is_acquired_outside_nominal_standoff_radius() {
+    fn main_resource_depot_is_acquired_outside_nominal_standoff_radius() {
         let tile_size = 32;
         let tank = target_test_entity(1, EntityKind::Tank, 10.0 * 32.0, 10.0 * 32.0);
-        let city_centre = target_test_entity(2, EntityKind::CityCentre, 25.0 * 32.0, 10.0 * 32.0);
+        let resource_depot =
+            target_test_entity(2, EntityKind::ResourceDepot, 25.0 * 32.0, 10.0 * 32.0);
         let observation = AiObservation {
             player_id: 1,
             tick: 0,
@@ -1006,7 +1007,7 @@ mod tests {
             owned: vec![tank],
             resources: Vec::new(),
             visible_allies: Vec::new(),
-            visible_enemies: vec![city_centre],
+            visible_enemies: vec![resource_depot],
             pending_builds: Vec::new(),
             upgrades: Vec::new(),
         };

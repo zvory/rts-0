@@ -25,7 +25,7 @@ pub(super) struct EconomyManagerInput<'a> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum EconomyProposal {
-    BuildExpansionCityCentre,
+    BuildExpansionResourceDepot,
     TrainWorker,
     AssignOilWorkers,
     AssignSteelWorkers,
@@ -66,7 +66,7 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
 
     let mut proposals = Vec::new();
     if input.expansion_plan.should_save {
-        proposals.push(EconomyProposal::BuildExpansionCityCentre);
+        proposals.push(EconomyProposal::BuildExpansionResourceDepot);
     }
     if !input.signals.defer_worker_training_for_tech
         && input.facts.worker_count < plan.target_workers

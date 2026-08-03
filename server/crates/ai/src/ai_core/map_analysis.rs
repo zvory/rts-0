@@ -897,7 +897,7 @@ fn build_resource_clusters(
 
     let expected_cluster_size =
         (config::STEEL_PATCHES_PER_BASE + config::OIL_PATCHES_PER_BASE) as usize;
-    let radius_px = (config::CC_RESOURCE_MAX_DIST_TILES + RESOURCE_CLUSTER_RADIUS_MARGIN_TILES)
+    let radius_px = (config::START_RESOURCE_MAX_DIST_TILES + RESOURCE_CLUSTER_RADIUS_MARGIN_TILES)
         * map.tile_size as f32;
     let radius2 = radius_px * radius_px;
     let mut unassigned = vec![true; resources.len()];

@@ -715,7 +715,7 @@ const observerAnalysis = decodeServerMessage({
   players: [{
     id: 1,
     units: [{ kind: "worker", count: 2, steelValue: 100, oilValue: 0 }],
-    production: [{ buildingId: 7, buildingKind: "city_centre", itemKind: "worker", itemType: "unit", progress: 0.25, queueDepth: 1 }],
+    production: [{ buildingId: 7, buildingKind: "resource_depot", itemKind: "worker", itemType: "unit", progress: 0.25, queueDepth: 1 }],
     upgrades: ["tank_unlock"],
     unitsLost: [],
     resourcesLost: { steel: 0, oil: 0 },

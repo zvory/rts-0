@@ -9,7 +9,7 @@ Built-in ImageGen, new composition from scratch. The earlier crossed-weapons can
 ## References
 
 - `/tmp/mg42-side-reference.jpg`: subject/anatomy reference only. Source: [MG42 machine gun at the Batey ha-Osef museum](https://commons.wikimedia.org/wiki/File:MG42-machine-gun-batey-haosef-1.jpg), Bukvoed, CC BY 3.0.
-- `../research-complex-emblem-team-tint.png`: approved abstraction, white-fill, and black-outline style only.
+- `../engineering-complex-emblem-team-tint.png`: approved abstraction, white-fill, and black-outline style only.
 - `../steelworks-emblem-team-tint.png`: approved abstraction, white-fill, and black-outline style only.
 
 ## Prompt

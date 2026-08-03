@@ -60,15 +60,15 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png \
     && test -s ./client/assets/rigs/building-emblems-preview/barracks-atlas-m14-team-tint.png \
     && test -s ./client/assets/rigs/building-emblems-preview/factory-atlas-team-tint.png \
-    && test -s ./client/assets/rigs/building-emblems-preview/research_complex-atlas-team-tint.png \
+    && test -s ./client/assets/rigs/building-emblems-preview/engineering_complex-atlas-team-tint.png \
     && test -s ./client/assets/rigs/building-emblems-preview/steelworks-atlas-team-tint.png \
     && test -s ./client/assets/rigs/building-emblems-preview/training_centre-atlas-mg42-panzerfaust-team-tint.png \
     && test -s ./client/assets/rigs/buildings-b2-distinct-pass-01/pump_jack-atlas.png \
     && test -s ./client/assets/rigs/buildings-b3-corrected-preview/factory-atlas.png \
-    && test -s ./client/assets/rigs/buildings-b4-selected-pass-01/research_complex-atlas.png \
+    && test -s ./client/assets/rigs/buildings-b4-selected-pass-01/engineering_complex-atlas.png \
     && test -s ./client/assets/rigs/buildings-b4-selected-pass-01/steelworks-atlas.png \
     && test -s ./client/assets/rigs/buildings-b7-team-paint-refined-preview/barracks-atlas.png \
-    && test -s ./client/assets/rigs/buildings-b7-team-paint-refined-preview/city_centre-atlas.png \
+    && test -s ./client/assets/rigs/buildings-b7-team-paint-refined-preview/resource_depot-atlas.png \
     && test -s ./client/assets/rigs/buildings-b7-team-paint-refined-preview/training_centre-atlas.png \
     && test -s ./client/assets/rigs/command-car-packed-radio-preview/generated/command-car-packed-radio-stars-30-atlas-v4.png \
     && test -s ./client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png \

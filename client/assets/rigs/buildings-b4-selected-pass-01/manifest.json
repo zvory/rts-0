@@ -6,6 +6,6 @@
   "status": "selected runtime art",
   "buildings": {
     "steelworks": { "label": "Gun Works B", "footprint": [3, 3], "frame": [384, 384] },
-    "research_complex": { "label": "Laboratory B", "footprint": [3, 3], "frame": [384, 384] }
+    "engineering_complex": { "label": "Laboratory B", "footprint": [3, 3], "frame": [384, 384] }
   }
 }

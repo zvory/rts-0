@@ -1113,7 +1113,7 @@ mod tests {
         let mut center = EntityView::new(
             3,
             1,
-            kinds::CITY_CENTRE,
+            kinds::RESOURCE_DEPOT,
             100.0,
             120.0,
             450,
@@ -1233,7 +1233,7 @@ mod tests {
                 },
                 Event::Build {
                     id: 3,
-                    kind: kinds::CITY_CENTRE.to_string(),
+                    kind: kinds::RESOURCE_DEPOT.to_string(),
                 },
                 Event::Notice {
                     msg: "Not enough steel".to_string(),

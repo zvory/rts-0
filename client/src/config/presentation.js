@@ -74,11 +74,11 @@ export const CAMERA = Object.freeze({
 // Pump Jack occupies the former Supply Depot W slot so its economy role stays
 // legible even though workers can also build one by right-clicking an oil patch.
 export const WORKER_BUILD_CARD_SLOTS = Object.freeze([
-  KIND.CITY_CENTRE,
+  KIND.RESOURCE_DEPOT,
   KIND.PUMP_JACK,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
-  KIND.RESEARCH_COMPLEX,
+  KIND.ENGINEERING_COMPLEX,
   KIND.FACTORY,
   KIND.STEELWORKS,
   KIND.TANK_TRAP,

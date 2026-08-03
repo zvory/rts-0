@@ -187,7 +187,7 @@ fn decide_with_profile(observation: &AiObservation, profile: &'static AiProfile)
 }
 
 fn jeff_opening_observation(worker_count: usize, pump_jacks: usize) -> AiObservation {
-    let mut owned = vec![building(1, EntityKind::CityCentre, Some(0))];
+    let mut owned = vec![building(1, EntityKind::ResourceDepot, Some(0))];
     owned.extend((0..worker_count).map(|index| {
         worker(
             20 + index as u32,
@@ -240,9 +240,9 @@ fn jeff_first_pump_builder_immediately_builds_one_followup_pump() {
         .find(|resource| resource.id == 200)
         .map(|resource| (resource.x, resource.y))
         .expect("first oil node");
-    if let Some(city_centre) = observation.owned.iter_mut().find(|entity| entity.id == 1) {
-        city_centre.x = 8.5 * ts;
-        city_centre.y = 8.5 * ts;
+    if let Some(resource_depot) = observation.owned.iter_mut().find(|entity| entity.id == 1) {
+        resource_depot.x = 8.5 * ts;
+        resource_depot.y = 8.5 * ts;
     }
     if let Some(builder) = observation.owned.iter_mut().find(|entity| entity.id == 20) {
         builder.x = first_oil.0;
@@ -292,10 +292,10 @@ fn jeff_first_pump_builder_immediately_builds_one_followup_pump() {
 
 fn jeff_armored_tech_observation(factory: Option<AiEntitySummary>) -> AiObservation {
     let mut owned = vec![
-        building(1, EntityKind::CityCentre, Some(0)),
+        building(1, EntityKind::ResourceDepot, Some(0)),
         building(2, EntityKind::Barracks, Some(0)),
         building(3, EntityKind::TrainingCentre, None),
-        building(4, EntityKind::ResearchComplex, Some(0)),
+        building(4, EntityKind::EngineeringComplex, Some(0)),
         worker(20, AiEntityState::Idle),
     ];
     if let Some(factory) = factory {
@@ -417,7 +417,7 @@ fn jeff_attack_phase_switch_preserves_home_defense_assignment() {
     memory.containment_opening_tanks.extend([101, 102]);
     memory.home_defensive_tank = Some(103);
     memory.home_defensive_tank_assigned_once = true;
-    memory.enemy_natural_city_centre = Some(201);
+    memory.enemy_natural_resource_depot = Some(201);
 
     let mut transitioned_attack = JEFFS_AI.attack;
     transitioned_attack.first_attack_size += 1;
@@ -427,7 +427,7 @@ fn jeff_attack_phase_switch_preserves_home_defense_assignment() {
     assert_eq!(memory.containment_opening_tanks, BTreeSet::from([101, 102]));
     assert_eq!(memory.home_defensive_tank, Some(103));
     assert!(memory.home_defensive_tank_assigned_once);
-    assert_eq!(memory.enemy_natural_city_centre, Some(201));
+    assert_eq!(memory.enemy_natural_resource_depot, Some(201));
 }
 
 fn second_factory_observation(steel: u32, oil: u32) -> AiObservation {
@@ -439,11 +439,11 @@ fn second_factory_observation(steel: u32, oil: u32) -> AiObservation {
             supply_cap: 120,
         },
         vec![
-            building(10, EntityKind::CityCentre, Some(0)),
-            building(11, EntityKind::CityCentre, Some(0)),
+            building(10, EntityKind::ResourceDepot, Some(0)),
+            building(11, EntityKind::ResourceDepot, Some(0)),
             building(12, EntityKind::Barracks, Some(0)),
             building(13, EntityKind::TrainingCentre, None),
-            building(14, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::EngineeringComplex, None),
             building(15, EntityKind::Factory, Some(0)),
             worker(20, AiEntityState::Idle),
         ],
@@ -461,11 +461,11 @@ fn places_first_factory_in_shorter_forward_band() {
             supply_cap: 120,
         },
         vec![
-            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
-            building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
+            building_at(10, EntityKind::ResourceDepot, Some(0), 8.5 * ts, 8.5 * ts),
+            building_at(11, EntityKind::ResourceDepot, Some(0), 23.5 * ts, 36.5 * ts),
             building(12, EntityKind::Barracks, Some(0)),
             building(13, EntityKind::TrainingCentre, None),
-            building(14, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::EngineeringComplex, None),
             worker(60, AiEntityState::Idle),
         ],
     ));
@@ -541,11 +541,11 @@ fn jeff_surplus_observation(steel: u32) -> AiObservation {
             supply_cap: 120,
         },
         vec![
-            building(10, EntityKind::CityCentre, Some(0)),
-            building(11, EntityKind::CityCentre, Some(0)),
+            building(10, EntityKind::ResourceDepot, Some(0)),
+            building(11, EntityKind::ResourceDepot, Some(0)),
             building(12, EntityKind::Barracks, Some(0)),
             building(13, EntityKind::TrainingCentre, None),
-            building(14, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::EngineeringComplex, None),
             building(15, EntityKind::Factory, Some(1)),
             combat_unit(30, EntityKind::Tank),
             combat_unit(31, EntityKind::Tank),
@@ -675,10 +675,10 @@ fn trains_worker_before_first_factory_when_below_saturation() {
             supply_cap: 40,
         },
         vec![
-            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+            building_at(10, EntityKind::ResourceDepot, Some(0), 8.5 * ts, 8.5 * ts),
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
-            building(13, EntityKind::ResearchComplex, None),
+            building(13, EntityKind::EngineeringComplex, None),
             worker(20, AiEntityState::Idle),
         ],
     );
@@ -701,11 +701,11 @@ fn trains_workers_before_first_tank_when_below_two_base_saturation() {
     let ts = config::TILE_SIZE as f32;
     let (tank_steel, tank_oil) = rts_rules::economy::cost(EntityKind::Tank);
     let mut owned = vec![
-        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
-        building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
+        building_at(10, EntityKind::ResourceDepot, Some(0), 8.5 * ts, 8.5 * ts),
+        building_at(11, EntityKind::ResourceDepot, Some(0), 23.5 * ts, 36.5 * ts),
         building(12, EntityKind::Barracks, Some(0)),
         building(13, EntityKind::TrainingCentre, None),
-        building(14, EntityKind::ResearchComplex, None),
+        building(14, EntityKind::EngineeringComplex, None),
         building(15, EntityKind::Factory, Some(0)),
         building(16, EntityKind::Steelworks, Some(0)),
     ];

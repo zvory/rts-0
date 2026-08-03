@@ -15,7 +15,7 @@ const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
 const ARMORED_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
-    EntityKind::ResearchComplex,
+    EntityKind::EngineeringComplex,
     EntityKind::Factory,
 ];
 const UPGRADES: [UpgradeKind; 2] = [UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
@@ -84,7 +84,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         }),
     },
     expansion: Some(ExpansionPolicy {
-        target_city_centres: 2,
+        target_resource_depots: 2,
         required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Tank,
         defensive_unit_count: 1,

@@ -33,11 +33,11 @@ const TANK_TRAP_OWNER: u32 = 1;
 const UNIT_FOOTPRINT_CLEARANCE_TILES: i32 = 1;
 const BUILDING_CLUSTERS: [(u32, u32, u32); 4] = [(1, 4, 54), (2, 94, 54), (3, 54, 4), (4, 54, 104)];
 const BUILDING_LAYOUT: [(EntityKind, u32, u32); 10] = [
-    (EntityKind::CityCentre, 0, 0),
+    (EntityKind::ResourceDepot, 0, 0),
     (EntityKind::Barracks, 4, 0),
     (EntityKind::Factory, 8, 0),
     (EntityKind::Steelworks, 12, 0),
-    (EntityKind::ResearchComplex, 16, 0),
+    (EntityKind::EngineeringComplex, 16, 0),
     (EntityKind::Depot, 0, 4),
     (EntityKind::Depot, 3, 4),
     (EntityKind::Depot, 6, 4),

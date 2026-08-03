@@ -171,7 +171,7 @@ fn lab_start_payload_can_use_bundled_lategame_scenario() {
     assert_eq!(resources(2).steel, 99_999);
     assert_eq!(resources(2).oil, 99_999);
     let mut all_research = CURRENT_CATALOG.researchable_upgrades(EntityKind::TrainingCentre);
-    all_research.extend(CURRENT_CATALOG.researchable_upgrades(EntityKind::ResearchComplex));
+    all_research.extend(CURRENT_CATALOG.researchable_upgrades(EntityKind::EngineeringComplex));
     all_research.sort_unstable();
     for player_id in [1, 2] {
         let mut completed_research = game.snapshot_full_for(player_id).upgrades;

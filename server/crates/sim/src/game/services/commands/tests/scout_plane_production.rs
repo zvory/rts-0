@@ -11,13 +11,20 @@ fn scout_plane_command(units: Vec<u32>, x: f32, y: f32) -> SimCommand {
 }
 
 #[test]
-fn scout_plane_is_no_longer_trained_at_city_centres() {
+fn scout_plane_is_no_longer_trained_at_resource_depots() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
-    let city_centre = entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 6, 6);
+    let resource_depot = entities
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let mut players = vec![player_state(1), player_state(2)];
     let resources_before = (players[0].steel, players[0].oil, players[0].supply_used);
 
@@ -28,7 +35,7 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
         vec![(
             1,
             SimCommand::Train {
-                building: city_centre,
+                building: resource_depot,
                 unit: EntityKind::ScoutPlane,
             },
         )],
@@ -36,11 +43,11 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
 
     assert!(
         entities
-            .get(city_centre)
-            .expect("city centre")
+            .get(resource_depot)
+            .expect("resource depot")
             .prod_queue()
             .is_empty(),
-        "Scout Plane should not enter the City Centre production queue"
+        "Scout Plane should not enter the Resource Depot production queue"
     );
     assert_eq!(
         (players[0].steel, players[0].oil, players[0].supply_used,),
@@ -51,7 +58,7 @@ fn scout_plane_is_no_longer_trained_at_city_centres() {
 }
 
 #[test]
-fn command_car_scout_plane_ability_launches_from_caster_without_a_city_centre() {
+fn command_car_scout_plane_ability_launches_from_caster_without_a_resource_depot() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
     let command_car = entities
@@ -111,7 +118,7 @@ fn command_car_scout_plane_ability_requires_completed_research() {
         entities
             .iter()
             .all(|entity| entity.kind != EntityKind::ScoutPlane),
-        "Scout Plane must not launch before its R&D research completes"
+        "Scout Plane must not launch before its Engineering Complex research completes"
     );
     assert_eq!(
         entities

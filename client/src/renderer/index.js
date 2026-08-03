@@ -1168,7 +1168,7 @@ export class Renderer {
    * which `_drawCommandFeedback` clears earlier this frame.
    * @private
    */
-  /** Draw the resource hover's nearest City Centre mining link. @private */
+  /** Draw the resource hover's nearest Resource Depot mining link. @private */
   /**
    * Draw a brief muzzle flash on the attacker plus a yellow tracer line to the
    * target, then a fainter continuation past the target for overpenetration.

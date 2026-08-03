@@ -6,7 +6,7 @@ any atlas.
 ## Reference images
 
 - `../barracks-emblem-m14-team-tint.png`: approved low-detail rifle treatment
-- `../research-complex-emblem-team-tint.png`: approved line weight and abstraction
+- `../engineering-complex-emblem-team-tint.png`: approved line weight and abstraction
 - `../factory-emblem-team-tint.png`: approved silhouette treatment
 - `../steelworks-emblem-team-tint.png`: approved silhouette treatment
 

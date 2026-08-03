@@ -18,10 +18,8 @@ import {
   DEFAULT_AI_PROFILE_ID,
   MAX_LOBBY_TEAMS,
   LobbyRosterView,
-  PLAYABLE_FACTIONS,
   shouldAcceptSpectatorDrop,
   shouldAcceptTeamDrop,
-  splitLobbyPlayers,
   teamSlotsForLobby,
 } from "./lobby_view.js";
 import { LobbyMapSelector } from "./lobby_map_selector.js";
@@ -61,7 +59,6 @@ const COUNTDOWN_SOUND_BY_INDEX = Object.freeze([
 export {
   DEFAULT_AI_PROFILE_ID,
   MAX_LOBBY_TEAMS,
-  PLAYABLE_FACTIONS,
   shouldAcceptSpectatorDrop,
   shouldAcceptTeamDrop,
   teamSlotsForLobby,
@@ -77,21 +74,6 @@ export function countdownSoundId(word, index = -1, total = 0) {
     return COUNTDOWN_SOUND_BY_INDEX[index] || null;
   }
   return null;
-}
-
-export function betaFactionSelectEnabledForLocation(locationLike) {
-  const host = String(locationLike?.hostname || "").toLowerCase();
-  const path = String(locationLike?.pathname || "");
-  return (
-    host.includes("beta") ||
-    path.startsWith("/beta") ||
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "0.0.0.0" ||
-    host === "::1" ||
-    host.endsWith(".localhost") ||
-    host === ""
-  );
 }
 
 export function lobbyBrowserAutoRefreshEligible({
@@ -142,10 +124,6 @@ export class Lobby {
     this.roomBlock = rootEl.querySelector(".lobby-room");
     this.elPlayers = rootEl.querySelector("#lobby-players");
     this.elRoomDisplay = rootEl.querySelector("#lobby-room-display");
-    this.elMapSummary = rootEl.querySelector("#lobby-map-summary");
-    this.elSeatsSummary = rootEl.querySelector("#lobby-seats-summary");
-    this.elSeatsSummaryCell = this.elSeatsSummary?.parentElement || null;
-    this.elObserversSummary = rootEl.querySelector("#lobby-observers-summary");
     this.btnReady = rootEl.querySelector("#lobby-ready");
     this.btnStart = rootEl.querySelector("#lobby-start");
     this.elStatus = rootEl.querySelector("#lobby-status");
@@ -641,47 +619,37 @@ export class Lobby {
       spectatorOnly: this._isReplayLobby(),
       playerCount: this._playerCount,
       maxPlayers: this._selectedMapMaxPlayers(),
-      betaFactionSelect: this._betaFactionSelectEnabled(),
       onAddAi: (teamId) => this.net.addAi(teamId, DEFAULT_AI_PROFILE_ID),
       onRemoveAi: (id) => this.net.removeAi(id),
       onSetAiProfile: (id, aiProfileId) => this.net.setAiProfile(id, aiProfileId),
       onSetTeam: (id, teamId) => this.net.setTeam(id, teamId),
       onSetSpectator: (id, spectator) => this.net.setSpectator(spectator, id),
-      onSetFaction: (factionId) => this.net.setFaction(factionId),
     });
-  }
-
-  _betaFactionSelectEnabled() {
-    return betaFactionSelectEnabledForLocation(window.location);
   }
 
   _selectedMapMaxPlayers() {
     return mapMaxPlayers(this._availableMaps.find((entry) => entry.name === this._selectedMap));
   }
 
-  /** Render the map selector in the summary row for hosts, or the map name for non-hosts. */
+  /** Render the selected map and its persistent preview in the setup panel. */
   _reflectMap() {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
-    const entry = this._availableMaps.find((e) => e.name === this._selectedMap);
-    const label = entry ? entry.name : (this._selectedMap || "Chokes");
     if (this._isReplayLobby()) {
-      this.mapSelector?.render({ visible: false, disabled: true });
-      if (this.elMapSummary) {
-        this.elMapSummary.textContent = label;
-        this.elMapSummary.hidden = false;
-      }
+      this.mapSelector?.render({
+        selectedMap: this._selectedMap,
+        visible: true,
+        disabled: true,
+        readOnly: true,
+      });
       return;
     }
     this.mapSelector?.render({
       maps: this._availableMaps,
       selectedMap: this._selectedMap,
-      visible: isHost,
-      disabled: this._countdownActive || !isHost,
+      visible: true,
+      disabled: this._countdownActive,
+      readOnly: !isHost,
     });
-    if (this.elMapSummary) {
-      this.elMapSummary.textContent = label;
-      this.elMapSummary.hidden = isHost;
-    }
   }
 
   /** Enable Start only for the host and only when the server says the match can start. */
@@ -903,16 +871,7 @@ export class Lobby {
   }
 
   _reflectSummary(room, players) {
-    const { seatedPlayers, spectatorPlayers } = splitLobbyPlayers(players);
-    const mapEntry = this._availableMaps.find((entry) => entry.name === this._selectedMap);
-    const mapLabel = mapEntry ? mapEntry.name : (this._selectedMap || "Chokes");
     if (this.elRoomDisplay) this.elRoomDisplay.textContent = room || "main";
-    if (this.elMapSummary) this.elMapSummary.textContent = mapLabel;
-    if (this.elSeatsSummary) this.elSeatsSummary.textContent = this._isReplayLobby()
-      ? ""
-      : `${seatedPlayers.length} / ${this._selectedMapMaxPlayers()}`;
-    if (this.elSeatsSummaryCell) this.elSeatsSummaryCell.hidden = this._isReplayLobby();
-    if (this.elObserversSummary) this.elObserversSummary.textContent = String(spectatorPlayers.length);
   }
 
   // --- Start handoff ---------------------------------------------------------

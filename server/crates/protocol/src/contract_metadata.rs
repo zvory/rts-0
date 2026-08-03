@@ -74,12 +74,12 @@ pub mod kinds {
     pub const TANK: &str = "tank";
     pub const COMMAND_CAR: &str = "command_car";
     pub const EKAT: &str = "ekat";
-    pub const CITY_CENTRE: &str = "city_centre";
+    pub const RESOURCE_DEPOT: &str = "resource_depot";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
     pub const TRAINING_CENTRE: &str = "training_centre";
-    pub const RESEARCH_COMPLEX: &str = "research_complex";
+    pub const ENGINEERING_COMPLEX: &str = "engineering_complex";
     pub const FACTORY: &str = "factory";
     pub const STEELWORKS: &str = "steelworks";
     pub const TANK_TRAP: &str = "tank_trap";
@@ -372,7 +372,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::TANK, 5),
     (kinds::SCOUT_CAR, 14),
     (kinds::SCOUT_PLANE, 25),
-    (kinds::CITY_CENTRE, 6),
+    (kinds::RESOURCE_DEPOT, 6),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
     (kinds::TRAINING_CENTRE, 9),
@@ -380,7 +380,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::STEEL, 11),
     (kinds::OIL, 12),
     (kinds::STEELWORKS, 13),
-    (kinds::RESEARCH_COMPLEX, 17),
+    (kinds::ENGINEERING_COMPLEX, 17),
     (kinds::COMMAND_CAR, 18),
     (kinds::EKAT, 19),
     (kinds::ZAMOK, 20),
@@ -689,12 +689,12 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("TANK", kinds::TANK),
         ("COMMAND_CAR", kinds::COMMAND_CAR),
         ("EKAT", kinds::EKAT),
-        ("CITY_CENTRE", kinds::CITY_CENTRE),
+        ("RESOURCE_DEPOT", kinds::RESOURCE_DEPOT),
         ("ZAMOK", kinds::ZAMOK),
         ("DEPOT", kinds::DEPOT),
         ("BARRACKS", kinds::BARRACKS),
         ("TRAINING_CENTRE", kinds::TRAINING_CENTRE),
-        ("RESEARCH_COMPLEX", kinds::RESEARCH_COMPLEX),
+        ("ENGINEERING_COMPLEX", kinds::ENGINEERING_COMPLEX),
         ("FACTORY", kinds::FACTORY),
         ("STEELWORKS", kinds::STEELWORKS),
         ("TANK_TRAP", kinds::TANK_TRAP),

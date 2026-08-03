@@ -628,8 +628,8 @@ function pointerEvent(canvas, clientX, clientY, {
 
 // Production rallies do not target resource nodes on the minimap.
 {
-  const cityCentre = { id: 12, owner: 1, kind: KIND.CITY_CENTRE };
-  const h = minimapHarness({ selected: [cityCentre] });
+  const resourceDepot = { id: 12, owner: 1, kind: KIND.RESOURCE_DEPOT };
+  const h = minimapHarness({ selected: [resourceDepot] });
   const steel = { id: 80, owner: 0, kind: KIND.STEEL, x: 120, y: 130, remaining: 1000 };
   const oil = { id: 81, owner: 0, kind: KIND.OIL, x: 150, y: 160, remaining: 1000 };
   h.state.map.resources = [steel, oil];
@@ -1359,7 +1359,7 @@ function pointerEvent(canvas, clientX, clientY, {
   assertApprox(minimap._entityBlipScale({ kind: KIND.TANK }), 1, 0.0001, "Tank keeps the current blip size");
   assertApprox(minimap._entityBlipScale({ kind: KIND.MACHINE_GUNNER }), 4 / 7, 0.0001, "unit blips interpolate by supply");
   assertApprox(minimap._entityBlipScale({ kind: KIND.TANK_TRAP }), 0.5, 0.0001, "Tank Trap blip is half size");
-  assertApprox(minimap._entityBlipScale({ kind: KIND.CITY_CENTRE }), 1, 0.0001, "City Centre keeps the current blip size");
+  assertApprox(minimap._entityBlipScale({ kind: KIND.RESOURCE_DEPOT }), 1, 0.0001, "Resource Depot keeps the current blip size");
   minimap.destroy();
 }
 

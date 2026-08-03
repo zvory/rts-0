@@ -258,12 +258,12 @@ pub(super) fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
         .entities
         .spawn_building(
             1,
-            EntityKind::ResearchComplex,
+            EntityKind::EngineeringComplex,
             research_pos.0,
             research_pos.1,
             true,
         )
-        .expect("completed R&D Complex should spawn");
+        .expect("completed Engineering Complex should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();

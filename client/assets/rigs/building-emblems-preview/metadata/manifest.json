@@ -22,12 +22,12 @@
       "atlas": "../steelworks-atlas-team-tint.png"
     },
     {
-      "kind": "research_complex",
-      "meaning": "R&D Complex / atom with eight electrons",
-      "emblem": "../research-complex-emblem-team-tint.png",
-      "source": "../generated/source/research-complex-atom-magenta.png",
-      "alpha": "../generated/alpha/research-complex-atom.png",
-      "atlas": "../research_complex-atlas-team-tint.png"
+      "kind": "engineering_complex",
+      "meaning": "Engineering Complex / atom with eight electrons",
+      "emblem": "../engineering-complex-emblem-team-tint.png",
+      "source": "../generated/source/engineering-complex-atom-magenta.png",
+      "alpha": "../generated/alpha/engineering-complex-atom.png",
+      "atlas": "../engineering_complex-atlas-team-tint.png"
     },
     {
       "kind": "barracks",

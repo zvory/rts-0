@@ -118,16 +118,16 @@ fn team_fog_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     let p3_base = game.state.map.tile_center(55, 55);
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
-        .expect("p1 city centre should spawn");
+        .spawn_building(1, EntityKind::ResourceDepot, p1_base.0, p1_base.1, true)
+        .expect("p1 resource depot should spawn");
     game.state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
-        .expect("p2 city centre should spawn");
+        .spawn_building(2, EntityKind::ResourceDepot, p2_base.0, p2_base.1, true)
+        .expect("p2 resource depot should spawn");
     game.state
         .entities
-        .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
-        .expect("p3 city centre should spawn");
+        .spawn_building(3, EntityKind::ResourceDepot, p3_base.0, p3_base.1, true)
+        .expect("p3 resource depot should spawn");
 
     let spotter_pos = game.state.map.tile_center(28, 30);
     let enemy_pos = game.state.map.tile_center(30, 30);
@@ -277,16 +277,16 @@ fn team_current_vision_keeps_smoke_blocking() {
     let p3_base = game.state.map.tile_center(50, 50);
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, p1_base.0, p1_base.1, true)
-        .expect("p1 city centre should spawn");
+        .spawn_building(1, EntityKind::ResourceDepot, p1_base.0, p1_base.1, true)
+        .expect("p1 resource depot should spawn");
     game.state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, p2_base.0, p2_base.1, true)
-        .expect("p2 city centre should spawn");
+        .spawn_building(2, EntityKind::ResourceDepot, p2_base.0, p2_base.1, true)
+        .expect("p2 resource depot should spawn");
     game.state
         .entities
-        .spawn_building(3, EntityKind::CityCentre, p3_base.0, p3_base.1, true)
-        .expect("p3 city centre should spawn");
+        .spawn_building(3, EntityKind::ResourceDepot, p3_base.0, p3_base.1, true)
+        .expect("p3 resource depot should spawn");
     let spotter_pos = game.state.map.tile_center(4, 4);
     let smoke_pos = game.state.map.tile_center(7, 4);
     let enemy_pos = game.state.map.tile_center(7, 4);

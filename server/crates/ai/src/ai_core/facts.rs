@@ -243,7 +243,7 @@ pub(crate) fn main_base_steel_saturation_target(
         start_tile.0 as f32 * tile_size as f32 + tile_size as f32 * 0.5,
         start_tile.1 as f32 * tile_size as f32 + tile_size as f32 * 0.5,
     );
-    let max_dist_px = (config::CC_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size as f32;
+    let max_dist_px = (config::START_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size as f32;
     let max_dist2 = max_dist_px * max_dist_px;
     resources
         .into_iter()
@@ -305,12 +305,12 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         EntityKind::Worker
         | EntityKind::ScoutPlane
         | EntityKind::Golem
-        | EntityKind::CityCentre
+        | EntityKind::ResourceDepot
         | EntityKind::Zamok
         | EntityKind::Depot
         | EntityKind::Barracks
         | EntityKind::TrainingCentre
-        | EntityKind::ResearchComplex
+        | EntityKind::EngineeringComplex
         | EntityKind::Factory
         | EntityKind::Steelworks
         | EntityKind::TankTrap
@@ -386,8 +386,8 @@ mod tests {
             10.5 * config::TILE_SIZE as f32,
             20.5 * config::TILE_SIZE as f32,
         );
-        let in_range = (config::CC_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
-        let out_of_range = (config::CC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
+        let in_range = (config::START_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
+        let out_of_range = (config::START_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
 
         let snapshot = Snapshot {
             tick: 0,

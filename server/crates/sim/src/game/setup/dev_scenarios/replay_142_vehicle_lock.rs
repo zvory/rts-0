@@ -29,12 +29,12 @@ impl Game {
         entities
             .spawn_building(
                 1,
-                EntityKind::CityCentre,
+                EntityKind::ResourceDepot,
                 anchor.0 + 32.0,
                 anchor.1 + 448.0,
                 true,
             )
-            .ok_or_else(|| "failed to spawn replay-142 City Centre".to_string())?;
+            .ok_or_else(|| "failed to spawn replay-142 Resource Depot".to_string())?;
 
         let specs = [
             (EntityKind::CommandCar, 0.0, 32.0, -2.343_303_7),

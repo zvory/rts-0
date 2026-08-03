@@ -478,7 +478,7 @@ import { textWithin } from "./dom_text.mjs";
           production: [
             {
               buildingId: 21,
-              buildingKind: KIND.RESEARCH_COMPLEX,
+              buildingKind: KIND.ENGINEERING_COMPLEX,
               itemKind: UPGRADE.TANK_UNLOCK,
               itemType: "upgrade",
               progress: 0.75,
@@ -496,7 +496,7 @@ import { textWithin } from "./dom_text.mjs";
       "production tab renders active unit production with progress and queue depth",
     );
     assert(
-      productionText.includes("Tank Production at R&D Complex") && productionText.includes("75"),
+      productionText.includes("Tank Production at Engineering Complex") && productionText.includes("75"),
       "production tab renders active research with mirrored upgrade labels",
     );
 

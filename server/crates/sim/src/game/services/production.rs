@@ -367,13 +367,13 @@ mod tests {
         let mortar = entities
             .spawn_unit(1, EntityKind::MortarTeam, 160.0, 160.0)
             .expect("mortar should spawn");
-        let (x, y) = footprint_center(&map, EntityKind::ResearchComplex, 10, 10);
-        let research_complex = entities
-            .spawn_building(1, EntityKind::ResearchComplex, x, y, true)
-            .expect("research complex should spawn");
+        let (x, y) = footprint_center(&map, EntityKind::EngineeringComplex, 10, 10);
+        let engineering_complex = entities
+            .spawn_building(1, EntityKind::EngineeringComplex, x, y, true)
+            .expect("engineering complex should spawn");
         entities
-            .get_mut(research_complex)
-            .expect("research complex")
+            .get_mut(engineering_complex)
+            .expect("engineering complex")
             .push_research(ResearchItem {
                 upgrade: UpgradeKind::MortarAutocast,
                 progress: 1,
@@ -563,18 +563,18 @@ mod tests {
     fn move_rally_keeps_spawned_worker_on_move_order() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
-        let city_centre = spawn_building_training(
+        let resource_depot = spawn_building_training(
             &map,
             &mut entities,
             10,
             10,
-            EntityKind::CityCentre,
+            EntityKind::ResourceDepot,
             EntityKind::Worker,
         );
         let rally = map.tile_center(18, 10);
         entities
-            .get_mut(city_centre)
-            .expect("city centre")
+            .get_mut(resource_depot)
+            .expect("resource depot")
             .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
         let mut players = vec![player(1)];
 

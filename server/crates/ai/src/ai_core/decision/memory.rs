@@ -12,10 +12,10 @@ use super::defense::{
 };
 use super::geometry;
 
-const CITY_CENTRE_RESUME_SAFE_TICKS: u32 = config::TICK_HZ * 3;
+const RESOURCE_DEPOT_RESUME_SAFE_TICKS: u32 = config::TICK_HZ * 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct IncompleteCityCentreMemory {
+struct IncompleteResourceDepotMemory {
     hp: u32,
     last_damage_tick: u32,
 }
@@ -40,15 +40,15 @@ pub(crate) struct AiDecisionMemory {
     pub(super) containment_repush_count: usize,
     pub(super) home_defensive_tank: Option<u32>,
     pub(super) home_defensive_tank_assigned_once: bool,
-    pub(super) enemy_natural_city_centre: Option<u32>,
+    pub(super) enemy_natural_resource_depot: Option<u32>,
     pub(super) enemy_natural_destroyed: bool,
-    pub(super) enemy_main_city_centre: Option<u32>,
+    pub(super) enemy_main_resource_depot: Option<u32>,
     pub(super) enemy_main_destroyed: bool,
     pub(super) endgame_search_waypoint: usize,
     pub(super) opening_first_pump_builder: Option<u32>,
     pub(super) opening_first_pump_builder_followups: usize,
     pub(super) turtle_opening_riflemen_ordered: usize,
-    incomplete_city_centres: BTreeMap<u32, IncompleteCityCentreMemory>,
+    incomplete_resource_depots: BTreeMap<u32, IncompleteResourceDepotMemory>,
 }
 
 impl AiDecisionMemory {
@@ -72,15 +72,15 @@ impl AiDecisionMemory {
             containment_repush_count: 0,
             home_defensive_tank: None,
             home_defensive_tank_assigned_once: false,
-            enemy_natural_city_centre: None,
+            enemy_natural_resource_depot: None,
             enemy_natural_destroyed: false,
-            enemy_main_city_centre: None,
+            enemy_main_resource_depot: None,
             enemy_main_destroyed: false,
             endgame_search_waypoint: 0,
             opening_first_pump_builder: None,
             opening_first_pump_builder_followups: 0,
             turtle_opening_riflemen_ordered: 0,
-            incomplete_city_centres: BTreeMap::new(),
+            incomplete_resource_depots: BTreeMap::new(),
         }
     }
 
@@ -156,15 +156,15 @@ impl AiDecisionMemory {
         self.containment_repush_count = 0;
         self.home_defensive_tank = None;
         self.home_defensive_tank_assigned_once = false;
-        self.enemy_natural_city_centre = None;
+        self.enemy_natural_resource_depot = None;
         self.enemy_natural_destroyed = false;
-        self.enemy_main_city_centre = None;
+        self.enemy_main_resource_depot = None;
         self.enemy_main_destroyed = false;
         self.endgame_search_waypoint = 0;
         self.opening_first_pump_builder = None;
         self.opening_first_pump_builder_followups = 0;
         self.turtle_opening_riflemen_ordered = 0;
-        self.incomplete_city_centres.clear();
+        self.incomplete_resource_depots.clear();
     }
 
     fn ensure_attack_policy(&mut self, profile: &AiProfile, attack: AttackPolicy) {
@@ -242,19 +242,19 @@ impl AiDecisionMemory {
             .min(policy.opening_riflemen);
     }
 
-    pub(super) fn sync_incomplete_city_centres(&mut self, observation: &AiObservation) {
+    pub(super) fn sync_incomplete_resource_depots(&mut self, observation: &AiObservation) {
         let mut active_sites = BTreeMap::new();
         for site in observation
             .owned
             .iter()
-            .filter(|entity| entity.kind == EntityKind::CityCentre && !entity.is_complete)
+            .filter(|entity| entity.kind == EntityKind::ResourceDepot && !entity.is_complete)
         {
             active_sites.insert(site.id, site.hp);
         }
-        self.incomplete_city_centres
+        self.incomplete_resource_depots
             .retain(|site_id, _| active_sites.contains_key(site_id));
         for (site_id, hp) in active_sites {
-            self.incomplete_city_centres
+            self.incomplete_resource_depots
                 .entry(site_id)
                 .and_modify(|site| {
                     if hp < site.hp {
@@ -262,17 +262,19 @@ impl AiDecisionMemory {
                     }
                     site.hp = hp;
                 })
-                .or_insert(IncompleteCityCentreMemory {
+                .or_insert(IncompleteResourceDepotMemory {
                     hp,
                     last_damage_tick: observation.tick,
                 });
         }
     }
 
-    pub(super) fn city_centre_is_safe_to_resume(&self, site_id: u32, tick: u32) -> bool {
-        self.incomplete_city_centres
+    pub(super) fn resource_depot_is_safe_to_resume(&self, site_id: u32, tick: u32) -> bool {
+        self.incomplete_resource_depots
             .get(&site_id)
-            .map(|site| tick.saturating_sub(site.last_damage_tick) >= CITY_CENTRE_RESUME_SAFE_TICKS)
+            .map(|site| {
+                tick.saturating_sub(site.last_damage_tick) >= RESOURCE_DEPOT_RESUME_SAFE_TICKS
+            })
             .unwrap_or(false)
     }
 

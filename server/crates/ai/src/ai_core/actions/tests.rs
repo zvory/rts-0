@@ -257,8 +257,8 @@ fn unit_training_respects_local_budget_and_supply() {
             supply_cap: 10,
         },
         vec![
-            production_building(20, EntityKind::CityCentre, 0),
-            production_building(21, EntityKind::CityCentre, 0),
+            production_building(20, EntityKind::ResourceDepot, 0),
+            production_building(21, EntityKind::ResourceDepot, 0),
         ],
         Vec::new(),
     );
@@ -276,7 +276,7 @@ fn unit_training_respects_local_budget_and_supply() {
     let trained = train_units(
         &mut ctx,
         TrainUnitsRequest {
-            buildings: facts.production_buildings(EntityKind::CityCentre),
+            buildings: facts.production_buildings(EntityKind::ResourceDepot),
             unit_priorities: &[EntityKind::Worker],
             completed_building_kinds: facts.complete_building_kinds(),
             completed_upgrades: facts.completed_upgrades(),
@@ -769,7 +769,7 @@ fn assign_workers_to_resource_accepts_completed_expansion_oil_candidate() {
             supply_cap: 10,
         },
         vec![
-            complete_building(20, EntityKind::CityCentre),
+            complete_building(20, EntityKind::ResourceDepot),
             worker(10, 0.0, 0.0, AiEntityState::Idle),
         ],
         vec![resource(31, EntityKind::Oil, 0.0, 0.0)],

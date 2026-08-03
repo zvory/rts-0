@@ -1188,10 +1188,10 @@ function buttonByLabel(card, label) {
     "worker shift-right-click on oil should queue a Pump Jack build instead of direct gather",
   );
 
-  const rallyCityCentre = {
+  const rallyResourceDepot = {
     id: 33,
     owner: 1,
-    kind: KIND.CITY_CENTRE,
+    kind: KIND.RESOURCE_DEPOT,
     x: 64,
     y: 64,
     buildProgress: null,
@@ -1199,8 +1199,8 @@ function buttonByLabel(card, label) {
   input.state = {
     playerId: 1,
     map: { tileSize: 32 },
-    entitiesInterpolated: () => [rallyCityCentre, overlappingSteel, overlappingOil],
-    selectedEntities: () => [rallyCityCentre],
+    entitiesInterpolated: () => [rallyResourceDepot, overlappingSteel, overlappingOil],
+    selectedEntities: () => [rallyResourceDepot],
     addCommandFeedback() {},
   };
   publishSelectionTestScene(input);

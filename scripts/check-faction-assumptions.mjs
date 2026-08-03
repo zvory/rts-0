@@ -178,7 +178,7 @@ const clientProtocol = [
   read("client/src/protocol.js"),
   read("client/src/protocol_constants.js"),
 ].join("\n");
-for (const token of ["WORKER", "GOLEM", "EKAT", "CITY_CENTRE", "ZAMOK", "STEEL", "OIL"]) {
+for (const token of ["WORKER", "GOLEM", "EKAT", "RESOURCE_DEPOT", "ZAMOK", "STEEL", "OIL"]) {
   assert(protocol.includes(`pub const ${token}`), `Rust protocol missing ${token}`);
   assert(clientProtocol.includes(`${token}:`), `client protocol missing ${token}`);
 }
@@ -193,7 +193,7 @@ assert(
   `compact snapshot version mismatch: Rust ${rustCompactVersion}, client ${clientCompactVersion}`,
 );
 
-const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|Golem|CityCentre|Depot|Barracks|TrainingCentre|ResearchComplex|Factory|Steelworks|Steel|Oil|Tank|ScoutCar|CommandCar|MortarTeam|AntiTankGun|Artillery|Rifleman|MachineGunner|Smoke|MortarFire|PointFire|Breakthrough|Charge)\b|\b(?:STARTING_STEEL|STARTING_OIL|STARTING_WORKERS)\b/;
+const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|Golem|ResourceDepot|Depot|Barracks|TrainingCentre|EngineeringComplex|Factory|Steelworks|Steel|Oil|Tank|ScoutCar|CommandCar|MortarTeam|AntiTankGun|Artillery|Rifleman|MachineGunner|Smoke|MortarFire|PointFire|Breakthrough|Charge)\b|\b(?:STARTING_STEEL|STARTING_OIL|STARTING_WORKERS)\b/;
 const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/actions.rs",
   "server/crates/ai/src/ai_core/decision/defense.rs",
@@ -426,9 +426,9 @@ const approvedSpecialCaseBudgets = new Map([
   // those helpers shrink or move behind catalog APIs.
   // Tank Trap phases add current-catalog construction eligibility and gameplay command handling
   // for a default-faction obstacle before a broader catalog API can absorb obstacle placement.
-  // Artillery Fire Control adds one R&D catalog entry for the current Kriegsia tech tree.
+  // Artillery Fire Control adds one Engineering Complex catalog entry for the current Kriegsia tech tree.
   // Scout Plane ability adds a Command Car carrier to the catalog.
-  // Scout Plane research adds one R&D Complex upgrade row to the catalog.
+  // Scout Plane research adds one Engineering Complex upgrade row to the catalog.
   // Entrenchment Phase 1 adds one Training Centre research entry and its negative Ekat assertion.
   // Stewardship Phase 3 moved ability and upgrade identity into this authoritative catalog owner;
   // the typed enum declarations and catalog rows intentionally raise the owner-file baseline.

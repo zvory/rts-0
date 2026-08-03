@@ -25,7 +25,7 @@ fn spawn_completed_mining_anchor(entities: &mut EntityStore, owner: u32, x: f32,
     entities
         .spawn_building(
             owner,
-            EntityKind::CityCentre,
+            EntityKind::ResourceDepot,
             x - config::TILE_SIZE as f32 * 2.0,
             y,
             true,
@@ -37,12 +37,19 @@ fn spawn_completed_mining_anchor(entities: &mut EntityStore, owner: u32, x: f32,
 fn entering_harvesting_clears_pending_queued_orders() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (ccx, ccy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, ccx, ccy, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let node = entities
-        .spawn_node(EntityKind::Steel, ccx + 48.0, ccy)
+        .spawn_node(EntityKind::Steel, resource_depot_x + 48.0, resource_depot_y)
         .expect("steel node should spawn");
     let (nx, ny) = entities
         .get(node)
@@ -152,15 +159,27 @@ fn gatherer_waits_at_patch_until_completed_anchor_exists() {
 fn worker_direct_oil_gather_order_is_idled() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (ccx, ccy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, ccx, ccy, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let oil = entities
-        .spawn_node(EntityKind::Oil, ccx + 48.0, ccy)
+        .spawn_node(EntityKind::Oil, resource_depot_x + 48.0, resource_depot_y)
         .expect("oil node should spawn");
     let worker = entities
-        .spawn_unit(1, EntityKind::Worker, ccx + 48.0, ccy)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 48.0,
+            resource_depot_y,
+        )
         .expect("worker should spawn");
     {
         let w = entities.get_mut(worker).expect("worker should exist");
@@ -239,7 +258,7 @@ fn pump_jack_waits_for_a_completed_friendly_mining_anchor() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
     let (pump_x, pump_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
-    let (far_x, far_y) = footprint_center(&map, EntityKind::CityCentre, 24, 24);
+    let (far_x, far_y) = footprint_center(&map, EntityKind::ResourceDepot, 24, 24);
     let oil = entities
         .spawn_node(EntityKind::Oil, pump_x, pump_y)
         .expect("oil node should spawn");
@@ -247,18 +266,18 @@ fn pump_jack_waits_for_a_completed_friendly_mining_anchor() {
         .spawn_building(1, EntityKind::PumpJack, pump_x, pump_y, true)
         .expect("pump jack should spawn");
     entities
-        .spawn_building(1, EntityKind::CityCentre, far_x, far_y, true)
-        .expect("distant owned city centre should spawn");
+        .spawn_building(1, EntityKind::ResourceDepot, far_x, far_y, true)
+        .expect("distant owned resource depot should spawn");
     spawn_completed_mining_anchor(&mut entities, 3, pump_x, pump_y);
     let incomplete_ally = entities
         .spawn_building(
             2,
-            EntityKind::CityCentre,
+            EntityKind::ResourceDepot,
             pump_x,
             pump_y - config::TILE_SIZE as f32 * 2.0,
             false,
         )
-        .expect("incomplete allied city centre should spawn");
+        .expect("incomplete allied resource depot should spawn");
     let teams = team_relations(&[(1, 7), (2, 7), (3, 3)]);
     let oil_before = entities
         .get(oil)
@@ -439,32 +458,39 @@ fn pump_jack_mines_only_oil_centered_in_its_footprint() {
 fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
-    let (ccx, ccy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, ccx, ccy, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let occupied = entities
-        .spawn_node(EntityKind::Steel, ccx + 48.0, ccy)
+        .spawn_node(EntityKind::Steel, resource_depot_x + 48.0, resource_depot_y)
         .expect("occupied steel node should spawn");
     let nearby = entities
         .spawn_node(
             EntityKind::Steel,
-            ccx + 48.0 + config::TILE_SIZE as f32 * 3.0,
-            ccy,
+            resource_depot_x + 48.0 + config::TILE_SIZE as f32 * 3.0,
+            resource_depot_y,
         )
         .expect("nearby steel node should spawn");
     let farther = entities
         .spawn_node(
             EntityKind::Steel,
-            ccx + 48.0 + config::TILE_SIZE as f32 * 6.0,
-            ccy,
+            resource_depot_x + 48.0 + config::TILE_SIZE as f32 * 6.0,
+            resource_depot_y,
         )
         .expect("farther steel node should spawn");
     let oil = entities
         .spawn_node(
             EntityKind::Oil,
-            ccx + 48.0 + config::TILE_SIZE as f32 * 2.0,
-            ccy,
+            resource_depot_x + 48.0 + config::TILE_SIZE as f32 * 2.0,
+            resource_depot_y,
         )
         .expect("nearby oil node should spawn");
     let (nx, ny) = entities
@@ -516,12 +542,19 @@ fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
 fn occupied_resource_without_free_neighbor_moves_worker_to_open_grass_and_stops_queue() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (ccx, ccy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, ccx, ccy, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let occupied = entities
-        .spawn_node(EntityKind::Steel, ccx + 48.0, ccy)
+        .spawn_node(EntityKind::Steel, resource_depot_x + 48.0, resource_depot_y)
         .expect("occupied steel node should spawn");
     let (nx, ny) = entities
         .get(occupied)

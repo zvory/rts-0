@@ -100,7 +100,7 @@ struct ArenaAggregate {
     candidate_wins: u32,
     baseline_wins: u32,
     unresolved_draws: u32,
-    starting_city_centre_wins: u32,
+    starting_resource_depot_wins: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -372,8 +372,8 @@ fn aggregate_runs(runs: &[ArenaRunSummary]) -> ArenaAggregate {
             aggregate.unresolved_draws = aggregate.unresolved_draws.saturating_add(1);
         }
         if run.outcome.candidate_won || run.outcome.baseline_won {
-            aggregate.starting_city_centre_wins =
-                aggregate.starting_city_centre_wins.saturating_add(1);
+            aggregate.starting_resource_depot_wins =
+                aggregate.starting_resource_depot_wins.saturating_add(1);
         }
     }
     aggregate
@@ -448,8 +448,8 @@ fn brief_markdown(run: &ArenaRunSummary) -> String {
         result_text(&run.outcome, candidate, baseline)
     ));
     text.push_str(&format!(
-        "- Starting City Centres: {}\n",
-        starting_city_centre_text(&result.starting_city_centres)
+        "- Starting Resource Depots: {}\n",
+        starting_resource_depot_text(&result.starting_resource_depots)
     ));
     text.push_str(&format!(
         "- Replay: {}\n\n",
@@ -503,22 +503,22 @@ fn brief_markdown(run: &ArenaRunSummary) -> String {
 
 fn result_text(outcome: &ArenaOutcome, candidate: &str, baseline: &str) -> String {
     if outcome.candidate_won {
-        return format!("candidate `{candidate}` killed the baseline starting City Centre");
+        return format!("candidate `{candidate}` killed the baseline starting Resource Depot");
     }
     if outcome.baseline_won {
-        return format!("baseline `{baseline}` killed the candidate starting City Centre");
+        return format!("baseline `{baseline}` killed the candidate starting Resource Depot");
     }
     if outcome.tick_cap {
         return "draw at tick cap".to_string();
     }
-    if outcome.end_reason == ProfileMatchupEndReason::StartingCityCentresDestroyed {
-        return "draw: both starting City Centres were destroyed".to_string();
+    if outcome.end_reason == ProfileMatchupEndReason::StartingResourceDepotsDestroyed {
+        return "draw: both starting Resource Depots were destroyed".to_string();
     }
-    "draw without a starting City Centre winner".to_string()
+    "draw without a starting Resource Depot winner".to_string()
 }
 
-fn starting_city_centre_text(
-    centres: &[crate::selfplay::ProfileMatchupStartingCityCentreResult],
+fn starting_resource_depot_text(
+    centres: &[crate::selfplay::ProfileMatchupStartingResourceDepotResult],
 ) -> String {
     if centres.is_empty() {
         return "-".to_string();
@@ -545,8 +545,8 @@ fn player_timeline(label: &str, player: &crate::selfplay::ProfileMatchupPlayerRe
         player.profile,
         tick_text(player.first_attack_command_tick),
         tick_text(player.first_rifleman_attack_command_tick),
-        tick_text(player.first_expansion_city_centre_planned_tick),
-        tick_text(player.first_expansion_city_centre_completed_tick),
+        tick_text(player.first_expansion_resource_depot_planned_tick),
+        tick_text(player.first_expansion_resource_depot_completed_tick),
         tick_text(player.first_tank_tick),
         player.worker_count,
         player.army_value,
@@ -735,9 +735,9 @@ mod tests {
     }
 
     #[test]
-    fn starting_city_centre_winner_is_not_overridden_by_army_value() {
+    fn starting_resource_depot_winner_is_not_overridden_by_army_value() {
         let result = profile_result(
-            crate::selfplay::ProfileMatchupEndReason::StartingCityCentreKilled,
+            crate::selfplay::ProfileMatchupEndReason::StartingResourceDepotKilled,
             Some(2),
             300,
             50,
@@ -750,7 +750,7 @@ mod tests {
         assert!(outcome.baseline_won);
         assert_eq!(
             result_text(&outcome, DEFAULT_CANDIDATE, DEFAULT_BASELINE),
-            format!("baseline `{DEFAULT_BASELINE}` killed the candidate starting City Centre")
+            format!("baseline `{DEFAULT_BASELINE}` killed the candidate starting Resource Depot")
         );
     }
 
@@ -771,9 +771,9 @@ mod tests {
                 player_id,
                 profile: profile_for_player(player_id).to_string(),
             }),
-            starting_city_centres: vec![
-                starting_city_centre(1, (winner_player_id == Some(2)).then_some(80)),
-                starting_city_centre(2, (winner_player_id == Some(1)).then_some(80)),
+            starting_resource_depots: vec![
+                starting_resource_depot(1, (winner_player_id == Some(2)).then_some(80)),
+                starting_resource_depot(2, (winner_player_id == Some(1)).then_some(80)),
             ],
             players: vec![
                 player_result(1, player_one_army),
@@ -808,18 +808,18 @@ mod tests {
             first_rifleman_attack_command_tick: None,
             first_scout_car_tick: None,
             first_scout_car_harass_command_tick: None,
-            first_expansion_city_centre_planned_tick: None,
-            first_expansion_city_centre_completed_tick: None,
+            first_expansion_resource_depot_planned_tick: None,
+            first_expansion_resource_depot_completed_tick: None,
             first_tank_tick: None,
             final_counts: BTreeMap::new(),
         }
     }
 
-    fn starting_city_centre(
+    fn starting_resource_depot(
         player_id: u32,
         death_tick: Option<u32>,
-    ) -> crate::selfplay::ProfileMatchupStartingCityCentreResult {
-        crate::selfplay::ProfileMatchupStartingCityCentreResult {
+    ) -> crate::selfplay::ProfileMatchupStartingResourceDepotResult {
+        crate::selfplay::ProfileMatchupStartingResourceDepotResult {
             player_id,
             profile: profile_for_player(player_id).to_string(),
             entity_id: player_id * 100,

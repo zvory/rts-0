@@ -206,7 +206,7 @@ pub(in crate::game::setup::dev_scenarios) fn tank_trap_pathing_map(
     .then(|| {
         services::occupancy::footprint_center(
             &map,
-            EntityKind::CityCentre,
+            EntityKind::ResourceDepot,
             center.0 + 18,
             center.1 - 18,
         )

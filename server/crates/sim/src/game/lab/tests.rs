@@ -444,19 +444,19 @@ fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
         Err(LabError::Placement { .. })
     ));
 
-    let city_centre = game
+    let resource_depot = game
         .state
         .entities
         .iter()
-        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
-        .expect("starting city centre")
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::ResourceDepot)
+        .expect("starting resource depot")
         .clone();
     assert!(matches!(
         game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
             owner: 1,
             kind: EntityKind::Depot,
-            x: city_centre.pos_x,
-            y: city_centre.pos_y,
+            x: resource_depot.pos_x,
+            y: resource_depot.pos_y,
             completed: true,
         })),
         Err(LabError::Placement { .. })
@@ -490,18 +490,18 @@ fn lab_move_entity_validates_collision_and_repairs_position() {
     let moved = game.state.entities.get(entity_id).expect("moved entity");
     assert_eq!((moved.pos_x, moved.pos_y), (move_x, move_y));
 
-    let city_centre = game
+    let resource_depot = game
         .state
         .entities
         .iter()
-        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::CityCentre)
-        .expect("starting city centre")
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::ResourceDepot)
+        .expect("starting resource depot")
         .clone();
     assert!(matches!(
         game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
             entity_id,
-            x: city_centre.pos_x,
-            y: city_centre.pos_y,
+            x: resource_depot.pos_x,
+            y: resource_depot.pos_y,
         })),
         Err(LabError::Placement { .. })
     ));
@@ -581,8 +581,8 @@ fn lab_bulk_spawn_failure_preserves_state_and_reports_index_with_suggestions() {
         .state
         .entities
         .iter()
-        .find(|entity| entity.kind == EntityKind::CityCentre)
-        .expect("city centre")
+        .find(|entity| entity.kind == EntityKind::ResourceDepot)
+        .expect("resource depot")
         .clone();
     let (x, y) = tile_center(&game, 30, 30);
     let before = game.state.entities.ids();

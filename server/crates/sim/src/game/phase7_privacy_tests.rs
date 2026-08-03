@@ -88,28 +88,28 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
         let pos = game.state.map.tile_center(tile.0, tile.1);
         game.state
             .entities
-            .spawn_building(owner, EntityKind::CityCentre, pos.0, pos.1, true)
-            .expect("city centre should spawn");
+            .spawn_building(owner, EntityKind::ResourceDepot, pos.0, pos.1, true)
+            .expect("resource depot should spawn");
     }
 
-    let ally_city_pos = game.state.map.tile_center(15, 2);
-    let ally_city_centre = game
+    let ally_depot_pos = game.state.map.tile_center(15, 2);
+    let ally_resource_depot = game
         .state
         .entities
         .spawn_building(
             2,
-            EntityKind::CityCentre,
-            ally_city_pos.0,
-            ally_city_pos.1,
+            EntityKind::ResourceDepot,
+            ally_depot_pos.0,
+            ally_depot_pos.1,
             true,
         )
-        .expect("ally producing city centre should spawn");
+        .expect("ally producing resource depot should spawn");
     {
         let building = game
             .state
             .entities
-            .get_mut(ally_city_centre)
-            .expect("city centre exists");
+            .get_mut(ally_resource_depot)
+            .expect("resource depot exists");
         building.push_production(ProdItem {
             unit: EntityKind::Worker,
             progress: 30,
@@ -167,16 +167,16 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
         .entities
         .spawn_building(
             2,
-            EntityKind::ResearchComplex,
+            EntityKind::EngineeringComplex,
             research_pos.0,
             research_pos.1,
             true,
         )
-        .expect("ally research complex should spawn");
+        .expect("ally engineering complex should spawn");
     game.state
         .entities
         .get_mut(research)
-        .expect("research complex exists")
+        .expect("engineering complex exists")
         .push_research(ResearchItem {
             upgrade: upgrade::UpgradeKind::TankUnlock,
             progress: 60,
@@ -230,15 +230,18 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
     assert!(barracks_view.rally_plan.is_empty());
     assert!(barracks_view.order_plan.is_empty());
 
-    let city_centre_view = snapshot
+    let resource_depot_view = snapshot
         .entities
         .iter()
-        .find(|entity| entity.id == ally_city_centre)
-        .expect("ally city centre should be visible");
-    assert_eq!(city_centre_view.prod_kind.as_deref(), Some(kinds::WORKER));
-    assert_eq!(city_centre_view.prod_queue, Some(2));
+        .find(|entity| entity.id == ally_resource_depot)
+        .expect("ally resource depot should be visible");
+    assert_eq!(
+        resource_depot_view.prod_kind.as_deref(),
+        Some(kinds::WORKER)
+    );
+    assert_eq!(resource_depot_view.prod_queue, Some(2));
     assert!(
-        city_centre_view.prod_scout_plane_queued,
+        resource_depot_view.prod_scout_plane_queued,
         "allied production details include hidden Scout Plane queue presence"
     );
 
@@ -246,7 +249,7 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
         .entities
         .iter()
         .find(|entity| entity.id == research)
-        .expect("ally research complex should be visible");
+        .expect("ally engineering complex should be visible");
     assert_eq!(
         research_view.prod_upgrade.as_deref(),
         Some(upgrade::UpgradeKind::TankUnlock.to_protocol_str())
