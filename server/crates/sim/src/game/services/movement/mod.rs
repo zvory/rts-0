@@ -21,9 +21,9 @@ use crate::game::PlayerState;
 use crate::protocol::Event;
 
 mod armor_reaction;
+mod car_drive;
 mod collision;
 mod pivot_drive;
-mod scout_car;
 mod standability;
 mod steering;
 mod traffic;

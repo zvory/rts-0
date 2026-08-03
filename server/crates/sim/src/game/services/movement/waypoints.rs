@@ -24,7 +24,7 @@ use super::pivot_drive::{
     pivot_drive_intent, pivot_drive_speed_scale, rotate_toward, vehicle_body_turn_rate,
     vehicle_oil_starves_movement, vehicle_traffic_adjustment,
 };
-use super::scout_car::plan_scout_car_motion;
+use super::car_drive::plan_scout_car_motion;
 use super::vehicle_route::route_accepts_waypoint;
 use super::standability::{
     footing_profile, requires_weapon_setup, unit_static_standable, FootingProfile,
