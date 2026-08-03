@@ -12,6 +12,7 @@ import {
   rgba,
 } from "./decals/selection.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
+import { TankTreadLayer } from "./tank_tread_layer.js";
 
 export const GROUND_DECAL_TEXTURE_WORLD_SCALE = 4;
 
@@ -60,6 +61,7 @@ export class GroundDecalLayer {
     this._assetLoadGeneration = 0;
     this._queuedUntilAssets = [];
     this._tintScratch = null;
+    this.tankTreads = new TankTreadLayer({ layer, pixi, createCanvas, recordDiagnostic });
     this.totalStamped = 0;
     this.textureUpdateCount = 0;
   }
@@ -85,6 +87,7 @@ export class GroundDecalLayer {
     this.sprite = new this.pixi.Sprite(this.texture);
     this.sprite.scale.set(this.downsample);
     this.layer.addChild(this.sprite);
+    this.tankTreads.resetForMap(map);
     this.recordDiagnostic?.("renderer.groundDecals.displayObjects", this.displayObjectCount());
     this._beginAssetLoad();
     return true;
@@ -197,10 +200,16 @@ export class GroundDecalLayer {
       downsample: this.downsample,
       layerChildCount: this.displayObjectCount(),
       assetStatus: this.assetStatus,
+      tankTreads: this.tankTreads.diagnostics(),
     };
   }
 
+  stampLiveTankTreads(entities, ownership) {
+    return this.tankTreads.stampOwnedTankPoses(entities, ownership);
+  }
+
   destroy() {
+    this.tankTreads.destroy();
     this._assetLoadGeneration += 1;
     this.assetLoadPromise = null;
     this.assetLoadError = null;

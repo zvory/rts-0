@@ -250,7 +250,8 @@ assert(
   const restorePixi = installFakePixi();
   try {
     const map = { width: 4, height: 4, tileSize: 32 };
-    const decalLayer = new GroundDecalLayer({ layer: new PIXI.Container() });
+    const layer = new PIXI.Container();
+    const decalLayer = new GroundDecalLayer({ layer });
     decalLayer.resetForMap(map);
     decalLayer.assetStatus = "ready";
     decalLayer.stampBatch([{
@@ -266,6 +267,15 @@ assert(
     }]);
     assert(decalLayer.texture.sourceUpdateCount === 1 && decalLayer.texture.textureUpdateCount === 0,
       "ground decals upload dynamic canvas pixels through Pixi v8 TextureSource.update");
+    const tank = { id: 40, kind: KIND.TANK, owner: 1, hp: 100, x: 40, y: 80, facing: 0 };
+    assert(decalLayer.stampLiveTankTreads([tank], 1) === 0,
+      "the first owned tank pose initializes best-effort tread contact without painting");
+    assert(decalLayer.stampLiveTankTreads([{ ...tank, x: 48, facing: 0.12 }], 1) === 1,
+      "existing snapshot poses alone paint owned tank translation and pivot contact");
+    assert(decalLayer.texture.sourceUpdateCount === 1 &&
+      decalLayer.diagnostics().tankTreads.tileCount === 1 &&
+      layer.children[1].texture.sourceUpdateCount === 1,
+    "treads upload one bounded tile without modifying the whole-map permanent decal texture");
 
     const trenchLayer = new TrenchDecalLayer({ layer: new PIXI.Container() });
     trenchLayer.resetForMap(map);

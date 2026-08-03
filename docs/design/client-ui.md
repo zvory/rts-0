@@ -49,6 +49,7 @@ src/
   renderer/worker_rehydration.js # revisioned map/grid/decal worker-owned staging
   renderer/map_editor_worker_renderer.js # Map Editor Pixi display objects behind the same worker
   renderer/decals.js # GroundDecalLayer permanent decal texture, stamping, diagnostics, teardown
+  renderer/tank_tread_layer.js # best-effort owned-tank contact raster derived from existing poses
   renderer/decals/ # SVG source manifest, generated PNG atlas metadata, worker-safe loader, deterministic selection
   renderer/trenches.js # Authoritative trench terrain pass and deterministic nearby-trench connectors
   renderer/feedback_view_model.js # Builder for renderer feedback's narrow per-frame read model
@@ -472,6 +473,23 @@ exposes total stamped decals, queued decals, texture update
 count, texture dimensions/downsample, child count, and asset-load status for stress checks. The
 renderer tears down the decal sprite, texture, canvas, tint scratch canvas, loaded atlas masks, and
 late async asset loads through `Renderer.destroy()` / rematch cleanup.
+
+`renderer/tank_tread_layer.js`
+```js
+export class TankTreadLayer {
+  resetForMap(map)
+  stampOwnedTankPoses(entities, owner)
+  diagnostics()
+  destroy()
+}
+```
+`TankTreadLayer` is deliberately best-effort presentation state. It derives paired tread contact
+from owned tank `x`/`y`/`facing` poses already present in ordinary snapshots, so driving adds no
+wire fields, messages, decal revisions, or checkpoint rows. Reconnects, background throttling, and
+timeline resets may omit earlier cosmetic tracks. Pixels persist for the current renderer lifetime
+in lazily allocated 512-world-pixel tiles (256×256 texels); only touched tiles upload, and all tile
+canvases/textures/sprites are destroyed with the ground-decal layer. Contact poses are accumulated
+between bounded 10 Hz uploads; the swept-contact raster fills the complete intervening motion.
 
 `renderer/trenches.js`
 ```js
@@ -1993,6 +2011,12 @@ terrain and resources):
 - Mortar impacts stamp a compact, air-burst-style starburst with a small dark center; artillery
   impacts stamp a larger starburst scaled to their authoritative impact radius. Both are neutral
   earth/charcoal marks, with no source owner or hidden-source recovery.
+- Owned moving or pivoting tanks leave best-effort paired tread marks derived from the entity poses
+  already supplied for normal rendering. The tread contact model advances independent belt phases,
+  stamps the full long contact patch, and paints additional shear during pivots. Treads are not
+  authoritative decals: they add zero network/checkpoint storage and may have cosmetic gaps after
+  reconnects or throttling. Separate 512-world-pixel tread tiles avoid repeatedly uploading the
+  whole-map death/impact canvas during continuous movement.
 - `GameState` retains normalized records keyed by stable server id and queues only newly learned
   records. Match stages the pending batch before presentation assembly and releases it only after a
   successful backend presentation; Pixi stamps detached frame records and never consumes the
@@ -2003,10 +2027,10 @@ terrain and resources):
   per stamped batch, and draws the accumulated marks as one sprite. Old decals are not iterated or
   redrawn during normal frames.
 - `Renderer.groundDecalDiagnostics()` exposes the permanent layer's stamped count, pending count,
-  texture update count, texture dimensions/downsample, layer child count, and asset-load status for
-  contract tests and local profiling.
-- `Renderer.destroy()` clears the decal texture/canvases and cancels late atlas loads so rematches
-  start with a fresh blank decal layer.
+  texture update count, texture dimensions/downsample, layer child count, asset-load status, and
+  tread tile/segment/upload counts for contract tests and local profiling.
+- `Renderer.destroy()` clears the decal and tread-tile textures/canvases and cancels late atlas
+  loads so rematches start with a fresh blank decal layer.
 
 Trench terrain rendering (`renderer/trenches.js`; layer `trenches` between ground decals and
 resources):
