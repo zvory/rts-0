@@ -118,6 +118,38 @@ for (const symmetry of ["horizontal", "vertical", "halfTurn", "threeWay", "radia
     `${symmetry} recipe output passes its shared symmetry check`);
 }
 
+const clippedThreeWay = buildMapFromRecipe({
+  name: "Clipped three-way terrain",
+  width: 32,
+  height: 32,
+  symmetry: "threeWay",
+  operations: [{ type: "rect", material: "water", from: [8, 1], to: [8, 1] }],
+});
+assert(!validateMap(clippedThreeWay, { symmetry: "threeWay" }).warnings.some((warning) => warning.includes("symmetry")),
+  "three-way checks recognize the exact rounded, edge-clipped orbit generated from [8,1]");
+
+const clippedDoodadOrbit = expandSymmetricPoints(
+  { width: 512, height: 512 },
+  [{ x: 186, y: 0 }],
+  "threeWay",
+).map((point, index) => ({ id: index + 1, typeId: "tree.oak", ...point }));
+const clippedDoodadMap = {
+  version: currentServerMapVersion,
+  name: "Clipped three-way doodad",
+  description: "",
+  _design: "symmetry fixture",
+  width: 16,
+  height: 16,
+  terrain: Array(16).fill(".".repeat(16)),
+  startLocations: [],
+  baseSites: [],
+  doodads: clippedDoodadOrbit,
+  stealthTiles: [],
+  noVehicleTiles: [],
+};
+assert(!validateMap(clippedDoodadMap, { symmetry: "threeWay" }).warnings.some((warning) => warning.includes("doodads")),
+  "three-way checks recognize the exact rounded, edge-clipped 512 px doodad orbit from {186,0}");
+
 const wrongRoadOrientation = buildMapFromRecipe({
   name: "Wrong road orientation",
   width: 32,
@@ -129,6 +161,18 @@ wrongRoadOrientation.terrain[27] = `${".".repeat(3)}\\${".".repeat(28)}`;
 assert(validateMap(wrongRoadOrientation, { symmetry: "horizontal" }).warnings
   .some((warning) => warning.includes("terrain") && warning.includes("symmetry")),
 "symmetry checks require the correctly transformed marked-road orientation");
+
+const allHorizontalRoad = {
+  ...clippedDoodadMap,
+  name: "Wrong diagonal road field",
+  width: 16,
+  height: 16,
+  terrain: Array(16).fill("-".repeat(16)),
+  doodads: [],
+};
+assert(validateMap(allHorizontalRoad, { symmetry: "diagonalMain" }).warnings
+  .some((warning) => warning.includes("terrain") && warning.includes("symmetry")),
+"a dominant marked-road character is still checked when symmetry must rotate its orientation");
 
 const radialLocations = expandSymmetricPoints({ width: 32, height: 32 }, [{ x: 10, y: 11 }], "radial");
 const radialDoodads = expandSymmetricPoints({ width: 1024, height: 1024 }, [{ x: 100, y: 120 }], "radial")
@@ -203,6 +247,31 @@ assert.throws(
   "recipe dimensions are not silently truncated",
 );
 assert.throws(() => buildMapFromRecipe({ width: "12", height: 1 }), /positive integers/);
+assert.throws(
+  () => buildMapFromRecipe({ width: 15, height: 16 }),
+  /at least 16 tiles/,
+  "recipe dimensions share the editor's minimum instead of failing only after UI import",
+);
+const boundedResources = buildMapFromRecipe({
+  width: 16,
+  height: 16,
+  operations: [{ type: "base", at: [8, 8], steelPatches: 100, oilPatches: -2 }],
+});
+assert.deepEqual(boundedResources.baseSites, [{ x: 8, y: 8, steelPatches: 36, oilPatches: 0 }],
+  "recipe resource counts use the same canonical bounds as editor import");
+const boundedResourcesUi = new MapEditorSession({ storage: null });
+boundedResourcesUi.loadAuthoredMap(boundedResources);
+assert.deepEqual(boundedResourcesUi.exportMap(), boundedResources,
+  "canonical recipe resource output is byte-for-byte stable through the UI adapter");
+assert.throws(
+  () => buildMapFromRecipe({
+    width: 32,
+    height: 32,
+    operations: Array.from({ length: 5 }, (_, index) => ({ type: "start", at: [8 + index * 3, 8] })),
+  }),
+  /more than 4 start locations/,
+  "the shared engine rejects a fifth start before either adapter can silently truncate it",
+);
 
 {
   const calls = [];

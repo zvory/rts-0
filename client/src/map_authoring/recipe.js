@@ -1,8 +1,14 @@
 import { applyMapOperation, terrainCharacter } from "./operations.js";
+import {
+  AUTHORED_MAP_MAX_BASE_SITES,
+  AUTHORED_MAP_MAX_DIMENSION_TILES,
+  AUTHORED_MAP_MAX_START_LOCATIONS,
+  AUTHORED_MAP_MIN_DIMENSION_TILES,
+} from "./limits.js";
 import { MAP_AUTHORING_SYMMETRY, symmetrySupported } from "./symmetry.js";
 
 export const CURRENT_AUTHORED_MAP_VERSION = 6;
-export const MAX_AUTHORED_MAP_DIMENSION_TILES = 256;
+export const MAX_AUTHORED_MAP_DIMENSION_TILES = AUTHORED_MAP_MAX_DIMENSION_TILES;
 
 export function isMapAuthoringRecipe(value) {
   return !!value && typeof value === "object" && !Array.isArray(value)
@@ -21,6 +27,9 @@ export function buildMapFromRecipe(recipe) {
   }
   if (width > MAX_AUTHORED_MAP_DIMENSION_TILES || height > MAX_AUTHORED_MAP_DIMENSION_TILES) {
     throw new Error(`Recipe width and height must each be at most ${MAX_AUTHORED_MAP_DIMENSION_TILES} tiles`);
+  }
+  if (width < AUTHORED_MAP_MIN_DIMENSION_TILES || height < AUTHORED_MAP_MIN_DIMENSION_TILES) {
+    throw new Error(`Recipe width and height must each be at least ${AUTHORED_MAP_MIN_DIMENSION_TILES} tiles`);
   }
   if (recipe.operations !== undefined && !Array.isArray(recipe.operations)) {
     throw new Error("Recipe operations must be an array when provided");
@@ -45,8 +54,18 @@ export function buildMapFromRecipe(recipe) {
   for (const operation of recipe.operations || []) {
     validateRecipeSymmetry(operation.symmetry ?? defaultSymmetry, map);
     applyMapOperation(map, operation, { defaultSymmetry });
+    validateRecipeLocationCounts(map);
   }
   return map;
+}
+
+function validateRecipeLocationCounts(map) {
+  if (map.startLocations.length > AUTHORED_MAP_MAX_START_LOCATIONS) {
+    throw new Error(`Recipe generates more than ${AUTHORED_MAP_MAX_START_LOCATIONS} start locations`);
+  }
+  if (map.baseSites.length > AUTHORED_MAP_MAX_BASE_SITES) {
+    throw new Error(`Recipe generates more than ${AUTHORED_MAP_MAX_BASE_SITES} base sites`);
+  }
 }
 
 function validateRecipeSymmetry(symmetry, dimensions) {

@@ -8,6 +8,15 @@ import {
 import { applyMapOperation, transformRoadCharacter } from "./map_authoring/operations.js";
 import { rectTiles } from "./map_authoring/geometry.js";
 import {
+  AUTHORED_MAP_MAX_BASE_SITES,
+  AUTHORED_MAP_MAX_DIMENSION_TILES,
+  AUTHORED_MAP_MAX_OIL_PATCHES,
+  AUTHORED_MAP_MAX_START_LOCATIONS,
+  AUTHORED_MAP_MAX_STEEL_PATCHES,
+  AUTHORED_MAP_MIN_DIMENSION_TILES,
+  boundedAuthoredPatchCount,
+} from "./map_authoring/limits.js";
+import {
   expandSymmetricPoints,
   MAP_AUTHORING_SYMMETRY,
   symmetrySupported,
@@ -18,15 +27,15 @@ import {
 export { MAP_EDITOR_MAX_DOODADS } from "./map_editor_doodads.js";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 25;
-export const MAP_EDITOR_MAX_START_LOCATIONS = 4;
-export const MAP_EDITOR_MAX_BASE_SITES = 32;
-export const MAP_EDITOR_MAX_STEEL_PATCHES = 36;
-export const MAP_EDITOR_MAX_OIL_PATCHES = 9;
+export const MAP_EDITOR_MAX_START_LOCATIONS = AUTHORED_MAP_MAX_START_LOCATIONS;
+export const MAP_EDITOR_MAX_BASE_SITES = AUTHORED_MAP_MAX_BASE_SITES;
+export const MAP_EDITOR_MAX_STEEL_PATCHES = AUTHORED_MAP_MAX_STEEL_PATCHES;
+export const MAP_EDITOR_MAX_OIL_PATCHES = AUTHORED_MAP_MAX_OIL_PATCHES;
 export const MAP_EDITOR_DEFAULT_STEEL_PATCHES = 12;
 export const MAP_EDITOR_DEFAULT_OIL_PATCHES = 3;
 export const MAP_EDITOR_DEFAULT_SIZE = 126;
-export const MAP_EDITOR_MIN_SIZE = 16;
-export const MAP_EDITOR_MAX_SIZE = 256;
+export const MAP_EDITOR_MIN_SIZE = AUTHORED_MAP_MIN_DIMENSION_TILES;
+export const MAP_EDITOR_MAX_SIZE = AUTHORED_MAP_MAX_DIMENSION_TILES;
 // Mirror the authored-map clearance contract enforced by the simulation.
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
@@ -958,8 +967,7 @@ function newBaseSite(location) {
 }
 function movedBaseSite(site, location) { return { ...copyBaseSite(site), ...copyLocation(location) }; }
 function boundedPatchCount(value, max, fallback) {
-  const number = Number(value);
-  return Number.isInteger(number) ? Math.max(0, Math.min(max, number)) : fallback;
+  return boundedAuthoredPatchCount(value, max, fallback);
 }
 function sameLocationSet(left, right) {
   const a = new Set((left || []).map(locationKey)); const b = new Set((right || []).map(locationKey));

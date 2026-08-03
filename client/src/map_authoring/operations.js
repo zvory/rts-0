@@ -1,4 +1,9 @@
 import { blobTiles, pathTiles, rectTiles, tuplePoint } from "./geometry.js";
+import {
+  AUTHORED_MAP_MAX_OIL_PATCHES,
+  AUTHORED_MAP_MAX_STEEL_PATCHES,
+  boundedAuthoredPatchCount,
+} from "./limits.js";
 import { expandSymmetricPoints, MAP_AUTHORING_SYMMETRY, normalizeDimensions } from "./symmetry.js";
 
 export const AUTHORING_TERRAIN = Object.freeze({
@@ -92,8 +97,16 @@ export function applyMapOperation(draft, operation, {
       addLocation(draft.baseSites, {
         x: location.x,
         y: location.y,
-        steelPatches: integer(operation.steelPatches, defaultSteelPatches),
-        oilPatches: integer(operation.oilPatches, defaultOilPatches),
+        steelPatches: boundedAuthoredPatchCount(
+          operation.steelPatches,
+          AUTHORED_MAP_MAX_STEEL_PATCHES,
+          defaultSteelPatches,
+        ),
+        oilPatches: boundedAuthoredPatchCount(
+          operation.oilPatches,
+          AUTHORED_MAP_MAX_OIL_PATCHES,
+          defaultOilPatches,
+        ),
       });
       if (type === "start" || operation.start === true) addLocation(draft.startLocations, { x: location.x, y: location.y });
     }
@@ -198,9 +211,4 @@ function addLocation(collection, record) {
 
 function locationKey(record) {
   return `${record?.x},${record?.y}`;
-}
-
-function integer(value, fallback = 0) {
-  const parsed = Number(value);
-  return Math.trunc(Number.isFinite(parsed) ? parsed : fallback);
 }

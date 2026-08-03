@@ -1,6 +1,7 @@
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { buildMapFromRecipe, isMapAuthoringRecipe } from "./map_authoring/recipe.js";
+import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import {
   canonicalDoodadColor,
   MAP_EDITOR_DEFAULT_FLOWER_COLOR,
@@ -27,6 +28,7 @@ const MAP_CATALOG_URL = "/maps/catalog";
 const MAP_EDITOR_MAX_JSON_BYTES = 2 * 1024 * 1024;
 const MAP_EDITOR_OPTIONS_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
 const MAP_EDITOR_TOOLS_STORAGE_KEY = "rts.mapEditor.tools.window.v1";
+const MAP_EDITOR_ANALYSIS_TIMEOUT_MS = 20_000;
 
 export class MapEditorPanel {
   constructor({
@@ -36,6 +38,10 @@ export class MapEditorPanel {
     onOpenLab,
     onOpenPreview,
     fetchImpl = globalThis.fetch?.bind(globalThis),
+    createAbortController = () => new AbortController(),
+    setTimeoutImpl = globalThis.setTimeout?.bind(globalThis),
+    clearTimeoutImpl = globalThis.clearTimeout?.bind(globalThis),
+    analysisTimeoutMs = MAP_EDITOR_ANALYSIS_TIMEOUT_MS,
   }) {
     this.root = root;
     this.session = session;
@@ -43,6 +49,10 @@ export class MapEditorPanel {
     this.onOpenLab = onOpenLab;
     this.onOpenPreview = onOpenPreview;
     this.fetchImpl = fetchImpl;
+    this.createAbortController = createAbortController;
+    this.setTimeoutImpl = setTimeoutImpl;
+    this.clearTimeoutImpl = clearTimeoutImpl;
+    this.analysisTimeoutMs = analysisTimeoutMs;
     this.catalog = [];
     this.catalogSkipped = [];
     this.catalogError = "";
@@ -64,6 +74,10 @@ export class MapEditorPanel {
     this.analysisPending = false;
     this.analysisResult = null;
     this.analysisKind = null;
+    this.analysisRequestToken = 0;
+    this.analysisAbortController = null;
+    this.analysisTimeoutId = null;
+    this.analysisMapFingerprint = null;
     this.recipeText = JSON.stringify({
       name: "Recipe map",
       width: session.draft?.width || MAP_EDITOR_DEFAULT_SIZE,
@@ -73,6 +87,7 @@ export class MapEditorPanel {
     }, null, 2);
     this.status = "";
     this.statusError = false;
+    this.analysisStatusOwned = false;
     this.destroyed = false;
     this.optionsEl = this.createPanelElement("map-editor-options-window", "Map Editor options");
     this.toolsEl = this.createPanelElement("map-editor-tools-window", "Map Editor tools");
@@ -101,6 +116,12 @@ export class MapEditorPanel {
   }
 
   applySessionSnapshot(snapshot) {
+    const analysisFingerprint = authoredMapFingerprint(snapshot?.draft);
+    if (this.analysisMapFingerprint === null) this.analysisMapFingerprint = analysisFingerprint;
+    else if (analysisFingerprint !== this.analysisMapFingerprint) {
+      MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
+      this.analysisMapFingerprint = analysisFingerprint;
+    }
     const width = snapshot?.draft?.width;
     const height = snapshot?.draft?.height;
     const loadedMap = snapshot?.reason === "loaded"
@@ -343,7 +364,14 @@ export class MapEditorPanel {
       field("Paint shape", shapes),
       field("Symmetry", symmetry),
     );
+    for (const warning of this.currentSymmetryWarnings()) {
+      section.appendChild(readout(`Symmetry warning: ${warning}`, true));
+    }
     return section;
+  }
+
+  currentSymmetryWarnings() {
+    return mapSymmetryWarnings(this.session.draft, this.symmetry);
   }
 
   renderMapOverlays() {
@@ -724,8 +752,7 @@ export class MapEditorPanel {
     this.session.loadAuthoredMap(recipe ? buildMapFromRecipe(map) : map);
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
-    this.analysisResult = null;
-    this.analysisKind = null;
+    MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
     this.viewport.armTool(null);
     return recipe ? "recipe" : "map";
   }
@@ -753,27 +780,80 @@ export class MapEditorPanel {
       this.setStatus("Authoritative map analysis is unavailable.", true);
       return null;
     }
+    const body = JSON.stringify(this.session.exportMap());
+    const fingerprint = body;
+    const token = (this.analysisRequestToken || 0) + 1;
+    this.analysisRequestToken = token;
+    this.analysisMapFingerprint = fingerprint;
+    const controller = this.createAbortController?.();
+    this.analysisAbortController = controller || null;
     this.analysisPending = true;
     this.analysisKind = mode;
     this.analysisResult = null;
-    this.setStatus(mode === "report" ? "Calculating authoritative routes…" : "Running authoritative map check…");
+    setAuthoritativeAnalysisStatus(
+      this,
+      mode === "report" ? "Calculating authoritative routes…" : "Running authoritative map check…",
+    );
     try {
-      const response = await this.fetchImpl(`/api/map-authoring/${mode}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(this.session.exportMap()),
+      const responseAndJson = (async () => {
+        const response = await this.fetchImpl(`/api/map-authoring/${mode}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+          ...(controller?.signal ? { signal: controller.signal } : {}),
+        });
+        return { response, result: await response.json() };
+      })();
+      const timeout = new Promise((_, reject) => {
+        if (typeof this.setTimeoutImpl !== "function") return;
+        const delay = positiveTimeout(this.analysisTimeoutMs, MAP_EDITOR_ANALYSIS_TIMEOUT_MS);
+        this.analysisTimeoutId = this.setTimeoutImpl(() => {
+          controller?.abort?.();
+          reject(new Error(`analysis timed out after ${delay} ms`));
+        }, delay);
       });
-      const result = await response.json();
+      const { response, result } = await Promise.race([responseAndJson, timeout]);
+      if (!MapEditorPanel.prototype.authoritativeAnalysisRequestIsCurrent.call(this, token, fingerprint)) return null;
       this.analysisResult = result;
       if (!response.ok || result?.valid !== true) throw new Error(result?.error || `HTTP ${response.status}`);
-      this.setStatus(authoritativeAnalysisSummary(mode, result));
+      setAuthoritativeAnalysisStatus(this, authoritativeAnalysisSummary(mode, result));
       return result;
     } catch (error) {
-      this.setStatus(`Authoritative ${mode} failed: ${error.message || error}`, true);
+      if (!MapEditorPanel.prototype.authoritativeAnalysisRequestIsCurrent.call(this, token, fingerprint)) return null;
+      setAuthoritativeAnalysisStatus(this, `Authoritative ${mode} failed: ${error.message || error}`, true);
       return null;
     } finally {
-      this.analysisPending = false;
-      this.render();
+      if (this.analysisRequestToken === token) {
+        MapEditorPanel.prototype.clearAuthoritativeAnalysisTimeout.call(this);
+        this.analysisAbortController = null;
+        this.analysisPending = false;
+        this.render();
+      }
+    }
+  }
+
+  authoritativeAnalysisRequestIsCurrent(token, fingerprint) {
+    if (this.destroyed || this.analysisRequestToken !== token) return false;
+    return authoredMapFingerprint(this.session.exportMap()) === fingerprint;
+  }
+
+  clearAuthoritativeAnalysisTimeout() {
+    if (this.analysisTimeoutId != null) this.clearTimeoutImpl?.(this.analysisTimeoutId);
+    this.analysisTimeoutId = null;
+  }
+
+  invalidateAuthoritativeAnalysis() {
+    this.analysisRequestToken = (this.analysisRequestToken || 0) + 1;
+    this.analysisAbortController?.abort?.();
+    this.analysisAbortController = null;
+    MapEditorPanel.prototype.clearAuthoritativeAnalysisTimeout.call(this);
+    this.analysisPending = false;
+    this.analysisResult = null;
+    this.analysisKind = null;
+    if (this.analysisStatusOwned) {
+      this.status = "";
+      this.statusError = false;
+      this.analysisStatusOwned = false;
     }
   }
 
@@ -875,12 +955,14 @@ export class MapEditorPanel {
   setStatus(message, error = false) {
     this.status = String(message || "");
     this.statusError = !!error;
+    this.analysisStatusOwned = false;
     this.render();
   }
 
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
     window.removeEventListener("keydown", this.onKeyDown);
     this.unsubscribe?.();
     this.unsubscribeCamera?.();
@@ -889,6 +971,20 @@ export class MapEditorPanel {
     this.optionsEl.remove();
     this.toolsEl.remove();
   }
+}
+
+function authoredMapFingerprint(map) {
+  return JSON.stringify(map ?? null);
+}
+
+function setAuthoritativeAnalysisStatus(panel, message, error = false) {
+  panel.setStatus(message, error);
+  panel.analysisStatusOwned = true;
+}
+
+function positiveTimeout(value, fallback) {
+  const timeout = Number(value);
+  return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
 }
 
 export function authoritativeAnalysisSummary(kind, result) {

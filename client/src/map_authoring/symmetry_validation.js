@@ -1,6 +1,7 @@
 import { transformRoadCharacter } from "./operations.js";
 import {
   MAP_AUTHORING_SYMMETRY,
+  expandSymmetricPoints,
   normalizeDimensions,
   symmetrySupported,
   symmetryTransforms,
@@ -34,24 +35,53 @@ export function mapSymmetryWarnings(map, symmetry = MAP_AUTHORING_SYMMETRY.NONE)
 }
 
 function terrainMismatchCount(map, dimensions, symmetry) {
-  let mismatches = 0;
   const transforms = symmetryTransforms(dimensions, symmetry).slice(1);
   const background = dominantTerrainCharacter(map.terrain);
+  const backgroundIsInvariant = transforms.every((transform) => (
+    transformRoadCharacter(background, transform) === background
+  ));
+  if (symmetry === MAP_AUTHORING_SYMMETRY.THREE_WAY) {
+    return generatedTerrainMismatchCount(map, dimensions, background, backgroundIsInvariant);
+  }
+  let mismatches = 0;
   for (let y = 0; y < dimensions.height; y += 1) {
     for (let x = 0; x < dimensions.width; x += 1) {
       const source = map.terrain[y][x];
       // Checking authored features is sufficient: if one symmetric copy is erased to the dominant
       // background, another retained copy still reports the missing partner. This also avoids
       // false positives from the documented square-grid approximation of three-way rotation.
-      if (source === background) continue;
+      if (backgroundIsInvariant && source === background) continue;
       if (transforms.some((transform) => {
         const target = transformPoint({ x, y }, dimensions, transform);
         const expected = transformRoadCharacter(source, transform);
-        return target && !matchingTerrainNear(map, target, expected, symmetry);
+        return target && map.terrain[target.y]?.[target.x] !== expected;
       })) mismatches += 1;
     }
   }
   return mismatches;
+}
+
+function generatedTerrainMismatchCount(map, dimensions, background, backgroundIsInvariant) {
+  const records = [];
+  for (let y = 0; y < dimensions.height; y += 1) {
+    for (let x = 0; x < dimensions.width; x += 1) {
+      const character = map.terrain[y][x];
+      if (!backgroundIsInvariant || character !== background) records.push({ x, y, character });
+    }
+  }
+  const covered = new Set();
+  for (const seed of records) {
+    const orbit = expandSymmetricPoints(dimensions, [seed], MAP_AUTHORING_SYMMETRY.THREE_WAY, {
+      decorate: (point, transform) => ({
+        ...point,
+        character: transformRoadCharacter(seed.character, transform),
+      }),
+    });
+    if (orbit.every((expected) => map.terrain[expected.y]?.[expected.x] === expected.character)) {
+      for (const expected of orbit) covered.add(locationKey(expected));
+    }
+  }
+  return records.reduce((count, record) => count + (covered.has(locationKey(record)) ? 0 : 1), 0);
 }
 
 function dominantTerrainCharacter(rows) {
@@ -71,19 +101,45 @@ function dominantTerrainCharacter(rows) {
 function pushLocationWarnings(warnings, label, records, dimensions, symmetry, equal = () => true) {
   if (!Array.isArray(records)) return;
   const valid = records.filter((record) => boundedRecord(record, dimensions));
+  if (symmetry === MAP_AUTHORING_SYMMETRY.THREE_WAY) {
+    pushGeneratedLocationWarnings(warnings, label, valid, dimensions, equal);
+    return;
+  }
   const byLocation = new Map(valid.map((record) => [locationKey(record), record]));
   let missing = 0;
   let differing = 0;
   for (const source of valid) {
     for (const transform of symmetryTransforms(dimensions, symmetry).slice(1)) {
       const target = transformPoint(source, dimensions, transform);
-      const partner = target && findLocationPartner(valid, byLocation, target, symmetry);
+      const partner = target && byLocation.get(locationKey(target));
       if (!partner) missing += 1;
       else if (!equal(source, partner)) differing += 1;
     }
   }
   if (missing) warnings.push(`${label} have ${missing} missing ${symmetry} partners`);
   if (differing) warnings.push(`${label} have ${differing} ${symmetry} resource mismatches`);
+}
+
+function pushGeneratedLocationWarnings(warnings, label, records, dimensions, equal) {
+  const byLocation = new Map(records.map((record) => [locationKey(record), record]));
+  const geometryCovered = new Set();
+  const attributesCovered = new Set();
+  for (const seed of records) {
+    const orbit = expandSymmetricPoints(dimensions, [seed], MAP_AUTHORING_SYMMETRY.THREE_WAY);
+    const partners = orbit.map((expected) => byLocation.get(locationKey(expected)));
+    if (partners.every(Boolean)) {
+      for (const expected of orbit) geometryCovered.add(locationKey(expected));
+      if (partners.every((partner) => equal(seed, partner))) {
+        for (const expected of orbit) attributesCovered.add(locationKey(expected));
+      }
+    }
+  }
+  const missing = records.filter((record) => !geometryCovered.has(locationKey(record))).length;
+  const differing = records.filter((record) => (
+    geometryCovered.has(locationKey(record)) && !attributesCovered.has(locationKey(record))
+  )).length;
+  if (missing) warnings.push(`${label} have ${missing} missing threeWay partners`);
+  if (differing) warnings.push(`${label} have ${differing} threeWay resource mismatches`);
 }
 
 function pushDoodadWarnings(warnings, records, mapDimensions, symmetry) {
@@ -93,6 +149,12 @@ function pushDoodadWarnings(warnings, records, mapDimensions, symmetry) {
     height: mapDimensions.height * TILE_SIZE_PX,
   };
   const valid = records.filter((record) => boundedRecord(record, dimensions));
+  if (symmetry === MAP_AUTHORING_SYMMETRY.THREE_WAY) {
+    const covered = generatedDoodadCoverage(valid, dimensions);
+    const missing = valid.filter((record) => !covered.has(doodadKey(record))).length;
+    if (missing) warnings.push(`doodads have ${missing} missing ${symmetry} partners`);
+    return;
+  }
   const keys = new Set(valid.map(doodadKey));
   let missing = 0;
   for (const source of valid) {
@@ -101,12 +163,28 @@ function pushDoodadWarnings(warnings, records, mapDimensions, symmetry) {
       if (!target) continue;
       if (source.typeId === "unit.tank_trap") target = snapToTileCentre(target);
       const expected = { ...source, ...target };
-      const matched = keys.has(doodadKey(expected)) || (symmetry === MAP_AUTHORING_SYMMETRY.THREE_WAY
-        && valid.some((candidate) => doodadAttributesEqual(candidate, expected) && nearby(candidate, expected)));
+      const matched = keys.has(doodadKey(expected));
       if (!matched) missing += 1;
     }
   }
   if (missing) warnings.push(`doodads have ${missing} missing ${symmetry} partners`);
+}
+
+function generatedDoodadCoverage(records, dimensions) {
+  const keys = new Set(records.map(doodadKey));
+  const covered = new Set();
+  for (const seed of records) {
+    const orbit = expandSymmetricPoints(dimensions, [seed], MAP_AUTHORING_SYMMETRY.THREE_WAY, {
+      decorate: (point) => {
+        const transformed = seed.typeId === "unit.tank_trap" ? snapToTileCentre(point) : point;
+        return { ...seed, ...transformed };
+      },
+    });
+    if (orbit.every((expected) => keys.has(doodadKey(expected)))) {
+      for (const expected of orbit) covered.add(doodadKey(expected));
+    }
+  }
+  return covered;
 }
 
 function rectangularTerrain(map, dimensions) {
@@ -123,36 +201,6 @@ function boundedRecord(record, dimensions) {
 
 function baseResourcesEqual(left, right) {
   return left.steelPatches === right.steelPatches && left.oilPatches === right.oilPatches;
-}
-
-function matchingTerrainNear(map, target, expected, symmetry) {
-  const radius = symmetry === MAP_AUTHORING_SYMMETRY.THREE_WAY ? 1 : 0;
-  for (let y = target.y - radius; y <= target.y + radius; y += 1) {
-    for (let x = target.x - radius; x <= target.x + radius; x += 1) {
-      if (terrainEquivalent(map.terrain[y]?.[x], expected)) return true;
-    }
-  }
-  return false;
-}
-
-function terrainEquivalent(left, right) {
-  return left === right;
-}
-
-function findLocationPartner(records, byLocation, target, symmetry) {
-  return byLocation.get(locationKey(target)) || (symmetry === MAP_AUTHORING_SYMMETRY.THREE_WAY
-    ? records.find((candidate) => nearby(candidate, target))
-    : null);
-}
-
-function nearby(left, right) {
-  const dx = left.x - right.x;
-  const dy = left.y - right.y;
-  return dx * dx + dy * dy <= 2;
-}
-
-function doodadAttributesEqual(left, right) {
-  return left.typeId === right.typeId && (left.color || "") === (right.color || "");
 }
 
 function doodadKey(record) {

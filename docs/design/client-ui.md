@@ -890,7 +890,7 @@ export class MapEditorSession {
 }
 ```
 `map_authoring/` is the single implementation of authoring geometry, symmetry, advisory symmetry
-checking, and recipe materialization. Browser pointer
+checking, authored-map limits, and recipe materialization. Browser pointer
 gestures and `scripts/map-author.mjs` recipes are adapters over its pure ESM operations; the package
 does not access the DOM, Pixi, Node filesystem APIs, or simulation state. UI-only input/history and
 CLI-only file/argument handling stay outside it.
@@ -951,6 +951,10 @@ water remain rejected there. Authored map rows
 encode bare, horizontal-marked, vertical-marked, NW-SE diagonal-marked, and NE-SW diagonal-marked
 roads with `=`, `-`, `|`, `\`, and `/`, respectively. The ten visual Open-terrain variants use
 `0` through `9` in protocol-code order: Gravel A/B/C, Dirt A/B/C, Mud A/B/C, then Frosted Ground.
+The selected symmetry runs the shared advisory checker against the current draft and renders any
+terrain, start/base, overlay, resource, or doodad mismatch directly below the selector. Three-way
+checks compare complete generated square-grid orbits, including rounded copies clipped by an edge;
+marked-road checks still require the transformed orientation.
 Editor status stays above the scrolling controls; failures use a high-contrast alert treatment.
 A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
@@ -1007,7 +1011,9 @@ The editor's `Authoritative check` and `Route report` actions post the current e
 counts or route/unreachable counts, while one collapsed `<details>` element exposes the complete
 JSON response as a single text node. `scripts/map-author.mjs check|report <map.json>` is the matching
 thin Node adapter over the `authored-map` Rust binary; neither adapter reimplements materialization
-or pathing.
+or pathing. Each browser request is bound to the exact exported-map fingerprint, has a total
+20-second deadline, and is aborted and cleared when the draft changes or the panel is destroyed;
+late responses cannot replace the result for a newer draft.
 
 `lab_panel_window.js` owns local drag, resize, collapse/expand, reset, keyboard nudge,
 viewport-clamping, and localStorage geometry hints for those app-owned lab windows. It has no
