@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Not started.
+- [ ] Abandoned; retained as historical context only.
 
 ## Objective
 

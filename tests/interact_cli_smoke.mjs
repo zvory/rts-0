@@ -22,8 +22,6 @@ const env = {
   RTS_INTERACT_TEST_TAILNET_PREVIEW_ROOT: previewRoot,
   RTS_INTERACT_TEST_TAILNET_PREVIEW_PORT: String(previewPort),
 };
-const renderer = env.RTS_INTERACT_LAB_RENDERER || "pixi";
-assert.ok(["pixi", "babylon"].includes(renderer), "Interact smoke renderer must be pixi or babylon");
 const recordingDurationMs = Number(env.RTS_INTERACT_LAB_RECORDING_CANARY_MS || 5_000);
 assert.ok(
   Number.isInteger(recordingDurationMs) && recordingDurationMs >= 2_000 && recordingDurationMs <= 60_000,
@@ -38,7 +36,6 @@ let daemonPid = null;
 try {
   assert.equal(call("shutdown").alreadyStopped, true, "isolated smoke starts from a stopped daemon");
   const opened = call("open", {
-    renderer,
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
   });
   sessionId = testArtifacts.ownSession(opened.sessionId);
@@ -90,7 +87,7 @@ try {
   assert.ok(Number.isFinite(focused.camera.focus?.x), "camera focus returns a bounded semantic camera");
   const screenshot = call("screenshot", {
     sessionId,
-    name: renderer === "babylon" ? "babylon-kernel" : "cli-smoke",
+    name: "cli-smoke",
     presentation: "clean",
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
     subjects: ["shooter", "target"],
@@ -171,7 +168,6 @@ try {
   sessionId = null;
   assert.equal(callFailure("inspect", { sessionId: closedSessionId }).code, "unknownSession", "closed session ids are rejected as stale");
   const reopened = call("open", {
-    renderer,
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
   });
   sessionId = testArtifacts.ownSession(reopened.sessionId);
@@ -192,7 +188,6 @@ try {
   sessionId = null;
 
   const gameOpened = callGame("open", {
-    renderer,
     opponent: "ai_2_1",
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
   });

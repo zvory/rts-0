@@ -8,11 +8,11 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 ## 1. Non-negotiable boundary
 
 - There is one JavaScript client, one `Match`, one state/interpolation pipeline, and one active
-  world renderer per match. Pixi is the default.
+  world renderer per match. Pixi is the sole shipped renderer.
 - During a match, `Match` owns the only main-thread `requestAnimationFrame` loop and visual clock.
   Pixi is pinned at v8.19.0 and initialized in one module worker with `autoStart:false` and an
   explicit WebGL preference; no normal, capture, or teardown path starts its ticker. The worker
-  updates and presents only from submitted frames; Babylon never calls `runRenderLoop()`.
+  updates and presents only from submitted frames.
 - Server/application coordinates remain two-dimensional world pixels. Scene axes, scale, height,
   and facing are backend-private presentation conversions.
 - Input and commands use semantic projection and selection data. Meshes, asset bounds, LODs,
@@ -21,7 +21,7 @@ in [client-ui.md](client-ui.md), and implementation status lives in
   `ClientIntent`, transport objects, hidden entity variants, or another backend's engine objects.
 - The backend root owns its canvas, engine/renderer, scene, and shared GPU resources. Entity/effect
   children own instances only and cannot dispose shared resources.
-- Missing `rtsRenderer` means Pixi. Babylon loads only for an explicit experimental selector.
+- There is no renderer selector or runtime fallback engine. Every route uses Pixi.
 - HUD, lobby, minimap, audio, diagnostics, and Lab panels remain shared external surfaces.
 
 Rendering work does not change the Rust server, protocol, simulation, fog authority, replay format,
@@ -230,7 +230,6 @@ public displayed-frame counter and publishes the matching `SelectionSceneV1`. Su
 frames discard their pending selection scene, while teardown settles pending work as destroyed and
 blocks late selection/decal/capture side effects.
 
-Babylon still updates scene state and synchronously presents exactly once inside `render(frame)`.
 Pixi's main-thread host returns asynchronous promise channels, while its module worker performs one
 `PIXI.Application.render()` for the accepted frame and acknowledges the exact generation/frame id.
 Duplicate, stale, unknown, impossibly
@@ -239,8 +238,7 @@ newest visible selection scene.
 
 The `PixiPresentationAdapter` is the sole bridge to existing Pixi helpers. Its exact private-read
 allowlist uses `{id, reviewTrigger}` records: a trigger is a concrete reason to reconsider a read,
-not a promised cleanup phase. New reads fail the contract, and Babylon cannot import the adapter or
-receive its sources.
+not a promised cleanup phase. New reads fail the contract.
 
 ### 4.1 Render-worker message boundary
 
@@ -298,73 +296,16 @@ presented; edits made while that presentation is in flight merge into the next s
 lets ordinary match frames remain latest-oriented without treating authoring changes as disposable
 presentation data. A failed editor worker stops new submissions and reports one visible error.
 
-## 5. Babylon foundation contracts
-
-### 5.1 Backend bundle and lifecycle
-
-The selected backend bundle creates the semantic camera before Match and the world renderer
-separately. The renderer receives projection only inside the detached frame. Babylon owns one
-canvas, engine, and scene; `destroy()` is idempotent and removes them. Support resize and one normal
-leave/re-enter cleanup case. Add cancellation tokens, context-loss recovery, or a generalized
-lifecycle manager only when a real async/resource path needs them.
-
-### 5.2 Coordinates
-
-One Babylon-private module owns world/scene point, inverse ground point, facing, height, and scale
-conversion. Entity, terrain, effect, and asset code import it rather than applying local axis swaps
-or scale constants. Pure representative-point and ground-hit tests prove the scene and semantic
-projection agree.
-
-### 5.3 Fog and generic content
-
-Babylon renders only the categories already separated by `PresentationFrameV2`. Current/explored
-fog uses the immutable revisions; remembered, intel, and reveal presentation use their explicit
-layers and never query a hidden source id. A real two-recipient sentinel test covers scene,
-selection, and diagnostics before the live route is enabled.
-
-Generic entities share simple source geometry/materials and remain truthful placeholders. They
-preserve team, facing, construction, selection, and HP data received in the frame. Shared HUD,
-minimap, audio, and control-group surfaces are reused. Babylon is opt-in for ordinary live players
-and Lab; replay and ordinary spectator matches explicitly fall back to Pixi.
-
-### 5.4 Flat-art reuse, trusted 3D assets, and events
-
-Existing checked-in PNG, WebP, sprite-sheet, and SVG art may be reused as Babylon textures on
-billboards or planes without introducing a new asset descriptor. Prefer the existing public URL,
-frame rectangle, or plain source description when it is already suitable; Babylon never imports a
-Pixi display object or runtime class. One static frame is sufficient for the playable catch-up, a
-shadow is optional, and any load/adaptation failure falls back immediately to a truthful generic
-primitive.
-
-The first new repository-owned 3D asset needs only a small descriptor: id/path, source/license
-note, scene scale, axes, ground pivot, visible bounds, team-material slot, and required visual
-anchors. Missing required metadata falls back to a generic placeholder. Flat or 3D assets never
-affect selection or authority.
-
-The backend root owns loaded source assets, shared materials, and textures; entity/effect instances
-own instantiated nodes/state only. Introduce a registry, reference counting, or pooling only when
-more than simple root ownership is required by real content.
-
-The first shared presentation event is immutable and self-contained: kind, authorized pose/anchor,
-start time, finite lifetime, seed, layer, and payload. It is reconciled before the backend, never
-looks up future/hidden entity state, and uses the Match visual clock. Retained history and
-deterministic effect-capture tooling are separate future features.
-
-## 6. Explicitly deferred
+## 5. Explicitly deferred
 
 The Pixi v8 version cutover does not require render groups or shared `GraphicsContext` resources;
 both remain follow-up performance experiments that need workload evidence and visual review.
-The current foundations do not require replay/spectator Babylon routes, default rollout, hostile
-asset validation, checksums/decoder policy, retained event history, generalized registries/pools,
-benchmark schemas/budgets, Babylon vegetation parity, required shadows, quality tiers, full
-rig/animation parity,
-new or re-authored faction art, or release certification. Add one through a new evidence-backed
-plan when a playtest, content need, or measurement justifies it.
+The current foundations do not require hostile asset validation, checksums/decoder policy,
+retained event history, generalized registries/pools, benchmark schemas/budgets, required shadows,
+quality tiers, new or re-authored faction art, or release certification. Add one through a new
+evidence-backed plan when a playtest, content need, or measurement justifies it.
 
-The deleted proof-of-concept remains historical only. Its observations may motivate a focused test
-after the corresponding real resource/effect exists, but they are not requirements or baselines.
-
-## 7. Executable evidence
+## 6. Executable evidence
 
 The Pixi v8.19.0 cutover was reviewed with the deterministic 16-tick decoded-RGBA gate using the
 same stream, state, camera, viewport, DPR, visual clock, and ready assets on both versions. Exact
