@@ -17,11 +17,13 @@ use crate::rules::terrain::{self, TerrainKind};
 use cache::{CacheEntry, CacheKey};
 
 mod authoring;
+mod route_finalize;
 mod tree_detours;
 pub(in crate::game) use authoring::StaticRouteAnalyzer;
 #[cfg(test)]
 mod tree_detours_tests;
-pub(in crate::game::services) use tree_detours::{expand_reverse_waypoints, tree_detour_between};
+pub(in crate::game::services) use route_finalize::finalize_reverse_waypoints;
+pub(in crate::game::services) use tree_detours::tree_detour_between;
 
 const VEHICLE_HARD_CLEARANCE_TILES: u16 = 1;
 const VEHICLE_PREFERRED_CLEARANCE_TILES: u16 = 3;

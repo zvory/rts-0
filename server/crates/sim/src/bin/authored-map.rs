@@ -1,11 +1,13 @@
+use std::fs::File;
 use std::io::Read;
 use std::process::ExitCode;
 
 use serde::Serialize;
 
-use rts_sim::game::map::{analyze_authored_json, check_authored_json};
+use rts_sim::game::process_authored_json;
 
-const OUTPUT_SCHEMA_VERSION: u32 = 1;
+const OUTPUT_SCHEMA_VERSION: u32 = 2;
+const MAX_AUTHORED_MAP_BYTES: usize = 512 * 1024;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,23 +62,64 @@ fn run(args: impl IntoIterator<Item = String>) -> Result<(), CliError> {
         return Err(CliError::Usage(format!("unexpected argument: {extra}")));
     }
     let json = read_input(&input).map_err(CliError::Map)?;
-    match command.as_str() {
-        "check" => print_json(&check_authored_json(&json).map_err(CliError::Map)?),
-        "report" => print_json(&analyze_authored_json(&json).map_err(CliError::Map)?),
-        _ => unreachable!(),
-    }
+    let include_route_report = command == "report";
+    print_json(&process_authored_json(&json, include_route_report).map_err(CliError::Map)?);
     Ok(())
 }
 
 fn read_input(path: &str) -> Result<String, String> {
     if path == "-" {
-        let mut input = String::new();
-        std::io::stdin()
-            .read_to_string(&mut input)
-            .map_err(|error| format!("cannot read map JSON from stdin: {error}"))?;
-        return Ok(input);
+        return read_bounded(std::io::stdin().lock(), "stdin");
     }
-    std::fs::read_to_string(path).map_err(|error| format!("cannot read {path}: {error}"))
+    let file = File::open(path).map_err(|error| format!("cannot read {path}: {error}"))?;
+    if file
+        .metadata()
+        .map_err(|error| format!("cannot inspect {path}: {error}"))?
+        .len()
+        > MAX_AUTHORED_MAP_BYTES as u64
+    {
+        return Err(format!(
+            "map JSON exceeds the {MAX_AUTHORED_MAP_BYTES}-byte input limit"
+        ));
+    }
+    read_bounded(file, path)
+}
+
+fn read_bounded(reader: impl Read, source: &str) -> Result<String, String> {
+    let mut bytes = Vec::with_capacity(MAX_AUTHORED_MAP_BYTES.min(64 * 1024));
+    reader
+        .take((MAX_AUTHORED_MAP_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("cannot read map JSON from {source}: {error}"))?;
+    if bytes.len() > MAX_AUTHORED_MAP_BYTES {
+        return Err(format!(
+            "map JSON exceeds the {MAX_AUTHORED_MAP_BYTES}-byte input limit"
+        ));
+    }
+    String::from_utf8(bytes).map_err(|_| "map JSON must be UTF-8".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn bounded_reader_accepts_limit_and_rejects_limit_plus_one() {
+        let accepted = vec![b' '; MAX_AUTHORED_MAP_BYTES];
+        assert_eq!(
+            read_bounded(Cursor::new(accepted), "fixture")
+                .expect("limit-sized input should pass")
+                .len(),
+            MAX_AUTHORED_MAP_BYTES
+        );
+
+        let oversized = vec![b' '; MAX_AUTHORED_MAP_BYTES + 1];
+        let error = read_bounded(Cursor::new(oversized), "fixture")
+            .expect_err("limit plus one should fail");
+        assert!(error.contains("input limit"), "{error}");
+    }
 }
 
 fn print_json(value: &impl Serialize) {

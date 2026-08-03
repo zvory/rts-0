@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
-    active_trench_occupation, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, AttackPhase,
-    BuildPhase, DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
+    active_trench_occupation, uses_oriented_vehicle_body, AttackPhase, BuildPhase,
+    DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -33,9 +33,8 @@ use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_tiles, Occupancy,
 };
 use crate::game::services::pathing::{
-    expand_reverse_waypoints, simplify_reverse_waypoints_with_limit, tree_detour_between,
-    PathCacheStatus, PathRequest, PathingRequestDiagnostics, PathingRequestOutcome, PathingService,
-    RouteShape,
+    finalize_reverse_waypoints, tree_detour_between, PathCacheStatus, PathRequest,
+    PathingRequestDiagnostics, PathingRequestOutcome, PathingService, RouteShape,
 };
 use crate::game::services::standability;
 use crate::game::smoke::SmokeCloudStore;
@@ -75,8 +74,6 @@ const MIN_REPATH_TICKS: u32 = 3;
 const MATERIAL_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
 
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
-const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
-
 enum PathAttempt<T = ()> {
     Ready(T),
     Failed,

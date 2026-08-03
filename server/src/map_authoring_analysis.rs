@@ -8,11 +8,14 @@ use axum::routing::post;
 use axum::Json;
 use axum::Router;
 use serde::Serialize;
+use tokio::sync::Semaphore;
 
-use rts_sim::game::map::{analyze_authored_json, check_authored_json};
+use rts_sim::game::process_authored_json;
 
 const MAX_AUTHORED_MAP_ANALYSIS_BYTES: usize = 512 * 1024;
-const OUTPUT_SCHEMA_VERSION: u32 = 1;
+const OUTPUT_SCHEMA_VERSION: u32 = 2;
+const MAX_CONCURRENT_MAP_ANALYSES: usize = 2;
+static MAP_ANALYSIS_PERMITS: Semaphore = Semaphore::const_new(MAX_CONCURRENT_MAP_ANALYSES);
 
 pub(crate) fn routes<S>() -> Router<S>
 where
@@ -52,15 +55,27 @@ async fn report_handler(body: Bytes) -> Response {
 }
 
 async fn analyze_request(body: Bytes, mode: AnalysisMode) -> Response {
+    analyze_request_with_permits(body, mode, &MAP_ANALYSIS_PERMITS).await
+}
+
+async fn analyze_request_with_permits(
+    body: Bytes,
+    mode: AnalysisMode,
+    permits: &Semaphore,
+) -> Response {
     let authored_json = match String::from_utf8(body.to_vec()) {
         Ok(json) => json,
         Err(_) => return error_response(StatusCode::BAD_REQUEST, "Map JSON must be UTF-8."),
     };
-    let task = tokio::task::spawn_blocking(move || match mode {
-        AnalysisMode::Check => check_authored_json(&authored_json)
-            .and_then(|result| serde_json::to_value(result).map_err(|error| error.to_string())),
-        AnalysisMode::Report => analyze_authored_json(&authored_json)
-            .and_then(|result| serde_json::to_value(result).map_err(|error| error.to_string())),
+    let Ok(_permit) = permits.try_acquire() else {
+        return error_response(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many map analyses are already running; try again shortly.",
+        );
+    };
+    let include_route_report = matches!(mode, AnalysisMode::Report);
+    let task = tokio::task::spawn_blocking(move || {
+        process_authored_json(&authored_json, include_route_report)
     });
     match task.await {
         Ok(Ok(result)) => Json(result).into_response(),
@@ -135,6 +150,7 @@ mod tests {
         let report = response_json(report).await;
         assert_eq!(report["valid"], true);
         assert_eq!(report["routes"].as_array().map(Vec::len), Some(2));
+        assert_eq!(report["truncated"], false);
     }
 
     #[tokio::test]
@@ -147,5 +163,22 @@ mod tests {
         assert!(error["error"]
             .as_str()
             .is_some_and(|value| !value.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn saturated_analysis_admission_rejects_before_work_is_spawned() {
+        let permits = Semaphore::new(0);
+        let response = analyze_request_with_permits(
+            Bytes::from(valid_map_json()),
+            AnalysisMode::Report,
+            &permits,
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        let error = response_json(response).await;
+        assert_eq!(error["valid"], false);
+        assert!(error["error"]
+            .as_str()
+            .is_some_and(|value| value.contains("already running")));
     }
 }
