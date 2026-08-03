@@ -569,7 +569,7 @@ export class MapEditorPanel {
       field("Flower color", color),
       field("Brush radius (world px)", radius),
       field("Spray density", density),
-      readout("Place adds one doodad. Spray and erase work continuously while held; symmetry applies when creating doodads."),
+      readout("Place adds one doodad. Spray and erase work continuously while held; symmetry applies when placing and erasing doodads."),
     );
     return section;
   }

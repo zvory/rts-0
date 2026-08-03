@@ -15,6 +15,7 @@ import {
   doodadTypeFromSelection,
   doodadIdsWithinRadius,
   extendDoodadSprayStroke,
+  MAP_EDITOR_MAX_DOODADS,
   symmetricDoodadPlacements,
 } from "./map_editor_doodads.js";
 import {
@@ -538,13 +539,23 @@ export class MapEditorViewport {
       height: (this.session.draft?.height || 0) * TILE_SIZE,
     };
     const typeIds = this.tool?.typeIds?.length ? this.tool.typeIds : [this.tool?.typeId];
-    const typeSeed = allocateMapEditorDoodadId(this.session.draft?.doodads || []);
-    const placements = symmetricDoodadPlacements(dimensions, points, this.tool?.symmetry);
-    const planned = placements.map((placement, index) => ({
-      ...placement,
-      typeId: doodadTypeFromSelection(typeIds, typeSeed + index),
-      color: this.tool?.color,
-    }));
+    const existing = this.session.draft?.doodads || [];
+    const typeSeed = allocateMapEditorDoodadId(existing);
+    const available = Math.max(0, MAP_EDITOR_MAX_DOODADS - existing.length);
+    const planned = [];
+    const plannedKeys = new Set();
+    for (const point of points || []) {
+      const group = symmetricDoodadPlacements(dimensions, [point], this.tool?.symmetry)
+        .filter((placement) => !plannedKeys.has(`${placement.x},${placement.y}`));
+      if (planned.length + group.length > available) break;
+      const typeId = doodadTypeFromSelection(typeIds, typeSeed + planned.length);
+      planned.push(...group.map((placement) => ({
+        ...placement,
+        typeId,
+        color: this.tool?.color,
+      })));
+      for (const placement of group) plannedKeys.add(`${placement.x},${placement.y}`);
+    }
     const added = this.session.placeDoodadRecords(planned);
     if (added.length) this.queueDoodadPatch({ upserts: added });
   }

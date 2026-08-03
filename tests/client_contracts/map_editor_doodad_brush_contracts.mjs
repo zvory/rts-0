@@ -4,6 +4,7 @@ import {
   createDoodadSprayStroke,
   doodadTypeFromSelection,
   extendDoodadSprayStroke,
+  MAP_EDITOR_MAX_DOODADS,
   MAP_EDITOR_DOODAD_TYPES,
   MAP_EDITOR_MAX_SPRAY_DENSITY,
 } from "../../client/src/map_editor_doodads.js";
@@ -109,7 +110,10 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 16, playerCount: 1 });
   session.beginDoodadStroke("Placed density fixture");
-  session.placeDoodads([{ x: 64, y: 96 }], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
+  session.placeDoodads([
+    { x: 64, y: 96 },
+    { x: 96, y: 96 },
+  ], { typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK });
   session.commitDoodadStroke();
   session.beginDoodadStroke("Sprayed symmetric mixed trees");
   const updates = [];
@@ -123,10 +127,15 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
     },
     queueDoodadPatch(update) { updates.push(structuredClone(update)); },
   };
-  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 80, y: 96 }]);
+  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [
+    { x: 80, y: 96 },
+    { x: 431, y: 415 },
+  ]);
   assert.deepEqual(updates[0].upserts.map(({ x, y }) => ({ x, y })), [
     { x: 80, y: 96 }, { x: 431, y: 415 },
-  ], "a dense tree spray keeps both members of a symmetry group even beside existing trees");
+  ], "a dense tree spray keeps both symmetry partners once even when its sampled points overlap");
+  assert.equal(new Set(updates[0].upserts.map(({ typeId }) => typeId)).size, 1,
+    "mirrored trees use one species from the selected mix");
   MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 160, y: 160 }]);
   assert.deepEqual(updates[1].upserts.map(({ x, y }) => ({ x, y })), [
     { x: 160, y: 160 }, { x: 351, y: 351 },
@@ -145,6 +154,33 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
   MapEditorViewport.prototype.continueDoodadPointer.call(viewport, { x: 100, y: 120 });
   assert.deepEqual(viewport.doodadLastWorld, { x: 100, y: 120 },
     "place is click-only; moving the pointer does not add a drag trail");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 16, playerCount: 1 });
+  session.draft.doodads = Array.from({ length: MAP_EDITOR_MAX_DOODADS - 1 }, (_, index) => ({
+    id: index + 1,
+    typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK,
+    x: index % 512,
+    y: Math.floor(index / 512),
+  }));
+  session.beginDoodadStroke("Sprayed near cap");
+  const updates = [];
+  const viewport = {
+    session,
+    tool: {
+      typeId: MAP_EDITOR_DOODAD_TYPES.TREE_OAK,
+      typeIds: [MAP_EDITOR_DOODAD_TYPES.TREE_OAK, MAP_EDITOR_DOODAD_TYPES.TREE_PINE],
+      color: null,
+      symmetry: MAP_EDITOR_SYMMETRY.HALF_TURN,
+    },
+    queueDoodadPatch(update) { updates.push(structuredClone(update)); },
+  };
+  MapEditorViewport.prototype.placeDoodadPoints.call(viewport, [{ x: 80, y: 96 }]);
+  assert.deepEqual(updates, [], "the doodad cap does not admit half a symmetry group");
+  assert.equal(session.draft.doodads.length, MAP_EDITOR_MAX_DOODADS - 1);
+  session.cancelDoodadStroke();
 }
 
 {
