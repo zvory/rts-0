@@ -10,6 +10,8 @@ export class ReplayViewer extends Match {
       onBackToLobby: options.onBackToLobby,
       unitRangesEnabled: options.unitRangesEnabled,
       onUnitRangesEnabledChange: options.onUnitRangesEnabledChange,
+      healthBarsAlwaysEnabled: options.healthBarsAlwaysEnabled,
+      onHealthBarsAlwaysEnabledChange: options.onHealthBarsAlwaysEnabledChange,
       autoSpectatorEnabled: options.autoSpectatorEnabled,
       onAutoSpectatorEnabledChange: options.onAutoSpectatorEnabledChange,
       capabilities: options.capabilities,

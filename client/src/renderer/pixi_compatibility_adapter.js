@@ -342,6 +342,7 @@ function buildFeedbackView(frame, entities, { smokes, abilityObjects, resourceSi
     feedbackOwnerIds,
     issueAsOwnerId: context?.issueAsOwnerId ?? null,
     showUnitRangesEnabled: context?.showUnitRangesEnabled !== false,
+    showHealthBarsAlwaysEnabled: !!context?.showHealthBarsAlwaysEnabled,
     showAllUnitRangesEnabled: !!context?.showAllUnitRangesEnabled,
     showSelectedFieldOfFireEnabled: !!context?.showSelectedFieldOfFireEnabled,
     debugPathOverlaysEnabled: !!context?.debugPathOverlaysEnabled,

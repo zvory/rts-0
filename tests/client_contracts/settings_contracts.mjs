@@ -28,6 +28,13 @@ import {
   writeUnitRangesEnabled,
 } from "../../client/src/unit_range_settings.js";
 import {
+  readAlwaysShowHealthBarsEnabled,
+  writeAlwaysShowHealthBarsEnabled,
+} from "../../client/src/health_bar_settings.js";
+import {
+  configureMatchDisplayPreferences,
+} from "../../client/src/match_settings_toggles.js";
+import {
   HOTKEY_COMMAND_SELECT_IDLE_WORKERS,
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PROFILE_SCHEMA_VERSION,
@@ -236,11 +243,46 @@ function hotkeyService() {
     assert(!readUnitRangesEnabled(storage), "unit range setting persists disabled state");
     writeUnitRangesEnabled(true, storage);
     assert(readUnitRangesEnabled(storage), "unit range setting clears override when re-enabled");
+    assert(!readAlwaysShowHealthBarsEnabled(storage), "always-show health bars defaults off");
+    writeAlwaysShowHealthBarsEnabled(true, storage);
+    assert(readAlwaysShowHealthBarsEnabled(storage), "always-show health bars persists enabled state");
+    writeAlwaysShowHealthBarsEnabled(false, storage);
+    assert(!readAlwaysShowHealthBarsEnabled(storage), "always-show health bars clears its override when disabled");
+    const unavailableStorage = {
+      getItem() { throw new Error("storage unavailable"); },
+      setItem() { throw new Error("storage unavailable"); },
+    };
+    assert(!readAlwaysShowHealthBarsEnabled(unavailableStorage), "health-bar storage read failures use the safe default");
+    writeAlwaysShowHealthBarsEnabled(true, unavailableStorage);
+  }
+
+  {
+    const state = {};
+    let synced = 0;
+    let notified = null;
+    const match = {
+      state,
+      syncSettingsToggleUi() { synced += 1; },
+      toggleUnitRangeOverlays() {},
+    };
+    configureMatchDisplayPreferences(match, {
+      unitRangesEnabled: false,
+      healthBarsAlwaysEnabled: true,
+      onHealthBarsAlwaysEnabledChange(enabled) { notified = enabled; },
+    });
+    assert(!state.showUnitRangesEnabled, "match display preferences initialize unit ranges");
+    assert(state.showHealthBarsAlwaysEnabled, "match display preferences initialize health bars");
+
+    match.onHealthBarToggle();
+    assert(!state.showHealthBarsAlwaysEnabled, "match health-bar toggle updates display state");
+    assert(synced === 1, "match health-bar toggle refreshes settings UI");
+    assert(notified === false, "match health-bar toggle publishes the new preference");
   }
 
   withFakeSettingsDocument(() => {
     let predictionToggled = false;
     let unitRangeToggled = false;
+    let healthBarsToggled = false;
     const [gameTab] = buildSettingsTabs({
       game: {
         kind: "match",
@@ -251,6 +293,10 @@ function hotkeyService() {
         unitRanges: {
           state: () => ({ enabled: true, available: true }),
           onToggle: () => { unitRangeToggled = true; },
+        },
+        healthBars: {
+          state: () => ({ enabled: false, available: true }),
+          onToggle: () => { healthBarsToggled = true; },
         },
       },
     }).filter((tab) => tab.id === "game");
@@ -266,6 +312,11 @@ function hotkeyService() {
     assert(rangeToggle.textContent === "Show Unit Ranges: on", "settings: unit range toggle uses expected label");
     rangeToggle.listeners.click();
     assert(unitRangeToggled, "settings: unit range control calls injected toggle");
+    const healthBarToggle = findFakeById(root, "always-show-health-bars-toggle");
+    assert(healthBarToggle, "settings: game tab renders always-show health bars control with pinned id");
+    assert(healthBarToggle.textContent === "Always Show HP Bars: off", "settings: health bars default to damaged-only");
+    healthBarToggle.listeners.click();
+    assert(healthBarsToggled, "settings: health bar control calls injected toggle");
   });
 
   withFakeSettingsDocument(() => {

@@ -68,6 +68,7 @@ export function buildRendererFeedbackView(
     unitRangeEntities: () => arrayOrEmpty(entities),
     enemyAntiTankGunThreats: () => enemyAntiTankGunThreats,
     showUnitRangesEnabled: state?.showUnitRangesEnabled !== false,
+    showHealthBarsAlwaysEnabled: !!state?.showHealthBarsAlwaysEnabled,
     showAllUnitRangesEnabled: !!state?.showAllUnitRangesEnabled,
     showSelectedFieldOfFireEnabled: controlOwner.showSelectedFieldOfFireEnabled,
     debugPathOverlaysEnabled: !!state?.debugPathOverlaysEnabled,

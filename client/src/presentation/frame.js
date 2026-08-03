@@ -171,6 +171,7 @@ export class PresentationFrameAssembler {
         feedbackOwnerIds: feedback.feedbackOwnerIds,
         issueAsOwnerId: feedback.issueAsOwnerId,
         showUnitRangesEnabled: feedback.showUnitRangesEnabled,
+        showHealthBarsAlwaysEnabled: feedback.showHealthBarsAlwaysEnabled,
         showAllUnitRangesEnabled: feedback.showAllUnitRangesEnabled,
         showSelectedFieldOfFireEnabled: feedback.showSelectedFieldOfFireEnabled,
         debugPathOverlaysEnabled: feedback.debugPathOverlaysEnabled,

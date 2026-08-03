@@ -86,6 +86,7 @@ function renderGamePanel(root, game) {
   }
   if (game?.pointerLock) renderPointerLockControl(root, game.pointerLock);
   if (game?.unitRanges) renderUnitRangeControl(root, game.unitRanges);
+  if (game?.healthBars) renderHealthBarControl(root, game.healthBars);
 }
 
 function renderExclusiveFullscreenControl(root, exclusiveFullscreen) {
@@ -193,6 +194,31 @@ function renderUnitRangeControl(root, unitRanges) {
   }
   sync();
   unitRanges.onMount?.(sync);
+}
+
+function renderHealthBarControl(root, healthBars) {
+  const button = document.createElement("button");
+  button.id = "always-show-health-bars-toggle";
+  button.type = "button";
+  button.className = "settings-toggle";
+  button.setAttribute("role", "switch");
+  button.addEventListener("click", () => {
+    healthBars.onToggle?.();
+    sync();
+  });
+  root.appendChild(button);
+
+  function sync() {
+    const state = healthBars.state?.() || {};
+    const enabled = !!state.enabled;
+    button.hidden = !!state.hidden;
+    button.disabled = state.available === false;
+    button.setAttribute("aria-checked", String(enabled));
+    button.textContent = enabled ? "Always Show HP Bars: on" : "Always Show HP Bars: off";
+    button.title = "Show every visible entity's HP bar, including at full health.";
+  }
+  sync();
+  healthBars.onMount?.(sync);
 }
 
 function renderHotkeysPanel(root, hotkeyProfiles, context) {
