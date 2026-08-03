@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::{Deserialize, Serialize};
+use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore};
@@ -210,14 +211,99 @@ impl TankTrailSpatialIndex {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Clone)]
 pub(super) struct TankTrailStore {
     next_id: u32,
     finalized: Vec<FinalizedTankTrail>,
     active_by_tank: BTreeMap<u32, ActiveTankTrail>,
-    #[serde(skip)]
     spatial_index: TankTrailSpatialIndex,
+}
+
+impl Serialize for TankTrailStore {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let finalized = self
+            .finalized
+            .iter()
+            .map(|trail| (trail.created_revision, encode_poses(&trail.poses)))
+            .collect::<Vec<_>>();
+        let active = self
+            .active_by_tank
+            .iter()
+            .map(|(tank_id, trail)| {
+                (
+                    *tank_id,
+                    trail.owner,
+                    encode_poses(&trail.poses),
+                    trail.last_observed,
+                    trail.last_motion_tick,
+                )
+            })
+            .collect::<Vec<_>>();
+        (finalized, active).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for TankTrailStore {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        type FinalizedRow = (u32, String);
+        type ActiveRow = (u32, u32, String, TankTrailPose, u32);
+        let (finalized_rows, active_rows): (Vec<FinalizedRow>, Vec<ActiveRow>) =
+            Deserialize::deserialize(deserializer)?;
+        let mut finalized = Vec::with_capacity(finalized_rows.len());
+        for (index, (created_revision, encoded)) in finalized_rows.into_iter().enumerate() {
+            let poses = decode_poses::<D::Error>(&encoded)?;
+            if poses.len() < 2 || poses.len() > MAX_ACTIVE_POSES {
+                return Err(D::Error::custom("invalid finalized tank trail pose count"));
+            }
+            let id = u32::try_from(index)
+                .ok()
+                .and_then(|value| value.checked_add(1))
+                .ok_or_else(|| D::Error::custom("too many finalized tank trails"))?;
+            let bounds = TrailBounds::from_poses(&poses)
+                .ok_or_else(|| D::Error::custom("invalid finalized tank trail bounds"))?;
+            finalized.push(FinalizedTankTrail {
+                id,
+                poses,
+                bounds,
+                created_revision,
+            });
+        }
+        let next_id = u32::try_from(finalized.len())
+            .ok()
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| D::Error::custom("too many finalized tank trails"))?;
+        let mut active_by_tank = BTreeMap::new();
+        for (tank_id, owner, encoded, last_observed, last_motion_tick) in active_rows {
+            let poses = decode_poses::<D::Error>(&encoded)?;
+            if poses.is_empty() || poses.len() > MAX_ACTIVE_POSES {
+                return Err(D::Error::custom("invalid active tank trail pose count"));
+            }
+            let previous = active_by_tank.insert(
+                tank_id,
+                ActiveTankTrail {
+                    owner,
+                    poses,
+                    last_observed,
+                    last_motion_tick,
+                },
+            );
+            if previous.is_some() {
+                return Err(D::Error::custom("duplicate active tank trail"));
+            }
+        }
+        Ok(Self {
+            next_id,
+            finalized,
+            active_by_tank,
+            spatial_index: TankTrailSpatialIndex::default(),
+        })
+    }
 }
 
 impl Default for TankTrailStore {
@@ -468,6 +554,35 @@ fn pose_valid(pose: TankTrailPose, map: &Map) -> bool {
     map.contains_world_point(pose.x(), pose.y())
 }
 
+fn encode_poses(poses: &[TankTrailPose]) -> String {
+    let mut bytes = Vec::with_capacity(poses.len() * 6);
+    for pose in poses {
+        bytes.extend_from_slice(&pose.0 .0.to_le_bytes());
+        bytes.extend_from_slice(&pose.0 .1.to_le_bytes());
+        bytes.extend_from_slice(&pose.0 .2.to_le_bytes());
+    }
+    STANDARD_NO_PAD.encode(bytes)
+}
+
+fn decode_poses<E: serde::de::Error>(encoded: &str) -> Result<Vec<TankTrailPose>, E> {
+    let bytes = STANDARD_NO_PAD
+        .decode(encoded)
+        .map_err(|_| E::custom("invalid tank trail pose encoding"))?;
+    if !bytes.len().is_multiple_of(6) {
+        return Err(E::custom("invalid tank trail pose byte length"));
+    }
+    Ok(bytes
+        .chunks_exact(6)
+        .map(|bytes| {
+            TankTrailPose((
+                u16::from_le_bytes([bytes[0], bytes[1]]),
+                u16::from_le_bytes([bytes[2], bytes[3]]),
+                i16::from_le_bytes([bytes[4], bytes[5]]),
+            ))
+        })
+        .collect())
+}
+
 fn trail_fully_visible(trail: &FinalizedTankTrail, player: u32, fog: &Fog, map: &Map) -> bool {
     let Some((min_tx, min_ty, max_tx, max_ty)) = trail.bounds.tile_range(map) else {
         return false;
@@ -587,5 +702,23 @@ mod tests {
             },
         );
         assert!(store.valid_checkpoint_state(&map, &BTreeSet::from([1]), 3));
+    }
+
+    #[test]
+    fn checkpoint_encoding_packs_poses_and_rebuilds_derived_bounds() {
+        let map = Map::generate(1, 7);
+        let poses = vec![TankTrailPose((400, 400, 0)), TankTrailPose((496, 400, 0))];
+        let pending = TankTrailStore::pending(poses).unwrap();
+        let mut store = TankTrailStore::new();
+        assert!(store.commit(pending, 1, 7, &map));
+
+        let json = serde_json::to_string(&store).unwrap();
+        assert!(json.len() < 64, "compact checkpoint row was {json}");
+        assert!(!json.contains("bounds"));
+        assert!(!json.contains("nextId"));
+
+        let restored: TankTrailStore = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.view(1), store.view(1));
+        assert_eq!(restored.finalized[0].bounds, store.finalized[0].bounds);
     }
 }

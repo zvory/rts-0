@@ -1,17 +1,64 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::{Deserialize, Serialize};
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 
 use super::tank_trail::TankTrailStore;
 use super::{decal_for_id, GroundDecal, GroundDecalStore, GroundDecalView, TankTrailView};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum GroundDecalRevisionEntry {
     Created { id: u32, tick: u32 },
     Discovered { player: u32, id: u32, tick: u32 },
     TrailCreated { id: u32, tick: u32 },
     TrailDiscovered { player: u32, id: u32, tick: u32 },
+}
+
+impl Serialize for GroundDecalRevisionEntry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Created { id, tick } => (0u32, *id, *tick).serialize(serializer),
+            Self::Discovered { player, id, tick } => {
+                (1u32, *player, *id, *tick).serialize(serializer)
+            }
+            Self::TrailCreated { id, tick } => (2u32, *id, *tick).serialize(serializer),
+            Self::TrailDiscovered { player, id, tick } => {
+                (3u32, *player, *id, *tick).serialize(serializer)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for GroundDecalRevisionEntry {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let row = Vec::<u32>::deserialize(deserializer)?;
+        match row.as_slice() {
+            [0, id, tick] => Ok(Self::Created {
+                id: *id,
+                tick: *tick,
+            }),
+            [1, player, id, tick] => Ok(Self::Discovered {
+                player: *player,
+                id: *id,
+                tick: *tick,
+            }),
+            [2, id, tick] => Ok(Self::TrailCreated {
+                id: *id,
+                tick: *tick,
+            }),
+            [3, player, id, tick] => Ok(Self::TrailDiscovered {
+                player: *player,
+                id: *id,
+                tick: *tick,
+            }),
+            _ => Err(D::Error::custom("invalid ground decal revision row")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -116,6 +163,26 @@ impl GroundDecalRevisionEntry {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checkpoint_revision_rows_use_compact_numeric_tuples() {
+        let entry = GroundDecalRevisionEntry::TrailDiscovered {
+            player: 2,
+            id: 17,
+            tick: 900,
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert_eq!(json, "[3,2,17,900]");
+        assert_eq!(
+            serde_json::from_str::<GroundDecalRevisionEntry>(&json).unwrap(),
+            entry
+        );
+    }
+}
+
 impl GroundDecalStore {
     pub(crate) fn revision_for_players(&self, players: &[u32]) -> u32 {
         let decal_revision = players
@@ -183,12 +250,8 @@ impl GroundDecalStore {
         let current_revisions = self
             .revision_log
             .revisions_at_tick(self.current_tick, include);
-        let after_revision = current_delta_after(
-            revision,
-            &all_revisions,
-            &current_revisions,
-            max_revisions,
-        );
+        let after_revision =
+            current_delta_after(revision, &all_revisions, &current_revisions, max_revisions);
         let (_, decals, trails) = self.views_for_players_after(players, after_revision);
         (revision, after_revision, decals, trails)
     }
@@ -224,12 +287,8 @@ impl GroundDecalStore {
         let current_revisions = self
             .revision_log
             .revisions_at_tick(self.current_tick, include);
-        let after_revision = current_delta_after(
-            revision,
-            &all_revisions,
-            &current_revisions,
-            max_revisions,
-        );
+        let after_revision =
+            current_delta_after(revision, &all_revisions, &current_revisions, max_revisions);
         let (_, decals, trails) = self.full_world_views_after(after_revision);
         (revision, after_revision, decals, trails)
     }
@@ -267,10 +326,5 @@ pub(super) fn current_delta_after_for_test(
     current_revisions: &[u32],
     max_revisions: usize,
 ) -> u32 {
-    current_delta_after(
-        revision,
-        all_revisions,
-        current_revisions,
-        max_revisions,
-    )
+    current_delta_after(revision, all_revisions, current_revisions, max_revisions)
 }

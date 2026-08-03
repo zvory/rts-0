@@ -5,6 +5,7 @@ edition = "2021"
 description = "Reusable authoritative RTS simulation without server transport dependencies"
 
 [dependencies]
+base64 = "0.22"
 rts-contract = { path = "../contract" }
 rts-protocol = { path = "../protocol" }
 rts-rules = { path = "../rules" }
