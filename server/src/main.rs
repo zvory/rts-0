@@ -189,8 +189,6 @@ async fn main() {
         .route("/lab/", get(index_handler))
         .route("/map-editor", get(index_handler))
         .route("/map-editor/", get(index_handler))
-        .route("/map-preview", get(index_handler))
-        .route("/map-preview/", get(index_handler))
         .route("/stress-test", get(stress_test_index_handler))
         .route("/stress-test/", get(stress_test_index_handler))
         .route("/version", get(version_handler))
