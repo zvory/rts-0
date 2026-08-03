@@ -236,6 +236,6 @@ mod tests {
     fn jeff_profile_fingerprint_uses_stable_canonical_data() {
         let identity = profile_identity_by_id(JEFFS_AI_ID).expect("Jeff profile identity");
 
-        assert_eq!(identity.fingerprint, "fnv1a64:80733ac21767d7be");
+        assert_eq!(identity.fingerprint, "fnv1a64:06aa666eeb8a9eb7");
     }
 }

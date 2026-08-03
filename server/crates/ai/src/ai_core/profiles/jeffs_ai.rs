@@ -2,8 +2,8 @@ use super::{
     AiProfile, AttackPolicy, BarracksCurve, BuildingPolicy, DefensiveMachineGunnerPolicy,
     ExpansionContainmentPolicy, ExpansionPolicy, ExtraFactoryPolicy, FastTankTimingPolicy,
     FrontalWavePolicy, HomeAntiTankPolicy, ProductionPolicy, Ratio, ResourceFloatThreshold,
-    ResourcePolicy, SurplusSteelProductionPolicy, TankResourcePolicy, TechTransitionPolicy,
-    WorkerPolicy,
+    ResourcePolicy, RiflemanDefensePolicy, SurplusSteelProductionPolicy, TankResourcePolicy,
+    TechTransitionPolicy, WorkerPolicy,
 };
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -97,6 +97,12 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
+    rifleman_defense: Some(RiflemanDefensePolicy {
+        activation_building: EntityKind::Factory,
+        max_main_chokes: 3,
+        perimeter_distance_tiles: 6.0,
+        reissue_distance_tiles: 1.0,
+    }),
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 2,
         perimeter_distance_tiles: 6.0,
@@ -184,6 +190,9 @@ mod tests {
         assert_eq!(transition.attack.regroup_reset_ticks, 120);
         assert_eq!(JEFFS_AI.frontal_wave.exclude_launched_ticks, Some(120));
         assert_eq!(JEFFS_AI.expansion.unwrap().defensive_unit_count, 1);
+        let rifle_defense = JEFFS_AI.rifleman_defense.unwrap();
+        assert_eq!(rifle_defense.activation_building, EntityKind::Factory);
+        assert_eq!(rifle_defense.max_main_chokes, 3);
         let containment = JEFFS_AI.expansion_containment.unwrap();
         assert_eq!(containment.minimum_tanks_to_continue, 2);
         assert_eq!(containment.recovery_tanks_to_continue, 3);

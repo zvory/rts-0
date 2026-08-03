@@ -68,6 +68,7 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
+    rifleman_defense: None,
     defensive_machine_gunners: None,
     turtle_defense: Some(TurtleDefensePolicy {
         max_chokes: 3,

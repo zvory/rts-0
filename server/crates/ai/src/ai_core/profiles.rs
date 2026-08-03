@@ -34,6 +34,7 @@ pub(crate) struct AiProfile {
     pub(crate) attack: AttackPolicy,
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
+    pub(crate) rifleman_defense: Option<RiflemanDefensePolicy>,
     pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
     pub(crate) turtle_defense: Option<TurtleDefensePolicy>,
     pub(crate) frontal_wave: FrontalWavePolicy,
@@ -41,6 +42,14 @@ pub(crate) struct AiProfile {
     pub(crate) home_anti_tank: Option<HomeAntiTankPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
     pub(crate) fast_tank_timing: Option<FastTankTimingPolicy>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub(crate) struct RiflemanDefensePolicy {
+    pub(crate) activation_building: EntityKind,
+    pub(crate) max_main_chokes: usize,
+    pub(crate) perimeter_distance_tiles: f32,
+    pub(crate) reissue_distance_tiles: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -357,6 +366,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
+    rifleman_defense: None,
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 4,
         perimeter_distance_tiles: 20.0,
