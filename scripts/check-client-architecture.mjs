@@ -159,6 +159,7 @@ const AREA_BY_FILE = new Map(Object.entries({
 }));
 
 const AREA_PREFIXES = [
+  ["map_authoring/", "ui"],
   ["config/", "rules-mirror"],
   ["config_", "rules-mirror"],
   ["presentation/", "presentation"],

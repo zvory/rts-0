@@ -5,6 +5,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { buildMapFromRecipe, renderPreviewSvg, validateMap } from "../scripts/map-author.mjs";
+import { MapEditorSession, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
+import { TERRAIN } from "../client/src/protocol.js";
 
 const repoRoot = new URL("../", import.meta.url);
 const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.rs", repoRoot), "utf8");
@@ -41,6 +43,40 @@ for (let y = 0; y < map.height; y += 1) {
 const validation = validateMap(map, { symmetry: "halfTurn" });
 assert(validation.warnings.some((warning) => warning.includes("protected area")), "blocked base clearance is advisory");
 assert(!validation.warnings.some((warning) => warning.includes("symmetry mismatches")), "generated terrain preserves symmetry");
+
+const parityRecipe = {
+  name: "Shared operation parity",
+  width: 32,
+  height: 32,
+  symmetry: "halfTurn",
+  operations: [{ type: "rect", material: "0", from: [3, 5], to: [5, 7] }],
+};
+const recipeTerrain = buildMapFromRecipe(parityRecipe).terrain;
+const editorSession = new MapEditorSession({ storage: null });
+editorSession.initializeBlank({ size: 32, playerCount: 2 });
+editorSession.beginTerrainStroke("Parity paint");
+const editorTiles = symmetricTerrainTiles(
+  editorSession.draft,
+  mapEditorRectTiles({ x: 3, y: 5 }, { x: 5, y: 7 }, editorSession.draft),
+  TERRAIN.GRAVEL_A,
+  MAP_EDITOR_SYMMETRY.HALF_TURN,
+);
+editorSession.paintTerrainTiles(editorTiles, TERRAIN.GRAVEL_A);
+editorSession.commitTerrainStroke();
+assert.deepEqual(
+  editorSession.exportMap().terrain,
+  recipeTerrain,
+  "UI tile gestures and recipe shapes materialize through the same symmetry and mutation engine",
+);
+
+const radial = buildMapFromRecipe({
+  name: "Shared symmetry vocabulary",
+  width: 16,
+  height: 16,
+  symmetry: "radial",
+  operations: [{ type: "rect", material: "water", from: [2, 3], to: [2, 3] }],
+});
+for (const [x, y] of [[2, 3], [12, 2], [13, 12], [3, 13]]) assert.equal(radial.terrain[y][x], "~");
 
 const preview = renderPreviewSvg(map, { tilePixels: 3 });
 assert(preview.startsWith("<svg"));
@@ -119,4 +155,4 @@ try {
   fs.rmSync(tempRoot, { recursive: true, force: true });
 }
 
-console.log("✅ map_author_cli_contracts.mjs: permissive recipe build, advisory validation, and preview");
+console.log("✅ map_author_cli_contracts.mjs: shared authoring parity, advisory validation, and preview");

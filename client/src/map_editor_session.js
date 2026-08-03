@@ -1,10 +1,19 @@
-import { PASSABLE, TERRAIN, isRoadTerrain } from "./protocol.js";
+import { PASSABLE, TERRAIN } from "./protocol.js";
 import {
   createMapEditorDoodads,
   MAP_EDITOR_MAX_DOODADS,
   normalizeMapEditorDoodads,
   removeMapEditorDoodads,
 } from "./map_editor_doodads.js";
+import { applyMapOperation, transformRoadCharacter } from "./map_authoring/operations.js";
+import { rectTiles } from "./map_authoring/geometry.js";
+import {
+  expandSymmetricPoints,
+  MAP_AUTHORING_SYMMETRY,
+  symmetrySupported,
+  symmetryTransforms as authoringSymmetryTransforms,
+  transformPoint as transformAuthoringPoint,
+} from "./map_authoring/symmetry.js";
 
 export { MAP_EDITOR_MAX_DOODADS } from "./map_editor_doodads.js";
 
@@ -21,16 +30,7 @@ export const MAP_EDITOR_MAX_SIZE = 256;
 // Mirror the authored-map clearance contract enforced by the simulation.
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
-export const MAP_EDITOR_SYMMETRY = Object.freeze({
-  NONE: "none",
-  HORIZONTAL: "horizontal",
-  VERTICAL: "vertical",
-  HALF_TURN: "halfTurn",
-  THREE_WAY: "threeWay",
-  RADIAL: "radial",
-  DIAGONAL_MAIN: "diagonalMain",
-  DIAGONAL_ANTI: "diagonalAnti",
-});
+export const MAP_EDITOR_SYMMETRY = MAP_AUTHORING_SYMMETRY;
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -71,23 +71,6 @@ const CHAR_TO_TERRAIN = Object.freeze({
   "7": TERRAIN.MUD_B,
   "8": TERRAIN.MUD_C,
   "9": TERRAIN.FROSTED_GROUND,
-});
-const ROAD_TERRAIN_ANGLES = new Map([
-  [TERRAIN.ROAD_HORIZONTAL, 0],
-  [TERRAIN.ROAD_DIAGONAL_NW_SE, 45],
-  [TERRAIN.ROAD_VERTICAL, 90],
-  [TERRAIN.ROAD_DIAGONAL_NE_SW, 135],
-]);
-const SIN_120 = Math.sqrt(3) / 2;
-const SYMMETRY_TRANSFORMS = Object.freeze({
-  [MAP_EDITOR_SYMMETRY.NONE]: ["identity"],
-  [MAP_EDITOR_SYMMETRY.HORIZONTAL]: ["identity", "horizontal"],
-  [MAP_EDITOR_SYMMETRY.VERTICAL]: ["identity", "vertical"],
-  [MAP_EDITOR_SYMMETRY.HALF_TURN]: ["identity", "rotate180"],
-  [MAP_EDITOR_SYMMETRY.THREE_WAY]: ["identity", "rotate120", "rotate240"],
-  [MAP_EDITOR_SYMMETRY.RADIAL]: ["identity", "rotate90", "rotate180", "rotate270"],
-  [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN]: ["identity", "diagonalMain"],
-  [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI]: ["identity", "diagonalAnti"],
 });
 
 export class MapEditorSession {
@@ -306,30 +289,21 @@ export class MapEditorSession {
 
   paintTerrainTiles(tiles, terrainCode) {
     if (!this.draft || !this.terrainStroke || !Array.isArray(tiles)) return [];
-    const { width, height } = draftDimensions(this.draft);
-    const byRow = new Map();
-    const changed = [];
-    for (const tile of tiles) {
-      const x = Math.trunc(Number(tile?.x));
-      const y = Math.trunc(Number(tile?.y));
-      const code = tile?.paintTerrainCode ?? terrainCode;
-      const ch = TERRAIN_TO_CHAR[code];
-      if (
-        !ch || x < 0 || y < 0 || x >= width || y >= height
-        || (
-          PASSABLE[code] !== true
-          && protectedTerrainTile(this.draft, x, y)
-        )
-      ) continue;
-      const row = byRow.get(y) || [...this.draft.terrain[y]];
-      if (row[x] === ch) continue;
-      row[x] = ch;
-      byRow.set(y, row);
-      const change = { x, y, code };
-      this.terrainStroke.dirty.set(`${x},${y}`, change);
-      changed.push(change);
+    const source = tiles.map((tile) => ({
+      ...tile,
+      character: TERRAIN_TO_CHAR[tile?.paintTerrainCode ?? terrainCode],
+    })).filter((tile) => tile.character);
+    const { terrainPatch } = applyMapOperation(this.draft, {
+      type: "paintTiles",
+      tiles: source,
+      expandSymmetry: false,
+    }, {
+      protectedTerrain: ({ x, y }) => protectedTerrainTile(this.draft, x, y),
+    });
+    const changed = terrainPatch.map(({ x, y, character }) => ({ x, y, code: CHAR_TO_TERRAIN[character] }));
+    for (const change of changed) {
+      this.terrainStroke.dirty.set(`${change.x},${change.y}`, change);
     }
-    for (const [y, row] of byRow) this.draft.terrain[y] = row.join("");
     return changed;
   }
 
@@ -363,24 +337,14 @@ export class MapEditorSession {
 
   paintOverlayTiles(tiles, edit = {}) {
     if (!this.draft || !this.overlayStroke || !Array.isArray(tiles)) return [];
-    const dimensions = draftDimensions(this.draft);
-    const stealth = new Map(this.draft.stealthTiles.map((tile) => [locationKey(tile), tile]));
-    const noVehicle = new Map(this.draft.noVehicleTiles.map((tile) => [locationKey(tile), tile]));
-    const changed = [];
-    for (const candidate of tiles) {
-      const tile = validMapTile(candidate, dimensions);
-      if (!tile) continue;
-      const key = locationKey(tile);
-      const before = `${stealth.has(key)}:${noVehicle.has(key)}`;
-      applyOverlayEdit(stealth, key, tile, edit.stealth);
-      applyOverlayEdit(noVehicle, key, tile, edit.noVehicle);
-      if (before === `${stealth.has(key)}:${noVehicle.has(key)}`) continue;
-      this.overlayStroke.dirty.set(key, tile);
-      changed.push(tile);
-    }
-    this.draft.stealthTiles = [...stealth.values()];
-    this.draft.noVehicleTiles = [...noVehicle.values()];
-    return changed;
+    const { overlayPatch } = applyMapOperation(this.draft, {
+      type: "overlayTiles",
+      tiles,
+      edit,
+      expandSymmetry: false,
+    });
+    for (const tile of overlayPatch) this.overlayStroke.dirty.set(locationKey(tile), tile);
+    return overlayPatch;
   }
 
   commitOverlayStroke() {
@@ -506,7 +470,7 @@ export class MapEditorSession {
 }
 
 export function symmetricMapTiles(dimensions, tiles, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
-  return symmetricTiles(dimensions, tiles, symmetry);
+  return symmetricTiles(dimensions, tiles, symmetry, ({ x, y }) => ({ x, y }));
 }
 
 /**
@@ -514,40 +478,19 @@ export function symmetricMapTiles(dimensions, tiles, symmetry = MAP_EDITOR_SYMME
  * geometrically correct in each reflected or rotated copy.
  */
 export function symmetricTerrainTiles(dimensions, tiles, terrainCode, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
-  return symmetricTiles(dimensions, tiles, symmetry, (tile, transform) => ({
-    ...tile,
+  return symmetricTiles(dimensions, tiles, symmetry, ({ x, y }, transform) => ({
+    x,
+    y,
     paintTerrainCode: transformTerrainCode(terrainCode, transform),
   }));
 }
 
 function symmetricTiles(dimensions, tiles, symmetry, decorate = (tile) => tile) {
-  const map = normalizeDimensions(dimensions);
-  if (!map || !Array.isArray(tiles)) return [];
-  const expanded = [];
-  const seen = new Set();
-  for (const tile of tiles) {
-    const source = validMapTile(tile, map);
-    if (!source) continue;
-    for (const transform of symmetryTransforms(map, symmetry)) {
-      const transformed = transformMapTile(source, map, transform);
-      if (!transformed || seen.has(locationKey(transformed))) continue;
-      seen.add(locationKey(transformed));
-      expanded.push(decorate(transformed, transform));
-    }
-  }
-  return expanded;
+  return expandSymmetricPoints(dimensions, tiles, symmetry, { decorate });
 }
 
 export function mapEditorRectTiles(first, last, dimensions) {
-  const map = normalizeDimensions(dimensions);
-  const start = validMapTile(first, map);
-  const end = validMapTile(last, map);
-  if (!start || !end) return [];
-  const tiles = [];
-  for (let y = Math.min(start.y, end.y); y <= Math.max(start.y, end.y); y++) {
-    for (let x = Math.min(start.x, end.x); x <= Math.max(start.x, end.x); x++) tiles.push({ x, y });
-  }
-  return tiles;
+  return rectTiles(dimensions, first, last);
 }
 
 export function moveSymmetricDraftLocation(draft, {
@@ -881,10 +824,6 @@ function normalizeOverlayTiles(locations, dimensions) {
     .sort((left, right) => left.x - right.x || left.y - right.y);
 }
 
-function applyOverlayEdit(collection, key, tile, value) {
-  if (value === true) collection.set(key, copyLocation(tile));
-  else if (value === false) collection.delete(key);
-}
 function normalizeBaseSites(baseSites, startLocations, dimensions) {
   const normalized = normalizeBaseSiteRecords(baseSites, dimensions);
   const startKeys = new Set(startLocations.map(locationKey));
@@ -981,98 +920,20 @@ function validMapTile(tile, dimensions) {
   return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < map.width && y < map.height ? { x, y } : null;
 }
 function transformMapTile(tile, dimensions, transform) {
-  if (!tile) return null;
-  const map = normalizeDimensions(dimensions);
-  if (!map) return null;
-  const maxX = map.width - 1;
-  const maxY = map.height - 1;
-  if (transform === "horizontal") return { x: tile.x, y: maxY - tile.y };
-  if (transform === "vertical") return { x: maxX - tile.x, y: tile.y };
-  if (transform === "rotate90") return map.width === map.height ? { x: maxX - tile.y, y: tile.x } : null;
-  if (transform === "rotate120") return map.width === map.height ? rotateAndSnapMapTile(tile, map, -0.5, SIN_120) : null;
-  if (transform === "rotate180") return { x: maxX - tile.x, y: maxY - tile.y };
-  if (transform === "rotate240") return map.width === map.height ? rotateAndSnapMapTile(tile, map, -0.5, -SIN_120) : null;
-  if (transform === "rotate270") return map.width === map.height ? { x: tile.y, y: maxY - tile.x } : null;
-  if (transform === "diagonalMain") return { x: tile.y, y: tile.x };
-  if (transform === "diagonalAnti") return { x: maxX - tile.y, y: maxY - tile.x };
-  return copyLocation(tile);
-}
-function rotateAndSnapMapTile(tile, dimensions, cosine, sine) {
-  const map = normalizeDimensions(dimensions);
-  const centreX = (map.width - 1) / 2;
-  const centreY = (map.height - 1) / 2;
-  const dx = tile.x - centreX;
-  const dy = tile.y - centreY;
-  const rotated = {
-    x: Math.round(centreX + dx * cosine - dy * sine),
-    y: Math.round(centreY + dx * sine + dy * cosine),
-  };
-  // A square has no exact three-fold rotational symmetry. Keep the closest tile-centre
-  // projection when it remains on the map and omit copies that rotate beyond its corners.
-  return validMapTile(rotated, map);
+  return transformAuthoringPoint(tile, dimensions, transform);
 }
 
 export function mapEditorSymmetrySupported(dimensions, symmetry) {
-  const map = normalizeDimensions(dimensions);
-  if (!map) return false;
-  const normalized = normalizeMapEditorSymmetry(symmetry);
-  return map.width === map.height || ![
-    MAP_EDITOR_SYMMETRY.THREE_WAY,
-    MAP_EDITOR_SYMMETRY.RADIAL,
-    MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN,
-    MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI,
-  ].includes(normalized);
+  return symmetrySupported(dimensions, symmetry);
 }
 
 function symmetryTransforms(dimensions, symmetry) {
-  const normalized = normalizeMapEditorSymmetry(symmetry);
-  return mapEditorSymmetrySupported(dimensions, normalized)
-    ? SYMMETRY_TRANSFORMS[normalized]
-    : SYMMETRY_TRANSFORMS[MAP_EDITOR_SYMMETRY.NONE];
+  return authoringSymmetryTransforms(dimensions, symmetry);
 }
 function transformTerrainCode(code, transform) {
-  if (transform === "rotate120" || transform === "rotate240") {
-    return closestRotatedRoadTerrain(code, transform === "rotate120" ? 120 : 240);
-  }
-  if (code === TERRAIN.ROAD_HORIZONTAL) {
-    return transform === "rotate90" || transform === "rotate270" || transform.startsWith("diagonal")
-      ? TERRAIN.ROAD_VERTICAL
-      : code;
-  }
-  if (code === TERRAIN.ROAD_VERTICAL) {
-    return transform === "rotate90" || transform === "rotate270" || transform.startsWith("diagonal")
-      ? TERRAIN.ROAD_HORIZONTAL
-      : code;
-  }
-  if (code === TERRAIN.ROAD_DIAGONAL_NW_SE) {
-    return transform === "horizontal" || transform === "vertical" || transform === "rotate90" || transform === "rotate270"
-      ? TERRAIN.ROAD_DIAGONAL_NE_SW
-      : code;
-  }
-  if (code === TERRAIN.ROAD_DIAGONAL_NE_SW) {
-    return transform === "horizontal" || transform === "vertical" || transform === "rotate90" || transform === "rotate270"
-      ? TERRAIN.ROAD_DIAGONAL_NW_SE
-      : code;
-  }
-  return code;
+  const character = TERRAIN_TO_CHAR[code];
+  return CHAR_TO_TERRAIN[transformRoadCharacter(character, transform)] ?? code;
 }
-function closestRotatedRoadTerrain(code, degrees) {
-  const sourceAngle = ROAD_TERRAIN_ANGLES.get(code);
-  if (sourceAngle === undefined) return code;
-  const targetAngle = (sourceAngle + degrees) % 180;
-  let closestCode = code;
-  let closestDistance = Infinity;
-  for (const [candidateCode, candidateAngle] of ROAD_TERRAIN_ANGLES) {
-    const difference = Math.abs(targetAngle - candidateAngle);
-    const distance = Math.min(difference, 180 - difference);
-    if (distance < closestDistance) {
-      closestCode = candidateCode;
-      closestDistance = distance;
-    }
-  }
-  return closestCode;
-}
-function normalizeMapEditorSymmetry(value) { return SYMMETRY_TRANSFORMS[value] ? value : MAP_EDITOR_SYMMETRY.NONE; }
 function locationKey(location) { return `${location?.x},${location?.y}`; }
 function sameLocation(a, b) { return !!a && !!b && a.x === b.x && a.y === b.y; }
 function copyLocation(location) { return { x: Number(location?.x), y: Number(location?.y) }; }

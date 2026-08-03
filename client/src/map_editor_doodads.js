@@ -1,4 +1,5 @@
 import { DOODAD_TYPE, DOODAD_TYPE_IDS } from "./config.js";
+import { expandSymmetricPoints } from "./map_authoring/symmetry.js";
 
 export const MAP_EDITOR_MAX_DOODADS = 4096;
 export const MAP_EDITOR_DEFAULT_FLOWER_COLOR = "#e8b84a";
@@ -138,23 +139,9 @@ export function doodadIdsWithinRect(records, from, to) {
 
 export function symmetricDoodadPlacements(worldDimensions, points, symmetry = "none") {
   const dimensions = normalizedWorldDimensions(worldDimensions);
-  if (!dimensions || !Array.isArray(points)) return [];
-  const transforms = symmetryTransforms(symmetry);
-  const placements = [];
-  const seen = new Set();
-  for (const point of points) {
-    const source = boundedPoint(point, dimensions);
-    if (!source) continue;
-    for (const transform of transforms) {
-      const next = transformPoint(source, dimensions, transform);
-      if (!next) continue;
-      const key = `${next.x},${next.y}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      placements.push(next);
-    }
-  }
-  return placements;
+  return dimensions
+    ? expandSymmetricPoints(dimensions, points, symmetry, { decorate: ({ x, y }) => ({ x, y }) })
+    : [];
 }
 
 /** Stateful fixed-distance path sampler. Segment subdivision does not change its output. */
@@ -240,48 +227,6 @@ function hashUnit(seed, index) {
   value = Math.imul(value, 0x735a2d97);
   value ^= value >>> 15;
   return (value >>> 0) / 0x100000000;
-}
-
-function symmetryTransforms(symmetry) {
-  if (symmetry === "horizontal") return ["identity", "horizontal"];
-  if (symmetry === "vertical") return ["identity", "vertical"];
-  if (symmetry === "halfTurn") return ["identity", "rotate180"];
-  if (symmetry === "threeWay") return ["identity", "rotate120", "rotate240"];
-  if (symmetry === "radial") return ["identity", "rotate90", "rotate180", "rotate270"];
-  if (symmetry === "diagonalMain") return ["identity", "diagonalMain"];
-  if (symmetry === "diagonalAnti") return ["identity", "diagonalAnti"];
-  return ["identity"];
-}
-
-function transformPoint(point, dimensions, transform) {
-  const maxX = dimensions.width - 1;
-  const maxY = dimensions.height - 1;
-  if (transform === "horizontal") return { x: point.x, y: maxY - point.y };
-  if (transform === "vertical") return { x: maxX - point.x, y: point.y };
-  if (transform === "rotate90") return boundedPoint({ x: maxY - point.y, y: point.x }, dimensions);
-  if (transform === "rotate180") return { x: maxX - point.x, y: maxY - point.y };
-  if (transform === "rotate270") return boundedPoint({ x: point.y, y: maxX - point.x }, dimensions);
-  if (transform === "diagonalMain") return { x: point.y, y: point.x };
-  if (transform === "diagonalAnti") return { x: maxY - point.y, y: maxX - point.x };
-  if (transform === "rotate120" || transform === "rotate240") {
-    const centreX = maxX / 2;
-    const centreY = maxY / 2;
-    const sine = transform === "rotate120" ? Math.sqrt(3) / 2 : -Math.sqrt(3) / 2;
-    return boundedPoint({
-      x: Math.round(centreX + (point.x - centreX) * -0.5 - (point.y - centreY) * sine),
-      y: Math.round(centreY + (point.x - centreX) * sine + (point.y - centreY) * -0.5),
-    }, dimensions);
-  }
-  return { ...point };
-}
-
-function boundedPoint(point, dimensions) {
-  const x = Math.round(Number(point?.x));
-  const y = Math.round(Number(point?.y));
-  return Number.isFinite(x) && Number.isFinite(y)
-    && x >= 0 && y >= 0 && x < dimensions.width && y < dimensions.height
-    ? { x, y }
-    : null;
 }
 
 function normalizedWorldDimensions(value) {

@@ -677,7 +677,7 @@ try {
     `MAP EDITOR: top Tools section exposes bounded framing, step, and percentage zoom controls (${JSON.stringify(editorUi.zoom)})`,
   );
   ok(
-    editorUi.actionButtons.includes("Load map JSON") &&
+    editorUi.actionButtons.includes("Load map or recipe JSON") &&
       editorUi.actionButtons.includes("Export map JSON") &&
       !editorUi.actionButtons.includes("Save on this device") &&
       !editorUi.actionButtons.includes("Load saved map"),

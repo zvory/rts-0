@@ -1,5 +1,6 @@
 import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
+import { buildMapFromRecipe, isMapAuthoringRecipe } from "./map_authoring/recipe.js";
 import {
   canonicalDoodadColor,
   MAP_EDITOR_DEFAULT_FLOWER_COLOR,
@@ -518,13 +519,13 @@ export class MapEditorPanel {
   renderActions() {
     const section = group("Save and test");
     section.append(
-      button("Load map JSON", () => this.chooseJsonFile()),
+      button("Load map or recipe JSON", () => this.chooseJsonFile()),
       button("Export map JSON", () => this.exportJson()),
       button(this.pending ? "Opening Lab…" : "Open in Lab", () => void this.openLab(), {
         disabled: this.pending,
         className: "map-editor-primary",
       }),
-      readout("Opening Lab validates this map on the server and starts a fresh ordinary Lab. Units and elapsed time never return to the editor."),
+      readout("Recipe JSON uses the same fill, rectangle, blob, stroke, road, base, start, and symmetry operations as the map-author CLI. Opening Lab validates the resulting map on the server and starts a fresh ordinary Lab."),
     );
     return section;
   }
@@ -687,10 +688,12 @@ export class MapEditorPanel {
   }
 
   loadMapData(map) {
-    this.session.loadAuthoredMap(map);
+    const recipe = isMapAuthoringRecipe(map);
+    this.session.loadAuthoredMap(recipe ? buildMapFromRecipe(map) : map);
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
     this.viewport.armTool(null);
+    return recipe ? "recipe" : "map";
   }
 
   undo() {
@@ -720,8 +723,8 @@ export class MapEditorPanel {
       }
       if (typeof file?.text !== "function") throw new Error("The selected file could not be read.");
       const text = await file.text();
-      this.loadMapData(JSON.parse(text));
-      this.setStatus(`Loaded ${name}.`);
+      const kind = this.loadMapData(JSON.parse(text));
+      this.setStatus(`Loaded ${kind === "recipe" ? "recipe " : ""}${name}.`);
     } catch (error) {
       this.setStatus(`Could not load ${name}: ${error.message || error}`, true);
     }

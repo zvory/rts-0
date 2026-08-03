@@ -114,6 +114,7 @@ src/
   map_editor_launch.js # Bounded editor route/handoff query parsing
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
   map_editor_session.js # Flat authored-map state, undo/redo, and stroke transactions
+  map_authoring/ # Pure browser/Node geometry, symmetry, and serializable map operations shared by the editor and CLI
   map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, JSON files, and Lab launch
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
@@ -886,6 +887,11 @@ export class MapEditorSession {
   mapOverlay()
 }
 ```
+`map_authoring/` is the single implementation of authoring geometry and symmetry. Browser pointer
+gestures and `scripts/map-author.mjs` recipes are adapters over its pure ESM operations; the package
+does not access the DOM, Pixi, Node filesystem APIs, or simulation state. UI-only input/history and
+CLI-only file/argument handling stay outside it.
+
 `LabPanel` renders separate floating, collapsible Options and Tools windows. Options owns room
 status, lab vision, command-limit policy, setup authoring metadata, validation,
 setup import/export/reset, and result status; Tools owns target player, player state, spawn palettes,
@@ -904,13 +910,15 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. Its separate floating Options and Tools panels are
 independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
-status, local JSON import/export, and Lab handoff; Tools owns terrain paint, start/base locations, and
+status, local authored-map or recipe JSON import, map JSON export, and Lab handoff; Tools owns terrain paint, start/base locations, and
 doodad authoring. The top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
 zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
 Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
-base locations, and provides undo/redo, local JSON import/export, and centered resize. Resize
+base locations, and provides undo/redo, local JSON import/map export, and centered resize. Recipe
+imports apply the shared fill, rectangle, blob, stroke, road, base, start, and symmetry operations,
+then load their result through the ordinary authored-map normalization path. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
 shifts start/base locations with the centered source map. Authored v6 maps and materialized Lab
 handoffs carry explicit `width` and `height`; loading bundled or locally imported older square maps
