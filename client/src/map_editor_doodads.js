@@ -2,6 +2,7 @@ import { DOODAD_TYPE, DOODAD_TYPE_IDS } from "./config.js";
 import { expandSymmetricPoints } from "./map_authoring/symmetry.js";
 
 export const MAP_EDITOR_MAX_DOODADS = 4096;
+export const MAP_EDITOR_TREE_MIN_SPACING = 64;
 export const MAP_EDITOR_DEFAULT_FLOWER_COLOR = "#e8b84a";
 export const MAP_EDITOR_DOODAD_TYPES = DOODAD_TYPE;
 export const MAP_EDITOR_DOODAD_CATALOG = Object.freeze([
@@ -23,6 +24,10 @@ export function isMapEditorDoodadType(typeId) {
 
 export function isWildflowerDoodadType(typeId) {
   return typeof typeId === "string" && typeId.startsWith("wildflower.") && TYPE_IDS.has(typeId);
+}
+
+export function isTreeDoodadType(typeId) {
+  return typeof typeId === "string" && typeId.startsWith("tree.") && TYPE_IDS.has(typeId);
 }
 
 export function isTankTrapDoodadType(typeId) {
@@ -181,6 +186,63 @@ export function extendDoodadSprayStroke(stroke, point) {
   stroke.distanceToNext -= remaining;
   stroke.last = end;
   return placements;
+}
+
+/** Stateful fixed-distance line sampler used by click-and-drag placement. */
+export function createDoodadDragStroke(point, { spacing = MAP_EDITOR_TREE_MIN_SPACING } = {}) {
+  const start = finitePoint(point);
+  if (!start) return null;
+  const normalizedSpacing = Math.max(4, Number(spacing) || MAP_EDITOR_TREE_MIN_SPACING);
+  return {
+    stroke: { last: start, distanceToNext: normalizedSpacing, spacing: normalizedSpacing },
+    placements: [start],
+  };
+}
+
+export function extendDoodadDragStroke(stroke, point) {
+  const end = finitePoint(point);
+  if (!stroke?.last || !end) return [];
+  const placements = [];
+  let from = stroke.last;
+  let dx = end.x - from.x;
+  let dy = end.y - from.y;
+  let remaining = Math.hypot(dx, dy);
+  while (remaining + 1e-9 >= stroke.distanceToNext) {
+    const ratio = stroke.distanceToNext / remaining;
+    from = { x: from.x + dx * ratio, y: from.y + dy * ratio };
+    placements.push({ x: Math.round(from.x), y: Math.round(from.y) });
+    dx = end.x - from.x;
+    dy = end.y - from.y;
+    remaining = Math.hypot(dx, dy);
+    stroke.distanceToNext = stroke.spacing;
+  }
+  stroke.distanceToNext -= remaining;
+  stroke.last = end;
+  return placements;
+}
+
+export function spacedTreePlacements(records, placements, minSpacing = MAP_EDITOR_TREE_MIN_SPACING) {
+  const spacing = Math.max(0, Number(minSpacing) || 0);
+  const squared = spacing * spacing;
+  const retained = (records || [])
+    .filter((record) => isTreeDoodadType(record?.typeId))
+    .map(({ x, y }) => ({ x, y }));
+  const accepted = [];
+  for (const placement of placements || []) {
+    const point = finitePoint(placement);
+    if (!point) continue;
+    if (retained.some((other) => (other.x - point.x) ** 2 + (other.y - point.y) ** 2 < squared)) continue;
+    accepted.push(point);
+    retained.push(point);
+  }
+  return accepted;
+}
+
+export function doodadTypeFromSelection(typeIds, seed = 1) {
+  const choices = [...new Set(typeIds || [])].filter(isMapEditorDoodadType);
+  if (!choices.length) return null;
+  const index = Math.floor(hashUnit(positiveSafeInteger(seed) || 1, choices.length) * choices.length);
+  return choices[Math.min(choices.length - 1, index)];
 }
 
 function normalizedDoodadFields(source, dimensions) {

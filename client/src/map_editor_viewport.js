@@ -11,10 +11,16 @@ import {
 } from "./map_authoring/layers.js";
 import {
   allocateMapEditorDoodadId,
+  createDoodadDragStroke,
   createDoodadSprayStroke,
+  doodadTypeFromSelection,
   doodadIdsWithinRadius,
   doodadIdsWithinRect,
   extendDoodadSprayStroke,
+  extendDoodadDragStroke,
+  isTreeDoodadType,
+  MAP_EDITOR_TREE_MIN_SPACING,
+  spacedTreePlacements,
   symmetricDoodadPlacements,
 } from "./map_editor_doodads.js";
 import {
@@ -106,6 +112,7 @@ export class MapEditorViewport {
     this.doodadSelectStart = null;
     this.doodadSelectEnd = null;
     this.doodadSprayStroke = null;
+    this.doodadDragStroke = null;
     this.doodadLastWorld = null;
     this.doodadBrushPoint = null;
     this.panPointerId = null;
@@ -506,6 +513,7 @@ export class MapEditorViewport {
       this.doodadPointerId = null;
       this.doodadPointerMode = null;
       this.doodadSprayStroke = null;
+      this.doodadDragStroke = null;
       this.doodadLastWorld = null;
       let changed = false;
       if (mode === "remove") {
@@ -563,7 +571,7 @@ export class MapEditorViewport {
       this.doodadPointerMode = "remove";
       this.drawOverlay();
     } else {
-      this.session.beginDoodadStroke(tool.mode === "erase" ? "Erased doodads" : tool.mode === "spray" ? "Sprayed wildflowers" : "Placed doodad");
+      this.session.beginDoodadStroke(tool.mode === "erase" ? "Erased doodads" : tool.mode === "spray" ? "Sprayed doodads" : "Placed doodads");
       this.doodadPointerMode = tool.mode;
       if (tool.mode === "spray") {
         const result = createDoodadSprayStroke(world, {
@@ -576,7 +584,9 @@ export class MapEditorViewport {
       } else if (tool.mode === "erase") {
         this.eraseDoodadsAt(world);
       } else {
-        this.placeDoodadPoints([world]);
+        const result = createDoodadDragStroke(world);
+        this.doodadDragStroke = result?.stroke || null;
+        this.placeDoodadPoints(result?.placements || []);
       }
     }
     this.doodadPointerId = event.pointerId;
@@ -592,6 +602,8 @@ export class MapEditorViewport {
     } else if (this.doodadPointerMode === "erase") {
       const spacing = Math.max(4, (Number(this.tool?.radius) || 48) / 2);
       for (const point of resampleWorldSegment(this.doodadLastWorld, world, spacing)) this.eraseDoodadsAt(point);
+    } else if (this.doodadPointerMode === "place" && this.doodadDragStroke && isTreeDoodadType(this.tool?.typeId)) {
+      this.placeDoodadPoints(extendDoodadDragStroke(this.doodadDragStroke, world));
     }
     this.doodadLastWorld = world;
   }
@@ -617,10 +629,15 @@ export class MapEditorViewport {
       width: (this.session.draft?.width || 0) * TILE_SIZE,
       height: (this.session.draft?.height || 0) * TILE_SIZE,
     }, points, this.tool?.symmetry);
-    const added = this.session.placeDoodads(placements, {
-      typeId: this.tool?.typeId,
-      color: this.tool?.color,
-    });
+    const typeIds = this.tool?.typeIds?.length ? this.tool.typeIds : [this.tool?.typeId];
+    const candidates = typeIds.every(isTreeDoodadType)
+      ? spacedTreePlacements(this.session.draft?.doodads, placements, MAP_EDITOR_TREE_MIN_SPACING)
+      : placements;
+    const added = [];
+    for (const placement of candidates) {
+      const typeId = doodadTypeFromSelection(typeIds, allocateMapEditorDoodadId(this.session.draft?.doodads || []));
+      added.push(...this.session.placeDoodads([placement], { typeId, color: this.tool?.color }));
+    }
     if (added.length) this.queueDoodadPatch({ upserts: added });
   }
 
@@ -938,8 +955,8 @@ function overlayPreviewColor(edit) {
 
 function doodadCommitLabel(mode) {
   if (mode === "erase") return "Doodads erased.";
-  if (mode === "spray") return "Wildflowers sprayed.";
-  return "Doodad placed.";
+  if (mode === "spray") return "Doodads sprayed.";
+  return "Doodads placed.";
 }
 
 function worldRect(from, to) {

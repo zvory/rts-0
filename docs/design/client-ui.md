@@ -1020,9 +1020,11 @@ history, or handoff. The shared pure `map_authoring/layers.js` vocabulary also d
 `map-author.mjs preview --layers <csv>`, whose SVG preview shows every layer by default and can
 isolate any comma-separated subset.
 
-The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Trees are placed singly and
-share one mechanical tree semantic with a tiny authoritative trunk; wildflowers can be placed
-singly or sprayed with a chosen tint. Tank Traps snap to tile centres and materialize at match setup
+The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Tree species are independently
+toggleable visual variants: click-drag placement and the low-density spray choose among the selected
+species and keep tree centres at least two tiles apart. All trees share one mechanical tree semantic
+with a tiny authoritative trunk; wildflowers can be placed singly or sprayed with a chosen tint.
+Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
 deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved: the
 removal tool box-selects any number of doodads for deletion, and a separate erase brush removes
