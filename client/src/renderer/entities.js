@@ -144,6 +144,12 @@ export function _drawSelectionAndHp(e, selection, state) {
   if (selected) {
     const g = this._slot("selectionRings", e.id);
     g.position.set(e.x, e.y);
+    // Directional footprints track the body beneath them. Infantry keeps its
+    // ground-projected oval screen-aligned so its facing does not make the
+    // marker wobble around a nearly circular silhouette.
+    g.rotation = usesVehicleSelectionBody(e.kind) && Number.isFinite(e.facing)
+      ? e.facing
+      : 0;
     const ring = this._ringRadius(e);
     let color;
     if (ownOwner(state, e.owner)) color = COLORS.selectOwn;

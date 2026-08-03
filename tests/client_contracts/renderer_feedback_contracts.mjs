@@ -1032,6 +1032,39 @@ function nearPoint(call, point, epsilon = 0.001) {
 }
 
 {
+  const drawSelectedRing = (entity) => {
+    const ringGfx = new RecordingGraphics();
+    _drawSelectionAndHp.call(
+      {
+        _slot() {
+          return ringGfx;
+        },
+        _ringRadius() {
+          return { rx: 20, ry: 12, cy: 2 };
+        },
+        _hpBarSlot() {
+          return {};
+        },
+        _hpBar() {},
+      },
+      entity,
+      new Set([entity.id]),
+      { playerId: 1 },
+    );
+    return ringGfx;
+  };
+  const facing = Math.PI / 3;
+  const tankRing = drawSelectedRing({
+    id: 70, owner: 1, kind: KIND.TANK, x: 100, y: 100, facing,
+  });
+  const riflemanRing = drawSelectedRing({
+    id: 71, owner: 1, kind: KIND.RIFLEMAN, x: 140, y: 100, facing,
+  });
+  assert(tankRing.rotation === facing, "vehicle selection ovals rotate with body facing");
+  assert(riflemanRing.rotation === 0, "infantry selection ovals remain screen-aligned");
+}
+
+{
   const selected = [
     {
       id: 81,
