@@ -38,7 +38,7 @@ function testGroupCooldownClocks(values, totalTicks) {
     }));
 }
 
-function rAndDCard(upgrades = [], prodUpgradeQueue = []) {
+function engineeringComplexCard(upgrades = [], prodUpgradeQueue = []) {
   return buildCommandCardDescriptors({
     playerId: 1,
     selection: [{ ...engineeringComplex, prodUpgradeQueue }],
@@ -66,14 +66,14 @@ function buttonSlots(card) {
 }
 
 {
-  const ids = slotIds(rAndDCard());
+  const ids = slotIds(engineeringComplexCard());
   assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
   assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(ids[4], `research:${UPGRADE.MORTAR_AUTOCAST}`);
   assert.equal(ids[5], `research:${UPGRADE.SMOKE_PLUS}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 6), [
+  assert.deepEqual(slotCommandIds(engineeringComplexCard()).slice(0, 6), [
     kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
@@ -81,16 +81,16 @@ function buttonSlots(card) {
     kriegsiaCommandId("research", UPGRADE.MORTAR_AUTOCAST),
     kriegsiaCommandId("research", UPGRADE.SMOKE_PLUS),
   ]);
-  assert.equal(rAndDCard().slots[1].enabled, false);
-  assert.equal(rAndDCard().slots[1].title, "Requires AT Guns");
-  assert.equal(rAndDCard().slots[1].label, "Artillery");
-  assert.equal(rAndDCard().slots[2].title, "Requires Artillery");
-  assert.equal(rAndDCard().slots[2].label, "Artillery Fire Control");
-  assert.equal(rAndDCard().slots[2].icon, "AFC");
+  assert.equal(engineeringComplexCard().slots[1].enabled, false);
+  assert.equal(engineeringComplexCard().slots[1].title, "Requires AT Guns");
+  assert.equal(engineeringComplexCard().slots[1].label, "Artillery");
+  assert.equal(engineeringComplexCard().slots[2].title, "Requires Artillery");
+  assert.equal(engineeringComplexCard().slots[2].label, "Artillery Fire Control");
+  assert.equal(engineeringComplexCard().slots[2].icon, "AFC");
 }
 
 {
-  const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK]);
+  const card = engineeringComplexCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK]);
   const ids = slotIds(card);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(card.slots[1].label, "Artillery");
@@ -143,14 +143,14 @@ function buttonSlots(card) {
 }
 
 {
-  const card = rAndDCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
+  const card = engineeringComplexCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
   assert.equal(card.slots[1].enabled, false);
   assert.equal(card.slots[1].title, "Queued");
   assert.equal(card.slots[2].enabled, true);
 }
 
 {
-  const ids = slotIds(rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
+  const ids = slotIds(engineeringComplexCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
   assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
@@ -160,7 +160,7 @@ function buttonSlots(card) {
 }
 
 {
-  const card = rAndDCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
+  const card = engineeringComplexCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
   const ids = slotIds(card);
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
