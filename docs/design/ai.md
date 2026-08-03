@@ -90,8 +90,29 @@ actions are intentionally not part of this seam yet.
 The public-SDK-only [reference strategy](../ai-authoring.md) is the executable authoring specimen.
 It runs through `AiController::with_strategy` and the canonical driver, gathers with one worker,
 uses cross-tick memory to dispatch a separate attack-move scout, and is covered by deterministic
-command-log and replay checks. Its documented rule/query and action-helper gaps are the bounded
-inputs to the next SDK phases; the example is not a selectable profile or a strength claim.
+command-log and replay checks. Its remaining action-helper gaps are the bounded input to the next
+SDK phase; the example is not a selectable profile or a strength claim.
+
+`AiRulebook` binds the authoritative `rts-rules` faction catalog to a strategy frame. Its bounded
+answers cover catalog order and availability, costs, supply, production time, health, footprint,
+builders, producers, prerequisites, gather capability, and train/research relationships; it owns
+no duplicate definitions. Upgrade costs/timing remain absent because their current owner is
+`rts-sim`, and the SDK does not move that authority merely to fill a catalog row.
+
+`WorldQueries` builds stable-id indexes over the frame's owned entities, currently visible allies
+and enemies, remembered contacts, and public known resources. It keeps current and remembered
+knowledge distinct, filters only explicitly exhausted resources, reports known mining conflicts,
+and uses stable-id tie-breaking after squared-`f32` distance for nearest selection. Checked world
+and tile helpers reject non-finite, overflowing, or out-of-bounds coordinates.
+
+Known building placement reuses the established AI footprint, public-resource, visible-building,
+production-exit, ring traversal, and tie-breaking approximation. Results are named `Invalid`,
+`KnownBlocked`, and `NoKnownConflict`; none claims authoritative legality, clearance, reachability,
+or command acceptance. Public queries depend only on `AiFrame` and explicit controller-owned
+failed-site exclusions. Legacy profiles retain their historical global-producer exit check through
+a narrow compatibility policy, while all other placement work is shared. Static connectivity,
+dynamic pathing, firing lanes, target legality, line of fire, and hidden occupancy remain outside
+the SDK because no Phase 4 consumer required them.
 
 ### Shared decision core
 

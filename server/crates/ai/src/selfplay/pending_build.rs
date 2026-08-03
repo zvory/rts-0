@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use super::player_view::{building_footprint_tiles, is_kind, PlayerView};
 use crate::ai_core::observation::AiBuildIntent;
 use crate::config;
+use crate::sdk::{KnownBuildSiteExclusions, WorldQueries};
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::protocol::{states, EntityView};
@@ -146,5 +147,20 @@ impl PendingBuildTracker {
             .get(&kind)
             .map(|spots| spots.contains(&(tile_x, tile_y)))
             .unwrap_or(false)
+    }
+
+    pub(crate) fn known_build_site_exclusions(
+        &self,
+        queries: &WorldQueries<'_>,
+    ) -> KnownBuildSiteExclusions {
+        let mut exclusions = KnownBuildSiteExclusions::default();
+        for (kind, sites) in &self.failed_spots {
+            for &(x, y) in sites {
+                if let Some(tile) = queries.tile(x, y) {
+                    exclusions.exclude(*kind, tile);
+                }
+            }
+        }
+        exclusions
     }
 }

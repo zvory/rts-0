@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 4 merges and reports concrete gaps.
+- [x] Done.
 
 ## Objective
 
@@ -64,14 +64,14 @@ No wire protocol, client, balance, lobby, or simulation command-processing chang
 
 ## Implementation Checklist
 
-- [ ] Derive the initial API from named Phase 4/current-AI call sites.
-- [ ] Add the bounded faction rulebook without a second registry.
-- [ ] Add deterministic known-world indexes and checked coordinate helpers.
-- [ ] Expose only the existing known-placement approximation with honest uncertainty names.
-- [ ] Add static connectivity only for a concrete consumer.
-- [ ] Adopt the surface in at least one current rule lookup and one current query call.
-- [ ] Add hidden-state A/B and old/new equivalence tests.
-- [ ] Pass the unchanged Phase 1 transcript and mark the phase done.
+- [x] Derive the initial API from named Phase 4/current-AI call sites.
+- [x] Add the bounded faction rulebook without a second registry.
+- [x] Add deterministic known-world indexes and checked coordinate helpers.
+- [x] Expose only the existing known-placement approximation with honest uncertainty names.
+- [x] Add static connectivity only for a concrete consumer. (No concrete consumer required it.)
+- [x] Adopt the surface in at least one current rule lookup and one current query call.
+- [x] Add hidden-state A/B and old/new equivalence tests.
+- [x] Pass the unchanged Phase 1 transcript and mark the phase done.
 
 ## Verification
 

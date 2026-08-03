@@ -76,6 +76,7 @@ pub struct AiMap {
 pub struct AiPlayer {
     pub id: u32,
     pub team_id: u32,
+    pub faction_id: String,
     pub is_ai: bool,
     pub is_alive: bool,
     pub start_tile: (u32, u32),
@@ -183,6 +184,7 @@ pub struct AiBuildObservation {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AiFrame {
     player_id: u32,
+    faction_id: String,
     tick: u32,
     team_id: u32,
     economy: AiEconomy,
@@ -200,6 +202,9 @@ pub struct AiFrame {
 impl AiFrame {
     pub fn player_id(&self) -> u32 {
         self.player_id
+    }
+    pub fn faction_id(&self) -> &str {
+        &self.faction_id
     }
     pub fn tick(&self) -> u32 {
         self.tick
@@ -253,6 +258,7 @@ impl AiFrame {
             .map(|player| AiPlayer {
                 id: player.id,
                 team_id: player.team_id,
+                faction_id: player.faction_id.clone(),
                 is_ai: player.is_ai,
                 is_alive: alive_player_ids
                     .map(|ids| ids.contains(&player.id))
@@ -383,6 +389,7 @@ impl AiFrame {
 
         Some(Self {
             player_id,
+            faction_id: own.faction_id.clone(),
             tick: snapshot.tick,
             team_id,
             economy: AiEconomy {

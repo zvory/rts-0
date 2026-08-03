@@ -182,9 +182,10 @@ pub(super) fn should_save_for_required_tech_building(
 }
 
 pub(super) fn producer_for_unit(unit: EntityKind) -> Option<EntityKind> {
+    let rules = crate::sdk::AiRulebook::compatibility_default();
     PRODUCTION_BUILDINGS
         .into_iter()
-        .find(|building| rts_rules::economy::trainable_units(*building).contains(&unit))
+        .find(|building| rules.can_train(*building, unit))
 }
 
 pub(super) fn production_building_order(unit_priorities: &[EntityKind]) -> Vec<EntityKind> {

@@ -1,4 +1,6 @@
-use rts_ai::sdk::{AiActionRequest, AiActions, AiFrame, AiResourceAmount, AiStrategy, EntityKind};
+use rts_ai::sdk::{
+    AiActionRequest, AiActions, AiFrame, AiRulebook, AiStrategy, EntityKind, WorldQueries,
+};
 
 /// A deliberately small opening that demonstrates the public SDK lifecycle.
 ///
@@ -28,6 +30,10 @@ impl AiStrategy for ReferenceStrategy {
 
     fn step(&mut self, frame: &AiFrame, actions: &mut AiActions) {
         self.steps = self.steps.saturating_add(1);
+        let Some(rules) = AiRulebook::for_frame(frame) else {
+            return;
+        };
+        let queries = WorldQueries::new(frame);
 
         let workers = frame
             .owned()
@@ -36,13 +42,14 @@ impl AiStrategy for ReferenceStrategy {
             .map(|entity| entity.id)
             .collect::<Vec<_>>();
 
-        if frame.economy().steel < 500 {
+        let expansion_steel = rules
+            .cost(EntityKind::CityCentre)
+            .map(|cost| cost.steel)
+            .unwrap_or(u32::MAX);
+        if rules.can_gather(EntityKind::Worker) && frame.economy().steel < expansion_steel {
             if let (Some(&worker), Some(node)) = (
                 workers.first(),
-                frame.resources().iter().find(|resource| {
-                    resource.kind == EntityKind::Steel
-                        && resource.remaining != AiResourceAmount::Known(0)
-                }),
+                queries.known_resources(EntityKind::Steel).next(),
             ) {
                 let _ = actions.submit(AiActionRequest::Gather {
                     units: vec![worker],

@@ -15,11 +15,9 @@ use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
 };
 use crate::ai_shared;
-use crate::sdk::{AiActionRequest, AiActions, AiFrame, AiStrategy};
+use crate::sdk::{AiActionRequest, AiActions, AiFrame, AiStrategy, KnownBuildSite, WorldQueries};
 use crate::selfplay::pending_build::PendingBuildTracker;
-use crate::selfplay::player_view::{
-    footprint_placeable_from_snapshot, occupied_tiles_from_snapshot, PlayerView,
-};
+use crate::selfplay::player_view::PlayerView;
 use rand::Rng;
 use rts_protocol::{ObserverMapAnalysisDiagnostics, ObserverMapAnalysisLayer};
 use rts_sim::game::command::SimCommand;
@@ -373,8 +371,9 @@ impl AiController {
         self.prune_combat_memory(&observation, tick);
 
         let profile = self.profile();
-        let occupied = occupied_tiles_from_snapshot(&context.start.map, context.snapshot);
         let failed_builds = &self.pending_builds;
+        let world_queries = WorldQueries::new(&frame);
+        let build_site_exclusions = failed_builds.known_build_site_exclusions(&world_queries);
         let map_analysis = self
             .static_map_context
             .get_or_analyze(context.start)
@@ -393,15 +392,13 @@ impl AiController {
                 prefer_toward_center: false,
             },
             |building, tile_x, tile_y| {
-                !failed_builds.failed(building, tile_x, tile_y)
-                    && footprint_placeable_from_snapshot(
-                        &context.start.map,
-                        context.snapshot,
+                world_queries.tile(tile_x, tile_y).is_some_and(|tile| {
+                    world_queries.known_build_site_compatibility(
                         building,
-                        tile_x,
-                        tile_y,
-                        &occupied,
-                    )
+                        tile,
+                        &build_site_exclusions,
+                    ) == KnownBuildSite::NoKnownConflict
+                })
             },
         );
         debug_assert_eq!(decision.profile_id, self.profile_id);

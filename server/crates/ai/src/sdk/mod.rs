@@ -4,7 +4,9 @@
 //! allowed to know, and action requests still pass through the ordinary simulation command path.
 
 mod frame;
+mod rulebook;
 mod strategy;
+mod world_queries;
 
 pub use frame::{
     AiBuildObservation, AiBuildObservationPhase, AiCompletion, AiEconomy, AiEntity, AiEntityState,
@@ -13,4 +15,9 @@ pub use frame::{
 };
 pub use rts_rules::faction::UpgradeKind;
 pub use rts_rules::EntityKind;
+pub use rulebook::{AiCost, AiEntityRule, AiFootprint, AiPrerequisites, AiRulebook};
 pub use strategy::{AiActionRequest, AiActions, AiStrategy, MAX_ACTIONS_PER_STEP};
+pub use world_queries::{
+    AiTile, AiWorldPoint, KnownBuildSite, KnownBuildSiteBlocker, KnownBuildSiteExclusions,
+    KnownResourceState, WorldQueries,
+};
