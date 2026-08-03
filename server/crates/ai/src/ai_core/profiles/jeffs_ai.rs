@@ -100,6 +100,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 2,
         perimeter_distance_tiles: 6.0,
+        lateral_spacing_tiles: 4.5,
         replacement_health_percent: Some(50),
     }),
     turtle_defense: None,
@@ -176,6 +177,13 @@ mod tests {
         assert!(!JEFFS_AI.workers.train_workers_for_oil);
         assert!(JEFFS_AI.workers.reuse_idle_before_training);
         assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 2);
+        assert_eq!(
+            JEFFS_AI
+                .defensive_machine_gunners
+                .unwrap()
+                .lateral_spacing_tiles,
+            4.5
+        );
         assert_eq!(transition.production.unit_priorities, &ARMORED_UNITS);
         assert_eq!(JEFFS_AI.production.queue_depth, 1);
         assert_eq!(transition.production.queue_depth, 1);

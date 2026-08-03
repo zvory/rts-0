@@ -480,12 +480,13 @@ pub(super) fn stage_defensive_machine_gunner_perimeter(
     enemy_base: EnemyBaseFact,
 ) -> Option<Vec<u32>> {
     let policy = profile.defensive_machine_gunners?;
-    stage_main_steel_defensive_line(
+    stage_main_steel_defensive_line_with_spacing(
         actions,
         observation,
         ready_units,
         enemy_base,
         policy.perimeter_distance_tiles,
+        policy.lateral_spacing_tiles,
     )
 }
 
