@@ -58,10 +58,10 @@ miningAnchorInput.state = {
   isAllyOwner: (owner) => owner === 2,
 };
 miningAnchorInput._selectionEntities = () => [
-  { id: 40, owner: 3, kind: KIND.CITY_CENTRE, x: 1, y: 1, buildProgress: null },
-  { id: 41, owner: 2, kind: KIND.CITY_CENTRE, x: 8, y: 8, buildProgress: 0.5 },
-  { id: 42, owner: 2, kind: KIND.CITY_CENTRE, x: 20, y: 20, buildProgress: null },
-  { id: 43, owner: 1, kind: KIND.CITY_CENTRE, x: 40, y: 40, buildProgress: null },
+  { id: 40, owner: 3, kind: KIND.RESOURCE_DEPOT, x: 1, y: 1, buildProgress: null },
+  { id: 41, owner: 2, kind: KIND.RESOURCE_DEPOT, x: 8, y: 8, buildProgress: 0.5 },
+  { id: 42, owner: 2, kind: KIND.RESOURCE_DEPOT, x: 20, y: 20, buildProgress: null },
+  { id: 43, owner: 1, kind: KIND.RESOURCE_DEPOT, x: 40, y: 40, buildProgress: null },
 ];
 assert(
   miningAnchorInput._nearestCompletedMiningAnchor(0, 0, true)?.id === 42,

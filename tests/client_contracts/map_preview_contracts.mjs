@@ -482,7 +482,7 @@ function createBridgeFixture({ renderPromise = null } = {}) {
   const match = {
     state: {
       map: { name: "Authority", width: 16, height: 16, tileSize: 32, resources: [{ id: 7 }] },
-      entitiesInterpolated: () => [{ id: 1, kind: "cityCentre" }, { id: 2, kind: "steelNode" }],
+      entitiesInterpolated: () => [{ id: 1, kind: "resourceDepot" }, { id: 2, kind: "steelNode" }],
     },
     renderer,
     camera,

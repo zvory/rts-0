@@ -429,7 +429,7 @@ const viewportEntities = [
     state: "idle", targetId: 2, weaponFacing: 0.25, setupState: "deployed", orderPlan: [],
   },
   { id: 2, kind: "rifleman", owner: 2, x: 240, y: 240, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
-  { id: 3, kind: KIND.CITY_CENTRE, owner: 1, x: 400, y: 400, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
+  { id: 3, kind: KIND.RESOURCE_DEPOT, owner: 1, x: 400, y: 400, hp: 100, maxHp: 100, state: "idle", orderPlan: [] },
 ];
 const viewportBridge = new InteractBridge({
   enabled: true,

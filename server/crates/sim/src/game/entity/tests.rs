@@ -196,7 +196,7 @@ fn firing_reveal_reaction_gates_evict_oldest_at_the_runtime_bound() {
 fn finished_building_kinds_have_exact_state_groups() {
     let cases = [
         (
-            EntityKind::CityCentre,
+            EntityKind::ResourceDepot,
             groups(false, false, true, false, false, false, false, false),
         ),
         (
@@ -212,7 +212,7 @@ fn finished_building_kinds_have_exact_state_groups() {
             groups(false, false, true, false, false, false, false, false),
         ),
         (
-            EntityKind::ResearchComplex,
+            EntityKind::EngineeringComplex,
             groups(false, false, true, false, false, false, false, false),
         ),
         (
@@ -239,11 +239,11 @@ fn finished_building_kinds_have_exact_state_groups() {
 #[test]
 fn unfinished_buildings_add_construction_state_only() {
     let kinds = [
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
         EntityKind::Depot,
         EntityKind::Barracks,
         EntityKind::TrainingCentre,
-        EntityKind::ResearchComplex,
+        EntityKind::EngineeringComplex,
         EntityKind::Factory,
         EntityKind::Steelworks,
         EntityKind::PumpJack,
@@ -265,7 +265,7 @@ fn unfinished_buildings_start_at_ten_percent_hp() {
     let kinds = [
         EntityKind::Depot,
         EntityKind::Barracks,
-        EntityKind::CityCentre,
+        EntityKind::ResourceDepot,
     ];
 
     for kind in kinds {
@@ -299,13 +299,13 @@ fn construction_hp_scales_linearly_to_full_completion() {
 
 #[test]
 fn construction_damage_permanently_reduces_completion_hp() {
-    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
-        .expect("city centre should spawn");
+    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, false)
+        .expect("resource depot should spawn");
     let original_max_hp = entity.max_hp;
     let total = entity
         .construction
         .as_ref()
-        .expect("city centre should be under construction")
+        .expect("resource depot should be under construction")
         .total;
     let damage = original_max_hp / 2;
 
@@ -320,8 +320,8 @@ fn construction_damage_permanently_reduces_completion_hp() {
 
 #[test]
 fn construction_damage_destroys_scaffold_when_remaining_hp_budget_is_exhausted() {
-    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
-        .expect("city centre should spawn");
+    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, false)
+        .expect("resource depot should spawn");
     let original_max_hp = entity.max_hp;
 
     assert!(entity.apply_damage(original_max_hp, Some((2, (30.0, 40.0), 7))));
@@ -333,8 +333,8 @@ fn construction_damage_destroys_scaffold_when_remaining_hp_budget_is_exhausted()
 
 #[test]
 fn construction_progress_cannot_outpace_cumulative_damage() {
-    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
-        .expect("city centre should spawn");
+    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, false)
+        .expect("resource depot should spawn");
     let original_max_hp = entity.max_hp;
     let first_damage = original_max_hp / 2;
     let final_damage = original_max_hp - first_damage;
@@ -351,8 +351,8 @@ fn construction_progress_cannot_outpace_cumulative_damage() {
 
 #[test]
 fn scaffold_survival_is_based_on_remaining_budget_not_temporary_progress_hp() {
-    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, false)
-        .expect("city centre should spawn");
+    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, false)
+        .expect("resource depot should spawn");
     let temporary_progress_hp = entity.hp;
     let original_max_hp = entity.max_hp;
 
@@ -367,8 +367,8 @@ fn scaffold_survival_is_based_on_remaining_budget_not_temporary_progress_hp() {
 
 #[test]
 fn damage_to_completed_building_does_not_reduce_max_hp() {
-    let mut entity = Entity::new_building(1, EntityKind::CityCentre, 10.0, 20.0, true)
-        .expect("city centre should spawn");
+    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, true)
+        .expect("resource depot should spawn");
     let original_max_hp = entity.max_hp;
     let damage = original_max_hp / 2;
 

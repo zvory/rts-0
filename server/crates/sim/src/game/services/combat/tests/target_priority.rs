@@ -7,9 +7,9 @@ fn tank_prefers_nearby_unit_over_armored_command_center() {
     let tank = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
         .expect("tank should spawn");
-    let city_centre = entities
-        .spawn_building(2, EntityKind::CityCentre, 160.0, 100.0, true)
-        .expect("city centre should spawn");
+    let resource_depot = entities
+        .spawn_building(2, EntityKind::ResourceDepot, 160.0, 100.0, true)
+        .expect("resource depot should spawn");
     let worker = entities
         .spawn_unit(2, EntityKind::Worker, 100.0, 180.0)
         .expect("worker should spawn");
@@ -21,7 +21,7 @@ fn tank_prefers_nearby_unit_over_armored_command_center() {
     let target = resolve_tank_test_target(&map, &entities, &default_team_relations(), tank);
 
     assert_eq!(target, Some(worker));
-    assert_ne!(target, Some(city_centre));
+    assert_ne!(target, Some(resource_depot));
 }
 
 #[test]

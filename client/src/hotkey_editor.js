@@ -16,10 +16,10 @@ const CONTEXT_LABELS = Object.freeze({
   "worker-build": "Worker Build Menu",
   "mixed-army-support": "Army Abilities",
   artillery: "Artillery Commands",
-  "city-centre-train": "City Centre",
+  "resource-depot-train": "Resource Depot",
   "factory-train": "Vehicle Works",
   "gun-works-train": "Gun Works",
-  "research-complex": "R&D Complex",
+  "engineering-complex": "Engineering Complex",
 });
 
 export function renderHotkeyEditor(root, hotkeyProfiles, context = {}) {

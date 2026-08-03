@@ -70,7 +70,7 @@ function workerBuildCard(factionId = "kriegsia") {
 }
 
 function commandCarCard() {
-  const cityCentre = { id: 21, owner: 1, kind: KIND.CITY_CENTRE, buildProgress: null };
+  const resourceDepot = { id: 21, owner: 1, kind: KIND.RESOURCE_DEPOT, buildProgress: null };
   const commandCar = {
     id: 22,
     owner: 1,
@@ -83,10 +83,10 @@ function commandCarCard() {
   return buildCommandCardDescriptors({
     playerId: 1,
     selection: [commandCar],
-    entities: [cityCentre, commandCar],
+    entities: [resourceDepot, commandCar],
     resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
     upgrades: [],
-    playerHasCompleteKind: (kind) => kind === KIND.CITY_CENTRE,
+    playerHasCompleteKind: (kind) => kind === KIND.RESOURCE_DEPOT,
     groupCooldownClocks: () => [],
   });
 }
@@ -148,8 +148,8 @@ function ekatCard() {
   );
   assert(
     catalog.contexts.some((context) =>
-      context.id === "research-complex-at-guns" &&
-        context.label === "R&D Complex (AT Guns researched)"
+      context.id === "engineering-complex-at-guns" &&
+        context.label === "Engineering Complex (AT Guns researched)"
     ),
     "hotkey command catalog names the researched AT Guns context explicitly",
   );
@@ -463,24 +463,24 @@ function ekatCard() {
     mode: "direct",
     name: "Legacy Build",
     bindings: {
-      "build.city_centre": "KeyB",
+      "build.resource_depot": "KeyB",
       "unit.move": "KeyM",
       "unit.attack": "KeyA",
       "unit.holdPosition": "KeyS",
       "worker.buildMenu": "KeyW",
     },
   }, { activate: true });
-  const cityCentreCommandId = kriegsiaCommandId("build", KIND.CITY_CENTRE);
+  const resourceDepotCommandId = kriegsiaCommandId("build", KIND.RESOURCE_DEPOT);
   assert.equal(migrated.ok, true, "legacy faction command ids import successfully");
   assert(migrated.warnings.some((warning) => warning.code === "legacyCommandMigrated"), "legacy command migration is diagnosed");
-  assert.equal(migrated.profile.factionBindings.kriegsia[cityCentreCommandId], "KeyB", "legacy build ids migrate into Kriegsia bindings");
-  assert.equal(migrated.profile.bindings["build.city_centre"], undefined, "legacy build ids are not kept in the global binding map");
+  assert.equal(migrated.profile.factionBindings.kriegsia[resourceDepotCommandId], "KeyB", "legacy build ids migrate into Kriegsia bindings");
+  assert.equal(migrated.profile.bindings["build.resource_depot"], undefined, "legacy build ids are not kept in the global binding map");
   assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "B", "migrated Kriegsia build binding resolves in Kriegsia cards");
 }
 
 {
   const hotkeys = service();
-  const cityCentreCommandId = kriegsiaCommandId("build", KIND.CITY_CENTRE);
+  const resourceDepotCommandId = kriegsiaCommandId("build", KIND.RESOURCE_DEPOT);
   const imported = hotkeys.importProfile({
     schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
     id: "custom.kriegsia-only",
@@ -489,7 +489,7 @@ function ekatCard() {
     name: "Kriegsia Only",
     factionBindings: {
       kriegsia: {
-        [cityCentreCommandId]: "KeyB",
+        [resourceDepotCommandId]: "KeyB",
       },
     },
     bindings: {
@@ -506,7 +506,7 @@ function ekatCard() {
 
 {
   const hotkeys = service();
-  const futureCommandId = ekatCommandId("build", KIND.CITY_CENTRE);
+  const futureCommandId = ekatCommandId("build", KIND.RESOURCE_DEPOT);
   const imported = hotkeys.importProfile({
     schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
     id: "custom.future-ekat",
@@ -528,7 +528,7 @@ function ekatCard() {
   assert.equal(imported.ok, true, "unavailable faction commands are preserved on import");
   assert(imported.warnings.some((warning) => warning.code === "unavailableFactionCommand"), "unavailable faction command preservation is diagnosed");
   assert.equal(imported.profile.factionBindings.ekat[futureCommandId], "KeyE", "future Ekat command binding is stored");
-  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "C", "future Ekat bindings are inactive for current Kriegsia cards");
+  assert.equal(hotkeys.resolveCard(workerBuildCard()).slots[0].hotkey, "R", "future Ekat bindings are inactive for current Kriegsia cards");
   assert.equal(hotkeys.exportProfile(imported.profile.id).factionBindings.ekat[futureCommandId], "KeyE", "future Ekat bindings round-trip through export");
 }
 

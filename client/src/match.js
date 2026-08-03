@@ -1036,7 +1036,7 @@ export class Match {
     this.camera.resize(dom.viewport.clientWidth, dom.viewport.clientHeight);
   }
 
-  /** Center the camera on this player's own starting tile (City Centre location). */
+  /** Center the camera on this player's own starting tile (Resource Depot location). */
   centerOnHome() {
     const me = this.state.players.find((p) => p.id === this.state.playerId);
     const ts = this.state.map.tileSize;

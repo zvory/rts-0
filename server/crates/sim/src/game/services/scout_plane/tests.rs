@@ -58,7 +58,7 @@ fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
 }
 
 #[test]
-fn scout_plane_launches_from_caster_without_a_city_centre() {
+fn scout_plane_launches_from_caster_without_a_resource_depot() {
     let map = test_map(32);
     let mut entities = EntityStore::new();
     let source_command_car = entities

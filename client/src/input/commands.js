@@ -11,7 +11,7 @@ import {
 } from "../protocol.js";
 import {
   ABILITIES,
-  MINING_CC_RANGE_TILES,
+  MINING_ANCHOR_RANGE_TILES,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   STATS,
   TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES,
@@ -827,14 +827,14 @@ export function _refreshResourceMiningPreview() {
     return;
   }
 
-  const rangePx = MINING_CC_RANGE_TILES * (this.state.map?.tileSize || DEFAULT_TILE_SIZE);
+  const rangePx = MINING_ANCHOR_RANGE_TILES * (this.state.map?.tileSize || DEFAULT_TILE_SIZE);
   intent?.updateResourceMiningPreview?.({
     resourceId: target.id,
     resourceX: target.x,
     resourceY: target.y,
-    ccId: nearest.id,
-    ccX: nearest.x,
-    ccY: nearest.y,
+    anchorId: nearest.id,
+    anchorX: nearest.x,
+    anchorY: nearest.y,
     inRange: nearest.dist <= rangePx + 0.001,
   });
 }
@@ -878,7 +878,7 @@ export function _nearestCompletedMiningAnchor(x, y, includeAllies = false) {
       !(includeAllies
         ? friendlyOwner(this.state, e.owner, this.controlPolicy)
         : ownOwner(this.state, e.owner, this.controlPolicy)) ||
-      (e.kind !== KIND.CITY_CENTRE && e.kind !== KIND.ZAMOK) ||
+      (e.kind !== KIND.RESOURCE_DEPOT && e.kind !== KIND.ZAMOK) ||
       (typeof e.buildProgress === "number" && e.buildProgress < 1)
     ) {
       continue;

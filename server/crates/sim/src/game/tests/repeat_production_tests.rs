@@ -36,8 +36,8 @@ fn spawn_building(game: &mut Game, owner: u32, kind: EntityKind, tile: (u32, u32
 
 fn repeat_fixture() -> (Game, u32) {
     let mut game = empty_flat_game(&players());
-    spawn_building(&mut game, 1, EntityKind::CityCentre, (3, 3));
-    spawn_building(&mut game, 2, EntityKind::CityCentre, (50, 50));
+    spawn_building(&mut game, 1, EntityKind::ResourceDepot, (3, 3));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
     let barracks = spawn_building(&mut game, 1, EntityKind::Barracks, (8, 8));
     game.state
         .entities
@@ -68,12 +68,12 @@ fn auto_build_defaults_to_running_without_resource_floors() {
 #[test]
 fn worker_auto_build_ignores_unspent_oil_reserve() {
     let mut game = empty_flat_game(&players());
-    let city_centre = spawn_building(&mut game, 1, EntityKind::CityCentre, (3, 3));
-    spawn_building(&mut game, 2, EntityKind::CityCentre, (50, 50));
+    let resource_depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (3, 3));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
     game.state
         .entities
-        .get_mut(city_centre)
-        .expect("city centre")
+        .get_mut(resource_depot)
+        .expect("resource depot")
         .set_repeat_production(Some(EntityKind::Worker), true);
     let cost = rules::economy::resource_cost(EntityKind::Worker);
     game.state.players[0].auto_build = AutoBuildSettings::default();
@@ -86,8 +86,8 @@ fn worker_auto_build_ignores_unspent_oil_reserve() {
     let queue = game
         .state
         .entities
-        .get(city_centre)
-        .expect("city centre")
+        .get(resource_depot)
+        .expect("resource depot")
         .prod_queue();
     assert_eq!(queue.len(), 1);
     assert_eq!(queue[0].unit, EntityKind::Worker);

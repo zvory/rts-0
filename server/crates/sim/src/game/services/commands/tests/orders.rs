@@ -259,21 +259,43 @@ fn mixed_selection_move_filters_to_owned_movable_units() {
 fn planner_backed_existing_command_families_preserve_active_and_queued_state() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let worker = entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 16.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 16.0,
+            resource_depot_y,
+        )
         .expect("worker should spawn");
     let rifle = entities
-        .spawn_unit(1, EntityKind::Rifleman, cc_x + 48.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Rifleman,
+            resource_depot_x + 48.0,
+            resource_depot_y,
+        )
         .expect("rifleman should spawn");
     let target = entities
-        .spawn_unit(2, EntityKind::Rifleman, cc_x + 96.0, cc_y)
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            resource_depot_x + 96.0,
+            resource_depot_y,
+        )
         .expect("target should spawn");
     let node = entities
-        .spawn_node(EntityKind::Steel, cc_x + 64.0, cc_y)
+        .spawn_node(EntityKind::Steel, resource_depot_x + 64.0, resource_depot_y)
         .expect("node should spawn");
 
     entities
@@ -363,7 +385,7 @@ fn planner_backed_existing_command_families_preserve_active_and_queued_state() {
             1,
             SimCommand::Build {
                 units: vec![worker],
-                building: EntityKind::CityCentre,
+                building: EntityKind::ResourceDepot,
                 tile_x: 10,
                 tile_y: 10,
                 queued: true,
@@ -380,15 +402,27 @@ fn planner_backed_existing_command_families_preserve_active_and_queued_state() {
 fn gather_command_accepts_occupied_but_mineable_resource_node() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let node = entities
-        .spawn_node(EntityKind::Steel, cc_x + 64.0, cc_y)
+        .spawn_node(EntityKind::Steel, resource_depot_x + 64.0, resource_depot_y)
         .expect("node should spawn");
     let holder = entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 64.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 64.0,
+            resource_depot_y,
+        )
         .expect("holder should spawn");
     {
         let h = entities.get_mut(holder).expect("holder should exist");
@@ -397,7 +431,12 @@ fn gather_command_accepts_occupied_but_mineable_resource_node() {
     }
     assert!(entities.claim_miner(node, holder));
     let worker = entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 32.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 32.0,
+            resource_depot_y,
+        )
         .expect("worker should spawn");
 
     apply(
@@ -428,15 +467,27 @@ fn gather_command_accepts_occupied_but_mineable_resource_node() {
 fn gather_command_rejects_oil_resource_nodes() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let node = entities
-        .spawn_node(EntityKind::Oil, cc_x + 64.0, cc_y)
+        .spawn_node(EntityKind::Oil, resource_depot_x + 64.0, resource_depot_y)
         .expect("oil node should spawn");
     let worker = entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 32.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 32.0,
+            resource_depot_y,
+        )
         .expect("worker should spawn");
 
     apply(
@@ -465,27 +516,63 @@ fn gather_command_rejects_oil_resource_nodes() {
 fn planner_backed_valid_queued_commands_emit_queue_full_notices() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let mover = entities
-        .spawn_unit(1, EntityKind::Tank, cc_x + 16.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Tank,
+            resource_depot_x + 16.0,
+            resource_depot_y,
+        )
         .expect("tank should spawn");
     let attacker = entities
-        .spawn_unit(1, EntityKind::Rifleman, cc_x + 48.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Rifleman,
+            resource_depot_x + 48.0,
+            resource_depot_y,
+        )
         .expect("rifleman should spawn");
     let gatherer = entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 16.0, cc_y + 32.0)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 16.0,
+            resource_depot_y + 32.0,
+        )
         .expect("gather worker should spawn");
     let builder = entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 48.0, cc_y + 32.0)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 48.0,
+            resource_depot_y + 32.0,
+        )
         .expect("build worker should spawn");
     let target = entities
-        .spawn_unit(2, EntityKind::Rifleman, cc_x + 96.0, cc_y)
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            resource_depot_x + 96.0,
+            resource_depot_y,
+        )
         .expect("target should spawn");
     let node = entities
-        .spawn_node(EntityKind::Steel, cc_x + 64.0, cc_y + 32.0)
+        .spawn_node(
+            EntityKind::Steel,
+            resource_depot_x + 64.0,
+            resource_depot_y + 32.0,
+        )
         .expect("node should spawn");
 
     for id in [mover, attacker, gatherer, builder] {
@@ -526,7 +613,7 @@ fn planner_backed_valid_queued_commands_emit_queue_full_notices() {
                 1,
                 SimCommand::Build {
                     units: vec![builder],
-                    building: EntityKind::CityCentre,
+                    building: EntityKind::ResourceDepot,
                     tile_x: 10,
                     tile_y: 10,
                     queued: true,
@@ -696,9 +783,9 @@ fn stop_clears_orders_and_hold_position_enters_hold_stance() {
 fn stop_releases_worker_from_active_construction() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (site_x, site_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (site_x, site_y) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     let site = entities
-        .spawn_building(1, EntityKind::CityCentre, site_x, site_y, false)
+        .spawn_building(1, EntityKind::ResourceDepot, site_x, site_y, false)
         .expect("scaffold should spawn");
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, site_x + 96.0, site_y)
@@ -708,7 +795,7 @@ fn stop_releases_worker_from_active_construction() {
         .expect("replacement worker should spawn");
     {
         let worker = entities.get_mut(worker).expect("worker should exist");
-        worker.set_order(Order::build(EntityKind::CityCentre, 4, 4));
+        worker.set_order(Order::build(EntityKind::ResourceDepot, 4, 4));
         worker.mark_build_phase(BuildPhase::Constructing { site });
         worker.set_target_id(Some(site));
         worker.append_queued_order(OrderIntent::move_to(400.0, 400.0));
@@ -768,7 +855,7 @@ fn stop_releases_worker_from_active_construction() {
             1,
             SimCommand::Build {
                 units: vec![replacement_worker],
-                building: EntityKind::CityCentre,
+                building: EntityKind::ResourceDepot,
                 tile_x: 4,
                 tile_y: 4,
                 queued: false,
@@ -782,7 +869,7 @@ fn stop_releases_worker_from_active_construction() {
             .expect("replacement worker should remain alive")
             .order()
             .build_intent_tile(),
-        Some((EntityKind::CityCentre, 4, 4)),
+        Some((EntityKind::ResourceDepot, 4, 4)),
         "another worker should accept the normal resume intent for the stopped scaffold"
     );
 }
@@ -937,21 +1024,43 @@ fn queued_unit_lists_accept_raw_cap_then_reject_cap_plus_one_whole() {
 fn queued_attack_and_gather_reject_dead_or_depleted_targets_before_appending() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
-    let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
     entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("city centre should spawn");
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("resource depot should spawn");
     let worker = entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 16.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 16.0,
+            resource_depot_y,
+        )
         .expect("worker should spawn");
     let rifle = entities
-        .spawn_unit(1, EntityKind::Rifleman, cc_x + 32.0, cc_y)
+        .spawn_unit(
+            1,
+            EntityKind::Rifleman,
+            resource_depot_x + 32.0,
+            resource_depot_y,
+        )
         .expect("rifleman should spawn");
     let target = entities
-        .spawn_unit(2, EntityKind::Rifleman, cc_x + 96.0, cc_y)
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            resource_depot_x + 96.0,
+            resource_depot_y,
+        )
         .expect("target should spawn");
     let node = entities
-        .spawn_node(EntityKind::Steel, cc_x + 64.0, cc_y)
+        .spawn_node(EntityKind::Steel, resource_depot_x + 64.0, resource_depot_y)
         .expect("node should spawn");
     assert!(entities
         .get_mut(target)

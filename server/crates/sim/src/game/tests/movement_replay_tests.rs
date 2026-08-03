@@ -77,43 +77,75 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
         game.state.entities.remove(id);
     }
 
-    let (cc_x, cc_y) =
-        services::occupancy::footprint_center(&game.state.map, EntityKind::CityCentre, 4, 4);
+    let (resource_depot_x, resource_depot_y) =
+        services::occupancy::footprint_center(&game.state.map, EntityKind::ResourceDepot, 4, 4);
     game.state
         .entities
-        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
-        .expect("player city centre should spawn");
-    let (enemy_cc_x, enemy_cc_y) =
-        services::occupancy::footprint_center(&game.state.map, EntityKind::CityCentre, 24, 4);
+        .spawn_building(
+            1,
+            EntityKind::ResourceDepot,
+            resource_depot_x,
+            resource_depot_y,
+            true,
+        )
+        .expect("player resource depot should spawn");
+    let (enemy_resource_depot_x, enemy_resource_depot_y) =
+        services::occupancy::footprint_center(&game.state.map, EntityKind::ResourceDepot, 24, 4);
     game.state
         .entities
-        .spawn_building(2, EntityKind::CityCentre, enemy_cc_x, enemy_cc_y, true)
-        .expect("enemy city centre should spawn");
+        .spawn_building(
+            2,
+            EntityKind::ResourceDepot,
+            enemy_resource_depot_x,
+            enemy_resource_depot_y,
+            true,
+        )
+        .expect("enemy resource depot should spawn");
 
     let node = game
         .state
         .entities
-        .spawn_node(EntityKind::Steel, cc_x + 96.0, cc_y)
+        .spawn_node(EntityKind::Steel, resource_depot_x + 96.0, resource_depot_y)
         .expect("resource node should spawn");
     let worker_builder = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y + 32.0)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x + 96.0,
+            resource_depot_y + 32.0,
+        )
         .expect("builder should spawn");
     let worker_gatherer = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Worker, cc_x, cc_y + 96.0)
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            resource_depot_x,
+            resource_depot_y + 96.0,
+        )
         .expect("gatherer should spawn");
     let rifleman = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Rifleman, cc_x + 96.0, cc_y + 160.0)
+        .spawn_unit(
+            1,
+            EntityKind::Rifleman,
+            resource_depot_x + 96.0,
+            resource_depot_y + 160.0,
+        )
         .expect("rifleman should spawn");
     let enemy = game
         .state
         .entities
-        .spawn_unit(2, EntityKind::Rifleman, cc_x + 224.0, cc_y + 160.0)
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            resource_depot_x + 224.0,
+            resource_depot_y + 160.0,
+        )
         .expect("enemy should spawn");
 
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
@@ -131,8 +163,8 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
         rifleman,
         enemy,
         node,
-        move_goal: (cc_x + 128.0, cc_y + 160.0),
-        attack_move_goal: (cc_x + 192.0, cc_y + 160.0),
+        move_goal: (resource_depot_x + 128.0, resource_depot_y + 160.0),
+        attack_move_goal: (resource_depot_x + 192.0, resource_depot_y + 160.0),
     }
 }
 
@@ -578,7 +610,7 @@ fn mixed_queued_command_log_replays_deterministically() {
         1,
         Command::Build {
             units: vec![worker_builder],
-            building: EntityKind::CityCentre,
+            building: EntityKind::ResourceDepot,
             tile_x: 12,
             tile_y: 12,
             queued: true,

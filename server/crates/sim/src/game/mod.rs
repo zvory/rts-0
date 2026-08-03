@@ -90,7 +90,7 @@ const AI_WORKER_RETREAT_TILES: f32 = 5.0;
 const FOG_UPDATE_INTERVAL_TICKS: u32 = 2;
 
 fn primary_base_kind(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::CityCentre | EntityKind::Zamok)
+    matches!(kind, EntityKind::ResourceDepot | EntityKind::Zamok)
 }
 
 fn primary_base_distance_sq(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {

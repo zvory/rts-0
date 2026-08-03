@@ -119,7 +119,7 @@ function publishScene(input, entities) {
   const removable = [
     { id: 61, owner: 2, kind: KIND.RIFLEMAN, x: 32, y: 32, hp: 45, maxHp: 45, state: STATE.IDLE },
     { id: 62, owner: 1, kind: KIND.WORKER, x: 72, y: 72, hp: 40, maxHp: 40, state: STATE.IDLE },
-    { id: 63, owner: 1, kind: KIND.CITY_CENTRE, x: 64, y: 64, hp: 1000, maxHp: 1000, state: STATE.IDLE },
+    { id: 63, owner: 1, kind: KIND.RESOURCE_DEPOT, x: 64, y: 64, hp: 1000, maxHp: 1000, state: STATE.IDLE },
     { id: 64, owner: 2, kind: KIND.RIFLEMAN, x: 48, y: 48, hp: 45, maxHp: 45, state: STATE.IDLE, shotReveal: true },
   ];
   input.clientIntent = new ClientIntent();

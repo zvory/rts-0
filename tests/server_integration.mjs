@@ -80,7 +80,7 @@ const { ok } = assertions;
   ok(snap.netStatus?.predictionVersion === 1 && snap.netStatus?.lastSimConsumedClientSeq === 0,
      `prediction ACK fields start at zero (v=${snap.netStatus?.predictionVersion}, seq=${snap.netStatus?.lastSimConsumedClientSeq})`);
   const mine = snap.entities.filter((e) => e.owner === A.playerId);
-  ok(mine.filter((e) => e.kind === "city_centre").length === 1, `A owns 1 City Centre`);
+  ok(mine.filter((e) => e.kind === "resource_depot").length === 1, `A owns 1 Resource Depot`);
   const workers = mine.filter((e) => e.kind === "worker");
   ok(workers.length === 6, `A owns 6 workers (${workers.length})`);
   const steelNodes = startA.map.resources.filter((e) => e.kind === "steel");
@@ -117,12 +117,12 @@ const { ok } = assertions;
   ok(A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq >= 1,
      `GATHER: server acknowledged consumed clientSeq ${A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq}`);
 
-  A.command({ c: "train", building: mine.find((e) => e.kind === "city_centre").id, unit: "worker" });
+  A.command({ c: "train", building: mine.find((e) => e.kind === "resource_depot").id, unit: "worker" });
   await sleep(1200);
   // Mining income can fully offset the worker cost while the private test server advances faster
   // than wall-clock time, so production state and the command ACK are the stable acceptance checks.
-  const cityCentre = A.lastSnapshot.entities.find((e) => e.kind === "city_centre" && e.owner === A.playerId);
-  ok(cityCentre && (cityCentre.prodKind === "worker" || (cityCentre.prodQueue || 0) >= 1), `TRAIN: City Centre shows production (queue=${cityCentre?.prodQueue})`);
+  const resourceDepot = A.lastSnapshot.entities.find((e) => e.kind === "resource_depot" && e.owner === A.playerId);
+  ok(resourceDepot && (resourceDepot.prodKind === "worker" || (resourceDepot.prodQueue || 0) >= 1), `TRAIN: Resource Depot shows production (queue=${resourceDepot?.prodQueue})`);
   ok(A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq >= 2,
      `TRAIN: server acknowledged consumed clientSeq ${A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq}`);
 

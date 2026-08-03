@@ -192,7 +192,7 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
         _ => intents_for_goal(goal, input.intents),
     };
     let selected = match goal {
-        StrategicGoal::Expansion => has_city_centre_intent(input.intents),
+        StrategicGoal::Expansion => has_resource_depot_intent(input.intents),
         StrategicGoal::Tech => input.intents.iter().any(|intent| {
             matches!(intent, AiIntent::Build { kind } if input.required_tech_path.contains(kind))
                 || matches!(intent, AiIntent::Research { .. })
@@ -266,7 +266,7 @@ fn blockers_for_goal(
             if !input.expansion_blockers.is_empty() {
                 blockers.extend(input.expansion_blockers.iter().map(expansion_blocker_trace));
             } else if input.save_for_expansion {
-                push_budget_blockers(&mut blockers, input.end_budget, EntityKind::CityCentre);
+                push_budget_blockers(&mut blockers, input.end_budget, EntityKind::ResourceDepot);
                 if input.facts.available_builder_count() == 0 {
                     blockers.push(GoalBlocker::NoBuilder);
                 }
@@ -333,7 +333,7 @@ fn expansion_blocker_trace(blocker: &ExpansionBlocker) -> GoalBlocker {
             GoalBlocker::MissingPrerequisite("expansion_defenders")
         }
         ExpansionBlocker::RequirementNotMet => {
-            GoalBlocker::MissingPrerequisite("city_centre_requirement")
+            GoalBlocker::MissingPrerequisite("resource_depot_requirement")
         }
         ExpansionBlocker::AlreadyAtTarget => GoalBlocker::MissingPrerequisite("expansion_done"),
         ExpansionBlocker::MaxPending => GoalBlocker::MissingPrerequisite("expansion_pending"),
@@ -384,9 +384,9 @@ fn intent_matches_goal(goal: StrategicGoal, intent: &AiIntent) -> bool {
             matches!(
                 intent,
                 AiIntent::Build {
-                    kind: EntityKind::CityCentre
+                    kind: EntityKind::ResourceDepot
                 } | AiIntent::ResumeConstruction {
-                    kind: EntityKind::CityCentre
+                    kind: EntityKind::ResourceDepot
                 }
             )
         }
@@ -422,14 +422,14 @@ fn has_build_intent(intents: &[AiIntent], kind: EntityKind) -> bool {
         .any(|intent| matches!(intent, AiIntent::Build { kind: built } if *built == kind))
 }
 
-fn has_city_centre_intent(intents: &[AiIntent]) -> bool {
+fn has_resource_depot_intent(intents: &[AiIntent]) -> bool {
     intents.iter().any(|intent| {
         matches!(
             intent,
             AiIntent::Build {
-                kind: EntityKind::CityCentre
+                kind: EntityKind::ResourceDepot
             } | AiIntent::ResumeConstruction {
-                kind: EntityKind::CityCentre
+                kind: EntityKind::ResourceDepot
             }
         )
     })

@@ -1,7 +1,7 @@
 //! Command-line AI profile balance matrix runner.
 //!
 //! This developer tool runs unordered profile pairs across a configurable number of seeds,
-//! writes every replay artifact, and aggregates starting-City-Centre wins plus draws.
+//! writes every replay artifact, and aggregates starting-Resource-Depot wins plus draws.
 #![allow(dead_code)]
 
 use std::path::PathBuf;
@@ -210,11 +210,11 @@ impl MatchupAggregate {
             self.first_tank_b_total = self.first_tank_b_total.saturating_add(tick as u64);
             self.first_tank_b_count = self.first_tank_b_count.saturating_add(1);
         }
-        if let Some(tick) = player_a.first_expansion_city_centre_planned_tick {
+        if let Some(tick) = player_a.first_expansion_resource_depot_planned_tick {
             self.expansion_a_total = self.expansion_a_total.saturating_add(tick as u64);
             self.expansion_a_count = self.expansion_a_count.saturating_add(1);
         }
-        if let Some(tick) = player_b.first_expansion_city_centre_planned_tick {
+        if let Some(tick) = player_b.first_expansion_resource_depot_planned_tick {
             self.expansion_b_total = self.expansion_b_total.saturating_add(tick as u64);
             self.expansion_b_count = self.expansion_b_count.saturating_add(1);
         }
@@ -412,9 +412,9 @@ fn print_table(aggregates: &[MatchupAggregate]) {
     }
     println!();
     println!(
-        "W/L/D are from the left profile's perspective and use only starting City Centre kills."
+        "W/L/D are from the left profile's perspective and use only starting Resource Depot kills."
     );
-    println!("Runs with no starting City Centre winner by the tick cap are draws.");
+    println!("Runs with no starting Resource Depot winner by the tick cap are draws.");
     println!("army/bldg/wrk/dmg are diagnostic per-run averages, not tiebreakers; tank/exp are average first ticks, or '-' if never seen.");
 }
 
@@ -456,7 +456,7 @@ mod tests {
     use super::{default_profiles, ensure_distinct_profiles, parse_args};
     use crate::selfplay::{
         ProfileMatchupEndReason, ProfileMatchupPlayerResult, ProfileMatchupResult,
-        ProfileMatchupStartingCityCentreResult, ProfileMatchupWinner,
+        ProfileMatchupStartingResourceDepotResult, ProfileMatchupWinner,
     };
     use std::collections::BTreeMap;
 
@@ -505,10 +505,10 @@ mod tests {
     }
 
     #[test]
-    fn starting_city_centre_winner_counts_even_with_lower_army_value() {
+    fn starting_resource_depot_winner_counts_even_with_lower_army_value() {
         let mut aggregate = super::MatchupAggregate::new("left".to_string(), "right".to_string());
         aggregate.record(&profile_result(
-            ProfileMatchupEndReason::StartingCityCentreKilled,
+            ProfileMatchupEndReason::StartingResourceDepotKilled,
             Some(2),
             1_000,
             10,
@@ -537,9 +537,9 @@ mod tests {
                 player_id,
                 profile: profile_for_player(player_id).to_string(),
             }),
-            starting_city_centres: vec![
-                starting_city_centre(1, (winner_player_id == Some(2)).then_some(120)),
-                starting_city_centre(2, (winner_player_id == Some(1)).then_some(120)),
+            starting_resource_depots: vec![
+                starting_resource_depot(1, (winner_player_id == Some(2)).then_some(120)),
+                starting_resource_depot(2, (winner_player_id == Some(1)).then_some(120)),
             ],
             players: vec![
                 player_result(1, player_one_army),
@@ -571,18 +571,18 @@ mod tests {
             first_rifleman_attack_command_tick: None,
             first_scout_car_tick: None,
             first_scout_car_harass_command_tick: None,
-            first_expansion_city_centre_planned_tick: None,
-            first_expansion_city_centre_completed_tick: None,
+            first_expansion_resource_depot_planned_tick: None,
+            first_expansion_resource_depot_completed_tick: None,
             first_tank_tick: None,
             final_counts: BTreeMap::new(),
         }
     }
 
-    fn starting_city_centre(
+    fn starting_resource_depot(
         player_id: u32,
         death_tick: Option<u32>,
-    ) -> ProfileMatchupStartingCityCentreResult {
-        ProfileMatchupStartingCityCentreResult {
+    ) -> ProfileMatchupStartingResourceDepotResult {
+        ProfileMatchupStartingResourceDepotResult {
             player_id,
             profile: profile_for_player(player_id).to_string(),
             entity_id: player_id * 100,

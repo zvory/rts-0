@@ -241,7 +241,7 @@ fn canonical_profiles_never_schedule_disabled_supply_depots() {
             supply_cap: 50,
         },
         vec![
-            building(1, EntityKind::CityCentre, Some(0)),
+            building(1, EntityKind::ResourceDepot, Some(0)),
             building(2, EntityKind::Barracks, Some(0)),
             worker(3, AiEntityState::Idle),
         ],
