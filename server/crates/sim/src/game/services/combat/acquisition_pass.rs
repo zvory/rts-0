@@ -51,6 +51,7 @@ pub(super) fn acquire(
         &|target_id| {
             (!is_mortar_team
                 || super::mortar_autocast_target_eligible(
+                    map,
                     entities,
                     id,
                     target_id,
@@ -102,6 +103,7 @@ pub(super) fn select(
     let target_filter = |target_id| {
         (!is_mortar_team
             || super::mortar_autocast_target_eligible(
+                map,
                 entities,
                 id,
                 target_id,

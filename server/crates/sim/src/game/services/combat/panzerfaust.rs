@@ -4,12 +4,11 @@ use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
 
 use super::acquisition::{combat_mode_with_moving_fire, resolve_target_for_weapon, CombatMode};
+use super::projection::combat_target_distance_sq;
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::{direct_fire_target_legal, DirectFireLegality};
 use super::weapons::mirror_weapon_to_body;
-use super::{
-    dist2, Fog, LineOfSight, Map, SmokeCloudStore, SpatialIndex, TeamRelations, RANGE_SLACK,
-};
+use super::{Fog, LineOfSight, Map, SmokeCloudStore, SpatialIndex, TeamRelations, RANGE_SLACK};
 
 mod events;
 mod runtime;
@@ -96,7 +95,10 @@ fn handle_loaded_combat(
         return false;
     }
 
-    let distance = dist2(px, py, tx, ty).sqrt();
+    let distance = entities
+        .get(target)
+        .map(|target| combat_target_distance_sq(map, (px, py), target).sqrt())
+        .unwrap_or(f32::INFINITY);
     let commanded_direct_target = mode == CombatMode::Ordered
         && entities
             .get(id)
@@ -280,7 +282,9 @@ fn panzerfaust_target_in_range(
     let range_px = panzerfaust_range_tiles(attacker) * config::TILE_SIZE as f32
         + attacker.radius()
         + RANGE_SLACK;
-    if dist2(attacker.pos_x, attacker.pos_y, target.pos_x, target.pos_y) > range_px * range_px {
+    if combat_target_distance_sq(map, (attacker.pos_x, attacker.pos_y), target)
+        > range_px * range_px
+    {
         return false;
     }
     map.contains_world_point(target.pos_x, target.pos_y)

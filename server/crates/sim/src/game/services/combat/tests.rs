@@ -3074,7 +3074,7 @@ fn direct_attack_on_out_of_range_building_creates_a_pursuit_path() {
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
         .expect("attacker should spawn");
     let target = entities
-        .spawn_building(2, EntityKind::Depot, 300.0, 100.0, true)
+        .spawn_building(2, EntityKind::Depot, 400.0, 100.0, true)
         .expect("target building should spawn");
     entities
         .get_mut(attacker)

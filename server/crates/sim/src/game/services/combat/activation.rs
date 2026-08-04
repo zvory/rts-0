@@ -4,6 +4,8 @@ use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 
+use super::projection::combat_target_distance_sq;
+
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::{direct_fire_target_legal, DirectFireLegality};
 
@@ -43,7 +45,7 @@ pub(super) fn secondary_weapon_target_passes_activation(
     };
     let dx = target_entity.pos_x - start.0;
     let dy = target_entity.pos_y - start.1;
-    let distance_sq = dx * dx + dy * dy;
+    let distance_sq = combat_target_distance_sq(map, start, target_entity);
     if !distance_sq.is_finite() || distance_sq > constraints.range_px * constraints.range_px {
         return false;
     }

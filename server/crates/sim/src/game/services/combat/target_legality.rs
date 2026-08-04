@@ -1,7 +1,9 @@
 use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::rules::terrain::{self, TerrainKind};
 
-use super::projection::{friendly_hard_blocker_between, shot_hits_intended_target};
+use super::projection::{
+    combat_target_distance_sq, friendly_hard_blocker_between, shot_hits_intended_target,
+};
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::{Fog, LineOfSight, Map, SmokeCloudStore, TeamRelations};
 
@@ -135,9 +137,7 @@ pub(super) fn auto_target_legality(
     let concealment = terrain::concealment_modifier(target.kind, TerrainKind::Open).max(0.0);
     let effective_acquire_px = acquire_px * concealment;
     let effective_weapon_range_px = weapon_range_px * concealment;
-    let dx = target.pos_x - px;
-    let dy = target.pos_y - py;
-    let distance_sq = dx * dx + dy * dy;
+    let distance_sq = combat_target_distance_sq(map, (px, py), target);
     if !distance_sq.is_finite()
         || !effective_acquire_px.is_finite()
         || distance_sq > effective_acquire_px * effective_acquire_px

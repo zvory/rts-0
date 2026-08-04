@@ -43,6 +43,7 @@ mod tests;
 use acquisition::{combat_mode, resolve_target as resolve_target_for_test};
 use acquisition::{combat_mode_with_moving_fire, CombatMode};
 use damage::apply_damage;
+use projection::combat_target_distance_sq;
 use shot_blocker_index::ShotBlockerIndex;
 use target_legality::{direct_fire_target_legal, DirectFireLegality};
 use weapons::{
@@ -319,8 +320,14 @@ pub(in crate::game) fn combat_system(
         };
 
         // Distance to chosen target.
-        let (tx, ty, t_owner, neutral_obstacle) = match entities.get(tid) {
-            Some(t) => (t.pos_x, t.pos_y, t.owner, t.is_neutral_obstacle()),
+        let (tx, ty, t_owner, neutral_obstacle, target_distance_sq) = match entities.get(tid) {
+            Some(t) => (
+                t.pos_x,
+                t.pos_y,
+                t.owner,
+                t.is_neutral_obstacle(),
+                combat_target_distance_sq(map, (px, py), t),
+            ),
             None => continue,
         };
         if !(neutral_obstacle
@@ -329,7 +336,7 @@ pub(in crate::game) fn combat_system(
         {
             continue; // Auto-acquisition stays hostile/obstacle-only; self-attacks are ordered.
         }
-        let dist = dist2(px, py, tx, ty).sqrt();
+        let dist = target_distance_sq.sqrt();
         let commanded_direct_target = mode == CombatMode::Ordered
             && entities
                 .get(id)
@@ -344,7 +351,7 @@ pub(in crate::game) fn combat_system(
         }
         let target_angle = (ty - py).atan2(tx - px);
         if is_mortar_team
-            && !mortar_autocast_target_eligible(entities, id, tid, min_range_px, range_px)
+            && !mortar_autocast_target_eligible(map, entities, id, tid, min_range_px, range_px)
         {
             continue;
         }
@@ -607,6 +614,7 @@ fn mortar_autocast_target_safe(
 }
 
 fn mortar_autocast_target_eligible(
+    map: &Map,
     entities: &EntityStore,
     attacker: u32,
     target: u32,
@@ -621,7 +629,7 @@ fn mortar_autocast_target_eligible(
     };
     let dx = target.pos_x - attacker.pos_x;
     let dy = target.pos_y - attacker.pos_y;
-    let distance = dx.hypot(dy);
+    let distance = combat_target_distance_sq(map, (attacker.pos_x, attacker.pos_y), target).sqrt();
     distance.is_finite()
         && distance >= min_range_px
         && distance <= max_range_px

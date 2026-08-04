@@ -301,6 +301,45 @@ pub(crate) fn building_rect_for_entity(map: &Map, e: &Entity) -> Option<RectBody
     })
 }
 
+/// Closest point that combat movement should approach on a target. Building targets return a
+/// footprint-boundary point so short-range attackers never path toward an unreachable center.
+pub(crate) fn closest_combat_target_point(
+    map: &Map,
+    attacker: (f32, f32),
+    target: &Entity,
+) -> (f32, f32) {
+    let Some(rect) = target
+        .is_building()
+        .then(|| building_rect_for_entity(map, target))
+        .flatten()
+    else {
+        return (target.pos_x, target.pos_y);
+    };
+    let clamped = (
+        attacker.0.clamp(rect.min_x, rect.max_x),
+        attacker.1.clamp(rect.min_y, rect.max_y),
+    );
+    if attacker.0 < rect.min_x
+        || attacker.0 > rect.max_x
+        || attacker.1 < rect.min_y
+        || attacker.1 > rect.max_y
+    {
+        return clamped;
+    }
+
+    let edges = [
+        ((rect.min_x, attacker.1), attacker.0 - rect.min_x),
+        ((rect.max_x, attacker.1), rect.max_x - attacker.0),
+        ((attacker.0, rect.min_y), attacker.1 - rect.min_y),
+        ((attacker.0, rect.max_y), rect.max_y - attacker.1),
+    ];
+    edges
+        .into_iter()
+        .min_by(|left, right| left.1.total_cmp(&right.1))
+        .map(|edge| edge.0)
+        .unwrap_or(clamped)
+}
+
 pub(crate) fn circle_intersects_rect(circle: CircleBody, rect: RectBody) -> bool {
     if !valid_circle(circle) || !valid_rect(rect) {
         return false;
