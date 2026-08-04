@@ -93,12 +93,16 @@ pub(super) fn select(
     let ready = entities
         .get(id)
         .is_some_and(|entity| entity.weapon_cooldown(weapon) == 0);
-    let travelling_attack_move = !is_mortar_team
-        && mode == CombatMode::Aggressive
+    let targetless_travelling_order = !is_mortar_team
         && entities.get(id).is_some_and(|entity| {
-            matches!(entity.order(), Order::AttackMove(_))
-                && entity.target_id().is_none()
-                && !entity.path_is_empty()
+            entity.target_id().is_none()
+                && match entity.order() {
+                    Order::AttackMove(_) => {
+                        mode == CombatMode::Aggressive && !entity.path_is_empty()
+                    }
+                    Order::Move(_) => mode == CombatMode::Opportunistic && can_move_fire,
+                    _ => false,
+                }
         });
     let target_filter = |target_id| {
         (!is_mortar_team
@@ -133,7 +137,7 @@ pub(super) fn select(
         ready,
         &target_filter,
     );
-    if retained.is_some() || (!ready && !travelling_attack_move) {
+    if retained.is_some() || (!ready && !targetless_travelling_order) {
         return retained;
     }
     acquire(

@@ -6,6 +6,7 @@ mod dispatch;
 mod dynamic_construction_path_block;
 mod factory_wall_rally_spawn;
 mod layouts;
+mod move_reload_acquisition;
 mod replay_142_vehicle_lock;
 mod replay_238_rifleman_corner_lock;
 mod replay_256_worker_expansion_rally;
@@ -750,6 +751,8 @@ mod command_car_corner_tests;
 mod factory_wall_rally_spawn_tests;
 #[cfg(test)]
 mod manual_clear_time_tests;
+#[cfg(test)]
+mod move_reload_acquisition_tests;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]

@@ -234,6 +234,11 @@ Current scenario ids:
   already inside its current moving-range boundary. On the known failure, it keeps advancing until
   reload permits fresh acquisition; after a fix, the same scene should stop at the initial boundary
   and wait there to fire.
+- `move_reload_acquisition` — after a ten-second inspection pause, one reloading Tank receives a
+  plain move past an invulnerable Anti-Tank Gun. The gun enters the Tank's moving cannon range while
+  fully visible; the Tank should acquire and turn its turret during reload without stopping its
+  commanded movement. This guards the behavior seen later in replay 227 at tick 13,569; exact
+  replay inspection shows the originally cited gun was still outside moving range at tick 13,488.
 - `tank_under_fire_retreat` — one reinforced inspection Tank takes frontal fire from a deployed
   Anti-Tank Gun, then after 10 seconds receives a long move order directly behind it. The baseline
   captures the current 180-degree pivot before retreat; future under-fire reverse behavior should
