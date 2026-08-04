@@ -17,7 +17,6 @@ use crate::game::services::standability;
 use crate::game::{PlayerState, ScoreState};
 use crate::protocol::NoticeSeverity;
 use rayon::prelude::*;
-
 use super::car_drive::{
     scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
 };
