@@ -12,6 +12,6 @@ const LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
 pub(super) const REPLAY_256_WORKER_EXPANSION_RALLY_SPEC: DevScenarioSpec = DevScenarioSpec {
     id: "replay_256_worker_expansion_rally",
     title: "Replay 256 Worker Rally Oscillation",
-    description: "Minimal reproduction of Soupman's replay-220 worker rally lock: four workers have distinct far-side rally goals and one stale waypoint beside a stationary unit. A corrected build drops that unreachable intermediate waypoint and continues toward each goal.",
+    description: "Organic reproduction of Soupman's replay-220 worker rally lock: a Resource Depot produces four workers at the real production cadence and rallies them across the map. Each worker naturally enters the same route beside a deployed Machine Gunner.",
     launches: &LAUNCHES,
 };
