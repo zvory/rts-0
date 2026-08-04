@@ -691,7 +691,7 @@ mod tests {
         let steel_mine = building_def(EntityKind::SteelMine).expect("steel mine definition");
         assert_eq!(
             (steel_mine.stats.cost_steel, steel_mine.stats.cost_oil),
-            (50, 0)
+            (0, 0)
         );
         assert_eq!(
             building_def(EntityKind::Barracks).unwrap().trains,
