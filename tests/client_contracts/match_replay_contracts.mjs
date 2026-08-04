@@ -1,10 +1,7 @@
 // tests/client_contracts/match_replay_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
-import {
-  assert,
-  assertApprox,
-} from "./assertions.mjs";
+import { assert, assertApprox } from "./assertions.mjs";
 import { withFakeOverlayDocument } from "./fakes.mjs";
 import { HUD } from "../../client/src/hud.js";
 import {
@@ -20,7 +17,6 @@ import { ClientIntent } from "../../client/src/client_intent.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { ReplayCameraInput } from "../../client/src/replay_camera_input.js";
 import { LivePauseOverlay } from "../../client/src/live_pause_overlay.js";
-import { ReplaySeekOverlay } from "../../client/src/replay_seek_overlay.js";
 import { notePredictionAuthoritativeSnapshot } from "../../client/src/match_live_pause.js";
 import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
 
@@ -729,24 +725,6 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(app.replaySeekNotice === "" && overlayHidden,
       "completed room-time state clears the center-screen seek notice without a replacement Start");
   }
-  withFakeOverlayDocument(({ FakeElement }) => {
-    const root = new FakeElement("section");
-    const overlay = new ReplaySeekOverlay({ root });
-    overlay.show("Seeking backward 5 seconds…");
-    assert(!overlay.el.hidden && overlay.title.textContent === "Seeking",
-      "replay seek overlay presents the large seeking label");
-    assert(overlay.detail.textContent === "Seeking backward 5 seconds…",
-      "replay seek overlay preserves authoritative direction and duration detail");
-    overlay.closeButton.listeners.click();
-    assert(overlay.dismissed && overlay.el.hidden,
-      "replay seek overlay can be dismissed for the current seek");
-    overlay.show("Seeking forward 10 seconds…");
-    assert(!overlay.dismissed && !overlay.el.hidden,
-      "a later replay seek shows the dismissed overlay again");
-    overlay.destroy();
-    assert(root.children.length === 0,
-      "replay seek overlay removes its generated DOM on destroy");
-  });
   {
     const match = Object.create(Match.prototype);
     const calls = [];

@@ -54,6 +54,7 @@ await import("./client_contracts/match_shell_contracts.mjs");
 await import("./client_contracts/match_notice_presenter_contracts.mjs");
 await import("./client_contracts/match_replay_contracts.mjs");
 await import("./client_contracts/replay_seek_state_contracts.mjs");
+await import("./client_contracts/replay_seek_overlay_contracts.mjs");
 await import("./client_contracts/room_time_controls_contracts.mjs");
 await import("./client_contracts/room_time_panel_contracts.mjs");
 await import("./client_contracts/spectator_controls_panel_contracts.mjs");
