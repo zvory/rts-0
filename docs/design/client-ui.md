@@ -137,7 +137,8 @@ src/
   frame_entity_views.js # One-RAF entity view builder shared by render, fog, HUD, minimap, analysis
   presentation/    # Frozen semantic layers, cloneable revisioned grids/projection data, static map, and frame assembly
   replay_controls.js # Capability-driven RoomTimeControls plus replay-only vision/branch controls
-  replay_seek_notice.js # Shared replay-seek direction/duration toast formatting
+  replay_seek_notice.js # Shared replay-seek direction/duration notice formatting
+  replay_seek_overlay.js # Dismissible center-screen authoritative seek progress notice
   room_time_panel.js # Floating, draggable chrome around shared room-time controls
   room_capabilities.js # Client-side room capability parser for controls/diagnostics affordances
   alerts.js       # Notice/toast alert ids and viewport alert behavior constants
@@ -718,9 +719,11 @@ replay-specific visibility/action capabilities, not by lab or URL identity.
 
 The app shell listens for reliable `roomTimeSeekStarted` broadcasts throughout replay playback,
 clears replay timeline-derived state in place without reconstructing `Match` or its renderer, and
-shows every viewer a `Seeking forward/backward X seconds…` toast. Authoritative
-`roomTimeState.seek` metadata owns the continuing progress lifecycle; sampled snapshots advance the
-existing timeline and growing keyframe marks until a state at the target omits `seek`.
+shows every viewer a `Seeking forward/backward X seconds…` notice. Authoritative
+`roomTimeState.seek` metadata owns the continuing progress lifecycle. During that lifecycle, a
+dismissible center-screen `Seeking` notice in the title typeface distinguishes reconstruction from
+ordinary fast playback; each new seek shows it again. Sampled snapshots advance the existing
+timeline and growing keyframe marks until a state at the target omits `seek`.
 
 Async `Match.create` startup uses semantic latest-only inbox slots for snapshots, room-time state,
 live-pause state, and observer analysis, plus a bounded ordered command-receipt queue. High-rate

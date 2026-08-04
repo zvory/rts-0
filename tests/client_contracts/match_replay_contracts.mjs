@@ -20,6 +20,7 @@ import { ClientIntent } from "../../client/src/client_intent.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { ReplayCameraInput } from "../../client/src/replay_camera_input.js";
 import { LivePauseOverlay } from "../../client/src/live_pause_overlay.js";
+import { ReplaySeekOverlay } from "../../client/src/replay_seek_overlay.js";
 import { notePredictionAuthoritativeSnapshot } from "../../client/src/match_live_pause.js";
 import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
 
@@ -709,23 +710,43 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   {
     const app = Object.create(App.prototype);
     let resetPayload = null;
-    let toast = null;
-    let hiddenToast = null;
+    let shownNotice = null;
+    let overlayHidden = false;
     app.match = { prepareReplaySeek(payload) { resetPayload = payload; } };
-    app.showToast = (message) => { toast = message; };
-    app.hideToast = (message) => { hiddenToast = message; return true; };
+    app.replaySeekOverlay = {
+      show(message) { shownNotice = message; overlayHidden = false; },
+      hide() { overlayHidden = true; },
+    };
     app.onRoomTimeSeekStarted({ controllerId: 7, fromTick: 30, targetTick: 330 });
     assert(resetPayload?.targetTick === 330,
       "accepted replay seek resets the current Match in place before replacement snapshots arrive");
-    assert(toast === "Seeking forward 10 seconds…",
-      "in-place replay seek keeps the immediate authoritative seek notice");
+    assert(shownNotice === "Seeking forward 10 seconds…" && !overlayHidden,
+      "in-place replay seek shows the immediate center-screen authoritative seek notice");
     app.onRoomTimeState({ currentTick: 120, seek: { id: 1, controllerId: 7, fromTick: 30, targetTick: 330 } });
-    assert(app.replaySeekNotice === toast && hiddenToast === null,
+    assert(app.replaySeekNotice === shownNotice && !overlayHidden,
       "progress room-time state keeps the seek notice visible without a replacement Start");
     app.onRoomTimeState({ currentTick: 330 });
-    assert(app.replaySeekNotice === "" && hiddenToast === toast,
-      "completed room-time state clears the sticky seek notice without a replacement Start");
+    assert(app.replaySeekNotice === "" && overlayHidden,
+      "completed room-time state clears the center-screen seek notice without a replacement Start");
   }
+  withFakeOverlayDocument(({ FakeElement }) => {
+    const root = new FakeElement("section");
+    const overlay = new ReplaySeekOverlay({ root });
+    overlay.show("Seeking backward 5 seconds…");
+    assert(!overlay.el.hidden && overlay.title.textContent === "Seeking",
+      "replay seek overlay presents the large seeking label");
+    assert(overlay.detail.textContent === "Seeking backward 5 seconds…",
+      "replay seek overlay preserves authoritative direction and duration detail");
+    overlay.closeButton.listeners.click();
+    assert(overlay.dismissed && overlay.el.hidden,
+      "replay seek overlay can be dismissed for the current seek");
+    overlay.show("Seeking forward 10 seconds…");
+    assert(!overlay.dismissed && !overlay.el.hidden,
+      "a later replay seek shows the dismissed overlay again");
+    overlay.destroy();
+    assert(root.children.length === 0,
+      "replay seek overlay removes its generated DOM on destroy");
+  });
   {
     const match = Object.create(Match.prototype);
     const calls = [];

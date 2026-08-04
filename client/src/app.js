@@ -80,6 +80,7 @@ import {
   settleRendererPreparationForStart,
 } from "./renderer/preparation_slot.js";
 import { formatReplaySeekNotice } from "./replay_seek_notice.js";
+import { ReplaySeekOverlay } from "./replay_seek_overlay.js";
 import { StressTestRunner } from "./stress_test.js";
 import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
 import { ChatOverlay } from "./chat_overlay.js";
@@ -204,6 +205,7 @@ export class App {
       sendButton: dom.chatSend,
       lobbyDock: dom.lobbyChatDock,
     });
+    this.replaySeekOverlay = new ReplaySeekOverlay({ root: dom.gameScreen });
     this.rendererPreparationSlot = new RendererPreparationSlot({
       onCountdownReady: (countdownId) => this.net.matchLoadReady(countdownId),
       onFailure: (error) => {
@@ -240,7 +242,7 @@ export class App {
         : null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
-    /** @type {string} active replay-seek toast, cleared by authoritative seek completion. */
+    /** @type {string} active replay-seek notice, cleared by authoritative seek completion. */
     this.replaySeekNotice = "";
     /** @type {number|undefined} heartbeat interval id while connected. */
     this.heartbeatTimer = undefined;
@@ -648,12 +650,12 @@ export class App {
     if (!notice) return;
     this.match?.prepareReplaySeek?.(m);
     this.replaySeekNotice = notice;
-    this.showToast(notice, null);
+    this.replaySeekOverlay?.show(notice);
   }
 
   onRoomTimeState(state) {
     if (!this.replaySeekNotice || state?.seek) return;
-    this.hideToast(this.replaySeekNotice);
+    this.replaySeekOverlay?.hide();
     this.replaySeekNotice = "";
   }
 
@@ -762,7 +764,7 @@ export class App {
     this.setCleanPresentation(false);
     const startsReplay = !!payload?.replay;
     if (this.replaySeekNotice) {
-      this.hideToast(this.replaySeekNotice);
+      this.replaySeekOverlay?.hide();
       this.replaySeekNotice = "";
     }
     if (!startsReplay) this.lastObservationRunId = "";

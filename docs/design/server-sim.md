@@ -807,7 +807,9 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   advances the authoritative `Game`/command cursor in bounded CPU slices. The actor yields between
   slices so room controls and membership remain responsive, records exact 2,000-tick keyframes, and
   publishes coalesced room-time state plus complete fog-scoped snapshots at a sampled wall-clock
-  cadence rather than once per simulated tick. No seek-time `start` rebuild is required. Lab
+  cadence rather than once per simulated tick. Replay pause governs ordinary playback, not this
+  internal reconstruction: a seek reaches its target and then remains paused there. No seek-time
+  `start` rebuild is required. Lab
   timeline seek retains its existing candidate `Game` and commits seek/cooldown metadata
   only after reconstruction succeeds; Lab replay import prepares one replacement bundle containing
   the duration-tick game, timeline, cleared scenario driver, imported operator/default vision,
