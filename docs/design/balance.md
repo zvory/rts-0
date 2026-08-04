@@ -6,7 +6,7 @@ buildables, trainables, upgrade ids, and ability carriers live in
 bare road, and all four marked road tiles share open-ground passability, cover, concealment, and
 line-of-sight behavior. The visual open-ground variants retain grass's 1.0x movement speed; road
 alone applies a 1.5x movement-speed multiplier. Independent authored slow-movement tiles apply a
-0.5x multiplier, while authored damage-reduction tiles halve incoming damage after existing damage
+0.75x multiplier, while authored damage-reduction tiles reduce incoming damage by 25% after existing damage
 policy; both sample the entity-centre tile and may overlap any base terrain or other overlay.
 `server/crates/rules/src/balance.rs` is the stable public re-export surface for timings, tile size,
 starting resources, supply caps, mining amounts, support-weapon constants, body dimensions, upgrade
@@ -342,12 +342,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
   NE-SW diagonal marked road tiles share this rule. A moving unit samples the terrain under its
   center at the start of each authoritative movement tick; roads otherwise behave like grass,
   including passability, construction, cover, concealment, and line of sight.
-- `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.5` and
-  `DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER = 0.5`. These independent sparse authored overlays sample
+- `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.75` and
+  `DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER = 0.75`. These independent sparse authored overlays sample
   the entity-centre tile. Slow movement multiplies the movement budget after the base-terrain
-  modifier (so a slowed road is 0.75x base speed). Damage reduction applies after weapon armor,
+  modifier (so a slowed road is 1.125x base speed). Damage reduction applies after weapon armor,
   facing, falloff, and entrenchment calculations to direct fire, overpenetration, Mortar,
-  Artillery, loaded Panzerfaust, and damaging ability projectiles; odd non-zero damage rounds up.
+  Artillery, loaded Panzerfaust, and damaging ability projectiles; fractional non-zero damage rounds up.
 - Gravel A/B/C, Dirt A/B/C, Mud A/B/C, and Frosted Ground are visual Open-terrain variants. They
   use grass-equivalent 1.0x movement, construction, cover, concealment, and line-of-sight rules.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to

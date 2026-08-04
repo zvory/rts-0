@@ -375,6 +375,18 @@ export class MapEditorViewport {
   }
 
   paintPreviewRecord() {
+    if (this.tool?.kind === "road" && this.paintStartTile && this.lastPaintTile) {
+      const end = snapRoadEnd(this.paintStartTile, this.lastPaintTile, this.session.draft);
+      const x0 = (this.paintStartTile.x + 0.5) * TILE_SIZE;
+      const y0 = (this.paintStartTile.y + 0.5) * TILE_SIZE;
+      const x1 = (end.x + 0.5) * TILE_SIZE;
+      const y1 = (end.y + 0.5) * TILE_SIZE;
+      return {
+        paths: [[[x0, y0], [x1, y1]]],
+        lineWidth: Math.max(TILE_SIZE, Number(this.tool.width) * TILE_SIZE),
+        color: 0xe6bf42,
+      };
+    }
     if (!["terrain", "overlay"].includes(this.tool?.kind) || this.tool.shape !== "box" || !this.paintStartTile || !this.lastPaintTile) return null;
     const x0 = Math.min(this.paintStartTile.x, this.lastPaintTile.x) * TILE_SIZE;
     const y0 = Math.min(this.paintStartTile.y, this.lastPaintTile.y) * TILE_SIZE;
@@ -409,17 +421,17 @@ export class MapEditorViewport {
     }
     const tile = this.eventTile(event, { kind: this.tool.kind });
     if (!tile) return;
-    if (this.tool.kind === "terrain" || this.tool.kind === "overlay") {
+    if (["terrain", "overlay", "road"].includes(this.tool.kind)) {
       this.paintPointerId = event.pointerId;
       this.paintStartTile = tile;
       this.lastPaintTile = tile;
       const action = this.tool.shape === "box" ? "Filled" : "Painted";
-      if (this.tool.kind === "terrain") {
+      if (this.tool.kind === "terrain" || this.tool.kind === "road") {
         this.session.beginTerrainStroke(`${action} ${terrainLabel(this.tool.terrain)} terrain`);
       } else {
         this.session.beginOverlayStroke(`${action} ${this.tool.label || "map overlay"}`);
       }
-      if (this.tool.shape === "box") this.drawOverlay();
+      if (this.tool.kind === "road" || this.tool.shape === "box") this.drawOverlay();
       else this.paintLine(tile, tile);
       event.currentTarget.setPointerCapture?.(event.pointerId);
     } else {
@@ -443,12 +455,12 @@ export class MapEditorViewport {
       }
       if (event.pointerId === this.doodadPointerId) return;
     }
-    if (event.pointerId !== this.paintPointerId || !["terrain", "overlay"].includes(this.tool?.kind)) return;
+    if (event.pointerId !== this.paintPointerId || !["terrain", "overlay", "road"].includes(this.tool?.kind)) return;
     const tile = this.eventTile(event);
     if (!tile || !this.lastPaintTile) return;
-    if (this.tool.shape !== "box") this.paintLine(this.lastPaintTile, tile);
+    if (this.tool.kind !== "road" && this.tool.shape !== "box") this.paintLine(this.lastPaintTile, tile);
     this.lastPaintTile = tile;
-    if (this.tool.shape === "box") this.drawOverlay();
+    if (this.tool.kind === "road" || this.tool.shape === "box") this.drawOverlay();
   }
 
   handlePointerUp(event) {
@@ -479,7 +491,9 @@ export class MapEditorViewport {
       if (!cancelled) {
         const tile = this.eventTile(event);
         if (tile) this.lastPaintTile = tile;
-        if (["terrain", "overlay"].includes(this.tool?.kind) && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
+        if (this.tool?.kind === "road" && this.paintStartTile && this.lastPaintTile) {
+          this.paintRoad(this.paintStartTile, this.lastPaintTile);
+        } else if (["terrain", "overlay"].includes(this.tool?.kind) && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
           this.paintBox(this.paintStartTile, this.lastPaintTile);
         }
       }
@@ -585,6 +599,12 @@ export class MapEditorViewport {
     this.paintTiles(mapEditorRectTiles(from, to, dimensions));
   }
 
+  paintRoad(from, to) {
+    const end = snapRoadEnd(from, to, this.session.draft);
+    const changes = this.session.paintRoad(from, end, this.tool?.width, this.tool?.symmetry);
+    if (changes.length) this.queueTerrainChanges(changes);
+  }
+
   paintTiles(tiles) {
     const dimensions = this.session.draft;
     if (this.tool?.kind === "overlay") {
@@ -596,25 +616,27 @@ export class MapEditorViewport {
       symmetricTerrainTiles(dimensions, tiles, this.tool.terrain, this.tool?.symmetry),
       this.tool.terrain,
     );
-    if (changes.length > 0) {
-      this.terrainRevision += 1;
-      if (this.pendingTerrainUpdate?.kind === "replace") {
-        const materialized = this.session.materialized();
-        this.pendingTerrainUpdate = {
-          ...this.pendingTerrainUpdate,
-          revision: this.terrainRevision,
-          terrain: materialized.terrain,
-        };
-      } else {
-        const priorChanges = this.pendingTerrainUpdate?.kind === "patch"
-          ? this.pendingTerrainUpdate.changes
-          : [];
-        this.pendingTerrainUpdate = {
-          kind: "patch",
-          revision: this.terrainRevision,
-          changes: coalesceTerrainChanges(priorChanges, changes),
-        };
-      }
+    if (changes.length > 0) this.queueTerrainChanges(changes);
+  }
+
+  queueTerrainChanges(changes) {
+    this.terrainRevision += 1;
+    if (this.pendingTerrainUpdate?.kind === "replace") {
+      const materialized = this.session.materialized();
+      this.pendingTerrainUpdate = {
+        ...this.pendingTerrainUpdate,
+        revision: this.terrainRevision,
+        terrain: materialized.terrain,
+      };
+    } else {
+      const priorChanges = this.pendingTerrainUpdate?.kind === "patch"
+        ? this.pendingTerrainUpdate.changes
+        : [];
+      this.pendingTerrainUpdate = {
+        kind: "patch",
+        revision: this.terrainRevision,
+        changes: coalesceTerrainChanges(priorChanges, changes),
+      };
     }
   }
 
@@ -810,6 +832,24 @@ function coalesceTerrainChanges(previous, changes) {
     byTile.set(`${change.x},${change.y}`, change);
   }
   return [...byTile.values()];
+}
+
+function snapRoadEnd(from, to, dimensions) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (dx === 0 && dy === 0) return { ...from };
+  const octant = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+  const stepX = Math.round(Math.cos(octant * Math.PI / 4));
+  const stepY = Math.round(Math.sin(octant * Math.PI / 4));
+  const projected = stepX && stepY
+    ? Math.max(1, Math.round((Math.abs(dx) + Math.abs(dy)) / 2))
+    : Math.max(1, Math.round(Math.abs(dx * stepX + dy * stepY)));
+  const width = Math.max(1, Math.trunc(Number(dimensions?.width)) || 1);
+  const height = Math.max(1, Math.trunc(Number(dimensions?.height)) || 1);
+  const maxX = stepX > 0 ? width - 1 - from.x : stepX < 0 ? from.x : Infinity;
+  const maxY = stepY > 0 ? height - 1 - from.y : stepY < 0 ? from.y : Infinity;
+  const distance = Math.min(projected, maxX, maxY);
+  return { x: from.x + stepX * distance, y: from.y + stepY * distance };
 }
 
 function presentationOutcomeMessage(outcome) {

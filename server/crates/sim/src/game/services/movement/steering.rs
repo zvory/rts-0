@@ -9,6 +9,8 @@ use super::standability::{
 };
 use super::STEERING_MAX_NEIGHBORS;
 
+mod tree_trunks;
+
 const STEERING_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 1.5;
 const STEERING_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.5;
 const STEERING_STRENGTH: f32 = 0.65;
@@ -56,6 +58,16 @@ pub(super) fn steered_candidate(
     budget: f32,
 ) -> Option<(f32, f32)> {
     let steer_dir = local_steering_dir(entities, spatial, id, x, y, path_dir);
+    let bounds = tree_trunks::query_bounds(x, y);
+    let steer_dir = tree_trunks::apply_bias(
+        occ.tree_trunks_in_tile_rect(bounds.0, bounds.1, bounds.2, bounds.3),
+        id,
+        kind,
+        x,
+        y,
+        steer_dir,
+        path_dir,
+    );
     if (steer_dir.0 - path_dir.0).abs() <= 1e-4 && (steer_dir.1 - path_dir.1).abs() <= 1e-4 {
         return None;
     }

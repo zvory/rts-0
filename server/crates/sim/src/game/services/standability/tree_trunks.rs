@@ -21,6 +21,9 @@ pub(in crate::game::services) fn segment_clear(
     from: (f32, f32),
     to: (f32, f32),
 ) -> bool {
+    if movement_body_class(kind) == MovementBodyClass::InfantryLike {
+        return true;
+    }
     let Some(body_radius) = unit_body(kind, from.0, from.1).map(UnitBody::bounding_radius) else {
         return false;
     };

@@ -1456,18 +1456,22 @@ by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.
 same `Tree` semantic class and authoritative 4.5-world-pixel circular trunk; species affects
 presentation only. Tree color
 is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
-`#rrggbb`. Tree trunks participate in unit standability and add a finite tile-path avoidance cost,
-while leaving the rest of their tile traversable. Wildflowers have no collision or pathing effect.
+`#rrggbb`. Tree trunks are hard geometry for vehicles. Infantry pathing assigns tree tiles a finite
+avoidance cost and local movement steers around nearby trunks when space exists, but trunks do not
+invalidate infantry paths or landings; infantry pass through when avoidance cannot resolve a dense
+cluster. Wildflowers have no collision or pathing effect.
 Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
 setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
 rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
-schema-v6 map overlays independently supply stealth, vehicle exclusion, 50% incoming-damage
-reduction, and 50% movement speed. The damage and movement effects are selected from the tile
+schema-v6 map overlays independently supply stealth, vehicle exclusion, 25% incoming-damage
+reduction, and 25% movement-speed reduction. The damage and movement effects are selected from the tile
 beneath the entity centre.
-Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
-count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
-doodads to `materializedMap`. Records are capped at 64, expire after two
-minutes, and are removed on the first consume; unknown, expired, or already-used ids return HTTP 410.
+Lab handoff creation strictly rejects unknown fields and validates the complete authored-map schema,
+catalog, count, ids, colors, and world bounds before binding terrain, locations, resource counts,
+and doodads to `materializedMap`. Editor-directed handoffs are bounded authored-draft transport and
+do not require or retain the duplicate materialized body. Records are capped at 64; Lab records
+expire after two minutes, editor records after 24 hours, and both are removed on first consume.
+Unknown, expired, or already-used ids return HTTP 410.
 The map body never appears in a URL. Consumption uses POST so browser or intermediary prefetching
 cannot burn the one-use record. Consuming a Lab-directed record creates a private Lab from the
 validated materialized map before the browser joins; an unjoined room has a short empty-room lease

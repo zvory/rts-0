@@ -176,9 +176,14 @@ export class MapEditorWorkerRenderer {
     }
     if (overlay.paintPreview) {
       const preview = overlay.paintPreview;
-      gfxStroke(this.overlay, 2, preview.color, 0.9);
-      gfxRect(gfxFill(this.overlay, preview.color, 0.16), preview.x, preview.y, preview.width, preview.height);
-      gfxNoFill(this.overlay);
+      if (Array.isArray(preview.paths)) {
+        gfxStrokePaths(this.overlay, preview.paths, preview.lineWidth, preview.color, 0.22);
+        gfxStrokePaths(this.overlay, preview.paths, 2, preview.color, 0.94);
+      } else {
+        gfxStroke(this.overlay, 2, preview.color, 0.9);
+        gfxRect(gfxFill(this.overlay, preview.color, 0.16), preview.x, preview.y, preview.width, preview.height);
+        gfxNoFill(this.overlay);
+      }
     }
   }
 

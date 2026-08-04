@@ -323,6 +323,22 @@ export class MapEditorSession {
     return changed;
   }
 
+  paintRoad(from, to, width = 5, symmetry = MAP_EDITOR_SYMMETRY.NONE) {
+    if (!this.draft || !this.terrainStroke || !from || !to) return [];
+    const { terrainPatch } = applyMapOperation(this.draft, {
+      type: "road",
+      points: [[from.x, from.y], [to.x, to.y]],
+      width: Math.max(1, Math.min(15, Math.trunc(Number(width)) || 5)),
+      roughness: 0,
+      symmetry,
+    }, {
+      protectedTerrain: ({ x, y }) => protectedTerrainTile(this.draft, x, y),
+    });
+    const changed = terrainPatch.map(({ x, y, character }) => ({ x, y, code: CHAR_TO_TERRAIN[character] }));
+    for (const change of changed) this.terrainStroke.dirty.set(`${change.x},${change.y}`, change);
+    return changed;
+  }
+
   commitTerrainStroke() {
     const stroke = this.terrainStroke;
     this.terrainStroke = null;

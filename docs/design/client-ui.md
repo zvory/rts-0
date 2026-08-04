@@ -75,6 +75,7 @@ src/
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   minimap_road_layer.js # Cached post-fog dotted road-marking overlay
+  minimap_forest_layer.js # Cached post-fog authored-tree symbol overlay
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
   lobby_map_selector.js # Host map picker: minimap previews, creator credits, keyboard navigation
   lobby_browser_view.js # Pre-join lobby browser rows, state rendering, and age/status formatting
@@ -975,7 +976,8 @@ Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
 base locations, and provides undo/redo, local map JSON import/export, and centered resize. The editor
-accepts only materialized authored maps containing terrain; agent-authored recipes remain a
+accepts authored-map JSON up to 8 MiB and only materialized authored maps containing terrain;
+agent-authored recipes remain a
 `scripts/map-author.mjs build` CLI input and are not a Map Editor document type. Import normalization
 preserves authored terrain verbatim, including impassable terrain in a protected base footprint, so
 the advisory and authoritative checks can report the author's actual input. Interactive rock/water
@@ -989,7 +991,9 @@ capacity; every base location is permanent and its authored resource counts spaw
 player starts there. The selected starting or neutral base exposes integer Steel (0–36) and Oil
 (0–9) patch controls; new and migrated bases default to 12 Steel and 3 Oil.
 Editor drafts may temporarily contain zero start locations so authors can clear and rebuild the player
-layout. Adding symmetric starts reuses any base sites already present at the target locations. There is no
+layout. Editor-directed handoffs preserve that in-progress zero-start state without trying to create
+a simulation; Lab-directed handoffs still require a playable start/base layout. Adding symmetric starts
+reuses any base sites already present at the target locations. There is no
 active layout, player slot, or per-player natural assignment. The viewport draws blue start
 markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
 and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
@@ -1005,6 +1009,9 @@ water remain rejected there. Authored map rows
 encode bare, horizontal-marked, vertical-marked, NW-SE diagonal-marked, and NE-SW diagonal-marked
 roads with `=`, `-`, `|`, `\`, and `/`, respectively. The ten visual Open-terrain variants use
 `0` through `9` in protocol-code order: Gravel A/B/C, Dirt A/B/C, Mud A/B/C, then Frosted Ground.
+The dedicated road tool drags a configurable-width road snapped to the eight cardinal/diagonal
+directions, paints bare-road shoulders, and chooses the yellow centre-mark orientation automatically.
+The same five road tile variants remain in the ordinary terrain palette for brush and box detail work.
 The selected symmetry runs the shared advisory checker against the current draft and renders any
 terrain, start/base, overlay, resource, or doodad mismatch directly below the selector. Three-way
 checks compare complete generated square-grid orbits, including rounded copies clipped by an edge;
@@ -1016,12 +1023,13 @@ edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
-The Gameplay overlays palette paints or erases Stealth, No vehicles, Damage reduction, and Slowed
-movement independently. There is no Forest tile or combined Forest paint tool; authors who want
-multiple semantics paint each layer. The viewport uses green, red, blue, and purple respectively,
+The Gameplay overlays palette can select any combination of Stealth, No vehicles, Damage reduction,
+and Slowed movement, then paint or erase the selected layers in one brush or box stroke. There is no
+Forest tile; authors compose its semantics from the independent layers. The viewport uses green, red, blue, and purple respectively,
 with a closed eye, no-entry sign, half shield, and mired boot on every affected tile. A single
 effect uses the full tile; overlapping effects subdivide into stable 2x2 icon cells so all four
-remain legible without hiding one another. Damage reduction and slowed movement are both 50%;
+remain legible without hiding one another. Damage reduction and slowed movement each reduce their
+affected value by 25%;
 overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON import/export, and
 Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
 
@@ -2184,6 +2192,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 [rendering parity ledger](rendering-parity.md).
 
 - Minimap roads reuse the world's deterministic dark-charcoal surface variants so revealed terrain stays visually coherent. Authored marked-road tiles draw small yellow centerline dots above fog, keeping the route network legible in unexplored territory; the dotted overlay is a cached static layer, while bare road tiles widen the charcoal surface without adding markings.
+- Authored tree doodads draw compact bright-green tree symbols above minimap fog so forest shape and density remain legible in explored and unexplored territory. The cached forest layer sits below roads, resources, and foreground player markers so tactical information stays readable.
 - Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through Resource Depot), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass. Positional under-attack alerts use a 2.2-second red pulse with a crisp white inner rim. The nearest local owned unit or building at the alert position strobes its icon interior between white and its team color in 300-millisecond phases for the same duration; the resolved entity keeps flashing if it moves.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →

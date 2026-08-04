@@ -63,7 +63,7 @@ fn every_road_variant_applies_the_authoritative_movement_speed_multiplier() {
 }
 
 #[test]
-fn authored_slow_tiles_halve_movement_and_stack_with_roads() {
+fn authored_slow_tiles_reduce_movement_by_a_quarter_and_stack_with_roads() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -97,12 +97,12 @@ fn authored_slow_tiles_halve_movement_and_stack_with_roads() {
     let base_speed = config::unit_stats(EntityKind::Rifleman)
         .expect("rifleman stats")
         .speed;
-    assert_moved_distance(&game, slow, slow_start, base_speed * 0.5, "slow tile");
+    assert_moved_distance(&game, slow, slow_start, base_speed * 0.75, "slow tile");
     assert_moved_distance(
         &game,
         slow_road,
         slow_road_start,
-        base_speed * crate::rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER * 0.5,
+        base_speed * crate::rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER * 0.75,
         "slow road tile",
     );
 }

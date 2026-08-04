@@ -5625,6 +5625,31 @@ input[type="text"]:focus {
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 }
 
+.map-editor-road-tool {
+  display: grid;
+  gap: 7px;
+}
+
+.map-editor-overlay-toggle {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  border: 1px solid rgba(208, 184, 132, 0.3);
+  border-radius: 4px;
+  padding: 6px 9px;
+  background: #252b2d;
+  color: #e7dfce;
+  cursor: pointer;
+  font: 600 11px var(--sans);
+}
+
+.map-editor-overlay-toggle:has(input:checked) {
+  border-color: #c9aa67;
+  background: #4a402e;
+}
+
 .map-editor-field input[type="color"] {
   min-height: 34px;
   padding: 3px;

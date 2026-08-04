@@ -15,9 +15,10 @@ use rts_sim::game::{Game, PlayerInit};
 
 use crate::AppState;
 
-const HANDOFF_TTL: Duration = Duration::from_secs(120);
+const LAB_HANDOFF_TTL: Duration = Duration::from_secs(120);
+const EDITOR_HANDOFF_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const MAX_HANDOFFS: usize = 64;
-const MAX_AUTHORED_MAP_BYTES: usize = 512 * 1024;
+const MAX_AUTHORED_MAP_BYTES: usize = 8 * 1024 * 1024;
 const HANDOFF_ID_LEN: usize = 32;
 
 #[derive(Clone, Default)]
@@ -29,7 +30,7 @@ pub(crate) struct MapHandoffStore {
 struct MapHandoff {
     destination: HandoffDestination,
     authored_map: serde_json::Value,
-    materialized_map: LabMapDraft,
+    materialized_map: Option<LabMapDraft>,
     expires_at: Instant,
 }
 
@@ -45,7 +46,7 @@ enum HandoffDestination {
 pub(crate) struct CreateMapHandoffRequest {
     destination: HandoffDestination,
     authored_map: serde_json::Value,
-    materialized_map: LabMapDraft,
+    materialized_map: Option<LabMapDraft>,
 }
 
 #[derive(Serialize)]
@@ -94,19 +95,25 @@ pub(crate) async fn create_handler(
             break candidate;
         }
     };
+    let ttl = match request.destination {
+        HandoffDestination::Lab => LAB_HANDOFF_TTL,
+        HandoffDestination::Editor => EDITOR_HANDOFF_TTL,
+    };
     entries.insert(
         handoff_id.clone(),
         MapHandoff {
             destination: request.destination,
             authored_map: request.authored_map,
-            materialized_map: request.materialized_map,
-            expires_at: now + HANDOFF_TTL,
+            materialized_map: (request.destination == HandoffDestination::Lab)
+                .then_some(request.materialized_map)
+                .flatten(),
+            expires_at: now + ttl,
         },
     );
 
     Json(CreateMapHandoffResponse {
         handoff_id,
-        expires_in_ms: HANDOFF_TTL.as_millis() as u64,
+        expires_in_ms: ttl.as_millis() as u64,
     })
     .into_response()
 }
@@ -137,9 +144,15 @@ pub(crate) async fn consume_handler(
 
     match handoff.destination {
         HandoffDestination::Lab => {
+            let Some(materialized_map) = handoff.materialized_map else {
+                return error_response(
+                    StatusCode::GONE,
+                    "This Lab handoff has no materialized map.".to_string(),
+                );
+            };
             let room = match state
                 .lobby
-                .create_map_editor_lab_room(handoff.materialized_map)
+                .create_map_editor_lab_room(materialized_map)
                 .await
             {
                 Ok(room) => room,
@@ -172,14 +185,23 @@ fn validate_request(request: &CreateMapHandoffRequest) -> Result<(), String> {
     if authored_json.len() > MAX_AUTHORED_MAP_BYTES {
         return Err("Map JSON is too large.".to_string());
     }
-    let player_count = request.materialized_map.starts.len();
+    // Editor handoffs are bounded opaque transport for in-progress drafts. Unlike Lab handoffs,
+    // they may intentionally carry no starts or bases and never construct a simulation.
+    if request.destination == HandoffDestination::Editor {
+        return Ok(());
+    }
+    let materialized_map = request
+        .materialized_map
+        .as_ref()
+        .ok_or_else(|| "Lab handoffs require a materialized map.".to_string())?;
+    let player_count = materialized_map.starts.len();
     if !(1..=4).contains(&player_count) {
         return Err("Map handoffs require one to four player starts.".to_string());
     }
     let authored_map = Map::materialize_authored_json(&authored_json, player_count)
         .map_err(|error| format!("Authored map is invalid: {error}"))?;
-    validate_materialized_binding(&authored_map, &request.materialized_map)?;
-    validate_materialized_map(&request.materialized_map, player_count)?;
+    validate_materialized_binding(&authored_map, materialized_map)?;
+    validate_materialized_map(materialized_map, player_count)?;
     Ok(())
 }
 
@@ -326,7 +348,7 @@ mod tests {
         CreateMapHandoffRequest {
             destination: HandoffDestination::Lab,
             authored_map,
-            materialized_map: LabMapDraft {
+            materialized_map: Some(LabMapDraft {
                 name: "1v1 No Terrain".to_string(),
                 width: 126,
                 height: 126,
@@ -338,8 +360,12 @@ mod tests {
                 no_vehicle_tiles: Vec::new(),
                 damage_reduction_tiles: Vec::new(),
                 slow_movement_tiles: Vec::new(),
-            },
+            }),
         }
+    }
+
+    fn materialized(request: &mut CreateMapHandoffRequest) -> &mut LabMapDraft {
+        request.materialized_map.as_mut().expect("materialized map")
     }
 
     #[test]
@@ -351,13 +377,13 @@ mod tests {
             validate_request(&valid)
         );
         let mut request = valid_request();
-        request.materialized_map.starts[0].x += 1;
+        materialized(&mut request).starts[0].x += 1;
         assert!(validate_request(&request)
             .expect_err("mismatched materialization must fail")
             .contains("do not match"));
 
         let mut request = valid_request();
-        request.materialized_map.base_sites[0].steel_patches = 11;
+        materialized(&mut request).base_sites[0].steel_patches = 11;
         assert!(validate_request(&request)
             .expect_err("mismatched resource counts must fail")
             .contains("do not match"));
@@ -366,7 +392,7 @@ mod tests {
     #[test]
     fn handoff_validation_rejects_materialized_terrain_mismatch() {
         let mut request = valid_request();
-        request.materialized_map.terrain[0] = terrain::ROCK;
+        materialized(&mut request).terrain[0] = terrain::ROCK;
 
         assert!(validate_request(&request)
             .expect_err("mismatched materialization must fail")
@@ -385,10 +411,10 @@ mod tests {
         };
         request.authored_map["doodads"] =
             serde_json::to_value([doodad.clone()]).expect("doodad JSON");
-        request.materialized_map.doodads = vec![doodad];
+        materialized(&mut request).doodads = vec![doodad];
         assert_eq!(validate_request(&request), Ok(()));
 
-        request.materialized_map.doodads[0].x += 1;
+        materialized(&mut request).doodads[0].x += 1;
         assert!(validate_request(&request)
             .expect_err("mismatched doodads must fail")
             .contains("doodads do not match"));
@@ -407,20 +433,20 @@ mod tests {
             request.authored_map[field] = serde_json::json!([{"x": 20, "y": 20}]);
             let tile = MapTile { x: 20, y: 20 };
             match field {
-                "stealthTiles" => request.materialized_map.stealth_tiles.push(tile),
-                "noVehicleTiles" => request.materialized_map.no_vehicle_tiles.push(tile),
+                "stealthTiles" => materialized(&mut request).stealth_tiles.push(tile),
+                "noVehicleTiles" => materialized(&mut request).no_vehicle_tiles.push(tile),
                 "damageReductionTiles" => {
-                    request.materialized_map.damage_reduction_tiles.push(tile)
+                    materialized(&mut request).damage_reduction_tiles.push(tile)
                 }
-                "slowMovementTiles" => request.materialized_map.slow_movement_tiles.push(tile),
+                "slowMovementTiles" => materialized(&mut request).slow_movement_tiles.push(tile),
                 _ => unreachable!(),
             }
             assert_eq!(validate_request(&request), Ok(()));
 
-            request.materialized_map.stealth_tiles.clear();
-            request.materialized_map.no_vehicle_tiles.clear();
-            request.materialized_map.damage_reduction_tiles.clear();
-            request.materialized_map.slow_movement_tiles.clear();
+            materialized(&mut request).stealth_tiles.clear();
+            materialized(&mut request).no_vehicle_tiles.clear();
+            materialized(&mut request).damage_reduction_tiles.clear();
+            materialized(&mut request).slow_movement_tiles.clear();
             assert!(validate_request(&request)
                 .expect_err("mismatched overlay materialization must fail")
                 .contains(expected_error));
@@ -444,7 +470,7 @@ mod tests {
         let mut chars = first_row.chars().collect::<Vec<_>>();
         chars[..road_chars.len()].copy_from_slice(&road_chars);
         request.authored_map["terrain"][0] = chars.into_iter().collect::<String>().into();
-        request.materialized_map.terrain[..road_codes.len()].copy_from_slice(&road_codes);
+        materialized(&mut request).terrain[..road_codes.len()].copy_from_slice(&road_codes);
 
         assert_eq!(validate_request(&request), Ok(()));
     }
@@ -471,7 +497,7 @@ mod tests {
         let mut row = first_row.chars().collect::<Vec<_>>();
         row[..chars.len()].copy_from_slice(&chars);
         request.authored_map["terrain"][0] = row.into_iter().collect::<String>().into();
-        request.materialized_map.terrain[..codes.len()].copy_from_slice(&codes);
+        materialized(&mut request).terrain[..codes.len()].copy_from_slice(&codes);
 
         assert_eq!(validate_request(&request), Ok(()));
     }
@@ -507,7 +533,7 @@ mod tests {
         );
         request.authored_map["startLocations"] = start_locations.into();
         request.authored_map["baseSites"] = base_sites.into();
-        request.materialized_map = LabMapDraft {
+        request.materialized_map = Some(LabMapDraft {
             name: "Custom dimensions".to_string(),
             width,
             height,
@@ -527,7 +553,7 @@ mod tests {
             no_vehicle_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
-        };
+        });
 
         assert_eq!(validate_request(&request), Ok(()));
     }

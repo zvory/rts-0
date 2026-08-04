@@ -27,6 +27,7 @@ import {
   isProducerBuilding,
 } from "./config.js";
 import { minimapTerrainColor, minimapTerrainStyleSignature } from "./minimap_terrain.js";
+import { MinimapForestLayer } from "./minimap_forest_layer.js";
 import { MinimapRoadLayer } from "./minimap_road_layer.js";
 import {
   artilleryFireRadiusTiles,
@@ -180,6 +181,11 @@ export class Minimap {
       onInvalidation: (prev, next) => this._recordMinimapInvalidation("road", prev, next),
       onDiagnostic: (label) => this._recordMinimapDiagnostic(label),
     });
+    this._forestLayer = new MinimapForestLayer({
+      createCanvas: () => this._createStaticCanvas(),
+      onInvalidation: (prev, next) => this._recordMinimapInvalidation("forest", prev, next),
+      onDiagnostic: (label) => this._recordMinimapDiagnostic(label),
+    });
     this._resourceLayer = null;
     this._resourceLayerCtx = null;
     this._resourceLayerSignature = null;
@@ -265,6 +271,7 @@ export class Minimap {
   _invalidateStaticLayers() {
     this._terrainLayerSignature = null;
     this._roadMarkingLayer.invalidate();
+    this._forestLayer.invalidate();
     this._resourceLayerSignature = null;
     this._fogLayerSignature = null;
   }
@@ -316,6 +323,11 @@ export class Minimap {
     this._drawTerrainLayer();
     this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
     this._drawFog();
+    this._forestLayer.draw({
+      ctx: this.ctx, map: this._renderMap(), size: this.size,
+      scale: this._scale, offX: this._offX, offY: this._offY,
+      presentation: this._canvasPresentationSignature(),
+    });
     this._roadMarkingLayer.draw({
       ctx: this.ctx, map: this._renderMap(), size: this.size,
       scale: this._scale, offX: this._offX, offY: this._offY,
@@ -981,6 +993,7 @@ export class Minimap {
     this._terrainLayerCtx = null;
     this._terrainLayerSignature = null;
     this._roadMarkingLayer.destroy();
+    this._forestLayer.destroy();
     this._resourceLayer = null;
     this._resourceLayerCtx = null;
     this._resourceLayerSignature = null;

@@ -12,7 +12,7 @@ fn flat_map(size: u32) -> Map {
 }
 
 #[test]
-fn tree_trunks_block_exact_unit_bodies_while_flowers_remain_inert() {
+fn tree_trunks_are_soft_for_infantry_hard_for_vehicles_and_flowers_remain_inert() {
     let mut tree_map = flat_map(12);
     let trunk = tree_map.tile_center(5, 5);
     tree_map.doodads.push(MapDoodad {
@@ -30,7 +30,7 @@ fn tree_trunks_block_exact_unit_bodies_while_flowers_remain_inert() {
     let same_tile_clear_x =
         trunk.0 + rifleman_radius + crate::game::map::doodads::TREE_TRUNK_RADIUS_PX + 0.1;
 
-    assert!(!unit_static_standable(
+    assert!(unit_static_standable(
         &tree_map,
         &tree_occupancy,
         EntityKind::Rifleman,
@@ -49,12 +49,19 @@ fn tree_trunks_block_exact_unit_bodies_while_flowers_remain_inert() {
         tree_map.tile_of(trunk.0, trunk.1),
         "the same tree tile must retain standable sub-tile space",
     );
-    assert!(!unit_static_segment_standable(
+    assert!(unit_static_segment_standable(
         &tree_map,
         &tree_occupancy,
         EntityKind::Rifleman,
         tree_map.tile_center(3, 5),
         tree_map.tile_center(7, 5),
+    ));
+    assert!(!unit_static_standable(
+        &tree_map,
+        &tree_occupancy,
+        EntityKind::Tank,
+        trunk.0,
+        trunk.1,
     ));
 
     let mut flower_map = flat_map(12);

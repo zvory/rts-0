@@ -74,9 +74,9 @@ pub struct Map {
     pub stealth_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
     pub no_vehicle_tiles: Vec<(u32, u32)>,
-    /// Canonical sparse tile coordinates halving incoming damage to occupants.
+    /// Canonical sparse tile coordinates reducing incoming damage to occupants by 25%.
     pub damage_reduction_tiles: Vec<(u32, u32)>,
-    /// Canonical sparse tile coordinates halving occupant movement speed.
+    /// Canonical sparse tile coordinates reducing occupant movement speed by 25%.
     pub slow_movement_tiles: Vec<(u32, u32)>,
 }
 

@@ -28,12 +28,12 @@ export const MAP_AUTHORING_LAYERS = Object.freeze([
   Object.freeze({
     id: MAP_AUTHORING_LAYER.DAMAGE_REDUCTION,
     label: "Damage reduction",
-    description: "Tiles that halve incoming damage",
+    description: "Tiles that reduce incoming damage by 25%",
   }),
   Object.freeze({
     id: MAP_AUTHORING_LAYER.SLOW_MOVEMENT,
     label: "Slowed movement",
-    description: "Tiles that halve movement speed",
+    description: "Tiles that reduce movement speed by 25%",
   }),
   Object.freeze({
     id: MAP_AUTHORING_LAYER.TREES,

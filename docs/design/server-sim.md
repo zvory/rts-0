@@ -72,8 +72,8 @@ impl Game {
     /// center near the intended layout, keep one tile between oil patches, and reject sites whose
     /// Pump Jack footprint would collide with non-oil resources while preserving Resource Depot
     /// resource-distance bounds. Schema-v5 doodads are catalog-validated and id-canonicalized.
-    /// Tree species share a 4.5px authoritative circular trunk used by exact unit standability;
-    /// tree tiles receive a finite path-avoidance cost but remain traversable outside the trunk.
+    /// Tree species share a 4.5px authoritative circular trunk. Vehicles use exact trunk
+    /// standability; infantry use finite path cost plus best-effort local steering with pass-through.
     /// Wildflowers remain presentation-only. Lab-restored oil nodes are normalized to passable tile centers and
     /// keep one free tile between oil patches.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
@@ -541,7 +541,8 @@ store a separate authoritative command stream, but they must not infer live stat
 Map policy:
 
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  permanent base sites, four sparse gameplay-overlay tile sets, and tree-trunk collision/path cost on every tick, while start/export
+  permanent base sites, four sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
+  infantry tree path-cost/local-steering data on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
 - `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, base-site bodies, or doodad bodies. It
@@ -568,9 +569,10 @@ outline-only presentation, and one-second counterfire reaction delay. The terrai
 lit when ordinary sight already covers it; only a tile lacking ordinary sight stays presentation-dark.
 Concealed deaths do not publish positional death events or global death decals. No-vehicle tiles seed
 vehicle-body occupancy only, so vehicles path around them while infantry can traverse the same tile.
-Damage-reduction tiles halve incoming direct, area, loaded-shot, overpenetration, and ability-projectile
-damage after existing weapon/armor/facing and entrenchment policy, rounding a non-zero odd result up.
-Slow-movement tiles apply a 0.5x movement-budget multiplier from the unit-centre tile and multiply
+Damage-reduction tiles reduce incoming direct, area, loaded-shot, overpenetration, and ability-projectile
+damage by 25% after existing weapon/armor/facing and entrenchment policy, rounding a non-zero
+fractional result up.
+Slow-movement tiles apply a 0.75x movement-budget multiplier from the unit-centre tile and multiply
 normally with road, upgrade, breakthrough, and ability movement modifiers. All four sparse layers
 are independent and may overlap at one coordinate.
 

@@ -234,7 +234,7 @@ async fn main() {
         .route("/api/lab-scenarios", get(catalog_handler))
         .route(
             "/api/map-handoffs",
-            post(map_handoffs::create_handler).layer(DefaultBodyLimit::max(512 * 1024)),
+            post(map_handoffs::create_handler).layer(DefaultBodyLimit::max(9 * 1024 * 1024)),
         )
         .route(
             "/api/map-handoffs/{handoff_id}",
