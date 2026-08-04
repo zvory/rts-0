@@ -1,7 +1,35 @@
 use super::session_policy::{
     ClockCapability, ClockTickSource, RoomTimeOperation, RoomTimeOperations, RoomTimeSource,
 };
+use super::RoomTask;
+use crate::protocol::RoomTimeState;
+use rts_sim::game::Game;
 use std::time::Duration;
+
+impl RoomTask {
+    pub(super) fn room_time_state_for_live_game(
+        &self,
+        game: &Game,
+        controller_id: Option<u32>,
+    ) -> RoomTimeState {
+        let control = self.tick_control();
+        let paused = matches!(control.mode, TickMode::RoomControlledPaused(_));
+        RoomTimeState {
+            current_tick: game.tick_count(),
+            duration_ticks: 0,
+            keyframe_ticks: Vec::new(),
+            speed: if paused {
+                0.0
+            } else {
+                control.speed_multiplier
+            },
+            paused,
+            ended: false,
+            controller_id,
+            seek: None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct RoomTimeClock {
