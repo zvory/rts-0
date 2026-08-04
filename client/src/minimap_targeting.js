@@ -1,4 +1,55 @@
-import { ORDER_STAGE, isResource } from "./protocol.js";
+import { ABILITY, ORDER_STAGE, UPGRADE, isResource } from "./protocol.js";
+
+export function ownOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    if (typeof controlPolicy.isCommandOwner === "function") {
+      return controlPolicy.isCommandOwner(owner, state);
+    }
+    return controlPolicy.canControlOwner(owner, state);
+  }
+  return typeof state?.isOwnOwner === "function"
+    ? state.isOwnOwner(owner)
+    : Number(owner) === state?.playerId;
+}
+
+export function allyOwner(state, owner, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    return typeof controlPolicy.isCommandAllyOwner === "function"
+      ? controlPolicy.isCommandAllyOwner(owner, state)
+      : false;
+  }
+  return typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner);
+}
+
+export function commandFeedbackOwner(state, controlPolicy = null) {
+  if (controlPolicy?.kind === "lab") {
+    const owner = typeof controlPolicy.feedbackOwner === "function"
+      ? controlPolicy.feedbackOwner(state)
+      : typeof controlPolicy.issueAsOwnerForSelection === "function"
+        ? controlPolicy.issueAsOwnerForSelection(state.selectedEntities?.() || [])
+        : null;
+    const ownerId = Number(owner);
+    return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
+  }
+  const ownerId = Number(state?.playerId);
+  return Number.isInteger(ownerId) && ownerId > 0 ? ownerId : null;
+}
+
+export function abilityTargetRadiusTiles(definition, ability, state, controlPolicy = null) {
+  const baseRadius = definition?.radiusTiles || 0;
+  if (ability === ABILITY.SMOKE && commandUpgrades(state, controlPolicy).includes(UPGRADE.SMOKE_PLUS)) {
+    return definition?.upgradedRadiusTiles || baseRadius;
+  }
+  return baseRadius;
+}
+
+export function commandUpgrades(state, controlPolicy = null) {
+  if (typeof controlPolicy?.commandUpgrades === "function") {
+    const upgrades = controlPolicy.commandUpgrades(state);
+    return Array.isArray(upgrades) ? upgrades : [];
+  }
+  return Array.isArray(state?.upgrades) ? state.upgrades : [];
+}
 
 export function commandTargetsMatch(left, right) {
   if (left === right) return true;
