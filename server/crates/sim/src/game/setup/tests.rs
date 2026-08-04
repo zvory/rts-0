@@ -327,16 +327,33 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
 
 #[test]
 fn authored_tank_trap_doodads_spawn_completed_neutral_entities() {
-    let players = [PlayerInit {
-        id: 1,
-        team_id: 1,
-        faction_id: DEFAULT_FACTION_ID.to_string(),
-        name: "Solo".to_string(),
-        color: "#cc1111".to_string(),
-        is_ai: false,
-    }];
-    let mut map = Map::generate(1, 0x7a4a_7001);
-    let (x, y) = map.tile_center(2, 2);
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "Alpha".to_string(),
+            color: "#cc1111".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "Bravo".to_string(),
+            color: "#1111cc".to_string(),
+            is_ai: false,
+        },
+    ];
+    let mut map = Map {
+        width: 64,
+        height: 64,
+        terrain: vec![crate::protocol::terrain::GRASS; 64 * 64],
+        starts: vec![(10, 10), (53, 10)],
+        ..Default::default()
+    };
+    let trap_tile = (32, 50);
+    let (x, y) = map.tile_center(trap_tile.0, trap_tile.1);
     map.doodads.push(crate::protocol::MapDoodad {
         id: 1,
         type_id: "unit.tank_trap".to_string(),
@@ -359,17 +376,39 @@ fn authored_tank_trap_doodads_spawn_completed_neutral_entities() {
     assert!(!trap.under_construction());
     assert!(
         game.start_payload().map.doodads.is_empty(),
-        "entity-backed authored objects must not reveal their positions outside fog"
+        "entity-backed authored objects still arrive through recipient-scoped snapshots"
     );
+    let trap_index = (trap_tile.1 * game.state.map.width + trap_tile.0) as usize;
+    for player in [1, 2] {
+        let snapshot = game.snapshot_for(player);
+        assert_eq!(snapshot.visible_tiles[trap_index], 0);
+        assert_eq!(snapshot.explored_tiles[trap_index], 1);
+        assert!(snapshot.entities.iter().all(|entity| entity.id != trap_id));
+        assert!(
+            snapshot
+                .remembered_buildings
+                .iter()
+                .any(|building| building.id == trap_id),
+            "player {player} should know the authored neutral building from match start"
+        );
+    }
 
     let occupied =
         crate::game::services::occupancy::Occupancy::build(&game.state.map, &game.state.entities);
-    assert!(!occupied.passable_for_kind(2, 2, EntityKind::ScoutCar));
+    assert!(!occupied.passable_for_kind(
+        trap_tile.0 as i32,
+        trap_tile.1 as i32,
+        EntityKind::ScoutCar
+    ));
     game.state.entities.remove(trap_id);
     let after_destroy =
         crate::game::services::occupancy::Occupancy::build(&game.state.map, &game.state.entities);
     assert!(
-        after_destroy.passable_for_kind(2, 2, EntityKind::ScoutCar),
+        after_destroy.passable_for_kind(
+            trap_tile.0 as i32,
+            trap_tile.1 as i32,
+            EntityKind::ScoutCar
+        ),
         "destroyed authored trap must disappear from rebuilt live occupancy"
     );
 }

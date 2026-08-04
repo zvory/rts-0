@@ -762,7 +762,11 @@ fog, so allied units attacking hidden enemies do not reveal hidden target ids or
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
 remain exact-owner-only in normal active-player and selected-player/team observer projections.
 
-A Tank Trap scaffold belongs to its builder only while construction is in progress. Completion
+A Tank Trap scaffold belongs to its builder only while construction is in progress. Entity-backed
+neutral buildings authored into the selected map begin in every player's `rememberedBuildings`
+and have their exact footprint set in `exploredTiles`, so their map-defined position is legible
+below fog from match start without granting current vision. Player-built Tank Traps do not receive
+this authored-map knowledge. Completion
 changes it to owner `0`, making it a neutral field obstacle. It grants no owner-private projection:
 outside current team vision no player receives its live entity, HP changes, attack alert, or death
 event. Any recipient with current vision receives its exact visible HP and ordinary visible impact

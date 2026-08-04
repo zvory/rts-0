@@ -130,7 +130,7 @@ pub(super) fn analyze_authored_json(json: &str) -> Result<AuthoredMapReport, Str
     let check = check_from_materialized(&materialized);
     let map = map_from_materialized(materialized);
     let mut static_entities = EntityStore::new();
-    spawn_authored_map_entities(&map, &mut static_entities);
+    let _ = spawn_authored_map_entities(&map, &mut static_entities);
     let mobility_profiles = MOBILITY_PROFILES
         .iter()
         .map(|&(id, kind)| MobilityProfileSummary {

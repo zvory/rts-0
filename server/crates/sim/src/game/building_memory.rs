@@ -22,6 +22,8 @@ pub(crate) struct BuildingMemoryEntry {
     pub(crate) build_progress: Option<f32>,
     pub(crate) under_construction: bool,
     pub(crate) observed_tick: u32,
+    #[serde(default)]
+    pub(crate) map_authored: bool,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -30,6 +32,30 @@ pub(crate) struct BuildingMemory {
 }
 
 impl BuildingMemory {
+    pub(crate) fn seed_authored_neutral_buildings(
+        &mut self,
+        player_ids: &[u32],
+        building_ids: &[u32],
+        entities: &EntityStore,
+        map: &Map,
+        tick: u32,
+    ) {
+        for &player_id in player_ids {
+            for &building_id in building_ids {
+                let Some(entity) = entities.get(building_id) else {
+                    continue;
+                };
+                if entity.owner != NEUTRAL || !entity.is_building() || entity.hp == 0 {
+                    continue;
+                }
+                self.entries.insert(
+                    (player_id, entity.id),
+                    entry_from_entity(entity, map, tick, true),
+                );
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn refresh(
         &mut self,
@@ -44,11 +70,23 @@ impl BuildingMemory {
         for &player_id in player_ids {
             self.remove_ineligible_or_scouted_destroyed(player_id, entities, fog, teams);
             for entity in entities.iter() {
-                if !visible_enemy_building(player_id, entity, fog, smokes, teams) {
+                let map_authored = self
+                    .entries
+                    .get(&(player_id, entity.id))
+                    .is_some_and(|entry| entry.map_authored);
+                if !visible_enemy_building(player_id, entity, fog, smokes, teams)
+                    && !(map_authored
+                        && entity.owner == NEUTRAL
+                        && entity.is_building()
+                        && entity.hp > 0
+                        && visible_to_team(player_id, entity, fog, smokes, teams))
+                {
                     continue;
                 }
-                self.entries
-                    .insert((player_id, entity.id), entry_from_entity(entity, map, tick));
+                self.entries.insert(
+                    (player_id, entity.id),
+                    entry_from_entity(entity, map, tick, map_authored),
+                );
             }
         }
     }
@@ -65,6 +103,13 @@ impl BuildingMemory {
                 return true;
             }
             if let Some(entity) = entities.get(*entity_id) {
+                if entry.map_authored
+                    && entity.owner == NEUTRAL
+                    && entity.is_building()
+                    && entity.hp > 0
+                {
+                    return true;
+                }
                 return enemy_building_memory_eligible(player_id, entity, teams);
             }
             !entry.footprint.iter().any(|&(tx, ty)| {
@@ -129,12 +174,22 @@ fn visible_enemy_building(
     teams: &TeamRelations,
 ) -> bool {
     enemy_building_memory_eligible(player_id, entity, teams)
-        && teams
-            .same_team_player_ids(player_id)
-            .into_iter()
-            .any(|team_player| {
-                projection::entity_visible_to_with_smoke(team_player, entity, fog, smokes)
-            })
+        && visible_to_team(player_id, entity, fog, smokes, teams)
+}
+
+fn visible_to_team(
+    player_id: u32,
+    entity: &Entity,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    teams: &TeamRelations,
+) -> bool {
+    teams
+        .same_team_player_ids(player_id)
+        .into_iter()
+        .any(|team_player| {
+            projection::entity_visible_to_with_smoke(team_player, entity, fog, smokes)
+        })
 }
 
 fn enemy_building_memory_eligible(player_id: u32, entity: &Entity, teams: &TeamRelations) -> bool {
@@ -143,7 +198,12 @@ fn enemy_building_memory_eligible(player_id: u32, entity: &Entity, teams: &TeamR
         && entity.is_building()
 }
 
-fn entry_from_entity(entity: &Entity, map: &Map, observed_tick: u32) -> BuildingMemoryEntry {
+fn entry_from_entity(
+    entity: &Entity,
+    map: &Map,
+    observed_tick: u32,
+    map_authored: bool,
+) -> BuildingMemoryEntry {
     BuildingMemoryEntry {
         id: entity.id,
         owner: entity.owner,
@@ -156,6 +216,7 @@ fn entry_from_entity(entity: &Entity, map: &Map, observed_tick: u32) -> Building
         build_progress: entity.build_progress_fraction(),
         under_construction: entity.under_construction(),
         observed_tick,
+        map_authored,
     }
 }
 
