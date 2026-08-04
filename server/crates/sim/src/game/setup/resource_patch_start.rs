@@ -44,41 +44,37 @@ pub(super) fn spawn(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rules::faction::StartingEntityGroup;
-
-    const STARTING_MINES: &[StartingEntityGroup] = &[StartingEntityGroup {
-        kind: EntityKind::SteelMine,
-        count: 1,
-        formation: StartingFormation::ResourcePatches,
-        completed: true,
-    }];
-    const LOADOUT: FactionLoadout = FactionLoadout {
-        id: "test.resource-patch-start",
-        initial_steel: 0,
-        initial_oil: 0,
-        starting_entities: STARTING_MINES,
-        opening_upgrades: &[],
-    };
+    use crate::rules::faction::CURRENT_CATALOG;
 
     #[test]
     fn starting_extractor_uses_only_its_newly_spawned_base_resources() {
         let mut entities = EntityStore::new();
+        let loadout = CURRENT_CATALOG.loadout;
+        let extractor_kind = loadout
+            .starting_entities
+            .iter()
+            .find(|group| group.formation == StartingFormation::ResourcePatches)
+            .expect("catalog should expose a resource-patch starting group")
+            .kind;
+        let node_kind = extractor_kind
+            .extracted_resource_kind()
+            .expect("resource-patch entity should identify its node kind");
         let unrelated = entities
-            .spawn_node(EntityKind::Steel, 32.0, 32.0)
-            .expect("unrelated steel patch");
+            .spawn_node(node_kind, 32.0, 32.0)
+            .expect("unrelated resource patch");
         let own = entities
-            .spawn_node(EntityKind::Steel, 320.0, 320.0)
-            .expect("new base steel patch");
+            .spawn_node(node_kind, 320.0, 320.0)
+            .expect("new base resource patch");
 
         assert_eq!(
-            spawn(&mut entities, 7, LOADOUT, &[own], 32.0, 32.0),
-            vec![EntityKind::SteelMine]
+            spawn(&mut entities, 7, loadout, &[own], 32.0, 32.0),
+            vec![extractor_kind]
         );
 
         let mine = entities
             .iter()
-            .find(|entity| entity.owner == 7 && entity.kind == EntityKind::SteelMine)
-            .expect("starting Steel Mine");
+            .find(|entity| entity.owner == 7 && entity.kind == extractor_kind)
+            .expect("starting resource extractor");
         assert_eq!((mine.pos_x, mine.pos_y), (320.0, 320.0));
         assert_ne!((mine.pos_x, mine.pos_y), (32.0, 32.0));
         assert!(entities.contains(unrelated));
