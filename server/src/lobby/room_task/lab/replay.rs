@@ -290,7 +290,9 @@ impl RoomTask {
         let Phase::InGame(game) = &self.phase else {
             return None;
         };
-        let mut state = self.room_time_state_for_live_game(game, self.lab_room_time_controller_id);
+        let mut state = self
+            .tick_control()
+            .room_time_state(game.tick_count(), self.lab_room_time_controller_id);
         if let Some(timeline) = &self.lab_timeline {
             state.duration_ticks = timeline.duration_ticks(game.tick_count());
             state.keyframe_ticks = timeline.keyframe_ticks();

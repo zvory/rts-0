@@ -570,7 +570,7 @@ impl RoomTask {
         let Phase::InGame(game) = &self.phase else {
             return None;
         };
-        Some(self.room_time_state_for_live_game(game, None))
+        Some(self.tick_control().room_time_state(game.tick_count(), None))
     }
 
     pub(super) fn send_live_ai_room_time_state_to(&self, player_id: u32) {

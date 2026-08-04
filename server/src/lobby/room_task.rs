@@ -284,7 +284,7 @@ impl RoomTask {
         self.tick_control().speed_multiplier()
     }
 
-    pub(super) fn tick_control(&self) -> TickControl {
+    fn tick_control(&self) -> TickControl {
         let policy = self.session_policy();
         let room_time = match (&self.phase, policy.clock.room_time_source()) {
             (Phase::ReplayViewer(session), Some(RoomTimeSource::ReplayPlayback)) => {
