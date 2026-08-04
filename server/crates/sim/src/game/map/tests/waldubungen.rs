@@ -9,9 +9,11 @@ fn waldubungen_is_selectable_with_standard_resources_at_every_base() {
         .expect("Waldübungen should be listed");
     assert_eq!((entry.min_players, entry.max_players), (1, 2));
 
-    let map = Map::load("Waldübungen", 2, 0x1234_5678)
+    let mut map = Map::load("Waldübungen", 2, 0x1234_5678)
         .expect("Waldübungen should load for two active players");
     assert_eq!((map.width, map.height), (192, 126));
+    map.starts.sort_unstable();
+    assert_eq!(map.starts, [(42, 9), (149, 116)]);
     for &base in &map.base_sites {
         let resources = map.resource_counts_at(base);
         assert_eq!(resources.steel_patches, 12, "base {base:?}");
