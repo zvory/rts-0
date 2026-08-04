@@ -13,6 +13,11 @@ pub struct DevScenarioSetup {
 pub(super) enum DevScenarioOrder {
     Move,
     AttackMove,
+    MoveWithPanzerfaustWindup {
+        attacker: u32,
+        victim: u32,
+        windup_ticks: u16,
+    },
 }
 
 impl DevScenarioSetup {
@@ -30,6 +35,23 @@ impl DevScenarioSetup {
                 y: self.goal.1,
                 queued: false,
             },
+            DevScenarioOrder::MoveWithPanzerfaustWindup { .. } => SimCommand::Move {
+                units: self.units.clone(),
+                x: self.goal.0,
+                y: self.goal.1,
+                queued: false,
+            },
+        }
+    }
+
+    pub fn panzerfaust_windup(&self) -> Option<(u32, u32, u16)> {
+        match self.order {
+            DevScenarioOrder::MoveWithPanzerfaustWindup {
+                attacker,
+                victim,
+                windup_ticks,
+            } => Some((attacker, victim, windup_ticks)),
+            _ => None,
         }
     }
 

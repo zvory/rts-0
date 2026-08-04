@@ -12,11 +12,40 @@ mod replay_256_worker_expansion_rally;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_coax;
+mod tank_damage_pursuit;
 mod tank_retreat;
 use dev_scenario_setup::{DevScenarioOrder, DevScenarioSetup};
 use layouts::*;
 
 impl Game {
+    pub fn start_dev_scenario_panzerfaust_windup(
+        &mut self,
+        attacker: u32,
+        target: u32,
+        windup_ticks: u16,
+    ) -> bool {
+        if self.state.entities.get(target).is_none() {
+            return false;
+        }
+        let Some(entity) = self.state.entities.get_mut(attacker) else {
+            return false;
+        };
+        if !matches!(entity.kind, EntityKind::Rifleman | EntityKind::Panzerfaust)
+            || windup_ticks == 0
+        {
+            return false;
+        }
+        let Some(combat) = entity.combat.as_mut() else {
+            return false;
+        };
+        combat.panzerfaust = Some(crate::game::entity::PanzerfaustState::Windup {
+            target,
+            ticks_remaining: windup_ticks,
+            total_ticks: windup_ticks,
+        });
+        true
+    }
+
     pub fn new_snaking_corridor_scenario(
         unit: EntityKind,
         count: usize,

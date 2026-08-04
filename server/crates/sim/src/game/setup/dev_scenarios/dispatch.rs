@@ -83,6 +83,9 @@ impl Game {
             "tank_reverse_traffic" => {
                 Self::new_tank_reverse_traffic_scenario(unit, unit_count, seed)
             }
+            "tank_damage_pursuit_pivot" => {
+                Self::new_tank_damage_pursuit_pivot_scenario(unit, unit_count, seed)
+            }
             _ => Err(format!("unknown dev scenario: {scenario_id}")),
         }
     }

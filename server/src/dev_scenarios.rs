@@ -15,7 +15,9 @@ use replay_238_rifleman_corner_lock::REPLAY_238_RIFLEMAN_CORNER_LOCK_SPEC;
 use replay_256_worker_expansion_rally::REPLAY_256_WORKER_EXPANSION_RALLY_SPEC;
 use scout_car_lake_reverse_l_path::SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC;
 use scout_car_open_ground_l_path::SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC;
-use tank_retreat::{TANK_REVERSE_TRAFFIC_SPEC, TANK_UNDER_FIRE_RETREAT_SPEC};
+use tank_retreat::{
+    TANK_DAMAGE_PURSUIT_PIVOT_SPEC, TANK_REVERSE_TRAFFIC_SPEC, TANK_UNDER_FIRE_RETREAT_SPEC,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DevScenarioLaunch {
@@ -768,7 +770,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 24] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 25] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -869,6 +871,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 24] = [
     },
     TANK_UNDER_FIRE_RETREAT_SPEC,
     TANK_REVERSE_TRAFFIC_SPEC,
+    TANK_DAMAGE_PURSUIT_PIVOT_SPEC,
 ];
 
 pub fn all_dev_scenarios() -> &'static [DevScenarioSpec] {

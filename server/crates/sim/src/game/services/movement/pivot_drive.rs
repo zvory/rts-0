@@ -257,12 +257,20 @@ pub(super) fn pivot_drive_intent(
     let desired_facing =
         super::armor_reaction::locked_source_facing(e).map_or(normal_desired_facing, |preferred| {
             let reverse_facing = normalize_angle(travel_facing + std::f32::consts::PI);
-            if angle_delta(preferred, reverse_facing).abs()
+            let preferred_facing = if angle_delta(preferred, reverse_facing).abs()
                 < angle_delta(preferred, travel_facing).abs()
             {
                 reverse_facing
             } else {
                 travel_facing
+            };
+            if super::armor_reaction::facing_preference_within_pivot_cap(
+                e.facing(),
+                preferred_facing,
+            ) {
+                preferred_facing
+            } else {
+                normal_desired_facing
             }
         });
     let reverse_facing = normalize_angle(travel_facing + std::f32::consts::PI);

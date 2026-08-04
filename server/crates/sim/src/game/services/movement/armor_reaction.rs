@@ -4,6 +4,10 @@ use super::pivot_drive::{angle_delta, rotate_toward, vehicle_body_turn_rate};
 
 const FACING_EPS_RAD: f32 = 1.0e-4;
 
+pub(super) fn facing_preference_within_pivot_cap(current: f32, desired: f32) -> bool {
+    angle_delta(current, desired).abs() <= crate::rules::combat::TANK_ARMOR_REACTION_MAX_PIVOT_RAD
+}
+
 pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
     entities: &mut EntityStore,
     tick: u32,
@@ -37,6 +41,9 @@ pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
         }) else {
             continue;
         };
+        if !facing_preference_within_pivot_cap(current, desired) {
+            continue;
+        }
 
         let rotated = rotate_toward(current, desired, vehicle_body_turn_rate(kind));
         if angle_delta(current, rotated).abs() <= FACING_EPS_RAD
@@ -103,7 +110,14 @@ mod tests {
             .as_mut()
             .expect("tank should have combat")
             .tank_stationary_range_ticks = config::TICK_HZ as u16 * 3;
-        tank.lock_tank_armor_reaction_source((300.0, 400.0), 10);
+        let first_source_angle = 75.0_f32.to_radians();
+        tank.lock_tank_armor_reaction_source(
+            (
+                300.0 + first_source_angle.cos() * 100.0,
+                300.0 + first_source_angle.sin() * 100.0,
+            ),
+            10,
+        );
         tank.lock_tank_armor_reaction_source((200.0, 300.0), 11);
 
         turn_once(&mut entities, 11);
@@ -123,6 +137,34 @@ mod tests {
                 .tank_stationary_range_ticks,
             config::TICK_HZ as u16 * 3
         );
+    }
+
+    #[test]
+    fn stationary_damage_facing_does_not_start_beyond_eighty_degrees() {
+        for (source_degrees, should_turn) in [(80.0_f32, true), (80.1_f32, false)] {
+            let mut entities = EntityStore::new();
+            let tank_id = entities
+                .spawn_unit(1, EntityKind::Tank, 300.0, 300.0)
+                .expect("tank should spawn");
+            let source_angle = source_degrees.to_radians();
+            let tank = entities.get_mut(tank_id).expect("tank should exist");
+            tank.hold_position();
+            tank.set_facing(0.0);
+            tank.lock_tank_armor_reaction_source(
+                (
+                    300.0 + source_angle.cos() * 100.0,
+                    300.0 + source_angle.sin() * 100.0,
+                ),
+                10,
+            );
+
+            turn_once(&mut entities, 11);
+
+            let turned = entities
+                .get(tank_id)
+                .is_some_and(|tank| tank.facing().abs() > FACING_EPS_RAD);
+            assert_eq!(turned, should_turn, "source angle was {source_degrees}°");
+        }
     }
 
     #[test]
@@ -209,7 +251,7 @@ mod tests {
             .spawn_unit(1, EntityKind::Tank, 15.0, 300.0)
             .expect("tank should spawn");
         let tank = entities.get_mut(tank_id).expect("tank should exist");
-        tank.set_facing(std::f32::consts::FRAC_PI_2);
+        tank.set_facing(101.0_f32.to_radians());
         tank.lock_tank_armor_reaction_source((0.0, 300.0), 10);
         let before = (tank.pos_x, tank.pos_y, tank.facing());
 
