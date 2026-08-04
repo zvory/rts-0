@@ -80,7 +80,7 @@ export function _sweep() {
     for (const [id, t] of this._queueLabelPool) {
       if (seen.has(id)) continue;
       if (evict.has(id)) {
-        this.layers.buildings.removeChild(t);
+        this.layers.buildingOverlays.removeChild(t);
         t.destroy();
         this._queueLabelPool.delete(id);
         this._recordRenderDiagnostic?.("renderer.pixi.displayObject.destroyed.queueText");

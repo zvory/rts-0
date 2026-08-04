@@ -143,8 +143,10 @@ try {
     y: 160,
     hp: 100,
     maxHp: 400,
-    state: "idle",
+    state: "train",
     buildProgress: 0.42,
+    prodProgress: 0.25,
+    prodQueue: 6,
   };
   const colorByOwner = new Map([[2, 0xc85050]]);
   const state = {
@@ -189,6 +191,20 @@ try {
   assert(
     renderer._pools.buildingShadows.get(entity.id)?.visible === false,
     "silhouette shadow replaces the temporary footprint shadow after the atlas loads",
+  );
+  const queueLabel = renderer._queueLabelPool.get(entity.id);
+  assert(
+    queueLabel?.text === "+5" && queueLabel.visible,
+    "a production queue exposes the count waiting behind its active item",
+  );
+  assert(
+    queueLabel.parent === renderer.layers.buildingOverlays,
+    "queue labels stay above producer bodies when PNG art replaces an SVG fallback",
+  );
+  assert(
+    renderer.world.children.indexOf(renderer.layers.buildingOverlays) >
+      renderer.world.children.indexOf(renderer.layers.buildings),
+    "the queue-label layer renders above the building-body layer",
   );
 } finally {
   renderer?.destroy();
