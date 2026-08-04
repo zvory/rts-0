@@ -114,7 +114,7 @@ async fn start_two_player_match(lobby: &Lobby, room: &str) -> RoomHandle {
 }
 
 async fn wait_for_lobby_room_count(lobby: &Lobby, expected: usize) {
-    tokio::time::timeout(Duration::from_secs(1), async {
+    let result = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             if lobby.rooms.lock().await.len() == expected {
                 return;
@@ -122,12 +122,15 @@ async fn wait_for_lobby_room_count(lobby: &Lobby, expected: usize) {
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
     })
-    .await
-    .expect("lobby room count did not settle");
+    .await;
+    if result.is_err() {
+        let actual = lobby.rooms.lock().await.len();
+        panic!("lobby room count did not settle: expected {expected}, got {actual}");
+    }
 }
 
 async fn wait_for_active_match_count(lobby: &Lobby, expected: usize) {
-    tokio::time::timeout(Duration::from_secs(1), async {
+    let result = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             if lobby.active_match_count() == expected {
                 return;
@@ -135,8 +138,11 @@ async fn wait_for_active_match_count(lobby: &Lobby, expected: usize) {
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
     })
-    .await
-    .expect("active match count did not settle");
+    .await;
+    if result.is_err() {
+        let actual = lobby.active_match_count();
+        panic!("active match count did not settle: expected {expected}, got {actual}");
+    }
 }
 
 fn test_drain() -> DrainHandle {

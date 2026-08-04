@@ -487,8 +487,11 @@ filter when collecting movement measurements. The browser shards divide
 the current PR coverage into client smoke plus phase 0.5, and phases 2.5 plus 5; each shard gets an
 isolated prebuilt server. The split jobs run `tests/run-all.sh` sub-modes under CI so the required
 aggregate gate preserves client smoke plus tri-state browser coverage without serializing every suite
-in one runner. The server-build job uploads generated sim-WASM browser assets, and both browser
-shards download them into `client/vendor/sim-wasm` before client smoke runs from its clean checkout. Local
+in one runner. Within the live Node job, simulation-heavy suites run in parallel; the AI lobby and
+lobby-browser suites run afterward so room-state convergence checks are not distorted by artificial
+same-runner simulation contention. The server-build job uploads generated sim-WASM browser assets,
+and both browser shards download them into `client/vendor/sim-wasm` before client smoke runs from
+its clean checkout. Local
 `tests/run-all.sh` runs keep client smoke in the default browser gate but skip the latency-sensitive
 tri-state browser scenarios unless `--with-tri-state-browser` or `RTS_RUN_TRI_STATE_BROWSER=1` is
 set. WASM-backed tri-state groups also stay opt-in unless `RTS_RUN_WASM_TRI_STATE=1` is set. When
