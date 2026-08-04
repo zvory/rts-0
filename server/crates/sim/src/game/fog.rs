@@ -414,6 +414,42 @@ impl Fog {
             .unwrap_or_default()
     }
 
+    /// Seed permanent map knowledge for entity-backed neutral buildings authored into the map.
+    /// This changes exploration history only; the buildings do not grant current vision.
+    pub(in crate::game) fn explore_building_footprints(
+        &mut self,
+        players: &[u32],
+        building_ids: &[u32],
+        store: &EntityStore,
+        map: &Map,
+    ) {
+        for &player in players {
+            let Some(explored) = self.explored_grids.get_mut(&player) else {
+                continue;
+            };
+            for &building_id in building_ids {
+                let Some(building) = store.get(building_id) else {
+                    continue;
+                };
+                if building.owner != 0 || !building.is_building() || building.hp == 0 {
+                    continue;
+                }
+                for (tx, ty) in building_footprint(map, building) {
+                    let Some(index) = ty
+                        .checked_mul(self.width)
+                        .and_then(|row| row.checked_add(tx))
+                        .map(|index| index as usize)
+                    else {
+                        continue;
+                    };
+                    if let Some(tile) = explored.get_mut(index) {
+                        *tile = true;
+                    }
+                }
+            }
+        }
+    }
+
     pub(crate) fn all_visible_tiles(&self) -> Vec<u8> {
         vec![1; self.width.saturating_mul(self.height) as usize]
     }

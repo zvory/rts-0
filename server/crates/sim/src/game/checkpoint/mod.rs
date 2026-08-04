@@ -243,9 +243,9 @@ impl GameCheckpointV1 {
         map_metadata: MapMetadata,
     ) -> Result<GameState, CheckpointPayloadError> {
         let legacy_tank_traps = normalize_completed_tank_traps(&mut self.entities.entities);
-        self.building_memory
-            .entries
-            .retain(|entry| !legacy_tank_traps.contains(&entry.building_id));
+        self.building_memory.entries.retain(|entry| {
+            entry.entry.map_authored || !legacy_tank_traps.contains(&entry.building_id)
+        });
         self.validate_against(&map, &map_metadata)?;
         let entities = self.entities.into_store();
         let panzerfaust_shots = self.panzerfaust_shots;

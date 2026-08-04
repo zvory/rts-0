@@ -340,7 +340,7 @@ impl Game {
             }
         }
 
-        spawn_authored_map_entities(&map, &mut entities);
+        let authored_neutral_buildings = spawn_authored_map_entities(&map, &mut entities);
 
         let derived = live_derived_state(&map, &entities, 0);
         let mut game = Game {
@@ -360,6 +360,19 @@ impl Game {
         systems::recompute_supply(&mut game.state.players, &game.state.entities);
         let ids = game.state.player_ids();
         game.recompute_live_fog(&ids);
+        game.state.fog.explore_building_footprints(
+            &ids,
+            &authored_neutral_buildings,
+            &game.state.entities,
+            &game.state.map,
+        );
+        game.state.building_memory.seed_authored_neutral_buildings(
+            &ids,
+            &authored_neutral_buildings,
+            &game.state.entities,
+            &game.state.map,
+            game.state.tick,
+        );
         game.refresh_fog_memories(&ids);
         game
     }
@@ -438,22 +451,31 @@ impl Game {
 
 /// Materialize entity-backed authored map objects exactly as a new live match does.
 ///
-/// Callers receive ordinary entities rather than permanent occupancy bits: once a tank trap is
-/// destroyed or deconstructed, rebuilding occupancy from the live store stops blocking it.
-pub(in crate::game) fn spawn_authored_map_entities(map: &Map, entities: &mut EntityStore) {
+/// Callers receive the ids of the spawned neutral buildings so match setup can seed shared map
+/// knowledge without broadening that treatment to neutral buildings created during play. These
+/// remain ordinary entities rather than permanent occupancy bits: once a tank trap is destroyed
+/// or deconstructed, rebuilding occupancy from the live store stops blocking it.
+pub(in crate::game) fn spawn_authored_map_entities(
+    map: &Map,
+    entities: &mut EntityStore,
+) -> Vec<u32> {
+    let mut spawned = Vec::new();
     for doodad in map
         .doodads
         .iter()
         .filter(|doodad| crate::game::map::doodads::is_tank_trap(doodad))
     {
-        let _ = entities.spawn_building(
+        if let Some(id) = entities.spawn_building(
             0,
             EntityKind::TankTrap,
             doodad.x as f32,
             doodad.y as f32,
             true,
-        );
+        ) {
+            spawned.push(id);
+        }
     }
+    spawned
 }
 
 pub(in crate::game) fn live_derived_state(
