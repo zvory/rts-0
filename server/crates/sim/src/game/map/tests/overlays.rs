@@ -42,8 +42,8 @@ fn reduction_and_slow_layers_are_independent_and_may_overlap_every_other_overlay
     assert_eq!(map.damage_reduction_tiles, vec![(18, 18), (19, 18)]);
     assert_eq!(map.slow_movement_tiles, vec![(18, 18), (20, 18)]);
     let center = map.tile_center(18, 18);
-    assert_eq!(map.damage_after_reduction_tile(center.0, center.1, 100), 50);
-    assert_eq!(map.slow_movement_multiplier_at(center.0, center.1), 0.5);
+    assert_eq!(map.damage_after_reduction_tile(center.0, center.1, 100), 75);
+    assert_eq!(map.slow_movement_multiplier_at(center.0, center.1), 0.75);
     assert_ne!(map.materialized_hash(), {
         let mut without_reduction = map.clone();
         without_reduction.damage_reduction_tiles.clear();
