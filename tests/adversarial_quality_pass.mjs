@@ -14,6 +14,7 @@ import {
   markdownReport,
   normalizeReport,
   parseArgs,
+  MAX_PRIOR_FOCUSED_VERIFICATION_CHARS,
   QUALITY_PASS_ENV,
   parseReviewedHeadMarker,
   renderPrompt,
@@ -38,6 +39,8 @@ const options = parseArgs([
   "--push",
   "--markdown-report-file",
   "/tmp/adversarial-quality-pass.md",
+  "--prior-focused-verification",
+  "node tests/agent_pr.mjs passed",
 ]);
 assert.equal(options.baseRef, "origin/main");
 assert.equal(options.headBranch, "zvorygin/example");
@@ -45,8 +48,13 @@ assert.equal(options.context, "adversarial-quality-pass");
 assert.equal(options.postStatus, true);
 assert.equal(options.push, true);
 assert.equal(options.markdownReportFile, "/tmp/adversarial-quality-pass.md");
+assert.equal(options.priorFocusedVerification, "node tests/agent_pr.mjs passed");
 
 assert.throws(() => parseArgs(["--unknown"]), /unknown argument/);
+assert.throws(
+  () => parseArgs(["--prior-focused-verification", "x".repeat(MAX_PRIOR_FOCUSED_VERIFICATION_CHARS + 1)]),
+  /exceeds the 2000-character limit/,
+);
 
 assert.deepEqual(
   preflightCommands("origin/main").map(({ command, args }) => [command, ...args]),
@@ -63,6 +71,7 @@ assert.deepEqual(
 const prompt = renderPrompt({
   baseRef: "origin/main",
   headRef: "HEAD",
+  priorFocusedVerification: "node tests/adversarial_quality_pass.mjs passed",
   reviewInputs: [{
     path: "client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream",
     classification: "binary",
@@ -89,6 +98,21 @@ assert.match(prompt, /complete, coherent,\nworking state/);
 assert.doesNotMatch(prompt, /fail the gate/i);
 assert.doesNotMatch(prompt, /close the PR/i);
 assert.match(prompt, /Review mode: Full\./);
+assert.match(prompt, /Prior focused verification:\nnode tests\/adversarial_quality_pass\.mjs passed/);
+assert.equal((prompt.match(/node tests\/adversarial_quality_pass\.mjs passed/g) ?? []).length, 1);
+assert.match(prompt, /claimed evidence to evaluate against the diff/);
+assert.match(prompt, /offline, deterministic focused tests,\nlinters, static policy scripts, format checks, and repository inspections/);
+assert.match(prompt, /Do not start HTTP or WebSocket listeners,\nbrowsers, Chrome, Interact, Tailnet preview/);
+assert.match(prompt, /exact behavior\nstill unverified and why it matters/);
+assert.match(prompt, /do not report generic EPERM, sandbox, or unavailable-tool\nconcerns/);
+assert.match(prompt, /do not broaden scope into opportunistic cleanup\nor a new validation harness/);
+
+const defaultVerificationPrompt = renderPrompt({
+  baseRef: "origin/main",
+  headRef: "HEAD",
+});
+assert.match(defaultVerificationPrompt, /Prior focused verification:\nnot supplied/);
+assert.equal((defaultVerificationPrompt.match(/Prior focused verification:/g) ?? []).length, 1);
 
 const reviewedAnchor = "a".repeat(40);
 const correctionHead = "b".repeat(40);
@@ -359,6 +383,7 @@ try {
   const docsOnlyCodexCalledMarker = path.join(tempRoot, "docs-only-codex-called.txt");
   const docsOnlyStatusCapture = path.join(tempRoot, "docs-only-gh-api.txt");
   const qualityStatusCapture = path.join(tempRoot, "quality-gh-api.txt");
+  const qualityPromptCapture = path.join(tempRoot, "quality-prompt.txt");
   const incrementalBody = path.join(tempRoot, "incremental-pr-body.md");
   const incrementalPromptCapture = path.join(tempRoot, "incremental-prompt.txt");
   const incrementalStatusCapture = path.join(tempRoot, "incremental-gh-api.txt");
@@ -551,6 +576,26 @@ done
     "pre-review failure must not push the branch",
   );
 
+  const oversizedVerificationTmp = fs.mkdtempSync(path.join(tempRoot, "oversized-verification-tmp-"));
+  const oversizedVerification = spawnSync(
+    "scripts/agent-pr.sh",
+    ["--verification", "x".repeat(MAX_PRIOR_FOCUSED_VERIFICATION_CHARS + 1)],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        CODEX_CALLED_MARKER: preReviewCodexCalledMarker,
+        GH_BIN: path.join(binPath, "gh"),
+        PATH: `${binPath}:${process.env.PATH}`,
+        TMPDIR: oversizedVerificationTmp,
+      }),
+    },
+  );
+  assert.equal(oversizedVerification.status, 2);
+  assert.match(oversizedVerification.stderr, /--verification exceeds the 2000-character limit/);
+  assert.equal(fs.existsSync(preReviewCodexCalledMarker), false, "oversized verification must not invoke Codex");
+  assert.deepEqual(fs.readdirSync(oversizedVerificationTmp), [], "oversized verification must clean up its stable helper copy");
+
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/quality-report-body"], { cwd: workPath });
   fs.appendFileSync(path.join(workPath, "README.md"), "implementation branch docs change\n");
@@ -566,6 +611,7 @@ done
       AGENT_GH_API_CAPTURE: qualityStatusCapture,
       AGENT_PR_BODY_CAPTURE: capturedBody,
       CODEX_CALLED_MARKER: codexCalledMarker,
+      AGENT_CODEX_PROMPT_CAPTURE: qualityPromptCapture,
       CODEX_MUTATE_AGENT_PR: "1",
       GH_BIN: path.join(binPath, "gh"),
       PATH: `${binPath}:${process.env.PATH}`,
@@ -589,6 +635,9 @@ done
   assert.match(body, /<!-- rts-agent-pr:quality-report:v1 -->/);
   assert.match(body, /<!-- \/rts-agent-pr:quality-report -->/);
   assert.match(fs.readFileSync(codexCalledMarker, "utf8"), /codex called/);
+  const capturedQualityPrompt = fs.readFileSync(qualityPromptCapture, "utf8");
+  assert.match(capturedQualityPrompt, /Prior focused verification:\nworkflow fixture/);
+  assert.equal((capturedQualityPrompt.match(/workflow fixture/g) ?? []).length, 1);
   assert.equal((fs.readFileSync(qualityStatusCapture, "utf8").match(/statuses\//g) ?? []).length, 1);
   assert.equal(fs.readFileSync(path.join(workPath, "server", "src", "branch.rs"), "utf8"), "fn main() {}\n");
   assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Run adversarial quality pass/);

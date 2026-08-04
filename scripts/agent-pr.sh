@@ -15,6 +15,12 @@ if [ "${RTS_AGENT_PR_STABLE_COPY:-0}" != "1" ]; then
 fi
 
 STABLE_COPY_PATH="${RTS_AGENT_PR_STABLE_COPY_PATH:-}"
+if [ -n "$STABLE_COPY_PATH" ]; then
+  # Argument validation runs before the broader lifecycle cleanup is installed below. Keep the
+  # re-executed stable copy from accumulating when an early validation error exits the helper.
+  trap 'rm -f -- "$STABLE_COPY_PATH"' EXIT
+fi
+
 GH_BIN="${GH_BIN:-gh}"
 BASE_BRANCH="main"
 HEAD_BRANCH=""
@@ -22,6 +28,7 @@ TITLE=""
 OWNER=""
 LIFECYCLE_MODE="normal"
 FOCUSED_VERIFICATION=""
+FOCUSED_VERIFICATION_MAX_CHARS=2000
 BODY_FILE=""
 EXTRA_BODY=""
 EXTRA_LABELS=()
@@ -51,7 +58,7 @@ Options:
   --title TITLE              PR title, default: last commit subject.
   --owner OWNER              Agent/user owning the PR, default: gh user or git user.
   --lifecycle MODE           Lifecycle mode, default: normal.
-  --verification TEXT        Focused local verification summary.
+  --verification TEXT        Focused local verification summary (at most 2,000 characters).
   --body-file FILE           Extra body text to append after ownership metadata.
   --label LABEL              Extra PR label to apply. Repeatable.
   --draft                    Create the PR as a draft when opening it.
@@ -82,6 +89,11 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+if [ "${#FOCUSED_VERIFICATION}" -gt "$FOCUSED_VERIFICATION_MAX_CHARS" ]; then
+  echo "agent-pr: --verification exceeds the ${FOCUSED_VERIFICATION_MAX_CHARS}-character limit" >&2
+  exit 2
+fi
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
@@ -127,7 +139,7 @@ if [ -z "$OWNER" ]; then
   OWNER="unknown"
 fi
 if [ -z "$FOCUSED_VERIFICATION" ]; then
-  FOCUSED_VERIFICATION="Not recorded by helper caller."
+  FOCUSED_VERIFICATION="not supplied"
 fi
 if [ -n "$BODY_FILE" ]; then
   EXTRA_BODY="$(cat "$BODY_FILE")"
@@ -316,6 +328,7 @@ run_quality_pass() {
         --head-branch "$HEAD_BRANCH" \
         --report-file "$quality_report_json" \
         --markdown-report-file "$quality_report_md" \
+        --prior-focused-verification "$FOCUSED_VERIFICATION" \
         --gh-bin "$GH_BIN" \
         --push \
         --post-status \
@@ -347,6 +360,7 @@ run_quality_pass() {
     --head-branch "$HEAD_BRANCH"
     --report-file "$quality_report_json"
     --markdown-report-file "$quality_report_md"
+    --prior-focused-verification "$FOCUSED_VERIFICATION"
     --review-metadata-file "$quality_review_metadata"
     --gh-bin "$GH_BIN"
     --push

@@ -15,6 +15,8 @@ const DEFAULT_GH_BIN = "gh";
 const VERDICTS = new Set(["passed_unchanged", "improved", "improved_with_concerns"]);
 const REVIEW_MODES = new Set(["full", "incremental", "already-reviewed"]);
 export const QUALITY_PASS_ENV = "RTS_ADVERSARIAL_QUALITY_PASS";
+export const MAX_PRIOR_FOCUSED_VERIFICATION_CHARS = 2000;
+export const PRIOR_FOCUSED_VERIFICATION_NOT_SUPPLIED = "not supplied";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDir, "..");
@@ -40,6 +42,8 @@ Options:
   --existing-pr-base BRANCH  Existing open PR target branch for anchor validation.
   --existing-pr-head SHA     Existing open PR head for local-head validation.
   --expected-base BRANCH     Expected PR target branch. Default: derived from --base.
+  --prior-focused-verification TEXT
+                             Implementer-supplied focused verification evidence (at most ${MAX_PRIOR_FOCUSED_VERIFICATION_CHARS} characters).
   --review-metadata-file FILE Wrapper-owned selected review mode/base output path.
   --codex-command COMMAND     Codex CLI command. Default: codex.
   --codex-model MODEL         Optional model passed to Codex CLI.
@@ -69,6 +73,7 @@ export function parseArgs(argv) {
     help: false,
     markdownReportFile: "",
     postStatus: false,
+    priorFocusedVerification: "",
     push: false,
     remote: DEFAULT_REMOTE,
     reportFile: "",
@@ -114,6 +119,8 @@ export function parseArgs(argv) {
       options.existingPrHead = value("--existing-pr-head");
     } else if (arg === "--expected-base" || arg.startsWith("--expected-base=")) {
       options.expectedBase = value("--expected-base");
+    } else if (arg === "--prior-focused-verification" || arg.startsWith("--prior-focused-verification=")) {
+      options.priorFocusedVerification = value("--prior-focused-verification");
     } else if (arg === "--review-metadata-file" || arg.startsWith("--review-metadata-file=")) {
       options.reviewMetadataFile = path.resolve(value("--review-metadata-file"));
     } else if (arg === "--codex-command" || arg.startsWith("--codex-command=")) {
@@ -137,6 +144,7 @@ export function parseArgs(argv) {
     }
   }
 
+  options.priorFocusedVerification = normalizePriorFocusedVerification(options.priorFocusedVerification);
   return options;
 }
 
@@ -148,6 +156,17 @@ function usageError(message) {
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+export function normalizePriorFocusedVerification(value) {
+  const verification = cleanString(value);
+  if (!verification) return PRIOR_FOCUSED_VERIFICATION_NOT_SUPPLIED;
+  if (verification.length > MAX_PRIOR_FOCUSED_VERIFICATION_CHARS) {
+    throw usageError(
+      `--prior-focused-verification exceeds the ${MAX_PRIOR_FOCUSED_VERIFICATION_CHARS}-character limit`,
+    );
+  }
+  return verification;
 }
 
 function expectedBaseFromRef(baseRef) {
@@ -269,8 +288,16 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
-export function renderPrompt({ baseRef, headRef, reviewMode = "full", reviewedHead = "", reviewInputs = [] }) {
+export function renderPrompt({
+  baseRef,
+  headRef,
+  reviewMode = "full",
+  reviewedHead = "",
+  reviewInputs = [],
+  priorFocusedVerification = "",
+}) {
   const exclusions = excludedRawPaths(reviewInputs);
+  const priorVerification = normalizePriorFocusedVerification(priorFocusedVerification);
   const incrementalInstruction = reviewMode === "incremental"
     ? `
 This is an incremental review. The branch was fully reviewed through ${reviewedHead}. Review only the
@@ -301,6 +328,21 @@ ${renderReviewInputManifest(reviewInputs)}
 Raw-content exclusions:
 ${exclusions.length ? exclusions.join("\n") : "<none>"}
 
+Prior focused verification:
+${priorVerification}
+
+Treat the prior focused verification as claimed evidence to evaluate against the diff. It does not
+prove that a check passed or that it was adequate. Do not repeat an expensive check already supported
+by adequate supplied evidence merely to make the report longer.
+
+Verification boundary: this workspace-write sandbox may run offline, deterministic focused tests,
+linters, static policy scripts, format checks, and repository inspections. Do not start HTTP or WebSocket listeners,
+browsers, Chrome, Interact, Tailnet preview, or other validation that needs unavailable machine or
+network access. Known sandbox restrictions are not remaining concerns by themselves. If a material
+behavior lacks adequate supplied evidence and cannot be checked offline, record the exact behavior
+still unverified and why it matters; do not report generic EPERM, sandbox, or unavailable-tool
+concerns.
+
 AI behavior is outside your authority: do not create, alter, or approve it. Refactor AI code only
 when behavior is preserved exactly.
 
@@ -312,6 +354,9 @@ Focus on:
 
 Ignore missing documentation updates and contract-documentation updates unless the omission directly
 creates a correctness or architecture problem.
+
+You may fix correctness and architecture issues, but do not broaden scope into opportunistic cleanup
+or a new validation harness.
 
 You may rewrite the branch. Prefer the simplest resulting system, not the smallest diff. If a better
 path is clear and you can complete it coherently, take it. If the ideal rewrite is too large to finish
@@ -658,6 +703,7 @@ class Runner {
           reviewMode: selection.mode,
           reviewedHead: selection.reviewedHead,
           reviewInputs,
+          priorFocusedVerification: options.priorFocusedVerification,
         }),
         codexArgs: buildCodexArgs({
           repoRoot,
