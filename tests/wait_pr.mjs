@@ -16,6 +16,7 @@ const origin = path.join(fixtureRoot, "origin.git");
 const publisher = path.join(fixtureRoot, "publisher");
 const worktreeRoot = path.join(fixtureRoot, "worktrees");
 const targetRoot = path.join(fixtureRoot, "targets");
+const deliveryLog = path.join(fixtureRoot, "delivery.log");
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -77,6 +78,7 @@ function waitEnvironment(headSha, number, files = []) {
     RTS_WAIT_PR_CHECKS_JSON: "[]",
     RTS_WORKTREE_ROOT: worktreeRoot,
     RTS_CARGO_TARGET_BASE_DIR: targetRoot,
+    RTS_WAIT_PR_DELIVERY_LOG: deliveryLog,
   };
 }
 
@@ -118,7 +120,7 @@ try {
 
   assert.match(output, /refreshing local main checkout/);
   assert.match(output, /local main is current/);
-  assert.equal(fs.existsSync(path.join(fixtureRoot, "delivery.log")), false, "wait-pr must not deliver patch notes");
+  assert.equal(fs.existsSync(deliveryLog), false, "wait-pr must not deliver patch notes");
   assert.equal(
     git(["rev-parse", "main"]).trim(),
     git(["rev-parse", "origin/main"]).trim(),
