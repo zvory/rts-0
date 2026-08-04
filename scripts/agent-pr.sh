@@ -15,6 +15,12 @@ if [ "${RTS_AGENT_PR_STABLE_COPY:-0}" != "1" ]; then
 fi
 
 STABLE_COPY_PATH="${RTS_AGENT_PR_STABLE_COPY_PATH:-}"
+if [ -n "$STABLE_COPY_PATH" ]; then
+  # Argument validation runs before the broader lifecycle cleanup is installed below. Keep the
+  # re-executed stable copy from accumulating when an early validation error exits the helper.
+  trap 'rm -f -- "$STABLE_COPY_PATH"' EXIT
+fi
+
 GH_BIN="${GH_BIN:-gh}"
 BASE_BRANCH="main"
 HEAD_BRANCH=""

@@ -576,6 +576,7 @@ done
     "pre-review failure must not push the branch",
   );
 
+  const oversizedVerificationTmp = fs.mkdtempSync(path.join(tempRoot, "oversized-verification-tmp-"));
   const oversizedVerification = spawnSync(
     "scripts/agent-pr.sh",
     ["--verification", "x".repeat(MAX_PRIOR_FOCUSED_VERIFICATION_CHARS + 1)],
@@ -586,12 +587,14 @@ done
         CODEX_CALLED_MARKER: preReviewCodexCalledMarker,
         GH_BIN: path.join(binPath, "gh"),
         PATH: `${binPath}:${process.env.PATH}`,
+        TMPDIR: oversizedVerificationTmp,
       }),
     },
   );
   assert.equal(oversizedVerification.status, 2);
   assert.match(oversizedVerification.stderr, /--verification exceeds the 2000-character limit/);
   assert.equal(fs.existsSync(preReviewCodexCalledMarker), false, "oversized verification must not invoke Codex");
+  assert.deepEqual(fs.readdirSync(oversizedVerificationTmp), [], "oversized verification must clean up its stable helper copy");
 
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/quality-report-body"], { cwd: workPath });
