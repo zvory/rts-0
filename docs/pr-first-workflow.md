@@ -25,7 +25,8 @@ The normal agent lifecycle is:
    The first non-Markdown pass is Full and records a wrapper-owned reviewed-head marker after its
    final-head status succeeds. A later manually pushed CI fix gets an Incremental pass only when the
    existing PR body marker is strict and wrapper-owned, its exact SHA still has a successful status,
-   it is a local strict ancestor, the new commits are linear, and the PR still targets `main`.
+   the PR's remote head matches local `HEAD`, it is a local strict ancestor, the new commits are
+   linear, and the PR still targets `main`.
    Incremental prompts and changed-path metadata cover only that correction range, while still
    allowing interaction checks against the complete checkout. Missing or ambiguous metadata,
    statuses, ancestry, merge/rebase-shaped history, or base selection falls back to Full. When the

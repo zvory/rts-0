@@ -38,6 +38,7 @@ Options:
   --markdown-report-file FILE Optional Markdown report output path for PR audit trails.
   --existing-pr-body-file FILE Existing open PR body used to recover a reviewed-head anchor.
   --existing-pr-base BRANCH  Existing open PR target branch for anchor validation.
+  --existing-pr-head SHA     Existing open PR head for local-head validation.
   --expected-base BRANCH     Expected PR target branch. Default: derived from --base.
   --review-metadata-file FILE Wrapper-owned selected review mode/base output path.
   --codex-command COMMAND     Codex CLI command. Default: codex.
@@ -62,6 +63,7 @@ export function parseArgs(argv) {
     fetchBase: true,
     existingPrBase: "",
     existingPrBodyFile: "",
+    existingPrHead: "",
     ghBin: DEFAULT_GH_BIN,
     headBranch: "",
     help: false,
@@ -108,6 +110,8 @@ export function parseArgs(argv) {
       options.existingPrBodyFile = path.resolve(value("--existing-pr-body-file"));
     } else if (arg === "--existing-pr-base" || arg.startsWith("--existing-pr-base=")) {
       options.existingPrBase = value("--existing-pr-base");
+    } else if (arg === "--existing-pr-head" || arg.startsWith("--existing-pr-head=")) {
+      options.existingPrHead = value("--existing-pr-head");
     } else if (arg === "--expected-base" || arg.startsWith("--expected-base=")) {
       options.expectedBase = value("--expected-base");
     } else if (arg === "--review-metadata-file" || arg.startsWith("--review-metadata-file=")) {
@@ -156,6 +160,15 @@ export function reviewedHeadMarker(sha) {
   return `<!-- rts-agent-pr:reviewed-head:v1 sha=${sha} -->`;
 }
 
+// GitHub returns commit statuses in reverse chronological order. Only the newest value for the
+// required context represents its current result; an earlier success may have been superseded.
+export function hasLatestSuccessfulStatus(statuses, context) {
+  if (!Array.isArray(statuses)) {
+    throw new Error("GitHub status lookup did not return an array");
+  }
+  return statuses.find((status) => status?.context === context)?.state === "success";
+}
+
 export function parseReviewedHeadMarker(body) {
   const wrappers = String(body || "").match(/<!-- rts-agent-pr:v1 -->[\s\S]*?<!-- \/rts-agent-pr -->/g) || [];
   if (wrappers.length !== 1) {
@@ -196,6 +209,7 @@ export function selectReviewMode({
   currentHead,
   existingPrBodyFile = "",
   existingPrBase = "",
+  existingPrHead = "",
   expectedBase = "",
   getSuccessfulStatus,
   commitExists,
@@ -207,6 +221,9 @@ export function selectReviewMode({
   }
   if (cleanString(existingPrBase) !== cleanString(expectedBase || expectedBaseFromRef(baseRef))) {
     return fullReview({ baseRef, reason: "existing PR targets an unexpected base branch" });
+  }
+  if (cleanString(existingPrHead) !== cleanString(currentHead)) {
+    return fullReview({ baseRef, reason: "existing PR head does not match local HEAD" });
   }
 
   const marker = parseReviewedHeadMarker(existingPrBodyFile);
@@ -587,10 +604,7 @@ class Runner {
       `repos/:owner/:repo/commits/${sha}/statuses?per_page=100`,
     ], { cwd: options.repoRoot });
     const statuses = JSON.parse(raw);
-    if (!Array.isArray(statuses)) {
-      throw new Error("GitHub status lookup did not return an array");
-    }
-    return statuses.some((status) => status?.context === options.context && status?.state === "success");
+    return hasLatestSuccessfulStatus(statuses, options.context);
   }
 
   chooseReviewMode(options, repoRoot, currentHead) {
@@ -602,6 +616,7 @@ class Runner {
       currentHead,
       existingPrBodyFile: options.existingPrBodyFile ? existingPrBody : "",
       existingPrBase: options.existingPrBase,
+      existingPrHead: options.existingPrHead,
       expectedBase: options.expectedBase || expectedBaseFromRef(options.baseRef),
       getSuccessfulStatus: (sha) => this.hasSuccessfulStatus(options, sha),
       commitExists: (sha) => this.runSucceeds("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: repoRoot }),

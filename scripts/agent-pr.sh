@@ -34,6 +34,8 @@ QUALITY_REVIEW_MODE=""
 QUALITY_REVIEW_BASE=""
 QUALITY_REVIEWED_HEAD=""
 PRESERVE_PRIOR_QUALITY_REPORT=0
+QUALITY_REPORT_START="<!-- rts-agent-pr:quality-report:v1 -->"
+QUALITY_REPORT_END="<!-- /rts-agent-pr:quality-report -->"
 
 usage() {
   cat <<'EOF'
@@ -109,7 +111,7 @@ if [ "$DRY_RUN" != "1" ]; then
     --base "$BASE_BRANCH" \
     --head "$HEAD_BRANCH" \
     --state open \
-    --json number,url,body,baseRefName \
+    --json number,url,body,baseRefName,headRefOid \
     --jq '.[0] // empty')"
 fi
 if [ -z "$TITLE" ]; then
@@ -261,6 +263,45 @@ load_quality_review_metadata() {
     echo "agent-pr: quality pass returned an empty review base" >&2
     exit 1
   fi
+  case "$PRESERVE_PRIOR_QUALITY_REPORT" in
+    true|false) ;;
+    *)
+      echo "agent-pr: quality pass returned invalid report-preservation state '$PRESERVE_PRIOR_QUALITY_REPORT'" >&2
+      exit 1
+      ;;
+  esac
+}
+
+preserve_prior_quality_report() {
+  local preserved_report
+  if ! preserved_report="$(awk -v start="$QUALITY_REPORT_START" -v end="$QUALITY_REPORT_END" '
+    $0 == start {
+      if (started || active) invalid = 1
+      else {
+        started = 1
+        active = 1
+        print
+      }
+      next
+    }
+    $0 == end {
+      if (!active || ended) invalid = 1
+      else {
+        print
+        active = 0
+        ended = 1
+      }
+      next
+    }
+    active { print }
+    END {
+      if (invalid || !started || !ended || active) exit 1
+    }
+  ' "$existing_pr_body_file")"; then
+    echo "agent-pr: verified reviewed head is missing one bounded prior quality report" >&2
+    return 1
+  fi
+  printf '%s\n' "$preserved_report"
 }
 
 run_quality_pass() {
@@ -313,8 +354,10 @@ run_quality_pass() {
   )
   if [ -n "$existing_pr_json" ]; then
     local existing_pr_base
+    local existing_pr_head
     existing_pr_base="$(jq -r '.baseRefName // empty' <<<"$existing_pr_json")"
-    quality_args+=(--existing-pr-body-file "$existing_pr_body_file" --existing-pr-base "$existing_pr_base")
+    existing_pr_head="$(jq -r '.headRefOid // empty' <<<"$existing_pr_json")"
+    quality_args+=(--existing-pr-body-file "$existing_pr_body_file" --existing-pr-base "$existing_pr_base" --existing-pr-head "$existing_pr_head")
   fi
   "${quality_args[@]}"
   load_quality_review_metadata
@@ -367,10 +410,11 @@ Needs-Human: $needs_human
 EOF
 
   if [ "$PRESERVE_PRIOR_QUALITY_REPORT" = "true" ]; then
-    sed -n '/^## Adversarial quality pass$/,$p' "$existing_pr_body_file"
+    preserve_prior_quality_report
   elif [ -s "$quality_report_md" ]; then
+    printf '%s\n' "$QUALITY_REPORT_START"
     cat "$quality_report_md"
-    printf '\n'
+    printf '%s\n\n' "$QUALITY_REPORT_END"
   fi
 
   if [ -n "$EXTRA_BODY" ]; then

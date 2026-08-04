@@ -10,6 +10,7 @@ import {
   autoCommitBody,
   buildCodexArgs,
   buildFetchArgs,
+  hasLatestSuccessfulStatus,
   markdownReport,
   normalizeReport,
   parseArgs,
@@ -116,6 +117,7 @@ const selectMode = (overrides = {}) => selectReviewMode({
   currentHead: correctionHead,
   existingPrBodyFile: markerBody,
   existingPrBase: "main",
+  existingPrHead: correctionHead,
   expectedBase: "main",
   getSuccessfulStatus: () => true,
   commitExists: () => true,
@@ -130,7 +132,7 @@ assert.deepEqual(selectMode(), {
   reviewedHead: reviewedAnchor,
   reason: "verified reviewed-head has a simple linear correction range",
 });
-assert.equal(selectMode({ currentHead: reviewedAnchor }).mode, "already-reviewed");
+assert.equal(selectMode({ currentHead: reviewedAnchor, existingPrHead: reviewedAnchor }).mode, "already-reviewed");
 assert.equal(selectMode({ existingPrBodyFile: "" }).mode, "full");
 assert.equal(selectMode({ existingPrBodyFile: "malformed marker" }).mode, "full");
 assert.equal(
@@ -145,6 +147,16 @@ assert.equal(selectMode({ commitExists: () => false }).mode, "full");
 assert.equal(selectMode({ isAncestor: () => false }).mode, "full");
 assert.equal(selectMode({ hasMergeCommit: () => true }).mode, "full");
 assert.equal(selectMode({ existingPrBase: "release" }).mode, "full");
+assert.equal(selectMode({ existingPrHead: "c".repeat(40) }).mode, "full");
+assert.equal(hasLatestSuccessfulStatus([
+  { context: "adversarial-quality-pass", state: "success" },
+], "adversarial-quality-pass"), true);
+assert.equal(hasLatestSuccessfulStatus([
+  { context: "adversarial-quality-pass", state: "failure" },
+  { context: "adversarial-quality-pass", state: "success" },
+], "adversarial-quality-pass"), false);
+assert.equal(hasLatestSuccessfulStatus([], "adversarial-quality-pass"), false);
+assert.throws(() => hasLatestSuccessfulStatus({}, "adversarial-quality-pass"), /did not return an array/);
 
 const incrementalPrompt = renderPrompt({
   baseRef: reviewedAnchor,
@@ -353,6 +365,7 @@ try {
   const noChangeBody = path.join(tempRoot, "no-change-pr-body.md");
   const noChangeCodexCalledMarker = path.join(tempRoot, "no-change-codex-called.txt");
   const noChangeStatusCapture = path.join(tempRoot, "no-change-gh-api.txt");
+  const extraBodyFile = path.join(tempRoot, "extra-pr-body.md");
   const preReviewCodexCalledMarker = path.join(tempRoot, "pre-review-codex-called.txt");
   const preReviewStatusCapture = path.join(tempRoot, "pre-review-gh-api.txt");
   const finalHeadCodexCalledMarker = path.join(tempRoot, "final-head-codex-called.txt");
@@ -362,6 +375,7 @@ try {
   const rewrittenPreflightStatusCapture = path.join(tempRoot, "rewritten-preflight-gh-api.txt");
   const rewrittenPreflightBody = path.join(tempRoot, "rewritten-preflight-pr-body.md");
   fs.mkdirSync(binPath, { recursive: true });
+  fs.writeFileSync(extraBodyFile, "## Fixture caller notes\n\nKeep this once.\n");
 
   writeExecutable(
     path.join(binPath, "codex"),
@@ -450,7 +464,8 @@ if [ "$1" = "pr" ] && [ "\${2:-}" = "list" ]; then
     jq -n \
       --rawfile body "\${AGENT_GH_PR_BODY_FILE:-}" \
       --arg base "\${AGENT_GH_PR_BASE:-main}" \
-      '{number: 123, url: "https://github.example/zvory/rts-0/pull/123", body: $body, baseRefName: $base}'
+      --arg head "$(git rev-parse HEAD)" \
+      '{number: 123, url: "https://github.example/zvory/rts-0/pull/123", body: $body, baseRefName: $base, headRefOid: $head}'
   fi
   exit 0
 fi
@@ -545,7 +560,7 @@ done
   run("git", ["add", "--", "README.md", "--implementation.rs", "server/src/branch.rs"], { cwd: workPath });
   run("git", ["commit", "-m", "Change branch"], { cwd: workPath });
 
-  const qualityPassRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture"], {
+  const qualityPassRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture", "--body-file", extraBodyFile], {
     cwd: workPath,
     env: {
       AGENT_GH_API_CAPTURE: qualityStatusCapture,
@@ -571,6 +586,8 @@ done
   assert.match(body, /Verdict: improved/);
   assert.match(body, /Captured report body\./);
   assert.match(body, /- embedded the quality-pass report/);
+  assert.match(body, /<!-- rts-agent-pr:quality-report:v1 -->/);
+  assert.match(body, /<!-- \/rts-agent-pr:quality-report -->/);
   assert.match(fs.readFileSync(codexCalledMarker, "utf8"), /codex called/);
   assert.equal((fs.readFileSync(qualityStatusCapture, "utf8").match(/statuses\//g) ?? []).length, 1);
   assert.equal(fs.readFileSync(path.join(workPath, "server", "src", "branch.rs"), "utf8"), "fn main() {}\n");
@@ -582,7 +599,7 @@ done
   run("git", ["add", "ci-fix.js"], { cwd: workPath });
   run("git", ["commit", "-m", "Apply deterministic CI fix"], { cwd: workPath });
   run("git", ["push", "origin", "HEAD:refs/heads/zvorygin/quality-report-body"], { cwd: workPath });
-  const incrementalRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--verification", "incremental fixture"], {
+  const incrementalRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--verification", "incremental fixture", "--body-file", extraBodyFile], {
     cwd: workPath,
     env: {
       AGENT_CODEX_PROMPT_CAPTURE: incrementalPromptCapture,
@@ -608,7 +625,7 @@ done
   assert.match(fs.readFileSync(incrementalStatusCapture, "utf8"), new RegExp(`statuses/${incrementalHead}`));
   assert.doesNotMatch(fs.readFileSync(incrementalStatusCapture, "utf8"), new RegExp(`statuses/${fullReviewedHead}`));
 
-  const noChangeRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--verification", "already-reviewed fixture"], {
+  const noChangeRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--verification", "already-reviewed fixture", "--body-file", extraBodyFile], {
     cwd: workPath,
     env: {
       AGENT_GH_API_CAPTURE: noChangeStatusCapture,
@@ -626,6 +643,8 @@ done
   assert.equal(fs.existsSync(noChangeStatusCapture), false, "verified current head must not repost status");
   assert.match(noChangeReportBody, new RegExp(`Review-Mode: Already Reviewed\\nReview-Base: ${incrementalHead}\\n${reviewedHeadMarker(incrementalHead)}`));
   assert.match(noChangeReportBody, /Captured report body\./, "already-reviewed rerun must preserve the durable report");
+  assert.equal((noChangeReportBody.match(/## Fixture caller notes/g) ?? []).length, 1, "already-reviewed rerun must not duplicate caller body content");
+  assert.equal((noChangeReportBody.match(/rts-agent-pr:quality-report:v1/g) ?? []).length, 1, "already-reviewed rerun must preserve exactly one bounded report");
 
   const workflowDryRun = run("scripts/agent-pr.sh", ["--dry-run", "--owner", "tester", "--verification", "dry-run fixture"], {
     cwd: workPath,

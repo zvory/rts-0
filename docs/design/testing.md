@@ -505,8 +505,9 @@ Full or Incremental pass records the wrapper-owned `<!-- rts-agent-pr:reviewed-h
 sha=<40-lowercase-hex> -->` marker beside `Review-Mode` and `Review-Base` in the PR body; child
 JSON never selects that SHA. On a rerun for an existing PR, the helper uses Incremental review only
 when that one strict marker names a locally present strict ancestor with a successful exact-SHA
-`adversarial-quality-pass` status, the PR still targets the expected base, and the correction range
-contains no merge commit. It then sends the child only that anchor-to-`HEAD` manifest while keeping
+`adversarial-quality-pass` status, the PR's remote head matches local `HEAD`, the PR still targets
+the expected base, and the correction range contains no merge commit. It then sends the child only
+that anchor-to-`HEAD` manifest while keeping
 the checkout available for interaction review. Missing, malformed, duplicate, untrusted, failed, or
 unavailable status data, non-ancestor/missing commits, merges, and unexpected bases use Full; the
 same verified anchor equal to `HEAD` launches no child and reposts no status, while retaining the
