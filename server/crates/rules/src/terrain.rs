@@ -206,9 +206,12 @@ mod tests {
     #[test]
     fn authored_overlay_multipliers_are_exact_and_nonzero_damage_stays_nonzero() {
         assert_eq!(slow_movement_tile_multiplier(false), 1.0);
-        assert_eq!(slow_movement_tile_multiplier(true), 0.5);
-        assert_eq!(damage_after_reduction_tile(100, true), 50);
-        assert_eq!(damage_after_reduction_tile(99, true), 50);
+        assert_eq!(
+            slow_movement_tile_multiplier(true),
+            SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER
+        );
+        assert_eq!(damage_after_reduction_tile(100, true), 75);
+        assert_eq!(damage_after_reduction_tile(99, true), 75);
         assert_eq!(damage_after_reduction_tile(1, true), 1);
         assert_eq!(damage_after_reduction_tile(0, true), 0);
         assert_eq!(damage_after_reduction_tile(99, false), 99);

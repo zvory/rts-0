@@ -400,7 +400,7 @@ mod tests {
     }
 
     #[test]
-    fn report_accounts_for_tree_detours_and_road_speed() {
+    fn report_keeps_infantry_tree_avoidance_local_and_accounts_for_road_speed() {
         let flat_json = authored_map(flat_rows('.'), json!([]), json!([]));
         let flat = analyze_authored_json(&flat_json).expect("flat fixture should analyze");
         let flat_infantry = route(&flat, "infantry");
@@ -411,9 +411,10 @@ mod tests {
             json!([]),
         );
         let tree = analyze_authored_json(&tree_json).expect("tree fixture should analyze");
-        assert!(
-            route(&tree, "infantry").distance_px > flat_infantry.distance_px,
-            "tree trunk on the direct segment should force a longer static route"
+        assert_eq!(
+            route(&tree, "infantry").distance_px,
+            flat_infantry.distance_px,
+            "infantry tree avoidance is local steering and must not block the static route"
         );
 
         let road = analyze_authored_json(&authored_map(flat_rows('='), json!([]), json!([])))
