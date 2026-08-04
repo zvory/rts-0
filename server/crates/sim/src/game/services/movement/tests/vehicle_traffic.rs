@@ -264,6 +264,30 @@ fn tank_armor_reaction_reverse_choice_has_an_inclusive_eighty_degree_pivot_cap()
 }
 
 #[test]
+fn tank_armor_reaction_over_cap_forward_choice_preserves_normal_close_goal_reverse() {
+    let map = flat_map(1);
+    let start = map.tile_center(20, 20);
+    let goal = (start.0 - config::TILE_SIZE as f32 * 2.0, start.1);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+        .expect("tank should spawn");
+    let entity = entities.get_mut(tank).expect("tank should exist");
+    entity.set_facing(0.0);
+    entity.lock_tank_armor_reaction_source((start.0 - 200.0, start.1), 10);
+    set_path_direct(&mut entities, tank, vec![goal]);
+    let occ = Occupancy::build(&map, &entities);
+    let entity = entities.get(tank).expect("tank should exist");
+    let intent = pivot_drive_intent(&map, &occ, entity, entity.pos_x, entity.pos_y)
+        .expect("tank should have drive intent");
+
+    assert!(
+        angle_delta(intent.desired_facing, 0.0).abs() <= 0.001,
+        "an over-cap damage preference must not replace the ordinary close-goal reverse heading"
+    );
+}
+
+#[test]
 fn expired_under_fire_preference_restores_normal_far_goal_pivot() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();

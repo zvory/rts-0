@@ -3,10 +3,9 @@ use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, MovePhas
 use super::pivot_drive::{angle_delta, rotate_toward, vehicle_body_turn_rate};
 
 const FACING_EPS_RAD: f32 = 1.0e-4;
-const TANK_ARMOR_REACTION_MAX_PIVOT_RAD: f32 = std::f32::consts::PI * 4.0 / 9.0;
 
 pub(super) fn facing_preference_within_pivot_cap(current: f32, desired: f32) -> bool {
-    angle_delta(current, desired).abs() <= TANK_ARMOR_REACTION_MAX_PIVOT_RAD
+    angle_delta(current, desired).abs() <= crate::rules::combat::TANK_ARMOR_REACTION_MAX_PIVOT_RAD
 }
 
 pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
