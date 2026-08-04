@@ -416,6 +416,78 @@ fn assert_range_near(actual: f32, expected: f32) {
 }
 
 #[test]
+fn reloading_plain_move_acquires_once_keeps_moving_and_retains_its_target() {
+    for (kind, methamphetamines) in [
+        (EntityKind::Tank, false),
+        (EntityKind::ScoutCar, false),
+        (EntityKind::Rifleman, true),
+    ] {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("moving-fire unit should spawn");
+        let committed = entities
+            .spawn_unit(2, EntityKind::Worker, 180.0, 100.0)
+            .expect("initial target should spawn");
+        let committed_hp = entities
+            .get(committed)
+            .expect("initial target should exist")
+            .hp;
+        let weapon = combat_rules::default_weapon_profile(kind)
+            .expect("moving-fire unit should have a default weapon")
+            .id;
+        if let Some(unit) = entities.get_mut(attacker) {
+            unit.set_order(Order::move_to(600.0, 100.0));
+            unit.set_path(vec![(600.0, 100.0)]);
+            unit.set_path_goal(Some((600.0, 100.0)));
+            unit.mark_move_phase(MovePhase::Moving);
+            unit.set_weapon_cooldown(weapon, 10);
+            if kind == EntityKind::Tank {
+                unit.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 99);
+            }
+        }
+        let mut owner = player_state(1, false);
+        if methamphetamines {
+            owner.upgrades.insert(UpgradeKind::Methamphetamines);
+        }
+        let players = [owner, player_state(2, false)];
+        let map = open_map(20);
+
+        run_combat_tick_on_map(&mut entities, &players, &map);
+
+        let unit = entities
+            .get(attacker)
+            .expect("moving-fire unit should remain alive");
+        assert_eq!(
+            unit.target_id(),
+            Some(committed),
+            "{kind:?} Move should notice an in-range target during reload"
+        );
+        assert_eq!(unit.path_goal(), Some((600.0, 100.0)), "{kind:?}");
+        assert!(
+            !unit.path_is_empty(),
+            "{kind:?} acquisition must not consume its commanded path"
+        );
+        assert_eq!(
+            entities.get(committed).map(|target| target.hp),
+            Some(committed_hp),
+            "{kind:?} acquisition during reload must not fire early"
+        );
+
+        entities
+            .spawn_unit(2, EntityKind::AntiTankGun, 140.0, 100.0)
+            .expect("higher-priority target should spawn");
+        run_combat_tick_on_map(&mut entities, &players, &map);
+
+        assert_eq!(
+            entities.get(attacker).and_then(|entity| entity.target_id()),
+            Some(committed),
+            "{kind:?} reload ticks should retain the target without reranking"
+        );
+    }
+}
+
+#[test]
 fn reloading_attack_move_acquires_once_then_keeps_its_committed_target() {
     let mut entities = EntityStore::new();
     let attacker = entities

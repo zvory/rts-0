@@ -294,9 +294,10 @@ not legal coax targets.
 Default weapons perform a full acquisition pass when ready and targetless, immediately after each
 shot to prepare the next engagement during reload, or when the prepared target is no longer
 fireable on the ready tick. Reload, setup, and aiming ticks revalidate only that committed target;
-they do not rerank nearby enemies. A targetless travelling Attack Move may scan during reload so a
-non-Mortar unit stops at the first in-range engagement, then follows the same committed-target
-rule. A still-fireable prepared target therefore receives the next
+they do not rerank nearby enemies. A targetless travelling movement order may scan during reload:
+Attack Move uses the acquired target to stop a non-Mortar unit at the first in-range engagement,
+while an ordinary Move does so only for moving-fire units and keeps following its commanded path.
+Both then follow the same committed-target rule. A still-fireable prepared target receives the next
 shot even if a higher-priority threat appeared during reload. The post-shot pass may then select
 that higher-priority threat for the following cycle. Tank coax fire has no independent retained
 target slot, so its acquisition pass runs only when the coax cooldown is ready. This cadence is

@@ -1,6 +1,7 @@
 use rts_sim::game::entity::EntityKind;
 
 mod command_car_corner;
+mod move_reload_acquisition;
 mod replay_142_vehicle_lock;
 mod replay_238_rifleman_corner_lock;
 mod replay_256_worker_expansion_rally;
@@ -10,6 +11,7 @@ mod tank_retreat;
 use command_car_corner::{
     COMMAND_CAR_BUILDING_CORNER_SPEC, COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
 };
+use move_reload_acquisition::MOVE_RELOAD_ACQUISITION_SPEC;
 use replay_142_vehicle_lock::REPLAY_142_VEHICLE_LOCK_SPEC;
 use replay_238_rifleman_corner_lock::REPLAY_238_RIFLEMAN_CORNER_LOCK_SPEC;
 use replay_256_worker_expansion_rally::REPLAY_256_WORKER_EXPANSION_RALLY_SPEC;
@@ -770,7 +772,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 25] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 26] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -869,6 +871,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 25] = [
         description: "After a ten-second inspection pause, a reloading Tank receives an attack-move through an invulnerable enemy Tank already inside its moving weapon range. The current bug lets it close to near-contact before acquiring the target; a corrected build should stop at the initial range boundary and wait for reload.",
         launches: &ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES,
     },
+    MOVE_RELOAD_ACQUISITION_SPEC,
     TANK_UNDER_FIRE_RETREAT_SPEC,
     TANK_REVERSE_TRAFFIC_SPEC,
     TANK_DAMAGE_PURSUIT_PIVOT_SPEC,

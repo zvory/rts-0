@@ -353,6 +353,9 @@ const approvedCurrentFactionFiles = new Set([
   // Dynamic construction path-block is an intentionally Kriegsia-specific worker/building
   // fixture; public faction admission remains routed through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/dynamic_construction_path_block.rs",
+  // Move-reload acquisition deliberately isolates the current Tank and Anti-Tank Gun interaction;
+  // public faction admission remains routed through the catalog-aware dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/move_reload_acquisition.rs",
   // Replay-derived Factory fixture intentionally enumerates today's vehicle roster; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/factory_wall_rally_spawn.rs",
@@ -404,6 +407,9 @@ const approvedCurrentFactionFiles = new Set([
   // This catalog entry exposes the intentionally Kriegsia-specific Scout Car L-path fixture;
   // public faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/scout_car_open_ground_l_path.rs",
+  // This catalog entry exposes the intentionally Kriegsia-specific Tank/Anti-Tank Gun fixture;
+  // public faction admission remains routed through the catalog-aware dev scenario launcher.
+  "server/src/dev_scenarios/move_reload_acquisition.rs",
   // These catalog entries describe intentionally Kriegsia-specific Tank retreat fixtures; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/tank_retreat.rs",

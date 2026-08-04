@@ -77,6 +77,9 @@ impl Game {
             "attack_move_reload_acquisition" => {
                 Self::new_attack_move_reload_acquisition_scenario(unit, unit_count, seed)
             }
+            "move_reload_acquisition" => {
+                Self::new_move_reload_acquisition_scenario(unit, unit_count, seed)
+            }
             "tank_under_fire_retreat" => {
                 Self::new_tank_under_fire_retreat_scenario(unit, unit_count, seed)
             }
