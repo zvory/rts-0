@@ -476,7 +476,8 @@ withFakeHudDocument(({ FakeElement }) => {
 
   const infantryModel = selectionBudgetGridModel(riflemen);
   assert(infantryModel.used === 24 && infantryModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports 24/24 infantry supply");
-  assert(infantryModel.cols === 12, "HUD base budget grid uses two rows of twelve cells");
+  assert(infantryModel.cols === 12 && infantryModel.rows === 4,
+    "HUD base budget grid uses four rows of twelve large cells");
   assert(infantryModel.blocks.every((block) => block.weight === 1 && block.cols === 1 && block.rows === 1 && block.placed),
     "HUD infantry blocks occupy one fixed cell each");
 
@@ -489,7 +490,55 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(commandCarModel.used === 28 &&
     commandCarModel.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS + STATS[KIND.COMMAND_CAR].supply,
     "HUD budget grid includes Command Car net-zero cap expansion");
-  assert(commandCarModel.cols === 24, "HUD budget grid grows visible columns for Command Car cap");
+  assert(commandCarModel.cols === 12 && commandCarModel.rows === 4 && commandCarModel.pages.length === 1,
+    "HUD four-row grid holds a Command Car-expanded 28-supply selection without shrinking");
+  assert(commandCarModel.blocks.every((block) => block.placed),
+    "HUD paginated budget grid places every block without fallback overlap");
+
+  const diversityPagedSelection = [
+    ...Array.from({ length: 6 }, (_, index) => ({
+      id: 1400 + index,
+      owner: 1,
+      kind: KIND.TANK,
+    })),
+    { id: 1410, owner: 1, kind: KIND.COMMAND_CAR },
+    { id: 1411, owner: 1, kind: KIND.COMMAND_CAR },
+    { id: 1412, owner: 1, kind: KIND.ARTILLERY },
+    { id: 1413, owner: 1, kind: KIND.MORTAR_TEAM },
+    { id: 1414, owner: 1, kind: KIND.RIFLEMAN },
+  ];
+  const diversityModel = selectionBudgetGridModel(diversityPagedSelection);
+  const selectedKinds = new Set(diversityPagedSelection.map((entity) => entity.kind));
+  const firstPageKinds = new Set(diversityModel.pages[0].blocks.map((block) => block.kind));
+  assert(diversityModel.pages.length === 2 &&
+    [...selectedKinds].every((kind) => firstPageKinds.has(kind)),
+    "HUD first page reserves one representative of every selected unit kind before duplicates");
+
+  const mixedSelection = [
+    ...Array.from({ length: 6 }, (_, index) => ({
+      id: 1250 + index,
+      owner: 1,
+      kind: KIND.RIFLEMAN,
+    })),
+    { id: 1260, owner: 1, kind: KIND.MORTAR_TEAM },
+    { id: 1261, owner: 1, kind: KIND.MORTAR_TEAM },
+    { id: 1262, owner: 1, kind: KIND.ARTILLERY },
+    { id: 1263, owner: 1, kind: KIND.TANK },
+  ];
+  const mixedModel = selectionBudgetGridModel(mixedSelection);
+  const occupiedCells = new Set();
+  let hasOverlap = false;
+  for (const block of mixedModel.blocks) {
+    for (let row = block.row; row < block.row + block.rows; row++) {
+      for (let col = block.col; col < block.col + block.cols; col++) {
+        const key = `${block.page}:${row}:${col}`;
+        if (occupiedCells.has(key)) hasOverlap = true;
+        occupiedCells.add(key);
+      }
+    }
+  }
+  assert(mixedModel.pages.length === 1 && mixedModel.blocks.every((block) => block.placed) && !hasOverlap,
+    "HUD packs late large units ahead of infantry without overlapping the mixed 24-supply selection");
 
   const artilleryShape = selectionBudgetBlockShape(STATS[KIND.ARTILLERY].supply);
   assert(artilleryShape.cols === 2 && artilleryShape.rows === 2 && artilleryShape.reservedCells == null,
@@ -522,6 +571,50 @@ withFakeHudDocument(({ FakeElement }) => {
     const stableChildren = panel.children;
     hud._renderSelectedPanel();
     assert(panel.children === stableChildren, "HUD selected budget grid skips unchanged DOM rebuilds");
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    let selected = diversityPagedSelection;
+    const state = {
+      selectionBudgetOverflow: null,
+      selectedEntities() {
+        return selected;
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    const tabs = panel.querySelectorAll(".sel-page-tab");
+    assert(tabs.length === 2 && tabs[0].className.includes("active"),
+      "HUD renders one clickable tab per fixed-size selection page");
+    const renderedFirstPageKinds = new Set(
+      panel.querySelectorAll(".sel-budget-block")
+        .map((block) => block.getAttribute("data-selection-kind")),
+    );
+    assert([...selectedKinds].every((kind) => renderedFirstPageKinds.has(String(kind))),
+      "HUD first rendered page visibly includes every selected unit kind");
+
+    panel.listeners.click({
+      target: tabs[1],
+      preventDefault() {},
+    });
+    const nextTabs = panel.querySelectorAll(".sel-page-tab");
+    assert(nextTabs[1].className.includes("active") &&
+      panel.querySelectorAll(".sel-budget-block").length > 0,
+      "HUD selection tabs switch pages without changing the authoritative selection");
+
+    selected = diversityPagedSelection.map((entity, index) => index === selected.length - 1
+      ? { ...entity, id: 1499, kind: KIND.WORKER }
+      : entity);
+    hud._renderSelectedPanel();
+    const resetTabs = panel.querySelectorAll(".sel-page-tab");
+    assert(resetTabs[0].className.includes("active"),
+      "HUD returns to the diversity-first page when the selected entity set changes");
   });
 
   withFakeHudDocument(({ FakeElement }) => {
