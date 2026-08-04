@@ -198,7 +198,8 @@ Current scenario ids:
   the exact destination instead of stalling at a corner.
 - `replay_256_worker_expansion_rally` — four workers reduced from replay 220 / match 256, sharing
   a stale immediate waypoint beside a stationary unit while their distinct far-side rally goals
-  make them reverse continuously without leaving the pocket.
+  make them reverse continuously without leaving the pocket. A corrected build drops only the
+  unreachable intermediate waypoint, then carries every worker to its original rally goal.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.

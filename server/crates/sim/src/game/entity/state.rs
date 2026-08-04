@@ -125,11 +125,12 @@ pub struct MovementState {
     pub last_repath_tick: u32,
     /// The goal world point of the most recently assigned path, for throttle-bypass checks.
     pub path_goal: Option<(f32, f32)>,
-    /// Consecutive ticks in which the unit moved less than `STUCK_EPS_PX`. Reset on progress
-    /// or when a new order is assigned. Used by tolerant arrival.
+    /// Consecutive ticks without sufficient recovery progress. Infantry measures net progress
+    /// toward its next waypoint; oriented vehicles retain displacement-based tracking. Reset on
+    /// progress or when a new order is assigned. Used by tolerant arrival and recovery.
     pub stuck_ticks: u16,
-    /// Position snapshot taken when `stuck_ticks` was last reset to 0. Used to measure
-    /// progress each tick for tolerant arrival.
+    /// Position snapshot taken when `stuck_ticks` was last reset to 0. For infantry, this measures
+    /// net waypoint progress rather than back-and-forth displacement.
     pub last_progress_pos: (f32, f32),
     /// Position delta from this tick's path-following movement phase. This is transient:
     /// reset before movement, set after waypoint advancement, and intentionally excludes
