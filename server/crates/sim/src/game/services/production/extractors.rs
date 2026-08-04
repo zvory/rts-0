@@ -13,8 +13,12 @@ pub(super) fn ensure_scaffold(entities: &mut EntityStore, producer_id: u32) -> b
     if !kind.is_resource_extractor() || !paid {
         return true;
     }
-    if scaffold_id(entities, producer_id, kind).is_some() {
-        return true;
+    if let Some(scaffold) = entities.iter().find(|entity| {
+        entity.kind == kind && entity.construction_producer_id() == Some(producer_id)
+    }) {
+        // Death cleanup owns settling a destroyed scaffold. Do not replace or advance it earlier
+        // in the tick, or the already-paid production item would survive the destruction.
+        return scaffold.hp > 0;
     }
     let Some((x, y)) = target(entities, producer_id, kind) else {
         return false;
@@ -33,10 +37,7 @@ pub(super) fn ensure_scaffold(entities: &mut EntityStore, producer_id: u32) -> b
         entities.remove(scaffold_id);
         return false;
     }
-    // A destroyed in-progress scaffold restarts the already-paid build from zero.
-    entities
-        .get_mut(producer_id)
-        .is_some_and(|producer| producer.set_front_production_progress(0))
+    true
 }
 
 pub(super) fn sync_scaffold_progress(entities: &mut EntityStore, producer_id: u32) {
