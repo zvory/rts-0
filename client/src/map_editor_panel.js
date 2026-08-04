@@ -974,7 +974,7 @@ export class MapEditorPanel {
     const name = String(file?.name || "selected file");
     try {
       if (Number(file?.size) > MAP_EDITOR_MAX_JSON_BYTES) {
-        throw new Error("Map JSON files must be 2 MB or smaller.");
+        throw new Error("Map JSON files must be 8 MiB or smaller.");
       }
       if (typeof file?.text !== "function") throw new Error("The selected file could not be read.");
       const text = await file.text();

@@ -289,11 +289,11 @@ assert(
 
   await MapEditorPanel.prototype.loadJsonFile.call(panel, {
     name: "huge.json",
-    size: 2 * 1024 * 1024 + 1,
+    size: 8 * 1024 * 1024 + 1,
     async text() { throw new Error("oversized files must not be read"); },
   });
   assert.deepEqual(statuses.at(-1), {
-    message: "Could not load huge.json: Map JSON files must be 2 MB or smaller.",
+    message: "Could not load huge.json: Map JSON files must be 8 MiB or smaller.",
     error: true,
   });
 
