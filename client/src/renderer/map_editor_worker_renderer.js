@@ -7,6 +7,7 @@ import {
 } from "../map_authoring/layers.js";
 import { DOODAD_TYPE } from "../config.js";
 import { drawTankTrap } from "./buildings.js";
+import { drawResourceNodePreview } from "./resources.js";
 import { gfxCircle, gfxFill, gfxFillStrokePath, gfxNoFill, gfxRect, gfxReset, gfxStroke, gfxStrokePaths } from "./native_graphics.js";
 
 export class MapEditorWorkerRenderer {
@@ -17,6 +18,7 @@ export class MapEditorWorkerRenderer {
     renderer.layers.feedback.addChild(this.overlay);
     this.tankTraps = new Map();
     this.doodads = new Map();
+    this.resourcePreviews = [];
     this.labels = [];
     this.lastOverlay = null;
     this.layerVisibility = defaultMapAuthoringLayerVisibility();
@@ -166,7 +168,10 @@ export class MapEditorWorkerRenderer {
       gfxNoFill(this.overlay);
     }
     if (this.layerVisibility[MAP_AUTHORING_LAYER.BASE]) {
+      this._drawResourcePreviews(overlay.resourcePreviews || []);
       for (const site of overlay.sites) this._drawSite(site);
+    } else {
+      this._drawResourcePreviews([]);
     }
     if (overlay.doodadBrushPreview) {
       const preview = overlay.doodadBrushPreview;
@@ -208,6 +213,19 @@ export class MapEditorWorkerRenderer {
     this.labels.push(label);
   }
 
+  _drawResourcePreviews(records) {
+    for (const graphic of this.resourcePreviews) graphic.destroy();
+    this.resourcePreviews = [];
+    for (const record of records) {
+      const graphic = new PIXI.Graphics();
+      drawResourceNodePreview(graphic, record.kind);
+      graphic.position.set(record.x, record.y);
+      graphic.alpha = record.selected ? 1 : 0.72;
+      this.renderer.layers.resources.addChild(graphic);
+      this.resourcePreviews.push(graphic);
+    }
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -215,6 +233,7 @@ export class MapEditorWorkerRenderer {
     this.labels = [];
     for (const id of [...this.tankTraps.keys()]) this._removeTankTrap(id);
     this.doodads.clear();
+    this._drawResourcePreviews([]);
     this.lastOverlay = null;
     this.overlay.destroy();
     this.renderer.destroy();

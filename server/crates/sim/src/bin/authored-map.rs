@@ -7,7 +7,7 @@ use serde::Serialize;
 use rts_sim::game::process_authored_json;
 
 const OUTPUT_SCHEMA_VERSION: u32 = 2;
-const MAX_AUTHORED_MAP_BYTES: usize = 512 * 1024;
+const MAX_AUTHORED_MAP_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -137,5 +137,14 @@ mod tests {
         let error = read_bounded(Cursor::new(oversized), "fixture")
             .expect_err("limit plus one should fail");
         assert!(error.contains("input limit"), "{error}");
+    }
+
+    #[test]
+    fn input_limit_accepts_the_largest_bundled_authoring_map() {
+        let dark_forest = include_bytes!("../../../../assets/maps/dark-forest.json");
+        assert!(
+            dark_forest.len() <= MAX_AUTHORED_MAP_BYTES,
+            "Dark Forest must remain usable with the authored-map CLI"
+        );
     }
 }

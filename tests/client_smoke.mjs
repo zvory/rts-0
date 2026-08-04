@@ -383,11 +383,10 @@ try {
     return true;
   });
   ok(engineerSelected, "selected the starting Engineer");
-  await page.evaluate(() => document.activeElement?.blur());
-  await page.keyboard.press("z");
+  await page.click('#command-card button[data-command-id="worker.buildMenu"]');
   ok(
     await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
-    "worker build hotkey opened the build submenu",
+    "worker Build command opened the build submenu",
   );
   const engineerBuildCard = await page.evaluate(() => ({
     hasDepotButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.resource_depot"]'),
@@ -827,7 +826,7 @@ try {
       editorUi.layerPanel.movePreservedSize &&
       ["Terrain & bases", "Stealth", "No vehicles", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)) &&
-      ["Paint stealth", "Paint no vehicles", "Paint damage reduction", "Paint slowed movement", "Erase stealth", "Erase no vehicles", "Erase damage reduction", "Erase slowed movement"]
+      ["Paint selected", "Erase selected"]
         .every((label) => editorUi.overlayTools.includes(label)) &&
       !editorUi.overlayTools.includes("Forest") && !editorUi.overlayTools.includes("Erase both"),
     `MAP EDITOR: compact floating Layers panel exposes eight independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,

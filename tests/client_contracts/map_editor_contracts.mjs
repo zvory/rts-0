@@ -44,6 +44,7 @@ import fs from "node:fs";
       },
       siteRecord: MapEditorViewport.prototype.siteRecord,
       paintPreviewRecord: () => null,
+      queueTerrainChanges: MapEditorViewport.prototype.queueTerrainChanges,
       onStatus(message, error) { this.status = { message, error }; },
       presentation: {
         present(record) {
@@ -114,6 +115,7 @@ import {
   symmetricDoodadPlacements,
 } from "../../client/src/map_editor_doodads.js";
 import { createMapEditorPresentation } from "../../client/src/map_editor_presentation.js";
+import { mapEditorBaseResourcePreviews } from "../../client/src/map_editor_base_resources.js";
 import {
   mapEditorSymmetryGuideCentre,
   mapEditorSymmetryGuideLines,
@@ -191,6 +193,8 @@ const baseLocations = (sites) => sites.map(({ x, y }) => ({ x, y }));
 const repoRoot = new URL("../../", import.meta.url);
 const oneVOneNoTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/1v1-no-terrain.json", repoRoot), "utf8"));
 const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.rs", repoRoot), "utf8");
+const serverSetupSource = fs.readFileSync(new URL("server/crates/sim/src/game/setup.rs", repoRoot), "utf8");
+const serverEconomySource = fs.readFileSync(new URL("server/crates/rules/src/balance/economy.rs", repoRoot), "utf8");
 const serverProtocolSource = fs.readFileSync(new URL("server/crates/protocol/src/lab_scenario.rs", repoRoot), "utf8");
 const mainSource = fs.readFileSync(new URL("client/src/main.js", repoRoot), "utf8");
 
@@ -208,6 +212,10 @@ assert(
   const serverMaxOil = Number(serverProtocolSource.match(/MAX_OIL_PATCHES_PER_BASE:\s*u32\s*=\s*(\d+)/)?.[1]);
   assert.equal(MAP_EDITOR_MAX_STEEL_PATCHES, serverMaxSteel);
   assert.equal(MAP_EDITOR_MAX_OIL_PATCHES, serverMaxOil);
+  assert.equal(Number(serverSetupSource.match(/STEEL_FIELD_COLUMNS:\s*u32\s*=\s*(\d+)/)?.[1]), 6,
+    "resource preview Steel columns stay aligned with live setup geometry");
+  assert.equal(Number(serverEconomySource.match(/STEEL_BLOCK_DIST_TILES:\s*f32\s*=\s*(\d+(?:\.\d+)?)/)?.[1]), 4,
+    "resource preview Steel distance stays aligned with live setup geometry");
 }
 
 {
@@ -288,11 +296,11 @@ assert(
 
   await MapEditorPanel.prototype.loadJsonFile.call(panel, {
     name: "huge.json",
-    size: 2 * 1024 * 1024 + 1,
+    size: 8 * 1024 * 1024 + 1,
     async text() { throw new Error("oversized files must not be read"); },
   });
   assert.deepEqual(statuses.at(-1), {
-    message: "Could not load huge.json: Map JSON files must be 2 MB or smaller.",
+    message: "Could not load huge.json: Map JSON files must be 8 MB or smaller.",
     error: true,
   });
 
@@ -490,6 +498,45 @@ assert(
   ]);
   assert.deepEqual(baseLocations(session.draft.baseSites), session.draft.startLocations,
     "symmetric start placement reuses an existing base and creates only the missing resource sites");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 1 });
+  const previews = mapEditorBaseResourcePreviews(session.draft);
+  assert.equal(previews.filter((preview) => preview.kind === "steel").length, 12,
+    "a default editor base previews every live Steel patch");
+  assert.equal(previews.filter((preview) => preview.kind === "oil").length, 3,
+    "a default editor base previews every live Oil patch");
+  assert.deepEqual(
+    previews.filter((preview) => preview.kind === "oil").map(({ x, y }) => ({ x, y })),
+    [{ x: 144, y: 400 }, { x: 144, y: 336 }, { x: 80, y: 368 }],
+    "Oil previews use the live setup offsets and tile centres",
+  );
+
+  MapEditorPanel.prototype.updateBasePatchCount.call({
+    session,
+    setStatus() {},
+  }, 0, "steelPatches", 2, "S1");
+  MapEditorPanel.prototype.updateBasePatchCount.call({
+    session,
+    setStatus() {},
+  }, 0, "oilPatches", 1, "S1");
+  const reduced = mapEditorBaseResourcePreviews(session.draft);
+  assert.deepEqual(
+    reduced.reduce((counts, preview) => ({ ...counts, [preview.kind]: (counts[preview.kind] || 0) + 1 }), {}),
+    { steel: 2, oil: 1 },
+    "resource count edits immediately change the viewport preview cardinality",
+  );
+}
+
+{
+  const darkForest = JSON.parse(fs.readFileSync(new URL("server/assets/maps/dark-forest.json", repoRoot), "utf8"));
+  const startKeys = new Set(darkForest.startLocations.map(({ x, y }) => `${x},${y}`));
+  const startBases = darkForest.baseSites.filter(({ x, y }) => startKeys.has(`${x},${y}`));
+  assert.equal(startBases.length, darkForest.startLocations.length);
+  assert(startBases.every((site) => site.steelPatches === 12 && site.oilPatches === 3),
+    "Dark Forest gives both randomly assigned player starts the same resource counts");
 }
 
 {

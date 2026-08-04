@@ -1,4 +1,5 @@
 import { Camera } from "./camera.js";
+import { mapEditorBaseResourcePreviews } from "./map_editor_base_resources.js";
 import { createMapEditorPresentation } from "./map_editor_presentation.js";
 import { createMapEditorTerrainPreview } from "./map_editor_terrain_preview.js";
 import { PRESENTATION_OUTCOME } from "./presentation/submission.js";
@@ -342,7 +343,10 @@ export class MapEditorViewport {
     const guideCentre = mapEditorSymmetryGuideCentre(dimensions, this.symmetry);
     const locations = this.session.mapOverlay();
     const sites = [];
-    for (const start of locations?.starts || []) sites.push(this.siteRecord(start, 0x4ec9ff, 11, `S${start.index + 1}`));
+    for (const start of locations?.starts || []) {
+      const baseIndex = draft.baseSites.findIndex((site) => site.x === start.x && site.y === start.y);
+      sites.push(this.siteRecord(start, 0x4ec9ff, 11, `S${start.index + 1}`, baseIndex === this.selectedBaseIndex));
+    }
     for (const [index, base] of (locations?.bases || []).entries()) {
       sites.push(this.siteRecord(base, 0xf4c542, 7, `B${index + 1}`, base.index === this.selectedBaseIndex));
     }
@@ -353,6 +357,10 @@ export class MapEditorViewport {
       guides,
       guideCentre,
       sites,
+      resourcePreviews: mapEditorBaseResourcePreviews(draft).map((preview) => ({
+        ...preview,
+        selected: preview.baseIndex === this.selectedBaseIndex,
+      })),
       stealthTiles: structuredCloneSafe(draft.stealthTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
       damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),
