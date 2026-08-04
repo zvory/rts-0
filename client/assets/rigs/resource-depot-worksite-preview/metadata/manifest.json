@@ -1,0 +1,33 @@
+{
+  "id": "resource-depot-worksite-preview-08",
+  "mode": "built-in-imagegen-plus-deterministic-raster-assembly",
+  "atlas": "../resource_depot-atlas.png",
+  "frameSize": [384, 384],
+  "frames": [
+    { "index": 0, "name": "base", "path": "../generated/runtime/resource_depot-base.png" },
+    { "index": 1, "name": "teamTint", "path": "../generated/runtime/resource_depot-mask.png" },
+    { "index": 2, "name": "silhouetteShadow", "path": "../generated/runtime/resource_depot-shadow.png" },
+    {
+      "index": 3,
+      "name": "teamTintEmblem",
+      "path": "../generated/runtime/resource_depot-emblem.png",
+      "description": "Centered 20%-reduced wrench silhouette with black outline and transparent edge clearance."
+    }
+  ],
+  "sources": [
+    "../generated/source/resource-depot-oil-silo-foundry-magenta.png",
+    "../generated/source/resource-depot-oil-silo-foundry-whitepaint-magenta.png",
+    "../generated/source/resource-depot-wrench-magenta.png"
+  ],
+  "alphaIntermediates": [
+    "../generated/alpha/resource-depot-oil-silo-foundry-alpha.png",
+    "../generated/alpha/resource-depot-oil-silo-foundry-whitepaint-alpha.png",
+    "../generated/alpha/resource-depot-wrench-alpha.png"
+  ],
+  "teamTint": "Runtime multiplicative tint maps white paint to the owning team color and preserves black outlines.",
+  "emblem": {
+    "outerBoundsPx": [146, 146],
+    "placement": "centered",
+    "source": "wrench chroma-key generation followed by deterministic alpha/outline assembly"
+  }
+}
