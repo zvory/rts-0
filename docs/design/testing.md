@@ -196,10 +196,10 @@ Current scenario ids:
   starts 20 tiles northeast of a centered 15-by-15 lake and receives a move order 20 tiles southwest
   of it. The regression requires the car to route around the lake without body overlap and reach
   the exact destination instead of stalling at a corner.
-- `replay_256_worker_expansion_rally` — four workers reduced from replay 220 / match 256, sharing
-  a stale immediate waypoint beside a stationary unit while their distinct far-side rally goals
-  make them reverse continuously without leaving the pocket. A corrected build drops only the
-  unreachable intermediate waypoint, then carries every worker to its original rally goal.
+- `replay_256_worker_expansion_rally` — replay 220 / match 256 reconstructed from its production
+  source: a Resource Depot produces four workers at the real 495-tick cadence and rallies them
+  across the map. They naturally share the opening route beside a deployed Machine Gunner, making
+  the scenario expose both excessive traffic steering and stale-waypoint recovery behavior.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.

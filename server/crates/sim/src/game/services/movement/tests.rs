@@ -1,3 +1,11 @@
+use super::car_drive::{
+    scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
+};
+use super::collision::COLLISION_EPS_PX;
+use super::pivot_drive::{
+    pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
+    PIVOT_VEHICLE_LOOKAHEAD_PX, VEHICLE_REVERSE_GOAL_DISTANCE_PX,
+};
 use super::*;
 use crate::config;
 use crate::game::entity::{
@@ -17,17 +25,9 @@ use crate::game::services::standability;
 use crate::game::{PlayerState, ScoreState};
 use crate::protocol::NoticeSeverity;
 use rayon::prelude::*;
-
-use super::car_drive::{
-    scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
-};
-use super::collision::COLLISION_EPS_PX;
-use super::pivot_drive::{
-    pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
-    PIVOT_VEHICLE_LOOKAHEAD_PX, VEHICLE_REVERSE_GOAL_DISTANCE_PX,
-};
 mod pivot_drive;
 mod static_repath;
+mod steering_proximity;
 mod tree_trunks;
 mod vehicle_traffic;
 
