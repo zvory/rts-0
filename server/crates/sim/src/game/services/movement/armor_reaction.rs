@@ -252,7 +252,7 @@ mod tests {
             .spawn_unit(1, EntityKind::Tank, 15.0, 300.0)
             .expect("tank should spawn");
         let tank = entities.get_mut(tank_id).expect("tank should exist");
-        tank.set_facing(std::f32::consts::FRAC_PI_2);
+        tank.set_facing(101.0_f32.to_radians());
         tank.lock_tank_armor_reaction_source((0.0, 300.0), 10);
         let before = (tank.pos_x, tank.pos_y, tank.facing());
 
