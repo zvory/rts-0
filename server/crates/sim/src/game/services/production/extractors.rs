@@ -95,7 +95,8 @@ pub(super) fn target(
             let dy = node.pos_y - producer.pos_y;
             let dist2 = dx * dx + dy * dy;
             if dist2 > range2 + 0.01
-                || extractor_on_node(entities, extractor_kind, node.pos_x, node.pos_y)
+                || entities.node_slot_holder(node.id).is_some()
+                || entities.resource_extractor_for_node(node.id).is_some()
             {
                 None
             } else {
@@ -106,11 +107,30 @@ pub(super) fn target(
         .map(|(_, _, x, y)| (x, y))
 }
 
-fn extractor_on_node(entities: &EntityStore, kind: EntityKind, x: f32, y: f32) -> bool {
-    entities.iter().any(|entity| {
-        entity.kind == kind
-            && entity.hp > 0
-            && (entity.pos_x - x).abs() <= 0.001
-            && (entity.pos_y - y).abs() <= 0.001
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{GatherPhase, Order};
+
+    #[test]
+    fn direct_miner_reservation_blocks_extractor_target() {
+        let mut entities = EntityStore::new();
+        let depot = entities
+            .spawn_building(1, EntityKind::ResourceDepot, 64.0, 64.0, true)
+            .expect("depot");
+        let node = entities
+            .spawn_node(EntityKind::Steel, 128.0, 64.0)
+            .expect("steel node");
+        let gatherer = entities
+            .spawn_unit(2, EntityKind::Golem, 128.0, 64.0)
+            .expect("gatherer");
+        {
+            let gatherer = entities.get_mut(gatherer).expect("gatherer");
+            gatherer.set_order(Order::gather(node));
+            gatherer.mark_gather_phase(GatherPhase::Harvesting);
+        }
+        assert!(entities.claim_miner(node, gatherer));
+
+        assert_eq!(target(&entities, depot, EntityKind::SteelMine), None);
+    }
 }

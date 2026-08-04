@@ -216,6 +216,52 @@ fn worker_direct_oil_gather_order_is_idled() {
 }
 
 #[test]
+fn direct_gatherer_cannot_share_a_steel_patch_with_an_extractor() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let node_pos = map.tile_center(12, 12);
+    spawn_completed_mining_anchor(&mut entities, 1, node_pos.0, node_pos.1);
+    let node = entities
+        .spawn_node(EntityKind::Steel, node_pos.0, node_pos.1)
+        .expect("steel node should spawn");
+    entities
+        .spawn_building(1, EntityKind::SteelMine, node_pos.0, node_pos.1, true)
+        .expect("steel mine should spawn");
+    let gatherer = entities
+        .spawn_unit(1, EntityKind::Golem, node_pos.0, node_pos.1)
+        .expect("gatherer should spawn");
+    entities
+        .get_mut(gatherer)
+        .expect("gatherer should exist")
+        .set_order(Order::gather(node));
+
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    let mut players = Vec::new();
+
+    gather_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &occ,
+        &mut coordinator,
+        &team_relations(&[(1, 1)]),
+        1,
+    );
+
+    assert_eq!(entities.node_slot_holder(node), None);
+    assert!(
+        !matches!(
+            entities.get(gatherer).expect("gatherer").order(),
+            Order::Gather(_)
+        ),
+        "an extractor-owned patch must not enter direct harvesting"
+    );
+}
+
+#[test]
 fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

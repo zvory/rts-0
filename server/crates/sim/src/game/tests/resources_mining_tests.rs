@@ -326,7 +326,7 @@ fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
         .get(worker)
         .map(|e| (e.pos_x, e.pos_y))
         .expect("worker position");
-    let node = game
+    let mut node = game
         .state
         .entities
         .iter()
@@ -360,6 +360,12 @@ fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
         Some(GatherPhase::Harvesting),
         "worker should reach and latch the starting patch before the Resource Depot is removed"
     );
+    node = game
+        .state
+        .entities
+        .get(worker)
+        .and_then(|worker| worker.order().gather_node())
+        .expect("worker should retain the patch selected after any occupied-node redirect");
 
     let (resource_depot, resource_depot_pos) = game
         .state

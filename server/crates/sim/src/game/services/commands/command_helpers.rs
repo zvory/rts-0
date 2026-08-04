@@ -14,6 +14,7 @@ pub(super) fn immediate_unit_can_replace(entities: &EntityStore, player: u32, un
 
 pub(super) fn gather_node_valid(entities: &EntityStore, _player: u32, node: u32) -> bool {
     world_query::live_steel_node(entities, node)
+        && entities.resource_extractor_for_node(node).is_none()
 }
 
 pub(super) fn choose_smoke_caster(
