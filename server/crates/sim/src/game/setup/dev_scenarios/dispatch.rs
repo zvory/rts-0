@@ -37,6 +37,9 @@ impl Game {
             "replay_238_rifleman_corner_lock" => {
                 Self::new_replay_238_rifleman_corner_lock_scenario(unit, unit_count, seed)
             }
+            "replay_256_worker_expansion_rally" => {
+                Self::new_replay_256_worker_expansion_rally_scenario(unit, unit_count, seed)
+            }
             "scout_car_wall_chokepoint" => {
                 Self::new_scout_car_wall_chokepoint_scenario(unit, unit_count, seed)
             }

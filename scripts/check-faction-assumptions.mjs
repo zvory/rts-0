@@ -362,6 +362,9 @@ const approvedCurrentFactionFiles = new Set([
   // Replay-derived Rifleman fixture intentionally recreates a current Kriegsia unit at the exact
   // recorded corner contact; public faction admission remains routed through the dev launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/replay_238_rifleman_corner_lock.rs",
+  // Replay-derived worker oscillation fixture intentionally recreates the current Kriegsia Worker
+  // and Machine Gunner interaction; public faction admission remains routed through the launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/replay_256_worker_expansion_rally.rs",
   // The lake reverse-path fixture deliberately isolates current Scout Car movement; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/scout_car_lake_reverse_l_path.rs",
@@ -391,6 +394,7 @@ const approvedCurrentFactionFiles = new Set([
   // admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/replay_142_vehicle_lock.rs",
   "server/src/dev_scenarios/replay_238_rifleman_corner_lock.rs",
+  "server/src/dev_scenarios/replay_256_worker_expansion_rally.rs",
   // This catalog entry exposes the intentionally Kriegsia-specific Scout Car lake fixture; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/scout_car_lake_reverse_l_path.rs",
