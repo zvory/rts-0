@@ -770,7 +770,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 24] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 25] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
