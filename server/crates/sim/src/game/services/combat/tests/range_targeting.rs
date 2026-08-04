@@ -1,5 +1,88 @@
 use super::*;
 
+fn worker_barracks_edge_fixture() -> (Map, EntityStore, u32, u32) {
+    let map = open_map(32);
+    let mut entities = EntityStore::new();
+    let barracks_pos = map.tile_center(12, 12);
+    let barracks = entities
+        .spawn_building(
+            2,
+            EntityKind::Barracks,
+            barracks_pos.0,
+            barracks_pos.1,
+            true,
+        )
+        .expect("barracks should spawn");
+    let worker_stats = config::unit_stats(EntityKind::Worker).expect("worker stats should exist");
+    let range_px = worker_stats.range_tiles as f32 * config::TILE_SIZE as f32
+        + worker_stats.radius
+        + RANGE_SLACK;
+    let worker = entities
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            barracks_pos.0 - 1.5 * config::TILE_SIZE as f32 - (range_px - 1.0),
+            barracks_pos.1,
+        )
+        .expect("worker should spawn");
+    (map, entities, worker, barracks)
+}
+
+#[test]
+fn worker_direct_attack_fires_at_barracks_footprint_edge() {
+    let (map, mut entities, worker, barracks) = worker_barracks_edge_fixture();
+    entities
+        .get_mut(worker)
+        .expect("worker should exist")
+        .set_order(Order::attack(barracks));
+    let hp_before = entities.get(barracks).expect("barracks should exist").hp;
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert!(
+        entities
+            .get(barracks)
+            .is_some_and(|target| target.hp < hp_before),
+        "a worker beside the wall should damage a wide barracks"
+    );
+    assert_eq!(
+        entities.get(worker).and_then(|worker| worker.target_id()),
+        Some(barracks)
+    );
+}
+
+#[test]
+fn worker_attack_move_acquires_barracks_by_footprint_edge() {
+    let (map, mut entities, worker, barracks) = worker_barracks_edge_fixture();
+    let destination = map.tile_center(20, 12);
+    entities
+        .get_mut(worker)
+        .expect("worker should exist")
+        .set_order(Order::attack_move_to(destination.0, destination.1));
+    let hp_before = entities.get(barracks).expect("barracks should exist").hp;
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert!(
+        entities
+            .get(barracks)
+            .is_some_and(|target| target.hp < hp_before),
+        "attack-move should acquire and damage a building whose edge is in range"
+    );
+    assert_eq!(
+        entities.get(worker).and_then(|worker| worker.target_id()),
+        Some(barracks)
+    );
+}
+
 #[test]
 fn automatic_acquisition_considers_only_targets_in_weapon_range() {
     struct Case {

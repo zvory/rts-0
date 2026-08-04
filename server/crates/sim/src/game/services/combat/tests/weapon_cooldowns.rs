@@ -9,7 +9,7 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
         (EntityKind::MachineGunner, 220.0),
         (EntityKind::ScoutCar, 180.0),
         (EntityKind::AntiTankGun, 220.0),
-        (EntityKind::MortarTeam, 280.0),
+        (EntityKind::MortarTeam, 320.0),
         (EntityKind::Tank, 180.0),
     ];
 

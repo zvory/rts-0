@@ -12,6 +12,40 @@ use super::shot_blocker_index::{ShotBlockerBounds, ShotBlockerIndex};
 const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
 const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
 
+/// Squared combat distance from an attacker's center to the target's attackable surface.
+/// Buildings use their authoritative footprint edge; other entities preserve center targeting.
+pub(super) fn combat_target_distance_sq(map: &Map, attacker: (f32, f32), target: &Entity) -> f32 {
+    if !attacker.0.is_finite() || !attacker.1.is_finite() {
+        return f32::INFINITY;
+    }
+    if target.is_building() {
+        let Some(rect) = building_rect_for_entity(map, target) else {
+            return f32::INFINITY;
+        };
+        let closest_x = attacker.0.clamp(rect.min_x, rect.max_x);
+        let closest_y = attacker.1.clamp(rect.min_y, rect.max_y);
+        let dx = attacker.0 - closest_x;
+        let dy = attacker.1 - closest_y;
+        return dx * dx + dy * dy;
+    }
+    let dx = attacker.0 - target.pos_x;
+    let dy = attacker.1 - target.pos_y;
+    let distance_sq = dx * dx + dy * dy;
+    if distance_sq.is_finite() {
+        distance_sq
+    } else {
+        f32::INFINITY
+    }
+}
+
+/// Conservative spatial-query padding for buildings whose edge is inside range but center is not.
+pub(super) fn max_building_combat_extent_px() -> f32 {
+    let half_tile = config::TILE_SIZE as f32 * 0.5;
+    crate::rules::defs::BUILDINGS.iter().fold(0.0, |max, def| {
+        max.max(def.stats.foot_w.max(def.stats.foot_h) as f32 * half_tile)
+    })
+}
+
 impl ShotBlockerIndex {
     pub(super) fn build(map: &Map, entities: &EntityStore) -> Self {
         Self::from_entries(entities.iter().filter_map(|entity| {

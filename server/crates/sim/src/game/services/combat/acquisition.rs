@@ -11,6 +11,7 @@ use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
 
 use super::priority::{AttackPriorityContext, TargetCandidate};
+use super::projection::max_building_combat_extent_px;
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::auto_target_legality;
 use super::weapons::{
@@ -241,7 +242,8 @@ fn legal_target_candidates(
     retained_target_id: Option<u32>,
 ) -> Vec<TargetCandidate> {
     let mut candidates = Vec::new();
-    for id in spatial.ids_in_circle_bbox(px, py, acquire_px) {
+    let query_radius = acquire_px + max_building_combat_extent_px();
+    for id in spatial.ids_in_circle_bbox(px, py, query_radius) {
         let Some(target) = entities.get(id) else {
             continue;
         };

@@ -19,6 +19,7 @@ use super::activation::{
 };
 use super::damage::apply_damage;
 use super::priority::{self, AttackPriorityContext, TargetCandidate};
+use super::projection::{combat_target_distance_sq, max_building_combat_extent_px};
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::DirectFireLegality;
 use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
@@ -208,7 +209,8 @@ fn tank_coax_target_candidates(
     snapshot: TankCoaxSnapshot,
 ) -> Vec<TargetCandidate> {
     let mut candidates = Vec::new();
-    for id in spatial.ids_in_circle_bbox(snapshot.pos_x, snapshot.pos_y, snapshot.range_px) {
+    let query_radius = snapshot.range_px + max_building_combat_extent_px();
+    for id in spatial.ids_in_circle_bbox(snapshot.pos_x, snapshot.pos_y, query_radius) {
         let Some(target) = entities.get(id) else {
             continue;
         };
@@ -225,9 +227,7 @@ fn tank_coax_target_candidates(
         ) {
             continue;
         }
-        let dx = target.pos_x - snapshot.pos_x;
-        let dy = target.pos_y - snapshot.pos_y;
-        let distance_sq = dx * dx + dy * dy;
+        let distance_sq = combat_target_distance_sq(map, (snapshot.pos_x, snapshot.pos_y), target);
         if !distance_sq.is_finite() {
             continue;
         }

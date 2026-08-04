@@ -25,8 +25,9 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::geometry::{
-    building_rect_for_entity, circle_intersects_rect, tile_rect, unit_bodies_intersect, unit_body,
-    unit_body_for_entity, unit_body_with_facing, CircleBody, RectBody, UnitBody,
+    building_rect_for_entity, circle_intersects_rect, closest_combat_target_point, tile_rect,
+    unit_bodies_intersect, unit_body, unit_body_for_entity, unit_body_with_facing, CircleBody,
+    RectBody, UnitBody,
 };
 use crate::game::services::interact_range_for_kind;
 use crate::game::services::occupancy::{
@@ -734,9 +735,8 @@ impl<'a> MoveCoordinator<'a> {
         self.request_path(entities, id, goal, false, PathingRequestSource::AttackMove)
     }
 
-    /// Repath an explicit attack toward the current target-relative firing position. Direct
-    /// attacks keep their target lock; unlike attack-move, this route is never used for
-    /// automatic target acquisition.
+    /// Repath an explicit attack toward its target-relative firing position without changing the
+    /// target lock or enabling automatic acquisition.
     pub fn request_direct_attack_path(
         &mut self,
         entities: &mut EntityStore,
@@ -745,20 +745,18 @@ impl<'a> MoveCoordinator<'a> {
         min_range_px: f32,
         max_range_px: f32,
     ) -> bool {
-        let Some((attacker_pos, target_pos)) = entities.get(id).and_then(|attacker| {
-            entities.get(target).map(|target| {
-                (
-                    (attacker.pos_x, attacker.pos_y),
-                    (target.pos_x, target.pos_y),
-                )
-            })
-        }) else {
+        let Some(attacker) = entities.get(id) else {
             return false;
         };
+        let attacker_pos = (attacker.pos_x, attacker.pos_y);
+        let Some(target) = entities.get(target) else {
+            return false;
+        };
+        let target_point = closest_combat_target_point(self.map, attacker_pos, target);
         let Some(goal) = direct_attack_staging_goal(
             self.map,
             attacker_pos,
-            target_pos,
+            target_point,
             min_range_px,
             max_range_px,
         ) else {
@@ -1314,6 +1312,8 @@ fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
     }
 }
 
+#[cfg(test)]
+mod building_attack_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
