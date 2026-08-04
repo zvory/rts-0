@@ -656,6 +656,38 @@ assert(
 }
 
 {
+  const legacy = {
+    version: 6,
+    name: "Legacy concealment",
+    description: "",
+    _design: "",
+    width: 32,
+    height: 32,
+    terrain: Array(32).fill(".".repeat(32)),
+    startLocations: [{ x: 8, y: 8 }, { x: 24, y: 24 }],
+    baseSites: [{ x: 8, y: 8, steelPatches: 4, oilPatches: 1 }, { x: 24, y: 24, steelPatches: 4, oilPatches: 1 }],
+    doodads: [{ id: 1, typeId: "tree.oak", x: 336, y: 336 }],
+    stealthTiles: [{ x: 10, y: 10 }],
+    noVehicleTiles: [{ x: 11, y: 10 }],
+    damageReductionTiles: [{ x: 12, y: 10 }],
+    slowMovementTiles: [{ x: 13, y: 10 }],
+  };
+  const session = new MapEditorSession({ storage: null });
+  session.loadAuthoredMap(legacy);
+  const migrated = session.exportMap();
+  assert.equal(migrated.version, 7, "local v6 maps migrate to the concealment schema");
+  assert.deepEqual(migrated.concealmentTiles, legacy.stealthTiles,
+    "v6 stealth tiles retain their concealment semantics");
+  assert.deepEqual(migrated.doodads, legacy.doodads, "v6 doodads survive migration");
+  assert.deepEqual(migrated.noVehicleTiles, legacy.noVehicleTiles, "v6 no-vehicle tiles survive migration");
+  assert.deepEqual(migrated.damageReductionTiles, legacy.damageReductionTiles,
+    "v6 damage-reduction tiles survive migration");
+  assert.deepEqual(migrated.slowMovementTiles, legacy.slowMovementTiles,
+    "v6 slow-movement tiles survive migration");
+  assert.equal(migrated.stealthTiles, undefined, "the obsolete root field is removed");
+}
+
+{
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
   const overlap = [{ x: 14, y: 14 }, { x: 15, y: 14 }];

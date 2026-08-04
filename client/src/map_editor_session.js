@@ -769,19 +769,23 @@ function normalizeDraft(draft) {
 }
 
 function migrateLegacyDraft(source) {
-  if ([4, 5].includes(Number(source?.version))) {
+  if ([4, 5, 6].includes(Number(source?.version))) {
     const dimensions = inferredDraftDimensions(source);
-    return {
+    const migrated = {
       ...clone(source),
       version: 7,
       width: dimensions.width,
       height: dimensions.height,
       doodads: Array.isArray(source?.doodads) ? source.doodads : [],
-      concealmentTiles: Array.isArray(source?.concealmentTiles) ? source.concealmentTiles : [],
+      concealmentTiles: Array.isArray(source?.concealmentTiles)
+        ? source.concealmentTiles
+        : Array.isArray(source?.stealthTiles) ? source.stealthTiles : [],
       noVehicleTiles: Array.isArray(source?.noVehicleTiles) ? source.noVehicleTiles : [],
       damageReductionTiles: Array.isArray(source?.damageReductionTiles) ? source.damageReductionTiles : [],
       slowMovementTiles: Array.isArray(source?.slowMovementTiles) ? source.slowMovementTiles : [],
     };
+    delete migrated.stealthTiles;
+    return migrated;
   }
   const sites = Array.isArray(source?.sites) ? source.sites : [];
   const byId = new Map(sites.map((site) => [site.id, site]));
