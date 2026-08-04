@@ -51,8 +51,8 @@ import {
 
 const HP_PER_SEGMENT = 15;
 const HP_SEGMENTS_PER_MAJOR_DIVIDER = 7;
-const HP_MINOR_DIVIDER_WIDTH = 0.4;
-const HP_MAJOR_DIVIDER_WIDTH = 1.2;
+const HP_MINOR_DIVIDER_WIDTH = 0.75;
+const HP_MAJOR_DIVIDER_WIDTH = 1.5;
 
 export function _ownerColors(state) {
   const out = new Map();
