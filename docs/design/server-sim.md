@@ -133,6 +133,15 @@ impl Game {
     /// Queue a validated-on-apply domain command from `player`. Cheap; real work happens in tick().
     pub fn enqueue(&mut self, player: u32, cmd: SimCommand);
 
+    /// Arm one authored dev-scenario infantry source with a bounded Panzerfaust windup. Returns
+    /// false for stale ids, missing combat state, or a zero-duration windup.
+    pub fn start_dev_scenario_panzerfaust_windup(
+        &mut self,
+        attacker: u32,
+        target: u32,
+        windup_ticks: u16,
+    ) -> bool;
+
     /// Ordinary retreat commands for AI-owned workers hit on the previous tick.
     pub fn worker_retreat_commands_for(&self, player: u32) -> Vec<SimCommand>;
 
@@ -922,7 +931,9 @@ branch seed.
 
 `/dev/scenario` remains mode-local for scripted setup and driver selection: each scenario still
 chooses a dedicated `Game::new_*_scenario` constructor and optional tick driver before joining the
-shared clock, projection, and launch helpers. Moving those constructors into a generic launch path
+shared clock, projection, and launch helpers. A driver that needs one delayed authoritative combat
+transition uses a narrow `Game` seam such as `start_dev_scenario_panzerfaust_windup`; it does not
+reach into entity state from the lobby. Moving those constructors into a generic launch path
 would either widen this behavior-preserving refactor or add scenario registration machinery, so
 future lab work should consume the extracted primitives first and migrate scenario setup only with a
 separate product-approved design. `scripts/check-lobby-architecture.mjs` guards the now-stable
@@ -1484,11 +1495,14 @@ General rules:
   The first successful enemy Tank cannon, Anti-Tank Gun, or Panzerfaust hit on a surviving Tank
   establishes a three-second hull-facing preference toward its source. Later qualifying hits
   refresh that under-fire window without redirecting the preference, preventing rapid threat
-  switching. A stationary Tank turns at the normal hull rate toward the preferred source. A moving
-  Tank compares the forward and reverse hull orientations for its current route direction and uses
-  whichever keeps its hull closer to the preferred source; a retreat route behind the threat
-  therefore begins in reverse even when its destination is far away or reached through intermediate
-  waypoints. After the preference expires, ordinary distance-based forward/reverse movement resumes.
+  switching. Damage-facing may start only when the preferred hull orientation is no more than 80
+  degrees from the Tank's current facing. An eligible stationary Tank turns at the normal hull rate
+  toward the preferred source. A moving Tank compares the forward and reverse hull orientations for
+  its current route direction and may choose reverse only when it keeps the hull closer to the
+  preferred source and needs no more than that same 80-degree pivot; otherwise ordinary route-facing
+  wins. A retreat route behind the threat therefore begins in reverse when the Tank is already
+  suitably aligned, including through intermediate waypoints. After the preference expires,
+  ordinary distance-based forward/reverse movement resumes.
   Vehicle traffic sensing follows travel direction rather than hull direction, so reversing Tanks
   yield to traffic behind them. Zero oil and static standability still gate movement. Idle, Hold
   Position, in-range Attack, and arrived Attack Move react without changing their order, path,

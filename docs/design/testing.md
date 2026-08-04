@@ -245,6 +245,12 @@ Current scenario ids:
   the gun line keeps the retreat visible to the guns without joining the fight. This provides a
   rearward traffic-control inspection scene under sustained fire. The scenario-only Tanks have
   extra health so sustained fire does not end the observation early.
+- `tank_damage_pursuit_pivot` — after five seconds, one Tank moves toward a spotted, packed
+  Anti-Tank Gun twelve tiles ahead while an infantry source one tile behind begins a real
+  two-second Panzerfaust windup. The launch, travel, 63-damage impact, and armor-reaction lock are
+  authoritative; the source uses the Rifleman presentation because an initial Panzerfaust entity
+  prevents the dev watcher from becoming ready. The regression requires the hit not to make the
+  moving Tank choose a reverse heading that needs more than an 80-degree hull pivot.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one

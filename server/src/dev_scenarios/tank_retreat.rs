@@ -17,6 +17,14 @@ const REVERSE_TRAFFIC_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
     case: None,
 }];
 
+const DAMAGE_PURSUIT_PIVOT_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
+    id: "tank_damage_pursuit_pivot",
+    unit: EntityKind::Tank,
+    count: 1,
+    blocker: None,
+    case: None,
+}];
+
 pub(super) const TANK_UNDER_FIRE_RETREAT_SPEC: DevScenarioSpec = DevScenarioSpec {
     id: "tank_under_fire_retreat",
     title: "Tank Under-Fire Retreat",
@@ -29,4 +37,11 @@ pub(super) const TANK_REVERSE_TRAFFIC_SPEC: DevScenarioSpec = DevScenarioSpec {
     title: "Tank Reverse Traffic",
     description: "Three reinforced Tanks form a shallow fan with adjacent headings 10 degrees apart, take frontal fire from three deployed Anti-Tank Guns, then after 10 seconds receive one grouped move order behind them. The normal formation planner assigns their destinations while an enemy Scout Car spotter keeps the retreat visible under sustained fire.",
     launches: &REVERSE_TRAFFIC_LAUNCHES,
+};
+
+pub(super) const TANK_DAMAGE_PURSUIT_PIVOT_SPEC: DevScenarioSpec = DevScenarioSpec {
+    id: "tank_damage_pursuit_pivot",
+    title: "Tank Damage Pursuit Pivot",
+    description: "After five seconds, a Tank receives a move order toward a spotted, packed Anti-Tank Gun twelve tiles ahead while an infantry source one tile behind begins a real two-second Panzerfaust windup. Inspect whether the resulting hit interrupts forward pursuit with a large reverse pivot.",
+    launches: &DAMAGE_PURSUIT_PIVOT_LAUNCHES,
 };

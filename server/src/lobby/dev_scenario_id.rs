@@ -24,6 +24,7 @@ pub(in crate::lobby) enum DevScenarioId {
     AttackMoveReloadAcquisition,
     TankUnderFireRetreat,
     TankReverseTraffic,
+    TankDamagePursuitPivot,
 }
 
 impl DevScenarioId {
@@ -55,6 +56,7 @@ impl DevScenarioId {
             "attack_move_reload_acquisition" => Some(Self::AttackMoveReloadAcquisition),
             "tank_under_fire_retreat" => Some(Self::TankUnderFireRetreat),
             "tank_reverse_traffic" => Some(Self::TankReverseTraffic),
+            "tank_damage_pursuit_pivot" => Some(Self::TankDamagePursuitPivot),
             _ => None,
         }
     }
@@ -87,6 +89,7 @@ impl DevScenarioId {
             Self::AttackMoveReloadAcquisition => "attack_move_reload_acquisition",
             Self::TankUnderFireRetreat => "tank_under_fire_retreat",
             Self::TankReverseTraffic => "tank_reverse_traffic",
+            Self::TankDamagePursuitPivot => "tank_damage_pursuit_pivot",
         }
     }
 }

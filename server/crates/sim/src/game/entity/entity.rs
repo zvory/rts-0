@@ -1350,10 +1350,8 @@ impl Entity {
     }
 
     pub(in crate::game) fn spend_panzerfaust(&mut self) {
-        if self.kind == EntityKind::Panzerfaust {
-            if let Some(combat) = self.combat.as_mut() {
-                combat.panzerfaust = Some(PanzerfaustState::Spent);
-            }
+        if let Some(combat) = self.combat.as_mut() {
+            combat.panzerfaust = Some(PanzerfaustState::Spent);
         }
     }
 }

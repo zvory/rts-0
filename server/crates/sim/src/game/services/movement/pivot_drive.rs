@@ -259,6 +259,10 @@ pub(super) fn pivot_drive_intent(
             let reverse_facing = normalize_angle(travel_facing + std::f32::consts::PI);
             if angle_delta(preferred, reverse_facing).abs()
                 < angle_delta(preferred, travel_facing).abs()
+                && super::armor_reaction::facing_preference_within_pivot_cap(
+                    e.facing(),
+                    reverse_facing,
+                )
             {
                 reverse_facing
             } else {

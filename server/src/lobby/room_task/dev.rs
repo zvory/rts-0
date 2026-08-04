@@ -31,6 +31,7 @@ pub(super) struct DevScenarioDriver {
     player_id: u32,
     command: SimCommand,
     issue_after_ticks: u32,
+    panzerfaust_windup: Option<(u32, u32, u16)>,
     issued: bool,
 }
 
@@ -43,6 +44,9 @@ impl DevScenarioDriver {
             return;
         }
         self.issued = true;
+        if let Some((attacker, target, windup_ticks)) = self.panzerfaust_windup {
+            game.start_dev_scenario_panzerfaust_windup(attacker, target, windup_ticks);
+        }
         game.enqueue(self.player_id, self.command.clone());
     }
 }
@@ -121,10 +125,12 @@ impl RoomTask {
                         let setup = $setup;
                         let player_id = setup.player_id;
                         let command = setup.command();
+                        let panzerfaust_windup = setup.panzerfaust_windup();
                         let driver = DevScenarioDriver {
                             player_id,
                             command,
                             issue_after_ticks: setup.issue_after_ticks,
+                            panzerfaust_windup,
                             issued: false,
                         };
                         Ok((setup.game, DevDriver::Scenario(driver), player_id))

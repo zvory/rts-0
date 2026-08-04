@@ -371,6 +371,9 @@ const approvedCurrentFactionFiles = new Set([
   // The open-ground L-path fixture deliberately isolates current Scout Car movement; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/scout_car_open_ground_l_path.rs",
+  // Tank damage-pursuit inspection deliberately seeds a fixed Kriegsia armor/Panzerfaust
+  // matchup; public faction admission remains routed through the catalog-aware dev launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/tank_damage_pursuit.rs",
   // Tank coax inspection deliberately seeds current roster targets as a no-fog dev fixture;
   // public faction admission still routes through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/tank_coax.rs",
