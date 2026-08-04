@@ -151,7 +151,7 @@ mod tests {
         assert!(replay.allows_room_time_operation(RoomTimeOperation::SetSpeed, true));
         assert!(replay.allows_room_time_operation(RoomTimeOperation::SeekRelative, true));
         assert!(replay.allows_room_time_operation(RoomTimeOperation::SeekAbsolute, true));
-        assert!(!replay.allows_room_time_operation(RoomTimeOperation::Step, true));
+        assert!(replay.allows_room_time_operation(RoomTimeOperation::Step, true));
 
         let paused_replay = TickControl::new(
             ClockCapability::REPLAY_PLAYBACK,
@@ -164,6 +164,7 @@ mod tests {
         );
         assert_duration_close(paused_replay.tick_interval(base), Duration::from_millis(90));
         assert_eq!(paused_replay.scheduled_action(), ScheduledTickAction::Noop);
+        assert!(paused_replay.can_step_room_time(true));
 
         let dev_watch = TickControl::new(
             ClockCapability::DEV_SCENARIO,

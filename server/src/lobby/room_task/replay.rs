@@ -516,7 +516,13 @@ impl RoomTask {
                 self.on_tick_live_game(TokioInstant::now());
                 self.broadcast_lab_room_time_state();
             }
-            Some(RoomTimeSource::ReplayPlayback) | Some(RoomTimeSource::LiveGame) | None => {}
+            Some(RoomTimeSource::ReplayPlayback) => {
+                self.on_tick_replay_viewer(TokioInstant::now());
+                if let Phase::ReplayViewer(session) = &self.phase {
+                    self.broadcast_room_time_state_for(session);
+                }
+            }
+            Some(RoomTimeSource::LiveGame) | None => {}
         }
     }
 

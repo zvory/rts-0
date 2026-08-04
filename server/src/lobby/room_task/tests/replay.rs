@@ -219,6 +219,7 @@ fn replay_start_payload_advertises_replay_controls() {
     assert!(initial.capabilities.room_time.available);
     assert!(initial.capabilities.room_time.set_speed);
     assert!(initial.capabilities.room_time.pause);
+    assert!(initial.capabilities.room_time.step);
     assert!(initial.capabilities.room_time.seek_relative);
     assert!(initial.capabilities.room_time.seek_absolute);
     assert!(initial.capabilities.room_time.timeline);
@@ -231,6 +232,47 @@ fn replay_start_payload_advertises_replay_controls() {
         initial.diagnostics.movement_paths,
         MovementPathDiagnosticScope::None
     );
+}
+
+#[test]
+fn paused_replay_steps_exactly_one_tick() {
+    let players = replay_test_players(2);
+    let (_live, artifact) = replay_test_artifact(&players, 3);
+    let replay = ReplaySession::new(artifact).unwrap();
+    let mut task = RoomTask::new(
+        "replay-step-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let writer = add_test_room_player(&mut task, 99, true);
+    task.phase = Phase::ReplayViewer(Box::new(replay));
+
+    task.on_step_room_time(99);
+    let Phase::ReplayViewer(session) = &task.phase else {
+        panic!("ignored running replay step should preserve replay playback");
+    };
+    assert_eq!(session.current_tick(), 0);
+    assert!(writer.snapshots.take().is_none());
+
+    task.on_set_room_time_speed(99, 0.0);
+    writer.room_time_state.take();
+
+    task.on_step_room_time(99);
+
+    let Phase::ReplayViewer(session) = &task.phase else {
+        panic!("replay step should preserve replay playback");
+    };
+    assert_eq!(session.current_tick(), 1);
+    assert_eq!(writer.snapshots.take().expect("stepped snapshot").tick, 1);
+    let state = writer
+        .room_time_state
+        .take()
+        .expect("step should publish authoritative room time");
+    assert_eq!(state.current_tick, 1);
+    assert!(state.paused);
+    assert_eq!(state.speed, 0.0);
 }
 
 #[test]
