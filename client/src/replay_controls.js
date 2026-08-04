@@ -318,7 +318,8 @@ export class RoomTimeControls {
     const awaitingAuthority = !this.roomTimeState;
     for (const btn of root.querySelectorAll(".spd-btn")) {
       if (!isRoomTimeActionButton(btn)) continue;
-      btn.disabled = blocksClockActions || this.roomTimeAccessDenied || awaitingAuthority;
+      const stepUnavailable = btn.dataset.stepRoomTime !== undefined && !this.roomTimeStepAvailable();
+      btn.disabled = blocksClockActions || this.roomTimeAccessDenied || awaitingAuthority || stepUnavailable;
     }
     const timeline = root.querySelector(".room-time-timeline-track");
     if (timeline) {
@@ -327,6 +328,18 @@ export class RoomTimeControls {
     }
     root.dataset.roomTimeAccessDenied = this.roomTimeAccessDenied ? "true" : "false";
     root.dataset.roomTimeAwaitingAuthority = awaitingAuthority ? "true" : "false";
+  }
+
+  roomTimeStepAvailable() {
+    const state = this.roomTimeState;
+    if (state?.paused !== true) return false;
+    if (state.ended === true) return false;
+    return !(
+      Number.isFinite(state.currentTick) &&
+      Number.isFinite(state.durationTicks) &&
+      state.durationTicks > 0 &&
+      state.currentTick >= state.durationTicks
+    );
   }
 
   noteSnapshotTick(tick) {

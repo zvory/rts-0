@@ -431,6 +431,10 @@ impl ReplaySession {
         self.last_controller_id = Some(controller_id);
     }
 
+    pub(super) fn note_step_controller(&mut self, controller_id: u32) {
+        self.last_controller_id = Some(controller_id);
+    }
+
     pub(super) fn enqueue_for_current_tick(&mut self) -> Result<(), String> {
         let tick = self.current_tick().saturating_add(1);
         while let Some(entry) = self.artifact.command_log.get(self.next_command) {

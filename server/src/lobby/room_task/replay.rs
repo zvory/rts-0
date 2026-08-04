@@ -517,6 +517,13 @@ impl RoomTask {
                 self.broadcast_lab_room_time_state();
             }
             Some(RoomTimeSource::ReplayPlayback) => {
+                let Phase::ReplayViewer(session) = &mut self.phase else {
+                    return;
+                };
+                if !session.has_remaining_ticks() {
+                    return;
+                }
+                session.note_step_controller(player_id);
                 self.on_tick_replay_viewer(TokioInstant::now());
                 if let Phase::ReplayViewer(session) = &self.phase {
                     self.broadcast_room_time_state_for(session);

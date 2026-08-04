@@ -247,6 +247,7 @@ fn paused_replay_steps_exactly_one_tick() {
         DrainHandle::default(),
     );
     let writer = add_test_room_player(&mut task, 99, true);
+    let stepping_writer = add_test_room_player(&mut task, 100, true);
     task.phase = Phase::ReplayViewer(Box::new(replay));
 
     task.on_step_room_time(99);
@@ -258,21 +259,23 @@ fn paused_replay_steps_exactly_one_tick() {
 
     task.on_set_room_time_speed(99, 0.0);
     writer.room_time_state.take();
+    stepping_writer.room_time_state.take();
 
-    task.on_step_room_time(99);
+    task.on_step_room_time(100);
 
     let Phase::ReplayViewer(session) = &task.phase else {
         panic!("replay step should preserve replay playback");
     };
     assert_eq!(session.current_tick(), 1);
     assert_eq!(writer.snapshots.take().expect("stepped snapshot").tick, 1);
-    let state = writer
+    let state = stepping_writer
         .room_time_state
         .take()
         .expect("step should publish authoritative room time");
     assert_eq!(state.current_tick, 1);
     assert!(state.paused);
     assert_eq!(state.speed, 0.0);
+    assert_eq!(state.controller_id, Some(100));
 }
 
 #[test]
