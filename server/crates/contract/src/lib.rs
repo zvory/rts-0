@@ -301,7 +301,7 @@ pub struct MapInfo {
     pub doodads: Vec<MapDoodad>,
     /// Sparse tile overlay whose unit occupants are concealed from enemies until revealed.
     #[serde(default)]
-    pub stealth_tiles: Vec<MapTile>,
+    pub concealment_tiles: Vec<MapTile>,
     /// Sparse tile overlay blocked only for vehicle-body movement.
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,

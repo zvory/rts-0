@@ -111,9 +111,9 @@ try {
       && LAYERS.indexOf("forestUnitOutlines") > unitIndex
       && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("hpBars")
       && LAYERS.indexOf("forestUnitOutlines") < LAYERS.indexOf("fog")
-      && LAYERS.indexOf("stealthUnitOutlines") > LAYERS.indexOf("fog")
-      && LAYERS.indexOf("stealthUnitOutlines") < LAYERS.indexOf("aboveFogHpBars"),
-    "tree outlines stay below HP/fog while stealth reveal outlines and HP remain above fog",
+      && LAYERS.indexOf("concealmentUnitOutlines") > LAYERS.indexOf("fog")
+      && LAYERS.indexOf("concealmentUnitOutlines") < LAYERS.indexOf("aboveFogHpBars"),
+    "tree outlines stay below HP/fog while concealment reveal outlines and HP remain above fog",
   );
 
   layer.destroy();
@@ -167,7 +167,7 @@ try {
       guides: [],
       guideCentre: null,
       sites: [{ x: 16, y: 16, color: 0x4ec9ff, radius: 7, label: "S1", selected: false }],
-      stealthTiles: [{ x: 1, y: 1 }],
+      concealmentTiles: [{ x: 1, y: 1 }],
       noVehicleTiles: [{ x: 1, y: 1 }],
       damageReductionTiles: [{ x: 1, y: 1 }],
       slowMovementTiles: [{ x: 1, y: 1 }],
@@ -181,10 +181,10 @@ try {
     "four overlapping semantic layers subdivide the tile instead of hiding one another");
   editor._applyLayerVisibility({
     ...defaultMapAuthoringLayerVisibility(),
-    [MAP_AUTHORING_LAYER.STEALTH]: false,
+    [MAP_AUTHORING_LAYER.CONCEALMENT]: false,
   });
   assert.deepEqual(latestDrawRectWidths(editor.overlay), [14, 14, 14],
-    "hiding stealth leaves all three independent gameplay layers visible");
+    "hiding concealment leaves all three independent gameplay layers visible");
   editor._applyLayerVisibility(defaultMapAuthoringLayerVisibility());
   editor._applyLayerVisibility({
     ...defaultMapAuthoringLayerVisibility(),

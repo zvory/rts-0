@@ -67,7 +67,7 @@ pub(super) fn load_for_players(
         base_sites: materialized.base_sites,
         base_resource_counts: materialized.base_resource_counts,
         doodads: materialized.doodads,
-        stealth_tiles: materialized.stealth_tiles,
+        concealment_tiles: materialized.concealment_tiles,
         no_vehicle_tiles: materialized.no_vehicle_tiles,
         damage_reduction_tiles: materialized.damage_reduction_tiles,
         slow_movement_tiles: materialized.slow_movement_tiles,
@@ -138,8 +138,12 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         })
         .collect();
     let doodads = super::doodads::canonicalize(width, height, authored.doodads)?;
-    let stealth_tiles =
-        parse_overlay_locations(width, height, &authored.stealth_tiles, "stealthTiles")?;
+    let concealment_tiles = parse_overlay_locations(
+        width,
+        height,
+        &authored.concealment_tiles,
+        "concealmentTiles",
+    )?;
     let no_vehicle_tiles =
         parse_overlay_locations(width, height, &authored.no_vehicle_tiles, "noVehicleTiles")?;
     let damage_reduction_tiles = parse_overlay_locations(
@@ -163,7 +167,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         base_sites: base_locations,
         base_resource_counts,
         doodads,
-        stealth_tiles,
+        concealment_tiles,
         no_vehicle_tiles,
         damage_reduction_tiles,
         slow_movement_tiles,
@@ -188,7 +192,7 @@ struct AuthoredMap {
     #[serde(default)]
     doodads: Vec<crate::protocol::MapDoodad>,
     #[serde(default)]
-    stealth_tiles: Vec<AuthoredLocation>,
+    concealment_tiles: Vec<AuthoredLocation>,
     #[serde(default)]
     no_vehicle_tiles: Vec<AuthoredLocation>,
     #[serde(default)]

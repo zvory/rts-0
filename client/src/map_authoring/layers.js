@@ -1,6 +1,6 @@
 export const MAP_AUTHORING_LAYER = Object.freeze({
   BASE: "base",
-  STEALTH: "stealth",
+  CONCEALMENT: "concealment",
   NO_VEHICLE: "no-vehicle",
   DAMAGE_REDUCTION: "damage-reduction",
   SLOW_MOVEMENT: "slow-movement",
@@ -16,8 +16,8 @@ export const MAP_AUTHORING_LAYERS = Object.freeze([
     description: "Terrain, start locations, and base sites",
   }),
   Object.freeze({
-    id: MAP_AUTHORING_LAYER.STEALTH,
-    label: "Stealth",
+    id: MAP_AUTHORING_LAYER.CONCEALMENT,
+    label: "Concealment",
     description: "Tiles that conceal units",
   }),
   Object.freeze({

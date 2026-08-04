@@ -537,7 +537,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // fog-filtered entity snapshots. Coordinates are integer world pixels. color is allowed only
     // on wildflowers.
     doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ],
-    stealthTiles: [ { x: u32, y: u32 } ],
+    concealmentTiles: [ { x: u32, y: u32 } ],
     noVehicleTiles: [ { x: u32, y: u32 } ],
     damageReductionTiles: [ { x: u32, y: u32 } ],
     slowMovementTiles: [ { x: u32, y: u32 } ]
@@ -793,7 +793,7 @@ Its reveal-only actionable tile is deliberately omitted from `visibleTiles` and 
 enemy unit occupies a presentation-dark tile. This keeps the unit fully legible without clearing
 the terrain tile beneath it.
 The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
-0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The one-second counterfire
+0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The half-second counterfire
 reaction applies only while a firing-reveal-stamped tile is the target's necessary source of
 actionable sight;
 ordinary live vision takes precedence and bypasses that reaction gate without changing weapon
@@ -802,10 +802,12 @@ both legality and reaction bypass. Repeated shots extend one stable reveal
 episode, so move orders or transient target switches cannot restart the same episode's reaction
 deadline. Tile-level provenance covers colocated entities and remains tied to the stamped tile when
 the firing entity moves before the next fog rebuild.
-A firing unit concealed by `stealthTiles` is projected with `visionOnly` and rendered as the white
-alpha edge of its current production rig/frame rather than full-color unit art. Its ordinary damaged-unit HP bar remains visible above fog. Firing
+A unit close-detected within two tiles between hostile body edges is team-shared for one second
+after separation and projected normally. A firing-only unit concealed by `concealmentTiles` is
+projected with `visionOnly` and rendered as the white alpha edge of its current production rig/frame
+rather than full-color unit art. Its ordinary damaged-unit HP bar remains visible above fog. Firing
 reveal provenance distinguishes concealment from terrain visibility: if the recipient already sees
-the ground, `visibleTiles` remains clear instead of drawing a dark square over the stealth tile.
+the ground, `visibleTiles` remains clear instead of drawing a dark square over the concealment tile.
 Artillery Fire creates the same kind of actionable temporary live fog for every enemy player,
 subject to normal smoke suppression, when the shell is launched. The reveal exposes the firing gun
 as a normal snapshot entity without exposing the target point, its terrain tile, surrounding
@@ -993,7 +995,7 @@ this state. Scout Plane
 entities are not selectable or commandable by normal clients, and runtime movement is driven by the
 server-side Command Car ability lifecycle.
 `visionOnly` is a special projection flag for non-owned render-only intel rather than normal
-visibility. Stealth firing reveals use it to select outline-only above-fog presentation. Current
+visibility. Concealment firing reveals use it to select outline-only above-fog presentation. Current
 lingering death sight is ordinary temporary team sight and does not set it. Clients must not select
 `visionOnly` entities.
 In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -1421,7 +1423,7 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV6,
+  authoredMap: AuthoredMapV7,
   materializedMap: {
     name: string,
     width: u32,
@@ -1430,7 +1432,7 @@ POST /api/map-handoffs
     starts: LabMapTile[],
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
     doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[],
-    stealthTiles: LabMapTile[],
+    concealmentTiles: LabMapTile[],
     noVehicleTiles: LabMapTile[],
     damageReductionTiles: LabMapTile[],
     slowMovementTiles: LabMapTile[]
@@ -1440,11 +1442,11 @@ POST /api/map-handoffs
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV6 }
+ | { destination: "editor", authoredMap: AuthoredMapV7 }
 ```
-`AuthoredMapV6` declares independent `width` and `height` tile dimensions, whose product must
+`AuthoredMapV7` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
-`doodads`, `stealthTiles`, `noVehicleTiles`, `damageReductionTiles`, and `slowMovementTiles`
+`doodads`, `concealmentTiles`, `noVehicleTiles`, `damageReductionTiles`, and `slowMovementTiles`
 arrays. Overlay records are bounded, unique, in-bounds tile-coordinate pairs; the four layers
 remain independent and may overlap.
 Each dimension is bounded to 256 tiles. Start locations determine the
@@ -1463,7 +1465,7 @@ cluster. Wildflowers have no collision or pathing effect.
 Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
 setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
 rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
-schema-v6 map overlays independently supply stealth, vehicle exclusion, 25% incoming-damage
+schema-v7 map overlays independently supply concealment, vehicle exclusion, 25% incoming-damage
 reduction, and 25% movement-speed reduction. The damage and movement effects are selected from the tile
 beneath the entity centre.
 Lab handoff creation strictly rejects unknown fields and validates the complete authored-map schema,
@@ -1499,7 +1501,7 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       starts: [{ x: u32, y: u32 }],
       baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }],
       doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }],
-      stealthTiles: [{ x: u32, y: u32 }],
+      concealmentTiles: [{ x: u32, y: u32 }],
       noVehicleTiles: [{ x: u32, y: u32 }],
       damageReductionTiles: [{ x: u32, y: u32 }],
       slowMovementTiles: [{ x: u32, y: u32 }]

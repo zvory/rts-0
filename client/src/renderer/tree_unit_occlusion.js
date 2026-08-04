@@ -39,8 +39,8 @@ export function _drawTreeOccludedUnitOutlines(entities, state, colorByOwner, opt
   return count;
 }
 
-/** Draw authoritative stealth reveals from their real animated rig, filtered to its outer edge. */
-export function _drawStealthUnitOutlines(entities, state, colorByOwner, options = {}) {
+/** Draw authoritative concealment reveals from their real animated rig, filtered to its outer edge. */
+export function _drawConcealmentUnitOutlines(entities, state, colorByOwner, options = {}) {
   if (!Array.isArray(entities)) return 0;
   let count = 0;
   for (const entity of entities) {
@@ -48,13 +48,13 @@ export function _drawStealthUnitOutlines(entities, state, colorByOwner, options 
     if (drawActualUnitOutline.call(this, entity, state, colorByOwner, {
       ...options,
       renderContext: null,
-      layerName: "stealthUnitOutlines",
-      unitPool: "stealthUnitOutlineRigs",
-      overlayPool: "stealthUnitOutlineRigOverlays",
-      errorPrefix: "stealthUnitOutline",
+      layerName: "concealmentUnitOutlines",
+      unitPool: "concealmentUnitOutlineRigs",
+      overlayPool: "concealmentUnitOutlineRigOverlays",
+      errorPrefix: "concealmentUnitOutline",
     })) count += 1;
   }
-  this._recordRenderDiagnostic?.("renderer.stealthUnitOutlines", count);
+  this._recordRenderDiagnostic?.("renderer.concealmentUnitOutlines", count);
   return count;
 }
 

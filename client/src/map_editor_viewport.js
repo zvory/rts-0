@@ -353,7 +353,7 @@ export class MapEditorViewport {
       guides,
       guideCentre,
       sites,
-      stealthTiles: structuredCloneSafe(draft.stealthTiles || []),
+      concealmentTiles: structuredCloneSafe(draft.concealmentTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
       damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),
       slowMovementTiles: structuredCloneSafe(draft.slowMovementTiles || []),
@@ -900,7 +900,7 @@ function terrainPreviewColor(code) {
 }
 
 function overlayPreviewColor(edit) {
-  if (edit?.stealth != null) return 0x5ed19a;
+  if (edit?.concealment != null) return 0x5ed19a;
   if (edit?.noVehicle != null) return 0xf26a5a;
   if (edit?.damageReduction != null) return 0x6da8ff;
   return 0xb276e8;

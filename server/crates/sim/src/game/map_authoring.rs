@@ -50,7 +50,7 @@ pub struct AuthoredMapCheck {
     pub start_locations: Vec<MapTileCoordinate>,
     pub base_sites: Vec<AuthoredBaseSummary>,
     pub doodad_count: usize,
-    pub stealth_tile_count: usize,
+    pub concealment_tile_count: usize,
     pub no_vehicle_tile_count: usize,
 }
 
@@ -221,7 +221,7 @@ fn check_from_materialized(map: &AuthoredMapData) -> AuthoredMapCheck {
             })
             .collect(),
         doodad_count: map.doodads.len(),
-        stealth_tile_count: map.stealth_tiles.len(),
+        concealment_tile_count: map.concealment_tiles.len(),
         no_vehicle_tile_count: map.no_vehicle_tiles.len(),
     }
 }
@@ -235,7 +235,7 @@ fn map_from_materialized(map: AuthoredMapData) -> Map {
         base_sites: map.base_sites,
         base_resource_counts: map.base_resource_counts,
         doodads: map.doodads,
-        stealth_tiles: map.stealth_tiles,
+        concealment_tiles: map.concealment_tiles,
         no_vehicle_tiles: map.no_vehicle_tiles,
         damage_reduction_tiles: map.damage_reduction_tiles,
         slow_movement_tiles: map.slow_movement_tiles,
@@ -265,7 +265,7 @@ mod tests {
                 {"x": 31, "y": 12, "steelPatches": 3, "oilPatches": 2}
             ],
             "doodads": doodads,
-            "stealthTiles": [],
+            "concealmentTiles": [],
             "noVehicleTiles": no_vehicle_tiles
         })
         .to_string()
@@ -376,7 +376,7 @@ mod tests {
             "startLocations": [{"x": 8, "y": 8}],
             "baseSites": base_sites,
             "doodads": [],
-            "stealthTiles": [],
+            "concealmentTiles": [],
             "noVehicleTiles": no_vehicle_wall
         })
         .to_string();

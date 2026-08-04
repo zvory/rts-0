@@ -381,7 +381,7 @@ assert(
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
-  assert.equal(session.exportMap().version, 6);
+  assert.equal(session.exportMap().version, 7);
   assert.deepEqual({ width: materialized.width, height: materialized.height }, { width: 126, height: 126 });
   assert.equal(session.exportMap().layouts, undefined, "flat map data has no layout matrix");
   assert.equal(materialized.starts.length, 2);
@@ -651,7 +651,7 @@ assert(
   };
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(legacy);
-  assert.equal(session.exportMap().version, 6, "local v2 maps migrate into current flat map data");
+  assert.equal(session.exportMap().version, 7, "local v2 maps migrate into current flat map data");
   assert.equal(session.exportMap().layouts, undefined);
 }
 
@@ -659,8 +659,8 @@ assert(
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
   const overlap = [{ x: 14, y: 14 }, { x: 15, y: 14 }];
-  session.beginOverlayStroke("Painted stealth");
-  assert.deepEqual(session.paintOverlayTiles(overlap, { stealth: true }), overlap);
+  session.beginOverlayStroke("Painted concealment");
+  assert.deepEqual(session.paintOverlayTiles(overlap, { concealment: true }), overlap);
   assert.equal(session.commitOverlayStroke(), true);
   session.beginOverlayStroke("Excluded vehicles");
   assert.deepEqual(session.paintOverlayTiles(overlap, { noVehicle: true }), overlap);
@@ -671,7 +671,7 @@ assert(
   session.beginOverlayStroke("Slowed movement");
   assert.deepEqual(session.paintOverlayTiles(overlap, { slowMovement: true }), overlap);
   assert.equal(session.commitOverlayStroke(), true);
-  assert.deepEqual(session.materialized().stealthTiles, overlap);
+  assert.deepEqual(session.materialized().concealmentTiles, overlap);
   assert.deepEqual(session.materialized().noVehicleTiles, overlap,
     "independent authoring tools may intentionally overlap their sparse semantic layers");
   assert.deepEqual(session.materialized().damageReductionTiles, overlap);
@@ -681,10 +681,10 @@ assert(
   session.beginOverlayStroke("Made long grass");
   assert.deepEqual(session.paintOverlayTiles([overlap[1]], { noVehicle: false }), [overlap[1]]);
   assert.equal(session.commitOverlayStroke(), true);
-  assert.deepEqual(session.materialized().stealthTiles, overlap,
-    "removing vehicle exclusion leaves independent stealth cover intact");
+  assert.deepEqual(session.materialized().concealmentTiles, overlap,
+    "removing vehicle exclusion leaves independent concealment cover intact");
   assert.deepEqual(session.materialized().noVehicleTiles, [overlap[0]]);
-  assert.deepEqual(session.exportMap().stealthTiles, overlap,
+  assert.deepEqual(session.exportMap().concealmentTiles, overlap,
     "authored exports retain sparse coordinate pairs rather than a full tile layer");
   assert.equal(session.undo(), true);
   assert.deepEqual(session.materialized().noVehicleTiles, overlap,
@@ -1115,7 +1115,7 @@ assert(
   const request = [];
   await createMapHandoff({
     destination: "lab",
-    authoredMap: { version: 6 },
+    authoredMap: { version: 7 },
     materializedMap: { width: 32, height: 16, starts: [], baseSites: [], doodads: [] },
     fetchImpl: async (_url, init) => {
       request.push(JSON.parse(init.body));
@@ -1223,7 +1223,7 @@ assert(
 {
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
-  assert.equal(session.exportMap().version, 6);
+  assert.equal(session.exportMap().version, 7);
   assert.deepEqual(session.materialized().doodads, []);
   session.beginDoodadStroke("Sprayed flowers");
   const added = session.placeDoodads([{ x: 100, y: 120 }, { x: 140, y: 150 }], {

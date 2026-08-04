@@ -102,7 +102,7 @@ pub(super) const TANK_TURRET_TURN_RATE_RAD_PER_TICK: f32 = 0.070;
 pub(super) const TANK_TURRET_FIRE_TOLERANCE_RAD: f32 = 0.18;
 pub(super) const ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const ANTI_TANK_GUN_FIRE_TOLERANCE_RAD: f32 = 0.12;
-const FIRING_REVEAL_RESPONSE_DELAY_TICKS: u32 = config::TICK_HZ;
+const FIRING_REVEAL_RESPONSE_DELAY_TICKS: u32 = config::TICK_HZ / 2;
 
 /// Acquire combat targets, apply damage, and emit attack events for one tick.
 #[allow(clippy::too_many_arguments)]
@@ -461,7 +461,7 @@ pub(in crate::game) fn combat_system(
                     }
                     mortar_shells
                         .schedule_autocast(events, fog, teams, owner, id, px, py, tx, ty, tick);
-                    if map.world_point_is_stealth(px, py) {
+                    if map.world_point_is_concealed(px, py) {
                         let victim_owner = entities.get(tid).map_or(0, |target| target.owner);
                         let player_ids = events.keys().copied().collect::<Vec<_>>();
                         record_firing_reveals_for_victim_team(
