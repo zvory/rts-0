@@ -9,6 +9,7 @@ import "./client_contracts/analytics_consent_contracts.mjs";
 
 await import("./client_contracts/settings_contracts.mjs");
 await import("./client_contracts/hud_contracts.mjs");
+await import("./client_contracts/selection_panel_contracts.mjs");
 await import("./client_contracts/status_badge_contracts.mjs");
 await import("./client_contracts/unit_icon_contracts.mjs");
 await import("./client_contracts/command_interaction_contracts.mjs");
