@@ -1291,7 +1291,8 @@ When `seek` is present, `currentTick` is the authoritative incremental reconstru
 the latest sampled snapshot represents that tick. The seek completes when a later state omits
 `seek` at the clamped target. The seek id is monotonic within the replay session so clients can
 distinguish replacement work from stale progress. `speed` and `paused` remain the selected replay
-clock state; pausing suspends incremental fast-forward and resuming continues it.
+playback state. Internal reconstruction continues to the requested target even when playback is
+paused; after completion the unchanged paused state prevents ordinary playback from advancing.
 
 `keyframeTicks` lists the replay or lab keyframes the server has recorded so far. Replay and lab
 clients may display them as seek marks, but a seek target is not limited to these ticks; the server

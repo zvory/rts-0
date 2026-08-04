@@ -168,6 +168,13 @@ fn room_task_tick_control_preserves_current_intervals_by_mode() {
     replay_task.on_set_room_time_speed(99, 0.0);
     assert_eq!(replay_task.current_tick_interval(), base);
 
+    replay_task.on_seek_room_time_to(99, 1);
+    assert_eq!(
+        replay_task.current_tick_interval(),
+        base.div_f32(ReplaySession::MAX_SPEED),
+        "paused playback must still schedule incremental seek work"
+    );
+
     let mut dev = RoomTask::new(
         "tick-dev".to_string(),
         RoomMode::DevScenario(DevScenarioConfig {
@@ -602,7 +609,7 @@ fn replay_vision_selection_sends_snapshot_without_waiting_for_tick() {
 }
 
 #[test]
-fn paused_replay_seek_publishes_reset_and_resumes_incrementally() {
+fn paused_replay_seek_reconstructs_to_target_and_remains_paused() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 4);
     let mut replay = ReplaySession::new(artifact).unwrap();
@@ -689,24 +696,20 @@ fn paused_replay_seek_publishes_reset_and_resumes_incrementally() {
     };
     assert_eq!(
         session.current_tick(),
-        0,
-        "pause must suspend seek progress"
+        1,
+        "paused replay seek should reach its target"
     );
-    assert!(session.is_seeking());
-
-    task.on_set_room_time_speed(100, 2.0);
-    let resumed = writer
-        .room_time_state
-        .take()
-        .expect("resume should publish authoritative speed");
-    assert_eq!(resumed.speed, 2.0);
-    assert!(resumed.seek.is_some());
-    task.on_tick(TokioInstant::now());
+    assert!(!session.is_seeking());
+    assert!(
+        session.is_paused(),
+        "seek completion should preserve paused playback"
+    );
     let completed = writer
         .room_time_state
         .take()
-        .expect("resumed seek should publish completion");
+        .expect("paused seek should publish completion");
     assert_eq!(completed.current_tick, 1);
+    assert!(completed.paused);
     assert!(completed.seek.is_none());
 }
 
