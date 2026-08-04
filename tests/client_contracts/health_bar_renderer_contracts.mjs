@@ -28,8 +28,8 @@ try {
     "40 HP health bar rounds to three whole 15 HP segments",
   );
   assert(
-    bar.rtsTicks.calls.filter((call) => call[0] === "drawRect").every((call) => call[3] === 0.4),
-    "ordinary 15 HP dividers use thin hairline marks",
+    bar.rtsTicks.calls.filter((call) => call[0] === "drawRect").every((call) => call[3] === 0.75),
+    "ordinary 15 HP dividers stay visible with three-quarter-pixel marks",
   );
 
   const highHpBar = makeBar();
@@ -42,7 +42,7 @@ try {
     maxHp: 250,
   }, null, 0x4878c8);
   const highHpDividers = highHpBar.rtsTicks.calls.filter((call) => call[0] === "drawRect");
-  const majorDividers = highHpDividers.filter((call) => call[3] === 1.2);
+  const majorDividers = highHpDividers.filter((call) => call[3] === 1.5);
   assert(
     highHpDividers.length === 16 && majorDividers.length === 2,
     "250 HP health bar thickens two existing dividers without adding marks",
