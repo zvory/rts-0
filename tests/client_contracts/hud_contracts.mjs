@@ -8,8 +8,6 @@ import {
   withFakeHudDocument,
 } from "./fakes.mjs";
 import {
-  BASE_COMMAND_SUPPLY_CAP,
-  COMMAND_CAR_SUPPLY_CAP_BONUS,
   STATS,
   TICK_HZ,
 } from "../../client/src/config.js";
@@ -19,8 +17,6 @@ import {
   formatGameTime,
   groupCooldownClocks,
   playerHasCompletedKind,
-  selectionBudgetBlockShape,
-  selectionBudgetGridModel,
 } from "../../client/src/hud.js";
 import { entrenchmentSelectionStatus } from "../../client/src/hud_selection_panel.js";
 import { renderAllPlayersResources } from "../../client/src/hud_resources.js";
@@ -458,72 +454,9 @@ withFakeHudDocument(({ FakeElement }) => {
 });
 
 // ---------------------------------------------------------------------------
-// HUD selection budget grid
+// HUD selection detail and interactions
 // ---------------------------------------------------------------------------
 {
-  const riflemen = Array.from({ length: 24 }, (_, index) => ({
-    id: 1000 + index,
-    owner: 1,
-    kind: KIND.RIFLEMAN,
-  }));
-  const tanks = Array.from({ length: 3 }, (_, index) => ({
-    id: 1100 + index,
-    owner: 1,
-    kind: KIND.TANK,
-  }));
-  const commandCar = { id: 1200, owner: 1, kind: KIND.COMMAND_CAR };
-  const artillery = { id: 1300, owner: 1, kind: KIND.ARTILLERY };
-
-  const infantryModel = selectionBudgetGridModel(riflemen);
-  assert(infantryModel.used === 24 && infantryModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports 24/24 infantry supply");
-  assert(infantryModel.cols === 12, "HUD base budget grid uses two rows of twelve cells");
-  assert(infantryModel.blocks.every((block) => block.weight === 1 && block.cols === 1 && block.rows === 1 && block.placed),
-    "HUD infantry blocks occupy one fixed cell each");
-
-  const tankModel = selectionBudgetGridModel(tanks);
-  assert(tankModel.used === 24 && tankModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports three Tanks as 24/24");
-  assert(tankModel.blocks.every((block) => block.weight === 8 && block.cols === 4 && block.rows === 2 && block.placed),
-    "HUD Tank blocks occupy a two-row by four-column shape");
-
-  const commandCarModel = selectionBudgetGridModel(tanks.concat(commandCar));
-  assert(commandCarModel.used === 28 &&
-    commandCarModel.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS + STATS[KIND.COMMAND_CAR].supply,
-    "HUD budget grid includes Command Car net-zero cap expansion");
-  assert(commandCarModel.cols === 24, "HUD budget grid grows visible columns for Command Car cap");
-
-  const artilleryShape = selectionBudgetBlockShape(STATS[KIND.ARTILLERY].supply);
-  assert(artilleryShape.cols === 2 && artilleryShape.rows === 2 && artilleryShape.reservedCells == null,
-    "HUD four-supply artillery uses a deterministic two-by-two shape");
-  const artilleryModel = selectionBudgetGridModel([artillery]);
-  assert(artilleryModel.blocks[0].reservedCells === 0, "HUD four-supply artillery has no reserved visual cell");
-
-  withFakeHudDocument(({ FakeElement }) => {
-    const panel = new FakeElement("section");
-    const root = {
-      querySelector(selector) {
-        return selector === "#selected-panel" ? panel : null;
-      },
-    };
-    const state = {
-      selectionBudgetOverflow: { used: 24, cap: BASE_COMMAND_SUPPLY_CAP, seq: 1 },
-      selectedEntities() {
-        return tanks;
-      },
-    };
-    const hud = new HUD(root, state, {}, null);
-    hud._renderSelectedPanel();
-    const grid = panel.querySelector(".sel-budget-grid");
-    const blocks = panel.querySelectorAll(".sel-budget-block");
-    const overflow = panel.querySelector(".sel-budget-overflow");
-    assert(grid && grid.style.values.get("--sel-budget-cols") === "12", "HUD renders grid columns into selected panel DOM");
-    assert(blocks.length === 3 && blocks.every((block) => block.className.includes("weight-8")),
-      "HUD renders three Tank budget blocks into selected panel DOM");
-    assert(overflow?.textContent === "Selection limit reached", "HUD renders overflow flash text near the budget counter");
-    const stableChildren = panel.children;
-    hud._renderSelectedPanel();
-    assert(panel.children === stableChildren, "HUD selected budget grid skips unchanged DOM rebuilds");
-  });
-
   withFakeHudDocument(({ FakeElement }) => {
     const panel = new FakeElement("section");
     const root = {

@@ -2957,7 +2957,7 @@ input[type="text"]:focus {
   left: 50%;
   bottom: 12px;
   transform: translateX(-50%);
-  width: clamp(280px, 36vw, 520px);
+  width: clamp(280px, 44vw, 520px);
   max-height: var(--bottom-hud-height);
   max-width: calc(100vw - 24px);
   pointer-events: none;
@@ -3151,10 +3151,10 @@ input[type="text"]:focus {
   color: var(--bad);
 }
 #selected-panel .sel-budget-grid {
-  --sel-budget-cell: 24px;
+  --sel-budget-cell: 32px;
   display: grid;
   grid-template-columns: repeat(var(--sel-budget-cols), var(--sel-budget-cell));
-  grid-template-rows: repeat(2, var(--sel-budget-cell));
+  grid-template-rows: repeat(var(--sel-budget-rows), var(--sel-budget-cell));
   grid-auto-flow: column;
   gap: 3px;
   align-items: stretch;
