@@ -5,8 +5,8 @@
   "exceptions": [
     {
       "path": "client/styles.css",
-      "lines": 5715,
-      "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; keep ratcheting until those responsibilities have an evidence-backed split."
+      "lines": 5722,
+      "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; the joined-lobby masthead now protects its title from variable replay room IDs, but keep ratcheting until those responsibilities have an evidence-backed split."
     },
     {
       "path": "scripts/client-perf-harness.mjs",
