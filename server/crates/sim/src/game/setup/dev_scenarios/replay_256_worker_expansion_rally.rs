@@ -4,7 +4,6 @@ use crate::game::entity::{ProdItem, RallyIntent, RallyKind, WeaponSetup};
 const DEPOT_POS: (f32, f32) = (304.0, 304.0);
 const MACHINE_GUNNER_POS: (f32, f32) = (560.0, 528.0);
 const RALLY: (f32, f32) = (1168.0, 2352.0);
-const WORKER_BUILD_TICKS: u32 = 495;
 
 impl Game {
     pub fn new_replay_256_worker_expansion_rally_scenario(
@@ -17,6 +16,10 @@ impl Game {
                 "replay-256 worker oscillation requires four workers, got {unit_count} {unit}"
             ));
         }
+        let worker_build_ticks = crate::rules::defs::unit_def(EntityKind::Worker)
+            .ok_or_else(|| "Worker rules definition is missing".to_string())?
+            .stats
+            .build_ticks;
 
         let mut map = Map::load("1v1", 1, seed)
             .map_err(|error| format!("failed to load replay-256 map: {error}"))?;
@@ -39,7 +42,7 @@ impl Game {
             producer.push_production(ProdItem {
                 unit: EntityKind::Worker,
                 progress: 0,
-                total: WORKER_BUILD_TICKS,
+                total: worker_build_ticks,
                 paid: true,
             });
         }
