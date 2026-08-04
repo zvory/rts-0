@@ -54,6 +54,7 @@ import fs from "node:fs";
         },
       },
       tick: MapEditorViewport.prototype.tick,
+      queueTerrainChanges: MapEditorViewport.prototype.queueTerrainChanges,
       submitPresentation: MapEditorViewport.prototype.submitPresentation,
       settlePresentation: MapEditorViewport.prototype.settlePresentation,
       stopPresentation: MapEditorViewport.prototype.stopPresentation,
