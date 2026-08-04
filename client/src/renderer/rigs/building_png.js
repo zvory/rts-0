@@ -25,7 +25,7 @@ function buildingSpec(kind, frameWidth, frameHeight, image, {
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
   buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
-  "/assets/rigs/resource-depot-worksite-preview/resource_depot-atlas.png?v=oil-silo-foundry-worksite-preview-08",
+    "/assets/rigs/resource-depot-worksite-preview/resource_depot-atlas.png?v=oil-silo-foundry-worksite-preview-08",
     { emblem: true }),
   buildingSpec(KIND.BARRACKS, 384, 256,
     "/assets/rigs/building-emblems-preview/barracks-atlas-m14-team-tint.png?v=building-emblems-preview-04",

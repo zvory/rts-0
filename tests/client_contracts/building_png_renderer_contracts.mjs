@@ -35,6 +35,7 @@ const silhouetteShadowKinds = new Set([
   KIND.STEELWORKS,
 ]);
 const emblemKinds = new Set([
+  KIND.RESOURCE_DEPOT,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.ENGINEERING_COMPLEX,

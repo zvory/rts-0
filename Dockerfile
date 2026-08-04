@@ -68,7 +68,6 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/buildings-b4-selected-pass-01/engineering_complex-atlas.png \
     && test -s ./client/assets/rigs/buildings-b4-selected-pass-01/steelworks-atlas.png \
     && test -s ./client/assets/rigs/buildings-b7-team-paint-refined-preview/barracks-atlas.png \
-    && test -s ./client/assets/rigs/buildings-b7-team-paint-refined-preview/resource_depot-atlas.png \
     && test -s ./client/assets/rigs/buildings-b7-team-paint-refined-preview/training_centre-atlas.png \
     && test -s ./client/assets/rigs/resource-depot-worksite-preview/resource_depot-atlas.png \
     && test -s ./client/assets/rigs/command-car-packed-radio-preview/generated/command-car-packed-radio-stars-30-atlas-v4.png \
