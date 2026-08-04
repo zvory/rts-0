@@ -19,11 +19,14 @@ export function mapEditorBaseResourcePreviews(draft) {
   const height = Math.max(0, Math.trunc(Number(draft?.height)) || 0);
   if (!width || !height) return [];
   const sites = Array.isArray(draft?.baseSites) ? draft.baseSites : [];
-  const steel = sites.flatMap((site, baseIndex) => steelPreviews(site, baseIndex, width, height));
-  const blockedPumpJackTiles = steelBlockedPumpJackTiles(steel, width, height);
+  const spawnedSteel = [];
   const occupiedOilTiles = new Set();
-  const previews = [...steel];
+  const previews = [];
   for (const [baseIndex, site] of sites.entries()) {
+    const steel = steelPreviews(site, baseIndex, width, height);
+    spawnedSteel.push(...steel);
+    previews.push(...steel);
+    const blockedPumpJackTiles = steelBlockedPumpJackTiles(spawnedSteel, width, height);
     previews.push(...oilPreviews(
       site,
       baseIndex,

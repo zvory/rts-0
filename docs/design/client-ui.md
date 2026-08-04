@@ -1002,7 +1002,7 @@ half-turn symmetry, while three-way, four-way, and diagonal transforms are disab
 would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
 The selected base has a pale map ring. The viewport previews every base's complete Steel and Oil
-cluster at the positions used by live match setup; selecting a start or expansion emphasizes its
+cluster with the live match setup geometry; selecting a start or expansion emphasizes its
 resource nodes while the panel reports the exact counts. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
 Grass, Gravel A/B/C, Dirt A/B/C, Mud A/B/C, Frosted Ground, bare road, and the four marked road

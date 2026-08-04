@@ -4,14 +4,9 @@
   "reason": "Initial frozen exceptions for files already above the 1500-line source/test cap when the repo-wide size gate was added.",
   "exceptions": [
     {
-      "path": "client/src/minimap.js",
-      "lines": 1512,
-      "reason": "Dark Forest added the last production minimap integration hooks after forest rendering moved into minimap_forest_layer.js; keep ratcheting the facade below the cap as remaining layer orchestration is extracted."
-    },
-    {
       "path": "client/styles.css",
-      "lines": 5747,
-      "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, Map Editor road/overlay controls, and responsive presentation rules; keep ratcheting until those responsibilities have an evidence-backed split."
+      "lines": 5722,
+      "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules; the joined-lobby masthead now protects its title from variable replay room IDs, but keep ratcheting until those responsibilities have an evidence-backed split."
     },
     {
       "path": "scripts/client-perf-harness.mjs",

@@ -518,6 +518,17 @@ assert(
     [{ x: 144, y: 400 }, { x: 144, y: 336 }, { x: 80, y: 368 }],
     "Oil previews use the live setup offsets and tile centres",
   );
+  const laterOverlappingBase = { ...session.draft, baseSites: [
+    ...session.draft.baseSites,
+    { x: 7, y: 10, steelPatches: 36, oilPatches: 0 },
+  ] };
+  assert.deepEqual(
+    mapEditorBaseResourcePreviews(laterOverlappingBase)
+      .filter((preview) => preview.kind === "oil" && preview.baseIndex === 0)
+      .map(({ x, y }) => ({ x, y })),
+    previews.filter((preview) => preview.kind === "oil").map(({ x, y }) => ({ x, y })),
+    "a later base's Steel does not retroactively relocate Oil spawned for an earlier base",
+  );
   const viewport = {
     session,
     resourcePreviewDraft: null,
