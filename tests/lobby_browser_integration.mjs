@@ -19,6 +19,8 @@ const assertions = createAssertions();
 const { ok } = assertions;
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LAB_SETUP_FIXTURE = path.join(REPO_ROOT, "server/assets/lab-scenarios/lategame.json");
+const LOBBY_ROW_SETTLE_TIMEOUT_MS = 10_000;
+const LOBBY_ROW_POLL_INTERVAL_MS = 100;
 const SAFE_REPLAY_LOBBY_ROW_KEYS = [
   "createdAtUnixMs",
   "hostName",
@@ -124,21 +126,25 @@ async function lobbyRows() {
 }
 
 async function waitForLobbyRow(room, predicate, label) {
-  for (let i = 0; i < 30; i++) {
-    const row = (await lobbyRows()).find((entry) => entry.room === room);
+  const deadline = performance.now() + LOBBY_ROW_SETTLE_TIMEOUT_MS;
+  let row;
+  while (performance.now() < deadline) {
+    row = (await lobbyRows()).find((entry) => entry.room === room);
     if (row && predicate(row)) return row;
-    await sleep(100);
+    await sleep(LOBBY_ROW_POLL_INTERVAL_MS);
   }
-  throw new Error(`timeout waiting for lobby row: ${label}`);
+  throw new Error(`timeout waiting for lobby row: ${label}; last row=${JSON.stringify(row ?? null)}`);
 }
 
 async function waitForLobbyGone(room, label) {
-  for (let i = 0; i < 50; i++) {
-    const row = (await lobbyRows()).find((entry) => entry.room === room);
+  const deadline = performance.now() + LOBBY_ROW_SETTLE_TIMEOUT_MS;
+  let row;
+  while (performance.now() < deadline) {
+    row = (await lobbyRows()).find((entry) => entry.room === room);
     if (!row) return true;
-    await sleep(100);
+    await sleep(LOBBY_ROW_POLL_INTERVAL_MS);
   }
-  throw new Error(`timeout waiting for lobby row removal: ${label}`);
+  throw new Error(`timeout waiting for lobby row removal: ${label}; last row=${JSON.stringify(row ?? null)}`);
 }
 
 async function expectNoLobbyRow(room, label) {

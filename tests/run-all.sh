@@ -642,15 +642,13 @@ else
   run_rust_suites_bg
 fi
 
-# --- 2/3. Node suites + client smoke (all parallelised) ------------------------------------
+# --- 2/3. Node suites + client smoke ---------------------------------------------------------
 if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   if [ "$RUN_LIVE_NODE" = "1" ]; then
-  run_suite_bg "API: server_integration" node "$SCRIPT_DIR/server_integration.mjs"
-  run_suite_bg "API: regression"         node "$SCRIPT_DIR/regression.mjs"
-  run_suite_bg "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
-  run_suite_bg "API: faction_integration" node "$SCRIPT_DIR/faction_integration.mjs"
-  run_suite_bg "API: team_integration"   node "$SCRIPT_DIR/team_integration.mjs"
-  run_suite_bg "API: lobby_browser_integration" node "$SCRIPT_DIR/lobby_browser_integration.mjs"
+    run_suite_bg "API: server_integration" node "$SCRIPT_DIR/server_integration.mjs"
+    run_suite_bg "API: regression"         node "$SCRIPT_DIR/regression.mjs"
+    run_suite_bg "API: faction_integration" node "$SCRIPT_DIR/faction_integration.mjs"
+    run_suite_bg "API: team_integration"   node "$SCRIPT_DIR/team_integration.mjs"
   else
     SKIPPED+=("Live Node API suites")
   fi
@@ -661,6 +659,10 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   collect_bg_results
 
   if [ "$RUN_LIVE_NODE" = "1" ]; then
+    # These suites repeatedly wait for room-actor state to converge. Run them after the
+    # simulation-heavy parallel batch so runner CPU contention cannot masquerade as a lobby bug.
+    run_suite "API: ai_integration" node "$SCRIPT_DIR/ai_integration.mjs"
+    run_suite "API: lobby_browser_integration" node "$SCRIPT_DIR/lobby_browser_integration.mjs"
     run_suite "API: lab_mortar_regression" node "$SCRIPT_DIR/lab_mortar_regression.mjs"
   fi
 
