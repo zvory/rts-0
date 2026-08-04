@@ -21,10 +21,18 @@ The normal agent lifecycle is:
    The helper first classifies the branch diff against `origin/main`. If every changed file ends in
    `.md`, it skips Codex adversarial review, pushes the branch, posts a successful
    `adversarial-quality-pass` status with a docs-only skip description, and writes the skip report
-   into the PR body. Otherwise it runs `scripts/adversarial-quality-pass.mjs` in the branch worktree,
-   allowing a fresh Codex CLI pass to improve or rewrite the branch, commit the final state, push
-   the final head, post the `adversarial-quality-pass` status, and write the full quality-pass
-   report into the PR body.
+   into the PR body. Otherwise it runs `scripts/adversarial-quality-pass.mjs` in the branch worktree.
+   The first non-Markdown pass is Full and records a wrapper-owned reviewed-head marker after its
+   final-head status succeeds. A later manually pushed CI fix gets an Incremental pass only when the
+   existing PR body marker is strict and wrapper-owned, its exact SHA still has a successful status,
+   the PR's remote head matches local `HEAD`, it is a local strict ancestor, the new commits are
+   linear, and the PR still targets `main`.
+   Incremental prompts and changed-path metadata cover only that correction range, while still
+   allowing interaction checks against the complete checkout. Missing or ambiguous metadata,
+   statuses, ancestry, merge/rebase-shaped history, or base selection falls back to Full. When the
+   verified marker already equals `HEAD`, the helper launches no Codex child and does not repost the
+   status; it preserves the existing quality report and only refreshes ordinary PR metadata and
+   auto-merge.
 5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged, the
    head SHA reachable from `origin/main`, and the local `main` checkout fast-forwarded with an
    ordinary `git pull --ff-only origin main`. The final refresh also runs the existing automatic
@@ -74,7 +82,10 @@ compiling or running specific tests. Do not add a separate diagnostic workflow f
 - CI failed: inspect the failing check from the PR or `gh pr checks <pr>`.
   Fix the branch in its worktree, run the smallest relevant local verification,
   commit, push, and rerun `scripts/agent-pr.sh --verification "..."` so the PR
-  body records the current evidence. A staged patch note remains in the local outbox across reruns.
+  body records the current evidence. A pushed linear correction can reuse the prior verified
+  reviewed-head marker for an Incremental pass; a merge, rebase, missing marker/status, changed
+  base, or other ambiguity deliberately receives Full review. A staged patch note remains in the
+  local outbox across reruns.
 - Branch stale or conflicted: fetch `origin/main`, merge it into the PR branch,
   resolve conflicts in the same worktree, rerun focused verification, and push.
   Do not claim completion or start follow-up work until `scripts/wait-pr.sh <pr>`

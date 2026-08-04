@@ -30,6 +30,12 @@ DRY_RUN=0
 DRAFT_FLAG=0
 QUALITY_CONTEXT="adversarial-quality-pass"
 CHANGED_FILES=()
+QUALITY_REVIEW_MODE=""
+QUALITY_REVIEW_BASE=""
+QUALITY_REVIEWED_HEAD=""
+PRESERVE_PRIOR_QUALITY_REPORT=0
+QUALITY_REPORT_START="<!-- rts-agent-pr:quality-report:v1 -->"
+QUALITY_REPORT_END="<!-- /rts-agent-pr:quality-report -->"
 
 usage() {
   cat <<'EOF'
@@ -105,7 +111,7 @@ if [ "$DRY_RUN" != "1" ]; then
     --base "$BASE_BRANCH" \
     --head "$HEAD_BRANCH" \
     --state open \
-    --json number,url,body \
+    --json number,url,body,baseRefName,headRefOid \
     --jq '.[0] // empty')"
 fi
 if [ -z "$TITLE" ]; then
@@ -129,10 +135,16 @@ fi
 
 quality_report_json="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.json)"
 quality_report_md="$(mktemp -t rts-adversarial-quality-pass.XXXXXX.md)"
+quality_review_metadata="$(mktemp -t rts-adversarial-review-metadata.XXXXXX.json)"
+existing_pr_body_file="$(mktemp -t rts-agent-pr-existing-body.XXXXXX.md)"
 tmp_body="$(mktemp -t rts-agent-pr.XXXXXX)"
 
+if [ -n "$existing_pr_json" ]; then
+  jq -r '.body // ""' <<<"$existing_pr_json" >"$existing_pr_body_file"
+fi
+
 cleanup() {
-  rm -f "$quality_report_json" "$quality_report_md" "$tmp_body"
+  rm -f "$quality_report_json" "$quality_report_md" "$quality_review_metadata" "$existing_pr_body_file" "$tmp_body"
   if [ -n "$STABLE_COPY_PATH" ]; then
     rm -f "$STABLE_COPY_PATH"
   fi
@@ -227,6 +239,71 @@ archive_completed_plans() {
   node scripts/archive-completed-plans.mjs --base "origin/$BASE_BRANCH" --commit
 }
 
+load_quality_review_metadata() {
+  if [ ! -s "$quality_review_metadata" ]; then
+    echo "agent-pr: quality pass did not record review metadata" >&2
+    exit 1
+  fi
+  QUALITY_REVIEW_MODE="$(jq -r '.mode // empty' "$quality_review_metadata")"
+  QUALITY_REVIEW_BASE="$(jq -r '.reviewBase // empty' "$quality_review_metadata")"
+  QUALITY_REVIEWED_HEAD="$(jq -r '.reviewedHead // empty' "$quality_review_metadata")"
+  PRESERVE_PRIOR_QUALITY_REPORT="$(jq -r '.preservePriorReport // false' "$quality_review_metadata")"
+  case "$QUALITY_REVIEW_MODE" in
+    Full|Incremental|"Already Reviewed") ;;
+    *)
+      echo "agent-pr: quality pass returned invalid review mode '$QUALITY_REVIEW_MODE'" >&2
+      exit 1
+      ;;
+  esac
+  if ! [[ "$QUALITY_REVIEWED_HEAD" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "agent-pr: quality pass returned invalid reviewed head" >&2
+    exit 1
+  fi
+  if [ -z "$QUALITY_REVIEW_BASE" ]; then
+    echo "agent-pr: quality pass returned an empty review base" >&2
+    exit 1
+  fi
+  case "$PRESERVE_PRIOR_QUALITY_REPORT" in
+    true|false) ;;
+    *)
+      echo "agent-pr: quality pass returned invalid report-preservation state '$PRESERVE_PRIOR_QUALITY_REPORT'" >&2
+      exit 1
+      ;;
+  esac
+}
+
+preserve_prior_quality_report() {
+  local preserved_report
+  if ! preserved_report="$(awk -v start="$QUALITY_REPORT_START" -v end="$QUALITY_REPORT_END" '
+    $0 == start {
+      if (started || active) invalid = 1
+      else {
+        started = 1
+        active = 1
+        print
+      }
+      next
+    }
+    $0 == end {
+      if (!active || ended) invalid = 1
+      else {
+        print
+        active = 0
+        ended = 1
+      }
+      next
+    }
+    active { print }
+    END {
+      if (invalid || !started || !ended || active) exit 1
+    }
+  ' "$existing_pr_body_file")"; then
+    echo "agent-pr: verified reviewed head is missing one bounded prior quality report" >&2
+    return 1
+  fi
+  printf '%s\n' "$preserved_report"
+}
+
 run_quality_pass() {
   if [ "$DRY_RUN" = "1" ]; then
     if git rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1 && is_docs_only_change; then
@@ -263,14 +340,27 @@ run_quality_pass() {
     return
   fi
 
-  scripts/adversarial-quality-pass.mjs \
-    --base "origin/$BASE_BRANCH" \
-    --head-branch "$HEAD_BRANCH" \
-    --report-file "$quality_report_json" \
-    --markdown-report-file "$quality_report_md" \
-    --gh-bin "$GH_BIN" \
-    --push \
+  local quality_args=(
+    scripts/adversarial-quality-pass.mjs
+    --base "origin/$BASE_BRANCH"
+    --expected-base "$BASE_BRANCH"
+    --head-branch "$HEAD_BRANCH"
+    --report-file "$quality_report_json"
+    --markdown-report-file "$quality_report_md"
+    --review-metadata-file "$quality_review_metadata"
+    --gh-bin "$GH_BIN"
+    --push
     --post-status
+  )
+  if [ -n "$existing_pr_json" ]; then
+    local existing_pr_base
+    local existing_pr_head
+    existing_pr_base="$(jq -r '.baseRefName // empty' <<<"$existing_pr_json")"
+    existing_pr_head="$(jq -r '.headRefOid // empty' <<<"$existing_pr_json")"
+    quality_args+=(--existing-pr-body-file "$existing_pr_body_file" --existing-pr-base "$existing_pr_base" --existing-pr-head "$existing_pr_head")
+  fi
+  "${quality_args[@]}"
+  load_quality_review_metadata
 
   local refreshed_branch
   refreshed_branch="$(git branch --show-current)"
@@ -303,14 +393,28 @@ Lifecycle-Mode: $LIFECYCLE_MODE
 Agent-Owned: true
 Auto-Merge: $auto_merge_text
 Focused-Verification: $FOCUSED_VERIFICATION
+EOF
+
+  if [ -n "$QUALITY_REVIEW_MODE" ]; then
+    cat <<EOF
+Review-Mode: $QUALITY_REVIEW_MODE
+Review-Base: $QUALITY_REVIEW_BASE
+<!-- rts-agent-pr:reviewed-head:v1 sha=$QUALITY_REVIEWED_HEAD -->
+EOF
+  fi
+
+  cat <<EOF
 Needs-Human: $needs_human
 <!-- /rts-agent-pr -->
 
 EOF
 
-  if [ -s "$quality_report_md" ]; then
+  if [ "$PRESERVE_PRIOR_QUALITY_REPORT" = "true" ]; then
+    preserve_prior_quality_report
+  elif [ -s "$quality_report_md" ]; then
+    printf '%s\n' "$QUALITY_REPORT_START"
     cat "$quality_report_md"
-    printf '\n'
+    printf '%s\n\n' "$QUALITY_REPORT_END"
   fi
 
   if [ -n "$EXTRA_BODY" ]; then

@@ -10,12 +10,16 @@ import {
   autoCommitBody,
   buildCodexArgs,
   buildFetchArgs,
+  hasLatestSuccessfulStatus,
   markdownReport,
   normalizeReport,
   parseArgs,
   QUALITY_PASS_ENV,
+  parseReviewedHeadMarker,
   renderPrompt,
+  reviewedHeadMarker,
   resolveHeadBranch,
+  selectReviewMode,
   statusDescription,
 } from "../scripts/adversarial-quality-pass.mjs";
 import { preflightCommands } from "../scripts/agent-pr-preflight.mjs";
@@ -84,6 +88,85 @@ assert.match(prompt, /Ignore missing documentation updates/);
 assert.match(prompt, /complete, coherent,\nworking state/);
 assert.doesNotMatch(prompt, /fail the gate/i);
 assert.doesNotMatch(prompt, /close the PR/i);
+assert.match(prompt, /Review mode: Full\./);
+
+const reviewedAnchor = "a".repeat(40);
+const correctionHead = "b".repeat(40);
+const markerBody = `<!-- rts-agent-pr:v1 -->
+Agent-Owned: true
+${reviewedHeadMarker(reviewedAnchor)}
+<!-- /rts-agent-pr -->
+## Adversarial quality pass
+`;
+assert.deepEqual(parseReviewedHeadMarker(markerBody), { sha: reviewedAnchor, reason: "" });
+assert.equal(
+  parseReviewedHeadMarker(markerBody.replace("<!-- /rts-agent-pr -->", `${reviewedHeadMarker(reviewedAnchor)}\n<!-- /rts-agent-pr -->`)).reason,
+  "duplicate reviewed-head markers",
+);
+assert.equal(
+  parseReviewedHeadMarker("<!-- rts-agent-pr:v1 -->\nAgent-Owned: true\n<!-- rts-agent-pr:reviewed-head:v1 sha=BAD -->\n<!-- /rts-agent-pr -->").reason,
+  "malformed reviewed-head marker",
+);
+assert.equal(
+  parseReviewedHeadMarker(`<!-- rts-agent-pr:v1 -->\nAgent-Owned: true\n<!-- /rts-agent-pr -->\n${reviewedHeadMarker(reviewedAnchor)}`).reason,
+  "missing reviewed-head marker",
+);
+
+const selectMode = (overrides = {}) => selectReviewMode({
+  baseRef: "origin/main",
+  currentHead: correctionHead,
+  existingPrBodyFile: markerBody,
+  existingPrBase: "main",
+  existingPrHead: correctionHead,
+  expectedBase: "main",
+  getSuccessfulStatus: () => true,
+  commitExists: () => true,
+  isAncestor: () => true,
+  hasMergeCommit: () => false,
+  ...overrides,
+});
+assert.deepEqual(selectMode(), {
+  mode: "incremental",
+  label: "Incremental",
+  reviewBase: reviewedAnchor,
+  reviewedHead: reviewedAnchor,
+  reason: "verified reviewed-head has a simple linear correction range",
+});
+assert.equal(selectMode({ currentHead: reviewedAnchor, existingPrHead: reviewedAnchor }).mode, "already-reviewed");
+assert.equal(selectMode({ existingPrBodyFile: "" }).mode, "full");
+assert.equal(selectMode({ existingPrBodyFile: "malformed marker" }).mode, "full");
+assert.equal(
+  selectMode({
+    existingPrBodyFile: `<!-- rts-agent-pr:v1 -->\nAgent-Owned: true\n<!-- /rts-agent-pr -->\n${reviewedHeadMarker(reviewedAnchor)}`,
+  }).mode,
+  "full",
+);
+assert.equal(selectMode({ getSuccessfulStatus: () => false }).mode, "full");
+assert.equal(selectMode({ getSuccessfulStatus: () => { throw new Error("offline"); } }).reason, "GitHub status lookup failed");
+assert.equal(selectMode({ commitExists: () => false }).mode, "full");
+assert.equal(selectMode({ isAncestor: () => false }).mode, "full");
+assert.equal(selectMode({ hasMergeCommit: () => true }).mode, "full");
+assert.equal(selectMode({ existingPrBase: "release" }).mode, "full");
+assert.equal(selectMode({ existingPrHead: "c".repeat(40) }).mode, "full");
+assert.equal(hasLatestSuccessfulStatus([
+  { context: "adversarial-quality-pass", state: "success" },
+], "adversarial-quality-pass"), true);
+assert.equal(hasLatestSuccessfulStatus([
+  { context: "adversarial-quality-pass", state: "failure" },
+  { context: "adversarial-quality-pass", state: "success" },
+], "adversarial-quality-pass"), false);
+assert.equal(hasLatestSuccessfulStatus([], "adversarial-quality-pass"), false);
+assert.throws(() => hasLatestSuccessfulStatus({}, "adversarial-quality-pass"), /did not return an array/);
+
+const incrementalPrompt = renderPrompt({
+  baseRef: reviewedAnchor,
+  headRef: "HEAD",
+  reviewMode: "incremental",
+  reviewedHead: reviewedAnchor,
+  reviewInputs: [],
+});
+assert.match(incrementalPrompt, /Review mode: Incremental\./);
+assert.match(incrementalPrompt, /Do not reopen unchanged earlier branch work/);
 
 assert.deepEqual(
   buildCodexArgs({
@@ -276,6 +359,13 @@ try {
   const docsOnlyCodexCalledMarker = path.join(tempRoot, "docs-only-codex-called.txt");
   const docsOnlyStatusCapture = path.join(tempRoot, "docs-only-gh-api.txt");
   const qualityStatusCapture = path.join(tempRoot, "quality-gh-api.txt");
+  const incrementalBody = path.join(tempRoot, "incremental-pr-body.md");
+  const incrementalPromptCapture = path.join(tempRoot, "incremental-prompt.txt");
+  const incrementalStatusCapture = path.join(tempRoot, "incremental-gh-api.txt");
+  const noChangeBody = path.join(tempRoot, "no-change-pr-body.md");
+  const noChangeCodexCalledMarker = path.join(tempRoot, "no-change-codex-called.txt");
+  const noChangeStatusCapture = path.join(tempRoot, "no-change-gh-api.txt");
+  const extraBodyFile = path.join(tempRoot, "extra-pr-body.md");
   const preReviewCodexCalledMarker = path.join(tempRoot, "pre-review-codex-called.txt");
   const preReviewStatusCapture = path.join(tempRoot, "pre-review-gh-api.txt");
   const finalHeadCodexCalledMarker = path.join(tempRoot, "final-head-codex-called.txt");
@@ -285,6 +375,7 @@ try {
   const rewrittenPreflightStatusCapture = path.join(tempRoot, "rewritten-preflight-gh-api.txt");
   const rewrittenPreflightBody = path.join(tempRoot, "rewritten-preflight-pr-body.md");
   fs.mkdirSync(binPath, { recursive: true });
+  fs.writeFileSync(extraBodyFile, "## Fixture caller notes\n\nKeep this once.\n");
 
   writeExecutable(
     path.join(binPath, "codex"),
@@ -310,6 +401,9 @@ if [[ "$quality_prompt" != *"final autonomous quality pass"* ]] ||
 fi
 if [ -n "\${CODEX_CALLED_MARKER:-}" ]; then
   printf 'codex called\\n' >>"$CODEX_CALLED_MARKER"
+fi
+if [ -n "\${AGENT_CODEX_PROMPT_CAPTURE:-}" ]; then
+  printf '%s' "$quality_prompt" >"$AGENT_CODEX_PROMPT_CAPTURE"
 fi
 if [ "\${RTS_ADVERSARIAL_QUALITY_PASS:-}" != "1" ]; then
   echo "missing quality pass environment" >&2
@@ -345,6 +439,18 @@ JSON
     `#!/usr/bin/env bash
 set -euo pipefail
 if [ "$1" = "api" ]; then
+  if [[ "$*" == *"/commits/"*"/statuses?per_page=100"* ]]; then
+    if [ "\${AGENT_GH_STATUS_FAILURE:-}" = "1" ]; then
+      echo "fixture GitHub status lookup failed" >&2
+      exit 1
+    fi
+    if [ -n "\${AGENT_GH_STATUS_SHA:-}" ] && [[ "$*" == *"/commits/\${AGENT_GH_STATUS_SHA:-}/statuses?per_page=100"* ]]; then
+      printf '[{"context":"adversarial-quality-pass","state":"%s"}]\\n' "\${AGENT_GH_STATUS_STATE:-success}"
+    else
+      printf '[]\\n'
+    fi
+    exit 0
+  fi
   if [[ "$*" == *"/statuses/"* ]] && [ -n "\${AGENT_GH_API_CAPTURE:-}" ]; then
     printf '%s\\n' "$*" >>"$AGENT_GH_API_CAPTURE"
   fi
@@ -354,9 +460,16 @@ if [ "$1" = "label" ] && [ "\${2:-}" = "create" ]; then
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "\${2:-}" = "list" ]; then
+  if [ -n "\${AGENT_GH_PR_BODY_FILE:-}" ]; then
+    jq -n \
+      --rawfile body "\${AGENT_GH_PR_BODY_FILE:-}" \
+      --arg base "\${AGENT_GH_PR_BASE:-main}" \
+      --arg head "$(git rev-parse HEAD)" \
+      '{number: 123, url: "https://github.example/zvory/rts-0/pull/123", body: $body, baseRefName: $base, headRefOid: $head}'
+  fi
   exit 0
 fi
-if [ "$1" = "pr" ] && [ "\${2:-}" = "create" ]; then
+if [ "$1" = "pr" ] && { [ "\${2:-}" = "create" ] || [ "\${2:-}" = "edit" ]; }; then
   body_file=""
   while [ "$#" -gt 0 ]; do
     if [ "$1" = "--body-file" ]; then
@@ -370,7 +483,9 @@ if [ "$1" = "pr" ] && [ "\${2:-}" = "create" ]; then
     exit 1
   fi
   cat "$body_file" >"$AGENT_PR_BODY_CAPTURE"
-  printf 'https://github.example/zvory/rts-0/pull/123\\n'
+  if [ "\${2:-}" = "create" ]; then
+    printf 'https://github.example/zvory/rts-0/pull/123\\n'
+  fi
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "\${2:-}" = "merge" ]; then
@@ -445,7 +560,7 @@ done
   run("git", ["add", "--", "README.md", "--implementation.rs", "server/src/branch.rs"], { cwd: workPath });
   run("git", ["commit", "-m", "Change branch"], { cwd: workPath });
 
-  const qualityPassRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture"], {
+  const qualityPassRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--title", "Quality report body", "--verification", "workflow fixture", "--body-file", extraBodyFile], {
     cwd: workPath,
     env: {
       AGENT_GH_API_CAPTURE: qualityStatusCapture,
@@ -471,10 +586,65 @@ done
   assert.match(body, /Verdict: improved/);
   assert.match(body, /Captured report body\./);
   assert.match(body, /- embedded the quality-pass report/);
+  assert.match(body, /<!-- rts-agent-pr:quality-report:v1 -->/);
+  assert.match(body, /<!-- \/rts-agent-pr:quality-report -->/);
   assert.match(fs.readFileSync(codexCalledMarker, "utf8"), /codex called/);
   assert.equal((fs.readFileSync(qualityStatusCapture, "utf8").match(/statuses\//g) ?? []).length, 1);
   assert.equal(fs.readFileSync(path.join(workPath, "server", "src", "branch.rs"), "utf8"), "fn main() {}\n");
   assert.match(run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout, /Run adversarial quality pass/);
+  const fullReviewedHead = run("git", ["rev-parse", "HEAD"], { cwd: workPath }).stdout.trim();
+  assert.match(body, new RegExp(`Review-Mode: Full\\nReview-Base: origin/main\\n${reviewedHeadMarker(fullReviewedHead)}`));
+
+  fs.writeFileSync(path.join(workPath, "ci-fix.js"), "export const ciFix = true;\n");
+  run("git", ["add", "ci-fix.js"], { cwd: workPath });
+  run("git", ["commit", "-m", "Apply deterministic CI fix"], { cwd: workPath });
+  run("git", ["push", "origin", "HEAD:refs/heads/zvorygin/quality-report-body"], { cwd: workPath });
+  const incrementalRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--verification", "incremental fixture", "--body-file", extraBodyFile], {
+    cwd: workPath,
+    env: {
+      AGENT_CODEX_PROMPT_CAPTURE: incrementalPromptCapture,
+      AGENT_GH_API_CAPTURE: incrementalStatusCapture,
+      AGENT_GH_PR_BODY_FILE: capturedBody,
+      AGENT_GH_STATUS_SHA: fullReviewedHead,
+      AGENT_PR_BODY_CAPTURE: incrementalBody,
+      CODEX_CALLED_MARKER: codexCalledMarker,
+      GH_BIN: path.join(binPath, "gh"),
+      PATH: `${binPath}:${process.env.PATH}`,
+    },
+  });
+  const incrementalHead = run("git", ["rev-parse", "HEAD"], { cwd: workPath }).stdout.trim();
+  const capturedIncrementalPrompt = fs.readFileSync(incrementalPromptCapture, "utf8");
+  const incrementalReportBody = fs.readFileSync(incrementalBody, "utf8");
+  assert.match(incrementalRun.stdout, new RegExp(`using Incremental review from ${fullReviewedHead}`));
+  assert.match(capturedIncrementalPrompt, /Review mode: Incremental\./);
+  assert.match(capturedIncrementalPrompt, new RegExp(`Review base: ${fullReviewedHead}`));
+  assert.match(capturedIncrementalPrompt, /Do not reopen unchanged earlier branch work/);
+  assert.match(capturedIncrementalPrompt, /ci-fix\.js \| class=reviewable/);
+  assert.doesNotMatch(capturedIncrementalPrompt, /README\.md \| class=/);
+  assert.match(incrementalReportBody, new RegExp(`Review-Mode: Incremental\\nReview-Base: ${fullReviewedHead}\\n${reviewedHeadMarker(incrementalHead)}`));
+  assert.match(fs.readFileSync(incrementalStatusCapture, "utf8"), new RegExp(`statuses/${incrementalHead}`));
+  assert.doesNotMatch(fs.readFileSync(incrementalStatusCapture, "utf8"), new RegExp(`statuses/${fullReviewedHead}`));
+
+  const noChangeRun = run("scripts/agent-pr.sh", ["--owner", "tester", "--verification", "already-reviewed fixture", "--body-file", extraBodyFile], {
+    cwd: workPath,
+    env: {
+      AGENT_GH_API_CAPTURE: noChangeStatusCapture,
+      AGENT_GH_PR_BODY_FILE: incrementalBody,
+      AGENT_GH_STATUS_SHA: incrementalHead,
+      AGENT_PR_BODY_CAPTURE: noChangeBody,
+      CODEX_CALLED_MARKER: noChangeCodexCalledMarker,
+      GH_BIN: path.join(binPath, "gh"),
+      PATH: `${binPath}:${process.env.PATH}`,
+    },
+  });
+  const noChangeReportBody = fs.readFileSync(noChangeBody, "utf8");
+  assert.match(noChangeRun.stdout, /skipping Codex, push, and status/);
+  assert.equal(fs.existsSync(noChangeCodexCalledMarker), false, "verified current head must not relaunch Codex");
+  assert.equal(fs.existsSync(noChangeStatusCapture), false, "verified current head must not repost status");
+  assert.match(noChangeReportBody, new RegExp(`Review-Mode: Already Reviewed\\nReview-Base: ${incrementalHead}\\n${reviewedHeadMarker(incrementalHead)}`));
+  assert.match(noChangeReportBody, /Captured report body\./, "already-reviewed rerun must preserve the durable report");
+  assert.equal((noChangeReportBody.match(/## Fixture caller notes/g) ?? []).length, 1, "already-reviewed rerun must not duplicate caller body content");
+  assert.equal((noChangeReportBody.match(/rts-agent-pr:quality-report:v1/g) ?? []).length, 1, "already-reviewed rerun must preserve exactly one bounded report");
 
   const workflowDryRun = run("scripts/agent-pr.sh", ["--dry-run", "--owner", "tester", "--verification", "dry-run fixture"], {
     cwd: workPath,
