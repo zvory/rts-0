@@ -1360,9 +1360,10 @@ minimap targeting feedback uses the mirrored cloud radius and duration effect fi
 replaces the stale authoritative plan when composing subsequent queued previews, and asynchronous
 Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
-command. The worker build submenu also exposes Pump Jack in the top-middle `W` slot; while armed,
-its placement preview snaps to the closest live oil patch within one map tile of the cursor before
-applying the normal footprint validation. Pump Jack construction remains legal outside the completed
+command. The worker build submenu leaves the retired top-middle `W` slot empty so removing depot-built
+extractors does not compact the remaining Engineer build hotkeys. Contextual Pump Jack placement
+snaps to the closest live oil patch within one map tile of the cursor before applying the normal
+footprint validation. Pump Jack construction remains legal outside the completed
 friendly Resource Depot/Zamok mining radius, while the normal resource-mining preview warns that the
 distant extractor will be inactive. Completed owned or allied Pump Jacks with inactive extraction show a red prohibited-sign
 badge above the building until a completed friendly mining anchor comes into range. If an owned or
