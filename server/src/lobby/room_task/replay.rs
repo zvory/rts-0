@@ -22,8 +22,7 @@ use super::super::ReplayBranchSeed;
 use super::helpers::DRAINING_NEW_MATCHES_DISABLED_MSG;
 use super::types::{LabSeekTarget, Phase, ReplayStartPayloadStamp, ReplayTickContext, RoomMode};
 use super::RoomTask;
-use crate::protocol::{RoomTimeState, ServerMessage, StartPayload, VisionSelectionRequest};
-use rts_sim::game::Game;
+use crate::protocol::{ServerMessage, StartPayload, VisionSelectionRequest};
 
 impl RoomTask {
     pub(super) fn prompt_for_replay_join(
@@ -314,27 +313,6 @@ impl RoomTask {
         self.send_scoped_replay_observer_analysis(session, self.order.clone());
     }
 
-    pub(super) fn room_time_state_for_live_game(
-        &self,
-        game: &Game,
-        controller_id: Option<u32>,
-    ) -> RoomTimeState {
-        RoomTimeState {
-            current_tick: game.tick_count(),
-            duration_ticks: 0,
-            keyframe_ticks: Vec::new(),
-            speed: if self.room_time_paused {
-                0.0
-            } else {
-                self.room_time_speed
-            },
-            paused: self.room_time_paused,
-            ended: false,
-            controller_id,
-            seek: None,
-        }
-    }
-
     fn clear_pending_snapshots_for(&self, recipients: impl IntoIterator<Item = u32>) {
         for player in recipients
             .into_iter()
@@ -516,7 +494,20 @@ impl RoomTask {
                 self.on_tick_live_game(TokioInstant::now());
                 self.broadcast_lab_room_time_state();
             }
-            Some(RoomTimeSource::ReplayPlayback) | Some(RoomTimeSource::LiveGame) | None => {}
+            Some(RoomTimeSource::ReplayPlayback) => {
+                let Phase::ReplayViewer(session) = &mut self.phase else {
+                    return;
+                };
+                if !session.has_remaining_ticks() {
+                    return;
+                }
+                session.note_step_controller(player_id);
+                self.on_tick_replay_viewer(TokioInstant::now());
+                if let Phase::ReplayViewer(session) = &self.phase {
+                    self.broadcast_room_time_state_for(session);
+                }
+            }
+            Some(RoomTimeSource::LiveGame) | None => {}
         }
     }
 

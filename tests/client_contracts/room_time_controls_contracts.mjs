@@ -255,6 +255,7 @@ const replayUi = new ReplayControls({
           available: true,
           setSpeed: true,
           pause: true,
+          step: true,
           seekRelative: true,
           seekAbsolute: true,
           timeline: true,
@@ -275,7 +276,7 @@ assert(replayControls.querySelector(".room-time-panel-title")?.textContent === "
 assert(replayControls.querySelector(".room-time-panel-body")?.querySelector(".seek-btn") === seekBack,
   "floating panel wraps the existing room-time buttons in its body");
 assert(!seekBack.hidden, "replay seek buttons stay visible in replay mode");
-assert(stepDev.hidden, "scenario step controls stay hidden in replay mode");
+assert(!stepDev.hidden, "replay viewers show step controls when step is advertised");
 const initialVisionButtons = replayControls.querySelectorAll(".vision-btn");
 assert(initialVisionButtons.every((button) => !button.disabled),
   "vision selection stays available while clock controls await authoritative state");
@@ -349,6 +350,7 @@ assert(pauseReplay?.textContent === "Pause", "replay viewer builds a pause butto
 const branchReplay = replayControls.querySelector(".replay-branch-btn");
 assert(branchReplay?.textContent === "Resume play from here", "replay branch button describes resuming from the current tick");
 replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 2, paused: false });
+assert(stepDev.disabled, "replay step stays disabled while playback is running");
 const hideEndTime = replayControls.querySelector(".replay-hide-end-time");
 const hideEndTimeCheckbox = hideEndTime.children[0];
 assert(hideEndTime?.children[1]?.textContent === "Hide end time", "replay controls label the spoiler toggle clearly");
@@ -435,6 +437,15 @@ assert(replayNet.speeds.length === speedsBeforePen + 1, "a pen pause tap sends e
 assert(pauseReplay.textContent === "Pause", "pause waits for authoritative confirmation before changing its label");
 replayUi.applyRoomTimeState({ currentTick: 120, durationTicks: 1_000, speed: 0, paused: true });
 assert(pauseReplay.textContent === "Resume", "paused replay button switches to resume");
+assert(!stepDev.disabled, "paused replay enables frame stepping while ticks remain");
+const replayStepsBeforeClick = replayNet.steps;
+stepDev._listeners.get("click")({});
+assert(replayNet.steps === replayStepsBeforeClick + 1, "paused replay step sends net.stepRoomTime");
+replayUi.applyRoomTimeState({ currentTick: 121, durationTicks: 1_000, speed: 0, paused: true });
+assert(replayControls.dataset.roomTimePending === "false", "replay step clears after the advanced tick is authoritative");
+replayUi.applyRoomTimeState({ currentTick: 1_000, durationTicks: 1_000, speed: 0, paused: true, ended: true });
+assert(stepDev.disabled, "concluded replay disables stepping past the final tick");
+replayUi.applyRoomTimeState({ currentTick: 121, durationTicks: 1_000, speed: 0, paused: true });
 pauseReplay._listeners.get("click")({ pointerType: "pen", detail: 1, preventDefault() {}, stopPropagation() {} });
 assert(replayNet.speeds.length === speedsBeforePen + 1, "the synthesized pen click does not duplicate pause");
 
@@ -795,14 +806,17 @@ assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
 assert(!scenarioSpeed0.hidden, "scenario mode shows pause controls when pause is advertised");
 assert(!scenarioStep.hidden, "scenario mode shows step controls");
 scenarioUi.applyRoomTimeState({ currentTick: 0, durationTicks: 0, speed: 2, paused: false });
+assert(scenarioStep.disabled, "scenario step stays disabled while room time is running");
 scenarioSpeed2._listeners.get("click")({});
 assert(replayNet.speeds.at(-1) === 2, "scenario speed click sends net.setRoomTimeSpeed");
 scenarioUi.applyRoomTimeState({ currentTick: 0, durationTicks: 0, speed: 2, paused: false });
-scenarioStep._listeners.get("click")({});
-assert(replayNet.steps === 1, "scenario step sends net.stepRoomTime");
-scenarioUi.applyRoomTimeState({ currentTick: 3, durationTicks: 0, speed: 2, paused: false });
 scenarioSpeed0._listeners.get("click")({});
 assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setRoomTimeSpeed");
+scenarioUi.applyRoomTimeState({ currentTick: 0, durationTicks: 0, speed: 0, paused: true });
+const scenarioStepsBeforeClick = replayNet.steps;
+scenarioStep._listeners.get("click")({});
+assert(replayNet.steps === scenarioStepsBeforeClick + 1, "scenario step sends net.stepRoomTime");
+scenarioUi.applyRoomTimeState({ currentTick: 3, durationTicks: 0, speed: 0, paused: true });
 scenarioUi.destroy();
 
 const aiLiveControls = fakeEl("div");
@@ -919,8 +933,9 @@ labUi.applyRoomTimeState({
   speed: 1,
   paused: true,
 });
+const labStepsBeforeClick = replayNet.steps;
 labStep._listeners.get("click")({});
-assert(replayNet.steps === 2, "lab step sends net.stepRoomTime through neutral controls");
+assert(replayNet.steps === labStepsBeforeClick + 1, "lab step sends net.stepRoomTime through neutral controls");
 labUi.applyRoomTimeState({
   currentTick: 120,
   durationTicks: 600,

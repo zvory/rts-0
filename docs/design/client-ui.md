@@ -712,7 +712,8 @@ export class ReplayControls extends RoomTimeControls
 `RoomTimeControls` renders pause/resume, speed, step, relative seek, absolute timeline seek, tick
 status, and keyframe marks only from `capabilities.roomTime`. The AI-only live route advertises the
 speed-only room-time profile, so the same component renders no seek, step, or timeline affordance
-for those rooms. Replay viewers also get a local `Hide end time` checkbox that removes the total
+for those rooms. Paused replay viewers can advance exactly one simulation tick with the shared step
+control. Replay viewers also get a local `Hide end time` checkbox that removes the total
 tick count and absolute timeline for spoiler-free commentary while retaining the current tick and
 playback speed. Replay fog-perspective controls and the replay-branch button remain gated by
 replay-specific visibility/action capabilities, not by lab or URL identity.

@@ -100,13 +100,6 @@ impl RoomTimeOperations {
         seek_absolute: false,
     };
 
-    pub(super) const SPEED_AND_SEEK: Self = Self {
-        set_speed: true,
-        step: false,
-        seek_relative: true,
-        seek_absolute: true,
-    };
-
     pub(super) const FULL_SEEKABLE: Self = Self {
         set_speed: true,
         step: true,
@@ -142,7 +135,7 @@ impl ClockCapability {
     pub(super) const BRANCH_STAGING: Self = Self::FixedRealtime(ClockTickSource::BranchStaging);
     pub(super) const REPLAY_PLAYBACK: Self = Self::RoomControlled(RoomTimeCapability {
         source: RoomTimeSource::ReplayPlayback,
-        operations: RoomTimeOperations::SPEED_AND_SEEK,
+        operations: RoomTimeOperations::FULL_SEEKABLE,
     });
     pub(super) const DEV_SCENARIO: Self = Self::RoomControlled(RoomTimeCapability {
         source: RoomTimeSource::DevScenario,

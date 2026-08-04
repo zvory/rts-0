@@ -176,7 +176,7 @@ impl RoomTask {
             return;
         };
         self.broadcast(&ServerMessage::RoomTimeState(
-            self.room_time_state_for_live_game(game, None),
+            self.tick_control().room_time_state(game.tick_count(), None),
         ));
     }
 

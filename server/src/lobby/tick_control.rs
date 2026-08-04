@@ -1,6 +1,7 @@
 use super::session_policy::{
     ClockCapability, ClockTickSource, RoomTimeOperation, RoomTimeOperations, RoomTimeSource,
 };
+use crate::protocol::RoomTimeState;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -82,6 +83,24 @@ impl TickControl {
         self.speed_multiplier
     }
 
+    pub(super) fn room_time_state(
+        self,
+        current_tick: u32,
+        controller_id: Option<u32>,
+    ) -> RoomTimeState {
+        let paused = matches!(self.mode, TickMode::RoomControlledPaused(_));
+        RoomTimeState {
+            current_tick,
+            duration_ticks: 0,
+            keyframe_ticks: Vec::new(),
+            speed: if paused { 0.0 } else { self.speed_multiplier },
+            paused,
+            ended: false,
+            controller_id,
+            seek: None,
+        }
+    }
+
     pub(super) fn scheduled_action(self) -> ScheduledTickAction {
         match self.mode {
             TickMode::RoomControlledPaused(_) => ScheduledTickAction::Noop,
@@ -151,7 +170,7 @@ mod tests {
         assert!(replay.allows_room_time_operation(RoomTimeOperation::SetSpeed, true));
         assert!(replay.allows_room_time_operation(RoomTimeOperation::SeekRelative, true));
         assert!(replay.allows_room_time_operation(RoomTimeOperation::SeekAbsolute, true));
-        assert!(!replay.allows_room_time_operation(RoomTimeOperation::Step, true));
+        assert!(replay.allows_room_time_operation(RoomTimeOperation::Step, true));
 
         let paused_replay = TickControl::new(
             ClockCapability::REPLAY_PLAYBACK,
@@ -164,6 +183,7 @@ mod tests {
         );
         assert_duration_close(paused_replay.tick_interval(base), Duration::from_millis(90));
         assert_eq!(paused_replay.scheduled_action(), ScheduledTickAction::Noop);
+        assert!(paused_replay.can_step_room_time(true));
 
         let dev_watch = TickControl::new(
             ClockCapability::DEV_SCENARIO,
