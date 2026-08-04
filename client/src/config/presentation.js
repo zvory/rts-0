@@ -75,6 +75,7 @@ export const CAMERA = Object.freeze({
 
 export const WORKER_BUILD_CARD_SLOTS = Object.freeze([
   KIND.RESOURCE_DEPOT,
+  null,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.ENGINEERING_COMPLEX,

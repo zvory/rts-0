@@ -59,6 +59,7 @@ import fs from "node:fs";
         },
       },
       tick: MapEditorViewport.prototype.tick,
+      queueTerrainChanges: MapEditorViewport.prototype.queueTerrainChanges,
       submitPresentation: MapEditorViewport.prototype.submitPresentation,
       settlePresentation: MapEditorViewport.prototype.settlePresentation,
       stopPresentation: MapEditorViewport.prototype.stopPresentation,
@@ -304,7 +305,7 @@ assert(
     async text() { throw new Error("oversized files must not be read"); },
   });
   assert.deepEqual(statuses.at(-1), {
-    message: "Could not load huge.json: Map JSON files must be 8 MB or smaller.",
+    message: "Could not load huge.json: Map JSON files must be 8 MiB or smaller.",
     error: true,
   });
 

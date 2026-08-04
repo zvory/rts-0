@@ -388,6 +388,7 @@ try {
     await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
     "worker Build command opened the build submenu",
   );
+  await page.waitForSelector('#command-card button[data-command-id="kriegsia.build.resource_depot"]');
   const engineerBuildCard = await page.evaluate(() => ({
     hasDepotButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.resource_depot"]'),
     hasPumpJackButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.pump_jack"]'),
@@ -767,6 +768,11 @@ try {
           .find((node) => node.querySelector("legend")?.textContent === "Gameplay overlays");
         return [...section?.querySelectorAll("button") || []].map((button) => button.textContent?.trim() || "");
       })(),
+      overlayEffects: [...document.querySelectorAll(".map-editor-overlay-toggle")]
+        .map((label) => ({
+          label: label.textContent?.trim() || "",
+          checked: !!label.querySelector("input[type=checkbox]")?.checked,
+        })),
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
@@ -826,8 +832,10 @@ try {
       editorUi.layerPanel.movePreservedSize &&
       ["Terrain & bases", "Stealth", "No vehicles", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)) &&
-      ["Paint selected", "Erase selected"]
-        .every((label) => editorUi.overlayTools.includes(label)) &&
+      ["Stealth", "No vehicles", "Damage reduction", "Slowed movement"]
+        .every((label) => editorUi.overlayEffects.some((effect) => effect.label === label)) &&
+      editorUi.overlayEffects.filter((effect) => effect.checked).map((effect) => effect.label).join(",") === "Stealth" &&
+      ["Paint selected", "Erase selected"].every((label) => editorUi.overlayTools.includes(label)) &&
       !editorUi.overlayTools.includes("Forest") && !editorUi.overlayTools.includes("Erase both"),
     `MAP EDITOR: compact floating Layers panel exposes eight independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
   );
