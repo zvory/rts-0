@@ -695,6 +695,7 @@ assert(
     overlayRevision: 0,
     selectedBaseIndex: null,
     siteRecord: MapEditorViewport.prototype.siteRecord,
+    resourcePreviewRecords: () => [],
     paintPreviewRecord: () => null,
   };
   MapEditorViewport.prototype.drawOverlay.call(recordViewport);
