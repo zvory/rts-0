@@ -550,7 +550,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::PumpJack,
         stats: balance::BuildingStats {
-            hp: 50,
+            hp: 75,
             sight_tiles: 1,
             cost_steel: 100,
             cost_oil: 0,
@@ -693,6 +693,8 @@ mod tests {
             (steel_mine.stats.cost_steel, steel_mine.stats.cost_oil),
             (50, 0)
         );
+        assert_eq!(steel_mine.stats.hp, 50);
+        assert_eq!(steel_mine.armor_class, ArmorClass::Small);
         assert_eq!(
             building_def(EntityKind::Barracks).unwrap().trains,
             BARRACKS_UNITS
@@ -816,7 +818,7 @@ mod tests {
     fn pump_jack_uses_contextual_oil_extractor_stats() {
         let def = building_def(EntityKind::PumpJack).expect("pump jack def");
 
-        assert_eq!(def.stats.hp, 50);
+        assert_eq!(def.stats.hp, 75);
         assert_eq!(def.stats.sight_tiles, 1);
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (100, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
