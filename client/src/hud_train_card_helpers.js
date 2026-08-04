@@ -22,6 +22,22 @@ export function selectedProducingBuildingsForKind(ctx, kind, isOwn) {
   );
 }
 
+export function productionRepeatAffordance(automatic, producerIds, repeatingIds, unit, ready) {
+  const activeCount = automatic ? producerIds.length : repeatingIds.length;
+  return {
+    repeatable: !automatic && ready,
+    countBadge: `${activeCount}/${producerIds.length}`,
+    autobuildIndicatorCount: activeCount,
+    cls: activeCount > 0 ? "autocast-enabled production-repeat-enabled" : "",
+    contextIntent: automatic ? null : {
+      type: "adjustProductionRepeat",
+      buildingIds: producerIds,
+      unit,
+    },
+    contextHotkeyModifiers: ["alt", "ctrl", "shift"],
+  };
+}
+
 export function trainAvailability(ctx, unit, resources, isOwn) {
   const st = STATS[unit];
   if (!st) return "locked";
