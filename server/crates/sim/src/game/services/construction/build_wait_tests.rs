@@ -94,7 +94,7 @@ fn waiting_build_starts_when_resources_become_available() {
 }
 
 #[test]
-fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
+fn arrived_pump_jack_starts_for_free() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
     let (sx, sy) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
@@ -126,43 +126,17 @@ fn arrived_pump_jack_waits_for_steel_and_charges_on_start() {
             .get(worker)
             .expect("worker should survive")
             .build_phase(),
-        Some(BuildPhase::WaitingAtSite)
+        Some(BuildPhase::Constructing {
+            site: entities
+                .iter()
+                .find(|entity| entity.kind == EntityKind::PumpJack && entity.under_construction())
+                .expect("free Pump Jack should start immediately")
+                .id,
+        })
     );
-    assert!(
-        entities
-            .iter()
-            .all(|entity| entity.kind != EntityKind::PumpJack),
-        "resource wait must not spawn a Pump Jack scaffold"
-    );
-    assert_eq!(
-        entities
-            .get(blocker)
-            .map(|entity| (entity.pos_x, entity.pos_y)),
-        Some(blocker_before),
-        "a Pump Jack that cannot yet be afforded must not displace friendly units"
-    );
-    assert!(matches!(
-        events.get(&1).and_then(|events| events.first()),
-        Some(Event::Notice { msg, .. }) if msg == "Not enough steel"
-    ));
-
     let cost = rules::economy::resource_cost(EntityKind::PumpJack);
-    assert_eq!((cost.steel, cost.oil), (100, 0));
-    players[0].set_resources(cost.steel, cost.oil);
-    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
-
-    let scaffold = entities
-        .iter()
-        .find(|entity| entity.kind == EntityKind::PumpJack && entity.under_construction())
-        .expect("Pump Jack should spawn once steel is available");
-    assert_eq!(
-        entities
-            .get(worker)
-            .expect("worker should survive")
-            .build_phase(),
-        Some(BuildPhase::Constructing { site: scaffold.id })
-    );
-    assert_eq!(players[0].steel, 0);
+    assert_eq!((cost.steel, cost.oil), (0, 0));
+    assert_eq!(players[0].steel, 99);
     assert_eq!(players[0].oil, 0);
     assert_ne!(
         entities

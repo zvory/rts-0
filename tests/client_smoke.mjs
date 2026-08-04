@@ -422,12 +422,12 @@ try {
   });
   ok(
     extractorSlots?.steelMineHotkey === "W" &&
-      extractorSlots.steelMineCost === "50" &&
-      extractorSlots.steelMineTooltip.includes("20s") &&
+      extractorSlots.steelMineCost === "0" &&
+      extractorSlots.steelMineTooltip.includes("24s") &&
       extractorSlots.pumpJackHotkey === "E" &&
-      extractorSlots.pumpJackCost === "100" &&
-      extractorSlots.pumpJackTooltip.includes("20s"),
-    `PRODUCTION: Depot exposes W Steel Mine (50) and E Pump Jack (100) with build times (${JSON.stringify(extractorSlots)})`,
+      extractorSlots.pumpJackCost === "0" &&
+      extractorSlots.pumpJackTooltip.includes("24s"),
+    `PRODUCTION: Depot shows automatic free W Steel Mine and E Pump Jack jobs with build times (${JSON.stringify(extractorSlots)})`,
   );
 
   const trainBtn = await page.evaluate(() => {

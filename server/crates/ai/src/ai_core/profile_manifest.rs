@@ -125,7 +125,6 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
             vec![
                 "economy_manager",
                 "two_engineer_two_pump_opening",
-                "depot_extractor_repeat",
                 "two_machine_gunner_opening",
                 "half_health_machine_gunner_replacement",
                 "immediate_tank_tech",

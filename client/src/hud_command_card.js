@@ -483,27 +483,35 @@ export function buildTrainCard(ctx, building) {
     const repeatingIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
       .filter((producer) => producer.prodRepeatKinds?.includes(unit))
       .map((producer) => producer.id);
-    const disabledReason = trainDisabledReason(ctx, unit, resources, isOwn);
+    const automaticExtractor = building.kind === KIND.RESOURCE_DEPOT &&
+      (unit === KIND.STEEL_MINE || unit === KIND.PUMP_JACK);
+    const disabledReason = automaticExtractor
+      ? "Automatically builds for free whenever a matching resource patch is available"
+      : trainDisabledReason(ctx, unit, resources, isOwn);
     const repeatHelp = "Alt-click, Alt+hotkey, or Ctrl+hotkey adds one auto-build; Shift+hotkey removes one";
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),
       kind: "button",
       action: "train",
-      intent: { type: "train", unit },
+      intent: automaticExtractor ? null : { type: "train", unit },
       icon: st.icon,
       unitIconKind: unit,
       label: st.label,
       cost: st.cost,
-      enabled: availability !== "locked",
+      enabled: !automaticExtractor && availability !== "locked",
       unaffordable: availability === "unaffordable",
-      title: disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp,
+      title: automaticExtractor
+        ? disabledReason
+        : (disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp),
       tooltipKind: unit,
-      repeatable: availability === "ready",
-      countBadge: `${repeatingIds.length}/${producerIds.length}`,
-      autobuildIndicatorCount: repeatingIds.length,
-      cls: repeatingIds.length > 0 ? "autocast-enabled production-repeat-enabled" : "",
-      contextIntent: {
+      repeatable: !automaticExtractor && availability === "ready",
+      countBadge: `${automaticExtractor ? producerIds.length : repeatingIds.length}/${producerIds.length}`,
+      autobuildIndicatorCount: automaticExtractor ? producerIds.length : repeatingIds.length,
+      cls: automaticExtractor || repeatingIds.length > 0
+        ? "autocast-enabled production-repeat-enabled"
+        : "",
+      contextIntent: automaticExtractor ? null : {
         type: "adjustProductionRepeat",
         buildingIds: producerIds,
         unit,
