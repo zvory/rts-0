@@ -296,7 +296,7 @@ try {
   };
   renderer._drawBuilding(steelMine, colorByOwner, state);
   assert(
-    renderer._pools.buildingShadows.get(steelMine.id)?.visible !== false,
+    renderer._pools.buildingShadows.get(steelMine.id)?.visible === true,
     "extractor SVG fallback keeps its footprint shadow while the component atlas is unavailable",
   );
   for (const seen of Object.values(renderer._seen)) seen.clear();
