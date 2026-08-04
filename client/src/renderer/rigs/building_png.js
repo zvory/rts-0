@@ -18,15 +18,16 @@ const RUNTIME_TILE_SIZE = 32;
 function buildingSpec(kind, frameWidth, frameHeight, image, {
   silhouetteShadow = true,
   emblem = false,
+  visualScale = 1,
 } = {}) {
-  return Object.freeze({ kind, frameWidth, frameHeight, image, silhouetteShadow, emblem });
+  return Object.freeze({ kind, frameWidth, frameHeight, image, silhouetteShadow, emblem, visualScale });
 }
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
   buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
     "/assets/rigs/resource-depot-worksite-preview/resource_depot-atlas.png?v=oil-silo-foundry-worksite-preview-08",
-    { emblem: true }),
+    { emblem: true, visualScale: 1.1 }),
   buildingSpec(KIND.BARRACKS, 384, 256,
     "/assets/rigs/building-emblems-preview/barracks-atlas-m14-team-tint.png?v=building-emblems-preview-04",
     { emblem: true }),
@@ -106,7 +107,7 @@ function definition(spec) {
 }
 
 function atlas(spec) {
-  const { kind, frameWidth, frameHeight, image, silhouetteShadow, emblem } = spec;
+  const { kind, frameWidth, frameHeight, image, silhouetteShadow, emblem, visualScale } = spec;
   const { footW, footH } = buildingFootprint(kind);
   const worldWidth = footW * RUNTIME_TILE_SIZE;
   const worldHeight = footH * RUNTIME_TILE_SIZE;
@@ -117,8 +118,10 @@ function atlas(spec) {
     h: frameHeight,
     originX: frameWidth / 2,
     originY: frameHeight / 2,
-    pixelsPerUnitX: frameWidth / worldWidth,
-    pixelsPerUnitY: frameHeight / worldHeight,
+    // Keep authoritative footprint and selection geometry unchanged while
+    // allowing atlas-specific transparent padding to be compensated visually.
+    pixelsPerUnitX: frameWidth / (worldWidth * visualScale),
+    pixelsPerUnitY: frameHeight / (worldHeight * visualScale),
   });
   const sprites = [
     {

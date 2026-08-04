@@ -105,6 +105,15 @@ for (const [kind, footprint] of expectedFootprints) {
         && sprite.frame.y + sprite.frame.h <= atlas.grid.height,
       `${kind}.${sprite.id} frame fits grid`,
     );
+    const expectedVisualScale = kind === KIND.RESOURCE_DEPOT ? 1.1 : 1;
+    strictAssert.equal(
+      sprite.frame.w / sprite.frame.pixelsPerUnitX,
+      footprint[0] * 32 * expectedVisualScale,
+    );
+    strictAssert.equal(
+      sprite.frame.h / sprite.frame.pixelsPerUnitY,
+      footprint[1] * 32 * expectedVisualScale,
+    );
   }
   strictAssert.equal(definition.parts.some((part) => part.id === "part.emblem"), hasEmblem);
   if (hasEmblem) {
