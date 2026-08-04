@@ -172,6 +172,7 @@ impl<'a> LineOfSight<'a> {
                     allow_opaque_target,
                     concealment_budget,
                     &mut concealment_tiles,
+                    true,
                 ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
@@ -186,6 +187,7 @@ impl<'a> LineOfSight<'a> {
                     allow_opaque_target,
                     concealment_budget,
                     &mut concealment_tiles,
+                    true,
                 ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
@@ -200,6 +202,7 @@ impl<'a> LineOfSight<'a> {
                     allow_opaque_target,
                     concealment_budget,
                     &mut concealment_tiles,
+                    false,
                 ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
@@ -211,6 +214,7 @@ impl<'a> LineOfSight<'a> {
                     allow_opaque_target,
                     concealment_budget,
                     &mut concealment_tiles,
+                    false,
                 ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
@@ -224,6 +228,7 @@ impl<'a> LineOfSight<'a> {
                     allow_opaque_target,
                     concealment_budget,
                     &mut concealment_tiles,
+                    true,
                 ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
@@ -244,12 +249,13 @@ impl<'a> LineOfSight<'a> {
         allow_opaque_target: bool,
         concealment_budget: Option<u32>,
         concealment_tiles: &mut u32,
+        count_concealment: bool,
     ) -> RaycastStep {
         if !self.map.in_bounds(tile.0, tile.1) {
             return RaycastStep::Blocked;
         }
         let current = (tile.0 as u32, tile.1 as u32);
-        if self.map.is_concealment_tile(current.0, current.1) {
+        if count_concealment && self.map.is_concealment_tile(current.0, current.1) {
             *concealment_tiles = concealment_tiles.saturating_add(1);
             if concealment_budget.is_some_and(|budget| *concealment_tiles > budget) {
                 return RaycastStep::Blocked;
@@ -397,5 +403,16 @@ mod tests {
         let los = LineOfSight::new(&map);
 
         assert!(los.tile_visible_from_world(map.tile_center(2, 4), (8, 4)));
+    }
+
+    #[test]
+    fn diagonal_fog_sight_counts_entered_tiles_not_corner_neighbors() {
+        let mut map = flat_map(10);
+        map.concealment_tiles = (2..=5).flat_map(|x| (2..=5).map(move |y| (x, y))).collect();
+        let los = LineOfSight::new(&map);
+        let origin = map.tile_center(1, 1);
+
+        assert!(los.tile_visible_from_world(origin, (4, 4)));
+        assert!(!los.tile_visible_from_world(origin, (5, 5)));
     }
 }
