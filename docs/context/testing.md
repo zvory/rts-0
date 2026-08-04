@@ -49,7 +49,7 @@ Use for tests, CI/hooks, or focused verification.
 - Installed hooks run staged whitespace checks, excluding `playtest_notes.md`, plus docs health.
   They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
 - `agent-pr.sh` skips Codex for pure `.md` diffs and otherwise formats touched Rust.
-  Patch notes use a local outbox, with no extra Codex pass.
+  Patch notes use a local outbox and require user approval.
 - Root npm tools require Node 22.18+ and run `scripts/ensure-node-deps.sh` for shared dependencies.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.

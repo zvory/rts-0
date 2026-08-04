@@ -16,6 +16,7 @@ const origin = path.join(fixtureRoot, "origin.git");
 const publisher = path.join(fixtureRoot, "publisher");
 const worktreeRoot = path.join(fixtureRoot, "worktrees");
 const targetRoot = path.join(fixtureRoot, "targets");
+const deliveryLog = path.join(fixtureRoot, "delivery.log");
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -71,16 +72,14 @@ function mergedViewJson(headSha, number, files = []) {
   });
 }
 
-function waitEnvironment(headSha, number, files = [], options = {}) {
-  const environment = {
+function waitEnvironment(headSha, number, files = []) {
+  return {
     RTS_WAIT_PR_VIEW_JSON: mergedViewJson(headSha, number, files),
     RTS_WAIT_PR_CHECKS_JSON: "[]",
     RTS_WORKTREE_ROOT: worktreeRoot,
     RTS_CARGO_TARGET_BASE_DIR: targetRoot,
+    RTS_WAIT_PR_DELIVERY_LOG: deliveryLog,
   };
-  if (options.skipDelivery !== false) environment.RTS_WAIT_PR_SKIP_PATCH_NOTE_DELIVERY = "1";
-  if (options.deliveryLog) environment.RTS_WAIT_PR_DELIVERY_LOG = options.deliveryLog;
-  return environment;
 }
 
 fs.mkdirSync(path.join(repo, "scripts"), { recursive: true });
@@ -114,22 +113,14 @@ try {
   const first = createTask(firstBranch, "wait-pr-41", "first.txt");
   mergeTask(firstBranch);
   fs.writeFileSync(path.join(repo, "local-note.txt"), "preserve me\n");
-  const deliveryLog = path.join(fixtureRoot, "delivery.log");
-
   const output = run("bash", [waitScript, "41"], {
     cwd: first.taskPath,
-    env: waitEnvironment(first.headSha, 41, ["first.txt"], { skipDelivery: false, deliveryLog }),
+    env: waitEnvironment(first.headSha, 41, ["first.txt"]),
   });
 
   assert.match(output, /refreshing local main checkout/);
-  assert.match(output, /attempting best-effort Discord patch-note delivery/);
   assert.match(output, /local main is current/);
-  const canonicalRepo = fs.realpathSync(repo);
-  assert.deepEqual(
-    fs.readFileSync(deliveryLog, "utf8").trim().split("\n"),
-    [`deps ${canonicalRepo}`, `outbox ${canonicalRepo}`],
-    "post-merge dependency and outbox tools must run from the surviving main worktree",
-  );
+  assert.equal(fs.existsSync(deliveryLog), false, "wait-pr must not deliver patch notes");
   assert.equal(
     git(["rev-parse", "main"]).trim(),
     git(["rev-parse", "origin/main"]).trim(),

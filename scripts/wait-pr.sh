@@ -29,7 +29,6 @@ Test fixtures:
   RTS_WAIT_PR_VIEW_JSON      JSON returned instead of `gh pr view`.
   RTS_WAIT_PR_CHECKS_JSON    JSON returned instead of `gh pr checks`.
   RTS_WAIT_PR_SKIP_FETCH=1   Skip `git fetch origin main` before ancestry check.
-  RTS_WAIT_PR_SKIP_PATCH_NOTE_DELIVERY=1  Skip the best-effort local outbox delivery.
 EOF
 }
 
@@ -67,25 +66,6 @@ refresh_main_checkout() {
   # because an already-current checkout does not invoke that hook.
   if ! (cd "$main_worktree" && scripts/cleanup-worktrees.sh --auto); then
     echo "wait-pr: local main is current, but opportunistic worktree cleanup failed" >&2
-  fi
-}
-
-deliver_patch_note_best_effort() {
-  local branch="$1"
-  local main_worktree="${2:-}"
-  if [ "${RTS_WAIT_PR_SKIP_PATCH_NOTE_DELIVERY:-0}" = "1" ]; then
-    return 0
-  fi
-  if [ -z "$main_worktree" ] || [ ! -f "$main_worktree/scripts/patch-note-outbox.mjs" ]; then
-    return 0
-  fi
-  echo "wait-pr: attempting best-effort Discord patch-note delivery for $branch"
-  if ! "$main_worktree/scripts/ensure-node-deps.sh" --repo "$main_worktree" --quiet; then
-    echo "wait-pr: patch-note dependencies unavailable; the local outbox entry was retained for manual retry" >&2
-    return 0
-  fi
-  if ! node "$main_worktree/scripts/patch-note-outbox.mjs" deliver --repo "$main_worktree" --branch "$branch"; then
-    echo "wait-pr: patch-note delivery failed; the local outbox entry was retained for manual retry" >&2
   fi
 }
 
@@ -184,10 +164,8 @@ while true; do
       git fetch --quiet origin main
     fi
     if git merge-base --is-ancestor "$head_sha" "$MAIN_REF"; then
-      delivery_main_worktree="$(main_worktree_path || true)"
-      refresh_main_checkout "$delivery_main_worktree"
-      cd "$delivery_main_worktree"
-      deliver_patch_note_best_effort "$head_ref" "$delivery_main_worktree"
+      main_worktree="$(main_worktree_path || true)"
+      refresh_main_checkout "$main_worktree"
       echo "wait-pr: PR #$number merged, $head_sha is reachable from $MAIN_REF, and local main is current"
       exit 0
     fi
