@@ -128,8 +128,14 @@ mod tests {
             min_pocket_count, 4,
             "all four workers should remain in the pocket"
         );
-        assert!(reversals >= 100, "lead worker only reversed {reversals} times");
-        assert!(distance >= 100.0, "lead worker only moved {distance:.1} pixels");
+        assert!(
+            reversals >= 100,
+            "lead worker only reversed {reversals} times"
+        );
+        assert!(
+            distance >= 100.0,
+            "lead worker only moved {distance:.1} pixels"
+        );
         assert!(span <= 24.0, "lead worker escaped a {span:.1}-pixel span");
     }
 }
