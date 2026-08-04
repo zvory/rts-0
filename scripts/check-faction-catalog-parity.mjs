@@ -475,9 +475,7 @@ for (const rustFaction of allRustCatalogs.catalogs) {
   );
   assert.deepEqual(
     rustFaction.gatherers.map((kind) => kindByStableId.get(kind)),
-    rustFaction.id === DEFAULT_FACTION_ID
-      ? [KIND.WORKER]
-      : rustFaction.id === "ekat"
+    rustFaction.id === "ekat"
         ? [KIND.GOLEM]
         : [],
     `${rustFaction.id} gatherer set remains explicit`,

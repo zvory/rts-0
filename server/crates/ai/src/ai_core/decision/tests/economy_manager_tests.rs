@@ -151,9 +151,8 @@ fn economy_manager_outputs_action_proposals() {
     });
 
     assert!(output.proposes(EconomyProposal::BuildExpansionResourceDepot));
-    assert!(output.proposes(EconomyProposal::TrainWorker));
-    assert!(output.proposes(EconomyProposal::AssignOilWorkers));
-    assert!(output.proposes(EconomyProposal::AssignSteelWorkers));
+    assert!(!output.proposes(EconomyProposal::TrainWorker));
+    assert_eq!(output.plan.target_workers, 1);
 }
 
 #[test]
@@ -198,11 +197,10 @@ fn economy_manager_can_hold_oil_at_current_assignment() {
         output.plan.desired_oil_workers,
         output.plan.current_oil_workers
     );
-    assert!(!output.proposes(EconomyProposal::AssignOilWorkers));
 }
 
 #[test]
-fn jeff_caps_workers_at_steel_patches_plus_one_builder_and_reuses_idle_first() {
+fn jeff_trains_exactly_one_additional_engineer() {
     let mut owned = vec![building_at(
         1,
         EntityKind::ResourceDepot,
@@ -239,11 +237,8 @@ fn jeff_caps_workers_at_steel_patches_plus_one_builder_and_reuses_idle_first() {
         },
     });
 
-    assert_eq!(
-        output.plan.target_workers,
-        output.plan.target_steel_workers + 1
-    );
-    assert!(!output.proposes(EconomyProposal::TrainWorker));
+    assert_eq!(output.plan.target_workers, 2);
+    assert!(output.proposes(EconomyProposal::TrainWorker));
 
     observation.owned[1].state = AiEntityState::Gather;
     let facts = AiFacts::from_observation(&observation);

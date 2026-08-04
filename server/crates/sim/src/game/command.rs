@@ -326,7 +326,9 @@ impl SimCommand {
                 },
             },
             protocol::Command::Train { building, unit } => match unit.parse::<EntityKind>() {
-                Ok(unit) if unit.is_unit() => SimCommand::Train { building, unit },
+                Ok(unit) if unit.is_unit() || unit.is_resource_extractor() => {
+                    SimCommand::Train { building, unit }
+                }
                 _ => SimCommand::Rejected {
                     reason: CommandRejection::Unit,
                 },
@@ -336,11 +338,13 @@ impl SimCommand {
                 unit,
                 delta,
             } => match unit.parse::<EntityKind>() {
-                Ok(unit) if unit.is_unit() => SimCommand::AdjustProductionRepeat {
-                    buildings,
-                    unit,
-                    delta,
-                },
+                Ok(unit) if unit.is_unit() || unit.is_resource_extractor() => {
+                    SimCommand::AdjustProductionRepeat {
+                        buildings,
+                        unit,
+                        delta,
+                    }
+                }
                 _ => SimCommand::Rejected {
                     reason: CommandRejection::Unit,
                 },

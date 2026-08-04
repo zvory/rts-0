@@ -6,6 +6,8 @@ use std::{
 use super::{Entity, EntityKind, GatherPhase};
 use serde::{Deserialize, Serialize};
 
+const RESOURCE_EXTRACTOR_POSITION_EPS_PX: f32 = 0.001;
+
 /// Hashes the server-allocated `u32` ids used only by [`EntityStore`].
 ///
 /// The identity fast path preserves distinct low bucket bits for monotonically allocated ids. The
@@ -175,6 +177,24 @@ impl EntityStore {
         } else {
             None
         }
+    }
+
+    /// Living extractor bound to this exact resource node, if any.
+    ///
+    /// Direct gatherers and depot production share this query so the two economy paths cannot
+    /// claim one Steel patch in the same tick.
+    pub fn resource_extractor_for_node(&self, node_id: u32) -> Option<u32> {
+        let node = self
+            .get(node_id)
+            .filter(|node| node.is_node() && node.remaining().unwrap_or(0) > 0)?;
+        self.iter()
+            .find(|entity| {
+                entity.hp > 0
+                    && entity.kind.extracted_resource_kind() == Some(node.kind)
+                    && (entity.pos_x - node.pos_x).abs() <= RESOURCE_EXTRACTOR_POSITION_EPS_PX
+                    && (entity.pos_y - node.pos_y).abs() <= RESOURCE_EXTRACTOR_POSITION_EPS_PX
+            })
+            .map(|entity| entity.id)
     }
 
     /// Claim `node_id`'s harvest slot for `worker_id` if the gatherer is in the authoritative

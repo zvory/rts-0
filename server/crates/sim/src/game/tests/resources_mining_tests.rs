@@ -1,5 +1,15 @@
 use super::*;
 
+fn set_internal_gather_order(game: &mut Game, gatherer: u32, node: u32) {
+    let entity = game
+        .state
+        .entities
+        .get_mut(gatherer)
+        .expect("gatherer should exist");
+    entity.set_order(Order::gather(node));
+    entity.mark_gather_phase(GatherPhase::ToNode);
+}
+
 #[test]
 fn gather_command_accepts_live_steel_without_nearby_completed_mining_anchor() {
     let players = [PlayerInit {
@@ -41,14 +51,7 @@ fn gather_command_accepts_live_steel_without_nearby_completed_mining_anchor() {
         .spawn_node(EntityKind::Steel, far_x, far_y)
         .expect("far resource node");
 
-    game.enqueue(
-        1,
-        Command::Gather {
-            units: vec![worker],
-            node: far_node,
-            queued: false,
-        },
-    );
+    set_internal_gather_order(&mut game, worker, far_node);
     game.tick();
 
     let worker_entity = game.state.entities.get(worker).expect("worker survives");
@@ -81,6 +84,12 @@ fn gather_command_to_occupied_patch_redirects_without_stealing_slot() {
         .filter(|e| e.owner == 1 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
         .collect();
+    let second = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+        .expect("second internal gatherer");
+    workers.push(second);
     workers.sort_unstable();
     let holder = workers[0];
     let ordered = workers[1];
@@ -124,14 +133,7 @@ fn gather_command_to_occupied_patch_redirects_without_stealing_slot() {
         ordered_entity.set_position(tile_origin.0 + 7.0, tile_origin.1 + 2.0);
     }
 
-    game.enqueue(
-        1,
-        Command::Gather {
-            units: vec![ordered],
-            node,
-            queued: false,
-        },
-    );
+    set_internal_gather_order(&mut game, ordered, node);
     for _ in 0..30 {
         game.tick();
         if game
@@ -224,14 +226,7 @@ fn same_tile_gather_outside_interaction_range_keeps_approaching() {
         "fixture must start outside interaction range ({initial_distance} <= {interact})"
     );
 
-    game.enqueue(
-        1,
-        Command::Gather {
-            units: vec![worker],
-            node,
-            queued: false,
-        },
-    );
+    set_internal_gather_order(&mut game, worker, node);
     for _ in 0..30 {
         game.tick();
         if game
@@ -294,14 +289,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
         worker_entity.pos_y = node_y;
     }
 
-    game.enqueue(
-        1,
-        Command::Gather {
-            units: vec![worker],
-            node,
-            queued: false,
-        },
-    );
+    set_internal_gather_order(&mut game, worker, node);
     game.tick();
 
     assert_eq!(
@@ -338,7 +326,7 @@ fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
         .get(worker)
         .map(|e| (e.pos_x, e.pos_y))
         .expect("worker position");
-    let node = game
+    let mut node = game
         .state
         .entities
         .iter()
@@ -351,14 +339,7 @@ fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
         .map(|e| e.id)
         .expect("starting resource node");
 
-    game.enqueue(
-        1,
-        Command::Gather {
-            units: vec![worker],
-            node,
-            queued: false,
-        },
-    );
+    set_internal_gather_order(&mut game, worker, node);
     for _ in 0..600 {
         game.tick();
         if matches!(
@@ -379,6 +360,12 @@ fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
         Some(GatherPhase::Harvesting),
         "worker should reach and latch the starting patch before the Resource Depot is removed"
     );
+    node = game
+        .state
+        .entities
+        .get(worker)
+        .and_then(|worker| worker.order().gather_node())
+        .expect("worker should retain the patch selected after any occupied-node redirect");
 
     let (resource_depot, resource_depot_pos) = game
         .state

@@ -216,6 +216,52 @@ fn worker_direct_oil_gather_order_is_idled() {
 }
 
 #[test]
+fn direct_gatherer_cannot_share_a_steel_patch_with_an_extractor() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let node_pos = map.tile_center(12, 12);
+    spawn_completed_mining_anchor(&mut entities, 1, node_pos.0, node_pos.1);
+    let node = entities
+        .spawn_node(EntityKind::Steel, node_pos.0, node_pos.1)
+        .expect("steel node should spawn");
+    entities
+        .spawn_building(1, EntityKind::SteelMine, node_pos.0, node_pos.1, true)
+        .expect("steel mine should spawn");
+    let gatherer = entities
+        .spawn_unit(1, EntityKind::Golem, node_pos.0, node_pos.1)
+        .expect("gatherer should spawn");
+    entities
+        .get_mut(gatherer)
+        .expect("gatherer should exist")
+        .set_order(Order::gather(node));
+
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    let mut players = Vec::new();
+
+    gather_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &occ,
+        &mut coordinator,
+        &team_relations(&[(1, 1)]),
+        1,
+    );
+
+    assert_eq!(entities.node_slot_holder(node), None);
+    assert!(
+        !matches!(
+            entities.get(gatherer).expect("gatherer").order(),
+            Order::Gather(_)
+        ),
+        "an extractor-owned patch must not enter direct harvesting"
+    );
+}
+
+#[test]
 fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
@@ -242,7 +288,7 @@ fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
     assert_eq!(payouts.len(), 1);
     assert_eq!(payouts[0].owner, 1);
     assert_eq!(
-        payouts[0].oil,
+        payouts[0].amount,
         config::OIL_LOAD,
         "Pump Jack should pay the same oil load as one worker harvest"
     );
@@ -250,6 +296,39 @@ fn completed_pump_jack_mines_overlapping_oil_at_worker_rate() {
         entities.get(oil).and_then(|node| node.remaining()),
         Some(oil_before - config::OIL_LOAD),
         "Pump Jack income should deplete the oil node by the paid amount"
+    );
+}
+
+#[test]
+fn completed_steel_mine_mines_overlapping_steel_at_extractor_rate() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (mine_x, mine_y) = footprint_center(&map, EntityKind::SteelMine, 4, 4);
+    let steel = entities
+        .spawn_node(EntityKind::Steel, mine_x, mine_y)
+        .expect("steel node should spawn");
+    entities
+        .spawn_building(1, EntityKind::SteelMine, mine_x, mine_y, true)
+        .expect("steel mine should spawn");
+    spawn_completed_mining_anchor(&mut entities, 1, mine_x, mine_y);
+    let teams = team_relations(&[(1, 1)]);
+    let steel_before = entities
+        .get(steel)
+        .and_then(|node| node.remaining())
+        .expect("steel node remaining");
+
+    let mut payouts = Vec::new();
+    for _ in 0..config::HARVEST_TICKS {
+        payouts.extend(pump_jack::tick(&mut entities, &teams));
+    }
+
+    assert_eq!(payouts.len(), 1);
+    assert_eq!(payouts[0].owner, 1);
+    assert_eq!(payouts[0].kind, EntityKind::Steel);
+    assert_eq!(payouts[0].amount, config::STEEL_LOAD);
+    assert_eq!(
+        entities.get(steel).and_then(|node| node.remaining()),
+        Some(steel_before - config::STEEL_LOAD)
     );
 }
 
@@ -311,7 +390,7 @@ fn pump_jack_waits_for_a_completed_friendly_mining_anchor() {
 
     assert_eq!(payouts.len(), 1);
     assert_eq!(payouts[0].owner, 1);
-    assert_eq!(payouts[0].oil, config::OIL_LOAD);
+    assert_eq!(payouts[0].amount, config::OIL_LOAD);
     assert_eq!(
         entities.get(oil).and_then(|node| node.remaining()),
         Some(oil_before - config::OIL_LOAD),
@@ -350,7 +429,7 @@ fn pump_jack_disappears_with_its_depleted_oil_patch() {
     let payouts = pump_jack::tick(&mut entities, &teams);
 
     assert_eq!(payouts.len(), 1);
-    assert_eq!(payouts[0].oil, config::OIL_LOAD);
+    assert_eq!(payouts[0].amount, config::OIL_LOAD);
     assert_eq!(entities.get(oil).and_then(|node| node.remaining()), Some(0));
     assert!(
         !entities.contains(pump),
@@ -398,7 +477,7 @@ fn pump_jack_does_not_retarget_another_oil_patch_after_depletion() {
     }
 
     assert_eq!(payouts.len(), 1);
-    assert_eq!(payouts[0].oil, config::OIL_LOAD);
+    assert_eq!(payouts[0].amount, config::OIL_LOAD);
     assert!(
         !entities.contains(pump),
         "Pump Jack should disappear when its supporting patch is depleted"

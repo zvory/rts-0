@@ -130,6 +130,39 @@ their `*_BODY_*` length, width, and clearance values instead.
 
 ### 5.0 Faction economy contract
 
+#### Depot-built extractors
+
+The Kriegsia economy replaces transferable Engineer mining with base-local extractor growth.
+Engineers remain 50-Steel, 1-Supply construction units trained by
+the Resource Depot, but they cannot gather resources and no longer place Pump Jacks. The standard
+start contains one completed Engineer and six completed Steel Mines attached to six of the home
+base's live Steel patches.
+
+Steel Mine uses placeholder presentation. It is a 1x1 completed-capable
+building with 50 HP, Small/unarmored combat classification, 1-tile sight, no weapon, no supply,
+and no survival-building contribution. It must be centered on one live Steel patch within the
+existing `MINING_ANCHOR_RANGE_TILES = 11` coverage of the producing Resource Depot. It extracts
+`STEEL_LOAD = 2` Steel every `HARVEST_TICKS = 40` ticks and disappears when its bound patch is
+depleted. It costs 50 Steel and takes 20 seconds to produce.
+
+Pump Jack keeps its existing 1x1 footprint, 50 HP, Small/unarmored classification, 1-tile sight,
+100-Steel cost, 20-second time, and `OIL_LOAD = 2` payout every 40 ticks, but moves from Engineer
+placement to Resource Depot production. A completed Resource Depot exposes Engineer, Steel Mine,
+and Pump Jack in one FIFO production queue. A paid front extractor item chooses a deterministic
+live, unoccupied matching patch within that specific depot's 11-tile coverage and immediately
+creates an under-construction scaffold there. The scaffold and depot production bars share the
+same authoritative progress, and queue completion completes that same scaffold; if no eligible
+patch exists, the front item pauses without starting.
+Manual clicks queue one item. Existing Alt-click/Alt-hotkey/Ctrl-hotkey repeat-production controls
+enable automatic production; repeated extractors pause without spending or queueing when all
+matching in-range patches are occupied and resume when destruction makes a patch eligible again.
+When both extractor kinds repeat at one Depot, a saturated kind yields to the other kind instead
+of blocking the shared queue.
+Neither extractor accepts a rally order, consumes supply, grants supply, or provides production,
+research, attacks, wreckage, refunds on death, or special death effects. Both remain ordinary
+fog-gated, targetable buildings and can be spawned in Lab. Built-in AIs enable repeat for both
+extractor kinds on every completed Resource Depot; their Engineers remain construction-only.
+
 The faction rollout keeps Steel, Oil, and Supply as the global economy contract. Faction catalogs
 decide which global units, buildings, upgrades, and abilities are legal for a player and define
 starting Steel/Oil values plus starting entity loadouts, but they still use fixed `steel`, `oil`,

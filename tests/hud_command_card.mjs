@@ -199,16 +199,15 @@ function buttonSlots(card) {
   assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.RESOURCE_DEPOT));
   assert.equal(buildCard.slots[0].slotIndex, 0);
   assert.equal(buildCard.slots[0].hotkey, "Q");
-  assert.equal(buildCard.slots[1].commandId, kriegsiaCommandId("build", KIND.PUMP_JACK));
-  assert.equal(buildCard.slots[1].label, "Pump Jack");
-  assert.equal(buildCard.slots[1].hotkey, "W");
-  assert.deepEqual(buildCard.slots[1].intent, {
-    type: "beginPlacement",
-    building: KIND.PUMP_JACK,
-  }, "Pump Jack W slot starts normal placement");
-  assert.equal(buildCard.slots[7].commandId, kriegsiaCommandId("build", KIND.TANK_TRAP));
-  assert.equal(buildCard.slots[7].label, "Tank Trap");
-  assert.equal(buildCard.slots[7].hotkey, "X");
+  assert.equal(buildCard.slots[1].commandId, kriegsiaCommandId("build", KIND.BARRACKS));
+  assert.equal(buildCard.slots[6].commandId, kriegsiaCommandId("build", KIND.TANK_TRAP));
+  assert.equal(buildCard.slots[6].label, "Tank Trap");
+  assert.equal(buildCard.slots[6].hotkey, "Z");
+  assert.equal(
+    buildCard.slots.some((slot) => slot?.commandId === kriegsiaCommandId("build", KIND.PUMP_JACK)),
+    false,
+    "Engineers no longer place Pump Jacks",
+  );
   assert.equal(buildCard.slots[8].commandId, "worker.return");
   assert.equal(buildCard.slots[8].hotkey, "C");
   assert.deepEqual(commandCardActivationCandidates(workerCard, "worker.buildMenu"), [{
@@ -307,6 +306,20 @@ function buttonSlots(card) {
     [],
     "Resource Depot no longer exposes Scout Plane production",
   );
+  assert.deepEqual(
+    resourceDepotCard.slots.slice(0, 3).map((slot) => slot?.commandId),
+    [
+      kriegsiaCommandId("train", KIND.WORKER),
+      kriegsiaCommandId("train", KIND.STEEL_MINE),
+      kriegsiaCommandId("train", KIND.PUMP_JACK),
+    ],
+    "Resource Depot exposes Engineer and both depot-local extractors",
+  );
+  assert.deepEqual(resourceDepotCard.slots[1].contextIntent, {
+    type: "adjustProductionRepeat",
+    buildingIds: [resourceDepot.id],
+    unit: KIND.STEEL_MINE,
+  });
 }
 
 {
@@ -649,7 +662,6 @@ function buttonSlots(card) {
   );
   assert.deepEqual(WORKER_BUILDABLE, [
     KIND.RESOURCE_DEPOT,
-    KIND.PUMP_JACK,
     KIND.BARRACKS,
     KIND.TRAINING_CENTRE,
     KIND.ENGINEERING_COMPLEX,

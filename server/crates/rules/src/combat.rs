@@ -315,6 +315,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         | EntityKind::Factory
         | EntityKind::Steelworks
         | EntityKind::TankTrap
+        | EntityKind::SteelMine
         | EntityKind::PumpJack
         | EntityKind::Steel
         | EntityKind::Oil => None,
@@ -810,6 +811,7 @@ mod tests {
             (EntityKind::Factory, None),
             (EntityKind::Steelworks, None),
             (EntityKind::TankTrap, None),
+            (EntityKind::SteelMine, None),
             (EntityKind::PumpJack, None),
             (EntityKind::Steel, None),
             (EntityKind::Oil, None),

@@ -16,22 +16,24 @@ input.state = {
   entitiesInterpolated: () => [worker, friendlyTank, oil],
   selectedEntities: () => [worker],
   isAllyOwner: (owner) => owner === 2,
+  isEnemyOwner: () => false,
   addCommandFeedback() {},
 };
 input.commandInteraction = { issueCommand(command) { commands.push(command); } };
 input._groundAtScreen = (x, y) => ({ x, y });
+const projection = createOrthographicProjectionSnapshot({
+  x: 0,
+  y: 0,
+  zoom: 1,
+  worldW: map.width * map.tileSize,
+  worldH: map.height * map.tileSize,
+  viewW: 640,
+  viewH: 480,
+});
 input.selectionScene = buildSelectionScene({
   entities: input.state.entitiesInterpolated(),
   tileSize: map.tileSize,
-  projection: createOrthographicProjectionSnapshot({
-    x: 0,
-    y: 0,
-    zoom: 1,
-    worldW: map.width * map.tileSize,
-    worldH: map.height * map.tileSize,
-    viewW: 640,
-    viewH: 480,
-  }),
+  projection,
 });
 
 const friendlyTankHullPoint = { x: friendlyTank.x + 24, y: friendlyTank.y };
@@ -44,11 +46,30 @@ assert(
 input._onRightClick(friendlyTankHullPoint);
 assert(
   commands.length === 1 &&
-    commands[0].c === "build" &&
-    commands[0].building === KIND.PUMP_JACK &&
-    commands[0].tileX === 3 &&
-    commands[0].tileY === 3,
-  "worker right-click on a friendly unit standing over oil should build the underlying Pump Jack",
+    commands[0].c === "move" &&
+    commands[0].units.join(",") === String(worker.id),
+  "Engineer right-click over oil remains a move now that depots produce Pump Jacks",
+);
+
+const steelMineScaffold = {
+  id: 4,
+  owner: 1,
+  kind: KIND.STEEL_MINE,
+  x: 144,
+  y: 144,
+  buildProgress: 0.5,
+};
+input.state.entitiesInterpolated = () => [worker, steelMineScaffold];
+input.selectionScene = buildSelectionScene({
+  entities: input.state.entitiesInterpolated(),
+  tileSize: map.tileSize,
+  projection,
+});
+commands.length = 0;
+input._onRightClick({ x: steelMineScaffold.x, y: steelMineScaffold.y });
+assert(
+  commands.length === 1 && commands[0].c === "move",
+  "Engineer right-click on a depot-built extractor scaffold moves instead of issuing an invalid build command",
 );
 
 const miningAnchorInput = Object.create(Input.prototype);

@@ -190,8 +190,9 @@ pub(crate) fn resource_node_building_overlap_allowed(
     building_kind: EntityKind,
     rect: RectBody,
 ) -> bool {
-    build_placement_policy(building_kind) == BuildPlacementPolicy::PumpJackOilOnly
-        && pump_jack::oil_node_center_in_rect(node, rect)
+    (building_kind == EntityKind::SteelMine && node.kind == EntityKind::Steel)
+        || (build_placement_policy(building_kind) == BuildPlacementPolicy::PumpJackOilOnly
+            && pump_jack::oil_node_center_in_rect(node, rect))
 }
 
 pub(crate) fn unit_intersects_building_footprint(

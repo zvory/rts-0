@@ -27,10 +27,10 @@ pub(crate) fn pump_jack_is_active(
     let Some(pump) = entities.get(pump_id) else {
         return false;
     };
-    if pump.kind != EntityKind::PumpJack || pump.hp == 0 || pump.under_construction() {
+    if !pump.kind.is_resource_extractor() || pump.hp == 0 || pump.under_construction() {
         return false;
     }
-    let Some(node) = pump_jack::oil_node(entities, pump_id) else {
+    let Some(node) = pump_jack::resource_node(entities, pump_id) else {
         return false;
     };
     pump_jack_has_completed_friendly_mining_anchor(entities, teams, pump.owner, node)
@@ -71,7 +71,7 @@ pub(crate) fn gather_system(
     }
     for payout in pump_jack::tick(entities, teams) {
         if let Some(ps) = players.iter_mut().find(|p| p.id == payout.owner) {
-            ps.add_gathered_resources(EntityKind::Oil, payout.oil, tick);
+            ps.add_gathered_resources(payout.kind, payout.amount, tick);
         }
     }
 }
@@ -114,7 +114,8 @@ fn gather_to_node(
             wait_gatherer_for_anchor(entities, id, node_pos, wx, wy);
             return;
         }
-        let can_mine = !matches!(entities.node_slot_holder(node), Some(m) if m != id);
+        let can_mine = !matches!(entities.node_slot_holder(node), Some(m) if m != id)
+            && entities.resource_extractor_for_node(node).is_none();
         if let Some(e) = entities.get_mut(id) {
             e.clear_path();
             e.set_facing((node_pos.1 - wy).atan2(node_pos.0 - wx));
@@ -201,6 +202,7 @@ fn closest_unoccupied_same_resource_node(
                     candidate.id,
                 )
                 && entities.node_slot_holder(candidate.id).is_none()
+                && entities.resource_extractor_for_node(candidate.id).is_none()
         })
         .filter_map(|candidate| {
             let d2 = dist2(nx, ny, candidate.pos_x, candidate.pos_y);
@@ -307,6 +309,11 @@ fn gather_harvesting(
             }
             _ => idle_gatherer(entities, id),
         }
+        return;
+    }
+
+    if entities.resource_extractor_for_node(node).is_some() {
+        idle_gatherer(entities, id);
         return;
     }
 

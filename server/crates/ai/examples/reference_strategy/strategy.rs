@@ -1,11 +1,9 @@
-use rts_ai::sdk::{
-    AiActions, AiFrame, AiRulebook, AiStrategy, EntityKind, UnitGroup, WorldQueries,
-};
+use rts_ai::sdk::{AiActions, AiFrame, AiStrategy, EntityKind, UnitGroup, WorldQueries};
 
 /// A deliberately small opening that demonstrates the public SDK lifecycle.
 ///
-/// The strategy keeps one worker gathering steel and sends a different worker to scout the first
-/// enemy start. It is a usage specimen, not a competitive profile.
+/// The strategy enables Depot-built extractors and sends its Engineer to scout the first enemy
+/// start. It is a usage specimen, not a competitive profile.
 #[derive(Default)]
 pub struct ReferenceStrategy {
     enemy_start: Option<(f32, f32)>,
@@ -30,9 +28,6 @@ impl AiStrategy for ReferenceStrategy {
 
     fn step(&mut self, frame: &AiFrame, actions: &mut AiActions) {
         self.steps = self.steps.saturating_add(1);
-        let Some(rules) = AiRulebook::for_frame(frame) else {
-            return;
-        };
         let queries = WorldQueries::new(frame);
 
         let workers = frame
@@ -42,23 +37,19 @@ impl AiStrategy for ReferenceStrategy {
             .map(|entity| entity.id)
             .collect::<Vec<_>>();
 
-        let expansion_steel = rules
-            .cost(EntityKind::ResourceDepot)
-            .map(|cost| cost.steel)
-            .unwrap_or(u32::MAX);
-        if rules.can_gather(EntityKind::Worker) && frame.economy().steel < expansion_steel {
-            if let (Some(&worker), Some(node)) = (
-                workers.first(),
-                queries.known_resources(EntityKind::Steel).next(),
-            ) {
-                let _ = actions.gather(&[worker], &[node.id], false);
-            }
+        let depots = frame
+            .owned()
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::ResourceDepot)
+            .map(|entity| entity.id)
+            .collect::<Vec<_>>();
+        if self.steps == 1 && queries.known_resources(EntityKind::Oil).next().is_some() {
+            let _ = actions.set_production_repeat(&depots, EntityKind::PumpJack, true);
         }
 
-        // Wait for a second decision so the example visibly uses cross-tick state. The stable
-        // frame ordering makes the second worker deterministic and keeps it separate from mining.
+        // Wait for a second decision so the example visibly uses cross-tick state.
         if !self.scout_dispatched && self.steps >= 2 {
-            if let (Some(&scout), Some((x, y))) = (workers.get(1), self.enemy_start) {
+            if let (Some(&scout), Some((x, y))) = (workers.first(), self.enemy_start) {
                 if let Ok(group) = UnitGroup::new([scout]) {
                     if actions.attack_move(&group, x, y, false).is_ok() {
                         self.scout_dispatched = true;

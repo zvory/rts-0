@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 mod checkpoint_start;
 mod dev_scenarios;
+mod resource_patch_start;
 
 const LIVE_PATHING_DEFAULT_BUDGET: usize = 32_768;
 const LIVE_PATHING_CACHE_CAPACITY: usize = 256;
@@ -505,7 +506,8 @@ fn dev_map_metadata(name: &str) -> MapMetadata {
     }
 }
 
-fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32)) {
+fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32)) -> Vec<u32> {
+    let mut spawned = Vec::new();
     let (tx, ty) = tile;
     let (hx, hy) = map.tile_center(tx, ty);
     let ts = config::TILE_SIZE as f32;
@@ -547,7 +549,9 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
                 config::START_RESOURCE_MIN_DIST_TILES,
                 config::START_RESOURCE_MAX_DIST_TILES
             );
-            entities.spawn_node(EntityKind::Steel, px, py);
+            if let Some(id) = entities.spawn_node(EntityKind::Steel, px, py) {
+                spawned.push(id);
+            }
             patch_index += 1;
         }
     }
@@ -583,8 +587,11 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
             config::START_RESOURCE_MIN_DIST_TILES,
             config::START_RESOURCE_MAX_DIST_TILES
         );
-        entities.spawn_node(EntityKind::Oil, px, py);
+        if let Some(id) = entities.spawn_node(EntityKind::Oil, px, py) {
+            spawned.push(id);
+        }
     }
+    spawned
 }
 
 fn tile_step(value: f32) -> i32 {
@@ -634,6 +641,9 @@ fn spawn_player_start(
     let ts = config::TILE_SIZE as f32;
 
     for group in loadout.starting_entities {
+        if group.formation == StartingFormation::ResourcePatches {
+            continue;
+        }
         for i in 0..group.count {
             let (x, y) = match group.formation {
                 StartingFormation::Center => (hx, hy),
@@ -642,6 +652,7 @@ fn spawn_player_start(
                     let ang = std::f32::consts::TAU * (i as f32) / (group.count.max(1) as f32);
                     (hx + ring_r * ang.cos(), hy + ring_r * ang.sin())
                 }
+                StartingFormation::ResourcePatches => continue,
             };
             let spawned = if group.kind.is_building() {
                 entities.spawn_building(player.id, group.kind, x, y, group.completed)
@@ -656,7 +667,12 @@ fn spawn_player_start(
         }
     }
 
-    spawn_base_resources(entities, map, start);
+    let base_resource_ids = spawn_base_resources(entities, map, start);
+    for kind in
+        resource_patch_start::spawn(entities, player.id, loadout, &base_resource_ids, hx, hy)
+    {
+        player.record_entity_created(kind);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

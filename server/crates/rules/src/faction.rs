@@ -180,6 +180,12 @@ const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
         },
         completed: true,
     },
+    StartingEntityGroup {
+        kind: EntityKind::SteelMine,
+        count: crate::balance::STARTING_STEEL_MINES,
+        formation: StartingFormation::ResourcePatches,
+        completed: true,
+    },
 ];
 
 const EMPTY_FIXTURE_START_ENTITIES: &[StartingEntityGroup] = &[
@@ -264,12 +270,12 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
     EntityKind::EngineeringComplex,
     EntityKind::Steelworks,
     EntityKind::TankTrap,
+    EntityKind::SteelMine,
     EntityKind::PumpJack,
 ];
 
 const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::ResourceDepot,
-    EntityKind::PumpJack,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
     EntityKind::EngineeringComplex,
@@ -611,7 +617,7 @@ pub const CURRENT_CATALOG: FactionCatalog = FactionCatalog {
     upgrades: &DEFAULT_UPGRADES,
     abilities: &DEFAULT_ABILITIES,
     builders: &[EntityKind::Worker],
-    gatherers: &[EntityKind::Worker],
+    gatherers: &[],
     production_anchors: &[
         EntityKind::ResourceDepot,
         EntityKind::Barracks,
@@ -724,6 +730,7 @@ impl AbilityCatalogEntry {
 pub enum StartingFormation {
     Center,
     Ring { radius_tiles_x10: u32 },
+    ResourcePatches,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -787,7 +794,7 @@ impl FactionCatalog {
             .unwrap_or(&[])
             .iter()
             .copied()
-            .filter(|unit| self.allows_unit(*unit))
+            .filter(|unit| self.allows_unit(*unit) || self.allows_building(*unit))
             .collect::<Vec<_>>()
     }
 
@@ -912,7 +919,11 @@ mod tests {
 
         assert_eq!(
             catalog.trainable_units(EntityKind::ResourceDepot),
-            vec![EntityKind::Worker]
+            vec![
+                EntityKind::Worker,
+                EntityKind::SteelMine,
+                EntityKind::PumpJack
+            ]
         );
         assert!(
             catalog.allows_unit(EntityKind::ScoutPlane),
@@ -954,12 +965,11 @@ mod tests {
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
         assert!(catalog.allows_building(EntityKind::PumpJack));
-        assert!(
-            catalog.can_build(EntityKind::Worker, EntityKind::PumpJack),
-            "Pump Jacks are worker-buildable while placement remains restricted to oil nodes"
-        );
+        assert!(!catalog.can_build(EntityKind::Worker, EntityKind::PumpJack));
+        assert!(!catalog.can_build(EntityKind::Worker, EntityKind::SteelMine));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::PumpJack));
+        assert!(!catalog.can_act_as_production_anchor(EntityKind::SteelMine));
         assert!(catalog.allows_ability(AbilityKind::Smoke, EntityKind::ScoutCar));
         assert!(catalog.allows_ability(AbilityKind::PointFire, ARTILLERY_ABILITY_CARRIERS[0]));
         assert!(catalog.allows_ability(AbilityKind::BlanketFire, ARTILLERY_ABILITY_CARRIERS[0]));

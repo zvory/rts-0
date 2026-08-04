@@ -9,6 +9,8 @@ use crate::game::PlayerState;
 use crate::game::{ability::AbilityKind, entity::EntityKind};
 use crate::rules;
 
+mod extractors;
+
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
 /// building and remove the item from the queue. Manual front items that have not paid yet retry
 /// their cost and supply first; standing repeat entries are only inserted after paying. If every
@@ -64,11 +66,22 @@ pub(crate) fn production_system(
             let producer_compatible =
                 rules::economy::trainable_units_for_faction(&faction_id, producer_kind)
                     .contains(&unit);
-            let stats = config::unit_stats(unit);
-            if let (true, true, Some(stats), Some(player)) = (
+            let build_ticks = production_ticks(unit);
+            let extractor_target_available =
+                !unit.is_resource_extractor() || extractors::target(entities, id, unit).is_some();
+            if !extractor_target_available {
+                // A Depot may repeat both extractor kinds. Saturation of the current kind must
+                // yield to the next allocation instead of starving a still-buildable kind.
+                if let Some(producer) = entities.get_mut(id) {
+                    producer.set_repeat_production(None, true);
+                }
+                continue;
+            }
+            if let (true, true, true, Some(build_ticks), Some(player)) = (
                 producer_compatible,
                 requirements_met,
-                stats,
+                extractor_target_available,
+                build_ticks,
                 players.iter_mut().find(|player| player.id == owner),
             ) {
                 let upgrade_met = upgrade::required_for_unit(unit)
@@ -84,7 +97,7 @@ pub(crate) fn production_system(
                             let queued = producer.push_production(ProdItem {
                                 unit,
                                 progress: 0,
-                                total: stats.build_ticks,
+                                total: build_ticks,
                                 paid: true,
                             });
                             if queued {
@@ -139,6 +152,9 @@ pub(crate) fn production_system(
                         .map(|item| (building.owner, item.unit))
                 })
         {
+            if unit.is_resource_extractor() && extractors::target(entities, id, unit).is_none() {
+                continue;
+            }
             let cost = rules::economy::resource_cost(unit);
             let supply = rules::economy::supply_cost(unit);
             if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
@@ -195,6 +211,10 @@ pub(crate) fn production_system(
             continue;
         }
 
+        if !extractors::ensure_scaffold(entities, id) {
+            continue;
+        }
+
         let ready = {
             let b = match entities.get_mut(id) {
                 Some(b) if active_producer && !b.prod_queue().is_empty() => b,
@@ -203,12 +223,31 @@ pub(crate) fn production_system(
             let owner = b.owner;
             b.tick_front_production().map(|unit| (owner, unit))
         };
+        extractors::sync_scaffold_progress(entities, id);
 
         if let Some((owner, unit)) = ready {
-            let unit_can_gather = players.iter().any(|player| {
-                player.id == owner
-                    && crate::rules::economy::can_gather_for_faction(&player.faction_id, unit)
-            });
+            if unit.is_resource_extractor() {
+                let Some(scaffold_id) = extractors::scaffold_id(entities, id, unit) else {
+                    continue;
+                };
+                if entities.get_mut(scaffold_id).is_some_and(|scaffold| {
+                    scaffold.set_construction_progress(u32::MAX)
+                        && scaffold.advance_construction() == Some(true)
+                }) {
+                    if let Some(building) = entities.get_mut(id) {
+                        building.remove_front_production();
+                    }
+                    if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
+                        player.record_entity_created(unit);
+                    }
+                }
+                continue;
+            }
+            let unit_can_gather = unit == EntityKind::Worker
+                || players.iter().any(|player| {
+                    player.id == owner
+                        && crate::rules::economy::can_gather_for_faction(&player.faction_id, unit)
+                });
             // Prefer the spawn exit closest to the first rally stage (if any), so units leave from
             // the side of the building facing the rally plan.
             let rally_plan = entities.get(id).map(|b| b.rally_plan()).unwrap_or_default();
@@ -233,7 +272,8 @@ pub(crate) fn production_system(
                     player.record_entity_created(unit);
                 }
                 // Send the new unit through the building's rally plan. Plain rally stages default
-                // to attack-move for combat units, but faction gatherers keep move rally behavior.
+                // to attack-move for combat units, but Engineers and faction gatherers keep move
+                // rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
                     coordinator.order_rally_move(
                         entities,
@@ -252,6 +292,12 @@ pub(crate) fn production_system(
             }
         }
     }
+}
+
+fn production_ticks(kind: EntityKind) -> Option<u32> {
+    config::unit_stats(kind)
+        .map(|stats| stats.build_ticks)
+        .or_else(|| config::building_stats(kind).map(|stats| stats.build_ticks))
 }
 
 fn rally_stage_attacks(unit_can_gather: bool, rally: RallyIntent) -> bool {

@@ -766,8 +766,8 @@ assert(
       "under-construction building keeps immutable background and fill geometry on the HP bar layer",
     );
     assert(
-      Math.abs(scaffoldHp.rtsFill.scaleX - (scaffold.hp / scaffold.maxHp)) < 0.001,
-      "under-construction HP-layer status scales the stable fill to remaining HP instead of build progress",
+      Math.abs(scaffoldHp.rtsFill.scaleX - scaffold.buildProgress) < 0.001,
+      "under-construction status uses the stable HP-bar layer to show build progress",
     );
     const backgroundCallCount = scaffoldHp.rtsBackground.calls.length;
     const fillCallCount = scaffoldHp.rtsFill.calls.length;
@@ -779,8 +779,8 @@ assert(
       "HP changes reuse immutable bar geometry without clearing or rebuilding either Graphics context",
     );
     assert(
-      Math.abs(scaffoldHp.rtsFill.scaleX - 0.2) < 0.001,
-      "HP changes update the retained fill transform",
+      Math.abs(scaffoldHp.rtsFill.scaleX - scaffold.buildProgress) < 0.001,
+      "HP changes do not replace the construction progress shown in the retained fill transform",
     );
     assert(
       renderer._pools.hpBars.has(completed.id),

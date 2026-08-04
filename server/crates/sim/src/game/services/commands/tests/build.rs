@@ -504,7 +504,7 @@ fn build_order_rejects_disabled_supply_depot() {
 }
 
 #[test]
-fn build_order_accepts_contextual_pump_jack_on_oil() {
+fn build_order_rejects_worker_pump_jack_even_on_oil() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
     let (site_x, site_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
@@ -533,86 +533,14 @@ fn build_order_accepts_contextual_pump_jack_on_oil() {
     );
 
     let worker = entities.get(worker).expect("worker should remain alive");
-    assert_eq!(
-        worker.order().build_intent_tile(),
-        Some((EntityKind::PumpJack, 4, 4)),
-        "Pump Jacks should be valid contextual worker builds on live oil patches"
-    );
-    assert!(
-        worker.path_goal().is_some(),
-        "accepted Pump Jack build order should send the worker toward the site"
-    );
+    assert_eq!(worker.order().build_intent_tile(), None);
     assert!(
         entities
             .iter()
             .all(|entity| entity.kind != EntityKind::PumpJack),
-        "build command admission must not spawn a Pump Jack scaffold"
+        "workers must not spawn Pump Jack scaffolds"
     );
-    assert!(
-        events.get(&1).is_none_or(Vec::is_empty),
-        "valid Pump Jack build admission should not emit a placement notice"
-    );
-}
-
-#[test]
-fn repeated_immediate_pump_jacks_distribute_across_selected_miners() {
-    let map = flat_map(32);
-    let mut entities = EntityStore::new();
-    let oil_sites = [(12, 12), (14, 12), (16, 12)];
-    for (tile_x, tile_y) in oil_sites {
-        let (x, y) = footprint_center(&map, EntityKind::PumpJack, tile_x, tile_y);
-        entities
-            .spawn_node(EntityKind::Oil, x, y)
-            .expect("oil node should spawn");
-    }
-
-    let worker_positions = [(360.0, 400.0), (96.0, 96.0), (128.0, 96.0)];
-    let mut workers = Vec::new();
-    for (index, (x, y)) in worker_positions.into_iter().enumerate() {
-        let worker = entities
-            .spawn_unit(1, EntityKind::Worker, x, y)
-            .expect("worker should spawn");
-        let steel = entities
-            .spawn_node(EntityKind::Steel, 64.0 + index as f32 * 32.0, 64.0)
-            .expect("steel node should spawn");
-        let worker_entity = entities.get_mut(worker).expect("worker should exist");
-        worker_entity.set_order(Order::gather(steel));
-        worker_entity.mark_gather_phase(GatherPhase::Harvesting);
-        workers.push(worker);
-    }
-
-    apply(
-        &map,
-        &mut entities,
-        oil_sites
-            .into_iter()
-            .map(|(tile_x, tile_y)| {
-                (
-                    1,
-                    SimCommand::Build {
-                        units: workers.clone(),
-                        building: EntityKind::PumpJack,
-                        tile_x,
-                        tile_y,
-                        queued: false,
-                    },
-                )
-            })
-            .collect(),
-    );
-
-    let mut assigned_sites: Vec<(u32, u32)> = workers
-        .iter()
-        .filter_map(|worker| {
-            entities
-                .get(*worker)
-                .and_then(|entity| entity.order().build_intent_tile())
-                .map(|(_, tile_x, tile_y)| (tile_x, tile_y))
-        })
-        .collect();
-    assigned_sites.sort_unstable();
-
-    assert_eq!(assigned_sites, oil_sites);
+    assert_notice(&events, 1, "Building unavailable");
 }
 
 #[test]
@@ -650,7 +578,7 @@ fn build_order_rejects_pump_jack_off_oil() {
         ),
         "Pump Jack build orders must be rejected away from live oil patches"
     );
-    assert_notice(&events, 1, "Cannot build there");
+    assert_notice(&events, 1, "Building unavailable");
 }
 
 #[test]

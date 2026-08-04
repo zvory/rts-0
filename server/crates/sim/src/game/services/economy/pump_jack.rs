@@ -1,19 +1,20 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::teams::TeamRelations;
 
 const POINT_IN_RECT_EPS_PX: f32 = 0.001;
 
 pub(super) struct PumpJackPayout {
     pub(super) owner: u32,
-    pub(super) oil: u32,
+    pub(super) kind: EntityKind,
+    pub(super) amount: u32,
 }
 
 pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<PumpJackPayout> {
     let pump_ids: Vec<u32> = entities
         .iter()
         .filter(|e| {
-            e.kind == EntityKind::PumpJack
+            e.kind.is_resource_extractor()
                 && e.hp > 0
                 && !e.under_construction()
                 && e.resource_extractor.is_some()
@@ -26,7 +27,7 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
         let Some(owner) = entities.get(pump_id).map(|pump| pump.owner) else {
             continue;
         };
-        let Some(node_id) = oil_node(entities, pump_id) else {
+        let Some(node_id) = resource_node(entities, pump_id) else {
             let _ = entities.remove(pump_id);
             continue;
         };
@@ -48,9 +49,15 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
             continue;
         }
 
-        let Some((taken, depleted)) = entities.get_mut(node_id).map(|node| {
-            let taken = node.harvest_resources(config::OIL_LOAD);
-            (taken, node.remaining().unwrap_or(0) == 0)
+        let Some((node_kind, taken, depleted)) = entities.get_mut(node_id).map(|node| {
+            let amount = if node.kind == EntityKind::Oil {
+                config::OIL_LOAD
+            } else {
+                config::STEEL_LOAD
+            };
+            let kind = node.kind;
+            let taken = node.harvest_resources(amount);
+            (kind, taken, node.remaining().unwrap_or(0) == 0)
         }) else {
             let _ = entities.remove(pump_id);
             continue;
@@ -62,7 +69,11 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
             extractor.progress = 0;
         }
         if taken > 0 {
-            payouts.push(PumpJackPayout { owner, oil: taken });
+            payouts.push(PumpJackPayout {
+                owner,
+                kind: node_kind,
+                amount: taken,
+            });
         }
         // A Pump Jack is bound to the oil patch it just extracted from. Remove it in the same
         // tick as the final payout so it cannot retarget another patch in its footprint and both
@@ -75,45 +86,21 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
     payouts
 }
 
-pub(super) fn oil_node(entities: &EntityStore, pump_id: u32) -> Option<u32> {
+pub(super) fn resource_node(entities: &EntityStore, pump_id: u32) -> Option<u32> {
     let pump = entities.get(pump_id)?;
-    if pump.kind != EntityKind::PumpJack {
-        return None;
-    }
-    let rect = building_rect(pump)?;
+    let node_kind = match pump.kind {
+        EntityKind::SteelMine => EntityKind::Steel,
+        EntityKind::PumpJack => EntityKind::Oil,
+        _ => return None,
+    };
     entities
         .iter()
         .filter(|node| {
-            node.kind == EntityKind::Oil && node.is_node() && node.remaining().unwrap_or(0) > 0
+            node.kind == node_kind && node.is_node() && node.remaining().unwrap_or(0) > 0
         })
-        .find(|node| point_inside_rect((node.pos_x, node.pos_y), rect))
+        .find(|node| {
+            (node.pos_x - pump.pos_x).abs() <= POINT_IN_RECT_EPS_PX
+                && (node.pos_y - pump.pos_y).abs() <= POINT_IN_RECT_EPS_PX
+        })
         .map(|node| node.id)
-}
-
-#[derive(Clone, Copy)]
-struct Rect {
-    min_x: f32,
-    min_y: f32,
-    max_x: f32,
-    max_y: f32,
-}
-
-fn building_rect(entity: &Entity) -> Option<Rect> {
-    let stats = config::building_stats(entity.kind)?;
-    let tile_size = config::TILE_SIZE as f32;
-    let half_w = stats.foot_w as f32 * tile_size * 0.5;
-    let half_h = stats.foot_h as f32 * tile_size * 0.5;
-    Some(Rect {
-        min_x: entity.pos_x - half_w,
-        min_y: entity.pos_y - half_h,
-        max_x: entity.pos_x + half_w,
-        max_y: entity.pos_y + half_h,
-    })
-}
-
-fn point_inside_rect(point: (f32, f32), rect: Rect) -> bool {
-    point.0 >= rect.min_x - POINT_IN_RECT_EPS_PX
-        && point.0 <= rect.max_x + POINT_IN_RECT_EPS_PX
-        && point.1 >= rect.min_y - POINT_IN_RECT_EPS_PX
-        && point.1 <= rect.max_y + POINT_IN_RECT_EPS_PX
 }

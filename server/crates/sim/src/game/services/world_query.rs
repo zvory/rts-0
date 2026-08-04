@@ -64,7 +64,11 @@ pub(crate) fn owned_survival_buildings(
 }
 
 fn survival_building_kind(kind: EntityKind) -> bool {
-    kind.is_building() && !matches!(kind, EntityKind::TankTrap | EntityKind::PumpJack)
+    kind.is_building()
+        && !matches!(
+            kind,
+            EntityKind::TankTrap | EntityKind::SteelMine | EntityKind::PumpJack
+        )
 }
 
 /// Kinds of all owned buildings (any state).

@@ -208,7 +208,8 @@ fn unknown_faction_start_and_commands_fail_closed() {
 
 #[test]
 fn standard_starting_loadout_matches_phase0_inventory() {
-    assert_eq!(config::STARTING_WORKERS, 6);
+    assert_eq!(config::STARTING_WORKERS, 1);
+    assert_eq!(config::STARTING_STEEL_MINES, 6);
     let players = [
         PlayerInit {
             id: 1,
@@ -249,6 +250,10 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         assert_eq!(
             owned_kind_count(&game, player.id, EntityKind::Worker),
             config::STARTING_WORKERS as usize
+        );
+        assert_eq!(
+            owned_kind_count(&game, player.id, EntityKind::SteelMine),
+            config::STARTING_STEEL_MINES as usize
         );
         assert_eq!(owned_kind_count(&game, player.id, EntityKind::Depot), 0);
         assert_eq!(owned_kind_count(&game, player.id, EntityKind::Barracks), 0);
@@ -306,6 +311,21 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
     }];
     let game = Game::new(&players, 0x1020_3040);
     let base_count = game.state.map.base_sites.len();
+
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Worker), 1);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::SteelMine), 6);
+    for mine in game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::SteelMine)
+    {
+        assert!(game.state.entities.iter().any(|node| {
+            node.kind == EntityKind::Steel
+                && (node.pos_x - mine.pos_x).abs() <= 0.001
+                && (node.pos_y - mine.pos_y).abs() <= 0.001
+        }));
+    }
 
     assert_eq!(
         game.state

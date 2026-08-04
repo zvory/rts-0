@@ -44,7 +44,7 @@ impl ResourceAvailability {
     ) -> Self {
         let completed_resource_depots = completed_resource_depots(observation);
         let latched_workers_by_node = latched_workers_by_node(observation);
-        let pump_jacks = active_pump_jacks(observation);
+        let extractors = active_extractors(observation);
         let mut occupied_by_kind = BTreeMap::new();
         let mut latched_by_kind = BTreeMap::new();
         let mut extractors_by_kind = BTreeMap::new();
@@ -67,24 +67,25 @@ impl ResourceAvailability {
                 let has_remaining = resource.remaining > 0;
                 let mineable_now =
                     has_remaining && nearest_completed_mining_resource_depot.is_some();
-                let extractor_count = if resource.kind == EntityKind::Oil {
-                    pump_jacks
+                let extractor_kind = extractor_kind_for_resource(resource.kind);
+                let extractor_count = extractor_kind.map_or(0, |kind| {
+                    extractors
                         .iter()
-                        .filter(|pump| pump_jack_overlaps_resource(pump, resource))
+                        .filter(|extractor| extractor.kind == kind)
+                        .filter(|extractor| extractor_overlaps_resource(extractor, resource))
                         .count()
+                });
+                let live_completed_extractor_count = if has_remaining {
+                    extractor_kind.map_or(0, |kind| {
+                        extractors
+                            .iter()
+                            .filter(|extractor| extractor.kind == kind && extractor.is_complete)
+                            .filter(|extractor| extractor_overlaps_resource(extractor, resource))
+                            .count()
+                    })
                 } else {
                     0
                 };
-                let live_completed_extractor_count =
-                    if resource.kind == EntityKind::Oil && has_remaining {
-                        pump_jacks
-                            .iter()
-                            .filter(|pump| pump.is_complete)
-                            .filter(|pump| pump_jack_overlaps_resource(pump, resource))
-                            .count()
-                    } else {
-                        0
-                    };
                 let occupied = latched_worker_count > 0 || extractor_count > 0;
                 if occupied {
                     *occupied_by_kind.entry(resource.kind).or_default() += 1;
@@ -239,25 +240,33 @@ fn latched_workers_by_node(observation: &AiObservation) -> BTreeMap<u32, usize> 
     counts
 }
 
-fn active_pump_jacks(observation: &AiObservation) -> Vec<&AiEntitySummary> {
+fn active_extractors(observation: &AiObservation) -> Vec<&AiEntitySummary> {
     observation
         .owned
         .iter()
-        .filter(|entity| entity.kind == EntityKind::PumpJack && entity.state != AiEntityState::Dead)
+        .filter(|entity| entity.kind.is_resource_extractor() && entity.state != AiEntityState::Dead)
         .collect()
 }
 
-fn pump_jack_overlaps_resource(pump: &AiEntitySummary, resource: &AiResourceSummary) -> bool {
-    let Some(stats) = config::building_stats(EntityKind::PumpJack) else {
+fn extractor_kind_for_resource(resource: EntityKind) -> Option<EntityKind> {
+    match resource {
+        EntityKind::Steel => Some(EntityKind::SteelMine),
+        EntityKind::Oil => Some(EntityKind::PumpJack),
+        _ => None,
+    }
+}
+
+fn extractor_overlaps_resource(extractor: &AiEntitySummary, resource: &AiResourceSummary) -> bool {
+    let Some(stats) = config::building_stats(extractor.kind) else {
         return false;
     };
     let tile_size = config::TILE_SIZE as f32;
     let half_w = stats.foot_w as f32 * tile_size * 0.5;
     let half_h = stats.foot_h as f32 * tile_size * 0.5;
-    resource.x >= pump.x - half_w - POINT_IN_RECT_EPS_PX
-        && resource.x <= pump.x + half_w + POINT_IN_RECT_EPS_PX
-        && resource.y >= pump.y - half_h - POINT_IN_RECT_EPS_PX
-        && resource.y <= pump.y + half_h + POINT_IN_RECT_EPS_PX
+    resource.x >= extractor.x - half_w - POINT_IN_RECT_EPS_PX
+        && resource.x <= extractor.x + half_w + POINT_IN_RECT_EPS_PX
+        && resource.y >= extractor.y - half_h - POINT_IN_RECT_EPS_PX
+        && resource.y <= extractor.y + half_h + POINT_IN_RECT_EPS_PX
 }
 
 fn nearest_completed_mining_resource_depot(

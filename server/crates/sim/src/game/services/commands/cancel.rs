@@ -15,10 +15,27 @@ pub(super) fn apply(
     cancel_construction: bool,
 ) -> Option<Cancelled> {
     if cancel_construction {
-        let (kind, cost_paid) = entities.get(building).and_then(|entity| {
+        let (kind, cost_paid, producer_id) = entities.get(building).and_then(|entity| {
             (entity.owner == player && entity.is_building() && entity.under_construction())
-                .then_some((entity.kind, entity.construction_cost_paid()))
+                .then_some((
+                    entity.kind,
+                    entity.construction_cost_paid(),
+                    entity.construction_producer_id(),
+                ))
         })?;
+        if let Some(producer_id) = producer_id {
+            let cancelled = entities.get_mut(producer_id).and_then(|producer| {
+                (producer.owner == player
+                    && producer
+                        .prod_queue()
+                        .first()
+                        .is_some_and(|front| front.unit == kind))
+                .then(|| producer.remove_front_production())
+                .flatten()
+            });
+            entities.remove(building)?;
+            return cancelled.map(Cancelled::Unit);
+        }
         let builders = entities
             .iter()
             .filter_map(|entity| {
@@ -35,16 +52,28 @@ pub(super) fn apply(
         return Some(Cancelled::Construction { kind, cost_paid });
     }
 
-    Some({
+    let (cancelled, remove_extractor_scaffold) = {
         let b = match entities.get_mut(building) {
             Some(b) if b.owner == player && b.is_building() && !b.under_construction() => b,
             _ => return None,
         };
         b.set_repeat_production(None, false);
         if let Some(item) = b.pop_last_research() {
-            Cancelled::Upgrade(item)
+            (Cancelled::Upgrade(item), false)
         } else {
-            Cancelled::Unit(b.pop_last_production()?)
+            let item = b.pop_last_production()?;
+            let remove_scaffold = item.unit.is_resource_extractor() && b.prod_queue().is_empty();
+            (Cancelled::Unit(item), remove_scaffold)
         }
-    })
+    };
+    if remove_extractor_scaffold {
+        let scaffold = entities
+            .iter()
+            .find(|entity| entity.construction_producer_id() == Some(building))
+            .map(|entity| entity.id);
+        if let Some(scaffold) = scaffold {
+            entities.remove(scaffold);
+        }
+    }
+    Some(cancelled)
 }

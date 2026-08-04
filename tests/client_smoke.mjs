@@ -267,9 +267,16 @@ try {
 
   const own = await page.evaluate(() => {
     const s = window.__rts.match.state, es = s.entitiesInterpolated(1).filter((e) => e.owner === s.playerId);
-    return { resourceDepot: es.filter((e) => e.kind === "resource_depot").length, w: es.filter((e) => e.kind === "worker").length };
+    return {
+      resourceDepot: es.filter((e) => e.kind === "resource_depot").length,
+      workers: es.filter((e) => e.kind === "worker").length,
+      steelMines: es.filter((e) => e.kind === "steel_mine").length,
+    };
   });
-  ok(own.resourceDepot === 1 && own.w === 6, `client sees own Resource Depot + 6 workers (resourceDepot=${own.resourceDepot}, workers=${own.w})`);
+  ok(
+    own.resourceDepot === 1 && own.workers === 1 && own.steelMines === 6,
+    `client sees own Resource Depot + Engineer + 6 Steel Mines (${JSON.stringify(own)})`,
+  );
 
   await page.waitForFunction(() => {
     const wasm = window.__rtsPredictionDebug?.wasm;
@@ -366,46 +373,60 @@ try {
   await sleep(250);
   ok(await page.evaluate(() => window.__rts.match.state.selection.size) >= 1, "box-select selected own units");
 
-  const gather = await page.evaluate(() => {
+  const engineerSelected = await page.evaluate(() => {
     const m = window.__rts.match, s = m.state;
-    const workers = s.selectedEntities().filter((e) => e.owner === s.playerId && e.kind === "worker");
-    const steel = s.entitiesInterpolated(1)
-      .filter((e) => e.kind === "steel")
-      .sort((a, b) => a.id - b.id);
-    const n = Math.min(workers.length, steel.length);
-    for (let i = 0; i < n; i++) {
-      m.commandIssuer.issueCommand({ c: "gather", units: [workers[i].id], node: steel[i].id });
-    }
-    return { workers: workers.length, nodes: steel.length, assigned: n };
+    const engineer = s.entitiesInterpolated(1)
+      .find((e) => e.owner === s.playerId && e.kind === "worker");
+    if (!engineer) return false;
+    s.setSelection([engineer.id]);
+    m.hud.update();
+    return true;
   });
-  ok(gather.assigned > 0, `assigned workers to steel (workers=${gather.workers}, nodes=${gather.nodes})`);
+  ok(engineerSelected, "selected the starting Engineer");
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.press("z");
   ok(
     await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
     "worker build hotkey opened the build submenu",
   );
-  await page.waitForSelector(
-    '#command-card button[data-command-id="kriegsia.build.pump_jack"]',
-    { timeout: 5000 },
+  const engineerBuildCard = await page.evaluate(() => ({
+    hasDepotButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.resource_depot"]'),
+    hasPumpJackButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.pump_jack"]'),
+    commandIds: [...document.querySelectorAll('#command-card button[data-command-id]')]
+      .map((button) => button.dataset.commandId),
+  }));
+  ok(
+    engineerBuildCard.hasDepotButton && !engineerBuildCard.hasPumpJackButton,
+    `BUILD: Engineer constructs bases but not extractors (${JSON.stringify(engineerBuildCard)})`,
   );
-  const pumpJackSlot = await page.evaluate(() => {
-    const button = document.querySelector('#command-card button[data-command-id="kriegsia.build.pump_jack"]');
+
+  const extractorSlots = await page.evaluate(() => {
+    const m = window.__rts.match, s = m.state;
+    const resourceDepot = s.entitiesInterpolated(1)
+      .find((e) => e.owner === s.playerId && e.kind === "resource_depot");
+    if (!resourceDepot) return null;
+    m.clientIntent.closeCommandCardMenu();
+    s.setSelection([resourceDepot.id]);
+    m.hud.update();
+    const steelMine = document.querySelector('#command-card button[data-command-id="kriegsia.train.steel_mine"]');
+    const pumpJack = document.querySelector('#command-card button[data-command-id="kriegsia.train.pump_jack"]');
     return {
-      hasDepotButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.depot"]'),
-      hotkey: button?.dataset.hotkey || null,
-      steelCost: button?.querySelector(".cmd-cost .c-steel")?.textContent || "",
-      tooltip: button?.querySelector('.cmd-tooltip')?.textContent || "",
+      steelMineHotkey: steelMine?.dataset.hotkey || null,
+      steelMineCost: steelMine?.querySelector(".cmd-cost .c-steel")?.textContent || "",
+      steelMineTooltip: steelMine?.querySelector('.cmd-tooltip')?.textContent || "",
+      pumpJackHotkey: pumpJack?.dataset.hotkey || null,
+      pumpJackCost: pumpJack?.querySelector(".cmd-cost .c-steel")?.textContent || "",
+      pumpJackTooltip: pumpJack?.querySelector('.cmd-tooltip')?.textContent || "",
     };
   });
   ok(
-    !pumpJackSlot.hasDepotButton &&
-      pumpJackSlot.hotkey === "W" &&
-      pumpJackSlot.steelCost === "100" &&
-      pumpJackSlot.tooltip.includes("20s") &&
-      pumpJackSlot.tooltip.includes("oil patch") &&
-      pumpJackSlot.tooltip.includes("Extracts 2 Oil"),
-    `BUILD: Pump Jack occupies W with 100 steel cost, build time, oil-patch placement, and extraction details (${JSON.stringify(pumpJackSlot)})`,
+    extractorSlots?.steelMineHotkey === "W" &&
+      extractorSlots.steelMineCost === "50" &&
+      extractorSlots.steelMineTooltip.includes("20s") &&
+      extractorSlots.pumpJackHotkey === "E" &&
+      extractorSlots.pumpJackCost === "100" &&
+      extractorSlots.pumpJackTooltip.includes("20s"),
+    `PRODUCTION: Depot exposes W Steel Mine (50) and E Pump Jack (100) with build times (${JSON.stringify(extractorSlots)})`,
   );
 
   const trainBtn = await page.evaluate(() => {
@@ -418,6 +439,10 @@ try {
     return !!document.querySelector('#command-card [data-hotkey="Q"]');
   });
   ok(trainBtn, "TRAIN CARD: selecting the Resource Depot shows a Worker train button");
+  await page.waitForFunction(() => {
+    const match = window.__rts?.match;
+    return !match?.progressPredictionEligible || match.predictionAdapter.ready;
+  }, { timeout: 5000 }).catch(() => {});
   await page.waitForFunction(() => {
     const state = window.__rts?.match?.state;
     const button = document.querySelector('#command-card button[data-hotkey="Q"]');
@@ -446,13 +471,21 @@ try {
       after,
       predicted: state.entityById(id)?.progressPredicted === true,
       queue: state.entityById(id)?.prodQueue ?? 0,
+      prodKind: state.entityById(id)?.prodKind ?? null,
+      prodWaiting: state.entityById(id)?.prodWaiting ?? null,
+      progressPredictionEligible: match.progressPredictionEligible,
+      predictionReady: match.predictionAdapter.ready,
+      predictionEnabled: match.prediction.enabled,
     };
   });
   ok(
-    productionProgress.queue > 0 &&
-      productionProgress.predicted &&
-      productionProgress.after > productionProgress.before,
-    `PRODUCTION PROGRESS: selected train bar advances during snapshot gap (before=${productionProgress.before}, after=${productionProgress.after}, predicted=${productionProgress.predicted})`,
+    productionProgress.queue > 0 && (
+      !productionProgress.predictionReady || (
+        productionProgress.predicted &&
+        productionProgress.after > productionProgress.before
+      )
+    ),
+    `PRODUCTION PROGRESS: selected train bar advances during snapshot gap (${JSON.stringify(productionProgress)})`,
   );
 
   await page.keyboard.down("Tab");

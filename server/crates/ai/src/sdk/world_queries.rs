@@ -201,7 +201,7 @@ impl<'a> WorldQueries<'a> {
             .current_entities()
             .any(|entity| entity.latched_resource == Some(id))
             || self.current_entities().any(|entity| {
-                entity.kind == EntityKind::PumpJack
+                entity.kind.extracted_resource_kind() == Some(resource.kind)
                     && point_overlaps_building(
                         resource.position,
                         entity,
@@ -577,6 +577,68 @@ mod tests {
         assert_eq!(
             queries.known_resource_state(resource_id),
             Some(KnownResourceState::KnownConflict)
+        );
+    }
+
+    #[test]
+    fn steel_mines_conflict_with_their_known_resource_patch() {
+        let game = Game::new_without_ai_controllers(&players(), 54);
+        let mut start = game.start_payload();
+        let mut snapshot = game.snapshot_for(1);
+        let resource_id = 999_997;
+        let position = (160.0, 160.0);
+        start.map.resources.push(ResourceNode {
+            id: resource_id,
+            kind: protocol::kinds::STEEL.to_string(),
+            x: position.0,
+            y: position.1,
+        });
+        snapshot.entities.push(protocol::EntityView::new(
+            999_996,
+            1,
+            protocol::kind_to_wire(EntityKind::SteelMine),
+            position.0,
+            position.1,
+            50,
+            50,
+            states::IDLE,
+        ));
+
+        let frame = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2])).unwrap();
+        assert_eq!(
+            WorldQueries::new(&frame).known_resource_state(resource_id),
+            Some(KnownResourceState::KnownConflict)
+        );
+    }
+
+    #[test]
+    fn extractors_do_not_conflict_with_a_different_resource_kind() {
+        let game = Game::new_without_ai_controllers(&players(), 55);
+        let mut start = game.start_payload();
+        let mut snapshot = game.snapshot_for(1);
+        let resource_id = 999_995;
+        let position = (160.0, 160.0);
+        start.map.resources.push(ResourceNode {
+            id: resource_id,
+            kind: protocol::kinds::STEEL.to_string(),
+            x: position.0,
+            y: position.1,
+        });
+        snapshot.entities.push(protocol::EntityView::new(
+            999_994,
+            1,
+            protocol::kind_to_wire(EntityKind::PumpJack),
+            position.0,
+            position.1,
+            50,
+            50,
+            states::IDLE,
+        ));
+
+        let frame = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2])).unwrap();
+        assert_eq!(
+            WorldQueries::new(&frame).known_resource_state(resource_id),
+            Some(KnownResourceState::NoKnownConflict)
         );
     }
 

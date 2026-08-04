@@ -15,8 +15,10 @@ RTS_FULL_AI_TESTS=1 RTS_GENERATE_JEFF_ORACLE_CANDIDATE=1 \
 
 The resulting file is
 `server/crates/ai/target/jeff-live-oracle/candidate-v1.jsonl`. Generation never updates this
-directory. The checked-in fixture must not be regenerated to make Phases 2-8 refactors pass;
-changing it requires a separately approved production behavior change with a transcript review.
+directory. The checked-in fixture must not be regenerated to make behavior-preserving refactors
+pass; changing it requires an approved production behavior change with a transcript review. The
+depot-extractor economy migration is such a behavior change: candidate review must confirm the new
+starting loadout and initial extractor-repeat commands before replacing the fixture.
 
 Canonical records are compact UTF-8 JSON Lines with one LF-terminated serde struct record per
 line. Field order is the Rust schema declaration order. Fingerprinted floating-point values are

@@ -1,7 +1,7 @@
 // End-to-end server integration test — no dependencies (uses Node's built-in global
 // WebSocket, Node >= 22). Drives two clients through the full lifecycle and asserts the
 // authoritative pipeline: lobby/host/colors -> ready/canStart -> start (map + per-player
-// payload) -> initial economy -> fog of war -> gather -> train -> give-up/win.
+// payload) -> initial economy -> fog of war -> extractor income -> train -> give-up/win.
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/server_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
@@ -76,13 +76,14 @@ const { ok } = assertions;
   ok(snap.steel === 75, `A starts with 75 steel (${snap.steel})`);
   ok(snap.oil === 0, `A starts with 0 oil (${snap.oil})`);
   ok(snap.supplyCap === 300, `A intrinsic supply cap = 300 (${snap.supplyCap})`);
-  ok(snap.supplyUsed === 6, `A supply used = 6 (${snap.supplyUsed})`);
+  ok(snap.supplyUsed === 1, `A supply used = 1 (${snap.supplyUsed})`);
   ok(snap.netStatus?.predictionVersion === 1 && snap.netStatus?.lastSimConsumedClientSeq === 0,
      `prediction ACK fields start at zero (v=${snap.netStatus?.predictionVersion}, seq=${snap.netStatus?.lastSimConsumedClientSeq})`);
   const mine = snap.entities.filter((e) => e.owner === A.playerId);
   ok(mine.filter((e) => e.kind === "resource_depot").length === 1, `A owns 1 Resource Depot`);
   const workers = mine.filter((e) => e.kind === "worker");
-  ok(workers.length === 6, `A owns 6 workers (${workers.length})`);
+  ok(workers.length === 1, `A owns 1 Engineer (${workers.length})`);
+  ok(mine.filter((e) => e.kind === "steel_mine").length === 6, "A owns 6 starting Steel Mines");
   const steelNodes = startA.map.resources.filter((e) => e.kind === "steel");
   ok(steelNodes.length > 0 && typeof steelNodes[0].id === "number", `start lists neutral steel nodes (${steelNodes.length})`);
   ok(!snap.entities.some((e) => e.kind === "steel" || e.kind === "oil"), "snapshot omits static resource entities");
@@ -102,20 +103,15 @@ const { ok } = assertions;
   ok(!specSnap.entities.some((e) => e.owner === C.playerId),
      "SPECTATOR: observer owns no entities");
 
-  A.command({ c: "gather", units: workers.map((w) => w.id), node: steelNodes[0].id });
-  let sawLatch = false, peak = snap.steel;
+  let peak = snap.steel;
   for (let i = 0; i < 30; i++) {
     await sleep(500);
     if (A.lastSnapshot) {
       peak = Math.max(peak, A.lastSnapshot.steel);
-      if (A.lastSnapshot.entities.some((e) => e.owner === A.playerId && e.kind === "worker" && e.latchedNode)) sawLatch = true;
       if (A.lastSnapshot.steel > 75) break;
     }
   }
-  ok(peak > 75, `GATHER: steel rose above 75 (peak=${peak})`);
-  ok(sawLatch, `GATHER: a worker latched onto steel`);
-  ok(A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq >= 1,
-     `GATHER: server acknowledged consumed clientSeq ${A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq}`);
+  ok(peak > 75, `EXTRACTORS: starting Steel Mines produced steel (peak=${peak})`);
 
   A.command({ c: "train", building: mine.find((e) => e.kind === "resource_depot").id, unit: "worker" });
   await sleep(1200);
@@ -123,7 +119,7 @@ const { ok } = assertions;
   // than wall-clock time, so production state and the command ACK are the stable acceptance checks.
   const resourceDepot = A.lastSnapshot.entities.find((e) => e.kind === "resource_depot" && e.owner === A.playerId);
   ok(resourceDepot && (resourceDepot.prodKind === "worker" || (resourceDepot.prodQueue || 0) >= 1), `TRAIN: Resource Depot shows production (queue=${resourceDepot?.prodQueue})`);
-  ok(A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq >= 2,
+  ok(A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq >= 1,
      `TRAIN: server acknowledged consumed clientSeq ${A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq}`);
 
   B.send({ t: "giveUp" });
@@ -137,8 +133,8 @@ const { ok } = assertions;
   ok(Array.isArray(over.scores) && over.scores.length === 2, `SCORE: gameOver lists both players (${over.scores?.length})`);
   const aScore = over.scores?.find((s) => s.id === A.playerId);
   const bScore = over.scores?.find((s) => s.id === B.playerId);
-  ok(aScore && aScore.unitScore >= 200 && aScore.structureScore >= 200, `SCORE: A has unit/structure value (${aScore?.unitScore}/${aScore?.structureScore})`);
-  ok(bScore && bScore.unitsLost >= 4 && bScore.buildingsLost >= 1, `SCORE: surrendered B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
+  ok(aScore && aScore.unitScore >= 50 && aScore.structureScore >= 800, `SCORE: A has unit/structure value (${aScore?.unitScore}/${aScore?.structureScore})`);
+  ok(bScore && bScore.unitsLost >= 1 && bScore.buildingsLost >= 7, `SCORE: surrendered B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
 
   const replayStartA = await A.waitFor((m) => m.t === "start" && m.replay, 4000, "A replay start");
   const replayStartB = await B.waitFor((m) => m.t === "start" && m.replay, 4000, "B replay start");

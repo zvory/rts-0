@@ -1,10 +1,21 @@
 import { KIND } from "../../client/src/protocol.js";
 import { _drawSelectionAndHp, _hpBar } from "../../client/src/renderer/entities.js";
+import { buildingProgressStatus } from "../../client/src/renderer/entity_state.js";
 import { assert } from "./assertions.mjs";
 import { installFakePixi } from "./pixi_fakes.mjs";
 
 const restorePixi = installFakePixi();
 try {
+  const constructionStatus = buildingProgressStatus({
+    kind: KIND.STEEL_MINE,
+    hp: 5,
+    maxHp: 50,
+    buildProgress: 0.5,
+  });
+  assert(
+    constructionStatus?.fraction === 0.5,
+    "construction status bars follow authoritative build progress instead of scaffold HP",
+  );
   const makeBar = () => {
     const bar = new PIXI.Container();
     bar.rtsBackground = new PIXI.Graphics();

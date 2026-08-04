@@ -188,7 +188,7 @@ export function _drawBuilding(e, colorByOwner, state) {
   }
 
   const hasProductionProgress = typeof e.prodProgress === "number" && e.prodProgress > 0;
-  const extractorInactive = e.kind === KIND.PUMP_JACK
+  const extractorInactive = (e.kind === KIND.STEEL_MINE || e.kind === KIND.PUMP_JACK)
     && e.extractorActive === false
     && !underConstruction;
   if (hasProductionProgress || extractorInactive) {

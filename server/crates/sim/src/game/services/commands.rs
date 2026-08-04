@@ -1931,10 +1931,13 @@ fn order_train(
         notice(events, player, "Requirement not met");
         return;
     }
-    let stats = match config::unit_stats(unit) {
-        Some(s) => s,
+    let build_ticks = match config::unit_stats(unit)
+        .map(|stats| stats.build_ticks)
+        .or_else(|| config::building_stats(unit).map(|stats| stats.build_ticks))
+    {
+        Some(build_ticks) => build_ticks,
         None => {
-            notice(events, player, "Unknown unit");
+            notice(events, player, "Unknown production item");
             return;
         }
     };
@@ -1954,7 +1957,7 @@ fn order_train(
         .is_some_and(|producer| producer.prod_queue().is_empty());
     let can_reserve_supply = ps.can_reserve_supply(supply);
     let mut paid = false;
-    if queue_empty && can_reserve_supply && ps.spend_cost(cost) {
+    if queue_empty && !unit.is_resource_extractor() && can_reserve_supply && ps.spend_cost(cost) {
         if ps.reserve_supply(supply) {
             paid = true;
         } else {
@@ -1966,7 +1969,7 @@ fn order_train(
         b.push_production(ProdItem {
             unit,
             progress: 0,
-            total: stats.build_ticks,
+            total: build_ticks,
             paid,
         })
     });
@@ -2026,7 +2029,11 @@ fn order_cancel(
             ps.refund_cost(rules::economy::resource_cost(kind));
             ps.record_construction_cancelled(kind);
         }
-        cancel::Cancelled::Unit(item) if item.paid && config::unit_stats(item.unit).is_some() => {
+        cancel::Cancelled::Unit(item)
+            if item.paid
+                && (config::unit_stats(item.unit).is_some()
+                    || item.unit.is_resource_extractor()) =>
+        {
             ps.refund_cost(rules::economy::resource_cost(item.unit));
             ps.release_supply(rules::economy::supply_cost(item.unit));
         }

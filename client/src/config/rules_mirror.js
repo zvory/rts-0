@@ -164,7 +164,8 @@ export const STATS = Object.freeze({
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
   [KIND.RESOURCE_DEPOT]: { label: "Resource Depot", icon: "RD", footW: 3, footH: 3, sight: 1,
-    cost: { steel: 450, oil: 100 }, buildTicks: 750, trains: [KIND.WORKER] },
+    cost: { steel: 450, oil: 100 }, buildTicks: 750,
+    trains: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK] },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -199,10 +200,15 @@ export const STATS = Object.freeze({
     cost: { steel: 30, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
     requires: KIND.TRAINING_CENTRE,
     requiresText: "Requires Training Centre" },
+  [KIND.STEEL_MINE]: { label: "Steel Mine", icon: "SM", footW: 1, footH: 1, sight: 1,
+    cost: { steel: 50, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [],
+    description:
+      "Resource Depot builds this on a nearby Steel patch. " +
+      `Extracts 2 Steel every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s.` },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [],
     description:
-      "Build on an oil patch. " +
+      "Resource Depot builds this on a nearby Oil patch. " +
       `Extracts ${OIL_LOAD} Oil every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s while within ` +
       `${MINING_ANCHOR_RANGE_TILES} tiles of a completed friendly Resource Depot or Zamok.` },
 
@@ -493,7 +499,6 @@ export const RESOURCE_AMOUNTS = Object.freeze({
 // What a worker can build (command card when a worker is selected).
 export const WORKER_BUILDABLE = Object.freeze([
   KIND.RESOURCE_DEPOT,
-  KIND.PUMP_JACK,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.ENGINEERING_COMPLEX,
