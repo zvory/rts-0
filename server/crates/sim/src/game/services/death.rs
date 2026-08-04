@@ -61,7 +61,7 @@ pub(crate) fn death_system(
     for dead in dead {
         if let Some(player) = players.iter_mut().find(|player| player.id == dead.owner) {
             for unit in dead.queued_units {
-                if config::unit_stats(unit).is_some() {
+                if config::unit_stats(unit).is_some() || unit.is_resource_extractor() {
                     player.refund_cost(economy::resource_cost(unit));
                     player.release_supply(economy::supply_cost(unit));
                 }
@@ -74,8 +74,16 @@ pub(crate) fn death_system(
                 ));
             }
         }
+        let linked_extractor_scaffolds = entities
+            .iter()
+            .filter(|entity| entity.construction_producer_id() == Some(dead.id))
+            .map(|entity| entity.id)
+            .collect::<Vec<_>>();
         entities.release_miner(dead.id);
         entities.remove(dead.id);
+        for scaffold in linked_extractor_scaffolds {
+            entities.remove(scaffold);
+        }
         record_score_death(players, dead.owner, dead.kind, dead.killer);
         let concealed_unit =
             config::unit_stats(dead.kind).is_some() && map.world_point_is_stealth(dead.x, dead.y);
