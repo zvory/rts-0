@@ -167,7 +167,7 @@ withFakeHudDocument(() => {
 withFakeHudDocument(() => {
   const rows = [
     {
-      id: 42,
+      id: 105,
       replayNumber: 105,
       startedAt: new Date().toISOString(),
       mapName: "Chokes",
@@ -175,8 +175,8 @@ withFakeHudDocument(() => {
       durationMs: 12_000,
     },
     {
-      id: 99,
-      replayNumber: 104,
+      id: 102,
+      replayNumber: 102,
       startedAt: new Date().toISOString(),
       mapName: "River Crossing",
       participants: ["Casey", "Dana"],
@@ -199,8 +199,8 @@ withFakeHudDocument(() => {
   const replayRows = tbody.children.filter((row) => row.className === "match-history-row");
   assert(thead.innerHTML.includes("Replay #"), "match history labels its replay-number column");
   assert(
-    replayRows.map((row) => row.children[0].textContent).join(",") === "105,104",
-    "match history renders the server's global visible-history numbers instead of page-local indexes",
+    replayRows.map((row) => row.children[0].textContent).join(",") === "105,102",
+    "match history renders canonical match ids and preserves gaps from hidden matches",
   );
 });
 

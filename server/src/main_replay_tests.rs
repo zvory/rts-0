@@ -16,7 +16,7 @@ fn replay_summary_for(
 ) -> rts_server::db::MatchSummary {
     rts_server::db::MatchSummary {
         id: 1,
-        replay_number: None,
+        replay_number: 1,
         match_run_id: None,
         started_at: chrono::Utc::now(),
         ended_at: chrono::Utc::now(),
