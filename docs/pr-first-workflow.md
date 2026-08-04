@@ -43,14 +43,13 @@ The normal agent lifecycle is:
    head SHA reachable from `origin/main`, and the local `main` checkout fast-forwarded with an
    ordinary `git pull --ff-only origin main`. The final refresh also runs the existing automatic
    merged-worktree cleanup, including when `main` was already current and Git's `post-merge` hook
-   therefore did not fire. If the implementing agent staged a local patch note with
-   `node scripts/patch-note-outbox.mjs stage --change "<change>"`, the waiter then attempts to send
-   it to the configured Discord webhooks. Before invoking the npm-backed outbox tool, the waiter
-   runs `scripts/ensure-node-deps.sh` for the refreshed main checkout; the helper reuses the
-   lockfile-keyed shared install and creates that worktree's `node_modules` link. Optional
-   `--before <png> --after <png>` inputs produce a
-   labeled four-second comparison. Delivery is deliberately best-effort: failure leaves the local
-   outbox entry for manual retry and never changes the successful merge result.
+   therefore did not fire. The waiter never sends patch notes. If the implementing agent staged a
+   local patch note with `node scripts/patch-note-outbox.mjs stage --change "<change>"`, it reports
+   the staged copy after merge and asks the user whether to send it. Only explicit approval permits
+   running `node scripts/patch-note-outbox.mjs deliver --branch <branch>` from the refreshed main
+   checkout. Optional `--before <png> --after <png>` inputs produce a labeled four-second
+   comparison. Delivery is deliberately best-effort: failure leaves the local outbox entry for
+   manual retry and never changes the successful merge result.
 
 GitHub Actions owns the full-suite merge gate through the aggregate `./tests/run-all.sh` check in
 the `Main test gate` workflow. The workflow runs split coverage jobs for server build, Rust

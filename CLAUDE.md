@@ -133,7 +133,9 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   `agent-pr.sh`: `node scripts/patch-note-outbox.mjs stage --change "<player-facing change>"`.
   Repeat `--change` as useful; for visual comparisons add matching Interact PNG paths or preview
   URLs with `--before <png> --after <png>`. Staging is optional when no player-facing note is useful
-  or the user asks to omit it. Delivery after merge is best-effort and must never block completion.
+  or the user asks to omit it. Patch-note delivery is opt-in: after the PR is merged, tell the user
+  what is staged and ask whether it should be sent. Do not invoke `patch-note-outbox.mjs deliver`
+  without explicit user approval. Delivery remains best-effort and must never block completion.
 - New units: complete Phase 0 and Phase 1 (unit brief and rules/balance specification) before
   implementation. Until the user explicitly authorizes implementation, edit only planning,
   checklist, and design documents.

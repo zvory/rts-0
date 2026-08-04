@@ -21,9 +21,7 @@ import {
 } from "../scripts/patch-note-outbox.mjs";
 
 const waiter = fs.readFileSync(new URL("../scripts/wait-pr.sh", import.meta.url), "utf8");
-assert.match(waiter, /deliver_patch_note_best_effort "\$head_ref" "\$delivery_main_worktree"/);
-assert.match(waiter, /ensure-node-deps\.sh" --repo "\$main_worktree" --quiet/);
-assert.match(waiter, /patch-note delivery failed; the local outbox entry was retained/);
+assert.doesNotMatch(waiter, /patch-note-outbox|deliver_patch_note|Discord patch-note/);
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });

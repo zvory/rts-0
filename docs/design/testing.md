@@ -315,14 +315,15 @@ canary runs own a private server; the browser shard passes its existing loopback
   `node scripts/patch-note-outbox.mjs stage --change "<change>"`. Root npm dependencies are
   prepared by `scripts/ensure-node-deps.sh`, which atomically installs each package/lockfile pair
   once under the shared cache and links the active worktree's `node_modules` to it. The canonical
-  test runner and post-merge patch-note delivery both use that helper, so npm-backed repository
-  tools do not depend on another worktree having run tests first. Supplying both `--before` and
+  test runner uses that helper, so npm-backed repository tools do not depend on another worktree
+  having run tests first. Supplying both `--before` and
   `--after` composes equal-sized PNG files or Interact preview URLs into a labeled four-second
   H.264 MP4, with each frame held for two seconds. The media is probed and capped below Discord's
-  default 10 MiB attachment limit. `scripts/wait-pr.sh` hydrates the refreshed main checkout and
-  attempts delivery only after proving the PR
-  head is reachable from `origin/main`; webhook errors retain the outbox entry and do not fail the
-  successful merge. Per-destination receipts avoid resending after an ordinary partial failure.
+  default 10 MiB attachment limit. `scripts/wait-pr.sh` never attempts delivery. After it proves the
+  PR head is reachable from `origin/main`, the implementing agent reports any staged note and asks
+  the user whether to send it. The agent may invoke the outbox delivery command only after explicit
+  approval; webhook errors retain the outbox entry and do not change the successful merge result.
+  Per-destination receipts avoid resending after an ordinary partial failure.
   Outbox tests cover copy bounds, exact media composition, byte integrity, partial delivery, and
   no-note/no-webhook behavior. Webhook payloads disable mention parsing.
   Dry-run coverage should keep preview generation non-mutating before clean/fetch checks, and nested
