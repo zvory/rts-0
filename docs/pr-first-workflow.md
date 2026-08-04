@@ -32,7 +32,13 @@ The normal agent lifecycle is:
    statuses, ancestry, merge/rebase-shaped history, or base selection falls back to Full. When the
    verified marker already equals `HEAD`, the helper launches no Codex child and does not repost the
    status; it preserves the existing quality report and only refreshes ordinary PR metadata and
-   auto-merge.
+   auto-merge. The implementing agent's `--verification` text is limited to 2,000 characters,
+   remains in PR metadata, and appears once in the child prompt as claimed prior evidence. The child
+   can evaluate it and run offline, deterministic focused tests, linters, static policy scripts,
+   format checks, and repository inspections, but must not attempt listeners, browsers, Chrome, Interact, Tailnet
+   preview, or other unavailable machine/network validation. The implementing agent owns required
+   live or visual validation. A missing material behavior must be reported as the specific
+   unverified behavior and its impact, not as a generic sandbox or `EPERM` concern.
 5. Run `scripts/wait-pr.sh <pr>` and do not claim completion until it reports the PR merged, the
    head SHA reachable from `origin/main`, and the local `main` checkout fast-forwarded with an
    ordinary `git pull --ff-only origin main`. The final refresh also runs the existing automatic

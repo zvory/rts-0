@@ -301,7 +301,15 @@ canary runs own a private server; the browser shard passes its existing loopback
   arguments.
 - Agent PR / adversarial quality workflow: run `node tests/adversarial_quality_pass.mjs` when
   changing `scripts/adversarial-quality-pass.mjs`, `scripts/agent-pr-preflight.mjs`, its schema, or
-  agent PR wiring. Patch-note copy
+  agent PR wiring. `scripts/agent-pr.sh --verification` accepts at most 2,000 characters, retains
+  that text in the PR metadata, and forwards it once as claimed prior focused-verification evidence
+  to a non-Markdown adversarial pass; absent text renders as `not supplied`. The child evaluates
+  that evidence against the diff rather than treating it as proof, may run only offline,
+  deterministic focused tests, linters, static policy scripts, format checks, and repository inspections in its
+  `workspace-write` sandbox, and must not start listeners, browsers, Chrome, Interact, or Tailnet
+  preview. Live or visual validation remains the implementing agent's responsibility. If a material
+  behavior lacks adequate supplied evidence and cannot be checked offline, the child records that
+  exact behavior and why it matters rather than a generic sandbox or `EPERM` concern. Patch-note copy
   is authored by the implementing agent rather than a second Codex pass. When useful, the agent
   stages up to 1,800 characters in the ignored Git-common-dir outbox with
   `node scripts/patch-note-outbox.mjs stage --change "<change>"`. Root npm dependencies are
