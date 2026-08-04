@@ -338,7 +338,6 @@ mod tests {
     fn stone_blocks_world_point_line_of_sight() {
         let map = map_with_rock_at((3, 2));
         let los = LineOfSight::new(&map);
-
         assert!(!los.clear_between_world_points(map.tile_center(1, 2), map.tile_center(5, 2),));
         assert!(los.clear_between_world_points(map.tile_center(1, 1), map.tile_center(5, 1),));
     }
@@ -348,7 +347,6 @@ mod tests {
         let map = map_with_rock_at((3, 2));
         let los = LineOfSight::new(&map);
         let origin = map.tile_center(1, 2);
-
         assert!(los.tile_visible_from_world(origin, (3, 2)));
         assert!(!los.tile_visible_from_world(origin, (4, 2)));
     }
@@ -367,7 +365,6 @@ mod tests {
             ..Default::default()
         };
         let los = LineOfSight::new(&map);
-
         assert!(!los.clear_between_world_points(map.tile_center(2, 2), map.tile_center(3, 3),));
     }
 
@@ -375,7 +372,6 @@ mod tests {
     fn grid_corner_target_near_map_edge_does_not_step_past_endpoint() {
         let map = flat_map(126);
         let los = LineOfSight::new(&map);
-
         assert!(los.clear_between_world_points((213.959, 3941.309), (32.0, 3968.0)));
         assert!(los.clear_between_world_points((213.959, 3941.309), (160.0, 4000.0)));
     }
@@ -386,14 +382,10 @@ mod tests {
         map.concealment_tiles = (2..=5).map(|x| (x, 4)).collect();
         let los = LineOfSight::new(&map);
         let origin = map.tile_center(1, 4);
-
         assert!(los.tile_visible_from_world(origin, (2, 4)));
         assert!(los.tile_visible_from_world(origin, (4, 4)));
         assert!(!los.tile_visible_from_world(origin, (5, 4)));
-        assert!(
-            los.clear_between_world_points(origin, map.tile_center(6, 4)),
-            "concealment limits sight, not weapon line of fire"
-        );
+        assert!(los.clear_between_world_points(origin, map.tile_center(6, 4)));
     }
 
     #[test]
@@ -401,7 +393,6 @@ mod tests {
         let mut map = flat_map(10);
         map.concealment_tiles = vec![(2, 4)];
         let los = LineOfSight::new(&map);
-
         assert!(los.tile_visible_from_world(map.tile_center(2, 4), (8, 4)));
     }
 
@@ -411,7 +402,6 @@ mod tests {
         map.concealment_tiles = (2..=5).flat_map(|x| (2..=5).map(move |y| (x, y))).collect();
         let los = LineOfSight::new(&map);
         let origin = map.tile_center(1, 1);
-
         assert!(los.tile_visible_from_world(origin, (4, 4)));
         assert!(!los.tile_visible_from_world(origin, (5, 5)));
     }
