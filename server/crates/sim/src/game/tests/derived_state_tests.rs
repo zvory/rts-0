@@ -385,14 +385,15 @@ fn movement_economy_checkpoint_preserves_harvesting_state_and_resource_projectio
     baseline.state.players[0].set_resources(25, 7);
     repair_after_authoritative_test_spawn(&mut baseline);
 
-    baseline.enqueue(
-        1,
-        Command::Gather {
-            units: vec![worker],
-            node,
-            queued: false,
-        },
-    );
+    {
+        let worker = baseline
+            .state
+            .entities
+            .get_mut(worker)
+            .expect("worker should exist");
+        worker.set_order(Order::gather(node));
+        worker.mark_gather_phase(GatherPhase::ToNode);
+    }
     baseline.tick();
     for _ in 0..8 {
         baseline.tick();

@@ -27,8 +27,6 @@ pub(super) struct EconomyManagerInput<'a> {
 pub(super) enum EconomyProposal {
     BuildExpansionResourceDepot,
     TrainWorker,
-    AssignOilWorkers,
-    AssignSteelWorkers,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,14 +53,9 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
             plan.desired_oil_workers = plan.current_oil_workers;
         }
     }
-    plan.target_workers = plan
-        .target_steel_workers
-        .saturating_add(input.profile.workers.extra_builder_workers)
-        .saturating_add(if input.profile.workers.train_workers_for_oil {
-            plan.desired_oil_workers
-        } else {
-            0
-        });
+    // Engineers are construction units now; resource growth belongs to Depot-produced extractors.
+    // Keep the starting Engineer and only train the profile's explicitly requested extras.
+    plan.target_workers = 1usize.saturating_add(input.profile.workers.extra_builder_workers);
 
     let mut proposals = Vec::new();
     if input.expansion_plan.should_save {
@@ -70,17 +63,8 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
     }
     if !input.signals.defer_worker_training_for_tech
         && input.facts.worker_count < plan.target_workers
-        && (!input.profile.workers.reuse_idle_before_training
-            || input.facts.idle_workers.is_empty())
     {
         proposals.push(EconomyProposal::TrainWorker);
     }
-    if plan.desired_oil_workers > plan.current_oil_workers {
-        proposals.push(EconomyProposal::AssignOilWorkers);
-    }
-    if plan.target_steel_workers > plan.current_steel_workers {
-        proposals.push(EconomyProposal::AssignSteelWorkers);
-    }
-
     EconomyManagerOutput { plan, proposals }
 }

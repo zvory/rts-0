@@ -28,7 +28,7 @@ struct LifecycleProbe<S> {
 impl<S: AiStrategy> AiStrategy for LifecycleProbe<S> {
     fn initialize(&mut self, frame: &AiFrame) {
         let rules = AiRulebook::for_frame(frame).expect("reference faction should have a rulebook");
-        assert!(rules.can_gather(EntityKind::Worker));
+        assert!(!rules.can_gather(EntityKind::Worker));
         assert_eq!(
             rules.entity(EntityKind::ResourceDepot).unwrap().builders,
             vec![EntityKind::Worker]
@@ -65,14 +65,18 @@ fn reference_strategy_is_deterministic_and_replayable_through_canonical_runtime(
     assert_eq!(lifecycle.stepped_at, vec![8, 17, 26, 35]);
     drop(lifecycle);
 
-    let gather = first
+    let extractor_repeat = first
         .commands
         .iter()
         .find_map(|entry| match &entry.command {
-            protocol::Command::Gather { units, node, .. } => Some((units[0], *node)),
+            protocol::Command::AdjustProductionRepeat {
+                buildings,
+                unit,
+                delta,
+            } if unit == "pump_jack" && *delta == 1 => Some(buildings[0]),
             _ => None,
         })
-        .expect("reference strategy should issue an economic gather action");
+        .expect("reference strategy should enable Depot extractor production");
     let scout = first
         .commands
         .iter()
@@ -81,15 +85,13 @@ fn reference_strategy_is_deterministic_and_replayable_through_canonical_runtime(
             _ => None,
         })
         .expect("reference strategy should issue a tactical attack-move action");
-    assert_ne!(gather.0, scout);
-
-    let gatherer = first
+    let resource_depot = first
         .final_snapshot
         .entities
         .iter()
-        .find(|entity| entity.id == gather.0)
-        .expect("gatherer should remain owner-visible");
-    assert_ne!(gatherer.state, protocol::states::IDLE);
+        .find(|entity| entity.id == extractor_repeat)
+        .expect("Resource Depot should remain owner-visible");
+    assert_eq!(resource_depot.kind, "resource_depot");
     let scouting_worker = first
         .final_snapshot
         .entities

@@ -27,13 +27,14 @@ pub enum EntityKind {
     Factory,
     Steelworks,
     TankTrap,
+    SteelMine,
     PumpJack,
     Steel,
     Oil,
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 25] = [
+    pub const ALL: [EntityKind; 26] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Rifleman,
@@ -56,6 +57,7 @@ impl EntityKind {
         EntityKind::Factory,
         EntityKind::Steelworks,
         EntityKind::TankTrap,
+        EntityKind::SteelMine,
         EntityKind::PumpJack,
         EntityKind::Steel,
         EntityKind::Oil,
@@ -71,6 +73,10 @@ impl EntityKind {
 
     pub fn is_node(self) -> bool {
         crate::defs::node_def(self).is_some()
+    }
+
+    pub fn is_resource_extractor(self) -> bool {
+        matches!(self, EntityKind::SteelMine | EntityKind::PumpJack)
     }
 
     pub fn stable_id(self) -> &'static str {
@@ -97,6 +103,7 @@ impl EntityKind {
             EntityKind::Factory => "factory",
             EntityKind::Steelworks => "steelworks",
             EntityKind::TankTrap => "tank_trap",
+            EntityKind::SteelMine => "steel_mine",
             EntityKind::PumpJack => "pump_jack",
             EntityKind::Steel => "steel",
             EntityKind::Oil => "oil",
@@ -131,6 +138,7 @@ impl FromStr for EntityKind {
             "factory" => Ok(EntityKind::Factory),
             "steelworks" => Ok(EntityKind::Steelworks),
             "tank_trap" => Ok(EntityKind::TankTrap),
+            "steel_mine" => Ok(EntityKind::SteelMine),
             "pump_jack" => Ok(EntityKind::PumpJack),
             "steel" => Ok(EntityKind::Steel),
             "oil" => Ok(EntityKind::Oil),
@@ -196,7 +204,7 @@ pub fn movement_body_class(kind: EntityKind) -> MovementBodyClass {
 pub fn static_blocker_class(kind: EntityKind) -> StaticBlockerClass {
     if kind == EntityKind::TankTrap {
         StaticBlockerClass::VehicleBodyOnly
-    } else if kind == EntityKind::PumpJack {
+    } else if matches!(kind, EntityKind::SteelMine | EntityKind::PumpJack) {
         StaticBlockerClass::None
     } else if kind.is_building() {
         StaticBlockerClass::AllGround
@@ -206,7 +214,11 @@ pub fn static_blocker_class(kind: EntityKind) -> StaticBlockerClass {
 }
 
 pub fn blocks_line_of_sight(kind: EntityKind) -> bool {
-    kind.is_building() && !matches!(kind, EntityKind::TankTrap | EntityKind::PumpJack)
+    kind.is_building()
+        && !matches!(
+            kind,
+            EntityKind::TankTrap | EntityKind::SteelMine | EntityKind::PumpJack
+        )
 }
 
 pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {

@@ -73,9 +73,15 @@ pub fn train_requirement_met(
     unit_kind: EntityKind,
     owned_complete_building_kinds: &[EntityKind],
 ) -> bool {
-    defs::unit_def(unit_kind)
-        .map(|d| d.train_requirement.is_met(owned_complete_building_kinds))
-        .unwrap_or(true)
+    if let Some(definition) = defs::unit_def(unit_kind) {
+        definition
+            .train_requirement
+            .is_met(owned_complete_building_kinds)
+    } else if let Some(definition) = defs::building_def(unit_kind) {
+        requirements_met(definition.build_requires, owned_complete_building_kinds)
+    } else {
+        false
+    }
 }
 
 /// Whether `unit_kind` is in this faction's catalog and its training tech has been unlocked.
@@ -85,7 +91,7 @@ pub fn train_requirement_met_for_faction(
     owned_complete_building_kinds: &[EntityKind],
 ) -> bool {
     catalog_for(faction_id).is_some_and(|catalog| {
-        catalog.allows_unit(unit_kind)
+        (catalog.allows_unit(unit_kind) || catalog.allows_building(unit_kind))
             && train_requirement_met(unit_kind, owned_complete_building_kinds)
     })
 }
@@ -187,7 +193,11 @@ mod tests {
         assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
             trainable_units(EntityKind::ResourceDepot),
-            &[EntityKind::Worker]
+            &[
+                EntityKind::Worker,
+                EntityKind::SteelMine,
+                EntityKind::PumpJack
+            ]
         );
         assert_eq!(trainable_units(EntityKind::Zamok), &[EntityKind::Golem]);
         assert_eq!(
@@ -368,10 +378,11 @@ mod tests {
             can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::TankTrap),
             "default workers can build Tank Traps"
         );
-        assert!(
-            can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::PumpJack),
-            "default workers can build contextual Pump Jacks on oil nodes"
-        );
+        assert!(!can_build_for_faction(
+            DEFAULT_FACTION_ID,
+            EntityKind::Worker,
+            EntityKind::PumpJack
+        ));
         assert!(
             !can_build_for_faction(
                 DEFAULT_FACTION_ID,

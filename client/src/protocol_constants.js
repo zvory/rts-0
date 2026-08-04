@@ -185,6 +185,7 @@ export const KIND = Object.freeze({
   FACTORY: "factory",
   STEELWORKS: "steelworks",
   TANK_TRAP: "tank_trap",
+  STEEL_MINE: "steel_mine",
   PUMP_JACK: "pump_jack",
   STEEL: "steel",
   OIL: "oil",
@@ -214,6 +215,7 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.FACTORY,
   KIND.STEELWORKS,
   KIND.TANK_TRAP,
+  KIND.STEEL_MINE,
   KIND.PUMP_JACK,
 ]);
 export const RESOURCE_KINDS = Object.freeze([KIND.STEEL, KIND.OIL]);
@@ -325,7 +327,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 51;
+export const COMPACT_SNAPSHOT_VERSION = 52;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -358,6 +360,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.EKAT]: 19,
   [KIND.ZAMOK]: 20,
   [KIND.TANK_TRAP]: 21,
+  [KIND.STEEL_MINE]: 26,
   [KIND.PUMP_JACK]: 23,
   [KIND.FACTORY]: 10,
   [KIND.STEEL]: 11,

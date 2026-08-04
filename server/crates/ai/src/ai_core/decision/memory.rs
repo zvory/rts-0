@@ -45,8 +45,7 @@ pub(crate) struct AiDecisionMemory {
     pub(super) enemy_main_resource_depot: Option<u32>,
     pub(super) enemy_main_destroyed: bool,
     pub(super) endgame_search_waypoint: usize,
-    pub(super) opening_first_pump_builder: Option<u32>,
-    pub(super) opening_first_pump_builder_followups: usize,
+    pub(super) extractor_repeat_depots: BTreeSet<u32>,
     pub(super) turtle_opening_riflemen_ordered: usize,
     incomplete_resource_depots: BTreeMap<u32, IncompleteResourceDepotMemory>,
 }
@@ -77,8 +76,7 @@ impl AiDecisionMemory {
             enemy_main_resource_depot: None,
             enemy_main_destroyed: false,
             endgame_search_waypoint: 0,
-            opening_first_pump_builder: None,
-            opening_first_pump_builder_followups: 0,
+            extractor_repeat_depots: BTreeSet::new(),
             turtle_opening_riflemen_ordered: 0,
             incomplete_resource_depots: BTreeMap::new(),
         }
@@ -161,8 +159,7 @@ impl AiDecisionMemory {
         self.enemy_main_resource_depot = None;
         self.enemy_main_destroyed = false;
         self.endgame_search_waypoint = 0;
-        self.opening_first_pump_builder = None;
-        self.opening_first_pump_builder_followups = 0;
+        self.extractor_repeat_depots.clear();
         self.turtle_opening_riflemen_ordered = 0;
         self.incomplete_resource_depots.clear();
     }

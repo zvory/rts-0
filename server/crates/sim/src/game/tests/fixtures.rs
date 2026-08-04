@@ -128,6 +128,13 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
     if e.is_node() {
         v.remaining = e.remaining();
     }
+    if e.kind.is_resource_extractor() {
+        v.extractor_active = Some(services::economy::pump_jack_is_active(
+            &game.state.entities,
+            &game.team_relations(),
+            e.id,
+        ));
+    }
     if e.kind == EntityKind::Worker && e.gather_phase() == Some(GatherPhase::Harvesting) {
         if let Some(node) = e.order().gather_node() {
             v.latched_node = Some(node);

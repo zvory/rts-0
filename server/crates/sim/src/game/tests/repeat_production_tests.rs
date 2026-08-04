@@ -1,6 +1,6 @@
 use super::fixtures::empty_flat_game;
 use super::*;
-use crate::game::entity::EntityKind;
+use crate::game::entity::{EntityKind, ProdItem};
 use crate::game::services::occupancy::footprint_center;
 use crate::game::upgrade::UpgradeKind;
 use crate::rules;
@@ -51,6 +51,248 @@ fn repeat_fixture() -> (Game, u32) {
     };
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     (game, barracks)
+}
+
+#[test]
+fn depot_completes_steel_mine_on_nearest_in_range_patch() {
+    let mut game = empty_flat_game(&players());
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
+    game.state
+        .entities
+        .get_mut(depot)
+        .expect("depot")
+        .push_production(ProdItem {
+            unit: EntityKind::SteelMine,
+            progress: 1,
+            total: 1,
+            paid: true,
+        });
+    let near = game.state.map.tile_center(14, 10);
+    let far = game.state.map.tile_center(18, 10);
+    game.state
+        .entities
+        .spawn_node(EntityKind::Steel, far.0, far.1);
+    game.state
+        .entities
+        .spawn_node(EntityKind::Steel, near.0, near.1);
+
+    game.tick();
+
+    assert!(game
+        .state
+        .entities
+        .get(depot)
+        .expect("depot")
+        .prod_queue()
+        .is_empty());
+    let mine = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::SteelMine)
+        .expect("steel mine should be produced");
+    assert_eq!((mine.pos_x, mine.pos_y), near);
+}
+
+#[test]
+fn depot_extractor_scaffold_matches_front_queue_progress() {
+    let mut game = empty_flat_game(&players());
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
+    let patch = game.state.map.tile_center(14, 10);
+    let total = config::building_stats(EntityKind::SteelMine)
+        .expect("steel mine stats")
+        .build_ticks;
+    game.state
+        .entities
+        .spawn_node(EntityKind::Steel, patch.0, patch.1);
+    game.state
+        .entities
+        .get_mut(depot)
+        .expect("depot")
+        .push_production(ProdItem {
+            unit: EntityKind::SteelMine,
+            progress: 0,
+            total,
+            paid: true,
+        });
+
+    game.tick();
+
+    let queue_progress = game.state.entities.get(depot).expect("depot").prod_queue()[0].progress;
+    let mine = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::SteelMine)
+        .expect("visible extractor scaffold");
+    assert!(mine.under_construction());
+    assert_eq!((mine.pos_x, mine.pos_y), patch);
+    assert_eq!(mine.construction_producer_id(), Some(depot));
+    assert_eq!(
+        mine.build_progress_fraction(),
+        Some(queue_progress as f32 / total as f32)
+    );
+}
+
+#[test]
+fn cancelling_extractor_scaffold_cancels_and_refunds_depot_item() {
+    let mut game = empty_flat_game(&players());
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
+    let patch = game.state.map.tile_center(14, 10);
+    game.state
+        .entities
+        .spawn_node(EntityKind::Steel, patch.0, patch.1);
+    game.state.players[0].set_resources(450, 0);
+    game.state
+        .entities
+        .get_mut(depot)
+        .expect("depot")
+        .push_production(ProdItem {
+            unit: EntityKind::SteelMine,
+            progress: 0,
+            total: 10,
+            paid: true,
+        });
+    game.tick();
+    let scaffold = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.construction_producer_id() == Some(depot))
+        .map(|entity| entity.id)
+        .expect("extractor scaffold");
+
+    game.enqueue(
+        1,
+        Command::Cancel {
+            building: scaffold,
+            construction: true,
+        },
+    );
+    game.tick();
+
+    assert!(game.state.entities.get(scaffold).is_none());
+    assert!(game
+        .state
+        .entities
+        .get(depot)
+        .expect("depot")
+        .prod_queue()
+        .is_empty());
+    assert_eq!(game.state.players[0].steel, 500);
+}
+
+#[test]
+fn repeated_extractor_pauses_when_saturated_and_resumes_after_destruction() {
+    let mut game = empty_flat_game(&players());
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
+    let patch = game.state.map.tile_center(14, 10);
+    game.state
+        .entities
+        .spawn_node(EntityKind::Steel, patch.0, patch.1);
+    let mine = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::SteelMine, patch.0, patch.1, true)
+        .expect("starting mine should spawn");
+    game.state
+        .entities
+        .get_mut(depot)
+        .expect("depot")
+        .set_repeat_production(Some(EntityKind::SteelMine), true);
+    game.state.players[0].set_resources(500, 0);
+
+    game.tick();
+    assert_eq!(game.state.players[0].steel, 500);
+    assert!(game
+        .state
+        .entities
+        .get(depot)
+        .expect("depot")
+        .prod_queue()
+        .is_empty());
+
+    game.state.entities.remove(mine);
+    game.tick();
+    assert_eq!(game.state.players[0].steel, 450);
+    let queue = game.state.entities.get(depot).expect("depot").prod_queue();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0].unit, EntityKind::SteelMine);
+    assert!(queue[0].paid);
+}
+
+#[test]
+fn saturated_extractor_repeat_yields_to_other_extractor_kind() {
+    let mut game = empty_flat_game(&players());
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
+    let steel_patch = game.state.map.tile_center(14, 10);
+    let oil_patch = game.state.map.tile_center(16, 10);
+    game.state
+        .entities
+        .spawn_node(EntityKind::Steel, steel_patch.0, steel_patch.1);
+    game.state
+        .entities
+        .spawn_node(EntityKind::Oil, oil_patch.0, oil_patch.1);
+    game.state
+        .entities
+        .spawn_building(1, EntityKind::SteelMine, steel_patch.0, steel_patch.1, true)
+        .expect("starting mine should spawn");
+    let producer = game.state.entities.get_mut(depot).expect("depot");
+    producer.set_repeat_production(Some(EntityKind::SteelMine), true);
+    producer.set_repeat_production(Some(EntityKind::PumpJack), true);
+    game.state.players[0].set_resources(500, 0);
+
+    game.tick();
+    assert!(game
+        .state
+        .entities
+        .get(depot)
+        .expect("depot")
+        .prod_queue()
+        .is_empty());
+
+    game.tick();
+    let queue = game.state.entities.get(depot).expect("depot").prod_queue();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0].unit, EntityKind::PumpJack);
+    assert_eq!(game.state.players[0].steel, 400);
+}
+
+#[test]
+fn extractor_production_ignores_matching_patches_outside_its_depot_range() {
+    let mut game = empty_flat_game(&players());
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (4, 4));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
+    let patch = game.state.map.tile_center(25, 25);
+    game.state
+        .entities
+        .spawn_node(EntityKind::Oil, patch.0, patch.1);
+    game.state
+        .entities
+        .get_mut(depot)
+        .expect("depot")
+        .push_production(ProdItem {
+            unit: EntityKind::PumpJack,
+            progress: 0,
+            total: 1,
+            paid: false,
+        });
+    game.state.players[0].set_resources(500, 0);
+
+    game.tick();
+
+    assert_eq!(game.state.players[0].steel, 500);
+    assert!(!game.state.entities.get(depot).expect("depot").prod_queue()[0].paid);
+    assert!(!game
+        .state
+        .entities
+        .iter()
+        .any(|entity| entity.kind == EntityKind::PumpJack));
 }
 
 #[test]

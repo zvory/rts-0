@@ -27,10 +27,10 @@ pub(crate) fn pump_jack_is_active(
     let Some(pump) = entities.get(pump_id) else {
         return false;
     };
-    if pump.kind != EntityKind::PumpJack || pump.hp == 0 || pump.under_construction() {
+    if !pump.kind.is_resource_extractor() || pump.hp == 0 || pump.under_construction() {
         return false;
     }
-    let Some(node) = pump_jack::oil_node(entities, pump_id) else {
+    let Some(node) = pump_jack::resource_node(entities, pump_id) else {
         return false;
     };
     pump_jack_has_completed_friendly_mining_anchor(entities, teams, pump.owner, node)
@@ -71,7 +71,7 @@ pub(crate) fn gather_system(
     }
     for payout in pump_jack::tick(entities, teams) {
         if let Some(ps) = players.iter_mut().find(|p| p.id == payout.owner) {
-            ps.add_gathered_resources(EntityKind::Oil, payout.oil, tick);
+            ps.add_gathered_resources(payout.kind, payout.amount, tick);
         }
     }
 }

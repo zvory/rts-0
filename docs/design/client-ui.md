@@ -2368,7 +2368,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   broad white-painted team-tint surfaces, and silhouette-derived shadows. They do not overlay
   abbreviation stencils; their art and silhouette carry the gameplay identity. Tank Traps remain
   procedural neutral steel hedgehogs. Under construction → translucent with a single HP-layer status bar whose
-  fill reflects current HP rather than changing authoritative construction progress;
+  fill reflects authoritative `buildProgress` (including Resource Depot-linked extractor progress)
+  rather than the scaffold's independently damageable current HP;
   production → small top-edge progress bar. Tank Trap deconstruction uses that same HP-layer status
   bar and drains from full to empty via `deconstructProgress`. Tank Traps render as neutral steel I-beam
   hedgehogs with deterministic per-id rotation. Owned scaffolds may locally extrapolate

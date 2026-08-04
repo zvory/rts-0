@@ -61,7 +61,11 @@ impl TechRequirement {
     }
 }
 
-const RESOURCE_DEPOT_UNITS: &[EntityKind] = &[EntityKind::Worker];
+const RESOURCE_DEPOT_UNITS: &[EntityKind] = &[
+    EntityKind::Worker,
+    EntityKind::SteelMine,
+    EntityKind::PumpJack,
+];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::Rifleman,
@@ -525,6 +529,25 @@ pub const BUILDINGS: &[BuildingDef] = &[
         build_requires: TRAINING_CENTRE_REQUIRED,
     },
     BuildingDef {
+        kind: EntityKind::SteelMine,
+        stats: balance::BuildingStats {
+            hp: 50,
+            sight_tiles: 1,
+            cost_steel: 50,
+            cost_oil: 0,
+            foot_w: 1,
+            foot_h: 1,
+            build_ticks: balance::TICK_HZ * 20,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: &[],
+    },
+    BuildingDef {
         kind: EntityKind::PumpJack,
         stats: balance::BuildingStats {
             hp: 50,
@@ -603,14 +626,20 @@ mod tests {
 
         for building in BUILDINGS {
             for unit_kind in building.trains {
-                let unit = unit_def(*unit_kind).expect("trained kind must be a unit def");
-                assert_eq!(
-                    unit.trained_at,
-                    Some(building.kind),
-                    "{} must point back to {} as trainer",
-                    unit.kind,
-                    building.kind
-                );
+                if let Some(unit) = unit_def(*unit_kind) {
+                    assert_eq!(
+                        unit.trained_at,
+                        Some(building.kind),
+                        "{} must point back to {} as trainer",
+                        unit.kind,
+                        building.kind
+                    );
+                } else {
+                    assert!(
+                        unit_kind.is_resource_extractor(),
+                        "non-unit production item {unit_kind} must be a resource extractor"
+                    );
+                }
             }
         }
     }
@@ -650,6 +679,7 @@ mod tests {
                 EntityKind::EngineeringComplex,
                 EntityKind::Steelworks,
                 EntityKind::TankTrap,
+                EntityKind::SteelMine,
                 EntityKind::PumpJack,
             ]
         );
@@ -657,6 +687,11 @@ mod tests {
         assert_eq!(
             building_def(EntityKind::ResourceDepot).unwrap().trains,
             RESOURCE_DEPOT_UNITS
+        );
+        let steel_mine = building_def(EntityKind::SteelMine).expect("steel mine definition");
+        assert_eq!(
+            (steel_mine.stats.cost_steel, steel_mine.stats.cost_oil),
+            (50, 0)
         );
         assert_eq!(
             building_def(EntityKind::Barracks).unwrap().trains,

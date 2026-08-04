@@ -29,7 +29,7 @@ fn turtle_expansion_ignores_opening_rifleman_losses() {
 }
 
 #[test]
-fn turtle_opening_starts_one_pump_jack_without_stalling_worker_training() {
+fn turtle_opening_enables_depot_extractor_repeat_without_training_miners() {
     let ts = config::TILE_SIZE as f32;
     let owned = vec![
         building_at(10, EntityKind::ResourceDepot, Some(0), 8.5 * ts, 8.5 * ts),
@@ -53,29 +53,16 @@ fn turtle_opening_starts_one_pump_jack_without_stalling_worker_training() {
         &mut AiDecisionMemory::for_profile(&AI_TURTLE),
     );
 
-    assert!(
-        decision.intents.contains(&AiIntent::Train {
-            kind: EntityKind::Worker
-        }),
-        "the Turtle opening must keep the Resource Depot on worker production"
-    );
-    assert_eq!(
-        decision
-            .commands
-            .iter()
-            .filter(|command| {
-                matches!(
-                    command,
-                    Command::Build {
-                        building: EntityKind::PumpJack,
-                        ..
-                    }
-                )
-            })
-            .count(),
-        1,
-        "the opening should fund one Pump Jack, not hold oil entirely or overcommit workers"
-    );
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Worker
+    }));
+    for unit in [EntityKind::SteelMine, EntityKind::PumpJack] {
+        assert!(decision.commands.iter().any(|command| matches!(
+            command,
+            Command::AdjustProductionRepeat { buildings, unit: queued, delta: 1 }
+                if buildings == &[10] && *queued == unit
+        )));
+    }
 }
 
 #[test]

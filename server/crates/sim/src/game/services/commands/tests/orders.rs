@@ -373,10 +373,10 @@ fn planner_backed_existing_command_families_preserve_active_and_queued_state() {
             },
         )],
     );
-    assert!(matches!(
-        entities.get(worker).unwrap().order(),
-        Order::Gather(_)
-    ));
+    assert!(
+        !matches!(entities.get(worker).unwrap().order(), Order::Gather(_)),
+        "engineers no longer accept direct gather orders"
+    );
 
     apply(
         &map,
@@ -399,7 +399,7 @@ fn planner_backed_existing_command_families_preserve_active_and_queued_state() {
 }
 
 #[test]
-fn gather_command_accepts_occupied_but_mineable_resource_node() {
+fn gather_command_rejects_workers_even_on_mineable_resource_nodes() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (resource_depot_x, resource_depot_y) =
@@ -452,14 +452,12 @@ fn gather_command_accepts_occupied_but_mineable_resource_node() {
         )],
     );
 
-    assert_eq!(
-        entities
-            .get(worker)
-            .expect("worker should exist")
-            .order()
-            .gather_node(),
-        Some(node),
-        "occupied mineable resources should remain valid gather targets; scatter happens on arrival"
+    assert!(
+        !matches!(
+            entities.get(worker).expect("worker should exist").order(),
+            Order::Gather(_)
+        ),
+        "engineers must not accept direct gather orders"
     );
 }
 
@@ -631,7 +629,7 @@ fn planner_backed_valid_queued_commands_emit_queue_full_notices() {
                 Event::Notice { msg, .. } if msg == "Command queue full"
             ))
             .count(),
-        4,
+        3,
         "each valid queued command that only fails the queue cap should notify"
     );
     for id in [mover, attacker, gatherer, builder] {

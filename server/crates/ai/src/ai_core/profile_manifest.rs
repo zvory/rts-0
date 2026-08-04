@@ -124,8 +124,8 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
             "Fast-Tank containment profile with a two-Tank opening wave, a reserved home Tank and spread Machine Gunner screen, deployed Anti-Tank Guns, and a post-natural advance on the enemy main.",
             vec![
                 "economy_manager",
-                "seven_worker_two_pump_opening",
-                "first_pump_builder_third_pump_handoff",
+                "two_engineer_two_pump_opening",
+                "depot_extractor_repeat",
                 "two_machine_gunner_opening",
                 "half_health_machine_gunner_replacement",
                 "immediate_tank_tech",
@@ -236,6 +236,6 @@ mod tests {
     fn jeff_profile_fingerprint_uses_stable_canonical_data() {
         let identity = profile_identity_by_id(JEFFS_AI_ID).expect("Jeff profile identity");
 
-        assert_eq!(identity.fingerprint, "fnv1a64:1288e6b83829967e");
+        assert_eq!(identity.fingerprint, "fnv1a64:edf62c11f86dc10b");
     }
 }

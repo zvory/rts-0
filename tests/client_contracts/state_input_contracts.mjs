@@ -1162,9 +1162,8 @@ function buttonByLabel(card, label) {
   input._onRightClick({ x: 100, y: 100 });
   assert(
     rightClickCommands.length === 1 &&
-      rightClickCommands[0].c === "gather" &&
-      rightClickCommands[0].node === overlappingSteel.id,
-    "worker right-click should prioritize an overlapped resource patch over the worker body",
+      rightClickCommands[0].c === "move",
+    "Engineer right-click on Steel should move instead of issuing a gather command",
   );
 
   const overlappingOil = { id: 32, owner: 0, kind: KIND.OIL, x: 112, y: 112, remaining: 1000 };
@@ -1180,12 +1179,9 @@ function buttonByLabel(card, label) {
   input._onRightClick({ x: 112, y: 112 }, { shiftKey: true });
   assert(
     rightClickCommands.length === 1 &&
-      rightClickCommands[0].c === "build" &&
-      rightClickCommands[0].building === KIND.PUMP_JACK &&
-      rightClickCommands[0].tileX === 3 &&
-      rightClickCommands[0].tileY === 3 &&
+      rightClickCommands[0].c === "move" &&
       rightClickCommands[0].queued === true,
-    "worker shift-right-click on oil should queue a Pump Jack build instead of direct gather",
+    "Engineer shift-right-click on Oil should queue movement instead of Pump Jack construction",
   );
 
   const rallyResourceDepot = {

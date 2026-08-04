@@ -272,7 +272,7 @@ pub fn project_entity(
                 .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog)));
     view.vision_only = vision_only;
 
-    if entity.kind == EntityKind::PumpJack && !entity.under_construction() {
+    if entity.kind.is_resource_extractor() && !entity.under_construction() {
         view.extractor_active = context.extractor_active;
     }
 

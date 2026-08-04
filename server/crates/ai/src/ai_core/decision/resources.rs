@@ -96,11 +96,7 @@ pub(super) fn plan_economy(
     } else {
         0
     };
-    let mut resource_counts = resource_worker_counts(observation);
-    let oil_extractors = availability.live_completed_extractor_count(EntityKind::Oil);
-    if oil_extractors > 0 {
-        *resource_counts.entry(EntityKind::Oil).or_default() += oil_extractors;
-    }
+    let resource_counts = resource_worker_counts(observation);
     let current_steel_workers = resource_counts
         .get(&EntityKind::Steel)
         .copied()
@@ -275,25 +271,16 @@ pub(super) fn next_tank_resource_goal(
 }
 
 pub(super) fn resource_worker_counts(observation: &AiObservation) -> BTreeMap<EntityKind, usize> {
-    let resources_by_id: BTreeMap<u32, EntityKind> = observation
-        .resources
-        .iter()
-        .map(|resource| (resource.id, resource.kind))
-        .collect();
     let mut counts = BTreeMap::new();
-    for worker in observation
-        .owned
-        .iter()
-        .filter(|entity| entity.kind == EntityKind::Worker)
-    {
-        let Some(node) = worker.latched_node else {
-            continue;
-        };
-        let Some(kind) = resources_by_id.get(&node).copied() else {
-            continue;
-        };
-        *counts.entry(kind).or_default() += 1;
-    }
+    let availability = resource_availability(observation);
+    counts.insert(
+        EntityKind::Steel,
+        availability.live_completed_extractor_count(EntityKind::Steel),
+    );
+    counts.insert(
+        EntityKind::Oil,
+        availability.live_completed_extractor_count(EntityKind::Oil),
+    );
     counts
 }
 

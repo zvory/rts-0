@@ -388,6 +388,10 @@ pub struct ConstructionState {
     /// scaffolds are intentionally unpaid and must not mint resources when cancelled.
     #[serde(default)]
     pub(crate) cost_paid: bool,
+    /// Resource Depot whose front production item owns this extractor scaffold. Ordinary
+    /// worker-built scaffolds have no producer.
+    #[serde(default)]
+    pub(crate) producer_id: Option<u32>,
 }
 
 /// Worker-only economy state.

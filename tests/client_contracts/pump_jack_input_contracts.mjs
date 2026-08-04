@@ -16,6 +16,7 @@ input.state = {
   entitiesInterpolated: () => [worker, friendlyTank, oil],
   selectedEntities: () => [worker],
   isAllyOwner: (owner) => owner === 2,
+  isEnemyOwner: () => false,
   addCommandFeedback() {},
 };
 input.commandInteraction = { issueCommand(command) { commands.push(command); } };
@@ -44,11 +45,9 @@ assert(
 input._onRightClick(friendlyTankHullPoint);
 assert(
   commands.length === 1 &&
-    commands[0].c === "build" &&
-    commands[0].building === KIND.PUMP_JACK &&
-    commands[0].tileX === 3 &&
-    commands[0].tileY === 3,
-  "worker right-click on a friendly unit standing over oil should build the underlying Pump Jack",
+    commands[0].c === "move" &&
+    commands[0].units.join(",") === String(worker.id),
+  "Engineer right-click over oil remains a move now that depots produce Pump Jacks",
 );
 
 const miningAnchorInput = Object.create(Input.prototype);

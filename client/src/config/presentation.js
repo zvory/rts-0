@@ -71,11 +71,8 @@ export const CAMERA = Object.freeze({
   edgeScrollPx: 14, // screen-edge band that triggers panning
 });
 
-// Pump Jack occupies the former Supply Depot W slot so its economy role stays
-// legible even though workers can also build one by right-clicking an oil patch.
 export const WORKER_BUILD_CARD_SLOTS = Object.freeze([
   KIND.RESOURCE_DEPOT,
-  KIND.PUMP_JACK,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.ENGINEERING_COMPLEX,

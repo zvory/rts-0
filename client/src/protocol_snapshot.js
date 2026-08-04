@@ -26,7 +26,9 @@ import { decodeCompactEvent } from "./protocol_snapshot_events.js";
 import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION) {
+  // Version 52 only appends the Steel Mine kind code, so version-51 fixture/replay frames retain
+  // the same field layout and remain safe to decode.
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 

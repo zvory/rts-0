@@ -26,8 +26,6 @@ import {
 } from "./artillery_targeting.js";
 import {
   commandHotkeyCodeFromEvent,
-  entityIntersectsRect,
-  pumpJackBuildIntentForResource,
 } from "./placement.js";
 import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
 import {
@@ -227,14 +225,12 @@ function normalRightClickAction(input, p) {
 
   const gatherers = input._selectedGathererIds();
   const workers = input._selectedWorkerIds();
-  const contextualResource = resource || pumpJackOilUnderFriendlyUnit(input, target, workers);
+  const contextualResource = resource;
   if (contextualResource && contextualResource.remaining !== 0) {
     const action = resourceRightClickAction(
       contextualResource,
       world || contextualResource,
       gatherers,
-      workers,
-      input.state.map,
     );
     if (action) return action;
   }
@@ -273,7 +269,7 @@ function normalRightClickAction(input, p) {
     };
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
-    const action = resourceRightClickAction(target, world || target, gatherers, workers, input.state.map);
+    const action = resourceRightClickAction(target, world || target, gatherers);
     if (action) return action;
     // Selection has no gatherers: fall through to a move onto the node's position.
   }
@@ -287,18 +283,7 @@ function normalRightClickAction(input, p) {
   };
 }
 
-function resourceRightClickAction(resource, world, gatherers, workers, map) {
-  const pumpJack = pumpJackBuildIntentForResource(resource, map);
-  if (resource.kind === KIND.OIL && workers.length > 0 && pumpJack) {
-    return {
-      kind: "build",
-      units: workers,
-      building: KIND.PUMP_JACK,
-      tileX: pumpJack.tileX,
-      tileY: pumpJack.tileY,
-      feedback: rightClickFeedback("move", resource.x, resource.y),
-    };
-  }
+function resourceRightClickAction(resource, world, gatherers) {
   if (gatherers.length > 0 && resource.kind !== KIND.OIL) {
     return {
       kind: "gather",
@@ -308,42 +293,6 @@ function resourceRightClickAction(resource, world, gatherers, workers, map) {
     };
   }
   return null;
-}
-
-function pumpJackOilUnderFriendlyUnit(input, target, workers) {
-  if (
-    workers.length === 0 ||
-    !target ||
-    !isUnit(target.kind) ||
-    !friendlyOwner(input.state, target.owner, input.controlPolicy)
-  ) {
-    return null;
-  }
-  const map = input.state?.map;
-  const tileSize = map?.tileSize || DEFAULT_TILE_SIZE;
-  const stat = STATS[KIND.PUMP_JACK];
-  if (!stat?.footW || !stat?.footH) return null;
-
-  const matches = [];
-  for (const candidate of input._selectionEntities?.() || []) {
-    if (candidate.kind !== KIND.OIL || candidate.remaining === 0) continue;
-    const intent = pumpJackBuildIntentForResource(candidate, map);
-    if (!intent) continue;
-    const minX = intent.tileX * tileSize;
-    const minY = intent.tileY * tileSize;
-    const maxX = minX + stat.footW * tileSize;
-    const maxY = minY + stat.footH * tileSize;
-    if (!entityIntersectsRect(target, minX, minY, maxX, maxY, tileSize)) continue;
-    matches.push(candidate);
-  }
-  matches.sort((a, b) => {
-    const ax = a.x - target.x;
-    const ay = a.y - target.y;
-    const bx = b.x - target.x;
-    const by = b.y - target.y;
-    return ax * ax + ay * ay - (bx * bx + by * by) || a.id - b.id;
-  });
-  return matches[0] || null;
 }
 
 function issueNormalRightClickAction(input, action, queued) {
@@ -500,7 +449,7 @@ export function _selectedGathererIds() {
   return selectedEntities(this.state)
     .filter((e) =>
       ownOwner(this.state, e.owner, this.controlPolicy) &&
-      (e.kind === KIND.WORKER || e.kind === KIND.GOLEM))
+      e.kind === KIND.GOLEM)
     .map((e) => e.id);
 }
 

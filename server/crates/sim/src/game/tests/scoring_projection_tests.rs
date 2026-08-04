@@ -18,6 +18,7 @@ fn scores_count_starting_entities() {
     assert_eq!(
         human.structure_score,
         entity_score_value(EntityKind::ResourceDepot)
+            + config::STARTING_STEEL_MINES * entity_score_value(EntityKind::SteelMine)
     );
     assert_eq!(human.units_killed, 0);
     assert_eq!(human.units_lost, 0);

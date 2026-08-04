@@ -80,8 +80,9 @@ Likewise, `AiBuildObservation` means only that this controller inferred an outst
 build; it is not an accepted, legal, or active-build receipt.
 
 `AiActions` is a typed per-think builder that retains at most 256 emitted actions in helper-call
-order. Its supported helpers are paid explicit-site build, resume-without-repay, train, research,
-gather, move, attack-move, direct attack, Hold Position, and Anti-Tank Gun setup. `UnitGroup`
+order. Its supported helpers are paid explicit-site build, resume-without-repay, train, standing
+production repeat, research, gather, move, attack-move, direct attack, Hold Position, and Anti-Tank
+Gun setup. `UnitGroup`
 canonicalizes tactical unit IDs into a sorted, deduplicated, non-empty set; caller-ordered worker,
 resource-node, and producer candidate lists are not normalized.
 
@@ -104,8 +105,8 @@ normal simulation validation, and replay logging are unchanged. The builder is d
 planner, task system, command receipt, or cross-tick scheduler.
 
 The public-SDK-only [reference strategy](../ai-authoring.md) is the executable authoring specimen.
-It runs through `AiController::with_strategy` and the canonical driver, gathers with one reserved
-worker, uses `UnitGroup` plus cross-tick memory to dispatch a separate attack-move scout, and is
+It runs through `AiController::with_strategy` and the canonical driver, enables Pump Jack repeat,
+uses `UnitGroup` plus cross-tick memory to dispatch its Engineer as an attack-move scout, and is
 covered by deterministic command-log and replay checks. The example is not a selectable profile or
 a strength claim.
 
@@ -160,11 +161,14 @@ The offline ai-map-analysis-debug tool loads bundled maps through the simulation
 the same static analysis, and renders the observer layers over terrain as SVG. Its choke overlay
 renders the exact detected choke tiles rather than choke bounding rectangles.
 
-The economy model is also observation-owned. A resource node is mineable only when it has
-resources remaining, is in range of a completed owned Resource Depot, is unoccupied by a latched
-worker or owned Pump Jack, and is not already reserved for the current think. Steel assignments
-emit Gather; oil assignments build Pump Jacks through the usual paid-building path. Expansion
-planning can still see known-but-not-yet-mineable resources without assigning workers to them.
+The economy model is also observation-owned. Engineers are construction-only and the built-in
+profiles retain only their starting Engineer plus any explicitly configured extra builder. On the
+first decision after each Resource Depot completes, the controller idempotently enables Steel Mine
+and Pump Jack repeat production there. The authoritative Depot queue chooses eligible in-range
+patches, pauses a saturated extractor kind, advances to the other repeated kind when possible, and
+resumes replacement production after an extractor is destroyed. Resource availability counts only
+completed, live extractors as current income while treating an in-progress scaffold as patch
+occupancy. Expansion planning can still see known resources outside current Depot coverage.
 
 Decision traces record the selected profile ID, tick, budget and reservation deltas, strategic
 goals for economy, supply, expansion, tech, production, local defense, and frontal attack, plus
@@ -179,16 +183,15 @@ AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
 panic does not override an already-active tech transition, so tank pressure continues its Factory
 path during pressure.
 
-AI 2.1 is the promoted pressure profile. It fully saturates steel, adds up to twelve oil workers,
+AI 2.1 is the promoted pressure profile. It fills in-range Steel and Oil extractor slots over time,
 keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. At a larger resource float it
 adds a second Factory. Frontal waves stage in cohorts so newly produced units do not immediately
 join an already-launched wave.
 
-AI Turtle shares AI 2.1 worker, oil, supply, and first-Barracks cadence, but uses a two-Rifleman
-opening and does not launch frontal waves. During its opening oil hold, it does not train workers
-toward suppressed oil assignments. It prioritizes a Training Centre, an early second Resource
+AI Turtle shares AI 2.1 extractor, supply, and first-Barracks cadence, but uses a two-Rifleman
+opening and does not launch frontal waves. It prioritizes a Training Centre, an early second Resource
 Depot, Entrenchment, support technology, Machine Gunners, and Anti-Tank Guns. It identifies up
 to three own-base chokepoints from the static map analysis, caps Machine Gunner production by
 planned choke-line staffing, staffs the active enemy-facing lines with Machine Gunners, and places

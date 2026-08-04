@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn faction_filtering_and_relationships_remain_authoritative() {
         let rules = AiRulebook::new(DEFAULT_FACTION_ID).unwrap();
-        assert!(rules.can_gather(EntityKind::Worker));
+        assert!(!rules.can_gather(EntityKind::Worker));
         assert!(!rules.is_available(EntityKind::Golem));
         assert_eq!(
             rules.entity(EntityKind::Tank).unwrap().producers,
@@ -243,6 +243,14 @@ mod tests {
                 DEFAULT_FACTION_ID,
                 EntityKind::Barracks
             )
+        );
+        assert_eq!(
+            rules.trainable_units(EntityKind::ResourceDepot),
+            vec![
+                EntityKind::Worker,
+                EntityKind::SteelMine,
+                EntityKind::PumpJack
+            ]
         );
     }
 }

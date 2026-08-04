@@ -3,8 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ai_core::actions::{
-    self, AiActionContext, BuildPlacementRequest, ResourceAssignmentPolicy, SpendBudget,
-    TrainUnitsRequest,
+    self, AiActionContext, BuildPlacementRequest, SpendBudget, TrainUnitsRequest,
 };
 use crate::ai_core::facts::{AiFacts, EnemyBaseFact};
 use crate::ai_core::map_analysis::AiMapAnalysis;
@@ -279,50 +278,7 @@ where
         save_for_expansion && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0;
 
     let economy_plan = economy_manager_output.plan.clone();
-    let mut skipped_workers = BTreeSet::new();
-    let opening_pump_followup_target = profile
-        .fast_tank_timing
-        .map(|timing| timing.first_pump_builder_additional_pump_jacks)
-        .unwrap_or(0);
-    let mut opening_pump_followups_assigned = 0;
-    if memory.opening_first_pump_builder_followups < opening_pump_followup_target
-        && facts.complete_building_count(EntityKind::PumpJack) > 0
-    {
-        if let Some(builder) = memory.opening_first_pump_builder {
-            let candidate = [builder];
-            let assigned = actions::assign_workers_to_resource(
-                &mut actions,
-                ResourceAssignmentPolicy {
-                    workers: &observation.owned,
-                    resources: &observation.resources,
-                    resource_kind: EntityKind::Oil,
-                    assignable_node_ids: &economy_plan.mineable_oil_nodes,
-                    candidate_worker_ids: Some(&candidate),
-                    skip_workers: &skipped_workers,
-                    pre_reserved_nodes: &economy_plan.occupied_nodes,
-                    idle_only: true,
-                    allow_latched_reassignment: false,
-                    max_assignments: Some(1),
-                    max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
-                    remote_worker_assignment_fallback: economy_plan
-                        .remote_worker_assignment_fallback,
-                },
-            );
-            if !assigned.is_empty() {
-                memory.opening_first_pump_builder_followups += 1;
-                opening_pump_followups_assigned = assigned.len();
-                intents.push(AiIntent::Gather {
-                    resource: EntityKind::Oil,
-                    assignments: assigned.len(),
-                });
-            }
-        }
-    }
-    if memory.opening_first_pump_builder_followups < opening_pump_followup_target {
-        if let Some(builder) = memory.opening_first_pump_builder {
-            skipped_workers.insert(builder);
-        }
-    }
+    enable_extractor_repeat_for_new_depots(observation, memory, &mut actions);
     let save_worker_training_for_tech = defer_economy_for_panic;
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker);
     if should_train_workers {
@@ -670,90 +626,6 @@ where
         }
     }
 
-    let panic_support_oil = panic_plan.map(|plan| plan.oil_workers > 0).unwrap_or(false);
-    let mut panic_oil_candidates = Vec::new();
-    if panic_support_oil {
-        panic_oil_candidates.extend(facts.idle_workers.iter().copied());
-        panic_oil_candidates.extend(facts.gathering_workers.iter().copied());
-        panic_oil_candidates.sort_unstable();
-        panic_oil_candidates.dedup();
-    }
-    let oil_candidate_workers = if panic_support_oil {
-        panic_oil_candidates.as_slice()
-    } else {
-        facts.idle_workers.as_slice()
-    };
-    let should_assign_oil_workers =
-        economy_manager_output.proposes(EconomyProposal::AssignOilWorkers);
-    if should_assign_oil_workers
-        && economy_plan.desired_oil_workers > economy_plan.current_oil_workers
-    {
-        let assigned = actions::assign_workers_to_resource(
-            &mut actions,
-            ResourceAssignmentPolicy {
-                workers: &observation.owned,
-                resources: &observation.resources,
-                resource_kind: EntityKind::Oil,
-                assignable_node_ids: &economy_plan.mineable_oil_nodes,
-                candidate_worker_ids: Some(oil_candidate_workers),
-                skip_workers: &skipped_workers,
-                pre_reserved_nodes: &economy_plan.occupied_nodes,
-                idle_only: !panic_support_oil,
-                allow_latched_reassignment: panic_support_oil,
-                max_assignments: Some(
-                    (economy_plan.desired_oil_workers - economy_plan.current_oil_workers)
-                        .saturating_sub(opening_pump_followups_assigned),
-                ),
-                max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
-                remote_worker_assignment_fallback: economy_plan.remote_worker_assignment_fallback,
-            },
-        );
-        if memory.opening_first_pump_builder.is_none()
-            && facts.building_count(EntityKind::PumpJack) == 0
-        {
-            memory.opening_first_pump_builder =
-                assigned.first().map(|assignment| assignment.worker);
-        }
-        if !assigned.is_empty() {
-            intents.push(AiIntent::Gather {
-                resource: EntityKind::Oil,
-                assignments: assigned.len(),
-            });
-        }
-    }
-
-    let should_assign_steel_workers =
-        economy_manager_output.proposes(EconomyProposal::AssignSteelWorkers);
-    if should_assign_steel_workers
-        && economy_plan.target_steel_workers > economy_plan.current_steel_workers
-    {
-        let assigned = actions::assign_workers_to_resource(
-            &mut actions,
-            ResourceAssignmentPolicy {
-                workers: &observation.owned,
-                resources: &observation.resources,
-                resource_kind: EntityKind::Steel,
-                assignable_node_ids: &economy_plan.mineable_steel_nodes,
-                candidate_worker_ids: Some(&facts.idle_workers),
-                skip_workers: &skipped_workers,
-                pre_reserved_nodes: &economy_plan.occupied_nodes,
-                idle_only: true,
-                allow_latched_reassignment: false,
-                max_assignments: Some(
-                    economy_plan.target_steel_workers - economy_plan.current_steel_workers,
-                ),
-                max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
-                remote_worker_assignment_fallback: economy_plan.remote_worker_assignment_fallback,
-            },
-        );
-        if !assigned.is_empty() {
-            intents.push(AiIntent::Gather {
-                resource: EntityKind::Steel,
-                assignments: assigned.len(),
-            });
-        }
-    }
-
     let defensive_machine_gunners = defensive_machine_gunner_units(observation, profile);
     let defensive_machine_gunner_units: BTreeSet<u32> =
         defensive_machine_gunners.iter().copied().collect();
@@ -1042,6 +914,40 @@ fn oil_demand_signal(
     panic_plan
         .map(|plan| OilDemandSignal::ExactWorkers(plan.oil_workers))
         .unwrap_or(OilDemandSignal::ProfileDefault)
+}
+
+fn enable_extractor_repeat_for_new_depots(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    actions: &mut AiActionContext<'_>,
+) {
+    let active_depots = observation
+        .owned
+        .iter()
+        .filter(|entity| {
+            entity.kind == EntityKind::ResourceDepot
+                && entity.is_complete
+                && entity.state != AiEntityState::Dead
+        })
+        .map(|entity| entity.id)
+        .collect::<BTreeSet<_>>();
+    memory
+        .extractor_repeat_depots
+        .retain(|id| active_depots.contains(id));
+
+    for depot in active_depots {
+        if memory.extractor_repeat_depots.insert(depot) {
+            for unit in [EntityKind::SteelMine, EntityKind::PumpJack] {
+                actions.emit_action(
+                    crate::sdk::actions::AiActionRequest::AdjustProductionRepeat {
+                        buildings: vec![depot],
+                        unit,
+                        delta: 1,
+                    },
+                );
+            }
+        }
+    }
 }
 
 fn should_build_expansion_from_economy_manager(output: &EconomyManagerOutput) -> bool {

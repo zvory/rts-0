@@ -364,6 +364,39 @@ impl AiActions {
         Ok(producer)
     }
 
+    /// Enable or disable one standing production allocation without spending its eventual cost.
+    /// The simulation remains authoritative over producer compatibility, repeat state, resources,
+    /// and queue insertion. Multiple kinds may be enabled on the same producer in one step.
+    pub fn set_production_repeat(
+        &mut self,
+        producers: &[u32],
+        kind: EntityKind,
+        enabled: bool,
+    ) -> Result<u32, ActionError> {
+        if !kind.is_unit() && !kind.is_resource_extractor() {
+            return Err(ActionBlocker::UnsupportedKind(kind).into());
+        }
+        if producers.is_empty() {
+            return Err(ActionBlocker::EmptyCandidates(ReservationNamespace::Producer).into());
+        }
+        let producer = producers
+            .iter()
+            .find(|id| {
+                self.owned_kinds.get(id).is_some_and(|producer_kind| {
+                    rts_rules::economy::trainable_units(*producer_kind).contains(&kind)
+                })
+            })
+            .copied()
+            .ok_or(ActionBlocker::NoCompatibleProducer)?;
+        self.preflight_capacity()?;
+        self.requests.push(AiActionRequest::AdjustProductionRepeat {
+            buildings: vec![producer],
+            unit: kind,
+            delta: if enabled { 1 } else { -1 },
+        });
+        Ok(producer)
+    }
+
     pub fn research(
         &mut self,
         producers: &[u32],
@@ -665,6 +698,11 @@ pub(crate) enum AiActionRequest {
     Train {
         building: u32,
         unit: EntityKind,
+    },
+    AdjustProductionRepeat {
+        buildings: Vec<u32>,
+        unit: EntityKind,
+        delta: i8,
     },
     Research {
         building: u32,

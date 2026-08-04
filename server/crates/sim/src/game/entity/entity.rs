@@ -152,10 +152,12 @@ impl Entity {
                 progress: 0,
                 total: s.build_ticks,
                 cost_paid: false,
+                producer_id: None,
             }),
             worker: None,
             resource_node: None,
-            resource_extractor: (kind == EntityKind::PumpJack)
+            resource_extractor: kind
+                .is_resource_extractor()
                 .then(ResourceExtractorState::default),
             scout_plane: None,
             ability_cooldowns: BTreeMap::new(),
@@ -1112,6 +1114,12 @@ impl Entity {
         };
         construction.cost_paid = true;
         true
+    }
+
+    pub(crate) fn construction_producer_id(&self) -> Option<u32> {
+        self.construction
+            .as_ref()
+            .and_then(|construction| construction.producer_id)
     }
 
     pub fn build_progress_fraction(&self) -> Option<f32> {

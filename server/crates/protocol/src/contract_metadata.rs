@@ -83,6 +83,7 @@ pub mod kinds {
     pub const FACTORY: &str = "factory";
     pub const STEELWORKS: &str = "steelworks";
     pub const TANK_TRAP: &str = "tank_trap";
+    pub const STEEL_MINE: &str = "steel_mine";
     pub const PUMP_JACK: &str = "pump_jack";
     pub const STEEL: &str = "steel";
     pub const OIL: &str = "oil";
@@ -195,7 +196,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 51;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 52;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -385,6 +386,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::EKAT, 19),
     (kinds::ZAMOK, 20),
     (kinds::TANK_TRAP, 21),
+    (kinds::STEEL_MINE, 26),
     (kinds::PUMP_JACK, 23),
 ];
 
@@ -698,6 +700,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("FACTORY", kinds::FACTORY),
         ("STEELWORKS", kinds::STEELWORKS),
         ("TANK_TRAP", kinds::TANK_TRAP),
+        ("STEEL_MINE", kinds::STEEL_MINE),
         ("PUMP_JACK", kinds::PUMP_JACK),
         ("STEEL", kinds::STEEL),
         ("OIL", kinds::OIL),

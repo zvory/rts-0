@@ -52,7 +52,8 @@ legal, clear, placeable, reachable, or accepted, and hidden dynamic state is nev
 ## Emit actions
 
 Call typed helpers on the `AiActions` supplied to `step`. The builder supports `paid_build`,
-`resume_build`, `train`, `research`, `gather`, `move_group`, `attack_move`, `attack`,
+`resume_build`, `train`, `set_production_repeat`, `research`, `gather`, `move_group`,
+`attack_move`, `attack`,
 `hold_position`, and `setup_anti_tank_guns`. Tactical helpers take a `UnitGroup`, which sorts and
 deduplicates IDs and rejects an empty group. Worker, resource-node, and producer candidate slices
 stay in caller order so priority remains explicit.
@@ -64,16 +65,15 @@ emitted actions, and trace unchanged. An `Ok` means only that the action was emi
 local batch; the simulation may still ignore it through ordinary validation. The builder makes no
 claim of command acceptance, legality, completion, or simulation atomicity.
 
-The specimen gathers steel with one worker and later attack-moves a different `UnitGroup` toward a
-public enemy start, tolerating missing workers, resources, or opponents without panicking. Actions
+The specimen enables Pump Jack repeat at its Resource Depot and later attack-moves its Engineer
+toward a public enemy start, tolerating missing Engineers, resources, or opponents without panicking. Actions
 are retained in helper-call order up to the per-think cap and translated to ordinary commands only
 after `step` returns.
 
 The external integration test compiles the strategy without access to `rts_ai` internals, checks
 the lifecycle cadence, runs the same seeded matchup twice, compares ordered command logs, observes
-the commands taking effect, and replays the ordinary command log. The specimen derives its
-expansion-saving threshold from the rulebook and chooses steel through the known-world resource
-index:
+the commands taking effect, and replays the ordinary command log. The specimen verifies the
+faction through the rulebook and discovers Oil through the known-world resource index:
 
 ```bash
 cargo nextest run --config-file .config/nextest.toml \

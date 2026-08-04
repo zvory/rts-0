@@ -213,10 +213,10 @@ fn jeff_opening_observation(worker_count: usize, pump_jacks: usize) -> AiObserva
 }
 
 #[test]
-fn jeff_waits_for_seven_workers_and_two_pump_jacks_before_barracks() {
+fn jeff_waits_for_two_engineers_and_two_pump_jacks_before_barracks() {
     for observation in [
-        jeff_opening_observation(6, 2),
-        jeff_opening_observation(7, 1),
+        jeff_opening_observation(1, 2),
+        jeff_opening_observation(2, 1),
     ] {
         let decision = decide_with_profile(&observation, &JEFFS_AI);
         assert!(!decision.intents.contains(&AiIntent::Build {
@@ -224,36 +224,16 @@ fn jeff_waits_for_seven_workers_and_two_pump_jacks_before_barracks() {
         }));
     }
 
-    let decision = decide_with_profile(&jeff_opening_observation(7, 2), &JEFFS_AI);
+    let decision = decide_with_profile(&jeff_opening_observation(2, 2), &JEFFS_AI);
     assert!(decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Barracks
     }));
 }
 
 #[test]
-fn jeff_first_pump_builder_immediately_builds_one_followup_pump() {
-    let mut observation = jeff_opening_observation(7, 1);
-    let ts = observation.map.tile_size as f32;
-    let first_oil = observation
-        .resources
-        .iter()
-        .find(|resource| resource.id == 200)
-        .map(|resource| (resource.x, resource.y))
-        .expect("first oil node");
-    if let Some(resource_depot) = observation.owned.iter_mut().find(|entity| entity.id == 1) {
-        resource_depot.x = 8.5 * ts;
-        resource_depot.y = 8.5 * ts;
-    }
-    if let Some(builder) = observation.owned.iter_mut().find(|entity| entity.id == 20) {
-        builder.x = first_oil.0;
-        builder.y = first_oil.1;
-    }
-    if let Some(pump_jack) = observation.owned.iter_mut().find(|entity| entity.id == 60) {
-        pump_jack.x = first_oil.0;
-        pump_jack.y = first_oil.1;
-    }
+fn jeff_enables_depot_repeat_for_both_extractors_once() {
+    let observation = jeff_opening_observation(2, 1);
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    memory.opening_first_pump_builder = Some(20);
     let width = observation.map.width;
     let height = observation.map.height;
 
@@ -270,24 +250,31 @@ fn jeff_first_pump_builder_immediately_builds_one_followup_pump() {
         |_, tx, ty| tx < width && ty < height,
     );
 
-    assert!(
-        decision.commands.iter().any(|command| {
-            matches!(
-                command,
-                Command::Build {
-                    units,
-                    building: EntityKind::PumpJack,
-                    ..
-                } if units == &[20]
-            )
-        }),
-        "commands={:?}",
-        decision.commands
+    for unit in [EntityKind::SteelMine, EntityKind::PumpJack] {
+        assert!(decision.commands.iter().any(|command| matches!(
+            command,
+            Command::AdjustProductionRepeat { buildings, unit: queued, delta: 1 }
+                if buildings == &[1] && *queued == unit
+        )));
+    }
+    assert!(memory.extractor_repeat_depots.contains(&1));
+
+    let second = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
     );
-    assert_eq!(memory.opening_first_pump_builder_followups, 1);
-    assert!(!decision.commands.iter().any(|command| {
-        matches!(command, Command::Gather { units, .. } if units.contains(&20))
-    }));
+    assert!(!second
+        .commands
+        .iter()
+        .any(|command| matches!(command, Command::AdjustProductionRepeat { .. })));
 }
 
 fn jeff_armored_tech_observation(factory: Option<AiEntitySummary>) -> AiObservation {
@@ -554,6 +541,7 @@ fn jeff_surplus_observation(steel: u32) -> AiObservation {
             combat_unit(34, EntityKind::MachineGunner),
             combat_unit(35, EntityKind::MachineGunner),
             worker(40, AiEntityState::Idle),
+            worker(41, AiEntityState::Idle),
         ],
     ));
     observation.upgrades.push(UpgradeKind::TankUnlock);
@@ -664,7 +652,7 @@ fn jeff_adds_the_second_vehicle_works_after_three_tanks_at_the_earlier_float() {
 }
 
 #[test]
-fn trains_worker_before_first_factory_when_below_saturation() {
+fn extractor_saturation_does_not_train_mining_workers_before_first_factory() {
     let ts = config::TILE_SIZE as f32;
     let (factory_steel, factory_oil) = rts_rules::economy::cost(EntityKind::Factory);
     let observation = observation(
@@ -685,19 +673,19 @@ fn trains_worker_before_first_factory_when_below_saturation() {
 
     let decision = decide(&observation);
 
-    assert!(decision.intents.contains(&AiIntent::Train {
+    assert!(!decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::Worker
     }));
     assert!(
-        !decision.intents.contains(&AiIntent::Build {
+        decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::Factory
         }),
-        "Worker production should reserve the first spend when below saturation"
+        "the old mining-worker spend must not block the first Factory"
     );
 }
 
 #[test]
-fn trains_workers_before_first_tank_when_below_two_base_saturation() {
+fn extractor_saturation_does_not_train_mining_workers_before_first_tank() {
     let ts = config::TILE_SIZE as f32;
     let (tank_steel, tank_oil) = rts_rules::economy::cost(EntityKind::Tank);
     let mut owned = vec![
@@ -724,13 +712,13 @@ fn trains_workers_before_first_tank_when_below_two_base_saturation() {
 
     let decision = decide(&observation);
 
-    assert!(decision.intents.contains(&AiIntent::Train {
+    assert!(!decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::Worker
     }));
     assert!(
-        !decision.intents.contains(&AiIntent::Train {
+        decision.intents.contains(&AiIntent::Train {
             kind: EntityKind::Tank
         }),
-        "first Tank should not preempt Worker queues below main-plus-natural saturation"
+        "the old mining-worker spend must not preempt Tank production"
     );
 }

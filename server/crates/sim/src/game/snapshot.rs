@@ -133,7 +133,7 @@ impl Game {
                     target,
                     debug_path_projection: options.debug_path_projection(),
                     active_construction_sites: Some(&self.state.active_construction_sites),
-                    extractor_active: (e.kind == EntityKind::PumpJack).then(|| {
+                    extractor_active: e.kind.is_resource_extractor().then(|| {
                         services::economy::pump_jack_is_active(&self.state.entities, &teams, e.id)
                     }),
                     teams: Some(&teams),
