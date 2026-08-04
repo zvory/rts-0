@@ -319,7 +319,10 @@ export function _queueLabel(e, cx, cy, count, bodyAlpha) {
     } });
     t.anchor.set(0.5, 0);
     this._queueLabelPool.set(e.id, t);
-    this.layers.buildings.addChild(t);
+    // Queue labels must stay above a producer's body. PNG building rigs can
+    // replace their SVG fallback after this label is created, which otherwise
+    // appends the body above the text in the buildings layer.
+    this.layers.buildingOverlays.addChild(t);
     this._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.queueText");
   } else {
     this._recordRenderDiagnostic?.("renderer.pixi.displayObject.reused.queueText");
