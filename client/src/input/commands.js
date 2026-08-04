@@ -483,6 +483,8 @@ function selectedOwnLandUnitIds(input, fallbackUnitIds = []) {
 function _isOwnIncompleteBuilding(target) {
   return (
     isBuilding(target.kind) &&
+    target.kind !== KIND.STEEL_MINE &&
+    target.kind !== KIND.PUMP_JACK &&
     typeof target.buildProgress === "number" &&
     target.buildProgress < 1
   );
