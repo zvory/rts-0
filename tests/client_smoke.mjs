@@ -89,6 +89,7 @@ try {
     { timeout: 5000 },
   );
   ok(true, "editing the joined lobby name updates the authoritative roster");
+  await page.evaluate(() => document.fonts.ready);
   const teamUi = await page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll("#lobby-players .team-row"));
     const seat = document.querySelector("#lobby-players .lobby-seat");
@@ -136,6 +137,25 @@ try {
     `joined desktop lobby uses roster, setup, and chat columns (${teamUi.shellColumns})`);
   ok(teamUi.mapPreviewBeforeDropdown,
     "map preview and creator credit render above the dropdown");
+
+  const replayMasthead = await page.evaluate(() => {
+    const room = document.querySelector("#lobby-room-display");
+    const logo = document.querySelector(".logo");
+    room.textContent = `__match_replay__:${"1acd263ae26c24bf65410ebdf01ae1bf".repeat(3)}`;
+    const logoStyle = getComputedStyle(logo);
+    return {
+      logoHeight: logo.getBoundingClientRect().height,
+      logoLineHeight: parseFloat(logoStyle.lineHeight),
+      roomClientWidth: room.clientWidth,
+      roomScrollWidth: room.scrollWidth,
+      roomHeight: room.getBoundingClientRect().height,
+    };
+  });
+  ok(replayMasthead.logoHeight <= replayMasthead.logoLineHeight * 1.5,
+    "joined lobby keeps the Bewegungskrieg logo on one line");
+  ok(replayMasthead.roomScrollWidth > replayMasthead.roomClientWidth
+    && replayMasthead.roomHeight < 40,
+  "long replay room IDs truncate to one masthead line");
 
   await page.type("#chat-input", "Lobby ready");
   await page.click("#chat-send");

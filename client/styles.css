@@ -380,6 +380,14 @@ body {
   align-items: stretch;
 }
 
+/* A joined room id can be much longer than the masthead title, especially for
+ * persisted replays. Keep it on its own row so it cannot collapse the title's
+ * grid column. */
+#lobby-screen.is-joined .lobby-masthead {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
 .lobby-box {
   min-width: 0;
   height: 100%;
@@ -423,7 +431,7 @@ body {
   line-height: 0.92;
   letter-spacing: 0;
   color: var(--accent);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .subtitle {
   margin: 6px 0 0;
@@ -442,7 +450,7 @@ body {
 .lobby-room-chip {
   display: grid;
   gap: 5px;
-  min-width: 184px;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid rgba(199, 208, 122, 0.38);
   border-radius: var(--radius);
@@ -462,6 +470,10 @@ body {
 }
 
 .lobby-room-chip strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--ink);
   font-size: 21px;
   font-weight: 400;
