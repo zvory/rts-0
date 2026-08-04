@@ -111,18 +111,34 @@ pub(super) fn target(
 mod tests {
     use super::*;
     use crate::game::entity::{GatherPhase, Order};
+    use crate::rules::faction::{CATALOGS, CURRENT_CATALOG};
 
     #[test]
     fn direct_miner_reservation_blocks_extractor_target() {
         let mut entities = EntityStore::new();
+        let extractor_kind = EntityKind::SteelMine;
+        let producer_kind = CURRENT_CATALOG
+            .production_anchors
+            .iter()
+            .copied()
+            .find(|kind| crate::rules::economy::trainable_units(*kind).contains(&extractor_kind))
+            .expect("catalog should expose an extractor producer");
+        let node_kind = extractor_kind
+            .extracted_resource_kind()
+            .expect("extractor should identify its resource");
+        let gatherer_kind = CATALOGS
+            .iter()
+            .flat_map(|catalog| catalog.gatherers.iter().copied())
+            .next()
+            .expect("a catalog should expose a direct gatherer");
         let depot = entities
-            .spawn_building(1, EntityKind::ResourceDepot, 64.0, 64.0, true)
+            .spawn_building(1, producer_kind, 64.0, 64.0, true)
             .expect("depot");
         let node = entities
-            .spawn_node(EntityKind::Steel, 128.0, 64.0)
+            .spawn_node(node_kind, 128.0, 64.0)
             .expect("steel node");
         let gatherer = entities
-            .spawn_unit(2, EntityKind::Golem, 128.0, 64.0)
+            .spawn_unit(2, gatherer_kind, 128.0, 64.0)
             .expect("gatherer");
         {
             let gatherer = entities.get_mut(gatherer).expect("gatherer");
@@ -131,6 +147,6 @@ mod tests {
         }
         assert!(entities.claim_miner(node, gatherer));
 
-        assert_eq!(target(&entities, depot, EntityKind::SteelMine), None);
+        assert_eq!(target(&entities, depot, extractor_kind), None);
     }
 }
