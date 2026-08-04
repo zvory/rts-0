@@ -30,7 +30,7 @@ function isInteractiveControl(target) {
   if (isTextEntry(target)) return true;
   const tag = String(target?.tagName || "").toUpperCase();
   if (tag === "BUTTON" || tag === "A" || tag === "SUMMARY") return true;
-  return !!target?.closest?.("button, a[href], [role='button'], [role='link'], [tabindex]");
+  return !!target?.closest?.("button, a[href], [role='button'], [role='link']");
 }
 
 function consume(event) {

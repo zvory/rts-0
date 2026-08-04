@@ -138,15 +138,27 @@ assert(
   }, { onOpenChange: (open) => menuStates.push(open) });
   assert(chat.channel === "team", "composer starts on ally chat in a team game");
 
-  windowListeners.keydown(key("Enter"));
-  assert(!composer.hidden && input.focused, "Enter opens and focuses the direct-text composer");
+  const gameplayViewport = new FakeElement();
+  gameplayViewport.tabIndex = -1;
+  gameplayViewport.closest = (selector) => selector.includes("[tabindex]") ? gameplayViewport : null;
+  windowListeners.keydown(key("Enter", gameplayViewport));
+  assert(!composer.hidden && input.focused,
+    "Enter opens chat when the focusable gameplay viewport owns keyboard focus");
   windowListeners.keydown(key("Tab", input));
   assert(chat.channel === "all" && channelLabel.textContent === "[ALL]", "Tab cycles to all chat");
   input.value = "push now";
   windowListeners.keydown(key("Enter", input));
   assertDeepEqual(sent, [{ channel: "all", text: "push now" }], "second Enter sends the selected channel");
   assert(composer.hidden, "sending closes the composer");
-  assertDeepEqual(menuStates, [true, false], "chat typing participates in interactive input capture");
+  input.focused = false;
+  const shiftedEnter = key("Enter", gameplayViewport);
+  shiftedEnter.shiftKey = true;
+  windowListeners.keydown(shiftedEnter);
+  assert(!composer.hidden && input.focused,
+    "Shift+Enter also opens chat from the focusable gameplay viewport");
+  chat.closeComposer();
+  assertDeepEqual(menuStates, [true, false, true, false],
+    "chat typing participates in interactive input capture");
 
   handlers.get("chat")({
     scope: "game",
