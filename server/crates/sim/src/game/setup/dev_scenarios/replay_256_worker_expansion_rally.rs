@@ -108,9 +108,8 @@ mod tests {
                 .min_by_key(|entity| entity.id);
             if let Some(worker) = first_worker {
                 first_worker_id = Some(worker.id);
-                closest = closest.min(
-                    (worker.x - route_waypoint.0).hypot(worker.y - route_waypoint.1),
-                );
+                closest =
+                    closest.min((worker.x - route_waypoint.0).hypot(worker.y - route_waypoint.1));
             }
         }
 
@@ -149,7 +148,11 @@ mod tests {
             .iter()
             .filter(|entity| entity.kind == "worker")
             .collect();
-        assert_eq!(workers.len(), 4, "the depot should produce all four workers");
+        assert_eq!(
+            workers.len(),
+            4,
+            "the depot should produce all four workers"
+        );
         for worker in workers {
             let distance = (worker.x - RALLY.0).hypot(worker.y - RALLY.1);
             assert!(
