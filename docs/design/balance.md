@@ -145,10 +145,10 @@ existing `MINING_ANCHOR_RANGE_TILES = 11` coverage of the producing Resource Dep
 `STEEL_LOAD = 2` Steel every `HARVEST_TICKS = 40` ticks and disappears when its bound patch is
 depleted. It costs 50 Steel and takes 20 seconds to produce.
 
-Pump Jack keeps its existing 1x1 footprint, 50 HP, Small/unarmored classification, 1-tile sight,
+Pump Jack keeps its existing 1x1 footprint, Small/unarmored classification, 1-tile sight,
 100-Steel cost, 20-second time, and `OIL_LOAD = 2` payout every 40 ticks, but moves from Engineer
-placement to Resource Depot production. A completed Resource Depot exposes Engineer, Steel Mine,
-and Pump Jack in one FIFO production queue. A paid front extractor item chooses a deterministic
+placement to Resource Depot production, and has 75 HP. A completed Resource Depot exposes Engineer,
+Steel Mine, and Pump Jack in one FIFO production queue. A paid front extractor item chooses a deterministic
 live, unoccupied matching patch within that specific depot's 11-tile coverage and immediately
 creates an under-construction scaffold there. The scaffold and depot production bars share the
 same authoritative progress, and queue completion completes that same scaffold; if no eligible
@@ -645,7 +645,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a Resource Depot and Training Centre |
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a completed trap captures every currently visible completed trap within 4 tiles as one cluster-clear order; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
-| pump_jack                  | Pump Jack          | 50  | 1     | 100 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; may be built at any distance, but mines 2 oil per 40 ticks only while its patch is within the 11-tile mining range of an owned or allied completed Resource Depot/Zamok; ejects friendly footprint occupants when its builder arrives; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
+| pump_jack                  | Pump Jack          | 75  | 1     | 100 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; may be built at any distance, but mines 2 oil per 40 ticks only while its patch is within the 11-tile mining range of an owned or allied completed Resource Depot/Zamok; ejects friendly footprint occupants when its builder arrives; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends
