@@ -79,6 +79,14 @@ impl EntityKind {
         matches!(self, EntityKind::SteelMine | EntityKind::PumpJack)
     }
 
+    pub const fn extracted_resource_kind(self) -> Option<EntityKind> {
+        match self {
+            EntityKind::SteelMine => Some(EntityKind::Steel),
+            EntityKind::PumpJack => Some(EntityKind::Oil),
+            _ => None,
+        }
+    }
+
     pub fn stable_id(self) -> &'static str {
         match self {
             EntityKind::Worker => "worker",

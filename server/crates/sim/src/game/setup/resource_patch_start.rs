@@ -16,10 +16,8 @@ pub(super) fn spawn(
         .iter()
         .filter(|group| group.formation == StartingFormation::ResourcePatches)
     {
-        let node_kind = match group.kind {
-            EntityKind::SteelMine => EntityKind::Steel,
-            EntityKind::PumpJack => EntityKind::Oil,
-            _ => continue,
+        let Some(node_kind) = group.kind.extracted_resource_kind() else {
+            continue;
         };
         let mut nodes = entities
             .iter()

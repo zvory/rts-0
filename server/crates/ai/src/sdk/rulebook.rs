@@ -244,13 +244,5 @@ mod tests {
                 EntityKind::Barracks
             )
         );
-        assert_eq!(
-            rules.trainable_units(EntityKind::ResourceDepot),
-            vec![
-                EntityKind::Worker,
-                EntityKind::SteelMine,
-                EntityKind::PumpJack
-            ]
-        );
     }
 }

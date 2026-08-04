@@ -77,13 +77,9 @@ pub(super) fn target(
     producer_id: u32,
     extractor_kind: EntityKind,
 ) -> Option<(f32, f32)> {
-    let node_kind = match extractor_kind {
-        EntityKind::SteelMine => EntityKind::Steel,
-        EntityKind::PumpJack => EntityKind::Oil,
-        _ => return None,
-    };
+    let node_kind = extractor_kind.extracted_resource_kind()?;
     let producer = entities.get(producer_id)?;
-    if producer.kind != EntityKind::ResourceDepot
+    if !crate::rules::economy::trainable_units(producer.kind).contains(&extractor_kind)
         || producer.hp == 0
         || producer.under_construction()
     {
