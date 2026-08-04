@@ -5,12 +5,11 @@ pub(super) fn spawn(
     entities: &mut EntityStore,
     owner: u32,
     loadout: FactionLoadout,
+    base_resource_ids: &[u32],
     home_x: f32,
     home_y: f32,
 ) -> Vec<EntityKind> {
     let mut spawned = Vec::new();
-    let range = crate::config::MINING_ANCHOR_RANGE_TILES * crate::config::TILE_SIZE as f32;
-    let range2 = range * range + 0.01;
     for group in loadout
         .starting_entities
         .iter()
@@ -19,14 +18,14 @@ pub(super) fn spawn(
         let Some(node_kind) = group.kind.extracted_resource_kind() else {
             continue;
         };
-        let mut nodes = entities
+        let mut nodes = base_resource_ids
             .iter()
+            .filter_map(|id| entities.get(*id))
             .filter(|entity| entity.kind == node_kind && entity.remaining().unwrap_or(0) > 0)
-            .filter_map(|entity| {
+            .map(|entity| {
                 let dx = entity.pos_x - home_x;
                 let dy = entity.pos_y - home_y;
-                let dist2 = dx * dx + dy * dy;
-                (dist2 <= range2).then_some((entity.id, dist2, entity.pos_x, entity.pos_y))
+                (entity.id, dx * dx + dy * dy, entity.pos_x, entity.pos_y)
             })
             .collect::<Vec<_>>();
         nodes.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
@@ -40,4 +39,48 @@ pub(super) fn spawn(
         }
     }
     spawned
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rules::faction::StartingEntityGroup;
+
+    const STARTING_MINES: &[StartingEntityGroup] = &[StartingEntityGroup {
+        kind: EntityKind::SteelMine,
+        count: 1,
+        formation: StartingFormation::ResourcePatches,
+        completed: true,
+    }];
+    const LOADOUT: FactionLoadout = FactionLoadout {
+        id: "test.resource-patch-start",
+        initial_steel: 0,
+        initial_oil: 0,
+        starting_entities: STARTING_MINES,
+        opening_upgrades: &[],
+    };
+
+    #[test]
+    fn starting_extractor_uses_only_its_newly_spawned_base_resources() {
+        let mut entities = EntityStore::new();
+        let unrelated = entities
+            .spawn_node(EntityKind::Steel, 32.0, 32.0)
+            .expect("unrelated steel patch");
+        let own = entities
+            .spawn_node(EntityKind::Steel, 320.0, 320.0)
+            .expect("new base steel patch");
+
+        assert_eq!(
+            spawn(&mut entities, 7, LOADOUT, &[own], 32.0, 32.0),
+            vec![EntityKind::SteelMine]
+        );
+
+        let mine = entities
+            .iter()
+            .find(|entity| entity.owner == 7 && entity.kind == EntityKind::SteelMine)
+            .expect("starting Steel Mine");
+        assert_eq!((mine.pos_x, mine.pos_y), (320.0, 320.0));
+        assert_ne!((mine.pos_x, mine.pos_y), (32.0, 32.0));
+        assert!(entities.contains(unrelated));
+    }
 }

@@ -506,7 +506,8 @@ fn dev_map_metadata(name: &str) -> MapMetadata {
     }
 }
 
-fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32)) {
+fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32)) -> Vec<u32> {
+    let mut spawned = Vec::new();
     let (tx, ty) = tile;
     let (hx, hy) = map.tile_center(tx, ty);
     let ts = config::TILE_SIZE as f32;
@@ -548,7 +549,9 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
                 config::START_RESOURCE_MIN_DIST_TILES,
                 config::START_RESOURCE_MAX_DIST_TILES
             );
-            entities.spawn_node(EntityKind::Steel, px, py);
+            if let Some(id) = entities.spawn_node(EntityKind::Steel, px, py) {
+                spawned.push(id);
+            }
             patch_index += 1;
         }
     }
@@ -584,8 +587,11 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
             config::START_RESOURCE_MIN_DIST_TILES,
             config::START_RESOURCE_MAX_DIST_TILES
         );
-        entities.spawn_node(EntityKind::Oil, px, py);
+        if let Some(id) = entities.spawn_node(EntityKind::Oil, px, py) {
+            spawned.push(id);
+        }
     }
+    spawned
 }
 
 fn tile_step(value: f32) -> i32 {
@@ -661,8 +667,10 @@ fn spawn_player_start(
         }
     }
 
-    spawn_base_resources(entities, map, start);
-    for kind in resource_patch_start::spawn(entities, player.id, loadout, hx, hy) {
+    let base_resource_ids = spawn_base_resources(entities, map, start);
+    for kind in
+        resource_patch_start::spawn(entities, player.id, loadout, &base_resource_ids, hx, hy)
+    {
         player.record_entity_created(kind);
     }
 }
