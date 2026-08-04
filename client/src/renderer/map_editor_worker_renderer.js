@@ -214,15 +214,22 @@ export class MapEditorWorkerRenderer {
   }
 
   _drawResourcePreviews(records) {
-    for (const graphic of this.resourcePreviews) graphic.destroy();
-    this.resourcePreviews = [];
-    for (const record of records) {
-      const graphic = new PIXI.Graphics();
-      drawResourceNodePreview(graphic, record.kind);
+    while (this.resourcePreviews.length > records.length) {
+      this.resourcePreviews.pop().destroy();
+    }
+    for (const [index, record] of records.entries()) {
+      let graphic = this.resourcePreviews[index];
+      if (!graphic) {
+        graphic = new PIXI.Graphics();
+        this.renderer.layers.resources.addChild(graphic);
+        this.resourcePreviews.push(graphic);
+      }
+      if (graphic.rtsResourcePreviewKind !== record.kind) {
+        drawResourceNodePreview(graphic, record.kind);
+        graphic.rtsResourcePreviewKind = record.kind;
+      }
       graphic.position.set(record.x, record.y);
       graphic.alpha = record.selected ? 1 : 0.72;
-      this.renderer.layers.resources.addChild(graphic);
-      this.resourcePreviews.push(graphic);
     }
   }
 

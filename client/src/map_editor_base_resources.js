@@ -103,21 +103,45 @@ function nearestOilTile(draft, desiredX, desiredY, homeX, homeY, occupied, block
 
 function nearestAcceptedTile(draft, desiredX, desiredY, accepted) {
   let best = null;
-  for (let y = 0; y < draft.height; y += 1) {
-    for (let x = 0; x < draft.width; x += 1) {
-      if (!tilePassable(draft, x, y) || !accepted(x, y)) continue;
-      const score = (x - desiredX) ** 2 + (y - desiredY) ** 2;
-      if (!best || score < best.score) best = { x, y, score };
+  const maxRadius = Math.max(desiredX, draft.width - desiredX - 1, desiredY, draft.height - desiredY - 1);
+  const consider = (x, y) => {
+    if (x < 0 || y < 0 || x >= draft.width || y >= draft.height) return;
+    if (!tilePassable(draft, x, y) || !accepted(x, y)) return;
+    const score = (x - desiredX) ** 2 + (y - desiredY) ** 2;
+    if (!best || score < best.score || (score === best.score && (y < best.y || (y === best.y && x < best.x)))) {
+      best = { x, y, score };
     }
+  };
+  for (let radius = 0; radius <= maxRadius; radius += 1) {
+    if (radius === 0) {
+      consider(desiredX, desiredY);
+    } else {
+      const left = desiredX - radius;
+      const right = desiredX + radius;
+      const top = desiredY - radius;
+      const bottom = desiredY + radius;
+      for (let x = left; x <= right; x += 1) {
+        consider(x, top);
+        consider(x, bottom);
+      }
+      for (let y = top + 1; y < bottom; y += 1) {
+        consider(left, y);
+        consider(right, y);
+      }
+    }
+    // Every unvisited tile is at least radius + 1 away on one axis. Strict inequality preserves
+    // the server's row/column tie-break when a later ring can match the current squared distance.
+    if (best && best.score < (radius + 1) ** 2) break;
   }
   return best;
 }
 
 function oilTileAccepted(x, y, occupied, blocked) {
   if (blocked.has(tileKey(x, y))) return false;
-  for (const key of occupied) {
-    const [otherX, otherY] = key.split(",").map(Number);
-    if (Math.abs(x - otherX) <= 1 && Math.abs(y - otherY) <= 1) return false;
+  for (let otherY = y - 1; otherY <= y + 1; otherY += 1) {
+    for (let otherX = x - 1; otherX <= x + 1; otherX += 1) {
+      if (occupied.has(tileKey(otherX, otherY))) return false;
+    }
   }
   return true;
 }

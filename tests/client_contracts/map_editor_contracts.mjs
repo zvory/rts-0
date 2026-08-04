@@ -45,6 +45,10 @@ import fs from "node:fs";
       siteRecord: MapEditorViewport.prototype.siteRecord,
       paintPreviewRecord: () => null,
       queueTerrainChanges: MapEditorViewport.prototype.queueTerrainChanges,
+      resourcePreviewRecords: MapEditorViewport.prototype.resourcePreviewRecords,
+      applySessionSnapshot: MapEditorViewport.prototype.applySessionSnapshot,
+      resourcePreviewDraft: null,
+      resourcePreviewCache: [],
       onStatus(message, error) { this.status = { message, error }; },
       presentation: {
         present(record) {
@@ -513,6 +517,20 @@ assert(
     [{ x: 144, y: 400 }, { x: 144, y: 336 }, { x: 80, y: 368 }],
     "Oil previews use the live setup offsets and tile centres",
   );
+  const viewport = {
+    session,
+    resourcePreviewDraft: null,
+    resourcePreviewCache: [],
+  };
+  const cached = MapEditorViewport.prototype.resourcePreviewRecords.call(viewport, session.draft);
+  assert.equal(MapEditorViewport.prototype.resourcePreviewRecords.call(viewport, session.draft), cached,
+    "unchanged editor drafts reuse resource placement across pointer-only overlay redraws");
+  viewport.rebuildTerrain = () => {};
+  viewport.rebuildDoodads = () => {};
+  viewport.drawOverlay = () => {};
+  MapEditorViewport.prototype.applySessionSnapshot.call(viewport, { draft: session.draft, reason: "terrainStroke" });
+  assert.notEqual(MapEditorViewport.prototype.resourcePreviewRecords.call(viewport, session.draft), cached,
+    "committed in-place terrain strokes invalidate cached resource placement");
 
   MapEditorPanel.prototype.updateBasePatchCount.call({
     session,

@@ -120,6 +120,8 @@ export class MapEditorViewport {
     this.pendingTerrainUpdate = null;
     this.pendingOverlay = null;
     this.pendingDoodadUpdate = null;
+    this.resourcePreviewDraft = null;
+    this.resourcePreviewCache = [];
     this.layerVisibility = defaultMapAuthoringLayerVisibility();
     this.presentationInFlight = null;
     this.presentationStopped = false;
@@ -250,6 +252,10 @@ export class MapEditorViewport {
 
   applySessionSnapshot(snapshot) {
     if (!snapshot?.draft) return;
+    if (snapshot.reason === "terrainStroke") {
+      this.resourcePreviewDraft = null;
+      this.resourcePreviewCache = [];
+    }
     if (!["terrainStroke", "doodadStroke", "overlayStroke"].includes(snapshot.reason)) {
       this.rebuildTerrain();
     }
@@ -357,7 +363,7 @@ export class MapEditorViewport {
       guides,
       guideCentre,
       sites,
-      resourcePreviews: mapEditorBaseResourcePreviews(draft).map((preview) => ({
+      resourcePreviews: this.resourcePreviewRecords(draft).map((preview) => ({
         ...preview,
         selected: preview.baseIndex === this.selectedBaseIndex,
       })),
@@ -368,6 +374,24 @@ export class MapEditorViewport {
       paintPreview: this.paintPreviewRecord(),
       doodadBrushPreview: this.doodadBrushPreviewRecord?.() || null,
     };
+  }
+
+  resourcePreviewRecords(draft) {
+    // Terrain strokes mutate the current draft in place, so recompute while one is active. All
+    // other committed edits replace the draft object and can share this placement result across
+    // selection, tool-preview, layer, and pointer-only overlay redraws.
+    if (!this.session.terrainStroke && this.resourcePreviewDraft === draft) {
+      return this.resourcePreviewCache;
+    }
+    const previews = mapEditorBaseResourcePreviews(draft);
+    if (this.session.terrainStroke) {
+      this.resourcePreviewDraft = null;
+      this.resourcePreviewCache = [];
+    } else {
+      this.resourcePreviewDraft = draft;
+      this.resourcePreviewCache = previews;
+    }
+    return previews;
   }
 
   doodadBrushPreviewRecord() {
