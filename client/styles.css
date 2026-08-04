@@ -431,7 +431,6 @@ body {
   line-height: 0.92;
   letter-spacing: 0;
   color: var(--accent);
-  overflow-wrap: normal;
 }
 .subtitle {
   margin: 6px 0 0;
