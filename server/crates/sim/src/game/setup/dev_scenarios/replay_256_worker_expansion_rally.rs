@@ -5,6 +5,12 @@ const DEPOT_POS: (f32, f32) = (304.0, 304.0);
 const MACHINE_GUNNER_POS: (f32, f32) = (560.0, 528.0);
 const RALLY: (f32, f32) = (1168.0, 2352.0);
 
+fn worker_build_ticks() -> Result<u32, String> {
+    crate::rules::defs::unit_def(EntityKind::Worker)
+        .map(|definition| definition.stats.build_ticks)
+        .ok_or_else(|| "Worker rules definition is missing".to_string())
+}
+
 impl Game {
     pub fn new_replay_256_worker_expansion_rally_scenario(
         unit: EntityKind,
@@ -16,10 +22,7 @@ impl Game {
                 "replay-256 worker oscillation requires four workers, got {unit_count} {unit}"
             ));
         }
-        let worker_build_ticks = crate::rules::defs::unit_def(EntityKind::Worker)
-            .ok_or_else(|| "Worker rules definition is missing".to_string())?
-            .stats
-            .build_ticks;
+        let worker_build_ticks = worker_build_ticks()?;
 
         let mut map = Map::load("1v1", 1, seed)
             .map_err(|error| format!("failed to load replay-256 map: {error}"))?;
@@ -39,12 +42,14 @@ impl Game {
             .get_mut(depot)
             .ok_or_else(|| "spawned replay-256 Resource Depot is missing".to_string())?;
         for _ in 0..unit_count {
-            producer.push_production(ProdItem {
+            if !producer.push_production(ProdItem {
                 unit: EntityKind::Worker,
                 progress: 0,
                 total: worker_build_ticks,
                 paid: true,
-            });
+            }) {
+                return Err("failed to queue replay-256 Worker production".to_string());
+            }
         }
         producer.set_rally_point(Some(RallyIntent::new(RallyKind::Move, RALLY.0, RALLY.1)));
 
@@ -86,6 +91,9 @@ impl Game {
 mod tests {
     use super::*;
 
+    const ROUTE_OBSERVATION_TICKS_AFTER_PRODUCTION: u32 = 305;
+    const FAR_SIDE_TRAVEL_TICKS_AFTER_PRODUCTION: u32 = 2_020;
+
     #[test]
     fn first_produced_worker_reaches_shared_route_waypoint_without_recovery() {
         let mut setup = Game::new_replay_256_worker_expansion_rally_scenario(
@@ -98,7 +106,9 @@ mod tests {
         let mut first_worker_id = None;
         let mut closest = f32::MAX;
 
-        for _ in 0..800 {
+        let observation_ticks = worker_build_ticks().expect("Worker rules definition")
+            + ROUTE_OBSERVATION_TICKS_AFTER_PRODUCTION;
+        for _ in 0..observation_ticks {
             setup.game.tick();
             let snapshot = setup.game.snapshot_full_for(setup.player_id);
             let first_worker = snapshot
@@ -138,7 +148,8 @@ mod tests {
             "the scenario must begin before any Worker is produced"
         );
 
-        for _ in 0..4_000 {
+        let production_ticks = worker_build_ticks().expect("Worker rules definition") * 4;
+        for _ in 0..production_ticks + FAR_SIDE_TRAVEL_TICKS_AFTER_PRODUCTION {
             setup.game.tick();
         }
 
