@@ -550,7 +550,12 @@ pub(super) fn advance_moving_units(
                 let stuck_ticks = e.movement.as_ref().map(|m| m.stuck_ticks).unwrap_or(0);
                 let recovery_threshold = config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
                 let skippable_next_waypoint = e.movement.as_ref().and_then(|movement| {
-                    (movement.path.len() > 1).then(|| movement.path[movement.path.len() - 2])
+                    movement
+                        .path
+                        .len()
+                        .checked_sub(2)
+                        .and_then(|index| movement.path.get(index))
+                        .copied()
                 });
                 // Dynamic traffic can make an intermediate waypoint unreachable even though the
                 // following segment is clear. Drop only that stale waypoint; retain final goals
