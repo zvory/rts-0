@@ -1,12 +1,15 @@
 use super::*;
-use crate::game::entity::{MovePhase, Order};
+use crate::game::entity::{ProdItem, RallyIntent, RallyKind, WeaponSetup};
 
-const WORKER_SPECS: [((f32, f32), (f32, f32)); 4] = [
-    ((560.648, 597.900_15), (1328.0, 2320.0)),
-    ((544.299_6, 605.429_75), (1168.0, 2352.0)),
-    ((527.765_3, 601.773_56), (1200.0, 2288.0)),
-    ((512.963_6, 591.553_3), (1136.0, 2384.0)),
-];
+const DEPOT_POS: (f32, f32) = (304.0, 304.0);
+const MACHINE_GUNNER_POS: (f32, f32) = (560.0, 528.0);
+const RALLY: (f32, f32) = (1168.0, 2352.0);
+
+fn worker_build_ticks() -> Result<u32, String> {
+    crate::rules::defs::unit_def(EntityKind::Worker)
+        .map(|definition| definition.stats.build_ticks)
+        .ok_or_else(|| "Worker rules definition is missing".to_string())
+}
 
 impl Game {
     pub fn new_replay_256_worker_expansion_rally_scenario(
@@ -19,32 +22,49 @@ impl Game {
                 "replay-256 worker oscillation requires four workers, got {unit_count} {unit}"
             ));
         }
+        let worker_build_ticks = worker_build_ticks()?;
 
-        let mut map = flat_dev_map(1);
-        let start_tile = (17, 18);
+        let mut map = Map::load("1v1", 1, seed)
+            .map_err(|error| format!("failed to load replay-256 map: {error}"))?;
+        let start_tile = (9, 9);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = start_tile;
         }
-        // Replay 220 / match 256 at tick 13,916 reduced to the five entities that preserve the
-        // loop: four rallied workers, the stationary unit beside their stale next waypoint, and
-        // each worker's distinct far-side rally destination.
+        // Replay 220 / match 256 reconstructed from the production source instead of its trapped
+        // endpoint: the Resource Depot produces workers at its real cadence and assigns each one
+        // a normal far-side rally order. The deployed Machine Gunner recreates the persistent
+        // traffic field beside their shared opening route.
         let mut entities = EntityStore::new();
-        entities
-            .spawn_unit(1, EntityKind::MachineGunner, 560.0, 528.0)
-            .ok_or_else(|| "failed to spawn replay-256 Machine Gunner".to_string())?;
-        let mut units = Vec::with_capacity(WORKER_SPECS.len());
-        for (start, goal) in WORKER_SPECS {
-            let id = entities
-                .spawn_unit(1, EntityKind::Worker, start.0, start.1)
-                .ok_or_else(|| "failed to spawn replay-256 Worker".to_string())?;
-            if let Some(worker) = entities.get_mut(id) {
-                worker.set_order(Order::move_to(goal.0, goal.1));
-                worker.mark_move_phase(MovePhase::Moving);
-                worker.set_path(vec![goal, (528.0, 560.0)]);
-                worker.set_path_goal(Some(goal));
+        let depot = entities
+            .spawn_building(1, EntityKind::ResourceDepot, DEPOT_POS.0, DEPOT_POS.1, true)
+            .ok_or_else(|| "failed to spawn replay-256 Resource Depot".to_string())?;
+        let producer = entities
+            .get_mut(depot)
+            .ok_or_else(|| "spawned replay-256 Resource Depot is missing".to_string())?;
+        for _ in 0..unit_count {
+            if !producer.push_production(ProdItem {
+                unit: EntityKind::Worker,
+                progress: 0,
+                total: worker_build_ticks,
+                paid: true,
+            }) {
+                return Err("failed to queue replay-256 Worker production".to_string());
             }
-            units.push(id);
         }
+        producer.set_rally_point(Some(RallyIntent::new(RallyKind::Move, RALLY.0, RALLY.1)));
+
+        let machine_gunner = entities
+            .spawn_unit(
+                1,
+                EntityKind::MachineGunner,
+                MACHINE_GUNNER_POS.0,
+                MACHINE_GUNNER_POS.1,
+            )
+            .ok_or_else(|| "failed to spawn replay-256 Machine Gunner".to_string())?;
+        entities
+            .get_mut(machine_gunner)
+            .ok_or_else(|| "spawned replay-256 Machine Gunner is missing".to_string())?
+            .set_weapon_setup(WeaponSetup::Deployed);
         let player_id = 1;
         let game = build_dev_scenario_game(
             map,
@@ -58,8 +78,8 @@ impl Game {
         DevScenarioSetup {
             game,
             player_id,
-            units,
-            goal: (545.0, 600.0),
+            units: vec![machine_gunner],
+            goal: RALLY,
             issue_after_ticks: u32::MAX,
             order: DevScenarioOrder::Move,
         }
@@ -71,30 +91,85 @@ impl Game {
 mod tests {
     use super::*;
 
+    const ROUTE_OBSERVATION_TICKS_AFTER_PRODUCTION: u32 = 305;
+    const FAR_SIDE_TRAVEL_TICKS_AFTER_PRODUCTION: u32 = 2_020;
+
     #[test]
-    fn stalled_rally_workers_recover_and_reach_their_goals() {
+    fn first_produced_worker_reaches_shared_route_waypoint_without_recovery() {
         let mut setup = Game::new_replay_256_worker_expansion_rally_scenario(
             EntityKind::Worker,
             4,
             0x2560_0220,
         )
         .expect("scenario");
-        for _ in 0..1_500 {
+        let route_waypoint = (528.0, 560.0);
+        let mut first_worker_id = None;
+        let mut closest = f32::MAX;
+
+        let observation_ticks = worker_build_ticks().expect("Worker rules definition")
+            + ROUTE_OBSERVATION_TICKS_AFTER_PRODUCTION;
+        for _ in 0..observation_ticks {
+            setup.game.tick();
+            let snapshot = setup.game.snapshot_full_for(setup.player_id);
+            let first_worker = snapshot
+                .entities
+                .iter()
+                .filter(|entity| entity.kind == "worker")
+                .min_by_key(|entity| entity.id);
+            if let Some(worker) = first_worker {
+                first_worker_id = Some(worker.id);
+                closest =
+                    closest.min((worker.x - route_waypoint.0).hypot(worker.y - route_waypoint.1));
+            }
+        }
+
+        let worker_id = first_worker_id.expect("the depot should produce its first Worker");
+        assert!(
+            closest <= config::ARRIVE_RADIUS_INTERMEDIATE_PX,
+            "worker {worker_id} missed the shared route waypoint by {closest:.2}px"
+        );
+    }
+
+    #[test]
+    fn produced_rally_workers_reach_the_far_side() {
+        let mut setup = Game::new_replay_256_worker_expansion_rally_scenario(
+            EntityKind::Worker,
+            4,
+            0x2560_0220,
+        )
+        .expect("scenario");
+        assert!(
+            setup
+                .game
+                .snapshot_full_for(setup.player_id)
+                .entities
+                .iter()
+                .all(|entity| entity.kind != "worker"),
+            "the scenario must begin before any Worker is produced"
+        );
+
+        let production_ticks = worker_build_ticks().expect("Worker rules definition") * 4;
+        for _ in 0..production_ticks + FAR_SIDE_TRAVEL_TICKS_AFTER_PRODUCTION {
             setup.game.tick();
         }
 
         let snapshot = setup.game.snapshot_full_for(setup.player_id);
-        for (index, id) in setup.units.iter().enumerate() {
-            let worker = snapshot
-                .entities
-                .iter()
-                .find(|entity| entity.id == *id)
-                .expect("worker");
-            let goal = WORKER_SPECS[index].1;
-            let distance = (worker.x - goal.0).hypot(worker.y - goal.1);
+        let workers: Vec<_> = snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == "worker")
+            .collect();
+        assert_eq!(
+            workers.len(),
+            4,
+            "the depot should produce all four workers"
+        );
+        for worker in workers {
+            let distance = (worker.x - RALLY.0).hypot(worker.y - RALLY.1);
             assert!(
-                distance <= 16.0,
-                "worker {id} remained {distance:.1}px from its goal"
+                distance <= 64.0,
+                "worker {} remained {distance:.1}px from the rally cluster",
+                worker.id
             );
         }
     }

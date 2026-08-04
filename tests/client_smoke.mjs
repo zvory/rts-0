@@ -479,8 +479,8 @@ try {
     () => {
       const settings = window.__rts.match.state.autoBuild;
       return settings?.paused === false &&
-        settings.reserveSteel === 50 &&
-        settings.reserveOil === 100;
+        settings.reserveSteel === 100 &&
+        settings.reserveOil === 200;
     },
     { timeout: 2000 },
   );
@@ -498,8 +498,8 @@ try {
       tabMenuPrototype.repeatConsumed &&
       !tabMenuPrototype.paused &&
       tabMenuPrototype.pauseHotkey === "A" &&
-      tabMenuPrototype.reservations.steel === 50 &&
-      tabMenuPrototype.reservations.oil === 100,
+      tabMenuPrototype.reservations.steel === 100 &&
+      tabMenuPrototype.reservations.oil === 200,
     `TAB MENU: held Tab sends authoritative Grid/Classic pause and reserve hotkeys (${JSON.stringify(tabMenuPrototype)})`,
   );
   await page.evaluate(() => {

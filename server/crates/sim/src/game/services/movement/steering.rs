@@ -70,7 +70,7 @@ pub(super) fn steered_candidate(
     unit_static_standable(occ, map, kind, nx, ny, facing).then_some((nx, ny))
 }
 
-fn local_steering_dir(
+pub(super) fn local_steering_dir(
     entities: &EntityStore,
     spatial: &SpatialIndex,
     id: u32,
@@ -149,8 +149,13 @@ fn local_steering_dir(
     let mut desired_x = path_dir.0;
     let mut desired_y = path_dir.1;
     if sep_len > 1e-4 {
-        desired_x += (sep_x / sep_len) * STEERING_STRENGTH;
-        desired_y += (sep_y / sep_len) * STEERING_STRENGTH;
+        // Keep the proximity, overlap, and footing magnitude accumulated above. Normalizing every
+        // nonzero signal to full strength makes a lone braced unit near the outer edge steer as
+        // hard as overlapping heavy traffic. Clamp only the upper bound so dense/close traffic
+        // retains the existing maximum avoidance authority.
+        let separation_strength = sep_len.min(1.0) * STEERING_STRENGTH;
+        desired_x += (sep_x / sep_len) * separation_strength;
+        desired_y += (sep_y / sep_len) * separation_strength;
     }
     desired_x += trap_bias.0 * TANK_TRAP_STEERING_STRENGTH;
     desired_y += trap_bias.1 * TANK_TRAP_STEERING_STRENGTH;
