@@ -242,15 +242,11 @@ pub(super) fn advance_moving_units(
                 let dist = (dx * dx + dy * dy).sqrt();
 
                 if path_len > 1 {
-                    // Intermediate waypoint: infantry follow the route corridor only when their
-                    // static swept body can reach the next segment. Vehicles keep their own
+                    // Intermediate waypoint: infantry and workers follow the route corridor only
+                    // when their static swept body can reach the next segment. Vehicles keep their own
                     // proximity and facing guards so reverse/recovery waypoints work as authored.
-                    // Workers deliberately keep following tile-center hints during construction
-                    // and resource traffic, but may consume one once they are physically nearby.
                     let accepts_waypoint = entities.get(id).is_some_and(|e| {
-                        if e.kind == EntityKind::Worker {
-                            dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX
-                        } else if uses_vehicle_movement {
+                        if uses_vehicle_movement {
                             route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
                         } else {
                             next_next.is_some_and(|next| {
