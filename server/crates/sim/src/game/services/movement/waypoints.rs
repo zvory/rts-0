@@ -530,10 +530,16 @@ pub(super) fn advance_moving_units(
                     .as_ref()
                     .map(|m| m.last_progress_pos)
                     .unwrap_or((x, y));
-                let dx = x - lx;
-                let dy = y - ly;
-                let moved = (dx * dx + dy * dy).sqrt();
-                if moved < config::STUCK_EPS_PX {
+                let progressed = if uses_oriented_vehicle_body(kind) {
+                    distance_between((lx, ly), (x, y)) >= config::STUCK_EPS_PX
+                } else {
+                    e.next_waypoint().is_some_and(|waypoint| {
+                        let previous_distance = distance_between((lx, ly), waypoint);
+                        let current_distance = distance_between((x, y), waypoint);
+                        previous_distance - current_distance >= config::STUCK_EPS_PX
+                    })
+                };
+                if !progressed {
                     if let Some(m) = e.movement.as_mut() {
                         m.stuck_ticks = m.stuck_ticks.saturating_add(1);
                     }
@@ -542,6 +548,30 @@ pub(super) fn advance_moving_units(
                     m.last_progress_pos = (x, y);
                 }
                 let stuck_ticks = e.movement.as_ref().map(|m| m.stuck_ticks).unwrap_or(0);
+                let recovery_threshold = config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
+                let skippable_next_waypoint = e.movement.as_ref().and_then(|movement| {
+                    (movement.path.len() > 1).then(|| movement.path[movement.path.len() - 2])
+                });
+                // Dynamic traffic can make an intermediate waypoint unreachable even though the
+                // following segment is clear. Drop only that stale waypoint; retain final goals
+                // and never shortcut a segment that static occupancy says is blocked.
+                if stuck_ticks >= recovery_threshold
+                    && static_blocked_ticks == 0
+                    && !uses_oriented_vehicle_body(kind)
+                    && skippable_next_waypoint.is_some_and(|following_waypoint| {
+                        unit_static_segment_standable(
+                            map,
+                            occ,
+                            e.kind,
+                            (x, y),
+                            following_waypoint,
+                        )
+                    })
+                {
+                    e.pop_waypoint();
+                    e.reset_stuck(x, y);
+                    continue;
+                }
                 // Tolerant arrival: stuck and near goal.
                 if stuck_ticks >= config::STUCK_ARRIVAL_TICKS && static_blocked_ticks == 0 {
                     if let Some((gx, gy)) = e.path_goal() {
@@ -577,9 +607,8 @@ pub(super) fn advance_moving_units(
                 // Sidestep: stuck mid-path (far from goal), cooldown elapsed,
                 // only for Move/AttackMove orders.
                 // Stagger trigger per unit so clustered units don't all sidestep at once.
-                let trigger_threshold = config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
                 if !uses_oriented_vehicle_body(kind)
-                    && stuck_ticks >= trigger_threshold
+                    && stuck_ticks >= recovery_threshold
                     && static_blocked_ticks == 0
                     && matches!(
                         e.order(),
