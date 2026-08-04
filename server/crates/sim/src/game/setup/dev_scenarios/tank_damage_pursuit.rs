@@ -128,6 +128,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn dev_panzerfaust_windup_rejects_a_stale_target_without_mutating_the_attacker() {
+        let mut setup =
+            Game::new_tank_damage_pursuit_pivot_scenario(EntityKind::Tank, 1, 0x5150_0724)
+                .expect("damage-pursuit scenario should build");
+        let (attacker, _, windup_ticks) = setup
+            .panzerfaust_windup()
+            .expect("scenario should author one delayed Panzerfaust windup");
+
+        assert!(!setup.game.start_dev_scenario_panzerfaust_windup(
+            attacker,
+            u32::MAX,
+            windup_ticks,
+        ));
+        assert!(setup
+            .game
+            .state
+            .entities
+            .get(attacker)
+            .and_then(|entity| entity.combat.as_ref())
+            .is_some_and(|combat| combat.panzerfaust.is_none()));
+    }
+
+    #[test]
     fn scenario_keeps_damage_preference_from_forcing_a_large_pursuit_pivot() {
         let mut setup = Game::new_dev_scenario(
             "tank_damage_pursuit_pivot",

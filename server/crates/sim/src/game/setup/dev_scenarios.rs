@@ -24,6 +24,9 @@ impl Game {
         target: u32,
         windup_ticks: u16,
     ) -> bool {
+        if self.state.entities.get(target).is_none() {
+            return false;
+        }
         let Some(entity) = self.state.entities.get_mut(attacker) else {
             return false;
         };

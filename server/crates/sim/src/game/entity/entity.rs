@@ -1350,7 +1350,11 @@ impl Entity {
     }
 
     pub(in crate::game) fn spend_panzerfaust(&mut self) {
-        if let Some(combat) = self.combat.as_mut() {
+        if let Some(combat) = self
+            .combat
+            .as_mut()
+            .filter(|combat| matches!(combat.panzerfaust, Some(PanzerfaustState::Windup { .. })))
+        {
             combat.panzerfaust = Some(PanzerfaustState::Spent);
         }
     }
