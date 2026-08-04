@@ -10,6 +10,10 @@ import {
   createBuildingPngRigDefinitions,
 } from "../../client/src/renderer/rigs/building_png.js";
 import {
+  createRigRenderContext,
+  sampleRigAnimation,
+} from "../../client/src/renderer/rigs/animation.js";
+import {
   pngAtlasCanRenderRoute,
   pngAtlasRouteCoverage,
 } from "../../client/src/renderer/rigs/png_runtime.js";
@@ -24,6 +28,7 @@ const expectedFootprints = new Map([
   [KIND.ENGINEERING_COMPLEX, [3, 3]],
   [KIND.FACTORY, [3, 3]],
   [KIND.STEELWORKS, [3, 3]],
+  [KIND.STEEL_MINE, [1, 1]],
   [KIND.PUMP_JACK, [1, 1]],
 ]);
 const silhouetteShadowKinds = new Set([
@@ -62,7 +67,13 @@ for (const [kind, footprint] of expectedFootprints) {
   );
   const hasSilhouetteShadow = silhouetteShadowKinds.has(kind);
   const hasEmblem = emblemKinds.has(kind);
-  const expectedBodyParts = ["part.base", "part.tint", ...(hasEmblem ? ["part.emblem"] : [])];
+  const componentBodyParts = kind === KIND.STEEL_MINE
+    ? ["part.pickaxe"]
+    : kind === KIND.PUMP_JACK
+      ? ["part.frame", "part.beam"]
+      : null;
+  const expectedBodyParts = componentBodyParts
+    ?? ["part.base", "part.tint", ...(hasEmblem ? ["part.emblem"] : [])];
   const expectedShadowParts = hasSilhouetteShadow ? ["part.shadow"] : [];
   strictAssert.deepEqual(atlas.routes.body, expectedBodyParts);
   strictAssert.deepEqual(atlas.routes.shadow, expectedShadowParts);
@@ -76,21 +87,25 @@ for (const [kind, footprint] of expectedFootprints) {
   );
   strictAssert.deepEqual(
     atlas.sprites.map((sprite) => sprite.id),
-    [
-      "sprite.base",
-      "sprite.tint",
-      ...(hasSilhouetteShadow ? ["sprite.shadow"] : []),
-      ...(hasEmblem ? ["sprite.emblem"] : []),
-    ],
+    componentBodyParts
+      ? componentBodyParts.map((part) => `sprite.${part.slice("part.".length)}`)
+      : [
+        "sprite.base",
+        "sprite.tint",
+        ...(hasSilhouetteShadow ? ["sprite.shadow"] : []),
+        ...(hasEmblem ? ["sprite.emblem"] : []),
+      ],
   );
   strictAssert.deepEqual(
     atlas.sprites.map((sprite) => sprite.tintSlot),
-    [
-      "fixed",
-      "team",
-      ...(hasSilhouetteShadow ? ["fixed"] : []),
-      ...(hasEmblem ? ["team"] : []),
-    ],
+    componentBodyParts
+      ? componentBodyParts.map(() => "fixed")
+      : [
+        "fixed",
+        "team",
+        ...(hasSilhouetteShadow ? ["fixed"] : []),
+        ...(hasEmblem ? ["team"] : []),
+      ],
   );
   strictAssert.deepEqual(
     new Set(atlas.sprites.flatMap((sprite) => sprite.sourceParts)),
@@ -133,6 +148,59 @@ for (const [kind, footprint] of expectedFootprints) {
     height: atlas.grid.height,
   });
 }
+
+const extractorCycleMs = (40 / 30) * 1000;
+const steelDefinition = definitions.get(KIND.STEEL_MINE);
+const activeSteel = { id: 901, kind: KIND.STEEL_MINE, extractorActive: true };
+const woundSteel = sampleRigAnimation(
+  steelDefinition,
+  activeSteel,
+  createRigRenderContext(activeSteel, { now: extractorCycleMs * 0.45 }),
+);
+const impactSteel = sampleRigAnimation(
+  steelDefinition,
+  activeSteel,
+  createRigRenderContext(activeSteel, { now: extractorCycleMs * 0.70 }),
+);
+strictAssert.ok(
+  woundSteel.parts["part.pickaxe"].transform.rotation > 0.7,
+  "steel extractor winds the pickaxe back before the strike",
+);
+strictAssert.ok(
+  Math.abs(impactSteel.parts["part.pickaxe"].transform.rotation) < 0.001,
+  "steel extractor reaches the ore at the payout beat",
+);
+const inactiveSteel = { ...activeSteel, extractorActive: false };
+const inactiveSample = sampleRigAnimation(
+  steelDefinition,
+  inactiveSteel,
+  createRigRenderContext(inactiveSteel, { now: extractorCycleMs * 0.70 }),
+);
+strictAssert.ok(inactiveSample.parts["part.pickaxe"].transform.rotation > 0.7);
+
+const pumpDefinition = definitions.get(KIND.PUMP_JACK);
+const activePump = { id: 902, kind: KIND.PUMP_JACK, extractorActive: true };
+const pumpTop = sampleRigAnimation(
+  pumpDefinition,
+  activePump,
+  createRigRenderContext(activePump, { now: extractorCycleMs * 3 * 0.25 }),
+);
+const pumpBottom = sampleRigAnimation(
+  pumpDefinition,
+  activePump,
+  createRigRenderContext(activePump, { now: extractorCycleMs * 3 * 0.75 }),
+);
+strictAssert.ok(pumpTop.parts["part.beam"].transform.rotation > 0.15);
+strictAssert.ok(pumpBottom.parts["part.beam"].transform.rotation < -0.15);
+const pumpAfterOneHarvest = sampleRigAnimation(
+  pumpDefinition,
+  activePump,
+  createRigRenderContext(activePump, { now: extractorCycleMs }),
+);
+strictAssert.ok(
+  pumpAfterOneHarvest.parts["part.beam"].transform.rotation > 0.13,
+  "pump jack advances only one third of its motion cycle per harvest",
+);
 
 const restorePixi = installFakePixi();
 let renderer;
@@ -215,6 +283,32 @@ try {
     renderer.world.children.indexOf(renderer.layers.buildingOverlays) >
       renderer.world.children.indexOf(renderer.layers.buildings),
     "the queue-label layer renders above the building-body layer",
+  );
+
+  const steelMine = {
+    ...entity,
+    id: 507,
+    kind: KIND.STEEL_MINE,
+    state: "idle",
+    buildProgress: 1,
+    prodProgress: 0,
+    prodQueue: 0,
+  };
+  renderer._drawBuilding(steelMine, colorByOwner, state);
+  assert(
+    renderer._pools.buildingShadows.get(steelMine.id)?.visible !== false,
+    "extractor SVG fallback keeps its footprint shadow while the component atlas is unavailable",
+  );
+  for (const seen of Object.values(renderer._seen)) seen.clear();
+  renderer._buildingPngRigAtlasTextures.set(
+    KIND.STEEL_MINE,
+    PIXI.Texture.from("steel-mine-building-atlas-test-texture"),
+  );
+  renderer._drawBuilding(steelMine, colorByOwner, state);
+  renderer._sweep();
+  assert(
+    renderer._pools.buildingShadows.get(steelMine.id)?.visible === false,
+    "loaded extractor component art suppresses the temporary fallback shadow",
   );
 } finally {
   renderer?.destroy();
