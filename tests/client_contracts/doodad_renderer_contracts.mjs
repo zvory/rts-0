@@ -136,7 +136,12 @@ try {
 
   const editorCalls = [];
   const editorRenderer = {
-    layers: { terrain: new PIXI.Container(), feedback: new PIXI.Container(), buildings: new PIXI.Container() },
+    layers: {
+      terrain: new PIXI.Container(),
+      feedback: new PIXI.Container(),
+      buildings: new PIXI.Container(),
+      resources: new PIXI.Container(),
+    },
     world: {
       position: { set() {} },
       scale: { set() {} },
@@ -167,6 +172,7 @@ try {
       guides: [],
       guideCentre: null,
       sites: [{ x: 16, y: 16, color: 0x4ec9ff, radius: 7, label: "S1", selected: false }],
+      resourcePreviews: [{ kind: "steel", x: 64, y: 64, selected: false }],
       stealthTiles: [{ x: 1, y: 1 }],
       noVehicleTiles: [{ x: 1, y: 1 }],
       damageReductionTiles: [{ x: 1, y: 1 }],
@@ -176,6 +182,15 @@ try {
     },
   });
   assert.equal(editor.tankTraps.size, 1, "the editor draws authored Tank Traps with the live entity geometry");
+  const firstResourcePreview = editor.resourcePreviews[0];
+  editor._redrawOverlay({
+    ...editor.lastOverlay,
+    resourcePreviews: [{ kind: "steel", x: 96, y: 64, selected: true }],
+  });
+  assert.equal(editor.resourcePreviews[0], firstResourcePreview,
+    "overlay-only redraws retain resource graphics instead of reallocating the whole cluster");
+  assert.equal(firstResourcePreview.x, 96);
+  assert.equal(firstResourcePreview.alpha, 1);
   assert.equal(editorRenderer.layers.buildings.children.length, 1, "Tank Trap previews use the building layer");
   assert.deepEqual(latestDrawRectWidths(editor.overlay), [14, 14, 14, 14],
     "four overlapping semantic layers subdivide the tile instead of hiding one another");

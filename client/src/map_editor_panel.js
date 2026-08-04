@@ -62,6 +62,7 @@ export class MapEditorPanel {
     this.selectedMapFile = "";
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
+    this.selectedSiteKind = "start";
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
     this.selectedOverlayEffects = new Set(["stealth"]);
@@ -504,17 +505,21 @@ export class MapEditorPanel {
     for (const [index, start] of starts.entries()) {
       startPicker.appendChild(button(`S${index + 1}`, () => {
         this.selectedStartIndex = index;
+        this.selectedSiteKind = "start";
+        const baseIndex = this.session.draft.baseSites.findIndex((site) => site.x === start.x && site.y === start.y);
+        this.viewport.setSelectedBase(baseIndex);
         this.render();
-      }, { active: index === this.selectedStartIndex, title: `${start.x}, ${start.y}` }));
+      }, { active: this.selectedSiteKind === "start" && index === this.selectedStartIndex, title: `Start base S${index + 1} at ${start.x}, ${start.y}` }));
     }
     const basePicker = document.createElement("div");
     basePicker.className = "map-editor-player-picker";
     for (const [index, base] of bases.entries()) {
       basePicker.appendChild(button(`B${index + 1}`, () => {
         this.selectedBaseIndex = index;
+        this.selectedSiteKind = "base";
         this.viewport.setSelectedBase(base.index);
         this.render();
-      }, { active: index === this.selectedBaseIndex, title: `${base.x}, ${base.y}` }));
+      }, { active: this.selectedSiteKind === "base" && index === this.selectedBaseIndex, title: `Expansion base B${index + 1} at ${base.x}, ${base.y}` }));
     }
     const start = starts[this.selectedStartIndex];
     const base = bases[this.selectedBaseIndex];
@@ -522,9 +527,9 @@ export class MapEditorPanel {
       ? this.session.draft.baseSites.findIndex((site) => site.x === start.x && site.y === start.y)
       : -1;
     const startBase = this.session.draft.baseSites[startBaseIndex];
-    this.viewport.setSelectedBase(base?.index ?? null);
+    this.viewport.setSelectedBase(this.selectedSiteKind === "start" ? startBaseIndex : base?.index ?? null);
     section.append(
-      readout(`Start locations set player capacity (${starts.length}/${MAP_EDITOR_MAX_START_LOCATIONS}). Drafts may temporarily have none. Every base site always spawns resources.`),
+      readout(`Player start bases (${starts.length}/${MAP_EDITOR_MAX_START_LOCATIONS}). Players are assigned among these starts when a match begins; each start also owns the resource patches shown on the map.`),
       startPicker,
       readout(start ? `Start ${this.selectedStartIndex + 1}: ${start.x}, ${start.y}` : "No start locations yet. Choose Add start, then click the map."),
       button("Move start", () => this.armLocation("start", this.selectedStartIndex), {
@@ -533,14 +538,15 @@ export class MapEditorPanel {
       }),
       button("Add start", () => this.armLocation("start", null, true), { disabled: starts.length >= MAP_EDITOR_MAX_START_LOCATIONS }),
       button("Remove start", () => this.removeLocation("start", this.selectedStartIndex), { disabled: !start }),
-      patchCountField("Start-base steel patches", startBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
-        this.updateBasePatchCount(startBaseIndex, "steelPatches", value);
+      patchCountField(`Steel patches at S${this.selectedStartIndex + 1}`, startBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
+        this.updateBasePatchCount(startBaseIndex, "steelPatches", value, `S${this.selectedStartIndex + 1}`);
       }, !startBase),
-      patchCountField("Start-base oil patches", startBase?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
-        this.updateBasePatchCount(startBaseIndex, "oilPatches", value);
+      patchCountField(`Oil patches at S${this.selectedStartIndex + 1}`, startBase?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
+        this.updateBasePatchCount(startBaseIndex, "oilPatches", value, `S${this.selectedStartIndex + 1}`);
       }, !startBase),
+      readout(startBase ? `S${this.selectedStartIndex + 1} will spawn ${startBase.steelPatches} Steel and ${startBase.oilPatches} Oil patches.` : "This start has no matching resource base."),
       basePicker,
-      readout(base ? `Base ${this.selectedBaseIndex + 1}: ${base.x}, ${base.y}` : "No neutral base sites yet."),
+      readout(base ? `Expansion B${this.selectedBaseIndex + 1}: ${base.x}, ${base.y}. Its patches spawn without a player depot.` : "No expansion base sites yet."),
       button("Move base", () => this.armLocation("base", base?.index), {
         disabled: !base,
         active: this.viewport.tool?.kind === "base" && !this.viewport.tool?.add && this.viewport.tool?.locationIndex === base?.index,
@@ -549,12 +555,13 @@ export class MapEditorPanel {
         disabled: this.session.draft.baseSites.length >= MAP_EDITOR_MAX_BASE_SITES,
       }),
       button("Remove base", () => this.removeLocation("base", base?.index), { disabled: !base }),
-      patchCountField("Base steel patches", base?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
-        this.updateBasePatchCount(base?.index, "steelPatches", value);
+      patchCountField(`Steel patches at B${this.selectedBaseIndex + 1}`, base?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
+        this.updateBasePatchCount(base?.index, "steelPatches", value, `B${this.selectedBaseIndex + 1}`);
       }, !base),
-      patchCountField("Base oil patches", base?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
-        this.updateBasePatchCount(base?.index, "oilPatches", value);
+      patchCountField(`Oil patches at B${this.selectedBaseIndex + 1}`, base?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
+        this.updateBasePatchCount(base?.index, "oilPatches", value, `B${this.selectedBaseIndex + 1}`);
       }, !base),
+      readout(base ? `B${this.selectedBaseIndex + 1} will spawn ${base.steelPatches} Steel and ${base.oilPatches} Oil patches.` : "Add an expansion base to configure its resources."),
       readout("Bases and starts reserve a passable grass area."),
     );
     return section;
@@ -687,6 +694,7 @@ export class MapEditorPanel {
   }
 
   armLocation(kind, locationIndex, add = false) {
+    this.selectedSiteKind = kind;
     this.viewport.armTool({ kind, locationIndex, add, symmetry: this.symmetry });
     this.setStatus(`Click the map to ${add ? "add" : "move"} this ${kind === "start" ? "start location" : "base site"}.`);
   }
@@ -700,14 +708,15 @@ export class MapEditorPanel {
     this.setStatus(changed ? "Map location removed." : result?.error || "Map location was already absent.", !changed);
   }
 
-  updateBasePatchCount(baseIndex, fieldName, value) {
+  updateBasePatchCount(baseIndex, fieldName, value, siteLabel = "Base") {
     const max = fieldName === "oilPatches" ? MAP_EDITOR_MAX_OIL_PATCHES : MAP_EDITOR_MAX_STEEL_PATCHES;
     const count = Math.max(0, Math.min(max, Math.trunc(Number(value)) || 0));
     const changed = this.session.mutate("Updated base resources", (draft) => {
       const site = draft.baseSites[Math.trunc(Number(baseIndex))];
       if (site) site[fieldName] = count;
     });
-    this.setStatus(changed ? "Base resource counts updated." : "Base resource count unchanged.");
+    const resource = fieldName === "oilPatches" ? "Oil" : "Steel";
+    this.setStatus(changed ? `${siteLabel} now has ${count} ${resource} patches.` : `${siteLabel} already has ${count} ${resource} patches.`);
   }
 
   armTerrain() {
@@ -798,6 +807,7 @@ export class MapEditorPanel {
     this.session.initializeBlank({ ...dimensions, playerCount: 2 });
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
+    this.selectedSiteKind = "start";
     this.viewport.armTool(null);
     this.setStatus(`Created a blank ${dimensions.width} × ${dimensions.height} two-player map.`);
     return true;
@@ -863,6 +873,7 @@ export class MapEditorPanel {
     this.session.loadAuthoredMap(map);
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
+    this.selectedSiteKind = "start";
     MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
     this.viewport.armTool(null);
   }

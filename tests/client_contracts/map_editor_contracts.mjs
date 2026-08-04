@@ -44,6 +44,11 @@ import fs from "node:fs";
       },
       siteRecord: MapEditorViewport.prototype.siteRecord,
       paintPreviewRecord: () => null,
+      queueTerrainChanges: MapEditorViewport.prototype.queueTerrainChanges,
+      resourcePreviewRecords: MapEditorViewport.prototype.resourcePreviewRecords,
+      applySessionSnapshot: MapEditorViewport.prototype.applySessionSnapshot,
+      resourcePreviewDraft: null,
+      resourcePreviewCache: [],
       onStatus(message, error) { this.status = { message, error }; },
       presentation: {
         present(record) {
@@ -115,6 +120,7 @@ import {
   symmetricDoodadPlacements,
 } from "../../client/src/map_editor_doodads.js";
 import { createMapEditorPresentation } from "../../client/src/map_editor_presentation.js";
+import { mapEditorBaseResourcePreviews } from "../../client/src/map_editor_base_resources.js";
 import {
   mapEditorSymmetryGuideCentre,
   mapEditorSymmetryGuideLines,
@@ -192,6 +198,8 @@ const baseLocations = (sites) => sites.map(({ x, y }) => ({ x, y }));
 const repoRoot = new URL("../../", import.meta.url);
 const oneVOneNoTerrainMap = JSON.parse(fs.readFileSync(new URL("server/assets/maps/1v1-no-terrain.json", repoRoot), "utf8"));
 const serverMapSource = fs.readFileSync(new URL("server/crates/sim/src/game/map.rs", repoRoot), "utf8");
+const serverSetupSource = fs.readFileSync(new URL("server/crates/sim/src/game/setup.rs", repoRoot), "utf8");
+const serverEconomySource = fs.readFileSync(new URL("server/crates/rules/src/balance/economy.rs", repoRoot), "utf8");
 const serverProtocolSource = fs.readFileSync(new URL("server/crates/protocol/src/lab_scenario.rs", repoRoot), "utf8");
 const mainSource = fs.readFileSync(new URL("client/src/main.js", repoRoot), "utf8");
 
@@ -209,6 +217,10 @@ assert(
   const serverMaxOil = Number(serverProtocolSource.match(/MAX_OIL_PATCHES_PER_BASE:\s*u32\s*=\s*(\d+)/)?.[1]);
   assert.equal(MAP_EDITOR_MAX_STEEL_PATCHES, serverMaxSteel);
   assert.equal(MAP_EDITOR_MAX_OIL_PATCHES, serverMaxOil);
+  assert.equal(Number(serverSetupSource.match(/STEEL_FIELD_COLUMNS:\s*u32\s*=\s*(\d+)/)?.[1]), 6,
+    "resource preview Steel columns stay aligned with live setup geometry");
+  assert.equal(Number(serverEconomySource.match(/STEEL_BLOCK_DIST_TILES:\s*f32\s*=\s*(\d+(?:\.\d+)?)/)?.[1]), 4,
+    "resource preview Steel distance stays aligned with live setup geometry");
 }
 
 {
@@ -496,6 +508,70 @@ assert(
 {
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 1 });
+  const previews = mapEditorBaseResourcePreviews(session.draft);
+  assert.equal(previews.filter((preview) => preview.kind === "steel").length, 12,
+    "a default editor base previews every live Steel patch");
+  assert.equal(previews.filter((preview) => preview.kind === "oil").length, 3,
+    "a default editor base previews every live Oil patch");
+  assert.deepEqual(
+    previews.filter((preview) => preview.kind === "oil").map(({ x, y }) => ({ x, y })),
+    [{ x: 144, y: 400 }, { x: 144, y: 336 }, { x: 80, y: 368 }],
+    "Oil previews use the live setup offsets and tile centres",
+  );
+  const laterOverlappingBase = { ...session.draft, baseSites: [
+    ...session.draft.baseSites,
+    { x: 7, y: 10, steelPatches: 36, oilPatches: 0 },
+  ] };
+  assert.deepEqual(
+    mapEditorBaseResourcePreviews(laterOverlappingBase)
+      .filter((preview) => preview.kind === "oil" && preview.baseIndex === 0)
+      .map(({ x, y }) => ({ x, y })),
+    previews.filter((preview) => preview.kind === "oil").map(({ x, y }) => ({ x, y })),
+    "a later base's Steel does not retroactively relocate Oil spawned for an earlier base",
+  );
+  const viewport = {
+    session,
+    resourcePreviewDraft: null,
+    resourcePreviewCache: [],
+  };
+  const cached = MapEditorViewport.prototype.resourcePreviewRecords.call(viewport, session.draft);
+  assert.equal(MapEditorViewport.prototype.resourcePreviewRecords.call(viewport, session.draft), cached,
+    "unchanged editor drafts reuse resource placement across pointer-only overlay redraws");
+  viewport.rebuildTerrain = () => {};
+  viewport.rebuildDoodads = () => {};
+  viewport.drawOverlay = () => {};
+  MapEditorViewport.prototype.applySessionSnapshot.call(viewport, { draft: session.draft, reason: "terrainStroke" });
+  assert.notEqual(MapEditorViewport.prototype.resourcePreviewRecords.call(viewport, session.draft), cached,
+    "committed in-place terrain strokes invalidate cached resource placement");
+
+  MapEditorPanel.prototype.updateBasePatchCount.call({
+    session,
+    setStatus() {},
+  }, 0, "steelPatches", 2, "S1");
+  MapEditorPanel.prototype.updateBasePatchCount.call({
+    session,
+    setStatus() {},
+  }, 0, "oilPatches", 1, "S1");
+  const reduced = mapEditorBaseResourcePreviews(session.draft);
+  assert.deepEqual(
+    reduced.reduce((counts, preview) => ({ ...counts, [preview.kind]: (counts[preview.kind] || 0) + 1 }), {}),
+    { steel: 2, oil: 1 },
+    "resource count edits immediately change the viewport preview cardinality",
+  );
+}
+
+{
+  const darkForest = JSON.parse(fs.readFileSync(new URL("server/assets/maps/dark-forest.json", repoRoot), "utf8"));
+  const startKeys = new Set(darkForest.startLocations.map(({ x, y }) => `${x},${y}`));
+  const startBases = darkForest.baseSites.filter(({ x, y }) => startKeys.has(`${x},${y}`));
+  assert.equal(startBases.length, darkForest.startLocations.length);
+  assert(startBases.every((site) => site.steelPatches === 12 && site.oilPatches === 3),
+    "Dark Forest gives both randomly assigned player starts the same resource counts");
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 1 });
   const viewport = {
     tool: { kind: "start", locationIndex: 0, add: false },
     armTool(tool) { this.tool = tool; },
@@ -631,6 +707,7 @@ assert(
     overlayRevision: 0,
     selectedBaseIndex: null,
     siteRecord: MapEditorViewport.prototype.siteRecord,
+    resourcePreviewRecords: () => [],
     paintPreviewRecord: () => null,
   };
   MapEditorViewport.prototype.drawOverlay.call(recordViewport);

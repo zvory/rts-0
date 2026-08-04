@@ -383,11 +383,10 @@ try {
     return true;
   });
   ok(engineerSelected, "selected the starting Engineer");
-  await page.evaluate(() => document.activeElement?.blur());
-  await page.keyboard.press("z");
+  await page.click('#command-card button[data-command-id="worker.buildMenu"]');
   ok(
     await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
-    "worker build hotkey opened the build submenu",
+    "worker Build command opened the build submenu",
   );
   await page.waitForSelector('#command-card button[data-command-id="kriegsia.build.resource_depot"]');
   const engineerBuildCard = await page.evaluate(() => ({
@@ -836,7 +835,8 @@ try {
       ["Stealth", "No vehicles", "Damage reduction", "Slowed movement"]
         .every((label) => editorUi.overlayEffects.some((effect) => effect.label === label)) &&
       editorUi.overlayEffects.filter((effect) => effect.checked).map((effect) => effect.label).join(",") === "Stealth" &&
-      ["Paint selected", "Erase selected"].every((label) => editorUi.overlayTools.includes(label)),
+      ["Paint selected", "Erase selected"].every((label) => editorUi.overlayTools.includes(label)) &&
+      !editorUi.overlayTools.includes("Forest") && !editorUi.overlayTools.includes("Erase both"),
     `MAP EDITOR: compact floating Layers panel exposes eight independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
   );
   await editorPage.click("input[aria-label='Show Stealth']");

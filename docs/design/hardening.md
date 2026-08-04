@@ -16,16 +16,16 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   ascending unique nonzero ids after authored-map canonicalization, allow only the server catalog,
   bound integer world-pixel coordinates to the map, reject color on trees, and accept only optional
   canonical lowercase `#rrggbb` wildflower colors. Authored maps and handoff DTOs deny unknown
-  fields, and the existing 512 KiB authored-map and 4 MiB Lab setup caps apply before mutation.
+  fields, and the existing 8 MiB authored-map and 4 MiB Lab setup caps apply before mutation.
 - **Map authoring analysis bounds** (`map_authoring_analysis.rs` and
   `game/map_authoring.rs`): `/api/map-authoring/check` and `/api/map-authoring/report` accept at most
-  512 KiB of UTF-8 authored-map JSON, pass it through the live materializer, and retain its
+  8 MiB of UTF-8 authored-map JSON, pass it through the live materializer, and retain its
   256-by-256 tile, 32-base, 4,096-doodad, and sparse-overlay limits. Static route searches have a
   deterministic 65,536-expansion per-route cap, 262,144-expansion request-wide budget, and
   256-route attempt cap. Omitted work remains explicit in the response rather than being reported
   as unreachable. A process-wide two-permit semaphore rejects excess concurrent work before
   `spawn_blocking`; admitted reports run on the blocking worker pool rather than a room or
-  async-networking task. The CLI applies the same 512 KiB cap before allocating its full input.
+  async-networking task. The CLI applies the same 8 MiB cap before allocating its full input.
   The endpoints return analysis only and never persist or launch the submitted map.
 - **Client stress-test report caps** (`stress_tests.rs`): the public client-only benchmark POST is
   capped at 2 MiB before JSON extraction and validates its fixed schema/workload, scalar lengths,

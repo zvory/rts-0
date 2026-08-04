@@ -94,6 +94,12 @@ export function _drawResource(e, fog) {
   g.rtsStaticRenderKey = renderKey;
 }
 
+export function drawResourceNodePreview(graphics, kind, radius = 11) {
+  graphics.clear();
+  if (kind === KIND.OIL || kind === "oil") drawOilSpring(graphics, radius);
+  else drawSteelBarStack(graphics, radius);
+}
+
 function drawOilSpring(g, r) {
   // Original drum fill area was roughly 1.514r². Scale the spring to 125%,
   // landing near 2.37r² so the gusher reads clearly at gameplay zoom.

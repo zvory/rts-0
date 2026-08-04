@@ -13,7 +13,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use rts_sim::game::process_authored_json;
 
-const MAX_AUTHORED_MAP_ANALYSIS_BYTES: usize = 512 * 1024;
+const MAX_AUTHORED_MAP_ANALYSIS_BYTES: usize = 8 * 1024 * 1024;
 const OUTPUT_SCHEMA_VERSION: u32 = 2;
 const MAX_CONCURRENT_MAP_ANALYSES: usize = 2;
 static MAP_ANALYSIS_PERMITS: LazyLock<Arc<Semaphore>> =
@@ -146,6 +146,15 @@ mod tests {
     use tokio::sync::oneshot;
 
     use super::*;
+
+    #[test]
+    fn request_limit_accepts_the_largest_bundled_authoring_map() {
+        let dark_forest = include_bytes!("../assets/maps/dark-forest.json");
+        assert!(
+            dark_forest.len() <= MAX_AUTHORED_MAP_ANALYSIS_BYTES,
+            "Dark Forest must remain usable with browser authoring analysis"
+        );
+    }
 
     fn valid_map_json() -> String {
         json!({

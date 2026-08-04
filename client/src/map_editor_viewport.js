@@ -1,4 +1,5 @@
 import { Camera } from "./camera.js";
+import { mapEditorBaseResourcePreviews } from "./map_editor_base_resources.js";
 import { createMapEditorPresentation } from "./map_editor_presentation.js";
 import { createMapEditorTerrainPreview } from "./map_editor_terrain_preview.js";
 import { PRESENTATION_OUTCOME } from "./presentation/submission.js";
@@ -119,6 +120,8 @@ export class MapEditorViewport {
     this.pendingTerrainUpdate = null;
     this.pendingOverlay = null;
     this.pendingDoodadUpdate = null;
+    this.resourcePreviewDraft = null;
+    this.resourcePreviewCache = [];
     this.layerVisibility = defaultMapAuthoringLayerVisibility();
     this.presentationInFlight = null;
     this.presentationStopped = false;
@@ -249,6 +252,10 @@ export class MapEditorViewport {
 
   applySessionSnapshot(snapshot) {
     if (!snapshot?.draft) return;
+    if (snapshot.reason === "terrainStroke") {
+      this.resourcePreviewDraft = null;
+      this.resourcePreviewCache = [];
+    }
     if (!["terrainStroke", "doodadStroke", "overlayStroke"].includes(snapshot.reason)) {
       this.rebuildTerrain();
     }
@@ -342,7 +349,10 @@ export class MapEditorViewport {
     const guideCentre = mapEditorSymmetryGuideCentre(dimensions, this.symmetry);
     const locations = this.session.mapOverlay();
     const sites = [];
-    for (const start of locations?.starts || []) sites.push(this.siteRecord(start, 0x4ec9ff, 11, `S${start.index + 1}`));
+    for (const start of locations?.starts || []) {
+      const baseIndex = draft.baseSites.findIndex((site) => site.x === start.x && site.y === start.y);
+      sites.push(this.siteRecord(start, 0x4ec9ff, 11, `S${start.index + 1}`, baseIndex === this.selectedBaseIndex));
+    }
     for (const [index, base] of (locations?.bases || []).entries()) {
       sites.push(this.siteRecord(base, 0xf4c542, 7, `B${index + 1}`, base.index === this.selectedBaseIndex));
     }
@@ -353,6 +363,10 @@ export class MapEditorViewport {
       guides,
       guideCentre,
       sites,
+      resourcePreviews: this.resourcePreviewRecords(draft).map((preview) => ({
+        ...preview,
+        selected: preview.baseIndex === this.selectedBaseIndex,
+      })),
       stealthTiles: structuredCloneSafe(draft.stealthTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
       damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),
@@ -360,6 +374,24 @@ export class MapEditorViewport {
       paintPreview: this.paintPreviewRecord(),
       doodadBrushPreview: this.doodadBrushPreviewRecord?.() || null,
     };
+  }
+
+  resourcePreviewRecords(draft) {
+    // Terrain strokes mutate the current draft in place, so recompute while one is active. All
+    // other committed edits replace the draft object and can share this placement result across
+    // selection, tool-preview, layer, and pointer-only overlay redraws.
+    if (!this.session.terrainStroke && this.resourcePreviewDraft === draft) {
+      return this.resourcePreviewCache;
+    }
+    const previews = mapEditorBaseResourcePreviews(draft);
+    if (this.session.terrainStroke) {
+      this.resourcePreviewDraft = null;
+      this.resourcePreviewCache = [];
+    } else {
+      this.resourcePreviewDraft = draft;
+      this.resourcePreviewCache = previews;
+    }
+    return previews;
   }
 
   doodadBrushPreviewRecord() {

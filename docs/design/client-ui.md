@@ -1001,7 +1001,9 @@ single-diagonal symmetry; grass is the erase material. Rectangular maps retain a
 half-turn symmetry, while three-way, four-way, and diagonal transforms are disabled because they
 would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
-The selected neutral base has a pale map ring. The viewport draws the selected
+The selected base has a pale map ring. The viewport previews every base's complete Steel and Oil
+cluster with the live match setup geometry; selecting a start or expansion emphasizes its
+resource nodes while the panel reports the exact counts. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
 Grass, Gravel A/B/C, Dirt A/B/C, Mud A/B/C, Frosted Ground, bare road, and the four marked road
 orientations are passable paint materials; all may cross protected start/base areas while rock and
