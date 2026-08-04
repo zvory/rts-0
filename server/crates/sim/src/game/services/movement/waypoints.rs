@@ -564,13 +564,7 @@ pub(super) fn advance_moving_units(
                     && static_blocked_ticks == 0
                     && !uses_oriented_vehicle_body(kind)
                     && skippable_next_waypoint.is_some_and(|following_waypoint| {
-                        unit_static_segment_standable(
-                            map,
-                            occ,
-                            e.kind,
-                            (x, y),
-                            following_waypoint,
-                        )
+                        unit_static_segment_standable(map, occ, e.kind, (x, y), following_waypoint)
                     })
                 {
                     e.pop_waypoint();
