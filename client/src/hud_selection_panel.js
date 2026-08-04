@@ -79,8 +79,9 @@ export function selectionBudgetGridModel(entities, overflow = null) {
 
   // Seed the first page with one of each selected kind before duplicates. Sorting those
   // representatives largest-first preserves contiguous room for wide/two-row portraits.
+  // If they do not all fit, keep packing them together on subsequent pages before duplicates.
   for (const block of representatives.sort(compareSelectionBudgetBlocks)) {
-    placeSelectionBlockOnPages(block, pages, cols, { firstPageOnly: true });
+    placeSelectionBlockOnPages(block, pages, cols);
   }
   for (const block of duplicates.sort(compareSelectionBudgetBlocks)) {
     placeSelectionBlockOnPages(block, pages, cols);
@@ -180,8 +181,6 @@ export class HudSelectionPanel {
       this._pageSelectionSig = pageSelectionSig;
       this._activePage = 0;
     }
-    const model = selectionBudgetGridModel(sel, overflow);
-    this._activePage = Math.min(this._activePage, Math.max(0, model.pages.length - 1));
     const sig = `${selectionPanelSignature(sel, overflow, this.state)}|page:${this._activePage}`;
     if (sig === this._renderSig) {
       this._recordSelectionDiagnostic("hud.dirty.selectionPanel.hit");
@@ -189,6 +188,7 @@ export class HudSelectionPanel {
     }
     this._recordSelectionDiagnostic("hud.dirty.selectionPanel.miss");
     this._renderSig = sig;
+    const model = selectionBudgetGridModel(sel, overflow);
 
     const frag = document.createDocumentFragment();
     const header = document.createElement("div");
@@ -578,12 +578,11 @@ function compareSelectionBudgetBlocks(a, b) {
     a.sourceIndex - b.sourceIndex;
 }
 
-function placeSelectionBlockOnPages(block, pages, cols, { firstPageOnly = false } = {}) {
+function placeSelectionBlockOnPages(block, pages, cols) {
   const shape = { cols: block.cols, rows: block.rows };
   let placement = null;
   let page = null;
-  const candidates = firstPageOnly ? pages.slice(0, 1) : pages;
-  for (const candidate of candidates) {
+  for (const candidate of pages) {
     const placed = placeSelectionBudgetBlock(candidate.occupied, cols, shape);
     if (!placed) continue;
     placement = placed;

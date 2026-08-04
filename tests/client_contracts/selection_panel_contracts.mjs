@@ -71,6 +71,15 @@ import { KIND } from "../../client/src/protocol.js";
     [...selectedKinds].every((kind) => firstPageKinds.has(kind)),
     "HUD first page reserves one representative of every selected unit kind before duplicates");
 
+  const manyUniqueKinds = Array.from({ length: 60 }, (_, index) => ({
+    id: 1500 + index,
+    owner: 1,
+    kind: `test_unique_kind_${index}`,
+  }));
+  const manyUniqueModel = selectionBudgetGridModel(manyUniqueKinds);
+  assert(manyUniqueModel.pages.length === 2 && manyUniqueModel.pages[1].blocks.length === 12,
+    "HUD packs representatives that overflow the first page together before placing duplicates");
+
   const mixedSelection = [
     ...Array.from({ length: 6 }, (_, index) => ({
       id: 1250 + index,

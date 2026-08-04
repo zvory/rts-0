@@ -9,11 +9,14 @@
   min-height: 28px;
   padding: 0 4px;
   border-bottom: 1px solid var(--panel-edge);
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 #selected-panel .sel-page-tab {
   appearance: none;
   min-width: 38px;
+  flex: 0 0 auto;
   min-height: 28px;
   padding: 4px 10px;
   border: 1px solid var(--panel-edge);
