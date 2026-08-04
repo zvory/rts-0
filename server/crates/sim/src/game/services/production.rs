@@ -29,15 +29,15 @@ pub(crate) fn production_system(
         let active_producer = entities.get(id).is_some_and(|producer| {
             producer.hp > 0 && producer.is_building() && !producer.under_construction()
         });
-        if active_producer {
-            let faction_id = entities
-                .get(id)
-                .and_then(|producer| {
-                    players
-                        .iter()
-                        .find(|player| player.id == producer.owner)
-                        .map(|player| player.faction_id.as_str())
-                })
+        let automatic_extractor_owner = entities
+            .get(id)
+            .filter(|producer| active_producer && producer.kind == EntityKind::ResourceDepot)
+            .map(|producer| producer.owner);
+        if let Some(owner) = automatic_extractor_owner {
+            let faction_id = players
+                .iter()
+                .find(|player| player.id == owner)
+                .map(|player| player.faction_id.as_str())
                 .unwrap_or("");
             for (owner, kind) in extractors::advance_automatic(entities, id, faction_id) {
                 if let Some(player) = players.iter_mut().find(|player| player.id == owner) {

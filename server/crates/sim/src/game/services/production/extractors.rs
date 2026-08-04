@@ -11,20 +11,17 @@ pub(super) fn advance_automatic(
     producer_id: u32,
     faction_id: &str,
 ) -> Vec<(u32, EntityKind)> {
-    let Some((owner, active)) = entities.get(producer_id).map(|producer| {
+    let Some((owner, producer_kind, active)) = entities.get(producer_id).map(|producer| {
         (
             producer.owner,
-            producer.hp > 0
-                && !producer.under_construction()
-                && AUTOMATIC_KINDS.iter().all(|kind| {
-                    rules::economy::trainable_units_for_faction(faction_id, producer.kind)
-                        .contains(kind)
-                }),
+            producer.kind,
+            producer.hp > 0 && !producer.under_construction(),
         )
     }) else {
         return Vec::new();
     };
-    if !active {
+    let trainable = rules::economy::trainable_units_for_faction(faction_id, producer_kind);
+    if !active || !AUTOMATIC_KINDS.iter().all(|kind| trainable.contains(kind)) {
         return Vec::new();
     }
 
