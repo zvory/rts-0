@@ -15,12 +15,7 @@
 
 .replay-seek-panel {
   position: relative;
-  min-width: min(620px, calc(100vw - 40px));
-  padding: clamp(30px, 5vw, 52px) clamp(42px, 8vw, 88px) 28px;
-  border: 1px solid rgba(199, 208, 122, 0.7);
-  border-radius: var(--radius);
-  background: rgba(17, 17, 15, 0.88);
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  max-width: calc(100vw - 72px);
   text-align: center;
   pointer-events: auto;
 }
@@ -28,7 +23,7 @@
 .replay-seek-title {
   color: var(--accent);
   font-family: "Germania One", var(--lobby-font);
-  font-size: clamp(72px, 12vw, 156px);
+  font-size: clamp(36px, 6vw, 78px);
   line-height: 0.9;
   text-shadow:
     5px 5px 0 #191710,
@@ -46,8 +41,8 @@
 
 .replay-seek-close {
   position: absolute;
-  top: 8px;
-  right: 10px;
+  top: -28px;
+  right: -32px;
   width: 38px;
   height: 38px;
   padding: 0;
@@ -69,11 +64,14 @@
 
 @media (max-width: 600px) {
   .replay-seek-panel {
-    min-width: calc(100vw - 24px);
-    padding: 34px 32px 24px;
+    max-width: calc(100vw - 56px);
   }
 
   .replay-seek-title {
-    font-size: clamp(64px, 20vw, 112px);
+    font-size: clamp(32px, 10vw, 56px);
+  }
+
+  .replay-seek-close {
+    right: -24px;
   }
 }

@@ -7,7 +7,7 @@ withFakeOverlayDocument(({ FakeElement }) => {
   const overlay = new ReplaySeekOverlay({ root });
   overlay.show("Seeking backward 5 seconds…");
   assert(!overlay.el.hidden && overlay.title.textContent === "Seeking",
-    "replay seek overlay presents the large seeking label");
+    "replay seek overlay presents the centered seeking label");
   assert(overlay.detail.textContent === "Seeking backward 5 seconds…",
     "replay seek overlay preserves authoritative direction and duration detail");
   overlay.closeButton.listeners.click();
