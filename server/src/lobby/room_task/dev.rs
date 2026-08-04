@@ -37,10 +37,7 @@ pub(super) struct DevScenarioDriver {
 
 impl DevScenarioDriver {
     fn enqueue_for_tick(&mut self, game: &mut Game) {
-        if self.issued {
-            return;
-        }
-        if game.tick_count() < self.issue_after_ticks {
+        if self.issued || game.tick_count() < self.issue_after_ticks {
             return;
         }
         self.issued = true;
@@ -85,7 +82,6 @@ impl RoomTask {
             self.send_dev_start_to(player_id);
         }
     }
-
     fn start_dev_session(&mut self) {
         self.prepare_live_match_launch();
         let (game, driver, view_player_id) = match self.build_dev_session() {
@@ -109,7 +105,6 @@ impl RoomTask {
         }
         crate::log_info!(room = %self.room, "dev session started");
     }
-
     fn build_dev_session(&self) -> Result<(Game, DevDriver, u32), String> {
         match &self.mode {
             RoomMode::Normal
@@ -125,12 +120,11 @@ impl RoomTask {
                         let setup = $setup;
                         let player_id = setup.player_id;
                         let command = setup.command();
-                        let panzerfaust_windup = setup.panzerfaust_windup();
                         let driver = DevScenarioDriver {
                             player_id,
                             command,
                             issue_after_ticks: setup.issue_after_ticks,
-                            panzerfaust_windup,
+                            panzerfaust_windup: setup.panzerfaust_windup(),
                             issued: false,
                         };
                         Ok((setup.game, DevDriver::Scenario(driver), player_id))
