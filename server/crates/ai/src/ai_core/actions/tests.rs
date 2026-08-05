@@ -1,6 +1,7 @@
 use super::*;
 use crate::ai_core::observation::{AiEconomy, AiMapSummary, AiObservation, AiPlayerSummary};
 use crate::ai_core::resource_availability::ResourceAvailability;
+use crate::config;
 
 fn worker(id: u32, x: f32, y: f32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
@@ -479,34 +480,31 @@ fn resource_assignment_picks_distinct_nodes() {
 
 #[test]
 fn resource_assignment_can_reassign_latched_workers_when_allowed() {
-    let pump_jack_steel = rts_rules::economy::cost(EntityKind::PumpJack).0;
     let mut latched = worker(10, 0.0, 0.0, AiEntityState::Gather);
-    latched.latched_node = Some(30);
+    latched.latched_node = Some(31);
     let observation = observation(
         AiEconomy {
-            steel: pump_jack_steel,
+            steel: 0,
             oil: 0,
             supply_used: 0,
             supply_cap: 10,
         },
         vec![latched],
         vec![
-            resource(30, EntityKind::Steel, 64.0, 0.0),
-            resource(31, EntityKind::Oil, 96.0, 0.0),
+            resource(30, EntityKind::Steel, 96.0, 0.0),
+            resource(31, EntityKind::Steel, 64.0, 0.0),
         ],
     );
     let facts = facts_from_observation(&observation);
     let mut ctx = context_from_facts(&facts, &observation);
     let empty = BTreeSet::new();
-    let assignable_node_ids = BTreeSet::from([31]);
-
     let assigned = assign_workers_to_resource(
         &mut ctx,
         ResourceAssignmentPolicy {
             workers: &observation.owned,
             resources: &observation.resources,
-            resource_kind: EntityKind::Oil,
-            assignable_node_ids: &assignable_node_ids,
+            resource_kind: EntityKind::Steel,
+            assignable_node_ids: &BTreeSet::from([30]),
             candidate_worker_ids: Some(&[10]),
             skip_workers: &empty,
             pre_reserved_nodes: &empty,
@@ -522,28 +520,20 @@ fn resource_assignment_can_reassign_latched_workers_when_allowed() {
         assigned,
         vec![ResourceAssignment {
             worker: 10,
-            node: 31
+            node: 30
         }]
     );
-    assert_eq!(ctx.budget().steel(), 0);
     assert!(matches!(
         ctx.into_commands().as_slice(),
-        [Command::Build {
-            units,
-            building: EntityKind::PumpJack,
-            tile_x: 3,
-            tile_y: 0,
-            queued: false
-        }] if units == &vec![10]
+        [Command::Gather { units, node: 30, queued: false }] if units == &vec![10]
     ));
 }
 
 #[test]
-fn oil_resource_assignment_requires_pump_jack_budget() {
-    let pump_jack_steel = rts_rules::economy::cost(EntityKind::PumpJack).0;
+fn oil_resource_assignment_defers_to_automatic_pump_jack() {
     let observation = observation(
         AiEconomy {
-            steel: pump_jack_steel.saturating_sub(1),
+            steel: 0,
             oil: 0,
             supply_used: 0,
             supply_cap: 10,
@@ -759,11 +749,10 @@ fn assign_workers_to_resource_ignores_non_mineable_oil_without_reserving_worker(
 }
 
 #[test]
-fn assign_workers_to_resource_accepts_completed_expansion_oil_candidate() {
-    let pump_jack_steel = rts_rules::economy::cost(EntityKind::PumpJack).0;
+fn assign_workers_to_resource_leaves_expansion_oil_to_automatic_pump_jack() {
     let observation = observation(
         AiEconomy {
-            steel: pump_jack_steel,
+            steel: 0,
             oil: 0,
             supply_used: 0,
             supply_cap: 10,
@@ -798,13 +787,8 @@ fn assign_workers_to_resource_accepts_completed_expansion_oil_candidate() {
         },
     );
 
-    assert_eq!(
-        assigned,
-        vec![ResourceAssignment {
-            worker: 10,
-            node: 31
-        }]
-    );
+    assert!(assigned.is_empty());
+    assert!(ctx.into_commands().is_empty());
 }
 
 #[test]

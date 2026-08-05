@@ -201,14 +201,14 @@ export const STATS = Object.freeze({
     requires: KIND.TRAINING_CENTRE,
     requiresText: "Requires Training Centre" },
   [KIND.STEEL_MINE]: { label: "Steel Mine", icon: "SM", footW: 1, footH: 1, sight: 1,
-    cost: { steel: 50, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [],
+    cost: { steel: 0, oil: 0 }, buildTicks: TICK_HZ * 24, trains: [],
     description:
-      "Resource Depot builds this on a nearby Steel patch. " +
+      "Resource Depots automatically build this for free on nearby Steel patches. " +
       `Extracts 2 Steel every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s.` },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
-    cost: { steel: 100, oil: 0 }, buildTicks: TICK_HZ * 20, trains: [],
+    cost: { steel: 0, oil: 0 }, buildTicks: TICK_HZ * 24, trains: [],
     description:
-      "Resource Depot builds this on a nearby Oil patch. " +
+      "Resource Depots automatically build this for free on nearby Oil patches. " +
       `Extracts ${OIL_LOAD} Oil every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s while within ` +
       `${MINING_ANCHOR_RANGE_TILES} tiles of a completed friendly Resource Depot or Zamok.` },
 

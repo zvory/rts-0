@@ -271,11 +271,12 @@ try {
       resourceDepot: es.filter((e) => e.kind === "resource_depot").length,
       workers: es.filter((e) => e.kind === "worker").length,
       steelMines: es.filter((e) => e.kind === "steel_mine").length,
+      completedSteelMines: es.filter((e) => e.kind === "steel_mine" && e.buildProgress == null).length,
     };
   });
   ok(
-    own.resourceDepot === 1 && own.workers === 1 && own.steelMines === 6,
-    `client sees own Resource Depot + Engineer + 6 Steel Mines (${JSON.stringify(own)})`,
+    own.resourceDepot === 1 && own.workers === 1 && own.completedSteelMines === 6 && own.steelMines >= 6,
+    `client sees own Resource Depot + Engineer + 6 completed Steel Mines plus any automatic scaffold (${JSON.stringify(own)})`,
   );
 
   await page.waitForFunction(() => {
@@ -422,12 +423,12 @@ try {
   });
   ok(
     extractorSlots?.steelMineHotkey === "W" &&
-      extractorSlots.steelMineCost === "50" &&
-      extractorSlots.steelMineTooltip.includes("20s") &&
+      extractorSlots.steelMineCost === "" &&
+      extractorSlots.steelMineTooltip.includes("24s") &&
       extractorSlots.pumpJackHotkey === "E" &&
-      extractorSlots.pumpJackCost === "100" &&
-      extractorSlots.pumpJackTooltip.includes("20s"),
-    `PRODUCTION: Depot exposes W Steel Mine (50) and E Pump Jack (100) with build times (${JSON.stringify(extractorSlots)})`,
+      extractorSlots.pumpJackCost === "" &&
+      extractorSlots.pumpJackTooltip.includes("24s"),
+    `PRODUCTION: Depot shows automatic free W Steel Mine and E Pump Jack jobs with build times (${JSON.stringify(extractorSlots)})`,
   );
 
   const trainBtn = await page.evaluate(() => {

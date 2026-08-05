@@ -12,7 +12,7 @@ pub(super) fn adjust(
     delta: i8,
     max_buildings: usize,
 ) {
-    if !matches!(delta, -1 | 1) {
+    if !matches!(delta, -1 | 1) || unit.is_resource_extractor() {
         return;
     }
 

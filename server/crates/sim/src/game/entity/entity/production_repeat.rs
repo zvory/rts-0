@@ -9,10 +9,13 @@ impl Entity {
         if count == 0 {
             return None;
         }
-        production
-            .repeat_units
-            .get(production.repeat_unit_cursor % count)
-            .copied()
+        (0..count).find_map(|offset| {
+            production
+                .repeat_units
+                .get((production.repeat_unit_cursor + offset) % count)
+                .copied()
+                .filter(|unit| !unit.is_resource_extractor())
+        })
     }
 
     /// `Some(unit)` toggles that unit; `None` clears (false) or advances the repeat cursor (true).

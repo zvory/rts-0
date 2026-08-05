@@ -853,11 +853,11 @@ withFakeHudDocument(({ FakeElement }) => {
   tooltipHud._resourceIcon = (kind) => kind;
   const pumpJackTooltip = tooltipHud._kindTooltipHtml(KIND.PUMP_JACK);
   assert(
-    pumpJackTooltip.includes("100") &&
-      pumpJackTooltip.includes("20s") &&
-      pumpJackTooltip.includes("Oil patch") &&
+    pumpJackTooltip.includes("24s") &&
+      pumpJackTooltip.includes("automatically build this for free") &&
+      pumpJackTooltip.includes("Oil patches") &&
       pumpJackTooltip.includes("Extracts 2 Oil every 1.3s"),
-    "Pump Jack tooltip explains its cost, build time, placement substrate, and oil income",
+    "Pump Jack tooltip explains automatic free production, build time, substrate, and oil income",
   );
   assert(buildCard.slots[3].label === "Training Centre", "worker build menu should include Training Centre");
   assert(!buildCard.slots[3].enabled, "locked build buttons should be disabled");

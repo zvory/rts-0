@@ -70,6 +70,7 @@ async function soloStart(room) {
     const own = snap.entities.filter((e) => e.owner === c.playerId);
     const ownWorkers = own.filter((e) => e.kind === "worker");
     const ownResourceDepots = own.filter((e) => e.kind === "resource_depot");
+    const completedSteelMines = own.filter((e) => e.kind === "steel_mine" && e.buildProgress == null);
     const visibleTiles = (snap.visibleTiles || []).filter(Boolean).length;
     ok(start.playerId === c.playerId && start.spectator === false,
        `SOLO START: start is stamped as host player (start=${start.playerId}, welcome=${c.playerId}, spectator=${start.spectator})`);
@@ -79,8 +80,8 @@ async function soloStart(room) {
        `SOLO START: snapshot carries host supply (${snap.supplyUsed}/${snap.supplyCap})`);
     ok(visibleTiles > 0,
        `SOLO START: snapshot carries authoritative visible tiles (${visibleTiles})`);
-    ok(ownResourceDepots.length === 1 && ownWorkers.length === 6,
-       `SOLO START: host sees normal selectable base units (resource_depot=${ownResourceDepots.length}, workers=${ownWorkers.length}, own=${own.length})`);
+    ok(ownResourceDepots.length === 1 && ownWorkers.length === 1 && completedSteelMines.length === 6,
+       `SOLO START: host sees normal selectable base units plus automatic extractor scaffolds (resource_depot=${ownResourceDepots.length}, workers=${ownWorkers.length}, completed_steel_mines=${completedSteelMines.length}, own=${own.length})`);
     c.ws.close();
   }
 

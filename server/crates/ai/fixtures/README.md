@@ -18,7 +18,8 @@ The resulting file is
 directory. The checked-in fixture must not be regenerated to make behavior-preserving refactors
 pass; changing it requires an approved production behavior change with a transcript review. The
 depot-extractor economy migration is such a behavior change: candidate review must confirm the new
-starting loadout and initial extractor-repeat commands before replacing the fixture.
+automatic scaffolds, absence of obsolete extractor-repeat commands, and resulting economy/AI
+timing changes before replacing the fixture.
 
 Canonical records are compact UTF-8 JSON Lines with one LF-terminated serde struct record per
 line. Field order is the Rust schema declaration order. Fingerprinted floating-point values are
