@@ -7,17 +7,7 @@ const START_RESOURCE_MIN_DIST_TILES = 3.5;
 const START_RESOURCE_MAX_DIST_TILES = 7;
 const RESOURCE_NODE_RADIUS = TILE_SIZE / 2;
 
-const OIL_OFFSETS = Object.freeze([
-  [4, 4],
-  [4, 2],
-  [6, 3],
-  [2, 4],
-  [3, 6],
-  [6, 5],
-  [1, 6],
-  [6, 1],
-  [0, 4],
-]);
+const OIL_OFFSET_PAIRS = Object.freeze([[6, 2], [5, 4], [3, 4], [3, 2]]);
 
 /**
  * Mirror the server's deterministic base-resource layout for editor-only stand-ins.
@@ -40,17 +30,21 @@ export function mapEditorResourcePatches(draft) {
     patches.push(...steel);
     steelNodes.push(...steel);
 
-    const oilStepX = tileStep(Math.cos(baseAngle + Math.PI / 2));
-    const oilStepY = tileStep(Math.sin(baseAngle + Math.PI / 2));
+    const inwardX = Math.cos(baseAngle);
+    const inwardY = Math.sin(baseAngle);
+    const lateralX = -inwardY;
+    const lateralY = inwardX;
+    const outwardX = -inwardX;
+    const outwardY = -inwardY;
     const blockedPumpJackTiles = resourceBlockedPumpJackTiles(width, height, steelNodes);
     const oilCount = Math.max(0, Math.trunc(Number(site.oilPatches) || 0));
     for (let index = 0; index < oilCount; index += 1) {
-      const [offsetX, offsetY] = OIL_OFFSETS[Math.min(index, OIL_OFFSETS.length - 1)];
-      const desiredTile = {
-        x: clamp(site.x + offsetX * oilStepX, 0, width - 1),
-        y: clamp(site.y + offsetY * oilStepY, 0, height - 1),
+      const [outwardTiles, lateralTiles] = oilPatchLocalOffset(index, oilCount);
+      const desired = {
+        x: anchorX + (outwardTiles * outwardX + lateralTiles * lateralX) * TILE_SIZE,
+        y: anchorY + (outwardTiles * outwardY + lateralTiles * lateralY) * TILE_SIZE,
       };
-      const tile = nearestOilTile(draft, desiredTile, { x: anchorX, y: anchorY }, occupiedOilTiles, blockedPumpJackTiles);
+      const tile = nearestOilTile(draft, desired, { x: anchorX, y: anchorY }, occupiedOilTiles, blockedPumpJackTiles);
       occupiedOilTiles.push(tile);
       patches.push({ kind: "oil", x: (tile.x + 0.5) * TILE_SIZE, y: (tile.y + 0.5) * TILE_SIZE });
     }
@@ -77,16 +71,18 @@ function orderedBaseSites(draft) {
 function steelPatchRecords(site, anchorX, anchorY, baseAngle) {
   const patches = Math.max(0, Math.trunc(Number(site.steelPatches) || 0));
   const fieldCounts = [Math.ceil(patches / 2), Math.floor(patches / 2)];
-  const perpendicularX = -Math.sin(baseAngle);
-  const perpendicularY = Math.cos(baseAngle);
+  const inwardX = Math.cos(baseAngle);
+  const inwardY = Math.sin(baseAngle);
+  const lateralX = -inwardY;
+  const lateralY = inwardX;
   const records = [];
   for (let sideIndex = 0; sideIndex < 2; sideIndex += 1) {
     const count = fieldCounts[sideIndex];
     if (!count) continue;
     const side = sideIndex === 0 ? 1 : -1;
     const blockDistance = side * STEEL_BLOCK_DIST_TILES * TILE_SIZE;
-    const blockX = anchorX + blockDistance * Math.cos(baseAngle);
-    const blockY = anchorY + blockDistance * Math.sin(baseAngle);
+    const blockX = anchorX + blockDistance * lateralX;
+    const blockY = anchorY + blockDistance * lateralY;
     const rows = Math.ceil(count / STEEL_FIELD_COLUMNS);
     const rowCenter = (rows - 1) / 2;
     const rowSpacing = rows > 1 ? TILE_SIZE / (rows - 1) : TILE_SIZE;
@@ -94,12 +90,12 @@ function steelPatchRecords(site, anchorX, anchorY, baseAngle) {
     for (let index = 0; index < count; index += 1) {
       const column = index % STEEL_FIELD_COLUMNS;
       const row = Math.floor(index / STEEL_FIELD_COLUMNS);
-      const across = (column - columnCenter) * TILE_SIZE;
-      const along = (row - rowCenter) * rowSpacing;
+      const inward = (column - columnCenter) * TILE_SIZE;
+      const lateral = (row - rowCenter) * rowSpacing;
       records.push({
         kind: "steel",
-        x: blockX + across * perpendicularX + along * Math.cos(baseAngle),
-        y: blockY + across * perpendicularY + along * Math.sin(baseAngle),
+        x: blockX + inward * inwardX + lateral * lateralX,
+        y: blockY + inward * inwardY + lateral * lateralY,
       });
     }
   }
@@ -115,7 +111,7 @@ function nearestOilTile(draft, desired, anchor, occupiedOilTiles, blockedPumpJac
   ));
   return constrained
     || nearestTile(draft, desired, (tile) => hasOilGap(tile, occupiedOilTiles) && !blockedPumpJackTiles.has(tileKey(tile)))
-    || desired;
+    || nearestTileToWorldPoint(draft, desired);
 }
 
 function nearestTile(draft, desired, accepts) {
@@ -124,7 +120,9 @@ function nearestTile(draft, desired, accepts) {
     for (let x = 0; x < draft.width; x += 1) {
       const tile = { x, y };
       if (!tilePassable(draft, tile) || !accepts(tile)) continue;
-      const score = (x - desired.x) ** 2 + (y - desired.y) ** 2;
+      const centerX = (x + 0.5) * TILE_SIZE;
+      const centerY = (y + 0.5) * TILE_SIZE;
+      const score = (centerX - desired.x) ** 2 + (centerY - desired.y) ** 2;
       if (!best || score < best.score - 0.001
         || (Math.abs(score - best.score) <= 0.001 && (y < best.y || (y === best.y && x < best.x)))) {
         best = { x, y, score };
@@ -132,6 +130,21 @@ function nearestTile(draft, desired, accepts) {
     }
   }
   return best && { x: best.x, y: best.y };
+}
+
+function nearestTileToWorldPoint(draft, desired) {
+  return {
+    x: clamp(roundTiesAway(desired.x / TILE_SIZE - 0.5), 0, draft.width - 1),
+    y: clamp(roundTiesAway(desired.y / TILE_SIZE - 0.5), 0, draft.height - 1),
+  };
+}
+
+function oilPatchLocalOffset(index, count) {
+  const hasCentre = count % 2 === 1;
+  if (hasCentre && index === 0) return [6, 0];
+  const pairedIndex = Math.max(0, index - (hasCentre ? 1 : 0));
+  const pair = OIL_OFFSET_PAIRS[Math.min(Math.floor(pairedIndex / 2), OIL_OFFSET_PAIRS.length - 1)];
+  return [pair[0], pairedIndex % 2 === 0 ? -pair[1] : pair[1]];
 }
 
 function tilePassable(draft, tile) {
@@ -175,6 +188,6 @@ function distanceTiles(tile, anchor) {
   return Math.hypot(x - anchor.x, y - anchor.y) / TILE_SIZE;
 }
 
-function tileStep(value) { return value < 0 ? -1 : 1; }
 function tileKey(tile) { return `${tile.x}:${tile.y}`; }
+function roundTiesAway(value) { return Math.sign(value) * Math.round(Math.abs(value)); }
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }

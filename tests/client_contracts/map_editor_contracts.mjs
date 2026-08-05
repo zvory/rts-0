@@ -714,7 +714,7 @@ assert(
   assert.equal(patches.filter(({ kind }) => kind === "oil").length, 3,
     "editor resource stand-ins mirror the authored Oil count");
   assert.deepEqual(patches.filter(({ kind }) => kind === "oil").map(({ x, y }) => [x, y]), [
-    [144, 400], [144, 336], [80, 368],
+    [144, 144], [176, 80], [80, 176],
   ], "editor Oil stand-ins mirror server tile offsets for the north-west base");
 
   const withoutOil = structuredClone(draft);
