@@ -374,6 +374,14 @@ pub struct BranchStagingOccupant {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct LiveResumeCountdown {
+    pub duration_ms: u32,
+    pub remaining_ms: u32,
+    pub words: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct LivePauseState {
     pub paused: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -385,6 +393,8 @@ pub struct LivePauseState {
     pub can_pause: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub can_unpause: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_countdown: Option<LiveResumeCountdown>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

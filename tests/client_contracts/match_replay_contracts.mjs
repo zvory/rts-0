@@ -926,8 +926,23 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(button && !button.hidden && !button.disabled, "live pause overlay enables unpause for pause-authorized viewers");
     button.listeners.click();
     assert(unpaused, "live pause overlay calls injected unpause action");
+    const playedCountdown = [];
+    overlay.audio = { playUI(id) { playedCountdown.push(id); } };
+    overlay.applyLivePauseState({
+      paused: true,
+      canUnpause: false,
+      resumeCountdown: {
+        durationMs: 3000,
+        remainingMs: 1900,
+        words: ["Drei!", "Zwei!", "Eins!"],
+      },
+    });
+    const countdown = root.querySelector(".live-resume-countdown");
+    assert(!countdown.hidden && countdown.textContent === "Zwei!", "resume countdown joins at the server-reported phase");
+    assert(playedCountdown[0] === "countdown_zwei", "resume countdown plays the matching spoken cue");
+    assert(overlay.panel.hidden, "resume countdown replaces pause actions until play restarts");
     overlay.applyLivePauseState({ paused: true, canUnpause: false });
-    assert(button.hidden && button.disabled, "live pause overlay hides unpause without authority");
+    assert(button.hidden && button.disabled && countdown.hidden, "live pause overlay hides unpause without authority");
     overlay.applyLivePauseState({ paused: false });
     assert(root.children[0].hidden, "live pause overlay hides when running");
     assert(!settingsRoot.classList.contains("live-pause-active"), "live pause overlay restores normal settings stacking after unpause");
@@ -1319,8 +1334,21 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   livePauseStateMatch.combatAudio = {
     updateWorldCombatBed(active) { worldBedStates.push(active); },
   };
-  livePauseStateMatch.applyLivePauseState({ paused: true, canPause: false, canUnpause: true });
+  livePauseStateMatch.applyLivePauseState({
+    paused: true,
+    canPause: false,
+    canUnpause: false,
+    resumeCountdown: {
+      durationMs: 3000,
+      remainingMs: 2500,
+      words: ["Drei!", "Zwei!", "Eins!"],
+    },
+  });
   assert(livePauseStateMatch.predictionVisualSuspended, "entering live pause suspends prediction visuals");
+  assert(
+    livePauseStateMatch.livePauseState.resumeCountdown?.remainingMs === 2500,
+    "live pause state validates the server resume countdown payload",
+  );
   assert(livePauseStateMatch.state.poseCleared === true, "entering live pause drops pose without clearing progress");
   assert(progressPauseStates.at(-1) === true, "live pause freezes progress prediction for a non-pausing client");
   assert(worldBedStates.at(-1) === false, "entering live pause fades out the world combat bed");

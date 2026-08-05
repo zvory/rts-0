@@ -27,6 +27,17 @@ pub(super) fn match_countdown_duration() -> Duration {
     }
 }
 
+pub(super) fn live_resume_countdown_duration() -> Duration {
+    #[cfg(test)]
+    {
+        Duration::from_millis(1)
+    }
+    #[cfg(not(test))]
+    {
+        Duration::from_secs(3)
+    }
+}
+
 pub(super) fn server_build_sha() -> &'static str {
     crate::build_info::build_id()
 }

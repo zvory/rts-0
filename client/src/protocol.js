@@ -132,6 +132,20 @@ export function decodeServerMessage(raw) {
   return raw;
 }
 
+/** Validate the optional synchronized-resume portion of a livePauseState payload. */
+export function liveResumeCountdownFromWire(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const durationMs = Math.floor(Number(raw.durationMs));
+  const remainingMs = Math.floor(Number(raw.remainingMs));
+  const words = Array.isArray(raw.words) ? raw.words.map((word) => String(word)) : [];
+  if (durationMs <= 0 || remainingMs <= 0 || words.length === 0) return null;
+  return {
+    durationMs,
+    remainingMs: Math.min(remainingMs, durationMs),
+    words,
+  };
+}
+
 
 // --- Client -> Server builders ---
 export const msg = Object.freeze({

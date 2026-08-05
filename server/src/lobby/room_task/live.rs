@@ -10,11 +10,15 @@ use super::super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase};
 use super::super::{normalize_start_team_id, CommandLifecycleTiming, PlayerInit};
-use super::helpers::{late_spectator_notice_name, live_ai_controllers, LIVE_PAUSE_LIMIT};
+use super::helpers::{
+    late_spectator_notice_name, live_ai_controllers, live_resume_countdown_duration,
+    LIVE_PAUSE_LIMIT, MATCH_COUNTDOWN_WORDS,
+};
 use super::types::{PendingClientCommandAck, Phase, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{
-    Event, LivePauseState, NoticeSeverity, PlayerScore, RoomTimeState, ServerMessage, TeamId,
+    Event, LivePauseState, LiveResumeCountdown, NoticeSeverity, PlayerScore, RoomTimeState,
+    ServerMessage, TeamId,
 };
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::command::SimCommand;
@@ -285,6 +289,18 @@ impl RoomTask {
 
     fn live_pause_state_for(&self, connection_id: u32) -> LivePauseState {
         let actor_id = self.live_pause_actor_for_connection(connection_id);
+        let resume_countdown = self.live_resume_countdown_deadline.map(|deadline| {
+            let duration = live_resume_countdown_duration();
+            let remaining = deadline.saturating_duration_since(TokioInstant::now());
+            LiveResumeCountdown {
+                duration_ms: duration.as_millis() as u32,
+                remaining_ms: remaining.as_millis().clamp(1, u32::MAX as u128) as u32,
+                words: MATCH_COUNTDOWN_WORDS
+                    .iter()
+                    .map(|word| (*word).to_string())
+                    .collect(),
+            }
+        });
         let pauses_remaining = actor_id.map(|actor_id| {
             LIVE_PAUSE_LIMIT
                 .saturating_sub(self.live_pause_counts.get(&actor_id).copied().unwrap_or(0))
@@ -298,7 +314,8 @@ impl RoomTask {
             pauses_remaining,
             pause_limit: LIVE_PAUSE_LIMIT,
             can_pause,
-            can_unpause: self.live_paused && actor_id.is_some(),
+            can_unpause: self.live_paused && resume_countdown.is_none() && actor_id.is_some(),
+            resume_countdown,
         }
     }
 
@@ -341,6 +358,7 @@ impl RoomTask {
             .insert(actor_id, used.saturating_add(1));
         self.live_paused = true;
         self.live_paused_by = Some(actor_id);
+        self.live_resume_countdown_deadline = None;
         crate::log_info!(room = %self.room, player_id, pause_actor_id = actor_id, "live match paused");
         self.broadcast_live_pause_state();
     }
@@ -354,10 +372,29 @@ impl RoomTask {
             self.send_live_pause_state_to(player_id);
             return;
         }
+        if self.live_resume_countdown_deadline.is_some() {
+            self.send_live_pause_state_to(player_id);
+            return;
+        }
+        self.live_resume_countdown_deadline =
+            Some(TokioInstant::now() + live_resume_countdown_duration());
+        crate::log_info!(room = %self.room, player_id, "live match resume countdown started");
+        self.broadcast_live_pause_state();
+    }
+
+    fn finish_live_resume_countdown_if_due(&mut self) -> bool {
+        let Some(deadline) = self.live_resume_countdown_deadline else {
+            return false;
+        };
+        if TokioInstant::now() < deadline {
+            return false;
+        }
+        self.live_resume_countdown_deadline = None;
         self.live_paused = false;
         self.live_paused_by = None;
-        crate::log_info!(room = %self.room, player_id, "live match unpaused");
+        crate::log_info!(room = %self.room, "live match resume countdown finished");
         self.broadcast_live_pause_state();
+        true
     }
 
     pub(super) fn on_give_up(&mut self, player_id: u32) {
@@ -597,7 +634,9 @@ impl RoomTask {
 
     pub(super) fn on_tick_live_game(&mut self, scheduled: TokioInstant) {
         if self.live_paused && self.live_pause_controls_available() {
-            return;
+            if !self.finish_live_resume_countdown_if_due() {
+                return;
+            }
         }
         self.apply_lab_scenario_actions();
         // Take ownership of the game for the duration of the tick so we can both mutate it and

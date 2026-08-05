@@ -89,6 +89,9 @@ pub(super) struct RoomTask {
     /// Live-match pause is room-owned control-plane state, separate from replay/dev room-time.
     live_paused: bool,
     live_paused_by: Option<u32>,
+    /// Deadline for a synchronized live-match resume countdown. Simulation stays paused until it
+    /// expires, including for clients that join as spectators after the countdown began.
+    live_resume_countdown_deadline: Option<TokioInstant>,
     live_pause_counts: HashMap<u32, u8>,
     lab_session: Option<LabSession>,
     lab_timeline: Option<LabTimeline>,
@@ -171,6 +174,7 @@ impl RoomTask {
             branch_live_seat_by_connection: HashMap::new(),
             live_paused: false,
             live_paused_by: None,
+            live_resume_countdown_deadline: None,
             live_pause_counts: HashMap::new(),
             lab_session: None,
             lab_timeline: None,

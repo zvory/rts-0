@@ -108,6 +108,37 @@ const { ok } = assertions;
   ok(!specSnap.entities.some((e) => e.owner === C.playerId),
      "SPECTATOR: observer owns no entities");
 
+  A.send({ t: "pauseGame" });
+  const pausedStates = await Promise.all([A, B, C].map((client) =>
+    client.waitFor((m) => m.t === "livePauseState" && m.paused === true && !m.resumeCountdown,
+      3000, `${client.tag} live pause`)
+  ));
+  ok(pausedStates.every((state) => state.canUnpause === true),
+     "LIVE PAUSE: players and spectator can request resume");
+  await sleep(100);
+  const frozenTick = A.lastSnapshot?.tick;
+  B.send({ t: "unpauseGame" });
+  const resumeStates = await Promise.all([A, B, C].map((client) =>
+    client.waitFor((m) => m.t === "livePauseState" && m.paused === true && m.resumeCountdown,
+      3000, `${client.tag} resume countdown`)
+  ));
+  ok(resumeStates.every((state) =>
+    state.canUnpause !== true &&
+    state.resumeCountdown.durationMs === 3000 &&
+    state.resumeCountdown.words.join(" ") === "Drei! Zwei! Eins!"),
+  "LIVE PAUSE: every recipient receives the synchronized three-second resume countdown");
+  await sleep(1000);
+  ok(A.lastSnapshot?.tick === frozenTick,
+     `LIVE PAUSE: simulation remains frozen during countdown (tick ${frozenTick})`);
+  const resumedStates = await Promise.all([A, B, C].map((client) =>
+    client.waitFor((m) => m.t === "livePauseState" && m.paused === false,
+      4000, `${client.tag} resumed state`)
+  ));
+  ok(resumedStates.every((state) => !state.resumeCountdown),
+     "LIVE PAUSE: every recipient receives authoritative resumed state after countdown");
+  await A.waitFor((m) => m.t === "snapshot" && m.tick > frozenTick, 3000, "post-resume snapshot");
+  ok(true, "LIVE PAUSE: simulation advances after the resume countdown");
+
   let peak = snap.steel;
   for (let i = 0; i < 30; i++) {
     await sleep(500);

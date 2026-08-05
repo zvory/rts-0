@@ -451,7 +451,23 @@ fn live_pause_authorizes_players_and_spectators_and_tracks_limit() {
     assert!(!spectator_pause_state.can_pause);
     assert!(spectator_pause_state.can_unpause);
     task.on_unpause_game(99);
-    assert!(!task.live_paused, "spectators can unpause live matches");
+    assert!(task.live_paused, "resume countdown keeps the match paused");
+    let resume_state = std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok())
+        .filter_map(|msg| match msg {
+            ServerMessage::LivePauseState(state) => Some(state),
+            _ => None,
+        })
+        .last()
+        .expect("spectator resume countdown state");
+    let countdown = resume_state
+        .resume_countdown
+        .expect("accepted unpause carries a resume countdown");
+    assert_eq!(countdown.words, ["Drei!", "Zwei!", "Eins!"]);
+    assert!(countdown.remaining_ms <= countdown.duration_ms);
+    assert!(!resume_state.can_unpause);
+    task.live_resume_countdown_deadline = Some(TokioInstant::now());
+    task.on_tick(TokioInstant::now());
+    assert!(!task.live_paused, "spectators can resume live matches");
     while writer_a.reliable_rx.try_recv().is_ok() {}
     while writer_b.reliable_rx.try_recv().is_ok() {}
     while writer_spectator.reliable_rx.try_recv().is_ok() {}
@@ -491,7 +507,16 @@ fn live_pause_authorizes_players_and_spectators_and_tracks_limit() {
         }
         assert_eq!(task.live_pause_counts.get(&1), Some(&expected_used));
         task.on_unpause_game(2);
-        assert!(!task.live_paused, "any active player can unpause");
+        assert!(
+            task.live_paused,
+            "any active player can start the resume countdown"
+        );
+        task.live_resume_countdown_deadline = Some(TokioInstant::now());
+        task.on_tick(TokioInstant::now());
+        assert!(
+            !task.live_paused,
+            "the countdown deadline resumes the match"
+        );
     }
 
     task.on_pause_game(1);
@@ -550,6 +575,16 @@ fn live_pause_skips_live_tick_work_until_unpaused() {
     );
 
     task.on_unpause_game(2);
+    assert!(
+        task.live_paused,
+        "simulation remains paused during resume countdown"
+    );
+    task.on_tick(TokioInstant::now());
+    let Phase::InGame(game) = &task.phase else {
+        panic!("normal live match should remain active");
+    };
+    assert_eq!(game.tick_count(), 0, "countdown must not advance sim");
+    task.live_resume_countdown_deadline = Some(TokioInstant::now());
     task.on_tick(TokioInstant::now());
     let Phase::InGame(game) = &task.phase else {
         panic!("normal live match should remain active");
@@ -1147,6 +1182,7 @@ fn late_spectator_notice_queues_while_live_paused() {
     );
 
     task.on_unpause_game(2);
+    task.live_resume_countdown_deadline = Some(TokioInstant::now());
     task.on_tick(TokioInstant::now());
     let expected = "Paused Scout has joined the match as a spectator";
     assert_single_late_spectator_notice(&mut writer_active_one, expected);

@@ -1,3 +1,5 @@
+import { liveResumeCountdownFromWire } from "./protocol.js";
+
 export function requestPauseGame(match) {
   if (!match.capabilities.matchControls?.pause) return;
   if (match.livePauseState.paused || !match.livePauseState.canPause) {
@@ -27,6 +29,7 @@ export function applyLivePauseState(match, state) {
     pauseLimit: Number.isInteger(state?.pauseLimit) ? state.pauseLimit : null,
     canPause: state?.canPause === true,
     canUnpause: state?.canUnpause === true,
+    resumeCountdown: liveResumeCountdownFromWire(state?.resumeCountdown),
   };
   if (match.livePauseState.paused) {
     suspendPredictionVisuals(match);
