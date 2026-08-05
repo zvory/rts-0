@@ -14,7 +14,9 @@ pub(super) fn spawn(
         .iter()
         .find(|entity| {
             entity.owner == owner
-                && entity.kind == EntityKind::ResourceDepot
+                && crate::rules::economy::trainable_units(entity.kind)
+                    .iter()
+                    .any(|kind| kind.is_resource_extractor())
                 && entity.hp > 0
                 && !entity.under_construction()
         })
