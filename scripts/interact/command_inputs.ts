@@ -28,7 +28,7 @@ export const ALL_CATALOG_CATEGORIES = Object.freeze([
 export const ALIAS_RE = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{1,64}$/;
-const SESSION_RE = /^(?:lab|game|scenario)_[a-f0-9]{32}$/;
+const SESSION_RE = /^(?:lab|game|scenario|map_editor)_[a-f0-9]{32}$/;
 const U32_MAX = 0xffff_ffff;
 const COMMAND_FIELDS = Object.freeze({
   move: ["c", "units", "x", "y", "queued"],
@@ -62,6 +62,7 @@ export function validatorFor(command: string): (value: unknown) => CommandInput 
 export function validateCommandInput(command: string, value: unknown): CommandInput {
   record(value, "input");
   const session = () => sessionId(value.sessionId);
+  if (command.startsWith("map-editor-")) return validateMapEditorNamespaceInput(command, value, session);
   if (command.startsWith("scenario-")) return validateScenarioNamespaceInput(command, value, session);
   if (command.startsWith("game-")) return validateGameNamespaceInput(command, value, session);
   if (command === "shutdown") return exact(value, [], "shutdown");
@@ -192,6 +193,69 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
     throw Object.assign(new Error(`Unknown command ${JSON.stringify(command)}.`), { code: "unknownCommand" });
   }
   return value;
+}
+
+function validateMapEditorNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {
+  if (command === "map-editor-open") {
+    exact(value, ["workspaceRoot", "map", "viewport"], "map-editor open");
+    if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("map-editor open.workspaceRoot", "must be a non-empty string");
+    value.map = bundledMapFile(value.map ?? "1v1.json", "map-editor open.map");
+    if (value.viewport != null) viewport(value.viewport, 4096, "map-editor open.viewport");
+    return value;
+  }
+  session();
+  if (command === "map-editor-inspect") {
+    exact(value, ["sessionId"], "map-editor inspect");
+  } else if (command === "map-editor-camera") {
+    exact(value, ["sessionId", "camera"], "map-editor camera");
+    validateMapEditorCamera(value.camera);
+  } else if (command === "map-editor-screenshot") {
+    exact(value, ["sessionId", "name", "presentation", "viewport"], "map-editor screenshot");
+    artifactToken(value.name, "map-editor screenshot.name");
+    presentation(value.presentation, "map-editor screenshot.presentation");
+    if (value.viewport != null) viewport(value.viewport, 2048, "map-editor screenshot.viewport");
+  } else {
+    throw Object.assign(new Error(`Unknown command ${JSON.stringify(command)}.`), { code: "unknownCommand" });
+  }
+  return value;
+}
+
+function validateMapEditorCamera(value: unknown) {
+  record(value, "map-editor camera.camera");
+  if (value.action === "overview") {
+    exact(value, ["action"], "map-editor camera");
+    return;
+  }
+  if (value.action === "zoom") {
+    exact(value, ["action", "zoom"], "map-editor camera");
+    boundedNumber(value.zoom, "map-editor camera.zoom", 0.05, 4);
+    return;
+  }
+  if (value.action !== "focus") invalid("map-editor camera.action", "must be overview, zoom, or focus");
+  exact(value, ["action", "space", "x", "y", "width", "height", "zoom", "padding"], "map-editor camera");
+  if (value.space !== "world" && value.space !== "tile") invalid("map-editor camera.space", "must be world or tile");
+  const maximum = value.space === "tile" ? 4096 : 131072;
+  boundedNumber(value.x, "map-editor camera.x", 0, maximum);
+  boundedNumber(value.y, "map-editor camera.y", 0, maximum);
+  const hasWidth = value.width != null;
+  const hasHeight = value.height != null;
+  if (hasWidth !== hasHeight) invalid("map-editor camera", "requires width and height together");
+  if (hasWidth) {
+    boundedNumber(value.width, "map-editor camera.width", Number.MIN_VALUE, maximum);
+    boundedNumber(value.height, "map-editor camera.height", Number.MIN_VALUE, maximum);
+    if (value.zoom != null) invalid("map-editor camera.zoom", "cannot be combined with an area");
+  } else if (value.zoom != null) {
+    boundedNumber(value.zoom, "map-editor camera.zoom", 0.05, 4);
+  }
+  if (value.padding != null) boundedNumber(value.padding, "map-editor camera.padding", 0, 1024);
+}
+
+function bundledMapFile(value: unknown, label: string) {
+  if (typeof value !== "string" || !value || value.length > 128) invalid(label, "must be a bounded bundled map name or path");
+  const normalized = value.replaceAll("\\", "/");
+  const match = /^(?:server\/assets\/maps\/)?([A-Za-z0-9_-]{1,64})(?:\.json)?$/.exec(normalized);
+  if (!match) invalid(label, "must name one JSON file under server/assets/maps");
+  return `${match[1]}.json`;
 }
 
 function validateScenarioNamespaceInput(command: string, value: CommandInput, session: () => void): CommandInput {

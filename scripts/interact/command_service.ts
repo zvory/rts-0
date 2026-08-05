@@ -12,6 +12,7 @@ import { defaultMapForMode } from "./session_defaults.ts";
 import { executeLabCommand } from "./namespaces/lab/commands.ts";
 import { executeGameCommand } from "./namespaces/game/commands.ts";
 import { executeDevScenarioCommand } from "./namespaces/dev_scenario/commands.ts";
+import { executeMapEditorCommand } from "./namespaces/map_editor/commands.ts";
 import {
   presentRecorderStatus, stopRecording, waitForRecording,
 } from "./capabilities/media.ts";
@@ -27,7 +28,7 @@ export class InteractService {
   closePromise: Promise<boolean> | null;
   openAbortController: AbortController | null;
   openPromise: Promise<unknown> | null;
-  openingKind: "lab" | "game" | "scenario" | null;
+  openingKind: "lab" | "game" | "scenario" | "map-editor" | null;
   coordinator: SessionCoordinator;
   sessions: Map<string, InteractSession>;
   log: (...values: unknown[]) => void;
@@ -76,10 +77,11 @@ export class InteractService {
         result = { shuttingDown: true };
       } else if (definition.handlerKey === "status") {
         result = await this.status(input);
-      } else if (["open", "game-open", "scenario-open"].includes(definition.handlerKey)) {
+      } else if (["open", "game-open", "scenario-open", "map-editor-open"].includes(definition.handlerKey)) {
         const kind = definition.handlerKey === "game-open"
           ? "game"
-          : definition.handlerKey === "scenario-open" ? "scenario" : "lab";
+          : definition.handlerKey === "scenario-open" ? "scenario"
+            : definition.handlerKey === "map-editor-open" ? "map-editor" : "lab";
         result = await this.open(input, kind);
       } else if (definition.handlerKey === "close") {
         result = { sessionId: input.sessionId, closed: await this.close(input.sessionId!) };
@@ -104,7 +106,7 @@ export class InteractService {
       return result;
     });
   }
-  async open(input: ServiceInput, kind: "lab" | "game" | "scenario" = "lab") {
+  async open(input: ServiceInput, kind: "lab" | "game" | "scenario" | "map-editor" = "lab") {
     if (this.closed) throw new InteractError("serviceClosed", "Interact is shutting down.");
     const workspaceRoot = resolveRequestedWorkspace(input.workspaceRoot, this.workspaceRoot);
     let existing = this.sessions.values().next().value;
@@ -141,7 +143,7 @@ export class InteractService {
         await driver.close().catch(() => {});
         throw new InteractError("serviceClosed", "Interact shut down while the session was opening.");
       }
-      const sessionId = `${kind}_${crypto.randomUUID().replaceAll("-", "")}`;
+      const sessionId = `${kind.replace("-", "_")}_${crypto.randomUUID().replaceAll("-", "")}`;
       const session: InteractSession = {
         sessionId, kind, driver, aliases: new Map<string, number>(), sceneRevision: 0,
         sceneIdentity: {
@@ -172,7 +174,7 @@ export class InteractService {
       if (this.openAbortController === openAbortController) this.openAbortController = null;
     }
   }
-  async describeExistingSession(session: InteractSession, requestedKind: "lab" | "game" | "scenario") {
+  async describeExistingSession(session: InteractSession, requestedKind: "lab" | "game" | "scenario" | "map-editor") {
     if (session.kind !== requestedKind) {
       throw new InteractError(
         "sessionKindMismatch",
@@ -194,6 +196,8 @@ export class InteractService {
       status,
       capabilities: session.kind === "lab"
         ? { aliases: true, selection: true, catalogCategories: [...ALL_CATALOG_CATEGORIES], maxSessions: this.maxSessions }
+        : session.kind === "map-editor"
+          ? { mapLoading: "bundled", camera: ["overview", "zoom", "focus"], media: ["screenshot"], maxSessions: this.maxSessions }
         : session.kind === "scenario"
           ? scenarioSessionCapabilities(this.maxSessions)
           : gameSessionCapabilities(session.sceneIdentity.role, this.maxSessions),
@@ -284,9 +288,13 @@ export class InteractService {
     if (command.startsWith("scenario-") && session.kind !== "scenario") {
       throw new InteractError("sessionKindMismatch", "This command requires a dev scenario session.");
     }
+    if (command.startsWith("map-editor-") && session.kind !== "map-editor") {
+      throw new InteractError("sessionKindMismatch", "This command requires a Map Editor session.");
+    }
     if (command === "record-stop") return stopRecording(session, this.artifactPreview);
     if (command.startsWith("game-")) return executeGameCommand(command, session, input, this.artifactPreview);
     if (command.startsWith("scenario-")) return executeDevScenarioCommand(command, session, input, this.artifactPreview);
+    if (command.startsWith("map-editor-")) return executeMapEditorCommand(command, session, input, this.artifactPreview);
     if (session.kind !== "lab") {
       throw new InteractError("sessionKindMismatch", "This command requires a Lab session.");
     }

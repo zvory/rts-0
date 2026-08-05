@@ -26,6 +26,12 @@ returns a `scenario_...` session id. The namespace is observation/media-only: `i
 `screenshot`, recording, time-lapse, capture cancellation, and lifecycle commands. It cannot spawn,
 move, order, build, or send arbitrary input. Scenario media defaults to `presentation:"clean"`.
 
+For Map Editor review, use `node scripts/interact/cli.mjs map-editor <command> '<JSON-object>'`.
+`map-editor open` loads one bundled map selected as a basename, filename, or bounded
+`server/assets/maps/<name>.json` path. Use `inspect`, `camera` (`overview`, `zoom`, or world/tile
+`focus`), and `screenshot`; editor screenshots default to `presentation:"normal"` so the actual
+editing surface remains visible.
+
 1. Run `open`, retain `result.sessionId`, then run `catalog` before choosing players or kinds.
    `open` is safe to repeat: it returns the active session. Run `close` first only when a fresh
    session or different launch options are needed. A cold build may take tens of seconds and emits
@@ -65,7 +71,7 @@ move, order, build, or send arbitrary input. Scenario media defaults to `present
 8. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
    it closes itself after 30 minutes without an accepted interaction.
 
-Capture files are confined to `target/interact/<lab|game|scenario>/<session-id>/` and ignored by Git. Do
+Capture files are confined to `target/interact/<lab|game|scenario|map-editor>/<session-id>/` and ignored by Git. Do
 not request arbitrary paths or add image bytes to Git. Lab remains for bounded authored scenes;
 full-match observation is limited to the game namespace's isolated AI-vs-AI spectator mode. A
 Tailnet Preview URL is copied into the machine-level preview service with at least 24 hours of

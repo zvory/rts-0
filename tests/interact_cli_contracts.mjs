@@ -58,8 +58,8 @@ try {
     assert.equal(help.stderr, "", `${helpCommand} keeps machine-readable help on stdout`);
     const helpEnvelope = JSON.parse(help.stdout);
     assert.equal(helpEnvelope.ok, true, `${helpCommand} returns a successful envelope`);
-    assert.deepEqual(helpEnvelope.result.namespaces.map(({ name }) => name), ["lab", "game", "dev-scenario"], `${helpCommand} lists every supported namespace`);
-    assert.equal(helpEnvelope.result.usage, "node scripts/interact/cli.mjs <lab|game|dev-scenario> <command> [JSON-object]", `${helpCommand} requires a namespace`);
+    assert.deepEqual(helpEnvelope.result.namespaces.map(({ name }) => name), ["lab", "game", "dev-scenario", "map-editor"], `${helpCommand} lists every supported namespace`);
+    assert.equal(helpEnvelope.result.usage, "node scripts/interact/cli.mjs <lab|game|dev-scenario|map-editor> <command> [JSON-object]", `${helpCommand} requires a namespace`);
   }
   for (const args of [["lab", "--help"], ["help", "lab"]]) {
     const help = spawnSync(process.execPath, [cli, ...args], {
@@ -95,6 +95,19 @@ try {
       result.commands,
       ["open", "close", "status", "inspect", "select", "camera", "screenshot", "record-start", "record-stop", "record-wait", "capture-timelapse", "capture-cancel", "shutdown"],
       "dev-scenario help exposes observation, framing, and media without gameplay mutations",
+    );
+  }
+  for (const args of [["map-editor", "--help"], ["help", "map-editor"]]) {
+    const help = spawnSync(process.execPath, [cli, ...args], {
+      cwd: path.dirname(root), env: baseEnv, encoding: "utf8",
+    });
+    assert.equal(help.status, 0, `${args.join(" ")} succeeds without a Git workspace`);
+    const result = JSON.parse(help.stdout).result;
+    assert.equal(result.namespace, "map-editor", `${args.join(" ")} identifies the Map Editor namespace`);
+    assert.deepEqual(
+      result.commands,
+      ["open", "close", "status", "inspect", "camera", "screenshot", "shutdown"],
+      "Map Editor help exposes only bundled-map observation, camera, screenshot, and lifecycle commands",
     );
   }
   const retiredScenarioNamespace = spawnSync(process.execPath, [cli, "scenario", "--help"], {
@@ -243,6 +256,24 @@ try {
   callNamespace("game", "close", { sessionId: spectatorOpened.sessionId });
   callNamespace("game", "shutdown");
   await waitFor(() => !fs.existsSync(paths.directory), 2000, "game contract daemon shuts down cleanly");
+
+  const editorOpened = callNamespace("map-editor", "open", {
+    map: "server/assets/maps/1v1.json",
+    viewport: { width: 1200, height: 800, deviceScaleFactor: 1 },
+  }).result;
+  assert.match(editorOpened.sessionId, /^map_editor_[a-f0-9]{32}$/, "Map Editor open returns a distinct bounded session id");
+  assert.equal(editorOpened.kind, "map-editor", "Map Editor open identifies its session kind");
+  assert.equal(editorOpened.status.map, "1v1.json", "Map Editor open normalizes the bounded bundled-map selector");
+  assert.deepEqual(editorOpened.capabilities.camera, ["overview", "zoom", "focus"], "Map Editor capabilities advertise bounded framing controls");
+  assert.equal(callNamespace("map-editor", "inspect", { sessionId: editorOpened.sessionId }).result.map.name, "Chokes", "Map Editor inspect returns detached map facts");
+  const editorOverview = callNamespace("map-editor", "camera", { sessionId: editorOpened.sessionId, camera: { action: "overview" } }).result;
+  assert.deepEqual(editorOverview.camera.focus, { x: 1024, y: 1024 }, "Map Editor overview frames the complete map");
+  const editorScreenshot = callNamespace("map-editor", "screenshot", { sessionId: editorOpened.sessionId, name: "1v1-resources" }).result;
+  assert.equal(editorScreenshot.presentation, "normal", "Map Editor screenshots retain editor controls by default");
+  assert.equal(editorScreenshot.preview.available, true, "Map Editor screenshots publish a Tailnet preview");
+  callNamespace("map-editor", "close", { sessionId: editorOpened.sessionId });
+  callNamespace("map-editor", "shutdown");
+  await waitFor(() => !fs.existsSync(paths.directory), 2000, "Map Editor contract daemon shuts down cleanly");
 
   const scenarioOpened = callNamespace("dev-scenario", "open", {
     id: "direct_reverse_order", unit: "tank", count: 1,

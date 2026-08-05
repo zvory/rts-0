@@ -122,7 +122,7 @@ interface ActiveFixedCapture {
 }
 interface DriverOptions {
   workspaceRoot?: string;
-  mode?: "lab" | "game" | "scenario";
+  mode?: "lab" | "game" | "scenario" | "map-editor";
   map?: string;
   seed?: string;
   scenario?: string; visualProfile?: string;
@@ -1192,7 +1192,7 @@ export function safeArtifactName(value: string, fallback = "scene") {
 
 function safeCaptureSessionId(value: unknown) {
   const sessionId = String(value || "").trim();
-  if (!/^(?:lab|game|scenario)_[a-f0-9]{32}$/.test(sessionId)) {
+  if (!/^(?:lab|game|scenario|map_editor)_[a-f0-9]{32}$/.test(sessionId)) {
     throw new InteractDriverError("invalidSession", "sessionId must be a valid Interact session id.");
   }
   return sessionId;

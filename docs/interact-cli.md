@@ -5,7 +5,8 @@ inspects small authoritative Lab scenes. The `game` namespace opens either one i
 human-vs-AI match or a spectator-only AI-vs-AI match for bounded inspection, screenshots, real-time
 video, and sampled time-lapse video. The observation-only `dev-scenario` namespace opens the existing
 server-authored dev scenarios for screenshots, before/after stills, real-time video, and sampled
-time lapses. All three start this worktree's normal Rust server and a headless client using the
+time lapses. The `map-editor` namespace loads one bounded bundled map for editor inspection,
+camera framing, and screenshots. All four start this worktree's normal Rust server and a headless client using the
 production Pixi renderer. Interact never edits source files.
 
 Interact requires Node 22.18 or newer and runs its TypeScript source directly through Node's
@@ -85,6 +86,19 @@ node scripts/interact/cli.mjs dev-scenario close '{"sessionId":"<id>"}'
 node scripts/interact/cli.mjs dev-scenario shutdown
 ```
 
+Map Editor capture accepts a bundled map name, filename, or its repository-relative asset path:
+
+```bash
+node scripts/interact/cli.mjs map-editor open '{"map":"server/assets/maps/1v1.json","viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
+node scripts/interact/cli.mjs map-editor inspect '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs map-editor camera '{"sessionId":"<id>","camera":{"action":"overview"}}'
+node scripts/interact/cli.mjs map-editor camera '{"sessionId":"<id>","camera":{"action":"zoom","zoom":1.25}}'
+node scripts/interact/cli.mjs map-editor camera '{"sessionId":"<id>","camera":{"action":"focus","space":"tile","x":24,"y":24,"width":32,"height":32,"padding":48}}'
+node scripts/interact/cli.mjs map-editor screenshot '{"sessionId":"<id>","name":"1v1-resources","presentation":"normal"}'
+node scripts/interact/cli.mjs map-editor close '{"sessionId":"<id>"}'
+node scripts/interact/cli.mjs map-editor shutdown
+```
+
 The complete surface is `open`, `close`, `reset`, `catalog`, `spawn`, `update`, `remove`, `order`,
 `time`, `vision`, `inspect`, `select`, `drag`, `camera`, `screenshot`, `record-start`, `record-stop`, `record-wait`, `export`,
 `import`, `artifact-inspect`, `capture-fixed`, `capture-cancel`, `status`, and `shutdown`. Success
@@ -133,6 +147,12 @@ surface. Scenario media defaults to clean presentation; use `presentation:"norma
 or minimap is part of the review.
 Scenario `select` uses the same browser-local, visible-entity contract and does not expand the
 namespace's server authority.
+
+The complete `map-editor` surface is `open`, `close`, `status`, `inspect`, `camera`, `screenshot`,
+and `shutdown`. `open` resolves `1v1`, `1v1.json`, and `server/assets/maps/1v1.json` to the same
+bundled JSON file; traversal and arbitrary paths are rejected. Camera commands can frame the full
+map, set zoom, center a world/tile point, or fit a world/tile rectangle. Screenshots retain the
+Map Editor controls by default and use the ordinary Interact artifact and Tailnet Preview pipeline.
 
 Global help returns the namespace catalog. `lab --help`, `lab help <command>`, and
 `lab <command> --help` return the Lab command catalog or a command's exact accepted shape and
@@ -219,7 +239,7 @@ concurrent calls return the one active session instead of starting another brows
 before `open` when a fresh session or different launch options are required. Optional aliases match
 `[A-Za-z][A-Za-z0-9_-]{0,31}` and remain private to that session. Unknown, duplicate, stale, or
 cross-session aliases are rejected rather than guessed. A session may retain up to 400 aliases.
-Only one authoritative session may be open per worktree across all three namespaces. Opening another
+Only one session may be open per worktree across all four namespaces. Opening another
 kind while a session is active returns `sessionKindMismatch` and preserves the current session.
 Server-rejected Lab launches, such as an unknown map or scenario, return `launchFailed` with the
 server's bounded error text as soon as the browser receives it rather than consuming the full
@@ -323,7 +343,7 @@ Repeat production uses the normal authoritative `adjustProductionRepeat` game co
 producer. Producer ownership, compatibility, allocation policy, resources, supply, and retry
 behavior remain ordinary simulation rules.
 
-Artifacts are first confined to `target/interact/<lab|game|scenario>/<session-id>/` and ignored by Git.
+Artifacts are first confined to `target/interact/<lab|game|scenario|map-editor>/<session-id>/` and ignored by Git.
 On publication, Interact copies the PNG or MP4 into the machine-level `tailnet-preview` service
 outside the worktree. That service binds the stable Tailnet port 8091, has no idle timeout, and
 retains each copied artifact for at least 24 hours. The URL therefore survives Lab `close`,

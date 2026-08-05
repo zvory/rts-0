@@ -1,6 +1,7 @@
 import { Camera } from "./camera.js";
 import { createMapEditorPresentation } from "./map_editor_presentation.js";
 import { createMapEditorTerrainPreview } from "./map_editor_terrain_preview.js";
+import { mapEditorResourcePatches } from "./map_editor_resource_patches.js";
 import { PRESENTATION_OUTCOME } from "./presentation/submission.js";
 import { TERRAIN } from "./protocol.js";
 import { MapEditorPixiPresentationAdapter } from "./renderer/map_editor_presentation_adapter.js";
@@ -242,6 +243,54 @@ export class MapEditorViewport {
     };
   }
 
+  cameraSnapshot() {
+    return this.camera.snapshot();
+  }
+
+  cameraViewportSnapshot() {
+    return { widthCssPx: this.camera.viewW, heightCssPx: this.camera.viewH };
+  }
+
+  cameraWorldBoundsSnapshot() {
+    return {
+      minX: this.camera.x,
+      minY: this.camera.y,
+      maxX: this.camera.x + this.camera.viewW / this.camera.zoom,
+      maxY: this.camera.y + this.camera.viewH / this.camera.zoom,
+    };
+  }
+
+  async controlInteractCamera(input) {
+    const action = String(input?.action || "");
+    if (action === "overview") {
+      this.fitToScreen();
+    } else if (action === "zoom") {
+      const focus = this.camera.snapshot().focus;
+      this.camera.setView({ centerX: focus.x, centerY: focus.y, zoom: Number(input.zoom) });
+    } else if (action === "focus") {
+      const scale = input.space === "tile" ? TILE_SIZE : 1;
+      const x = Number(input.x) * scale;
+      const y = Number(input.y) * scale;
+      const width = input.width == null ? 0 : Number(input.width) * scale;
+      const height = input.height == null ? 0 : Number(input.height) * scale;
+      if (width > 0 && height > 0) {
+        this.camera.fitWorldPoints([
+          { x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height },
+        ], { paddingCssPx: Number(input.padding || 0) });
+      } else {
+        this.camera.setView({ centerX: x, centerY: y, zoom: input.zoom == null ? this.camera.zoom : Number(input.zoom) });
+      }
+    } else {
+      throw Object.assign(new Error("Map Editor camera action must be overview, zoom, or focus."), { code: "invalidCamera" });
+    }
+    await animationFrames(2);
+    return {
+      camera: this.cameraSnapshot(),
+      cameraViewport: this.cameraViewportSnapshot(),
+      cameraWorldBounds: this.cameraWorldBoundsSnapshot(),
+    };
+  }
+
   subscribeZoom(listener) {
     if (typeof listener !== "function") throw new TypeError("zoom listener must be a function");
     return this.camera.subscribe((snapshot) => listener(Math.round(snapshot.framingScale * 100)));
@@ -353,6 +402,7 @@ export class MapEditorViewport {
       guides,
       guideCentre,
       sites,
+      resourcePatches: mapEditorResourcePatches(draft),
       concealmentTiles: structuredCloneSafe(draft.concealmentTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
       damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),
@@ -958,6 +1008,13 @@ function resampleWorldSegment(from, to, spacing) {
 
 function isTextEntry(target) {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(String(target?.tagName || "")) || !!target?.isContentEditable;
+}
+
+function animationFrames(count) {
+  return new Promise((resolve) => {
+    const next = () => count-- <= 0 ? resolve() : requestAnimationFrame(next);
+    next();
+  });
 }
 
 function structuredCloneSafe(value) {

@@ -1,6 +1,7 @@
 import { dom } from "./bootstrap.js";
 import { createMapHandoff, consumeMapHandoff } from "./map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "./map_editor_launch.js";
+import { MapEditorInteractBridge } from "./map_editor_interact_bridge.js";
 import { MapEditorPanel } from "./map_editor_panel.js";
 import { MapEditorSession } from "./map_editor_session.js";
 import { MapEditorViewport } from "./map_editor_viewport.js";
@@ -21,6 +22,7 @@ export class MapEditorApp {
     this.session = new MapEditorSession();
     this.viewport = null;
     this.panel = null;
+    this.interactBridge = null;
     this.allowUnload = false;
     this.onBeforeUnload = (event) => {
       if (this.allowUnload || !this.session.hasUnsavedChanges) return;
@@ -71,6 +73,10 @@ export class MapEditorApp {
       onOpenPreview: (map) => this.openPreview(map),
     });
     this.panel = panel;
+    if (this.launch.interact && !this.launch.error) {
+      this.interactBridge = new MapEditorInteractBridge({ app: this });
+      await this.interactBridge.initialize(this.launch.mapFile);
+    }
     if (this.launch.error) this.panel.setStatus(this.launch.error, true);
     globalThis.__mapEditor = this;
   }
@@ -108,6 +114,8 @@ export class MapEditorApp {
 
   destroy() {
     window.removeEventListener("beforeunload", this.onBeforeUnload);
+    this.interactBridge?.destroy();
+    this.interactBridge = null;
     this.panel?.destroy();
     this.viewport?.destroy();
     document.body.classList.remove("map-editor-mode");

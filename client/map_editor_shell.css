@@ -3,6 +3,13 @@
   display: none !important;
 }
 
+.map-editor-interact-clean .map-editor-panel,
+.map-editor-interact-clean .map-editor-toolbar,
+.map-editor-interact-clean .map-editor-tool-rail,
+.map-editor-interact-clean .map-editor-status-dock {
+  display: none !important;
+}
+
 .map-editor-tools-window {
   right: 12px;
   left: auto;

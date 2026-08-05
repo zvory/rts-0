@@ -224,7 +224,7 @@ function codedError(code: string, message: string) {
 
 function validSessionId(value: unknown) {
   const sessionId = String(value || "");
-  if (!/^(?:lab|game|scenario)_[a-f0-9]{32}$/.test(sessionId)) throw codedError("invalidSession", "sessionId must be a valid Interact session id.");
+  if (!/^(?:lab|game|scenario|map_editor)_[a-f0-9]{32}$/.test(sessionId)) throw codedError("invalidSession", "sessionId must be a valid Interact session id.");
   return sessionId;
 }
 

@@ -49,13 +49,6 @@ import {
 } from "./terrain_palette.js";
 
 export function _drawResource(e, fog) {
-  const stat = STATS[e.kind] || {};
-  const base = stat.size || 11;
-  // Scale a little with remaining amount (clamped) so depleted nodes shrink.
-  const full = RESOURCE_AMOUNTS[e.kind] || 1;
-  const frac = e.remaining == null ? 1 : clamp01(e.remaining / full);
-  const r = base * (0.55 + 0.45 * frac);
-
   const ts = (this._map && this._map.tileSize) || 32;
   const visible = !fog || fog.isVisible(Math.floor(e.x / ts), Math.floor(e.y / ts));
   const alpha = visible ? 1 : 0.7;
@@ -72,26 +65,37 @@ export function _drawResource(e, fog) {
   g.alpha = alpha;
   if (g.rtsStaticRedraw === false) return;
 
-  if (e.kind === KIND.OIL) {
-    drawOilSpring(g, r);
+  drawResourceNodeGraphic(g, e.kind, { remaining: e.remaining, mined });
+  g.rtsStaticRenderKey = renderKey;
+}
+
+/** Draw one resource node at a Graphics object's local origin. */
+export function drawResourceNodeGraphic(graphics, kind, { remaining = null, mined = false } = {}) {
+  const stat = STATS[kind] || {};
+  const base = stat.size || 11;
+  // Scale a little with remaining amount (clamped) so depleted nodes shrink.
+  const full = RESOURCE_AMOUNTS[kind] || 1;
+  const frac = remaining == null ? 1 : clamp01(remaining / full);
+  const radius = base * (0.55 + 0.45 * frac);
+
+  if (kind === KIND.OIL) {
+    drawOilSpring(graphics, radius);
   } else {
     // Steel stockpile: three staggered bars with top/side faces so the pile reads
     // as overlapping metal instead of flat crates.
-    drawSteelBarStack(g, r);
+    drawSteelBarStack(graphics, radius);
   }
 
-  if (mined) {
-    if (e.kind === KIND.OIL) {
-      const xr = r * 0.45;
-      gfxStrokePaths(g, [
-        [[-xr, -xr], [xr, xr]],
-        [[xr, -xr], [-xr, xr]],
-      ], 2.5, 0xffffff, 0.95);
-    } else {
-      drawSteelMiningCracks(g, r);
-    }
+  if (!mined) return;
+  if (kind === KIND.OIL) {
+    const xr = radius * 0.45;
+    gfxStrokePaths(graphics, [
+      [[-xr, -xr], [xr, xr]],
+      [[xr, -xr], [-xr, xr]],
+    ], 2.5, 0xffffff, 0.95);
+  } else {
+    drawSteelMiningCracks(graphics, radius);
   }
-  g.rtsStaticRenderKey = renderKey;
 }
 
 function drawOilSpring(g, r) {

@@ -13,7 +13,7 @@ export function interactLaunchUrl({
   visualProfile,
   devScenario,
 }: {
-  mode: "lab" | "game" | "scenario";
+  mode: "lab" | "game" | "scenario" | "map-editor";
   baseUrl: string;
   room: string;
   map: string;
@@ -25,6 +25,13 @@ export function interactLaunchUrl({
   visualProfile?: string;
   devScenario: { id: string; unit: string; count: number; blocker: string; case: string };
 }) {
+  if (mode === "map-editor") {
+    const url = new URL("/map-editor", baseUrl);
+    url.searchParams.set("map", map);
+    url.searchParams.set("interact", "map-editor");
+    url.searchParams.set("rtsNoAutoPointerLock", "1");
+    return url.href;
+  }
   if (mode === "lab") {
     const url = new URL("/lab", baseUrl);
     url.searchParams.set("room", room);

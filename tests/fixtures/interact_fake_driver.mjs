@@ -207,7 +207,8 @@ export async function openInteractDriver(options) {
       return { roomTime: { currentTick: tick, speed: control.action === "resume" ? control.speed || 1 : 0, paused: control.action !== "resume" }, snapshotTick: tick };
     },
     async inspect(query) {
-      return inspect(query);
+      const result = inspect(query);
+      return options.mode === "map-editor" ? { ...result, map: { ...CATALOG.maps[0] } } : result;
     },
     async select(entityIds) {
       if (entityIds.some((id) => !entities.some((entity) => entity.id === id))) {
