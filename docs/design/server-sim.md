@@ -1005,8 +1005,12 @@ policy is centralized instead of scattered through services.
 
 Production buildings may carry an ordered server-authoritative `repeat_units` list. The production
 system silently retries the current list entry only while the unit queue is empty, using the same
-economy, supply, tech, and producer predicates as direct training. It advances to the next entry
-only after a repeated unit is admitted, so two active units produce in stable A/B/A/B order. Once
+economy, supply, tech, and producer predicates as direct training. Entries whose building or
+upgrade prerequisite is incomplete stay enabled but are skipped when choosing work, so they cannot
+starve a currently trainable entry and become eligible automatically when their prerequisite
+completes. Resource, supply, pause, and reserve failures remain temporary waits on the selected
+eligible entry. The cursor advances after a repeated unit is admitted, so two eligible active units
+produce in stable A/B/A/B order. Once
 admitted, a repeated unit is an ordinary FIFO entry, so later manual train commands append behind
 it. Enabling a unit appends it to the list if absent, disabling it removes only that unit, and any
 production cancel clears the whole list before removing the latest queued item. The list and its
