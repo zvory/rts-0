@@ -540,9 +540,37 @@ pub(in crate::game) fn combat_system(
             }
         }
         if fired {
-            let direct_target_survived =
-                commanded_direct_target && entities.get(tid).is_some_and(|target| target.hp > 0);
-            let next_target = direct_target_survived.then_some(tid).or_else(|| {
+            // Keep the shot's target through the reload if it remains legal. Re-ranking here
+            // made dense concealed engagements churn between freshly revealed targets, which
+            // repeatedly incurred their firing-reveal reaction delay instead of letting a
+            // deployed weapon complete its normal firing cycle. `select` retains this target
+            // through reload, and falls back to priority acquisition if it died or disappeared.
+            let target_survived = entities.get(tid).is_some_and(|target| target.hp > 0);
+            let next_target = if target_survived {
+                acquisition_pass::select(
+                    map,
+                    entities,
+                    &blockers,
+                    teams,
+                    spatial,
+                    &los,
+                    fog,
+                    smokes,
+                    id,
+                    owner,
+                    px,
+                    py,
+                    acquire_px,
+                    mode,
+                    can_move_fire,
+                    weapon_profile.id,
+                    is_mortar_team,
+                    min_range_px,
+                    range_px,
+                    require_safe_mortar_autocast_target,
+                    tick,
+                )
+            } else {
                 acquisition_pass::acquire(
                     map,
                     entities,
@@ -565,7 +593,7 @@ pub(in crate::game) fn combat_system(
                     require_safe_mortar_autocast_target,
                     tick,
                 )
-            });
+            };
             if let Some(e) = entities.get_mut(id) {
                 e.set_target_id(next_target);
             }
