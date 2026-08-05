@@ -49,8 +49,7 @@ pub(crate) fn production_system(
             }
         }
         let repeat_owner = entities.get(id).and_then(|producer| {
-            (active_producer && producer.prod_queue().is_empty())
-                .then_some(producer.owner)
+            (active_producer && producer.prod_queue().is_empty()).then_some(producer.owner)
         });
         if let Some(owner) = repeat_owner {
             let faction_id = players

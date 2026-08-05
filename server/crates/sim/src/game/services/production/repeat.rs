@@ -10,14 +10,12 @@ pub(super) fn next_eligible(
     completed_upgrades: Option<&BTreeSet<UpgradeKind>>,
     owned_complete: &[EntityKind],
 ) -> Option<EntityKind> {
-    let (producer_kind, repeat_count) = entities
-        .get(producer_id)
-        .and_then(|producer| {
-            producer
-                .production
-                .as_ref()
-                .map(|production| (producer.kind, production.repeat_units.len()))
-        })?;
+    let (producer_kind, repeat_count) = entities.get(producer_id).and_then(|producer| {
+        producer
+            .production
+            .as_ref()
+            .map(|production| (producer.kind, production.repeat_units.len()))
+    })?;
     let trainable = rules::economy::trainable_units_for_faction(faction_id, producer_kind);
     for _ in 0..repeat_count {
         let unit = entities
