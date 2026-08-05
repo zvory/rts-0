@@ -111,6 +111,7 @@ await import("./client_contracts/observer_analysis_contracts.mjs");
 await import("./client_contracts/map_editor_layer_contracts.mjs");
 await import("./client_contracts/map_editor_panel_workflow_contracts.mjs");
 await import("./client_contracts/map_editor_contracts.mjs");
+await import("./client_contracts/map_editor_resource_patch_contracts.mjs");
 await import("./client_contracts/map_editor_forest_overlay_contracts.mjs");
 await import("./client_contracts/map_editor_doodad_brush_contracts.mjs");
 await import("./client_contracts/map_author_analysis_contracts.mjs");
