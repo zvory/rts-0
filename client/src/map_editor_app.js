@@ -89,7 +89,7 @@ export class MapEditorApp {
 
   async openPreview({ authoredMap, materializedMap }) {
     const opened = window.open("about:blank", "_blank");
-    if (!opened) throw new Error("The browser blocked the map preview window. Allow pop-ups and try again.");
+    if (!opened) throw new Error("The browser blocked the minimap preview window. Allow pop-ups and try again.");
     opened.opener = null;
     try {
       const handoff = await createMapHandoff({

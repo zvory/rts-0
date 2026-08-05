@@ -1,23 +1,32 @@
-/* Authoritative map-preview route. The normal Match viewport stays visible while
-   ordinary app/Lab chrome is suppressed around the focused export controls. */
+/* Authoritative minimap-preview route. The live world viewport and ordinary app/Lab
+   chrome stay hidden behind the focused production-minimap preview. */
 .map-preview-mode #app > :not(#game-screen),
-.map-preview-mode #game-screen > :not(#viewport):not(.map-preview-controls) {
+.map-preview-mode #game-screen > :not(.map-preview-controls) {
   display: none !important;
 }
 
 .map-preview-controls {
   position: absolute;
   z-index: 40;
-  top: 18px;
-  right: 18px;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
   display: grid;
   gap: 9px;
-  width: min(330px, calc(100vw - 36px));
+  width: min(560px, calc(100vw - 36px));
   padding: 14px;
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
   background: rgba(24, 24, 21, 0.94);
   box-shadow: var(--shadow);
+}
+
+.map-preview-image {
+  display: block;
+  width: min(512px, 100%);
+  height: auto;
+  margin: 4px auto;
+  border: 1px solid var(--panel-edge);
+  image-rendering: pixelated;
 }
 
 .map-preview-mode #app[data-clean-presentation="true"] #game-screen > .map-preview-controls {
@@ -43,9 +52,4 @@
 .map-preview-controls button:disabled {
   cursor: wait;
   opacity: 0.55;
-}
-
-.map-preview-mode #viewport,
-.map-preview-mode #viewport canvas {
-  cursor: default;
 }
