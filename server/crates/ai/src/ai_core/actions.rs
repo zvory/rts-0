@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::ai_core::facts::{AiFacts, ProductionBuildingFact};
 use crate::ai_core::observation::{AiEntityState, AiEntitySummary, AiResourceSummary};
 use crate::ai_shared;
-use crate::config;
 use crate::sdk::actions::{ActionBudget, ActionReservations, AiActionRequest};
 use rts_rules;
 use rts_sim::game::command::SimCommand as Command;
@@ -573,7 +572,9 @@ pub(crate) fn assign_workers_to_resource(
     ctx: &mut AiActionContext<'_>,
     policy: ResourceAssignmentPolicy<'_>,
 ) -> Vec<ResourceAssignment> {
-    if !policy.resource_kind.is_node() {
+    // Pump Jacks are permanent depot-owned background jobs. Reserving an Engineer or emitting a
+    // manual build command here would only compete with the authoritative automatic job.
+    if !policy.resource_kind.is_node() || policy.resource_kind == EntityKind::Oil {
         return Vec::new();
     }
 
@@ -612,34 +613,13 @@ pub(crate) fn assign_workers_to_resource(
         let Some(node) = nearest_unreserved_node(worker, &policy, ctx.reservations()) else {
             continue;
         };
-        let pump_jack_site = if policy.resource_kind == EntityKind::Oil {
-            let Some(resource) = resource_by_id(policy.resources, node) else {
-                continue;
-            };
-            Some(pump_jack_tile_for_resource(resource))
-        } else {
-            None
-        };
-        if pump_jack_site.is_some() && !ctx.budget.reserve_building(EntityKind::PumpJack) {
-            continue;
-        }
         ctx.reservations.reserve_worker(worker.id);
         ctx.reservations.reserve_resource_node(node);
-        if let Some((tile_x, tile_y)) = pump_jack_site {
-            ctx.emit_action(AiActionRequest::Build {
-                units: vec![worker.id],
-                building: EntityKind::PumpJack,
-                tile_x,
-                tile_y,
-                queued: false,
-            });
-        } else {
-            ctx.emit_action(AiActionRequest::Gather {
-                units: vec![worker.id],
-                node,
-                queued: false,
-            });
-        }
+        ctx.emit_action(AiActionRequest::Gather {
+            units: vec![worker.id],
+            node,
+            queued: false,
+        });
         assignments.push(ResourceAssignment {
             worker: worker.id,
             node,
@@ -813,17 +793,6 @@ fn candidate_worker_ids(workers: &[AiEntitySummary], explicit_ids: Option<&[u32]
         .unwrap_or_else(|| workers.iter().map(|worker| worker.id).collect());
     let mut seen = BTreeSet::new();
     ids.into_iter().filter(|id| seen.insert(*id)).collect()
-}
-
-fn resource_by_id(resources: &[AiResourceSummary], id: u32) -> Option<&AiResourceSummary> {
-    resources.iter().find(|resource| resource.id == id)
-}
-
-fn pump_jack_tile_for_resource(resource: &AiResourceSummary) -> (u32, u32) {
-    let tile_size = config::TILE_SIZE as f32;
-    let tile_x = ((resource.x / tile_size) - 0.5).round().max(0.0) as u32;
-    let tile_y = ((resource.y / tile_size) - 0.5).round().max(0.0) as u32;
-    (tile_x, tile_y)
 }
 
 fn nearest_unreserved_node(

@@ -1,5 +1,67 @@
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore};
+use crate::rules;
+
+const AUTOMATIC_KINDS: [EntityKind; 2] = [EntityKind::SteelMine, EntityKind::PumpJack];
+
+/// Advance both free depot-local extractor jobs independently. Each kind pauses when its matching
+/// patches are saturated and starts again from zero when a completed extractor is destroyed.
+pub(super) fn advance_automatic(
+    entities: &mut EntityStore,
+    producer_id: u32,
+    faction_id: &str,
+) -> Vec<(u32, EntityKind)> {
+    let Some((owner, producer_kind, active)) = entities.get(producer_id).map(|producer| {
+        (
+            producer.owner,
+            producer.kind,
+            producer.hp > 0 && !producer.under_construction(),
+        )
+    }) else {
+        return Vec::new();
+    };
+    let trainable = rules::economy::trainable_units_for_faction(faction_id, producer_kind);
+    if !active || !AUTOMATIC_KINDS.iter().all(|kind| trainable.contains(kind)) {
+        return Vec::new();
+    }
+
+    let mut completed = Vec::new();
+    for kind in AUTOMATIC_KINDS {
+        // Old replay/checkpoint queues remain authoritative until their extractor item finishes;
+        // the permanent background job takes over afterward.
+        if entities
+            .get(producer_id)
+            .is_some_and(|producer| producer.prod_queue().iter().any(|item| item.unit == kind))
+        {
+            continue;
+        }
+        let scaffold = scaffold_id(entities, producer_id, kind).or_else(|| {
+            let (x, y) = target(entities, producer_id, kind)?;
+            let scaffold = entities.spawn_building(owner, kind, x, y, false)?;
+            let associated = entities.get_mut(scaffold).is_some_and(|entity| {
+                let Some(construction) = entity.construction.as_mut() else {
+                    return false;
+                };
+                construction.producer_id = Some(producer_id);
+                true
+            });
+            if !associated {
+                entities.remove(scaffold);
+                return None;
+            }
+            Some(scaffold)
+        });
+        if scaffold.is_some_and(|scaffold| {
+            entities
+                .get_mut(scaffold)
+                .and_then(|entity| entity.advance_construction())
+                == Some(true)
+        }) {
+            completed.push((owner, kind));
+        }
+    }
+    completed
+}
 
 pub(super) fn ensure_scaffold(entities: &mut EntityStore, producer_id: u32) -> bool {
     let Some((owner, kind, paid)) = entities.get(producer_id).and_then(|producer| {

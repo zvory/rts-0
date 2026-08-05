@@ -26,6 +26,7 @@ import {
 } from "./hud_unit_commands.js";
 import {
   firstOpenCommandSlot,
+  productionRepeatAffordance,
   researchAvailability,
   researchDisabledReason,
   researchSlotForUpgrade,
@@ -478,37 +479,35 @@ export function buildTrainCard(ctx, building) {
     const slot = firstOpenCommandSlot(slots, trainSlotForUnit(building.kind, unit, trains), cancelSlot);
     if (slot < 0) continue;
     const availability = trainAvailability(ctx, unit, resources, isOwn);
-    const producerIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
-      .map((producer) => producer.id);
-    const repeatingIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
+    const producers = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf);
+    const producerIds = producers.map((producer) => producer.id);
+    const repeatingIds = producers
       .filter((producer) => producer.prodRepeatKinds?.includes(unit))
       .map((producer) => producer.id);
-    const disabledReason = trainDisabledReason(ctx, unit, resources, isOwn);
+    const automatic = building.kind === KIND.RESOURCE_DEPOT &&
+      (unit === KIND.STEEL_MINE || unit === KIND.PUMP_JACK);
+    const disabledReason = automatic
+      ? "Automatically builds for free whenever a matching resource patch is available"
+      : trainDisabledReason(ctx, unit, resources, isOwn);
     const repeatHelp = "Alt-click, Alt+hotkey, or Ctrl+hotkey adds one auto-build; Shift+hotkey removes one";
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),
       kind: "button",
       action: "train",
-      intent: { type: "train", unit },
+      intent: automatic ? null : { type: "train", unit },
       icon: st.icon,
       unitIconKind: unit,
       label: st.label,
       cost: st.cost,
-      enabled: availability !== "locked",
+      enabled: !automatic && availability !== "locked",
       unaffordable: availability === "unaffordable",
-      title: disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp,
+      title: automatic
+        ? disabledReason
+        : (disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp),
       tooltipKind: unit,
-      repeatable: availability === "ready",
-      countBadge: `${repeatingIds.length}/${producerIds.length}`,
-      autobuildIndicatorCount: repeatingIds.length,
-      cls: repeatingIds.length > 0 ? "autocast-enabled production-repeat-enabled" : "",
-      contextIntent: {
-        type: "adjustProductionRepeat",
-        buildingIds: producerIds,
-        unit,
-      },
-      contextHotkeyModifiers: ["alt", "ctrl", "shift"],
+      ...productionRepeatAffordance(automatic, producerIds, repeatingIds, unit,
+        availability === "ready"),
       onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };
   }

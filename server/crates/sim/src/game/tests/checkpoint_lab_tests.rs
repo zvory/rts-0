@@ -186,6 +186,7 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
     })
     .expect("god mode should update");
     game.tick();
+    game.tick();
 
     let checkpoint = game
         .export_lab_checkpoint_scenario("Untitled lab scenario".to_string(), TEST_BUILD_SHA)

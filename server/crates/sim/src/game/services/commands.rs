@@ -1915,6 +1915,9 @@ fn order_train(
     unit: EntityKind,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
+    if unit.is_resource_extractor() {
+        return;
+    }
     let faction_id = faction_id_for(
         players.iter().map(|p| (p.id, p.faction_id.as_str())),
         player,
