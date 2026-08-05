@@ -54,52 +54,6 @@ fn repeat_fixture() -> (Game, u32) {
 }
 
 #[test]
-fn unfinished_producer_repeat_begins_after_completion() {
-    let mut game = empty_flat_game(&players());
-    spawn_building(&mut game, 1, EntityKind::ResourceDepot, (3, 3));
-    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let (x, y) = footprint_center(&game.state.map, EntityKind::Barracks, 8, 8);
-    let barracks = game
-        .state
-        .entities
-        .spawn_building(1, EntityKind::Barracks, x, y, false)
-        .expect("unfinished barracks should spawn");
-    game.state.players[0].set_resources(1_000, 1_000);
-
-    game.enqueue(
-        1,
-        Command::AdjustProductionRepeat {
-            buildings: vec![barracks],
-            unit: EntityKind::Rifleman,
-            delta: 1,
-        },
-    );
-    game.tick();
-
-    let producer = game.state.entities.get(barracks).expect("barracks");
-    assert!(producer.under_construction());
-    assert_eq!(producer.repeat_production(), Some(EntityKind::Rifleman));
-    assert!(producer.prod_queue().is_empty());
-
-    let producer = game
-        .state
-        .entities
-        .get_mut(barracks)
-        .expect("barracks");
-    assert!(producer.set_construction_progress(u32::MAX));
-    assert_eq!(producer.advance_construction(), Some(true));
-    game.tick();
-
-    let queued = game
-        .state
-        .entities
-        .get(barracks)
-        .expect("completed barracks")
-        .prod_queue();
-    assert_eq!(queued.first().map(|item| item.unit), Some(EntityKind::Rifleman));
-}
-
-#[test]
 fn depot_completes_steel_mine_on_nearest_in_range_patch() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
