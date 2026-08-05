@@ -8,7 +8,7 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 //   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
 //   → selection-rings → world-Y-sorted units/tree-canopies
-//   → forest-unit-outlines → smokes → hp-bars → fog → stealth-unit-outlines → visual-sample-labels
+//   → forest-unit-outlines → smokes → hp-bars → fog → concealment-unit-outlines → visual-sample-labels
 //   → shot-reveal-shadows → shot-reveals → above-fog-hp-bars
 //   → feedback/miss-toasts → placement-ghost → drag-box
 //
@@ -97,7 +97,7 @@ import { createUnitOutlineFilter } from "./unit_outline_filter.js";
 import {
   _attachForestUnitOutline,
   _destroyForestUnitOutlineGroup,
-  _drawStealthUnitOutlines,
+  _drawConcealmentUnitOutlines,
   _drawTreeOccludedUnitOutlines,
 } from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
@@ -187,8 +187,8 @@ export class Renderer {
     this.layers.units.sortableChildren = true;
     this.layers.forestUnitOutlines.sortableChildren = true;
     this._forestUnitOutlineGroups = new Map();
-    this._stealthUnitOutlineFilter = createUnitOutlineFilter(PIXI);
-    this.layers.stealthUnitOutlines.filters = [this._stealthUnitOutlineFilter];
+    this._concealmentUnitOutlineFilter = createUnitOutlineFilter(PIXI);
+    this.layers.concealmentUnitOutlines.filters = [this._concealmentUnitOutlineFilter];
     this._assetReadiness = new Map();
     this._doodads = new DoodadLayer({
       pixi: PIXI,
@@ -327,8 +327,8 @@ export class Renderer {
       liveShotRevealRigEffects: new Map(),
       forestUnitOutlineRigs: new Map(),
       forestUnitOutlineRigOverlays: new Map(),
-      stealthUnitOutlineRigs: new Map(),
-      stealthUnitOutlineRigOverlays: new Map(),
+      concealmentUnitOutlineRigs: new Map(),
+      concealmentUnitOutlineRigOverlays: new Map(),
       buildingPngShadows: new Map(),
       buildingRigs: new Map(),
     };
@@ -343,8 +343,8 @@ export class Renderer {
       liveShotRevealRigEffects: { poolName: "liveShotRevealRigEffects", layerName: "shotReveals" },
       forestUnitOutlineRigs: { poolName: "forestUnitOutlineRigs", layerName: "forestUnitOutlines" },
       forestUnitOutlineRigOverlays: { poolName: "forestUnitOutlineRigOverlays", layerName: "forestUnitOutlines" },
-      stealthUnitOutlineRigs: { poolName: "stealthUnitOutlineRigs", layerName: "stealthUnitOutlines" },
-      stealthUnitOutlineRigOverlays: { poolName: "stealthUnitOutlineRigOverlays", layerName: "stealthUnitOutlines" },
+      concealmentUnitOutlineRigs: { poolName: "concealmentUnitOutlineRigs", layerName: "concealmentUnitOutlines" },
+      concealmentUnitOutlineRigOverlays: { poolName: "concealmentUnitOutlineRigOverlays", layerName: "concealmentUnitOutlines" },
       buildingPngShadows: { poolName: "buildingPngShadows", layerName: "buildingShadows" },
       buildingRigs: { poolName: "buildingRigs", layerName: "buildings" },
     };
@@ -699,10 +699,10 @@ export class Renderer {
         }),
       );
     });
-    time("renderer.stealthUnitOutlines", () => {
+    time("renderer.concealmentUnitOutlines", () => {
       this._drawSafely(
-        "stealthUnitOutlines",
-        () => this._drawStealthUnitOutlines(regularEntities, state, colorByOwner, {
+        "concealmentUnitOutlines",
+        () => this._drawConcealmentUnitOutlines(regularEntities, state, colorByOwner, {
           visualUnitOverrides: visualUnitOverrideMap,
           visualFrameStripOverrides: visualFrameStripOverrideMap,
         }),
@@ -1235,9 +1235,9 @@ export class Renderer {
     for (const id of [...this._forestUnitOutlineGroups.keys()]) {
       this._destroyForestUnitOutlineGroup(id);
     }
-    this.layers.stealthUnitOutlines.filters = null;
-    this._stealthUnitOutlineFilter?.destroy?.();
-    this._stealthUnitOutlineFilter = null;
+    this.layers.concealmentUnitOutlines.filters = null;
+    this._concealmentUnitOutlineFilter?.destroy?.();
+    this._concealmentUnitOutlineFilter = null;
     destroyRendererTextureMap(this._livePngRigAtlasTextures);
     destroyRendererTextureMap(this._buildingPngRigAtlasTextures);
     destroyRendererTextureMap(this._liveFrameStripTextures);
@@ -1341,7 +1341,7 @@ Object.assign(Renderer.prototype, {
   _drawUnit,
   _attachForestUnitOutline,
   _destroyForestUnitOutlineGroup,
-  _drawStealthUnitOutlines,
+  _drawConcealmentUnitOutlines,
   _drawTreeOccludedUnitOutlines,
   _rigRenderContextFor,
   _drawShotRevealUnit,

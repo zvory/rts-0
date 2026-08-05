@@ -242,8 +242,8 @@ fn validate_materialized_binding(
     if authored.doodads != materialized.doodads {
         return Err("Authored and materialized doodads do not match.".to_string());
     }
-    if !tiles_match(&authored.stealth_tiles, &materialized.stealth_tiles) {
-        return Err("Authored and materialized stealth tiles do not match.".to_string());
+    if !tiles_match(&authored.concealment_tiles, &materialized.concealment_tiles) {
+        return Err("Authored and materialized concealment tiles do not match.".to_string());
     }
     if !tiles_match(&authored.no_vehicle_tiles, &materialized.no_vehicle_tiles) {
         return Err("Authored and materialized no-vehicle tiles do not match.".to_string());
@@ -356,7 +356,7 @@ mod tests {
                 starts,
                 base_sites,
                 doodads: Vec::new(),
-                stealth_tiles: Vec::new(),
+                concealment_tiles: Vec::new(),
                 no_vehicle_tiles: Vec::new(),
                 damage_reduction_tiles: Vec::new(),
                 slow_movement_tiles: Vec::new(),
@@ -423,7 +423,7 @@ mod tests {
     #[test]
     fn handoff_validation_binds_all_sparse_gameplay_layers_exactly() {
         let fields = [
-            ("stealthTiles", "stealth"),
+            ("concealmentTiles", "concealment"),
             ("noVehicleTiles", "no-vehicle"),
             ("damageReductionTiles", "damage-reduction"),
             ("slowMovementTiles", "slow-movement"),
@@ -433,7 +433,7 @@ mod tests {
             request.authored_map[field] = serde_json::json!([{"x": 20, "y": 20}]);
             let tile = MapTile { x: 20, y: 20 };
             match field {
-                "stealthTiles" => materialized(&mut request).stealth_tiles.push(tile),
+                "concealmentTiles" => materialized(&mut request).concealment_tiles.push(tile),
                 "noVehicleTiles" => materialized(&mut request).no_vehicle_tiles.push(tile),
                 "damageReductionTiles" => {
                     materialized(&mut request).damage_reduction_tiles.push(tile)
@@ -443,7 +443,7 @@ mod tests {
             }
             assert_eq!(validate_request(&request), Ok(()));
 
-            materialized(&mut request).stealth_tiles.clear();
+            materialized(&mut request).concealment_tiles.clear();
             materialized(&mut request).no_vehicle_tiles.clear();
             materialized(&mut request).damage_reduction_tiles.clear();
             materialized(&mut request).slow_movement_tiles.clear();
@@ -549,7 +549,7 @@ mod tests {
                 })
                 .collect(),
             doodads: Vec::new(),
-            stealth_tiles: Vec::new(),
+            concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),

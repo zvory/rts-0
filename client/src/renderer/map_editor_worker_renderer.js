@@ -222,7 +222,7 @@ export class MapEditorWorkerRenderer {
 }
 
 const OVERLAY_VISUALS = Object.freeze({
-  stealth: Object.freeze({ color: 0x2f9f78, icon: drawClosedEye }),
+  concealment: Object.freeze({ color: 0x2f9f78, icon: drawClosedEye }),
   noVehicle: Object.freeze({ color: 0xd94b45, icon: drawNoEntry }),
   damageReduction: Object.freeze({ color: 0x3e82d7, icon: drawHalfShield }),
   slowMovement: Object.freeze({ color: 0x8b5fc7, icon: drawMiredBoot }),
@@ -239,7 +239,7 @@ function drawGameplayOverlays(graphics, overlay, visibility) {
       byTile.set(key, entry);
     }
   };
-  add("stealth", overlay.stealthTiles, MAP_AUTHORING_LAYER.STEALTH);
+  add("concealment", overlay.concealmentTiles, MAP_AUTHORING_LAYER.CONCEALMENT);
   add("noVehicle", overlay.noVehicleTiles, MAP_AUTHORING_LAYER.NO_VEHICLE);
   add("damageReduction", overlay.damageReductionTiles, MAP_AUTHORING_LAYER.DAMAGE_REDUCTION);
   add("slowMovement", overlay.slowMovementTiles, MAP_AUTHORING_LAYER.SLOW_MOVEMENT);

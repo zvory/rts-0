@@ -20,7 +20,7 @@ export const LAYERS = [
   "smokes",
   "hpBars",
   "fog",
-  "stealthUnitOutlines",
+  "concealmentUnitOutlines",
   "visualSampleLabels",
   "shotRevealShadows",
   "shotReveals",

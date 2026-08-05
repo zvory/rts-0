@@ -1,7 +1,7 @@
 use super::super::*;
 
 fn authored_map_with_overlays(
-    stealth_tiles: serde_json::Value,
+    concealment_tiles: serde_json::Value,
     no_vehicle_tiles: serde_json::Value,
 ) -> String {
     serde_json::json!({
@@ -15,7 +15,7 @@ fn authored_map_with_overlays(
         "startLocations": [{"x": 8, "y": 8}],
         "baseSites": [{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}],
         "doodads": [],
-        "stealthTiles": stealth_tiles,
+        "concealmentTiles": concealment_tiles,
         "noVehicleTiles": no_vehicle_tiles,
         "damageReductionTiles": [],
         "slowMovementTiles": [],
@@ -58,17 +58,17 @@ fn authored_overlays_are_canonicalized_and_hash_as_distinct_layers() {
         serde_json::json!([{"x": 22, "y": 21}]),
     );
     let map = Map::from_authored_json(1, &json, 0).expect("valid authored overlays");
-    assert_eq!(map.stealth_tiles, vec![(19, 21), (20, 21)]);
+    assert_eq!(map.concealment_tiles, vec![(19, 21), (20, 21)]);
     assert_eq!(map.no_vehicle_tiles, vec![(22, 21)]);
 
-    let mut stealth_only = map.clone();
-    stealth_only.no_vehicle_tiles.clear();
-    stealth_only.stealth_tiles = vec![(22, 21)];
-    let mut no_vehicle_only = stealth_only.clone();
-    no_vehicle_only.stealth_tiles.clear();
+    let mut concealment_only = map.clone();
+    concealment_only.no_vehicle_tiles.clear();
+    concealment_only.concealment_tiles = vec![(22, 21)];
+    let mut no_vehicle_only = concealment_only.clone();
+    no_vehicle_only.concealment_tiles.clear();
     no_vehicle_only.no_vehicle_tiles = vec![(22, 21)];
     assert_ne!(
-        stealth_only.materialized_hash(),
+        concealment_only.materialized_hash(),
         no_vehicle_only.materialized_hash(),
         "the same coordinate in different gameplay layers must not collide",
     );

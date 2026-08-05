@@ -753,8 +753,8 @@ fn validate_map_container(
         .map_err(|reason| invalid(format!("{label}.map.data {reason}")))?;
     validate_overlay_tiles(
         label,
-        "stealthTiles",
-        &scenario.map.data.stealth_tiles,
+        "concealmentTiles",
+        &scenario.map.data.concealment_tiles,
         width,
         height,
         tile_count,

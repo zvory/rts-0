@@ -40,7 +40,7 @@ const DOODAD_TYPES = new Set([
 ]);
 const MAP_FIELDS = new Set([
   "version", "name", "description", "width", "height", "terrain", "startLocations",
-  "baseSites", "_design", "doodads", "stealthTiles", "noVehicleTiles",
+  "baseSites", "_design", "doodads", "concealmentTiles", "noVehicleTiles",
   "damageReductionTiles", "slowMovementTiles",
 ]);
 const START_FIELDS = new Set(["x", "y"]);
@@ -207,7 +207,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
     const blocked = blockedClearance(map, site, startKeys.has(locationKey(site)) ? 7 : 4);
     if (blocked) warnings.push(`base (${site.x},${site.y}) has ${blocked.reason} in its protected area at (${blocked.x},${blocked.y})`);
   }
-  for (const field of ["stealthTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
+  for (const field of ["concealmentTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
     const locations = map[field] === undefined ? [] : map[field];
     if (!Array.isArray(locations)) {
       warnings.push(`${field} must be an array`);
@@ -318,9 +318,9 @@ export function renderPreviewSvg(map, { tilePixels = 5, layers = "all" } = {}) {
     }
     elements.push("</g>");
   }
-  appendSemanticTileLayer(elements, map.stealthTiles, {
-    id: MAP_AUTHORING_LAYER.STEALTH,
-    visible: visibility[MAP_AUTHORING_LAYER.STEALTH],
+  appendSemanticTileLayer(elements, map.concealmentTiles, {
+    id: MAP_AUTHORING_LAYER.CONCEALMENT,
+    visible: visibility[MAP_AUTHORING_LAYER.CONCEALMENT],
     width,
     height,
     fill: "#2d8c64",

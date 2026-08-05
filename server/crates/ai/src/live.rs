@@ -628,7 +628,7 @@ mod tests {
                     y: crate::config::TILE_SIZE as f32 * 1.5,
                 }],
                 doodads: Vec::new(),
-                stealth_tiles: Vec::new(),
+                concealment_tiles: Vec::new(),
                 no_vehicle_tiles: Vec::new(),
                 damage_reduction_tiles: Vec::new(),
                 slow_movement_tiles: Vec::new(),

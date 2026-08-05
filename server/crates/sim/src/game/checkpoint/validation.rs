@@ -291,6 +291,26 @@ pub(super) fn validate_fog(
         }
     }
     validate_firing_reveal_visibility(fog, player_ids, entity_next_id, tick)?;
+    for (&viewer, by_entity) in &fog.concealment_detection_until {
+        if !player_ids.contains(&viewer) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "fog.concealmentDetectionUntil",
+                id: viewer,
+            });
+        }
+        for (&entity_id, &expires_at) in by_entity {
+            if entity_id == 0
+                || entity_id >= entity_next_id
+                || expires_at <= tick
+                || expires_at
+                    > tick.saturating_add(rules::terrain::CONCEALMENT_DETECTION_PERSIST_TICKS)
+            {
+                return Err(CheckpointPayloadError::InvalidValue {
+                    field: "fog.concealmentDetectionUntil",
+                });
+            }
+        }
+    }
     Ok(())
 }
 

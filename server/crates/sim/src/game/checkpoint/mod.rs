@@ -45,9 +45,9 @@ struct PlayerCheckpointRef<'a, T> {
 
 const CHECKPOINT_SCHEMA: &str = "rts.gameCheckpoint";
 const CHECKPOINT_VERSION: u32 = rts_contract::GAME_CHECKPOINT_CURRENT_VERSION;
-// Construction funding and tank-trail ownership are authoritative state. Keep older payloads
-// outside this compatibility boundary instead of silently guessing missing fields.
-const SIM_SCHEMA_VERSION: u32 = 4;
+// Construction funding, tank-trail ownership, and concealment detection are authoritative state.
+// Keep older payloads outside this boundary instead of silently guessing missing fields.
+const SIM_SCHEMA_VERSION: u32 = 5;
 const RULES_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const RNG_ALGORITHM: &str = "rts-small-rng-0.8-draws-v1";
@@ -440,6 +440,8 @@ struct FogStateV1 {
     #[serde(default)]
     explored_grids: BTreeMap<u32, Vec<bool>>,
     firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
+    #[serde(default)]
+    concealment_detection_until: BTreeMap<u32, BTreeMap<u32, u32>>,
 }
 
 impl FogStateV1 {
@@ -451,6 +453,7 @@ impl FogStateV1 {
             grids: fog.checkpoint_grids(),
             explored_grids: fog.checkpoint_explored_grids(),
             firing_reveal_visibility: fog.checkpoint_firing_reveal_visibility(),
+            concealment_detection_until: fog.checkpoint_concealment_detection_until(),
         }
     }
 
@@ -461,6 +464,7 @@ impl FogStateV1 {
             self.grids,
             self.explored_grids,
             self.firing_reveal_visibility,
+            self.concealment_detection_until,
         )
     }
 }

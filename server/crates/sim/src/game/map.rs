@@ -30,7 +30,7 @@ pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
 /// The only map schema version this server accepts. Bump when the schema changes incompatibly.
-pub const CURRENT_MAP_VERSION: u32 = 6;
+pub const CURRENT_MAP_VERSION: u32 = 7;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -71,7 +71,7 @@ pub struct Map {
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
     pub doodads: Vec<MapDoodad>,
     /// Canonical sparse tile coordinates granting unit concealment.
-    pub stealth_tiles: Vec<(u32, u32)>,
+    pub concealment_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
     pub no_vehicle_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing incoming damage to occupants by 25%.
@@ -201,7 +201,7 @@ impl Map {
             hash = fnv_bytes(hash, &counts.oil_patches.to_le_bytes());
         }
         hash = doodads::hash_materialized(hash, &self.doodads);
-        hash = hash_tiles(hash, b"stealth", &self.stealth_tiles);
+        hash = hash_tiles(hash, b"concealment", &self.concealment_tiles);
         hash = hash_tiles(hash, b"no-vehicle", &self.no_vehicle_tiles);
         hash = hash_tiles(hash, b"damage-reduction", &self.damage_reduction_tiles);
         hash = hash_tiles(hash, b"slow-movement", &self.slow_movement_tiles);
@@ -296,8 +296,8 @@ impl Map {
     }
 
     #[inline]
-    fn is_stealth_tile(&self, x: u32, y: u32) -> bool {
-        self.stealth_tiles.binary_search(&(x, y)).is_ok()
+    pub(crate) fn is_concealment_tile(&self, x: u32, y: u32) -> bool {
+        self.concealment_tiles.binary_search(&(x, y)).is_ok()
     }
 
     #[inline]
@@ -311,10 +311,10 @@ impl Map {
     }
 
     #[inline]
-    pub(crate) fn world_point_is_stealth(&self, x: f32, y: f32) -> bool {
+    pub(crate) fn world_point_is_concealed(&self, x: f32, y: f32) -> bool {
         self.contains_world_point(x, y) && {
             let (tx, ty) = self.tile_of(x, y);
-            self.is_stealth_tile(tx, ty)
+            self.is_concealment_tile(tx, ty)
         }
     }
 
@@ -341,7 +341,7 @@ impl Map {
     ) -> (Vec<MapTile>, Vec<MapTile>, Vec<MapTile>, Vec<MapTile>) {
         let convert = |tiles: &[(u32, u32)]| tiles.iter().map(|&(x, y)| MapTile { x, y }).collect();
         (
-            convert(&self.stealth_tiles),
+            convert(&self.concealment_tiles),
             convert(&self.no_vehicle_tiles),
             convert(&self.damage_reduction_tiles),
             convert(&self.slow_movement_tiles),
@@ -781,7 +781,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 6,
+              "version": 7,
               "name": "bad",
               "width": 2,
               "height": 2,
@@ -806,7 +806,7 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 6,
+              "version": 7,
               "name": "bad-base",
               "width": 32,
               "height": 32,
@@ -832,7 +832,7 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 6,
+              "version": 7,
               "name": "road-base",
               "width": 32,
               "height": 32,
@@ -855,7 +855,7 @@ mod tests {
     fn current_authored_map_materializes_rectangular_dimensions() {
         let rows = vec![".".repeat(30); 20];
         let json = serde_json::json!({
-            "version": 6,
+            "version": 7,
             "name": "wide-test",
             "width": 30,
             "height": 20,
@@ -889,7 +889,7 @@ mod tests {
     fn current_dimensions_must_match_terrain_shape() {
         let rows = vec![".".repeat(30); 20];
         let json = serde_json::json!({
-            "version": 6,
+            "version": 7,
             "name": "mismatched-test",
             "width": 20,
             "height": 30,

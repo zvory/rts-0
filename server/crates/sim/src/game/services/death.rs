@@ -109,7 +109,7 @@ pub(crate) fn death_system(
         }
         record_score_death(players, dead.owner, dead.kind, dead.killer);
         let concealed_unit =
-            config::unit_stats(dead.kind).is_some() && map.world_point_is_stealth(dead.x, dead.y);
+            config::unit_stats(dead.kind).is_some() && map.world_point_is_concealed(dead.x, dead.y);
         if !concealed_unit {
             ground_decals.create_death(
                 dead.kind,

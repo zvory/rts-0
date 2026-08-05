@@ -50,12 +50,12 @@ const FOREST_OUTLINE_POOL_PROFILE = Object.freeze({
   omitEffects: true,
 });
 
-const STEALTH_OUTLINE_POOL_PROFILE = Object.freeze({
-  familyKey: "stealthUnitOutline",
-  liveRigUnit: "stealthUnitOutlineRigs",
-  unit: "stealthUnitOutlines",
-  liveRigOverlay: "stealthUnitOutlineRigOverlays",
-  overlay: "stealthUnitOutlines",
+const CONCEALMENT_OUTLINE_POOL_PROFILE = Object.freeze({
+  familyKey: "concealmentUnitOutline",
+  liveRigUnit: "concealmentUnitOutlineRigs",
+  unit: "concealmentUnitOutlines",
+  liveRigOverlay: "concealmentUnitOutlineRigOverlays",
+  overlay: "concealmentUnitOutlines",
   omitShadow: true,
   omitEffects: true,
 });
@@ -64,7 +64,7 @@ const ROUTE_PLAN_CACHE = new Map([
   [DEFAULT_POOL_PROFILE, new Map()],
   [SHOT_REVEAL_POOL_PROFILE, new Map()],
   [FOREST_OUTLINE_POOL_PROFILE, new Map()],
-  [STEALTH_OUTLINE_POOL_PROFILE, new Map()],
+  [CONCEALMENT_OUTLINE_POOL_PROFILE, new Map()],
 ]);
 
 const LIVE_RIG_SOURCES = Object.freeze([
@@ -265,8 +265,8 @@ function knownPoolProfile(pools) {
   if (usesProfile(pools, FOREST_OUTLINE_POOL_PROFILE) && matchesPoolProfile(pools, FOREST_OUTLINE_POOL_PROFILE)) {
     return FOREST_OUTLINE_POOL_PROFILE;
   }
-  if (usesProfile(pools, STEALTH_OUTLINE_POOL_PROFILE) && matchesPoolProfile(pools, STEALTH_OUTLINE_POOL_PROFILE)) {
-    return STEALTH_OUTLINE_POOL_PROFILE;
+  if (usesProfile(pools, CONCEALMENT_OUTLINE_POOL_PROFILE) && matchesPoolProfile(pools, CONCEALMENT_OUTLINE_POOL_PROFILE)) {
+    return CONCEALMENT_OUTLINE_POOL_PROFILE;
   }
   if (matchesPoolProfile(pools, DEFAULT_POOL_PROFILE)) return DEFAULT_POOL_PROFILE;
   return null;

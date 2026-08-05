@@ -1023,7 +1023,7 @@ edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
-The Gameplay overlays palette can select any combination of Stealth, No vehicles, Damage reduction,
+The Gameplay overlays palette can select any combination of Concealment, No vehicles, Damage reduction,
 and Slowed movement, then paint or erase the selected layers in one brush or box stroke. There is no
 Forest tile; authors compose its semantics from the independent layers. The viewport uses green, red, blue, and purple respectively,
 with a closed eye, no-entry sign, half shield, and mired boot on every affected tile. A single
@@ -1034,7 +1034,7 @@ overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON 
 Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
 
 The editor's compact floating Layers panel independently toggles eight presentation-only authoring
-layers in a two-column grid: Terrain & bases, Stealth, No vehicles, Damage reduction, Slowed
+layers in a two-column grid: Terrain & bases, Concealment, No vehicles, Damage reduction, Slowed
 movement, Trees, Gameplay doodads, and Decorative doodads. Full labels and descriptions remain available through accessible checkbox names
 and hover tooltips when narrow panel geometry truncates visible text. Tank Traps are gameplay
 doodads; wildflowers are decorative doodads. Visibility never mutates the draft, export, undo
@@ -1052,7 +1052,7 @@ Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
 deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved; the
 erase brush removes them continuously. Symmetry applies when placing and erasing doodads, while undo/redo
-apply to all authored doodads. Trees retain only their tiny trunk collision; a dense tree grouping's stealth and vehicle
+apply to all authored doodads. Trees retain only their tiny trunk collision; a dense tree grouping's concealment and vehicle
 exclusion come from independent gameplay overlays. Trees do not change line of sight, cover, or
 combat damage, and wildflowers remain mechanically inert.
 
@@ -2281,7 +2281,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   unit intersects a tree canopy in front of it, the renderer redraws that unit's current production
   rig/frame into an alpha-only filter that emits a white outer edge and an 85%-opacity flat
   owner/team-color silhouette above the canopy. Friendly, allied, and visible enemy units use their
-  respective owner colors. Authoritative `visionOnly` stealth reveals
+  respective owner colors. Authoritative `visionOnly` concealment reveals
   omit their rig from the normal full-color layer and route the same current rig/frame through a
   dedicated white-edge-only filtered outline layer above fog and canopies; damaged reveal HP stays
   above fog as well. These readability passes use only already-admitted entities and do not reveal

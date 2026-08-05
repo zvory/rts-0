@@ -832,18 +832,18 @@ try {
       editorUi.layerPanel?.outsideTools && editorUi.layerPanel.columns === 2 &&
       editorUi.layerPanel.height < 180 && editorUi.layerPanel.maxToggleHeight < 32 &&
       editorUi.layerPanel.movePreservedSize &&
-      ["Terrain & bases", "Stealth", "No vehicles", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
+      ["Terrain & bases", "Concealment", "No vehicles", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)) &&
-      ["Stealth", "No vehicles", "Damage reduction", "Slowed movement"]
+      ["Concealment", "No vehicles", "Damage reduction", "Slowed movement"]
         .every((label) => editorUi.overlayEffects.some((effect) => effect.label === label)) &&
-      editorUi.overlayEffects.filter((effect) => effect.checked).map((effect) => effect.label).join(",") === "Stealth" &&
+      editorUi.overlayEffects.filter((effect) => effect.checked).map((effect) => effect.label).join(",") === "Concealment" &&
       ["Paint selected", "Erase selected"].every((label) => editorUi.overlayTools.includes(label)),
     `MAP EDITOR: compact floating Layers panel exposes eight independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
   );
-  await editorPage.click("input[aria-label='Show Stealth']");
-  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === false);
-  await editorPage.click("input[aria-label='Show Stealth']");
-  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === true);
+  await editorPage.click("input[aria-label='Show Concealment']");
+  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().concealment === false);
+  await editorPage.click("input[aria-label='Show Concealment']");
+  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().concealment === true);
   ok(true, "MAP EDITOR: layer checkbox changes reach the live worker presentation path");
   ok(
     editorUi.actionButtons.includes("Load map JSON") &&

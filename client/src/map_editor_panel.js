@@ -64,7 +64,7 @@ export class MapEditorPanel {
     this.selectedBaseIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
-    this.selectedOverlayEffects = new Set(["stealth"]);
+    this.selectedOverlayEffects = new Set(["concealment"]);
     this.overlayMode = "paint";
     this.roadWidth = 5;
     this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.TREE_OAK;
@@ -454,7 +454,7 @@ export class MapEditorPanel {
     const palette = document.createElement("div");
     palette.className = "map-editor-palette";
     for (const [key, label] of [
-      ["stealth", "Stealth"],
+      ["concealment", "Concealment"],
       ["noVehicle", "No vehicles"],
       ["damageReduction", "Damage reduction"],
       ["slowMovement", "Slowed movement"],
@@ -483,7 +483,7 @@ export class MapEditorPanel {
       }),
     );
     section.append(
-      readout(`${this.session.draft.stealthTiles.length} stealth; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
+      readout(`${this.session.draft.concealmentTiles.length} concealment; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
       readout("Select any combination, then paint or erase all selected effects in one stroke. Damage reduction and slowed movement each reduce their affected value by 25%."),
       palette,
       actions,
@@ -1073,7 +1073,7 @@ function overlayEffectName(key) {
   if (key === "noVehicle") return "no vehicles";
   if (key === "damageReduction") return "damage reduction";
   if (key === "slowMovement") return "slowed movement";
-  return "stealth";
+  return "concealment";
 }
 
 function authoredMapFingerprint(map) {

@@ -273,7 +273,13 @@ pub(crate) fn unit_explicit_attack_target_valid(
     crate::rules::target::default_weapon_can_target(attacker.kind, target.kind)
         && explicit_attack_target_inside_fixed_arc(attacker, target)
         && is_explicit_attack_targetable(target, teams, attacker_owner, attacker_id)
-        && !projection::entity_hidden_by_stealth_from_team(attacker_owner, target, map, fog, teams)
+        && !projection::entity_hidden_by_concealment_from_team(
+            attacker_owner,
+            target,
+            map,
+            fog,
+            teams,
+        )
         && target_team_visible
         && smokes.is_none_or(|smokes| {
             smokes.units_have_melee_visibility(attacker, target)

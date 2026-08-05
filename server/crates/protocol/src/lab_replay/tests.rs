@@ -65,7 +65,7 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
                 ],
                 base_sites: Vec::new(),
                 doodads: Vec::new(),
-                stealth_tiles: Vec::new(),
+                concealment_tiles: Vec::new(),
                 no_vehicle_tiles: Vec::new(),
                 damage_reduction_tiles: Vec::new(),
                 slow_movement_tiles: Vec::new(),
@@ -470,7 +470,7 @@ fn lab_replay_artifact_rejects_invalid_sparse_overlay_tiles() {
         ),
     ] {
         let mut artifact = valid_artifact();
-        artifact.initial_setup.map.data.stealth_tiles = tiles;
+        artifact.initial_setup.map.data.concealment_tiles = tiles;
 
         let error = validate_lab_replay_artifact(&artifact)
             .expect_err("invalid sparse overlay tiles must be rejected at the protocol boundary");

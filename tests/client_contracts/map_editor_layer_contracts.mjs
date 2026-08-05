@@ -15,9 +15,9 @@ assert.equal(mapAuthoringDoodadLayer("tree.oak"), MAP_AUTHORING_LAYER.TREES);
 assert.equal(mapAuthoringDoodadLayer("unit.tank_trap"), MAP_AUTHORING_LAYER.GAMEPLAY_DOODADS);
 assert.equal(mapAuthoringDoodadLayer("wildflower.cluster"), MAP_AUTHORING_LAYER.DECORATIVE_DOODADS);
 assert.deepEqual(
-  Object.entries(mapAuthoringLayerVisibilityFromSelection("stealth,trees"))
+  Object.entries(mapAuthoringLayerVisibilityFromSelection("concealment,trees"))
     .filter(([, visible]) => visible).map(([id]) => id),
-  [MAP_AUTHORING_LAYER.STEALTH, MAP_AUTHORING_LAYER.TREES],
+  [MAP_AUTHORING_LAYER.CONCEALMENT, MAP_AUTHORING_LAYER.TREES],
   "layer selection isolates an exact semantic subset",
 );
 assert.throws(() => mapAuthoringLayerVisibilityFromSelection("forest"), /Unsupported map authoring layer/,
@@ -29,12 +29,12 @@ const viewport = {
   drawOverlay() { redraws += 1; },
 };
 assert.equal(MapEditorViewport.prototype.setLayerVisibility.call(
-  viewport, MAP_AUTHORING_LAYER.STEALTH, false,
+  viewport, MAP_AUTHORING_LAYER.CONCEALMENT, false,
 ), true);
-assert.equal(viewport.layerVisibility[MAP_AUTHORING_LAYER.STEALTH], false);
+assert.equal(viewport.layerVisibility[MAP_AUTHORING_LAYER.CONCEALMENT], false);
 assert.equal(redraws, 1, "visibility changes enqueue a fresh worker-owned editor presentation");
 assert.equal(MapEditorViewport.prototype.setLayerVisibility.call(
-  viewport, MAP_AUTHORING_LAYER.STEALTH, false,
+  viewport, MAP_AUTHORING_LAYER.CONCEALMENT, false,
 ), false, "reapplying the same visibility is a no-op");
 
 console.log("✅ map_editor_layer_contracts.mjs: shared layer vocabulary and viewport switches passed");

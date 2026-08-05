@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "width": 166,
   "height": 166,
   "name": "4 Player Map",
@@ -289,7 +289,7 @@
       "oilPatches": 3
     }
   ],
-  "stealthTiles": [],
+  "concealmentTiles": [],
   "noVehicleTiles": [],
   "doodads": []
 }

@@ -541,7 +541,7 @@ impl Game {
             .map(|tile| (tile.x, tile.y))
             .collect();
         let base_resource_counts = map_draft::resource_counts(&draft, name)?;
-        let (stealth_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
+        let (concealment_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
             map_draft::canonical_overlays(&draft, name)?;
         let doodads = map_draft::canonical_doodads(draft.width, draft.height, draft.doodads, name)?;
         let mut occupied_sites = std::collections::HashSet::new();
@@ -578,7 +578,7 @@ impl Game {
             base_sites,
             base_resource_counts,
             doodads,
-            stealth_tiles,
+            concealment_tiles,
             no_vehicle_tiles,
             damage_reduction_tiles,
             slow_movement_tiles,
