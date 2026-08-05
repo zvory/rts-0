@@ -165,7 +165,7 @@ fn current_authored_schema_requires_forest_spans() {
         .remove("forestSpans");
 
     let error = Map::materialize_authored_json(&authored.to_string(), 1)
-        .expect_err("schema-v7 maps must declare forestSpans");
+        .expect_err("schema-v8 maps must declare forestSpans");
     assert!(
         error.contains("forestSpans must be an array"),
         "error was: {error}"

@@ -984,7 +984,7 @@ the advisory and authoritative checks can report the author's actual input. Inte
 painting is still rejected in protected footprints, and moving or adding a location makes its
 footprint passable. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
-shifts start/base locations with the centered source map. Authored v7 maps and materialized Lab
+shifts start/base locations with the centered source map. Authored v8 maps and materialized Lab
 handoffs carry explicit `width` and `height`; older authored schemas are rejected. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
 player starts there. The selected starting or neutral base exposes integer Steel (0–36) and Oil
@@ -1027,7 +1027,7 @@ Forest painting is the single source for its tree scatter and all four gameplay 
 stores the exact tile area as compact inclusive `[y, xStart, xEnd]` row spans; generated trees use
 reserved deterministic ids, while ordinary doodads remain independently authored. Symmetry expands
 the forest stroke before the span mask is updated. Erasing removes both the semantic area and only
-the forest-owned trees. Authored schemas before v7 are rejected rather than migrated.
+the forest-owned trees. Authored schemas before v8 are rejected rather than migrated.
 
 Generated-tree placement uses the visible foliage bounds shared with the doodad renderer, including
 the renderer's deterministic size variation. Interior canopies must remain substantially within the

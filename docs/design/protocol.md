@@ -1423,7 +1423,7 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV7,
+  authoredMap: AuthoredMapV8,
   materializedMap: {
     name: string,
     width: u32,
@@ -1442,15 +1442,15 @@ POST /api/map-handoffs
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV7 }
+ | { destination: "editor", authoredMap: AuthoredMapV8 }
 ```
-`AuthoredMapV7` declares independent `width` and `height` tile dimensions, whose product must
+`AuthoredMapV8` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
 `doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `damageReductionTiles`, and
 `slowMovementTiles` arrays. A forest span is `[y, xStart, xEnd]` with inclusive bounds; spans may
 not overlap and materialize into all four gameplay layers. Explicit overlay records remain bounded,
 unique, in-bounds tile-coordinate pairs and can independently supplement forest-derived layers.
-Schema v7 is the only accepted authored-map schema. Older documents are rejected rather than
+Schema v8 is the only accepted authored-map schema. Older documents are rejected rather than
 migrated, and every shipped map declares `forestSpans` even when it is empty.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
@@ -1468,7 +1468,7 @@ cluster. Wildflowers have no collision or pathing effect.
 Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
 setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
 rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
-schema-v7 forest spans jointly supply concealment, vehicle exclusion, 25% incoming-damage reduction,
+schema-v8 forest spans jointly supply concealment, vehicle exclusion, 25% incoming-damage reduction,
 and 25% movement-speed reduction; independent explicit overlays can supply any subset outside a
 forest. The damage and movement effects are selected from the tile
 beneath the entity centre.

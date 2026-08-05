@@ -182,17 +182,48 @@ export function forestTreeFoliageCoverage(record, spans, dimensions) {
 }
 
 export function isGeneratedForestDoodad(record, dimensions) {
+  return forestOwnedDoodadIds([record], dimensions).has(Number(record?.id));
+}
+
+export function forestOwnedDoodadIds(records, dimensions, { maxDoodads = 4_096 } = {}) {
+  const source = Array.isArray(records) ? records : [];
+  const candidates = source.filter((record) => isForestDoodadCandidate(record, dimensions));
+  if (!candidates.length) return new Set();
+  const definiteManualCount = source.length - candidates.length;
+  const generated = generatedForestDoodads(dimensions?.forestSpans, dimensions, {
+    max: Math.max(0, Math.trunc(maxDoodads) - definiteManualCount),
+  });
+  const expectedById = new Map(generated.map((record) => [record.id, record]));
+  return new Set(candidates.filter((record) => (
+    sameGeneratedDoodad(record, expectedById.get(Number(record.id)))
+  )).map((record) => Number(record.id)));
+}
+
+function isForestDoodadCandidate(record, dimensions) {
   const id = Number(record?.id);
   const map = normalizeDimensions(dimensions);
-  if (
+  return Boolean(
     !map
-    || !TREE_TYPES.includes(record?.typeId)
-    || !Number.isSafeInteger(id)
-    || id <= FOREST_DOODAD_ID_BASE
-    || id > FOREST_DOODAD_ID_BASE + map.width * map.height
-  ) return false;
-  const index = id - FOREST_DOODAD_ID_BASE - 1;
-  return forestSpansContainTile(dimensions?.forestSpans, index % map.width, Math.floor(index / map.width));
+      ? false
+      : TREE_TYPES.includes(record?.typeId)
+        && Number.isSafeInteger(id)
+        && id > FOREST_DOODAD_ID_BASE
+        && id <= FOREST_DOODAD_ID_BASE + map.width * map.height
+        && forestSpansContainTile(
+          dimensions?.forestSpans,
+          (id - FOREST_DOODAD_ID_BASE - 1) % map.width,
+          Math.floor((id - FOREST_DOODAD_ID_BASE - 1) / map.width),
+        )
+  );
+}
+
+function sameGeneratedDoodad(record, expected) {
+  if (!expected) return false;
+  return Number(record.id) === expected.id
+    && record.typeId === expected.typeId
+    && Number(record.x) === expected.x
+    && Number(record.y) === expected.y
+    && record.color == null;
 }
 
 function bestBoundaryTreeType(orbit, canonicalKey, map, tileSet) {

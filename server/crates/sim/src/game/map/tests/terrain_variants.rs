@@ -6,7 +6,7 @@ fn authored_map_accepts_visual_open_terrain_variants() {
     rows[8].replace_range(3..13, "0123456789");
     let json = format!(
         r#"{{
-          "version": 7,
+          "version": 8,
           "name": "open-variants",
           "width": 32,
           "height": 32,

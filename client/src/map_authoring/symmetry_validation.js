@@ -1,5 +1,5 @@
 import { transformRoadCharacter } from "./operations.js";
-import { forestTilesFromSpans, isGeneratedForestDoodad } from "./forests.js";
+import { forestOwnedDoodadIds, forestTilesFromSpans } from "./forests.js";
 import {
   MAP_AUTHORING_SYMMETRY,
   expandSymmetricPoints,
@@ -37,8 +37,9 @@ export function mapSymmetryWarnings(map, symmetry = MAP_AUTHORING_SYMMETRY.NONE)
   // Forest symmetry is authoritative at the tile-mask level above. Generated trees remain
   // upright and align their asymmetric vertical foliage bounds to the mask perimeter, so their
   // grounded root coordinates are intentionally not geometric symmetry partners.
+  const forestDoodadIds = forestOwnedDoodadIds(map.doodads, map);
   const manualDoodads = Array.isArray(map.doodads)
-    ? map.doodads.filter((record) => !isGeneratedForestDoodad(record, map))
+    ? map.doodads.filter((record) => !forestDoodadIds.has(Number(record.id)))
     : map.doodads;
   pushDoodadWarnings(warnings, manualDoodads, dimensions, symmetry);
   return warnings;

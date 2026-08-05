@@ -441,7 +441,7 @@ assert(
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
-  assert.equal(session.exportMap().version, 7);
+  assert.equal(session.exportMap().version, 8);
   assert.deepEqual({ width: materialized.width, height: materialized.height }, { width: 126, height: 126 });
   assert.equal(session.exportMap().layouts, undefined, "flat map data has no layout matrix");
   assert.equal(materialized.starts.length, 2);
@@ -1192,7 +1192,7 @@ assert(
   const request = [];
   await createMapHandoff({
     destination: "lab",
-    authoredMap: { version: 7 },
+    authoredMap: { version: 8 },
     materializedMap: { width: 32, height: 16, starts: [], baseSites: [], doodads: [] },
     fetchImpl: async (_url, init) => {
       request.push(JSON.parse(init.body));
@@ -1300,7 +1300,7 @@ assert(
 {
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
-  assert.equal(session.exportMap().version, 7);
+  assert.equal(session.exportMap().version, 8);
   assert.deepEqual(session.materialized().doodads, []);
   session.beginDoodadStroke("Sprayed flowers");
   const added = session.placeDoodads([{ x: 100, y: 120 }, { x: 140, y: 150 }], {

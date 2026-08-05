@@ -30,7 +30,7 @@ pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
 /// The only authored-map schema accepted by this build.
-pub const CURRENT_MAP_VERSION: u32 = 7;
+pub const CURRENT_MAP_VERSION: u32 = 8;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -761,7 +761,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 6,
+              "version": 7,
               "name": "previous",
               "width": 2,
               "height": 1,
@@ -777,7 +777,7 @@ mod tests {
         )
         .expect_err("the previous schema should be rejected");
 
-        assert!(err.contains("requires version 7"), "error was: {err}");
+        assert!(err.contains("requires version 8"), "error was: {err}");
     }
 
     #[test]
@@ -807,7 +807,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 7,
+              "version": 8,
               "name": "bad",
               "width": 2,
               "height": 2,
@@ -833,7 +833,7 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 7,
+              "version": 8,
               "name": "bad-base",
               "width": 32,
               "height": 32,
@@ -842,7 +842,8 @@ mod tests {
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -859,7 +860,7 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 7,
+              "version": 8,
               "name": "road-base",
               "width": 32,
               "height": 32,

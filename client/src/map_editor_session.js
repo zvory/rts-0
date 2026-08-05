@@ -10,11 +10,10 @@ import { applyMapOperation, transformRoadCharacter } from "./map_authoring/opera
 import { rectTiles } from "./map_authoring/geometry.js";
 import {
   editForestSpans,
-  FOREST_DOODAD_ID_BASE,
+  forestOwnedDoodadIds,
   forestSpansFromTiles,
   forestTilesFromSpans,
   generatedForestDoodads,
-  isGeneratedForestDoodad,
   normalizeForestSpans,
 } from "./map_authoring/forests.js";
 import {
@@ -50,7 +49,7 @@ export const MAP_EDITOR_MAX_SIZE = AUTHORED_MAP_MAX_DIMENSION_TILES;
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
 export const MAP_EDITOR_SYMMETRY = MAP_AUTHORING_SYMMETRY;
-export const MAP_EDITOR_MAP_VERSION = 7;
+export const MAP_EDITOR_MAP_VERSION = 8;
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -373,7 +372,7 @@ export class MapEditorSession {
 
   beginOverlayStroke(label = "Painted map overlay") {
     if (!this.draft || this.overlayStroke) return false;
-    this.overlayStroke = { label, before: clone(this.draft), dirty: new Map() };
+    this.overlayStroke = { label, before: clone(this.draft), dirty: new Map(), strippedForestDoodads: false };
     return true;
   }
 
@@ -393,13 +392,14 @@ export class MapEditorSession {
     if (!this.draft || !this.overlayStroke || !Array.isArray(tiles)) return [];
     const result = editForestSpans(this.draft.forestSpans, tiles, paint, this.draft);
     if (!result.changed.length) return [];
-    this.draft.forestSpans = result.spans;
-    if (!paint) {
-      const erasedIds = new Set(result.changed.map((tile) => (
-        FOREST_DOODAD_ID_BASE + tile.y * this.draft.width + tile.x + 1
-      )));
-      this.draft.doodads = this.draft.doodads.filter((doodad) => !erasedIds.has(doodad.id));
+    if (!this.overlayStroke.strippedForestDoodads) {
+      const ownedIds = forestOwnedDoodadIds(this.draft.doodads, this.draft, {
+        maxDoodads: MAP_EDITOR_MAX_DOODADS,
+      });
+      this.draft.doodads = this.draft.doodads.filter((doodad) => !ownedIds.has(Number(doodad.id)));
+      this.overlayStroke.strippedForestDoodads = true;
     }
+    this.draft.forestSpans = result.spans;
     for (const tile of result.changed) this.overlayStroke.dirty.set(locationKey(tile), tile);
     return result.changed;
   }
@@ -825,7 +825,10 @@ function resizeDraftCentered(source, width, height) {
   const shift = (location) => ({ ...location, x: location.x + offsetX, y: location.y + offsetY });
   const startLocations = source.startLocations.map(shift);
   const baseSites = source.baseSites.map(shift);
-  const doodads = (source.doodads || []).filter((doodad) => !isGeneratedForestDoodad(doodad, source)).map((doodad) => ({
+  const forestDoodadIds = forestOwnedDoodadIds(source.doodads, source, {
+    maxDoodads: MAP_EDITOR_MAX_DOODADS,
+  });
+  const doodads = (source.doodads || []).filter((doodad) => !forestDoodadIds.has(Number(doodad.id))).map((doodad) => ({
     ...copyDoodad(doodad),
     x: doodad.x + offsetX * 32,
     y: doodad.y + offsetY * 32,
@@ -890,11 +893,16 @@ function mergedOverlayTiles(explicit, forest) {
 }
 
 function reconcileForestDoodads(draft) {
-  const manual = (draft.doodads || []).filter((doodad) => !isGeneratedForestDoodad(doodad, draft));
+  const ownedIds = forestOwnedDoodadIds(draft.doodads, draft, {
+    maxDoodads: MAP_EDITOR_MAX_DOODADS,
+  });
+  const manual = (draft.doodads || []).filter((doodad) => !ownedIds.has(Number(doodad.id)));
+  const manualIds = new Set(manual.map((doodad) => Number(doodad.id)));
   const available = Math.max(0, MAP_EDITOR_MAX_DOODADS - manual.length);
   draft.doodads = normalizeDraftDoodads([
     ...manual,
-    ...generatedForestDoodads(draft.forestSpans, draft, { max: available }),
+    ...generatedForestDoodads(draft.forestSpans, draft, { max: available })
+      .filter((doodad) => !manualIds.has(doodad.id)),
   ], draft);
 }
 

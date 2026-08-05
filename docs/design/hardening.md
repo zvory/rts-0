@@ -16,7 +16,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   ascending unique nonzero ids after authored-map canonicalization, allow only the server catalog,
   bound integer world-pixel coordinates to the map, reject color on trees, and accept only optional
   canonical lowercase `#rrggbb` wildflower colors. Authored maps and handoff DTOs deny unknown
-  fields. Schema-v7 forest spans require in-bounds inclusive x ranges and reject overlap; their
+  fields. Schema-v8 forest spans require in-bounds inclusive x ranges and reject overlap; their
   expanded area is inherently capped by the 256-by-256 map. The existing 512 KiB authored-map and
   4 MiB Lab setup caps apply before mutation.
 - **Map authoring analysis bounds** (`map_authoring_analysis.rs` and
