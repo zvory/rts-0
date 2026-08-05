@@ -1005,6 +1005,8 @@ it. Enabling a unit appends it to the list if absent, disabling it removes only 
 production cancel clears the whole list before removing the latest queued item. The list and its
 next-unit cursor are durable entity state, so checkpoints, replay branches, and Lab rewinds
 preserve them without recording synthetic train commands on every retry.
+Rally plans and repeat-production choices may be assigned while a production building is still
+under construction; both remain inert until completion, then govern its first produced unit.
 
 Explicit manual train and research commands use bounded eight-entry FIFO queues. The front entry
 pays immediately when the queue is empty and its cost (plus unit supply) is available; otherwise it

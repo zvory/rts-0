@@ -1814,7 +1814,9 @@ have separate stable Engineering Complex slots. A dependent button unlocks for q
 its prerequisite is complete or already present earlier in the selected building's authoritative
 `prodUpgradeQueue`. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. Selecting an owned building
-under construction shows a dedicated construction card with Cancel in the bottom-right `C` slot;
+under construction shows a dedicated construction card with Cancel in the bottom-right `C` slot.
+An unfinished production building also shows its production buttons with primary training disabled,
+while Alt/Ctrl/Shift production hotkeys can assign standing repeat production for after completion;
 click selection prefers the scaffold over an overlapping builder, and cancellation returns the full
 construction cost. The Scout Plane affordance
 is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It unlocks after

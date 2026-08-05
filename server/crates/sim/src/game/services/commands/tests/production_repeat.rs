@@ -19,6 +19,35 @@ fn production_repeat_adjustment_protocol_round_trip() {
 }
 
 #[test]
+fn unfinished_producer_remembers_repeat_production_for_after_completion() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+    let barracks = entities
+        .spawn_building(1, EntityKind::Barracks, x, y, false)
+        .expect("unfinished barracks should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+
+    apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::AdjustProductionRepeat {
+                buildings: vec![barracks],
+                unit: EntityKind::Rifleman,
+                delta: 1,
+            },
+        )],
+    );
+
+    let barracks = entities.get(barracks).expect("unfinished barracks");
+    assert!(barracks.under_construction());
+    assert_eq!(barracks.repeat_production(), Some(EntityKind::Rifleman));
+}
+
+#[test]
 fn auto_build_settings_protocol_round_trip() {
     let command = SimCommand::SetAutoBuildSettings {
         paused: true,

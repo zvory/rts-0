@@ -24,7 +24,7 @@ pub(super) fn adjust(
 
     let candidate = dedupe_units(buildings).into_iter().filter_map(|building| {
         let producer = entities.get(building)?;
-        if producer.owner != player || !producer.is_building() || producer.under_construction() {
+        if producer.owner != player || !producer.is_building() {
             return None;
         }
         let repeat_units = &producer.production.as_ref()?.repeat_units;

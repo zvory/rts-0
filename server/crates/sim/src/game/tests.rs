@@ -19,6 +19,7 @@ mod checkpoint_payload_tests;
 mod checkpoint_start_tests;
 mod checkpoint_visibility_tests;
 mod concealment_zone_tests;
+mod deferred_producer_order_tests;
 mod derived_state_tests;
 mod determinism_tests;
 mod ekat_tests;
