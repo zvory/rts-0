@@ -221,7 +221,7 @@ fn validate_materialized_map(draft: &LabMapDraft, player_count: usize) -> Result
     let metadata = Map::metadata_for_name("Chokes")
         .map_err(|error| format!("Could not prepare map metadata: {error}"))?;
     let mut game = Game::new_lab(&players, 0, map, metadata);
-    game.apply_lab_op(LabOp::ApplyMapDraft(draft.clone()))
+    game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft.clone())))
         .map_err(|error| format!("Map locations are invalid: {error:?}"))?;
     Ok(())
 }

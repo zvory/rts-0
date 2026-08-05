@@ -734,7 +734,7 @@ impl RoomTask {
         let mut map_name = config.map_name.clone();
         if let Some(draft) = draft {
             map_name.clone_from(&draft.name);
-            game.apply_lab_op(LabOp::ApplyMapDraft(draft.clone()))
+            game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft.clone())))
                 .map_err(|err| {
                     format!(
                         "Cannot materialize Map Editor handoff: {}",

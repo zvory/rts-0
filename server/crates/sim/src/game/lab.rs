@@ -46,7 +46,7 @@ pub enum LabOp {
     SetPlayerResources(LabSetPlayerResources),
     SetPlayerGodMode { player_id: u32, enabled: bool },
     SetCompletedResearch(LabSetCompletedResearch),
-    ApplyMapDraft(LabMapDraft),
+    ApplyMapDraft(Box<LabMapDraft>),
     RestoreCheckpointScenario(Box<LabCheckpointScenarioV1>),
 }
 
@@ -304,7 +304,7 @@ impl Game {
                 self.lab_set_player_god_mode(player_id, enabled)
             }
             LabOp::SetCompletedResearch(input) => self.lab_set_completed_research(input),
-            LabOp::ApplyMapDraft(draft) => self.lab_apply_map_draft(draft),
+            LabOp::ApplyMapDraft(draft) => self.lab_apply_map_draft(*draft),
             LabOp::RestoreCheckpointScenario(scenario) => {
                 self.restore_lab_checkpoint_scenario_op(*scenario)
             }

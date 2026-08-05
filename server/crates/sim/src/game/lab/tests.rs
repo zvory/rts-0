@@ -94,7 +94,7 @@ fn lab_map_draft_rebuilds_the_battle_on_authoritative_terrain_and_bases() {
     }
 
     let outcome = game
-        .apply_lab_op(LabOp::ApplyMapDraft(map_draft()))
+        .apply_lab_op(LabOp::ApplyMapDraft(Box::new(map_draft())))
         .expect("valid lab map draft");
 
     assert_eq!(
@@ -154,7 +154,7 @@ fn lab_map_draft_preserves_visual_open_terrain_variants() {
     ];
     draft.terrain[..variants.len()].copy_from_slice(&variants);
 
-    game.apply_lab_op(LabOp::ApplyMapDraft(draft))
+    game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft)))
         .expect("visual open terrain draft");
 
     assert_eq!(&game.state.map.terrain[..variants.len()], &variants);
@@ -177,7 +177,7 @@ fn lab_map_draft_rejects_duplicate_base_resource_records() {
     });
 
     let error = game
-        .apply_lab_op(LabOp::ApplyMapDraft(draft))
+        .apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft)))
         .expect_err("duplicate base coordinates must not silently overwrite resource counts");
     assert!(matches!(
         error,
@@ -192,7 +192,7 @@ fn lab_map_draft_rejects_blocked_base_protection_area() {
     draft.terrain[12 * 64 + 12] = terrain::ROCK;
 
     assert!(matches!(
-        game.apply_lab_op(LabOp::ApplyMapDraft(draft)),
+        game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft))),
         Err(LabError::InvalidMap { reason, .. })
             if reason.contains("protected area")
     ));
@@ -204,7 +204,7 @@ fn lab_map_draft_allows_terrain_immediately_beyond_starting_unit_area() {
     let mut draft = map_draft();
     draft.terrain[12 * 64 + 16] = terrain::ROCK;
 
-    game.apply_lab_op(LabOp::ApplyMapDraft(draft))
+    game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft)))
         .expect("terrain beyond the starting unit area should remain editable");
     assert_eq!(game.state.map.terrain[12 * 64 + 16], terrain::ROCK);
 }
@@ -258,7 +258,7 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
     };
 
     let outcome = game
-        .apply_lab_op(LabOp::ApplyMapDraft(draft))
+        .apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft)))
         .expect("terrain-only edit");
 
     assert_eq!(
