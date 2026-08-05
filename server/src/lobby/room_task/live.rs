@@ -633,10 +633,11 @@ impl RoomTask {
     }
 
     pub(super) fn on_tick_live_game(&mut self, scheduled: TokioInstant) {
-        if self.live_paused && self.live_pause_controls_available() {
-            if !self.finish_live_resume_countdown_if_due() {
-                return;
-            }
+        if self.live_paused
+            && self.live_pause_controls_available()
+            && !self.finish_live_resume_countdown_if_due()
+        {
+            return;
         }
         self.apply_lab_scenario_actions();
         // Take ownership of the game for the duration of the tick so we can both mutate it and
