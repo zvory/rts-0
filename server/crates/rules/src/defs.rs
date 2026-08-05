@@ -366,7 +366,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             cost_oil: 0,
             foot_w: 3,
             foot_h: 3,
-            build_ticks: 750,
+            build_ticks: balance::TICK_HZ * 5,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
