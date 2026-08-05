@@ -53,6 +53,7 @@ await import("./client_contracts/artillery_targeting_contracts.mjs");
 await import("./client_contracts/support_weapon_setup_targeting_contracts.mjs");
 await import("./client_contracts/match_shell_contracts.mjs");
 await import("./client_contracts/match_notice_presenter_contracts.mjs");
+await import("./client_contracts/live_pause_overlay_contracts.mjs");
 await import("./client_contracts/match_replay_contracts.mjs");
 await import("./client_contracts/replay_seek_state_contracts.mjs");
 await import("./client_contracts/replay_seek_overlay_contracts.mjs");
