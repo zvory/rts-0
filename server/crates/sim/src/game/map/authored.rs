@@ -164,12 +164,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         &forest_tiles,
     );
     let no_building_tiles = merge_overlay_locations(
-        parse_overlay_locations(
-            width,
-            height,
-            &authored.no_building_tiles,
-            "noBuildingTiles",
-        )?,
+        parse_overlay_locations(width, height, &authored.no_building_tiles, "noBuildingTiles")?,
         &forest_tiles,
     );
     let damage_reduction_tiles = merge_overlay_locations(

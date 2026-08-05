@@ -577,11 +577,11 @@ impl Game {
             base_sites,
             base_resource_counts,
             doodads,
-            concealment_tiles: overlays.0,
-            no_vehicle_tiles: overlays.1,
-            no_building_tiles: overlays.2,
-            damage_reduction_tiles: overlays.3,
-            slow_movement_tiles: overlays.4,
+            concealment_tiles: overlays.concealment,
+            no_vehicle_tiles: overlays.no_vehicle,
+            no_building_tiles: overlays.no_building,
+            damage_reduction_tiles: overlays.damage_reduction,
+            slow_movement_tiles: overlays.slow_movement,
         };
         let map_metadata = MapMetadata {
             name: name.to_string(),

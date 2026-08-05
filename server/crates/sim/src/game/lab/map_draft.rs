@@ -1,19 +1,14 @@
 use std::collections::HashMap;
 
 use crate::game::map::{doodads, BaseResourceCounts, Map};
+use crate::game::MapOverlayTiles;
 use crate::protocol::{LabBaseSite, LabMapDraft, LabMapTile, MapDoodad, MapTile};
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 use super::LabError;
 
 pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
-    let (
-        concealment_tiles,
-        no_vehicle_tiles,
-        no_building_tiles,
-        damage_reduction_tiles,
-        slow_movement_tiles,
-    ) = map.protocol_overlay_tiles();
+    let overlays = map.protocol_overlay_tiles();
     LabMapDraft {
         name: name.to_string(),
         width: map.width,
@@ -38,11 +33,11 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
             })
             .collect(),
         doodads: map.doodads.clone(),
-        concealment_tiles,
-        no_vehicle_tiles,
-        no_building_tiles,
-        damage_reduction_tiles,
-        slow_movement_tiles,
+        concealment_tiles: overlays.concealment,
+        no_vehicle_tiles: overlays.no_vehicle,
+        no_building_tiles: overlays.no_building,
+        damage_reduction_tiles: overlays.damage_reduction,
+        slow_movement_tiles: overlays.slow_movement,
     }
 }
 
@@ -91,56 +86,47 @@ pub(super) fn canonical_doodads(
     })
 }
 
-type TileCoordinates = Vec<(u32, u32)>;
-type CanonicalOverlays = (
-    TileCoordinates,
-    TileCoordinates,
-    TileCoordinates,
-    TileCoordinates,
-    TileCoordinates,
-);
-
 pub(super) fn canonical_overlays(
     draft: &LabMapDraft,
     name: &str,
-) -> Result<CanonicalOverlays, LabError> {
-    Ok((
-        canonical_tiles(
+) -> Result<MapOverlayTiles<(u32, u32)>, LabError> {
+    Ok(MapOverlayTiles {
+        concealment: canonical_tiles(
             &draft.concealment_tiles,
             draft.width,
             draft.height,
             "concealmentTiles",
             name,
         )?,
-        canonical_tiles(
+        no_vehicle: canonical_tiles(
             &draft.no_vehicle_tiles,
             draft.width,
             draft.height,
             "noVehicleTiles",
             name,
         )?,
-        canonical_tiles(
+        no_building: canonical_tiles(
             &draft.no_building_tiles,
             draft.width,
             draft.height,
             "noBuildingTiles",
             name,
         )?,
-        canonical_tiles(
+        damage_reduction: canonical_tiles(
             &draft.damage_reduction_tiles,
             draft.width,
             draft.height,
             "damageReductionTiles",
             name,
         )?,
-        canonical_tiles(
+        slow_movement: canonical_tiles(
             &draft.slow_movement_tiles,
             draft.width,
             draft.height,
             "slowMovementTiles",
             name,
         )?,
-    ))
+    })
 }
 
 fn canonical_tiles(

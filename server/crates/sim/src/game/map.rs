@@ -12,6 +12,8 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+use super::MapOverlayTiles;
+
 mod authored;
 mod base_resources;
 mod data;
@@ -344,23 +346,15 @@ impl Map {
         terrain_rules::slow_movement_tile_multiplier(active)
     }
 
-    pub(crate) fn protocol_overlay_tiles(
-        &self,
-    ) -> (
-        Vec<MapTile>,
-        Vec<MapTile>,
-        Vec<MapTile>,
-        Vec<MapTile>,
-        Vec<MapTile>,
-    ) {
+    pub(super) fn protocol_overlay_tiles(&self) -> MapOverlayTiles<MapTile> {
         let convert = |tiles: &[(u32, u32)]| tiles.iter().map(|&(x, y)| MapTile { x, y }).collect();
-        (
-            convert(&self.concealment_tiles),
-            convert(&self.no_vehicle_tiles),
-            convert(&self.no_building_tiles),
-            convert(&self.damage_reduction_tiles),
-            convert(&self.slow_movement_tiles),
-        )
+        MapOverlayTiles {
+            concealment: convert(&self.concealment_tiles),
+            no_vehicle: convert(&self.no_vehicle_tiles),
+            no_building: convert(&self.no_building_tiles),
+            damage_reduction: convert(&self.damage_reduction_tiles),
+            slow_movement: convert(&self.slow_movement_tiles),
+        }
     }
 
     /// Whether a tile is passable terrain. Out-of-bounds is impassable. This does NOT

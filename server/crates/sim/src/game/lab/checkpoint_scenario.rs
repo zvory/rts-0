@@ -96,13 +96,7 @@ pub struct LabCheckpointScenarioSource {
 
 impl LabCheckpointScenarioMap {
     pub(super) fn from_map(map: &Map, metadata: &MapMetadata) -> Self {
-        let (
-            concealment_tiles,
-            no_vehicle_tiles,
-            no_building_tiles,
-            damage_reduction_tiles,
-            slow_movement_tiles,
-        ) = map.protocol_overlay_tiles();
+        let overlays = map.protocol_overlay_tiles();
         Self {
             name: metadata.name.clone(),
             schema_version: metadata.schema_version,
@@ -131,11 +125,11 @@ impl LabCheckpointScenarioMap {
                     })
                     .collect(),
                 doodads: map.doodads.clone(),
-                concealment_tiles,
-                no_vehicle_tiles,
-                no_building_tiles,
-                damage_reduction_tiles,
-                slow_movement_tiles,
+                concealment_tiles: overlays.concealment,
+                no_vehicle_tiles: overlays.no_vehicle,
+                no_building_tiles: overlays.no_building,
+                damage_reduction_tiles: overlays.damage_reduction,
+                slow_movement_tiles: overlays.slow_movement,
             },
         }
     }
