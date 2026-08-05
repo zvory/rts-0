@@ -729,7 +729,7 @@ try {
       withinViewport: [layersRect, panelRect].every((rect) => rect &&
         rect.left >= 8 && rect.right <= window.innerWidth - 8 &&
         rect.top >= 8 && rect.bottom <= window.innerHeight - 8),
-      belowToolbar: [layersRect, panelRect].every((rect) => rect && toolbarRect && rect.top >= toolbarRect.bottom),
+      belowToolbar: [movedLayersRect, panelRect].every((rect) => rect && toolbarRect && rect.top >= toolbarRect.bottom),
       noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
         .every((node) => node.scrollWidth <= node.clientWidth),
       actionButtons: [...document.querySelectorAll(".map-editor-toolbar button")]
