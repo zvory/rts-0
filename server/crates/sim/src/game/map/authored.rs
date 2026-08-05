@@ -75,6 +75,7 @@ pub(super) fn load_for_players(
         doodads: materialized.doodads,
         concealment_tiles: materialized.concealment_tiles,
         no_vehicle_tiles: materialized.no_vehicle_tiles,
+        no_building_tiles: materialized.no_building_tiles,
         damage_reduction_tiles: materialized.damage_reduction_tiles,
         slow_movement_tiles: materialized.slow_movement_tiles,
     })
@@ -162,6 +163,15 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         parse_overlay_locations(width, height, &authored.no_vehicle_tiles, "noVehicleTiles")?,
         &forest_tiles,
     );
+    let no_building_tiles = merge_overlay_locations(
+        parse_overlay_locations(
+            width,
+            height,
+            &authored.no_building_tiles,
+            "noBuildingTiles",
+        )?,
+        &forest_tiles,
+    );
     let damage_reduction_tiles = merge_overlay_locations(
         parse_overlay_locations(
             width,
@@ -191,6 +201,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         doodads,
         concealment_tiles,
         no_vehicle_tiles,
+        no_building_tiles,
         damage_reduction_tiles,
         slow_movement_tiles,
     })
@@ -218,6 +229,8 @@ struct AuthoredMap {
     concealment_tiles: Vec<AuthoredLocation>,
     #[serde(default)]
     no_vehicle_tiles: Vec<AuthoredLocation>,
+    #[serde(default)]
+    no_building_tiles: Vec<AuthoredLocation>,
     #[serde(default)]
     damage_reduction_tiles: Vec<AuthoredLocation>,
     #[serde(default)]

@@ -14,6 +14,7 @@ import {
   mapAuthoringDoodadLayer,
   mapAuthoringLayerVisibilityFromSelection,
 } from "../client/src/map_authoring/layers.js";
+import { forestTilesFromSpans } from "../client/src/map_authoring/forests.js";
 import {
   buildMapFromRecipe,
   CURRENT_AUTHORED_MAP_VERSION as CURRENT_MAP_VERSION,
@@ -40,8 +41,8 @@ const DOODAD_TYPES = new Set([
 ]);
 const MAP_FIELDS = new Set([
   "version", "name", "description", "width", "height", "terrain", "startLocations",
-  "baseSites", "_design", "doodads", "concealmentTiles", "noVehicleTiles",
-  "damageReductionTiles", "slowMovementTiles",
+  "baseSites", "_design", "doodads", "forestSpans", "concealmentTiles", "noVehicleTiles",
+  "noBuildingTiles", "damageReductionTiles", "slowMovementTiles",
 ]);
 const START_FIELDS = new Set(["x", "y"]);
 const BASE_FIELDS = new Set(["x", "y", "steelPatches", "oilPatches"]);
@@ -207,7 +208,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
     const blocked = blockedClearance(map, site, startKeys.has(locationKey(site)) ? 7 : 4);
     if (blocked) warnings.push(`base (${site.x},${site.y}) has ${blocked.reason} in its protected area at (${blocked.x},${blocked.y})`);
   }
-  for (const field of ["concealmentTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
+  for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "damageReductionTiles", "slowMovementTiles"]) {
     const locations = map[field] === undefined ? [] : map[field];
     if (!Array.isArray(locations)) {
       warnings.push(`${field} must be an array`);
@@ -318,6 +319,14 @@ export function renderPreviewSvg(map, { tilePixels = 5, layers = "all" } = {}) {
     }
     elements.push("</g>");
   }
+  appendSemanticTileLayer(elements, forestTilesFromSpans(map.forestSpans, { width, height }), {
+    id: MAP_AUTHORING_LAYER.FOREST,
+    visible: visibility[MAP_AUTHORING_LAYER.FOREST],
+    width,
+    height,
+    fill: "#315f36",
+    stroke: "#b3d57a",
+  });
   appendSemanticTileLayer(elements, map.concealmentTiles, {
     id: MAP_AUTHORING_LAYER.CONCEALMENT,
     visible: visibility[MAP_AUTHORING_LAYER.CONCEALMENT],
@@ -333,6 +342,14 @@ export function renderPreviewSvg(map, { tilePixels = 5, layers = "all" } = {}) {
     height,
     fill: "#d94b45",
     stroke: "#ffaaa5",
+  });
+  appendSemanticTileLayer(elements, map.noBuildingTiles, {
+    id: MAP_AUTHORING_LAYER.NO_BUILDING,
+    visible: visibility[MAP_AUTHORING_LAYER.NO_BUILDING],
+    width,
+    height,
+    fill: "#d58a2f",
+    stroke: "#ffd293",
   });
   appendSemanticTileLayer(elements, map.damageReductionTiles, {
     id: MAP_AUTHORING_LAYER.DAMAGE_REDUCTION,

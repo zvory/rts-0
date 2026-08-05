@@ -6,8 +6,14 @@ import { FOREST_DOODAD_ID_BASE } from "../../client/src/map_authoring/forests.js
 const tile = { x: 8, y: 8 };
 const session = new MapEditorSession({ storage: null });
 session.initializeBlank({ size: 16, playerCount: 2 });
-session.beginOverlayStroke("Painted concealment");
-session.paintOverlayTiles([tile], { concealment: true });
+session.beginOverlayStroke("Painted independent effects");
+session.paintOverlayTiles([tile], {
+  concealment: true,
+  noVehicle: true,
+  noBuilding: true,
+  damageReduction: true,
+  slowMovement: true,
+});
 assert.equal(session.commitOverlayStroke(), true);
 session.beginOverlayStroke("Painted forest");
 session.paintForestTiles([tile], true);
@@ -15,8 +21,10 @@ assert.equal(session.commitOverlayStroke(), true);
 session.beginOverlayStroke("Erased forest");
 session.paintForestTiles([tile], false);
 assert.equal(session.commitOverlayStroke(), true);
-assert.deepEqual(session.exportMap().concealmentTiles, [tile],
-  "erasing forest preserves an independently authored overlay that overlapped it");
+for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "damageReductionTiles", "slowMovementTiles"]) {
+  assert.deepEqual(session.exportMap()[field], [tile],
+    `erasing forest preserves the independently authored ${field} overlay that overlapped it`);
+}
 
 const forest = [];
 for (let y = 2; y < 14; y += 1) for (let x = 2; x < 14; x += 1) forest.push({ x, y });

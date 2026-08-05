@@ -54,6 +54,8 @@ pub struct LabCheckpointScenarioMapData {
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
     #[serde(default)]
+    pub no_building_tiles: Vec<MapTile>,
+    #[serde(default)]
     pub damage_reduction_tiles: Vec<MapTile>,
     #[serde(default)]
     pub slow_movement_tiles: Vec<MapTile>,
@@ -94,8 +96,13 @@ pub struct LabCheckpointScenarioSource {
 
 impl LabCheckpointScenarioMap {
     pub(super) fn from_map(map: &Map, metadata: &MapMetadata) -> Self {
-        let (concealment_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
-            map.protocol_overlay_tiles();
+        let (
+            concealment_tiles,
+            no_vehicle_tiles,
+            no_building_tiles,
+            damage_reduction_tiles,
+            slow_movement_tiles,
+        ) = map.protocol_overlay_tiles();
         Self {
             name: metadata.name.clone(),
             schema_version: metadata.schema_version,
@@ -126,6 +133,7 @@ impl LabCheckpointScenarioMap {
                 doodads: map.doodads.clone(),
                 concealment_tiles,
                 no_vehicle_tiles,
+                no_building_tiles,
                 damage_reduction_tiles,
                 slow_movement_tiles,
             },
@@ -171,6 +179,11 @@ impl LabCheckpointScenarioMap {
                 .collect(),
             no_vehicle_tiles: data
                 .no_vehicle_tiles
+                .into_iter()
+                .map(|tile| (tile.x, tile.y))
+                .collect(),
+            no_building_tiles: data
+                .no_building_tiles
                 .into_iter()
                 .map(|tile| (tile.x, tile.y))
                 .collect(),
@@ -310,6 +323,13 @@ impl LabCheckpointScenarioMap {
             width,
             height,
             "noVehicleTiles",
+            &self.name,
+        )?;
+        validate_overlay_tiles(
+            &self.data.no_building_tiles,
+            width,
+            height,
+            "noBuildingTiles",
             &self.name,
         )?;
         validate_overlay_tiles(

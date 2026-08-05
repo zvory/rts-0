@@ -149,7 +149,7 @@ mod tests {
 
     fn valid_map_json() -> String {
         json!({
-            "version": 8,
+            "version": 9,
             "name": "HTTP analysis fixture",
             "width": 24,
             "height": 24,

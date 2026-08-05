@@ -251,7 +251,7 @@ Core unit roles:
 
 Terrain rules:
 - **Open ground** favors machine guns and tanks.
-- **Forests** are passable by infantry and impassable to tanks.
+- **Forests** are passable by infantry, impassable to tanks, and unavailable for building placement.
 - Infantry in forests gets defensive and concealment bonuses.
 - Forests are intentionally "infantry country": the main way to clear infantry from a
   forest is to send in your own infantry.

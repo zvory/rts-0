@@ -769,6 +769,14 @@ fn validate_map_container(
     )?;
     validate_overlay_tiles(
         label,
+        "noBuildingTiles",
+        &scenario.map.data.no_building_tiles,
+        width,
+        height,
+        tile_count,
+    )?;
+    validate_overlay_tiles(
+        label,
         "damageReductionTiles",
         &scenario.map.data.damage_reduction_tiles,
         width,

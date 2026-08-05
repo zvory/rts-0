@@ -224,6 +224,7 @@ export class MapEditorWorkerRenderer {
 const OVERLAY_VISUALS = Object.freeze({
   concealment: Object.freeze({ color: 0x2f9f78, icon: drawClosedEye }),
   noVehicle: Object.freeze({ color: 0xd94b45, icon: drawNoEntry }),
+  noBuilding: Object.freeze({ color: 0xd58a2f, icon: drawNoBuilding }),
   damageReduction: Object.freeze({ color: 0x3e82d7, icon: drawHalfShield }),
   slowMovement: Object.freeze({ color: 0x8b5fc7, icon: drawMiredBoot }),
 });
@@ -239,17 +240,17 @@ function drawGameplayOverlays(graphics, overlay, visibility) {
       byTile.set(key, entry);
     }
   };
-  for (const tile of overlay.forestTiles || []) {
+  for (const tile of visibility[MAP_AUTHORING_LAYER.FOREST] ? overlay.forestTiles || [] : []) {
     const key = `${tile.x}:${tile.y}`;
-    const effects = [];
-    if (visibility[MAP_AUTHORING_LAYER.CONCEALMENT]) effects.push("concealment");
-    if (visibility[MAP_AUTHORING_LAYER.NO_VEHICLE]) effects.push("noVehicle");
-    if (visibility[MAP_AUTHORING_LAYER.DAMAGE_REDUCTION]) effects.push("damageReduction");
-    if (visibility[MAP_AUTHORING_LAYER.SLOW_MOVEMENT]) effects.push("slowMovement");
-    if (effects.length) byTile.set(key, { x: tile.x, y: tile.y, effects });
+    byTile.set(key, {
+      x: tile.x,
+      y: tile.y,
+      effects: ["concealment", "noVehicle", "noBuilding", "damageReduction", "slowMovement"],
+    });
   }
   add("concealment", overlay.concealmentTiles, MAP_AUTHORING_LAYER.CONCEALMENT);
   add("noVehicle", overlay.noVehicleTiles, MAP_AUTHORING_LAYER.NO_VEHICLE);
+  add("noBuilding", overlay.noBuildingTiles, MAP_AUTHORING_LAYER.NO_BUILDING);
   add("damageReduction", overlay.damageReductionTiles, MAP_AUTHORING_LAYER.DAMAGE_REDUCTION);
   add("slowMovement", overlay.slowMovementTiles, MAP_AUTHORING_LAYER.SLOW_MOVEMENT);
 
@@ -258,8 +259,9 @@ function drawGameplayOverlays(graphics, overlay, visibility) {
     for (let index = 0; index < tile.effects.length; index += 1) {
       const kind = tile.effects[index];
       const visual = OVERLAY_VISUALS[kind];
+      const columns = tile.effects.length > 4 ? 3 : 2;
       const cell = shared
-        ? { x: tile.x * 32 + 1 + (index % 2) * 15, y: tile.y * 32 + 1 + Math.floor(index / 2) * 15, size: 14 }
+        ? { x: tile.x * 32 + 1 + (index % columns) * (columns === 3 ? 10 : 15), y: tile.y * 32 + 1 + Math.floor(index / columns) * 15, size: columns === 3 ? 9 : 14 }
         : { x: tile.x * 32 + 2, y: tile.y * 32 + 2, size: 28 };
       gfxStroke(graphics, shared ? 1 : 1.5, visual.color, 0.96);
       gfxRect(gfxFill(graphics, visual.color, shared ? 0.34 : 0.25), cell.x, cell.y, cell.size, cell.size);
@@ -274,6 +276,16 @@ function drawNoEntry(graphics, cx, cy, size) {
   gfxStroke(graphics, Math.max(1.2, size * 0.12), 0xffffff, 0.96);
   gfxCircle(graphics, cx, cy, radius);
   gfxStrokePaths(graphics, [[[cx - radius * 0.7, cy + radius * 0.7], [cx + radius * 0.7, cy - radius * 0.7]]], Math.max(1.2, size * 0.13), 0xffffff, 0.96);
+}
+
+function drawNoBuilding(graphics, cx, cy, size) {
+  const half = size * 0.32;
+  gfxStroke(graphics, Math.max(1, size * 0.1), 0xffffff, 0.96);
+  gfxStrokePaths(graphics, [
+    [[cx - half, cy - size * 0.04], [cx, cy - half], [cx + half, cy - size * 0.04]],
+    [[cx - half * 0.75, cy - size * 0.04], [cx - half * 0.75, cy + half], [cx + half * 0.75, cy + half], [cx + half * 0.75, cy - size * 0.04]],
+    [[cx - half, cy + half], [cx + half, cy - half]],
+  ], Math.max(1, size * 0.1), 0xffffff, 0.96);
 }
 
 function drawClosedEye(graphics, cx, cy, size) {

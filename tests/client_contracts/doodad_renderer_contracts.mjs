@@ -169,22 +169,30 @@ try {
       sites: [{ x: 16, y: 16, color: 0x4ec9ff, radius: 7, label: "S1", selected: false }],
       concealmentTiles: [{ x: 1, y: 1 }],
       noVehicleTiles: [{ x: 1, y: 1 }],
+      noBuildingTiles: [{ x: 1, y: 1 }],
       damageReductionTiles: [{ x: 1, y: 1 }],
       slowMovementTiles: [{ x: 1, y: 1 }],
+      forestTiles: [{ x: 2, y: 2 }],
       paintPreview: null,
       doodadBrushPreview: { x: 20, y: 20, radius: 12, mode: "spray", typeId: "wildflower.single", color: "#ffffff" },
     },
   });
   assert.equal(editor.tankTraps.size, 1, "the editor draws authored Tank Traps with the live entity geometry");
   assert.equal(editorRenderer.layers.buildings.children.length, 1, "Tank Trap previews use the building layer");
-  assert.deepEqual(latestDrawRectWidths(editor.overlay), [14, 14, 14, 14],
-    "four overlapping semantic layers subdivide the tile instead of hiding one another");
+  assert.deepEqual(latestDrawRectWidths(editor.overlay), Array(10).fill(9),
+    "the independent effects and composite Forest tile each expose all five semantics");
+  editor._applyLayerVisibility({
+    ...defaultMapAuthoringLayerVisibility(),
+    [MAP_AUTHORING_LAYER.FOREST]: false,
+  });
+  assert.deepEqual(latestDrawRectWidths(editor.overlay), Array(5).fill(9),
+    "hiding Forest leaves all five independently authored gameplay layers visible");
   editor._applyLayerVisibility({
     ...defaultMapAuthoringLayerVisibility(),
     [MAP_AUTHORING_LAYER.CONCEALMENT]: false,
   });
-  assert.deepEqual(latestDrawRectWidths(editor.overlay), [14, 14, 14],
-    "hiding concealment leaves all three independent gameplay layers visible");
+  assert.deepEqual(latestDrawRectWidths(editor.overlay), [...Array(5).fill(9), ...Array(4).fill(14)],
+    "hiding independent concealment does not remove concealment composed by Forest");
   editor._applyLayerVisibility(defaultMapAuthoringLayerVisibility());
   editor._applyLayerVisibility({
     ...defaultMapAuthoringLayerVisibility(),
@@ -239,7 +247,7 @@ function latestDrawRectWidths(graphics) {
   return graphics.calls.slice(lastClear + 1)
     .filter(([kind]) => kind === "drawRect")
     .map(([, , , width]) => width)
-    .filter((width) => width === 28 || width === 14);
+    .filter((width) => width === 28 || width === 14 || width === 9);
 }
 
 console.log("✅ doodad_renderer_contracts.mjs: static assets, layering, wind, editor updates, and teardown passed");

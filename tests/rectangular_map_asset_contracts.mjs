@@ -43,18 +43,26 @@ const materializedHash = (data) => fnv1a64([
 ]);
 
 const bundledMapContracts = new Map([
-  ["1v1-no-terrain.json", [126, 126, "43229a90f176eca98bc846369c23829ec21ef651110c6130f60cd44064e0f493", "9c6bb0b4ccfe69bc"]],
-  ["1v1.json", [126, 126, "dc1f3578b9b8e59dddef9dad876a43873771efac6d7cff010b65a6088f30c91d", "cd55900cbe1e9874"]],
-  ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "61377cc4b01a8b5f"]],
-  ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "d265f86970553f9d"]],
-  ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "d96f306a6a2e4768"]],
-  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "e3113284b382a363"]],
+  ["1v1-no-terrain.json", [126, 126, "43229a90f176eca98bc846369c23829ec21ef651110c6130f60cd44064e0f493", "5449736a38c5bf0f"]],
+  ["1v1.json", [126, 126, "dc1f3578b9b8e59dddef9dad876a43873771efac6d7cff010b65a6088f30c91d", "62f5e3ae24627171"]],
+  ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "b8d868823f52c3b0"]],
+  ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "378f0774d89c3348"]],
+  ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "3e841d4c3f18fd53"]],
+  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "cefe2db445a1cbf8"]],
 ]);
+
+for (const fileName of fs.readdirSync(new URL("server/assets/maps/", repoRoot)).filter((name) => name.endsWith(".json"))) {
+  const map = JSON.parse(fs.readFileSync(new URL(`server/assets/maps/${fileName}`, repoRoot), "utf8"));
+  assert.equal(map.version, 9, `${fileName} uses the forest/no-building schema`);
+  assert(Array.isArray(map.forestSpans), `${fileName} declares forestSpans`);
+  assert(Array.isArray(map.noBuildingTiles), `${fileName} declares noBuildingTiles`);
+}
 
 for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMapContracts) {
   const rawMap = fs.readFileSync(new URL(`server/assets/maps/${fileName}`, repoRoot));
   const map = JSON.parse(rawMap);
-  assert.equal(map.version, 8, `${fileName} uses the forest-span schema`);
+  assert.equal(map.version, 9, `${fileName} uses the forest/no-building schema`);
+  assert(Array.isArray(map.noBuildingTiles), `${fileName} declares noBuildingTiles`);
   assert.equal(map.width, width, `${fileName} preserves its inferred terrain width`);
   assert.equal(map.height, height, `${fileName} preserves its inferred terrain height`);
   assert.equal(map.terrain.length, height, `${fileName} terrain row count matches height`);

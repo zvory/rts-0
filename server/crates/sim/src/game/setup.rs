@@ -381,8 +381,13 @@ impl Game {
     /// Static info for the `start` message: terrain grid + each player's start tile. The
     /// `player_id` is left 0; the networking layer overwrites it per recipient.
     pub fn start_payload(&self) -> StartPayload {
-        let (concealment_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
-            self.state.map.protocol_overlay_tiles();
+        let (
+            concealment_tiles,
+            no_vehicle_tiles,
+            no_building_tiles,
+            damage_reduction_tiles,
+            slow_movement_tiles,
+        ) = self.state.map.protocol_overlay_tiles();
         let resources = self
             .state
             .entities
@@ -414,6 +419,7 @@ impl Game {
                 .collect(),
             concealment_tiles,
             no_vehicle_tiles,
+            no_building_tiles,
             damage_reduction_tiles,
             slow_movement_tiles,
         };

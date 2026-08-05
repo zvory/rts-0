@@ -540,12 +540,12 @@ store a separate authoritative command stream, but they must not infer live stat
 
 Map policy:
 
-- Authored-map schema v8 requires compact non-overlapping `[y, xStart, xEnd]` forest spans. Loading
-  expands every forest tile into the existing stealth, no-vehicle, damage-reduction, and
-  slow-movement vectors before `Map` construction. Earlier schemas and v8 documents missing the
+- Authored-map schema v9 requires compact non-overlapping `[y, xStart, xEnd]` forest spans. Loading
+  expands every forest tile into the existing stealth, no-vehicle, no-building, damage-reduction, and
+  slow-movement vectors before `Map` construction. Earlier schemas and v9 documents missing the
   required forest array are rejected rather than migrated.
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  permanent base sites, four sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
+  permanent base sites, five sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
   infantry tree path-cost/local-steering data on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
@@ -560,9 +560,9 @@ Map policy:
   a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `width`, `height`,
   `playerCount`, and `materializedMapHash` against the supplied map. `materializedMapHash` is a
   stable hash over the materialized live `Map` fields (`width`, `height`, row-major terrain,
-  selected starts, base sites/resource counts, canonical doodads, and all four sparse gameplay overlays).
+  selected starts, base sites/resource counts, canonical doodads, and all five sparse gameplay overlays).
   Explicit empty doodad and overlay lists preserve the equivalent legacy materialized hash. Populated
-  concealment, no-vehicle, damage-reduction, and slow-movement layers use distinct hash tags. If any binding fact
+  concealment, no-vehicle, no-building, damage-reduction, and slow-movement layers use distinct hash tags. If any binding fact
   differs, the importer rejects the payload; it must not fall back to regenerating a map from seed
   or silently accepting a nearby map.
 
@@ -583,7 +583,7 @@ Damage-reduction tiles reduce incoming direct, area, loaded-shot, overpenetratio
 damage by 25% after existing weapon/armor/facing and entrenchment policy, rounding a non-zero
 fractional result up.
 Slow-movement tiles apply a 0.75x movement-budget multiplier from the unit-centre tile and multiply
-normally with road, upgrade, breakthrough, and ability movement modifiers. All four sparse layers
+normally with road, upgrade, breakthrough, and ability movement modifiers. All five sparse layers
 are independent and may overlap at one coordinate.
 
 Field map for Phase 2 DTO conversion:

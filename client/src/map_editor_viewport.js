@@ -355,6 +355,7 @@ export class MapEditorViewport {
       sites,
       concealmentTiles: structuredCloneSafe(draft.concealmentTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
+      noBuildingTiles: structuredCloneSafe(draft.noBuildingTiles || []),
       damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),
       slowMovementTiles: structuredCloneSafe(draft.slowMovementTiles || []),
       forestTiles: structuredCloneSafe(this.session.forestTiles?.() || []),
@@ -932,6 +933,7 @@ function terrainPreviewColor(code) {
 function overlayPreviewColor(edit) {
   if (edit?.concealment != null) return 0x5ed19a;
   if (edit?.noVehicle != null) return 0xf26a5a;
+  if (edit?.noBuilding != null) return 0xe9a23b;
   if (edit?.damageReduction != null) return 0x6da8ff;
   return 0xb276e8;
 }

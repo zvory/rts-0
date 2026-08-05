@@ -155,6 +155,13 @@ pub(crate) fn footprint_placeable_from_snapshot(
             {
                 return false;
             }
+            if map
+                .no_building_tiles
+                .iter()
+                .any(|tile| tile.x == tx && tile.y == ty)
+            {
+                return false;
+            }
             if occupied.contains(&(tx, ty)) {
                 return false;
             }

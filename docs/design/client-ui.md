@@ -1033,11 +1033,11 @@ texture per tile.
 
 The Terrain palette exposes Forest as compound content with a configurable 1–31-tile brush; the
 separate operation rail applies it with Brush or removes it with Erase.
-Forest painting is the single source for its tree scatter and all four gameplay effects. The draft
+Forest painting is the single source for its tree scatter and all five gameplay effects. The draft
 stores the exact tile area as compact inclusive `[y, xStart, xEnd]` row spans; generated trees use
 reserved deterministic ids, while ordinary doodads remain independently authored. Symmetry expands
 the forest stroke before the span mask is updated. Erasing removes both the semantic area and only
-the forest-owned trees. Authored schemas before v8 are rejected rather than migrated.
+the forest-owned trees. Authored schemas before v9 are rejected rather than migrated.
 
 Generated-tree placement uses the visible foliage bounds shared with the doodad renderer, including
 the renderer's deterministic size variation. Interior canopies must remain substantially within the
@@ -1046,19 +1046,19 @@ tree roots sit in the immediately adjacent tile below the forest while their fol
 the semantic boundary. The grounded root location is therefore not itself evidence that a tile is a
 forest tile.
 
-The Gameplay overlays palette can select any combination of Concealment, No vehicles, Damage reduction,
-and Slowed movement, then paint or erase the selected layers in one brush or box stroke. There is no
-separate Forest gameplay tile: materialization unions forest spans into these four existing runtime
-layers. The viewport uses green, red, blue, and purple respectively,
-with a closed eye, no-entry sign, half shield, and mired boot on every affected tile. A single
-effect uses the full tile; overlapping effects subdivide into stable 2x2 icon cells so all four
+The Gameplay overlays palette can select any combination of Concealment, No vehicles, No buildings, Damage reduction,
+and Slowed movement, then paint or erase the selected layers in one brush or box stroke. Forest is a
+separate composite authoring tile: materialization unions its spans into all five runtime layers,
+while the five effect tiles remain independently paintable. The viewport uses green, red, amber, blue, and purple respectively,
+with a closed eye, no-entry sign, crossed building, half shield, and mired boot on every affected tile. A single
+effect uses the full tile; overlapping effects subdivide into stable 2x2 or 3x2 icon cells so all five
 remain legible without hiding one another. Damage reduction and slowed movement each reduce their
 affected value by 25%;
 overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON import/export, and
 Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
 
-The editor's compact floating Layers panel independently toggles eight presentation-only authoring
-layers in a two-column grid: Terrain & bases, Concealment, No vehicles, Damage reduction, Slowed
+The editor's compact floating Layers panel independently toggles ten presentation-only authoring
+layers in a two-column grid: Terrain & bases, Forest, Concealment, No vehicles, No buildings, Damage reduction, Slowed
 movement, Trees, Gameplay doodads, and Decorative doodads. Full labels and descriptions remain available through accessible checkbox names
 and hover tooltips when narrow panel geometry truncates visible text. Tank Traps are gameplay
 doodads; wildflowers are decorative doodads. Visibility never mutates the draft, export, undo

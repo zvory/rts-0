@@ -30,7 +30,7 @@ pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
 /// The only authored-map schema accepted by this build.
-pub const CURRENT_MAP_VERSION: u32 = 8;
+pub const CURRENT_MAP_VERSION: u32 = 9;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -74,6 +74,8 @@ pub struct Map {
     pub concealment_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
     pub no_vehicle_tiles: Vec<(u32, u32)>,
+    /// Canonical sparse tile coordinates that reject intersecting building footprints.
+    pub no_building_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing incoming damage to occupants by 25%.
     pub damage_reduction_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing occupant movement speed by 25%.
@@ -203,6 +205,7 @@ impl Map {
         hash = doodads::hash_materialized(hash, &self.doodads);
         hash = hash_tiles(hash, b"concealment", &self.concealment_tiles);
         hash = hash_tiles(hash, b"no-vehicle", &self.no_vehicle_tiles);
+        hash = hash_tiles(hash, b"no-building", &self.no_building_tiles);
         hash = hash_tiles(hash, b"damage-reduction", &self.damage_reduction_tiles);
         hash = hash_tiles(hash, b"slow-movement", &self.slow_movement_tiles);
         format!("{hash:016x}")
@@ -306,6 +309,11 @@ impl Map {
     }
 
     #[inline]
+    pub(crate) fn is_no_building_tile(&self, x: u32, y: u32) -> bool {
+        self.no_building_tiles.binary_search(&(x, y)).is_ok()
+    }
+
+    #[inline]
     pub(crate) fn is_slow_movement_tile(&self, x: u32, y: u32) -> bool {
         self.slow_movement_tiles.binary_search(&(x, y)).is_ok()
     }
@@ -338,11 +346,18 @@ impl Map {
 
     pub(crate) fn protocol_overlay_tiles(
         &self,
-    ) -> (Vec<MapTile>, Vec<MapTile>, Vec<MapTile>, Vec<MapTile>) {
+    ) -> (
+        Vec<MapTile>,
+        Vec<MapTile>,
+        Vec<MapTile>,
+        Vec<MapTile>,
+        Vec<MapTile>,
+    ) {
         let convert = |tiles: &[(u32, u32)]| tiles.iter().map(|&(x, y)| MapTile { x, y }).collect();
         (
             convert(&self.concealment_tiles),
             convert(&self.no_vehicle_tiles),
+            convert(&self.no_building_tiles),
             convert(&self.damage_reduction_tiles),
             convert(&self.slow_movement_tiles),
         )
@@ -777,7 +792,7 @@ mod tests {
         )
         .expect_err("the previous schema should be rejected");
 
-        assert!(err.contains("requires version 8"), "error was: {err}");
+        assert!(err.contains("requires version 9"), "error was: {err}");
     }
 
     #[test]
@@ -807,7 +822,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 8,
+              "version": 9,
               "name": "bad",
               "width": 2,
               "height": 2,
@@ -833,7 +848,7 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 8,
+              "version": 9,
               "name": "bad-base",
               "width": 32,
               "height": 32,
@@ -860,7 +875,7 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 8,
+              "version": 9,
               "name": "road-base",
               "width": 32,
               "height": 32,

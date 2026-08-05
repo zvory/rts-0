@@ -91,6 +91,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
         doodads: Vec::new(),
         concealment_tiles: Vec::new(),
         no_vehicle_tiles: Vec::new(),
+        no_building_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),
     });

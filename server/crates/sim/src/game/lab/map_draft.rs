@@ -7,8 +7,13 @@ use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 use super::LabError;
 
 pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
-    let (concealment_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
-        map.protocol_overlay_tiles();
+    let (
+        concealment_tiles,
+        no_vehicle_tiles,
+        no_building_tiles,
+        damage_reduction_tiles,
+        slow_movement_tiles,
+    ) = map.protocol_overlay_tiles();
     LabMapDraft {
         name: name.to_string(),
         width: map.width,
@@ -35,6 +40,7 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
         doodads: map.doodads.clone(),
         concealment_tiles,
         no_vehicle_tiles,
+        no_building_tiles,
         damage_reduction_tiles,
         slow_movement_tiles,
     }
@@ -91,6 +97,7 @@ type CanonicalOverlays = (
     TileCoordinates,
     TileCoordinates,
     TileCoordinates,
+    TileCoordinates,
 );
 
 pub(super) fn canonical_overlays(
@@ -110,6 +117,13 @@ pub(super) fn canonical_overlays(
             draft.width,
             draft.height,
             "noVehicleTiles",
+            name,
+        )?,
+        canonical_tiles(
+            &draft.no_building_tiles,
+            draft.width,
+            draft.height,
+            "noBuildingTiles",
             name,
         )?,
         canonical_tiles(

@@ -248,6 +248,9 @@ fn validate_materialized_binding(
     if !tiles_match(&authored.no_vehicle_tiles, &materialized.no_vehicle_tiles) {
         return Err("Authored and materialized no-vehicle tiles do not match.".to_string());
     }
+    if !tiles_match(&authored.no_building_tiles, &materialized.no_building_tiles) {
+        return Err("Authored and materialized no-building tiles do not match.".to_string());
+    }
     if !tiles_match(
         &authored.damage_reduction_tiles,
         &materialized.damage_reduction_tiles,
@@ -358,6 +361,7 @@ mod tests {
                 doodads: Vec::new(),
                 concealment_tiles: Vec::new(),
                 no_vehicle_tiles: Vec::new(),
+                no_building_tiles: Vec::new(),
                 damage_reduction_tiles: Vec::new(),
                 slow_movement_tiles: Vec::new(),
             }),
@@ -425,6 +429,7 @@ mod tests {
         let fields = [
             ("concealmentTiles", "concealment"),
             ("noVehicleTiles", "no-vehicle"),
+            ("noBuildingTiles", "no-building"),
             ("damageReductionTiles", "damage-reduction"),
             ("slowMovementTiles", "slow-movement"),
         ];
@@ -435,6 +440,7 @@ mod tests {
             match field {
                 "concealmentTiles" => materialized(&mut request).concealment_tiles.push(tile),
                 "noVehicleTiles" => materialized(&mut request).no_vehicle_tiles.push(tile),
+                "noBuildingTiles" => materialized(&mut request).no_building_tiles.push(tile),
                 "damageReductionTiles" => {
                     materialized(&mut request).damage_reduction_tiles.push(tile)
                 }
@@ -445,6 +451,7 @@ mod tests {
 
             materialized(&mut request).concealment_tiles.clear();
             materialized(&mut request).no_vehicle_tiles.clear();
+            materialized(&mut request).no_building_tiles.clear();
             materialized(&mut request).damage_reduction_tiles.clear();
             materialized(&mut request).slow_movement_tiles.clear();
             assert!(validate_request(&request)
@@ -551,6 +558,7 @@ mod tests {
             doodads: Vec::new(),
             concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            no_building_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
         });
