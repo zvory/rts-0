@@ -104,6 +104,6 @@ export function mapEditorContentLabel(panel, overlayEffectName, terrainName) {
   }
   if (panel.activeCategory === "locations") return panel.locationContent === "base" ? "Neutral base" : "Player start";
   if (panel.terrainContent === "road") return "Automatic road";
-  if (panel.terrainContent === "forest") return "Forest preset";
+  if (panel.terrainContent === "forest") return "Forest tile";
   return terrainName(panel.selectedTerrain).replaceAll("-", " ");
 }

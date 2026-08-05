@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use super::super::player_view::{is_complete, kind_of, PlayerView};
 use super::super::scripts::{ProfileBackedScript, ScriptedPlayer};
@@ -10,13 +10,9 @@ use rts_sim::protocol::{EntityView, Snapshot, StartPayload};
 
 #[derive(Default)]
 struct ResourceRegressionEvidence {
-    pre_expansion_steel_gather_tick: Option<u32>,
-    first_pump_jack_build_tick: Option<u32>,
-    first_mineable_oil_tick: Option<u32>,
+    first_expansion_pump_jack_tick: Option<u32>,
     first_second_completed_resource_depot_tick: Option<u32>,
 }
-
-const POINT_IN_RECT_EPS_PX: f32 = 0.001;
 
 fn profile_players() -> Vec<PlayerInit> {
     vec![
@@ -39,15 +35,6 @@ fn profile_players() -> Vec<PlayerInit> {
     ]
 }
 
-fn gather_node_kind(start: &StartPayload, node: u32) -> Option<EntityKind> {
-    start
-        .map
-        .resources
-        .iter()
-        .find(|resource| resource.id == node)
-        .and_then(|resource| resource.kind.parse().ok())
-}
-
 fn completed_resource_depots(snapshot: &Snapshot, player_id: u32) -> Vec<&EntityView> {
     snapshot
         .entities
@@ -58,147 +45,44 @@ fn completed_resource_depots(snapshot: &Snapshot, player_id: u32) -> Vec<&Entity
         .collect()
 }
 
-fn resource_remaining(start: &StartPayload, snapshot: &Snapshot, node: u32) -> u32 {
-    snapshot
-        .resource_deltas
-        .iter()
-        .find(|delta| delta.id == node)
-        .map(|delta| delta.remaining)
-        .unwrap_or_else(|| {
-            if start
-                .map
-                .resources
-                .iter()
-                .any(|resource| resource.id == node)
-            {
-                1
-            } else {
-                0
-            }
-        })
-}
-
-fn resource_mineable_by_completed_resource_depot(
+fn has_pump_jack_for_expansion_depot(
     start: &StartPayload,
     snapshot: &Snapshot,
     player_id: u32,
-    node: u32,
+    starting_depot_id: u32,
 ) -> bool {
-    let Some(resource) = start
-        .map
-        .resources
-        .iter()
-        .find(|resource| resource.id == node)
-    else {
-        return false;
-    };
-    if resource_remaining(start, snapshot, node) == 0 {
-        return false;
-    }
     let range_px = config::MINING_ANCHOR_RANGE_TILES * start.map.tile_size as f32;
     let range2 = range_px * range_px + 0.01;
-    completed_resource_depots(snapshot, player_id)
-        .iter()
-        .any(|resource_depot| {
-            let dx = resource_depot.x - resource.x;
-            let dy = resource_depot.y - resource.y;
-            dx * dx + dy * dy <= range2
-        })
-}
-
-fn has_free_mineable_resource(
-    start: &StartPayload,
-    snapshot: &Snapshot,
-    player_id: u32,
-    kind: EntityKind,
-) -> bool {
-    let mut occupied_nodes: BTreeSet<u32> = snapshot
-        .entities
-        .iter()
-        .filter(|entity| entity.owner == player_id)
-        .filter(|entity| kind_of(entity) == Some(EntityKind::Worker))
-        .filter_map(|entity| entity.latched_node)
-        .collect();
-    for pump_jack in snapshot
+    let expansion_depots = completed_resource_depots(snapshot, player_id)
+        .into_iter()
+        .filter(|depot| depot.id != starting_depot_id);
+    let pump_jacks = snapshot
         .entities
         .iter()
         .filter(|entity| entity.owner == player_id)
         .filter(|entity| kind_of(entity) == Some(EntityKind::PumpJack))
-    {
-        occupied_nodes.extend(oil_nodes_overlapping_pump_jack_entity(
-            start, snapshot, pump_jack,
-        ));
-    }
-    start.map.resources.iter().any(|resource| {
-        resource.kind.parse::<EntityKind>().ok() == Some(kind)
-            && !occupied_nodes.contains(&resource.id)
-            && resource_mineable_by_completed_resource_depot(
-                start,
-                snapshot,
-                player_id,
-                resource.id,
-            )
+        .collect::<Vec<_>>();
+
+    expansion_depots.into_iter().any(|depot| {
+        pump_jacks.iter().any(|pump_jack| {
+            let dx = depot.x - pump_jack.x;
+            let dy = depot.y - pump_jack.y;
+            dx * dx + dy * dy <= range2
+        })
     })
-}
-
-fn oil_nodes_overlapping_pump_jack_entity(
-    start: &StartPayload,
-    snapshot: &Snapshot,
-    pump_jack: &EntityView,
-) -> Vec<u32> {
-    let Some(stats) = config::building_stats(EntityKind::PumpJack) else {
-        return Vec::new();
-    };
-    let tile_size = start.map.tile_size as f32;
-    let half_w = stats.foot_w as f32 * tile_size * 0.5;
-    let half_h = stats.foot_h as f32 * tile_size * 0.5;
-    start
-        .map
-        .resources
-        .iter()
-        .filter(|resource| resource.kind.parse::<EntityKind>().ok() == Some(EntityKind::Oil))
-        .filter(|resource| resource_remaining(start, snapshot, resource.id) > 0)
-        .filter(|resource| {
-            resource.x >= pump_jack.x - half_w - POINT_IN_RECT_EPS_PX
-                && resource.x <= pump_jack.x + half_w + POINT_IN_RECT_EPS_PX
-                && resource.y >= pump_jack.y - half_h - POINT_IN_RECT_EPS_PX
-                && resource.y <= pump_jack.y + half_h + POINT_IN_RECT_EPS_PX
-        })
-        .map(|resource| resource.id)
-        .collect()
-}
-
-fn pump_jack_build_target_oil_node(
-    start: &StartPayload,
-    snapshot: &Snapshot,
-    tile_x: u32,
-    tile_y: u32,
-) -> Option<u32> {
-    let stats = config::building_stats(EntityKind::PumpJack)?;
-    let tile_size = start.map.tile_size as f32;
-    let min_x = tile_x as f32 * tile_size;
-    let min_y = tile_y as f32 * tile_size;
-    let max_x = tile_x.saturating_add(stats.foot_w) as f32 * tile_size;
-    let max_y = tile_y.saturating_add(stats.foot_h) as f32 * tile_size;
-    start
-        .map
-        .resources
-        .iter()
-        .filter(|resource| resource.kind.parse::<EntityKind>().ok() == Some(EntityKind::Oil))
-        .filter(|resource| resource_remaining(start, snapshot, resource.id) > 0)
-        .find(|resource| {
-            resource.x >= min_x - POINT_IN_RECT_EPS_PX
-                && resource.x <= max_x + POINT_IN_RECT_EPS_PX
-                && resource.y >= min_y - POINT_IN_RECT_EPS_PX
-                && resource.y <= max_y + POINT_IN_RECT_EPS_PX
-        })
-        .map(|resource| resource.id)
 }
 
 fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence {
     let players = profile_players();
     let mut game = Game::new_without_ai_controllers(&players, 0x4100_0004);
     let start = game.start_payload();
+    let starting_depot_id = game
+        .snapshot_for(1)
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && kind_of(entity) == Some(EntityKind::ResourceDepot))
+        .map(|entity| entity.id)
+        .expect("player one should start with a Resource Depot");
     let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(ProfileBackedScript::economy_only(1)),
         Box::new(ProfileBackedScript::economy_only(2)),
@@ -219,10 +103,10 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
         {
             evidence.first_second_completed_resource_depot_tick = Some(tick);
         }
-        if evidence.first_mineable_oil_tick.is_none()
-            && has_free_mineable_resource(&start, player_one_snapshot, 1, EntityKind::Oil)
+        if evidence.first_expansion_pump_jack_tick.is_none()
+            && has_pump_jack_for_expansion_depot(&start, player_one_snapshot, 1, starting_depot_id)
         {
-            evidence.first_mineable_oil_tick = Some(tick);
+            evidence.first_expansion_pump_jack_tick = Some(tick);
         }
 
         let mut commands = Vec::new();
@@ -249,59 +133,28 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
         for (player_id, command) in commands {
             if player_id == 1 {
                 if let Command::Gather { node, .. } = &command {
-                    let kind = gather_node_kind(&start, *node);
-                    let has_free_steel = has_free_mineable_resource(
-                        &start,
-                        player_one_snapshot,
-                        1,
-                        EntityKind::Steel,
-                    );
-                    let has_free_oil =
-                        has_free_mineable_resource(&start, player_one_snapshot, 1, EntityKind::Oil);
-                    if player_one_snapshot.supply_used >= 20
-                        && player_one_snapshot.supply_used <= 25
-                        && has_free_steel
-                        && !has_free_oil
-                    {
-                        assert_eq!(
-                            kind,
-                            Some(EntityKind::Steel),
-                            "pre-expansion gather at tick {tick} targeted {kind:?} while only steel was mineable"
-                        );
-                        evidence.pre_expansion_steel_gather_tick.get_or_insert(tick);
-                    }
+                    let kind = start
+                        .map
+                        .resources
+                        .iter()
+                        .find(|resource| resource.id == *node)
+                        .and_then(|resource| resource.kind.parse().ok());
                     assert_ne!(
                         kind,
                         Some(EntityKind::Oil),
-                        "oil at tick {tick} should use Pump Jack construction, not direct gather"
+                        "oil at tick {tick} should use the Depot's automatic Pump Jack job, not direct gather"
                     );
                 }
-                if let Command::Build {
-                    building: EntityKind::PumpJack,
-                    tile_x,
-                    tile_y,
-                    ..
-                } = &command
-                {
-                    let Some(node) = pump_jack_build_target_oil_node(
-                        &start,
-                        player_one_snapshot,
-                        *tile_x,
-                        *tile_y,
-                    ) else {
-                        panic!("Pump Jack build at tick {tick} did not overlap a live oil patch");
-                    };
-                    assert!(
-                        resource_mineable_by_completed_resource_depot(
-                            &start,
-                            player_one_snapshot,
-                            1,
-                            node
-                        ),
-                        "Pump Jack build at tick {tick} targeted a known but non-mineable oil node"
-                    );
-                    evidence.first_pump_jack_build_tick.get_or_insert(tick);
-                }
+                assert!(
+                    !matches!(
+                        command,
+                        Command::Build {
+                            building: EntityKind::PumpJack,
+                            ..
+                        }
+                    ),
+                    "Pump Jack at tick {tick} should come from the Depot's automatic job"
+                );
             }
             game.enqueue(player_id, command);
         }
@@ -313,25 +166,8 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
 }
 
 #[test]
-fn profile_backed_ai_prefers_mineable_steel_over_known_non_mineable_oil() {
-    if crate::skip_unless_full_ai(
-        "profile_backed_ai_prefers_mineable_steel_over_known_non_mineable_oil",
-    ) {
-        return;
-    }
-    let evidence = run_resource_regression_profile(6_000);
-
-    assert!(
-        evidence.pre_expansion_steel_gather_tick.is_some(),
-        "expected a low-to-mid supply pre-expansion steel gather while oil was known but not mineable"
-    );
-}
-
-#[test]
-fn profile_backed_ai_assigns_oil_after_expansion_resource_depot_completes() {
-    if crate::skip_unless_full_ai(
-        "profile_backed_ai_assigns_oil_after_expansion_resource_depot_completes",
-    ) {
+fn profile_backed_expansion_receives_automatic_pump_jack() {
+    if crate::skip_unless_full_ai("profile_backed_expansion_receives_automatic_pump_jack") {
         return;
     }
     let evidence = run_resource_regression_profile(9_000);
@@ -343,15 +179,12 @@ fn profile_backed_ai_assigns_oil_after_expansion_resource_depot_completes() {
         "expected AI 1.0 economy progression to complete an expansion Resource Depot"
     );
     assert!(
-        evidence.first_mineable_oil_tick.is_some(),
-        "expected expansion completion to make at least one oil node mineable"
+        evidence.first_expansion_pump_jack_tick.is_some(),
+        "expected the completed expansion Resource Depot to start an automatic Pump Jack"
     );
     assert!(
-        evidence.first_pump_jack_build_tick.is_some(),
-        "expected profile-backed economy to assign a worker to build a Pump Jack after expansion"
-    );
-    assert!(
-        evidence.first_pump_jack_build_tick >= evidence.first_mineable_oil_tick,
-        "Pump Jack build should not precede the first mineable-oil tick"
+        evidence.first_expansion_pump_jack_tick
+            >= evidence.first_second_completed_resource_depot_tick,
+        "the expansion Pump Jack must not precede its completed Resource Depot"
     );
 }

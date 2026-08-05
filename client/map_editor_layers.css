@@ -10,13 +10,13 @@
   right: auto;
   left: 96px;
   max-height: min(240px, calc(100vh - 70px));
-  padding: 8px 8px 10px;
+  padding: 6px 8px;
 }
 
 .map-editor-layers-window .lab-panel-titlebar {
-  top: -8px;
-  margin-bottom: 4px;
-  padding-bottom: 4px;
+  top: -6px;
+  margin-bottom: 2px;
+  padding-bottom: 2px;
 }
 
 .map-editor-layers-window .lab-panel-resize-handle {
@@ -60,7 +60,7 @@
   gap: 5px;
   align-items: center;
   min-width: 0;
-  padding: 2px 5px;
+  padding: 1px 5px;
   border: 1px solid rgba(208, 184, 132, 0.18);
   border-radius: 4px;
   color: #e7dfce;

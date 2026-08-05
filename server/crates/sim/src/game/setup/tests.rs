@@ -210,6 +210,7 @@ fn unknown_faction_start_and_commands_fail_closed() {
 fn standard_starting_loadout_matches_phase0_inventory() {
     assert_eq!(config::STARTING_WORKERS, 1);
     assert_eq!(config::STARTING_STEEL_MINES, 6);
+    assert_eq!(config::STARTING_PUMP_JACKS, 1);
     let players = [
         PlayerInit {
             id: 1,
@@ -254,6 +255,10 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         assert_eq!(
             owned_kind_count(&game, player.id, EntityKind::SteelMine),
             config::STARTING_STEEL_MINES as usize
+        );
+        assert_eq!(
+            owned_kind_count(&game, player.id, EntityKind::PumpJack),
+            config::STARTING_PUMP_JACKS as usize
         );
         assert_eq!(owned_kind_count(&game, player.id, EntityKind::Depot), 0);
         assert_eq!(owned_kind_count(&game, player.id, EntityKind::Barracks), 0);
@@ -314,6 +319,7 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
 
     assert_eq!(owned_kind_count(&game, 1, EntityKind::Worker), 1);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::SteelMine), 6);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::PumpJack), 1);
     let resource_depot = game
         .state
         .entities
@@ -338,6 +344,23 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
                 && (node.pos_y - mine.pos_y).abs() <= 0.001
         }));
     }
+    let pump_jack = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::PumpJack)
+        .expect("standard start should contain one completed Pump Jack");
+    assert!(!pump_jack.under_construction());
+    assert_eq!(
+        pump_jack.resource_extractor_producer_id(),
+        Some(resource_depot),
+        "starting Pump Jack must belong to the home depot's automatic job"
+    );
+    assert!(game.state.entities.iter().any(|node| {
+        node.kind == EntityKind::Oil
+            && (node.pos_x - pump_jack.pos_x).abs() <= 0.001
+            && (node.pos_y - pump_jack.pos_y).abs() <= 0.001
+    }));
 
     assert_eq!(
         game.state

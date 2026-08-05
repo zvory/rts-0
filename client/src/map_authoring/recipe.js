@@ -50,6 +50,7 @@ export function buildMapFromRecipe(recipe) {
     forestSpans: [],
     concealmentTiles: [],
     noVehicleTiles: [],
+    noBuildingTiles: [],
     damageReductionTiles: [],
     slowMovementTiles: [],
   };

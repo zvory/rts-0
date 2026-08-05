@@ -96,6 +96,7 @@ fn known_kind(kind: &str) -> bool {
             | kinds::ENGINEERING_COMPLEX
             | kinds::FACTORY
             | kinds::STEELWORKS
+            | kinds::STEEL_MINE
             | kinds::PUMP_JACK
             | kinds::STEEL
             | kinds::OIL
@@ -109,7 +110,8 @@ mod tests {
     use rts_sim::protocol::{kinds, EntityView, MapInfo, Snapshot, SnapshotNetStatus};
 
     #[test]
-    fn pump_jack_is_a_known_snapshot_entity() {
+    fn automatic_extractors_are_known_snapshot_entities() {
+        assert!(known_kind(kinds::STEEL_MINE));
         assert!(known_kind(kinds::PUMP_JACK));
     }
 
@@ -152,6 +154,7 @@ mod tests {
             doodads: Vec::new(),
             concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            no_building_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
         };
@@ -167,6 +170,7 @@ mod tests {
             doodads: Vec::new(),
             concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            no_building_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
         };

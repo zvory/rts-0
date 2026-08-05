@@ -42,6 +42,7 @@ assert.equal(map.startLocations.length, 2);
 assert.equal(map.baseSites.length, 2);
 assert.deepEqual(map.concealmentTiles, []);
 assert.deepEqual(map.noVehicleTiles, []);
+assert.deepEqual(map.noBuildingTiles, []);
 assert.deepEqual(map.damageReductionTiles, []);
 assert.deepEqual(map.slowMovementTiles, []);
 for (let y = 0; y < map.height; y += 1) {
@@ -52,7 +53,25 @@ for (let y = 0; y < map.height; y += 1) {
 
 const validation = validateMap(map, { symmetry: "halfTurn" });
 assert(validation.warnings.some((warning) => warning.includes("protected area")), "blocked base clearance is advisory");
+assert(!validation.warnings.some((warning) => warning.includes("unsupported field \"forestSpans\"")),
+  "the CLI validator accepts the current schema's compact Forest field");
 assert(!validation.warnings.some((warning) => warning.includes("symmetry mismatches")), "generated terrain preserves symmetry");
+
+for (const [forestSpans, expected] of [
+  [undefined, "must be an array"],
+  [[[1, 2]], "must be [y, xStart, xEnd]"],
+  [[[1, 4, 3]], "outside the map or has reversed x bounds"],
+  [[[1, 1, 2], [1, 2, 3]], "overlaps another span at (2,1)"],
+  [[[map.height, 1, 1]], "outside the map or has reversed x bounds"],
+]) {
+  const warnings = validateMap({ ...map, forestSpans }).warnings;
+  assert(warnings.some((warning) => warning.includes(expected)),
+    `the CLI validator rejects malformed Forest spans: ${expected}`);
+}
+
+assert(validateMap({ ...map, noBuildingTiles: undefined }).warnings
+  .some((warning) => warning.includes("noBuildingTiles must be an array")),
+"the CLI validator requires the current schema's no-building layer");
 
 const protectedRecipe = {
   name: "Advisory protected terrain",
@@ -186,11 +205,12 @@ const layeredRadial = {
   width: 32,
   height: 32,
   terrain: Array(32).fill(".".repeat(32)),
-  startLocations: radialLocations,
+  startLocations: [...radialLocations],
   baseSites: radialLocations.map((point) => ({ ...point, steelPatches: 4, oilPatches: 1 })),
   doodads: radialDoodads,
-  concealmentTiles: radialLocations,
-  noVehicleTiles: radialLocations,
+  concealmentTiles: [...radialLocations],
+  noVehicleTiles: [...radialLocations],
+  noBuildingTiles: [...radialLocations],
 };
 assert(!validateMap(layeredRadial, { symmetry: "radial" }).warnings.some((warning) => warning.includes("symmetry")));
 layeredRadial.terrain[10] = `${".".repeat(9)}#${".".repeat(22)}`;
@@ -198,9 +218,10 @@ layeredRadial.baseSites[0].steelPatches = 5;
 layeredRadial.startLocations.pop();
 layeredRadial.concealmentTiles.pop();
 layeredRadial.noVehicleTiles.pop();
+layeredRadial.noBuildingTiles.pop();
 layeredRadial.doodads.pop();
 const layeredWarnings = validateMap(layeredRadial, { symmetry: "radial" }).warnings;
-for (const layer of ["terrain", "start locations", "base locations", "concealment tiles", "no-vehicle tiles", "doodads"]) {
+for (const layer of ["terrain", "start locations", "base locations", "concealment tiles", "no-vehicle tiles", "no-building tiles", "doodads"]) {
   assert(layeredWarnings.some((warning) => warning.includes(layer)), `${layer} symmetry is checked`);
 }
 
@@ -210,8 +231,10 @@ assert(preview.includes(">1</text>"));
 
 const layeredPreviewMap = {
   ...map,
+  forestSpans: [[7, 7, 7]],
   concealmentTiles: [{ x: 1, y: 2 }],
   noVehicleTiles: [{ x: 3, y: 4 }],
+  noBuildingTiles: [{ x: 5, y: 6 }],
   doodads: [
     { id: 1, typeId: "tree.oak", x: 64, y: 64 },
     { id: 2, typeId: "unit.tank_trap", x: 80, y: 80 },
@@ -226,8 +249,12 @@ const concealmentPreview = renderPreviewSvg(layeredPreviewMap, { layers: MAP_AUT
 assert(concealmentPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.CONCEALMENT}"`));
 assert(!concealmentPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.BASE}"`));
 assert(!concealmentPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.TREES}"`));
-assert.throws(() => renderPreviewSvg(layeredPreviewMap, { layers: "forest" }), /Unsupported map authoring layer/,
-  "the CLI does not preserve Forest as a combined-layer alias");
+const forestPreview = renderPreviewSvg(layeredPreviewMap, { layers: MAP_AUTHORING_LAYER.FOREST });
+assert(forestPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.FOREST}"`));
+assert(!forestPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.CONCEALMENT}"`),
+  "the CLI previews Forest independently from its materialized gameplay effects");
+assert.throws(() => renderPreviewSvg(layeredPreviewMap, { layers: "forest-effect" }), /Unsupported map authoring layer/,
+  "the CLI rejects unknown combined-layer aliases");
 
 const malformedValidation = validateMap({
   version: currentServerMapVersion,

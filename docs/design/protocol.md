@@ -539,6 +539,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ],
     concealmentTiles: [ { x: u32, y: u32 } ],
     noVehicleTiles: [ { x: u32, y: u32 } ],
+    noBuildingTiles: [ { x: u32, y: u32 } ],
     damageReductionTiles: [ { x: u32, y: u32 } ],
     slowMovementTiles: [ { x: u32, y: u32 } ]
   },
@@ -1433,7 +1434,7 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV8,
+  authoredMap: AuthoredMapV9,
   materializedMap: {
     name: string,
     width: u32,
@@ -1444,6 +1445,7 @@ POST /api/map-handoffs
     doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[],
     concealmentTiles: LabMapTile[],
     noVehicleTiles: LabMapTile[],
+    noBuildingTiles: LabMapTile[],
     damageReductionTiles: LabMapTile[],
     slowMovementTiles: LabMapTile[]
   }
@@ -1452,15 +1454,16 @@ POST /api/map-handoffs
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV8 }
+ | { destination: "editor", authoredMap: AuthoredMapV9 }
 ```
-`AuthoredMapV8` declares independent `width` and `height` tile dimensions, whose product must
+`AuthoredMapV9` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
-`doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `damageReductionTiles`, and
-`slowMovementTiles` arrays. A forest span is `[y, xStart, xEnd]` with inclusive bounds; spans may
-not overlap and materialize into all four gameplay layers. Explicit overlay records remain bounded,
+`doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `noBuildingTiles`, `damageReductionTiles`, and
+`slowMovementTiles` arrays. A forest span is the compact encoding of the first-class composite
+Forest tile: `[y, xStart, xEnd]` with inclusive bounds. Spans may not overlap and each Forest tile
+materializes into all five gameplay layers. Explicit overlay records remain bounded,
 unique, in-bounds tile-coordinate pairs and can independently supplement forest-derived layers.
-Schema v8 is the only accepted authored-map schema. Older documents are rejected rather than
+Schema v9 is the only accepted authored-map schema. Older documents are rejected rather than
 migrated, and every shipped map declares `forestSpans` even when it is empty.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
@@ -1478,7 +1481,7 @@ cluster. Wildflowers have no collision or pathing effect.
 Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
 setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
 rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
-schema-v8 forest spans jointly supply concealment, vehicle exclusion, 25% incoming-damage reduction,
+schema-v9 forest spans jointly supply concealment, vehicle exclusion, building exclusion, 25% incoming-damage reduction,
 and 25% movement-speed reduction; independent explicit overlays can supply any subset outside a
 forest. The damage and movement effects are selected from the tile
 beneath the entity centre.
@@ -1517,6 +1520,7 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }],
       concealmentTiles: [{ x: u32, y: u32 }],
       noVehicleTiles: [{ x: u32, y: u32 }],
+      noBuildingTiles: [{ x: u32, y: u32 }],
       damageReductionTiles: [{ x: u32, y: u32 }],
       slowMovementTiles: [{ x: u32, y: u32 }]
     }

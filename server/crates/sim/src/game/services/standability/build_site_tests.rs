@@ -32,6 +32,22 @@ fn build_site_status_classifies_invalid_footprints_and_terrain() {
 }
 
 #[test]
+fn build_site_status_rejects_any_no_building_tile_in_footprint() {
+    let mut map = flat_map(12);
+    let entities = EntityStore::new();
+    map.no_building_tiles = vec![(5, 5)];
+
+    assert_eq!(
+        building_site_status_for_build_intent(&map, &entities, EntityKind::Depot, 4, 4, u32::MAX),
+        BuildSiteStatus::InvalidFootprint
+    );
+    assert_eq!(
+        building_site_status_for_build_intent(&map, &entities, EntityKind::Depot, 6, 6, u32::MAX),
+        BuildSiteStatus::Clear
+    );
+}
+
+#[test]
 fn build_site_status_classifies_building_and_scaffold_blockers() {
     let map = flat_map(12);
     let (x, y) = footprint_center(&map, EntityKind::Depot, 4, 4);
