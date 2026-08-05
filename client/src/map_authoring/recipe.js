@@ -11,8 +11,9 @@ import {
   MAP_AUTHORING_RECIPE_MAX_WORK_UNITS,
 } from "./limits.js";
 import { MAP_AUTHORING_SYMMETRY, symmetrySupported } from "./symmetry.js";
+import { CURRENT_AUTHORED_MAP_VERSION } from "./schema.js";
 
-export const CURRENT_AUTHORED_MAP_VERSION = 8;
+export { CURRENT_AUTHORED_MAP_VERSION } from "./schema.js";
 export const MAX_AUTHORED_MAP_DIMENSION_TILES = AUTHORED_MAP_MAX_DIMENSION_TILES;
 
 export function buildMapFromRecipe(recipe) {

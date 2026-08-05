@@ -25,6 +25,7 @@ import {
   AUTHORED_MAP_MIN_DIMENSION_TILES,
   boundedAuthoredPatchCount,
 } from "./map_authoring/limits.js";
+import { CURRENT_AUTHORED_MAP_VERSION } from "./map_authoring/schema.js";
 import {
   expandSymmetricPoints,
   MAP_AUTHORING_SYMMETRY,
@@ -49,7 +50,7 @@ export const MAP_EDITOR_MAX_SIZE = AUTHORED_MAP_MAX_DIMENSION_TILES;
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
 export const MAP_EDITOR_SYMMETRY = MAP_AUTHORING_SYMMETRY;
-export const MAP_EDITOR_MAP_VERSION = 8;
+export const MAP_EDITOR_MAP_VERSION = CURRENT_AUTHORED_MAP_VERSION;
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
