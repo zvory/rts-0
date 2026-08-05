@@ -15,6 +15,7 @@ mod extractors;
 /// building and remove the item from the queue. Manual front items that have not paid yet retry
 /// their cost and supply first; standing repeat entries are only inserted after paying. If every
 /// spawn point is blocked, keep the complete item queued and retry next tick.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn production_system(
     _map: &Map,
     entities: &mut EntityStore,
@@ -23,6 +24,7 @@ pub(crate) fn production_system(
     fog: &Fog,
     smokes: &SmokeCloudStore,
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
+    tick: u32,
 ) {
     let mut completed_buildings_by_owner = None;
     for id in entities.ids() {
@@ -39,7 +41,7 @@ pub(crate) fn production_system(
                 .find(|player| player.id == owner)
                 .map(|player| player.faction_id.as_str())
                 .unwrap_or("");
-            for (owner, kind) in extractors::advance_automatic(entities, id, faction_id) {
+            for (owner, kind) in extractors::advance_automatic(entities, id, faction_id, tick) {
                 if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
                     player.record_entity_created(kind);
                 }
@@ -687,6 +689,7 @@ mod tests {
             &fog,
             &smokes,
             &mut events,
+            1,
         );
         coordinator.process_awaiting_paths(&mut entities);
 
@@ -913,6 +916,7 @@ mod tests {
             fog,
             &smokes,
             &mut events,
+            1,
         );
     }
 

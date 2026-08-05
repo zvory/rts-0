@@ -1122,6 +1122,12 @@ impl Entity {
             .and_then(|construction| construction.producer_id)
     }
 
+    pub(crate) fn resource_extractor_producer_id(&self) -> Option<u32> {
+        self.resource_extractor
+            .as_ref()
+            .and_then(|extractor| extractor.producer_id)
+    }
+
     pub fn build_progress_fraction(&self) -> Option<f32> {
         let c = self.construction.as_ref()?;
         Some(if c.total == 0 {
