@@ -138,7 +138,13 @@ export function liveResumeCountdownFromWire(raw) {
   const durationMs = Math.floor(Number(raw.durationMs));
   const remainingMs = Math.floor(Number(raw.remainingMs));
   const words = Array.isArray(raw.words) ? raw.words.map((word) => String(word)) : [];
-  if (durationMs <= 0 || remainingMs <= 0 || words.length === 0) return null;
+  if (
+    !Number.isFinite(durationMs) ||
+    !Number.isFinite(remainingMs) ||
+    durationMs <= 0 ||
+    remainingMs <= 0 ||
+    words.length === 0
+  ) return null;
   return {
     durationMs,
     remainingMs: Math.min(remainingMs, durationMs),

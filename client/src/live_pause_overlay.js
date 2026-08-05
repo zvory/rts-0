@@ -82,7 +82,10 @@ export class LivePauseOverlay {
 
   render() {
     this.el.hidden = !this.state.paused;
-    this.settingsRoot?.classList.toggle("live-pause-active", this.state.paused);
+    this.settingsRoot?.classList.toggle(
+      "live-pause-active",
+      this.state.paused && !this.state.resumeCountdown,
+    );
     this.clearCountdown();
     if (!this.state.paused) {
       this.panel.hidden = false;

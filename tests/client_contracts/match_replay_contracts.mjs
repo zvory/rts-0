@@ -1279,6 +1279,10 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   livePauseStateMatch.publishPredictionDebug = () => {};
   livePauseStateMatch.livePauseOverlay = { applyLivePauseState() {} };
   livePauseStateMatch.syncLivePauseUi = () => {};
+  let closedMenusForResume = 0;
+  livePauseStateMatch.closeMenus = () => {
+    closedMenusForResume += 1;
+  };
   const worldBedStates = [];
   livePauseStateMatch.combatAudio = {
     updateWorldCombatBed(active) { worldBedStates.push(active); },
@@ -1298,6 +1302,16 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     livePauseStateMatch.livePauseState.resumeCountdown?.remainingMs === 2500,
     "live pause state validates the server resume countdown payload",
   );
+  assert(closedMenusForResume === 1, "resume countdown dismisses menus that could obscure it");
+  livePauseStateMatch.applyLivePauseState({
+    paused: true,
+    resumeCountdown: {
+      durationMs: 3000,
+      remainingMs: 2000,
+      words: ["Drei!", "Zwei!", "Eins!"],
+    },
+  });
+  assert(closedMenusForResume === 1, "countdown state refreshes do not repeatedly dismiss menus");
   assert(livePauseStateMatch.state.poseCleared === true, "entering live pause drops pose without clearing progress");
   assert(progressPauseStates.at(-1) === true, "live pause freezes progress prediction for a non-pausing client");
   assert(worldBedStates.at(-1) === false, "entering live pause fades out the world combat bed");

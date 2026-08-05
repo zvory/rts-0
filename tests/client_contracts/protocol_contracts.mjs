@@ -43,11 +43,21 @@ import {
   WEAPON_KIND_CODE,
   cmd,
   decodeServerMessage,
+  liveResumeCountdownFromWire,
   parseServerFrame,
   msg,
 } from "../../client/src/protocol.js";
 
 import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
+
+assert(
+  liveResumeCountdownFromWire({
+    durationMs: undefined,
+    remainingMs: Infinity,
+    words: ["Drei!"],
+  }) === null,
+  "live resume countdown rejects non-finite timing fields",
+);
 
 // ---------------------------------------------------------------------------
 // Protocol

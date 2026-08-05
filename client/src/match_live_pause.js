@@ -22,6 +22,7 @@ export function requestUnpauseGame(match) {
 
 export function applyLivePauseState(match, state) {
   const wasPaused = match.livePauseState.paused === true;
+  const wasResumeCountingDown = match.livePauseState.resumeCountdown != null;
   match.livePauseState = {
     paused: state?.paused === true,
     pausedBy: Number.isInteger(state?.pausedBy) ? state.pausedBy : null,
@@ -31,6 +32,9 @@ export function applyLivePauseState(match, state) {
     canUnpause: state?.canUnpause === true,
     resumeCountdown: liveResumeCountdownFromWire(state?.resumeCountdown),
   };
+  if (match.livePauseState.resumeCountdown && !wasResumeCountingDown) {
+    match.closeMenus?.();
+  }
   if (match.livePauseState.paused) {
     suspendPredictionVisuals(match);
   } else if (wasPaused) {

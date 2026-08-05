@@ -43,6 +43,10 @@ withFakeOverlayDocument(({ FakeElement }) => {
   assert(!countdown.hidden && countdown.textContent === "Zwei!", "resume countdown joins at the server-reported phase");
   assert(playedCountdown[0] === "countdown_zwei", "resume countdown plays the matching spoken cue");
   assert(overlay.panel.hidden, "resume countdown replaces pause actions until play restarts");
+  assert(
+    !settingsRoot.classList.contains("live-pause-active"),
+    "resume countdown lowers settings beneath its screen blocker",
+  );
   overlay.applyLivePauseState({ paused: true, canUnpause: false });
   assert(button.hidden && button.disabled && countdown.hidden, "live pause overlay hides unpause without authority");
   overlay.applyLivePauseState({ paused: false });
