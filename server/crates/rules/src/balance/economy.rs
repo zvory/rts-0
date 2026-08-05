@@ -10,6 +10,7 @@ pub const STARTING_STEEL: u32 = 75;
 pub const STARTING_OIL: u32 = 0;
 pub const STARTING_WORKERS: u32 = 1;
 pub const STARTING_STEEL_MINES: u32 = 6;
+pub const STARTING_PUMP_JACKS: u32 = 1;
 
 pub const STEEL_LOAD: u32 = 2;
 pub const OIL_LOAD: u32 = 2;

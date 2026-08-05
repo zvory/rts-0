@@ -179,7 +179,7 @@ fn destroyed_automatic_extractor_scaffold_waits_five_seconds_then_restarts_free(
         .find(|entity| {
             entity.kind.is_resource_extractor()
                 && entity.kind != kind
-                && entity.resource_extractor_producer_id() == Some(resource_depot)
+                && entity.construction_producer_id() == Some(resource_depot)
         })
         .map(|entity| entity.id)
         .expect("the other automatic extractor scaffold should exist");
@@ -254,6 +254,16 @@ fn killed_completed_automatic_extractor_cooldown_survives_checkpoint_restore() {
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::ResourceDepot)
         .map(|entity| entity.id)
         .expect("player resource depot should exist");
+    let starting_pump_jacks = game
+        .state
+        .entities
+        .iter()
+        .filter(|entity| {
+            entity.kind == EntityKind::PumpJack
+                && entity.resource_extractor_producer_id() == Some(resource_depot)
+        })
+        .map(|entity| entity.id)
+        .collect::<Vec<_>>();
 
     for _ in 0..config::building_stats(EntityKind::PumpJack)
         .expect("pump jack stats")
@@ -270,6 +280,7 @@ fn killed_completed_automatic_extractor_cooldown_survives_checkpoint_restore() {
             entity.kind == EntityKind::PumpJack
                 && !entity.under_construction()
                 && entity.resource_extractor_producer_id() == Some(resource_depot)
+                && !starting_pump_jacks.contains(&entity.id)
         })
         .map(|entity| entity.id)
         .expect("automatic Pump Jack should complete and retain its producer");
@@ -284,6 +295,7 @@ fn killed_completed_automatic_extractor_cooldown_survives_checkpoint_restore() {
     assert!(game.state.entities.iter().all(|entity| {
         entity.kind != EntityKind::PumpJack
             || entity.resource_extractor_producer_id() != Some(resource_depot)
+            || starting_pump_jacks.contains(&entity.id)
     }));
     let checkpoint = game
         .checkpoint_payload_text_for_test()
@@ -298,6 +310,7 @@ fn killed_completed_automatic_extractor_cooldown_survives_checkpoint_restore() {
         assert!(game.state.entities.iter().all(|entity| {
             entity.kind != EntityKind::PumpJack
                 || entity.resource_extractor_producer_id() != Some(resource_depot)
+                || starting_pump_jacks.contains(&entity.id)
         }));
     }
 
@@ -306,6 +319,7 @@ fn killed_completed_automatic_extractor_cooldown_survives_checkpoint_restore() {
         entity.kind == EntityKind::PumpJack
             && entity.under_construction()
             && entity.resource_extractor_producer_id() == Some(resource_depot)
+            && !starting_pump_jacks.contains(&entity.id)
     }));
 }
 
