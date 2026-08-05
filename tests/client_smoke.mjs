@@ -427,7 +427,7 @@ try {
       extractorSlots.steelMineTooltip.includes("24s") &&
       extractorSlots.pumpJackHotkey === "E" &&
       extractorSlots.pumpJackCost === "" &&
-      extractorSlots.pumpJackTooltip.includes("24s"),
+      extractorSlots.pumpJackTooltip.includes("36s"),
     `PRODUCTION: Depot shows automatic free W Steel Mine and E Pump Jack jobs with build times (${JSON.stringify(extractorSlots)})`,
   );
 
