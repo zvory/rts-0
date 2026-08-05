@@ -16,10 +16,8 @@ export function parseMapPreviewArgs(argv) {
   const options = {
     map: "",
     out: "",
-    kind: "world",
     width: 2048,
     height: 2048,
-    padding: 24,
     url: DEFAULT_URL,
     chrome: process.env.CHROME || "",
     browserDpr: 1,
@@ -37,14 +35,10 @@ export function parseMapPreviewArgs(argv) {
     else if (arg.startsWith("--map=")) options.map = path.resolve(arg.slice(6));
     else if (arg === "--out") options.out = path.resolve(value());
     else if (arg.startsWith("--out=")) options.out = path.resolve(arg.slice(6));
-    else if (arg === "--kind") options.kind = value();
-    else if (arg.startsWith("--kind=")) options.kind = arg.slice(7);
     else if (arg === "--width") options.width = integer(value(), arg);
     else if (arg.startsWith("--width=")) options.width = integer(arg.slice(8), "--width");
     else if (arg === "--height") options.height = integer(value(), arg);
     else if (arg.startsWith("--height=")) options.height = integer(arg.slice(9), "--height");
-    else if (arg === "--padding") options.padding = integer(value(), arg, { allowZero: true });
-    else if (arg.startsWith("--padding=")) options.padding = integer(arg.slice(10), "--padding", { allowZero: true });
     else if (arg === "--url") options.url = value();
     else if (arg.startsWith("--url=")) options.url = arg.slice(6);
     else if (arg === "--chrome") options.chrome = value();
@@ -64,7 +58,7 @@ export function parseMapPreviewArgs(argv) {
       throw new Error("--out must use a .png, .jpg, or .jpeg extension");
     }
     options.format = extension === ".png" ? "png" : "jpeg";
-    if (!new Set(["world", "minimap"]).has(options.kind)) throw new Error("--kind must be world or minimap");
+    if (options.width !== options.height) throw new Error("minimap preview width and height must match");
     options.url = localServerUrl(options.url);
   }
   return options;
@@ -109,7 +103,7 @@ export async function renderMapPreview(options, dependencies = {}) {
     const result = await withTimeout(
       page.evaluate(
         (request) => globalThis.__rtsMapPreview.call("capture", request),
-        { kind: options.kind, width: options.width, height: options.height, padding: options.padding },
+        { width: options.width, height: options.height },
       ),
       dependencies.captureTimeoutMs || CAPTURE_TIMEOUT_MS,
       "Map preview browser capture timed out.",
@@ -139,7 +133,7 @@ export async function renderMapPreview(options, dependencies = {}) {
     return Object.freeze({
       map: path.resolve(options.map),
       out: options.out,
-      kind: options.kind,
+      kind: "minimap",
       format: options.format,
       width: dimensions.width,
       height: dimensions.height,
@@ -285,10 +279,8 @@ function usage() {
   node scripts/map-preview.mjs --map MAP.json --out PREVIEW.png|PREVIEW.jpg [options]
 
 Options:
-  --kind world|minimap   Live Match world renderer or live Match minimap (default: world)
-  --width N              Output width in pixels (default: 2048; capture page allows 64–4096)
-  --height N             Output height in pixels (default: 2048; capture page allows 64–4096)
-  --padding N            World-preview edge padding in pixels (default: 24)
+  --width N              Square output width in pixels (default: 2048; allows 64–4096)
+  --height N             Square output height in pixels (default: 2048; allows 64–4096)
   --url URL              Running local RTS server (default: ${DEFAULT_URL})
   --chrome PATH          Chrome/Chromium executable (or set CHROME)
   --browser-dpr N        Browser device scale for DPR regression checks (default: 1)

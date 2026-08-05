@@ -3,7 +3,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { Camera } from "../../client/src/camera.js";
 import { mapPreviewLaunchConfig } from "../../client/src/map_preview_launch.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { Fog } from "../../client/src/fog.js";
@@ -11,7 +10,6 @@ import { captureMinimapPng } from "../../client/src/minimap_capture.js";
 import {
   analyzeRgba,
   installMapPreviewStartupStatus,
-  MAP_PREVIEW_CAMERA_MIN_ZOOM,
   MAP_PREVIEW_LIMITS,
   MapPreviewBridge,
   normalizeCaptureRequest,
@@ -46,57 +44,17 @@ assert.match(mapPreviewLaunchConfig({ pathname: "/map-preview", search: "?handof
   delete globalThis.__rtsMapPreview;
 }
 
-assert.deepEqual(normalizeCaptureRequest({ kind: "world", width: 1200, height: 800, padding: 40 }), {
-  kind: "world", width: 1200, height: 800, padding: 40,
+assert.deepEqual(normalizeCaptureRequest({ width: 1024, height: 1024 }), {
+  kind: "minimap", width: 1024, height: 1024,
 });
-assert.deepEqual(normalizeCaptureRequest({ kind: "minimap", width: 1024, height: 1024 }), {
-  kind: "minimap", width: 1024, height: 1024, padding: 0,
-});
-assert.throws(() => normalizeCaptureRequest({ kind: "minimap", width: 1024, height: 512 }), /square/);
-assert.throws(
-  () => normalizeCaptureRequest({
-    kind: "world",
-    width: MAP_PREVIEW_LIMITS.maxDimension,
-    height: MAP_PREVIEW_LIMITS.maxDimension,
-    padding: 1500,
-  }),
-  /padding/,
-);
-assert.throws(() => normalizeCaptureRequest({ kind: "world", width: 63, height: 64 }), /64/);
+assert.throws(() => normalizeCaptureRequest({ width: 1024, height: 512 }), /square/);
+assert.throws(() => normalizeCaptureRequest({ width: 63, height: 63 }), /64/);
 assert.deepEqual(analyzeRgba(Uint8Array.from([0, 0, 0, 255, 1, 2, 3, 255])), {
   pixelCount: 2,
   uniqueColors: 2,
   dominantColorPixels: 1,
   nonDominantPixels: 1,
 });
-
-{
-  const outputPixels = 2048;
-  const padding = 32;
-  const worldPixels = 256 * 32;
-  const corners = [
-    { x: 0, y: 0 },
-    { x: worldPixels, y: 0 },
-    { x: worldPixels, y: worldPixels },
-    { x: 0, y: worldPixels },
-  ];
-  const normalCamera = new Camera(outputPixels, outputPixels);
-  normalCamera.setMapBounds(worldPixels, worldPixels);
-  normalCamera.fitWorldPoints(corners, { paddingCssPx: padding });
-  assert.equal(normalCamera.zoom, 0.4, "the normal live camera retains its gameplay zoom floor");
-  assert.ok(outputPixels / normalCamera.zoom < worldPixels, "the gameplay floor cannot frame a 256×256 map");
-
-  const previewCamera = new Camera(outputPixels, outputPixels, { minZoom: MAP_PREVIEW_CAMERA_MIN_ZOOM });
-  previewCamera.setMapBounds(worldPixels, worldPixels);
-  previewCamera.fitWorldPoints(corners, { paddingCssPx: padding });
-  assert.equal(previewCamera.zoom, (outputPixels - padding * 2) / worldPixels);
-  assert.ok(outputPixels / previewCamera.zoom >= worldPixels,
-    "the preview-only camera floor fits every edge of a 256×256 map at the default export size");
-  const appSource = fs.readFileSync(new URL("../../client/src/app.js", import.meta.url), "utf8");
-  const matchSource = fs.readFileSync(new URL("../../client/src/match.js", import.meta.url), "utf8");
-  assert.match(appSource, /cameraMinZoom: this\.mapPreviewLaunch \? MAP_PREVIEW_CAMERA_MIN_ZOOM : undefined/);
-  assert.match(matchSource, /minZoom: options\.cameraMinZoom \?\? autoSpectatorCameraMinZoom/);
-}
 
 {
   const fog = new Fog(2, 2);
@@ -140,7 +98,7 @@ assert.deepEqual(analyzeRgba(Uint8Array.from([0, 0, 0, 255, 1, 2, 3, 255])), {
   await MapEditorPanel.prototype.openPreview.call(panel);
   assert.deepEqual(handedOff, [{ authoredMap: { name: "UI preview" }, materializedMap: { width: 16, height: 16 } }]);
   assert.equal(panel.pending, false);
-  assert.equal(statuses.at(-1).message, "Opened the PNG preview page.");
+  assert.equal(statuses.at(-1).message, "Opened the minimap preview page.");
 }
 
 {
@@ -182,9 +140,9 @@ try {
     return 1;
   };
   const initialization = bridge.initialize();
-  assert.equal(bridge.status().state, "starting", "capture is not advertised before initial fitting settles");
+  assert.equal(bridge.status().state, "starting", "capture is not advertised before initial minimap rendering settles");
   await assert.rejects(
-    bridge.call("capture", { kind: "world", width: 64, height: 64, padding: 0 }),
+    bridge.call("capture", { width: 64, height: 64 }),
     /still starting/,
   );
   releaseInitialization();
@@ -194,20 +152,21 @@ try {
   globalThis.requestAnimationFrame = (callback) => { queueMicrotask(callback); return 1; };
   assert.equal(bridge.status().state, "ready");
   assert.ok(fixture.app.cleanCalls.every(Boolean), "initial preview hides app chrome");
-  assert.equal(fixture.camera.fitCalls.length, 1, "initial preview fits the complete map before any export");
+  const previewChildren = fixture.root.children[0].children;
+  assert.ok(previewChildren.some((child) => child.className === "map-preview-image"
+      && child.src === "data:image/png;base64,minimap"),
+    "the preview page presents the captured minimap instead of the world viewport");
+  assert.ok(previewChildren.some((child) => child.textContent === "Download minimap PNG (2048 px)"));
+  assert.ok(previewChildren.every((child) => !/world/i.test(child.textContent || "")),
+    "the preview controls expose no world-render capture");
 
-  const world = await bridge.call("capture", { kind: "world", width: 64, height: 64, padding: 0 });
-  assert.equal(world.width, 64);
-  assert.equal(world.height, 64);
-  assert.deepEqual(fixture.renderer.resizeCalls[0], [64, 64, 1],
-    "world output forces DPR 1 even in a DPR 2 browser");
-  assert.equal(fixture.camera.fitCalls.length, 3,
-    "capture fits its exact surface, then restores the fitted interactive preview");
-
-  const minimap = await bridge.call("capture", { kind: "minimap", width: 64, height: 64 });
+  const minimap = await bridge.call("capture", { width: 64, height: 64 });
   assert.equal(minimap.authoritative, true);
-  assert.deepEqual(fixture.minimap.captureCalls, [{ width: 64, height: 64 }],
-    "bridge delegates high-resolution output to the live Minimap");
+  assert.equal(minimap.kind, "minimap");
+  assert.deepEqual(fixture.minimap.captureCalls, [
+    { width: 512, height: 512 },
+    { width: 64, height: 64 },
+  ], "the visible preview and high-resolution export both use the live Minimap");
   bridge.destroy();
   assert.equal(fixture.documentObj.body.classList.has("map-preview-mode"), false);
 } finally {
@@ -217,60 +176,9 @@ try {
 }
 
 {
-  const savedImageData2 = globalThis.ImageData;
-  const savedRaf2 = globalThis.requestAnimationFrame;
-  globalThis.ImageData = class ImageData {
-    constructor(data, width, height) { this.data = data; this.width = width; this.height = height; }
-  };
-  globalThis.requestAnimationFrame = (callback) => { queueMicrotask(callback); return 1; };
-  try {
-    let resolveLateFrame;
-    const lateFrame = new Promise((resolve) => { resolveLateFrame = resolve; });
-    const fixture = createBridgeFixture({ renderPromise: lateFrame });
-    const bridge = new MapPreviewBridge({ ...fixture, captureTimeoutMs: 2 });
-    await bridge.initialize();
-    await Promise.race([
-      assert.rejects(
-        bridge.call("capture", { kind: "world", width: 64, height: 64, padding: 0 }),
-        /timed out/,
-      ),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("capture deadline did not settle")), 100)),
-    ]);
-    assert.equal(fixture.renderer.readCalls, 0,
-      "deadline rejection does not continue into framebuffer readback");
-    assert.equal(bridge.captureActive, false, "deadline releases the capture lock");
-    assert.equal(fixture.match.exitCount, 1, "hung fixed capture exits before rejection");
-    assert.equal(fixture.match.resizeCount, 3,
-      "hung capture restores renderer, then fitted preview, after the initial preview resize");
-    const stable = {
-      exits: fixture.match.exitCount,
-      resizes: fixture.match.resizeCount,
-      fits: fixture.camera.fitCalls.length,
-      reads: fixture.renderer.readCalls,
-    };
-    resolveLateFrame({ rendererFrame: 9 });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.deepEqual(
-      {
-        exits: fixture.match.exitCount,
-        resizes: fixture.match.resizeCount,
-        fits: fixture.camera.fitCalls.length,
-        reads: fixture.renderer.readCalls,
-      },
-      stable,
-      "late fixed-frame completion cannot mutate restored preview state",
-    );
-  } finally {
-    globalThis.ImageData = savedImageData2;
-    globalThis.requestAnimationFrame = savedRaf2;
-  }
-}
-
-{
   const options = parseMapPreviewArgs([
     "--map", "server/assets/maps/1v1-no-terrain.json",
     "--out", "target/map-preview.png",
-    "--kind", "minimap",
     "--width", "1024",
     "--height", "1024",
     "--browser-dpr", "2",
@@ -278,6 +186,15 @@ try {
   ]);
   assert.equal(options.browserDpr, 2);
   assert.equal(options.url, "http://localhost:8099/");
+  assert.equal(options.width, options.height, "the CLI accepts only square minimap output");
+  assert.throws(
+    () => parseMapPreviewArgs(["--map", "map.json", "--out", "map.png", "--width", "512", "--height", "256"]),
+    /must match/,
+  );
+  assert.throws(
+    () => parseMapPreviewArgs(["--map", "map.json", "--out", "map.png", "--kind", "world"]),
+    /unknown argument/,
+  );
   assert.throws(
     () => parseMapPreviewArgs(["--map", "map.json", "--out", "map.png", "--url", "https://example.com"]),
     /loopback/,
@@ -298,7 +215,6 @@ try {
   const jpegOptions = parseMapPreviewArgs([
     "--map", "server/assets/maps/schone-tage.json",
     "--out", "target/map-preview.jpg",
-    "--kind", "minimap",
     "--width", "512",
     "--height", "512",
     "--browser-dpr", "2",
@@ -392,7 +308,6 @@ try {
   const result = await renderMapPreview(parseMapPreviewArgs([
     "--map", "server/assets/maps/schone-tage.json",
     "--out", out,
-    "--kind", "minimap",
     "--width", "512",
     "--height", "512",
     "--chrome", "/bin/sh",
@@ -428,7 +343,7 @@ try {
   }
 }
 
-function createBridgeFixture({ renderPromise = null } = {}) {
+function createBridgeFixture() {
   const rgba = new Uint8Array(64 * 64 * 4);
   for (let index = 0; index < rgba.length; index += 4) {
     rgba[index] = (index / 4) % 2;
@@ -451,26 +366,6 @@ function createBridgeFixture({ renderPromise = null } = {}) {
       return node;
     },
   };
-  const renderer = {
-    resizeCalls: [],
-    readCalls: 0,
-    resize(...args) { this.resizeCalls.push(args); },
-    captureReadiness() {
-      return { ready: true, failedAssets: [], pendingAssets: [], renderErrors: [], missingTextureSubjectIds: [] };
-    },
-    async readPresentedPixels(frameId) {
-      this.readCalls += 1;
-      assert.equal(frameId, 9);
-      return { width: 64, height: 64, rgba };
-    },
-  };
-  const camera = {
-    fitCalls: [],
-    snapshot: () => ({ version: 1, focus: { x: 1, y: 1 }, zoom: 1 }),
-    resize() {},
-    restore() {},
-    fitWorldPoints(points, options) { this.fitCalls.push({ points, options }); },
-  };
   const minimap = {
     captureCalls: [],
     canvas: { width: 220, height: 220, toDataURL: () => "data:image/png;base64,minimap" },
@@ -484,22 +379,13 @@ function createBridgeFixture({ renderPromise = null } = {}) {
       map: { name: "Authority", width: 16, height: 16, tileSize: 32, resources: [{ id: 7 }] },
       entitiesInterpolated: () => [{ id: 1, kind: "resourceDepot" }, { id: 2, kind: "steelNode" }],
     },
-    renderer,
-    camera,
     minimap,
     fog: { revealAll: false, setRevealAll(value) { this.revealAll = value; } },
     resizeCount: 0,
-    exitCount: 0,
     handleResize() { this.resizeCount += 1; },
-    enterFixedCapture() { return { visualStartMs: 100 }; },
-    async renderFixedCaptureFrame() {
-      if (renderPromise) return renderPromise;
-      return { rendererFrame: 9 };
-    },
-    exitFixedCapture() { this.exitCount += 1; },
   };
   const app = { cleanCalls: [], setCleanPresentation(value) { this.cleanCalls.push(value); } };
-  return { app, match, renderer, camera, minimap, documentObj, root };
+  return { app, match, minimap, documentObj, root };
 }
 
 function fakeNode(kind) {
@@ -508,13 +394,20 @@ function fakeNode(kind) {
     children: [],
     dataset: {},
     disabled: false,
+    textContent: "",
     append(...children) { this.children.push(...children); },
     appendChild(child) { this.children.push(child); },
     remove() { this.removed = true; },
     addEventListener() {},
     setAttribute() {},
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
+    querySelector(selector) {
+      const dataKey = selector === "[data-map-preview-image]"
+        ? "mapPreviewImage"
+        : selector === "[data-map-preview-status]" ? "mapPreviewStatus" : "";
+      if (!dataKey) return null;
+      return this.children.find((child) => Object.hasOwn(child.dataset || {}, dataKey)) || null;
+    },
+    querySelectorAll(selector) { return selector === "button" ? this.children.filter((child) => child.kind === "button") : []; },
     click() {},
   };
 }

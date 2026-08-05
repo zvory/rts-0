@@ -325,13 +325,13 @@ export class Minimap {
     const now = performance.now();
     const attackFlashIds = this._underAttackFlashEntityIds(entities, now);
     this._drawTerrainLayer();
-    this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
-    this._drawFog();
     this._forestLayer.draw({
       ctx: this.ctx, map: this._renderMap(), size: this.size,
       scale: this._scale, offX: this._offX, offY: this._offY,
       presentation: this._canvasPresentationSignature(),
     });
+    this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
+    this._drawFog();
     this._roadMarkingLayer.draw({
       ctx: this.ctx, map: this._renderMap(), size: this.size,
       scale: this._scale, offX: this._offX, offY: this._offY,
