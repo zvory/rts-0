@@ -160,7 +160,7 @@ Current scenario ids:
   of it. The regression requires the car to route around the lake without body overlap and reach
   the exact destination instead of stalling at a corner.
 - `replay_256_worker_expansion_rally` — replay 220 / match 256 reconstructed from its production
-  source: a Resource Depot produces four workers at the real 495-tick cadence and rallies them
+  source: a Resource Depot produces four workers at the real 150-tick cadence and rallies them
   across the map. They naturally share the opening route beside a deployed Machine Gunner, making
   the scenario expose both excessive traffic steering and stale-waypoint recovery behavior.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
