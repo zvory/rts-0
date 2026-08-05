@@ -1464,8 +1464,8 @@ struct WallChokepointTiming {
 }
 
 const SNAKING_CORRIDOR_REGRESSION_BASELINES: &[(EntityKind, usize, u32)] = &[
-    (EntityKind::Worker, 1, 2_295),
-    (EntityKind::Worker, 4, 2_322),
+    (EntityKind::Worker, 1, 2_602),
+    (EntityKind::Worker, 4, 2_629),
     (EntityKind::Rifleman, 1, 2_295),
     (EntityKind::Rifleman, 4, 2_322),
     (EntityKind::MachineGunner, 1, 2_883),

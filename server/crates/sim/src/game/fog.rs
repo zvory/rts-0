@@ -28,6 +28,7 @@ use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use serde::{Deserialize, Serialize};
 
+mod concealment_detection;
 mod presentation;
 mod reveal_provenance;
 mod smoke_melee;
@@ -88,6 +89,8 @@ pub struct Fog {
     /// itself was dark before the stamp. Combat uses this instead of inferring provenance from the
     /// flattened actionable grid.
     firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
+    /// Viewer -> concealed entity -> exclusive expiry tick for close-contact detection.
+    concealment_detection_until: BTreeMap<u32, BTreeMap<u32, u32>>,
 }
 
 impl Fog {
@@ -98,6 +101,7 @@ impl Fog {
             grids: HashMap::new(),
             explored_grids: HashMap::new(),
             firing_reveal_visibility: BTreeMap::new(),
+            concealment_detection_until: BTreeMap::new(),
         }
     }
 
@@ -107,6 +111,7 @@ impl Fog {
         grids: BTreeMap<u32, Vec<bool>>,
         mut explored_grids: BTreeMap<u32, Vec<bool>>,
         firing_reveal_visibility: BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>>,
+        concealment_detection_until: BTreeMap<u32, BTreeMap<u32, u32>>,
     ) -> Self {
         // Normalize legacy/malformed state to keep ordinary visible tiles explored. Actionable
         // firing-reveal stamps are intentionally presentation-dark and must stay unexplored when
@@ -139,6 +144,7 @@ impl Fog {
             grids: grids.into_iter().collect(),
             explored_grids: explored_grids.into_iter().collect(),
             firing_reveal_visibility,
+            concealment_detection_until,
         }
     }
 
@@ -164,6 +170,12 @@ impl Fog {
         &self,
     ) -> BTreeMap<u32, BTreeMap<u32, FiringRevealVisibility>> {
         self.firing_reveal_visibility.clone()
+    }
+
+    pub(in crate::game) fn checkpoint_concealment_detection_until(
+        &self,
+    ) -> BTreeMap<u32, BTreeMap<u32, u32>> {
+        self.concealment_detection_until.clone()
     }
 
     /// Recompute visibility for all `players` from the union of their entities' sight circles.

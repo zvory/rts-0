@@ -1,21 +1,22 @@
-import { DOODAD_TYPE } from "../config.js";
+import { DOODAD_TYPE, TREE_DOODAD_GEOMETRY } from "../config.js";
 
 export const MAX_DOODADS = 4096;
 
-const TREE_SPECS = Object.freeze({
-  oak: Object.freeze({ widthPx: 119, heightPx: 112, anchorY: 0.94, windAmplitude: 0.025, windRate: 0.00115, shadowX: 34, shadowY: 9 }),
-  pine: Object.freeze({ widthPx: 120, heightPx: 122, anchorY: 0.96, windAmplitude: 0.018, windRate: 0.001, shadowX: 34, shadowY: 8 }),
-  spruce: Object.freeze({ widthPx: 103, heightPx: 126, anchorY: 0.96, windAmplitude: 0.016, windRate: 0.00095, shadowX: 30, shadowY: 8 }),
-  alder: Object.freeze({ widthPx: 93, heightPx: 102, anchorY: 0.94, windAmplitude: 0.027, windRate: 0.0012, shadowX: 27, shadowY: 8 }),
+const TREE_PRESENTATION = Object.freeze({
+  [DOODAD_TYPE.TREE_OAK]: Object.freeze({ windAmplitude: 0.025, windRate: 0.00115, shadowX: 34, shadowY: 9 }),
+  [DOODAD_TYPE.TREE_PINE]: Object.freeze({ windAmplitude: 0.018, windRate: 0.001, shadowX: 34, shadowY: 8 }),
+  [DOODAD_TYPE.TREE_SPRUCE]: Object.freeze({ windAmplitude: 0.016, windRate: 0.00095, shadowX: 30, shadowY: 8 }),
+  [DOODAD_TYPE.TREE_ALDER]: Object.freeze({ windAmplitude: 0.027, windRate: 0.0012, shadowX: 27, shadowY: 8 }),
 });
 
 const entries = {};
-for (const [species, spec] of Object.entries(TREE_SPECS)) {
-  const typeId = `tree.${species}`;
+for (const [typeId, geometry] of Object.entries(TREE_DOODAD_GEOMETRY)) {
+  const species = typeId.slice("tree.".length);
   entries[typeId] = treeEntry({
     typeId,
     image: `/assets/doodads/tree-${species}.png`,
-    ...spec,
+    ...geometry,
+    ...TREE_PRESENTATION[typeId],
   });
 }
 

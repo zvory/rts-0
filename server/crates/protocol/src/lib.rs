@@ -50,7 +50,7 @@ pub use rts_contract::{
     VisibilityCapabilities, DEFAULT_FACTION_ID, GAME_CHECKPOINT_CURRENT_VERSION,
     MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
-pub use server_message::ServerMessage;
+pub use server_message::{LivePauseState, LiveResumeCountdown, ServerMessage};
 
 /// A gameplay command. Validated when applied, not when received.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -370,21 +370,6 @@ pub struct BranchStagingSeat {
 pub struct BranchStagingOccupant {
     pub id: u32,
     pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LivePauseState {
-    pub paused: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub paused_by: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pauses_remaining: Option<u8>,
-    pub pause_limit: u8,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub can_pause: bool,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub can_unpause: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

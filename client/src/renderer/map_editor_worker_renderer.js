@@ -176,9 +176,14 @@ export class MapEditorWorkerRenderer {
     }
     if (overlay.paintPreview) {
       const preview = overlay.paintPreview;
-      gfxStroke(this.overlay, 2, preview.color, 0.9);
-      gfxRect(gfxFill(this.overlay, preview.color, 0.16), preview.x, preview.y, preview.width, preview.height);
-      gfxNoFill(this.overlay);
+      if (Array.isArray(preview.paths)) {
+        gfxStrokePaths(this.overlay, preview.paths, preview.lineWidth, preview.color, 0.22);
+        gfxStrokePaths(this.overlay, preview.paths, 2, preview.color, 0.94);
+      } else {
+        gfxStroke(this.overlay, 2, preview.color, 0.9);
+        gfxRect(gfxFill(this.overlay, preview.color, 0.16), preview.x, preview.y, preview.width, preview.height);
+        gfxNoFill(this.overlay);
+      }
     }
   }
 
@@ -217,7 +222,7 @@ export class MapEditorWorkerRenderer {
 }
 
 const OVERLAY_VISUALS = Object.freeze({
-  stealth: Object.freeze({ color: 0x2f9f78, icon: drawClosedEye }),
+  concealment: Object.freeze({ color: 0x2f9f78, icon: drawClosedEye }),
   noVehicle: Object.freeze({ color: 0xd94b45, icon: drawNoEntry }),
   damageReduction: Object.freeze({ color: 0x3e82d7, icon: drawHalfShield }),
   slowMovement: Object.freeze({ color: 0x8b5fc7, icon: drawMiredBoot }),
@@ -230,11 +235,20 @@ function drawGameplayOverlays(graphics, overlay, visibility) {
     for (const tile of tiles || []) {
       const key = `${tile.x}:${tile.y}`;
       const entry = byTile.get(key) || { x: tile.x, y: tile.y, effects: [] };
-      entry.effects.push(kind);
+      if (!entry.effects.includes(kind)) entry.effects.push(kind);
       byTile.set(key, entry);
     }
   };
-  add("stealth", overlay.stealthTiles, MAP_AUTHORING_LAYER.STEALTH);
+  for (const tile of overlay.forestTiles || []) {
+    const key = `${tile.x}:${tile.y}`;
+    const effects = [];
+    if (visibility[MAP_AUTHORING_LAYER.CONCEALMENT]) effects.push("concealment");
+    if (visibility[MAP_AUTHORING_LAYER.NO_VEHICLE]) effects.push("noVehicle");
+    if (visibility[MAP_AUTHORING_LAYER.DAMAGE_REDUCTION]) effects.push("damageReduction");
+    if (visibility[MAP_AUTHORING_LAYER.SLOW_MOVEMENT]) effects.push("slowMovement");
+    if (effects.length) byTile.set(key, { x: tile.x, y: tile.y, effects });
+  }
+  add("concealment", overlay.concealmentTiles, MAP_AUTHORING_LAYER.CONCEALMENT);
   add("noVehicle", overlay.noVehicleTiles, MAP_AUTHORING_LAYER.NO_VEHICLE);
   add("damageReduction", overlay.damageReductionTiles, MAP_AUTHORING_LAYER.DAMAGE_REDUCTION);
   add("slowMovement", overlay.slowMovementTiles, MAP_AUTHORING_LAYER.SLOW_MOVEMENT);

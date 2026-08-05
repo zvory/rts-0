@@ -10,7 +10,7 @@ use super::super::live_tick::{LiveTickDriver, LiveTickResult};
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase};
 use super::super::{normalize_start_team_id, CommandLifecycleTiming, PlayerInit};
-use super::helpers::{late_spectator_notice_name, live_ai_controllers, LIVE_PAUSE_LIMIT};
+use super::helpers::{late_spectator_notice_name, live_ai_controllers};
 use super::types::{PendingClientCommandAck, Phase, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{
@@ -285,21 +285,7 @@ impl RoomTask {
 
     fn live_pause_state_for(&self, connection_id: u32) -> LivePauseState {
         let actor_id = self.live_pause_actor_for_connection(connection_id);
-        let pauses_remaining = actor_id.map(|actor_id| {
-            LIVE_PAUSE_LIMIT
-                .saturating_sub(self.live_pause_counts.get(&actor_id).copied().unwrap_or(0))
-        });
-        let can_pause = pauses_remaining
-            .map(|remaining| !self.live_paused && remaining > 0)
-            .unwrap_or(false);
-        LivePauseState {
-            paused: self.live_paused,
-            paused_by: self.live_paused_by,
-            pauses_remaining,
-            pause_limit: LIVE_PAUSE_LIMIT,
-            can_pause,
-            can_unpause: self.live_paused && actor_id.is_some(),
-        }
+        self.live_pause.state_for(actor_id)
     }
 
     fn send_live_pause_state_to(&self, connection_id: u32) {
@@ -328,19 +314,10 @@ impl RoomTask {
             self.send_live_pause_state_to(player_id);
             return;
         };
-        if self.live_paused {
+        if !self.live_pause.pause(actor_id) {
             self.send_live_pause_state_to(player_id);
             return;
         }
-        let used = self.live_pause_counts.get(&actor_id).copied().unwrap_or(0);
-        if used >= LIVE_PAUSE_LIMIT {
-            self.send_live_pause_state_to(player_id);
-            return;
-        }
-        self.live_pause_counts
-            .insert(actor_id, used.saturating_add(1));
-        self.live_paused = true;
-        self.live_paused_by = Some(actor_id);
         crate::log_info!(room = %self.room, player_id, pause_actor_id = actor_id, "live match paused");
         self.broadcast_live_pause_state();
     }
@@ -350,14 +327,21 @@ impl RoomTask {
             self.send_live_pause_state_to(player_id);
             return;
         }
-        if !self.live_paused {
+        if !self.live_pause.start_resume() {
             self.send_live_pause_state_to(player_id);
             return;
         }
-        self.live_paused = false;
-        self.live_paused_by = None;
-        crate::log_info!(room = %self.room, player_id, "live match unpaused");
+        crate::log_info!(room = %self.room, player_id, "live match resume countdown started");
         self.broadcast_live_pause_state();
+    }
+
+    fn finish_live_resume_countdown_if_due(&mut self) -> bool {
+        if !self.live_pause.finish_resume_if_due() {
+            return false;
+        }
+        crate::log_info!(room = %self.room, "live match resume countdown finished");
+        self.broadcast_live_pause_state();
+        true
     }
 
     pub(super) fn on_give_up(&mut self, player_id: u32) {
@@ -596,7 +580,10 @@ impl RoomTask {
     }
 
     pub(super) fn on_tick_live_game(&mut self, scheduled: TokioInstant) {
-        if self.live_paused && self.live_pause_controls_available() {
+        if self.live_pause.is_paused()
+            && self.live_pause_controls_available()
+            && !self.finish_live_resume_countdown_if_due()
+        {
             return;
         }
         self.apply_lab_scenario_actions();

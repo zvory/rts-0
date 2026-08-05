@@ -1,5 +1,88 @@
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore};
+use crate::rules;
+
+const AUTOMATIC_KINDS: [EntityKind; 2] = [EntityKind::SteelMine, EntityKind::PumpJack];
+
+/// Advance both free depot-local extractor jobs independently. Each kind pauses when its matching
+/// patches are saturated and waits through its combat restart delay after an extractor is killed.
+pub(super) fn advance_automatic(
+    entities: &mut EntityStore,
+    producer_id: u32,
+    faction_id: &str,
+    tick: u32,
+) -> Vec<(u32, EntityKind)> {
+    let Some((owner, producer_kind, active)) = entities.get(producer_id).map(|producer| {
+        (
+            producer.owner,
+            producer.kind,
+            producer.hp > 0 && !producer.under_construction(),
+        )
+    }) else {
+        return Vec::new();
+    };
+    let trainable = rules::economy::trainable_units_for_faction(faction_id, producer_kind);
+    if !active || !AUTOMATIC_KINDS.iter().all(|kind| trainable.contains(kind)) {
+        return Vec::new();
+    }
+
+    let mut completed = Vec::new();
+    for kind in AUTOMATIC_KINDS {
+        if entities.get(producer_id).is_some_and(|producer| {
+            producer
+                .automatic_extractor_restart_at(kind)
+                .is_some_and(|restart_at| tick < restart_at)
+        }) {
+            continue;
+        }
+        // Production runs before death cleanup. A killed extractor must remain authoritative for
+        // this tick so a replacement cannot appear before death records the restart deadline.
+        if entities.iter().any(|entity| {
+            entity.hp == 0
+                && entity.kind == kind
+                && entity.resource_extractor_producer_id() == Some(producer_id)
+        }) {
+            continue;
+        }
+        // Old replay/checkpoint queues remain authoritative until their extractor item finishes;
+        // the permanent background job takes over afterward.
+        if entities
+            .get(producer_id)
+            .is_some_and(|producer| producer.prod_queue().iter().any(|item| item.unit == kind))
+        {
+            continue;
+        }
+        let scaffold = scaffold_id(entities, producer_id, kind).or_else(|| {
+            let (x, y) = target(entities, producer_id, kind)?;
+            let scaffold = entities.spawn_building(owner, kind, x, y, false)?;
+            let associated = entities.get_mut(scaffold).is_some_and(|entity| {
+                let Some(construction) = entity.construction.as_mut() else {
+                    return false;
+                };
+                construction.producer_id = Some(producer_id);
+                let Some(extractor) = entity.resource_extractor.as_mut() else {
+                    return false;
+                };
+                extractor.producer_id = Some(producer_id);
+                true
+            });
+            if !associated {
+                entities.remove(scaffold);
+                return None;
+            }
+            Some(scaffold)
+        });
+        if scaffold.is_some_and(|scaffold| {
+            entities
+                .get_mut(scaffold)
+                .and_then(|entity| entity.advance_construction())
+                == Some(true)
+        }) {
+            completed.push((owner, kind));
+        }
+    }
+    completed
+}
 
 pub(super) fn ensure_scaffold(entities: &mut EntityStore, producer_id: u32) -> bool {
     let Some((owner, kind, paid)) = entities.get(producer_id).and_then(|producer| {
@@ -13,8 +96,12 @@ pub(super) fn ensure_scaffold(entities: &mut EntityStore, producer_id: u32) -> b
     if !kind.is_resource_extractor() || !paid {
         return true;
     }
-    if scaffold_id(entities, producer_id, kind).is_some() {
-        return true;
+    if let Some(scaffold) = entities.iter().find(|entity| {
+        entity.kind == kind && entity.construction_producer_id() == Some(producer_id)
+    }) {
+        // Death cleanup owns settling a destroyed scaffold. Do not replace or advance it earlier
+        // in the tick, or the already-paid production item would survive the destruction.
+        return scaffold.hp > 0;
     }
     let Some((x, y)) = target(entities, producer_id, kind) else {
         return false;
@@ -27,16 +114,17 @@ pub(super) fn ensure_scaffold(entities: &mut EntityStore, producer_id: u32) -> b
             return false;
         };
         construction.producer_id = Some(producer_id);
+        let Some(extractor) = scaffold.resource_extractor.as_mut() else {
+            return false;
+        };
+        extractor.producer_id = Some(producer_id);
         true
     });
     if !associated {
         entities.remove(scaffold_id);
         return false;
     }
-    // A destroyed in-progress scaffold restarts the already-paid build from zero.
-    entities
-        .get_mut(producer_id)
-        .is_some_and(|producer| producer.set_front_production_progress(0))
+    true
 }
 
 pub(super) fn sync_scaffold_progress(entities: &mut EntityStore, producer_id: u32) {

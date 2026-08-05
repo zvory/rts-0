@@ -75,6 +75,7 @@ src/
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   minimap_road_layer.js # Cached post-fog dotted road-marking overlay
+  minimap_forest_layer.js # Cached post-fog authored-tree symbol overlay
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
   lobby_map_selector.js # Host map picker: minimap previews, creator credits, keyboard navigation
   lobby_browser_view.js # Pre-join lobby browser rows, state rendering, and age/status formatting
@@ -975,21 +976,23 @@ Options loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
 base locations, and provides undo/redo, local map JSON import/export, and centered resize. The editor
-accepts only materialized authored maps containing terrain; agent-authored recipes remain a
+accepts authored-map JSON up to 8 MiB and only materialized authored maps containing terrain;
+agent-authored recipes remain a
 `scripts/map-author.mjs build` CLI input and are not a Map Editor document type. Import normalization
 preserves authored terrain verbatim, including impassable terrain in a protected base footprint, so
 the advisory and authoritative checks can report the author's actual input. Interactive rock/water
 painting is still rejected in protected footprints, and moving or adding a location makes its
 footprint passable. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
-shifts start/base locations with the centered source map. Authored v6 maps and materialized Lab
-handoffs carry explicit `width` and `height`; loading bundled or locally imported older square maps
-derives those axes from their terrain rows. Start locations set map player
+shifts start/base locations with the centered source map. Authored v8 maps and materialized Lab
+handoffs carry explicit `width` and `height`; older authored schemas are rejected. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
 player starts there. The selected starting or neutral base exposes integer Steel (0–36) and Oil
 (0–9) patch controls; new and migrated bases default to 12 Steel and 3 Oil.
 Editor drafts may temporarily contain zero start locations so authors can clear and rebuild the player
-layout. Adding symmetric starts reuses any base sites already present at the target locations. There is no
+layout. Editor-directed handoffs preserve that in-progress zero-start state without trying to create
+a simulation; Lab-directed handoffs still require a playable start/base layout. Adding symmetric starts
+reuses any base sites already present at the target locations. There is no
 active layout, player slot, or per-player natural assignment. The viewport draws blue start
 markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
 and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
@@ -1005,6 +1008,9 @@ water remain rejected there. Authored map rows
 encode bare, horizontal-marked, vertical-marked, NW-SE diagonal-marked, and NE-SW diagonal-marked
 roads with `=`, `-`, `|`, `\`, and `/`, respectively. The ten visual Open-terrain variants use
 `0` through `9` in protocol-code order: Gravel A/B/C, Dirt A/B/C, Mud A/B/C, then Frosted Ground.
+The dedicated road tool drags a configurable-width road snapped to the eight cardinal/diagonal
+directions, paints bare-road shoulders, and chooses the yellow centre-mark orientation automatically.
+The same five road tile variants remain in the ordinary terrain palette for brush and box detail work.
 The selected symmetry runs the shared advisory checker against the current draft and renders any
 terrain, start/base, overlay, resource, or doodad mismatch directly below the selector. Three-way
 checks compare complete generated square-grid orbits, including rounded copies clipped by an edge;
@@ -1016,17 +1022,33 @@ edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
-The Gameplay overlays palette paints or erases Stealth, No vehicles, Damage reduction, and Slowed
-movement independently. There is no Forest tile or combined Forest paint tool; authors who want
-multiple semantics paint each layer. The viewport uses green, red, blue, and purple respectively,
+The Forest palette exposes Paint Forest and Erase Forest with a configurable 1–31-tile brush.
+Forest painting is the single source for its tree scatter and all four gameplay effects. The draft
+stores the exact tile area as compact inclusive `[y, xStart, xEnd]` row spans; generated trees use
+reserved deterministic ids, while ordinary doodads remain independently authored. Symmetry expands
+the forest stroke before the span mask is updated. Erasing removes both the semantic area and only
+the forest-owned trees. Authored schemas before v8 are rejected rather than migrated.
+
+Generated-tree placement uses the visible foliage bounds shared with the doodad renderer, including
+the renderer's deterministic size variation. Interior canopies must remain substantially within the
+painted mask. Perimeter trees are placed first so their foliage joins along exposed sides; bottom-edge
+tree roots sit in the immediately adjacent tile below the forest while their foliage terminates on
+the semantic boundary. The grounded root location is therefore not itself evidence that a tile is a
+forest tile.
+
+The Gameplay overlays palette can select any combination of Concealment, No vehicles, Damage reduction,
+and Slowed movement, then paint or erase the selected layers in one brush or box stroke. There is no
+separate Forest gameplay tile: materialization unions forest spans into these four existing runtime
+layers. The viewport uses green, red, blue, and purple respectively,
 with a closed eye, no-entry sign, half shield, and mired boot on every affected tile. A single
 effect uses the full tile; overlapping effects subdivide into stable 2x2 icon cells so all four
-remain legible without hiding one another. Damage reduction and slowed movement are both 50%;
+remain legible without hiding one another. Damage reduction and slowed movement each reduce their
+affected value by 25%;
 overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON import/export, and
 Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
 
 The editor's compact floating Layers panel independently toggles eight presentation-only authoring
-layers in a two-column grid: Terrain & bases, Stealth, No vehicles, Damage reduction, Slowed
+layers in a two-column grid: Terrain & bases, Concealment, No vehicles, Damage reduction, Slowed
 movement, Trees, Gameplay doodads, and Decorative doodads. Full labels and descriptions remain available through accessible checkbox names
 and hover tooltips when narrow panel geometry truncates visible text. Tank Traps are gameplay
 doodads; wildflowers are decorative doodads. Visibility never mutates the draft, export, undo
@@ -1044,8 +1066,8 @@ Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
 deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved; the
 erase brush removes them continuously. Symmetry applies when placing and erasing doodads, while undo/redo
-apply to all authored doodads. Trees retain only their tiny trunk collision; a dense tree grouping's stealth and vehicle
-exclusion come from independent gameplay overlays. Trees do not change line of sight, cover, or
+apply to all authored doodads. Individually placed trees retain only their tiny trunk collision;
+forest-owned trees receive their shared effects from the compact forest span mask. Trees do not change line of sight, cover, or
 combat damage, and wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
@@ -1247,7 +1269,10 @@ the Settings gear. `Match` owns `LivePauseOverlay` under `#game-screen` for reli
 `livePauseState` messages; the overlay resolves `pausedBy` through the match roster, exposes direct
 Game-settings and Hotkeys-tab actions, and raises only `#game-menu` above its screen blocker while
 paused. Resume remains visible only when the server grants `canUnpause`, and the overlay is
-destroyed with the match.
+destroyed with the match. Once resume is accepted, the pause actions give way to the same large,
+spoken `Drei! Zwei! Eins!` presentation used before match start. The client begins at the
+server-reported remaining phase for a mid-countdown attach, while authoritative simulation stays
+paused until the server's final unpaused state.
 When Windows exclusive fullscreen has enabled native cursor capture, the injected
 `onOpenChange` callback lets `Match` release capture while Settings is open and resume it after
 close. The hold-Tab menu uses the same match-owned policy so every interactive menu remains
@@ -1352,9 +1377,10 @@ minimap targeting feedback uses the mirrored cloud radius and duration effect fi
 replaces the stale authoritative plan when composing subsequent queued previews, and asynchronous
 Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
-command. The worker build submenu also exposes Pump Jack in the top-middle `W` slot; while armed,
-its placement preview snaps to the closest live oil patch within one map tile of the cursor before
-applying the normal footprint validation. Pump Jack construction remains legal outside the completed
+command. The worker build submenu leaves the retired top-middle `W` slot empty so removing depot-built
+extractors does not compact the remaining Engineer build hotkeys. Contextual Pump Jack placement
+snaps to the closest live oil patch within one map tile of the cursor before applying the normal
+footprint validation. Pump Jack construction remains legal outside the completed
 friendly Resource Depot/Zamok mining radius, while the normal resource-mining preview warns that the
 distant extractor will be inactive. Completed owned or allied Pump Jacks with inactive extraction show a red prohibited-sign
 badge above the building until a completed friendly mining anchor comes into range. If an owned or
@@ -1805,7 +1831,9 @@ have separate stable Engineering Complex slots. A dependent button unlocks for q
 its prerequisite is complete or already present earlier in the selected building's authoritative
 `prodUpgradeQueue`. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. Selecting an owned building
-under construction shows a dedicated construction card with Cancel in the bottom-right `C` slot;
+under construction shows a dedicated construction card with Cancel in the bottom-right `C` slot.
+An unfinished production building also shows its production buttons with primary training disabled,
+while Alt/Ctrl/Shift production hotkeys can assign standing repeat production for after completion;
 click selection prefers the scaffold over an overlapping builder, and cancellation returns the full
 construction cost. The Scout Plane affordance
 is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It unlocks after
@@ -2184,6 +2212,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 [rendering parity ledger](rendering-parity.md).
 
 - Minimap roads reuse the world's deterministic dark-charcoal surface variants so revealed terrain stays visually coherent. Authored marked-road tiles draw small yellow centerline dots above fog, keeping the route network legible in unexplored territory; the dotted overlay is a cached static layer, while bare road tiles widen the charcoal surface without adding markings.
+- Authored tree doodads draw compact bright-green tree symbols above minimap fog so forest shape and density remain legible in explored and unexplored territory. The cached forest layer sits below roads, resources, and foreground player markers so tactical information stays readable.
 - Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through Resource Depot), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass. Positional under-attack alerts use a 2.2-second red pulse with a crisp white inner rim. The nearest local owned unit or building at the alert position strobes its icon interior between white and its team color in 300-millisecond phases for the same duration; the resolved entity keeps flashing if it moves.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
@@ -2274,7 +2303,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   unit intersects a tree canopy in front of it, the renderer redraws that unit's current production
   rig/frame into an alpha-only filter that emits a white outer edge and an 85%-opacity flat
   owner/team-color silhouette above the canopy. Friendly, allied, and visible enemy units use their
-  respective owner colors. Authoritative `visionOnly` stealth reveals
+  respective owner colors. Authoritative `visionOnly` concealment reveals
   omit their rig from the normal full-color layer and route the same current rig/frame through a
   dedicated white-edge-only filtered outline layer above fog and canopies; damaged reveal HP stays
   above fog as well. These readability passes use only already-admitted entities and do not reveal

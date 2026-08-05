@@ -15,7 +15,7 @@ pub struct LabMapDraft {
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
     #[serde(default)]
-    pub stealth_tiles: Vec<MapTile>,
+    pub concealment_tiles: Vec<MapTile>,
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
     #[serde(default)]
@@ -94,7 +94,7 @@ pub struct LabCheckpointScenarioMapData {
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
     #[serde(default)]
-    pub stealth_tiles: Vec<MapTile>,
+    pub concealment_tiles: Vec<MapTile>,
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
     #[serde(default)]
@@ -173,7 +173,7 @@ mod tests {
                 oil_patches: 9,
             }],
             doodads: Vec::new(),
-            stealth_tiles: Vec::new(),
+            concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
@@ -199,7 +199,7 @@ mod tests {
             serde_json::from_value(encoded).expect("checkpoint map data parses");
         assert_eq!(parsed.base_sites, data.base_sites);
         assert!(parsed.doodads.is_empty());
-        assert!(parsed.stealth_tiles.is_empty());
+        assert!(parsed.concealment_tiles.is_empty());
         assert!(parsed.no_vehicle_tiles.is_empty());
         assert!(parsed.damage_reduction_tiles.is_empty());
         assert!(parsed.slow_movement_tiles.is_empty());

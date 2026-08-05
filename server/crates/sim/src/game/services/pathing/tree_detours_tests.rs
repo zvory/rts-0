@@ -38,7 +38,7 @@ fn rifleman_tile_path_routes_around_tree_trunk_tile() {
 }
 
 #[test]
-fn local_visibility_route_crosses_a_tree_tile_without_crossing_its_trunk() {
+fn infantry_may_cross_trunks_while_vehicle_routes_still_detour() {
     let size = 12;
     let mut map = Map {
         width: size,
@@ -60,7 +60,10 @@ fn local_visibility_route_crosses_a_tree_tile_without_crossing_its_trunk() {
     let detour = tree_detour_between(&map, &occupancy, EntityKind::Rifleman, from, to)
         .expect("same-tile trunk should have a local route");
 
-    assert!(detour.len() >= 2, "route was {detour:?}");
+    assert!(
+        detour.is_empty(),
+        "infantry route should use soft local avoidance: {detour:?}"
+    );
     let route = std::iter::once(from)
         .chain(detour)
         .chain(std::iter::once(to))
@@ -82,8 +85,8 @@ fn local_visibility_route_crosses_a_tree_tile_without_crossing_its_trunk() {
         from,
         vec![to, trunk],
     )
-    .expect("blocked tree-center hint should be replaced");
-    assert!(!expanded.contains(&trunk));
+    .expect("infantry tree-center hint should remain reachable");
+    assert!(expanded.contains(&trunk));
 
     let tank_from = (trunk.0 - 48.0, trunk.1);
     let tank_to = (trunk.0 + 48.0, trunk.1);
@@ -108,9 +111,9 @@ fn local_visibility_route_crosses_a_tree_tile_without_crossing_its_trunk() {
         map.tile_center(4, 5),
         vec![beyond, second_trunk, trunk],
     )
-    .expect("consecutive blocked tree-center hints should be replaced");
-    assert!(!expanded.contains(&trunk));
-    assert!(!expanded.contains(&second_trunk));
+    .expect("consecutive tree-center hints should remain reachable for infantry");
+    assert!(expanded.contains(&trunk));
+    assert!(expanded.contains(&second_trunk));
 
     let mut dense_map = map.clone();
     dense_map.doodads = (1..=9)
@@ -130,5 +133,5 @@ fn local_visibility_route_crosses_a_tree_tile_without_crossing_its_trunk() {
         from,
         vec![to],
     )
-    .is_none());
+    .is_some());
 }

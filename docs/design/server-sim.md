@@ -72,8 +72,8 @@ impl Game {
     /// center near the intended layout, keep one tile between oil patches, and reject sites whose
     /// Pump Jack footprint would collide with non-oil resources while preserving Resource Depot
     /// resource-distance bounds. Schema-v5 doodads are catalog-validated and id-canonicalized.
-    /// Tree species share a 4.5px authoritative circular trunk used by exact unit standability;
-    /// tree tiles receive a finite path-avoidance cost but remain traversable outside the trunk.
+    /// Tree species share a 4.5px authoritative circular trunk. Vehicles use exact trunk
+    /// standability; infantry use finite path cost plus best-effort local steering with pass-through.
     /// Wildflowers remain presentation-only. Lab-restored oil nodes are normalized to passable tile centers and
     /// keep one free tile between oil patches.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
@@ -480,7 +480,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 4,
+    "simSchemaVersion": 5,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -540,8 +540,13 @@ store a separate authoritative command stream, but they must not infer live stat
 
 Map policy:
 
+- Authored-map schema v8 requires compact non-overlapping `[y, xStart, xEnd]` forest spans. Loading
+  expands every forest tile into the existing stealth, no-vehicle, damage-reduction, and
+  slow-movement vectors before `Map` construction. Earlier schemas and v8 documents missing the
+  required forest array are rejected rather than migrated.
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  permanent base sites, four sparse gameplay-overlay tile sets, and tree-trunk collision/path cost on every tick, while start/export
+  permanent base sites, four sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
+  infantry tree path-cost/local-steering data on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
 - `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, base-site bodies, or doodad bodies. It
@@ -557,20 +562,27 @@ Map policy:
   stable hash over the materialized live `Map` fields (`width`, `height`, row-major terrain,
   selected starts, base sites/resource counts, canonical doodads, and all four sparse gameplay overlays).
   Explicit empty doodad and overlay lists preserve the equivalent legacy materialized hash. Populated
-  stealth, no-vehicle, damage-reduction, and slow-movement layers use distinct hash tags. If any binding fact
+  concealment, no-vehicle, damage-reduction, and slow-movement layers use distinct hash tags. If any binding fact
   differs, the importer rejects the payload; it must not fall back to regenerating a map from seed
   or silently accepting a nearby map.
 
-Stealth applies to units, not buildings or doodads. Owners and allies always receive their units;
-enemy projection, auto-acquisition, explicit attack validation, and retained targets reject a unit
-standing on a stealth tile until that unit fires. Firing creates the existing entity-scoped reveal,
-outline-only presentation, and one-second counterfire reaction delay. The terrain remains normally
-lit when ordinary sight already covers it; only a tile lacking ordinary sight stays presentation-dark.
+Concealment applies to units, not buildings or doodads. Sight rays traverse at most three
+concealment tiles, excluding the origin and including the target, while weapon line of fire remains
+unrestricted by concealment. This lets a unit at a forest edge retain normal outward vision while
+limiting vision through a forest interior. Owners and allies always receive their units. Enemy
+projection, auto-acquisition, explicit attack validation, and retained targets reject a concealed
+unit unless a hostile unit is within two tiles measured between body edges, or that unit has fired.
+Close detection is shared with the spotter's team, remains active for one second after separation,
+and projects the target normally; smoke suppresses it. Firing creates the existing entity-scoped
+reveal, outline-only presentation, and half-second counterfire reaction delay. The terrain remains
+normally lit when ordinary sight already covers it; only a tile lacking ordinary sight stays
+presentation-dark.
 Concealed deaths do not publish positional death events or global death decals. No-vehicle tiles seed
 vehicle-body occupancy only, so vehicles path around them while infantry can traverse the same tile.
-Damage-reduction tiles halve incoming direct, area, loaded-shot, overpenetration, and ability-projectile
-damage after existing weapon/armor/facing and entrenchment policy, rounding a non-zero odd result up.
-Slow-movement tiles apply a 0.5x movement-budget multiplier from the unit-centre tile and multiply
+Damage-reduction tiles reduce incoming direct, area, loaded-shot, overpenetration, and ability-projectile
+damage by 25% after existing weapon/armor/facing and entrenchment policy, rounding a non-zero
+fractional result up.
+Slow-movement tiles apply a 0.75x movement-budget multiplier from the unit-centre tile and multiply
 normally with road, upgrade, breakthrough, and ability movement modifiers. All four sparse layers
 are independent and may overlap at one coordinate.
 
@@ -580,7 +592,7 @@ Field map for Phase 2 DTO conversion:
 | --- | --- |
 | `map` | Excluded as a body; represented by `mapBinding`. Import writes the exact container-supplied `Map` into `GameState.map` only after binding validation succeeds. |
 | `entities` | `EntityStoreV1` with allocator/high-water state and explicit entity DTOs. Entity DTOs must cover stable ids, owners, kind, HP, flags, construction/production/resource state (including whether an unfinished scaffold's construction cost was paid and the optional Resource Depot producer id for a queue-owned extractor scaffold), combat cooldowns, targets, bounded reveal-reaction gates, body/weapon/setup facing, entity-local active orders, queued order intents, selected movement paths, selected waypoints, path goals, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, reservations, occupants/transport-like references if added later, and all entity-local timers. |
-| `fog` | `FogStateV1` latest sampled visibility grids plus bounded per-viewer firing-reveal provenance. The sampled provenance may lead or trail the current source list by one simulation tick, and ids remain bounded by the entity allocator high-water mark. |
+| `fog` | `FogStateV1` latest sampled visibility grids plus bounded per-viewer firing-reveal provenance and close-detection expiry ticks. The sampled provenance may lead or trail the current source list by one simulation tick, and ids remain bounded by the entity allocator high-water mark. |
 | `building_memory` | `BuildingMemoryV1` remembered enemy-building entries per player, including last-seen state and footprint facts needed for projection after restore. |
 | `anti_tank_gun_memory` | `AntiTankGunMemoryV1` remembered deployed enemy Anti-Tank Gun position/facing entries per player, preserving fog knowledge across replay and Lab keyframe restore. |
 | `players` | `PlayerStateV1` rows with id, team id, faction id, name, color, start tile, resources, supply, AI slot flag, score counters, mined-resource lifetime totals, rolling mined-resource income history, completed upgrades, and Auto-Build pause/resource-floor settings. |
@@ -752,8 +764,11 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   event loop continues handling reliable control messages, Give up, disconnects, and unpause, but
   the live scheduled tick returns before constructing `LiveTickDriver`, so AI thinking,
   command-ack consumption, `Game::tick`, snapshot fanout, and defeat checks do not advance.
+  An accepted unpause starts a room-owned three-second synchronized resume countdown; the room
+  remains paused through its deadline, broadcasts the remaining countdown phase to every live
+  recipient, and resumes simulation only after the final word.
   `prepare_live_match_launch`, live-match teardown/replay transition, and empty-room reset all
-  clear pause counters and paused state.
+  clear pause counters, countdown deadline, and paused state.
 - Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a
   gameplay-read-only live spectator attach with shared pause controls. Spectators receive
   `StartPayload.spectator = true` and live
@@ -997,6 +1012,8 @@ it. Enabling a unit appends it to the list if absent, disabling it removes only 
 production cancel clears the whole list before removing the latest queued item. The list and its
 next-unit cursor are durable entity state, so checkpoints, replay branches, and Lab rewinds
 preserve them without recording synthetic train commands on every retry.
+Rally plans and repeat-production choices may be assigned while a production building is still
+under construction; both remain inert until completion, then govern its first produced unit.
 
 Explicit manual train and research commands use bounded eight-entry FIFO queues. The front entry
 pays immediately when the queue is empty and its cost (plus unit supply) is available; otherwise it
@@ -1757,10 +1774,10 @@ the reveal, and whether the terrain lacked ordinary sight before any firing reve
 keeping provenance attached to the authoritative fog result rather than inferred later. This tile-level record
 also covers colocated entities and does not follow a source that moves to a different tile during
 the next tick. Combatants that first engage a target
-through reveal-only sight spend a one-second response delay before their first counter-shot, so
+through reveal-only sight spend a half-second response delay before their first counter-shot, so
 firing-reveal counterfire plays out as shot/counter-shot rather than an instant simultaneous chain.
 An actionable tile lacking ordinary sight is removed from snapshot `visibleTiles` and explored-history
-accumulation; a stealth reveal on ordinarily visible ground does not darken that terrain.
+accumulation; a concealment reveal on ordinarily visible ground does not darken that terrain.
 The firing unit remains in `entities`; the client recognizes a projected enemy unit whose tile is
 presentation-dark and renders it on the explicit above-fog reveal layer. Thus firing reveals expose
 the unit for counterfire without clearing or exploring the terrain beneath it.

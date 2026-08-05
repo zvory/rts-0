@@ -10,6 +10,17 @@ pub(super) fn spawn(
     home_y: f32,
 ) -> Vec<EntityKind> {
     let mut spawned = Vec::new();
+    let producer_id = entities
+        .iter()
+        .find(|entity| {
+            entity.owner == owner
+                && crate::rules::economy::trainable_units(entity.kind)
+                    .iter()
+                    .any(|kind| kind.is_resource_extractor())
+                && entity.hp > 0
+                && !entity.under_construction()
+        })
+        .map(|entity| entity.id);
     for group in loadout
         .starting_entities
         .iter()
@@ -30,10 +41,15 @@ pub(super) fn spawn(
             .collect::<Vec<_>>();
         nodes.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
         for (_, _, x, y) in nodes.into_iter().take(group.count as usize) {
-            if entities
-                .spawn_building(owner, group.kind, x, y, group.completed)
-                .is_some()
-            {
+            if let Some(id) = entities.spawn_building(owner, group.kind, x, y, group.completed) {
+                if let Some(producer_id) = producer_id {
+                    if let Some(extractor) = entities
+                        .get_mut(id)
+                        .and_then(|entity| entity.resource_extractor.as_mut())
+                    {
+                        extractor.producer_id = Some(producer_id);
+                    }
+                }
                 spawned.push(group.kind);
             }
         }

@@ -114,7 +114,7 @@ pub(in crate::game) fn record_firing_reveals_for_victim_team(
         let already_visible_without_reveal =
             fog.is_visible_without_firing_reveal_world(viewer, attacker_pos.0, attacker_pos.1);
         if already_visible_without_reveal
-            && !map.world_point_is_stealth(attacker_pos.0, attacker_pos.1)
+            && !map.world_point_is_concealed(attacker_pos.0, attacker_pos.1)
         {
             continue;
         }

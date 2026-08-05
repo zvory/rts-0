@@ -12,7 +12,11 @@ export async function createMapHandoff({
   const { response, payload } = await boundedJsonFetch(fetchImpl, collectionUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ destination, authoredMap, materializedMap }),
+    body: JSON.stringify({
+      destination,
+      authoredMap,
+      ...(destination === "editor" ? {} : { materializedMap }),
+    }),
   }, timeoutMs);
   if (!response.ok) throw new Error(payload?.error || `Map handoff failed (HTTP ${response.status}).`);
   if (!/^[a-f0-9]{32}$/.test(payload?.handoffId || "")) {

@@ -271,11 +271,12 @@ try {
       resourceDepot: es.filter((e) => e.kind === "resource_depot").length,
       workers: es.filter((e) => e.kind === "worker").length,
       steelMines: es.filter((e) => e.kind === "steel_mine").length,
+      completedSteelMines: es.filter((e) => e.kind === "steel_mine" && e.buildProgress == null).length,
     };
   });
   ok(
-    own.resourceDepot === 1 && own.workers === 1 && own.steelMines === 6,
-    `client sees own Resource Depot + Engineer + 6 Steel Mines (${JSON.stringify(own)})`,
+    own.resourceDepot === 1 && own.workers === 1 && own.completedSteelMines === 6 && own.steelMines >= 6,
+    `client sees own Resource Depot + Engineer + 6 completed Steel Mines plus any automatic scaffold (${JSON.stringify(own)})`,
   );
 
   await page.waitForFunction(() => {
@@ -389,6 +390,7 @@ try {
     await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerBuild"),
     "worker build hotkey opened the build submenu",
   );
+  await page.waitForSelector('#command-card button[data-command-id="kriegsia.build.resource_depot"]');
   const engineerBuildCard = await page.evaluate(() => ({
     hasDepotButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.resource_depot"]'),
     hasPumpJackButton: !!document.querySelector('#command-card button[data-command-id="kriegsia.build.pump_jack"]'),
@@ -421,12 +423,12 @@ try {
   });
   ok(
     extractorSlots?.steelMineHotkey === "W" &&
-      extractorSlots.steelMineCost === "50" &&
-      extractorSlots.steelMineTooltip.includes("20s") &&
+      extractorSlots.steelMineCost === "" &&
+      extractorSlots.steelMineTooltip.includes("24s") &&
       extractorSlots.pumpJackHotkey === "E" &&
-      extractorSlots.pumpJackCost === "100" &&
-      extractorSlots.pumpJackTooltip.includes("20s"),
-    `PRODUCTION: Depot exposes W Steel Mine (50) and E Pump Jack (100) with build times (${JSON.stringify(extractorSlots)})`,
+      extractorSlots.pumpJackCost === "" &&
+      extractorSlots.pumpJackTooltip.includes("24s"),
+    `PRODUCTION: Depot shows automatic free W Steel Mine and E Pump Jack jobs with build times (${JSON.stringify(extractorSlots)})`,
   );
 
   const trainBtn = await page.evaluate(() => {
@@ -768,6 +770,11 @@ try {
           .find((node) => node.querySelector("legend")?.textContent === "Gameplay overlays");
         return [...section?.querySelectorAll("button") || []].map((button) => button.textContent?.trim() || "");
       })(),
+      overlayEffects: [...document.querySelectorAll(".map-editor-overlay-toggle")]
+        .map((label) => ({
+          label: label.textContent?.trim() || "",
+          checked: !!label.querySelector("input[type=checkbox]")?.checked,
+        })),
       symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
       symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
         .map((option) => option.textContent),
@@ -825,17 +832,18 @@ try {
       editorUi.layerPanel?.outsideTools && editorUi.layerPanel.columns === 2 &&
       editorUi.layerPanel.height < 180 && editorUi.layerPanel.maxToggleHeight < 32 &&
       editorUi.layerPanel.movePreservedSize &&
-      ["Terrain & bases", "Stealth", "No vehicles", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
+      ["Terrain & bases", "Concealment", "No vehicles", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)) &&
-      ["Paint stealth", "Paint no vehicles", "Paint damage reduction", "Paint slowed movement", "Erase stealth", "Erase no vehicles", "Erase damage reduction", "Erase slowed movement"]
-        .every((label) => editorUi.overlayTools.includes(label)) &&
-      !editorUi.overlayTools.includes("Forest") && !editorUi.overlayTools.includes("Erase both"),
+      ["Concealment", "No vehicles", "Damage reduction", "Slowed movement"]
+        .every((label) => editorUi.overlayEffects.some((effect) => effect.label === label)) &&
+      editorUi.overlayEffects.filter((effect) => effect.checked).map((effect) => effect.label).join(",") === "Concealment" &&
+      ["Paint selected", "Erase selected"].every((label) => editorUi.overlayTools.includes(label)),
     `MAP EDITOR: compact floating Layers panel exposes eight independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
   );
-  await editorPage.click("input[aria-label='Show Stealth']");
-  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === false);
-  await editorPage.click("input[aria-label='Show Stealth']");
-  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().stealth === true);
+  await editorPage.click("input[aria-label='Show Concealment']");
+  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().concealment === false);
+  await editorPage.click("input[aria-label='Show Concealment']");
+  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().concealment === true);
   ok(true, "MAP EDITOR: layer checkbox changes reach the live worker presentation path");
   ok(
     editorUi.actionButtons.includes("Load map JSON") &&

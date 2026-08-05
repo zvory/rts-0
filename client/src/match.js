@@ -491,6 +491,7 @@ export class Match {
         onUnpause: this.onUnpauseGame,
         onOpenSettings: (tabId) => this.openSettingsTab(tabId),
         playerNameForId: (playerId) => this.state.playerById(playerId)?.name,
+        audio: this.audio,
       });
     }
     this.applySpectatorUi();

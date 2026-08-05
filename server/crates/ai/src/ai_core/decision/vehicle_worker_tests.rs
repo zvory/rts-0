@@ -231,7 +231,7 @@ fn jeff_waits_for_two_engineers_and_two_pump_jacks_before_barracks() {
 }
 
 #[test]
-fn jeff_enables_depot_repeat_for_both_extractors_once() {
+fn jeff_does_not_issue_obsolete_extractor_repeat_commands() {
     let observation = jeff_opening_observation(2, 1);
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     let width = observation.map.width;
@@ -250,14 +250,10 @@ fn jeff_enables_depot_repeat_for_both_extractors_once() {
         |_, tx, ty| tx < width && ty < height,
     );
 
-    for unit in [EntityKind::SteelMine, EntityKind::PumpJack] {
-        assert!(decision.commands.iter().any(|command| matches!(
-            command,
-            Command::AdjustProductionRepeat { buildings, unit: queued, delta: 1 }
-                if buildings == &[1] && *queued == unit
-        )));
-    }
-    assert!(memory.extractor_repeat_depots.contains(&1));
+    assert!(!decision
+        .commands
+        .iter()
+        .any(|command| matches!(command, Command::AdjustProductionRepeat { .. })));
 
     let second = decide_profile_without_static_map_for_tests(
         &observation,

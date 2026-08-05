@@ -50,7 +50,7 @@ pub struct LabCheckpointScenarioMapData {
     #[serde(default)]
     pub doodads: Vec<MapDoodad>,
     #[serde(default)]
-    pub stealth_tiles: Vec<MapTile>,
+    pub concealment_tiles: Vec<MapTile>,
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
     #[serde(default)]
@@ -94,7 +94,7 @@ pub struct LabCheckpointScenarioSource {
 
 impl LabCheckpointScenarioMap {
     pub(super) fn from_map(map: &Map, metadata: &MapMetadata) -> Self {
-        let (stealth_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
+        let (concealment_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
             map.protocol_overlay_tiles();
         Self {
             name: metadata.name.clone(),
@@ -124,7 +124,7 @@ impl LabCheckpointScenarioMap {
                     })
                     .collect(),
                 doodads: map.doodads.clone(),
-                stealth_tiles,
+                concealment_tiles,
                 no_vehicle_tiles,
                 damage_reduction_tiles,
                 slow_movement_tiles,
@@ -164,8 +164,8 @@ impl LabCheckpointScenarioMap {
                 .collect(),
             base_resource_counts,
             doodads: data.doodads,
-            stealth_tiles: data
-                .stealth_tiles
+            concealment_tiles: data
+                .concealment_tiles
                 .into_iter()
                 .map(|tile| (tile.x, tile.y))
                 .collect(),
@@ -299,10 +299,10 @@ impl LabCheckpointScenarioMap {
             },
         )?;
         validate_overlay_tiles(
-            &self.data.stealth_tiles,
+            &self.data.concealment_tiles,
             width,
             height,
-            "stealthTiles",
+            "concealmentTiles",
             &self.name,
         )?;
         validate_overlay_tiles(

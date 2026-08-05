@@ -2,7 +2,7 @@ use super::*;
 use crate::rules::terrain::TerrainKind;
 
 #[test]
-fn authored_damage_reduction_tile_halves_direct_weapon_damage() {
+fn authored_damage_reduction_tile_reduces_direct_weapon_damage_by_a_quarter() {
     let (mut entities, attacker, victim) = rifleman_with_enemy();
     let mut map = open_map(16);
     let victim_pos = entities
@@ -62,7 +62,10 @@ fn authored_damage_reduction_tile_halves_direct_weapon_damage() {
 
     assert!(outcome.is_some());
     let after = entities.get(victim).expect("victim").hp;
-    assert_eq!(before - after, expected_uncovered.saturating_add(1) / 2);
+    assert_eq!(
+        before - after,
+        expected_uncovered.saturating_mul(3).saturating_add(3) / 4
+    );
 }
 
 fn mark_entrenched(entities: &mut EntityStore, id: u32) {

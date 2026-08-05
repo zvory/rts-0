@@ -234,7 +234,7 @@ async fn main() {
         .route("/api/lab-scenarios", get(catalog_handler))
         .route(
             "/api/map-handoffs",
-            post(map_handoffs::create_handler).layer(DefaultBodyLimit::max(512 * 1024)),
+            post(map_handoffs::create_handler).layer(DefaultBodyLimit::max(9 * 1024 * 1024)),
         )
         .route(
             "/api/map-handoffs/{handoff_id}",
@@ -1654,12 +1654,11 @@ struct MapCatalogResponse {
 
 fn map_catalog_entry(file: String, json: &str) -> Option<MapCatalogEntry> {
     let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
-    if value
+    let version = value
         .get("version")
         .and_then(|v| v.as_u64())
-        .and_then(|v| u32::try_from(v).ok())
-        != Some(CURRENT_MAP_VERSION)
-    {
+        .and_then(|v| u32::try_from(v).ok())?;
+    if version != CURRENT_MAP_VERSION {
         return None;
     }
     let stem = file.trim_end_matches(".json");

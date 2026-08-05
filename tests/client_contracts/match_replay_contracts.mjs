@@ -2,7 +2,6 @@
 // Domain contract assertions imported by ../client_contracts.mjs.
 
 import { assert, assertApprox } from "./assertions.mjs";
-import { withFakeOverlayDocument } from "./fakes.mjs";
 import { HUD } from "../../client/src/hud.js";
 import {
   EVENT,
@@ -16,7 +15,6 @@ import { CameraNavigationInput } from "../../client/src/input/camera_navigation.
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { ReplayCameraInput } from "../../client/src/replay_camera_input.js";
-import { LivePauseOverlay } from "../../client/src/live_pause_overlay.js";
 import { notePredictionAuthoritativeSnapshot } from "../../client/src/match_live_pause.js";
 import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
 
@@ -901,40 +899,6 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   );
   assert(spectatorCapabilities.matchControls.pause, "spectators keep advertised live pause controls");
 
-  withFakeOverlayDocument(({ FakeElement }) => {
-    const root = new FakeElement("section");
-    const settingsRoot = new FakeElement("div");
-    let unpaused = false;
-    const openedTabs = [];
-    const overlay = new LivePauseOverlay({
-      root,
-      settingsRoot,
-      onUnpause: () => { unpaused = true; },
-      onOpenSettings: (tabId) => openedTabs.push(tabId),
-      playerNameForId: (playerId) => playerId === 2 ? "Alex" : "",
-    });
-    overlay.applyLivePauseState({ paused: true, pausedBy: 2, pauseLimit: 3, canUnpause: true });
-    assert(root.children.length === 1, "live pause overlay mounts generated DOM");
-    assert(!root.children[0].hidden, "live pause overlay shows when paused");
-    assert(root.children[0].attributes.get("role") === "dialog", "live pause actions use dialog semantics");
-    assert(root.querySelector(".live-pause-meta")?.textContent === "Paused by Alex", "live pause overlay resolves the pausing player's roster name");
-    assert(settingsRoot.classList.contains("live-pause-active"), "live pause overlay raises settings above its screen blocker");
-    root.querySelector("#live-pause-settings").listeners.click();
-    root.querySelector("#live-pause-hotkeys").listeners.click();
-    assert(openedTabs.join(",") === "game,hotkeys", "live pause overlay opens game settings and hotkey editing");
-    const button = root.querySelector("#live-pause-unpause");
-    assert(button && !button.hidden && !button.disabled, "live pause overlay enables unpause for pause-authorized viewers");
-    button.listeners.click();
-    assert(unpaused, "live pause overlay calls injected unpause action");
-    overlay.applyLivePauseState({ paused: true, canUnpause: false });
-    assert(button.hidden && button.disabled, "live pause overlay hides unpause without authority");
-    overlay.applyLivePauseState({ paused: false });
-    assert(root.children[0].hidden, "live pause overlay hides when running");
-    assert(!settingsRoot.classList.contains("live-pause-active"), "live pause overlay restores normal settings stacking after unpause");
-    overlay.destroy();
-    assert(root.children.length === 0, "live pause overlay tears down DOM");
-  });
-
   const noticeAudioMatch = Object.create(Match.prototype);
   const playedNotices = [];
   let minimapPings = 0;
@@ -1315,12 +1279,39 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   livePauseStateMatch.publishPredictionDebug = () => {};
   livePauseStateMatch.livePauseOverlay = { applyLivePauseState() {} };
   livePauseStateMatch.syncLivePauseUi = () => {};
+  let closedMenusForResume = 0;
+  livePauseStateMatch.closeMenus = () => {
+    closedMenusForResume += 1;
+  };
   const worldBedStates = [];
   livePauseStateMatch.combatAudio = {
     updateWorldCombatBed(active) { worldBedStates.push(active); },
   };
-  livePauseStateMatch.applyLivePauseState({ paused: true, canPause: false, canUnpause: true });
+  livePauseStateMatch.applyLivePauseState({
+    paused: true,
+    canPause: false,
+    canUnpause: false,
+    resumeCountdown: {
+      durationMs: 3000,
+      remainingMs: 2500,
+      words: ["Drei!", "Zwei!", "Eins!"],
+    },
+  });
   assert(livePauseStateMatch.predictionVisualSuspended, "entering live pause suspends prediction visuals");
+  assert(
+    livePauseStateMatch.livePauseState.resumeCountdown?.remainingMs === 2500,
+    "live pause state validates the server resume countdown payload",
+  );
+  assert(closedMenusForResume === 1, "resume countdown dismisses menus that could obscure it");
+  livePauseStateMatch.applyLivePauseState({
+    paused: true,
+    resumeCountdown: {
+      durationMs: 3000,
+      remainingMs: 2000,
+      words: ["Drei!", "Zwei!", "Eins!"],
+    },
+  });
+  assert(closedMenusForResume === 1, "countdown state refreshes do not repeatedly dismiss menus");
   assert(livePauseStateMatch.state.poseCleared === true, "entering live pause drops pose without clearing progress");
   assert(progressPauseStates.at(-1) === true, "live pause freezes progress prediction for a non-pausing client");
   assert(worldBedStates.at(-1) === false, "entering live pause fades out the world combat bed");

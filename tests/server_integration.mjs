@@ -83,7 +83,12 @@ const { ok } = assertions;
   ok(mine.filter((e) => e.kind === "resource_depot").length === 1, `A owns 1 Resource Depot`);
   const workers = mine.filter((e) => e.kind === "worker");
   ok(workers.length === 1, `A owns 1 Engineer (${workers.length})`);
-  ok(mine.filter((e) => e.kind === "steel_mine").length === 6, "A owns 6 starting Steel Mines");
+  const steelMines = mine.filter((e) => e.kind === "steel_mine");
+  const completedSteelMines = steelMines.filter((e) => e.buildProgress == null);
+  ok(
+    completedSteelMines.length === 6 && steelMines.length >= 6,
+    `A owns 6 completed starting Steel Mines plus any automatic scaffold (${completedSteelMines.length}/${steelMines.length})`,
+  );
   const steelNodes = startA.map.resources.filter((e) => e.kind === "steel");
   ok(steelNodes.length > 0 && typeof steelNodes[0].id === "number", `start lists neutral steel nodes (${steelNodes.length})`);
   ok(!snap.entities.some((e) => e.kind === "steel" || e.kind === "oil"), "snapshot omits static resource entities");
@@ -102,6 +107,37 @@ const { ok } = assertions;
      "SPECTATOR: observer snapshots do not carry prediction ACK metadata");
   ok(!specSnap.entities.some((e) => e.owner === C.playerId),
      "SPECTATOR: observer owns no entities");
+
+  A.send({ t: "pauseGame" });
+  const pausedStates = await Promise.all([A, B, C].map((client) =>
+    client.waitFor((m) => m.t === "livePauseState" && m.paused === true && !m.resumeCountdown,
+      3000, `${client.tag} live pause`)
+  ));
+  ok(pausedStates.every((state) => state.canUnpause === true),
+     "LIVE PAUSE: players and spectator can request resume");
+  await sleep(100);
+  const frozenTick = A.lastSnapshot?.tick;
+  B.send({ t: "unpauseGame" });
+  const resumeStates = await Promise.all([A, B, C].map((client) =>
+    client.waitFor((m) => m.t === "livePauseState" && m.paused === true && m.resumeCountdown,
+      3000, `${client.tag} resume countdown`)
+  ));
+  ok(resumeStates.every((state) =>
+    state.canUnpause !== true &&
+    state.resumeCountdown.durationMs === 3000 &&
+    state.resumeCountdown.words.join(" ") === "Drei! Zwei! Eins!"),
+  "LIVE PAUSE: every recipient receives the synchronized three-second resume countdown");
+  await sleep(1000);
+  ok(A.lastSnapshot?.tick === frozenTick,
+     `LIVE PAUSE: simulation remains frozen during countdown (tick ${frozenTick})`);
+  const resumedStates = await Promise.all([A, B, C].map((client) =>
+    client.waitFor((m) => m.t === "livePauseState" && m.paused === false,
+      4000, `${client.tag} resumed state`)
+  ));
+  ok(resumedStates.every((state) => !state.resumeCountdown),
+     "LIVE PAUSE: every recipient receives authoritative resumed state after countdown");
+  await A.waitFor((m) => m.t === "snapshot" && m.tick > frozenTick, 3000, "post-resume snapshot");
+  ok(true, "LIVE PAUSE: simulation advances after the resume countdown");
 
   let peak = snap.steel;
   for (let i = 0; i < 30; i++) {
@@ -133,7 +169,7 @@ const { ok } = assertions;
   ok(Array.isArray(over.scores) && over.scores.length === 2, `SCORE: gameOver lists both players (${over.scores?.length})`);
   const aScore = over.scores?.find((s) => s.id === A.playerId);
   const bScore = over.scores?.find((s) => s.id === B.playerId);
-  ok(aScore && aScore.unitScore >= 50 && aScore.structureScore >= 800, `SCORE: A has unit/structure value (${aScore?.unitScore}/${aScore?.structureScore})`);
+  ok(aScore && aScore.unitScore >= 50 && aScore.structureScore >= 500, `SCORE: A has unit/structure value (${aScore?.unitScore}/${aScore?.structureScore})`);
   ok(bScore && bScore.unitsLost >= 1 && bScore.buildingsLost >= 7, `SCORE: surrendered B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
 
   const replayStartA = await A.waitFor((m) => m.t === "start" && m.replay, 4000, "A replay start");

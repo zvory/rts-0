@@ -1915,6 +1915,9 @@ fn order_train(
     unit: EntityKind,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
+    if unit.is_resource_extractor() {
+        return;
+    }
     let faction_id = faction_id_for(
         players.iter().map(|p| (p.id, p.faction_id.as_str())),
         player,
@@ -1985,7 +1988,8 @@ fn order_train(
 }
 
 /// Set a unit-producing building's rally point. Validates ownership and that the building is a
-/// completed producer; sanitizes/clamps the point to the map. Invalid requests are ignored
+/// producer; sanitizes/clamps the point to the map. Unfinished producers retain the rally for
+/// their first completed production. Invalid requests are ignored
 /// silently (consistent with movement commands), so a hostile client cannot wedge the tick loop.
 fn order_set_rally(
     entities: &mut EntityStore,
@@ -1996,7 +2000,7 @@ fn order_set_rally(
     queued: bool,
 ) {
     let ok = matches!(entities.get(building), Some(b)
-        if b.owner == player && b.is_building() && !b.under_construction()
+        if b.owner == player && b.is_building()
         && rules::economy::can_act_as_production_anchor_for_faction(faction_id, b.kind));
     if !ok {
         return;

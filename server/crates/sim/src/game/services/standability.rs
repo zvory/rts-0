@@ -66,7 +66,9 @@ pub(crate) fn unit_static_standable_with_facing(
             return false;
         }
     }
-    if !tree_trunks::body_clear(occ, body) {
+    if movement_body_class(kind) == MovementBodyClass::VehicleBody
+        && !tree_trunks::body_clear(occ, body)
+    {
         return false;
     }
 

@@ -537,7 +537,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // fog-filtered entity snapshots. Coordinates are integer world pixels. color is allowed only
     // on wildflowers.
     doodads: [ { id: u32, typeId: string, x: u32, y: u32, color?: "#rrggbb" } ],
-    stealthTiles: [ { x: u32, y: u32 } ],
+    concealmentTiles: [ { x: u32, y: u32 } ],
     noVehicleTiles: [ { x: u32, y: u32 } ],
     damageReductionTiles: [ { x: u32, y: u32 } ],
     slowMovementTiles: [ { x: u32, y: u32 } ]
@@ -793,7 +793,7 @@ Its reveal-only actionable tile is deliberately omitted from `visibleTiles` and 
 enemy unit occupies a presentation-dark tile. This keeps the unit fully legible without clearing
 the terrain tile beneath it.
 The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
-0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The one-second counterfire
+0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The half-second counterfire
 reaction applies only while a firing-reveal-stamped tile is the target's necessary source of
 actionable sight;
 ordinary live vision takes precedence and bypasses that reaction gate without changing weapon
@@ -802,10 +802,12 @@ both legality and reaction bypass. Repeated shots extend one stable reveal
 episode, so move orders or transient target switches cannot restart the same episode's reaction
 deadline. Tile-level provenance covers colocated entities and remains tied to the stamped tile when
 the firing entity moves before the next fog rebuild.
-A firing unit concealed by `stealthTiles` is projected with `visionOnly` and rendered as the white
-alpha edge of its current production rig/frame rather than full-color unit art. Its ordinary damaged-unit HP bar remains visible above fog. Firing
+A unit close-detected within two tiles between hostile body edges is team-shared for one second
+after separation and projected normally. A firing-only unit concealed by `concealmentTiles` is
+projected with `visionOnly` and rendered as the white alpha edge of its current production rig/frame
+rather than full-color unit art. Its ordinary damaged-unit HP bar remains visible above fog. Firing
 reveal provenance distinguishes concealment from terrain visibility: if the recipient already sees
-the ground, `visibleTiles` remains clear instead of drawing a dark square over the stealth tile.
+the ground, `visibleTiles` remains clear instead of drawing a dark square over the concealment tile.
 Artillery Fire creates the same kind of actionable temporary live fog for every enemy player,
 subject to normal smoke suppression, when the shell is launched. The reveal exposes the firing gun
 as a normal snapshot entity without exposing the target point, its terrain tile, surrounding
@@ -993,7 +995,7 @@ this state. Scout Plane
 entities are not selectable or commandable by normal clients, and runtime movement is driven by the
 server-side Command Car ability lifecycle.
 `visionOnly` is a special projection flag for non-owned render-only intel rather than normal
-visibility. Stealth firing reveals use it to select outline-only above-fog presentation. Current
+visibility. Concealment firing reveals use it to select outline-only above-fog presentation. Current
 lingering death sight is ordinary temporary team sight and does not set it. Clients must not select
 `visionOnly` entities.
 In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -1332,12 +1334,22 @@ own remaining-count value plus pause/unpause authority:
   pausesRemaining?: u8,
   pauseLimit: u8,
   canPause?: bool,
-  canUnpause?: bool
+  canUnpause?: bool,
+  resumeCountdown?: {
+    durationMs: u32,
+    remainingMs: u32,
+    words: string[]
+  }
 }
 ```
 Each active seat and live spectator connection has three successful pause starts per match. The
 server decrements the count only when a request changes the room from unpaused to paused; any
-pause-capable live recipient can unpause. While live
+pause-capable live recipient can request a resume. An accepted resume starts a server-owned
+three-second `Drei! Zwei! Eins!` countdown and leaves `paused: true` until its deadline. During the
+countdown `canUnpause` is false, and `resumeCountdown` carries the full duration, recipient-time
+remaining duration, and display words so late live spectators enter at the current word rather
+than restarting it. The server broadcasts a final `paused: false` state when simulation resumes.
+While live
 pause is active the room task skips the live simulation tick branch, so AI thinking, command-ack
 consumption, `Game::tick`, live snapshot fanout, and defeat checks do not advance, while reliable
 control-plane messages such as ping/pong, net reports, Give up, disconnect handling, and unpause
@@ -1421,7 +1433,7 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV6,
+  authoredMap: AuthoredMapV8,
   materializedMap: {
     name: string,
     width: u32,
@@ -1430,7 +1442,7 @@ POST /api/map-handoffs
     starts: LabMapTile[],
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
     doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[],
-    stealthTiles: LabMapTile[],
+    concealmentTiles: LabMapTile[],
     noVehicleTiles: LabMapTile[],
     damageReductionTiles: LabMapTile[],
     slowMovementTiles: LabMapTile[]
@@ -1440,13 +1452,16 @@ POST /api/map-handoffs
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV6 }
+ | { destination: "editor", authoredMap: AuthoredMapV8 }
 ```
-`AuthoredMapV6` declares independent `width` and `height` tile dimensions, whose product must
+`AuthoredMapV8` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
-`doodads`, `stealthTiles`, `noVehicleTiles`, `damageReductionTiles`, and `slowMovementTiles`
-arrays. Overlay records are bounded, unique, in-bounds tile-coordinate pairs; the four layers
-remain independent and may overlap.
+`doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `damageReductionTiles`, and
+`slowMovementTiles` arrays. A forest span is `[y, xStart, xEnd]` with inclusive bounds; spans may
+not overlap and materialize into all four gameplay layers. Explicit overlay records remain bounded,
+unique, in-bounds tile-coordinate pairs and can independently supplement forest-derived layers.
+Schema v8 is the only accepted authored-map schema. Older documents are rejected rather than
+migrated, and every shipped map declares `forestSpans` even when it is empty.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
@@ -1456,18 +1471,23 @@ by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.
 same `Tree` semantic class and authoritative 4.5-world-pixel circular trunk; species affects
 presentation only. Tree color
 is forbidden. Wildflower color is optional and, when present, must be canonical lowercase
-`#rrggbb`. Tree trunks participate in unit standability and add a finite tile-path avoidance cost,
-while leaving the rest of their tile traversable. Wildflowers have no collision or pathing effect.
+`#rrggbb`. Tree trunks are hard geometry for vehicles. Infantry pathing assigns tree tiles a finite
+avoidance cost and local movement steers around nearby trunks when space exists, but trunks do not
+invalidate infantry paths or landings; infantry pass through when avoidance cannot resolve a dense
+cluster. Wildflowers have no collision or pathing effect.
 Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
 setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
 rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
-schema-v6 map overlays independently supply stealth, vehicle exclusion, 50% incoming-damage
-reduction, and 50% movement speed. The damage and movement effects are selected from the tile
+schema-v8 forest spans jointly supply concealment, vehicle exclusion, 25% incoming-damage reduction,
+and 25% movement-speed reduction; independent explicit overlays can supply any subset outside a
+forest. The damage and movement effects are selected from the tile
 beneath the entity centre.
-Creation strictly rejects unknown fields and validates the complete authored-map schema, catalog,
-count, ids, colors, and world bounds before binding terrain, locations, resource counts, and
-doodads to `materializedMap`. Records are capped at 64, expire after two
-minutes, and are removed on the first consume; unknown, expired, or already-used ids return HTTP 410.
+Lab handoff creation strictly rejects unknown fields and validates the complete authored-map schema,
+catalog, count, ids, colors, and world bounds before binding terrain, locations, resource counts,
+and doodads to `materializedMap`. Editor-directed handoffs are bounded authored-draft transport and
+do not require or retain the duplicate materialized body. Records are capped at 64; Lab records
+expire after two minutes, editor records after 24 hours, and both are removed on first consume.
+Unknown, expired, or already-used ids return HTTP 410.
 The map body never appears in a URL. Consumption uses POST so browser or intermediary prefetching
 cannot burn the one-use record. Consuming a Lab-directed record creates a private Lab from the
 validated materialized map before the browser joins; an unjoined room has a short empty-room lease
@@ -1495,7 +1515,7 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       starts: [{ x: u32, y: u32 }],
       baseSites: [{ x: u32, y: u32, steelPatches: u32, oilPatches: u32 }],
       doodads: [{ id: u32, typeId: string, x: u32, y: u32, color?: string }],
-      stealthTiles: [{ x: u32, y: u32 }],
+      concealmentTiles: [{ x: u32, y: u32 }],
       noVehicleTiles: [{ x: u32, y: u32 }],
       damageReductionTiles: [{ x: u32, y: u32 }],
       slowMovementTiles: [{ x: u32, y: u32 }]

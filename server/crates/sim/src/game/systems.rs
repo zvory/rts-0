@@ -330,6 +330,7 @@ pub(crate) fn run_tick(
             fog,
             smokes,
             events,
+            tick,
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "player_ability_cooldowns", || {

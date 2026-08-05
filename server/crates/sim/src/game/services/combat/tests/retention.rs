@@ -243,6 +243,43 @@ fn firing_immediately_acquires_the_next_target_for_reload_tracking() {
 }
 
 #[test]
+fn firing_keeps_a_living_auto_target_through_reload() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+        .expect("machine gunner should spawn");
+    let committed = entities
+        .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+        .expect("committed rifleman should spawn");
+    let higher_priority = entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 160.0, 100.0)
+        .expect("higher-priority fallback should spawn");
+    if let Some(machine_gunner) = entities.get_mut(attacker) {
+        machine_gunner.set_order(Order::HoldPosition);
+        machine_gunner.set_weapon_setup(WeaponSetup::Deployed);
+        machine_gunner.set_target_id(Some(committed));
+    }
+
+    run_combat_tick(&mut entities);
+
+    let machine_gunner = entities.get(attacker).expect("machine gunner should exist");
+    assert!(
+        machine_gunner.attack_cd() > 0,
+        "the machine gunner should fire"
+    );
+    assert_eq!(
+        machine_gunner.target_id(),
+        Some(committed),
+        "a living target stays committed through reload instead of churning to a newly ranked target"
+    );
+    assert_ne!(
+        machine_gunner.target_id(),
+        Some(higher_priority),
+        "the fallback remains available only if the committed target becomes invalid"
+    );
+}
+
+#[test]
 fn explicit_attack_kill_keeps_fallback_target_through_reload() {
     let mut entities = EntityStore::new();
     let attacker = entities

@@ -29,8 +29,8 @@ use serde::{Deserialize, Serialize};
 pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
-/// The only map schema version this server accepts. Bump when the schema changes incompatibly.
-pub const CURRENT_MAP_VERSION: u32 = 6;
+/// The only authored-map schema accepted by this build.
+pub const CURRENT_MAP_VERSION: u32 = 8;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -71,12 +71,12 @@ pub struct Map {
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
     pub doodads: Vec<MapDoodad>,
     /// Canonical sparse tile coordinates granting unit concealment.
-    pub stealth_tiles: Vec<(u32, u32)>,
+    pub concealment_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
     pub no_vehicle_tiles: Vec<(u32, u32)>,
-    /// Canonical sparse tile coordinates halving incoming damage to occupants.
+    /// Canonical sparse tile coordinates reducing incoming damage to occupants by 25%.
     pub damage_reduction_tiles: Vec<(u32, u32)>,
-    /// Canonical sparse tile coordinates halving occupant movement speed.
+    /// Canonical sparse tile coordinates reducing occupant movement speed by 25%.
     pub slow_movement_tiles: Vec<(u32, u32)>,
 }
 
@@ -201,7 +201,7 @@ impl Map {
             hash = fnv_bytes(hash, &counts.oil_patches.to_le_bytes());
         }
         hash = doodads::hash_materialized(hash, &self.doodads);
-        hash = hash_tiles(hash, b"stealth", &self.stealth_tiles);
+        hash = hash_tiles(hash, b"concealment", &self.concealment_tiles);
         hash = hash_tiles(hash, b"no-vehicle", &self.no_vehicle_tiles);
         hash = hash_tiles(hash, b"damage-reduction", &self.damage_reduction_tiles);
         hash = hash_tiles(hash, b"slow-movement", &self.slow_movement_tiles);
@@ -296,8 +296,8 @@ impl Map {
     }
 
     #[inline]
-    fn is_stealth_tile(&self, x: u32, y: u32) -> bool {
-        self.stealth_tiles.binary_search(&(x, y)).is_ok()
+    pub(crate) fn is_concealment_tile(&self, x: u32, y: u32) -> bool {
+        self.concealment_tiles.binary_search(&(x, y)).is_ok()
     }
 
     #[inline]
@@ -311,10 +311,10 @@ impl Map {
     }
 
     #[inline]
-    pub(crate) fn world_point_is_stealth(&self, x: f32, y: f32) -> bool {
+    pub(crate) fn world_point_is_concealed(&self, x: f32, y: f32) -> bool {
         self.contains_world_point(x, y) && {
             let (tx, ty) = self.tile_of(x, y);
-            self.is_stealth_tile(tx, ty)
+            self.is_concealment_tile(tx, ty)
         }
     }
 
@@ -341,7 +341,7 @@ impl Map {
     ) -> (Vec<MapTile>, Vec<MapTile>, Vec<MapTile>, Vec<MapTile>) {
         let convert = |tiles: &[(u32, u32)]| tiles.iter().map(|&(x, y)| MapTile { x, y }).collect();
         (
-            convert(&self.stealth_tiles),
+            convert(&self.concealment_tiles),
             convert(&self.no_vehicle_tiles),
             convert(&self.damage_reduction_tiles),
             convert(&self.slow_movement_tiles),
@@ -415,7 +415,7 @@ fn default_available_map() -> AvailableMap {
 fn available_map_from_json(stem: &str, json: &str) -> Option<AvailableMap> {
     let v = serde_json::from_str::<serde_json::Value>(json).ok()?;
     let version = v.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
-    if u32::try_from(version).ok() != Some(CURRENT_MAP_VERSION) {
+    if !u32::try_from(version).is_ok_and(supported_map_version) {
         return None;
     }
     let name = v
@@ -435,6 +435,10 @@ fn available_map_from_json(stem: &str, json: &str) -> Option<AvailableMap> {
         min_players,
         max_players,
     })
+}
+
+pub(super) fn supported_map_version(version: u32) -> bool {
+    version == CURRENT_MAP_VERSION
 }
 
 fn fnv_usize(hash: u64, value: usize) -> u64 {
@@ -745,13 +749,35 @@ mod tests {
               "terrain": [".."],
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }"#,
             0,
         )
         .expect_err("wrong version should be rejected");
 
         assert!(err.contains("not supported"), "error was: {err}");
+
+        let err = Map::from_authored_json(
+            1,
+            r#"{
+              "version": 7,
+              "name": "previous",
+              "width": 2,
+              "height": 1,
+              "description": "the previous authored-map schema",
+              "_design": "n/a",
+              "terrain": [".."],
+              "startLocations": [{"x": 0, "y": 0}],
+              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
+              "doodads": [],
+              "forestSpans": []
+            }"#,
+            0,
+        )
+        .expect_err("the previous schema should be rejected");
+
+        assert!(err.contains("requires version 8"), "error was: {err}");
     }
 
     #[test]
@@ -781,7 +807,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 6,
+              "version": 8,
               "name": "bad",
               "width": 2,
               "height": 2,
@@ -790,7 +816,8 @@ mod tests {
               "terrain": ["..", ".x"],
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }"#,
             0,
         )
@@ -806,7 +833,7 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 6,
+              "version": 8,
               "name": "bad-base",
               "width": 32,
               "height": 32,
@@ -815,7 +842,8 @@ mod tests {
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -832,7 +860,7 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 6,
+              "version": 8,
               "name": "road-base",
               "width": 32,
               "height": 32,
@@ -841,7 +869,8 @@ mod tests {
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -855,7 +884,7 @@ mod tests {
     fn current_authored_map_materializes_rectangular_dimensions() {
         let rows = vec![".".repeat(30); 20];
         let json = serde_json::json!({
-            "version": 6,
+            "version": CURRENT_MAP_VERSION,
             "name": "wide-test",
             "width": 30,
             "height": 20,
@@ -868,7 +897,8 @@ mod tests {
                 "y": 8,
                 "steelPatches": 12,
                 "oilPatches": 3
-            }]
+            }],
+            "forestSpans": []
         });
 
         let map = Map::from_authored_json(1, &json.to_string(), 0)
@@ -889,7 +919,7 @@ mod tests {
     fn current_dimensions_must_match_terrain_shape() {
         let rows = vec![".".repeat(30); 20];
         let json = serde_json::json!({
-            "version": 6,
+            "version": CURRENT_MAP_VERSION,
             "name": "mismatched-test",
             "width": 20,
             "height": 30,
@@ -902,7 +932,8 @@ mod tests {
                 "y": 8,
                 "steelPatches": 12,
                 "oilPatches": 3
-            }]
+            }],
+            "forestSpans": []
         });
 
         let error = Map::from_authored_json(1, &json.to_string(), 0)

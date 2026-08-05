@@ -19,8 +19,8 @@ const UNIT_RIG_POOL_FAMILIES = Object.freeze([
     "forestUnitOutlineRigOverlays",
   ]),
   Object.freeze([
-    "stealthUnitOutlineRigs",
-    "stealthUnitOutlineRigOverlays",
+    "concealmentUnitOutlineRigs",
+    "concealmentUnitOutlineRigOverlays",
   ]),
 ]);
 const UNIT_RIG_POOL_FAMILY_BY_NAME = new Map();

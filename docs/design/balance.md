@@ -6,7 +6,7 @@ buildables, trainables, upgrade ids, and ability carriers live in
 bare road, and all four marked road tiles share open-ground passability, cover, concealment, and
 line-of-sight behavior. The visual open-ground variants retain grass's 1.0x movement speed; road
 alone applies a 1.5x movement-speed multiplier. Independent authored slow-movement tiles apply a
-0.5x multiplier, while authored damage-reduction tiles halve incoming damage after existing damage
+0.75x multiplier, while authored damage-reduction tiles reduce incoming damage by 25% after existing damage
 policy; both sample the entity-centre tile and may overlap any base terrain or other overlay.
 `server/crates/rules/src/balance.rs` is the stable public re-export surface for timings, tile size,
 starting resources, supply caps, mining amounts, support-weapon constants, body dimensions, upgrade
@@ -143,25 +143,25 @@ building with 50 HP, Small/unarmored combat classification, 1-tile sight, no wea
 and no survival-building contribution. It must be centered on one live Steel patch within the
 existing `MINING_ANCHOR_RANGE_TILES = 11` coverage of the producing Resource Depot. It extracts
 `STEEL_LOAD = 2` Steel every `HARVEST_TICKS = 40` ticks and disappears when its bound patch is
-depleted. It costs 50 Steel and takes 20 seconds to produce.
+depleted. It is free and takes 24 seconds to produce.
 
-Pump Jack keeps its existing 1x1 footprint, 50 HP, Small/unarmored classification, 1-tile sight,
-100-Steel cost, 20-second time, and `OIL_LOAD = 2` payout every 40 ticks, but moves from Engineer
-placement to Resource Depot production. A completed Resource Depot exposes Engineer, Steel Mine,
-and Pump Jack in one FIFO production queue. A paid front extractor item chooses a deterministic
-live, unoccupied matching patch within that specific depot's 11-tile coverage and immediately
-creates an under-construction scaffold there. The scaffold and depot production bars share the
-same authoritative progress, and queue completion completes that same scaffold; if no eligible
-patch exists, the front item pauses without starting.
-Manual clicks queue one item. Existing Alt-click/Alt-hotkey/Ctrl-hotkey repeat-production controls
-enable automatic production; repeated extractors pause without spending or queueing when all
-matching in-range patches are occupied and resume when destruction makes a patch eligible again.
-When both extractor kinds repeat at one Depot, a saturated kind yields to the other kind instead
-of blocking the shared queue.
+Pump Jack keeps its existing 1x1 footprint, 75 HP, Small/unarmored classification, 1-tile sight,
+and `OIL_LOAD = 2` payout every 40 ticks. It is also free and takes 24 seconds to produce.
+Every completed Resource Depot permanently runs one Steel Mine job and one Pump Jack job in the
+background. The two jobs progress concurrently with each other and independently of the Depot's
+ordinary Engineer FIFO. Each job chooses the nearest deterministic live, unoccupied matching patch
+within that specific depot's 11-tile coverage and creates an under-construction scaffold there. If
+no eligible patch exists, only that resource job pauses without creating a scaffold. It resumes
+automatically when depletion or destruction makes another patch eligible. If an in-progress
+scaffold is destroyed or cancelled, its free job restarts from zero. Players cannot queue, disable,
+or cancel the permanent automatic jobs through production commands. When an extractor or its
+in-progress scaffold is killed, only that depot's matching resource job waits five seconds before
+creating its replacement scaffold. Normal patch depletion does not apply this combat restart delay.
 Neither extractor accepts a rally order, consumes supply, grants supply, or provides production,
 research, attacks, wreckage, refunds on death, or special death effects. Both remain ordinary
-fog-gated, targetable buildings and can be spawned in Lab. Built-in AIs enable repeat for both
-extractor kinds on every completed Resource Depot; their Engineers remain construction-only.
+fog-gated, targetable buildings and can be spawned in Lab. Their Engineers remain
+construction-only; built-in AIs need no extractor-production action because every Depot owns the
+same permanent jobs.
 
 The faction rollout keeps Steel, Oil, and Supply as the global economy contract. Faction catalogs
 decide which global units, buildings, upgrades, and abilities are legal for a player and define
@@ -342,12 +342,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
   NE-SW diagonal marked road tiles share this rule. A moving unit samples the terrain under its
   center at the start of each authoritative movement tick; roads otherwise behave like grass,
   including passability, construction, cover, concealment, and line of sight.
-- `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.5` and
-  `DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER = 0.5`. These independent sparse authored overlays sample
+- `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.75` and
+  `DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER = 0.75`. These independent sparse authored overlays sample
   the entity-centre tile. Slow movement multiplies the movement budget after the base-terrain
-  modifier (so a slowed road is 0.75x base speed). Damage reduction applies after weapon armor,
+  modifier (so a slowed road is 1.125x base speed). Damage reduction applies after weapon armor,
   facing, falloff, and entrenchment calculations to direct fire, overpenetration, Mortar,
-  Artillery, loaded Panzerfaust, and damaging ability projectiles; odd non-zero damage rounds up.
+  Artillery, loaded Panzerfaust, and damaging ability projectiles; fractional non-zero damage rounds up.
 - Gravel A/B/C, Dirt A/B/C, Mud A/B/C, and Frosted Ground are visual Open-terrain variants. They
   use grass-equivalent 1.0x movement, construction, cover, concealment, and line-of-sight rules.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
@@ -585,18 +585,11 @@ profiles and explicit activation/autocast policy instead of being folded into de
   anchor is close enough, gatherers ignore new gather orders for that steel patch and active miners
   scatter roughly one tile away from the patch. When a patch empties the gatherer goes idle (no
   automatic retarget).
-- Oil extraction: workers do not directly mine oil. The worker build card exposes Pump Jack in its
-  top-middle `W` slot with the normal cost and build-time tooltip. Arming it snaps the placement
-  preview to the nearest live oil patch within one map tile of the cursor. A worker right-click on
-  a live oil patch continues to issue the same Pump Jack build directly. Completed Pump Jacks mine
-  `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former oil rate, and deplete the
-  underlying oil node. When that final load empties the patch, its Pump Jack disappears with it.
-  Pump Jack placement requires overlap with a live oil node, but has no tech or mining-anchor
-  requirement. AI resource planning treats oil patches within the 11-tile mining-anchor range as
-  immediately available Pump Jack sites. Friendly units standing over the patch do not intercept
-  the contextual right-click; when the builder arrives, owned and allied units overlapping the
-  footprint are moved to the nearest clear positions before the Pump Jack scaffold is placed.
-  Enemy units remain blockers.
+- Oil extraction: workers do not directly mine oil. Every completed Resource Depot automatically
+  builds free Pump Jacks on its in-range oil patches, concurrently with its free Steel Mine job.
+  Completed Pump Jacks mine `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former
+  oil rate, and deplete the underlying oil node. When that final load empties the patch, its Pump
+  Jack disappears with it and the permanent Depot job moves to the next eligible patch.
 - One gatherer per direct-mined patch: each direct-mined node has a single harvest slot
   (`Entity::miner`). A patch is
   occupied only after the gatherer reaches `GatherPhase::Harvesting`; right-clicking a patch
@@ -616,7 +609,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 495 (~16.5s) |
+| worker          | 40  | 4   | 1     | 24 | 1.4   | 10    | 50  | 0   | 1   | 495 (~16.5s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 25  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
@@ -636,7 +629,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| resource_depot                | Resource Depot        | 300 | 1     | 450 steel + 100 oil | 3x3  | 750       | trains workers; no supply; players start with one free |
+| resource_depot                | Resource Depot        | 300 | 1     | 450 steel + 100 oil | 3x3  | 750       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
@@ -645,7 +638,8 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a Resource Depot and Training Centre |
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a completed trap captures every currently visible completed trap within 4 tiles as one cluster-clear order; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
-| pump_jack                  | Pump Jack          | 50  | 1     | 100 steel + 0 oil | 1x1  | 600       | contextual oil extractor built by workers on live oil patches; may be built at any distance, but mines 2 oil per 40 ticks only while its patch is within the 11-tile mining range of an owned or allied completed Resource Depot/Zamok; ejects friendly footprint occupants when its builder arrives; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight; no tech requirement |
+| steel_mine                 | Steel Mine         | 50  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
+| pump_jack                  | Pump Jack          | 75  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

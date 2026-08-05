@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 8,
   "width": 150,
   "height": 150,
   "name": "3 Player Map",
@@ -245,7 +245,8 @@
       "oilPatches": 3
     }
   ],
-  "stealthTiles": [],
+  "forestSpans": [],
+  "concealmentTiles": [],
   "noVehicleTiles": [],
   "doodads": []
 }

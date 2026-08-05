@@ -17,6 +17,8 @@ export const COLORS = Object.freeze({
   roadShoulderDark: 0x40352a,
   roadLine: 0xd0aa32,
   minimapRoadLine: 0xf1cb43,
+  minimapForestCanopy: 0x68c6a3,
+  minimapForestTrunk: 0x31584f,
   grid: 0x000000,
   steel: 0x9a9a9a,
   oil: 0x111111,
@@ -73,6 +75,7 @@ export const CAMERA = Object.freeze({
 
 export const WORKER_BUILD_CARD_SLOTS = Object.freeze([
   KIND.RESOURCE_DEPOT,
+  null,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.ENGINEERING_COMPLEX,

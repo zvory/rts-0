@@ -91,7 +91,10 @@ pub(super) fn advance_moving_units(
                 e.pos_x,
                 e.pos_y,
                 !uses_oriented_vehicle_body(e.kind)
-                    && matches!(e.order(), Order::Move(_) | Order::Attack(_))
+                    && matches!(
+                        e.order(),
+                        Order::Move(_) | Order::AttackMove(_) | Order::Attack(_)
+                    )
                     && footing_profile(e) != FootingProfile::Ghost,
                 e.next_waypoint(),
             )

@@ -1,3 +1,5 @@
+import { liveResumeCountdownFromWire } from "./protocol.js";
+
 export function requestPauseGame(match) {
   if (!match.capabilities.matchControls?.pause) return;
   if (match.livePauseState.paused || !match.livePauseState.canPause) {
@@ -20,6 +22,7 @@ export function requestUnpauseGame(match) {
 
 export function applyLivePauseState(match, state) {
   const wasPaused = match.livePauseState.paused === true;
+  const wasResumeCountingDown = match.livePauseState.resumeCountdown != null;
   match.livePauseState = {
     paused: state?.paused === true,
     pausedBy: Number.isInteger(state?.pausedBy) ? state.pausedBy : null,
@@ -27,7 +30,11 @@ export function applyLivePauseState(match, state) {
     pauseLimit: Number.isInteger(state?.pauseLimit) ? state.pauseLimit : null,
     canPause: state?.canPause === true,
     canUnpause: state?.canUnpause === true,
+    resumeCountdown: liveResumeCountdownFromWire(state?.resumeCountdown),
   };
+  if (match.livePauseState.resumeCountdown && !wasResumeCountingDown) {
+    match.closeMenus?.();
+  }
   if (match.livePauseState.paused) {
     suspendPredictionVisuals(match);
   } else if (wasPaused) {

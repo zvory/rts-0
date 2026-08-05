@@ -420,7 +420,7 @@ mod tests {
             terrain: vec![terrain::GRASS; 64 * 64],
             resources: vec![],
             doodads: vec![],
-            stealth_tiles: vec![],
+            concealment_tiles: vec![],
             no_vehicle_tiles: vec![],
             damage_reduction_tiles: vec![],
             slow_movement_tiles: vec![],

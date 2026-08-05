@@ -24,8 +24,7 @@ use super::projection_abilities::{
     active_ability_object_expires_in, active_return_object_id, return_available_tick,
 };
 use super::projection_panzerfaust::project_panzerfaust_state;
-use super::projection_visibility::entity_hidden_by_stealth_from_players;
-pub(crate) use super::projection_visibility::entity_hidden_by_stealth_from_team;
+pub(crate) use super::projection_visibility::entity_hidden_by_concealment_from_team;
 pub(crate) use super::projection_visibility::shot_reveals_attacker;
 #[allow(unused_imports)]
 pub use super::projection_visibility::{
@@ -84,29 +83,6 @@ pub(crate) enum PrivateDetailProjection<'a> {
 }
 
 impl PrivateDetailProjection<'_> {
-    fn entity_hidden_by_stealth(
-        self,
-        viewer: u32,
-        entity: &Entity,
-        map: &crate::game::map::Map,
-        fog: &Fog,
-        teams: &TeamRelations,
-    ) -> bool {
-        match self {
-            Self::ExactViewer => {
-                entity_hidden_by_stealth_from_team(viewer, entity, map, fog, teams)
-            }
-            Self::SelectedOwners(player_ids) => entity_hidden_by_stealth_from_players(
-                player_ids.iter().copied(),
-                entity,
-                map,
-                fog,
-                teams,
-            ),
-            Self::AllProjected => false,
-        }
-    }
-
     fn viewer_for(self, viewer: u32, entity: &Entity) -> Option<u32> {
         match self {
             Self::ExactViewer => (entity.owner == viewer).then_some(viewer),
@@ -201,18 +177,14 @@ pub fn project_entity(
         context.teams,
     );
     let concealment_fog = context.concealment_fog.unwrap_or(context.fog);
-    let hidden_by_stealth = context.map.zip(context.teams).is_some_and(|(map, teams)| {
-        context.private_detail_projection.entity_hidden_by_stealth(
-            viewer,
-            entity,
-            map,
-            concealment_fog,
-            teams,
-        )
+    let hidden_by_concealment = context.map.zip(context.teams).is_some_and(|(map, teams)| {
+        context
+            .private_detail_projection
+            .entity_hidden_by_concealment(viewer, entity, map, concealment_fog, teams)
     });
     if context.fogged
         && !selected_owner
-        && (hidden_by_stealth
+        && (hidden_by_concealment
             || !context
                 .smokes
                 .map(|smokes| {
@@ -246,13 +218,21 @@ pub fn project_entity(
     let private_detail_viewer = context.private_detail_projection.viewer_for(viewer, entity);
     let private_detail_owner = private_detail_viewer.is_some();
     let exact_owner = private_detail_owner;
-    let stealth_reveal_only = context.fogged
+    let concealment_reveal_only = context.fogged
         && !owner_or_ally
         && entity.is_unit()
         && context
             .map
-            .is_some_and(|map| map.world_point_is_stealth(entity.pos_x, entity.pos_y));
-    let vision_only = stealth_reveal_only
+            .is_some_and(|map| map.world_point_is_concealed(entity.pos_x, entity.pos_y))
+        && !context.teams.is_some_and(|teams| {
+            context.private_detail_projection.has_concealment_detection(
+                viewer,
+                entity.id,
+                concealment_fog,
+                teams,
+            )
+        });
+    let vision_only = concealment_reveal_only
         || (context.fogged
             && !owner_or_ally
             && !entity.is_node()
@@ -301,13 +281,15 @@ pub fn project_entity(
                     || !context.fogged
                     || (!vision_only
                         && !context.map.zip(context.teams).is_some_and(|(map, teams)| {
-                            context.private_detail_projection.entity_hidden_by_stealth(
-                                viewer,
-                                target,
-                                map,
-                                concealment_fog,
-                                teams,
-                            )
+                            context
+                                .private_detail_projection
+                                .entity_hidden_by_concealment(
+                                    viewer,
+                                    target,
+                                    map,
+                                    concealment_fog,
+                                    teams,
+                                )
                         })
                         && context
                             .smokes

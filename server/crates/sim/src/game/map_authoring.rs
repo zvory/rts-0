@@ -50,7 +50,7 @@ pub struct AuthoredMapCheck {
     pub start_locations: Vec<MapTileCoordinate>,
     pub base_sites: Vec<AuthoredBaseSummary>,
     pub doodad_count: usize,
-    pub stealth_tile_count: usize,
+    pub concealment_tile_count: usize,
     pub no_vehicle_tile_count: usize,
 }
 
@@ -221,7 +221,7 @@ fn check_from_materialized(map: &AuthoredMapData) -> AuthoredMapCheck {
             })
             .collect(),
         doodad_count: map.doodads.len(),
-        stealth_tile_count: map.stealth_tiles.len(),
+        concealment_tile_count: map.concealment_tiles.len(),
         no_vehicle_tile_count: map.no_vehicle_tiles.len(),
     }
 }
@@ -235,7 +235,7 @@ fn map_from_materialized(map: AuthoredMapData) -> Map {
         base_sites: map.base_sites,
         base_resource_counts: map.base_resource_counts,
         doodads: map.doodads,
-        stealth_tiles: map.stealth_tiles,
+        concealment_tiles: map.concealment_tiles,
         no_vehicle_tiles: map.no_vehicle_tiles,
         damage_reduction_tiles: map.damage_reduction_tiles,
         slow_movement_tiles: map.slow_movement_tiles,
@@ -265,7 +265,8 @@ mod tests {
                 {"x": 31, "y": 12, "steelPatches": 3, "oilPatches": 2}
             ],
             "doodads": doodads,
-            "stealthTiles": [],
+            "forestSpans": [],
+            "concealmentTiles": [],
             "noVehicleTiles": no_vehicle_tiles
         })
         .to_string()
@@ -376,7 +377,8 @@ mod tests {
             "startLocations": [{"x": 8, "y": 8}],
             "baseSites": base_sites,
             "doodads": [],
-            "stealthTiles": [],
+            "forestSpans": [],
+            "concealmentTiles": [],
             "noVehicleTiles": no_vehicle_wall
         })
         .to_string();
@@ -400,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn report_accounts_for_tree_detours_and_road_speed() {
+    fn report_keeps_infantry_tree_avoidance_local_and_accounts_for_road_speed() {
         let flat_json = authored_map(flat_rows('.'), json!([]), json!([]));
         let flat = analyze_authored_json(&flat_json).expect("flat fixture should analyze");
         let flat_infantry = route(&flat, "infantry");
@@ -411,9 +413,10 @@ mod tests {
             json!([]),
         );
         let tree = analyze_authored_json(&tree_json).expect("tree fixture should analyze");
-        assert!(
-            route(&tree, "infantry").distance_px > flat_infantry.distance_px,
-            "tree trunk on the direct segment should force a longer static route"
+        assert_eq!(
+            route(&tree, "infantry").distance_px,
+            flat_infantry.distance_px,
+            "infantry tree avoidance is local steering and must not block the static route"
         );
 
         let road = analyze_authored_json(&authored_map(flat_rows('='), json!([]), json!([])))

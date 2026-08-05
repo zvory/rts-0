@@ -278,7 +278,6 @@ where
         save_for_expansion && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0;
 
     let economy_plan = economy_manager_output.plan.clone();
-    enable_extractor_repeat_for_new_depots(observation, memory, &mut actions);
     let save_worker_training_for_tech = defer_economy_for_panic;
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker);
     if should_train_workers {
@@ -914,40 +913,6 @@ fn oil_demand_signal(
     panic_plan
         .map(|plan| OilDemandSignal::ExactWorkers(plan.oil_workers))
         .unwrap_or(OilDemandSignal::ProfileDefault)
-}
-
-fn enable_extractor_repeat_for_new_depots(
-    observation: &AiObservation,
-    memory: &mut AiDecisionMemory,
-    actions: &mut AiActionContext<'_>,
-) {
-    let active_depots = observation
-        .owned
-        .iter()
-        .filter(|entity| {
-            entity.kind == EntityKind::ResourceDepot
-                && entity.is_complete
-                && entity.state != AiEntityState::Dead
-        })
-        .map(|entity| entity.id)
-        .collect::<BTreeSet<_>>();
-    memory
-        .extractor_repeat_depots
-        .retain(|id| active_depots.contains(id));
-
-    for depot in active_depots {
-        if memory.extractor_repeat_depots.insert(depot) {
-            for unit in [EntityKind::SteelMine, EntityKind::PumpJack] {
-                actions.emit_action(
-                    crate::sdk::actions::AiActionRequest::AdjustProductionRepeat {
-                        buildings: vec![depot],
-                        unit,
-                        delta: 1,
-                    },
-                );
-            }
-        }
-    }
 }
 
 fn should_build_expansion_from_economy_manager(output: &EconomyManagerOutput) -> bool {

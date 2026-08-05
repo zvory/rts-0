@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 8,
   "width": 196,
   "height": 196,
   "name": "Open Basin",
@@ -287,7 +287,8 @@
       "oilPatches": 3
     }
   ],
-  "stealthTiles": [],
+  "forestSpans": [],
+  "concealmentTiles": [],
   "noVehicleTiles": [],
   "doodads": []
 }

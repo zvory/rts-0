@@ -12,7 +12,7 @@ use super::{stamp_point, Fog};
 pub(in crate::game) struct FiringRevealVisibility {
     pub(in crate::game) episode_started_at_tick: u32,
     /// The reveal is required to target the entity, including a unit concealed on ordinarily
-    /// visible stealth terrain.
+    /// visible concealment terrain.
     pub(in crate::game) reveal_only: bool,
     /// The stamped tile itself lacked ordinary sight and must stay presentation-dark.
     pub(in crate::game) terrain_reveal_only: bool,
@@ -57,6 +57,13 @@ impl Fog {
             else {
                 continue;
             };
+            let terrain_reveal_only = !self
+                .grids
+                .get(&source.viewer())
+                .and_then(|grid| grid.get(tile as usize))
+                .copied()
+                .unwrap_or(false);
+            let close_detected = self.has_concealment_detection(source.viewer(), entity.id);
             let Some(visibility) = self
                 .firing_reveal_visibility
                 .get_mut(&source.viewer())
@@ -65,14 +72,8 @@ impl Fog {
                 continue;
             };
             visibility.revealed_tile = Some(tile);
-            let terrain_reveal_only = !self
-                .grids
-                .get(&source.viewer())
-                .and_then(|grid| grid.get(tile as usize))
-                .copied()
-                .unwrap_or(false);
-            visibility.reveal_only =
-                terrain_reveal_only || map.world_point_is_stealth(entity.pos_x, entity.pos_y);
+            visibility.reveal_only = terrain_reveal_only
+                || (map.world_point_is_concealed(entity.pos_x, entity.pos_y) && !close_detected);
             visibility.terrain_reveal_only = terrain_reveal_only;
         }
 

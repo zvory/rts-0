@@ -24,9 +24,15 @@ pub const MAP_TERRAIN_MUD_C: u8 = 16;
 pub const MAP_TERRAIN_FROSTED_GROUND: u8 = 17;
 
 pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
-pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 = 0.5;
-const DAMAGE_REDUCTION_TILE_DAMAGE_NUMERATOR: u32 = 1;
-const DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR: u32 = 2;
+pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 = 0.75;
+/// Body-edge distance at which an ordinary unit detects a concealed hostile unit.
+pub const CONCEALMENT_CLOSE_DETECTION_RANGE_TILES: f32 = 2.0;
+/// Maximum number of concealment tiles an ordinary fog-of-war sight ray may enter.
+pub const CONCEALMENT_SIGHT_DEPTH_TILES: u32 = 3;
+/// Duration that an entity remains detected after close contact ends.
+pub const CONCEALMENT_DETECTION_PERSIST_TICKS: u32 = crate::balance::TICK_HZ;
+const DAMAGE_REDUCTION_TILE_DAMAGE_NUMERATOR: u32 = 3;
+const DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR: u32 = 4;
 pub const DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER: f32 =
     DAMAGE_REDUCTION_TILE_DAMAGE_NUMERATOR as f32 / DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR as f32;
 
@@ -88,12 +94,13 @@ pub fn slow_movement_tile_multiplier(active: bool) -> f32 {
     }
 }
 
-/// Halve incoming damage while the target center occupies an authored reduction tile.
+/// Reduce incoming damage by 25% while the target center occupies an authored reduction tile.
 /// Integer damage rounds up so a non-zero hit always remains meaningful.
 pub fn damage_after_reduction_tile(damage: u32, active: bool) -> u32 {
     if active {
-        damage / DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR
-            + u32::from(!damage.is_multiple_of(DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR))
+        let scaled = u64::from(damage) * u64::from(DAMAGE_REDUCTION_TILE_DAMAGE_NUMERATOR);
+        ((scaled + u64::from(DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR - 1))
+            / u64::from(DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR)) as u32
     } else {
         damage
     }
@@ -205,9 +212,12 @@ mod tests {
     #[test]
     fn authored_overlay_multipliers_are_exact_and_nonzero_damage_stays_nonzero() {
         assert_eq!(slow_movement_tile_multiplier(false), 1.0);
-        assert_eq!(slow_movement_tile_multiplier(true), 0.5);
-        assert_eq!(damage_after_reduction_tile(100, true), 50);
-        assert_eq!(damage_after_reduction_tile(99, true), 50);
+        assert_eq!(
+            slow_movement_tile_multiplier(true),
+            SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER
+        );
+        assert_eq!(damage_after_reduction_tile(100, true), 75);
+        assert_eq!(damage_after_reduction_tile(99, true), 75);
         assert_eq!(damage_after_reduction_tile(1, true), 1);
         assert_eq!(damage_after_reduction_tile(0, true), 0);
         assert_eq!(damage_after_reduction_tile(99, false), 99);

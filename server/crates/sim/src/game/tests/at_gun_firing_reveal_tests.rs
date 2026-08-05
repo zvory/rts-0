@@ -505,7 +505,7 @@ fn third_party_combat_does_not_make_hidden_shooter_actionable() {
 }
 
 #[test]
-fn counterfire_against_firing_revealed_target_waits_one_second() {
+fn counterfire_against_firing_revealed_target_waits_half_second() {
     let (mut game, enemy_at, counter_at) = hidden_enemy_at_gun_with_counter_fixture();
 
     game.tick();
@@ -542,7 +542,7 @@ fn counterfire_against_firing_revealed_target_waits_one_second() {
         "counter AT gun should still acquire the firing-revealed target"
     );
 
-    for _ in 1..config::TICK_HZ {
+    for _ in 1..config::TICK_HZ / 2 {
         game.tick();
         assert_eq!(
             game.state
@@ -551,14 +551,14 @@ fn counterfire_against_firing_revealed_target_waits_one_second() {
                 .expect("enemy AT gun should still exist")
                 .hp,
             hp_after_reveal,
-            "counterfire should wait the full one-second response delay"
+            "counterfire should wait the half-second response delay"
         );
     }
 
     game.tick();
     assert!(
         game.state.entities.get(enemy_at).is_none_or(|entity| entity.hp < hp_after_reveal),
-        "counter AT gun should fire after the one-second response delay while reveal remains active"
+        "counter AT gun should fire after the half-second response delay while reveal remains active"
     );
 }
 

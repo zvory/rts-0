@@ -12,7 +12,7 @@ pub(super) fn adjust(
     delta: i8,
     max_buildings: usize,
 ) {
-    if !matches!(delta, -1 | 1) {
+    if !matches!(delta, -1 | 1) || unit.is_resource_extractor() {
         return;
     }
 
@@ -24,7 +24,7 @@ pub(super) fn adjust(
 
     let candidate = dedupe_units(buildings).into_iter().filter_map(|building| {
         let producer = entities.get(building)?;
-        if producer.owner != player || !producer.is_building() || producer.under_construction() {
+        if producer.owner != player || !producer.is_building() {
             return None;
         }
         let repeat_units = &producer.production.as_ref()?.repeat_units;

@@ -27,7 +27,7 @@ import {
 } from "./map_editor_session.js";
 
 const MAP_CATALOG_URL = "/maps/catalog";
-const MAP_EDITOR_MAX_JSON_BYTES = 2 * 1024 * 1024;
+const MAP_EDITOR_MAX_JSON_BYTES = 8 * 1024 * 1024;
 const MAP_EDITOR_OPTIONS_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
 const MAP_EDITOR_TOOLS_STORAGE_KEY = "rts.mapEditor.tools.window.v1";
 const MAP_EDITOR_LAYERS_STORAGE_KEY = "rts.mapEditor.layers.window.v1";
@@ -64,6 +64,11 @@ export class MapEditorPanel {
     this.selectedBaseIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
     this.paintShape = "brush";
+    this.selectedOverlayEffects = new Set(["concealment"]);
+    this.overlayMode = "paint";
+    this.forestMode = "paint";
+    this.forestBrushWidth = 9;
+    this.roadWidth = 5;
     this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.TREE_OAK;
     this.selectedTreeTypes = new Set([MAP_EDITOR_DOODAD_TYPES.TREE_OAK]);
     this.doodadMode = "place";
@@ -198,6 +203,7 @@ export class MapEditorPanel {
       body.append(
         this.renderZoom(),
         this.renderTerrain(),
+        this.renderForest(),
         this.renderMapOverlays(),
         this.renderDoodads(),
         this.renderLocations(),
@@ -408,11 +414,38 @@ export class MapEditorPanel {
       palette,
       field("Paint shape", shapes),
       field("Symmetry", symmetry),
+      this.renderRoadTool(),
     );
     for (const warning of this.currentSymmetryWarnings()) {
       section.appendChild(readout(`Symmetry warning: ${warning}`, true));
     }
     return section;
+  }
+
+  renderRoadTool() {
+    const controls = document.createElement("div");
+    controls.className = "map-editor-road-tool";
+    const width = document.createElement("input");
+    width.type = "number";
+    width.min = "1";
+    width.max = "15";
+    width.step = "1";
+    width.value = String(this.roadWidth);
+    width.setAttribute("aria-label", "Road width in tiles");
+    width.addEventListener("change", () => {
+      this.roadWidth = Math.max(1, Math.min(15, Math.trunc(Number(width.value)) || 5));
+      width.value = String(this.roadWidth);
+      if (this.viewport.tool?.kind === "road") this.armRoad();
+    });
+    controls.append(
+      field("Width (tiles)", width),
+      button("Lay road", () => {
+        this.armRoad();
+        this.setStatus("Drag to lay a road. The path snaps to horizontal, vertical, or diagonal and adds yellow centre markers.");
+      }, { active: this.viewport.tool?.kind === "road" }),
+      readout("Drag in any of 8 directions. Road edges are bare; the centre line is marked automatically."),
+    );
+    return field("Road tool", controls);
   }
 
   currentSymmetryWarnings() {
@@ -423,29 +456,65 @@ export class MapEditorPanel {
     const section = group("Gameplay overlays");
     const palette = document.createElement("div");
     palette.className = "map-editor-palette";
-    const tools = [
-      ["Paint stealth", { stealth: true }, "stealth tiles"],
-      ["Paint no vehicles", { noVehicle: true }, "no-vehicle tiles"],
-      ["Paint damage reduction", { damageReduction: true }, "damage-reduction tiles"],
-      ["Paint slowed movement", { slowMovement: true }, "slow-movement tiles"],
-      ["Erase stealth", { stealth: false }, "stealth erasure"],
-      ["Erase no vehicles", { noVehicle: false }, "no-vehicle erasure"],
-      ["Erase damage reduction", { damageReduction: false }, "damage-reduction erasure"],
-      ["Erase slowed movement", { slowMovement: false }, "slow-movement erasure"],
-    ];
-    for (const [label, edit, status] of tools) {
-      palette.appendChild(button(label, () => {
-        this.armOverlay(edit, status);
-        this.setStatus(`${this.paintShape === "box" ? "Drag to fill a box with" : "Painting"} ${status}.`);
-      }, {
-        active: this.viewport.tool?.kind === "overlay"
-          && JSON.stringify(this.viewport.tool.edit) === JSON.stringify(edit),
-      }));
+    for (const [key, label] of [
+      ["concealment", "Concealment"],
+      ["noVehicle", "No vehicles"],
+      ["damageReduction", "Damage reduction"],
+      ["slowMovement", "Slowed movement"],
+    ]) {
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = this.selectedOverlayEffects.has(key);
+      input.addEventListener("change", () => {
+        if (input.checked) this.selectedOverlayEffects.add(key);
+        else this.selectedOverlayEffects.delete(key);
+        if (this.viewport.tool?.kind === "overlay") this.armSelectedOverlays(this.overlayMode);
+      });
+      const control = document.createElement("label");
+      control.className = "map-editor-overlay-toggle";
+      control.append(input, document.createTextNode(label));
+      palette.appendChild(control);
     }
+    const actions = document.createElement("div");
+    actions.className = "map-editor-palette";
+    actions.append(
+      button("Paint selected", () => this.armSelectedOverlays("paint"), {
+        active: this.viewport.tool?.kind === "overlay" && this.overlayMode === "paint",
+      }),
+      button("Erase selected", () => this.armSelectedOverlays("erase"), {
+        active: this.viewport.tool?.kind === "overlay" && this.overlayMode === "erase",
+      }),
+    );
     section.append(
-      readout(`${this.session.draft.stealthTiles.length} stealth; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
-      readout("Each gameplay effect is an independent layer. Damage reduction and slowed movement are both 50%."),
+      readout(`${this.session.draft.concealmentTiles.length} concealment; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
+      readout("Select any combination, then paint or erase all selected effects in one stroke. Damage reduction and slowed movement each reduce their affected value by 25%."),
       palette,
+      actions,
+    );
+    return section;
+  }
+
+  renderForest() {
+    const section = group("Forest");
+    const actions = document.createElement("div");
+    actions.className = "map-editor-palette";
+    actions.append(
+      button("Paint Forest", () => this.armForest("paint"), {
+        active: this.viewport.tool?.kind === "forest" && this.forestMode === "paint",
+      }),
+      button("Erase Forest", () => this.armForest("erase"), {
+        active: this.viewport.tool?.kind === "forest" && this.forestMode === "erase",
+      }),
+    );
+    const width = numericInput(this.forestBrushWidth, 1, 31, (value) => {
+      this.forestBrushWidth = value;
+      if (this.viewport.tool?.kind === "forest") this.armForest(this.forestMode);
+    }, "Forest brush width in tiles");
+    const tileCount = this.session.forestTiles().length;
+    section.append(
+      actions,
+      field("Brush width (tiles)", width),
+      readout(`${tileCount} forest tile${tileCount === 1 ? "" : "s"}. Painting a forest adds its trees and all four gameplay effects together.`),
     );
     return section;
   }
@@ -676,6 +745,40 @@ export class MapEditorPanel {
       shape: this.paintShape,
       symmetry: this.symmetry,
     });
+  }
+
+  armRoad() {
+    this.viewport.armTool({
+      kind: "road",
+      width: this.roadWidth,
+      symmetry: this.symmetry,
+    });
+    this.render();
+  }
+
+  armSelectedOverlays(mode) {
+    if (!this.selectedOverlayEffects.size) {
+      if (this.viewport.tool?.kind === "overlay") this.viewport.armTool(null);
+      this.setStatus("Select at least one gameplay overlay first.", true);
+      return;
+    }
+    this.overlayMode = mode === "erase" ? "erase" : "paint";
+    const value = this.overlayMode === "paint";
+    const edit = Object.fromEntries([...this.selectedOverlayEffects].map((key) => [key, value]));
+    const names = [...this.selectedOverlayEffects].map((key) => overlayEffectName(key)).join(", ");
+    this.armOverlay(edit, `${this.overlayMode === "paint" ? "painted" : "erased"} ${names}`);
+    this.setStatus(`${this.paintShape === "box" ? "Drag to fill a box" : "Paint"} to ${this.overlayMode} ${names}.`);
+  }
+
+  armForest(mode) {
+    this.forestMode = mode === "erase" ? "erase" : "paint";
+    this.viewport.armTool({
+      kind: "forest",
+      paint: this.forestMode === "paint",
+      width: this.forestBrushWidth,
+      symmetry: this.symmetry,
+    });
+    this.setStatus(`${this.forestMode === "paint" ? "Paint" : "Erase"} forest with the ${this.forestBrushWidth}-tile brush.`);
   }
 
   armOverlay(edit, label) {
@@ -910,7 +1013,7 @@ export class MapEditorPanel {
     const name = String(file?.name || "selected file");
     try {
       if (Number(file?.size) > MAP_EDITOR_MAX_JSON_BYTES) {
-        throw new Error("Map JSON files must be 2 MB or smaller.");
+        throw new Error("Map JSON files must be 8 MiB or smaller.");
       }
       if (typeof file?.text !== "function") throw new Error("The selected file could not be read.");
       const text = await file.text();
@@ -1003,6 +1106,13 @@ export class MapEditorPanel {
     this.toolsEl.remove();
     this.layersEl.remove();
   }
+}
+
+function overlayEffectName(key) {
+  if (key === "noVehicle") return "no vehicles";
+  if (key === "damageReduction") return "damage reduction";
+  if (key === "slowMovement") return "slowed movement";
+  return "concealment";
 }
 
 function authoredMapFingerprint(map) {

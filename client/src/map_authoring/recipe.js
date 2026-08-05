@@ -11,8 +11,9 @@ import {
   MAP_AUTHORING_RECIPE_MAX_WORK_UNITS,
 } from "./limits.js";
 import { MAP_AUTHORING_SYMMETRY, symmetrySupported } from "./symmetry.js";
+import { CURRENT_AUTHORED_MAP_VERSION } from "./schema.js";
 
-export const CURRENT_AUTHORED_MAP_VERSION = 6;
+export { CURRENT_AUTHORED_MAP_VERSION } from "./schema.js";
 export const MAX_AUTHORED_MAP_DIMENSION_TILES = AUTHORED_MAP_MAX_DIMENSION_TILES;
 
 export function buildMapFromRecipe(recipe) {
@@ -46,7 +47,8 @@ export function buildMapFromRecipe(recipe) {
     baseSites: [],
     _design: String(recipe.design || `Generated from a shared map-authoring recipe with ${recipe.symmetry || "no"} symmetry.`),
     doodads: [],
-    stealthTiles: [],
+    forestSpans: [],
+    concealmentTiles: [],
     noVehicleTiles: [],
     damageReductionTiles: [],
     slowMovementTiles: [],

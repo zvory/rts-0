@@ -845,25 +845,26 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(buildCard.slots[0].hotkey === "Q", "worker build hotkey Q should be preserved");
   assert(buildCard.slots[0].unaffordable, "unaffordable build buttons stay clickable for feedback");
   assert(buildCard.slots[0].enabled, "unaffordable build buttons enter placement and wait at the site");
-  assert(buildCard.slots[1].label === "Barracks", "Engineer build menu moves Barracks into the top-middle W slot");
-  assert(buildCard.slots[1].hotkey === "W", "Barracks build hotkey should be W");
-  assert(buildCard.slots[1].cost.steel === 150, "Barracks build button should expose its regular cost");
+  assert(buildCard.slots[1] === null, "Engineer build menu keeps the retired top-middle W slot empty");
+  assert(buildCard.slots[2].label === "Barracks", "Engineer build menu keeps Barracks in the top-right E slot");
+  assert(buildCard.slots[2].hotkey === "E", "Barracks build hotkey should be E");
+  assert(buildCard.slots[2].cost.steel === 150, "Barracks build button should expose its regular cost");
   const tooltipHud = Object.create(HUD.prototype);
   tooltipHud._resourceIcon = (kind) => kind;
   const pumpJackTooltip = tooltipHud._kindTooltipHtml(KIND.PUMP_JACK);
   assert(
-    pumpJackTooltip.includes("100") &&
-      pumpJackTooltip.includes("20s") &&
-      pumpJackTooltip.includes("Oil patch") &&
+    pumpJackTooltip.includes("24s") &&
+      pumpJackTooltip.includes("automatically build this for free") &&
+      pumpJackTooltip.includes("Oil patches") &&
       pumpJackTooltip.includes("Extracts 2 Oil every 1.3s"),
-    "Pump Jack tooltip explains its cost, build time, placement substrate, and oil income",
+    "Pump Jack tooltip explains automatic free production, build time, substrate, and oil income",
   );
-  assert(buildCard.slots[2].label === "Training Centre", "worker build menu should include Training Centre");
-  assert(!buildCard.slots[2].enabled, "locked build buttons should be disabled");
-  assert(buildCard.slots[2].title === "Requires Barracks", "locked build tooltip should explain requirement");
-  assert(buildCard.slots[6].label === "Tank Trap", "worker build menu should include Tank Trap");
-  assert(!buildCard.slots[6].enabled, "Tank Trap should require a completed Training Centre");
-  assert(buildCard.slots[6].title === "Requires Training Centre", "Tank Trap tooltip should explain its requirement");
+  assert(buildCard.slots[3].label === "Training Centre", "worker build menu should include Training Centre");
+  assert(!buildCard.slots[3].enabled, "locked build buttons should be disabled");
+  assert(buildCard.slots[3].title === "Requires Barracks", "locked build tooltip should explain requirement");
+  assert(buildCard.slots[7].label === "Tank Trap", "worker build menu should include Tank Trap");
+  assert(!buildCard.slots[7].enabled, "Tank Trap should require a completed Training Centre");
+  assert(buildCard.slots[7].title === "Requires Training Centre", "Tank Trap tooltip should explain its requirement");
   assert(buildCard.slots[8].intent.type === "closeCommandCardMenu", "worker return button should close submenu");
   assert(buildCard.slots[8].commandId === "worker.return", "worker return should expose stable command identity");
 
