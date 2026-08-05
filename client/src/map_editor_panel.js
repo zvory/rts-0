@@ -3,6 +3,14 @@ import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import {
+  MAP_EDITOR_CATEGORIES,
+  MAP_EDITOR_OPERATIONS,
+  activeMapEditorOperation,
+  availableMapEditorOperations,
+  mapEditorContentLabel,
+  mapEditorOperationHelp,
+} from "./map_editor_panel_workflow.js";
+import {
   canonicalDoodadColor,
   MAP_EDITOR_DEFAULT_FLOWER_COLOR,
   MAP_EDITOR_DOODAD_CATALOG,
@@ -14,7 +22,6 @@ import {
 } from "./map_editor_doodads.js";
 import {
   MAP_EDITOR_DEFAULT_SIZE,
-  MAP_EDITOR_HISTORY_LIMIT,
   MAP_EDITOR_MAX_BASE_SITES,
   MAP_EDITOR_MAX_OIL_PATCHES,
   MAP_EDITOR_MAX_STEEL_PATCHES,
@@ -32,7 +39,6 @@ const MAP_EDITOR_OPTIONS_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
 const MAP_EDITOR_TOOLS_STORAGE_KEY = "rts.mapEditor.tools.window.v1";
 const MAP_EDITOR_LAYERS_STORAGE_KEY = "rts.mapEditor.layers.window.v1";
 const MAP_EDITOR_ANALYSIS_TIMEOUT_MS = 20_000;
-
 export class MapEditorPanel {
   constructor({
     root,
@@ -76,6 +82,18 @@ export class MapEditorPanel {
     this.doodadRadius = 48;
     this.doodadDensity = 4;
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
+    this.activeCategory = "terrain";
+    this.terrainContent = "material";
+    this.locationContent = "start";
+    this.lastOperation = {
+      terrain: "brush",
+      objects: "place",
+      zones: "brush",
+      locations: "add",
+    };
+    this.mapSettingsOpen = false;
+    this.layersOpen = !window.matchMedia?.("(max-width: 720px)")?.matches;
+    this.categoryScroll = Object.fromEntries(MAP_EDITOR_CATEGORIES.map(([category]) => [category, 0]));
     this.blankMapWidth = String(MAP_EDITOR_DEFAULT_SIZE);
     this.blankMapHeight = String(MAP_EDITOR_DEFAULT_SIZE);
     this.observedMapDimensions = null;
@@ -91,19 +109,27 @@ export class MapEditorPanel {
     this.statusError = false;
     this.analysisStatusOwned = false;
     this.destroyed = false;
-    this.optionsEl = this.createPanelElement("map-editor-options-window", "Map Editor options");
-    this.toolsEl = this.createPanelElement("map-editor-tools-window", "Map Editor tools");
+    this.toolbarEl = document.createElement("nav");
+    this.toolbarEl.className = "map-editor-toolbar";
+    this.toolbarEl.setAttribute("aria-label", "Map document actions");
+    this.toolRailEl = document.createElement("aside");
+    this.toolRailEl.className = "map-editor-tool-rail";
+    this.toolRailEl.setAttribute("aria-label", "Map editing operations");
+    this.statusEl = document.createElement("div");
+    this.statusEl.className = "map-editor-status-dock";
+    this.optionsEl = this.createPanelElement("map-editor-options-window", "Map settings");
+    this.toolsEl = this.createPanelElement("map-editor-tools-window", "Map content palette");
     this.layersEl = this.createPanelElement("map-editor-layers-window", "Map Editor layers");
     this.el = this.optionsEl;
-    root.append(this.optionsEl, this.layersEl, this.toolsEl);
+    root.append(this.toolbarEl, this.toolRailEl, this.optionsEl, this.layersEl, this.toolsEl, this.statusEl);
     this.optionsWindowChrome = new LabPanelWindowChrome(this.optionsEl, {
       storageKey: MAP_EDITOR_OPTIONS_STORAGE_KEY,
-      panelLabel: "map editor options",
+      panelLabel: "map settings",
       minWidth: 220,
     });
     this.toolsWindowChrome = new LabPanelWindowChrome(this.toolsEl, {
       storageKey: MAP_EDITOR_TOOLS_STORAGE_KEY,
-      panelLabel: "map editor tools",
+      panelLabel: "map content palette",
       minWidth: 220,
     });
     this.layersWindowChrome = new LabPanelWindowChrome(this.layersEl, {
@@ -151,66 +177,303 @@ export class MapEditorPanel {
       this.viewport.setSymmetry(this.symmetry);
       if (this.viewport.tool) this.viewport.armTool({ ...this.viewport.tool, symmetry: this.symmetry });
     }
+    MapEditorPanel.prototype.reconcileOperationAvailability.call(this);
     this.render();
   }
 
   render() {
     if (this.destroyed) return;
+    this.renderToolbar();
+    this.renderToolRail();
     this.renderOptionsWindow();
     this.renderLayersWindow();
     this.renderToolsWindow();
+    this.renderStatusDock();
+  }
+
+  renderToolbar() {
+    this.toolbarEl.replaceChildren();
+    const identity = document.createElement("div");
+    identity.className = "map-editor-toolbar-identity";
+    const title = document.createElement("strong");
+    title.textContent = this.session.draft?.name || "Untitled map";
+    const dimensions = document.createElement("span");
+    dimensions.textContent = this.session.draft
+      ? `${this.session.draft.width} × ${this.session.draft.height}`
+      : "Preparing…";
+    identity.append(title, dimensions);
+
+    const history = document.createElement("div");
+    history.className = "map-editor-toolbar-group";
+    history.append(
+      button("Undo", () => this.undo(), { disabled: !this.session.undoStack.length, title: "Ctrl/Cmd-Z" }),
+      button("Redo", () => this.redo(), { disabled: !this.session.redoStack.length, title: "Ctrl/Cmd-Shift-Z" }),
+    );
+
+    const view = document.createElement("div");
+    view.className = "map-editor-toolbar-group";
+    const zoomInput = document.createElement("input");
+    const zoomLimits = this.viewport.zoomLimitsPercent();
+    zoomInput.type = "number";
+    zoomInput.min = String(zoomLimits.min);
+    zoomInput.max = String(zoomLimits.max);
+    zoomInput.step = "1";
+    zoomInput.value = String(this.viewport.zoomPercent());
+    zoomInput.className = "map-editor-toolbar-zoom";
+    zoomInput.setAttribute("aria-label", "Zoom percentage");
+    zoomInput.addEventListener("change", () => {
+      zoomInput.value = String(this.viewport.setZoomPercent(zoomInput.value));
+    });
+    this.zoomInput = zoomInput;
+    view.append(
+      button("Map settings", () => {
+        this.mapSettingsOpen = !this.mapSettingsOpen;
+        this.render();
+      }, { active: this.mapSettingsOpen }),
+      button("Layers", () => {
+        this.layersOpen = !this.layersOpen;
+        this.render();
+      }, {
+        active: this.layersOpen && !this.mapSettingsOpen,
+        disabled: this.mapSettingsOpen,
+        title: this.mapSettingsOpen ? "Close Map settings to edit layer visibility." : "Toggle layer visibility controls.",
+      }),
+      button("Fit", () => this.viewport.fitToScreen(), { title: "Fit the whole map" }),
+      button("Fill", () => this.viewport.fillScreen(), { title: "Fill the viewport" }),
+      button("−", () => this.viewport.zoomOut(), { title: "Zoom out", className: "map-editor-zoom-step" }),
+      zoomInput,
+      document.createTextNode("%"),
+      button("+", () => this.viewport.zoomIn(), { title: "Zoom in", className: "map-editor-zoom-step" }),
+    );
+
+    const workflow = document.createElement("div");
+    workflow.className = "map-editor-toolbar-group map-editor-toolbar-workflow";
+    workflow.append(
+      button("Import", () => this.chooseJsonFile()),
+      button("Export", () => this.exportJson()),
+      button(this.analysisPending && this.analysisKind === "check" ? "Checking…" : "Check", () => void this.runAuthoritativeAnalysis("check"), {
+        disabled: this.analysisPending,
+      }),
+      button(this.pending ? "Preparing…" : "Preview", () => void this.openPreview(), { disabled: this.pending }),
+      button(this.pending ? "Opening…" : "Open in Lab", () => void this.openLab(), {
+        disabled: this.pending,
+        className: "map-editor-primary",
+      }),
+    );
+    this.toolbarEl.append(identity, history, view, workflow);
+  }
+
+  availableOperations() {
+    return availableMapEditorOperations(this);
+  }
+
+  activeOperation() {
+    return activeMapEditorOperation(this);
+  }
+
+  reconcileOperationAvailability() {
+    const active = MapEditorPanel.prototype.activeOperation.call(this);
+    if (!active || MapEditorPanel.prototype.availableOperations.call(this).has(active)) return true;
+    this.viewport.armTool(null);
+    return false;
+  }
+
+  operationHelp(operation) {
+    return mapEditorOperationHelp(operation, this.activeCategory);
+  }
+
+  selectCategory(category) {
+    if (!MAP_EDITOR_CATEGORIES.some(([value]) => value === category)) return;
+    this.activeCategory = category;
+    const available = this.availableOperations();
+    const preferred = this.lastOperation[category];
+    const operation = available.has(preferred) ? preferred : available.values().next().value;
+    if (operation) this.selectOperation(operation);
+    else {
+      this.viewport.armTool(null);
+      this.render();
+    }
+  }
+
+  selectOperation(operation) {
+    if (!this.availableOperations().has(operation)) return false;
+    if (this.activeCategory === "objects") {
+      this.lastOperation.objects = operation;
+      this.armDoodad(operation);
+      this.setStatus(this.operationHelp(operation));
+      return true;
+    }
+    if (this.activeCategory === "zones") {
+      this.lastOperation.zones = operation;
+      if (operation === "erase") this.armSelectedOverlays("erase");
+      else {
+        this.paintShape = operation === "box" ? "box" : "brush";
+        this.armSelectedOverlays("paint");
+      }
+      return true;
+    }
+    if (this.activeCategory === "locations") {
+      const kind = this.locationContent;
+      const index = kind === "start" ? this.selectedStartIndex : this.session.mapOverlay()?.bases?.[this.selectedBaseIndex]?.index;
+      if (operation === "remove") {
+        this.removeLocation(kind, index);
+        return true;
+      }
+      this.lastOperation.locations = operation;
+      this.armLocation(kind, operation === "add" ? null : index, operation === "add");
+      return true;
+    }
+    this.lastOperation.terrain = operation;
+    if (this.terrainContent === "road" && operation === "path") {
+      this.armRoad();
+      this.setStatus(this.operationHelp(operation));
+    } else if (this.terrainContent === "forest") {
+      this.armForest(operation === "erase" ? "erase" : "paint");
+    } else {
+      this.paintShape = operation === "box" ? "box" : "brush";
+      this.armTerrain(operation === "erase" ? TERRAIN.GRASS : this.selectedTerrain);
+      this.setStatus(this.operationHelp(operation));
+    }
+    return true;
+  }
+
+  renderContextSummary() {
+    const section = document.createElement("section");
+    section.className = "map-editor-context-summary";
+    const summary = document.createElement("div");
+    summary.className = "map-editor-current-tool";
+    const heading = document.createElement("strong");
+    heading.textContent = "Current tool";
+    const detail = document.createElement("span");
+    detail.textContent = `${this.activeOperation() || "None"} · ${this.currentContentLabel()}`;
+    summary.append(heading, detail);
+    section.append(summary, field("Symmetry", this.renderSymmetrySelect()));
+    for (const warning of this.currentSymmetryWarnings()) {
+      section.appendChild(readout(`Symmetry warning: ${warning}`, true));
+    }
+    return section;
+  }
+
+  renderSymmetrySelect() {
+    const symmetry = document.createElement("select");
+    symmetry.setAttribute("aria-label", "Symmetry");
+    symmetry.title = "Symmetry applies to terrain, zones, objects, forests, roads, and locations.";
+    for (const [value, label] of [
+      [MAP_EDITOR_SYMMETRY.NONE, "None"],
+      [MAP_EDITOR_SYMMETRY.HORIZONTAL, "Horizontal"],
+      [MAP_EDITOR_SYMMETRY.VERTICAL, "Vertical"],
+      [MAP_EDITOR_SYMMETRY.HALF_TURN, "Half-turn (180°)"],
+      [MAP_EDITOR_SYMMETRY.THREE_WAY, "3-way rotation (120°, square-grid approximation)"],
+      [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (4-way)"],
+      [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN, "Diagonal ↘ (top-left ↔ bottom-right)"],
+      [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI, "Diagonal ↙ (top-right ↔ bottom-left)"],
+    ]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      option.disabled = !mapEditorSymmetrySupported(this.session.draft, value);
+      symmetry.appendChild(option);
+    }
+    symmetry.value = this.symmetry;
+    symmetry.addEventListener("change", () => this.setSymmetry(symmetry.value));
+    return symmetry;
+  }
+
+  currentContentLabel() {
+    return mapEditorContentLabel(this, overlayEffectName, terrainName);
+  }
+
+  renderToolRail() {
+    this.toolRailEl.replaceChildren();
+    this.toolRailEl.hidden = this.mapSettingsOpen;
+    const label = document.createElement("span");
+    label.className = "map-editor-tool-rail-label";
+    label.textContent = "Apply";
+    this.toolRailEl.appendChild(label);
+    const available = this.availableOperations();
+    const active = this.activeOperation();
+    for (const [operation, operationLabel] of MAP_EDITOR_OPERATIONS) {
+      const enabled = available.has(operation);
+      const control = button(operationLabel, () => this.selectOperation(operation), {
+        disabled: !enabled,
+        active: enabled && active === operation,
+        pressed: enabled ? active === operation : null,
+        title: enabled ? this.operationHelp(operation) : `${operationLabel} is unavailable for ${this.activeCategory}.`,
+        className: "map-editor-tool-rail-button",
+      });
+      if (!enabled) control.setAttribute("aria-label", `${operationLabel}. Unavailable for ${this.currentContentLabel()}.`);
+      this.toolRailEl.appendChild(control);
+    }
+  }
+
+  renderStatusDock() {
+    this.statusEl.replaceChildren();
+    const status = this.renderStatus();
+    if (status) this.statusEl.appendChild(status);
   }
 
   renderOptionsWindow() {
     const scroll = panelScroll(this.optionsEl);
     this.optionsEl.replaceChildren();
     const header = this.optionsWindowChrome.renderHeader({
-      kicker: "Options",
-      collapseLabel: "map editor options panel",
+      kicker: "Map settings",
+      collapseLabel: "map settings panel",
     });
     header.classList.add("map-editor-header");
     const body = document.createElement("div");
     body.className = "lab-panel-body map-editor-panel-body";
-    const status = this.renderStatus();
-    if (status) body.appendChild(status);
     if (!this.session.draft) {
       body.appendChild(readout("Preparing editor…"));
     } else {
       body.append(
         this.renderMapSource(),
-        this.renderHistory(),
         this.renderDetails(),
-        this.renderActions(),
+        this.renderDocumentUtilities(),
       );
     }
     this.optionsEl.append(header, body, this.optionsWindowChrome.renderResizeHandle());
+    this.optionsEl.hidden = !this.mapSettingsOpen;
     restorePanelScroll(body, scroll);
   }
 
   renderToolsWindow() {
-    const scroll = panelScroll(this.toolsEl);
+    const priorContent = this.toolsEl.querySelector(".map-editor-category-content");
+    const priorCategory = priorContent?.dataset.category;
+    if (priorCategory && priorCategory in this.categoryScroll) this.categoryScroll[priorCategory] = priorContent.scrollTop;
     this.toolsEl.replaceChildren();
     const header = this.toolsWindowChrome.renderHeader({
-      kicker: "Tools",
-      collapseLabel: "map editor tools panel",
+      kicker: "Palette",
+      collapseLabel: "map content palette",
     });
     header.classList.add("map-editor-header");
     const body = document.createElement("div");
     body.className = "lab-panel-body map-editor-panel-body";
+    let content = null;
     if (!this.session.draft) {
       body.appendChild(readout("Preparing editor…"));
     } else {
-      body.append(
-        this.renderZoom(),
-        this.renderTerrain(),
-        this.renderForest(),
-        this.renderMapOverlays(),
-        this.renderDoodads(),
-        this.renderLocations(),
-      );
+      const tabs = document.createElement("div");
+      tabs.className = "map-editor-category-tabs";
+      for (const [category, label] of MAP_EDITOR_CATEGORIES) {
+        const tab = button(label, () => this.selectCategory(category), {
+          active: this.activeCategory === category,
+          pressed: this.activeCategory === category,
+          className: "map-editor-category-tab",
+        });
+        tabs.appendChild(tab);
+      }
+      content = document.createElement("div");
+      content.className = "map-editor-category-content";
+      content.dataset.category = this.activeCategory;
+      if (this.activeCategory === "objects") content.appendChild(this.renderDoodads());
+      else if (this.activeCategory === "zones") content.appendChild(this.renderMapOverlays());
+      else if (this.activeCategory === "locations") content.appendChild(this.renderLocations());
+      else content.append(this.renderTerrain(), this.renderForest());
+      body.append(tabs, content, this.renderContextSummary());
     }
     this.toolsEl.append(header, body, this.toolsWindowChrome.renderResizeHandle());
-    restorePanelScroll(body, scroll);
+    if (content) content.scrollTop = this.categoryScroll[this.activeCategory] || 0;
+    this.toolsEl.hidden = this.mapSettingsOpen;
   }
 
   renderLayersWindow() {
@@ -225,42 +488,7 @@ export class MapEditorPanel {
     if (!this.session.draft) body.appendChild(readout("Preparing editor…"));
     else body.appendChild(this.renderLayers());
     this.layersEl.append(header, body, this.layersWindowChrome.renderResizeHandle());
-  }
-
-  renderZoom() {
-    const section = group("Zoom");
-    const framing = document.createElement("div");
-    framing.className = "map-editor-zoom-framing";
-    framing.append(
-      button("Fill screen", () => this.viewport.fillScreen()),
-      button("Fit to screen", () => this.viewport.fitToScreen()),
-    );
-
-    const controls = document.createElement("div");
-    controls.className = "map-editor-zoom-controls";
-    const zoomInput = document.createElement("input");
-    const zoomLimits = this.viewport.zoomLimitsPercent();
-    zoomInput.type = "number";
-    zoomInput.min = String(zoomLimits.min);
-    zoomInput.max = String(zoomLimits.max);
-    zoomInput.step = "1";
-    zoomInput.value = String(this.viewport.zoomPercent());
-    zoomInput.setAttribute("aria-label", "Zoom percentage");
-    zoomInput.addEventListener("change", () => {
-      zoomInput.value = String(this.viewport.setZoomPercent(zoomInput.value));
-    });
-    this.zoomInput = zoomInput;
-    const percent = document.createElement("span");
-    percent.className = "map-editor-zoom-percent";
-    percent.textContent = "%";
-    controls.append(
-      button("−", () => this.viewport.zoomOut(), { title: "Zoom out", className: "map-editor-zoom-step" }),
-      zoomInput,
-      percent,
-      button("+", () => this.viewport.zoomIn(), { title: "Zoom in", className: "map-editor-zoom-step" }),
-    );
-    section.append(framing, controls);
-    return section;
+    this.layersEl.hidden = !this.layersOpen || this.mapSettingsOpen;
   }
 
   updateZoomControl(percent = this.viewport.zoomPercent()) {
@@ -321,17 +549,6 @@ export class MapEditorPanel {
     return section;
   }
 
-  renderHistory() {
-    const section = document.createElement("section");
-    section.className = "map-editor-history";
-    section.append(
-      button("Undo", () => this.undo(), { disabled: !this.session.undoStack.length, title: "Ctrl/Cmd-Z" }),
-      button("Redo", () => this.redo(), { disabled: !this.session.redoStack.length, title: "Ctrl/Cmd-Shift-Z" }),
-      readout(`${this.session.undoStack.length}/${MAP_EDITOR_HISTORY_LIMIT}`),
-    );
-    return section;
-  }
-
   renderDetails() {
     const section = group("Map details");
     section.append(
@@ -350,7 +567,7 @@ export class MapEditorPanel {
     const palette = document.createElement("div");
     palette.className = "map-editor-palette";
     for (const [code, label] of [
-      [TERRAIN.GRASS, "Grass / erase"],
+      [TERRAIN.GRASS, "Grass"],
       [TERRAIN.GRAVEL_A, "Gravel A — Slate"],
       [TERRAIN.GRAVEL_B, "Gravel B — Limestone"],
       [TERRAIN.GRAVEL_C, "Gravel C — Chalk"],
@@ -370,10 +587,11 @@ export class MapEditorPanel {
       [TERRAIN.ROAD_DIAGONAL_NE_SW, "Road — diagonal ↙"],
     ]) {
       const control = button(label, () => {
+        this.terrainContent = "material";
         this.selectedTerrain = code;
-        this.armTerrain();
-        this.setStatus(`${this.paintShape === "box" ? "Drag to fill a box with" : "Painting"} ${terrainName(code)}.`);
-      }, { active: this.viewport.tool?.kind === "terrain" && this.selectedTerrain === code });
+        if (!["brush", "box", "erase"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
+        this.selectOperation(this.lastOperation.terrain);
+      }, { active: this.terrainContent === "material" && this.selectedTerrain === code });
       control.dataset.terrain = terrainName(code);
       control.classList.add("map-editor-terrain-button");
       const preview = this.viewport.createTerrainPreview?.(code);
@@ -384,41 +602,10 @@ export class MapEditorPanel {
       }
       palette.appendChild(control);
     }
-    const shapes = document.createElement("div");
-    shapes.className = "map-editor-palette";
-    for (const [value, label] of [["brush", "Brush"], ["box", "Box fill"]]) {
-      shapes.appendChild(button(label, () => this.setPaintShape(value), { active: this.paintShape === value }));
-    }
-    const symmetry = document.createElement("select");
-    symmetry.setAttribute("aria-label", "Symmetry");
-    symmetry.title = "Symmetry applies to terrain and base moves.";
-    for (const [value, label] of [
-      [MAP_EDITOR_SYMMETRY.NONE, "None"],
-      [MAP_EDITOR_SYMMETRY.HORIZONTAL, "Horizontal"],
-      [MAP_EDITOR_SYMMETRY.VERTICAL, "Vertical"],
-      [MAP_EDITOR_SYMMETRY.HALF_TURN, "Half-turn (180°)"],
-      [MAP_EDITOR_SYMMETRY.THREE_WAY, "3-way rotation (120°, square-grid approximation)"],
-      [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (4-way)"],
-      [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN, "Diagonal ↘ (top-left ↔ bottom-right)"],
-      [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI, "Diagonal ↙ (top-right ↔ bottom-left)"],
-    ]) {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = label;
-      option.disabled = !mapEditorSymmetrySupported(this.session.draft, value);
-      symmetry.appendChild(option);
-    }
-    symmetry.value = this.symmetry;
-    symmetry.addEventListener("change", () => this.setSymmetry(symmetry.value));
     section.append(
       palette,
-      field("Paint shape", shapes),
-      field("Symmetry", symmetry),
       this.renderRoadTool(),
     );
-    for (const warning of this.currentSymmetryWarnings()) {
-      section.appendChild(readout(`Symmetry warning: ${warning}`, true));
-    }
     return section;
   }
 
@@ -439,10 +626,12 @@ export class MapEditorPanel {
     });
     controls.append(
       field("Width (tiles)", width),
-      button("Lay road", () => {
-        this.armRoad();
+      button("Automatic road", () => {
+        this.terrainContent = "road";
+        this.lastOperation.terrain = "path";
+        this.selectOperation("path");
         this.setStatus("Drag to lay a road. The path snaps to horizontal, vertical, or diagonal and adds yellow centre markers.");
-      }, { active: this.viewport.tool?.kind === "road" }),
+      }, { active: this.terrainContent === "road" }),
       readout("Drag in any of 8 directions. Road edges are bare; the centre line is marked automatically."),
     );
     return field("Road tool", controls);
@@ -468,51 +657,38 @@ export class MapEditorPanel {
       input.addEventListener("change", () => {
         if (input.checked) this.selectedOverlayEffects.add(key);
         else this.selectedOverlayEffects.delete(key);
-        if (this.viewport.tool?.kind === "overlay") this.armSelectedOverlays(this.overlayMode);
+        if (!this.selectedOverlayEffects.size) {
+          this.viewport.armTool(null);
+          this.setStatus("Select at least one zone effect to enable Brush, Box, or Erase.", true);
+        } else if (this.viewport.tool?.kind === "overlay") this.armSelectedOverlays(this.overlayMode);
+        else this.selectOperation(this.lastOperation.zones);
       });
       const control = document.createElement("label");
       control.className = "map-editor-overlay-toggle";
       control.append(input, document.createTextNode(label));
       palette.appendChild(control);
     }
-    const actions = document.createElement("div");
-    actions.className = "map-editor-palette";
-    actions.append(
-      button("Paint selected", () => this.armSelectedOverlays("paint"), {
-        active: this.viewport.tool?.kind === "overlay" && this.overlayMode === "paint",
-      }),
-      button("Erase selected", () => this.armSelectedOverlays("erase"), {
-        active: this.viewport.tool?.kind === "overlay" && this.overlayMode === "erase",
-      }),
-    );
     section.append(
       readout(`${this.session.draft.concealmentTiles.length} concealment; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
       readout("Select any combination, then paint or erase all selected effects in one stroke. Damage reduction and slowed movement each reduce their affected value by 25%."),
       palette,
-      actions,
     );
     return section;
   }
 
   renderForest() {
     const section = group("Forest");
-    const actions = document.createElement("div");
-    actions.className = "map-editor-palette";
-    actions.append(
-      button("Paint Forest", () => this.armForest("paint"), {
-        active: this.viewport.tool?.kind === "forest" && this.forestMode === "paint",
-      }),
-      button("Erase Forest", () => this.armForest("erase"), {
-        active: this.viewport.tool?.kind === "forest" && this.forestMode === "erase",
-      }),
-    );
     const width = numericInput(this.forestBrushWidth, 1, 31, (value) => {
       this.forestBrushWidth = value;
       if (this.viewport.tool?.kind === "forest") this.armForest(this.forestMode);
     }, "Forest brush width in tiles");
     const tileCount = this.session.forestTiles().length;
     section.append(
-      actions,
+      button("Forest preset", () => {
+        this.terrainContent = "forest";
+        this.lastOperation.terrain = "brush";
+        this.selectOperation("brush");
+      }, { active: this.terrainContent === "forest" }),
       field("Brush width (tiles)", width),
       readout(`${tileCount} forest tile${tileCount === 1 ? "" : "s"}. Painting a forest adds its trees and all four gameplay effects together.`),
     );
@@ -532,7 +708,8 @@ export class MapEditorPanel {
     for (const [index, start] of starts.entries()) {
       startPicker.appendChild(button(`S${index + 1}`, () => {
         this.selectedStartIndex = index;
-        this.render();
+        if (this.locationContent === "start" && this.lastOperation.locations === "move") this.selectOperation("move");
+        else this.render();
       }, { active: index === this.selectedStartIndex, title: `${start.x}, ${start.y}` }));
     }
     const basePicker = document.createElement("div");
@@ -541,7 +718,8 @@ export class MapEditorPanel {
       basePicker.appendChild(button(`B${index + 1}`, () => {
         this.selectedBaseIndex = index;
         this.viewport.setSelectedBase(base.index);
-        this.render();
+        if (this.locationContent === "base" && this.lastOperation.locations === "move") this.selectOperation("move");
+        else this.render();
       }, { active: index === this.selectedBaseIndex, title: `${base.x}, ${base.y}` }));
     }
     const start = starts[this.selectedStartIndex];
@@ -551,40 +729,60 @@ export class MapEditorPanel {
       : -1;
     const startBase = this.session.draft.baseSites[startBaseIndex];
     this.viewport.setSelectedBase(base?.index ?? null);
+    const locationTypes = document.createElement("div");
+    locationTypes.className = "map-editor-palette";
+    locationTypes.append(
+      button("Player starts", () => {
+        this.locationContent = "start";
+        const operations = this.availableOperations();
+        const preferred = this.lastOperation.locations;
+        const operation = operations.has(preferred) ? preferred : operations.values().next().value;
+        if (operation) this.selectOperation(operation);
+        else {
+          this.viewport.armTool(null);
+          this.render();
+        }
+      }, { active: this.locationContent === "start" }),
+      button("Neutral bases", () => {
+        this.locationContent = "base";
+        const operations = this.availableOperations();
+        const preferred = this.lastOperation.locations;
+        const operation = operations.has(preferred) ? preferred : operations.values().next().value;
+        if (operation) this.selectOperation(operation);
+        else {
+          this.viewport.armTool(null);
+          this.render();
+        }
+      }, { active: this.locationContent === "base" }),
+    );
     section.append(
       readout(`Start locations set player capacity (${starts.length}/${MAP_EDITOR_MAX_START_LOCATIONS}). Drafts may temporarily have none. Every base site always spawns resources.`),
-      startPicker,
-      readout(start ? `Start ${this.selectedStartIndex + 1}: ${start.x}, ${start.y}` : "No start locations yet. Choose Add start, then click the map."),
-      button("Move start", () => this.armLocation("start", this.selectedStartIndex), {
-        disabled: !start,
-        active: this.viewport.tool?.kind === "start" && this.viewport.tool?.locationIndex === this.selectedStartIndex,
-      }),
-      button("Add start", () => this.armLocation("start", null, true), { disabled: starts.length >= MAP_EDITOR_MAX_START_LOCATIONS }),
-      button("Remove start", () => this.removeLocation("start", this.selectedStartIndex), { disabled: !start }),
-      patchCountField("Start-base steel patches", startBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
-        this.updateBasePatchCount(startBaseIndex, "steelPatches", value);
-      }, !startBase),
-      patchCountField("Start-base oil patches", startBase?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
-        this.updateBasePatchCount(startBaseIndex, "oilPatches", value);
-      }, !startBase),
-      basePicker,
-      readout(base ? `Base ${this.selectedBaseIndex + 1}: ${base.x}, ${base.y}` : "No neutral base sites yet."),
-      button("Move base", () => this.armLocation("base", base?.index), {
-        disabled: !base,
-        active: this.viewport.tool?.kind === "base" && !this.viewport.tool?.add && this.viewport.tool?.locationIndex === base?.index,
-      }),
-      button("Add base", () => this.armLocation("base", null, true), {
-        disabled: this.session.draft.baseSites.length >= MAP_EDITOR_MAX_BASE_SITES,
-      }),
-      button("Remove base", () => this.removeLocation("base", base?.index), { disabled: !base }),
-      patchCountField("Base steel patches", base?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
-        this.updateBasePatchCount(base?.index, "steelPatches", value);
-      }, !base),
-      patchCountField("Base oil patches", base?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
-        this.updateBasePatchCount(base?.index, "oilPatches", value);
-      }, !base),
+      locationTypes,
       readout("Bases and starts reserve a passable grass area."),
     );
+    if (this.locationContent === "start") {
+      section.append(
+        startPicker,
+        readout(start ? `Start ${this.selectedStartIndex + 1}: ${start.x}, ${start.y}` : "No start locations yet. Choose Add, then click the map."),
+        patchCountField("Start-base steel patches", startBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
+          this.updateBasePatchCount(startBaseIndex, "steelPatches", value);
+        }, !startBase),
+        patchCountField("Start-base oil patches", startBase?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
+          this.updateBasePatchCount(startBaseIndex, "oilPatches", value);
+        }, !startBase),
+      );
+    } else {
+      section.append(
+        basePicker,
+        readout(base ? `Base ${this.selectedBaseIndex + 1}: ${base.x}, ${base.y}` : "No neutral base sites yet."),
+        patchCountField("Base steel patches", base?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
+          this.updateBasePatchCount(base?.index, "steelPatches", value);
+        }, !base),
+        patchCountField("Base oil patches", base?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
+          this.updateBasePatchCount(base?.index, "oilPatches", value);
+        }, !base),
+      );
+    }
     return section;
   }
 
@@ -596,21 +794,6 @@ export class MapEditorPanel {
     const treePalette = this.renderDoodadPalette(trees, { multiple: true });
     const flowerPalette = this.renderDoodadPalette(flowers);
     const neutralUnitPalette = this.renderDoodadPalette(neutralUnits);
-
-    const tools = document.createElement("div");
-    tools.className = "map-editor-palette";
-    tools.append(
-      button("Place", () => this.armDoodad("place"), {
-        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "place",
-      }),
-      button("Spray", () => this.armDoodad("spray"), {
-        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "spray",
-        disabled: !isTreeDoodadType(this.selectedDoodadType) && !isWildflowerDoodadType(this.selectedDoodadType),
-      }),
-      button("Erase", () => this.armDoodad("erase"), {
-        active: this.viewport.tool?.kind === "doodad" && this.viewport.tool?.mode === "erase",
-      }),
-    );
 
     const color = document.createElement("input");
     color.type = "color";
@@ -638,10 +821,9 @@ export class MapEditorPanel {
       flowerPalette,
       readout("Neutral units"),
       neutralUnitPalette,
-      field("Tool", tools),
-      field("Flower color", color),
-      field("Brush radius (world px)", radius),
-      field("Spray density", density),
+      ...(isWildflowerDoodadType(this.selectedDoodadType) ? [field("Flower color", color)] : []),
+      ...(["spray", "erase"].includes(this.lastOperation.objects) ? [field("Brush radius (world px)", radius)] : []),
+      ...(this.lastOperation.objects === "spray" ? [field("Spray density", density)] : []),
       readout("Place adds one doodad. Spray and erase work continuously while held; symmetry applies when placing and erasing doodads."),
     );
     return section;
@@ -661,11 +843,10 @@ export class MapEditorPanel {
             this.selectedDoodadType = entry.typeId;
           }
         } else this.selectedDoodadType = entry.typeId;
-        if (!multiple && !isWildflowerDoodadType(entry.typeId)) this.doodadMode = "place";
-        this.armDoodad(this.doodadMode);
-        this.setStatus(multiple
-          ? `Tree mix: ${this.selectedTreeTypes.size} species selected.`
-          : `Placing ${entry.label.toLowerCase()}.`);
+        if (!isTreeDoodadType(this.selectedDoodadType) && !isWildflowerDoodadType(this.selectedDoodadType)
+          && this.lastOperation.objects === "spray") this.lastOperation.objects = "place";
+        this.selectOperation(this.lastOperation.objects);
+        if (multiple) this.setStatus(`Tree mix: ${this.selectedTreeTypes.size} species selected.`);
       }, {
         active: multiple
           ? this.selectedTreeTypes.has(entry.typeId)
@@ -678,26 +859,13 @@ export class MapEditorPanel {
     return palette;
   }
 
-  renderActions() {
-    const section = group("Save and test");
+  renderDocumentUtilities() {
+    const section = group("Advanced validation");
     section.append(
-      button("Load map JSON", () => this.chooseJsonFile()),
-      button("Export map JSON", () => this.exportJson()),
-      button(this.analysisPending && this.analysisKind === "check" ? "Checking…" : "Authoritative check", () => void this.runAuthoritativeAnalysis("check"), {
-        disabled: this.analysisPending,
-      }),
       button(this.analysisPending && this.analysisKind === "report" ? "Reporting routes…" : "Route report", () => void this.runAuthoritativeAnalysis("report"), {
         disabled: this.analysisPending,
       }),
-      button(this.pending ? "Preparing preview…" : "Preview PNGs", () => void this.openPreview(), {
-        disabled: this.pending,
-      }),
-      button(this.pending ? "Opening Lab…" : "Open in Lab", () => void this.openLab(), {
-        disabled: this.pending,
-        className: "map-editor-primary",
-      }),
-      readout("Opening Lab validates the current map on the server and starts a fresh ordinary Lab."),
-      readout("Preview PNGs opens the existing game renderer with 2048 px world and minimap downloads."),
+      readout("Check, Preview, Import, Export, and Open in Lab stay available in the document bar."),
     );
     if (this.analysisResult) section.appendChild(renderAnalysisResult(this.analysisKind, this.analysisResult));
     return section;
@@ -738,10 +906,10 @@ export class MapEditorPanel {
     this.setStatus(changed ? "Base resource counts updated." : "Base resource count unchanged.");
   }
 
-  armTerrain() {
+  armTerrain(terrain = this.selectedTerrain) {
     this.viewport.armTool({
       kind: "terrain",
-      terrain: this.selectedTerrain,
+      terrain,
       shape: this.paintShape,
       symmetry: this.symmetry,
     });
@@ -806,15 +974,6 @@ export class MapEditorPanel {
       density: this.doodadDensity,
       symmetry: this.symmetry,
     });
-    this.render();
-  }
-
-  setPaintShape(shape) {
-    this.paintShape = shape === "box" ? "box" : "brush";
-    if (this.viewport.tool?.kind === "terrain") this.armTerrain();
-    else if (this.viewport.tool?.kind === "overlay") {
-      this.viewport.armTool({ ...this.viewport.tool, shape: this.paintShape });
-    }
     this.render();
   }
 
@@ -1102,6 +1261,9 @@ export class MapEditorPanel {
     this.optionsWindowChrome.destroy();
     this.toolsWindowChrome.destroy();
     this.layersWindowChrome.destroy();
+    this.toolbarEl.remove();
+    this.toolRailEl.remove();
+    this.statusEl.remove();
     this.optionsEl.remove();
     this.toolsEl.remove();
     this.layersEl.remove();
