@@ -484,9 +484,7 @@ impl RoomTask {
     }
 
     pub(super) fn reset_live_pause_state(&mut self) {
-        self.live_paused = false;
-        self.live_paused_by = None;
-        self.live_pause_counts.clear();
+        self.live_pause.reset();
     }
 
     pub(super) fn reset_room_time_state(&mut self) {

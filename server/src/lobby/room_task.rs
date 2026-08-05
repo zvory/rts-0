@@ -1,5 +1,6 @@
 use super::connection::send_or_log;
 use super::lab_timeline::LabTimeline;
+use super::live_pause::LivePauseControl;
 use super::projection::{selection_from_observer_view, ProjectionPolicy};
 use super::session_policy::{RoomTimeSource, SessionPhase, SessionPolicy, SessionPolicyContext};
 use super::tick_control::{RoomTimeClock, TickControl};
@@ -23,7 +24,7 @@ mod branch;
 mod chat;
 mod dev;
 mod ground_decals;
-mod helpers;
+pub(super) mod helpers;
 mod lab;
 mod lifecycle;
 mod live;
@@ -86,10 +87,7 @@ pub(super) struct RoomTask {
     outcome_sent: HashSet<u32>,
     /// In replay branch live matches, connected ids differ from original replay player ids.
     branch_live_seat_by_connection: HashMap<u32, u32>,
-    /// Live-match pause is room-owned control-plane state, separate from replay/dev room-time.
-    live_paused: bool,
-    live_paused_by: Option<u32>,
-    live_pause_counts: HashMap<u32, u8>,
+    live_pause: LivePauseControl,
     lab_session: Option<LabSession>,
     lab_timeline: Option<LabTimeline>,
     dev_driver: Option<DevDriver>,
@@ -169,9 +167,7 @@ impl RoomTask {
             match_human_count: 0,
             outcome_sent: HashSet::new(),
             branch_live_seat_by_connection: HashMap::new(),
-            live_paused: false,
-            live_paused_by: None,
-            live_pause_counts: HashMap::new(),
+            live_pause: LivePauseControl::default(),
             lab_session: None,
             lab_timeline: None,
             dev_driver: None,

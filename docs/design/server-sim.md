@@ -760,8 +760,11 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   event loop continues handling reliable control messages, Give up, disconnects, and unpause, but
   the live scheduled tick returns before constructing `LiveTickDriver`, so AI thinking,
   command-ack consumption, `Game::tick`, snapshot fanout, and defeat checks do not advance.
+  An accepted unpause starts a room-owned three-second synchronized resume countdown; the room
+  remains paused through its deadline, broadcasts the remaining countdown phase to every live
+  recipient, and resumes simulation only after the final word.
   `prepare_live_match_launch`, live-match teardown/replay transition, and empty-room reset all
-  clear pause counters and paused state.
+  clear pause counters, countdown deadline, and paused state.
 - Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a
   gameplay-read-only live spectator attach with shared pause controls. Spectators receive
   `StartPayload.spectator = true` and live

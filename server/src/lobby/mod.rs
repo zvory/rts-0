@@ -51,6 +51,7 @@ mod lab_replay_operations;
 pub(crate) mod lab_scenario_driver;
 mod lab_timeline;
 mod launch;
+mod live_pause;
 mod live_tick;
 mod map_catalog;
 mod match_history_writes;

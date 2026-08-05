@@ -1,5 +1,30 @@
 use super::*;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveResumeCountdown {
+    pub duration_ms: u32,
+    pub remaining_ms: u32,
+    pub words: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LivePauseState {
+    pub paused: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_by: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pauses_remaining: Option<u8>,
+    pub pause_limit: u8,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub can_pause: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub can_unpause: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_countdown: Option<LiveResumeCountdown>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "t", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum ServerMessage {

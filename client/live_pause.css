@@ -39,3 +39,7 @@
   justify-content: center;
   gap: 8px;
 }
+
+.live-resume-countdown.match-countdown {
+  inset: 0;
+}

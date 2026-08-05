@@ -1255,7 +1255,10 @@ the Settings gear. `Match` owns `LivePauseOverlay` under `#game-screen` for reli
 `livePauseState` messages; the overlay resolves `pausedBy` through the match roster, exposes direct
 Game-settings and Hotkeys-tab actions, and raises only `#game-menu` above its screen blocker while
 paused. Resume remains visible only when the server grants `canUnpause`, and the overlay is
-destroyed with the match.
+destroyed with the match. Once resume is accepted, the pause actions give way to the same large,
+spoken `Drei! Zwei! Eins!` presentation used before match start. The client begins at the
+server-reported remaining phase for a mid-countdown attach, while authoritative simulation stays
+paused until the server's final unpaused state.
 When Windows exclusive fullscreen has enabled native cursor capture, the injected
 `onOpenChange` callback lets `Match` release capture while Settings is open and resume it after
 close. The hold-Tab menu uses the same match-owned policy so every interactive menu remains
