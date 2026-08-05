@@ -1,4 +1,4 @@
-import { COLORS } from "./config.js";
+import { COLORS, TREE_DOODAD_GEOMETRY, doodadSizeVariation } from "./config.js";
 
 const TREE_TYPE_PREFIX = "tree.";
 
@@ -15,6 +15,8 @@ const signatureChanged = (prev, next) => {
 const forestStyleSignature = () => [
   COLORS.minimapForestCanopy,
   COLORS.minimapForestTrunk,
+  COLORS.minimapForestOutline,
+  COLORS.minimapForestHighlight,
 ].join(",");
 
 export class MinimapForestLayer {
@@ -75,26 +77,46 @@ export class MinimapForestLayer {
   }
 
   _paint(ctx, trees, tileSize, scale, offX, offY) {
-    const radius = Math.max(1.2, tileSize * scale * 0.18);
-    const trunkWidth = Math.max(0.65, radius * 0.45);
-    const trunkHeight = Math.max(0.8, radius * 0.72);
-
     ctx.save();
     ctx.fillStyle = hex(COLORS.minimapForestTrunk);
     for (const tree of trees) {
-      const x = offX + tree.x * scale;
-      const y = offY + tree.y * scale;
-      ctx.fillRect(x - trunkWidth / 2, y + radius * 0.35, trunkWidth, trunkHeight);
+      const { x, y, radius } = treeMark(tree, tileSize, scale, offX, offY);
+      const trunkWidth = Math.max(0.8, radius * 0.38);
+      const trunkHeight = Math.max(1.1, radius * 0.78);
+      ctx.fillRect(x - trunkWidth / 2, y + radius * 0.2, trunkWidth, trunkHeight);
     }
 
     ctx.fillStyle = hex(COLORS.minimapForestCanopy);
     ctx.beginPath();
     for (const tree of trees) {
-      const x = offX + tree.x * scale;
-      const y = offY + tree.y * scale;
-      ctx.moveTo(x, y - radius * 1.25);
-      ctx.lineTo(x + radius, y + radius * 0.65);
-      ctx.lineTo(x - radius, y + radius * 0.65);
+      const { x, y, radius } = treeMark(tree, tileSize, scale, offX, offY);
+      ctx.moveTo(x, y - radius * 1.65);
+      ctx.lineTo(x + radius * 0.92, y - radius * 0.12);
+      ctx.lineTo(x + radius * 0.42, y - radius * 0.12);
+      ctx.lineTo(x + radius * 1.15, y + radius * 0.82);
+      ctx.lineTo(x - radius * 1.15, y + radius * 0.82);
+      ctx.lineTo(x - radius * 0.42, y - radius * 0.12);
+      ctx.lineTo(x - radius * 0.92, y - radius * 0.12);
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.strokeStyle = hex(COLORS.minimapForestOutline);
+    ctx.lineWidth = Math.max(0.8, scale * 2.4);
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = hex(COLORS.minimapForestHighlight);
+    ctx.beginPath();
+    for (const tree of trees) {
+      const { x, y, radius } = treeMark(tree, tileSize, scale, offX, offY);
+      ctx.moveTo(x, y - radius * 1.28);
+      ctx.lineTo(x + radius * 0.48, y - radius * 0.18);
+      ctx.lineTo(x + radius * 0.22, y - radius * 0.18);
+      ctx.lineTo(x + radius * 0.58, y + radius * 0.48);
+      ctx.lineTo(x - radius * 0.58, y + radius * 0.48);
+      ctx.lineTo(x - radius * 0.22, y - radius * 0.18);
+      ctx.lineTo(x - radius * 0.48, y - radius * 0.18);
       ctx.closePath();
     }
     ctx.fill();
@@ -118,4 +140,21 @@ export class MinimapForestLayer {
     }
     return this.trees;
   }
+}
+
+function treeMark(tree, tileSize, scale, offX, offY) {
+  const geometry = TREE_DOODAD_GEOMETRY[tree.typeId];
+  const variation = doodadSizeVariation(Number(tree.id));
+  const foliage = geometry?.foliage;
+  const centerOffsetY = foliage
+    ? (foliage.top + foliage.bottom) * 0.5 * variation
+    : -tileSize * 1.5;
+  const foliageWidth = foliage
+    ? (foliage.right - foliage.left) * variation
+    : tileSize * 2;
+  return {
+    x: offX + tree.x * scale,
+    y: offY + (tree.y + centerOffsetY) * scale,
+    radius: Math.max(2.2, foliageWidth * scale * 0.42),
+  };
 }

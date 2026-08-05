@@ -1224,14 +1224,14 @@ export class MapEditorPanel {
   async openPreview() {
     if (this.pending) return;
     this.pending = true;
-    this.setStatus("Validating map and preparing PNG previews…");
+    this.setStatus("Validating map and preparing a minimap preview…");
     try {
       await this.onOpenPreview?.({
         authoredMap: this.session.exportMap(),
         materializedMap: this.session.materialized(),
       });
       this.pending = false;
-      this.setStatus("Opened the PNG preview page.");
+      this.setStatus("Opened the minimap preview page.");
     } catch (error) {
       this.pending = false;
       this.setStatus(error.message || String(error), true);
