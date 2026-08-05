@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DEFAULT_FACTION_ID } from "../client/src/protocol.js";
+import { STATS } from "../client/src/config.js";
+import { DEFAULT_FACTION_ID, KIND } from "../client/src/protocol.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const wasmAssetDir = process.env.RTS_SIM_WASM_ASSET_DIR
@@ -97,7 +98,7 @@ const baseline = {
       kind: "production",
       identity: "unit:worker",
       fraction: 0.25,
-      totalTicks: 495,
+      totalTicks: STATS[KIND.WORKER].buildTicks,
     },
   ],
   visibleObstacles: [
