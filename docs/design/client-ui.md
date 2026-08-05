@@ -75,7 +75,7 @@ src/
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   minimap_road_layer.js # Cached post-fog dotted road-marking overlay
-  minimap_forest_layer.js # Cached post-fog authored-tree symbol overlay
+  minimap_forest_layer.js # Cached pre-fog foliage-centered tree-symbol overlay
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls
   lobby_map_selector.js # Host map picker: minimap previews, creator credits, keyboard navigation
   lobby_browser_view.js # Pre-join lobby browser rows, state rendering, and age/status formatting
@@ -120,7 +120,7 @@ src/
   map_editor_launch.js # Bounded editor route/handoff query parsing
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
   map_preview_app.js # Capture-only authored-map route composed around existing renderers
-  map_preview_bridge.js # Bounded world/minimap PNG capture surface
+  map_preview_bridge.js # Bounded minimap-only PNG capture surface
   map_editor_session.js # Flat authored-map state, undo/redo, and stroke transactions
   map_authoring/ # Pure browser/Node geometry, symmetry, and serializable map operations shared by the editor and CLI
   map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, JSON files, and Lab launch
@@ -1092,24 +1092,22 @@ in either direction; the editor does not maintain a separate browser-storage wor
 `/map-preview` is a launch-gated consumer of the same one-use, two-minute Lab handoff used by
 `Open in Lab`. It accepts no map data through query parameters or browser-evaluation calls. The
 server validates the authored and materialized maps, creates a private Lab, and sends an ordinary
-authoritative start payload and snapshot. The route then runs the normal `App`/`Match`, Pixi world
-renderer, and live `Minimap`, including server-materialized starting resource depots, neutral bases,
-resources, and doodads; it does not maintain preview-only map rendering logic.
+authoritative start payload and snapshot. The route then runs the normal `App`/`Match` and live
+`Minimap`, including server-materialized starting resource depots, neutral bases, resources, and
+doodads. Its visible page presents that captured production minimap; the world viewport is not a
+preview surface.
 
-Its versioned bridge exposes only bounded 64–4096-pixel `world` and square `minimap` PNG captures,
-with at most 16,777,216 output pixels. It enables reveal-all vision, suppresses app chrome, fits the
-complete map on initial load, and restores that fitted interactive preview after each export. World
-captures use Match's fixed-capture path, force renderer DPR 1 so requested dimensions mean output
-pixels on every display, wait for authoritative entity assets, and encode decoded renderer RGBA
-rather than taking a DOM screenshot. Minimap captures call `Minimap.capturePng`, which temporarily
-resizes the production minimap and omits only transient camera, ping, and artillery markers; terrain,
-resources, and authoritative entities remain. `scripts/map-preview.mjs` is the local Node/Chrome
+Its versioned bridge exposes only bounded square 64–4096-pixel minimap PNG captures, with at most
+16,777,216 output pixels. It enables reveal-all vision and suppresses app chrome. Captures call
+`Minimap.capturePng`, which temporarily resizes the production minimap and omits only transient
+camera, ping, and artillery markers; terrain, resources, and authoritative entities remain.
+`scripts/map-preview.mjs` is the local Node/Chrome
 adapter: it validates and materializes an authored map with `MapEditorSession`, creates a bounded Lab
 handoff on a loopback RTS server, calls the narrow bridge under a browser-side deadline, validates
 the returned PNG dimensions, and writes the requested artifact. Its output extension may be PNG or
 JPEG; JPEG output is transcoded in the already-running preview browser after validating the
 authoritative PNG, with bounded `--jpeg-quality`. A 512×512 minimap export displayed at 256 CSS
-pixels is the lobby's 2×/high-DPR preview convention. The Map Editor's `Preview PNGs`
+pixels is the lobby's 2×/high-DPR preview convention. The Map Editor's `Preview`
 action uses the same handoff and route, whose visible controls call the same bridge. The page owns
 no authoring operations or recipe semantics.
 
@@ -2225,7 +2223,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 [rendering parity ledger](rendering-parity.md).
 
 - Minimap roads reuse the world's deterministic dark-charcoal surface variants so revealed terrain stays visually coherent. Authored marked-road tiles draw small yellow centerline dots above fog, keeping the route network legible in unexplored territory; the dotted overlay is a cached static layer, while bare road tiles widen the charcoal surface without adding markings.
-- Authored tree doodads draw compact bright-green tree symbols above minimap fog so forest shape and density remain legible in explored and unexplored territory. The cached forest layer sits below roads, resources, and foreground player markers so tactical information stays readable.
+- Authored tree doodads draw compact, dark cartographic pine symbols centered on their foliage bounds rather than their grounded trunk anchors. The cached forest layer renders beneath minimap fog, so trees are clear in current vision, dim when explored without vision, and nearly hidden when unexplored; roads, resources, and foreground player markers remain above it for tactical readability.
 - Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through Resource Depot), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass. Positional under-attack alerts use a 2.2-second red pulse with a crisp white inner rim. The nearest local owned unit or building at the alert position strobes its icon interior between white and its team color in 300-millisecond phases for the same duration; the resolved entity keeps flashing if it moves.
 - Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →

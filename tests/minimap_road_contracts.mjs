@@ -101,6 +101,7 @@ export function runMinimapRoadContracts() {
         TERRAIN.GRASS, TERRAIN.ROAD_VERTICAL, TERRAIN.GRASS,
       ],
       resources: [{ id: 10, kind: "steel", x: 2.5, y: 1.5, remaining: 100 }],
+      doodads: [{ id: 11, typeId: "tree.oak", x: 1.5, y: 1.5 }],
     },
     selectedEntities() { return []; },
     entitiesInterpolated() { return []; },
@@ -124,15 +125,17 @@ export function runMinimapRoadContracts() {
   });
 
   minimap.render();
-  assert(layers.length === 4, "marked-road minimap creates terrain, fog, road, and resource layers");
-  const [terrainLayer, fogLayer, roadLayer, resourceLayer] = layers;
+  assert(layers.length === 5, "marked-road minimap creates terrain, forest, fog, road, and resource layers");
+  const [terrainLayer, forestLayer, fogLayer, roadLayer, resourceLayer] = layers;
   const drawIndex = (layer) => canvas.context.calls.findIndex((call) =>
     call.op === "drawImage" && call.source === layer.canvas.label);
   const terrainIndex = drawIndex(terrainLayer);
+  const forestIndex = drawIndex(forestLayer);
   const fogIndex = drawIndex(fogLayer);
   const roadIndex = drawIndex(roadLayer);
   const resourceIndex = drawIndex(resourceLayer);
-  assert(terrainIndex >= 0 && fogIndex > terrainIndex, "fog draws above charcoal road terrain");
+  assert(terrainIndex >= 0 && forestIndex > terrainIndex, "forest symbols draw above terrain");
+  assert(fogIndex > forestIndex, "fog dims forest symbols together with terrain");
   assert(roadIndex > fogIndex, "yellow road dots stay visible above unexplored fog");
   assert(resourceIndex > roadIndex, "resource blips retain priority above road dots");
   const roadDots = roadLayer.context.calls.filter((call) => call.op === "arc");
