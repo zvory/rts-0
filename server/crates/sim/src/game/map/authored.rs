@@ -38,6 +38,9 @@ pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
     if authored.forest_spans.is_none() {
         return Err("map forestSpans must be an array".to_string());
     }
+    if authored.no_building_tiles.is_none() {
+        return Err("map noBuildingTiles must be an array".to_string());
+    }
     let starts = authored.start_locations.len();
     if starts == 0 || starts > MAX_START_LOCATIONS {
         return Err(format!(
@@ -156,7 +159,13 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
     };
     let concealment_tiles = materialize_overlay(&authored.concealment_tiles, "concealmentTiles")?;
     let no_vehicle_tiles = materialize_overlay(&authored.no_vehicle_tiles, "noVehicleTiles")?;
-    let no_building_tiles = materialize_overlay(&authored.no_building_tiles, "noBuildingTiles")?;
+    let no_building_tiles = materialize_overlay(
+        authored
+            .no_building_tiles
+            .as_deref()
+            .ok_or_else(|| "map noBuildingTiles must be an array".to_string())?,
+        "noBuildingTiles",
+    )?;
     let damage_reduction_tiles =
         materialize_overlay(&authored.damage_reduction_tiles, "damageReductionTiles")?;
     let slow_movement_tiles =
@@ -200,8 +209,7 @@ struct AuthoredMap {
     concealment_tiles: Vec<AuthoredLocation>,
     #[serde(default)]
     no_vehicle_tiles: Vec<AuthoredLocation>,
-    #[serde(default)]
-    no_building_tiles: Vec<AuthoredLocation>,
+    no_building_tiles: Option<Vec<AuthoredLocation>>,
     #[serde(default)]
     damage_reduction_tiles: Vec<AuthoredLocation>,
     #[serde(default)]

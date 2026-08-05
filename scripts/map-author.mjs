@@ -241,7 +241,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
   }
   warnings.push(...validateForestSpans(map.forestSpans, width, height));
   for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "damageReductionTiles", "slowMovementTiles"]) {
-    const locations = map[field] === undefined ? [] : map[field];
+    const locations = map[field] === undefined && field !== "noBuildingTiles" ? [] : map[field];
     if (!Array.isArray(locations)) {
       warnings.push(`${field} must be an array`);
       continue;

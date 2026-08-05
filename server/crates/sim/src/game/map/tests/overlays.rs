@@ -182,3 +182,23 @@ fn current_authored_schema_requires_forest_spans() {
         "error was: {error}"
     );
 }
+
+#[test]
+fn current_authored_schema_requires_no_building_tiles() {
+    let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+        serde_json::json!([]),
+        serde_json::json!([]),
+    ))
+    .expect("test map JSON");
+    authored
+        .as_object_mut()
+        .expect("authored map object")
+        .remove("noBuildingTiles");
+
+    let error = Map::materialize_authored_json(&authored.to_string(), 1)
+        .expect_err("schema-v9 maps must declare noBuildingTiles");
+    assert!(
+        error.contains("noBuildingTiles must be an array"),
+        "error was: {error}"
+    );
+}

@@ -759,7 +759,8 @@ mod tests {
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }"#,
             0,
         )
@@ -780,7 +781,8 @@ mod tests {
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }"#,
             0,
         )
@@ -826,7 +828,8 @@ mod tests {
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }"#,
             0,
         )
@@ -852,7 +855,8 @@ mod tests {
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -879,7 +883,8 @@ mod tests {
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -907,7 +912,8 @@ mod tests {
                 "steelPatches": 12,
                 "oilPatches": 3
             }],
-            "forestSpans": []
+            "forestSpans": [],
+            "noBuildingTiles": []
         });
 
         let map = Map::from_authored_json(1, &json.to_string(), 0)
@@ -942,7 +948,8 @@ mod tests {
                 "steelPatches": 12,
                 "oilPatches": 3
             }],
-            "forestSpans": []
+            "forestSpans": [],
+            "noBuildingTiles": []
         });
 
         let error = Map::from_authored_json(1, &json.to_string(), 0)

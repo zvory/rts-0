@@ -69,6 +69,10 @@ for (const [forestSpans, expected] of [
     `the CLI validator rejects malformed Forest spans: ${expected}`);
 }
 
+assert(validateMap({ ...map, noBuildingTiles: undefined }).warnings
+  .some((warning) => warning.includes("noBuildingTiles must be an array")),
+"the CLI validator requires the current schema's no-building layer");
+
 const protectedRecipe = {
   name: "Advisory protected terrain",
   width: 32,
