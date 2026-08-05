@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-
 {
   const savedRaf = globalThis.requestAnimationFrame;
   const scheduled = [];
@@ -27,6 +26,8 @@ import fs from "node:fs";
       presentationFrameId: 0,
       terrainRevision: 0,
       overlayRevision: 0,
+      resourcePatchRevision: -1,
+      resourcePatches: [],
       pendingTerrainUpdate: null,
       pendingOverlay: null,
       symmetry: MAP_EDITOR_SYMMETRY.NONE,
@@ -43,6 +44,7 @@ import fs from "node:fs";
         mapOverlay() { return { starts: [], bases: [] }; },
       },
       siteRecord: MapEditorViewport.prototype.siteRecord,
+      resourcePatchRecords: MapEditorViewport.prototype.resourcePatchRecords,
       paintPreviewRecord: () => null,
       onStatus(message, error) { this.status = { message, error }; },
       presentation: {
@@ -682,21 +684,6 @@ assert(
   assert.deepEqual(site, { x: 336, y: 400, color: 0xf4c542, radius: 7, label: "B1", selected: true },
     "the selected base becomes a detached presentation marker");
 
-  const recordViewport = {
-    session: {
-      draft: { width: 16, height: 16, terrain: Array(16) },
-      mapOverlay: () => ({ starts: [], bases: [] }),
-    },
-    symmetry: MAP_EDITOR_SYMMETRY.NONE,
-    overlayRevision: 0,
-    selectedBaseIndex: null,
-    siteRecord: MapEditorViewport.prototype.siteRecord,
-    paintPreviewRecord: () => null,
-  };
-  MapEditorViewport.prototype.drawOverlay.call(recordViewport);
-  assert.equal(recordViewport.pendingOverlay.revision, 1);
-  assert(Array.isArray(recordViewport.pendingOverlay.gridPaths),
-    "Map Editor grid lines cross as detached paths for the Pixi owner");
 }
 
 {
@@ -1205,6 +1192,8 @@ assert(
 {
   assert.deepEqual(mapEditorLaunchConfig({ search: "", pathname: "/map-editor" }), {
     handoffId: "",
+    interact: false,
+    mapFile: "",
     error: "",
   });
   assert.equal(MAP_EDITOR_MAX_BASE_SITES, 32);

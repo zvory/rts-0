@@ -1008,7 +1008,10 @@ operation applies grass internally. Rectangular maps retain axis reflection and
 half-turn symmetry, while three-way, four-way, and diagonal transforms are disabled because they
 would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
-The selected neutral base has a pale map ring. The viewport draws the selected
+The editor viewport also draws non-authoritative Steel and Oil stand-ins for every base using the
+same count, centre-facing field geometry, tile snapping, passability search, and Oil spacing rules
+as match setup and the production resource-node drawing primitives; editing either patch count
+updates those stand-ins immediately. The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
 Grass, Gravel A/B/C, Dirt A/B/C, Mud A/B/C, Frosted Ground, bare road, and the four marked road
 orientations are passable paint materials; all may cross protected start/base areas while rock and

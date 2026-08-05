@@ -296,6 +296,30 @@ const COMMAND_RECORDS = Object.freeze({
     bounds: ["duration 1-300 seconds", "sample interval 250-60000 ms", "10-60 output FPS", "0.125-8x simulation speed", "DPR >0 and <=4", "at most 1800 frames", "64 MiB output"],
     example: { sessionId: "<scenario-session-id>", name: "pathing", maxDurationMs: 30000, sampleEveryMs: 500, speed: 4 },
   }),
+  "map-editor-open": descriptor("Open or recover the Map Editor with one bundled map loaded.", "{workspaceRoot?:string,map?:bundled-map-selector,viewport?:viewport}", {
+    scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
+    variants: ["map accepts 1v1, 1v1.json, or server/assets/maps/1v1.json and resolves only beneath the bundled maps directory"],
+    defaults: ["workspaceRoot=current worktree", "map=1v1.json", "viewport=1440x900 at DPR 1"],
+    bounds: ["one session across all Interact namespaces", "safe bundled JSON basename only", "viewport 320-4096 x 240-4096"],
+    example: { map: "server/assets/maps/1v1.json", viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
+  }),
+  "map-editor-inspect": descriptor("Inspect Map Editor readiness, loaded-map facts, and semantic camera bounds.", "{sessionId:string}", {
+    lane: "observation",
+    bounds: ["returns detached map and camera facts only"],
+    example: { sessionId: "<map-editor-session-id>" },
+  }),
+  "map-editor-camera": descriptor("Frame the full map, set zoom, or focus a world/tile point or rectangle.", "{sessionId:string,camera:map-editor-camera-command}", {
+    variants: ["overview {action}", "zoom {action,zoom}", "focus {action,space:\"world\"|\"tile\",x,y,zoom?}", "focus area {action,space,x,y,width,height,padding?}"],
+    defaults: ["point focus preserves current zoom", "area padding=0"],
+    bounds: ["zoom 0.05-4", "tile coordinates <=4096", "world coordinates <=131072", "padding 0-1024"],
+    example: { sessionId: "<map-editor-session-id>", camera: { action: "focus", space: "tile", x: 24, y: 24, width: 32, height: 32, padding: 48 } },
+  }),
+  "map-editor-screenshot": descriptor("Capture a readiness-checked Map Editor PNG and return its Tailnet Preview URL.", "{sessionId:string,name?:token,presentation?:\"normal\"|\"clean\",viewport?:viewport}", {
+    variants: ["presentation=normal retains Map Editor controls", "presentation=clean captures only the editor canvas", "response.preview.url is the user-delivery URL"],
+    defaults: ["name=map-editor", "presentation=normal", "viewport=current dimensions at DPR 4"],
+    bounds: ["name 1-48 safe-token characters", "capture viewport 320-2048 x 240-2048", "DPR >0 and <=4"],
+    example: { sessionId: "<map-editor-session-id>", name: "1v1-resources", presentation: "normal" },
+  }),
 });
 
 export const INTERACT_COMMAND_REGISTRY: Readonly<Record<string, CommandDefinition>> = Object.freeze(Object.fromEntries(
@@ -318,7 +342,9 @@ const NAMESPACE_RECORDS = Object.freeze({
   lab: namespace(
     "Arrange and inspect authoritative Lab scenes.",
     Object.fromEntries(INTERACT_COMMAND_KEYS.filter(
-      (name) => !name.startsWith("game-") && !name.startsWith("scenario-"),
+      (name) => !name.startsWith("game-")
+        && !name.startsWith("scenario-")
+        && !name.startsWith("map-editor-"),
     ).map((name) => [name, name])),
   ),
   game: namespace(
@@ -357,6 +383,18 @@ const NAMESPACE_RECORDS = Object.freeze({
       "record-wait": "record-wait",
       "capture-timelapse": "scenario-capture-timelapse",
       "capture-cancel": "capture-cancel",
+      shutdown: "shutdown",
+    },
+  ),
+  "map-editor": namespace(
+    "Load, inspect, frame, and capture one bundled map in the Map Editor.",
+    {
+      open: "map-editor-open",
+      close: "close",
+      status: "status",
+      inspect: "map-editor-inspect",
+      camera: "map-editor-camera",
+      screenshot: "map-editor-screenshot",
       shutdown: "shutdown",
     },
   ),

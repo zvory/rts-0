@@ -69,7 +69,7 @@ export interface ServiceInput extends JsonObject {
 
 export interface InteractSession {
   sessionId: string;
-  kind: "lab" | "game" | "scenario";
+  kind: "lab" | "game" | "scenario" | "map-editor";
   driver: InteractDriver;
   aliases: Map<string, number>;
   sceneRevision: number;

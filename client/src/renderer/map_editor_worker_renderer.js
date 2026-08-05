@@ -6,8 +6,10 @@ import {
   normalizeMapAuthoringLayerVisibility,
 } from "../map_authoring/layers.js";
 import { DOODAD_TYPE } from "../config.js";
+import { KIND } from "../protocol.js";
 import { drawTankTrap } from "./buildings.js";
 import { gfxCircle, gfxFill, gfxFillStrokePath, gfxNoFill, gfxRect, gfxReset, gfxStroke, gfxStrokePaths } from "./native_graphics.js";
+import { drawResourceNodeGraphic } from "./resources.js";
 
 export class MapEditorWorkerRenderer {
   constructor(renderer) {
@@ -16,6 +18,7 @@ export class MapEditorWorkerRenderer {
     this.overlay = new PIXI.Graphics();
     renderer.layers.feedback.addChild(this.overlay);
     this.tankTraps = new Map();
+    this.resourcePatches = new Map();
     this.doodads = new Map();
     this.labels = [];
     this.lastOverlay = null;
@@ -166,7 +169,10 @@ export class MapEditorWorkerRenderer {
       gfxNoFill(this.overlay);
     }
     if (this.layerVisibility[MAP_AUTHORING_LAYER.BASE]) {
+      this._syncResourcePatches(overlay.resourcePatches || []);
       for (const site of overlay.sites) this._drawSite(site);
+    } else {
+      this._syncResourcePatches([]);
     }
     if (overlay.doodadBrushPreview) {
       const preview = overlay.doodadBrushPreview;
@@ -208,12 +214,33 @@ export class MapEditorWorkerRenderer {
     this.labels.push(label);
   }
 
+  _syncResourcePatches(records) {
+    const next = new Set();
+    for (const patch of records || []) {
+      const key = `${patch.kind}:${patch.x}:${patch.y}`;
+      next.add(key);
+      if (this.resourcePatches.has(key)) continue;
+      const graphic = new PIXI.Graphics();
+      graphic.position.set(patch.x, patch.y);
+      drawResourceNodeGraphic(graphic, patch.kind === "oil" ? KIND.OIL : KIND.STEEL);
+      this.renderer.layers.resources.addChild(graphic);
+      this.resourcePatches.set(key, graphic);
+    }
+    for (const [key, graphic] of this.resourcePatches) {
+      if (next.has(key)) continue;
+      graphic.parent?.removeChild?.(graphic);
+      graphic.destroy();
+      this.resourcePatches.delete(key);
+    }
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
     for (const label of this.labels) label.destroy();
     this.labels = [];
     for (const id of [...this.tankTraps.keys()]) this._removeTankTrap(id);
+    this._syncResourcePatches([]);
     this.doodads.clear();
     this.lastOverlay = null;
     this.overlay.destroy();

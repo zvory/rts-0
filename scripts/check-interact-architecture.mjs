@@ -72,11 +72,11 @@ function checkRegistry() {
     }
   }
 
-  expectMetadata("daemon scope", "scope", "daemon", ["open", "status", "shutdown", "game-open", "scenario-open"]);
-  expectMetadata("observation lane", "lane", "observation", ["status", "record-wait", "game-inspect", "scenario-inspect"]);
+  expectMetadata("daemon scope", "scope", "daemon", ["open", "status", "shutdown", "game-open", "scenario-open", "map-editor-open"]);
+  expectMetadata("observation lane", "lane", "observation", ["status", "record-wait", "game-inspect", "scenario-inspect", "map-editor-inspect"]);
   expectMetadata("cancellation lane", "lane", "cancellation", ["capture-cancel"]);
-  expectMetadata("lifecycle lane", "lane", "lifecycle", ["open", "close", "shutdown", "game-open", "scenario-open"]);
-  expectMetadata("startup timeout", "timeoutClass", "startup", ["open", "game-open", "scenario-open"]);
+  expectMetadata("lifecycle lane", "lane", "lifecycle", ["open", "close", "shutdown", "game-open", "scenario-open", "map-editor-open"]);
+  expectMetadata("startup timeout", "timeoutClass", "startup", ["open", "game-open", "scenario-open", "map-editor-open"]);
   expectMetadata("lifecycle/media timeout", "timeoutClass", "lifecycle-media", [
     "close", "shutdown", "record-stop", "record-wait", "capture-fixed", "game-capture-timelapse",
     "scenario-capture-timelapse",
@@ -113,6 +113,7 @@ function checkServiceRouting() {
     ["namespaces/lab/commands.ts", "executeLabCommand"],
     ["namespaces/game/commands.ts", "executeGameCommand"],
     ["namespaces/dev_scenario/commands.ts", "executeDevScenarioCommand"],
+    ["namespaces/map_editor/commands.ts", "executeMapEditorCommand"],
   ]) {
     if (!relativeImports(service, "command_service.ts").includes(modulePath) || !service.includes(`${executor}(`)) {
       failures.push(`command_service.ts must import and dispatch through ${executor} from ${modulePath}`);
