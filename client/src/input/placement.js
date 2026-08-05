@@ -4,6 +4,7 @@ import { DEFAULT_TILE_SIZE } from "./constants.js";
 import { buildTankTrapLineSites, tankTrapBuildCommands } from "./tank_trap_line.js";
 
 const POINT_IN_RECT_EPS_PX = 0.001;
+const NO_BUILDING_TILE_SETS = new WeakMap();
 
 export function footprintValidAgainstEntities(
   entities,
@@ -84,6 +85,7 @@ function footprintPlacementBlockerFromSource(
     for (let tx = tileX; tx < tileX + footW; tx++) {
       const code = map.terrain[ty * map.width + tx];
       if (!PASSABLE[code]) return "terrain";
+      if (noBuildingTileSet(map).has(`${tx},${ty}`)) return "terrain";
     }
   }
   const ts = map.tileSize;
@@ -106,6 +108,15 @@ function footprintPlacementBlockerFromSource(
   }
   if (policy?.resourceOverlap === "oilCenterRequired" && !contextualOilCenter) return "terrain";
   return null;
+}
+
+function noBuildingTileSet(map) {
+  let tiles = NO_BUILDING_TILE_SETS.get(map);
+  if (!tiles) {
+    tiles = new Set((map.noBuildingTiles || []).map((tile) => `${tile.x},${tile.y}`));
+    NO_BUILDING_TILE_SETS.set(map, tiles);
+  }
+  return tiles;
 }
 
 function createPlacementEntityQuery(entities, allowedOverlapIds, map, policy) {

@@ -432,7 +432,7 @@ fn footprint_in_bounds_and_passable(
 
     for ty in tile_y..max_y {
         for tx in tile_x..max_x {
-            if !map.is_passable(tx as i32, ty as i32) {
+            if !map.is_passable(tx as i32, ty as i32) || map.is_no_building_tile(tx, ty) {
                 return false;
             }
         }

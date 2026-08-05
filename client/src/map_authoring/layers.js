@@ -1,7 +1,9 @@
 export const MAP_AUTHORING_LAYER = Object.freeze({
   BASE: "base",
+  FOREST: "forest",
   CONCEALMENT: "concealment",
   NO_VEHICLE: "no-vehicle",
+  NO_BUILDING: "no-building",
   DAMAGE_REDUCTION: "damage-reduction",
   SLOW_MOVEMENT: "slow-movement",
   TREES: "trees",
@@ -16,6 +18,11 @@ export const MAP_AUTHORING_LAYERS = Object.freeze([
     description: "Terrain, start locations, and base sites",
   }),
   Object.freeze({
+    id: MAP_AUTHORING_LAYER.FOREST,
+    label: "Forest",
+    description: "Composite tiles with trees and all five gameplay effects",
+  }),
+  Object.freeze({
     id: MAP_AUTHORING_LAYER.CONCEALMENT,
     label: "Concealment",
     description: "Tiles that conceal units",
@@ -24,6 +31,11 @@ export const MAP_AUTHORING_LAYERS = Object.freeze([
     id: MAP_AUTHORING_LAYER.NO_VEHICLE,
     label: "No vehicles",
     description: "Tiles blocked to vehicles",
+  }),
+  Object.freeze({
+    id: MAP_AUTHORING_LAYER.NO_BUILDING,
+    label: "No buildings",
+    description: "Tiles blocked to building placement",
   }),
   Object.freeze({
     id: MAP_AUTHORING_LAYER.DAMAGE_REDUCTION,

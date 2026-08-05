@@ -12,6 +12,8 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+use super::MapOverlayTiles;
+
 mod authored;
 mod base_resources;
 mod data;
@@ -30,7 +32,7 @@ pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
 /// The only authored-map schema accepted by this build.
-pub const CURRENT_MAP_VERSION: u32 = 8;
+pub const CURRENT_MAP_VERSION: u32 = 9;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -74,6 +76,8 @@ pub struct Map {
     pub concealment_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates blocked for vehicle-body movement only.
     pub no_vehicle_tiles: Vec<(u32, u32)>,
+    /// Canonical sparse tile coordinates that reject intersecting building footprints.
+    pub no_building_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing incoming damage to occupants by 25%.
     pub damage_reduction_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing occupant movement speed by 25%.
@@ -203,6 +207,7 @@ impl Map {
         hash = doodads::hash_materialized(hash, &self.doodads);
         hash = hash_tiles(hash, b"concealment", &self.concealment_tiles);
         hash = hash_tiles(hash, b"no-vehicle", &self.no_vehicle_tiles);
+        hash = hash_tiles(hash, b"no-building", &self.no_building_tiles);
         hash = hash_tiles(hash, b"damage-reduction", &self.damage_reduction_tiles);
         hash = hash_tiles(hash, b"slow-movement", &self.slow_movement_tiles);
         format!("{hash:016x}")
@@ -306,6 +311,11 @@ impl Map {
     }
 
     #[inline]
+    pub(crate) fn is_no_building_tile(&self, x: u32, y: u32) -> bool {
+        self.no_building_tiles.binary_search(&(x, y)).is_ok()
+    }
+
+    #[inline]
     pub(crate) fn is_slow_movement_tile(&self, x: u32, y: u32) -> bool {
         self.slow_movement_tiles.binary_search(&(x, y)).is_ok()
     }
@@ -336,16 +346,15 @@ impl Map {
         terrain_rules::slow_movement_tile_multiplier(active)
     }
 
-    pub(crate) fn protocol_overlay_tiles(
-        &self,
-    ) -> (Vec<MapTile>, Vec<MapTile>, Vec<MapTile>, Vec<MapTile>) {
+    pub(super) fn protocol_overlay_tiles(&self) -> MapOverlayTiles<MapTile> {
         let convert = |tiles: &[(u32, u32)]| tiles.iter().map(|&(x, y)| MapTile { x, y }).collect();
-        (
-            convert(&self.concealment_tiles),
-            convert(&self.no_vehicle_tiles),
-            convert(&self.damage_reduction_tiles),
-            convert(&self.slow_movement_tiles),
-        )
+        MapOverlayTiles {
+            concealment: convert(&self.concealment_tiles),
+            no_vehicle: convert(&self.no_vehicle_tiles),
+            no_building: convert(&self.no_building_tiles),
+            damage_reduction: convert(&self.damage_reduction_tiles),
+            slow_movement: convert(&self.slow_movement_tiles),
+        }
     }
 
     /// Whether a tile is passable terrain. Out-of-bounds is impassable. This does NOT
@@ -750,7 +759,8 @@ mod tests {
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }"#,
             0,
         )
@@ -771,13 +781,14 @@ mod tests {
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }"#,
             0,
         )
         .expect_err("the previous schema should be rejected");
 
-        assert!(err.contains("requires version 8"), "error was: {err}");
+        assert!(err.contains("requires version 9"), "error was: {err}");
     }
 
     #[test]
@@ -807,7 +818,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 8,
+              "version": 9,
               "name": "bad",
               "width": 2,
               "height": 2,
@@ -817,7 +828,8 @@ mod tests {
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }"#,
             0,
         )
@@ -833,7 +845,7 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 8,
+              "version": 9,
               "name": "bad-base",
               "width": 32,
               "height": 32,
@@ -843,7 +855,8 @@ mod tests {
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -860,7 +873,7 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 8,
+              "version": 9,
               "name": "road-base",
               "width": 32,
               "height": 32,
@@ -870,7 +883,8 @@ mod tests {
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
               "doodads": [],
-              "forestSpans": []
+              "forestSpans": [],
+              "noBuildingTiles": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -898,7 +912,8 @@ mod tests {
                 "steelPatches": 12,
                 "oilPatches": 3
             }],
-            "forestSpans": []
+            "forestSpans": [],
+            "noBuildingTiles": []
         });
 
         let map = Map::from_authored_json(1, &json.to_string(), 0)
@@ -933,7 +948,8 @@ mod tests {
                 "steelPatches": 12,
                 "oilPatches": 3
             }],
-            "forestSpans": []
+            "forestSpans": [],
+            "noBuildingTiles": []
         });
 
         let error = Map::from_authored_json(1, &json.to_string(), 0)

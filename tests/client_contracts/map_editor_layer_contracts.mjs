@@ -15,13 +15,13 @@ assert.equal(mapAuthoringDoodadLayer("tree.oak"), MAP_AUTHORING_LAYER.TREES);
 assert.equal(mapAuthoringDoodadLayer("unit.tank_trap"), MAP_AUTHORING_LAYER.GAMEPLAY_DOODADS);
 assert.equal(mapAuthoringDoodadLayer("wildflower.cluster"), MAP_AUTHORING_LAYER.DECORATIVE_DOODADS);
 assert.deepEqual(
-  Object.entries(mapAuthoringLayerVisibilityFromSelection("concealment,trees"))
+  Object.entries(mapAuthoringLayerVisibilityFromSelection("forest,concealment,trees"))
     .filter(([, visible]) => visible).map(([id]) => id),
-  [MAP_AUTHORING_LAYER.CONCEALMENT, MAP_AUTHORING_LAYER.TREES],
+  [MAP_AUTHORING_LAYER.FOREST, MAP_AUTHORING_LAYER.CONCEALMENT, MAP_AUTHORING_LAYER.TREES],
   "layer selection isolates an exact semantic subset",
 );
-assert.throws(() => mapAuthoringLayerVisibilityFromSelection("forest"), /Unsupported map authoring layer/,
-  "the removed Forest authoring concept is not a layer alias");
+assert.throws(() => mapAuthoringLayerVisibilityFromSelection("forest-effect"), /Unsupported map authoring layer/,
+  "unknown authoring concepts are not accepted as layer aliases");
 
 let redraws = 0;
 const viewport = {

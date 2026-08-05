@@ -237,6 +237,7 @@ fn map_from_materialized(map: AuthoredMapData) -> Map {
         doodads: map.doodads,
         concealment_tiles: map.concealment_tiles,
         no_vehicle_tiles: map.no_vehicle_tiles,
+        no_building_tiles: map.no_building_tiles,
         damage_reduction_tiles: map.damage_reduction_tiles,
         slow_movement_tiles: map.slow_movement_tiles,
     }
@@ -267,7 +268,8 @@ mod tests {
             "doodads": doodads,
             "forestSpans": [],
             "concealmentTiles": [],
-            "noVehicleTiles": no_vehicle_tiles
+            "noVehicleTiles": no_vehicle_tiles,
+            "noBuildingTiles": []
         })
         .to_string()
     }
@@ -379,7 +381,8 @@ mod tests {
             "doodads": [],
             "forestSpans": [],
             "concealmentTiles": [],
-            "noVehicleTiles": no_vehicle_wall
+            "noVehicleTiles": no_vehicle_wall,
+            "noBuildingTiles": []
         })
         .to_string();
 

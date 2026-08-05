@@ -46,7 +46,7 @@ pub enum LabOp {
     SetPlayerResources(LabSetPlayerResources),
     SetPlayerGodMode { player_id: u32, enabled: bool },
     SetCompletedResearch(LabSetCompletedResearch),
-    ApplyMapDraft(LabMapDraft),
+    ApplyMapDraft(Box<LabMapDraft>),
     RestoreCheckpointScenario(Box<LabCheckpointScenarioV1>),
 }
 
@@ -304,7 +304,7 @@ impl Game {
                 self.lab_set_player_god_mode(player_id, enabled)
             }
             LabOp::SetCompletedResearch(input) => self.lab_set_completed_research(input),
-            LabOp::ApplyMapDraft(draft) => self.lab_apply_map_draft(draft),
+            LabOp::ApplyMapDraft(draft) => self.lab_apply_map_draft(*draft),
             LabOp::RestoreCheckpointScenario(scenario) => {
                 self.restore_lab_checkpoint_scenario_op(*scenario)
             }
@@ -541,8 +541,7 @@ impl Game {
             .map(|tile| (tile.x, tile.y))
             .collect();
         let base_resource_counts = map_draft::resource_counts(&draft, name)?;
-        let (concealment_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
-            map_draft::canonical_overlays(&draft, name)?;
+        let overlays = map_draft::canonical_overlays(&draft, name)?;
         let doodads = map_draft::canonical_doodads(draft.width, draft.height, draft.doodads, name)?;
         let mut occupied_sites = std::collections::HashSet::new();
         for &(x, y) in &starts {
@@ -578,10 +577,11 @@ impl Game {
             base_sites,
             base_resource_counts,
             doodads,
-            concealment_tiles,
-            no_vehicle_tiles,
-            damage_reduction_tiles,
-            slow_movement_tiles,
+            concealment_tiles: overlays.concealment,
+            no_vehicle_tiles: overlays.no_vehicle,
+            no_building_tiles: overlays.no_building,
+            damage_reduction_tiles: overlays.damage_reduction,
+            slow_movement_tiles: overlays.slow_movement,
         };
         let map_metadata = MapMetadata {
             name: name.to_string(),
