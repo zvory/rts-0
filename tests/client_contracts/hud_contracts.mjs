@@ -853,7 +853,7 @@ withFakeHudDocument(({ FakeElement }) => {
   tooltipHud._resourceIcon = (kind) => kind;
   const pumpJackTooltip = tooltipHud._kindTooltipHtml(KIND.PUMP_JACK);
   assert(
-    pumpJackTooltip.includes("24s") &&
+    pumpJackTooltip.includes("36s") &&
       pumpJackTooltip.includes("automatically build this for free") &&
       pumpJackTooltip.includes("Oil patches") &&
       pumpJackTooltip.includes("Extracts 2 Oil every 1.3s"),

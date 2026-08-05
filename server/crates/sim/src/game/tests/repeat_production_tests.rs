@@ -34,6 +34,10 @@ fn spawn_building(game: &mut Game, owner: u32, kind: EntityKind, tile: (u32, u32
         .expect("building should spawn")
 }
 
+fn spawn_node(game: &mut Game, kind: EntityKind, pos: (f32, f32)) {
+    game.state.entities.spawn_node(kind, pos.0, pos.1);
+}
+
 fn repeat_fixture() -> (Game, u32) {
     let mut game = empty_flat_game(&players());
     spawn_building(&mut game, 1, EntityKind::ResourceDepot, (3, 3));
@@ -70,12 +74,8 @@ fn depot_completes_steel_mine_on_nearest_in_range_patch() {
         });
     let near = game.state.map.tile_center(14, 10);
     let far = game.state.map.tile_center(18, 10);
-    game.state
-        .entities
-        .spawn_node(EntityKind::Steel, far.0, far.1);
-    game.state
-        .entities
-        .spawn_node(EntityKind::Steel, near.0, near.1);
+    spawn_node(&mut game, EntityKind::Steel, far);
+    spawn_node(&mut game, EntityKind::Steel, near);
 
     game.tick();
 
@@ -104,9 +104,7 @@ fn depot_extractor_scaffold_matches_front_queue_progress() {
     let total = config::building_stats(EntityKind::SteelMine)
         .expect("steel mine stats")
         .build_ticks;
-    game.state
-        .entities
-        .spawn_node(EntityKind::Steel, patch.0, patch.1);
+    spawn_node(&mut game, EntityKind::Steel, patch);
     game.state
         .entities
         .get_mut(depot)
@@ -142,9 +140,7 @@ fn cancelling_legacy_extractor_scaffold_restarts_free_without_refund() {
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
     let patch = game.state.map.tile_center(14, 10);
-    game.state
-        .entities
-        .spawn_node(EntityKind::Steel, patch.0, patch.1);
+    spawn_node(&mut game, EntityKind::Steel, patch);
     game.state.players[0].set_resources(450, 0);
     game.state
         .entities
@@ -191,9 +187,7 @@ fn automatic_extractor_pauses_when_saturated_and_restarts_free_after_destruction
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
     let patch = game.state.map.tile_center(14, 10);
-    game.state
-        .entities
-        .spawn_node(EntityKind::Steel, patch.0, patch.1);
+    spawn_node(&mut game, EntityKind::Steel, patch);
     let mine = game
         .state
         .entities
@@ -228,43 +222,52 @@ fn automatic_extractor_pauses_when_saturated_and_restarts_free_after_destruction
 #[test]
 fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     let mut game = empty_flat_game(&players());
-    let _depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
     let steel_patch = game.state.map.tile_center(14, 10);
     let oil_patch = game.state.map.tile_center(16, 10);
-    game.state
-        .entities
-        .spawn_node(EntityKind::Steel, steel_patch.0, steel_patch.1);
-    game.state
-        .entities
-        .spawn_node(EntityKind::Oil, oil_patch.0, oil_patch.1);
+    spawn_node(&mut game, EntityKind::Steel, steel_patch);
+    spawn_node(&mut game, EntityKind::Oil, oil_patch);
     game.state.players[0].set_resources(0, 0);
-
     game.tick();
-    let progress = |kind| {
+    let progress = |game: &Game, kind| {
         game.state
             .entities
             .iter()
             .find(|entity| entity.kind == kind && entity.under_construction())
             .and_then(|entity| entity.build_progress_fraction())
     };
-    let expected_first_tick = 1.0 / (config::TICK_HZ * 24) as f32;
-    assert_eq!(progress(EntityKind::SteelMine), Some(expected_first_tick));
-    assert_eq!(progress(EntityKind::PumpJack), Some(expected_first_tick));
+    let completed = |game: &Game, kind| {
+        game.state.entities.iter().any(|entity| {
+            entity.kind == kind
+                && !entity.under_construction()
+                && entity.resource_extractor_producer_id() == Some(depot)
+        })
+    };
+    let steel_ticks = config::TICK_HZ * 24;
+    let pump_ticks = config::TICK_HZ * 36;
+    assert_eq!(
+        progress(&game, EntityKind::PumpJack),
+        Some(1.0 / pump_ticks as f32)
+    );
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
         (0, 0)
     );
-    for _ in 1..config::TICK_HZ * 24 {
+    for _ in 1..steel_ticks {
         game.tick();
     }
-    for kind in [EntityKind::SteelMine, EntityKind::PumpJack] {
-        assert!(game
-            .state
-            .entities
-            .iter()
-            .any(|entity| entity.kind == kind && !entity.under_construction()));
+    assert!(completed(&game, EntityKind::SteelMine));
+    assert!(!completed(&game, EntityKind::PumpJack));
+    assert_eq!(
+        progress(&game, EntityKind::PumpJack),
+        Some(steel_ticks as f32 / pump_ticks as f32)
+    );
+    for _ in steel_ticks..pump_ticks {
+        game.tick();
     }
+    assert!(completed(&game, EntityKind::SteelMine));
+    assert!(completed(&game, EntityKind::PumpJack));
 }
 
 #[test]
@@ -273,9 +276,7 @@ fn extractor_production_ignores_matching_patches_outside_its_depot_range() {
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (4, 4));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
     let patch = game.state.map.tile_center(25, 25);
-    game.state
-        .entities
-        .spawn_node(EntityKind::Oil, patch.0, patch.1);
+    spawn_node(&mut game, EntityKind::Oil, patch);
     game.state
         .entities
         .get_mut(depot)

@@ -146,7 +146,7 @@ existing `MINING_ANCHOR_RANGE_TILES = 11` coverage of the producing Resource Dep
 depleted. It is free and takes 24 seconds to produce.
 
 Pump Jack keeps its existing 1x1 footprint, 75 HP, Small/unarmored classification, 1-tile sight,
-and `OIL_LOAD = 2` payout every 40 ticks. It is also free and takes 24 seconds to produce.
+and `OIL_LOAD = 2` payout every 40 ticks. It is also free and takes 36 seconds to produce.
 Every completed Resource Depot permanently runs one Steel Mine job and one Pump Jack job in the
 background. The two jobs progress concurrently with each other and independently of the Depot's
 ordinary Engineer FIFO. Each job chooses the nearest deterministic live, unoccupied matching patch
@@ -639,7 +639,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a completed trap captures every currently visible completed trap within 4 tiles as one cluster-clear order; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | steel_mine                 | Steel Mine         | 50  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
-| pump_jack                  | Pump Jack          | 75  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
+| pump_jack                  | Pump Jack          | 75  | 1     | 0 | 1x1  | 1080      | free permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

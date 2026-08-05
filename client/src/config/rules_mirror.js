@@ -206,7 +206,7 @@ export const STATS = Object.freeze({
       "Resource Depots automatically build this for free on nearby Steel patches. " +
       `Extracts 2 Steel every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s.` },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
-    cost: { steel: 0, oil: 0 }, buildTicks: TICK_HZ * 24, trains: [],
+    cost: { steel: 0, oil: 0 }, buildTicks: TICK_HZ * 36, trains: [],
     description:
       "Resource Depots automatically build this for free on nearby Oil patches. " +
       `Extracts ${OIL_LOAD} Oil every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s while within ` +
