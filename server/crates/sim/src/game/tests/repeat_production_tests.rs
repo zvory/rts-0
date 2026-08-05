@@ -228,7 +228,7 @@ fn automatic_extractor_pauses_when_saturated_and_restarts_free_after_destruction
 #[test]
 fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     let mut game = empty_flat_game(&players());
-    let _depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
     let steel_patch = game.state.map.tile_center(14, 10);
     let oil_patch = game.state.map.tile_center(16, 10);
@@ -247,6 +247,13 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
             .find(|entity| entity.kind == kind && entity.under_construction())
             .and_then(|entity| entity.build_progress_fraction())
     };
+    let completed = |game: &Game, kind| {
+        game.state.entities.iter().any(|entity| {
+            entity.kind == kind
+                && !entity.under_construction()
+                && entity.resource_extractor_producer_id() == Some(depot)
+        })
+    };
     let steel_ticks = config::TICK_HZ * 24;
     let pump_ticks = config::TICK_HZ * 36;
     assert_eq!(
@@ -260,7 +267,8 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     for _ in 1..steel_ticks {
         game.tick();
     }
-    assert_eq!(progress(&game, EntityKind::SteelMine), None);
+    assert!(completed(&game, EntityKind::SteelMine));
+    assert!(!completed(&game, EntityKind::PumpJack));
     assert_eq!(
         progress(&game, EntityKind::PumpJack),
         Some(steel_ticks as f32 / pump_ticks as f32)
@@ -268,7 +276,8 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     for _ in steel_ticks..pump_ticks {
         game.tick();
     }
-    assert_eq!(progress(&game, EntityKind::PumpJack), None);
+    assert!(completed(&game, EntityKind::SteelMine));
+    assert!(completed(&game, EntityKind::PumpJack));
 }
 
 #[test]
