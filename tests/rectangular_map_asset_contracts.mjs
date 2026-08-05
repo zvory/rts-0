@@ -74,16 +74,16 @@ for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMa
 }
 
 const bundledScenarioContracts = new Map([
-  ["lategame.json", ["9e6169128d81ed61", "7918f89f6178e9c9"]],
-  ["render-preview.json", ["9e6169128d81ed61", "f82d4bf8967c50c9"]],
-  ["fixed-roster-hellhole.json", ["4638fcdac85871c7", "b8b0dd056c34c92d"]],
-  ["tank-trap-cluster-clear.json", ["9e6169128d81ed61", "7918f89f6178e9c9"]],
+  ["lategame.json", [8, "cd55900cbe1e9874", "7918f89f6178e9c9"]],
+  ["render-preview.json", [7, "9e6169128d81ed61", "f82d4bf8967c50c9"]],
+  ["fixed-roster-hellhole.json", [7, "4638fcdac85871c7", "b8b0dd056c34c92d"]],
+  ["tank-trap-cluster-clear.json", [7, "9e6169128d81ed61", "7918f89f6178e9c9"]],
 ]);
 
-for (const [fileName, [contentHash, expectedMaterializedHash]] of bundledScenarioContracts) {
+for (const [fileName, [schemaVersion, contentHash, expectedMaterializedHash]] of bundledScenarioContracts) {
   const scenario = JSON.parse(fs.readFileSync(new URL(`server/assets/lab-scenarios/${fileName}`, repoRoot), "utf8"));
   const checkpoint = JSON.parse(scenario.checkpointPayload);
-  assert.equal(scenario.map.schemaVersion, 7, `${fileName} binds the current authored map schema`);
+  assert.equal(scenario.map.schemaVersion, schemaVersion, `${fileName} binds its authored map schema`);
   assert.equal(scenario.map.contentHash, contentHash, `${fileName} binds the exact authored map bytes`);
   assert.equal(scenario.map.data.width, 126, `${fileName} preserves its map width`);
   assert.equal(scenario.map.data.height, 126, `${fileName} preserves its map height`);
@@ -98,7 +98,7 @@ for (const [fileName, [contentHash, expectedMaterializedHash]] of bundledScenari
     checkpoint.mapBinding,
     {
       name: scenario.map.name,
-      schemaVersion: 7,
+      schemaVersion,
       contentHash,
       materializedMapHash: expectedMaterializedHash,
       width: 126,
