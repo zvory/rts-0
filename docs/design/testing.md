@@ -60,9 +60,8 @@ checks per-tick invariants for invalid resources, supply overflow, malformed ent
 out-of-bounds positions, and non-finite progress values. It also enforces progress deadlines so a
 stuck economy/tech/combat loop fails as a deadlock instead of timing out silently.
 
-Special harness scripts remain where they cover behavior that is not a normal AI strategy profile:
-`WorkerRushScript` is an all-in worker-pull scenario, and `MineOnlyScript` is passive mining/fairness
-coverage. These scripts are kept isolated from the canonical profile list.
+`MineOnlyScript` remains as isolated passive mining/fairness coverage outside the canonical profile
+list.
 
 **Artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
 with:

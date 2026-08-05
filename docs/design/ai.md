@@ -221,8 +221,7 @@ Matchup, arena, balance, `LiveSelfPlay`, real-AI tests, and live-AI performance 
 driver. `ProfileBackedScript` survives only as a thin `AiController` adapter for synthetic mixed
 script fixtures; its economy-only variant is an explicitly named command-filtering wrapper. It
 owns no profile decision memory, map cache, pending builds, placement search, combat-stage state,
-or cadence. Synthetic `WorkerRushScript` and `MineOnlyScript` retain their explicitly scoped
-six-tick harness cadence.
+or cadence. Synthetic `MineOnlyScript` retains its explicitly scoped six-tick harness cadence.
 
 This cutover intentionally changes historical offline output. The old adapter invoked both players
 at tick zero and then player 1/2 at ticks 5/4 modulo six, used the default away-from-center build
