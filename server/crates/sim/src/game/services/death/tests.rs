@@ -225,6 +225,7 @@ fn destroyed_automatic_extractor_scaffold_waits_five_seconds_then_restarts_free(
         game.tick();
         assert!(game.state.entities.iter().all(|entity| {
             entity.kind != kind
+                || !entity.under_construction()
                 || entity.resource_extractor_producer_id() != Some(resource_depot)
         }));
     }

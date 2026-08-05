@@ -314,12 +314,24 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
 
     assert_eq!(owned_kind_count(&game, 1, EntityKind::Worker), 1);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::SteelMine), 6);
+    let resource_depot = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::ResourceDepot)
+        .map(|entity| entity.id)
+        .expect("standard start should contain a Resource Depot");
     for mine in game
         .state
         .entities
         .iter()
         .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::SteelMine)
     {
+        assert_eq!(
+            mine.resource_extractor_producer_id(),
+            Some(resource_depot),
+            "starting mines must belong to the depot job that replaces them"
+        );
         assert!(game.state.entities.iter().any(|node| {
             node.kind == EntityKind::Steel
                 && (node.pos_x - mine.pos_x).abs() <= 0.001
