@@ -696,6 +696,7 @@ try {
     const optionsRect = optionsWindow?.getBoundingClientRect();
     const panelRect = toolsWindow?.getBoundingClientRect();
     const layersRect = layersWindow?.getBoundingClientRect();
+    const toolbarRect = document.querySelector(".map-editor-toolbar")?.getBoundingClientRect();
     const layersMoveHandle = layersWindow?.querySelector(".lab-panel-drag-handle");
     layersMoveHandle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
     const movedLayersRect = layersWindow?.getBoundingClientRect();
@@ -728,6 +729,7 @@ try {
       withinViewport: [layersRect, panelRect].every((rect) => rect &&
         rect.left >= 8 && rect.right <= window.innerWidth - 8 &&
         rect.top >= 8 && rect.bottom <= window.innerHeight - 8),
+      belowToolbar: [movedLayersRect, panelRect].every((rect) => rect && toolbarRect && rect.top >= toolbarRect.bottom),
       noHorizontalOverflow: [...document.querySelectorAll(".map-editor-palette, .map-editor-player-picker")]
         .every((node) => node.scrollWidth <= node.clientWidth),
       actionButtons: [...document.querySelectorAll(".map-editor-toolbar button")]
@@ -797,8 +799,8 @@ try {
     `MAP EDITOR: document settings, visibility, and palette surfaces omit initial status slop and show all 18 terrain previews (headers=${editorUi.headers.join("/")}, previews=${editorUi.terrainPreviews.length})`,
   );
   ok(
-    editorUi.floatingChrome && editorUi.settingsHidden && editorUi.panelsDoNotOverlap && editorUi.withinViewport && editorUi.noHorizontalOverflow,
-    "MAP EDITOR: the hidden settings sheet and two visible floating panels preserve map workspace and viewport bounds",
+    editorUi.floatingChrome && editorUi.settingsHidden && editorUi.panelsDoNotOverlap && editorUi.withinViewport && editorUi.belowToolbar && editorUi.noHorizontalOverflow,
+    "MAP EDITOR: the hidden settings sheet and two visible floating panels preserve map workspace, toolbar clearance, and viewport bounds",
   );
   ok(
     ["Fill", "Fit", "−", "+"].every((label) => editorUi.zoom?.buttons.includes(label)) &&

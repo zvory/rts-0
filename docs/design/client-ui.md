@@ -969,7 +969,8 @@ entity, resource, order, timeline, or replay state crosses that boundary.
 
 `MapEditorApp` owns the dedicated editor. Its persistent document bar owns map identity, undo/redo,
 the Map settings and Layers toggles, camera framing/zoom, local authored-map JSON import/export,
-authoritative check, preview, and Lab handoff. Map settings is an independently movable,
+authoritative check, preview, and Lab handoff. The document bar reserves the top strip: movable
+editor panels are constrained below it when dragged, restored, resized, or viewport-clamped. Map settings is an independently movable,
 collapsible, and resizable sheet for map source, details, resizing, and the advanced route report;
 opening it temporarily replaces the editing palette and operation rail. Layers remains a separate
 visibility-only floating panel. The palette is independently movable, collapsible, and resizable,

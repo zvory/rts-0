@@ -22,6 +22,7 @@ export class LabPanelWindowChrome {
     this.storageKey = options.storageKey || DEFAULT_STORAGE_KEY;
     this.panelLabel = String(options.panelLabel || "lab controls").trim() || "panel";
     this.minWidth = finitePositive(options.minWidth) || MIN_WIDTH;
+    this.topInset = finitePositive(options.topInset) || DEFAULT_MARGIN;
     const configuredMinHeight = finitePositive(options.minHeight);
     this.minHeight = configuredMinHeight || MIN_HEIGHT;
     if (configuredMinHeight) {
@@ -262,16 +263,16 @@ export class LabPanelWindowChrome {
     const viewport = this.viewport();
     const margin = DEFAULT_MARGIN;
     const maxWidth = Math.max(1, viewport.width - margin * 2);
-    const maxHeight = Math.max(1, viewport.height - margin * 2);
+    const maxHeight = Math.max(1, viewport.height - this.topInset - margin);
     const minWidth = Math.min(this.minWidth, maxWidth);
     const minHeight = Math.min(this.minHeight, maxHeight);
     const width = clamp(finitePositive(geometry.width) || defaultWidth(viewport), minWidth, maxWidth);
     const height = clamp(finitePositive(geometry.height) || defaultHeight(viewport, this.minHeight), minHeight, maxHeight);
     const maxLeft = Math.max(margin, viewport.width - width - margin);
-    const maxTop = Math.max(margin, viewport.height - height - margin);
+    const maxTop = Math.max(this.topInset, viewport.height - height - margin);
     return {
       left: Math.round(clamp(finiteNumber(geometry.left) ?? defaultLeft(viewport, width), margin, maxLeft)),
-      top: Math.round(clamp(finiteNumber(geometry.top) ?? DEFAULT_TOP, margin, maxTop)),
+      top: Math.round(clamp(finiteNumber(geometry.top) ?? DEFAULT_TOP, this.topInset, maxTop)),
       width: Math.round(width),
       height: Math.round(height),
     };

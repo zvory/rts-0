@@ -38,6 +38,7 @@ const MAP_EDITOR_MAX_JSON_BYTES = 8 * 1024 * 1024;
 const MAP_EDITOR_OPTIONS_STORAGE_KEY = "rts.mapEditor.panel.window.v1";
 const MAP_EDITOR_TOOLS_STORAGE_KEY = "rts.mapEditor.tools.window.v1";
 const MAP_EDITOR_LAYERS_STORAGE_KEY = "rts.mapEditor.layers.window.v1";
+const MAP_EDITOR_PANEL_TOP_INSET = 70;
 const MAP_EDITOR_ANALYSIS_TIMEOUT_MS = 20_000;
 export class MapEditorPanel {
   constructor({
@@ -126,17 +127,20 @@ export class MapEditorPanel {
       storageKey: MAP_EDITOR_OPTIONS_STORAGE_KEY,
       panelLabel: "map settings",
       minWidth: 220,
+      topInset: MAP_EDITOR_PANEL_TOP_INSET,
     });
     this.toolsWindowChrome = new LabPanelWindowChrome(this.toolsEl, {
       storageKey: MAP_EDITOR_TOOLS_STORAGE_KEY,
       panelLabel: "map content palette",
       minWidth: 220,
+      topInset: MAP_EDITOR_PANEL_TOP_INSET,
     });
     this.layersWindowChrome = new LabPanelWindowChrome(this.layersEl, {
       storageKey: MAP_EDITOR_LAYERS_STORAGE_KEY,
       panelLabel: "map editor layers",
       minWidth: 220,
       minHeight: 120,
+      topInset: MAP_EDITOR_PANEL_TOP_INSET,
     });
     this.onKeyDown = (event) => this.handleKeyDown(event);
     window.addEventListener("keydown", this.onKeyDown);
