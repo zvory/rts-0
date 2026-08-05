@@ -26,10 +26,6 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/crossroads.jpg",
   }),
-  "Dark Forest": Object.freeze({
-    author: "Alex",
-    preview: "/assets/map-previews/dark-forest.jpg",
-  }),
   "Open Basin": Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/open-basin.jpg",
@@ -37,10 +33,6 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
   "Schone Tage": Object.freeze({
     author: "oti",
     preview: "/assets/map-previews/schone-tage.jpg",
-  }),
-  "Waldübungen": Object.freeze({
-    author: "Alex",
-    preview: "/assets/map-previews/waldubungen.jpg",
   }),
 });
 
