@@ -494,6 +494,7 @@ mod tests {
     use std::collections::HashSet;
 
     mod base_limits;
+    mod crossroads;
     mod doodads;
     mod four_player;
     mod open_basin;
