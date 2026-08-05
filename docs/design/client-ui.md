@@ -124,6 +124,7 @@ src/
   map_editor_session.js # Flat authored-map state, undo/redo, and stroke transactions
   map_authoring/ # Pure browser/Node geometry, symmetry, and serializable map operations shared by the editor and CLI
   map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, JSON files, and Lab launch
+  map_editor_panel_workflow.js # Pure editor category/operation availability and current-tool labels
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
@@ -966,16 +967,21 @@ save/open uses the bounded lab replay artifact path instead of the legacy `expor
 authoritative map-only payload, creates a server-validated editor handoff, and navigates away; no Lab
 entity, resource, order, timeline, or replay state crosses that boundary.
 
-`MapEditorApp` owns the dedicated editor. Its separate floating Options, Layers, and Tools panels are
-independently movable, collapsible, and resizable. Options owns map source, undo/redo, map details,
-status, local authored-map JSON import/export, and Lab handoff; Layers owns
-presentation visibility; Tools owns terrain paint, start/base locations, and doodad authoring. The
-top of Tools owns camera zoom controls: fill the viewport, fit the entire map,
-zoom in/out, or enter an exact percentage. The percentage stays synchronized with wheel zoom.
-Options loads bundled JSON from `/maps/catalog` and
+`MapEditorApp` owns the dedicated editor. Its persistent document bar owns map identity, undo/redo,
+the Map settings and Layers toggles, camera framing/zoom, local authored-map JSON import/export,
+authoritative check, preview, and Lab handoff. Map settings is an independently movable,
+collapsible, and resizable sheet for map source, details, resizing, and the advanced route report;
+opening it temporarily replaces the editing palette and operation rail. Layers remains a separate
+visibility-only floating panel. The palette is independently movable, collapsible, and resizable,
+with pinned Terrain, Objects, Zones, and Locations tabs above the sole scrolling content region and
+pinned current-tool/symmetry context below it. A separate operation rail exposes Brush, Box, Path,
+Place, Spray, Erase, Add, Move, and Remove; operations that cannot apply to the selected content
+remain visible but disabled with explanatory titles. The percentage in the document bar stays
+synchronized with wheel zoom. Map settings loads bundled JSON from `/maps/catalog` and
 `/maps/<file>`, creates configurable 16–256-tile-per-axis blank maps with a 126 × 126 default and
 separate width/height fields that follow the active draft, edits name/description plus flat start and
-base locations, and provides undo/redo, local map JSON import/export, and centered resize. The editor
+base locations, and provides centered resize; the document bar owns undo/redo and local map JSON
+import/export. The editor
 accepts authored-map JSON up to 8 MiB and only materialized authored maps containing terrain;
 agent-authored recipes remain a
 `scripts/map-author.mjs build` CLI input and are not a Map Editor document type. Import normalization
@@ -994,9 +1000,10 @@ layout. Editor-directed handoffs preserve that in-progress zero-start state with
 a simulation; Lab-directed handoffs still require a playable start/base layout. Adding symmetric starts
 reuses any base sites already present at the target locations. There is no
 active layout, player slot, or per-player natural assignment. The viewport draws blue start
-markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain tools support brush
+markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain content supports brush
 and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
-single-diagonal symmetry; grass is the erase material. Rectangular maps retain axis reflection and
+single-diagonal symmetry; Grass remains an ordinary selectable material, while the separate Erase
+operation applies grass internally. Rectangular maps retain axis reflection and
 half-turn symmetry, while three-way, four-way, and diagonal transforms are disabled because they
 would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
@@ -1015,14 +1022,16 @@ The selected symmetry runs the shared advisory checker against the current draft
 terrain, start/base, overlay, resource, or doodad mismatch directly below the selector. Three-way
 checks compare complete generated square-grid orbits, including rounded copies clipped by an edge;
 marked-road checks still require the transformed orientation.
-Editor status stays above the scrolling controls; failures use a high-contrast alert treatment.
+Editor status uses a separate bottom dock outside the scrolling palette; failures use a
+high-contrast alert treatment.
 A terrain pointer stroke clones once for undo,
 mutates rows in place, records dirty tiles, and commits once. The renderer patches those tiles plus their
 edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
-The Forest palette exposes Paint Forest and Erase Forest with a configurable 1–31-tile brush.
+The Terrain palette exposes Forest as compound content with a configurable 1–31-tile brush; the
+separate operation rail applies it with Brush or removes it with Erase.
 Forest painting is the single source for its tree scatter and all four gameplay effects. The draft
 stores the exact tile area as compact inclusive `[y, xStart, xEnd]` row spans; generated trees use
 reserved deterministic ids, while ordinary doodads remain independently authored. Symmetry expands

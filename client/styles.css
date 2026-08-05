@@ -5469,7 +5469,7 @@ input[type="text"]:focus {
   display: none !important;
 }
 
-.map-editor-mode #game-screen > :not(#viewport):not(.map-editor-panel) {
+.map-editor-mode #game-screen > :not(#viewport):not(.map-editor-panel):not(.map-editor-toolbar):not(.map-editor-tool-rail):not(.map-editor-status-dock) {
   display: none !important;
 }
 
@@ -5480,24 +5480,19 @@ input[type="text"]:focus {
 
 .map-editor-panel {
   position: absolute;
-  top: 58px;
+  top: 82px;
   bottom: auto;
-  width: min(390px, calc(50vw - 18px));
-  min-width: min(260px, calc(50vw - 18px));
-  max-height: min(680px, calc(100vh - 70px));
+  width: min(390px, calc((100vw - 128px) / 2));
+  min-width: min(260px, calc((100vw - 128px) / 2));
+  max-height: calc(100vh - 98px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .map-editor-options-window {
-  left: 12px;
+  left: 96px;
   right: auto;
-}
-
-.map-editor-tools-window {
-  right: 12px;
-  left: auto;
 }
 
 .map-editor-header {
@@ -5707,16 +5702,16 @@ input[type="text"]:focus {
     left: 8px;
     width: auto;
     min-width: min(260px, calc(100vw - 16px));
-    max-height: calc(50vh - 12px);
+    max-height: calc(100vh - 142px);
   }
 
   .map-editor-options-window {
-    top: auto;
-    bottom: 8px;
+    top: 70px;
+    bottom: auto;
   }
 
   .map-editor-tools-window {
-    top: 8px;
+    top: 70px;
     bottom: auto;
   }
 }

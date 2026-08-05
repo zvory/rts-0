@@ -1,12 +1,14 @@
 .map-editor-panel {
-  --map-editor-panel-width: min(390px, calc((100vw - 48px) / 3));
+  --map-editor-panel-width: min(390px, calc((100vw - 128px) / 2));
   width: var(--map-editor-panel-width);
   min-width: min(240px, var(--map-editor-panel-width));
 }
 
 .map-editor-layers-window {
+  top: auto;
+  bottom: 12px;
   right: auto;
-  left: calc((100vw - 48px) / 3 + 24px);
+  left: 96px;
   max-height: min(240px, calc(100vh - 70px));
   padding: 8px 8px 10px;
 }
@@ -91,21 +93,16 @@
   padding-right: 0;
 }
 
-@media (min-width: 1218px) {
-  .map-editor-layers-window {
-    left: calc(50% - 195px);
-  }
-}
-
 @media (max-width: 720px) {
   .map-editor-layers-window {
-    top: calc(33.333vh + 4px);
+    z-index: 34;
+    top: 70px;
     bottom: auto;
-    max-height: calc(33.333vh - 12px);
+    max-height: calc(100vh - 142px);
   }
 
   .map-editor-options-window,
   .map-editor-tools-window {
-    max-height: calc(33.333vh - 12px);
+    max-height: calc(100vh - 142px);
   }
 }
