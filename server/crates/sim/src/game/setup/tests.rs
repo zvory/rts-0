@@ -121,7 +121,7 @@ fn unknown_faction_start_and_commands_fail_closed() {
     let engineering_complex = game
         .state
         .entities
-        .spawn_building(1, EntityKind::EngineeringComplex, x + 192.0, y, true)
+        .spawn_building(1, EntityKind::EngineeringComplex, x + 448.0, y, true)
         .unwrap();
     let artillery = game
         .state
@@ -489,7 +489,7 @@ fn authored_base_resource_counts_control_spawned_patch_totals() {
 }
 
 #[test]
-fn base_steel_patches_split_across_both_sides_of_resource_depot() {
+fn base_resources_flank_the_centreline_and_put_oil_outward() {
     let players = [
         (1, super::teams::normalize_team_id(1, 1)),
         (2, super::teams::normalize_team_id(2, 2)),
@@ -504,26 +504,41 @@ fn base_steel_patches_split_across_both_sides_of_resource_depot() {
     assert!(len > f32::EPSILON);
     let dir_x = dir_x / len;
     let dir_y = dir_y / len;
+    let lateral_x = -dir_y;
+    let lateral_y = dir_x;
 
     let mut entities = EntityStore::new();
     spawn_base_resources(&mut entities, &map, start);
 
-    let mut toward_center = 0;
-    let mut away_from_center = 0;
+    let mut left_of_centreline = 0;
+    let mut right_of_centreline = 0;
     for steel in entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::Steel)
     {
-        let projection = (steel.pos_x - hx) * dir_x + (steel.pos_y - hy) * dir_y;
+        let projection = (steel.pos_x - hx) * lateral_x + (steel.pos_y - hy) * lateral_y;
         if projection > config::TILE_SIZE as f32 {
-            toward_center += 1;
+            right_of_centreline += 1;
         } else if projection < -(config::TILE_SIZE as f32) {
-            away_from_center += 1;
+            left_of_centreline += 1;
         }
     }
 
-    assert_eq!(toward_center, config::STEEL_PATCHES_PER_BASE.div_ceil(2));
-    assert_eq!(away_from_center, config::STEEL_PATCHES_PER_BASE / 2);
+    assert_eq!(
+        right_of_centreline,
+        config::STEEL_PATCHES_PER_BASE.div_ceil(2)
+    );
+    assert_eq!(left_of_centreline, config::STEEL_PATCHES_PER_BASE / 2);
+    for oil in entities
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::Oil)
+    {
+        let inward_projection = (oil.pos_x - hx) * dir_x + (oil.pos_y - hy) * dir_y;
+        assert!(
+            inward_projection < -(config::TILE_SIZE as f32),
+            "oil patch must be behind the base, away from map centre"
+        );
+    }
 }
 
 #[test]

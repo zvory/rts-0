@@ -516,8 +516,10 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     let dy = map.world_height_px() * 0.5 - hy;
     let base_angle = dy.atan2(dx);
 
-    let perp_x = -base_angle.sin();
-    let perp_y = base_angle.cos();
+    let inward_x = base_angle.cos();
+    let inward_y = base_angle.sin();
+    let lateral_x = -inward_y;
+    let lateral_y = inward_x;
 
     let counts = map.resource_counts_at(tile);
     let patches = counts.steel_patches;
@@ -528,8 +530,8 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
             continue;
         }
         let block_dist = side * config::STEEL_BLOCK_DIST_TILES * ts;
-        let block_cx = hx + block_dist * base_angle.cos();
-        let block_cy = hy + block_dist * base_angle.sin();
+        let block_cx = hx + block_dist * lateral_x;
+        let block_cy = hy + block_dist * lateral_y;
         let rows = field_patches.div_ceil(STEEL_FIELD_COLUMNS);
         let row_center = (rows - 1) as f32 / 2.0;
         let row_spacing = if rows > 1 { ts / (rows - 1) as f32 } else { ts };
@@ -539,8 +541,8 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
             let row = (i / STEEL_FIELD_COLUMNS) as f32;
             let off_x = (col - col_center) * ts;
             let off_y = (row - row_center) * row_spacing;
-            let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
-            let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
+            let px = block_cx + off_x * inward_x + off_y * lateral_x;
+            let py = block_cy + off_x * inward_y + off_y * lateral_y;
             let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
             debug_assert!(
                 (config::START_RESOURCE_MIN_DIST_TILES..=config::START_RESOURCE_MAX_DIST_TILES)
@@ -556,9 +558,8 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         }
     }
 
-    let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
-    let oil_step_x = tile_step(oil_angle.cos());
-    let oil_step_y = tile_step(oil_angle.sin());
+    let outward_x = -inward_x;
+    let outward_y = -inward_y;
     let mut oil_tiles = resource_placement::occupied_resource_tiles(map, entities, EntityKind::Oil);
     let blocked_pump_jack_tiles = resource_placement::resource_blocked_building_tiles(
         map,
@@ -567,8 +568,9 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         Some(EntityKind::Oil),
     );
     for i in 0..counts.oil_patches {
-        let (tile_dx, tile_dy) = oil_patch_tile_offset(i, oil_step_x, oil_step_y);
-        let (desired_x, desired_y) = offset_tile_center(map, tx, ty, tile_dx, tile_dy);
+        let (outward_tiles, lateral_tiles) = oil_patch_local_offset(i, counts.oil_patches);
+        let desired_x = hx + (outward_tiles * outward_x + lateral_tiles * lateral_x) * ts;
+        let desired_y = hy + (outward_tiles * outward_y + lateral_tiles * lateral_y) * ts;
         let (px, py, tile) = resource_placement::nearest_oil_patch_tile_center(
             map,
             desired_x,
@@ -594,38 +596,23 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     spawned
 }
 
-fn tile_step(value: f32) -> i32 {
-    if value < 0.0 {
-        -1
-    } else {
-        1
+fn oil_patch_local_offset(index: u32, count: u32) -> (f32, f32) {
+    // Keep the cluster centred on the outward ray. Odd-sized clusters use one centre patch;
+    // the remaining patches are added as matching lateral pairs.
+    const PAIRS: [(f32, f32); 4] = [(6.0, 2.0), (5.0, 4.0), (3.0, 4.0), (3.0, 2.0)];
+    let has_centre = count % 2 == 1;
+    if has_centre && index == 0 {
+        return (6.0, 0.0);
     }
-}
 
-fn oil_patch_tile_offset(index: u32, step_x: i32, step_y: i32) -> (i32, i32) {
-    // Integer offsets keep mirrored starts at identical base-resource distances after tile snapping. The
-    // nine authored slots maintain at least one free tile between desired Pump Jack centres.
-    const OFFSETS: [(i32, i32); 9] = [
-        (4, 4),
-        (4, 2),
-        (6, 3),
-        (2, 4),
-        (3, 6),
-        (6, 5),
-        (1, 6),
-        (6, 1),
-        (0, 4),
-    ];
-    let (x, y) = OFFSETS[index.min((OFFSETS.len() - 1) as u32) as usize];
-    (x * step_x, y * step_y)
-}
-
-fn offset_tile_center(map: &Map, tx: u32, ty: u32, dx: i32, dy: i32) -> (f32, f32) {
-    let max_x = map.width.saturating_sub(1) as i32;
-    let max_y = map.height.saturating_sub(1) as i32;
-    let desired_tx = (tx as i32 + dx).clamp(0, max_x) as u32;
-    let desired_ty = (ty as i32 + dy).clamp(0, max_y) as u32;
-    map.tile_center(desired_tx, desired_ty)
+    let paired_index = index.saturating_sub(u32::from(has_centre));
+    let pair = PAIRS[(paired_index / 2).min((PAIRS.len() - 1) as u32) as usize];
+    let lateral = if paired_index % 2 == 0 {
+        -pair.1
+    } else {
+        pair.1
+    };
+    (pair.0, lateral)
 }
 
 /// Spawn a Resource Depot, starting workers, and resource clusters for one player.
