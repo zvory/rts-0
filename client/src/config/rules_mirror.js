@@ -123,7 +123,7 @@ export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 // `cost`/`supply` drive the command card.
 export const STATS = Object.freeze({
   [KIND.WORKER]: { label: "Engineer", icon: "EN", size: 9, sight: 10,
-    rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 495 },
+    rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 150 },
   [KIND.GOLEM]: { label: "Golem", icon: "GLM", size: 9, sight: 10,
     rangeTiles: 1, cost: { steel: 0, oil: 0 }, supply: 4, buildTicks: 396 },
   [KIND.RIFLEMAN]: { label: "Rifleman", icon: "RF", size: 9, sight: 11,
