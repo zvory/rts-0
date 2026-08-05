@@ -1318,6 +1318,33 @@ await withFakeDocument(async () => {
 
 await withFakeDocument(async () => {
   const el = document.createElement("aside");
+  const chrome = new LabPanelWindowChrome(el, {
+    windowObj: {
+      innerWidth: 1920,
+      innerHeight: 1080,
+      addEventListener() {},
+      removeEventListener() {},
+    },
+    minWidth: 220,
+    minHeight: 120,
+    topInset: 70,
+    panelLabel: "protected layers",
+  });
+  const constrained = chrome.constrainGeometry({ left: 740, top: 12, width: 390, height: 188 });
+  assert(
+    constrained.top === 70 && constrained.height === 188,
+    "LabPanelWindowChrome keeps an optional protected top inset clear without changing panel size",
+  );
+  const tall = chrome.constrainGeometry({ left: 12, top: 12, width: 320, height: 2000 });
+  assert(
+    tall.top === 70 && tall.height === 998 && tall.top + tall.height === 1068,
+    "LabPanelWindowChrome fits tall panels between the protected top inset and viewport margin",
+  );
+  chrome.destroy();
+});
+
+await withFakeDocument(async () => {
+  const el = document.createElement("aside");
   const storage = fakeStorage({
     "test.lab.panel.mobile": JSON.stringify({
       schemaVersion: 1,
