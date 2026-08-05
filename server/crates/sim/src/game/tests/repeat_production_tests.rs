@@ -241,30 +241,53 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     game.state.players[0].set_resources(0, 0);
 
     game.tick();
-    let progress = |kind| {
+    let progress = |game: &Game, kind| {
         game.state
             .entities
             .iter()
             .find(|entity| entity.kind == kind && entity.under_construction())
             .and_then(|entity| entity.build_progress_fraction())
     };
-    let expected_first_tick = 1.0 / (config::TICK_HZ * 24) as f32;
-    assert_eq!(progress(EntityKind::SteelMine), Some(expected_first_tick));
-    assert_eq!(progress(EntityKind::PumpJack), Some(expected_first_tick));
+    let build_ticks = |kind| {
+        config::building_stats(kind)
+            .expect("automatic extractor stats")
+            .build_ticks
+    };
+    let steel_ticks = build_ticks(EntityKind::SteelMine);
+    let pump_ticks = build_ticks(EntityKind::PumpJack);
+    assert_eq!(
+        progress(&game, EntityKind::SteelMine),
+        Some(1.0 / steel_ticks as f32)
+    );
+    assert_eq!(
+        progress(&game, EntityKind::PumpJack),
+        Some(1.0 / pump_ticks as f32)
+    );
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
         (0, 0)
     );
-    for _ in 1..config::TICK_HZ * 24 {
+    for _ in 1..steel_ticks {
         game.tick();
     }
-    for kind in [EntityKind::SteelMine, EntityKind::PumpJack] {
-        assert!(game
-            .state
-            .entities
-            .iter()
-            .any(|entity| entity.kind == kind && !entity.under_construction()));
+    assert!(game
+        .state
+        .entities
+        .iter()
+        .any(|entity| entity.kind == EntityKind::SteelMine && !entity.under_construction()));
+    assert_eq!(
+        progress(&game, EntityKind::PumpJack),
+        Some(steel_ticks as f32 / pump_ticks as f32)
+    );
+
+    for _ in steel_ticks..pump_ticks {
+        game.tick();
     }
+    assert!(game
+        .state
+        .entities
+        .iter()
+        .any(|entity| entity.kind == EntityKind::PumpJack && !entity.under_construction()));
 }
 
 #[test]
