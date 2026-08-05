@@ -150,46 +150,17 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         .as_deref()
         .ok_or_else(|| "map forestSpans must be an array".to_string())?;
     let forest_tiles = parse_forest_spans(width, height, forest_spans)?;
-    let concealment_tiles = merge_overlay_locations(
-        parse_overlay_locations(
-            width,
-            height,
-            &authored.concealment_tiles,
-            "concealmentTiles",
-        )?,
-        &forest_tiles,
-    );
-    let no_vehicle_tiles = merge_overlay_locations(
-        parse_overlay_locations(width, height, &authored.no_vehicle_tiles, "noVehicleTiles")?,
-        &forest_tiles,
-    );
-    let no_building_tiles = merge_overlay_locations(
-        parse_overlay_locations(
-            width,
-            height,
-            &authored.no_building_tiles,
-            "noBuildingTiles",
-        )?,
-        &forest_tiles,
-    );
-    let damage_reduction_tiles = merge_overlay_locations(
-        parse_overlay_locations(
-            width,
-            height,
-            &authored.damage_reduction_tiles,
-            "damageReductionTiles",
-        )?,
-        &forest_tiles,
-    );
-    let slow_movement_tiles = merge_overlay_locations(
-        parse_overlay_locations(
-            width,
-            height,
-            &authored.slow_movement_tiles,
-            "slowMovementTiles",
-        )?,
-        &forest_tiles,
-    );
+    let materialize_overlay = |locations: &[AuthoredLocation], field| {
+        parse_overlay_locations(width, height, locations, field)
+            .map(|locations| merge_overlay_locations(locations, &forest_tiles))
+    };
+    let concealment_tiles = materialize_overlay(&authored.concealment_tiles, "concealmentTiles")?;
+    let no_vehicle_tiles = materialize_overlay(&authored.no_vehicle_tiles, "noVehicleTiles")?;
+    let no_building_tiles = materialize_overlay(&authored.no_building_tiles, "noBuildingTiles")?;
+    let damage_reduction_tiles =
+        materialize_overlay(&authored.damage_reduction_tiles, "damageReductionTiles")?;
+    let slow_movement_tiles =
+        materialize_overlay(&authored.slow_movement_tiles, "slowMovementTiles")?;
     Ok(AuthoredMapData {
         name: authored.name,
         width,
