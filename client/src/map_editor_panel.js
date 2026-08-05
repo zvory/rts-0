@@ -177,6 +177,7 @@ export class MapEditorPanel {
       this.viewport.setSymmetry(this.symmetry);
       if (this.viewport.tool) this.viewport.armTool({ ...this.viewport.tool, symmetry: this.symmetry });
     }
+    MapEditorPanel.prototype.reconcileOperationAvailability.call(this);
     this.render();
   }
 
@@ -270,6 +271,13 @@ export class MapEditorPanel {
     return activeMapEditorOperation(this);
   }
 
+  reconcileOperationAvailability() {
+    const active = MapEditorPanel.prototype.activeOperation.call(this);
+    if (!active || MapEditorPanel.prototype.availableOperations.call(this).has(active)) return true;
+    this.viewport.armTool(null);
+    return false;
+  }
+
   operationHelp(operation) {
     return mapEditorOperationHelp(operation, this.activeCategory);
   }
@@ -292,6 +300,7 @@ export class MapEditorPanel {
     if (this.activeCategory === "objects") {
       this.lastOperation.objects = operation;
       this.armDoodad(operation);
+      this.setStatus(this.operationHelp(operation));
       return true;
     }
     if (this.activeCategory === "zones") {
@@ -315,12 +324,15 @@ export class MapEditorPanel {
       return true;
     }
     this.lastOperation.terrain = operation;
-    if (this.terrainContent === "road" && operation === "path") this.armRoad();
-    else if (this.terrainContent === "forest") this.armForest(operation === "erase" ? "erase" : "paint");
-    else {
+    if (this.terrainContent === "road" && operation === "path") {
+      this.armRoad();
+      this.setStatus(this.operationHelp(operation));
+    } else if (this.terrainContent === "forest") {
+      this.armForest(operation === "erase" ? "erase" : "paint");
+    } else {
       this.paintShape = operation === "box" ? "box" : "brush";
       this.armTerrain(operation === "erase" ? TERRAIN.GRASS : this.selectedTerrain);
-      this.render();
+      this.setStatus(this.operationHelp(operation));
     }
     return true;
   }
@@ -579,7 +591,6 @@ export class MapEditorPanel {
         this.selectedTerrain = code;
         if (!["brush", "box", "erase"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
         this.selectOperation(this.lastOperation.terrain);
-        this.setStatus(`${this.paintShape === "box" ? "Drag to fill a box with" : "Painting"} ${terrainName(code)}.`);
       }, { active: this.terrainContent === "material" && this.selectedTerrain === code });
       control.dataset.terrain = terrainName(code);
       control.classList.add("map-editor-terrain-button");
@@ -834,10 +845,8 @@ export class MapEditorPanel {
         } else this.selectedDoodadType = entry.typeId;
         if (!isTreeDoodadType(this.selectedDoodadType) && !isWildflowerDoodadType(this.selectedDoodadType)
           && this.lastOperation.objects === "spray") this.lastOperation.objects = "place";
-        this.armDoodad(this.lastOperation.objects);
-        this.setStatus(multiple
-          ? `Tree mix: ${this.selectedTreeTypes.size} species selected.`
-          : `Placing ${entry.label.toLowerCase()}.`);
+        this.selectOperation(this.lastOperation.objects);
+        if (multiple) this.setStatus(`Tree mix: ${this.selectedTreeTypes.size} species selected.`);
       }, {
         active: multiple
           ? this.selectedTreeTypes.has(entry.typeId)

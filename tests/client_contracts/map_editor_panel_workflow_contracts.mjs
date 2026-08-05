@@ -5,7 +5,10 @@ import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { mapEditorContentLabel } from "../../client/src/map_editor_panel_workflow.js";
 import { MAP_EDITOR_DOODAD_TYPES } from "../../client/src/map_editor_doodads.js";
 import { TERRAIN } from "../../client/src/protocol.js";
-import { MAP_EDITOR_MAX_BASE_SITES } from "../../client/src/map_editor_session.js";
+import {
+  MAP_EDITOR_MAX_BASE_SITES,
+  MAP_EDITOR_MAX_START_LOCATIONS,
+} from "../../client/src/map_editor_session.js";
 
 const shellStyles = fs.readFileSync(new URL("../../client/map_editor_shell.css", import.meta.url), "utf8");
 const panelSource = fs.readFileSync(new URL("../../client/src/map_editor_panel.js", import.meta.url), "utf8");
@@ -57,6 +60,7 @@ assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/
 
 {
   const calls = [];
+  const statuses = [];
   const panel = {
     activeCategory: "terrain",
     terrainContent: "material",
@@ -64,14 +68,33 @@ assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/
     paintShape: "box",
     lastOperation: { terrain: "box" },
     availableOperations: MapEditorPanel.prototype.availableOperations,
+    operationHelp: MapEditorPanel.prototype.operationHelp,
     armTerrain(terrain) { calls.push({ terrain, shape: this.paintShape }); },
-    render() {},
+    setStatus(message) { statuses.push(message); },
   };
   assert.equal(MapEditorPanel.prototype.selectOperation.call(panel, "erase"), true);
   assert.deepEqual(calls, [{ terrain: TERRAIN.GRASS, shape: "brush" }],
     "terrain erase uses the grass material while preserving the separately selected water content");
   assert.equal(panel.selectedTerrain, TERRAIN.WATER);
   assert.equal(panel.lastOperation.terrain, "erase");
+  assert.deepEqual(statuses, ["Remove editable content under the eraser."],
+    "the persistent status dock describes the newly armed terrain operation");
+}
+
+{
+  const statuses = [];
+  const panel = {
+    activeCategory: "objects",
+    selectedDoodadType: MAP_EDITOR_DOODAD_TYPES.TREE_OAK,
+    lastOperation: { objects: "place" },
+    availableOperations: MapEditorPanel.prototype.availableOperations,
+    operationHelp: MapEditorPanel.prototype.operationHelp,
+    armDoodad() {},
+    setStatus(message) { statuses.push(message); },
+  };
+  assert.equal(MapEditorPanel.prototype.selectOperation.call(panel, "erase"), true);
+  assert.deepEqual(statuses, ["Remove editable content under the eraser."],
+    "switching the object rail to Erase cannot leave a stale Placing instruction");
 }
 
 {
@@ -136,6 +159,26 @@ assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/
   panel.locationContent = "start";
   assert(MapEditorPanel.prototype.availableOperations.call(panel).has("add"),
     "start Add remains available at the base-site cap so an existing neutral base can be promoted");
+}
+
+{
+  const fullStarts = Array.from({ length: MAP_EDITOR_MAX_START_LOCATIONS }, (_, index) => ({ x: index, y: 0 }));
+  const panel = {
+    activeCategory: "locations",
+    locationContent: "start",
+    viewport: {
+      tool: { kind: "start", add: true },
+      armTool(tool) { this.tool = tool; },
+    },
+    session: {
+      draft: { startLocations: fullStarts, baseSites: fullStarts },
+      mapOverlay() { return { bases: [] }; },
+    },
+  };
+  assert.equal(MapEditorPanel.prototype.reconcileOperationAvailability.call(panel), false,
+    "a persistent location Add tool is disarmed when a session update consumes the last slot");
+  assert.equal(panel.viewport.tool, null,
+    "the viewport cannot keep applying an operation that the rail has disabled");
 }
 
 {
