@@ -7,27 +7,16 @@ use super::types::AiSlot;
 
 const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
     ["itest-", "ai-itest-", "client-smoke-", "reg-"];
-pub(super) const MATCH_COUNTDOWN_WORDS: [&str; 3] = ["Drei!", "Zwei!", "Eins!"];
+pub(in crate::lobby) const MATCH_COUNTDOWN_WORDS: [&str; 3] = ["Drei!", "Zwei!", "Eins!"];
 #[cfg(test)]
 pub(super) const LAB_PLAYER_ONE_ID: u32 = 1;
 #[cfg(test)]
 pub(super) const LAB_PLAYER_TWO_ID: u32 = 2;
-pub(super) const LIVE_PAUSE_LIMIT: u8 = 3;
+pub(in crate::lobby) const LIVE_PAUSE_LIMIT: u8 = 3;
 pub(super) const DRAINING_NEW_MATCHES_DISABLED_MSG: &str =
     "Server is draining for deploy; new matches are disabled.";
 
-pub(super) fn match_countdown_duration() -> Duration {
-    #[cfg(test)]
-    {
-        Duration::from_millis(1)
-    }
-    #[cfg(not(test))]
-    {
-        Duration::from_secs(3)
-    }
-}
-
-pub(super) fn live_resume_countdown_duration() -> Duration {
+pub(in crate::lobby) fn match_countdown_duration() -> Duration {
     #[cfg(test)]
     {
         Duration::from_millis(1)

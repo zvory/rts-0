@@ -438,9 +438,12 @@ fn live_pause_authorizes_players_and_spectators_and_tracks_limit() {
     while writer_spectator.reliable_rx.try_recv().is_ok() {}
 
     task.on_pause_game(99);
-    assert!(task.live_paused, "spectators can pause live matches");
-    assert_eq!(task.live_paused_by, Some(99));
-    assert_eq!(task.live_pause_counts.get(&99), Some(&1));
+    assert!(
+        task.live_pause.is_paused(),
+        "spectators can pause live matches"
+    );
+    assert_eq!(task.live_pause.paused_by(), Some(99));
+    assert_eq!(task.live_pause.used(99), Some(&1));
     let spectator_pause_state = std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok())
         .find_map(|msg| match msg {
             ServerMessage::LivePauseState(state) => Some(state),
@@ -451,7 +454,10 @@ fn live_pause_authorizes_players_and_spectators_and_tracks_limit() {
     assert!(!spectator_pause_state.can_pause);
     assert!(spectator_pause_state.can_unpause);
     task.on_unpause_game(99);
-    assert!(task.live_paused, "resume countdown keeps the match paused");
+    assert!(
+        task.live_pause.is_paused(),
+        "resume countdown keeps the match paused"
+    );
     let resume_state = std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok())
         .filter_map(|msg| match msg {
             ServerMessage::LivePauseState(state) => Some(state),
@@ -465,17 +471,20 @@ fn live_pause_authorizes_players_and_spectators_and_tracks_limit() {
     assert_eq!(countdown.words, ["Drei!", "Zwei!", "Eins!"]);
     assert!(countdown.remaining_ms <= countdown.duration_ms);
     assert!(!resume_state.can_unpause);
-    task.live_resume_countdown_deadline = Some(TokioInstant::now());
+    task.live_pause.force_resume_due();
     task.on_tick(TokioInstant::now());
-    assert!(!task.live_paused, "spectators can resume live matches");
+    assert!(
+        !task.live_pause.is_paused(),
+        "spectators can resume live matches"
+    );
     while writer_a.reliable_rx.try_recv().is_ok() {}
     while writer_b.reliable_rx.try_recv().is_ok() {}
     while writer_spectator.reliable_rx.try_recv().is_ok() {}
 
     task.on_pause_game(1);
-    assert!(task.live_paused);
-    assert_eq!(task.live_paused_by, Some(1));
-    assert_eq!(task.live_pause_counts.get(&1), Some(&1));
+    assert!(task.live_pause.is_paused());
+    assert_eq!(task.live_pause.paused_by(), Some(1));
+    assert_eq!(task.live_pause.used(1), Some(&1));
     let active_state = std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok())
         .find_map(|msg| match msg {
             ServerMessage::LivePauseState(state) => Some(state),
@@ -496,35 +505,35 @@ fn live_pause_authorizes_players_and_spectators_and_tracks_limit() {
 
     task.on_pause_game(1);
     assert_eq!(
-        task.live_pause_counts.get(&1),
+        task.live_pause.used(1),
         Some(&1),
         "repeated pause while paused must not spend another charge"
     );
 
     for expected_used in 1..=3 {
-        if !task.live_paused {
+        if !task.live_pause.is_paused() {
             task.on_pause_game(1);
         }
-        assert_eq!(task.live_pause_counts.get(&1), Some(&expected_used));
+        assert_eq!(task.live_pause.used(1), Some(&expected_used));
         task.on_unpause_game(2);
         assert!(
-            task.live_paused,
+            task.live_pause.is_paused(),
             "any active player can start the resume countdown"
         );
-        task.live_resume_countdown_deadline = Some(TokioInstant::now());
+        task.live_pause.force_resume_due();
         task.on_tick(TokioInstant::now());
         assert!(
-            !task.live_paused,
+            !task.live_pause.is_paused(),
             "the countdown deadline resumes the match"
         );
     }
 
     task.on_pause_game(1);
     assert!(
-        !task.live_paused,
+        !task.live_pause.is_paused(),
         "fourth successful pause by one player is denied"
     );
-    assert_eq!(task.live_pause_counts.get(&1), Some(&3));
+    assert_eq!(task.live_pause.used(1), Some(&3));
     let denied_state = std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok())
         .filter_map(|msg| match msg {
             ServerMessage::LivePauseState(state) => Some(state),
@@ -576,7 +585,7 @@ fn live_pause_skips_live_tick_work_until_unpaused() {
 
     task.on_unpause_game(2);
     assert!(
-        task.live_paused,
+        task.live_pause.is_paused(),
         "simulation remains paused during resume countdown"
     );
     task.on_tick(TokioInstant::now());
@@ -584,7 +593,7 @@ fn live_pause_skips_live_tick_work_until_unpaused() {
         panic!("normal live match should remain active");
     };
     assert_eq!(game.tick_count(), 0, "countdown must not advance sim");
-    task.live_resume_countdown_deadline = Some(TokioInstant::now());
+    task.live_pause.force_resume_due();
     task.on_tick(TokioInstant::now());
     let Phase::InGame(game) = &task.phase else {
         panic!("normal live match should remain active");
@@ -983,7 +992,7 @@ fn paused_live_vision_selection_sends_current_snapshot_immediately() {
     task.start_match();
     task.on_tick(TokioInstant::now());
     let _ = writer_spectator.snapshots.take();
-    task.live_paused = true;
+    task.live_pause.force_paused();
 
     task.on_set_vision_selection(99, VisionSelectionRequest::Player { player_id: 1 });
 
@@ -1163,7 +1172,7 @@ fn late_spectator_notice_queues_while_live_paused() {
     let _ = writer_active_one.snapshots.take();
     let _ = writer_active_two.snapshots.take();
     task.on_pause_game(1);
-    assert!(task.live_paused);
+    assert!(task.live_pause.is_paused());
 
     let (msg_tx, mut writer_new_spectator) = ConnectionSink::new();
     let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
@@ -1182,7 +1191,7 @@ fn late_spectator_notice_queues_while_live_paused() {
     );
 
     task.on_unpause_game(2);
-    task.live_resume_countdown_deadline = Some(TokioInstant::now());
+    task.live_pause.force_resume_due();
     task.on_tick(TokioInstant::now());
     let expected = "Paused Scout has joined the match as a spectator";
     assert_single_late_spectator_notice(&mut writer_active_one, expected);
