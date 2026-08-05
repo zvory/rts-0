@@ -1,7 +1,7 @@
 {
   "version": 8,
   "name": "Crossroads",
-  "description": "",
+  "description": "A two-player battlefield with intersecting roads, waterways, and ten resource sites.",
   "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
   "width": 126,
   "height": 126,
