@@ -87,7 +87,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       STATS[KIND.RESOURCE_DEPOT].buildTicks === 750,
     "Resource Depot cost and build time mirror server",
   );
-  assert(STATS[KIND.WORKER].buildTicks === 495, "Worker build time mirrors server");
+  assert(STATS[KIND.WORKER].buildTicks === 150, "Worker build time mirrors server");
   assert(
     Array.isArray(STATS[KIND.FACTORY].requires),
     "Vehicle Works should expose all server-side build prerequisites",
