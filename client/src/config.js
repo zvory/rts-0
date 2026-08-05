@@ -21,7 +21,12 @@ export {
 
 export { PLAYER_PALETTE } from "./config/player_palette_mirror.js";
 
-export { DOODAD_TYPE, DOODAD_TYPE_IDS } from "./config/doodads.js";
+export {
+  DOODAD_TYPE,
+  DOODAD_TYPE_IDS,
+  TREE_DOODAD_GEOMETRY,
+  doodadSizeVariation,
+} from "./config/doodads.js";
 
 export {
   ABILITIES,

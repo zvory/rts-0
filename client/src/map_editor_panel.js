@@ -66,6 +66,8 @@ export class MapEditorPanel {
     this.paintShape = "brush";
     this.selectedOverlayEffects = new Set(["concealment"]);
     this.overlayMode = "paint";
+    this.forestMode = "paint";
+    this.forestBrushWidth = 9;
     this.roadWidth = 5;
     this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.TREE_OAK;
     this.selectedTreeTypes = new Set([MAP_EDITOR_DOODAD_TYPES.TREE_OAK]);
@@ -201,6 +203,7 @@ export class MapEditorPanel {
       body.append(
         this.renderZoom(),
         this.renderTerrain(),
+        this.renderForest(),
         this.renderMapOverlays(),
         this.renderDoodads(),
         this.renderLocations(),
@@ -491,6 +494,31 @@ export class MapEditorPanel {
     return section;
   }
 
+  renderForest() {
+    const section = group("Forest");
+    const actions = document.createElement("div");
+    actions.className = "map-editor-palette";
+    actions.append(
+      button("Paint Forest", () => this.armForest("paint"), {
+        active: this.viewport.tool?.kind === "forest" && this.forestMode === "paint",
+      }),
+      button("Erase Forest", () => this.armForest("erase"), {
+        active: this.viewport.tool?.kind === "forest" && this.forestMode === "erase",
+      }),
+    );
+    const width = numericInput(this.forestBrushWidth, 1, 31, (value) => {
+      this.forestBrushWidth = value;
+      if (this.viewport.tool?.kind === "forest") this.armForest(this.forestMode);
+    }, "Forest brush width in tiles");
+    const tileCount = this.session.forestTiles().length;
+    section.append(
+      actions,
+      field("Brush width (tiles)", width),
+      readout(`${tileCount} forest tile${tileCount === 1 ? "" : "s"}. Painting a forest adds its trees and all four gameplay effects together.`),
+    );
+    return section;
+  }
+
   renderLocations() {
     const section = group("Start and base locations");
     const starts = this.session.draft.startLocations;
@@ -740,6 +768,17 @@ export class MapEditorPanel {
     const names = [...this.selectedOverlayEffects].map((key) => overlayEffectName(key)).join(", ");
     this.armOverlay(edit, `${this.overlayMode === "paint" ? "painted" : "erased"} ${names}`);
     this.setStatus(`${this.paintShape === "box" ? "Drag to fill a box" : "Paint"} to ${this.overlayMode} ${names}.`);
+  }
+
+  armForest(mode) {
+    this.forestMode = mode === "erase" ? "erase" : "paint";
+    this.viewport.armTool({
+      kind: "forest",
+      paint: this.forestMode === "paint",
+      width: this.forestBrushWidth,
+      symmetry: this.symmetry,
+    });
+    this.setStatus(`${this.forestMode === "paint" ? "Paint" : "Erase"} forest with the ${this.forestBrushWidth}-tile brush.`);
   }
 
   armOverlay(edit, label) {

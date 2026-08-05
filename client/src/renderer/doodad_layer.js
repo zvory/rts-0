@@ -7,6 +7,7 @@ import {
 } from "./doodad_manifest.js";
 import { gfxEllipse, gfxFill } from "./native_graphics.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
+import { doodadSizeVariation } from "../config.js";
 
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const MIN_CULL_MARGIN_CSS_PX = 140;
@@ -175,8 +176,8 @@ export class DoodadLayer {
     if (!manifest || !texture) return;
     const display = new this.pixi.Sprite(texture);
     display.anchor?.set?.(0.5, manifest.anchorY);
-    display.width = manifest.widthPx * sizeVariation(record.id);
-    display.height = manifest.heightPx * sizeVariation(record.id);
+    display.width = manifest.widthPx * doodadSizeVariation(record.id);
+    display.height = manifest.heightPx * doodadSizeVariation(record.id);
     display.tint = manifest.tintable && record.color ? colorNumber(record.color) : 0xffffff;
     const parent = manifest.layer === "canopy" ? this.canopyLayer : this.understoryLayer;
     parent.addChild(display);
@@ -284,7 +285,7 @@ function positionInstance(instance) {
 }
 
 function canopyBounds(instance) {
-  const variation = sizeVariation(instance.record.id);
+  const variation = doodadSizeVariation(instance.record.id);
   const width = instance.manifest.widthPx * variation;
   const height = instance.manifest.heightPx * variation;
   return {
@@ -305,10 +306,6 @@ function bucketKey(x, y) {
 
 function colorNumber(color) {
   return Number.parseInt(color.slice(1), 16);
-}
-
-function sizeVariation(id) {
-  return 0.92 + stableNoise(id, 31) * 0.16;
 }
 
 function stableNoise(id, salt) {

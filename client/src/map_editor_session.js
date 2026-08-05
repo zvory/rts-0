@@ -9,6 +9,15 @@ import {
 import { applyMapOperation, transformRoadCharacter } from "./map_authoring/operations.js";
 import { rectTiles } from "./map_authoring/geometry.js";
 import {
+  editForestSpans,
+  FOREST_DOODAD_ID_BASE,
+  forestSpansFromTiles,
+  forestTilesFromSpans,
+  generatedForestDoodads,
+  isGeneratedForestDoodad,
+  normalizeForestSpans,
+} from "./map_authoring/forests.js";
+import {
   AUTHORED_MAP_MAX_BASE_SITES,
   AUTHORED_MAP_MAX_DIMENSION_TILES,
   AUTHORED_MAP_MAX_OIL_PATCHES,
@@ -41,6 +50,7 @@ export const MAP_EDITOR_MAX_SIZE = AUTHORED_MAP_MAX_DIMENSION_TILES;
 export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
 export const MAP_EDITOR_SYMMETRY = MAP_AUTHORING_SYMMETRY;
+export const MAP_EDITOR_MAP_VERSION = 7;
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -379,6 +389,25 @@ export class MapEditorSession {
     return overlayPatch;
   }
 
+  paintForestTiles(tiles, paint = true) {
+    if (!this.draft || !this.overlayStroke || !Array.isArray(tiles)) return [];
+    const result = editForestSpans(this.draft.forestSpans, tiles, paint, this.draft);
+    if (!result.changed.length) return [];
+    this.draft.forestSpans = result.spans;
+    if (!paint) {
+      const erasedIds = new Set(result.changed.map((tile) => (
+        FOREST_DOODAD_ID_BASE + tile.y * this.draft.width + tile.x + 1
+      )));
+      this.draft.doodads = this.draft.doodads.filter((doodad) => !erasedIds.has(doodad.id));
+    }
+    for (const tile of result.changed) this.overlayStroke.dirty.set(locationKey(tile), tile);
+    return result.changed;
+  }
+
+  forestTiles() {
+    return this.draft ? forestTilesFromSpans(this.draft.forestSpans, this.draft) : [];
+  }
+
   commitOverlayStroke() {
     const stroke = this.overlayStroke;
     this.overlayStroke = null;
@@ -487,6 +516,7 @@ export class MapEditorSession {
     if (!this.draft) throw new Error("Map is not initialized.");
     const draft = clone(this.draft);
     normalizeDraft(draft);
+    const forestTiles = forestTilesFromSpans(draft.forestSpans, draft);
     return {
       name: draft.name,
       width: draft.width,
@@ -495,10 +525,10 @@ export class MapEditorSession {
       starts: draft.startLocations.map(copyLocation),
       baseSites: draft.baseSites.map(copyBaseSite),
       doodads: draft.doodads.map(copyDoodad),
-      concealmentTiles: draft.concealmentTiles.map(copyLocation),
-      noVehicleTiles: draft.noVehicleTiles.map(copyLocation),
-      damageReductionTiles: draft.damageReductionTiles.map(copyLocation),
-      slowMovementTiles: draft.slowMovementTiles.map(copyLocation),
+      concealmentTiles: mergedOverlayTiles(draft.concealmentTiles, forestTiles),
+      noVehicleTiles: mergedOverlayTiles(draft.noVehicleTiles, forestTiles),
+      damageReductionTiles: mergedOverlayTiles(draft.damageReductionTiles, forestTiles),
+      slowMovementTiles: mergedOverlayTiles(draft.slowMovementTiles, forestTiles),
     };
   }
 
@@ -707,7 +737,7 @@ export function authoredMapFromMaterialized({
   const bases = normalizeBaseSiteRecords(baseSites, dimensions);
   for (const start of startLocations) if (!bases.some((site) => sameLocation(site, start))) bases.push(newBaseSite(start));
   const draft = {
-    version: 7,
+    version: MAP_EDITOR_MAP_VERSION,
     name: String(name || "Map").trim() || "Map",
     description: String(description || ""),
     _design: "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
@@ -717,6 +747,10 @@ export function authoredMapFromMaterialized({
     startLocations,
     baseSites: bases,
     doodads: normalizeDraftDoodads(doodads, dimensions),
+    // A materialized map no longer carries the provenance needed to distinguish a compact forest
+    // from four independently overlapping gameplay layers. Preserve its exact semantics instead
+    // of guessing and unexpectedly generating trees when a Lab map returns to the editor.
+    forestSpans: [],
     concealmentTiles: normalizeOverlayTiles(concealmentTiles, dimensions),
     noVehicleTiles: normalizeOverlayTiles(noVehicleTiles, dimensions),
     damageReductionTiles: normalizeOverlayTiles(damageReductionTiles, dimensions),
@@ -740,7 +774,12 @@ export function materializedMapsEqual(left, right) {
 
 function normalizeDraft(draft) {
   if (!draft || typeof draft !== "object") throw new Error("Map data is invalid.");
-  if (Number(draft.version) !== 7) replaceObject(draft, migrateLegacyDraft(draft));
+  if (Number(draft.version) !== MAP_EDITOR_MAP_VERSION) {
+    throw new Error(`Map schema version ${draft.version ?? "missing"} is unsupported; expected version ${MAP_EDITOR_MAP_VERSION}.`);
+  }
+  if (!Array.isArray(draft.forestSpans)) {
+    throw new Error("Map forestSpans must be an array.");
+  }
   if (!positiveInteger(draft.width) || !positiveInteger(draft.height)) {
     const inferred = inferredDraftDimensions(draft);
     draft.width = inferred.width;
@@ -751,7 +790,6 @@ function normalizeDraft(draft) {
   if (!width || !height || !Array.isArray(draft.terrain) || draft.terrain.length !== height || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== width)) {
     throw new Error("Map terrain rows must match its width and height.");
   }
-  draft.version = 7;
   draft.name = String(draft.name || "Map").trim() || "Map";
   draft.description = String(draft.description || "");
   draft._design = String(draft._design || "Flat map locations.");
@@ -761,57 +799,14 @@ function normalizeDraft(draft) {
   draft.height = height;
   draft.startLocations = normalizeLocations(draft.startLocations, dimensions).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
   draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, dimensions);
+  draft.forestSpans = normalizeForestSpans(draft.forestSpans, dimensions);
   draft.doodads = normalizeDraftDoodads(draft.doodads, dimensions);
   draft.concealmentTiles = normalizeOverlayTiles(draft.concealmentTiles, dimensions);
   draft.noVehicleTiles = normalizeOverlayTiles(draft.noVehicleTiles, dimensions);
   draft.damageReductionTiles = normalizeOverlayTiles(draft.damageReductionTiles, dimensions);
   draft.slowMovementTiles = normalizeOverlayTiles(draft.slowMovementTiles, dimensions);
-}
-
-function migrateLegacyDraft(source) {
-  if ([4, 5, 6].includes(Number(source?.version))) {
-    const dimensions = inferredDraftDimensions(source);
-    const migrated = {
-      ...clone(source),
-      version: 7,
-      width: dimensions.width,
-      height: dimensions.height,
-      doodads: Array.isArray(source?.doodads) ? source.doodads : [],
-      concealmentTiles: Array.isArray(source?.concealmentTiles)
-        ? source.concealmentTiles
-        : Array.isArray(source?.stealthTiles) ? source.stealthTiles : [],
-      noVehicleTiles: Array.isArray(source?.noVehicleTiles) ? source.noVehicleTiles : [],
-      damageReductionTiles: Array.isArray(source?.damageReductionTiles) ? source.damageReductionTiles : [],
-      slowMovementTiles: Array.isArray(source?.slowMovementTiles) ? source.slowMovementTiles : [],
-    };
-    delete migrated.stealthTiles;
-    return migrated;
-  }
-  const sites = Array.isArray(source?.sites) ? source.sites : [];
-  const byId = new Map(sites.map((site) => [site.id, site]));
-  const dimensions = inferredDraftDimensions(source);
-  const starts = normalizeLocations(source?.startLocations, dimensions);
-  for (const layout of source?.layouts || []) for (const slot of layout?.slots || []) {
-    const site = byId.get(slot.main);
-    if (site && !starts.some((candidate) => sameLocation(candidate, site))) starts.push(copyLocation(site));
-  }
-  if (!starts.length) for (const site of sites.filter((site) => site.kind === "main")) starts.push(copyLocation(site));
-  return {
-    version: 7,
-    name: source?.name || "Map",
-    description: source?.description || "",
-    _design: "Migrated map data. Flat locations and per-base resource counts are authoritative.",
-    width: dimensions.width,
-    height: dimensions.height,
-    terrain: source?.terrain || [],
-    startLocations: starts,
-    baseSites: (source?.baseSites || sites).map(copyBaseSite),
-    doodads: [],
-    concealmentTiles: [],
-    noVehicleTiles: [],
-    damageReductionTiles: [],
-    slowMovementTiles: [],
-  };
+  removeForestTilesFromManualOverlays(draft);
+  reconcileForestDoodads(draft);
 }
 
 function resizeDraftCentered(source, width, height) {
@@ -831,12 +826,13 @@ function resizeDraftCentered(source, width, height) {
   const shift = (location) => ({ ...location, x: location.x + offsetX, y: location.y + offsetY });
   const startLocations = source.startLocations.map(shift);
   const baseSites = source.baseSites.map(shift);
-  const doodads = (source.doodads || []).map((doodad) => ({
+  const doodads = (source.doodads || []).filter((doodad) => !isGeneratedForestDoodad(doodad, current)).map((doodad) => ({
     ...copyDoodad(doodad),
     x: doodad.x + offsetX * 32,
     y: doodad.y + offsetY * 32,
   }));
   const shiftTile = (tile) => ({ x: tile.x + offsetX, y: tile.y + offsetY });
+  const forestTiles = forestTilesFromSpans(source.forestSpans, current).map(shiftTile);
   const draft = {
     ...clone(source),
     width,
@@ -845,6 +841,7 @@ function resizeDraftCentered(source, width, height) {
     startLocations,
     baseSites,
     doodads,
+    forestSpans: forestSpansFromTiles(forestTiles, { width, height }),
     concealmentTiles: (source.concealmentTiles || []).map(shiftTile),
     noVehicleTiles: (source.noVehicleTiles || []).map(shiftTile),
     damageReductionTiles: (source.damageReductionTiles || []).map(shiftTile),
@@ -886,6 +883,28 @@ function normalizeLocations(locations, dimensions) {
 function normalizeOverlayTiles(locations, dimensions) {
   return normalizeLocations(locations, dimensions)
     .sort((left, right) => left.x - right.x || left.y - right.y);
+}
+
+function mergedOverlayTiles(explicit, forest) {
+  const byKey = new Map([...explicit, ...forest].map((tile) => [locationKey(tile), copyLocation(tile)]));
+  return [...byKey.values()].sort((left, right) => left.x - right.x || left.y - right.y);
+}
+
+function removeForestTilesFromManualOverlays(draft) {
+  const forestKeys = new Set(forestTilesFromSpans(draft.forestSpans, draft).map(locationKey));
+  if (!forestKeys.size) return;
+  for (const field of ["concealmentTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
+    draft[field] = (draft[field] || []).filter((tile) => !forestKeys.has(locationKey(tile)));
+  }
+}
+
+function reconcileForestDoodads(draft) {
+  const manual = (draft.doodads || []).filter((doodad) => !isGeneratedForestDoodad(doodad, draft));
+  const available = Math.max(0, MAP_EDITOR_MAX_DOODADS - manual.length);
+  draft.doodads = normalizeDraftDoodads([
+    ...manual,
+    ...generatedForestDoodads(draft.forestSpans, draft, { max: available }),
+  ], draft);
 }
 
 function normalizeBaseSites(baseSites, startLocations, dimensions) {
@@ -1042,7 +1061,6 @@ function sameFlatArray(left, right) { return Array.isArray(left) && Array.isArra
 function draftFingerprint(draft) { return JSON.stringify(draft); }
 function clone(value) { return structuredCloneSafe(value); }
 function structuredCloneSafe(value) { return typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value)); }
-function replaceObject(target, source) { for (const key of Object.keys(target)) delete target[key]; Object.assign(target, clone(source)); }
 function positiveInteger(value) { const number = Number(value); return Number.isInteger(number) && number > 0 ? number : 0; }
 function validEditorDimension(value) { return value >= MAP_EDITOR_MIN_SIZE && value <= MAP_EDITOR_MAX_SIZE; }
 function boundedMapDimension(value) {

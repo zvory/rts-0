@@ -1446,9 +1446,12 @@ POST /api/map-handoffs/{handoffId}
 ```
 `AuthoredMapV7` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
-`doodads`, `concealmentTiles`, `noVehicleTiles`, `damageReductionTiles`, and `slowMovementTiles`
-arrays. Overlay records are bounded, unique, in-bounds tile-coordinate pairs; the four layers
-remain independent and may overlap.
+`doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `damageReductionTiles`, and
+`slowMovementTiles` arrays. A forest span is `[y, xStart, xEnd]` with inclusive bounds; spans may
+not overlap and materialize into all four gameplay layers. Explicit overlay records remain bounded,
+unique, in-bounds tile-coordinate pairs and can independently supplement forest-derived layers.
+Schema v7 is the only accepted authored-map schema. Older documents are rejected rather than
+migrated, and every shipped map declares `forestSpans` even when it is empty.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
@@ -1465,8 +1468,9 @@ cluster. Wildflowers have no collision or pathing effect.
 Tank Trap records must be tile-centred and become completed owner-0 Tank Trap entities during game
 setup; from that point they use ordinary entity fog, combat, deconstruction, and vehicle-pathing
 rules. Static trees and wildflowers have no fog, vision, cover, or combat behavior themselves;
-schema-v7 map overlays independently supply concealment, vehicle exclusion, 25% incoming-damage
-reduction, and 25% movement-speed reduction. The damage and movement effects are selected from the tile
+schema-v7 forest spans jointly supply concealment, vehicle exclusion, 25% incoming-damage reduction,
+and 25% movement-speed reduction; independent explicit overlays can supply any subset outside a
+forest. The damage and movement effects are selected from the tile
 beneath the entity centre.
 Lab handoff creation strictly rejects unknown fields and validates the complete authored-map schema,
 catalog, count, ids, colors, and world bounds before binding terrain, locations, resource counts,

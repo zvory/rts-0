@@ -46,6 +46,7 @@ export function buildMapFromRecipe(recipe) {
     baseSites: [],
     _design: String(recipe.design || `Generated from a shared map-authoring recipe with ${recipe.symmetry || "no"} symmetry.`),
     doodads: [],
+    forestSpans: [],
     concealmentTiles: [],
     noVehicleTiles: [],
     damageReductionTiles: [],

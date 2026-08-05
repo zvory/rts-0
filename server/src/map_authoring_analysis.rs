@@ -162,6 +162,7 @@ mod tests {
                 {"x": 16, "y": 16, "steelPatches": 4, "oilPatches": 1}
             ],
             "doodads": [],
+            "forestSpans": [],
             "concealmentTiles": [],
             "noVehicleTiles": []
         })

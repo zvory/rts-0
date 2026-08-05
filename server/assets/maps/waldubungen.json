@@ -8620,5 +8620,8 @@
       "y": 3023,
       "id": 201
     }
-  ]
+  ],
+  "forestSpans": [],
+  "damageReductionTiles": [],
+  "slowMovementTiles": []
 }

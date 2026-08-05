@@ -54,9 +54,9 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - Lab setup import/export accepts only checkpoint-backed `LabCheckpointScenarioV1`.
   `validateScenario` previews bounds without mutating the room or accepting client server paths.
   `metadata.lab.initialCamera` may set the first Lab world-pixel center.
-- Map handoffs cap 64 records. Schema-v7 `LabMapDraft` carries `doodads[]` (≤4,096)
-  with `concealmentTiles[]`, `noVehicleTiles[]`, `damageReductionTiles[]`, and
-  `slowMovementTiles[]`; Tank Traps are neutral entities.
+- Map handoffs cap 64 records. Schema-v7 `forestSpans[]` expand into all four gameplay layers;
+  `LabMapDraft` retains effect tiles and ≤4,096 doodads. Older schemas are rejected; Tank
+  Traps materialize as neutral entities.
 
 ## Invariants
 - **Mirror.** Every protocol change touches both files **and**

@@ -5,8 +5,8 @@ use serde::Deserialize;
 mod assignment;
 
 use super::{
-    AuthoredMapData, BaseResourceCounts, Map, StartAssignmentPlayer, BASE_PROTECTION_RADIUS_TILES,
-    BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
+    supported_map_version, AuthoredMapData, BaseResourceCounts, Map, StartAssignmentPlayer,
+    BASE_PROTECTION_RADIUS_TILES, BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
@@ -26,7 +26,7 @@ pub(super) fn schema_version(json: &str) -> Result<u32, String> {
 pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
     let authored: AuthoredMap =
         serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
-    if authored.version != CURRENT_MAP_VERSION {
+    if !supported_map_version(authored.version) {
         return Err(format!(
             "map schema version {} is not supported; server requires version {CURRENT_MAP_VERSION}",
             authored.version
@@ -77,7 +77,7 @@ pub(super) fn load_for_players(
 pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMapData, String> {
     let authored: AuthoredMap =
         serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
-    if authored.version != CURRENT_MAP_VERSION {
+    if !supported_map_version(authored.version) {
         return Err(format!(
             "map schema version {} is not supported; server requires version {CURRENT_MAP_VERSION}",
             authored.version
@@ -138,26 +138,33 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         })
         .collect();
     let doodads = super::doodads::canonicalize(width, height, authored.doodads)?;
-    let concealment_tiles = parse_overlay_locations(
-        width,
-        height,
-        &authored.concealment_tiles,
-        "concealmentTiles",
-    )?;
-    let no_vehicle_tiles =
-        parse_overlay_locations(width, height, &authored.no_vehicle_tiles, "noVehicleTiles")?;
-    let damage_reduction_tiles = parse_overlay_locations(
-        width,
-        height,
-        &authored.damage_reduction_tiles,
-        "damageReductionTiles",
-    )?;
-    let slow_movement_tiles = parse_overlay_locations(
-        width,
-        height,
-        &authored.slow_movement_tiles,
-        "slowMovementTiles",
-    )?;
+    let forest_tiles = parse_forest_spans(width, height, &authored.forest_spans)?;
+    let concealment_tiles = merge_overlay_locations(
+        parse_overlay_locations(width, height, &authored.concealment_tiles, "concealmentTiles")?,
+        &forest_tiles,
+    );
+    let no_vehicle_tiles = merge_overlay_locations(
+        parse_overlay_locations(width, height, &authored.no_vehicle_tiles, "noVehicleTiles")?,
+        &forest_tiles,
+    );
+    let damage_reduction_tiles = merge_overlay_locations(
+        parse_overlay_locations(
+            width,
+            height,
+            &authored.damage_reduction_tiles,
+            "damageReductionTiles",
+        )?,
+        &forest_tiles,
+    );
+    let slow_movement_tiles = merge_overlay_locations(
+        parse_overlay_locations(
+            width,
+            height,
+            &authored.slow_movement_tiles,
+            "slowMovementTiles",
+        )?,
+        &forest_tiles,
+    );
     Ok(AuthoredMapData {
         name: authored.name,
         width,
@@ -191,6 +198,8 @@ struct AuthoredMap {
     base_sites: Vec<AuthoredBaseSite>,
     #[serde(default)]
     doodads: Vec<crate::protocol::MapDoodad>,
+    #[serde(default)]
+    forest_spans: Vec<[u32; 3]>,
     #[serde(default)]
     concealment_tiles: Vec<AuthoredLocation>,
     #[serde(default)]
@@ -305,6 +314,40 @@ fn parse_overlay_locations(
     let mut locations = parse_locations(width, height, authored, field)?;
     locations.sort_unstable();
     Ok(locations)
+}
+
+fn parse_forest_spans(
+    width: u32,
+    height: u32,
+    spans: &[[u32; 3]],
+) -> Result<Vec<(u32, u32)>, String> {
+    let mut locations = Vec::new();
+    let mut seen = HashSet::new();
+    for (index, &[y, x_start, x_end]) in spans.iter().enumerate() {
+        if y >= height || x_start > x_end || x_end >= width {
+            return Err(format!(
+                "forestSpans[{index}] = [{y},{x_start},{x_end}] is outside the {width}x{height} map or has reversed x bounds"
+            ));
+        }
+        for x in x_start..=x_end {
+            if !seen.insert((x, y)) {
+                return Err(format!(
+                    "forestSpans[{index}] overlaps an earlier span at ({x},{y})"
+                ));
+            }
+            locations.push((x, y));
+        }
+    }
+    locations.sort_unstable();
+    Ok(locations)
+}
+
+fn merge_overlay_locations(explicit: Vec<(u32, u32)>, forest: &[(u32, u32)]) -> Vec<(u32, u32)> {
+    let mut merged: HashSet<_> = explicit.into_iter().collect();
+    merged.extend(forest.iter().copied());
+    let mut locations: Vec<_> = merged.into_iter().collect();
+    locations.sort_unstable();
+    locations
 }
 
 fn parse_base_sites(

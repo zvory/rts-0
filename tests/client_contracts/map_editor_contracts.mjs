@@ -104,6 +104,12 @@ import { mapEditorLaunchConfig } from "../../client/src/map_editor_launch.js";
 import { authoritativeAnalysisSummary, MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { defaultMapAuthoringLayerVisibility, MAP_AUTHORING_LAYER } from "../../client/src/map_authoring/layers.js";
 import {
+  FOREST_DOODAD_ID_BASE,
+  forestTreeFoliageBounds,
+  forestTreeFoliageCoverage,
+  forestTilesFromSpans,
+} from "../../client/src/map_authoring/forests.js";
+import {
   canonicalDoodadColor,
   createDoodadSprayStroke,
   createMapEditorDoodads,
@@ -318,6 +324,47 @@ assert(
   }
   assert.equal(session.hasUnsavedChanges, false, "exporting the current map clears the unsaved-change warning");
   assert.match(statuses.at(-1).message, /^Exported .+\.json\.$/);
+}
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const forest = [];
+  for (let y = 10; y < 20; y += 1) for (let x = 10; x < 20; x += 1) forest.push({ x, y });
+  session.beginOverlayStroke("Painted forest");
+  assert.equal(session.paintForestTiles(forest, true).length, 100);
+  assert.equal(session.commitOverlayStroke(), true);
+  const authored = session.exportMap();
+  assert.deepEqual(authored.forestSpans, Array.from({ length: 10 }, (_, index) => [10 + index, 10, 19]),
+    "forest paint is stored as exact compact horizontal spans");
+  assert.equal(authored.concealmentTiles.length + authored.noVehicleTiles.length
+    + authored.damageReductionTiles.length + authored.slowMovementTiles.length, 0,
+  "forest mechanics do not duplicate coordinates into four authored arrays");
+  for (const field of ["concealmentTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
+    assert.equal(session.materialized()[field].length, 100, `forest materialization populates ${field}`);
+  }
+  const generated = authored.doodads.filter((doodad) => doodad.id > FOREST_DOODAD_ID_BASE);
+  assert(generated.length > 0 && generated.every((doodad) => doodad.typeId.startsWith("tree.")),
+    "forest paint deterministically owns generated tree doodads in the reserved id range");
+  assert(generated.every((doodad) => forestTreeFoliageCoverage(doodad, authored.forestSpans, authored) >= 0.95),
+    "generated foliage stays substantially inside the semantic forest rather than testing only its root tile");
+  const bottomBoundary = 20 * 32;
+  const bottomTrees = generated.filter((doodad) => Math.abs(forestTreeFoliageBounds(doodad).bottom - bottomBoundary) <= 1);
+  assert(bottomTrees.length > 0 && bottomTrees.every((doodad) => Math.floor(doodad.y / 32) === 20),
+    "bottom-edge canopies align to the forest boundary while their grounded roots sit one tile below it");
+  const leftBoundary = 10 * 32;
+  const rightBoundary = 20 * 32;
+  assert(generated.some((doodad) => Math.abs(forestTreeFoliageBounds(doodad).left - leftBoundary) <= 1),
+    "left-edge foliage aligns with the painted forest boundary");
+  assert(generated.some((doodad) => Math.abs(forestTreeFoliageBounds(doodad).right - rightBoundary) <= 1),
+    "right-edge foliage aligns with the painted forest boundary");
+
+  session.beginOverlayStroke("Erased forest");
+  assert.equal(session.paintForestTiles(forest, false).length, 100);
+  assert.equal(session.commitOverlayStroke(), true);
+  assert.deepEqual(forestTilesFromSpans(session.exportMap().forestSpans, session.draft), []);
+  assert.equal(session.exportMap().doodads.some((doodad) => doodad.id > FOREST_DOODAD_ID_BASE), false,
+    "forest erase removes forest-owned trees together with the semantic area");
 }
 
 {
@@ -650,41 +697,15 @@ assert(
     layouts: [{ id: "2p", playerCount: 2, slots: [{ main: "main", naturals: ["natural"] }, { main: "natural", naturals: [] }] }],
   };
   const session = new MapEditorSession({ storage: null });
-  session.loadAuthoredMap(legacy);
-  assert.equal(session.exportMap().version, 7, "local v2 maps migrate into current flat map data");
-  assert.equal(session.exportMap().layouts, undefined);
-}
-
-{
-  const legacy = {
-    version: 6,
-    name: "Legacy concealment",
-    description: "",
-    _design: "",
-    width: 32,
-    height: 32,
-    terrain: Array(32).fill(".".repeat(32)),
-    startLocations: [{ x: 8, y: 8 }, { x: 24, y: 24 }],
-    baseSites: [{ x: 8, y: 8, steelPatches: 4, oilPatches: 1 }, { x: 24, y: 24, steelPatches: 4, oilPatches: 1 }],
-    doodads: [{ id: 1, typeId: "tree.oak", x: 336, y: 336 }],
-    stealthTiles: [{ x: 10, y: 10 }],
-    noVehicleTiles: [{ x: 11, y: 10 }],
-    damageReductionTiles: [{ x: 12, y: 10 }],
-    slowMovementTiles: [{ x: 13, y: 10 }],
-  };
-  const session = new MapEditorSession({ storage: null });
-  session.loadAuthoredMap(legacy);
-  const migrated = session.exportMap();
-  assert.equal(migrated.version, 7, "local v6 maps migrate to the concealment schema");
-  assert.deepEqual(migrated.concealmentTiles, legacy.stealthTiles,
-    "v6 stealth tiles retain their concealment semantics");
-  assert.deepEqual(migrated.doodads, legacy.doodads, "v6 doodads survive migration");
-  assert.deepEqual(migrated.noVehicleTiles, legacy.noVehicleTiles, "v6 no-vehicle tiles survive migration");
-  assert.deepEqual(migrated.damageReductionTiles, legacy.damageReductionTiles,
-    "v6 damage-reduction tiles survive migration");
-  assert.deepEqual(migrated.slowMovementTiles, legacy.slowMovementTiles,
-    "v6 slow-movement tiles survive migration");
-  assert.equal(migrated.stealthTiles, undefined, "the obsolete root field is removed");
+  assert.throws(() => session.loadAuthoredMap(legacy), /version 2 is unsupported/,
+    "the editor rejects legacy schemas instead of silently migrating them");
+  const incompleteCurrent = authoredMapFromMaterialized({
+    name: "Incomplete current map", description: "", size: 16,
+    terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [],
+  });
+  delete incompleteCurrent.forestSpans;
+  assert.throws(() => session.loadAuthoredMap(incompleteCurrent), /forestSpans must be an array/,
+    "the current schema requires the new forest representation instead of retaining a compatibility path");
 }
 
 {
@@ -714,7 +735,7 @@ assert(
   assert.deepEqual(session.paintOverlayTiles([overlap[1]], { noVehicle: false }), [overlap[1]]);
   assert.equal(session.commitOverlayStroke(), true);
   assert.deepEqual(session.materialized().concealmentTiles, overlap,
-    "removing vehicle exclusion leaves independent concealment cover intact");
+    "removing vehicle exclusion leaves independent concealment intact");
   assert.deepEqual(session.materialized().noVehicleTiles, [overlap[0]]);
   assert.deepEqual(session.exportMap().concealmentTiles, overlap,
     "authored exports retain sparse coordinate pairs rather than a full tile layer");
@@ -1076,6 +1097,25 @@ assert(
   assert.equal(invalidMove.ok, false);
   assert.match(invalidMove.error, /edge clearance/);
   assert.deepEqual(draft, before, "three-way relocation rejects clipped or edge-unsafe copies atomically");
+}
+
+{
+  const overlap = [{ x: 6, y: 7 }];
+  const draft = authoredMapFromMaterialized({
+    name: "Independent overlapping effects", description: "", size: 16,
+    terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [], doodads: [],
+    concealmentTiles: overlap,
+    noVehicleTiles: overlap,
+    damageReductionTiles: overlap,
+    slowMovementTiles: overlap,
+  });
+  assert.deepEqual(draft.forestSpans, [],
+    "materialized maps do not guess forest provenance from four independently overlapping effects");
+  for (const field of ["concealmentTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
+    assert.deepEqual(draft[field], overlap, `${field} remains explicit when forest provenance is unavailable`);
+  }
+  assert.equal(draft.doodads.some((doodad) => doodad.id > FOREST_DOODAD_ID_BASE), false,
+    "overlapping materialized effects do not synthesize forest trees");
 }
 
 {

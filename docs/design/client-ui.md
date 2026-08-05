@@ -984,9 +984,8 @@ the advisory and authoritative checks can report the author's actual input. Inte
 painting is still rejected in protected footprints, and moving or adding a location makes its
 footprint passable. Resize
 preserves the existing tile cells without scaling them, fills newly exposed edges with grass, and
-shifts start/base locations with the centered source map. Authored v6 maps and materialized Lab
-handoffs carry explicit `width` and `height`; loading bundled or locally imported older square maps
-derives those axes from their terrain rows. Start locations set map player
+shifts start/base locations with the centered source map. Authored v7 maps and materialized Lab
+handoffs carry explicit `width` and `height`; older authored schemas are rejected. Start locations set map player
 capacity; every base location is permanent and its authored resource counts spawn even when no
 player starts there. The selected starting or neutral base exposes integer Steel (0–36) and Oil
 (0–9) patch controls; new and migrated bases default to 12 Steel and 3 Oil.
@@ -1023,9 +1022,24 @@ edge-sharing neighbours into the existing canvas texture and calls
 `texture.source.update()`; it does not recreate the canvas, fingerprint/serialize the map, or replace a Pixi
 texture per tile.
 
+The Forest palette exposes Paint Forest and Erase Forest with a configurable 1–31-tile brush.
+Forest painting is the single source for its tree scatter and all four gameplay effects. The draft
+stores the exact tile area as compact inclusive `[y, xStart, xEnd]` row spans; generated trees use
+reserved deterministic ids, while ordinary doodads remain independently authored. Symmetry expands
+the forest stroke before the span mask is updated. Erasing removes both the semantic area and only
+the forest-owned trees. Authored schemas before v7 are rejected rather than migrated.
+
+Generated-tree placement uses the visible foliage bounds shared with the doodad renderer, including
+the renderer's deterministic size variation. Interior canopies must remain substantially within the
+painted mask. Perimeter trees are placed first so their foliage joins along exposed sides; bottom-edge
+tree roots sit in the immediately adjacent tile below the forest while their foliage terminates on
+the semantic boundary. The grounded root location is therefore not itself evidence that a tile is a
+forest tile.
+
 The Gameplay overlays palette can select any combination of Concealment, No vehicles, Damage reduction,
 and Slowed movement, then paint or erase the selected layers in one brush or box stroke. There is no
-Forest tile; authors compose its semantics from the independent layers. The viewport uses green, red, blue, and purple respectively,
+separate Forest gameplay tile: materialization unions forest spans into these four existing runtime
+layers. The viewport uses green, red, blue, and purple respectively,
 with a closed eye, no-entry sign, half shield, and mired boot on every affected tile. A single
 effect uses the full tile; overlapping effects subdivide into stable 2x2 icon cells so all four
 remain legible without hiding one another. Damage reduction and slowed movement each reduce their
@@ -1052,8 +1066,8 @@ Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
 deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved; the
 erase brush removes them continuously. Symmetry applies when placing and erasing doodads, while undo/redo
-apply to all authored doodads. Trees retain only their tiny trunk collision; a dense tree grouping's concealment and vehicle
-exclusion come from independent gameplay overlays. Trees do not change line of sight, cover, or
+apply to all authored doodads. Individually placed trees retain only their tiny trunk collision;
+forest-owned trees receive their shared effects from the compact forest span mask. Trees do not change line of sight, cover, or
 combat damage, and wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
