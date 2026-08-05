@@ -324,6 +324,32 @@ function buttonSlots(card) {
 }
 
 {
+  const unfinishedBarracks = {
+    id: 28,
+    owner: 1,
+    kind: KIND.BARRACKS,
+    buildProgress: 0.4,
+  };
+  const constructionCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [unfinishedBarracks],
+    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const rifleman = constructionCard.slots.find((slot) => slot?.id === `train:${KIND.RIFLEMAN}`);
+  assert.equal(constructionCard.kind, "construction");
+  assert.equal(rifleman?.enabled, false, "unfinished producers cannot train immediately");
+  assert.deepEqual(rifleman?.contextIntent, {
+    type: "adjustProductionRepeat",
+    buildingIds: [unfinishedBarracks.id],
+    unit: KIND.RIFLEMAN,
+  }, "unfinished producers expose their auto-build hotkey action");
+  assert.equal(constructionCard.slots[8]?.commandId, "construction.cancel");
+}
+
+{
   const scoutCar = {
     id: 30,
     owner: 1,

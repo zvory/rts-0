@@ -1,12 +1,47 @@
 import { STATE, isBuilding } from "./protocol.js";
 import { STATS, UPGRADES } from "./config.js";
 
-export function selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf) {
+export function constructionCancelDescriptor(building) {
+  return {
+    id: `cancel-construction:${building.id}`,
+    commandId: "construction.cancel",
+    kind: "button",
+    action: "cancelConstruction",
+    intent: { type: "cancelConstruction", buildingId: building.id },
+    icon: "CNCL",
+    label: "Cancel",
+    enabled: true,
+    cls: "cancel",
+    title: "Cancel construction for a full refund",
+    repeatable: false,
+  };
+}
+
+export function trainResourcesOf(ctx) {
+  const base = ctx.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+  const resources = {
+    steel: base.steel ?? 0,
+    oil: base.oil ?? 0,
+    supplyUsed: Number.isFinite(base.supplyUsed) ? base.supplyUsed : 0,
+    supplyCap: Number.isFinite(base.supplyCap) ? base.supplyCap : null,
+  };
+  for (const entry of ctx.optimisticProduction || []) {
+    const st = STATS[entry?.unit];
+    if (!st) continue;
+    const cost = st.cost || {};
+    resources.steel -= cost.steel ?? 0;
+    resources.oil -= cost.oil ?? 0;
+    const supply = st.supply ?? 0;
+    if (Number.isFinite(supply) && supply > 0) resources.supplyUsed += supply;
+  }
+  return resources;
+}
+
+export function selectedRepeatProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf) {
   return (ctx.selection || []).filter(
     (e) =>
       isOwn(ctx, e) &&
       isBuilding(e.kind) &&
-      e.buildProgress == null &&
       factionTrainsOf(ctx, e.kind).includes(unit),
   );
 }

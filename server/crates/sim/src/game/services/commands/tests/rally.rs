@@ -74,6 +74,35 @@ fn set_rally_stores_point_on_producer_and_rejects_others() {
 }
 
 #[test]
+fn unfinished_producer_remembers_rally_for_after_completion() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+    let barracks = entities
+        .spawn_building(1, EntityKind::Barracks, x, y, false)
+        .expect("unfinished barracks should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::SetRally {
+                building: barracks,
+                x: 300.0,
+                y: 400.0,
+                kind: RallyKind::Move,
+                queued: false,
+            },
+        )],
+    );
+
+    let barracks = entities.get(barracks).expect("unfinished barracks");
+    assert!(barracks.under_construction());
+    assert_eq!(barracks.rally_point(), Some((300.0, 400.0)));
+}
+
+#[test]
 fn set_rally_clamps_out_of_bounds_point() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
