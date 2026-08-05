@@ -263,7 +263,10 @@ fn firing_keeps_a_living_auto_target_through_reload() {
     run_combat_tick(&mut entities);
 
     let machine_gunner = entities.get(attacker).expect("machine gunner should exist");
-    assert!(machine_gunner.attack_cd() > 0, "the machine gunner should fire");
+    assert!(
+        machine_gunner.attack_cd() > 0,
+        "the machine gunner should fire"
+    );
     assert_eq!(
         machine_gunner.target_id(),
         Some(committed),
