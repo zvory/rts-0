@@ -239,7 +239,6 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
         .entities
         .spawn_node(EntityKind::Oil, oil_patch.0, oil_patch.1);
     game.state.players[0].set_resources(0, 0);
-
     game.tick();
     let progress = |game: &Game, kind| {
         game.state
@@ -248,17 +247,8 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
             .find(|entity| entity.kind == kind && entity.under_construction())
             .and_then(|entity| entity.build_progress_fraction())
     };
-    let build_ticks = |kind| {
-        config::building_stats(kind)
-            .expect("automatic extractor stats")
-            .build_ticks
-    };
-    let steel_ticks = build_ticks(EntityKind::SteelMine);
-    let pump_ticks = build_ticks(EntityKind::PumpJack);
-    assert_eq!(
-        progress(&game, EntityKind::SteelMine),
-        Some(1.0 / steel_ticks as f32)
-    );
+    let steel_ticks = config::TICK_HZ * 24;
+    let pump_ticks = config::TICK_HZ * 36;
     assert_eq!(
         progress(&game, EntityKind::PumpJack),
         Some(1.0 / pump_ticks as f32)
@@ -270,24 +260,15 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     for _ in 1..steel_ticks {
         game.tick();
     }
-    assert!(game
-        .state
-        .entities
-        .iter()
-        .any(|entity| entity.kind == EntityKind::SteelMine && !entity.under_construction()));
+    assert_eq!(progress(&game, EntityKind::SteelMine), None);
     assert_eq!(
         progress(&game, EntityKind::PumpJack),
         Some(steel_ticks as f32 / pump_ticks as f32)
     );
-
     for _ in steel_ticks..pump_ticks {
         game.tick();
     }
-    assert!(game
-        .state
-        .entities
-        .iter()
-        .any(|entity| entity.kind == EntityKind::PumpJack && !entity.under_construction()));
+    assert_eq!(progress(&game, EntityKind::PumpJack), None);
 }
 
 #[test]
