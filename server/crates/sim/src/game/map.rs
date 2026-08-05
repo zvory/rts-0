@@ -29,8 +29,8 @@ use serde::{Deserialize, Serialize};
 pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
-/// The only map schema version this server accepts. Bump when the schema changes incompatibly.
-pub const CURRENT_MAP_VERSION: u32 = 7;
+/// The only authored-map schema accepted by this build.
+pub const CURRENT_MAP_VERSION: u32 = 8;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -415,7 +415,7 @@ fn default_available_map() -> AvailableMap {
 fn available_map_from_json(stem: &str, json: &str) -> Option<AvailableMap> {
     let v = serde_json::from_str::<serde_json::Value>(json).ok()?;
     let version = v.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
-    if u32::try_from(version).ok() != Some(CURRENT_MAP_VERSION) {
+    if !u32::try_from(version).is_ok_and(supported_map_version) {
         return None;
     }
     let name = v
@@ -435,6 +435,10 @@ fn available_map_from_json(stem: &str, json: &str) -> Option<AvailableMap> {
         min_players,
         max_players,
     })
+}
+
+pub(super) fn supported_map_version(version: u32) -> bool {
+    version == CURRENT_MAP_VERSION
 }
 
 fn fnv_usize(hash: u64, value: usize) -> u64 {
@@ -745,13 +749,35 @@ mod tests {
               "terrain": [".."],
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }"#,
             0,
         )
         .expect_err("wrong version should be rejected");
 
         assert!(err.contains("not supported"), "error was: {err}");
+
+        let err = Map::from_authored_json(
+            1,
+            r#"{
+              "version": 7,
+              "name": "previous",
+              "width": 2,
+              "height": 1,
+              "description": "the previous authored-map schema",
+              "_design": "n/a",
+              "terrain": [".."],
+              "startLocations": [{"x": 0, "y": 0}],
+              "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
+              "doodads": [],
+              "forestSpans": []
+            }"#,
+            0,
+        )
+        .expect_err("the previous schema should be rejected");
+
+        assert!(err.contains("requires version 8"), "error was: {err}");
     }
 
     #[test]
@@ -781,7 +807,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 7,
+              "version": 8,
               "name": "bad",
               "width": 2,
               "height": 2,
@@ -790,7 +816,8 @@ mod tests {
               "terrain": ["..", ".x"],
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }"#,
             0,
         )
@@ -806,7 +833,7 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 7,
+              "version": 8,
               "name": "bad-base",
               "width": 32,
               "height": 32,
@@ -815,7 +842,8 @@ mod tests {
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -832,7 +860,7 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 7,
+              "version": 8,
               "name": "road-base",
               "width": 32,
               "height": 32,
@@ -841,7 +869,8 @@ mod tests {
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -855,7 +884,7 @@ mod tests {
     fn current_authored_map_materializes_rectangular_dimensions() {
         let rows = vec![".".repeat(30); 20];
         let json = serde_json::json!({
-            "version": 7,
+            "version": CURRENT_MAP_VERSION,
             "name": "wide-test",
             "width": 30,
             "height": 20,
@@ -868,7 +897,8 @@ mod tests {
                 "y": 8,
                 "steelPatches": 12,
                 "oilPatches": 3
-            }]
+            }],
+            "forestSpans": []
         });
 
         let map = Map::from_authored_json(1, &json.to_string(), 0)
@@ -889,7 +919,7 @@ mod tests {
     fn current_dimensions_must_match_terrain_shape() {
         let rows = vec![".".repeat(30); 20];
         let json = serde_json::json!({
-            "version": 7,
+            "version": CURRENT_MAP_VERSION,
             "name": "mismatched-test",
             "width": 20,
             "height": 30,
@@ -902,7 +932,8 @@ mod tests {
                 "y": 8,
                 "steelPatches": 12,
                 "oilPatches": 3
-            }]
+            }],
+            "forestSpans": []
         });
 
         let error = Map::from_authored_json(1, &json.to_string(), 0)

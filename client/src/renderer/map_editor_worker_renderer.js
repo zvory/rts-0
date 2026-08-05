@@ -235,10 +235,19 @@ function drawGameplayOverlays(graphics, overlay, visibility) {
     for (const tile of tiles || []) {
       const key = `${tile.x}:${tile.y}`;
       const entry = byTile.get(key) || { x: tile.x, y: tile.y, effects: [] };
-      entry.effects.push(kind);
+      if (!entry.effects.includes(kind)) entry.effects.push(kind);
       byTile.set(key, entry);
     }
   };
+  for (const tile of overlay.forestTiles || []) {
+    const key = `${tile.x}:${tile.y}`;
+    const effects = [];
+    if (visibility[MAP_AUTHORING_LAYER.CONCEALMENT]) effects.push("concealment");
+    if (visibility[MAP_AUTHORING_LAYER.NO_VEHICLE]) effects.push("noVehicle");
+    if (visibility[MAP_AUTHORING_LAYER.DAMAGE_REDUCTION]) effects.push("damageReduction");
+    if (visibility[MAP_AUTHORING_LAYER.SLOW_MOVEMENT]) effects.push("slowMovement");
+    if (effects.length) byTile.set(key, { x: tile.x, y: tile.y, effects });
+  }
   add("concealment", overlay.concealmentTiles, MAP_AUTHORING_LAYER.CONCEALMENT);
   add("noVehicle", overlay.noVehicleTiles, MAP_AUTHORING_LAYER.NO_VEHICLE);
   add("damageReduction", overlay.damageReductionTiles, MAP_AUTHORING_LAYER.DAMAGE_REDUCTION);

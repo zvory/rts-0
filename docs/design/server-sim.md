@@ -540,6 +540,10 @@ store a separate authoritative command stream, but they must not infer live stat
 
 Map policy:
 
+- Authored-map schema v8 requires compact non-overlapping `[y, xStart, xEnd]` forest spans. Loading
+  expands every forest tile into the existing stealth, no-vehicle, damage-reduction, and
+  slow-movement vectors before `Map` construction. Earlier schemas and v8 documents missing the
+  required forest array are rejected rather than migrated.
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
   permanent base sites, four sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
   infantry tree path-cost/local-steering data on every tick, while start/export

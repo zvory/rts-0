@@ -15,6 +15,7 @@ fn authored_map_with_overlays(
         "startLocations": [{"x": 8, "y": 8}],
         "baseSites": [{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}],
         "doodads": [],
+        "forestSpans": [],
         "concealmentTiles": concealment_tiles,
         "noVehicleTiles": no_vehicle_tiles,
         "damageReductionTiles": [],
@@ -109,4 +110,64 @@ fn authored_overlays_reject_duplicates_and_out_of_bounds_tiles() {
             .expect_err("invalid overlay coordinates must be rejected");
         assert!(error.contains(expected), "error was: {error}");
     }
+}
+
+#[test]
+fn compact_forest_spans_materialize_into_all_gameplay_layers() {
+    let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+        serde_json::json!([{"x": 20, "y": 21}]),
+        serde_json::json!([]),
+    ))
+    .expect("test map JSON");
+    authored["forestSpans"] = serde_json::json!([[22, 18, 20], [23, 19, 19]]);
+    let materialized = Map::materialize_authored_json(&authored.to_string(), 1)
+        .expect("valid compact forest spans");
+
+    let forest = vec![(18, 22), (19, 22), (19, 23), (20, 22)];
+    assert_eq!(materialized.no_vehicle_tiles, forest);
+    assert_eq!(materialized.damage_reduction_tiles, forest);
+    assert_eq!(materialized.slow_movement_tiles, forest);
+    assert_eq!(
+        materialized.concealment_tiles,
+        vec![(18, 22), (19, 22), (19, 23), (20, 21), (20, 22)]
+    );
+}
+
+#[test]
+fn compact_forest_spans_reject_overlap_and_bad_bounds() {
+    for (spans, expected) in [
+        (serde_json::json!([[22, 18, 20], [22, 20, 21]]), "overlaps"),
+        (serde_json::json!([[22, 20, 18]]), "reversed"),
+        (serde_json::json!([[32, 18, 20]]), "outside"),
+    ] {
+        let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+            serde_json::json!([]),
+            serde_json::json!([]),
+        ))
+        .expect("test map JSON");
+        authored["forestSpans"] = spans;
+        let error = Map::materialize_authored_json(&authored.to_string(), 1)
+            .expect_err("invalid compact forest spans must be rejected");
+        assert!(error.contains(expected), "error was: {error}");
+    }
+}
+
+#[test]
+fn current_authored_schema_requires_forest_spans() {
+    let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+        serde_json::json!([]),
+        serde_json::json!([]),
+    ))
+    .expect("test map JSON");
+    authored
+        .as_object_mut()
+        .expect("authored map object")
+        .remove("forestSpans");
+
+    let error = Map::materialize_authored_json(&authored.to_string(), 1)
+        .expect_err("schema-v8 maps must declare forestSpans");
+    assert!(
+        error.contains("forestSpans must be an array"),
+        "error was: {error}"
+    );
 }
