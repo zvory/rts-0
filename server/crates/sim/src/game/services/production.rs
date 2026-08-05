@@ -10,6 +10,7 @@ use crate::game::{ability::AbilityKind, entity::EntityKind};
 use crate::rules;
 
 mod extractors;
+mod repeat;
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
 /// building and remove the item from the queue. Manual front items that have not paid yet retry
@@ -47,14 +48,10 @@ pub(crate) fn production_system(
                 }
             }
         }
-        let repeat_request = entities.get(id).and_then(|producer| {
-            (active_producer && producer.prod_queue().is_empty())
-                .then(|| (producer.owner, producer.kind, producer.repeat_production()))
-                .and_then(|(owner, producer_kind, unit)| {
-                    unit.map(|unit| (owner, producer_kind, unit))
-                })
+        let repeat_owner = entities.get(id).and_then(|producer| {
+            (active_producer && producer.prod_queue().is_empty()).then_some(producer.owner)
         });
-        if let Some((owner, producer_kind, unit)) = repeat_request {
+        if let Some(owner) = repeat_owner {
             let faction_id = players
                 .iter()
                 .find(|player| player.id == owner)
@@ -76,40 +73,41 @@ pub(crate) fn production_system(
                 .get(&owner)
                 .map(Vec::as_slice)
                 .unwrap_or_default();
-            let requirements_met = rules::economy::train_requirement_met_for_faction(
+            let completed_upgrades = players
+                .iter()
+                .find(|player| player.id == owner)
+                .map(|player| &player.upgrades);
+            let repeat_request = repeat::next_eligible(
+                entities,
+                id,
                 &faction_id,
-                unit,
+                completed_upgrades,
                 owned_complete,
             );
-            let producer_compatible =
-                rules::economy::trainable_units_for_faction(&faction_id, producer_kind)
-                    .contains(&unit);
-            let build_ticks = production_ticks(unit);
-            let extractor_target_available =
-                !unit.is_resource_extractor() || extractors::target(entities, id, unit).is_some();
-            if !extractor_target_available {
-                // A Depot may repeat both extractor kinds. Saturation of the current kind must
-                // yield to the next allocation instead of starving a still-buildable kind.
-                if let Some(producer) = entities.get_mut(id) {
-                    producer.set_repeat_production(None, true);
+
+            if let Some(unit) = repeat_request {
+                let build_ticks = production_ticks(unit);
+                let extractor_target_available = !unit.is_resource_extractor()
+                    || extractors::target(entities, id, unit).is_some();
+                if !extractor_target_available {
+                    // A Depot may repeat both extractor kinds. Saturation of the current kind must
+                    // yield to the next allocation instead of starving a still-buildable kind.
+                    if let Some(producer) = entities.get_mut(id) {
+                        producer.set_repeat_production(None, true);
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if let (true, true, true, Some(build_ticks), Some(player)) = (
-                producer_compatible,
-                requirements_met,
-                extractor_target_available,
-                build_ticks,
-                players.iter_mut().find(|player| player.id == owner),
-            ) {
-                let upgrade_met = upgrade::required_for_unit(unit)
-                    .is_none_or(|required| player.upgrades.contains(&required));
+                let Some(player) = players.iter_mut().find(|player| player.id == owner) else {
+                    continue;
+                };
+                let Some(build_ticks) = build_ticks else {
+                    continue;
+                };
                 let cost = rules::economy::resource_cost(unit);
                 let supply = rules::economy::supply_cost(unit);
                 let supply_available = player.can_reserve_supply(supply);
                 let auto_build_allowed = player.can_auto_build(cost);
-                if upgrade_met && supply_available && auto_build_allowed && player.spend_cost(cost)
-                {
+                if supply_available && auto_build_allowed && player.spend_cost(cost) {
                     if player.reserve_supply(supply) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
                             let queued = producer.push_production(ProdItem {
@@ -389,6 +387,7 @@ mod tests {
     use crate::protocol::terrain;
 
     mod rally;
+    mod repeat_locking;
     mod upgrades;
     mod waiting;
     use std::collections::HashMap;
