@@ -684,35 +684,6 @@ assert(
   assert.deepEqual(site, { x: 336, y: 400, color: 0xf4c542, radius: 7, label: "B1", selected: true },
     "the selected base becomes a detached presentation marker");
 
-  const recordViewport = {
-    session: {
-      draft: { width: 16, height: 16, terrain: Array(16).fill("."), baseSites: [], startLocations: [] },
-      mapOverlay: () => ({ starts: [], bases: [] }),
-    },
-    symmetry: MAP_EDITOR_SYMMETRY.NONE,
-    terrainRevision: 1,
-    overlayRevision: 0,
-    resourcePatchRevision: -1,
-    resourcePatches: [],
-    selectedBaseIndex: null,
-    siteRecord: MapEditorViewport.prototype.siteRecord,
-    resourcePatchRecords: MapEditorViewport.prototype.resourcePatchRecords,
-    paintPreviewRecord: () => null,
-  };
-  MapEditorViewport.prototype.drawOverlay.call(recordViewport);
-  assert.equal(recordViewport.pendingOverlay.revision, 1);
-  assert.equal(recordViewport.resourcePatchRevision, 1,
-    "Map Editor resource stand-ins are cached against terrain/base-data revisions");
-  const initialResourcePatches = recordViewport.pendingOverlay.resourcePatches;
-  MapEditorViewport.prototype.drawOverlay.call(recordViewport);
-  assert.equal(recordViewport.pendingOverlay.resourcePatches, initialResourcePatches,
-    "unrelated overlay redraws reuse deterministic resource placement records");
-  recordViewport.terrainRevision += 1;
-  MapEditorViewport.prototype.drawOverlay.call(recordViewport);
-  assert.notEqual(recordViewport.pendingOverlay.resourcePatches, initialResourcePatches,
-    "terrain/base-data revisions invalidate cached resource placement records");
-  assert(Array.isArray(recordViewport.pendingOverlay.gridPaths),
-    "Map Editor grid lines cross as detached paths for the Pixi owner");
 }
 
 {

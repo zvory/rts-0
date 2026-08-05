@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 
 import { mapEditorResourcePatches } from "../../client/src/map_editor_resource_patches.js";
+import { MAP_EDITOR_SYMMETRY } from "../../client/src/map_editor_session.js";
+import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
 
 const draft = {
   width: 32,
@@ -22,3 +24,33 @@ const withoutOil = structuredClone(draft);
 withoutOil.baseSites[0].oilPatches = 0;
 assert.equal(mapEditorResourcePatches(withoutOil).length, 12,
   "editing a base patch count changes the next editor presentation");
+
+const viewport = {
+  session: {
+    draft: { width: 16, height: 16, terrain: Array(16).fill("."), baseSites: [], startLocations: [] },
+    mapOverlay: () => ({ starts: [], bases: [] }),
+  },
+  symmetry: MAP_EDITOR_SYMMETRY.NONE,
+  terrainRevision: 1,
+  overlayRevision: 0,
+  resourcePatchRevision: -1,
+  resourcePatches: [],
+  selectedBaseIndex: null,
+  siteRecord: MapEditorViewport.prototype.siteRecord,
+  resourcePatchRecords: MapEditorViewport.prototype.resourcePatchRecords,
+  paintPreviewRecord: () => null,
+};
+MapEditorViewport.prototype.drawOverlay.call(viewport);
+assert.equal(viewport.pendingOverlay.revision, 1);
+assert.equal(viewport.resourcePatchRevision, 1,
+  "Map Editor resource stand-ins are cached against terrain/base-data revisions");
+const initialResourcePatches = viewport.pendingOverlay.resourcePatches;
+MapEditorViewport.prototype.drawOverlay.call(viewport);
+assert.equal(viewport.pendingOverlay.resourcePatches, initialResourcePatches,
+  "unrelated overlay redraws reuse deterministic resource placement records");
+viewport.terrainRevision += 1;
+MapEditorViewport.prototype.drawOverlay.call(viewport);
+assert.notEqual(viewport.pendingOverlay.resourcePatches, initialResourcePatches,
+  "terrain/base-data revisions invalidate cached resource placement records");
+assert(Array.isArray(viewport.pendingOverlay.gridPaths),
+  "Map Editor grid lines cross as detached paths for the Pixi owner");
