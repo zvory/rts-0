@@ -363,7 +363,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             hp: 300,
             sight_tiles: 1,
             cost_steel: 450,
-            cost_oil: 100,
+            cost_oil: 0,
             foot_w: 3,
             foot_h: 3,
             build_ticks: balance::TICK_HZ * 5,

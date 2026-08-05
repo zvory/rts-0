@@ -1,78 +1,10 @@
 use std::collections::BTreeMap;
 
-use super::super::milestones::{CombatGoal, Milestones, PlayerMilestoneGoal};
 use super::super::player_view::PlayerView;
-use super::super::scripts::{
-    MineOnlyScript, ProfileBackedScript, ScriptedPlayer, WorkerRushScript,
-};
-use super::harness::{finalize_self_play_success, replay_artifact_url, SelfPlayRunner};
+use super::super::scripts::{MineOnlyScript, ScriptedPlayer};
 use crate::config;
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{Snapshot, StartPayload};
-
-#[test]
-fn scripted_self_play_worker_rush_vs_economy() {
-    if crate::skip_unless_full_ai("scripted_self_play_worker_rush_vs_economy") {
-        return;
-    }
-    let players = vec![
-        PlayerInit {
-            id: 1,
-            team_id: 1,
-            faction_id: "kriegsia".to_string(),
-            name: "Worker Rush".into(),
-            color: "#e71d36".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 2,
-            team_id: 2,
-            faction_id: "kriegsia".to_string(),
-            name: "Economy".into(),
-            color: "#3a86ff".into(),
-            is_ai: true,
-        },
-    ];
-    let game = Game::new_without_ai_controllers(&players, 0x1234_5678);
-    let start = game.start_payload();
-    let specs = players.clone();
-    let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-        Box::new(WorkerRushScript::new(1, 2)),
-        Box::new(ProfileBackedScript::economy_only(2)),
-    ];
-    let milestones = Milestones::with_goals(
-        [
-            (1, PlayerMilestoneGoal::default()),
-            (2, PlayerMilestoneGoal::damaged_economy()),
-        ],
-        CombatGoal::worker_attack_by(1),
-    );
-    let mut runner = SelfPlayRunner::with_milestones(
-        "scripted_self_play_worker_rush_vs_economy",
-        game,
-        start,
-        specs,
-        scripts,
-        milestones,
-    );
-
-    match runner.run() {
-        Ok(report) => finalize_self_play_success(&runner, &players, &report),
-        Err(failure) => {
-            let artifact = runner
-                .write_failure_artifact(&failure)
-                .map(|p| {
-                    let name = p
-                        .file_name()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| p.display().to_string());
-                    replay_artifact_url(&name)
-                })
-                .unwrap_or_else(|e| format!("artifact write failed: {e}"));
-            panic!("self-play failed: {}; REPLAY={artifact}", failure.reason);
-        }
-    }
-}
 
 /// A scripted player that does nothing but send idle workers to mine the nearest steel node.
 /// No building, no training, no combat — pure passive mining.

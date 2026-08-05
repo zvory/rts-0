@@ -186,6 +186,12 @@ const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
         formation: StartingFormation::ResourcePatches,
         completed: true,
     },
+    StartingEntityGroup {
+        kind: EntityKind::PumpJack,
+        count: crate::balance::STARTING_PUMP_JACKS,
+        formation: StartingFormation::ResourcePatches,
+        completed: true,
+    },
 ];
 
 const EMPTY_FIXTURE_START_ENTITIES: &[StartingEntityGroup] = &[

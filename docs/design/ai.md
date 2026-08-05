@@ -217,21 +217,11 @@ production, and combat.
 
 ### Self-play and arena tools
 
-The test-only schema-1 Jeff live-controller oracle freezes command generation separately from
-simulation replay. It drives two production `AiController`s through the same
-`CanonicalAiTickDriver` used by the room, in player order on authored `Chokes` with seed
-`0x4a45_4646`. It captures both stagger offsets and every empty/result batch before enqueue, then
-fingerprints the fog-filtered inputs, recipient events, and post-tick player views while preserving
-exact retreat and emitted commands. The normal test compares a 3,600-tick prefix; the
-`RTS_FULL_AI_TESTS=1` tier compares the full 9,000-tick fixture. The fixture and candidate policy
-are documented in `server/crates/ai/fixtures/README.md` and the testing design.
-
 Matchup, arena, balance, `LiveSelfPlay`, real-AI tests, and live-AI performance hosts all use that
 driver. `ProfileBackedScript` survives only as a thin `AiController` adapter for synthetic mixed
 script fixtures; its economy-only variant is an explicitly named command-filtering wrapper. It
 owns no profile decision memory, map cache, pending builds, placement search, combat-stage state,
-or cadence. Synthetic `WorkerRushScript` and `MineOnlyScript` retain their explicitly scoped
-six-tick harness cadence.
+or cadence. Synthetic `MineOnlyScript` retains its explicitly scoped six-tick harness cadence.
 
 This cutover intentionally changes historical offline output. The old adapter invoked both players
 at tick zero and then player 1/2 at ticks 5/4 modulo six, used the default away-from-center build
