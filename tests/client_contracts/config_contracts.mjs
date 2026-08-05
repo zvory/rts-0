@@ -84,7 +84,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assert(
     STATS[KIND.RESOURCE_DEPOT].cost.steel === 450 &&
       STATS[KIND.RESOURCE_DEPOT].cost.oil === 100 &&
-      STATS[KIND.RESOURCE_DEPOT].buildTicks === 150,
+      STATS[KIND.RESOURCE_DEPOT].buildTicks === TICK_HZ * 5,
     "Resource Depot cost and build time mirror server",
   );
   assert(STATS[KIND.WORKER].buildTicks === 495, "Worker build time mirrors server");
