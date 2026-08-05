@@ -2,7 +2,7 @@ import strictAssert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { STATS } from "../../client/src/config.js";
+import { HARVEST_TICKS, STATS, TICK_HZ } from "../../client/src/config.js";
 import { KIND } from "../../client/src/protocol.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
@@ -149,7 +149,7 @@ for (const [kind, footprint] of expectedFootprints) {
   });
 }
 
-const extractorCycleMs = (40 / 30) * 1000;
+const extractorCycleMs = (HARVEST_TICKS / TICK_HZ) * 1000;
 const steelDefinition = definitions.get(KIND.STEEL_MINE);
 const activeSteel = { id: 901, kind: KIND.STEEL_MINE, extractorActive: true };
 const woundSteel = sampleRigAnimation(
@@ -201,6 +201,13 @@ strictAssert.ok(
   pumpAfterOneHarvest.parts["part.beam"].transform.rotation > 0.13,
   "pump jack advances only one third of its motion cycle per harvest",
 );
+const inactivePump = { ...activePump, extractorActive: false };
+const inactivePumpSample = sampleRigAnimation(
+  pumpDefinition,
+  inactivePump,
+  createRigRenderContext(inactivePump, { now: extractorCycleMs * 3 * 0.25 }),
+);
+strictAssert.equal(inactivePumpSample.parts["part.beam"].transform.rotation, 0);
 
 const restorePixi = installFakePixi();
 let renderer;
