@@ -846,6 +846,9 @@ function buttonByLabel(card, label) {
     footprintValidAgainstEntities([other], new Set([7]), 1, 1, 2, 2, map) === false,
     "client_preview_rejects_other_unit_body_inside_footprint",
   );
+  const noBuildingMap = { ...map, noBuildingTiles: [{ x: 2, y: 2 }] };
+  assert(!footprintValidAgainstEntities([], new Set(), 1, 1, 2, 2, noBuildingMap),
+    "client preview rejects a footprint that intersects a no-building tile");
   assert(
     movementBodyClass(KIND.WORKER) === "infantryLike" &&
       movementBodyClass(KIND.RIFLEMAN) === "infantryLike" &&

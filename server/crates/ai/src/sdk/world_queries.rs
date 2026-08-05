@@ -298,6 +298,9 @@ impl<'a> WorldQueries<'a> {
                 if !is_passable(self.frame.map().terrain[index]) {
                     return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::KnownTerrain);
                 }
+                if self.frame.map().no_building_tiles.contains(&(x, y)) {
+                    return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::KnownTerrain);
+                }
                 if self.resource_at_tile(x, y) {
                     return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::KnownResource);
                 }
@@ -781,5 +784,39 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn known_placement_rejects_no_building_tiles() {
+        let game = Game::new_without_ai_controllers(&players(), 71);
+        let mut start = game.start_payload();
+        let snapshot = game.snapshot_for(1);
+        let initial = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2])).unwrap();
+        let initial_queries = WorldQueries::new(&initial);
+        let exclusions = KnownBuildSiteExclusions::default();
+        let clear = (0..start.map.height)
+            .flat_map(|y| (0..start.map.width).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                initial_queries.tile(x, y).is_some_and(|tile| {
+                    initial_queries.known_build_site(EntityKind::TankTrap, tile, &exclusions)
+                        == KnownBuildSite::NoKnownConflict
+                })
+            })
+            .expect("flat map should have a clear Tank Trap site");
+        start.map.no_building_tiles.push(protocol::MapTile {
+            x: clear.0,
+            y: clear.1,
+        });
+
+        let frame = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2])).unwrap();
+        let queries = WorldQueries::new(&frame);
+        assert_eq!(
+            queries.known_build_site(
+                EntityKind::TankTrap,
+                queries.tile(clear.0, clear.1).unwrap(),
+                &exclusions,
+            ),
+            KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::KnownTerrain),
+        );
     }
 }

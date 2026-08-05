@@ -305,6 +305,9 @@ pub struct MapInfo {
     /// Sparse tile overlay blocked only for vehicle-body movement.
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
+    /// Sparse tile overlay that rejects building footprints.
+    #[serde(default)]
+    pub no_building_tiles: Vec<MapTile>,
     /// Sparse tile overlay that reduces incoming damage to occupants by 25%.
     #[serde(default)]
     pub damage_reduction_tiles: Vec<MapTile>,

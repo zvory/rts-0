@@ -422,6 +422,7 @@ mod tests {
             doodads: vec![],
             concealment_tiles: vec![],
             no_vehicle_tiles: vec![],
+            no_building_tiles: vec![],
             damage_reduction_tiles: vec![],
             slow_movement_tiles: vec![],
         };

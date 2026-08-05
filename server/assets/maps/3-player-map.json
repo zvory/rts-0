@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "width": 150,
   "height": 150,
   "name": "3 Player Map",
@@ -248,5 +248,6 @@
   "forestSpans": [],
   "concealmentTiles": [],
   "noVehicleTiles": [],
-  "doodads": []
+  "doodads": [],
+  "noBuildingTiles": []
 }

@@ -70,6 +70,7 @@ pub struct AiMap {
     pub height: u32,
     pub tile_size: u32,
     pub terrain: Vec<AiTerrain>,
+    pub no_building_tiles: BTreeSet<(u32, u32)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -408,6 +409,12 @@ impl AiFrame {
                     .iter()
                     .copied()
                     .map(AiTerrain::from_code)
+                    .collect(),
+                no_building_tiles: start
+                    .map
+                    .no_building_tiles
+                    .iter()
+                    .map(|tile| (tile.x, tile.y))
                     .collect(),
             },
             players,

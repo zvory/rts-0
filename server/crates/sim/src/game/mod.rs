@@ -86,6 +86,14 @@ use state::GameState;
 pub use crate::game::command::SimCommand;
 pub use teams::TeamId;
 
+struct MapOverlayTiles<T> {
+    concealment: Vec<T>,
+    no_vehicle: Vec<T>,
+    no_building: Vec<T>,
+    damage_reduction: Vec<T>,
+    slow_movement: Vec<T>,
+}
+
 const AI_WORKER_RETREAT_TILES: f32 = 5.0;
 const FOG_UPDATE_INTERVAL_TICKS: u32 = 2;
 

@@ -19,6 +19,8 @@ pub struct LabMapDraft {
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
     #[serde(default)]
+    pub no_building_tiles: Vec<MapTile>,
+    #[serde(default)]
     pub damage_reduction_tiles: Vec<MapTile>,
     #[serde(default)]
     pub slow_movement_tiles: Vec<MapTile>,
@@ -98,6 +100,8 @@ pub struct LabCheckpointScenarioMapData {
     #[serde(default)]
     pub no_vehicle_tiles: Vec<MapTile>,
     #[serde(default)]
+    pub no_building_tiles: Vec<MapTile>,
+    #[serde(default)]
     pub damage_reduction_tiles: Vec<MapTile>,
     #[serde(default)]
     pub slow_movement_tiles: Vec<MapTile>,
@@ -175,6 +179,7 @@ mod tests {
             doodads: Vec::new(),
             concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
+            no_building_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
         };
@@ -201,6 +206,7 @@ mod tests {
         assert!(parsed.doodads.is_empty());
         assert!(parsed.concealment_tiles.is_empty());
         assert!(parsed.no_vehicle_tiles.is_empty());
+        assert!(parsed.no_building_tiles.is_empty());
         assert!(parsed.damage_reduction_tiles.is_empty());
         assert!(parsed.slow_movement_tiles.is_empty());
     }
