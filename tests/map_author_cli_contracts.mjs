@@ -57,6 +57,18 @@ assert(!validation.warnings.some((warning) => warning.includes("unsupported fiel
   "the CLI validator accepts the current schema's compact Forest field");
 assert(!validation.warnings.some((warning) => warning.includes("symmetry mismatches")), "generated terrain preserves symmetry");
 
+for (const [forestSpans, expected] of [
+  [undefined, "must be an array"],
+  [[[1, 2]], "must be [y, xStart, xEnd]"],
+  [[[1, 4, 3]], "outside the map or has reversed x bounds"],
+  [[[1, 1, 2], [1, 2, 3]], "overlaps another span at (2,1)"],
+  [[[map.height, 1, 1]], "outside the map or has reversed x bounds"],
+]) {
+  const warnings = validateMap({ ...map, forestSpans }).warnings;
+  assert(warnings.some((warning) => warning.includes(expected)),
+    `the CLI validator rejects malformed Forest spans: ${expected}`);
+}
+
 const protectedRecipe = {
   name: "Advisory protected terrain",
   width: 32,

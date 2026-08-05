@@ -133,6 +133,37 @@ function blockedClearance(map, site, radius) {
   return null;
 }
 
+function validateForestSpans(spans, width, height) {
+  if (!Array.isArray(spans)) return ["forestSpans must be an array"];
+  const warnings = [];
+  const occupied = new Set();
+  for (const [index, span] of spans.entries()) {
+    if (!Array.isArray(span) || span.length !== 3 || !span.every(isUint32)) {
+      warnings.push(`forestSpans[${index}] must be [y, xStart, xEnd] unsigned integers`);
+      continue;
+    }
+    const [y, xStart, xEnd] = span;
+    if (y >= height || xStart > xEnd || xEnd >= width) {
+      warnings.push(`forestSpans[${index}] is outside the map or has reversed x bounds`);
+      continue;
+    }
+    let overlap = null;
+    for (let x = xStart; x <= xEnd; x += 1) {
+      const key = `${x},${y}`;
+      if (occupied.has(key)) {
+        overlap = key;
+        break;
+      }
+    }
+    if (overlap) {
+      warnings.push(`forestSpans[${index}] overlaps another span at (${overlap})`);
+    } else {
+      for (let x = xStart; x <= xEnd; x += 1) occupied.add(`${x},${y}`);
+    }
+  }
+  return warnings;
+}
+
 export function validateMap(map, { symmetry = "none" } = {}) {
   const warnings = [];
   const width = integer(map?.width);
@@ -208,6 +239,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
     const blocked = blockedClearance(map, site, startKeys.has(locationKey(site)) ? 7 : 4);
     if (blocked) warnings.push(`base (${site.x},${site.y}) has ${blocked.reason} in its protected area at (${blocked.x},${blocked.y})`);
   }
+  warnings.push(...validateForestSpans(map.forestSpans, width, height));
   for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "damageReductionTiles", "slowMovementTiles"]) {
     const locations = map[field] === undefined ? [] : map[field];
     if (!Array.isArray(locations)) {
