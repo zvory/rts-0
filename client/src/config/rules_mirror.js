@@ -164,7 +164,7 @@ export const STATS = Object.freeze({
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
   [KIND.RESOURCE_DEPOT]: { label: "Resource Depot", icon: "RD", footW: 3, footH: 3, sight: 1,
-    cost: { steel: 450, oil: 100 }, buildTicks: 750,
+    cost: { steel: 450, oil: 100 }, buildTicks: 150,
     trains: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK] },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
