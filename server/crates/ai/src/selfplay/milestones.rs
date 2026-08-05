@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use super::player_view::{is_complete, kind_of};
-use crate::config;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::protocol::{states, Event, Snapshot};
@@ -206,13 +205,6 @@ impl CombatGoal {
         }
     }
 
-    pub(super) fn worker_attack_by(player_id: u32) -> Self {
-        CombatGoal {
-            min_worker_attacks_by_player: BTreeMap::from([(player_id, 1)]),
-            ..CombatGoal::default()
-        }
-    }
-
     fn complete(&self, milestones: &Milestones) -> bool {
         if self.require_any_combat && milestones.attack_events == 0 && milestones.death_events == 0
         {
@@ -304,15 +296,6 @@ impl PlayerMilestoneGoal {
             require_barracks_complete: true,
             require_rifleman: true,
             require_tank: true,
-            ..PlayerMilestoneGoal::default()
-        }
-    }
-
-    pub(super) fn damaged_economy() -> Self {
-        PlayerMilestoneGoal {
-            require_gathering: true,
-            require_damage_taken: true,
-            min_workers: config::STARTING_WORKERS + 2,
             ..PlayerMilestoneGoal::default()
         }
     }

@@ -136,7 +136,7 @@ The Kriegsia economy replaces transferable Engineer mining with base-local extra
 Engineers remain 50-Steel, 1-Supply construction units trained by
 the Resource Depot, but they cannot gather resources and no longer place Pump Jacks. The standard
 start contains one completed Engineer and six completed Steel Mines attached to six of the home
-base's live Steel patches.
+base's live Steel patches, plus one completed Pump Jack attached to one home-base Oil patch.
 
 Steel Mine uses placeholder presentation. It is a 1x1 completed-capable
 building with 50 HP, Small/unarmored combat classification, 1-tile sight, no weapon, no supply,
@@ -567,8 +567,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   compatibility; it is the original 96×96 handcrafted map padded with 15 passable grass tiles on
   every edge. Both map JSON assets use terrain row strings, flat `startLocations`, and flat
   `baseSites`.
-- Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 6`,
-  one Resource Depot at the player's start tile, 12 steel patches with 625 steel each split into
+- Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 1`,
+  one Resource Depot, one completed Pump Jack on a home Oil patch, and six completed Steel Mines at
+  the player's start, with 12 steel patches holding 625 steel each split into
   two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 962 oil
   each nearby. Each base therefore holds 7,500 steel and 2,886 oil, a 2.599:1 Steel/Oil ratio (the
   nearest whole-unit node capacity to the 2.6:1 target).
@@ -587,6 +588,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   automatic retarget).
 - Oil extraction: workers do not directly mine oil. Every completed Resource Depot automatically
   builds free Pump Jacks on its in-range oil patches, concurrently with its free Steel Mine job.
+  The starting Resource Depot begins with one completed Pump Jack; later Resource Depots retain
+  the ordinary automatic construction behavior.
   Completed Pump Jacks mine `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former
   oil rate, and deplete the underlying oil node. When that final load empties the patch, its Pump
   Jack disappears with it and the permanent Depot job moves to the next eligible patch.
@@ -629,7 +632,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| resource_depot                | Resource Depot        | 300 | 1     | 450 steel + 100 oil | 3x3  | 750       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
+| resource_depot                | Resource Depot        | 300 | 1     | 450 steel + 0 oil | 3x3  | 750       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |

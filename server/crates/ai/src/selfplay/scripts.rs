@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
-use super::player_view::{is_kind, player_start_world, PlayerView};
-use super::{ATTACK_REISSUE_TICKS, SYNTHETIC_SCRIPT_THINK_INTERVAL};
+use super::player_view::PlayerView;
+use super::SYNTHETIC_SCRIPT_THINK_INTERVAL;
 use crate::ai_core::actions::{self, AiActionContext, ResourceAssignmentPolicy, SpendBudget};
 use crate::ai_core::facts::AiFacts;
 use crate::ai_core::observation::AiObservation;
@@ -113,81 +113,6 @@ fn is_combat_command(command: &Command) -> bool {
         | Command::Stop { .. }
         | Command::SetRally { .. }
         | Command::Rejected { .. } => false,
-    }
-}
-
-pub(super) struct WorkerRushScript {
-    player_id: u32,
-    target_player_id: u32,
-    last_attack_tick: u32,
-}
-
-// Intentionally retained as special harness coverage: this is an all-in worker pull, not a normal
-// strategy profile.
-impl WorkerRushScript {
-    pub(super) fn new(player_id: u32, target_player_id: u32) -> Self {
-        WorkerRushScript {
-            player_id,
-            target_player_id,
-            last_attack_tick: 0,
-        }
-    }
-
-    fn should_think(&self, tick: u32) -> bool {
-        tick == 0
-            || tick
-                .wrapping_add(self.player_id)
-                .is_multiple_of(SYNTHETIC_SCRIPT_THINK_INTERVAL)
-    }
-}
-
-impl ScriptedPlayer for WorkerRushScript {
-    fn player_id(&self) -> u32 {
-        self.player_id
-    }
-
-    fn name(&self) -> &'static str {
-        "worker-rush"
-    }
-
-    fn commands(&mut self, view: PlayerView<'_>, _retreat_commands: Vec<Command>) -> Vec<Command> {
-        if !self.should_think(view.tick) {
-            return Vec::new();
-        }
-        let workers: Vec<u32> = view
-            .snapshot
-            .entities
-            .iter()
-            .filter(|e| e.owner == view.player_id && is_kind(e, EntityKind::Worker))
-            .map(|e| e.id)
-            .collect();
-        if workers.is_empty() {
-            return Vec::new();
-        }
-        let attack_due = view.tick == 0
-            || view.tick.saturating_sub(self.last_attack_tick) >= ATTACK_REISSUE_TICKS;
-        if !attack_due {
-            return Vec::new();
-        }
-        let Some((x, y)) = player_start_world(view.start, self.target_player_id) else {
-            return Vec::new();
-        };
-        let Some(observation) = view.observation([]) else {
-            return Vec::new();
-        };
-        let facts = AiFacts::from_observation(&observation);
-        let mut actions = AiActionContext::new(
-            &facts,
-            SpendBudget::new(
-                view.snapshot.steel,
-                view.snapshot.oil,
-                view.snapshot.supply_used,
-                view.snapshot.supply_cap,
-            ),
-        );
-        self.last_attack_tick = view.tick;
-        actions::attack_move_units(&mut actions, workers, x, y);
-        actions.into_commands()
     }
 }
 
