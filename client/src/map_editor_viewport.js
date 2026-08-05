@@ -117,6 +117,8 @@ export class MapEditorViewport {
     this.terrainRevision = 0;
     this.overlayRevision = 0;
     this.doodadRevision = 0;
+    this.resourcePatchRevision = -1;
+    this.resourcePatches = [];
     this.pendingTerrainUpdate = null;
     this.pendingOverlay = null;
     this.pendingDoodadUpdate = null;
@@ -342,6 +344,14 @@ export class MapEditorViewport {
     };
   }
 
+  resourcePatchRecords() {
+    if (this.resourcePatchRevision !== this.terrainRevision) {
+      this.resourcePatches = mapEditorResourcePatches(this.session.draft);
+      this.resourcePatchRevision = this.terrainRevision;
+    }
+    return this.resourcePatches;
+  }
+
   queueDoodadPatch({ upserts = [], removedIds = [] } = {}) {
     this.doodadRevision += 1;
     if (this.pendingDoodadUpdate?.kind === "replace") {
@@ -402,7 +412,7 @@ export class MapEditorViewport {
       guides,
       guideCentre,
       sites,
-      resourcePatches: mapEditorResourcePatches(draft),
+      resourcePatches: this.resourcePatchRecords(),
       concealmentTiles: structuredCloneSafe(draft.concealmentTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
       damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),

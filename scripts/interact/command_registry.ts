@@ -342,7 +342,9 @@ const NAMESPACE_RECORDS = Object.freeze({
   lab: namespace(
     "Arrange and inspect authoritative Lab scenes.",
     Object.fromEntries(INTERACT_COMMAND_KEYS.filter(
-      (name) => !name.startsWith("game-") && !name.startsWith("scenario-"),
+      (name) => !name.startsWith("game-")
+        && !name.startsWith("scenario-")
+        && !name.startsWith("map-editor-"),
     ).map((name) => [name, name])),
   ),
   game: namespace(

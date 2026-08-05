@@ -70,6 +70,8 @@ try {
     assert.equal(result.namespace, "lab", `${args.join(" ")} identifies the namespace`);
     assert.ok(result.commands.includes("open"), `${args.join(" ")} lists open`);
     assert.ok(result.commands.includes("shutdown"), `${args.join(" ")} lists shutdown`);
+    assert.equal(result.commands.some((command) => command.startsWith("map-editor-")), false,
+      `${args.join(" ")} does not leak Map Editor registry keys into Lab`);
   }
   for (const args of [["game", "--help"], ["help", "game"]]) {
     const help = spawnSync(process.execPath, [cli, ...args], {
