@@ -184,10 +184,15 @@ export function forestTreeFoliageCoverage(record, spans, dimensions) {
 export function isGeneratedForestDoodad(record, dimensions) {
   const id = Number(record?.id);
   const map = normalizeDimensions(dimensions);
-  return !!map
-    && Number.isSafeInteger(id)
-    && id > FOREST_DOODAD_ID_BASE
-    && id <= FOREST_DOODAD_ID_BASE + map.width * map.height;
+  if (
+    !map
+    || !TREE_TYPES.includes(record?.typeId)
+    || !Number.isSafeInteger(id)
+    || id <= FOREST_DOODAD_ID_BASE
+    || id > FOREST_DOODAD_ID_BASE + map.width * map.height
+  ) return false;
+  const index = id - FOREST_DOODAD_ID_BASE - 1;
+  return forestSpansContainTile(dimensions?.forestSpans, index % map.width, Math.floor(index / map.width));
 }
 
 function bestBoundaryTreeType(orbit, canonicalKey, map, tileSet) {
@@ -327,6 +332,12 @@ function edgeProbePoint(tile, edge) {
 
 function edgeProbeKey(tile, edge) { return `${tile.x},${tile.y}:${edge}`; }
 function generatedTreeId(tile, map) { return FOREST_DOODAD_ID_BASE + tile.y * map.width + tile.x + 1; }
+function forestSpansContainTile(spans, x, y) {
+  return Array.isArray(spans) && spans.some((span) => (
+    Array.isArray(span) && span.length === 3 && Number(span[0]) === y
+    && Number(span[1]) <= x && x <= Number(span[2])
+  ));
+}
 function scaledFoliage(foliage, variation) {
   return {
     left: foliage.left * variation,

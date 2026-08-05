@@ -51,7 +51,8 @@ fn authored_map_supports_many_unconditional_base_sites() {
           "terrain": {},
           "startLocations": [{{"x": 8, "y": 24}}],
           "baseSites": [{}],
-          "doodads": []
+          "doodads": [],
+          "forestSpans": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
         base_sites.join(",")
@@ -85,7 +86,8 @@ fn authored_map_rejects_more_than_bounded_base_sites() {
           "terrain": {},
           "startLocations": [{{"x": 8, "y": 100}}],
           "baseSites": [{}],
-          "doodads": []
+          "doodads": [],
+          "forestSpans": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
         base_sites.join(",")
@@ -116,7 +118,8 @@ fn authored_map_accepts_zero_and_maximum_per_base_resource_counts() {
             {{"x": 8, "y": 8, "steelPatches": 0, "oilPatches": 0}},
             {{"x": 31, "y": 31, "steelPatches": 36, "oilPatches": 9}}
           ],
-          "doodads": []
+          "doodads": [],
+          "forestSpans": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
     );
@@ -152,7 +155,8 @@ fn authored_map_rejects_per_base_resource_counts_above_the_limits() {
             "terrain": rows.clone(),
             "startLocations": [{ "x": 8, "y": 8 }],
             "baseSites": [site],
-            "doodads": []
+            "doodads": [],
+            "forestSpans": []
         })
         .to_string();
         let err = Map::from_authored_json(1, &json, 0)

@@ -32,6 +32,9 @@ pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
             authored.version
         ));
     }
+    if authored.forest_spans.is_none() {
+        return Err("map forestSpans must be an array".to_string());
+    }
     let starts = authored.start_locations.len();
     if starts == 0 || starts > MAX_START_LOCATIONS {
         return Err(format!(
@@ -138,9 +141,18 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         })
         .collect();
     let doodads = super::doodads::canonicalize(width, height, authored.doodads)?;
-    let forest_tiles = parse_forest_spans(width, height, &authored.forest_spans)?;
+    let forest_spans = authored
+        .forest_spans
+        .as_deref()
+        .ok_or_else(|| "map forestSpans must be an array".to_string())?;
+    let forest_tiles = parse_forest_spans(width, height, forest_spans)?;
     let concealment_tiles = merge_overlay_locations(
-        parse_overlay_locations(width, height, &authored.concealment_tiles, "concealmentTiles")?,
+        parse_overlay_locations(
+            width,
+            height,
+            &authored.concealment_tiles,
+            "concealmentTiles",
+        )?,
         &forest_tiles,
     );
     let no_vehicle_tiles = merge_overlay_locations(
@@ -198,8 +210,7 @@ struct AuthoredMap {
     base_sites: Vec<AuthoredBaseSite>,
     #[serde(default)]
     doodads: Vec<crate::protocol::MapDoodad>,
-    #[serde(default)]
-    forest_spans: Vec<[u32; 3]>,
+    forest_spans: Option<Vec<[u32; 3]>>,
     #[serde(default)]
     concealment_tiles: Vec<AuthoredLocation>,
     #[serde(default)]

@@ -265,6 +265,7 @@ mod tests {
                 {"x": 31, "y": 12, "steelPatches": 3, "oilPatches": 2}
             ],
             "doodads": doodads,
+            "forestSpans": [],
             "concealmentTiles": [],
             "noVehicleTiles": no_vehicle_tiles
         })
@@ -376,6 +377,7 @@ mod tests {
             "startLocations": [{"x": 8, "y": 8}],
             "baseSites": base_sites,
             "doodads": [],
+            "forestSpans": [],
             "concealmentTiles": [],
             "noVehicleTiles": no_vehicle_wall
         })

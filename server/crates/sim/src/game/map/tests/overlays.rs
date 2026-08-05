@@ -15,6 +15,7 @@ fn authored_map_with_overlays(
         "startLocations": [{"x": 8, "y": 8}],
         "baseSites": [{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}],
         "doodads": [],
+        "forestSpans": [],
         "concealmentTiles": concealment_tiles,
         "noVehicleTiles": no_vehicle_tiles,
         "damageReductionTiles": [],
@@ -149,4 +150,24 @@ fn compact_forest_spans_reject_overlap_and_bad_bounds() {
             .expect_err("invalid compact forest spans must be rejected");
         assert!(error.contains(expected), "error was: {error}");
     }
+}
+
+#[test]
+fn current_authored_schema_requires_forest_spans() {
+    let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+        serde_json::json!([]),
+        serde_json::json!([]),
+    ))
+    .expect("test map JSON");
+    authored
+        .as_object_mut()
+        .expect("authored map object")
+        .remove("forestSpans");
+
+    let error = Map::materialize_authored_json(&authored.to_string(), 1)
+        .expect_err("schema-v7 maps must declare forestSpans");
+    assert!(
+        error.contains("forestSpans must be an array"),
+        "error was: {error}"
+    );
 }

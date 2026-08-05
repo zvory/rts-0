@@ -749,7 +749,8 @@ mod tests {
               "terrain": [".."],
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }"#,
             0,
         )
@@ -769,7 +770,8 @@ mod tests {
               "terrain": [".."],
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }"#,
             0,
         )
@@ -814,7 +816,8 @@ mod tests {
               "terrain": ["..", ".x"],
               "startLocations": [{"x": 0, "y": 0}],
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }"#,
             0,
         )
@@ -865,7 +868,8 @@ mod tests {
               "terrain": {},
               "startLocations": [{{"x": 8, "y": 8}}],
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
-              "doodads": []
+              "doodads": [],
+              "forestSpans": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -892,7 +896,8 @@ mod tests {
                 "y": 8,
                 "steelPatches": 12,
                 "oilPatches": 3
-            }]
+            }],
+            "forestSpans": []
         });
 
         let map = Map::from_authored_json(1, &json.to_string(), 0)
@@ -926,7 +931,8 @@ mod tests {
                 "y": 8,
                 "steelPatches": 12,
                 "oilPatches": 3
-            }]
+            }],
+            "forestSpans": []
         });
 
         let error = Map::from_authored_json(1, &json.to_string(), 0)

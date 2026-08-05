@@ -826,7 +826,7 @@ function resizeDraftCentered(source, width, height) {
   const shift = (location) => ({ ...location, x: location.x + offsetX, y: location.y + offsetY });
   const startLocations = source.startLocations.map(shift);
   const baseSites = source.baseSites.map(shift);
-  const doodads = (source.doodads || []).filter((doodad) => !isGeneratedForestDoodad(doodad, current)).map((doodad) => ({
+  const doodads = (source.doodads || []).filter((doodad) => !isGeneratedForestDoodad(doodad, source)).map((doodad) => ({
     ...copyDoodad(doodad),
     x: doodad.x + offsetX * 32,
     y: doodad.y + offsetY * 32,

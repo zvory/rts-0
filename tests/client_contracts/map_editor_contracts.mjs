@@ -109,6 +109,7 @@ import {
   forestTreeFoliageCoverage,
   forestTilesFromSpans,
 } from "../../client/src/map_authoring/forests.js";
+import { mapSymmetryWarnings } from "../../client/src/map_authoring/symmetry_validation.js";
 import {
   canonicalDoodadColor,
   createDoodadSprayStroke,
@@ -358,6 +359,18 @@ assert(
     "left-edge foliage aligns with the painted forest boundary");
   assert(generated.some((doodad) => Math.abs(forestTreeFoliageBounds(doodad).right - rightBoundary) <= 1),
     "right-edge foliage aligns with the painted forest boundary");
+  const hasDoodadWarning = (map) => mapSymmetryWarnings(map, MAP_EDITOR_SYMMETRY.HALF_TURN)
+    .some((warning) => warning.startsWith("doodads have"));
+  assert.equal(hasDoodadWarning(authored), false, "forest-owned trees do not create false symmetry warnings");
+  const asymmetricManualTree = structuredClone(authored);
+  asymmetricManualTree.doodads.push({ id: 1, typeId: "tree.oak", x: 200, y: 200 });
+  assert(hasDoodadWarning(asymmetricManualTree), "manual doodads remain subject to symmetry validation");
+  const reservedIdWithoutForest = authoredMapFromMaterialized({
+    name: "High manual id", description: "", size: 32,
+    terrain: Array(32 * 32).fill(TERRAIN.GRASS), starts: [], baseSites: [],
+    doodads: [{ id: FOREST_DOODAD_ID_BASE + 1, typeId: "tree.oak", x: 200, y: 200 }],
+  });
+  assert.equal(reservedIdWithoutForest.doodads.length, 1, "unmatched high imported ids remain manual");
 
   session.beginOverlayStroke("Erased forest");
   assert.equal(session.paintForestTiles(forest, false).length, 100);
@@ -699,13 +712,10 @@ assert(
   const session = new MapEditorSession({ storage: null });
   assert.throws(() => session.loadAuthoredMap(legacy), /version 2 is unsupported/,
     "the editor rejects legacy schemas instead of silently migrating them");
-  const incompleteCurrent = authoredMapFromMaterialized({
-    name: "Incomplete current map", description: "", size: 16,
-    terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [],
-  });
+  const incompleteCurrent = authoredMapFromMaterialized({ name: "Incomplete current map", description: "", size: 16,
+    terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [] });
   delete incompleteCurrent.forestSpans;
-  assert.throws(() => session.loadAuthoredMap(incompleteCurrent), /forestSpans must be an array/,
-    "the current schema requires the new forest representation instead of retaining a compatibility path");
+  assert.throws(() => session.loadAuthoredMap(incompleteCurrent), /forestSpans must be an array/);
 }
 
 {
@@ -1101,19 +1111,14 @@ assert(
 
 {
   const overlap = [{ x: 6, y: 7 }];
+  const effectFields = ["concealmentTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"];
   const draft = authoredMapFromMaterialized({
     name: "Independent overlapping effects", description: "", size: 16,
     terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [], doodads: [],
-    concealmentTiles: overlap,
-    noVehicleTiles: overlap,
-    damageReductionTiles: overlap,
-    slowMovementTiles: overlap,
+    ...Object.fromEntries(effectFields.map((field) => [field, overlap])),
   });
-  assert.deepEqual(draft.forestSpans, [],
-    "materialized maps do not guess forest provenance from four independently overlapping effects");
-  for (const field of ["concealmentTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
-    assert.deepEqual(draft[field], overlap, `${field} remains explicit when forest provenance is unavailable`);
-  }
+  assert.deepEqual(draft.forestSpans, [], "overlapping materialized effects do not guess forest provenance");
+  for (const field of effectFields) assert.deepEqual(draft[field], overlap, `${field} remains explicit`);
   assert.equal(draft.doodads.some((doodad) => doodad.id > FOREST_DOODAD_ID_BASE), false,
     "overlapping materialized effects do not synthesize forest trees");
 }
