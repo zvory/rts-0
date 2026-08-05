@@ -370,6 +370,10 @@ pub struct ProductionState {
     /// whenever it is read so restored state cannot make the tick path panic.
     #[serde(default)]
     pub repeat_unit_cursor: usize,
+    /// Earliest simulation tick at which each permanent extractor job may create a replacement
+    /// after its previous extractor or scaffold was killed.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub automatic_extractor_restart_at: BTreeMap<EntityKind, u32>,
     /// Optional first rally stage (world pixels). When set, freshly produced units receive this
     /// order and the producer prefers the spawn exit closest to it.
     pub rally_point: Option<RallyIntent>,
@@ -422,6 +426,11 @@ pub struct ResourceNodeState {
 pub struct ResourceExtractorState {
     /// Ticks accumulated toward the next attached harvest payout.
     pub progress: u32,
+    /// Resource Depot whose permanent background job created this extractor. Unlike the
+    /// construction-local association, this survives completion so combat death can delay only
+    /// the responsible depot job.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) producer_id: Option<u32>,
 }
 
 /// Compact classification of which optional state groups an entity kind owns.

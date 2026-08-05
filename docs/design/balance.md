@@ -154,7 +154,9 @@ within that specific depot's 11-tile coverage and creates an under-construction 
 no eligible patch exists, only that resource job pauses without creating a scaffold. It resumes
 automatically when depletion or destruction makes another patch eligible. If an in-progress
 scaffold is destroyed or cancelled, its free job restarts from zero. Players cannot queue, disable,
-or cancel the permanent automatic jobs through production commands.
+or cancel the permanent automatic jobs through production commands. When an extractor or its
+in-progress scaffold is killed, only that depot's matching resource job waits five seconds before
+creating its replacement scaffold. Normal patch depletion does not apply this combat restart delay.
 Neither extractor accepts a rally order, consumes supply, grants supply, or provides production,
 research, attacks, wreckage, refunds on death, or special death effects. Both remain ordinary
 fog-gated, targetable buildings and can be spawned in Lab. Their Engineers remain

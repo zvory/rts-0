@@ -3,6 +3,30 @@ use crate::game::entity::{EntityKind, ProdItem, MAX_PRODUCTION_QUEUE};
 use super::Entity;
 
 impl Entity {
+    pub(crate) fn automatic_extractor_restart_at(&self, kind: EntityKind) -> Option<u32> {
+        self.production
+            .as_ref()?
+            .automatic_extractor_restart_at
+            .get(&kind)
+            .copied()
+    }
+
+    pub(crate) fn delay_automatic_extractor_restart(
+        &mut self,
+        kind: EntityKind,
+        restart_at: u32,
+    ) -> bool {
+        let Some(production) = self.production.as_mut() else {
+            return false;
+        };
+        production
+            .automatic_extractor_restart_at
+            .entry(kind)
+            .and_modify(|current| *current = (*current).max(restart_at))
+            .or_insert(restart_at);
+        true
+    }
+
     pub fn prod_queue(&self) -> &[ProdItem] {
         self.production
             .as_ref()

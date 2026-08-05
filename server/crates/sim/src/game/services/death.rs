@@ -11,6 +11,8 @@ use crate::game::PlayerState;
 use crate::protocol::Event;
 use crate::rules::{economy, projection};
 
+const EXTRACTOR_RESPAWN_DELAY_TICKS: u32 = config::TICK_HZ * 5;
+
 /// Remove entities whose hp has hit zero, emitting a fog-respecting `Death` event: a player
 /// gets the poof only if they owned the entity or its death position is currently visible to
 /// them (events are best-effort flavor). `death_system` runs before the fog recompute, so the
@@ -45,6 +47,7 @@ pub(crate) fn death_system(
             weapon_facing: e.weapon_facing(),
             killer: e.last_damage_owner(),
             construction_producer: e.construction_producer_id(),
+            extractor_producer: e.resource_extractor_producer_id(),
             queued_units: e
                 .prod_queue()
                 .iter()
@@ -61,6 +64,14 @@ pub(crate) fn death_system(
         .collect();
 
     for dead in dead {
+        if let Some(producer_id) = dead.extractor_producer {
+            let restart_at = tick.saturating_add(EXTRACTOR_RESPAWN_DELAY_TICKS);
+            if let Some(producer) = entities.get_mut(producer_id) {
+                if producer.owner == dead.owner {
+                    producer.delay_automatic_extractor_restart(dead.kind, restart_at);
+                }
+            }
+        }
         let linked_extractor_scaffolds = entities
             .iter()
             .filter(|entity| entity.construction_producer_id() == Some(dead.id))
@@ -245,6 +256,7 @@ struct DeadEntity {
     weapon_facing: Option<f32>,
     killer: Option<u32>,
     construction_producer: Option<u32>,
+    extractor_producer: Option<u32>,
     queued_units: Vec<EntityKind>,
     queued_upgrades: Vec<crate::game::upgrade::UpgradeKind>,
 }

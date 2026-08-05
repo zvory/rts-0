@@ -152,7 +152,7 @@ fn destroyed_depot_does_not_refund_linked_extractor_construction() {
 }
 
 #[test]
-fn destroyed_automatic_extractor_scaffold_restarts_free() {
+fn destroyed_automatic_extractor_scaffold_waits_five_seconds_then_restarts_free() {
     let mut game =
         Game::new_for_replay_with_starting_resources(&players(), 5_000, 5_000, 0xD1E5_0004);
     let resource_depot = game
@@ -172,6 +172,23 @@ fn destroyed_automatic_extractor_scaffold_restarts_free() {
         .find(|entity| entity.construction_producer_id() == Some(resource_depot))
         .map(|entity| (entity.id, entity.kind))
         .expect("automatic extractor scaffold should be linked to its producer");
+    let sibling = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| {
+            entity.kind.is_resource_extractor()
+                && entity.kind != kind
+                && entity.resource_extractor_producer_id() == Some(resource_depot)
+        })
+        .map(|entity| entity.id)
+        .expect("the other automatic extractor scaffold should exist");
+    let sibling_progress_before = game
+        .state
+        .entities
+        .get(sibling)
+        .and_then(|entity| entity.build_progress_fraction())
+        .expect("the other automatic extractor should be under construction");
     {
         let entity = game
             .state
@@ -191,11 +208,26 @@ fn destroyed_automatic_extractor_scaffold_restarts_free() {
         .expect("resource depot should survive")
         .prod_queue()
         .is_empty());
+    let sibling_progress_after = game
+        .state
+        .entities
+        .get(sibling)
+        .and_then(|entity| entity.build_progress_fraction())
+        .expect("the other automatic extractor should keep building");
+    assert!(sibling_progress_after > sibling_progress_before);
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
         starting_resources,
         "automatic extractor construction must not spend or refund resources"
     );
+
+    for _ in 0..config::TICK_HZ * 5 - 1 {
+        game.tick();
+        assert!(game.state.entities.iter().all(|entity| {
+            entity.kind != kind
+                || entity.resource_extractor_producer_id() != Some(resource_depot)
+        }));
+    }
 
     game.tick();
 
@@ -208,6 +240,72 @@ fn destroyed_automatic_extractor_scaffold_restarts_free() {
         })
         .expect("permanent automatic job should replace the destroyed scaffold");
     assert_ne!(replacement.id, scaffold);
+}
+
+#[test]
+fn killed_completed_automatic_extractor_cooldown_survives_checkpoint_restore() {
+    let mut game =
+        Game::new_for_replay_with_starting_resources(&players(), 5_000, 5_000, 0xD1E5_0005);
+    let resource_depot = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::ResourceDepot)
+        .map(|entity| entity.id)
+        .expect("player resource depot should exist");
+
+    for _ in 0..config::building_stats(EntityKind::PumpJack)
+        .expect("pump jack stats")
+        .build_ticks
+    {
+        game.tick();
+    }
+
+    let killed = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| {
+            entity.kind == EntityKind::PumpJack
+                && !entity.under_construction()
+                && entity.resource_extractor_producer_id() == Some(resource_depot)
+        })
+        .map(|entity| entity.id)
+        .expect("automatic Pump Jack should complete and retain its producer");
+    game.state
+        .entities
+        .get_mut(killed)
+        .expect("completed Pump Jack should exist before destruction")
+        .apply_damage(u32::MAX, None);
+
+    game.tick();
+    assert!(game.state.entities.get(killed).is_none());
+    assert!(game.state.entities.iter().all(|entity| {
+        entity.kind != EntityKind::PumpJack
+            || entity.resource_extractor_producer_id() != Some(resource_depot)
+    }));
+    let checkpoint = game
+        .checkpoint_payload_text_for_test()
+        .expect("extractor restart cooldown checkpoint");
+    let map = game.state.map.clone();
+    let map_metadata = game.map_metadata().clone();
+    game = Game::restore_checkpoint_payload_text_for_test(&checkpoint, map, map_metadata)
+        .expect("restore extractor restart cooldown");
+
+    for _ in 0..config::TICK_HZ * 5 - 1 {
+        game.tick();
+        assert!(game.state.entities.iter().all(|entity| {
+            entity.kind != EntityKind::PumpJack
+                || entity.resource_extractor_producer_id() != Some(resource_depot)
+        }));
+    }
+
+    game.tick();
+    assert!(game.state.entities.iter().any(|entity| {
+        entity.kind == EntityKind::PumpJack
+            && entity.under_construction()
+            && entity.resource_extractor_producer_id() == Some(resource_depot)
+    }));
 }
 
 #[test]
