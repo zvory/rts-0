@@ -21,47 +21,11 @@ deterministic simulation ordering. Preserved schema 2 incident replay files are 
 not supported replay fixtures; current replay workloads use schema 3 captures. Entity iteration and
 A* tie-breaking must remain stable; avoid hash-order-dependent simulation behavior.
 
-**Live-controller transcript parity.** The schema-1 Jeff oracle in
-`server/crates/ai/fixtures/jeff_live_oracle_v1.jsonl` answers a different question from command-log
-replay: it reruns the actual `AiController` and proves that the controller generates the same
-ordered command batches from the same fog-filtered inputs. Its test-only host calls the same
-`CanonicalAiTickDriver` as `lobby/live_tick.rs`: two `jeffs_ai` controllers run in player order on
-authored `Chokes` with seed `0x4a45_4646`, every controller result is collected before any command
-is enqueued, and the starting-primary-base policy supplies the objective-alive set. The transcript keeps
-every empty call, exact retreat input and emitted `SimCommand`, current-tick decision trace,
-post-tick command-log delta, recipient-event digest, objective-alive IDs, and per-player snapshot
-digest. Compact serde JSON bytes and repository-owned FNV-1a64 fingerprints are the stable
-canonical representation. Fingerprinted floating-point values are rounded to 1/1024 of a world
-unit so CPU-specific subpixel arithmetic does not make the cross-platform gate flaky; exact
-commands remain unquantized in the transcript. Git or compiler identity is not behavior identity.
-Profile fingerprints likewise hash an explicit serde representation of the policy and manifest
-metadata; Rust `Debug` output is not a stable identity format.
-
-The ordinary gate compares ticks 0-3599, covering both nine-tick stagger offsets, opening economy,
-failed-site placement recovery, construction, production, staging, and first attack orders. With
-`RTS_FULL_AI_TESTS=1`, it compares all 9,000 ticks, extending through Tank/Scout Car production,
-armored movement and hold orders, expansion construction, later pending-build recovery, and stage
-suppression. A first-divergence report classifies input, command, trace, or post-tick drift and
-includes fixture metadata plus the exact tick/player/command index and surrounding fingerprints.
-
-Candidate generation is explicit and target-only:
-
-```bash
-RTS_FULL_AI_TESTS=1 RTS_GENERATE_JEFF_ORACLE_CANDIDATE=1 \
-  cargo nextest run --config-file .config/nextest.toml \
-  --manifest-path server/Cargo.toml --profile default -p rts-ai \
-  -E 'test(/jeff_live_oracle/)'
-```
-
-It writes `server/crates/ai/target/jeff-live-oracle/candidate-v1.jsonl`; ordinary tests never write
-or bless fixtures. The checked-in schema-1 fixture is immutable during the AI SDK refactors and
-must not be regenerated to hide a mismatch.
-
-Because the oracle, production room, matchup/arena/balance tools, `LiveSelfPlay`, normal real-AI
-tests, and the live-AI performance host share this driver, host orchestration changes are now
-covered by the immutable fixture. Offline harnesses retain tick, outcome, scorecard, replay,
-metrics, and artifact ownership; the driver owns only alive-policy selection, immutable pre-tick
-AI inputs, retreat injection, collect-before-enqueue ordering, and stable enqueue order.
+The production room, matchup/arena/balance tools, `LiveSelfPlay`, normal real-AI tests, and the
+live-AI performance host share `CanonicalAiTickDriver`. Offline harnesses retain tick, outcome,
+scorecard, replay, metrics, and artifact ownership; the driver owns only alive-policy selection,
+immutable pre-tick AI inputs, retreat injection, collect-before-enqueue ordering, and stable enqueue
+order.
 
 **Derived-state rebuild coverage.** The test-only `Game` rebuild seam clears the persistent
 `PathingService` cache and rebuilds the final spatial index from authoritative entities at a tick
