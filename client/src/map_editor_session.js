@@ -805,7 +805,6 @@ function normalizeDraft(draft) {
   draft.noVehicleTiles = normalizeOverlayTiles(draft.noVehicleTiles, dimensions);
   draft.damageReductionTiles = normalizeOverlayTiles(draft.damageReductionTiles, dimensions);
   draft.slowMovementTiles = normalizeOverlayTiles(draft.slowMovementTiles, dimensions);
-  removeForestTilesFromManualOverlays(draft);
   reconcileForestDoodads(draft);
 }
 
@@ -888,14 +887,6 @@ function normalizeOverlayTiles(locations, dimensions) {
 function mergedOverlayTiles(explicit, forest) {
   const byKey = new Map([...explicit, ...forest].map((tile) => [locationKey(tile), copyLocation(tile)]));
   return [...byKey.values()].sort((left, right) => left.x - right.x || left.y - right.y);
-}
-
-function removeForestTilesFromManualOverlays(draft) {
-  const forestKeys = new Set(forestTilesFromSpans(draft.forestSpans, draft).map(locationKey));
-  if (!forestKeys.size) return;
-  for (const field of ["concealmentTiles", "noVehicleTiles", "damageReductionTiles", "slowMovementTiles"]) {
-    draft[field] = (draft[field] || []).filter((tile) => !forestKeys.has(locationKey(tile)));
-  }
 }
 
 function reconcileForestDoodads(draft) {
