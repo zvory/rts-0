@@ -186,6 +186,7 @@ fn lab_checkpoint_scenario_export_preserves_god_mode_and_rejects_map_mismatches(
     })
     .expect("god mode should update");
     game.tick();
+    game.tick();
 
     let checkpoint = game
         .export_lab_checkpoint_scenario("Untitled lab scenario".to_string(), TEST_BUILD_SHA)
@@ -230,7 +231,7 @@ fn lab_checkpoint_scenario_rejects_noncanonical_overlays() {
     let mut checkpoint = game
         .export_lab_checkpoint_scenario("Overlay order".to_string(), TEST_BUILD_SHA)
         .expect("checkpoint export");
-    checkpoint.map.data.stealth_tiles = vec![MapTile { x: 2, y: 1 }, MapTile { x: 1, y: 1 }];
+    checkpoint.map.data.concealment_tiles = vec![MapTile { x: 2, y: 1 }, MapTile { x: 1, y: 1 }];
     assert_restore_invalid_map(checkpoint, "not canonical");
 }
 
@@ -261,7 +262,7 @@ fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
             .collect(),
         base_resource_counts: Default::default(),
         doodads: Vec::new(),
-        stealth_tiles: Vec::new(),
+        concealment_tiles: Vec::new(),
         no_vehicle_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),

@@ -67,7 +67,7 @@ impl AntiTankGunMemory {
         let team_players = context.teams.same_team_player_ids(player_id);
         let mut observed_ids = HashSet::new();
         for entity in context.entities.iter() {
-            let visible = !projection::entity_hidden_by_stealth_from_team(
+            let visible = !projection::entity_hidden_by_concealment_from_team(
                 player_id,
                 entity,
                 context.map,

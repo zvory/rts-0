@@ -40,7 +40,7 @@ assert.equal(map.width, 32);
 assert.equal(map.height, 32);
 assert.equal(map.startLocations.length, 2);
 assert.equal(map.baseSites.length, 2);
-assert.deepEqual(map.stealthTiles, []);
+assert.deepEqual(map.concealmentTiles, []);
 assert.deepEqual(map.noVehicleTiles, []);
 assert.deepEqual(map.damageReductionTiles, []);
 assert.deepEqual(map.slowMovementTiles, []);
@@ -145,7 +145,7 @@ const clippedDoodadMap = {
   startLocations: [],
   baseSites: [],
   doodads: clippedDoodadOrbit,
-  stealthTiles: [],
+  concealmentTiles: [],
   noVehicleTiles: [],
 };
 assert(!validateMap(clippedDoodadMap, { symmetry: "threeWay" }).warnings.some((warning) => warning.includes("doodads")),
@@ -189,18 +189,18 @@ const layeredRadial = {
   startLocations: radialLocations,
   baseSites: radialLocations.map((point) => ({ ...point, steelPatches: 4, oilPatches: 1 })),
   doodads: radialDoodads,
-  stealthTiles: radialLocations,
+  concealmentTiles: radialLocations,
   noVehicleTiles: radialLocations,
 };
 assert(!validateMap(layeredRadial, { symmetry: "radial" }).warnings.some((warning) => warning.includes("symmetry")));
 layeredRadial.terrain[10] = `${".".repeat(9)}#${".".repeat(22)}`;
 layeredRadial.baseSites[0].steelPatches = 5;
 layeredRadial.startLocations.pop();
-layeredRadial.stealthTiles.pop();
+layeredRadial.concealmentTiles.pop();
 layeredRadial.noVehicleTiles.pop();
 layeredRadial.doodads.pop();
 const layeredWarnings = validateMap(layeredRadial, { symmetry: "radial" }).warnings;
-for (const layer of ["terrain", "start locations", "base locations", "stealth tiles", "no-vehicle tiles", "doodads"]) {
+for (const layer of ["terrain", "start locations", "base locations", "concealment tiles", "no-vehicle tiles", "doodads"]) {
   assert(layeredWarnings.some((warning) => warning.includes(layer)), `${layer} symmetry is checked`);
 }
 
@@ -210,7 +210,7 @@ assert(preview.includes(">1</text>"));
 
 const layeredPreviewMap = {
   ...map,
-  stealthTiles: [{ x: 1, y: 2 }],
+  concealmentTiles: [{ x: 1, y: 2 }],
   noVehicleTiles: [{ x: 3, y: 4 }],
   doodads: [
     { id: 1, typeId: "tree.oak", x: 64, y: 64 },
@@ -222,10 +222,10 @@ const layeredPreview = renderPreviewSvg(layeredPreviewMap);
 for (const layer of Object.values(MAP_AUTHORING_LAYER)) {
   assert(layeredPreview.includes(`data-layer="${layer}"`), `default CLI preview includes ${layer}`);
 }
-const stealthPreview = renderPreviewSvg(layeredPreviewMap, { layers: MAP_AUTHORING_LAYER.STEALTH });
-assert(stealthPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.STEALTH}"`));
-assert(!stealthPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.BASE}"`));
-assert(!stealthPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.TREES}"`));
+const concealmentPreview = renderPreviewSvg(layeredPreviewMap, { layers: MAP_AUTHORING_LAYER.CONCEALMENT });
+assert(concealmentPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.CONCEALMENT}"`));
+assert(!concealmentPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.BASE}"`));
+assert(!concealmentPreview.includes(`data-layer="${MAP_AUTHORING_LAYER.TREES}"`));
 assert.throws(() => renderPreviewSvg(layeredPreviewMap, { layers: "forest" }), /Unsupported map authoring layer/,
   "the CLI does not preserve Forest as a combined-layer alias");
 
@@ -237,7 +237,7 @@ const malformedValidation = validateMap({
   startLocations: [null],
   baseSites: [{ x: 8, y: 8, steelPatches: -1, oilPatches: 10 }],
   doodads: null,
-  stealthTiles: [{ x: "1", y: 2 }],
+  concealmentTiles: [{ x: "1", y: 2 }],
   unsupportedRootField: true,
 });
 assert(malformedValidation.warnings.some((warning) => warning.includes("terrain has")));
@@ -245,7 +245,7 @@ assert(malformedValidation.warnings.some((warning) => warning.includes("start lo
 assert(malformedValidation.warnings.some((warning) => warning.includes("steelPatches")));
 assert(malformedValidation.warnings.some((warning) => warning.includes("oilPatches")));
 assert(malformedValidation.warnings.some((warning) => warning.includes("doodads must be an array")));
-assert(malformedValidation.warnings.some((warning) => warning.includes("stealthTiles[0]")));
+assert(malformedValidation.warnings.some((warning) => warning.includes("concealmentTiles[0]")));
 assert(malformedValidation.warnings.some((warning) => warning.includes("unsupportedRootField")));
 assert.deepEqual(validateMap(null).warnings, ["map must be a JSON object"]);
 
@@ -256,12 +256,12 @@ const injectedPreview = renderPreviewSvg({
   terrain: ["..", ".."],
   startLocations: [],
   baseSites: [{ x: '0\" onmouseover=\"alert(1)', y: 0 }],
-  stealthTiles: {},
+  concealmentTiles: {},
   noVehicleTiles: null,
   doodads: {},
 });
 assert(!injectedPreview.includes("onmouseover"), "preview omits non-numeric site coordinates");
-assert(injectedPreview.includes('data-layer="stealth"'),
+assert(injectedPreview.includes('data-layer="concealment"'),
   "preview tolerates advisory-invalid optional layer collections");
 const unsupportedDoodadPreview = renderPreviewSvg({
   name: "Unsupported doodad safety",
@@ -353,7 +353,7 @@ assert.throws(
     operations: Array.from({ length: 5 }, () => ({
       type: "overlayTiles",
       tiles: Array(65_536).fill({ x: 0, y: 0 }),
-      edit: { stealth: true },
+      edit: { concealment: true },
     })),
   }),
   /explicit tiles must total at most 262144 entries/,
@@ -426,7 +426,7 @@ try {
   assert(validate.stdout.includes("protected area"));
 
   const render = spawnSync(process.execPath, [
-    "scripts/map-author.mjs", "preview", mapPath, "--output", previewPath, "--layers", "stealth",
+    "scripts/map-author.mjs", "preview", mapPath, "--output", previewPath, "--layers", "concealment",
   ], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -434,7 +434,7 @@ try {
   assert.equal(render.status, 0, render.stderr);
   const previewSvg = fs.readFileSync(previewPath, "utf8");
   assert(previewSvg.startsWith("<svg"));
-  assert(previewSvg.includes('data-layer="stealth"') && !previewSvg.includes('data-layer="base"'),
+  assert(previewSvg.includes('data-layer="concealment"') && !previewSvg.includes('data-layer="base"'),
     "CLI --layers forwards the exact preview layer selection");
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });

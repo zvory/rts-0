@@ -17,7 +17,7 @@ pub struct AuthoredMapData {
     pub base_sites: Vec<(u32, u32)>,
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
     pub doodads: Vec<MapDoodad>,
-    pub stealth_tiles: Vec<(u32, u32)>,
+    pub concealment_tiles: Vec<(u32, u32)>,
     pub no_vehicle_tiles: Vec<(u32, u32)>,
     pub damage_reduction_tiles: Vec<(u32, u32)>,
     pub slow_movement_tiles: Vec<(u32, u32)>,

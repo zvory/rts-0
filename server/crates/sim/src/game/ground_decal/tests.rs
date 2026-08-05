@@ -27,6 +27,7 @@ fn fog_with_visible_tile(player: u32, visible_index: Option<usize>) -> Fog {
         BTreeMap::from([(player, grid)]),
         BTreeMap::new(),
         BTreeMap::new(),
+        BTreeMap::new(),
     )
 }
 

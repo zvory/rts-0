@@ -674,6 +674,14 @@ impl Game {
             &self.state.smokes,
             &teams,
         );
+        self.state.fog.refresh_concealment_detection_for_teams(
+            self.state.tick,
+            &self.state.entities,
+            &self.state.map,
+            &self.state.smokes,
+            &teams,
+            self.derived.final_spatial(),
+        );
         self.state.fog.stamp_firing_reveal_sources_with_smoke(
             &self.state.firing_reveals,
             &self.state.entities,

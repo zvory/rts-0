@@ -215,9 +215,9 @@ back-to-front world-Y ordering; tree understory and shadows remain below them, w
 and fog remain above. Any received ordinary unit occluded by a tree gets a white outer edge plus an
 85%-opacity owner/team-color silhouette derived from the alpha of its current production rig/frame
 above the canopy. Authoritative `visionOnly`
-stealth reveals omit that rig from the normal full-color layer, redraw the same current production
+concealment reveals omit that rig from the normal full-color layer, redraw the same current production
 rig into a filtered above-fog outline layer, and keep damaged-unit HP above it. The filter samples
-alpha only and never copies faction-colored pixels; stealth reveals retain the white edge without
+alpha only and never copies faction-colored pixels; concealment reveals retain the white edge without
 the team-color fill. These passes consume only already-admitted entities and therefore cannot reveal
 a hidden enemy.
 

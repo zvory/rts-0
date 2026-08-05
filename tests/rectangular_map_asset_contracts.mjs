@@ -43,18 +43,18 @@ const materializedHash = (data) => fnv1a64([
 ]);
 
 const bundledMapContracts = new Map([
-  ["1v1-no-terrain.json", [126, 126, "43229a90f176eca98bc846369c23829ec21ef651110c6130f60cd44064e0f493", "5edd41538241850c"]],
-  ["1v1.json", [126, 126, "dc1f3578b9b8e59dddef9dad876a43873771efac6d7cff010b65a6088f30c91d", "1c6148c3617c5f44"]],
-  ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "ea61ac41e2c86aed"]],
-  ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "450b266bde22a3d3"]],
-  ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "cefc0c6af15e2d48"]],
-  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "9bf599459e2d0485"]],
+  ["1v1-no-terrain.json", [126, 126, "43229a90f176eca98bc846369c23829ec21ef651110c6130f60cd44064e0f493", "bdaad28d7c92177b"]],
+  ["1v1.json", [126, 126, "dc1f3578b9b8e59dddef9dad876a43873771efac6d7cff010b65a6088f30c91d", "9e6169128d81ed61"]],
+  ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "3c7518fa5be30b14"]],
+  ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "354d147958614ac0"]],
+  ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "4638fcdac85871c7"]],
+  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "348529d8604df328"]],
 ]);
 
 for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMapContracts) {
   const rawMap = fs.readFileSync(new URL(`server/assets/maps/${fileName}`, repoRoot));
   const map = JSON.parse(rawMap);
-  assert.equal(map.version, 6, `${fileName} uses the sparse-overlay schema`);
+  assert.equal(map.version, 7, `${fileName} uses the sparse-overlay schema`);
   assert.equal(map.width, width, `${fileName} preserves its inferred terrain width`);
   assert.equal(map.height, height, `${fileName} preserves its inferred terrain height`);
   assert.equal(map.terrain.length, height, `${fileName} terrain row count matches height`);
@@ -74,16 +74,16 @@ for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMa
 }
 
 const bundledScenarioContracts = new Map([
-  ["lategame.json", ["1c6148c3617c5f44", "7918f89f6178e9c9"]],
-  ["render-preview.json", ["1c6148c3617c5f44", "f82d4bf8967c50c9"]],
-  ["fixed-roster-hellhole.json", ["cefc0c6af15e2d48", "b8b0dd056c34c92d"]],
-  ["tank-trap-cluster-clear.json", ["1c6148c3617c5f44", "7918f89f6178e9c9"]],
+  ["lategame.json", ["9e6169128d81ed61", "7918f89f6178e9c9"]],
+  ["render-preview.json", ["9e6169128d81ed61", "f82d4bf8967c50c9"]],
+  ["fixed-roster-hellhole.json", ["4638fcdac85871c7", "b8b0dd056c34c92d"]],
+  ["tank-trap-cluster-clear.json", ["9e6169128d81ed61", "7918f89f6178e9c9"]],
 ]);
 
 for (const [fileName, [contentHash, expectedMaterializedHash]] of bundledScenarioContracts) {
   const scenario = JSON.parse(fs.readFileSync(new URL(`server/assets/lab-scenarios/${fileName}`, repoRoot), "utf8"));
   const checkpoint = JSON.parse(scenario.checkpointPayload);
-  assert.equal(scenario.map.schemaVersion, 6, `${fileName} binds the current authored map schema`);
+  assert.equal(scenario.map.schemaVersion, 7, `${fileName} binds the current authored map schema`);
   assert.equal(scenario.map.contentHash, contentHash, `${fileName} binds the exact authored map bytes`);
   assert.equal(scenario.map.data.width, 126, `${fileName} preserves its map width`);
   assert.equal(scenario.map.data.height, 126, `${fileName} preserves its map height`);
@@ -98,7 +98,7 @@ for (const [fileName, [contentHash, expectedMaterializedHash]] of bundledScenari
     checkpoint.mapBinding,
     {
       name: scenario.map.name,
-      schemaVersion: 6,
+      schemaVersion: 7,
       contentHash,
       materializedMapHash: expectedMaterializedHash,
       width: 126,

@@ -98,7 +98,7 @@ fn destroyed_producer_refunds_paid_work_but_not_unpaid_queue_entries() {
 }
 
 #[test]
-fn destroyed_depot_refunds_extractor_and_removes_linked_scaffold() {
+fn destroyed_depot_does_not_refund_linked_extractor_construction() {
     let mut game =
         Game::new_for_replay_with_starting_resources(&players(), 5_000, 5_000, 0xD1E5_0003);
     let resource_depot = game
@@ -144,7 +144,70 @@ fn destroyed_depot_refunds_extractor_and_removes_linked_scaffold() {
 
     assert!(game.state.entities.get(resource_depot).is_none());
     assert!(game.state.entities.get(scaffold).is_none());
-    assert_eq!(game.state.players[0].steel, starting_steel);
+    assert_eq!(
+        game.state.players[0].steel,
+        starting_steel - pump_jack_cost.steel,
+        "extractor construction destroyed with its producer must not be refunded"
+    );
+}
+
+#[test]
+fn destroyed_automatic_extractor_scaffold_restarts_free() {
+    let mut game =
+        Game::new_for_replay_with_starting_resources(&players(), 5_000, 5_000, 0xD1E5_0004);
+    let resource_depot = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.owner == 1 && entity.kind == EntityKind::ResourceDepot)
+        .map(|entity| entity.id)
+        .expect("player resource depot should exist");
+    let starting_resources = (game.state.players[0].steel, game.state.players[0].oil);
+    game.tick();
+
+    let (scaffold, kind) = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.construction_producer_id() == Some(resource_depot))
+        .map(|entity| (entity.id, entity.kind))
+        .expect("automatic extractor scaffold should be linked to its producer");
+    {
+        let entity = game
+            .state
+            .entities
+            .get_mut(scaffold)
+            .expect("automatic extractor scaffold should exist before destruction");
+        entity.apply_damage(entity.max_hp, None);
+    }
+
+    game.tick();
+
+    assert!(game.state.entities.get(scaffold).is_none());
+    assert!(game
+        .state
+        .entities
+        .get(resource_depot)
+        .expect("resource depot should survive")
+        .prod_queue()
+        .is_empty());
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        starting_resources,
+        "automatic extractor construction must not spend or refund resources"
+    );
+
+    game.tick();
+
+    let replacement = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| {
+            entity.kind == kind && entity.construction_producer_id() == Some(resource_depot)
+        })
+        .expect("permanent automatic job should replace the destroyed scaffold");
+    assert_ne!(replacement.id, scaffold);
 }
 
 #[test]

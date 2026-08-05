@@ -29,7 +29,7 @@ fn turtle_expansion_ignores_opening_rifleman_losses() {
 }
 
 #[test]
-fn turtle_opening_enables_depot_extractor_repeat_without_training_miners() {
+fn turtle_opening_relies_on_permanent_depot_extractor_jobs_without_training_miners() {
     let ts = config::TILE_SIZE as f32;
     let owned = vec![
         building_at(10, EntityKind::ResourceDepot, Some(0), 8.5 * ts, 8.5 * ts),
@@ -56,13 +56,10 @@ fn turtle_opening_enables_depot_extractor_repeat_without_training_miners() {
     assert!(!decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::Worker
     }));
-    for unit in [EntityKind::SteelMine, EntityKind::PumpJack] {
-        assert!(decision.commands.iter().any(|command| matches!(
-            command,
-            Command::AdjustProductionRepeat { buildings, unit: queued, delta: 1 }
-                if buildings == &[10] && *queued == unit
-        )));
-    }
+    assert!(!decision
+        .commands
+        .iter()
+        .any(|command| matches!(command, Command::AdjustProductionRepeat { .. })));
 }
 
 #[test]

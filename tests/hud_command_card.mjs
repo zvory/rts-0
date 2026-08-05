@@ -317,11 +317,36 @@ function buttonSlots(card) {
     ],
     "Resource Depot exposes Engineer and both depot-local extractors",
   );
-  assert.deepEqual(resourceDepotCard.slots[1].contextIntent, {
-    type: "adjustProductionRepeat",
-    buildingIds: [resourceDepot.id],
-    unit: KIND.STEEL_MINE,
+  assert.equal(resourceDepotCard.slots[1].enabled, false);
+  assert.equal(resourceDepotCard.slots[1].contextIntent, null);
+  assert.equal(resourceDepotCard.slots[1].autobuildIndicatorCount, 1);
+  assert.match(resourceDepotCard.slots[1].title, /Automatically builds for free/);
+}
+
+{
+  const unfinishedBarracks = {
+    id: 28,
+    owner: 1,
+    kind: KIND.BARRACKS,
+    buildProgress: 0.4,
+  };
+  const constructionCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [unfinishedBarracks],
+    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
   });
+  const rifleman = constructionCard.slots.find((slot) => slot?.id === `train:${KIND.RIFLEMAN}`);
+  assert.equal(constructionCard.kind, "construction");
+  assert.equal(rifleman?.enabled, false, "unfinished producers cannot train immediately");
+  assert.deepEqual(rifleman?.contextIntent, {
+    type: "adjustProductionRepeat",
+    buildingIds: [unfinishedBarracks.id],
+    unit: KIND.RIFLEMAN,
+  }, "unfinished producers expose their auto-build hotkey action");
+  assert.equal(constructionCard.slots[8]?.commandId, "construction.cancel");
 }
 
 {

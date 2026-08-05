@@ -25,16 +25,19 @@ import {
   stopDescriptor,
 } from "./hud_unit_commands.js";
 import {
+  constructionCancelDescriptor,
   firstOpenCommandSlot,
+  productionRepeatAffordance,
   researchAvailability,
   researchDisabledReason,
   researchSlotForUpgrade,
   selectedResearchBuilding,
-  selectedProducerBuildingsForUnit,
+  selectedRepeatProducerBuildingsForUnit,
   selectedProducingBuildingsForKind,
   trainAvailability,
   trainDisabledReason,
   trainLimitSignature,
+  trainResourcesOf,
   trainSlotForUnit,
 } from "./hud_train_card_helpers.js";
 import { buildEkatCommandCardContextSamples } from "./hud_command_card_contexts.js";
@@ -222,7 +225,7 @@ export function buildCommandCardDescriptors(ctx) {
     return buildWorkerBuildCard(ctx);
   }
   if (underConstructionBuilding(ctx, primary)) {
-    return buildConstructionCard(primary);
+    return buildConstructionCard(ctx, primary);
   }
   if (selectedOwnUnits(ctx, selection).length > 0) {
     return buildUnitCard(ctx, selection);
@@ -245,21 +248,12 @@ export function commandSubject(ctx, selection) {
   return null;
 }
 
-export function buildConstructionCard(building) {
+export function buildConstructionCard(ctx, building) {
+  if (factionTrainsOf(ctx, building.kind).length > 0) {
+    return buildTrainCard(ctx, building, { underConstruction: true });
+  }
   const slots = new Array(9).fill(null);
-  slots[8] = {
-    id: `cancel-construction:${building.id}`,
-    commandId: "construction.cancel",
-    kind: "button",
-    action: "cancelConstruction",
-    intent: { type: "cancelConstruction", buildingId: building.id },
-    icon: "CNCL",
-    label: "Cancel",
-    enabled: true,
-    cls: "cancel",
-    title: "Cancel construction for a full refund",
-    repeatable: false,
-  };
+  slots[8] = constructionCancelDescriptor(building);
   return card("construction", `construction|${building.id}`, slots);
 }
 
@@ -446,17 +440,19 @@ function abilitySlotPriority(definition) {
   return definition?.commandCardPriority ?? 0;
 }
 
-export function buildTrainCard(ctx, building) {
+export function buildTrainCard(ctx, building, { underConstruction = false } = {}) {
   const resources = trainResourcesOf(ctx);
   const factionId = commandFactionId(ctx);
   const trains = factionTrainsOf(ctx, building.kind);
-  const researches = availableResearchesOf(ctx, building.kind);
-  const producingBuildings = selectedProducingBuildingsForKind(ctx, building.kind, isOwn);
+  const researches = underConstruction ? [] : availableResearchesOf(ctx, building.kind);
+  const producingBuildings = underConstruction
+    ? []
+    : selectedProducingBuildingsForKind(ctx, building.kind, isOwn);
   const cancelSlot = 8;
   const signature =
-    `train|${building.id}|` +
+    `${underConstruction ? "construction" : "train"}|${building.id}|` +
     trains.map((unit) => {
-      const producers = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf);
+      const producers = selectedRepeatProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf);
       const producerIds = producers.map((e) => e.id).join(".");
       const repeatingIds = producers
         .filter((producer) => producer.prodRepeatKinds?.includes(unit))
@@ -478,37 +474,37 @@ export function buildTrainCard(ctx, building) {
     const slot = firstOpenCommandSlot(slots, trainSlotForUnit(building.kind, unit, trains), cancelSlot);
     if (slot < 0) continue;
     const availability = trainAvailability(ctx, unit, resources, isOwn);
-    const producerIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
-      .map((producer) => producer.id);
-    const repeatingIds = selectedProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf)
+    const producers = selectedRepeatProducerBuildingsForUnit(ctx, unit, isOwn, factionTrainsOf);
+    const producerIds = producers.map((producer) => producer.id);
+    const repeatingIds = producers
       .filter((producer) => producer.prodRepeatKinds?.includes(unit))
       .map((producer) => producer.id);
-    const disabledReason = trainDisabledReason(ctx, unit, resources, isOwn);
+    const automatic = building.kind === KIND.RESOURCE_DEPOT &&
+      (unit === KIND.STEEL_MINE || unit === KIND.PUMP_JACK);
+    const disabledReason = automatic
+      ? "Automatically builds for free whenever a matching resource patch is available"
+      : underConstruction
+        ? "Training becomes available when construction completes"
+      : trainDisabledReason(ctx, unit, resources, isOwn);
     const repeatHelp = "Alt-click, Alt+hotkey, or Ctrl+hotkey adds one auto-build; Shift+hotkey removes one";
     slots[slot] = {
       id: `train:${unit}`,
       commandId: factionCommandId(factionId, "train", unit),
       kind: "button",
       action: "train",
-      intent: { type: "train", unit },
+      intent: automatic || underConstruction ? null : { type: "train", unit },
       icon: st.icon,
       unitIconKind: unit,
       label: st.label,
       cost: st.cost,
-      enabled: availability !== "locked",
-      unaffordable: availability === "unaffordable",
-      title: disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp,
+      enabled: !automatic && !underConstruction && availability !== "locked",
+      unaffordable: !underConstruction && availability === "unaffordable",
+      title: automatic
+        ? disabledReason
+        : (disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp),
       tooltipKind: unit,
-      repeatable: availability === "ready",
-      countBadge: `${repeatingIds.length}/${producerIds.length}`,
-      autobuildIndicatorCount: repeatingIds.length,
-      cls: repeatingIds.length > 0 ? "autocast-enabled production-repeat-enabled" : "",
-      contextIntent: {
-        type: "adjustProductionRepeat",
-        buildingIds: producerIds,
-        unit,
-      },
-      contextHotkeyModifiers: ["alt", "ctrl", "shift"],
+      ...productionRepeatAffordance(automatic, producerIds, repeatingIds, unit,
+        !underConstruction && availability === "ready"),
       onUnavailableIntent: { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };
   }
@@ -538,7 +534,9 @@ export function buildTrainCard(ctx, building) {
     };
   }
 
-  if (producingBuildings.length > 0) {
+  if (underConstruction) {
+    slots[cancelSlot] = constructionCancelDescriptor(building);
+  } else if (producingBuildings.length > 0) {
     slots[cancelSlot] = {
       id: `cancel:${building.kind}`,
       commandId: `production.cancel.${building.kind}`,
@@ -554,7 +552,7 @@ export function buildTrainCard(ctx, building) {
     };
   }
 
-  return card("train", signature, slots);
+  return card(underConstruction ? "construction" : "train", signature, slots);
 }
 
 export function selectedAbilityAffordances(ctx, selection) {
@@ -702,26 +700,6 @@ function requirementsOf(definition) {
 
 function resourcesOf(ctx) {
   return ctx.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
-}
-
-function trainResourcesOf(ctx) {
-  const base = resourcesOf(ctx);
-  const resources = {
-    steel: base.steel ?? 0,
-    oil: base.oil ?? 0,
-    supplyUsed: Number.isFinite(base.supplyUsed) ? base.supplyUsed : 0,
-    supplyCap: Number.isFinite(base.supplyCap) ? base.supplyCap : null,
-  };
-  for (const entry of ctx.optimisticProduction || []) {
-    const st = STATS[entry?.unit];
-    if (!st) continue;
-    const cost = st.cost || {};
-    resources.steel -= cost.steel ?? 0;
-    resources.oil -= cost.oil ?? 0;
-    const supply = st.supply ?? 0;
-    if (Number.isFinite(supply) && supply > 0) resources.supplyUsed += supply;
-  }
-  return resources;
 }
 
 function commandFactionId(ctx) {

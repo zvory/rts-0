@@ -15,8 +15,9 @@ use crate::rules::{economy, projection};
 /// gets the poof only if they owned the entity or its death position is currently visible to
 /// them (events are best-effort flavor). `death_system` runs before the fog recompute, so the
 /// current fog still reflects who could see the unit while it was alive — exactly the players
-/// who should see it die. A dead building refunds every prepaid unit and research item before its
-/// queues are removed. Workers building a since-removed site are reset elsewhere.
+/// who should see it die. A dead building refunds prepaid units and research before its queues are
+/// removed, except for linked extractor construction that dies with its producer. Workers building
+/// a since-removed site are reset elsewhere.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn death_system(
     map: &Map,
@@ -43,6 +44,7 @@ pub(crate) fn death_system(
             facing: e.facing(),
             weapon_facing: e.weapon_facing(),
             killer: e.last_damage_owner(),
+            construction_producer: e.construction_producer_id(),
             queued_units: e
                 .prod_queue()
                 .iter()
@@ -59,9 +61,35 @@ pub(crate) fn death_system(
         .collect();
 
     for dead in dead {
+        let linked_extractor_scaffolds = entities
+            .iter()
+            .filter(|entity| entity.construction_producer_id() == Some(dead.id))
+            .map(|entity| (entity.id, entity.kind))
+            .collect::<Vec<_>>();
+        if let Some(producer_id) = dead.construction_producer {
+            let lost_item = entities.get_mut(producer_id).and_then(|producer| {
+                (producer.owner == dead.owner
+                    && producer
+                        .prod_queue()
+                        .first()
+                        .is_some_and(|front| front.unit == dead.kind))
+                .then(|| producer.remove_front_production())
+                .flatten()
+            });
+            if let Some(item) = lost_item {
+                if let Some(player) = players.iter_mut().find(|player| player.id == dead.owner) {
+                    player.release_supply(economy::supply_cost(item.unit));
+                }
+            }
+        }
         if let Some(player) = players.iter_mut().find(|player| player.id == dead.owner) {
             for unit in dead.queued_units {
-                if config::unit_stats(unit).is_some() || unit.is_resource_extractor() {
+                let linked_construction_died = linked_extractor_scaffolds
+                    .iter()
+                    .any(|(_, scaffold_kind)| *scaffold_kind == unit);
+                if !linked_construction_died
+                    && (config::unit_stats(unit).is_some() || unit.is_resource_extractor())
+                {
                     player.refund_cost(economy::resource_cost(unit));
                     player.release_supply(economy::supply_cost(unit));
                 }
@@ -74,19 +102,14 @@ pub(crate) fn death_system(
                 ));
             }
         }
-        let linked_extractor_scaffolds = entities
-            .iter()
-            .filter(|entity| entity.construction_producer_id() == Some(dead.id))
-            .map(|entity| entity.id)
-            .collect::<Vec<_>>();
         entities.release_miner(dead.id);
         entities.remove(dead.id);
-        for scaffold in linked_extractor_scaffolds {
+        for (scaffold, _) in linked_extractor_scaffolds {
             entities.remove(scaffold);
         }
         record_score_death(players, dead.owner, dead.kind, dead.killer);
         let concealed_unit =
-            config::unit_stats(dead.kind).is_some() && map.world_point_is_stealth(dead.x, dead.y);
+            config::unit_stats(dead.kind).is_some() && map.world_point_is_concealed(dead.x, dead.y);
         if !concealed_unit {
             ground_decals.create_death(
                 dead.kind,
@@ -221,6 +244,7 @@ struct DeadEntity {
     facing: f32,
     weapon_facing: Option<f32>,
     killer: Option<u32>,
+    construction_producer: Option<u32>,
     queued_units: Vec<EntityKind>,
     queued_upgrades: Vec<crate::game::upgrade::UpgradeKind>,
 }

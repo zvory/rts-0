@@ -401,10 +401,16 @@ impl Game {
                     continue;
                 }
                 let live_visible = live_fog.is_visible_world(pid, v.x, v.y);
-                let stealth_concealment =
+                let concealment_concealment =
                     self.state.entities.get(v.id).is_some_and(Entity::is_unit)
-                        && self.state.map.world_point_is_stealth(v.x, v.y);
-                let stealth_reveal = stealth_concealment
+                        && self.state.map.world_point_is_concealed(v.x, v.y);
+                let concealment_detection = concealment_concealment
+                    && self
+                        .team_relations()
+                        .same_team_player_ids(pid)
+                        .into_iter()
+                        .any(|player| self.state.fog.has_concealment_detection(player, v.id));
+                let concealment_reveal = concealment_concealment
                     && self
                         .team_relations()
                         .same_team_player_ids(pid)
@@ -419,7 +425,7 @@ impl Game {
                 // legacy/special render-only intel.
                 if v.vision_only {
                     assert!(
-                        !live_visible || stealth_reveal,
+                        !live_visible || concealment_reveal,
                         "invariant: tick {} snapshot for player {} marks live-visible enemy entity {} as vision-only at {}",
                         self.state.tick,
                         pid,
@@ -428,7 +434,7 @@ impl Game {
                     );
                 } else {
                     assert!(
-                        live_visible && !stealth_concealment,
+                        live_visible && (!concealment_concealment || concealment_detection),
                         "invariant: tick {} snapshot for player {} exposes hidden enemy entity {} at {}",
                         self.state.tick,
                         pid,
@@ -438,7 +444,7 @@ impl Game {
                 }
                 // If a target_id is exposed, the target must be projected too. Checking the
                 // snapshot itself keeps this invariant aligned with projection policy, including
-                // public resource nodes and smoke/stealth visibility.
+                // public resource nodes and smoke/concealment visibility.
                 if let Some(tid) = v.target_id {
                     if let Some(t) = self.state.entities.get(tid) {
                         assert!(

@@ -25,6 +25,12 @@ pub const MAP_TERRAIN_FROSTED_GROUND: u8 = 17;
 
 pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
 pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 = 0.75;
+/// Body-edge distance at which an ordinary unit detects a concealed hostile unit.
+pub const CONCEALMENT_CLOSE_DETECTION_RANGE_TILES: f32 = 2.0;
+/// Maximum number of concealment tiles an ordinary fog-of-war sight ray may enter.
+pub const CONCEALMENT_SIGHT_DEPTH_TILES: u32 = 3;
+/// Duration that an entity remains detected after close contact ends.
+pub const CONCEALMENT_DETECTION_PERSIST_TICKS: u32 = crate::balance::TICK_HZ;
 const DAMAGE_REDUCTION_TILE_DAMAGE_NUMERATOR: u32 = 3;
 const DAMAGE_REDUCTION_TILE_DAMAGE_DENOMINATOR: u32 = 4;
 pub const DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER: f32 =

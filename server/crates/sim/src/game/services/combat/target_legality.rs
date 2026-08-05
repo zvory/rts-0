@@ -56,7 +56,7 @@ pub(super) fn direct_fire_target_legal(
     if !targetable {
         return false;
     }
-    if crate::rules::projection::entity_hidden_by_stealth_from_team(
+    if crate::rules::projection::entity_hidden_by_concealment_from_team(
         attacker_owner,
         target_entity,
         map,
@@ -169,8 +169,9 @@ fn target_has_legal_shot(
     py: f32,
     target: &Entity,
 ) -> bool {
-    if crate::rules::projection::entity_hidden_by_stealth_from_team(owner, target, map, fog, teams)
-    {
+    if crate::rules::projection::entity_hidden_by_concealment_from_team(
+        owner, target, map, fog, teams,
+    ) {
         return false;
     }
     let target_team_visible =

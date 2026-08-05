@@ -381,7 +381,7 @@ impl Game {
     /// Static info for the `start` message: terrain grid + each player's start tile. The
     /// `player_id` is left 0; the networking layer overwrites it per recipient.
     pub fn start_payload(&self) -> StartPayload {
-        let (stealth_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
+        let (concealment_tiles, no_vehicle_tiles, damage_reduction_tiles, slow_movement_tiles) =
             self.state.map.protocol_overlay_tiles();
         let resources = self
             .state
@@ -412,7 +412,7 @@ impl Game {
                 .filter(|doodad| !crate::game::map::doodads::is_tank_trap(doodad))
                 .cloned()
                 .collect(),
-            stealth_tiles,
+            concealment_tiles,
             no_vehicle_tiles,
             damage_reduction_tiles,
             slow_movement_tiles,

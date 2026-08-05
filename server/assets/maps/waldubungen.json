@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "width": 192,
   "height": 126,
   "name": "Waldübungen",
@@ -205,7 +205,7 @@
       "oilPatches": 3
     }
   ],
-  "stealthTiles": [
+  "concealmentTiles": [
     {
       "x": 11,
       "y": 27

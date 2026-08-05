@@ -137,7 +137,7 @@ fn depot_extractor_scaffold_matches_front_queue_progress() {
 }
 
 #[test]
-fn cancelling_extractor_scaffold_cancels_and_refunds_depot_item() {
+fn cancelling_legacy_extractor_scaffold_restarts_free_without_refund() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
@@ -182,11 +182,11 @@ fn cancelling_extractor_scaffold_cancels_and_refunds_depot_item() {
         .expect("depot")
         .prod_queue()
         .is_empty());
-    assert_eq!(game.state.players[0].steel, 500);
+    assert_eq!(game.state.players[0].steel, 450);
 }
 
 #[test]
-fn repeated_extractor_pauses_when_saturated_and_resumes_after_destruction() {
+fn automatic_extractor_pauses_when_saturated_and_restarts_free_after_destruction() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
@@ -199,11 +199,6 @@ fn repeated_extractor_pauses_when_saturated_and_resumes_after_destruction() {
         .entities
         .spawn_building(1, EntityKind::SteelMine, patch.0, patch.1, true)
         .expect("starting mine should spawn");
-    game.state
-        .entities
-        .get_mut(depot)
-        .expect("depot")
-        .set_repeat_production(Some(EntityKind::SteelMine), true);
     game.state.players[0].set_resources(500, 0);
 
     game.tick();
@@ -211,24 +206,29 @@ fn repeated_extractor_pauses_when_saturated_and_resumes_after_destruction() {
     assert!(game
         .state
         .entities
-        .get(depot)
-        .expect("depot")
-        .prod_queue()
-        .is_empty());
+        .iter()
+        .all(|entity| { entity.kind != EntityKind::SteelMine || !entity.under_construction() }));
 
     game.state.entities.remove(mine);
     game.tick();
-    assert_eq!(game.state.players[0].steel, 450);
-    let queue = game.state.entities.get(depot).expect("depot").prod_queue();
-    assert_eq!(queue.len(), 1);
-    assert_eq!(queue[0].unit, EntityKind::SteelMine);
-    assert!(queue[0].paid);
+    assert_eq!(game.state.players[0].steel, 500);
+    let scaffold = game
+        .state
+        .entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::SteelMine && entity.under_construction())
+        .expect("the permanent free job should restart the mine");
+    assert_eq!(scaffold.construction_producer_id(), Some(depot));
+    assert_eq!(
+        scaffold.build_progress_fraction(),
+        Some(1.0 / (config::TICK_HZ * 24) as f32)
+    );
 }
 
 #[test]
-fn saturated_extractor_repeat_yields_to_other_extractor_kind() {
+fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     let mut game = empty_flat_game(&players());
-    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    let _depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
     let steel_patch = game.state.map.tile_center(14, 10);
     let oil_patch = game.state.map.tile_center(16, 10);
@@ -238,29 +238,33 @@ fn saturated_extractor_repeat_yields_to_other_extractor_kind() {
     game.state
         .entities
         .spawn_node(EntityKind::Oil, oil_patch.0, oil_patch.1);
-    game.state
-        .entities
-        .spawn_building(1, EntityKind::SteelMine, steel_patch.0, steel_patch.1, true)
-        .expect("starting mine should spawn");
-    let producer = game.state.entities.get_mut(depot).expect("depot");
-    producer.set_repeat_production(Some(EntityKind::SteelMine), true);
-    producer.set_repeat_production(Some(EntityKind::PumpJack), true);
-    game.state.players[0].set_resources(500, 0);
+    game.state.players[0].set_resources(0, 0);
 
     game.tick();
-    assert!(game
-        .state
-        .entities
-        .get(depot)
-        .expect("depot")
-        .prod_queue()
-        .is_empty());
-
-    game.tick();
-    let queue = game.state.entities.get(depot).expect("depot").prod_queue();
-    assert_eq!(queue.len(), 1);
-    assert_eq!(queue[0].unit, EntityKind::PumpJack);
-    assert_eq!(game.state.players[0].steel, 400);
+    let progress = |kind| {
+        game.state
+            .entities
+            .iter()
+            .find(|entity| entity.kind == kind && entity.under_construction())
+            .and_then(|entity| entity.build_progress_fraction())
+    };
+    let expected_first_tick = 1.0 / (config::TICK_HZ * 24) as f32;
+    assert_eq!(progress(EntityKind::SteelMine), Some(expected_first_tick));
+    assert_eq!(progress(EntityKind::PumpJack), Some(expected_first_tick));
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (0, 0)
+    );
+    for _ in 1..config::TICK_HZ * 24 {
+        game.tick();
+    }
+    for kind in [EntityKind::SteelMine, EntityKind::PumpJack] {
+        assert!(game
+            .state
+            .entities
+            .iter()
+            .any(|entity| entity.kind == kind && !entity.under_construction()));
+    }
 }
 
 #[test]

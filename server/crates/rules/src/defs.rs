@@ -533,11 +533,11 @@ pub const BUILDINGS: &[BuildingDef] = &[
         stats: balance::BuildingStats {
             hp: 50,
             sight_tiles: 1,
-            cost_steel: 50,
+            cost_steel: 0,
             cost_oil: 0,
             foot_w: 1,
             foot_h: 1,
-            build_ticks: balance::TICK_HZ * 20,
+            build_ticks: balance::TICK_HZ * 24,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -550,13 +550,13 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::PumpJack,
         stats: balance::BuildingStats {
-            hp: 50,
+            hp: 75,
             sight_tiles: 1,
-            cost_steel: 100,
+            cost_steel: 0,
             cost_oil: 0,
             foot_w: 1,
             foot_h: 1,
-            build_ticks: balance::TICK_HZ * 20,
+            build_ticks: balance::TICK_HZ * 24,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -691,8 +691,10 @@ mod tests {
         let steel_mine = building_def(EntityKind::SteelMine).expect("steel mine definition");
         assert_eq!(
             (steel_mine.stats.cost_steel, steel_mine.stats.cost_oil),
-            (50, 0)
+            (0, 0)
         );
+        assert_eq!(steel_mine.stats.hp, 50);
+        assert_eq!(steel_mine.armor_class, ArmorClass::Small);
         assert_eq!(
             building_def(EntityKind::Barracks).unwrap().trains,
             BARRACKS_UNITS
@@ -812,14 +814,14 @@ mod tests {
     }
 
     #[test]
-    fn pump_jack_uses_contextual_oil_extractor_stats() {
+    fn pump_jack_uses_free_automatic_extractor_stats() {
         let def = building_def(EntityKind::PumpJack).expect("pump jack def");
 
-        assert_eq!(def.stats.hp, 50);
+        assert_eq!(def.stats.hp, 75);
         assert_eq!(def.stats.sight_tiles, 1);
-        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (100, 0));
+        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (0, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
-        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 20);
+        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 24);
         assert_eq!(def.armor_class, ArmorClass::Small);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());

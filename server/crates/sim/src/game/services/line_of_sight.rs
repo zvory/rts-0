@@ -77,7 +77,7 @@ impl<'a> LineOfSight<'a> {
     /// True when no opaque terrain lies on the segment between two world-pixel points.
     /// The origin tile is ignored; the target tile is treated as blocking if it is opaque.
     pub(crate) fn clear_between_world_points(&self, from: (f32, f32), to: (f32, f32)) -> bool {
-        self.raycast_clear(from, to, false, false)
+        self.raycast_clear(from, to, false, false, None)
     }
 
     /// True when `tile` is visible from a world-pixel origin. The target tile itself may be
@@ -86,7 +86,13 @@ impl<'a> LineOfSight<'a> {
         if tile.0 >= self.map.width || tile.1 >= self.map.height {
             return false;
         }
-        self.raycast_clear(from, self.map.tile_center(tile.0, tile.1), true, true)
+        self.raycast_clear(
+            from,
+            self.map.tile_center(tile.0, tile.1),
+            true,
+            true,
+            Some(crate::rules::terrain::CONCEALMENT_SIGHT_DEPTH_TILES),
+        )
     }
 
     fn raycast_clear(
@@ -95,6 +101,7 @@ impl<'a> LineOfSight<'a> {
         to: (f32, f32),
         allow_opaque_target: bool,
         allow_dynamic_target: bool,
+        concealment_budget: Option<u32>,
     ) -> bool {
         let (from_x, from_y) = from;
         let (to_x, to_y) = to;
@@ -143,6 +150,7 @@ impl<'a> LineOfSight<'a> {
         let step_y = axis_step(dy);
         let mut t_max_x = first_boundary_t(x0, tx, dx, step_x);
         let mut t_max_y = first_boundary_t(y0, ty, dy, step_y);
+        let mut concealment_tiles = 0;
         let t_delta_x = if step_x == 0 {
             f32::INFINITY
         } else {
@@ -158,7 +166,14 @@ impl<'a> LineOfSight<'a> {
             if t_max_x < t_max_y {
                 tx += step_x;
                 t_max_x += t_delta_x;
-                match self.trace_step((tx, ty), target, allow_opaque_target) {
+                match self.trace_step(
+                    (tx, ty),
+                    target,
+                    allow_opaque_target,
+                    concealment_budget,
+                    &mut concealment_tiles,
+                    true,
+                ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
                     RaycastStep::Blocked => return false,
@@ -166,7 +181,14 @@ impl<'a> LineOfSight<'a> {
             } else if t_max_y < t_max_x {
                 ty += step_y;
                 t_max_y += t_delta_y;
-                match self.trace_step((tx, ty), target, allow_opaque_target) {
+                match self.trace_step(
+                    (tx, ty),
+                    target,
+                    allow_opaque_target,
+                    concealment_budget,
+                    &mut concealment_tiles,
+                    true,
+                ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
                     RaycastStep::Blocked => return false,
@@ -174,19 +196,40 @@ impl<'a> LineOfSight<'a> {
             } else {
                 let next_tx = tx + step_x;
                 let next_ty = ty + step_y;
-                match self.trace_step((next_tx, ty), target, allow_opaque_target) {
+                match self.trace_step(
+                    (next_tx, ty),
+                    target,
+                    allow_opaque_target,
+                    concealment_budget,
+                    &mut concealment_tiles,
+                    false,
+                ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
                     RaycastStep::Blocked => return false,
                 }
-                match self.trace_step((tx, next_ty), target, allow_opaque_target) {
+                match self.trace_step(
+                    (tx, next_ty),
+                    target,
+                    allow_opaque_target,
+                    concealment_budget,
+                    &mut concealment_tiles,
+                    false,
+                ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
                     RaycastStep::Blocked => return false,
                 }
                 tx = next_tx;
                 ty = next_ty;
-                match self.trace_step((tx, ty), target, allow_opaque_target) {
+                match self.trace_step(
+                    (tx, ty),
+                    target,
+                    allow_opaque_target,
+                    concealment_budget,
+                    &mut concealment_tiles,
+                    true,
+                ) {
                     RaycastStep::Clear => {}
                     RaycastStep::ReachedTarget => return true,
                     RaycastStep::Blocked => return false,
@@ -204,11 +247,20 @@ impl<'a> LineOfSight<'a> {
         tile: (i32, i32),
         target: (u32, u32),
         allow_opaque_target: bool,
+        concealment_budget: Option<u32>,
+        concealment_tiles: &mut u32,
+        count_concealment: bool,
     ) -> RaycastStep {
         if !self.map.in_bounds(tile.0, tile.1) {
             return RaycastStep::Blocked;
         }
         let current = (tile.0 as u32, tile.1 as u32);
+        if count_concealment && self.map.is_concealment_tile(current.0, current.1) {
+            *concealment_tiles = concealment_tiles.saturating_add(1);
+            if concealment_budget.is_some_and(|budget| *concealment_tiles > budget) {
+                return RaycastStep::Blocked;
+            }
+        }
         if current == target {
             if allow_opaque_target || !self.tile_blocks(current) {
                 RaycastStep::ReachedTarget
@@ -286,7 +338,6 @@ mod tests {
     fn stone_blocks_world_point_line_of_sight() {
         let map = map_with_rock_at((3, 2));
         let los = LineOfSight::new(&map);
-
         assert!(!los.clear_between_world_points(map.tile_center(1, 2), map.tile_center(5, 2),));
         assert!(los.clear_between_world_points(map.tile_center(1, 1), map.tile_center(5, 1),));
     }
@@ -296,7 +347,6 @@ mod tests {
         let map = map_with_rock_at((3, 2));
         let los = LineOfSight::new(&map);
         let origin = map.tile_center(1, 2);
-
         assert!(los.tile_visible_from_world(origin, (3, 2)));
         assert!(!los.tile_visible_from_world(origin, (4, 2)));
     }
@@ -315,7 +365,6 @@ mod tests {
             ..Default::default()
         };
         let los = LineOfSight::new(&map);
-
         assert!(!los.clear_between_world_points(map.tile_center(2, 2), map.tile_center(3, 3),));
     }
 
@@ -323,8 +372,37 @@ mod tests {
     fn grid_corner_target_near_map_edge_does_not_step_past_endpoint() {
         let map = flat_map(126);
         let los = LineOfSight::new(&map);
-
         assert!(los.clear_between_world_points((213.959, 3941.309), (32.0, 3968.0)));
         assert!(los.clear_between_world_points((213.959, 3941.309), (160.0, 4000.0)));
+    }
+
+    #[test]
+    fn fog_sight_reaches_three_concealment_tiles_but_not_the_fourth() {
+        let mut map = flat_map(10);
+        map.concealment_tiles = (2..=5).map(|x| (x, 4)).collect();
+        let los = LineOfSight::new(&map);
+        let origin = map.tile_center(1, 4);
+        assert!(los.tile_visible_from_world(origin, (2, 4)));
+        assert!(los.tile_visible_from_world(origin, (4, 4)));
+        assert!(!los.tile_visible_from_world(origin, (5, 4)));
+        assert!(los.clear_between_world_points(origin, map.tile_center(6, 4)));
+    }
+
+    #[test]
+    fn concealment_origin_is_not_counted_when_looking_outward() {
+        let mut map = flat_map(10);
+        map.concealment_tiles = vec![(2, 4)];
+        let los = LineOfSight::new(&map);
+        assert!(los.tile_visible_from_world(map.tile_center(2, 4), (8, 4)));
+    }
+
+    #[test]
+    fn diagonal_fog_sight_counts_entered_tiles_not_corner_neighbors() {
+        let mut map = flat_map(10);
+        map.concealment_tiles = (2..=5).flat_map(|x| (2..=5).map(move |y| (x, y))).collect();
+        let los = LineOfSight::new(&map);
+        let origin = map.tile_center(1, 1);
+        assert!(los.tile_visible_from_world(origin, (4, 4)));
+        assert!(!los.tile_visible_from_world(origin, (5, 5)));
     }
 }

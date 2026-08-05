@@ -127,7 +127,7 @@ fn direct_fire_legality_rejects_resource_nodes() {
 }
 
 #[test]
-fn mortar_autocast_rejects_unrevealed_units_on_stealth_tiles() {
+fn mortar_autocast_rejects_unrevealed_units_on_concealment_tiles() {
     let mut map = open_map(16);
     let mut entities = EntityStore::new();
     let mortar_pos = map.tile_center(2, 8);
@@ -142,7 +142,7 @@ fn mortar_autocast_rejects_unrevealed_units_on_stealth_tiles() {
     let target = entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
-    map.stealth_tiles = vec![(8, 8)];
+    map.concealment_tiles = vec![(8, 8)];
 
     let teams = default_team_relations();
     let fog = visible_fog(&map, &entities);
@@ -172,7 +172,7 @@ fn mortar_autocast_rejects_unrevealed_units_on_stealth_tiles() {
             entities.get(target).expect("target should exist"),
         )
         .is_none(),
-        "indirect autocast must not bypass authoritative stealth concealment"
+        "indirect autocast must not bypass authoritative concealment concealment"
     );
 }
 

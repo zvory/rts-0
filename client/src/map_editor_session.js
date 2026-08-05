@@ -115,7 +115,7 @@ export class MapEditorSession {
       starts: (startPayload?.players || []).map((player) => ({ x: Number(player.startTileX), y: Number(player.startTileY) })),
       baseSites: [],
       doodads: map.doodads,
-      stealthTiles: map.stealthTiles,
+      concealmentTiles: map.concealmentTiles,
       noVehicleTiles: map.noVehicleTiles,
       damageReductionTiles: map.damageReductionTiles,
       slowMovementTiles: map.slowMovementTiles,
@@ -138,7 +138,7 @@ export class MapEditorSession {
       starts: data.starts,
       baseSites: data.baseSites || data.expansionSites,
       doodads: data.doodads,
-      stealthTiles: data.stealthTiles,
+      concealmentTiles: data.concealmentTiles,
       noVehicleTiles: data.noVehicleTiles,
       damageReductionTiles: data.damageReductionTiles,
       slowMovementTiles: data.slowMovementTiles,
@@ -173,7 +173,7 @@ export class MapEditorSession {
       starts,
       baseSites: starts,
       doodads: [],
-      stealthTiles: [],
+      concealmentTiles: [],
       noVehicleTiles: [],
       damageReductionTiles: [],
       slowMovementTiles: [],
@@ -495,7 +495,7 @@ export class MapEditorSession {
       starts: draft.startLocations.map(copyLocation),
       baseSites: draft.baseSites.map(copyBaseSite),
       doodads: draft.doodads.map(copyDoodad),
-      stealthTiles: draft.stealthTiles.map(copyLocation),
+      concealmentTiles: draft.concealmentTiles.map(copyLocation),
       noVehicleTiles: draft.noVehicleTiles.map(copyLocation),
       damageReductionTiles: draft.damageReductionTiles.map(copyLocation),
       slowMovementTiles: draft.slowMovementTiles.map(copyLocation),
@@ -691,7 +691,7 @@ export function authoredMapFromMaterialized({
   starts,
   baseSites,
   doodads = [],
-  stealthTiles = [],
+  concealmentTiles = [],
   noVehicleTiles = [],
   damageReductionTiles = [],
   slowMovementTiles = [],
@@ -707,7 +707,7 @@ export function authoredMapFromMaterialized({
   const bases = normalizeBaseSiteRecords(baseSites, dimensions);
   for (const start of startLocations) if (!bases.some((site) => sameLocation(site, start))) bases.push(newBaseSite(start));
   const draft = {
-    version: 6,
+    version: 7,
     name: String(name || "Map").trim() || "Map",
     description: String(description || ""),
     _design: "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
@@ -717,7 +717,7 @@ export function authoredMapFromMaterialized({
     startLocations,
     baseSites: bases,
     doodads: normalizeDraftDoodads(doodads, dimensions),
-    stealthTiles: normalizeOverlayTiles(stealthTiles, dimensions),
+    concealmentTiles: normalizeOverlayTiles(concealmentTiles, dimensions),
     noVehicleTiles: normalizeOverlayTiles(noVehicleTiles, dimensions),
     damageReductionTiles: normalizeOverlayTiles(damageReductionTiles, dimensions),
     slowMovementTiles: normalizeOverlayTiles(slowMovementTiles, dimensions),
@@ -732,7 +732,7 @@ export function materializedMapsEqual(left, right) {
   return sameLocationSet(left.starts, right.starts)
     && sameBaseSiteSet(left.baseSites, right.baseSites)
     && sameDoodadSet(left.doodads, right.doodads)
-    && sameLocationSet(left.stealthTiles, right.stealthTiles)
+    && sameLocationSet(left.concealmentTiles, right.concealmentTiles)
     && sameLocationSet(left.noVehicleTiles, right.noVehicleTiles)
     && sameLocationSet(left.damageReductionTiles, right.damageReductionTiles)
     && sameLocationSet(left.slowMovementTiles, right.slowMovementTiles);
@@ -740,7 +740,7 @@ export function materializedMapsEqual(left, right) {
 
 function normalizeDraft(draft) {
   if (!draft || typeof draft !== "object") throw new Error("Map data is invalid.");
-  if (Number(draft.version) !== 6) replaceObject(draft, migrateLegacyDraft(draft));
+  if (Number(draft.version) !== 7) replaceObject(draft, migrateLegacyDraft(draft));
   if (!positiveInteger(draft.width) || !positiveInteger(draft.height)) {
     const inferred = inferredDraftDimensions(draft);
     draft.width = inferred.width;
@@ -751,7 +751,7 @@ function normalizeDraft(draft) {
   if (!width || !height || !Array.isArray(draft.terrain) || draft.terrain.length !== height || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== width)) {
     throw new Error("Map terrain rows must match its width and height.");
   }
-  draft.version = 6;
+  draft.version = 7;
   draft.name = String(draft.name || "Map").trim() || "Map";
   draft.description = String(draft.description || "");
   draft._design = String(draft._design || "Flat map locations.");
@@ -762,26 +762,30 @@ function normalizeDraft(draft) {
   draft.startLocations = normalizeLocations(draft.startLocations, dimensions).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
   draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, dimensions);
   draft.doodads = normalizeDraftDoodads(draft.doodads, dimensions);
-  draft.stealthTiles = normalizeOverlayTiles(draft.stealthTiles, dimensions);
+  draft.concealmentTiles = normalizeOverlayTiles(draft.concealmentTiles, dimensions);
   draft.noVehicleTiles = normalizeOverlayTiles(draft.noVehicleTiles, dimensions);
   draft.damageReductionTiles = normalizeOverlayTiles(draft.damageReductionTiles, dimensions);
   draft.slowMovementTiles = normalizeOverlayTiles(draft.slowMovementTiles, dimensions);
 }
 
 function migrateLegacyDraft(source) {
-  if ([4, 5].includes(Number(source?.version))) {
+  if ([4, 5, 6].includes(Number(source?.version))) {
     const dimensions = inferredDraftDimensions(source);
-    return {
+    const migrated = {
       ...clone(source),
-      version: 6,
+      version: 7,
       width: dimensions.width,
       height: dimensions.height,
       doodads: Array.isArray(source?.doodads) ? source.doodads : [],
-      stealthTiles: Array.isArray(source?.stealthTiles) ? source.stealthTiles : [],
+      concealmentTiles: Array.isArray(source?.concealmentTiles)
+        ? source.concealmentTiles
+        : Array.isArray(source?.stealthTiles) ? source.stealthTiles : [],
       noVehicleTiles: Array.isArray(source?.noVehicleTiles) ? source.noVehicleTiles : [],
       damageReductionTiles: Array.isArray(source?.damageReductionTiles) ? source.damageReductionTiles : [],
       slowMovementTiles: Array.isArray(source?.slowMovementTiles) ? source.slowMovementTiles : [],
     };
+    delete migrated.stealthTiles;
+    return migrated;
   }
   const sites = Array.isArray(source?.sites) ? source.sites : [];
   const byId = new Map(sites.map((site) => [site.id, site]));
@@ -793,7 +797,7 @@ function migrateLegacyDraft(source) {
   }
   if (!starts.length) for (const site of sites.filter((site) => site.kind === "main")) starts.push(copyLocation(site));
   return {
-    version: 6,
+    version: 7,
     name: source?.name || "Map",
     description: source?.description || "",
     _design: "Migrated map data. Flat locations and per-base resource counts are authoritative.",
@@ -803,7 +807,7 @@ function migrateLegacyDraft(source) {
     startLocations: starts,
     baseSites: (source?.baseSites || sites).map(copyBaseSite),
     doodads: [],
-    stealthTiles: [],
+    concealmentTiles: [],
     noVehicleTiles: [],
     damageReductionTiles: [],
     slowMovementTiles: [],
@@ -841,7 +845,7 @@ function resizeDraftCentered(source, width, height) {
     startLocations,
     baseSites,
     doodads,
-    stealthTiles: (source.stealthTiles || []).map(shiftTile),
+    concealmentTiles: (source.concealmentTiles || []).map(shiftTile),
     noVehicleTiles: (source.noVehicleTiles || []).map(shiftTile),
     damageReductionTiles: (source.damageReductionTiles || []).map(shiftTile),
     slowMovementTiles: (source.slowMovementTiles || []).map(shiftTile),
