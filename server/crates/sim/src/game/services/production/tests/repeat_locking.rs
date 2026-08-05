@@ -59,6 +59,29 @@ fn repeat_production_skips_unit_with_missing_upgrade_requirement() {
     );
 }
 
+#[test]
+fn repeat_production_skips_stale_unit_incompatible_with_producer() {
+    let (map, mut entities, barracks) = repeat_barracks([EntityKind::Tank, EntityKind::Rifleman]);
+    spawn_complete_building(&map, &mut entities, EntityKind::Factory, 16);
+    let mut players = vec![player(1)];
+    players[0].upgrades.insert(UpgradeKind::TankUnlock);
+    players[0].set_resources(10_000, 10_000);
+
+    tick_production(&map, &mut entities, &mut players);
+
+    let producer = entities.get(barracks).expect("barracks");
+    assert_eq!(producer.prod_queue()[0].unit, EntityKind::Rifleman);
+    assert_eq!(
+        producer
+            .production
+            .as_ref()
+            .expect("production")
+            .repeat_units,
+        [EntityKind::Tank, EntityKind::Rifleman],
+        "stale intent should remain visible so it can be removed explicitly"
+    );
+}
+
 fn repeat_barracks<const N: usize>(units: [EntityKind; N]) -> (Map, EntityStore, u32) {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

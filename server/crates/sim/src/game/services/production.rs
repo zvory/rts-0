@@ -48,20 +48,11 @@ pub(crate) fn production_system(
                 }
             }
         }
-        let repeat_producer = entities.get(id).and_then(|producer| {
-            (active_producer && producer.prod_queue().is_empty()).then(|| {
-                (
-                    producer.owner,
-                    producer.kind,
-                    producer
-                        .production
-                        .as_ref()
-                        .map(|production| production.repeat_units.len())
-                        .unwrap_or(0),
-                )
-            })
+        let repeat_owner = entities.get(id).and_then(|producer| {
+            (active_producer && producer.prod_queue().is_empty())
+                .then_some(producer.owner)
         });
-        if let Some((owner, producer_kind, repeat_count)) = repeat_producer {
+        if let Some(owner) = repeat_owner {
             let faction_id = players
                 .iter()
                 .find(|player| player.id == owner)
@@ -87,19 +78,15 @@ pub(crate) fn production_system(
                 .iter()
                 .find(|player| player.id == owner)
                 .map(|player| &player.upgrades);
-            let repeat_request = repeat::next_unlocked(
+            let repeat_request = repeat::next_eligible(
                 entities,
                 id,
                 &faction_id,
                 completed_upgrades,
                 owned_complete,
-                repeat_count,
             );
 
             if let Some(unit) = repeat_request {
-                let producer_compatible =
-                    rules::economy::trainable_units_for_faction(&faction_id, producer_kind)
-                        .contains(&unit);
                 let build_ticks = production_ticks(unit);
                 let extractor_target_available = !unit.is_resource_extractor()
                     || extractors::target(entities, id, unit).is_some();
@@ -114,7 +101,7 @@ pub(crate) fn production_system(
                 let Some(player) = players.iter_mut().find(|player| player.id == owner) else {
                     continue;
                 };
-                let Some(build_ticks) = build_ticks.filter(|_| producer_compatible) else {
+                let Some(build_ticks) = build_ticks else {
                     continue;
                 };
                 let cost = rules::economy::resource_cost(unit);
