@@ -55,6 +55,8 @@ export const ANIMATION_INPUTS = Object.freeze([
   "oilStarved",
   "fuelCueVisible",
   "panzerfaustLoaded",
+  "extractorPickaxeRotation",
+  "extractorPumpRotation",
 ]);
 export const ANIMATION_PROPERTIES = Object.freeze([
   "transform.x",

@@ -2247,7 +2247,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   coax muzzle anchors use sampled rig-part transforms so feedback origins follow the visible barrel
   tip during recoil scale and kick.
 - Kriegsia Resource Depot, Barracks, Training Centre, Engineering Complex, Steelworks, Vehicle Works,
-  and Pump Jack use footprint-scaled raster atlases. Each atlas composes a fixed full-color base
+  Steel Mine, and Pump Jack use footprint-scaled raster atlases. The one-tile extractors use modular
+  fixed-color components: the Steel Mine swings a pickaxe once per 40-tick harvest period, while the
+  front-facing Pump Jack rocks its separate beam once per three harvest periods and both rest while
+  inactive. Other building atlases compose a fixed full-color base
   with a grayscale mask extracted from authored white paint and tinted to the owning player at
   runtime; brick, doors, windows, machinery, outlines, and material shading stay fixed. Selected
   perspective buildings supply blurred, offset silhouette shadows instead of rectangular footprint

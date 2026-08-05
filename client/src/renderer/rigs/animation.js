@@ -1,4 +1,4 @@
-import { STATS } from "../../config.js";
+import { HARVEST_TICKS, STATS, TICK_HZ } from "../../config.js";
 import { KIND, SETUP, STATE } from "../../protocol.js";
 import { angleLerp, clamp01, hexToInt, polar, recoilVector, smoothstep01, tankBodyVisual, weaponRecoilOffset } from "../shared.js";
 import { normalizedPartSet } from "./part_selection.js";
@@ -7,6 +7,13 @@ const RIG_CONTEXT_READY = Symbol("rtsRigContextReady");
 const RIG_ANIMATION_STAGE = Symbol("rtsRigAnimationStage");
 const ARTILLERY_VISUAL_SCALE = 0.75;
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
+const HARVEST_CYCLE_MS = (HARVEST_TICKS / TICK_HZ) * 1000;
+const PUMP_JACK_CYCLE_MS = HARVEST_CYCLE_MS * 3;
+const PICKAXE_WIND_BACK_RAD = 0.72;
+const RESTING_EXTRACTOR_ANIMATION = Object.freeze({
+  pickaxeRotation: PICKAXE_WIND_BACK_RAD,
+  pumpRotation: 0,
+});
 
 const BINDING_VISIBLE = 0;
 const BINDING_TINT_SLOT = 1;
@@ -51,6 +58,7 @@ export function createRigRenderContext(entity, {
   const carriageVisualFacing = visualCarriageFacing(entity.kind, facing, weaponFacing, deploy, weaponVisualFacing);
   const weaponRecoil = recoilPx > 0 ? polar(weaponVisualFacing + Math.PI, recoilPx) : { x: 0, y: 0 };
   const scoutGunner = scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx);
+  const extractor = extractorAnimation(entity, now);
   const recoilKickFactor = entity.kind === KIND.TANK
     ? 0.85
     : entity.kind === KIND.ARTILLERY
@@ -111,9 +119,45 @@ export function createRigRenderContext(entity, {
     oilStarved,
     fuelCueVisible: lowOil || oilStarved,
     panzerfaustLoaded: entity.panzerfaustLoaded !== false,
+    extractorPickaxeRotation: extractor.pickaxeRotation,
+    extractorPumpRotation: extractor.pumpRotation,
   };
   Object.defineProperty(context, RIG_CONTEXT_READY, { value: true });
   return context;
+}
+
+function extractorAnimation(entity, now) {
+  if (entity.extractorActive !== true || !Number.isFinite(now)) {
+    return RESTING_EXTRACTOR_ANIMATION;
+  }
+
+  if (entity.kind === KIND.STEEL_MINE) {
+    const phase = ((now % HARVEST_CYCLE_MS) + HARVEST_CYCLE_MS) % HARVEST_CYCLE_MS
+      / HARVEST_CYCLE_MS;
+    let pickaxeRotation;
+    if (phase < 0.45) {
+      pickaxeRotation = PICKAXE_WIND_BACK_RAD + smoothstep01(phase / 0.45) * 0.08;
+    } else if (phase < 0.68) {
+      pickaxeRotation = PICKAXE_WIND_BACK_RAD
+        * (1 - smoothstep01((phase - 0.45) / 0.23));
+    } else if (phase < 0.76) {
+      pickaxeRotation = 0;
+    } else {
+      pickaxeRotation = PICKAXE_WIND_BACK_RAD * smoothstep01((phase - 0.76) / 0.24);
+    }
+    return { pickaxeRotation, pumpRotation: 0 };
+  }
+
+  if (entity.kind === KIND.PUMP_JACK) {
+    const phase = ((now % PUMP_JACK_CYCLE_MS) + PUMP_JACK_CYCLE_MS) % PUMP_JACK_CYCLE_MS
+      / PUMP_JACK_CYCLE_MS;
+    return {
+      pickaxeRotation: PICKAXE_WIND_BACK_RAD,
+      pumpRotation: Math.sin(phase * Math.PI * 2) * 0.16,
+    };
+  }
+
+  return RESTING_EXTRACTOR_ANIMATION;
 }
 
 export function transformedRigAnchorPoint(definition, entity, anchorName, renderOptions = {}) {

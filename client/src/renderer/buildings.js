@@ -96,9 +96,9 @@ export function _drawBuilding(e, colorByOwner, state) {
       }],
       alpha: bodyAlpha,
     });
-  } else {
-    // Legacy buildings retain a footprint shadow. Perspective raster buildings
-    // provide their own silhouette-derived shadow route instead.
+  } else if (!usePngRig || !pngAtlas?.omitFootprintShadow) {
+    // Legacy and loading fallbacks retain a footprint shadow. A loaded raster
+    // may provide a silhouette-derived shadow or intentionally omit one.
     const shadowKey = `${e.x}|${e.y}|${w}|${h}`;
     const sh = this._staticSlot?.(
       "buildingShadows",

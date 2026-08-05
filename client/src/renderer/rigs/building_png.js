@@ -19,9 +19,40 @@ function buildingSpec(kind, frameWidth, frameHeight, image, {
   silhouetteShadow = true,
   emblem = false,
   visualScale = 1,
+  componentRig = null,
+  omitFootprintShadow = false,
 } = {}) {
-  return Object.freeze({ kind, frameWidth, frameHeight, image, silhouetteShadow, emblem, visualScale });
+  return Object.freeze({
+    kind,
+    frameWidth,
+    frameHeight,
+    image,
+    silhouetteShadow,
+    emblem,
+    visualScale,
+    componentRig,
+    omitFootprintShadow,
+  });
 }
+
+const STEEL_MINE_COMPONENT_RIG = Object.freeze({
+  parts: Object.freeze([
+    Object.freeze({ id: "part.pickaxe", drawOrder: 11, column: 0, originX: 100, originY: 97, x: 15, y: 11 }),
+  ]),
+  animations: Object.freeze([
+    Object.freeze({ partId: "part.pickaxe", input: "extractorPickaxeRotation", property: "transform.rotation" }),
+  ]),
+});
+
+const PUMP_JACK_COMPONENT_RIG = Object.freeze({
+  parts: Object.freeze([
+    Object.freeze({ id: "part.frame", drawOrder: 10, column: 0, originX: 63, originY: 48, x: 0, y: -7 }),
+    Object.freeze({ id: "part.beam", drawOrder: 11, column: 1, originX: 63, originY: 35, x: 0, y: -7 }),
+  ]),
+  animations: Object.freeze([
+    Object.freeze({ partId: "part.beam", input: "extractorPumpRotation", property: "transform.rotation" }),
+  ]),
+});
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
@@ -43,9 +74,12 @@ const BUILDING_PNG_SPECS = Object.freeze([
   buildingSpec(KIND.STEELWORKS, 384, 384,
     "/assets/rigs/building-emblems-preview/steelworks-atlas-team-tint.png?v=building-emblems-preview-03",
     { emblem: true }),
+  buildingSpec(KIND.STEEL_MINE, 128, 128,
+    "/assets/rigs/extractor-animation-poc/steel-mine-atlas.png?v=extractor-animation-poc-01",
+    { silhouetteShadow: false, componentRig: STEEL_MINE_COMPONENT_RIG, omitFootprintShadow: true }),
   buildingSpec(KIND.PUMP_JACK, 128, 128,
-    "/assets/rigs/buildings-b2-distinct-pass-01/pump_jack-atlas.png?v=b2-distinct-01",
-    { silhouetteShadow: false }),
+    "/assets/rigs/extractor-animation-poc/pump-jack-atlas.png?v=extractor-animation-poc-01",
+    { silhouetteShadow: false, componentRig: PUMP_JACK_COMPONENT_RIG, omitFootprintShadow: true }),
 ]);
 
 function deepFreeze(value) {
@@ -67,6 +101,19 @@ function part(id, drawOrder, tintSlot, opacity = 1) {
   };
 }
 
+function componentPart(component) {
+  return {
+    ...part(component.id, component.drawOrder, "fixed"),
+    transform: Object.freeze({
+      x: component.x ?? 0,
+      y: component.y ?? 0,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+    }),
+  };
+}
+
 function buildingFootprint(kind) {
   const { footW, footH } = STATS[kind] || {};
   if (!Number.isInteger(footW) || footW <= 0 || !Number.isInteger(footH) || footH <= 0) {
@@ -76,11 +123,13 @@ function buildingFootprint(kind) {
 }
 
 function definition(spec) {
-  const { kind, silhouetteShadow, emblem } = spec;
+  const { kind, silhouetteShadow, emblem, componentRig } = spec;
   const { footW, footH } = buildingFootprint(kind);
   const width = footW * RUNTIME_TILE_SIZE;
   const height = footH * RUNTIME_TILE_SIZE;
-  const parts = [part("part.base", 10, "fixed"), part("part.tint", 11, "team")];
+  const parts = componentRig
+    ? componentRig.parts.map(componentPart)
+    : [part("part.base", 10, "fixed"), part("part.tint", 11, "team")];
   if (emblem) parts.push(part("part.emblem", 12, "team"));
   if (silhouetteShadow) parts.push(part("part.shadow", 0, "fixed", 0.3));
   const validation = validateRigDefinition({
@@ -97,8 +146,10 @@ function definition(spec) {
       selection: { x: -width / 2, y: -height / 2, width, height },
       hp: { x: -width * 0.4, y: -height / 2 - 7, width: width * 0.8, height: 6 },
     },
-    animations: [],
-    requiredRuntimeInputs: [],
+    animations: componentRig?.animations ?? [],
+    requiredRuntimeInputs: componentRig
+      ? [...new Set(componentRig.animations.map((animation) => animation.input))]
+      : [],
   });
   if (!validation.ok) {
     throw new TypeError(`Invalid building PNG definition ${kind}: ${JSON.stringify(validation.errors)}`);
@@ -107,7 +158,17 @@ function definition(spec) {
 }
 
 function atlas(spec) {
-  const { kind, frameWidth, frameHeight, image, silhouetteShadow, emblem, visualScale } = spec;
+  const {
+    kind,
+    frameWidth,
+    frameHeight,
+    image,
+    silhouetteShadow,
+    emblem,
+    visualScale,
+    componentRig,
+    omitFootprintShadow,
+  } = spec;
   const { footW, footH } = buildingFootprint(kind);
   const worldWidth = footW * RUNTIME_TILE_SIZE;
   const worldHeight = footH * RUNTIME_TILE_SIZE;
@@ -123,6 +184,35 @@ function atlas(spec) {
     pixelsPerUnitX: frameWidth / (worldWidth * visualScale),
     pixelsPerUnitY: frameHeight / (worldHeight * visualScale),
   });
+  if (componentRig) {
+    const sprites = componentRig.parts.map((component) => ({
+      id: `sprite.${component.id.slice("part.".length)}`,
+      animationPart: component.id,
+      sourceParts: [component.id],
+      tintSlot: "fixed",
+      drawOrder: component.drawOrder,
+      frame: {
+        ...frame(frameWidth * component.column),
+        originX: component.originX,
+        originY: component.originY,
+      },
+    }));
+    return deepFreeze({
+      enabled: true,
+      unit: kind,
+      image,
+      omitFootprintShadow,
+      viewBox: { x: -worldWidth / 2, y: -worldHeight / 2, width: worldWidth, height: worldHeight },
+      grid: {
+        columns: sprites.length,
+        rows: 1,
+        width: frameWidth * sprites.length,
+        height: frameHeight,
+      },
+      routes: { body: componentRig.parts.map((component) => component.id), shadow: [] },
+      sprites,
+    });
+  }
   const sprites = [
     {
       id: "sprite.base",
