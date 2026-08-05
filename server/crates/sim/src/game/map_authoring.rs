@@ -268,7 +268,8 @@ mod tests {
             "doodads": doodads,
             "forestSpans": [],
             "concealmentTiles": [],
-            "noVehicleTiles": no_vehicle_tiles
+            "noVehicleTiles": no_vehicle_tiles,
+            "noBuildingTiles": []
         })
         .to_string()
     }
@@ -380,7 +381,8 @@ mod tests {
             "doodads": [],
             "forestSpans": [],
             "concealmentTiles": [],
-            "noVehicleTiles": no_vehicle_wall
+            "noVehicleTiles": no_vehicle_wall,
+            "noBuildingTiles": []
         })
         .to_string();
 

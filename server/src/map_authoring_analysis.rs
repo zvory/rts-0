@@ -164,7 +164,8 @@ mod tests {
             "doodads": [],
             "forestSpans": [],
             "concealmentTiles": [],
-            "noVehicleTiles": []
+            "noVehicleTiles": [],
+            "noBuildingTiles": []
         })
         .to_string()
     }
