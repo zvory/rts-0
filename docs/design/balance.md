@@ -632,7 +632,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| resource_depot                | Resource Depot        | 300 | 1     | 450 steel + 0 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
+| resource_depot                | Resource Depot        | 300 | 1     | 450 steel + 100 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
 | zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
