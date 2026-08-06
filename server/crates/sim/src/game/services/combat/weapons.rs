@@ -345,10 +345,10 @@ fn maybe_begin_anti_tank_gun_setup_after_alignment(e: &mut Entity) {
         return;
     }
     if !e.path_is_empty()
-        || !matches!(
+        || !(matches!(
             e.order(),
             Order::Idle | Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire { .. }
-        )
+        ) || (e.kind == EntityKind::Artillery && matches!(e.order(), Order::AttackMove(_))))
     {
         return;
     }

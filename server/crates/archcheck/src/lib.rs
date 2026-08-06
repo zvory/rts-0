@@ -30,6 +30,8 @@ const PURE_POLICY_FORBIDDEN_IMPORTS: &[&str] = &[
 
 const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("ability_orders", ServiceRole::MutationHelper),
+    ("artillery_attack_move", ServiceRole::TickSystem),
+    ("artillery_fire", ServiceRole::MutationHelper),
     ("combat", ServiceRole::TickSystem),
     ("commands", ServiceRole::CommandAdapter),
     ("construction", ServiceRole::TickSystem),
@@ -98,6 +100,16 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
         &["commands", "move_coordinator", "world_query"],
     ),
     (
+        "artillery_attack_move",
+        &[
+            "artillery_fire",
+            "move_coordinator",
+            "spatial",
+            "world_query",
+        ],
+    ),
+    ("artillery_fire", &[]),
+    (
         "combat",
         &[
             "geometry",
@@ -113,6 +125,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
         "commands",
         &[
             "ability_orders",
+            "artillery_fire",
             "construction",
             "move_coordinator",
             "movement",

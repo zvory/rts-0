@@ -2,6 +2,423 @@ use super::fixtures::*;
 use super::*;
 
 #[test]
+fn artillery_attack_move_uses_team_vision_and_preserves_the_route() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 7,
+            faction_id: "kriegsia".to_string(),
+            name: "Gunner".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 7,
+            faction_id: "kriegsia".to_string(),
+            name: "Spotter".into(),
+            color: "#0f0".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 9,
+            faction_id: "kriegsia".to_string(),
+            name: "Target".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let gun_pos = game.state.map.tile_center(10, 10);
+    let target_pos = game.state.map.tile_center(30, 10);
+    let destination = game.state.map.tile_center(50, 10);
+    let artillery = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, gun_pos.0, gun_pos.1)
+        .expect("artillery should spawn");
+    let enemy = game
+        .state
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("enemy should spawn");
+    game.state
+        .entities
+        .spawn_unit(
+            2,
+            EntityKind::Worker,
+            target_pos.0,
+            target_pos.1 + config::TILE_SIZE as f32,
+        )
+        .expect("allied spotter should spawn");
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    let ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
+    assert!(!game
+        .state
+        .fog
+        .is_visible_world(1, target_pos.0, target_pos.1));
+    assert!(game
+        .state
+        .fog
+        .is_visible_world(2, target_pos.0, target_pos.1));
+
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![artillery],
+            x: destination.0,
+            y: destination.1,
+            queued: false,
+        },
+    );
+    let initial_steel = game.state.players[0].steel;
+    let mut fired_target = None;
+    for _ in 0..=(config::ARTILLERY_SETUP_TICKS as u32 + 8) {
+        for (player, events) in game.tick() {
+            if player != 1 {
+                continue;
+            }
+            for event in events {
+                if let Event::ArtilleryTarget { from, x, y, .. } = event {
+                    if from == artillery {
+                        fired_target = Some((x, y));
+                    }
+                }
+            }
+        }
+        if fired_target.is_some() {
+            break;
+        }
+    }
+
+    let fired_target = fired_target.expect("attack-moving artillery should set up and fire");
+    assert!(
+        (fired_target.0 - target_pos.0).hypot(fired_target.1 - target_pos.1)
+            <= config::ARTILLERY_MIN_FIRE_RADIUS_TILES * config::TILE_SIZE as f32,
+        "automatic artillery should use the narrowest available dispersion"
+    );
+    let artillery_entity = game
+        .state
+        .entities
+        .get(artillery)
+        .expect("artillery exists");
+    assert!(matches!(artillery_entity.order(), Order::AttackMove(_)));
+    assert_eq!(artillery_entity.move_intent(), Some(destination));
+    assert_eq!(artillery_entity.target_id(), Some(enemy));
+    assert_eq!(
+        game.state.players[0].steel,
+        initial_steel - config::ARTILLERY_AMMO_COST_STEEL
+    );
+}
+
+#[test]
+fn artillery_attack_move_prioritizes_soft_targets_then_infantry_then_tanks() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let gun_pos = game.state.map.tile_center(10, 10);
+    let soft_pos = game.state.map.tile_center(22, 10);
+    let infantry_pos = game.state.map.tile_center(26, 10);
+    let tank_pos = game.state.map.tile_center(30, 10);
+    let destination = game.state.map.tile_center(50, 10);
+    let artillery = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, gun_pos.0, gun_pos.1)
+        .expect("artillery should spawn");
+    let anti_tank_gun = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::AntiTankGun, soft_pos.0, soft_pos.1)
+        .expect("soft support weapon should spawn");
+    let infantry = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, infantry_pos.0, infantry_pos.1)
+        .expect("enemy infantry should spawn");
+    let tank = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Tank, tank_pos.0, tank_pos.1)
+        .expect("enemy tank should spawn");
+    // Give the tank cluster far more purchase value than either better target. Target class must
+    // still win before the deliberately simple dispersion-value score is considered.
+    for offset in 1..=3 {
+        game.state
+            .entities
+            .spawn_unit(
+                2,
+                EntityKind::Tank,
+                tank_pos.0,
+                tank_pos.1 + offset as f32 * config::TILE_SIZE as f32,
+            )
+            .expect("tank cluster should spawn");
+    }
+    game.state
+        .entities
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            infantry_pos.0,
+            infantry_pos.1 + config::TILE_SIZE as f32,
+        )
+        .expect("friendly spotter inside the possible blast area should spawn");
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    let ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
+
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![artillery],
+            x: destination.0,
+            y: destination.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let artillery_entity = game
+        .state
+        .entities
+        .get(artillery)
+        .expect("artillery exists");
+    assert_eq!(
+        artillery_entity.target_id(),
+        Some(anti_tank_gun),
+        "an exposed soft support weapon should outrank a valuable tank cluster"
+    );
+
+    game.state.entities.remove(anti_tank_gun);
+    game.rebuild_final_spatial();
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(artillery)
+            .and_then(Entity::target_id),
+        Some(infantry),
+        "infantry should outrank tanks when no exposed soft target remains"
+    );
+
+    game.state.entities.remove(infantry);
+    game.rebuild_final_spatial();
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(artillery)
+            .and_then(Entity::target_id),
+        Some(tank),
+        "tanks should remain legal fallback targets"
+    );
+}
+
+#[test]
+fn artillery_attack_move_targets_buildings_only_after_units_are_gone() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let gun_pos = game.state.map.tile_center(10, 10);
+    let building_pos = game.state.map.tile_center(24, 10);
+    let unit_pos = game.state.map.tile_center(26, 10);
+    let destination = game.state.map.tile_center(50, 10);
+    let artillery = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, gun_pos.0, gun_pos.1)
+        .expect("artillery should spawn");
+    let building = game
+        .state
+        .entities
+        .spawn_building(
+            2,
+            EntityKind::ResourceDepot,
+            building_pos.0,
+            building_pos.1,
+            true,
+        )
+        .expect("building should spawn");
+    let unit = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Worker, unit_pos.0, unit_pos.1)
+        .expect("unit should spawn");
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, unit_pos.0, unit_pos.1 + 32.0)
+        .expect("spotter should spawn");
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    let ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
+
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![artillery],
+            x: destination.0,
+            y: destination.1,
+            queued: false,
+        },
+    );
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(artillery)
+            .and_then(Entity::target_id),
+        Some(unit)
+    );
+
+    game.state.entities.remove(unit);
+    game.rebuild_final_spatial();
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(artillery)
+            .and_then(Entity::target_id),
+        Some(building),
+        "a visible building should become eligible once no visible unit remains"
+    );
+}
+
+#[test]
+fn deployed_artillery_attack_move_fires_in_field_without_tearing_down() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let gun_pos = game.state.map.tile_center(10, 10);
+    let target_pos = game.state.map.tile_center(24, 10);
+    let destination = game.state.map.tile_center(40, 10);
+    let artillery = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, gun_pos.0, gun_pos.1)
+        .expect("artillery should spawn");
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("enemy should spawn");
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, target_pos.0, target_pos.1 + 32.0)
+        .expect("spotter should spawn");
+    deploy_artillery_toward(&mut game, artillery, target_pos);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    let ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
+
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![artillery],
+            x: destination.0,
+            y: destination.1,
+            queued: false,
+        },
+    );
+    let events = game.tick();
+
+    let artillery_entity = game
+        .state
+        .entities
+        .get(artillery)
+        .expect("artillery exists");
+    assert_eq!(artillery_entity.weapon_setup(), WeaponSetup::Deployed);
+    assert!(artillery_entity.path_is_empty());
+    assert!(matches!(artillery_entity.order(), Order::AttackMove(_)));
+    assert!(events.iter().any(|(player, events)| {
+        *player == 1
+            && events.iter().any(
+                |event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery),
+            )
+    }));
+}
+
+#[test]
+fn artillery_attack_move_tears_down_and_resumes_after_targets_disappear() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let gun_pos = game.state.map.tile_center(10, 10);
+    let target_pos = game.state.map.tile_center(24, 10);
+    let destination = game.state.map.tile_center(40, 10);
+    let artillery = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, gun_pos.0, gun_pos.1)
+        .expect("artillery should spawn");
+    let enemy = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("enemy should spawn");
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, target_pos.0, target_pos.1 + 32.0)
+        .expect("spotter should spawn");
+    deploy_artillery_toward(&mut game, artillery, target_pos);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    let ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![artillery],
+            x: destination.0,
+            y: destination.1,
+            queued: false,
+        },
+    );
+    game.tick();
+    game.state.entities.remove(enemy);
+    game.rebuild_final_spatial();
+
+    for _ in 0..config::TICK_HZ {
+        game.tick();
+    }
+    let artillery_entity = game
+        .state
+        .entities
+        .get(artillery)
+        .expect("artillery exists");
+    assert!(matches!(
+        artillery_entity.weapon_setup(),
+        WeaponSetup::TearingDown { .. }
+    ));
+    assert!(!artillery_entity.path_is_empty());
+    assert!(matches!(artillery_entity.order(), Order::AttackMove(_)));
+
+    let stopped_x = artillery_entity.pos_x;
+    for _ in 0..=(config::ARTILLERY_SETUP_TICKS as u32 + 8) {
+        game.tick();
+    }
+    assert!(
+        game.state
+            .entities
+            .get(artillery)
+            .expect("artillery exists")
+            .pos_x
+            > stopped_x,
+        "the packed artillery should continue toward its attack-move destination"
+    );
+}
+
+#[test]
 fn artillery_point_fire_queue_is_terminal() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);

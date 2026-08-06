@@ -3,9 +3,7 @@ import {
   ABILITIES,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
-  ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
-  ARTILLERY_MIN_RANGE_TILES,
   MORTAR_FIELD_OF_FIRE_RAD,
   MORTAR_MIN_RANGE_TILES,
   MORTAR_RANGE_TILES,
@@ -292,8 +290,15 @@ function dynamicUnitRangeProfile(e, tileSize) {
 }
 
 function staticUnitRangeProfile(e, tileSize) {
+  if (e.kind === KIND.ARTILLERY) {
+    return {
+      kind: "circle",
+      minRadius: 0,
+      maxRadius: ARTILLERY_MAX_RANGE_TILES * tileSize,
+    };
+  }
+
   if (
-    e.kind === KIND.ARTILLERY ||
     e.kind === KIND.ANTI_TANK_GUN ||
     (e.kind === KIND.MORTAR_TEAM && e.setupState === SETUP.DEPLOYED)
   ) {
@@ -322,13 +327,6 @@ function staticUnitRangeProfile(e, tileSize) {
 }
 
 function fieldOfFireProfile(kind, tileSize) {
-  if (kind === KIND.ARTILLERY) {
-    return {
-      minRadius: ARTILLERY_MIN_RANGE_TILES * tileSize,
-      maxRadius: ARTILLERY_MAX_RANGE_TILES * tileSize,
-      arc: ARTILLERY_FIELD_OF_FIRE_RAD,
-    };
-  }
   if (kind === KIND.ANTI_TANK_GUN) {
     return {
       minRadius: 0,

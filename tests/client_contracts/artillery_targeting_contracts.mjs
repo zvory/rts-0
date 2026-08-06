@@ -481,19 +481,30 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
 
   pointFireInput.state.selectedEntities = () => [selectedArtillery];
   const deployedArtillery = { ...selectedArtillery, setupState: SETUP.DEPLOYED, setupFacing: 0 };
-  const artilleryConeGfx = new RecordingGraphics();
+  const artilleryRangeGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(
-    { _feedbackGfx: artilleryConeGfx, _map: { tileSize: 32 } },
-    { playerId: 1, showUnitRangesEnabled: true, selectedEntities: () => [deployedArtillery] },
+    { _feedbackGfx: artilleryRangeGfx, _map: { tileSize: 32 } },
+    {
+      playerId: 1,
+      showUnitRangesEnabled: true,
+      selectedEntities: () => [selectedArtillery, deployedArtillery],
+    },
   );
-  const artilleryConeArcs = artilleryConeGfx.calls.filter((call) => call[0] === "arc");
+  const artilleryRangePoints = artilleryRangeGfx.calls
+    .filter((call) => call[0] === "moveTo" || call[0] === "lineTo")
+    .map((call) => Math.hypot(call[1] - selectedArtillery.x, call[2] - selectedArtillery.y));
   assert(
-    artilleryConeArcs.some((call) => call[3] === ARTILLERY_MAX_RANGE_TILES * 32),
-    "Artillery field-of-fire cone preview uses the mirrored maximum range",
+    artilleryRangePoints.length > 0 && artilleryRangePoints.every((distance) =>
+      Math.abs(distance - ARTILLERY_MAX_RANGE_TILES * 32) < 1
+    ),
+    "Packed and deployed artillery draw only the mirrored maximum-range circle",
   );
   assert(
-    artilleryConeArcs.some((call) => call[3] === ARTILLERY_MIN_RANGE_TILES * 32 && call[6] === true),
-    "Artillery field-of-fire cone preview cuts out the mirrored minimum range",
+    !artilleryRangeGfx.calls.some((call) => call[0] === "arc") &&
+      artilleryRangeGfx.calls.filter((call) =>
+        call[0] === "lineStyle" && call[2] === 0x8eb7ff && call[3] === 0.68
+      ).length === 2,
+    "Selected artillery use one regular blue range indicator per gun in every setup state",
   );
 
   pointFireInput.mouse = {

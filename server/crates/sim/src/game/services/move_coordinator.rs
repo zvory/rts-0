@@ -20,7 +20,7 @@ use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     active_trench_occupation, uses_oriented_vehicle_body, AttackPhase, BuildPhase,
-    DeconstructPhase, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
+    DeconstructPhase, Entity, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -346,7 +346,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path_goal(Some(*g));
             e.mark_move_phase(MovePhase::AwaitingPath);
             e.reset_gather_state();
-            e.begin_weapon_teardown_for_movement();
+            begin_weapon_teardown_for_ground_order(e, attack_move);
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
@@ -415,7 +415,7 @@ impl<'a> MoveCoordinator<'a> {
             entity.set_path_goal(Some(goal));
             entity.mark_move_phase(MovePhase::AwaitingPath);
             entity.reset_gather_state();
-            entity.begin_weapon_teardown_for_movement();
+            begin_weapon_teardown_for_ground_order(entity, attack_move);
             let (x, y) = (entity.pos_x, entity.pos_y);
             entity.reset_stuck(x, y);
         }
@@ -471,7 +471,7 @@ impl<'a> MoveCoordinator<'a> {
         unit.set_path_goal(Some(goal));
         unit.mark_move_phase(MovePhase::AwaitingPath);
         unit.reset_gather_state();
-        unit.begin_weapon_teardown_for_movement();
+        begin_weapon_teardown_for_ground_order(unit, attack_move);
         let (px, py) = (unit.pos_x, unit.pos_y);
         unit.reset_stuck(px, py);
     }
@@ -1136,6 +1136,13 @@ fn count_awaiting_paths(entities: &EntityStore) -> usize {
         .iter()
         .filter(|entity| entity.is_unit() && entity.move_phase() == Some(MovePhase::AwaitingPath))
         .count()
+}
+
+fn begin_weapon_teardown_for_ground_order(entity: &mut Entity, attack_move: bool) {
+    if attack_move && entity.kind == EntityKind::Artillery {
+        return;
+    }
+    entity.begin_weapon_teardown_for_movement();
 }
 
 fn visible_occupied_trench_ids_for_player(
