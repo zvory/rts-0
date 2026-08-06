@@ -273,10 +273,10 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       ABILITIES[ABILITY.POINT_FIRE].rangeTiles === ARTILLERY_MAX_RANGE_TILES &&
       ABILITIES[ABILITY.POINT_FIRE].minRangeTiles === ARTILLERY_MIN_RANGE_TILES &&
       ABILITIES[ABILITY.POINT_FIRE].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
-      ARTILLERY_MIN_FIRE_RADIUS_TILES === 6 &&
-      ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES === 3 &&
+      ARTILLERY_MIN_FIRE_RADIUS_TILES === 4 &&
+      ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES === 1 &&
       ARTILLERY_SHELL_DELAY_TICKS === 150,
-    "Artillery Fire exposes its carrier, range band, six-tile base and three-tile upgraded minimum radii, and 5-second delay",
+    "Artillery Fire exposes its carrier, range band, four-tile base and one-tile upgraded minimum radii, and 5-second delay",
   );
   assert(
     ABILITIES[ABILITY.BLANKET_FIRE].carriers.includes(KIND.ARTILLERY) &&
@@ -431,7 +431,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADES[UPGRADE.BALLISTIC_TABLES].researchTicks === BALLISTIC_TABLES_RESEARCH_TICKS &&
       BALLISTIC_TABLES_RESEARCH_TICKS === TICK_HZ * 15 &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].requiresUpgrade === UPGRADE.ARTILLERY_UNLOCK &&
-      UPGRADES[UPGRADE.BALLISTIC_TABLES].description.includes("3 tiles"),
+      UPGRADES[UPGRADE.BALLISTIC_TABLES].description.includes("1 tile"),
     "Artillery Fire Control exposes its 50/100 cost, 15-second duration, Artillery prerequisite, and radius effect",
   );
   assert(
@@ -965,8 +965,12 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     assert(tankButton?.dataset.hotkey === "W", "Tank training should occupy the top-middle W slot");
     assert(commandCarButton?.dataset.hotkey === "E", "Command Car training should occupy the top-right E slot");
     assert(
-      commandCarButton && !commandCarButton.disabled && commandCarButton.className.includes("primary-disabled"),
-      "Command Car training should keep its primary action disabled while allowing auto-build allocation before an Engineering Complex exists",
+      commandCarButton && !commandCarButton.disabled && !commandCarButton.className.includes("primary-disabled"),
+      "Command Car training should be available as soon as the Vehicle Works is complete",
+    );
+    assert(
+      tankButton && tankButton.className.includes("primary-disabled"),
+      "Tank training should remain locked without Tank Production",
     );
     assert(
       commandCarButton?.dataset.contextAction === "true",
@@ -1039,26 +1043,6 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       "Alt+production hotkeys dispatch one signed addition through the context-action path",
     );
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
-
-    renderedButtons.length = 0;
-    const completedEngineeringComplex = {
-      id: 780,
-      owner: playerId,
-      kind: KIND.ENGINEERING_COMPLEX,
-      buildProgress: null,
-    };
-    factoryHud.state.entitiesInterpolated = () => [selectedFactory, completedEngineeringComplex];
-    renderCommandCard(factoryHud);
-    const stillLockedTankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
-    const unlockedCommandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
-    assert(
-      stillLockedTankButton && stillLockedTankButton.className.includes("primary-disabled"),
-      "a completed Engineering Complex should not unlock Tank training without Tank Production",
-    );
-    assert(
-      unlockedCommandCarButton && !unlockedCommandCarButton.disabled,
-      "a completed Engineering Complex should enable Command Car training without Tank Production",
-    );
 
     renderedButtons.length = 0;
     const selectedGunWorks = {
