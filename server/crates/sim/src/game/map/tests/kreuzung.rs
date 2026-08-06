@@ -12,8 +12,8 @@ fn kreuzung_is_selectable_and_retains_its_authored_sites() {
     assert_eq!(entry.min_players, 1);
     assert_eq!(entry.max_players, 2);
 
-    let mut map = Map::load("Kreuzung", 2, 0x1234_5678)
-        .expect("Kreuzung should load for two active players");
+    let mut map =
+        Map::load("Kreuzung", 2, 0x1234_5678).expect("Kreuzung should load for two active players");
     assert_eq!((map.width, map.height), (126, 126));
     map.starts.sort_unstable();
     assert_eq!(map.starts, [(47, 8), (117, 78)]);
