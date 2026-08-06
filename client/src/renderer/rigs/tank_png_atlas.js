@@ -22,9 +22,6 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     PRODUCTION_RASTER_COLOR_TARGET,
     BAKED_COLOR_ADJUSTMENT,
   ),
-  // The nearly white assembled portrait loses its body fill when multiplied directly by the
-  // dark team palette in the HUD. Lift the masked team color before restoring the source detail.
-  "iconTintBrightness": 1.8,
   "iconVisibleBounds": {
     "x": 54,
     "y": 116,

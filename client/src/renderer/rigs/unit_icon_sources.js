@@ -71,7 +71,6 @@ function atlasPortrait(atlas, teamColor) {
       frame: assembled,
       visibleFrame: atlas.iconVisibleBounds || assembled,
       teamTint: true,
-      teamTintBrightness: atlas.iconTintBrightness,
     };
   }
 
@@ -101,7 +100,6 @@ function atlasPortrait(atlas, teamColor) {
         h: frameHeight,
       },
       teamTint: true,
-      teamTintBrightness: atlas.iconTintBrightness,
     };
   }
 
@@ -198,7 +196,6 @@ function rasterIconMarkup({
   frame,
   visibleFrame = null,
   teamTint = false,
-  teamTintBrightness = 1,
   teamColor = "#0072b2",
 }) {
   const safeSheetWidth = positiveDimension(sheetWidth);
@@ -221,25 +218,12 @@ function rasterIconMarkup({
     ? paddedVisibleFrame(safeFrame, safeVisibleFrame)
     : centeredZoomFrame(safeFrame);
   const tintColor = normalizeTeamColor(teamColor);
-  const safeTintBrightness = positiveScale(teamTintBrightness);
-  const tintProfile = safeTintBrightness === 1
-    ? ""
-    : `-b${String(number(safeTintBrightness)).replace(".", "_")}`;
-  const tintId = `unit-icon-tint-${tintColor.slice(1).toLowerCase()}${tintProfile}`;
-  const brightenedTeamColor = safeTintBrightness === 1
-    ? "maskedTeamColor"
-    : "brightenedTeamColor";
+  const tintId = `unit-icon-tint-${tintColor.slice(1).toLowerCase()}`;
   const tintFilter = teamTint
     ? `<defs><filter id="${tintId}" color-interpolation-filters="sRGB">` +
         `<feFlood flood-color="${tintColor}" result="teamColor" />` +
         `<feComposite in="teamColor" in2="SourceGraphic" operator="in" result="maskedTeamColor" />` +
-        (safeTintBrightness === 1 ? "" :
-          `<feComponentTransfer in="maskedTeamColor" result="brightenedTeamColor">` +
-            `<feFuncR type="linear" slope="${number(safeTintBrightness)}" />` +
-            `<feFuncG type="linear" slope="${number(safeTintBrightness)}" />` +
-            `<feFuncB type="linear" slope="${number(safeTintBrightness)}" />` +
-          `</feComponentTransfer>`) +
-        `<feBlend in="SourceGraphic" in2="${brightenedTeamColor}" mode="multiply" />` +
+        `<feBlend in="SourceGraphic" in2="maskedTeamColor" mode="multiply" />` +
       `</filter></defs>`
     : "";
   const imageFilter = teamTint ? ` filter="url(#${tintId})"` : "";
@@ -434,11 +418,6 @@ function centeredZoomFrame(frame) {
 function positiveDimension(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : 0;
-}
-
-function positiveScale(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 function finiteNumber(value) {
