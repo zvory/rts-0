@@ -125,14 +125,20 @@ export class MapEditorMinimapPreview {
     this._discardFrame();
     const generation = this.generation;
     this.mapKey = key;
-    this.bridgePromise = this._createBridge(payload, key, generation).catch((error) => {
-      if (this.mapKey === key) {
+    let bridgePromise;
+    bridgePromise = this._createBridge(payload, key, generation).catch((error) => {
+      // An invalidated request may reject after an undo has started a replacement for the same
+      // map. Only the promise that still owns the frame may clear the registered bridge.
+      if (this.bridgePromise === bridgePromise) {
         this.mapKey = "";
         this.bridgePromise = null;
+        this.frame?.remove();
+        this.frame = null;
       }
       throw error;
     });
-    return this.bridgePromise;
+    this.bridgePromise = bridgePromise;
+    return bridgePromise;
   }
 
   async _createBridge({ authoredMap, materializedMap }, key, generation) {

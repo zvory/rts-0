@@ -142,6 +142,43 @@ assert.deepEqual(analyzeRgba(Uint8Array.from([0, 0, 0, 255, 1, 2, 3, 255])), {
 }
 
 {
+  const pending = [];
+  const removedFrames = [];
+  const preview = Object.create(MapEditorMinimapPreview.prototype);
+  Object.assign(preview, {
+    destroyed: false,
+    mapKey: "",
+    frame: null,
+    bridgePromise: null,
+    generation: 0,
+    _createBridge() {
+      return new Promise((resolve, reject) => pending.push({ resolve, reject }));
+    },
+  });
+  const payload = { authoredMap: { name: "Undo race" } };
+  const stale = preview._bridge(payload);
+  preview._discardFrame();
+  const replacement = preview._bridge(payload);
+  preview.frame = { remove: () => removedFrames.push("replacement") };
+  pending[0].reject(new Error("stale preview cancelled"));
+  await assert.rejects(stale, /stale preview cancelled/);
+  assert.equal(preview.bridgePromise, replacement,
+    "a stale same-map rejection does not clear its replacement bridge");
+  assert.deepEqual(removedFrames, [], "a stale rejection does not remove the replacement frame");
+  pending[1].resolve({ call() {} });
+  await replacement;
+
+  preview._discardFrame();
+  removedFrames.length = 0;
+  const failed = preview._bridge(payload);
+  preview.frame = { remove: () => removedFrames.push("failed") };
+  pending[2].reject(new Error("preview startup failed"));
+  await assert.rejects(failed, /preview startup failed/);
+  assert.equal(preview.bridgePromise, null, "the failed current bridge releases its promise");
+  assert.deepEqual(removedFrames, ["failed"], "the failed current bridge removes its frame");
+}
+
+{
   const rectangles = [];
   const ctx = {
     fillStyle: "",
