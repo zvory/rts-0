@@ -24,7 +24,7 @@ pub fn damage_after_rifleman_movement(
     let numerator = u64::from(RIFLEMAN_MOVING_DAMAGE_NUMERATOR);
     let denominator = u64::from(RIFLEMAN_MOVING_DAMAGE_DENOMINATOR);
     let scaled = u64::from(damage) * numerator;
-    ((scaled + denominator - 1) / denominator) as u32
+    scaled.div_ceil(denominator) as u32
 }
 
 #[derive(Debug, Clone, Copy)]
