@@ -965,12 +965,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     assert(tankButton?.dataset.hotkey === "W", "Tank training should occupy the top-middle W slot");
     assert(commandCarButton?.dataset.hotkey === "E", "Command Car training should occupy the top-right E slot");
     assert(
-      commandCarButton && !commandCarButton.disabled && !commandCarButton.className.includes("primary-disabled"),
-      "Command Car training should be available as soon as the Vehicle Works is complete",
-    );
-    assert(
-      tankButton && tankButton.className.includes("primary-disabled"),
-      "Tank training should remain locked without Tank Production",
+      commandCarButton && !commandCarButton.disabled && commandCarButton.className.includes("primary-disabled"),
+      "Command Car training should keep its primary action disabled while allowing auto-build allocation before an Engineering Complex exists",
     );
     assert(
       commandCarButton?.dataset.contextAction === "true",
@@ -1043,6 +1039,26 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       "Alt+production hotkeys dispatch one signed addition through the context-action path",
     );
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
+
+    renderedButtons.length = 0;
+    const completedEngineeringComplex = {
+      id: 780,
+      owner: playerId,
+      kind: KIND.ENGINEERING_COMPLEX,
+      buildProgress: null,
+    };
+    factoryHud.state.entitiesInterpolated = () => [selectedFactory, completedEngineeringComplex];
+    renderCommandCard(factoryHud);
+    const stillLockedTankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
+    const unlockedCommandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
+    assert(
+      stillLockedTankButton && stillLockedTankButton.className.includes("primary-disabled"),
+      "a completed Engineering Complex should not unlock Tank training without Tank Production",
+    );
+    assert(
+      unlockedCommandCarButton && !unlockedCommandCarButton.disabled,
+      "a completed Engineering Complex should enable Command Car training without Tank Production",
+    );
 
     renderedButtons.length = 0;
     const selectedGunWorks = {

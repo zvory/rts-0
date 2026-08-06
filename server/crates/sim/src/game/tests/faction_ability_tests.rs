@@ -151,7 +151,7 @@ fn smoke_plus_doubles_scout_car_smoke_radius_and_duration() {
 }
 
 #[test]
-fn command_car_trains_at_factory_without_engineering_complex() {
+fn command_car_requires_completed_engineering_complex_then_trains_at_factory() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -165,13 +165,51 @@ fn command_car_trains_at_factory_without_engineering_complex() {
     for id in game.state.entities.ids() {
         game.state.entities.remove(id);
     }
+    let engineering_complex_pos = game.state.map.tile_center(8, 12);
     let factory_pos = game.state.map.tile_center(12, 8);
+    let engineering_complex = game
+        .state
+        .entities
+        .spawn_building(
+            1,
+            EntityKind::EngineeringComplex,
+            engineering_complex_pos.0,
+            engineering_complex_pos.1,
+            false,
+        )
+        .expect("engineering complex should spawn");
     let factory = game
         .state
         .entities
         .spawn_building(1, EntityKind::Factory, factory_pos.0, factory_pos.1, true)
         .expect("factory should spawn");
 
+    game.enqueue(
+        1,
+        Command::Train {
+            building: factory,
+            unit: EntityKind::CommandCar,
+        },
+    );
+    game.tick();
+    assert!(
+        game.state
+            .entities
+            .get(factory)
+            .expect("factory")
+            .prod_queue()
+            .is_empty(),
+        "Command Cars should require a completed Engineering Complex"
+    );
+
+    let engineering_complex = game
+        .state
+        .entities
+        .get_mut(engineering_complex)
+        .expect("engineering complex");
+    while engineering_complex.under_construction() {
+        engineering_complex.advance_construction();
+    }
     game.enqueue(
         1,
         Command::Train {
@@ -187,7 +225,7 @@ fn command_car_trains_at_factory_without_engineering_complex() {
             .expect("factory")
             .prod_queue()
             .is_empty(),
-        "Tanks should remain locked without Tank Production"
+        "a completed Engineering Complex should not unlock Tanks without Tank Production"
     );
 
     game.enqueue(
@@ -206,7 +244,7 @@ fn command_car_trains_at_factory_without_engineering_complex() {
             .entities
             .iter()
             .any(|e| e.owner == 1 && e.kind == EntityKind::CommandCar),
-        "Vehicle Works should train Command Cars without an Engineering Complex"
+        "Vehicle Works should train Command Cars once an Engineering Complex is complete"
     );
 }
 
