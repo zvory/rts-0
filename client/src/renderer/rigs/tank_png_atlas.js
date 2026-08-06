@@ -18,6 +18,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
   "enabled": true,
   "unit": "tank",
   "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass11-white-dim30",
+  "iconImage": "/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png?v=pass11-white-dim30",
   "runtimeColorAdjustment": relativeColorAdjustment(
     PRODUCTION_RASTER_COLOR_TARGET,
     BAKED_COLOR_ADJUSTMENT,

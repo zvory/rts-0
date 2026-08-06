@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { KIND } from "../client/src/protocol.js";
+import { liveUnitIconMarkupFor } from "../client/src/renderer/rigs/unit_icon_sources.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_RUNTIME_RIG_TEXTURE_DIMENSION = 2048;
@@ -192,6 +194,16 @@ for (const sourceFile of clientRuntimeSourceFiles) {
   const source = fs.readFileSync(sourceFile, "utf8");
   for (const match of source.matchAll(/["'`(](\/assets\/rigs\/[^"'`)\s?#]+)/g)) {
     runtimeRigAssets.add(`./client${match[1]}`);
+  }
+}
+for (const kind of Object.values(KIND)) {
+  const iconMarkup = liveUnitIconMarkupFor(kind);
+  for (const match of iconMarkup.matchAll(/<image href="([^"]+)/g)) {
+    const pathname = new URL(match[1], "http://localhost").pathname;
+    if (!pathname.startsWith("/assets/rigs/")) {
+      throw new Error(`${kind} unit icon must use a deployed /assets/rigs/ image URL, got ${match[1]}`);
+    }
+    runtimeRigAssets.add(`./client${pathname}`);
   }
 }
 const checkedInRuntimeAssets = [
