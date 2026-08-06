@@ -498,7 +498,7 @@ fn manual_mortar_launch_and_impact_markers_are_visible_to_allies() {
         .all(|event| !matches!(event, Event::MortarLaunch { .. })));
 
     let mut impact_events = Vec::new();
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         impact_events = game.tick();
     }
     let ally_impact = impact_events

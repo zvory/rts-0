@@ -1,4 +1,4 @@
-import { ARTILLERY_OUTER_RADIUS_TILES } from "./config.js";
+import { ARTILLERY_OUTER_RADIUS_TILES, MORTAR_OUTER_RADIUS_TILES } from "./config.js";
 import { EVENT, KIND, STATE, WEAPON_KIND, isUnit } from "./protocol.js";
 
 const SHOT_REVEAL_MS = 1500;
@@ -133,7 +133,7 @@ export class VisualEffectBuffers {
     }
     const delayTicks = Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0;
     const durationMs = Math.max(1, (delayTicks / 30) * 1000);
-    const radiusTiles = Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.5;
+    const radiusTiles = Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : MORTAR_OUTER_RADIUS_TILES;
     const seed = Math.floor(ev.toX * 13 + ev.toY * 7 + now) >>> 0;
     if (typeof ev.from === "number") {
       this.weaponRecoilById.set(ev.from, recoilRecord(now, WEAPON_KIND.MORTAR_TEAM_MORTAR));
@@ -182,7 +182,7 @@ export class VisualEffectBuffers {
     this.mortarImpacts.push({
       x: ev.x,
       y: ev.y,
-      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.5,
+      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : MORTAR_OUTER_RADIUS_TILES,
       seed: Math.floor(ev.x * 13 + ev.y * 7 + now) >>> 0,
       createdAt: now,
     });
