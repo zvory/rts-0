@@ -290,6 +290,11 @@ pub struct MapInfo {
     pub tile_size: u32,
     /// Row-major terrain codes, length = width * height.
     pub terrain: Vec<u8>,
+    /// Row-major static elevation levels, length = width * height.
+    ///
+    /// Elevation is presentation-only for now: the server owns and distributes it, but no
+    /// movement, visibility, or combat rule consumes it.
+    pub elevation: Vec<u8>,
     /// Positions of all neutral resource nodes (steel/oil). Included so the
     /// client can render them on the minimap before fog-of-war reveals them.
     pub resources: Vec<ResourceNode>,

@@ -231,6 +231,7 @@ fn map_from_materialized(map: AuthoredMapData) -> Map {
         width: map.width,
         height: map.height,
         terrain: map.terrain,
+        elevation: map.elevation,
         starts: map.starts,
         base_sites: map.base_sites,
         base_resource_counts: map.base_resource_counts,

@@ -14,6 +14,7 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
         width: map.width,
         height: map.height,
         terrain: map.terrain.clone(),
+        elevation: map.elevation.clone(),
         starts: map
             .starts
             .iter()

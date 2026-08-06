@@ -63,6 +63,9 @@ pub struct Map {
     pub height: u32,
     /// Row-major terrain codes, length `width * height`.
     pub terrain: Vec<u8>,
+    /// Row-major authoritative static elevation levels, length `width * height`.
+    /// No gameplay rule consumes these levels yet.
+    pub elevation: Vec<u8>,
     /// One start tile `(tile_x, tile_y)` per player, in player-index order.
     pub starts: Vec<(u32, u32)>,
     /// Every authored base location. These always receive resource clusters; selected starts
@@ -193,6 +196,8 @@ impl Map {
         hash = fnv_bytes(hash, &self.width.to_le_bytes());
         hash = fnv_bytes(hash, &self.height.to_le_bytes());
         hash = fnv_bytes(hash, &self.terrain);
+        hash = fnv_bytes(hash, b"elevation");
+        hash = fnv_bytes(hash, &self.elevation);
         hash = fnv_usize(hash, self.starts.len());
         for &(x, y) in &self.starts {
             hash = fnv_bytes(hash, &x.to_le_bytes());

@@ -10,6 +10,8 @@ pub struct LabMapDraft {
     pub width: u32,
     pub height: u32,
     pub terrain: Vec<u8>,
+    #[serde(default)]
+    pub elevation: Vec<u8>,
     pub starts: Vec<LabMapTile>,
     pub base_sites: Vec<LabBaseSite>,
     #[serde(default)]
@@ -92,6 +94,8 @@ pub struct LabCheckpointScenarioMapData {
     pub width: u32,
     pub height: u32,
     pub terrain: Vec<u8>,
+    #[serde(default)]
+    pub elevation: Vec<u8>,
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
     pub base_sites: Vec<LabScenarioBaseSite>,

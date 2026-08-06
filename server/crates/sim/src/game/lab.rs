@@ -573,6 +573,11 @@ impl Game {
             width: draft.width,
             height: draft.height,
             terrain: draft.terrain,
+            elevation: if draft.elevation.is_empty() {
+                vec![0; (draft.width * draft.height) as usize]
+            } else {
+                draft.elevation
+            },
             starts,
             base_sites,
             base_resource_counts,

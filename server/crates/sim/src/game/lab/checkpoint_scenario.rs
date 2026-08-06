@@ -44,6 +44,8 @@ pub struct LabCheckpointScenarioMapData {
     pub width: u32,
     pub height: u32,
     pub terrain: Vec<u8>,
+    #[serde(default)]
+    pub elevation: Vec<u8>,
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
     pub base_sites: Vec<LabScenarioBaseSite>,
@@ -108,6 +110,7 @@ impl LabCheckpointScenarioMap {
                 width: map.width,
                 height: map.height,
                 terrain: map.terrain.clone(),
+                elevation: map.elevation.clone(),
                 starts: map
                     .starts
                     .iter()
@@ -157,6 +160,7 @@ impl LabCheckpointScenarioMap {
             width: data.width,
             height: data.height,
             terrain: data.terrain,
+            elevation: data.elevation,
             starts: data
                 .starts
                 .into_iter()
