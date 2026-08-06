@@ -524,7 +524,6 @@ mod tests {
     mod crossroads;
     mod doodads;
     mod four_player;
-    mod kreuzung;
     mod open_basin;
     mod overlays;
     mod schone_tage;

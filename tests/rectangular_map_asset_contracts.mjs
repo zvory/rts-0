@@ -64,9 +64,9 @@ for (const fileName of fs.readdirSync(new URL("server/assets/maps/", repoRoot)).
     }
   }
   assert.deepEqual(
-    map.noEntrenchmentTiles,
+    [...map.noEntrenchmentTiles].sort((left, right) => left.y - right.y || left.x - right.x),
     expectedNoEntrenchment,
-    `${fileName} marks every road tile and only road tiles as no-entrenchment`,
+    `${fileName} marks every road tile and only road tiles as no-entrenchment regardless of serialization order`,
   );
 }
 
