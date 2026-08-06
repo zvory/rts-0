@@ -807,6 +807,34 @@ try {
       editorUi.zoom.min === "5" && editorUi.zoom.max === "400" && editorUi.zoom.value > 0,
     `MAP EDITOR: document bar exposes bounded framing, step, and percentage zoom controls (${JSON.stringify(editorUi.zoom)})`,
   );
+  await editorPage.evaluate(async () => {
+    const response = await fetch("/maps/1v1.json");
+    window.__mapEditor.session.loadAuthoredMap(await response.json());
+  });
+  const previewButton = await editorPage.evaluateHandle(() => [...document.querySelectorAll(".map-editor-toolbar button")]
+    .find((button) => button.textContent === "Preview"));
+  await previewButton.hover();
+  await editorPage.waitForFunction(() => {
+    const popover = document.querySelector(".map-editor-minimap-preview");
+    const image = popover?.querySelector("img");
+    return popover && !popover.hidden && !image?.hidden && image?.src.startsWith("data:image/png;base64,");
+  }, { timeout: 15000 });
+  ok(true, "MAP EDITOR: hovering Preview presents the authoritative minimap without navigation");
+  await editorPage.evaluate(() => {
+    window.__mapEditor.minimapPreview.clipboard = {
+      async write(items) {
+        const blob = await items[0].getType("image/png");
+        window.__mapEditorCopiedPreview = { type: blob.type, size: blob.size };
+      },
+    };
+  });
+  await previewButton.click();
+  await editorPage.waitForFunction(() => document.querySelector(".map-editor-status")?.textContent
+    ?.includes("Copied the 2048 px minimap PNG to the clipboard.")
+    && window.__mapEditorCopiedPreview?.type === "image/png"
+    && window.__mapEditorCopiedPreview?.size > 10_000, { timeout: 15000 });
+  ok(true, "MAP EDITOR: clicking Preview copies the 2048 px minimap PNG to the clipboard");
+  await previewButton.dispose();
   await editorPage.evaluate(() => [...document.querySelectorAll(".map-editor-toolbar button")]
     .find((button) => button.textContent === "Map settings")?.click());
   const settingsMode = await editorPage.evaluate(() => ({

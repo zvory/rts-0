@@ -5469,7 +5469,7 @@ input[type="text"]:focus {
   display: none !important;
 }
 
-.map-editor-mode #game-screen > :not(#viewport):not(.map-editor-panel):not(.map-editor-toolbar):not(.map-editor-tool-rail):not(.map-editor-status-dock) {
+.map-editor-mode #game-screen > :not(#viewport):not(.map-editor-panel):not(.map-editor-toolbar):not(.map-editor-tool-rail):not(.map-editor-status-dock):not(.map-editor-minimap-preview):not(.map-editor-minimap-preview-frame) {
   display: none !important;
 }
 

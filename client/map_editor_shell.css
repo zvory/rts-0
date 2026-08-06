@@ -68,6 +68,42 @@
   white-space: nowrap;
 }
 
+.map-editor-minimap-preview {
+  position: fixed;
+  z-index: 45;
+  display: grid;
+  width: min(320px, calc(100vw - 16px));
+  min-height: 80px;
+  box-sizing: border-box;
+  place-items: center;
+  padding: 8px;
+  border: 1px solid rgba(208, 184, 132, 0.48);
+  border-radius: 7px;
+  background: rgba(18, 22, 23, 0.98);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.58);
+  color: #d8c79f;
+  pointer-events: none;
+}
+
+.map-editor-minimap-preview[hidden],
+.map-editor-minimap-preview-frame {
+  display: none !important;
+}
+
+.map-editor-minimap-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.map-editor-minimap-preview span {
+  padding: 14px;
+  color: #8f897b;
+  font: 11px var(--mono);
+  text-align: center;
+}
+
 .map-editor-toolbar-zoom {
   box-sizing: border-box;
   width: 58px;

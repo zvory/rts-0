@@ -2,6 +2,7 @@ import { TERRAIN } from "./protocol.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
+import { createMapEditorPreviewButton } from "./map_editor_preview_button.js";
 import {
   MAP_EDITOR_CATEGORIES,
   MAP_EDITOR_OPERATIONS,
@@ -46,7 +47,10 @@ export class MapEditorPanel {
     session,
     viewport,
     onOpenLab,
-    onOpenPreview,
+    onShowPreview,
+    onHidePreview,
+    onCopyPreview,
+    onInvalidatePreview,
     fetchImpl = globalThis.fetch?.bind(globalThis),
     createAbortController = () => new AbortController(),
     setTimeoutImpl = globalThis.setTimeout?.bind(globalThis),
@@ -57,7 +61,10 @@ export class MapEditorPanel {
     this.session = session;
     this.viewport = viewport;
     this.onOpenLab = onOpenLab;
-    this.onOpenPreview = onOpenPreview;
+    this.onShowPreview = onShowPreview;
+    this.onHidePreview = onHidePreview;
+    this.onCopyPreview = onCopyPreview;
+    this.onInvalidatePreview = onInvalidatePreview;
     this.fetchImpl = fetchImpl;
     this.createAbortController = createAbortController;
     this.setTimeoutImpl = setTimeoutImpl;
@@ -161,6 +168,7 @@ export class MapEditorPanel {
     if (this.analysisMapFingerprint === null) this.analysisMapFingerprint = analysisFingerprint;
     else if (analysisFingerprint !== this.analysisMapFingerprint) {
       MapEditorPanel.prototype.invalidateAuthoritativeAnalysis.call(this);
+      this.onInvalidatePreview?.();
       this.analysisMapFingerprint = analysisFingerprint;
     }
     const width = snapshot?.draft?.width;
@@ -258,7 +266,13 @@ export class MapEditorPanel {
       button(this.analysisPending && this.analysisKind === "check" ? "Checking…" : "Check", () => void this.runAuthoritativeAnalysis("check"), {
         disabled: this.analysisPending,
       }),
-      button(this.pending ? "Preparing…" : "Preview", () => void this.openPreview(), { disabled: this.pending }),
+      createMapEditorPreviewButton({
+        session: this.session,
+        onShow: this.onShowPreview,
+        onHide: this.onHidePreview,
+        onCopy: this.onCopyPreview,
+        onStatus: (message, error) => this.setStatus(message, error),
+      }),
       button(this.pending ? "Opening…" : "Open in Lab", () => void this.openLab(), {
         disabled: this.pending,
         className: "map-editor-primary",
@@ -1216,23 +1230,6 @@ export class MapEditorPanel {
         authoredMap: this.session.exportMap(),
         materializedMap: this.session.materialized(),
       });
-    } catch (error) {
-      this.pending = false;
-      this.setStatus(error.message || String(error), true);
-    }
-  }
-
-  async openPreview() {
-    if (this.pending) return;
-    this.pending = true;
-    this.setStatus("Validating map and preparing a minimap preview…");
-    try {
-      await this.onOpenPreview?.({
-        authoredMap: this.session.exportMap(),
-        materializedMap: this.session.materialized(),
-      });
-      this.pending = false;
-      this.setStatus("Opened the minimap preview page.");
     } catch (error) {
       this.pending = false;
       this.setStatus(error.message || String(error), true);

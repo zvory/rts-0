@@ -2,6 +2,7 @@ import { dom } from "./bootstrap.js";
 import { createMapHandoff, consumeMapHandoff } from "./map_editor_handoff.js";
 import { mapEditorLaunchConfig } from "./map_editor_launch.js";
 import { MapEditorInteractBridge } from "./map_editor_interact_bridge.js";
+import { MapEditorMinimapPreview } from "./map_editor_minimap_preview.js";
 import { MapEditorPanel } from "./map_editor_panel.js";
 import { MapEditorSession } from "./map_editor_session.js";
 import { MapEditorViewport } from "./map_editor_viewport.js";
@@ -22,6 +23,7 @@ export class MapEditorApp {
     this.session = new MapEditorSession();
     this.viewport = null;
     this.panel = null;
+    this.minimapPreview = null;
     this.interactBridge = null;
     this.allowUnload = false;
     this.onBeforeUnload = (event) => {
@@ -65,12 +67,19 @@ export class MapEditorApp {
       session: this.session,
       onStatus: (message, error) => panel?.setStatus(message, error),
     });
+    this.minimapPreview = new MapEditorMinimapPreview({
+      root: dom.gameScreen,
+      locationObj: this.locationObj,
+    });
     panel = new MapEditorPanel({
       root: dom.gameScreen,
       session: this.session,
       viewport: this.viewport,
       onOpenLab: (map) => this.openInLab(map),
-      onOpenPreview: (map) => this.openPreview(map),
+      onShowPreview: (anchor, map) => this.minimapPreview.show(anchor, map),
+      onHidePreview: () => this.minimapPreview.hide(),
+      onCopyPreview: (map) => this.minimapPreview.copy(map),
+      onInvalidatePreview: () => this.minimapPreview.invalidate(),
     });
     this.panel = panel;
     if (this.launch.interact && !this.launch.error) {
@@ -93,30 +102,13 @@ export class MapEditorApp {
     window.location.assign(url.toString());
   }
 
-  async openPreview({ authoredMap, materializedMap }) {
-    const opened = window.open("about:blank", "_blank");
-    if (!opened) throw new Error("The browser blocked the minimap preview window. Allow pop-ups and try again.");
-    opened.opener = null;
-    try {
-      const handoff = await createMapHandoff({
-        destination: "lab",
-        authoredMap,
-        materializedMap,
-      });
-      const url = new URL("/map-preview", this.locationObj.href);
-      url.searchParams.set("handoff", handoff.handoffId);
-      opened.location.replace(url.toString());
-    } catch (error) {
-      opened.close();
-      throw error;
-    }
-  }
-
   destroy() {
     window.removeEventListener("beforeunload", this.onBeforeUnload);
     this.interactBridge?.destroy();
     this.interactBridge = null;
     this.panel?.destroy();
+    this.minimapPreview?.destroy();
+    this.minimapPreview = null;
     this.viewport?.destroy();
     document.body.classList.remove("map-editor-mode");
   }
