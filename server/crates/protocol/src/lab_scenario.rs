@@ -21,6 +21,8 @@ pub struct LabMapDraft {
     #[serde(default)]
     pub no_building_tiles: Vec<MapTile>,
     #[serde(default)]
+    pub no_entrenchment_tiles: Vec<MapTile>,
+    #[serde(default)]
     pub damage_reduction_tiles: Vec<MapTile>,
     #[serde(default)]
     pub slow_movement_tiles: Vec<MapTile>,
@@ -102,6 +104,8 @@ pub struct LabCheckpointScenarioMapData {
     #[serde(default)]
     pub no_building_tiles: Vec<MapTile>,
     #[serde(default)]
+    pub no_entrenchment_tiles: Vec<MapTile>,
+    #[serde(default)]
     pub damage_reduction_tiles: Vec<MapTile>,
     #[serde(default)]
     pub slow_movement_tiles: Vec<MapTile>,
@@ -180,6 +184,7 @@ mod tests {
             concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
             no_building_tiles: Vec::new(),
+            no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
         };

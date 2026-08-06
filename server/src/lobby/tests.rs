@@ -585,6 +585,7 @@ async fn unused_map_editor_lab_rooms_expire_and_cannot_be_recreated_by_name() {
             concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
             no_building_tiles: Vec::new(),
+            no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
         })
@@ -615,6 +616,7 @@ async fn draining_rejects_new_map_editor_lab_rooms() {
             concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
             no_building_tiles: Vec::new(),
+            no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
         })

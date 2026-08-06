@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "width": 166,
   "height": 166,
   "name": "4 Player Map",
@@ -293,5 +293,6 @@
   "concealmentTiles": [],
   "noVehicleTiles": [],
   "doodads": [],
-  "noBuildingTiles": []
+  "noBuildingTiles": [],
+  "noEntrenchmentTiles": []
 }

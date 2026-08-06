@@ -19,6 +19,7 @@ fn authored_map_with_overlays(
         "concealmentTiles": concealment_tiles,
         "noVehicleTiles": no_vehicle_tiles,
         "noBuildingTiles": [],
+        "noEntrenchmentTiles": [],
         "damageReductionTiles": [],
         "slowMovementTiles": [],
     })
@@ -62,6 +63,14 @@ fn authored_overlays_are_canonicalized_and_hash_as_distinct_layers() {
     let map = Map::from_authored_json(1, &json, 0).expect("valid authored overlays");
     assert_eq!(map.concealment_tiles, vec![(19, 21), (20, 21)]);
     assert_eq!(map.no_vehicle_tiles, vec![(22, 21)]);
+
+    let mut no_entrenchment = map.clone();
+    no_entrenchment.no_entrenchment_tiles = vec![(22, 21)];
+    assert_ne!(
+        map.materialized_hash(),
+        no_entrenchment.materialized_hash(),
+        "the no-entrenchment layer must participate in v10 materialized identity",
+    );
 
     let mut concealment_only = map.clone();
     concealment_only.no_vehicle_tiles.clear();
@@ -114,7 +123,7 @@ fn authored_overlays_reject_duplicates_and_out_of_bounds_tiles() {
 }
 
 #[test]
-fn compact_forest_spans_materialize_into_all_gameplay_layers() {
+fn compact_forest_spans_materialize_into_the_five_composite_layers() {
     let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
         serde_json::json!([{"x": 20, "y": 21}]),
         serde_json::json!([]),
@@ -127,6 +136,10 @@ fn compact_forest_spans_materialize_into_all_gameplay_layers() {
     let forest = vec![(18, 22), (19, 22), (19, 23), (20, 22)];
     assert_eq!(materialized.no_vehicle_tiles, forest);
     assert_eq!(materialized.no_building_tiles, forest);
+    assert!(
+        materialized.no_entrenchment_tiles.is_empty(),
+        "Forest must not acquire the independent no-entrenchment effect",
+    );
     assert_eq!(materialized.damage_reduction_tiles, forest);
     assert_eq!(materialized.slow_movement_tiles, forest);
     assert_eq!(
@@ -196,9 +209,29 @@ fn current_authored_schema_requires_no_building_tiles() {
         .remove("noBuildingTiles");
 
     let error = Map::materialize_authored_json(&authored.to_string(), 1)
-        .expect_err("schema-v9 maps must declare noBuildingTiles");
+        .expect_err("schema-v10 maps must declare noBuildingTiles");
     assert!(
         error.contains("noBuildingTiles must be an array"),
+        "error was: {error}"
+    );
+}
+
+#[test]
+fn current_authored_schema_requires_no_entrenchment_tiles() {
+    let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+        serde_json::json!([]),
+        serde_json::json!([]),
+    ))
+    .expect("test map JSON");
+    authored
+        .as_object_mut()
+        .expect("map object")
+        .remove("noEntrenchmentTiles");
+
+    let error = Map::materialize_authored_json(&authored.to_string(), 1)
+        .expect_err("schema-v10 maps must declare noEntrenchmentTiles");
+    assert!(
+        error.contains("noEntrenchmentTiles must be an array"),
         "error was: {error}"
     );
 }

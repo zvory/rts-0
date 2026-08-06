@@ -341,7 +341,8 @@ assert(
   assert.deepEqual(authored.forestSpans, Array.from({ length: 10 }, (_, index) => [10 + index, 10, 19]),
     "forest paint is stored as exact compact horizontal spans");
   assert.equal(authored.concealmentTiles.length + authored.noVehicleTiles.length
-    + authored.noBuildingTiles.length + authored.damageReductionTiles.length + authored.slowMovementTiles.length, 0,
+    + authored.noBuildingTiles.length + authored.noEntrenchmentTiles.length
+    + authored.damageReductionTiles.length + authored.slowMovementTiles.length, 0,
   "forest mechanics do not duplicate coordinates into five authored arrays");
   for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "damageReductionTiles", "slowMovementTiles"]) {
     assert.equal(session.materialized()[field].length, 100, `forest materialization populates ${field}`);
@@ -443,7 +444,7 @@ assert(
   const session = new MapEditorSession({ storage: null });
   session.loadAuthoredMap(oneVOneNoTerrainMap);
   const materialized = session.materialized();
-  assert.equal(session.exportMap().version, 9);
+  assert.equal(session.exportMap().version, 10);
   assert.deepEqual({ width: materialized.width, height: materialized.height }, { width: 126, height: 126 });
   assert.equal(session.exportMap().layouts, undefined, "flat map data has no layout matrix");
   assert.equal(materialized.starts.length, 2);
@@ -711,7 +712,8 @@ assert(
   const overlap = [{ x: 14, y: 14 }, { x: 15, y: 14 }];
   for (const [label, effect] of [
     ["Painted concealment", "concealment"], ["Excluded vehicles", "noVehicle"],
-    ["Excluded buildings", "noBuilding"], ["Reduced damage", "damageReduction"],
+    ["Excluded buildings", "noBuilding"], ["Excluded entrenchment", "noEntrenchment"],
+    ["Reduced damage", "damageReduction"],
     ["Slowed movement", "slowMovement"],
   ]) {
     session.beginOverlayStroke(label);
@@ -722,9 +724,10 @@ assert(
   assert.deepEqual(session.materialized().noVehicleTiles, overlap,
     "independent authoring tools may intentionally overlap their sparse semantic layers");
   assert.deepEqual(session.materialized().noBuildingTiles, overlap);
+  assert.deepEqual(session.materialized().noEntrenchmentTiles, overlap);
   assert.deepEqual(session.materialized().damageReductionTiles, overlap);
   assert.deepEqual(session.materialized().slowMovementTiles, overlap,
-    "all five gameplay layers may intentionally share one tile");
+    "all six gameplay layers may intentionally share one tile");
 
   session.beginOverlayStroke("Made long grass");
   assert.deepEqual(session.paintOverlayTiles([overlap[1]], { noVehicle: false }), [overlap[1]]);
@@ -809,6 +812,11 @@ assert(
     assert.deepEqual(session.paintTerrainTiles([tile], tile.code), [tile]);
   }
   assert.equal(session.commitTerrainStroke(), true);
+  assert.equal(session.draft.noEntrenchmentTiles.length, roadTiles.length);
+  for (const tile of roadTiles) {
+    assert(session.draft.noEntrenchmentTiles.some(({ x, y }) => x === tile.x && y === tile.y),
+      "painting any road variant automatically adds the no-entrenchment overlay");
+  }
   for (const tile of roadTiles) {
     assert.equal(session.materialized().terrain[tile.y * 32 + tile.x], tile.code);
   }
@@ -820,6 +828,11 @@ assert(
     );
   }
   assert.equal(session.commitTerrainStroke(), true);
+  assert.deepEqual(
+    session.draft.noEntrenchmentTiles,
+    [],
+    "painting open ground over roads removes their automatic no-entrenchment overlay",
+  );
 }
 
 {
@@ -1096,7 +1109,7 @@ assert(
 
 {
   const overlap = [{ x: 6, y: 7 }];
-  const effectFields = ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "damageReductionTiles", "slowMovementTiles"];
+  const effectFields = ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "noEntrenchmentTiles", "damageReductionTiles", "slowMovementTiles"];
   const draft = authoredMapFromMaterialized({
     name: "Independent overlapping effects", description: "", size: 16,
     terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [], doodads: [],
@@ -1177,7 +1190,7 @@ assert(
   const request = [];
   await createMapHandoff({
     destination: "lab",
-    authoredMap: { version: 9 },
+    authoredMap: { version: 10 },
     materializedMap: { width: 32, height: 16, starts: [], baseSites: [], doodads: [] },
     fetchImpl: async (_url, init) => {
       request.push(JSON.parse(init.body));
@@ -1287,7 +1300,7 @@ assert(
 {
   const session = new MapEditorSession({ storage: null });
   session.initializeBlank({ size: 32, playerCount: 2 });
-  assert.equal(session.exportMap().version, 9);
+  assert.equal(session.exportMap().version, 10);
   assert.deepEqual(session.materialized().doodads, []);
   session.beginDoodadStroke("Sprayed flowers");
   const added = session.placeDoodads([{ x: 100, y: 120 }, { x: 140, y: 150 }], {

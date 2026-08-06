@@ -252,6 +252,7 @@ const OVERLAY_VISUALS = Object.freeze({
   concealment: Object.freeze({ color: 0x2f9f78, icon: drawClosedEye }),
   noVehicle: Object.freeze({ color: 0xd94b45, icon: drawNoEntry }),
   noBuilding: Object.freeze({ color: 0xd58a2f, icon: drawNoBuilding }),
+  noEntrenchment: Object.freeze({ color: 0xb84a8f, icon: drawNoEntry }),
   damageReduction: Object.freeze({ color: 0x3e82d7, icon: drawHalfShield }),
   slowMovement: Object.freeze({ color: 0x8b5fc7, icon: drawMiredBoot }),
 });
@@ -278,6 +279,7 @@ function drawGameplayOverlays(graphics, overlay, visibility) {
   add("concealment", overlay.concealmentTiles, MAP_AUTHORING_LAYER.CONCEALMENT);
   add("noVehicle", overlay.noVehicleTiles, MAP_AUTHORING_LAYER.NO_VEHICLE);
   add("noBuilding", overlay.noBuildingTiles, MAP_AUTHORING_LAYER.NO_BUILDING);
+  add("noEntrenchment", overlay.noEntrenchmentTiles, MAP_AUTHORING_LAYER.NO_ENTRENCHMENT);
   add("damageReduction", overlay.damageReductionTiles, MAP_AUTHORING_LAYER.DAMAGE_REDUCTION);
   add("slowMovement", overlay.slowMovementTiles, MAP_AUTHORING_LAYER.SLOW_MOVEMENT);
 

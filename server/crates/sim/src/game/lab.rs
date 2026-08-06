@@ -580,6 +580,7 @@ impl Game {
             concealment_tiles: overlays.concealment,
             no_vehicle_tiles: overlays.no_vehicle,
             no_building_tiles: overlays.no_building,
+            no_entrenchment_tiles: overlays.no_entrenchment,
             damage_reduction_tiles: overlays.damage_reduction,
             slow_movement_tiles: overlays.slow_movement,
         };

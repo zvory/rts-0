@@ -1023,6 +1023,8 @@ roads with `=`, `-`, `|`, `\`, and `/`, respectively. The ten visual Open-terrai
 `0` through `9` in protocol-code order: Gravel A/B/C, Dirt A/B/C, Mud A/B/C, then Frosted Ground.
 The dedicated road tool drags a configurable-width road snapped to the eight cardinal/diagonal
 directions, paints bare-road shoulders, and chooses the yellow centre-mark orientation automatically.
+Every road paint also adds the independent No entrenchment overlay to the affected tiles; painting
+non-road terrain back over those tiles removes that automatic overlay.
 The same five road tile variants remain in the ordinary terrain palette for brush and box detail work.
 The selected symmetry runs the shared advisory checker against the current draft and renders any
 terrain, start/base, overlay, resource, or doodad mismatch directly below the selector. Three-way
@@ -1038,7 +1040,7 @@ texture per tile.
 
 The Terrain palette exposes Forest as compound content with a configurable 1–31-tile brush; the
 separate operation rail applies it with Brush or removes it with Erase.
-Forest painting is the single source for its tree scatter and all five gameplay effects. The draft
+Forest painting is the single source for its tree scatter and its five composite gameplay effects. The draft
 stores the exact tile area as compact inclusive `[y, xStart, xEnd]` row spans; generated trees use
 reserved deterministic ids, while ordinary doodads remain independently authored. Symmetry expands
 the forest stroke before the span mask is updated. Erasing removes both the semantic area and only
@@ -1051,12 +1053,13 @@ tree roots sit in the immediately adjacent tile below the forest while their fol
 the semantic boundary. The grounded root location is therefore not itself evidence that a tile is a
 forest tile.
 
-The Gameplay overlays palette can select any combination of Concealment, No vehicles, No buildings, Damage reduction,
-and Slowed movement, then paint or erase the selected layers in one brush or box stroke. Forest is a
+The Gameplay overlays palette can select any combination of Concealment, No vehicles, No buildings,
+No entrenchment, Damage reduction, and Slowed movement, then paint or erase the selected layers in one brush or box stroke. Forest is a
 separate composite authoring tile: materialization unions its spans into all five runtime layers,
-while the five effect tiles remain independently paintable. The viewport uses green, red, amber, blue, and purple respectively,
-with a closed eye, no-entry sign, crossed building, half shield, and mired boot on every affected tile. A single
-effect uses the full tile; overlapping effects subdivide into stable 2x2 or 3x2 icon cells so all five
+while all six effect tiles remain independently paintable. No entrenchment prevents eligible infantry
+from digging or occupying trenches on the tile and is automatically authored beneath roads. The viewport uses distinct colors and icons,
+including a closed eye, no-entry sign, crossed building, half shield, and mired boot on affected tiles. A single
+effect uses the full tile; overlapping effects subdivide into stable 2x2 or 3x2 icon cells so all effects
 remain legible without hiding one another. Damage reduction and slowed movement each reduce their
 affected value by 25%;
 overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON import/export, and

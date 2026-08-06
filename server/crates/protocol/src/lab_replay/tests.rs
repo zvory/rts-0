@@ -68,6 +68,7 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
                 concealment_tiles: Vec::new(),
                 no_vehicle_tiles: Vec::new(),
                 no_building_tiles: Vec::new(),
+                no_entrenchment_tiles: Vec::new(),
                 damage_reduction_tiles: Vec::new(),
                 slow_movement_tiles: Vec::new(),
             },

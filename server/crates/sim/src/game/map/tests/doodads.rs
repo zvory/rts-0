@@ -25,7 +25,8 @@ fn authored_doodads_are_validated_canonicalized_and_hashed() {
             {"id": 9, "typeId": "unit.tank_trap", "x": 80, "y": 80}
         ],
         "forestSpans": [],
-        "noBuildingTiles": []
+        "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
     });
     let json = serde_json::to_string(&document).expect("map JSON");
     let materialized = Map::materialize_authored_json(&json, 1).expect("valid doodads");
@@ -60,7 +61,8 @@ fn authored_doodads_reject_unknown_fields_and_invalid_catalog_data() {
         "baseSites": [{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}],
         "doodads": [{"id": 1, "typeId": "tree.oak", "x": 400, "y": 500, "rotation": 1}],
         "forestSpans": [],
-        "noBuildingTiles": []
+        "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
     });
     let err = Map::materialize_authored_json(&base.to_string(), 1)
         .expect_err("unknown doodad field must fail");
@@ -125,7 +127,8 @@ fn authored_doodads_respect_rectangular_world_bounds() {
         "baseSites": [{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}],
         "doodads": [{"id": 1, "typeId": "tree.oak", "x": 100, "y": 512}],
         "forestSpans": [],
-        "noBuildingTiles": []
+        "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
     });
 
     let error = Map::materialize_authored_json(&document.to_string(), 1)

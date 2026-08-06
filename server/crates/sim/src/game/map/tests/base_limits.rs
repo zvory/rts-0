@@ -42,7 +42,7 @@ fn authored_map_supports_many_unconditional_base_sites() {
         .collect();
     let json = format!(
         r#"{{
-          "version": 9,
+          "version": 10,
           "name": "many-bases",
           "width": 80,
           "height": 80,
@@ -53,7 +53,8 @@ fn authored_map_supports_many_unconditional_base_sites() {
           "baseSites": [{}],
           "doodads": [],
           "forestSpans": [],
-          "noBuildingTiles": []
+          "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
         base_sites.join(",")
@@ -78,7 +79,7 @@ fn authored_map_rejects_more_than_bounded_base_sites() {
         .collect();
     let json = format!(
         r#"{{
-          "version": 9,
+          "version": 10,
           "name": "too-many-bases",
           "width": 200,
           "height": 200,
@@ -89,7 +90,8 @@ fn authored_map_rejects_more_than_bounded_base_sites() {
           "baseSites": [{}],
           "doodads": [],
           "forestSpans": [],
-          "noBuildingTiles": []
+          "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
         base_sites.join(",")
@@ -108,7 +110,7 @@ fn authored_map_accepts_zero_and_maximum_per_base_resource_counts() {
     let rows = vec![".".repeat(40); 40];
     let json = format!(
         r#"{{
-          "version": 9,
+          "version": 10,
           "name": "resource-bounds",
           "width": 40,
           "height": 40,
@@ -122,7 +124,8 @@ fn authored_map_accepts_zero_and_maximum_per_base_resource_counts() {
           ],
           "doodads": [],
           "forestSpans": [],
-          "noBuildingTiles": []
+          "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
         }}"#,
         serde_json::to_string(&rows).unwrap(),
     );
@@ -149,7 +152,7 @@ fn authored_map_rejects_per_base_resource_counts_above_the_limits() {
         });
         site[field] = value.into();
         let json = serde_json::json!({
-            "version": 9,
+            "version": 10,
             "name": "bad-resource-count",
             "width": 32,
             "height": 32,
@@ -160,7 +163,8 @@ fn authored_map_rejects_per_base_resource_counts_above_the_limits() {
             "baseSites": [site],
             "doodads": [],
             "forestSpans": [],
-            "noBuildingTiles": []
+            "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
         })
         .to_string();
         let err = Map::from_authored_json(1, &json, 0)

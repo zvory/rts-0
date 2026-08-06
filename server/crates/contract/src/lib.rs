@@ -308,6 +308,9 @@ pub struct MapInfo {
     /// Sparse tile overlay that rejects building footprints.
     #[serde(default)]
     pub no_building_tiles: Vec<MapTile>,
+    /// Sparse tile overlay where infantry cannot dig or occupy trenches.
+    #[serde(default)]
+    pub no_entrenchment_tiles: Vec<MapTile>,
     /// Sparse tile overlay that reduces incoming damage to occupants by 25%.
     #[serde(default)]
     pub damage_reduction_tiles: Vec<MapTile>,

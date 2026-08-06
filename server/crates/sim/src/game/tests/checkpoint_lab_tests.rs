@@ -265,6 +265,7 @@ fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
         concealment_tiles: Vec::new(),
         no_vehicle_tiles: Vec::new(),
         no_building_tiles: Vec::new(),
+        no_entrenchment_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),
     };

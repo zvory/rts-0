@@ -1,4 +1,4 @@
-import { applyMapOperation, terrainCharacter } from "./operations.js";
+import { applyMapOperation, AUTHORING_ROAD_CHARACTERS, terrainCharacter } from "./operations.js";
 import {
   AUTHORED_MAP_MAX_BASE_SITES,
   AUTHORED_MAP_MAX_DIMENSION_TILES,
@@ -51,6 +51,9 @@ export function buildMapFromRecipe(recipe) {
     concealmentTiles: [],
     noVehicleTiles: [],
     noBuildingTiles: [],
+    noEntrenchmentTiles: AUTHORING_ROAD_CHARACTERS.has(background)
+      ? Array.from({ length: height }, (_, y) => Array.from({ length: width }, (_, x) => ({ x, y }))).flat()
+      : [],
     damageReductionTiles: [],
     slowMovementTiles: [],
   };

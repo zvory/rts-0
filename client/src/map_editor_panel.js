@@ -667,6 +667,7 @@ export class MapEditorPanel {
       ["concealment", "Concealment"],
       ["noVehicle", "No vehicles"],
       ["noBuilding", "No buildings"],
+      ["noEntrenchment", "No entrenchment"],
       ["damageReduction", "Damage reduction"],
       ["slowMovement", "Slowed movement"],
     ]) {
@@ -688,7 +689,7 @@ export class MapEditorPanel {
       palette.appendChild(control);
     }
     section.append(
-      readout(`${this.session.draft.concealmentTiles.length} concealment; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.noBuildingTiles.length} no-building; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
+      readout(`${this.session.draft.concealmentTiles.length} concealment; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.noBuildingTiles.length} no-building; ${this.session.draft.noEntrenchmentTiles.length} no-entrenchment; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
       readout("Select any combination, then paint or erase all selected effects in one stroke. Damage reduction and slowed movement each reduce their affected value by 25%."),
       palette,
     );
@@ -1275,6 +1276,7 @@ export class MapEditorPanel {
 function overlayEffectName(key) {
   if (key === "noVehicle") return "no vehicles";
   if (key === "noBuilding") return "no buildings";
+  if (key === "noEntrenchment") return "no entrenchment";
   if (key === "damageReduction") return "damage reduction";
   if (key === "slowMovement") return "slowed movement";
   return "concealment";

@@ -540,12 +540,13 @@ store a separate authoritative command stream, but they must not infer live stat
 
 Map policy:
 
-- Authored-map schema v9 requires compact non-overlapping `[y, xStart, xEnd]` forest spans. Loading
+- Authored-map schema v10 requires compact non-overlapping `[y, xStart, xEnd]` forest spans and an
+  explicit `noEntrenchmentTiles` overlay. Loading
   expands every forest tile into the existing stealth, no-vehicle, no-building, damage-reduction, and
   slow-movement vectors before `Map` construction. Earlier schemas and v9 documents missing the
   required forest array are rejected rather than migrated.
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  permanent base sites, five sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
+  permanent base sites, six sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
   infantry tree path-cost/local-steering data on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
@@ -560,7 +561,7 @@ Map policy:
   a live `Game`, it validates `mapBinding.name`, `schemaVersion`, authored `contentHash`, `width`, `height`,
   `playerCount`, and `materializedMapHash` against the supplied map. `materializedMapHash` is a
   stable hash over the materialized live `Map` fields (`width`, `height`, row-major terrain,
-  selected starts, base sites/resource counts, canonical doodads, and all five sparse gameplay overlays).
+  selected starts, base sites/resource counts, canonical doodads, and all six sparse gameplay overlays).
   Explicit empty doodad and overlay lists preserve the equivalent legacy materialized hash. Populated
   concealment, no-vehicle, no-building, damage-reduction, and slow-movement layers use distinct hash tags. If any binding fact
   differs, the importer rejects the payload; it must not fall back to regenerating a map from seed
