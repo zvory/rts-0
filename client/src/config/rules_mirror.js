@@ -296,7 +296,7 @@ export const ABILITIES = Object.freeze({
     label: "Breakthrough!",
     icon: "BRK",
     hotkey: "E",
-    title: "Nearby owned units are always faster; activate full speed (stronger in smoke)",
+    title: "Activate full speed and moving fire with half attack cooldown (stronger in smoke)",
     carriers: Object.freeze([KIND.COMMAND_CAR]),
     targetMode: "self",
     rangeTiles: null,

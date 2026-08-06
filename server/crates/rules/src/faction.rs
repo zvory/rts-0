@@ -454,7 +454,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         label: "Breakthrough!",
         icon: "BRK",
         hotkey: Some("E"),
-        title: "Nearby owned units are always faster; activate full speed (stronger in smoke)",
+        title: "Activate full speed and moving fire with half attack cooldown (stronger in smoke)",
         carriers: &[EntityKind::CommandCar],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
