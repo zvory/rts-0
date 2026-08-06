@@ -193,3 +193,24 @@ fn no_entrenchment_tiles_block_digging_and_trench_occupation() {
         "the same overlay must also reject occupation of a restored or injected trench",
     );
 }
+
+#[test]
+fn road_terrain_blocks_entrenchment_without_a_redundant_overlay_record() {
+    let mut map = flat_map(32);
+    let tile = (10, 10);
+    let position = map.tile_center(tile.0, tile.1);
+    let index = map.index(tile.0, tile.1);
+    map.terrain[index] = terrain::ROAD_BARE;
+
+    let mut entities = EntityStore::new();
+    let rifleman = entities
+        .spawn_unit(1, EntityKind::Rifleman, position.0, position.1)
+        .expect("rifleman");
+    let entity = entities.get(rifleman).expect("rifleman should exist");
+
+    assert!(map.no_entrenchment_tiles.is_empty());
+    assert!(
+        !can_create_trench(&map, &|owner| owner == 1, entity),
+        "road terrain itself must enforce the gameplay rule for legacy Lab/checkpoint maps",
+    );
+}

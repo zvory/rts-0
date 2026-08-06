@@ -19,7 +19,7 @@ fn authored_map_with_overlays(
         "concealmentTiles": concealment_tiles,
         "noVehicleTiles": no_vehicle_tiles,
         "noBuildingTiles": [],
-              "noEntrenchmentTiles": [],
+        "noEntrenchmentTiles": [],
         "damageReductionTiles": [],
         "slowMovementTiles": [],
     })
@@ -123,7 +123,7 @@ fn authored_overlays_reject_duplicates_and_out_of_bounds_tiles() {
 }
 
 #[test]
-fn compact_forest_spans_materialize_into_all_gameplay_layers() {
+fn compact_forest_spans_materialize_into_the_five_composite_layers() {
     let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
         serde_json::json!([{"x": 20, "y": 21}]),
         serde_json::json!([]),
@@ -136,6 +136,10 @@ fn compact_forest_spans_materialize_into_all_gameplay_layers() {
     let forest = vec![(18, 22), (19, 22), (19, 23), (20, 22)];
     assert_eq!(materialized.no_vehicle_tiles, forest);
     assert_eq!(materialized.no_building_tiles, forest);
+    assert!(
+        materialized.no_entrenchment_tiles.is_empty(),
+        "Forest must not acquire the independent no-entrenchment effect",
+    );
     assert_eq!(materialized.damage_reduction_tiles, forest);
     assert_eq!(materialized.slow_movement_tiles, forest);
     assert_eq!(

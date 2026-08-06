@@ -170,7 +170,11 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
             .ok_or_else(|| "map noBuildingTiles must be an array".to_string())?,
         "noBuildingTiles",
     )?;
-    let no_entrenchment_tiles = materialize_overlay(
+    // Forest remains the established five-effect composite. No-entrenchment is independent and
+    // is authored explicitly (including the automatic records generated beneath road terrain).
+    let no_entrenchment_tiles = parse_overlay_locations(
+        width,
+        height,
         authored
             .no_entrenchment_tiles
             .as_deref()
