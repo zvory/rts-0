@@ -560,10 +560,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
   and overlapping Command Cars do not stack. Breakthrough is the self-targeted instant active
   version: it applies the full 1.8x speed status to owned units currently within that same radius
   for 180 ticks (~6s), with a 750-tick (~25s) per-caster cooldown, no resource cost, queueability,
-  and movement during casting. The active status uses the 2.2x multiplier while the affected unit
-  is inside smoke or during the 60-tick (~2s) recent-smoke grace window after leaving it; it
-  overrides the passive aura. Multiple active Breakthrough effects do not stack; a shorter refresh
-  cannot reduce an active buff. Enemies see the active status only when the affected unit is
+  and movement during casting. While an affected unit is actually moving, Breakthrough lets it
+  fire without stopping and halves the cooldown of each weapon fired on that tick. Stationary
+  attacks retain their normal cooldown, and setup weapons still obey their setup requirements. The
+  active status uses the 2.2x multiplier while the affected unit is inside smoke or during the
+  60-tick (~2s) recent-smoke grace window after leaving it; it overrides the passive aura. Multiple
+  active Breakthrough effects do not stack; a shorter refresh cannot reduce an active buff. Enemies
+  see the active status only when the affected unit is
   otherwise visible through authoritative fog. The client draws the permanent radius faintly for
   each visible Command Car and brightens it while the active aura is running. Fake Army and
   allied-unit support are deferred.
@@ -648,7 +651,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | engineering_complex           | Engineering Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Mortar Autocast, Smoke Plus, and Scout Plane; requires a Resource Depot and Training Centre |
 | factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, then tank and command_car after Tank Production research; requires a Resource Depot and Training Centre |
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a Resource Depot and Training Centre |
-| tank_trap                  | Tank Trap          | 120 | 0     | 30 steel + 0 oil | 1x1  | 300       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a completed trap captures every currently visible completed trap within 4 tiles as one cluster-clear order; workers deconstruct completed traps in 150 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
+| tank_trap                  | Tank Trap          | 120 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a completed trap captures every currently visible completed trap within 4 tiles as one cluster-clear order; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | steel_mine                 | Steel Mine         | 50  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
 | pump_jack                  | Pump Jack          | 75  | 1     | 0 | 1x1  | 1080      | free permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 

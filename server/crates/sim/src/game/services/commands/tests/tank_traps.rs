@@ -216,6 +216,7 @@ fn tank_trap_build_order_requires_completed_training_centre() {
 
 #[test]
 fn tank_trap_construction_charges_on_arrival_and_uses_spec_build_time() {
+    let trap_stats = config::building_stats(EntityKind::TankTrap).expect("Tank Trap stats");
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (x, y) = footprint_center(&map, EntityKind::TankTrap, 6, 6);
@@ -249,7 +250,11 @@ fn tank_trap_construction_charges_on_arrival_and_uses_spec_build_time() {
         &mut active_sites,
     );
 
-    assert_eq!(players[0].steel, steel_before - 30);
+    assert_eq!(
+        players[0].steel,
+        steel_before - trap_stats.cost_steel,
+        "construction should charge the authoritative Tank Trap steel cost"
+    );
     let site = entities
         .iter()
         .find(|entity| entity.kind == EntityKind::TankTrap)
@@ -257,7 +262,7 @@ fn tank_trap_construction_charges_on_arrival_and_uses_spec_build_time() {
     assert!(site.under_construction());
     assert_eq!(
         site.construction.as_ref().map(|state| state.total),
-        Some(config::TICK_HZ * 10)
+        Some(trap_stats.build_ticks)
     );
 }
 

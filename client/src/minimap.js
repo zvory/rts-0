@@ -165,6 +165,7 @@ export class Minimap {
     this._hoverShiftKey = false;
 
     this.size = canvasEl.width; // assumed square (220 per index.html)
+    this._basePresentationSize = canvasEl.width;
 
     // Cached world->canvas transform, recomputed when the map first arrives.
     this._scale = 1; // canvas px per world px
@@ -328,6 +329,7 @@ export class Minimap {
     this._forestLayer.draw({
       ctx: this.ctx, map: this._renderMap(), size: this.size,
       scale: this._scale, offX: this._offX, offY: this._offY,
+      presentationScale: this._presentationScale(),
       presentation: this._canvasPresentationSignature(),
     });
     this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
@@ -435,7 +437,8 @@ export class Minimap {
   }
 
   _paintResources(ctx, map) {
-    const r = MINIMAP_STATIC_ENTITY_BLIP_RADIUS;
+    const presentationScale = this._presentationScale();
+    const r = MINIMAP_STATIC_ENTITY_BLIP_RADIUS * presentationScale;
     for (const node of map.resources || []) {
       if (node.remaining === 0) continue;
       const p = this._worldToCanvas(node.x, node.y);
@@ -443,7 +446,7 @@ export class Minimap {
         ctx.fillStyle = hex(COLORS.oil);
         ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 0.8;
+        ctx.lineWidth = 0.8 * presentationScale;
         ctx.strokeRect(p.x - r, p.y - r, r * 2, r * 2);
       } else {
         ctx.fillStyle = hex(COLORS.steel);
@@ -562,6 +565,10 @@ export class Minimap {
       rectH = rect?.height || 0;
     }
     return `${this.canvas.width}x${this.canvas.height}@${dpr}:${rectW}x${rectH}`;
+  }
+
+  _presentationScale() {
+    return this.size / this._basePresentationSize;
   }
 
   /**
@@ -751,8 +758,9 @@ export class Minimap {
 
     const ctx = this.ctx;
     ctx.save();
+    const presentationScale = this._presentationScale();
     for (const [dx, dy] of MINIMAP_PLAYER_BLIP_OUTLINE_OFFSETS) {
-      ctx.drawImage(canvas, dx, dy);
+      ctx.drawImage(canvas, dx * presentationScale, dy * presentationScale);
     }
     ctx.restore();
   }
@@ -771,7 +779,7 @@ export class Minimap {
     const baseRadius = playerOwned
       ? MINIMAP_OWNED_ENTITY_BLIP_RADIUS
       : MINIMAP_STATIC_ENTITY_BLIP_RADIUS;
-    const r = baseRadius * entityScale;
+    const r = baseRadius * entityScale * this._presentationScale();
     ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
   }
 
@@ -795,11 +803,12 @@ export class Minimap {
   }
 
   _drawScoutPlaneBlip(ctx, cx, cy, color, { scale = 1, stroke = true } = {}) {
-    const s = MINIMAP_BLIP_SCALE * scale;
+    const presentationScale = this._presentationScale();
+    const s = MINIMAP_BLIP_SCALE * scale * presentationScale;
     ctx.save();
     ctx.strokeStyle = "#101010";
     ctx.fillStyle = color;
-    ctx.lineWidth = 0.8;
+    ctx.lineWidth = 0.8 * presentationScale;
     ctx.beginPath();
     ctx.moveTo(cx + 2.7 * s, cy);
     ctx.lineTo(cx - 1.8 * s, cy - 2.2 * s);

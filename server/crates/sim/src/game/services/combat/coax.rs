@@ -22,6 +22,7 @@ use super::priority::{self, AttackPriorityContext, TargetCandidate};
 use super::projection::{combat_target_distance_sq, max_building_combat_extent_px};
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::DirectFireLegality;
+use super::weapons::moving_attack_cooldown;
 use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
 
 const TANK_COAX_HALF_ARC_RAD: f32 = std::f32::consts::PI / 18.0;
@@ -119,6 +120,10 @@ pub(super) fn fire_tank_coax_system(
             0.0,
             tick,
         );
+        let cooldown = entities
+            .get(id)
+            .map(|e| moving_attack_cooldown(e, weapon_profile.cooldown))
+            .unwrap_or(weapon_profile.cooldown);
         if let Some(shot) = shot_victim.filter(|shot| shot.reveals_attacker) {
             let player_ids = events.keys().copied().collect::<Vec<_>>();
             record_firing_reveals_for_victim_team(
@@ -132,11 +137,11 @@ pub(super) fn fire_tank_coax_system(
                 id,
                 (snapshot.pos_x, snapshot.pos_y),
                 tick,
-                weapon_profile.cooldown,
+                cooldown,
             );
         }
         if let Some(e) = entities.get_mut(id) {
-            e.set_weapon_cooldown(weapon_profile.id, weapon_profile.cooldown);
+            e.set_weapon_cooldown(weapon_profile.id, cooldown);
         }
     }
 }
