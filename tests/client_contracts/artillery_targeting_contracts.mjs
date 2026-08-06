@@ -44,7 +44,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
         1,
         artilleryMinFireRadiusTiles([UPGRADE.BALLISTIC_TABLES]),
       ) === ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES,
-    "Artillery Fire radius selection uses the six-tile base minimum and three-tile Fire Control minimum",
+    "Artillery Fire radius selection uses the four-tile base minimum and one-tile Fire Control minimum",
   );
 }
 
@@ -277,7 +277,7 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
   assert(
     artilleryCommands[2]?.c === "artilleryFire" &&
       artilleryCommands[2].x === queuedRawPoint.x &&
-      artilleryCommands[2].radiusTiles === 6 &&
+      artilleryCommands[2].radiusTiles === ARTILLERY_MIN_FIRE_RADIUS_TILES &&
       artilleryCommands[2].queued === true,
     "Queued Artillery Fire sends its raw center and selected radius to the server",
   );

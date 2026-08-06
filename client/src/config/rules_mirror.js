@@ -52,8 +52,8 @@ export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 5;
 export const ARTILLERY_OUTER_RADIUS_TILES = 2;
 export const ARTILLERY_BLANKET_RADIUS_TILES = 15;
 export const TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES = 4;
-export const ARTILLERY_MIN_FIRE_RADIUS_TILES = 6;
-export const ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3;
+export const ARTILLERY_MIN_FIRE_RADIUS_TILES = 4;
+export const ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 1;
 export const ARTILLERY_AMMO_COST = Object.freeze({ steel: 5, oil: 0 });
 export const SMOKE_ABILITY_RANGE_TILES = 14;
 export const SMOKE_LAUNCH_MAX_DELAY_MS = 100;
@@ -443,7 +443,7 @@ export const UPGRADES = Object.freeze({
     icon: "AFC",
     cost: Object.freeze({ steel: 50, oil: 100 }),
     researchTicks: BALLISTIC_TABLES_RESEARCH_TICKS,
-    description: "Reduce Artillery Fire minimum radius from 6 to 3 tiles",
+    description: "Reduce Artillery Fire minimum radius from 4 to 1 tile",
     researchedAt: KIND.ENGINEERING_COMPLEX,
     requiresUpgrade: UPGRADE.ARTILLERY_UNLOCK,
     requiresText: "Requires Artillery",

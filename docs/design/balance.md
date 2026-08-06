@@ -406,11 +406,11 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ARTILLERY_AMMO_COST_STEEL = 5`. It moves at 1.6 px/tick, slightly faster than the
   Anti-Tank Gun's 1.52 px/tick speed.
   Unified Fire uses a player-selected radius clamped between
-  `ARTILLERY_MIN_FIRE_RADIUS_TILES = 6` and `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored
+  `ARTILLERY_MIN_FIRE_RADIUS_TILES = 4` and `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored
   locked center. Every shell lands at a point sampled uniformly by area inside that circle. There
   is no separate range-based error, accuracy sequence, or repeated-shot tightening. Artillery Fire
   Control costs 100 steel and 150 oil, takes 20 seconds, requires Artillery, and reduces the
-  minimum selected radius to `ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 3`.
+  minimum selected radius to `ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 1`.
   Its body length, width, clearance, and selection radius are scaled to 75% of the Tank, matching
   its rendered rig and shrinking both its visual and authoritative gameplay footprint. It costs
   150 steel / 50 oil to train. Impacts deal 75 armor-piercing damage within 2/3 tile and
