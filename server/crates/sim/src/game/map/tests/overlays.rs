@@ -137,7 +137,7 @@ fn compact_forest_spans_materialize_into_all_gameplay_layers() {
 
 #[test]
 fn shipped_forest_maps_exclude_buildings_on_their_full_semantic_forest_mask() {
-    for name in ["Crossroads"] {
+    for name in ["Kreuzung"] {
         let map = Map::load(name, 1, 0).expect("bundled forest map should load");
         assert!(!map.no_building_tiles.is_empty(), "{name}");
         assert_eq!(map.no_building_tiles, map.no_vehicle_tiles, "{name}");

@@ -22,9 +22,9 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/chokes.jpg",
   }),
-  Crossroads: Object.freeze({
+  Kreuzung: Object.freeze({
     author: "Alex",
-    preview: "/assets/map-previews/crossroads.jpg",
+    preview: "/assets/map-previews/kreuzung.jpg",
   }),
   "Open Basin": Object.freeze({
     author: "Alex",
