@@ -138,6 +138,7 @@ pub struct MovementState {
     pub last_move_delta: (f32, f32),
     /// Whether this tick's waypoint advancement actually translated the unit. Unlike
     /// `last_move_delta`, this excludes external movement such as Magic Anchor pulls.
+    #[serde(default)]
     pub path_translated_this_tick: bool,
     /// Ticks remaining before this unit may sidestep again. Decremented each tick; reset to 0
     /// on new order.

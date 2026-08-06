@@ -331,9 +331,13 @@ impl Entity {
             } else {
                 (0.0, 0.0)
             };
-            if m.last_move_delta == (0.0, 0.0) {
-                m.path_translated_this_tick = false;
-            }
+        }
+    }
+
+    pub(crate) fn reset_movement_delta(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.last_move_delta = (0.0, 0.0);
+            m.path_translated_this_tick = false;
         }
     }
 
