@@ -19,6 +19,11 @@ const assertions = createAssertions();
 const { ok } = assertions;
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LAB_SETUP_FIXTURE = path.join(REPO_ROOT, "server/assets/lab-scenarios/lategame.json");
+const REPLAY_MAP = path.join(REPO_ROOT, "server/assets/maps/1v1.json");
+// The replay fixture reuses the old checkpoint's entities but restores them onto the current
+// bundled map. Keep this binding explicit so a gameplay-affecting map change cannot silently make
+// the replay-lobby integration exercise a stale map.
+const CURRENT_REPLAY_MAP_MATERIALIZED_HASH = "8d1b6abc62bea6bd";
 const LOBBY_ROW_SETTLE_TIMEOUT_MS = 10_000;
 const LOBBY_ROW_POLL_INTERVAL_MS = 100;
 const SAFE_REPLAY_LOBBY_ROW_KEYS = [
@@ -64,6 +69,12 @@ function installReplayLobbyFixture() {
 function schemaThreeReplayFixture() {
   const setup = JSON.parse(fs.readFileSync(LAB_SETUP_FIXTURE, "utf8"));
   const checkpoint = JSON.parse(setup.checkpointPayload);
+  const mapBytes = fs.readFileSync(REPLAY_MAP);
+  const currentMap = JSON.parse(mapBytes);
+  const currentContentHash = fnv1a64(mapBytes);
+  checkpoint.mapBinding.schemaVersion = currentMap.version;
+  checkpoint.mapBinding.contentHash = currentContentHash;
+  checkpoint.mapBinding.materializedMapHash = CURRENT_REPLAY_MAP_MATERIALIZED_HASH;
   const players = checkpoint.players.map((player) => ({
     id: player.id,
     team_id: player.teamId,
@@ -76,17 +87,17 @@ function schemaThreeReplayFixture() {
     artifactSchemaVersion: 3,
     serverBuildSha: "live-node-fixture",
     mapName: setup.map.name,
-    mapSchemaVersion: setup.map.schemaVersion,
-    mapContentHash: setup.map.contentHash,
+    mapSchemaVersion: currentMap.version,
+    mapContentHash: currentContentHash,
     seed: setup.seed,
     playerLoadouts: checkpoint.startingLoadouts,
     players,
     startState: {
       mapName: setup.map.name,
-      mapSchemaVersion: setup.map.schemaVersion,
-      mapContentHash: setup.map.contentHash,
+      mapSchemaVersion: currentMap.version,
+      mapContentHash: currentContentHash,
       seed: setup.seed,
-      checkpointPayload: setup.checkpointPayload,
+      checkpointPayload: JSON.stringify(checkpoint),
     },
     durationTicks: 120,
     commandLog: [],
@@ -105,6 +116,15 @@ function schemaThreeReplayFixture() {
       buildingsLost: player.score?.buildingsLost ?? 0,
     })),
   };
+}
+
+function fnv1a64(bytes) {
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of bytes) {
+    hash ^= BigInt(byte);
+    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+  }
+  return hash.toString(16).padStart(16, "0");
 }
 
 async function createLobby(room) {
@@ -184,8 +204,9 @@ async function main() {
 
   const replayFixture = installReplayLobbyFixture();
   const replayCreate = await createDevReplayLobby(replayFixture.name);
+  const replayCreateError = replayCreate.ok ? "" : `: ${await replayCreate.clone().text()}`;
   ok(replayCreate.status === 201,
-    `dev replay-lobby helper creates a replay staging room (${replayCreate.status})`);
+    `dev replay-lobby helper creates a replay staging room (${replayCreate.status}${replayCreateError})`);
   const replayPayload = await replayCreate.json();
   const replayRoom = replayPayload.room;
   ok(/^__match_replay__:[0-9a-f]+$/.test(replayRoom),
