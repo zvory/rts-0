@@ -117,6 +117,8 @@ src/
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   launch_url.js   # Namespaced rtsLaunch URL parsing and pure lobby automation decisions
   map_editor_app.js # Dedicated `/map-editor` lifecycle; never constructs Net, Match, or GameState
+  map_editor_minimap_preview.js # In-editor authoritative minimap hover and clipboard flow
+  map_editor_preview_button.js # Preview button hover/focus/click UI binding
   map_editor_launch.js # Bounded editor route/handoff query parsing
   map_editor_handoff.js # Short-lived HTTP map handoff create/consume client
   map_preview_app.js # Capture-only authored-map route composed around existing renderers
@@ -1107,9 +1109,13 @@ handoff on a loopback RTS server, calls the narrow bridge under a browser-side d
 the returned PNG dimensions, and writes the requested artifact. Its output extension may be PNG or
 JPEG; JPEG output is transcoded in the already-running preview browser after validating the
 authoritative PNG, with bounded `--jpeg-quality`. A 512×512 minimap export displayed at 256 CSS
-pixels is the lobby's 2×/high-DPR preview convention. The Map Editor's `Preview`
-action uses the same handoff and route, whose visible controls call the same bridge. The page owns
-no authoring operations or recipe semantics.
+pixels is the lobby's 2×/high-DPR preview convention. The Map Editor's `Preview` action uses the
+same handoff and route in an app-owned hidden frame: hover presents the captured minimap beside the
+document-bar control, while click copies a 2048×2048 PNG to the system clipboard without navigating
+away from the editor. The standalone route's visible controls call the same bridge. The page owns no
+authoring operations or recipe semantics. Fixed-pixel minimap marks scale from the live minimap's
+base presentation size during larger captures so resources, trees, units, and buildings retain their
+relative proportions.
 
 The editor's `Authoritative check` and `Route report` actions post the current exported map to
 `/api/map-authoring/check` and `/api/map-authoring/report`. The panel summarizes validity and base

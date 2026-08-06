@@ -4,8 +4,10 @@ import os from "node:os";
 import path from "node:path";
 
 import { mapPreviewLaunchConfig } from "../../client/src/map_preview_launch.js";
-import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
+import { MapEditorMinimapPreview, pngDataUrlToBlob } from "../../client/src/map_editor_minimap_preview.js";
+import { createMapEditorPreviewButton } from "../../client/src/map_editor_preview_button.js";
 import { Fog } from "../../client/src/fog.js";
+import { Minimap } from "../../client/src/minimap.js";
 import { captureMinimapPng } from "../../client/src/minimap_capture.js";
 import {
   analyzeRgba,
@@ -84,21 +86,79 @@ assert.deepEqual(analyzeRgba(Uint8Array.from([0, 0, 0, 255, 1, 2, 3, 255])), {
 }
 
 {
-  const handedOff = [];
+  const source = fs.readFileSync(new URL("../../client/src/map_editor_preview_button.js", import.meta.url), "utf8");
+  assert.match(source, /pointerenter/);
+  assert.match(source, /onCopy\?\.\(payload\(\)\)/);
+  assert.match(source, /Copied the 2048 px minimap PNG to the clipboard/);
+  assert.doesNotMatch(source, /window\.open|location\.assign/, "preview control never opens or navigates a page");
+  const savedDocument = globalThis.document;
+  const shown = [];
+  const copied = [];
   const statuses = [];
-  const panel = {
-    pending: false,
-    session: {
-      exportMap: () => ({ name: "UI preview" }),
-      materialized: () => ({ width: 16, height: 16 }),
-    },
-    async onOpenPreview(payload) { handedOff.push(payload); },
-    setStatus(message, error = false) { statuses.push({ message, error }); },
+  globalThis.document = { createElement: (kind) => fakeNode(kind) };
+  try {
+    const control = createMapEditorPreviewButton({
+      session: {
+        exportMap: () => ({ name: "UI preview" }),
+        materialized: () => ({ width: 16, height: 16 }),
+      },
+      onShow: (anchor, payload) => shown.push({ anchor, payload }),
+      onCopy: async (payload) => copied.push(payload),
+      onStatus: (message, error = false) => statuses.push({ message, error }),
+    });
+    control.listeners.pointerenter();
+    await control.listeners.click();
+    const payload = { authoredMap: { name: "UI preview" }, materializedMap: { width: 16, height: 16 } };
+    assert.deepEqual(shown, [{ anchor: control, payload }], "hover requests the authoritative minimap in place");
+    assert.deepEqual(copied, [payload], "click copies the same current map preview");
+    assert.equal(statuses.at(-1).message, "Copied the 2048 px minimap PNG to the clipboard.");
+  } finally {
+    if (savedDocument === undefined) delete globalThis.document;
+    else globalThis.document = savedDocument;
+  }
+}
+
+{
+  const png = pngDataUrlToBlob("data:image/png;base64,AQIDBA==");
+  assert.equal(png.type, "image/png");
+  assert.equal(png.size, 4);
+  assert.throws(() => pngDataUrlToBlob("data:text/plain;base64,AQID"), /invalid PNG/);
+
+  const writes = [];
+  class ClipboardItemFixture {
+    constructor(contents) { this.contents = contents; }
+  }
+  const preview = Object.create(MapEditorMinimapPreview.prototype);
+  Object.assign(preview, {
+    destroyed: false,
+    clipboard: { async write(items) { writes.push(items); } },
+    ClipboardItemCtor: ClipboardItemFixture,
+    _capture: async () => "data:image/png;base64,AQIDBA==",
+  });
+  await preview.copy({ authoredMap: { name: "Clipboard" } });
+  assert.equal(writes.length, 1);
+  const copiedPng = await writes[0][0].contents["image/png"];
+  assert.equal(copiedPng.type, "image/png", "clipboard receives a promised PNG Blob");
+}
+
+{
+  const rectangles = [];
+  const ctx = {
+    fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 0,
+    fillRect(x, y, width, height) { rectangles.push({ x, y, width, height }); },
+    strokeRect() {},
   };
-  await MapEditorPanel.prototype.openPreview.call(panel);
-  assert.deepEqual(handedOff, [{ authoredMap: { name: "UI preview" }, materializedMap: { width: 16, height: 16 } }]);
-  assert.equal(panel.pending, false);
-  assert.equal(statuses.at(-1).message, "Opened the minimap preview page.");
+  const minimap = Object.create(Minimap.prototype);
+  Object.assign(minimap, {
+    size: 2048,
+    _basePresentationSize: 242,
+    _worldToCanvas: () => ({ x: 100, y: 100 }),
+  });
+  minimap._paintResources(ctx, { resources: [{ kind: "steel", x: 1, y: 1, remaining: 10 }] });
+  assert.ok(rectangles[0].width > 35 && rectangles[0].width < 40,
+    "2048 px captures scale resource marks with the minimap instead of leaving them at 4.4 px");
 }
 
 {
@@ -392,13 +452,14 @@ function fakeNode(kind) {
   return {
     kind,
     children: [],
+    listeners: {},
     dataset: {},
     disabled: false,
     textContent: "",
     append(...children) { this.children.push(...children); },
     appendChild(child) { this.children.push(child); },
     remove() { this.removed = true; },
-    addEventListener() {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
     setAttribute() {},
     querySelector(selector) {
       const dataKey = selector === "[data-map-preview-image]"
