@@ -2326,9 +2326,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   above fog as well. These readability passes use only already-admitted entities and do not reveal
   hidden enemies.
   When the in-match Game settings
-  tab enables unit ranges, selected ordinary units draw dotted firing-range circles, deployed
-  Anti-Tank Guns and artillery draw field-of-fire wedges, and their packed states do not draw
-  field-of-fire overlays. An enemy deployed Anti-Tank Gun observed through ordinary vision or an
+  tab enables unit ranges, selected ordinary units draw dotted firing-range circles, selected
+  artillery always draw one dotted maximum-range circle regardless of setup state, and deployed
+  Anti-Tank Guns draw field-of-fire wedges while packed Anti-Tank Guns do not. An enemy deployed Anti-Tank Gun observed through ordinary vision or an
   above-fog firing reveal draws its field-of-fire wedge as sparse amber-orange diagonal hatching
   with a contrasting keyline and no blanket fill. Friendly selected field-of-fire wedges retain
   their unhatched blue treatment. Losing vision freezes the last enemy position and facing as
@@ -2344,8 +2344,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   is visible only while that
   Command Car is selected; active Breakthrough always shows the bright ring. In Lab scenario
   authoring, deployed
-  Anti-Tank Gun and artillery
-  field-of-fire wedges remain visible for the currently selected owner even when the broad unit
+  Anti-Tank Gun field-of-fire wedges remain visible for the currently selected owner even when the broad unit
   range overlay is off.
   Distinct silhouette per kind (engineer: compact block; rifleman: enabled no-backpack PNG
   frame strip with frame 0 idle, frames 1-3 moving, and frame 4 firing; machine gunner: enabled PNG frame-strip

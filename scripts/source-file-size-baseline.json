@@ -20,8 +20,8 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2457,
-      "reason": "Checkpoint policy and simulation-architecture enforcement remain concentrated in this oversized checker; keep ratcheting until scanners and tests are split into modules."
+      "lines": 2470,
+      "reason": "The architecture checker now classifies the authoritative artillery attack-move tick service and shared shell-firing helper and records their narrow service dependencies; keep ratcheting until scanners and tests are split into modules."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -35,8 +35,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",
-      "lines": 1913,
-      "reason": "Close vehicle move precision adds focused same-tile exact-goal handling and regression coverage in the oversized coordinator; requires human playtest review and should ratchet down when order-entry policy/tests split."
+      "lines": 1920,
+      "reason": "Attack Move now preserves deployed artillery long enough for authoritative acquisition to decide whether to fire or redeploy; keep ratcheting until ground-order setup policy splits from the oversized coordinator."
     },
     {
       "path": "server/crates/sim/src/game/services/movement/tests.rs",

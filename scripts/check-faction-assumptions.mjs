@@ -279,6 +279,12 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/panzerfaust_shot.rs",
   "server/crates/sim/src/game/player_state.rs",
   "server/crates/sim/src/game/services/ability_orders.rs",
+  // Autonomous artillery acquisition is still a global Artillery-kind and Ballistic Tables
+  // runtime policy until catalogs describe attack-move carriers and fire-control upgrades.
+  "server/crates/sim/src/game/services/artillery_attack_move.rs",
+  // Shared artillery firing preserves the existing concrete Artillery setup/reload runtime;
+  // carrier admission still routes through the selected player's faction ability catalog.
+  "server/crates/sim/src/game/services/artillery_fire.rs",
   "server/crates/sim/src/game/services/combat/acquisition.rs",
   // Combat target legality centralizes the existing Mortar Team indirect-fire exception moved
   // out of acquisition.rs; it does not expand faction admission or target policy.

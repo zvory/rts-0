@@ -7,6 +7,8 @@
 //! query surface.
 
 pub mod ability_orders;
+pub(in crate::game) mod artillery_attack_move;
+pub(crate) mod artillery_fire;
 pub mod combat;
 pub mod commands;
 pub mod construction;

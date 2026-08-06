@@ -411,6 +411,14 @@ profiles and explicit activation/autocast policy instead of being folded into de
   is no separate range-based error, accuracy sequence, or repeated-shot tightening. Artillery Fire
   Control costs 100 steel and 150 oil, takes 20 seconds, requires Artillery, and reduces the
   minimum selected radius to `ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 1`.
+  Artillery Fire also works autonomously during Attack Move. A travelling gun stops for currently team-visible
+  enemy units in its firing band, falling back to buildings only when no unit is eligible, and
+  ranks exposed unarmored targets such as support weapons and light cars first, combat infantry
+  second, and armored units last. Within each tier it scores aim points by the summed purchase
+  value inside its minimum dispersion circle. It sets up
+  without abandoning the commanded route, prefers targets inside its deployed field before
+  redeploying, spends the normal 5 steel per shell, retains friendly fire, and resumes movement
+  after a one-second no-target grace. Separate guns make independent choices, so overkill is valid.
   Its body length, width, clearance, and selection radius are scaled to 75% of the Tank, matching
   its rendered rig and shrinking both its visual and authoritative gameplay footprint. It costs
   150 steel / 50 oil to train. Impacts deal 75 armor-piercing damage within 2/3 tile and

@@ -844,18 +844,17 @@ function nearPoint(call, point, epsilon = 0.001) {
   const rangeGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call({ _feedbackGfx: rangeGfx, _map: { tileSize: 32 } }, feedbackView);
   assert(rangeGfx.calls.some((call) => call[0] === "lineTo"), "lab P2 selected units draw range rings");
-  assert(rangeGfx.calls.some((call) => call[0] === "arc"), "lab P2 deployed support weapons draw field-of-fire ranges");
+  assert(
+    !rangeGfx.calls.some((call) => call[0] === "arc"),
+    "selected artillery use a regular maximum-range circle instead of a field-of-fire wedge",
+  );
   assert(
     rangeGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1 && call[3] === 0.68),
     "selected unit range rings draw at doubled opacity",
   );
   assert(
-    rangeGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1.5 && call[3] === 0.36),
-    "selected support-weapon field-of-fire outlines draw at doubled opacity",
-  );
-  assert(
-    rangeGfx.calls.some((call) => call[0] === "beginFill" && call[2] === 0.07),
-    "selected support-weapon field-of-fire fill draws at doubled opacity",
+    !rangeGfx.calls.some((call) => call[0] === "beginFill"),
+    "the regular artillery range indicator does not tint its enormous range area",
   );
   assert(
     rangeGfx.calls.some((call) => call[0] === "lineTo" && call[1] > 446 && Math.abs(call[2] - 96) < 8),
@@ -968,12 +967,8 @@ function nearPoint(call, point, epsilon = 0.001) {
     { ...feedbackView, showUnitRangesEnabled: false },
   );
   assert(
-    disabledRangeGfx.calls.some((call) => call[0] === "arc"),
-    "lab selected deployed support weapons keep field-of-fire cones when unit ranges are disabled",
-  );
-  assert(
-    !disabledRangeGfx.calls.some((call) => call[0] === "lineTo" && call[1] > 446 && Math.abs(call[2] - 96) < 8),
-    "lab selected non-support unit ranges stay hidden when unit ranges are disabled",
+    !disabledRangeGfx.calls.some((call) => call[0] === "lineTo" || call[0] === "arc"),
+    "artillery and other regular unit ranges stay hidden when unit ranges are disabled",
   );
 
   const setupGfx = new RecordingGraphics();

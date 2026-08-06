@@ -10,9 +10,7 @@ use crate::game::entity::{
     supports_manual_emplacement, EntityKind, EntityStore, Order, OrderIntent, ProdItem,
     RallyIntent, ResearchItem, WeaponSetup,
 };
-use crate::game::firing_reveal::{
-    record_global_firing_reveals_for_enemy_players, FiringRevealSource,
-};
+use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
@@ -39,14 +37,13 @@ use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
-use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
-use crate::rules::{self, combat::WeaponKind};
+use crate::protocol::{self, Event, NoticeSeverity};
+use crate::rules;
 #[cfg(test)]
 use rts_contract::{LAB_MAX_UNITS_PER_COMMAND, MAX_UNITS_PER_COMMAND};
 use std::collections::HashMap;
 const MAX_RALLY_STAGES: usize = 4;
 const MIN_FORMATION_POINT_DISTANCE_PX: f32 = 2.0;
-mod artillery_scatter;
 mod auto_build;
 mod cancel;
 mod command_helpers;
@@ -55,7 +52,6 @@ mod planner_facts;
 mod production_repeat;
 mod scout_plane_ability;
 mod support_weapon_setup;
-use self::artillery_scatter::artillery_blanket_point;
 use self::command_helpers::{
     artillery_fire_mode_for, choose_smoke_caster, clear_queued_orders,
     clear_staged_anti_tank_gun_setup, gather_node_valid, immediate_unit_can_replace,
@@ -69,6 +65,9 @@ use self::planner_facts::{
     ability_from_planner, ability_to_planner, build_kind_code, build_kind_from_code,
     entity_order_intent_from_planner, issue_mode, planner_config, planner_facts, AbilityFactInput,
 };
+#[cfg(test)]
+use crate::game::services::artillery_fire::artillery_blanket_point;
+use crate::game::services::artillery_fire::{artillery_min_fire_radius_tiles, try_fire_artillery};
 struct CommandExecutionContext<'a, 'pathing> {
     map: &'a Map,
     entities: &'a mut EntityStore,
@@ -1578,151 +1577,10 @@ fn order_artillery_point_fire(
         target.x,
         target.y,
         tick,
-        mode,
+        crate::game::services::order_execution::artillery_ability(mode),
         radius_tiles,
+        config::ARTILLERY_RELOAD_TICKS,
     )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn try_fire_artillery(
-    entities: &mut EntityStore,
-    players: &mut [PlayerState],
-    teams: &TeamRelations,
-    fog: &Fog,
-    artillery_shells: &mut ArtilleryShellStore,
-    firing_reveals: &mut Vec<FiringRevealSource>,
-    events: &mut HashMap<u32, Vec<Event>>,
-    player: u32,
-    unit: u32,
-    x: f32,
-    y: f32,
-    tick: u32,
-    mode: ArtilleryFireMode,
-    radius_tiles: f32,
-) -> bool {
-    let ready = matches!(entities.get(unit), Some(e)
-        if e.owner == player
-            && e.kind == EntityKind::Artillery
-            && e.hp > 0
-            && e.attack_cd() == 0
-            && matches!(e.weapon_setup(), WeaponSetup::Deployed));
-    if !ready {
-        return false;
-    }
-    let faction_id = faction_id_for(
-        players.iter().map(|p| (p.id, p.faction_id.as_str())),
-        player,
-    );
-    let ability = match mode {
-        ArtilleryFireMode::Point => AbilityKind::PointFire,
-        ArtilleryFireMode::Blanket => AbilityKind::BlanketFire,
-    };
-    if !ability_orders::caster_allowed_by_faction(entities, &faction_id, unit, ability) {
-        return false;
-    }
-    let ammo_cost = ability::definition(ability).cost;
-    let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
-        return false;
-    };
-    let min_fire_radius_tiles =
-        artillery_min_fire_radius_tiles(ps.has_upgrade(UpgradeKind::BallisticTables));
-    if !ps.can_afford(ammo_cost.steel, ammo_cost.oil) {
-        notice(events, player, protocol::notices::ARTILLERY_STEEL_SHORTAGE);
-        if let Some(e) = entities.get_mut(unit) {
-            e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
-        }
-        return false;
-    }
-    if !ps.spend_cost(ammo_cost) {
-        notice(events, player, protocol::notices::ARTILLERY_STEEL_SHORTAGE);
-        return false;
-    }
-    let (target_x, target_y) = {
-        let Some(e) = entities.get_mut(unit) else {
-            ps.refund_cost(ammo_cost);
-            return false;
-        };
-        let shot_number = e.increment_artillery_blanket_shots_fired();
-        e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
-        let fire_radius_tiles = match mode {
-            ArtilleryFireMode::Point => min_fire_radius_tiles,
-            ArtilleryFireMode::Blanket => radius_tiles.clamp(
-                min_fire_radius_tiles,
-                config::ARTILLERY_BLANKET_RADIUS_TILES,
-            ),
-        };
-        artillery_blanket_point(unit, player, tick, (x, y), shot_number, fire_radius_tiles)
-    };
-    let reveal = entities.get(unit).map(|attacker| AttackReveal {
-        owner: attacker.owner,
-        kind: protocol::kind_to_wire(attacker.kind).to_string(),
-        x: attacker.pos_x,
-        y: attacker.pos_y,
-        facing: Some(attacker.facing()),
-        weapon_facing: attacker.weapon_facing(),
-        setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
-    });
-    artillery_shells.schedule(player, unit, target_x, target_y, tick);
-    if let Some(reveal) = reveal.as_ref() {
-        let facing = reveal.weapon_facing.or(reveal.facing).unwrap_or(0.0);
-        let player_ids: Vec<u32> = events.keys().copied().collect();
-        record_global_firing_reveals_for_enemy_players(
-            firing_reveals,
-            &player_ids,
-            teams,
-            player,
-            unit,
-            tick,
-            config::ARTILLERY_RELOAD_TICKS,
-        );
-        for pid in player_ids {
-            events.entry(pid).or_default().push(Event::ArtilleryFiring {
-                owner: reveal.owner,
-                x: reveal.x,
-                y: reveal.y,
-                facing,
-            });
-        }
-    }
-    for pid in events.keys().copied().collect::<Vec<_>>() {
-        if teams.same_team_or_same_owner(pid, player) {
-            events.entry(pid).or_default().push(Event::ArtilleryTarget {
-                from: unit,
-                x: target_x,
-                y: target_y,
-                radius_tiles: config::ARTILLERY_OUTER_RADIUS_TILES,
-                delay_ticks: config::ARTILLERY_SHELL_DELAY_TICKS,
-            });
-        }
-    }
-    if let Some(reveal) = reveal {
-        let player_ids: Vec<u32> = events.keys().copied().collect();
-        for pid in player_ids {
-            if teams.same_team_or_same_owner(pid, player)
-                || !crate::rules::projection::team_visible_world(
-                    pid, reveal.x, reveal.y, fog, teams,
-                )
-            {
-                continue;
-            }
-            events.entry(pid).or_default().push(Event::Attack {
-                from: unit,
-                to: unit,
-                reveal: Some(reveal.clone()),
-                to_pos: None,
-                weapon_kind: Some(WeaponKind::ArtilleryGun.stable_id().to_string()),
-            });
-        }
-    }
-    true
-}
-
-fn artillery_min_fire_radius_tiles(has_fire_control: bool) -> f32 {
-    if has_fire_control {
-        config::ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES
-    } else {
-        config::ARTILLERY_MIN_FIRE_RADIUS_TILES
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1813,8 +1671,9 @@ pub(in crate::game) fn artillery_point_fire_system(
             x,
             y,
             tick,
-            mode,
+            crate::game::services::order_execution::artillery_ability(mode),
             radius_tiles,
+            config::ARTILLERY_RELOAD_TICKS,
         );
     }
 }

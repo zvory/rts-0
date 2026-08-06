@@ -215,6 +215,21 @@ pub(crate) fn run_tick(
             perf.record_pathing(record);
         }
     }
+    crate::perf::timed(perf.as_deref_mut(), "artillery_attack_move", || {
+        services::artillery_attack_move::run(
+            map,
+            entities,
+            players,
+            &pre_command.spatial,
+            &mut coordinator,
+            artillery_shells,
+            firing_reveals,
+            events,
+            fog,
+            smokes,
+            tick,
+        );
+    });
     crate::perf::timed(perf.as_deref_mut(), "movement", || {
         services::movement::movement_system_with_events(
             map,
