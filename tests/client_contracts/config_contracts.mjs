@@ -1056,7 +1056,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       "a completed Engineering Complex should not unlock Tank training without Tank Production",
     );
     assert(
-      unlockedCommandCarButton && !unlockedCommandCarButton.disabled,
+      unlockedCommandCarButton && !unlockedCommandCarButton.disabled &&
+        !unlockedCommandCarButton.className.includes("primary-disabled"),
       "a completed Engineering Complex should enable Command Car training without Tank Production",
     );
 
