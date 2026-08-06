@@ -95,11 +95,11 @@ assert(
   );
   const tankIcon = liveUnitIconMarkupFor(KIND.TANK);
   assert(['data-unit-icon-source="png-atlas-reference"', "tank-tiger-i-pass-11-white-alpha.png",
-    'viewBox="41.025 108.9 531.975 298.2"', 'id="unit-icon-tint-0072b2-b1_8"',
-    'filter="url(#unit-icon-tint-0072b2-b1_8)"', 'result="brightenedTeamColor"', '<feFuncB type="linear" slope="1.8" />',
-    'in2="brightenedTeamColor" mode="multiply"'].every((fragment) => tankIcon.includes(fragment)),
-    "unit icon resolver fits and visibly tints the live Tank PNG reference",
-  );
+      'viewBox="41.025 108.9 531.975 298.2"', 'id="unit-icon-tint-0072b2"',
+      'filter="url(#unit-icon-tint-0072b2)"', 'in2="maskedTeamColor" mode="multiply"']
+      .every((fragment) => tankIcon.includes(fragment)) && !tankIcon.includes("brightenedTeamColor") &&
+      !tankIcon.includes("feComponentTransfer"),
+    "unit icon resolver fits and applies the standard team tint to the live Tank PNG reference");
   const artilleryIcon = liveUnitIconMarkupFor(KIND.ARTILLERY);
   const antiTankGunIcon = liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN);
   assert(
