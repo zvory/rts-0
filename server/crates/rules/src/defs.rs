@@ -514,11 +514,11 @@ pub const BUILDINGS: &[BuildingDef] = &[
         stats: balance::BuildingStats {
             hp: 120,
             sight_tiles: 0,
-            cost_steel: 30,
+            cost_steel: 20,
             cost_oil: 0,
             foot_w: 1,
             foot_h: 1,
-            build_ticks: balance::TICK_HZ * 10,
+            build_ticks: balance::TICK_HZ * 5,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -805,9 +805,9 @@ mod tests {
 
         assert_eq!(def.stats.hp, 120);
         assert_eq!(def.stats.sight_tiles, 0);
-        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (30, 0));
+        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (20, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
-        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 10);
+        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 5);
         assert_eq!(def.armor_class, ArmorClass::Armored);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());

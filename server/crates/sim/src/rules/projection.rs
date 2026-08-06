@@ -1447,6 +1447,8 @@ mod tests {
 
     #[test]
     fn tank_trap_deconstruction_projects_reverse_progress() {
+        let required_ticks = tank_trap_deconstruction_ticks();
+        let elapsed_ticks = required_ticks / 2;
         let mut entities = EntityStore::new();
         let trap_id = entities
             .spawn_building(2, EntityKind::TankTrap, 160.0, 160.0, true)
@@ -1458,7 +1460,7 @@ mod tests {
             let worker = entities.get_mut(worker_id).expect("worker should exist");
             worker.set_order(Order::deconstruct(trap_id));
             worker.mark_deconstruct_phase(DeconstructPhase::Deconstructing);
-            for _ in 0..(tank_trap_deconstruction_ticks() / 2) {
+            for _ in 0..elapsed_ticks {
                 worker.tick_deconstruction();
             }
         }
@@ -1469,11 +1471,12 @@ mod tests {
             .expect("viewer should see trap");
 
         assert_eq!(view.build_progress, None);
+        let expected_remaining = 1.0 - elapsed_ticks as f32 / required_ticks as f32;
         assert!(
             (view
                 .deconstruct_progress
                 .expect("deconstruct progress should project")
-                - 0.5)
+                - expected_remaining)
                 .abs()
                 < 0.001,
             "deconstruction progress should be the remaining reverse fraction"
