@@ -380,8 +380,8 @@ fn damage_to_completed_building_does_not_reduce_max_hp() {
 
 #[test]
 fn rifleman_takes_quarter_less_damage_only_after_path_translation() {
-    let mut rifleman = Entity::new_unit(1, EntityKind::Rifleman, 10.0, 20.0)
-        .expect("rifleman should spawn");
+    let mut rifleman =
+        Entity::new_unit(1, EntityKind::Rifleman, 10.0, 20.0).expect("rifleman should spawn");
     let starting_hp = rifleman.hp;
 
     rifleman.set_path_movement_delta(1.6, 0.0);
@@ -395,8 +395,8 @@ fn rifleman_takes_quarter_less_damage_only_after_path_translation() {
 
 #[test]
 fn externally_moved_rifleman_does_not_receive_path_movement_damage_reduction() {
-    let mut rifleman = Entity::new_unit(1, EntityKind::Rifleman, 10.0, 20.0)
-        .expect("rifleman should spawn");
+    let mut rifleman =
+        Entity::new_unit(1, EntityKind::Rifleman, 10.0, 20.0).expect("rifleman should spawn");
     let starting_hp = rifleman.hp;
 
     rifleman.set_movement_delta(1.6, 0.0);
@@ -406,8 +406,8 @@ fn externally_moved_rifleman_does_not_receive_path_movement_damage_reduction() {
 
 #[test]
 fn moving_panzerfaust_does_not_receive_rifleman_damage_reduction() {
-    let mut panzerfaust = Entity::new_unit(1, EntityKind::Panzerfaust, 10.0, 20.0)
-        .expect("panzerfaust should spawn");
+    let mut panzerfaust =
+        Entity::new_unit(1, EntityKind::Panzerfaust, 10.0, 20.0).expect("panzerfaust should spawn");
     let starting_hp = panzerfaust.hp;
 
     panzerfaust.set_movement_delta(1.6, 0.0);
