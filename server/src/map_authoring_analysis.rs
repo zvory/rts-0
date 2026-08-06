@@ -149,7 +149,7 @@ mod tests {
 
     fn valid_map_json() -> String {
         json!({
-            "version": 9,
+            "version": 10,
             "name": "HTTP analysis fixture",
             "width": 24,
             "height": 24,
@@ -165,7 +165,8 @@ mod tests {
             "forestSpans": [],
             "concealmentTiles": [],
             "noVehicleTiles": [],
-            "noBuildingTiles": []
+            "noBuildingTiles": [],
+            "noEntrenchmentTiles": []
         })
         .to_string()
     }

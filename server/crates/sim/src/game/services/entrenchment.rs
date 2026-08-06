@@ -84,7 +84,7 @@ pub(crate) fn entrenchment_system(
             continue;
         }
 
-        let can_create = can_create_trench(has_entrenchment, &snapshot);
+        let can_create = can_create_trench(map, has_entrenchment, &snapshot);
         let should_dig = can_create
             && stationary_for_digging(pre_collision_position, &snapshot)
             && !standing_in_trench(&indexes.trenches, snapshot.pos_x, snapshot.pos_y);
@@ -121,15 +121,19 @@ fn occupation_candidate(
     occupied_trench_counts: &OccupiedTrenchCounts,
     entity: &Entity,
 ) -> Option<OccupationCandidate> {
-    if !eligible_living_infantry(entity) || !stopped_for_occupation(pre_collision_position, entity)
+    if !eligible_living_infantry(entity)
+        || !map.world_point_allows_entrenchment(entity.pos_x, entity.pos_y)
+        || !stopped_for_occupation(pre_collision_position, entity)
     {
         return None;
     }
     best_occupation_candidate(map, entities, occ, indexes, occupied_trench_counts, entity)
 }
 
-fn can_create_trench(has_entrenchment: &dyn Fn(u32) -> bool, entity: &Entity) -> bool {
-    eligible_living_infantry(entity) && has_entrenchment(entity.owner)
+fn can_create_trench(map: &Map, has_entrenchment: &dyn Fn(u32) -> bool, entity: &Entity) -> bool {
+    eligible_living_infantry(entity)
+        && has_entrenchment(entity.owner)
+        && map.world_point_allows_entrenchment(entity.pos_x, entity.pos_y)
 }
 
 fn eligible_living_infantry(entity: &Entity) -> bool {

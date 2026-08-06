@@ -32,7 +32,7 @@ pub use rts_protocol::AvailableMap;
 pub use {base_resources::BaseResourceCounts, data::AuthoredMapData};
 
 /// The only authored-map schema accepted by this build.
-pub const CURRENT_MAP_VERSION: u32 = 9;
+pub const CURRENT_MAP_VERSION: u32 = 10;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -78,6 +78,8 @@ pub struct Map {
     pub no_vehicle_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates that reject intersecting building footprints.
     pub no_building_tiles: Vec<(u32, u32)>,
+    /// Canonical sparse tile coordinates where infantry cannot dig or occupy trenches.
+    pub no_entrenchment_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing incoming damage to occupants by 25%.
     pub damage_reduction_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing occupant movement speed by 25%.
@@ -208,6 +210,11 @@ impl Map {
         hash = hash_tiles(hash, b"concealment", &self.concealment_tiles);
         hash = hash_tiles(hash, b"no-vehicle", &self.no_vehicle_tiles);
         hash = hash_tiles(hash, b"no-building", &self.no_building_tiles);
+        // Keep pre-v10 Lab/checkpoint artifacts with an omitted (therefore empty) layer
+        // importable; non-empty v10 layers still participate in identity.
+        if !self.no_entrenchment_tiles.is_empty() {
+            hash = hash_tiles(hash, b"no-entrenchment", &self.no_entrenchment_tiles);
+        }
         hash = hash_tiles(hash, b"damage-reduction", &self.damage_reduction_tiles);
         hash = hash_tiles(hash, b"slow-movement", &self.slow_movement_tiles);
         format!("{hash:016x}")
@@ -316,6 +323,16 @@ impl Map {
     }
 
     #[inline]
+    pub(crate) fn world_point_allows_entrenchment(&self, x: f32, y: f32) -> bool {
+        self.contains_world_point(x, y) && {
+            let (tx, ty) = self.tile_of(x, y);
+            self.no_entrenchment_tiles.binary_search(&(tx, ty)).is_err()
+                && terrain_rules::TerrainKind::from_map_code(self.terrain_at(tx, ty))
+                    != Some(terrain_rules::TerrainKind::Road)
+        }
+    }
+
+    #[inline]
     pub(crate) fn is_slow_movement_tile(&self, x: u32, y: u32) -> bool {
         self.slow_movement_tiles.binary_search(&(x, y)).is_ok()
     }
@@ -352,6 +369,7 @@ impl Map {
             concealment: convert(&self.concealment_tiles),
             no_vehicle: convert(&self.no_vehicle_tiles),
             no_building: convert(&self.no_building_tiles),
+            no_entrenchment: convert(&self.no_entrenchment_tiles),
             damage_reduction: convert(&self.damage_reduction_tiles),
             slow_movement: convert(&self.slow_movement_tiles),
         }
@@ -761,7 +779,8 @@ mod tests {
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
               "forestSpans": [],
-              "noBuildingTiles": []
+              "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
             }"#,
             0,
         )
@@ -783,13 +802,14 @@ mod tests {
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
               "forestSpans": [],
-              "noBuildingTiles": []
+              "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
             }"#,
             0,
         )
         .expect_err("the previous schema should be rejected");
 
-        assert!(err.contains("requires version 9"), "error was: {err}");
+        assert!(err.contains("requires version 10"), "error was: {err}");
     }
 
     #[test]
@@ -819,7 +839,7 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 9,
+              "version": 10,
               "name": "bad",
               "width": 2,
               "height": 2,
@@ -830,7 +850,8 @@ mod tests {
               "baseSites": [{"x": 0, "y": 0, "steelPatches": 12, "oilPatches": 3}],
               "doodads": [],
               "forestSpans": [],
-              "noBuildingTiles": []
+              "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
             }"#,
             0,
         )
@@ -846,7 +867,7 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 9,
+              "version": 10,
               "name": "bad-base",
               "width": 32,
               "height": 32,
@@ -857,7 +878,8 @@ mod tests {
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
               "doodads": [],
               "forestSpans": [],
-              "noBuildingTiles": []
+              "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -874,7 +896,7 @@ mod tests {
         rows[8].replace_range(8..9, "=");
         let json = format!(
             r#"{{
-              "version": 9,
+              "version": 10,
               "name": "road-base",
               "width": 32,
               "height": 32,
@@ -885,7 +907,8 @@ mod tests {
               "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
               "doodads": [],
               "forestSpans": [],
-              "noBuildingTiles": []
+              "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
@@ -914,7 +937,8 @@ mod tests {
                 "oilPatches": 3
             }],
             "forestSpans": [],
-            "noBuildingTiles": []
+            "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
         });
 
         let map = Map::from_authored_json(1, &json.to_string(), 0)
@@ -950,7 +974,8 @@ mod tests {
                 "oilPatches": 3
             }],
             "forestSpans": [],
-            "noBuildingTiles": []
+            "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
         });
 
         let error = Map::from_authored_json(1, &json.to_string(), 0)

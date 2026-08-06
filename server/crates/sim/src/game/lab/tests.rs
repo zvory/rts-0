@@ -65,6 +65,7 @@ fn map_draft() -> LabMapDraft {
         concealment_tiles: Vec::new(),
         no_vehicle_tiles: Vec::new(),
         no_building_tiles: Vec::new(),
+        no_entrenchment_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),
         doodads: vec![
@@ -252,6 +253,7 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
         concealment_tiles: Vec::new(),
         no_vehicle_tiles: Vec::new(),
         no_building_tiles: Vec::new(),
+        no_entrenchment_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),
         doodads: Vec::new(),

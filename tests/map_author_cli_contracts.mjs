@@ -43,6 +43,10 @@ assert.equal(map.baseSites.length, 2);
 assert.deepEqual(map.concealmentTiles, []);
 assert.deepEqual(map.noVehicleTiles, []);
 assert.deepEqual(map.noBuildingTiles, []);
+assert(map.noEntrenchmentTiles.length > 0, "road operations author no-entrenchment tiles");
+for (const tile of map.noEntrenchmentTiles) {
+  assert("=-|\\/".includes(map.terrain[tile.y][tile.x]), "automatic no-entrenchment tiles follow roads");
+}
 assert.deepEqual(map.damageReductionTiles, []);
 assert.deepEqual(map.slowMovementTiles, []);
 for (let y = 0; y < map.height; y += 1) {
@@ -73,6 +77,10 @@ assert(validateMap({ ...map, noBuildingTiles: undefined }).warnings
   .some((warning) => warning.includes("noBuildingTiles must be an array")),
 "the CLI validator requires the current schema's no-building layer");
 
+assert(validateMap({ ...map, noEntrenchmentTiles: undefined }).warnings
+  .some((warning) => warning.includes("noEntrenchmentTiles must be an array")),
+"the CLI validator requires the current schema's no-entrenchment layer");
+
 const protectedRecipe = {
   name: "Advisory protected terrain",
   width: 32,
@@ -94,6 +102,16 @@ assert(validateMap(protectedMap).warnings.some((warning) => warning.includes("pr
 
 const operationlessRecipe = { name: "Operationless recipe", width: 16, height: 18 };
 assert.deepEqual(buildMapFromRecipe(operationlessRecipe).terrain, Array(18).fill(".".repeat(16)));
+
+const roadBackground = buildMapFromRecipe({ ...operationlessRecipe, background: "road-bare" });
+assert.equal(roadBackground.noEntrenchmentTiles.length, roadBackground.width * roadBackground.height,
+  "road backgrounds automatically author no-entrenchment on every tile");
+const filledRoad = buildMapFromRecipe({
+  ...operationlessRecipe,
+  operations: [{ type: "fill", material: "road-horizontal" }],
+});
+assert.equal(filledRoad.noEntrenchmentTiles.length, filledRoad.width * filledRoad.height,
+  "road fill operations automatically author no-entrenchment on every tile");
 
 const parityRecipe = {
   name: "Shared operation parity",
@@ -211,6 +229,7 @@ const layeredRadial = {
   concealmentTiles: [...radialLocations],
   noVehicleTiles: [...radialLocations],
   noBuildingTiles: [...radialLocations],
+  noEntrenchmentTiles: [...radialLocations],
 };
 assert(!validateMap(layeredRadial, { symmetry: "radial" }).warnings.some((warning) => warning.includes("symmetry")));
 layeredRadial.terrain[10] = `${".".repeat(9)}#${".".repeat(22)}`;
@@ -219,9 +238,10 @@ layeredRadial.startLocations.pop();
 layeredRadial.concealmentTiles.pop();
 layeredRadial.noVehicleTiles.pop();
 layeredRadial.noBuildingTiles.pop();
+layeredRadial.noEntrenchmentTiles.pop();
 layeredRadial.doodads.pop();
 const layeredWarnings = validateMap(layeredRadial, { symmetry: "radial" }).warnings;
-for (const layer of ["terrain", "start locations", "base locations", "concealment tiles", "no-vehicle tiles", "no-building tiles", "doodads"]) {
+for (const layer of ["terrain", "start locations", "base locations", "concealment tiles", "no-vehicle tiles", "no-building tiles", "no-entrenchment tiles", "doodads"]) {
   assert(layeredWarnings.some((warning) => warning.includes(layer)), `${layer} symmetry is checked`);
 }
 

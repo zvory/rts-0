@@ -157,3 +157,39 @@ fn only_firing_attack_orders_hold_ground() {
         "in-range firing attacks should count as holding ground"
     );
 }
+
+#[test]
+fn no_entrenchment_tiles_block_digging_and_trench_occupation() {
+    let mut map = flat_map(32);
+    let tile = (10, 10);
+    let position = map.tile_center(tile.0, tile.1);
+    let mut trenches = TrenchStore::new();
+    trenches
+        .create(&map, position.0, position.1)
+        .expect("control trench should seed before the overlay is applied");
+    map.no_entrenchment_tiles = vec![tile];
+
+    let mut entities = EntityStore::new();
+    let rifleman = entities
+        .spawn_unit(1, EntityKind::Rifleman, position.0, position.1)
+        .expect("rifleman");
+    let entity = entities.get(rifleman).expect("rifleman should exist");
+    assert!(!can_create_trench(&map, &|owner| owner == 1, entity));
+
+    let occ = Occupancy::build(&map, &entities);
+    let indexes = EntrenchmentIndexes::build(&map, &entities, &trenches);
+    let occupied = build_occupied_trench_counts(&entities);
+    assert!(
+        occupation_candidate(
+            &map,
+            &entities,
+            &|_| None,
+            &occ,
+            &indexes,
+            &occupied,
+            entity,
+        )
+        .is_none(),
+        "the same overlay must also reject occupation of a restored or injected trench",
+    );
+}

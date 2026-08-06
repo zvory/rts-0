@@ -90,6 +90,7 @@ struct MapOverlayTiles<T> {
     concealment: Vec<T>,
     no_vehicle: Vec<T>,
     no_building: Vec<T>,
+    no_entrenchment: Vec<T>,
     damage_reduction: Vec<T>,
     slow_movement: Vec<T>,
 }

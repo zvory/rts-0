@@ -23,6 +23,7 @@ export const AUTHORING_TERRAIN_CHARACTERS = new Set([...Object.values(AUTHORING_
 export const AUTHORING_PASSABLE_CHARACTERS = new Set([".", "=", "-", "|", "\\", "/", ..."0123456789"]);
 
 const ROAD_ANGLES = new Map([["-", 0], ["\\", 45], ["|", 90], ["/", 135]]);
+export const AUTHORING_ROAD_CHARACTERS = new Set(["=", ...ROAD_ANGLES.keys()]);
 
 export function terrainCharacter(material) {
   const key = String(material || "").toLowerCase();
@@ -45,8 +46,7 @@ export function applyMapOperation(draft, operation, {
   const symmetry = operation.symmetry ?? defaultSymmetry;
   if (type === "fill") {
     const character = terrainCharacter(operation.material ?? operation.character);
-    for (let y = 0; y < dimensions.height; y += 1) draft.terrain[y] = character.repeat(dimensions.width);
-    return { terrainPatch: allTiles(dimensions, character) };
+    return paintTerrain(draft, allTiles(dimensions, character), () => false);
   }
   if (["rect", "blob", "stroke"].includes(type)) {
     const character = terrainCharacter(operation.material ?? operation.character);
@@ -153,17 +153,25 @@ function paintTerrain(draft, tiles, protectedTerrain) {
   const dimensions = normalizeDimensions(draft);
   const byRow = new Map();
   const terrainPatch = [];
+  const noEntrenchment = new Map((draft.noEntrenchmentTiles || []).map((tile) => [locationKey(tile), tile]));
   for (const candidate of tiles) {
     const point = expandSymmetricPoints(dimensions, [candidate], MAP_AUTHORING_SYMMETRY.NONE)[0];
     const character = terrainCharacter(candidate.character);
     if (!point || (!AUTHORING_PASSABLE_CHARACTERS.has(character) && protectedTerrain(point, draft))) continue;
     const row = byRow.get(point.y) || [...draft.terrain[point.y]];
-    if (row[point.x] === character) continue;
+    const key = locationKey(point);
+    const previous = row[point.x];
+    const hadNoEntrenchment = noEntrenchment.has(key);
+    if (AUTHORING_ROAD_CHARACTERS.has(character)) noEntrenchment.set(key, { x: point.x, y: point.y });
+    else if (AUTHORING_ROAD_CHARACTERS.has(previous)) noEntrenchment.delete(key);
+    const overlayChanged = hadNoEntrenchment !== noEntrenchment.has(key);
+    if (previous === character && !overlayChanged) continue;
     row[point.x] = character;
     byRow.set(point.y, row);
     terrainPatch.push({ x: point.x, y: point.y, character });
   }
   for (const [y, row] of byRow) draft.terrain[y] = row.join("");
+  draft.noEntrenchmentTiles = [...noEntrenchment.values()];
   return { terrainPatch };
 }
 
@@ -171,24 +179,30 @@ function paintOverlays(draft, tiles, edit) {
   const concealment = new Map((draft.concealmentTiles || []).map((tile) => [locationKey(tile), tile]));
   const noVehicle = new Map((draft.noVehicleTiles || []).map((tile) => [locationKey(tile), tile]));
   const noBuilding = new Map((draft.noBuildingTiles || []).map((tile) => [locationKey(tile), tile]));
+  const noEntrenchment = new Map((draft.noEntrenchmentTiles || []).map((tile) => [locationKey(tile), tile]));
   const damageReduction = new Map((draft.damageReductionTiles || []).map((tile) => [locationKey(tile), tile]));
   const slowMovement = new Map((draft.slowMovementTiles || []).map((tile) => [locationKey(tile), tile]));
   const overlayPatch = [];
   for (const tile of tiles) {
     const key = locationKey(tile);
-    const before = `${concealment.has(key)}:${noVehicle.has(key)}:${noBuilding.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}`;
+    const before = `${concealment.has(key)}:${noVehicle.has(key)}:${noBuilding.has(key)}:${noEntrenchment.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}`;
     applyOverlayEdit(concealment, key, tile, edit.concealment);
     applyOverlayEdit(noVehicle, key, tile, edit.noVehicle);
     applyOverlayEdit(noBuilding, key, tile, edit.noBuilding);
+    applyOverlayEdit(noEntrenchment, key, tile, edit.noEntrenchment);
+    if (AUTHORING_ROAD_CHARACTERS.has(draft.terrain[tile.y]?.[tile.x])) {
+      noEntrenchment.set(key, { x: tile.x, y: tile.y });
+    }
     applyOverlayEdit(damageReduction, key, tile, edit.damageReduction);
     applyOverlayEdit(slowMovement, key, tile, edit.slowMovement);
-    if (before !== `${concealment.has(key)}:${noVehicle.has(key)}:${noBuilding.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}`) {
+    if (before !== `${concealment.has(key)}:${noVehicle.has(key)}:${noBuilding.has(key)}:${noEntrenchment.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}`) {
       overlayPatch.push({ x: tile.x, y: tile.y });
     }
   }
   draft.concealmentTiles = [...concealment.values()];
   draft.noVehicleTiles = [...noVehicle.values()];
   draft.noBuildingTiles = [...noBuilding.values()];
+  draft.noEntrenchmentTiles = [...noEntrenchment.values()];
   draft.damageReductionTiles = [...damageReduction.values()];
   draft.slowMovementTiles = [...slowMovement.values()];
   return { overlayPatch };

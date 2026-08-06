@@ -853,14 +853,14 @@ try {
   await editorPage.evaluate(() => [...document.querySelectorAll(".map-editor-toolbar button")]
     .find((button) => button.textContent === "Map settings")?.click());
   ok(
-    editorUi.layers.length === 10 && editorUi.layers.every((layer) => layer.checked && layer.description) &&
+    editorUi.layers.length === 11 && editorUi.layers.every((layer) => layer.checked && layer.description) &&
       editorUi.layers.every((layer) => layer.title === `${layer.label} — ${layer.description}`) &&
       editorUi.layerPanel?.outsideTools && editorUi.layerPanel.columns === 2 &&
-      editorUi.layerPanel.height < 180 && editorUi.layerPanel.maxToggleHeight < 32 &&
+      editorUi.layerPanel.height < 210 && editorUi.layerPanel.maxToggleHeight < 32 &&
       editorUi.layerPanel.movePreservedSize &&
-      ["Terrain & bases", "Forest", "Concealment", "No vehicles", "No buildings", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
+      ["Terrain & bases", "Forest", "Concealment", "No vehicles", "No buildings", "No entrenchment", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)),
-    `MAP EDITOR: compact floating Layers panel exposes ten independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
+    `MAP EDITOR: compact floating Layers panel exposes eleven independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
   );
   await editorPage.click("input[aria-label='Show Concealment']");
   await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.layerVisibilitySnapshot?.().concealment === false);

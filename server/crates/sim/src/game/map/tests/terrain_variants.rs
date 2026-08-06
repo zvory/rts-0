@@ -6,7 +6,7 @@ fn authored_map_accepts_visual_open_terrain_variants() {
     rows[8].replace_range(3..13, "0123456789");
     let json = format!(
         r#"{{
-          "version": 9,
+          "version": 10,
           "name": "open-variants",
           "width": 32,
           "height": 32,
@@ -17,7 +17,8 @@ fn authored_map_accepts_visual_open_terrain_variants() {
           "baseSites": [{{"x": 8, "y": 8, "steelPatches": 12, "oilPatches": 3}}, {{"x": 24, "y": 24, "steelPatches": 12, "oilPatches": 3}}],
           "doodads": [],
           "forestSpans": [],
-          "noBuildingTiles": []
+          "noBuildingTiles": [],
+              "noEntrenchmentTiles": []
         }}"#,
         serde_json::to_string(&rows).unwrap()
     );

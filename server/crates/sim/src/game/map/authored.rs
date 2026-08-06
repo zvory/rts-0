@@ -41,6 +41,9 @@ pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
     if authored.no_building_tiles.is_none() {
         return Err("map noBuildingTiles must be an array".to_string());
     }
+    if authored.no_entrenchment_tiles.is_none() {
+        return Err("map noEntrenchmentTiles must be an array".to_string());
+    }
     let starts = authored.start_locations.len();
     if starts == 0 || starts > MAX_START_LOCATIONS {
         return Err(format!(
@@ -79,6 +82,7 @@ pub(super) fn load_for_players(
         concealment_tiles: materialized.concealment_tiles,
         no_vehicle_tiles: materialized.no_vehicle_tiles,
         no_building_tiles: materialized.no_building_tiles,
+        no_entrenchment_tiles: materialized.no_entrenchment_tiles,
         damage_reduction_tiles: materialized.damage_reduction_tiles,
         slow_movement_tiles: materialized.slow_movement_tiles,
     })
@@ -166,6 +170,13 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
             .ok_or_else(|| "map noBuildingTiles must be an array".to_string())?,
         "noBuildingTiles",
     )?;
+    let no_entrenchment_tiles = materialize_overlay(
+        authored
+            .no_entrenchment_tiles
+            .as_deref()
+            .ok_or_else(|| "map noEntrenchmentTiles must be an array".to_string())?,
+        "noEntrenchmentTiles",
+    )?;
     let damage_reduction_tiles =
         materialize_overlay(&authored.damage_reduction_tiles, "damageReductionTiles")?;
     let slow_movement_tiles =
@@ -182,6 +193,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         concealment_tiles,
         no_vehicle_tiles,
         no_building_tiles,
+        no_entrenchment_tiles,
         damage_reduction_tiles,
         slow_movement_tiles,
     })
@@ -210,6 +222,7 @@ struct AuthoredMap {
     #[serde(default)]
     no_vehicle_tiles: Vec<AuthoredLocation>,
     no_building_tiles: Option<Vec<AuthoredLocation>>,
+    no_entrenchment_tiles: Option<Vec<AuthoredLocation>>,
     #[serde(default)]
     damage_reduction_tiles: Vec<AuthoredLocation>,
     #[serde(default)]

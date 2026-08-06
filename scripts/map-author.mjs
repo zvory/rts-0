@@ -43,6 +43,7 @@ const MAP_FIELDS = new Set([
   "version", "name", "description", "width", "height", "terrain", "startLocations",
   "baseSites", "_design", "doodads", "forestSpans", "concealmentTiles", "noVehicleTiles",
   "noBuildingTiles", "damageReductionTiles", "slowMovementTiles",
+  "noEntrenchmentTiles",
 ]);
 const START_FIELDS = new Set(["x", "y"]);
 const BASE_FIELDS = new Set(["x", "y", "steelPatches", "oilPatches"]);
@@ -240,8 +241,9 @@ export function validateMap(map, { symmetry = "none" } = {}) {
     if (blocked) warnings.push(`base (${site.x},${site.y}) has ${blocked.reason} in its protected area at (${blocked.x},${blocked.y})`);
   }
   warnings.push(...validateForestSpans(map.forestSpans, width, height));
-  for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "damageReductionTiles", "slowMovementTiles"]) {
-    const locations = map[field] === undefined && field !== "noBuildingTiles" ? [] : map[field];
+  for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "noEntrenchmentTiles", "damageReductionTiles", "slowMovementTiles"]) {
+    const required = field === "noBuildingTiles" || field === "noEntrenchmentTiles";
+    const locations = map[field] === undefined && !required ? [] : map[field];
     if (!Array.isArray(locations)) {
       warnings.push(`${field} must be an array`);
       continue;
@@ -382,6 +384,14 @@ export function renderPreviewSvg(map, { tilePixels = 5, layers = "all" } = {}) {
     height,
     fill: "#d58a2f",
     stroke: "#ffd293",
+  });
+  appendSemanticTileLayer(elements, map.noEntrenchmentTiles, {
+    id: MAP_AUTHORING_LAYER.NO_ENTRENCHMENT,
+    visible: visibility[MAP_AUTHORING_LAYER.NO_ENTRENCHMENT],
+    width,
+    height,
+    fill: "#b84a8f",
+    stroke: "#f0a9d4",
   });
   appendSemanticTileLayer(elements, map.damageReductionTiles, {
     id: MAP_AUTHORING_LAYER.DAMAGE_REDUCTION,

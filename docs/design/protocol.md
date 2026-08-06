@@ -540,6 +540,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     concealmentTiles: [ { x: u32, y: u32 } ],
     noVehicleTiles: [ { x: u32, y: u32 } ],
     noBuildingTiles: [ { x: u32, y: u32 } ],
+    noEntrenchmentTiles: [ { x: u32, y: u32 } ],
     damageReductionTiles: [ { x: u32, y: u32 } ],
     slowMovementTiles: [ { x: u32, y: u32 } ]
   },
@@ -1434,7 +1435,7 @@ Map mutation is not a `LabClientOp`; `exportMap` is read-only. The dedicated edi
 POST /api/map-handoffs
 {
   destination: "lab" | "editor",
-  authoredMap: AuthoredMapV9,
+    authoredMap: AuthoredMapV10,
   materializedMap: {
     name: string,
     width: u32,
@@ -1446,6 +1447,7 @@ POST /api/map-handoffs
     concealmentTiles: LabMapTile[],
     noVehicleTiles: LabMapTile[],
     noBuildingTiles: LabMapTile[],
+    noEntrenchmentTiles: LabMapTile[],
     damageReductionTiles: LabMapTile[],
     slowMovementTiles: LabMapTile[]
   }
@@ -1454,16 +1456,16 @@ POST /api/map-handoffs
 
 POST /api/map-handoffs/{handoffId}
 -> { destination: "lab", room: privateLabRoom }
- | { destination: "editor", authoredMap: AuthoredMapV9 }
+ | { destination: "editor", authoredMap: AuthoredMapV10 }
 ```
-`AuthoredMapV9` declares independent `width` and `height` tile dimensions, whose product must
+`AuthoredMapV10` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
-`doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `noBuildingTiles`, `damageReductionTiles`, and
-`slowMovementTiles` arrays. A forest span is the compact encoding of the first-class composite
+`doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `noBuildingTiles`,
+`noEntrenchmentTiles`, `damageReductionTiles`, and `slowMovementTiles` arrays. A forest span is the compact encoding of the first-class composite
 Forest tile: `[y, xStart, xEnd]` with inclusive bounds. Spans may not overlap and each Forest tile
 materializes into all five gameplay layers. Explicit overlay records remain bounded,
 unique, in-bounds tile-coordinate pairs and can independently supplement forest-derived layers.
-Schema v9 is the only accepted authored-map schema. Older documents are rejected rather than
+Schema v10 is the only accepted authored-map schema. Older documents are rejected rather than
 migrated, and every shipped map declares `forestSpans` even when it is empty.
 Each dimension is bounded to 256 tiles. Start locations determine the
 supported player count; every base site is a permanent resource location, including unoccupied
@@ -1521,6 +1523,7 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       concealmentTiles: [{ x: u32, y: u32 }],
       noVehicleTiles: [{ x: u32, y: u32 }],
       noBuildingTiles: [{ x: u32, y: u32 }],
+      noEntrenchmentTiles: [{ x: u32, y: u32 }],
       damageReductionTiles: [{ x: u32, y: u32 }],
       slowMovementTiles: [{ x: u32, y: u32 }]
     }

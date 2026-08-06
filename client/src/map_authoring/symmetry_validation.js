@@ -33,6 +33,7 @@ export function mapSymmetryWarnings(map, symmetry = MAP_AUTHORING_SYMMETRY.NONE)
   pushLocationWarnings(warnings, "concealment tiles", map.concealmentTiles, dimensions, symmetry);
   pushLocationWarnings(warnings, "no-vehicle tiles", map.noVehicleTiles, dimensions, symmetry);
   pushLocationWarnings(warnings, "no-building tiles", map.noBuildingTiles, dimensions, symmetry);
+  pushLocationWarnings(warnings, "no-entrenchment tiles", map.noEntrenchmentTiles, dimensions, symmetry);
   pushLocationWarnings(warnings, "damage-reduction tiles", map.damageReductionTiles, dimensions, symmetry);
   pushLocationWarnings(warnings, "slow-movement tiles", map.slowMovementTiles, dimensions, symmetry);
   // Forest symmetry is authoritative at the tile-mask level above. Generated trees remain

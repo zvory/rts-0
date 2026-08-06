@@ -128,6 +128,7 @@ export class MapEditorSession {
       concealmentTiles: map.concealmentTiles,
       noVehicleTiles: map.noVehicleTiles,
       noBuildingTiles: map.noBuildingTiles,
+      noEntrenchmentTiles: map.noEntrenchmentTiles,
       damageReductionTiles: map.damageReductionTiles,
       slowMovementTiles: map.slowMovementTiles,
     });
@@ -152,6 +153,7 @@ export class MapEditorSession {
       concealmentTiles: data.concealmentTiles,
       noVehicleTiles: data.noVehicleTiles,
       noBuildingTiles: data.noBuildingTiles,
+      noEntrenchmentTiles: data.noEntrenchmentTiles,
       damageReductionTiles: data.damageReductionTiles,
       slowMovementTiles: data.slowMovementTiles,
     });
@@ -188,6 +190,7 @@ export class MapEditorSession {
       concealmentTiles: [],
       noVehicleTiles: [],
       noBuildingTiles: [],
+      noEntrenchmentTiles: [],
       damageReductionTiles: [],
       slowMovementTiles: [],
     });
@@ -532,6 +535,7 @@ export class MapEditorSession {
       concealmentTiles: mergedOverlayTiles(draft.concealmentTiles, forestTiles),
       noVehicleTiles: mergedOverlayTiles(draft.noVehicleTiles, forestTiles),
       noBuildingTiles: mergedOverlayTiles(draft.noBuildingTiles, forestTiles),
+      noEntrenchmentTiles: normalizeOverlayTiles(draft.noEntrenchmentTiles, draft),
       damageReductionTiles: mergedOverlayTiles(draft.damageReductionTiles, forestTiles),
       slowMovementTiles: mergedOverlayTiles(draft.slowMovementTiles, forestTiles),
     };
@@ -729,6 +733,7 @@ export function authoredMapFromMaterialized({
   concealmentTiles = [],
   noVehicleTiles = [],
   noBuildingTiles = [],
+  noEntrenchmentTiles = [],
   damageReductionTiles = [],
   slowMovementTiles = [],
 }) {
@@ -760,6 +765,7 @@ export function authoredMapFromMaterialized({
     concealmentTiles: normalizeOverlayTiles(concealmentTiles, dimensions),
     noVehicleTiles: normalizeOverlayTiles(noVehicleTiles, dimensions),
     noBuildingTiles: normalizeOverlayTiles(noBuildingTiles, dimensions),
+    noEntrenchmentTiles: normalizeOverlayTiles(noEntrenchmentTiles, dimensions),
     damageReductionTiles: normalizeOverlayTiles(damageReductionTiles, dimensions),
     slowMovementTiles: normalizeOverlayTiles(slowMovementTiles, dimensions),
   };
@@ -776,6 +782,7 @@ export function materializedMapsEqual(left, right) {
     && sameLocationSet(left.concealmentTiles, right.concealmentTiles)
     && sameLocationSet(left.noVehicleTiles, right.noVehicleTiles)
     && sameLocationSet(left.noBuildingTiles, right.noBuildingTiles)
+    && sameLocationSet(left.noEntrenchmentTiles, right.noEntrenchmentTiles)
     && sameLocationSet(left.damageReductionTiles, right.damageReductionTiles)
     && sameLocationSet(left.slowMovementTiles, right.slowMovementTiles);
 }
@@ -790,6 +797,9 @@ function normalizeDraft(draft) {
   }
   if (!Array.isArray(draft.noBuildingTiles)) {
     throw new Error("Map noBuildingTiles must be an array.");
+  }
+  if (!Array.isArray(draft.noEntrenchmentTiles)) {
+    throw new Error("Map noEntrenchmentTiles must be an array.");
   }
   if (!positiveInteger(draft.width) || !positiveInteger(draft.height)) {
     const inferred = inferredDraftDimensions(draft);
@@ -815,6 +825,7 @@ function normalizeDraft(draft) {
   draft.concealmentTiles = normalizeOverlayTiles(draft.concealmentTiles, dimensions);
   draft.noVehicleTiles = normalizeOverlayTiles(draft.noVehicleTiles, dimensions);
   draft.noBuildingTiles = normalizeOverlayTiles(draft.noBuildingTiles, dimensions);
+  draft.noEntrenchmentTiles = normalizeOverlayTiles(draft.noEntrenchmentTiles, dimensions);
   draft.damageReductionTiles = normalizeOverlayTiles(draft.damageReductionTiles, dimensions);
   draft.slowMovementTiles = normalizeOverlayTiles(draft.slowMovementTiles, dimensions);
   reconcileForestDoodads(draft);
@@ -859,6 +870,7 @@ function resizeDraftCentered(source, width, height) {
     concealmentTiles: (source.concealmentTiles || []).map(shiftTile),
     noVehicleTiles: (source.noVehicleTiles || []).map(shiftTile),
     noBuildingTiles: (source.noBuildingTiles || []).map(shiftTile),
+    noEntrenchmentTiles: (source.noEntrenchmentTiles || []).map(shiftTile),
     damageReductionTiles: (source.damageReductionTiles || []).map(shiftTile),
     slowMovementTiles: (source.slowMovementTiles || []).map(shiftTile),
   };

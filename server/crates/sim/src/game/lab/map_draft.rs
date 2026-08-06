@@ -36,6 +36,7 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
         concealment_tiles: overlays.concealment,
         no_vehicle_tiles: overlays.no_vehicle,
         no_building_tiles: overlays.no_building,
+        no_entrenchment_tiles: overlays.no_entrenchment,
         damage_reduction_tiles: overlays.damage_reduction,
         slow_movement_tiles: overlays.slow_movement,
     }
@@ -110,6 +111,13 @@ pub(super) fn canonical_overlays(
             draft.width,
             draft.height,
             "noBuildingTiles",
+            name,
+        )?,
+        no_entrenchment: canonical_tiles(
+            &draft.no_entrenchment_tiles,
+            draft.width,
+            draft.height,
+            "noEntrenchmentTiles",
             name,
         )?,
         damage_reduction: canonical_tiles(

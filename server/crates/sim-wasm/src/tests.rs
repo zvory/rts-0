@@ -24,6 +24,7 @@ fn start_payload() -> StartPayload {
             concealment_tiles: Vec::new(),
             no_vehicle_tiles: Vec::new(),
             no_building_tiles: Vec::new(),
+            no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
         },

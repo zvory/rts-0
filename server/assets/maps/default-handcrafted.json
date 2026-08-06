@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "width": 126,
   "height": 126,
   "name": "Chokes",
@@ -229,5 +229,6 @@
   "concealmentTiles": [],
   "noVehicleTiles": [],
   "doodads": [],
-  "noBuildingTiles": []
+  "noBuildingTiles": [],
+  "noEntrenchmentTiles": []
 }

@@ -416,6 +416,7 @@ export class MapEditorViewport {
       concealmentTiles: structuredCloneSafe(draft.concealmentTiles || []),
       noVehicleTiles: structuredCloneSafe(draft.noVehicleTiles || []),
       noBuildingTiles: structuredCloneSafe(draft.noBuildingTiles || []),
+      noEntrenchmentTiles: structuredCloneSafe(draft.noEntrenchmentTiles || []),
       damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),
       slowMovementTiles: structuredCloneSafe(draft.slowMovementTiles || []),
       forestTiles: structuredCloneSafe(this.session.forestTiles?.() || []),

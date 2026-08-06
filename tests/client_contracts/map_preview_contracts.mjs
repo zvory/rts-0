@@ -424,7 +424,7 @@ try {
   const authoredMaps = fs.readdirSync(new URL("../../server/assets/maps/", import.meta.url))
     .filter((file) => file.endsWith(".json"))
     .map((file) => JSON.parse(fs.readFileSync(new URL(`../../server/assets/maps/${file}`, import.meta.url), "utf8")))
-    .filter((map) => map.version === 9);
+    .filter((map) => map.version === 10);
   assert.deepEqual(
     authoredMaps.map((map) => map.name).sort(),
     Object.keys(LOBBY_MAP_PRESENTATION).sort(),
