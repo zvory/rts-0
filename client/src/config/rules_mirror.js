@@ -197,7 +197,7 @@ export const STATS = Object.freeze({
     trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY],
     requires: [KIND.RESOURCE_DEPOT, KIND.TRAINING_CENTRE] },
   [KIND.TANK_TRAP]: { label: "Tank Trap", icon: "TT", footW: 1, footH: 1, sight: 0,
-    cost: { steel: 30, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
+    cost: { steel: 20, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [],
     requires: KIND.TRAINING_CENTRE,
     requiresText: "Requires Training Centre" },
   [KIND.STEEL_MINE]: { label: "Steel Mine", icon: "SM", footW: 1, footH: 1, sight: 1,
