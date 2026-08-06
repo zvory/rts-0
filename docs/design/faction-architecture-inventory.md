@@ -114,8 +114,8 @@ live oil patches with no tech requirement. Barracks requires a completed Resourc
 Centre requires a completed Resource Depot and Barracks; Engineering Complex, Factory, and Gun Works require a
 completed Resource Depot and Training Centre; Tank Trap requires a completed Training Centre. Resource
 Depot trains Workers. Barracks trains Riflemen immediately and Machine
-Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately,
-Command Cars once an Engineering Complex is complete, and Tanks after Tank Production research. Gun Works
+Gunners after the Training Centre requirement is met. Factory trains Scout Cars and Command Cars
+immediately, and Tanks after Tank Production research. Gun Works
 trains Mortar Teams immediately, Anti-Tank Guns after AT Guns research, and Artillery after
 Artillery research.
 
