@@ -9,7 +9,6 @@ import {
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
   MORTAR_INNER_RADIUS_TILES,
-  MORTAR_OUTER_RADIUS_TILES,
   MORTAR_FIELD_OF_FIRE_RAD,
   MORTAR_MIN_RANGE_TILES,
   MORTAR_RANGE_TILES,
@@ -834,7 +833,7 @@ export function _drawMortarTargets(state) {
     const age = now - target.createdAt;
     const t = clamp01(age / duration);
     const fade = 1 - smoothstep01(Math.max(0, t - 0.78) / 0.22);
-    const radius = Math.max(20, (target.radiusTiles || MORTAR_OUTER_RADIUS_TILES) * ts);
+    const radius = Math.max(20, (target.radiusTiles || 1) * ts);
     const pulse = 1 + Math.sin(t * Math.PI * 5) * 0.035;
 
     if (finiteNumber(target.fromX) && finiteNumber(target.fromY)) {
