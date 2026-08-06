@@ -339,11 +339,7 @@ fn entrenched_meth_rifleman_keeps_faster_attack_cooldown() {
     let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
     assert_eq!(
         rifleman.attack_cd(),
-        config::unit_stats(EntityKind::Rifleman)
-            .expect("rifleman stats")
-            .cooldown
-            * config::METHAMPHETAMINES_ATTACK_COOLDOWN_NUMERATOR
-            / config::METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR,
+        config::METHAMPHETAMINES_RIFLEMAN_ATTACK_COOLDOWN_TICKS,
         "Methamphetamines attack cadence should still apply while entrenched"
     );
     assert!(

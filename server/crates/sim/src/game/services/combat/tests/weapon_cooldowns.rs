@@ -97,3 +97,30 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
         );
     }
 }
+
+#[test]
+fn methamphetamines_sets_rifleman_weapon_cooldown_to_eight_ticks() {
+    let mut entities = EntityStore::new();
+    let attacker_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+        .expect("target should spawn");
+    entities
+        .get_mut(attacker_id)
+        .expect("rifleman should exist")
+        .set_order(Order::attack(target_id));
+    let mut meth_player = player_state(1, false);
+    meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
+
+    run_combat_tick_with_players(&mut entities, &[meth_player, player_state(2, false)]);
+
+    assert_eq!(
+        entities
+            .get(attacker_id)
+            .expect("rifleman should exist")
+            .attack_cd(),
+        8
+    );
+}

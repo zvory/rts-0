@@ -967,6 +967,10 @@ impl Entity {
         amount: u32,
         attribution: Option<(u32, (f32, f32), u32)>,
     ) -> bool {
+        let (move_dx, move_dy) = self.movement_delta();
+        let moved_this_tick = move_dx != 0.0 || move_dy != 0.0;
+        let amount =
+            config::damage_after_rifleman_movement(self.kind, amount, moved_this_tick);
         if self.hp == 0 || amount == 0 || self.invulnerable {
             return false;
         }
