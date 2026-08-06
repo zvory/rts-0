@@ -397,7 +397,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
                 if *from == mortar
                     && (*to_x - impact_pos.0).abs() < 0.001
                     && (*to_y - impact_pos.1).abs() < 0.001
-                    && *delay_ticks == config::MORTAR_SHELL_DELAY_TICKS
+                    && *delay_ticks == config::MORTAR_MANUAL_SHELL_DELAY_TICKS
         )),
         "accepted mortar command should emit a launch marker with impact timing: {owner_events:?}"
     );
@@ -436,7 +436,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         .hp;
 
     let mut impact_events = Vec::new();
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         impact_events = game.tick();
     }
 
@@ -956,6 +956,7 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
     let mortar_pos = game.state.map.tile_center(8, 8);
     let target_pos = game.state.map.tile_center(14, 8);
     let outer_pos = game.state.map.tile_center(15, 8);
+    let outside_pos = game.state.map.tile_center(16, 8);
     let mortar = game
         .state
         .entities
@@ -967,13 +968,18 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
     let armored_inner = game
         .state
         .entities
-        .spawn_building(2, EntityKind::TankTrap, target_pos.0, target_pos.1, true)
+        .spawn_unit(2, EntityKind::Tank, target_pos.0, target_pos.1)
         .expect("armored target should spawn");
     let armored_outer = game
         .state
         .entities
-        .spawn_building(2, EntityKind::TankTrap, outer_pos.0, outer_pos.1, true)
+        .spawn_unit(2, EntityKind::Tank, outer_pos.0, outer_pos.1)
         .expect("outer armored target should spawn");
+    let armored_outside = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Tank, outside_pos.0, outside_pos.1)
+        .expect("outside armored target should spawn");
     let armored_inner_hp_before = game
         .state
         .entities
@@ -985,6 +991,12 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
         .entities
         .get(armored_outer)
         .expect("outer armored target exists")
+        .hp;
+    let armored_outside_hp_before = game
+        .state
+        .entities
+        .get(armored_outside)
+        .expect("outside armored target exists")
         .hp;
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
@@ -1015,8 +1027,13 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
         .entities
         .get_mut(armored_outer)
         .expect("outer armored target should exist")
+        .set_position(impact_pos.0, impact_pos.1 + config::TILE_SIZE as f32 * 0.75);
+    game.state
+        .entities
+        .get_mut(armored_outside)
+        .expect("outside armored target should exist")
         .set_position(impact_pos.0, impact_pos.1 + config::TILE_SIZE as f32 * 1.25);
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         game.tick();
     }
 
@@ -1032,6 +1049,12 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
         .get(armored_outer)
         .expect("outer armored target should survive")
         .hp;
+    let armored_outside_hp_after = game
+        .state
+        .entities
+        .get(armored_outside)
+        .expect("outside armored target should survive")
+        .hp;
     assert_eq!(
         armored_inner_hp_before - armored_inner_hp_after,
         config::MORTAR_INNER_DAMAGE / 4,
@@ -1041,6 +1064,10 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
         armored_outer_hp_before - armored_outer_hp_after,
         config::MORTAR_OUTER_DAMAGE / 4,
         "outer mortar splash should receive the standard non-piercing armor reduction"
+    );
+    assert_eq!(
+        armored_outside_hp_before, armored_outside_hp_after,
+        "mortar splash should stop at the one-tile outer radius"
     );
 }
 

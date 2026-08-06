@@ -358,13 +358,17 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
   `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
-  `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
+  `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s autocast travel),
+  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 34` (~1.13s manual travel),
+  `MORTAR_OUTER_RADIUS_TILES = 1.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`,
   `MORTAR_VISIBLE_MEDIAN_SCATTER_TILES = 1.0`, and
   `MORTAR_BLIND_MEDIAN_SCATTER_TILES = 4.0`.
   Mortar facing uses sim-local `mortar::TURN_RATE_RAD_PER_TICK = PI / 6`, so a 180-degree turn
   takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
+  Manual shots use half the shell flight time of autocast shots; launch events carry the selected
+  delay so the client projectile animation stays synchronized with the authoritative impact.
   Neither radius has armor penetration: armored targets take the standard non-piercing reduction,
   resulting in 25 inner damage or 10 outer damage before other modifiers. Manual Fire uses hotkey
   `X` and remains a player-directed override that does not require setup, but it must land in the

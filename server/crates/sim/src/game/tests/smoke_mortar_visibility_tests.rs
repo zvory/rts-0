@@ -125,7 +125,7 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         .expect("target should still exist")
         .hp;
     let mut impact_events = Vec::new();
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         impact_events = game.tick();
     }
     assert!(

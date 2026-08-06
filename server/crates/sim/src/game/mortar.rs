@@ -33,6 +33,13 @@ impl MortarFireMode {
     fn reveals_launch_to_enemies(self) -> bool {
         matches!(self, Self::Autocast)
     }
+
+    fn delay_ticks(self) -> u32 {
+        match self {
+            Self::Manual => config::MORTAR_MANUAL_SHELL_DELAY_TICKS,
+            Self::Autocast => config::MORTAR_SHELL_DELAY_TICKS,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,12 +185,13 @@ impl MortarShellStore {
         } else {
             (x, y)
         };
+        let delay_ticks = fire_mode.delay_ticks();
         self.shells.push(MortarShell {
             owner,
             attacker,
             x: impact_x,
             y: impact_y,
-            impact_tick: tick.saturating_add(config::MORTAR_SHELL_DELAY_TICKS),
+            impact_tick: tick.saturating_add(delay_ticks),
         });
         emit_launch(
             events,
@@ -196,6 +204,7 @@ impl MortarShellStore {
             impact_x,
             impact_y,
             fire_mode.reveals_launch_to_enemies(),
+            delay_ticks,
         );
     }
 
@@ -248,6 +257,7 @@ fn emit_launch(
     to_x: f32,
     to_y: f32,
     reveal_launch_to_enemies: bool,
+    delay_ticks: u32,
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
@@ -265,7 +275,7 @@ fn emit_launch(
             to_x,
             to_y,
             radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
-            delay_ticks: config::MORTAR_SHELL_DELAY_TICKS,
+            delay_ticks,
         });
     }
 }
