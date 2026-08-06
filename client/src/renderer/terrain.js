@@ -13,6 +13,8 @@ import {
 
 const TERRAIN_TEXTURE_DOWNSAMPLE = 4;
 const GROUND_TRANSITION_DEPTH = 0.56;
+const HEIGHT_LIGHT_X = -0.58;
+const HEIGHT_LIGHT_Y = -0.58;
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
@@ -65,6 +67,66 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   // Markings belong to the road surface and must remain legible above edge dither.
   drawRoadMarking(ctx, code, x, y, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
+  drawElevationRelief(ctx, map, tx, ty, textureTileSize);
+}
+
+function elevationAt(map, tx, ty, fallback = 0) {
+  if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return fallback;
+  return Number(map.elevation?.[ty * map.width + tx]) || 0;
+}
+
+/**
+ * Paint cartographic relief without moving the ground plane. A fixed upper-left light makes
+ * opposing slopes read consistently, while level tint and high/low lips disambiguate ridges from
+ * valleys even when the viewer perceptually inverts the shading.
+ */
+function drawElevationRelief(ctx, map, tx, ty, size) {
+  const x = tx * size;
+  const y = ty * size;
+  const level = elevationAt(map, tx, ty);
+  const west = elevationAt(map, tx - 1, ty, level);
+  const east = elevationAt(map, tx + 1, ty, level);
+  const north = elevationAt(map, tx, ty - 1, level);
+  const south = elevationAt(map, tx, ty + 1, level);
+  const gradientX = (east - west) * 0.5;
+  const gradientY = (south - north) * 0.5;
+  const light = Math.max(-1, Math.min(1, gradientX * HEIGHT_LIGHT_X + gradientY * HEIGHT_LIGHT_Y));
+
+  // Absolute level remains visible on plateaus where directional hillshade is necessarily flat.
+  if (level > 0) {
+    const tintAlpha = Math.min(0.16, level * 0.035);
+    ctx.fillStyle = colorCss(0xe7cf8b, tintAlpha);
+    ctx.fillRect(x, y, size, size);
+  }
+  if (Math.abs(light) > 0.01) {
+    ctx.fillStyle = colorCss(light > 0 ? 0xfff4cb : 0x182129, Math.min(0.25, 0.08 + Math.abs(light) * 0.1));
+    ctx.fillRect(x, y, size, size);
+  }
+
+  const edge = Math.max(1, Math.floor(size * 0.18));
+  drawElevationEdge(ctx, "north", x, y, size, edge, level, north);
+  drawElevationEdge(ctx, "south", x, y, size, edge, level, south);
+  drawElevationEdge(ctx, "west", x, y, size, edge, level, west);
+  drawElevationEdge(ctx, "east", x, y, size, edge, level, east);
+}
+
+function drawElevationEdge(ctx, direction, x, y, size, edge, level, neighbor) {
+  if (level === neighbor) return;
+  const highSide = level > neighbor;
+  const difference = Math.min(4, Math.abs(level - neighbor));
+  ctx.fillStyle = colorCss(highSide ? 0xf5df9f : 0x1b2020, Math.min(0.82, 0.4 + difference * 0.1));
+  if (direction === "north") ctx.fillRect(x, y, size, edge);
+  else if (direction === "south") ctx.fillRect(x, y + size - edge, size, edge);
+  else if (direction === "west") ctx.fillRect(x, y, edge, size);
+  else ctx.fillRect(x + size - edge, y, edge, size);
+
+  // A hairline on the high tile is the explicit contour; the broader dark low-side strip is the lip.
+  if (!highSide) return;
+  ctx.fillStyle = colorCss(0xffefbd, 0.88);
+  if (direction === "north") ctx.fillRect(x, y, size, 1);
+  else if (direction === "south") ctx.fillRect(x, y + size - 1, size, 1);
+  else if (direction === "west") ctx.fillRect(x, y, 1, size);
+  else ctx.fillRect(x + size - 1, y, 1, size);
 }
 
 function drawTerrainVariantDetails(ctx, variant, tx, ty, x, y, size) {
@@ -214,6 +276,7 @@ export function buildStaticMap(map, {
     height: map.height,
     tileSize: map.tileSize,
     terrain: Array.from(map.terrain || []),
+    elevation: Array.from(map.elevation || new Uint8Array(map.width * map.height)),
   };
   const ts = map.tileSize;
   const textureTileSize = Math.max(1, Math.round(ts / TERRAIN_TEXTURE_DOWNSAMPLE));

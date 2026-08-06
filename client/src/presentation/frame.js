@@ -8,7 +8,7 @@ import { createRendererProjectionRecord } from "./projection_record.js";
 import { DOODAD_TYPE_IDS } from "../config.js";
 
 export const PRESENTATION_FRAME_VERSION = 2;
-export const STATIC_MAP_PRESENTATION_VERSION = 2;
+export const STATIC_MAP_PRESENTATION_VERSION = 3;
 export const MAX_PRESENTED_DOODADS = 4096;
 
 const STATIC_DOODAD_TYPES = new Set(DOODAD_TYPE_IDS);
@@ -52,6 +52,7 @@ export class PresentationFrameAssembler {
     this._mapSource = null;
     this._staticMap = null;
     this._terrainCache = new GridSnapshotCache();
+    this._elevationCache = new GridSnapshotCache();
     this._visibleCache = new GridSnapshotCache();
     this._exploredCache = new GridSnapshotCache();
     if (map) this._replaceStaticMap(map);
@@ -244,11 +245,18 @@ export class PresentationFrameAssembler {
     const tileSizePx = finitePositiveNumber(map?.tileSize);
     this._staticRevision += 1;
     this._terrainCache.clear();
+    this._elevationCache.clear();
     const terrain = this._terrainCache.snapshot({
       revision: this._staticRevision,
       width,
       height,
       source: map?.terrain || new Uint8Array(width * height),
+    });
+    const elevation = this._elevationCache.snapshot({
+      revision: this._staticRevision,
+      width,
+      height,
+      source: map?.elevation || new Uint8Array(width * height),
     });
     const resourceSites = [];
     for (const resource of map?.resources || []) {
@@ -276,6 +284,7 @@ export class PresentationFrameAssembler {
       heightPx: height * tileSizePx,
       tileSizePx,
       terrain,
+      elevation,
       resourceSites: Object.freeze(resourceSites),
       doodads,
     });

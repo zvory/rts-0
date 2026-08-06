@@ -268,12 +268,15 @@ function materializeStaticMap(staticMap) {
   const width = staticMap.terrain.width;
   const height = staticMap.terrain.height;
   const terrain = new Uint8Array(width * height);
+  const elevation = new Uint8Array(width * height);
   copyGridSnapshotInto(staticMap.terrain, terrain);
+  copyGridSnapshotInto(staticMap.elevation, elevation);
   return {
     width,
     height,
     tileSize: staticMap.tileSizePx,
     terrain,
+    elevation,
     resources: staticMap.resourceSites.map((resource) => ({ ...resource })),
     doodads: (staticMap.doodads || []).map((doodad) => ({ ...doodad })),
   };

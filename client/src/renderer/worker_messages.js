@@ -49,6 +49,7 @@ export function createInitializeMessage({ canvas, widthCssPx, heightCssPx, dpr, 
 export function createMapGenerationMessage(staticMap) {
   requireGeneration(staticMap?.generation);
   const terrain = cloneGridValues(staticMap?.terrain, "terrain");
+  const elevation = cloneGridValues(staticMap?.elevation, "elevation");
   return request(RENDER_WORKER_MESSAGE.MAP_GENERATION, staticMap.generation, {
     map: {
       version: staticMap.version,
@@ -57,9 +58,12 @@ export function createMapGenerationMessage(staticMap) {
       heightPx: positiveFinite(staticMap.heightPx, "map heightPx"),
       tileSizePx: positiveFinite(staticMap.tileSizePx, "map tileSizePx"),
       terrain: gridRecord(staticMap.terrain, terrain),
+      elevation: gridRecord(staticMap.elevation, elevation),
       resourceSites: clonePlain(staticMap.resourceSites || []),
       doodads: clonePlain(staticMap.doodads || []),
     },
+  // Terrain keeps the existing transferred lifetime; the small proof-of-concept elevation grid
+  // is cloned with the envelope so older map-generation queue assumptions stay undisturbed.
   }, [terrain.buffer]);
 }
 
@@ -177,6 +181,7 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       break;
     case RENDER_WORKER_MESSAGE.MAP_GENERATION:
       validateGrid(payload?.map?.terrain, "terrain");
+      validateGrid(payload?.map?.elevation, "elevation");
       requireId(payload?.map?.revision, "map revision", { allowZero: false });
       validateDoodads(payload?.map?.doodads);
       break;
