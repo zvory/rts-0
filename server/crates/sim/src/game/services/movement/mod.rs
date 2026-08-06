@@ -94,7 +94,7 @@ pub(crate) fn movement_system_with_events(
 ) {
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
-            e.set_movement_delta(0.0, 0.0);
+            e.reset_movement_delta();
         }
     }
     for id in entities.ids() {
