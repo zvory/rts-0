@@ -31,6 +31,7 @@ pub(in crate::game) fn try_fire_artillery(
     tick: u32,
     ability: AbilityKind,
     radius_tiles: f32,
+    initial_attack_cd: u32,
 ) -> bool {
     if !matches!(ability, AbilityKind::PointFire | AbilityKind::BlanketFire) {
         return false;
@@ -64,7 +65,7 @@ pub(in crate::game) fn try_fire_artillery(
     if !player_state.can_afford(ammo_cost.steel, ammo_cost.oil) {
         notice(events, player, protocol::notices::ARTILLERY_STEEL_SHORTAGE);
         if let Some(entity) = entities.get_mut(unit) {
-            entity.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
+            entity.set_attack_cd(initial_attack_cd);
         }
         return false;
     }
@@ -78,7 +79,7 @@ pub(in crate::game) fn try_fire_artillery(
             return false;
         };
         let shot_number = entity.increment_artillery_blanket_shots_fired();
-        entity.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
+        entity.set_attack_cd(initial_attack_cd);
         let fire_radius_tiles = match ability {
             AbilityKind::PointFire => min_fire_radius_tiles,
             AbilityKind::BlanketFire => radius_tiles.clamp(

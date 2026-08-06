@@ -1579,6 +1579,7 @@ fn order_artillery_point_fire(
         tick,
         crate::game::services::order_execution::artillery_ability(mode),
         radius_tiles,
+        config::ARTILLERY_RELOAD_TICKS,
     )
 }
 
@@ -1672,6 +1673,7 @@ pub(in crate::game) fn artillery_point_fire_system(
             tick,
             crate::game::services::order_execution::artillery_ability(mode),
             radius_tiles,
+            config::ARTILLERY_RELOAD_TICKS,
         );
     }
 }

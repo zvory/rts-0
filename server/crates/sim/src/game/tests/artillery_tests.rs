@@ -337,6 +337,11 @@ fn deployed_artillery_attack_move_fires_in_field_without_tearing_down() {
         .get(artillery)
         .expect("artillery exists");
     assert_eq!(artillery_entity.weapon_setup(), WeaponSetup::Deployed);
+    assert_eq!(
+        artillery_entity.attack_cd(),
+        config::ARTILLERY_RELOAD_TICKS,
+        "autonomous fire should retain the same effective reload as manual fire"
+    );
     assert!(artillery_entity.path_is_empty());
     assert!(matches!(artillery_entity.order(), Order::AttackMove(_)));
     assert!(events.iter().any(|(player, events)| {
