@@ -152,9 +152,20 @@ const { ok } = assertions;
   A.command({ c: "train", building: mine.find((e) => e.kind === "resource_depot").id, unit: "worker" });
   await sleep(1200);
   // Mining income can fully offset the worker cost while the private test server advances faster
-  // than wall-clock time, so production state and the command ACK are the stable acceptance checks.
+  // than wall-clock time. The accelerated 5ms test tick can also finish the Worker before this
+  // snapshot, so either active production or the completed unit is a stable acceptance check.
   const resourceDepot = A.lastSnapshot.entities.find((e) => e.kind === "resource_depot" && e.owner === A.playerId);
-  ok(resourceDepot && (resourceDepot.prodKind === "worker" || (resourceDepot.prodQueue || 0) >= 1), `TRAIN: Resource Depot shows production (queue=${resourceDepot?.prodQueue})`);
+  const workerCountAfterTrain = A.lastSnapshot.entities.filter(
+    (e) => e.kind === "worker" && e.owner === A.playerId,
+  ).length;
+  ok(
+    resourceDepot && (
+      resourceDepot.prodKind === "worker" ||
+      (resourceDepot.prodQueue || 0) >= 1 ||
+      workerCountAfterTrain > workers.length
+    ),
+    `TRAIN: Resource Depot accepted production (queue=${resourceDepot?.prodQueue}, workers=${workerCountAfterTrain})`,
+  );
   ok(A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq >= 1,
      `TRAIN: server acknowledged consumed clientSeq ${A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq}`);
 
