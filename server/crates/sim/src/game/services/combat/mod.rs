@@ -49,8 +49,9 @@ use target_legality::{direct_fire_target_legal, DirectFireLegality};
 use weapons::{
     begin_idle_deployed_weapon_setup, can_fire_while_moving, deployed_weapon_ready_to_fire,
     effective_attack_profile, mirror_weapon_to_body, mortar_target_inside_field_of_fire,
-    moving_fire_miss_chance, moving_fire_move_order_holds_path, relax_vehicle_weapon_toward_body,
-    rotate_anti_tank_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
+    moving_attack_cooldown, moving_fire_miss_chance, moving_fire_move_order_holds_path,
+    relax_vehicle_weapon_toward_body, rotate_anti_tank_gun_for_combat,
+    rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
     update_attack_move_no_target_teardown, uses_vehicle_weapon_policy,
 };
 
@@ -212,6 +213,7 @@ pub(in crate::game) fn combat_system(
             } else {
                 cd
             };
+            let cd = moving_attack_cooldown(e, cd);
             let range_px = range_tiles * config::TILE_SIZE as f32
                 + if e.kind == EntityKind::MortarTeam {
                     0.0

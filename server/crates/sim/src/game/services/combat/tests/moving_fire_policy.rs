@@ -20,6 +20,71 @@ fn visible_target_x_outside_weapon_range(entities: &EntityStore, attacker_id: u3
 }
 
 #[test]
+fn breakthrough_rifleman_fires_during_move_and_uses_half_cooldown() {
+    let mut entities = EntityStore::new();
+    let rifleman = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let target = entities
+        .spawn_building(2, EntityKind::Depot, 180.0, 100.0, true)
+        .expect("target should spawn");
+    let goal = (400.0, 100.0);
+    if let Some(unit) = entities.get_mut(rifleman) {
+        unit.set_order(Order::move_to(goal.0, goal.1));
+        unit.set_path(vec![goal]);
+        unit.set_path_goal(Some(goal));
+        unit.mark_move_phase(MovePhase::Moving);
+        unit.set_movement_delta(3.0, 0.0);
+        unit.start_breakthrough(config::BREAKTHROUGH_DURATION_TICKS);
+    }
+    let hp_before = entities.get(target).expect("target should exist").hp;
+
+    run_combat_tick(&mut entities);
+
+    let rifleman = entities.get(rifleman).expect("rifleman should survive");
+    assert!(
+        entities.get(target).expect("target should survive").hp < hp_before,
+        "Breakthrough should grant opportunity fire to a moving rifleman"
+    );
+    assert_eq!(rifleman.path_goal(), Some(goal));
+    assert!(
+        !rifleman.path_is_empty(),
+        "Breakthrough moving fire should preserve the commanded Move path"
+    );
+    assert_eq!(
+        rifleman.attack_cd(),
+        combat_rules::attack_profile(EntityKind::Rifleman).cooldown / 2,
+        "a weapon fired while moving under Breakthrough should reload in half the normal time"
+    );
+}
+
+#[test]
+fn stationary_breakthrough_attack_keeps_normal_cooldown() {
+    let mut entities = EntityStore::new();
+    let rifleman = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let target = entities
+        .spawn_building(2, EntityKind::Depot, 180.0, 100.0, true)
+        .expect("target should spawn");
+    if let Some(unit) = entities.get_mut(rifleman) {
+        unit.set_order(Order::attack(target));
+        unit.start_breakthrough(config::BREAKTHROUGH_DURATION_TICKS);
+    }
+
+    run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities
+            .get(rifleman)
+            .expect("rifleman should survive")
+            .attack_cd(),
+        combat_rules::attack_profile(EntityKind::Rifleman).cooldown,
+        "Breakthrough should not accelerate stationary attacks"
+    );
+}
+
+#[test]
 fn moving_fire_move_orders_do_not_chase_targets_outside_weapon_range() {
     for kind in [EntityKind::Tank, EntityKind::ScoutCar] {
         let mut entities = EntityStore::new();

@@ -187,6 +187,21 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
 pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
         || (crate::rules::is_rifle_infantry(e.kind) && methamphetamines_researched)
+        || breakthrough_moving_fire_active(e)
+}
+
+pub(super) fn breakthrough_moving_fire_active(e: &Entity) -> bool {
+    let (dx, dy) = e.movement_delta();
+    e.breakthrough_ticks() > 0 && dx.mul_add(dx, dy * dy) > f32::EPSILON
+}
+
+pub(super) fn moving_attack_cooldown(e: &Entity, cooldown: u32) -> u32 {
+    if breakthrough_moving_fire_active(e) {
+        cooldown.saturating_mul(config::BREAKTHROUGH_MOVING_ATTACK_COOLDOWN_NUMERATOR)
+            / config::BREAKTHROUGH_MOVING_ATTACK_COOLDOWN_DENOMINATOR
+    } else {
+        cooldown
+    }
 }
 
 pub(super) fn uses_vehicle_weapon_policy(e: &Entity) -> bool {

@@ -88,6 +88,41 @@ fn tank_coax_fires_in_arc_with_small_arms_damage_and_weapon_event() {
 }
 
 #[test]
+fn moving_breakthrough_halves_tank_coax_cooldown() {
+    let map = open_map(16);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Worker, COAX_TARGET_X, 100.0)
+        .expect("worker should spawn");
+    prepare_coax_tank(&mut entities, tank);
+    if let Some(tank) = entities.get_mut(tank) {
+        tank.set_movement_delta(2.0, 0.0);
+        tank.start_breakthrough(config::BREAKTHROUGH_DURATION_TICKS);
+    }
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert_eq!(
+        entities
+            .get(tank)
+            .expect("tank should survive")
+            .weapon_cooldown(combat_rules::WeaponKind::TankCoax),
+        combat_rules::weapon_profile(combat_rules::WeaponKind::TankCoax)
+            .expect("coax profile should exist")
+            .cooldown
+            / 2,
+        "Breakthrough should halve every weapon cooldown fired while moving"
+    );
+}
+
+#[test]
 fn tank_coax_attack_events_remain_fog_projected() {
     let map = open_map(16);
     let mut entities = EntityStore::new();
