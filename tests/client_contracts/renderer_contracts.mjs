@@ -94,12 +94,12 @@ assert(
     "unit icon resolver fits the Scout Plane silhouette instead of center-cropping it",
   );
   const tankIcon = liveUnitIconMarkupFor(KIND.TANK);
-  assert(
-    tankIcon.includes('data-unit-icon-source="png-atlas-reference"') &&
-      tankIcon.includes("tank-tiger-i-pass-11-white-alpha.png") &&
-      tankIcon.includes('viewBox="41.025 108.9 531.975 298.2"'),
-    "unit icon resolver fits the live Tank PNG reference to its opaque silhouette",
-  );
+  assert(['data-unit-icon-source="png-atlas-reference"', "tank-tiger-i-pass-11-white-alpha.png",
+      'viewBox="41.025 108.9 531.975 298.2"', 'id="unit-icon-tint-0072b2"',
+      'filter="url(#unit-icon-tint-0072b2)"', 'in2="maskedTeamColor" mode="multiply"']
+      .every((fragment) => tankIcon.includes(fragment)) && !tankIcon.includes("brightenedTeamColor") &&
+      !tankIcon.includes("feComponentTransfer"),
+    "unit icon resolver fits and applies the standard team tint to the live Tank PNG reference");
   const artilleryIcon = liveUnitIconMarkupFor(KIND.ARTILLERY);
   const antiTankGunIcon = liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN);
   assert(
