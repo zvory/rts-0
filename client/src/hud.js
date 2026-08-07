@@ -39,7 +39,6 @@ import { HudSelectionPanel } from "./hud_selection_panel.js";
 import { HOTKEY_COMMAND_SELECT_IDLE_WORKERS } from "./hotkey_profiles.js";
 import { resourceIconHtml } from "./resource_icons.js";
 export {
-  formatTankOilUsed,
   selectionBudgetBlockShape,
   selectionBudgetGridModel,
 } from "./hud_selection_panel.js";

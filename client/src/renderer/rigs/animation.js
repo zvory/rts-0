@@ -74,10 +74,6 @@ export function createRigRenderContext(entity, {
       y: Math.sin(weaponFacing + Math.PI) * recoilPx * recoilKickFactor,
     }
     : { x: 0, y: 0 };
-  const ownUnit = entity.owner === state.playerId;
-  const oil = state.resources ? state.resources.oil : null;
-  const lowOil = ownUnit && typeof oil === "number" && oil > 0 && oil <= 5;
-  const oilStarved = ownUnit && oil === 0 && (entity.state === STATE.MOVE || entity.state === STATE.ATTACK);
   const context = {
     now,
     teamColor: colorByOwner.get(entity.owner) ?? hexToInt(entity.teamColor),
@@ -115,9 +111,6 @@ export function createRigRenderContext(entity, {
     setupBarrelVisible: Boolean(setup.barrel || deploy > 0.75),
     busy: isBusy(entity),
     breakthroughTicks: finite(entity.breakthroughTicks, 0),
-    lowOil,
-    oilStarved,
-    fuelCueVisible: lowOil || oilStarved,
     panzerfaustLoaded: entity.panzerfaustLoaded !== false,
     extractorPickaxeRotation: extractor.pickaxeRotation,
     extractorPumpRotation: extractor.pumpRotation,
@@ -395,7 +388,7 @@ function defaultSetupVisual(entity) {
 }
 
 function defaultVehicleMotion() {
-  return { leftPhase: 0, rightPhase: 0, leftDir: 0, rightDir: 0, activity: 0, lowOil: false, oilStarved: false };
+  return { leftPhase: 0, rightPhase: 0, leftDir: 0, rightDir: 0, activity: 0 };
 }
 
 function visualWeaponFacing(kind, facing, weaponFacing, deploy) {

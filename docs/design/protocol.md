@@ -868,7 +868,7 @@ adds an explicit application compression envelope.
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
-      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
+      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, reservedMovementOil?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
@@ -1107,9 +1107,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   rallyPlan?: [                  // building rally stages; owner-private except full-world diagnostics
     { kind: "move"|"attackMove", x: f32, y: f32 }
   ],
-  // tanks:
-  oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
-  setupFacing?: f32,             // anti_tank_gun/mortar_team/artillery only: owner/allied deployed arc center; appended after oilUsed in compact snapshots
+  // compact slot 19 remains null after retirement of movement-oil telemetry
+  setupFacing?: f32,             // anti_tank_gun/mortar_team/artillery only: owner/allied deployed arc center; compact slot 20
   orderPlan?: [                  // current + queued order stages; owner-private except full-world diagnostics
     { kind: "move"|"attackMove"|"holdPosition"|"attack"|"gather"|"build"|"deconstruct"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"setupAntiTankGuns", x: f32, y: f32 }
   ],

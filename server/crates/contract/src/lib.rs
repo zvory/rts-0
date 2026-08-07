@@ -914,9 +914,6 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rally_plan: Vec<OrderPlanMarker>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub oil_used: Option<f32>,
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub order_plan: Vec<OrderPlanMarker>,
 
@@ -986,7 +983,6 @@ impl EntityView {
             setup_facing: None,
             rally: None,
             rally_plan: Vec::new(),
-            oil_used: None,
             order_plan: Vec::new(),
             charge_cooldown_left: None,
             abilities: Vec::new(),

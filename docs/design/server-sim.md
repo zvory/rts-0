@@ -375,11 +375,6 @@ Phase 7 release audit for the ownership sequence:
   unsupported-schema error. Replay seek still uses recorded commands plus in-process
   `clone_for_replay_keyframe` keyframes after the start game is rebuilt. Schema, map, faction, and
   loadout drift reject with explicit messages while build-SHA drift remains warning-compatible.
-  The offline `replay-oil-analyze` binary reconstructs one artifact through this same boundary and
-  samples Scout Car, Command Car, and Tank cumulative movement oil at the last point before death
-  cleanup. That phase placement retains vehicles that move and die on the same tick, and vehicles
-  produced on the final tick, without adding analysis state to `GameState`, checkpoints, snapshots,
-  or the wire protocol.
 - Lab timeline seek still replays lab timeline entries from in-process keyframes. Current lab
   import/export UI uses checkpoint-backed `LabCheckpointScenarioV1` containers:
   materialized map data/binding lives beside an embedded `GameCheckpointV1` text payload, and
@@ -1531,7 +1526,7 @@ General rules:
   suitably aligned, including through intermediate waypoints. After the preference expires,
   ordinary distance-based forward/reverse movement resumes.
   Vehicle traffic sensing follows travel direction rather than hull direction, so reversing Tanks
-  yield to traffic behind them. Zero oil and static standability still gate movement. Idle, Hold
+  yield to traffic behind them. Static standability still gates hull rotation. Idle, Hold
   Position, in-range Attack, and arrived Attack Move react without changing their order, path,
   target, or independent turret aim. Static standability may block a rotation but never translate
   the Tank to make room. Stationary preference rotation preserves the stationary range ramp; path

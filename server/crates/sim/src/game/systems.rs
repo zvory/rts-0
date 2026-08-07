@@ -37,7 +37,6 @@ use crate::game::ground_decal::GroundDecalStore;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::panzerfaust_shot::PanzerfaustShotStore;
-use crate::game::replay_oil_analysis::VehicleOilCollector;
 use crate::game::services;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
@@ -154,7 +153,6 @@ pub(crate) fn run_tick(
     pending: Vec<crate::game::commands::PendingCommand>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
-    vehicle_oil_collector: Option<&mut VehicleOilCollector>,
     mut perf: Option<&mut crate::perf::TickPerf>,
 ) -> SpatialIndex {
     let mut occupancy_cache = OccupancyPhaseCache::new(map);
@@ -233,14 +231,13 @@ pub(crate) fn run_tick(
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "movement", || {
-        services::movement::movement_system_with_events(
+        services::movement::movement_system_with_context(
             map,
             entities,
             players,
             &pre_command.occupancy,
             &pre_command.spatial,
             tick,
-            events,
             smokes,
             ability_runtime,
         );
@@ -397,11 +394,6 @@ pub(crate) fn run_tick(
         ability_runtime.tick_projectiles(map, entities, &teams, &post_movement.spatial, tick);
         ability_runtime.tick(entities, tick);
     });
-    // Observe at the last point before death cleanup. This retains vehicles killed on this tick
-    // while also including vehicles whose production completed after the movement phase.
-    if let Some(collector) = vehicle_oil_collector {
-        collector.observe(tick, entities);
-    }
     crate::perf::timed(perf.as_deref_mut(), "death", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         services::death::death_system(
@@ -564,7 +556,6 @@ mod tests {
             Vec::new(),
             &mut events,
             1,
-            None,
             None,
         );
 

@@ -90,13 +90,12 @@ test("animation sampler applies game-state bindings without Pixi", () => {
   };
   const context = createRigRenderContext(entity, {
     now: fixedNow,
-    state: { playerId: 1, resources: { oil: 0 }, weaponRecoil: () => 0.5 },
+    state: { playerId: 1, weaponRecoil: () => 0.5 },
     colorByOwner: new Map([[1, 0x336699]]),
     vehicleMotion: { activity: 0.75 },
   });
   const sampled = sampleRigAnimation(definition, entity, context);
   assert.equal(sampled.context.teamColor, 0x336699);
-  assert.equal(sampled.context.oilStarved, true);
   assert.equal(sampled.parts["part.hull"].transform.rotation, Math.PI / 2);
   assert.equal(sampled.parts["part.turret"].transform.rotation, Math.PI);
   assert.equal(sampled.parts["part.barrel"].transform.rotation, Math.PI);
@@ -567,7 +566,6 @@ test("live rig routes expose kind-specific production part groups", () => {
   assert.equal(tankRoutes[1].parts.includes("part.turret"), true);
   assert.equal(tankRoutes[1].parts.includes("part.barrel"), true);
   assert.equal(tankRoutes[1].parts.includes("part.coaxBarrel"), true);
-  assert.equal(tankRoutes[1].parts.includes("part.fuelCue.box"), true);
   assert.equal(tankRoutes.length, 3);
   assert.deepEqual(tankRoutes[2].parts, ["part.tank.flashCone", "part.tank.flashCore", "part.tank.flashGlow"]);
 });
@@ -655,10 +653,9 @@ test("default Tank draw uses its PNG atlas with native shadow and effect metadat
 
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
-  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.size, 1);
+  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.size, 0);
   assert.equal(renderer._liveRigPools.liveUnitRigEffects.size, 1);
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
-  const overlays = renderer._liveRigPools.liveUnitRigOverlays.get(entity.id);
   const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(unit.parts.get("sprite.hull").display.rotation, 0);
   assert.equal(unit.parts.get("sprite.turret").display.rotation, Math.PI / 2);
@@ -666,19 +663,18 @@ test("default Tank draw uses its PNG atlas with native shadow and effect metadat
   assert.equal(effects.parts.get("part.tank.flashCore").display.visible, true);
   assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
-  assert.equal(overlays.parts.get("part.fuelCue.box").display.visible, false);
 });
 
-test("tank PNG atlas route splits native shadow, fuel cue, and muzzle flash metadata", () => {
+test("tank PNG atlas route splits native shadow, unit, and muzzle flash metadata", () => {
   const definition = createLiveRigDefinitions().get(KIND.TANK);
   const [shadowRoute, unitRoute, effectRoute] = liveRigRoutesFor(KIND.TANK);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, shadowRoute), false);
-  assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, unitRoute), false);
+  assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, unitRoute), true);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, effectRoute), false);
   const unitCoverage = pngAtlasRouteCoverage(definition, TANK_PNG_RIG_ATLAS, unitRoute);
   assert.equal(unitCoverage.coveredParts.includes("part.hull"), true);
   assert.equal(unitCoverage.coveredParts.includes("part.turret"), true);
-  assert.deepEqual(unitCoverage.missingParts, ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"]);
+  assert.deepEqual(unitCoverage.missingParts, []);
   assert.equal(TANK_PNG_RIG_ATLAS.grid?.normalization?.worldScale, 1.2);
   for (const spriteId of ["sprite.hull", "sprite.turret", "sprite.barrel"]) {
     const sprite = TANK_PNG_RIG_ATLAS.sprites.find((candidate) => candidate.id === spriteId);
@@ -722,22 +718,17 @@ test("tank PNG atlas route splits native shadow, fuel cue, and muzzle flash meta
 
   const shadow = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
-  const overlay = renderer._liveRigPools.liveUnitRigOverlays.get(entity.id);
   const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
   assert.equal(contextCallCount, 1);
   assert.equal(typeof shadow.matches, "function");
   assert.deepEqual([...shadow.parts.keys()], ["part.shadow"]);
   assert.equal(shadow.parts.get("part.shadow").display.visible, true);
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
-  assert.equal(typeof overlay.matches, "function");
   assert.equal(typeof effects.matches, "function");
-  assert.deepEqual([...overlay.parts.keys()].sort(), ["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"]);
   assert.deepEqual([...effects.parts.keys()].sort(), ["part.tank.flashCone", "part.tank.flashCore", "part.tank.flashGlow"]);
   assert.equal(unit.parts.has("sprite.hull"), true);
   assert.equal(unit.parts.has("sprite.turret"), true);
   assert.equal(unit.parts.has("sprite.barrel"), true);
-  assert.equal(unit.parts.has("sprite.fuelCue"), false);
-  assert.equal(overlay.parts.get("part.fuelCue.box").display.visible, false);
   assert.equal(effects.parts.get("part.tank.flashCore").display.alpha, 0);
   assert.equal(unit.parts.get("sprite.turret").display.rotation, Math.PI / 2);
   assert.equal(unit.parts.get("sprite.barrel").display.rotation, Math.PI / 2);
@@ -1293,7 +1284,7 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   );
 });
 
-test("tank PNG atlas native overlays are destroyed when the same id becomes an SVG-only unit", () => {
+test("tank PNG atlas native effects are destroyed when the same id becomes an SVG-only unit", () => {
   const tankDefinition = createLiveRigDefinitions().get(KIND.TANK);
   const workerDefinition = compileFixture("rig-worker.svg", KIND.WORKER);
   const entity = {
@@ -1316,9 +1307,8 @@ test("tank PNG atlas native overlays are destroyed when the same id becomes an S
 
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
 
-  const overlay = renderer._liveRigPools.liveUnitRigOverlays.get(entity.id);
   const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
-  assert.equal(typeof overlay.matches, "function");
+  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.has(entity.id), false);
   assert.equal(typeof effects.matches, "function");
 
   renderer._drawUnit({
@@ -1328,7 +1318,6 @@ test("tank PNG atlas native overlays are destroyed when the same id becomes an S
   }, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
 
   const workerRig = renderer._liveRigPools.liveUnitRigs.get(entity.id);
-  assert.equal(overlay._destroyed, true);
   assert.equal(effects._destroyed, true);
   assert.equal(renderer._liveRigPools.liveUnitRigOverlays.has(entity.id), false);
   assert.equal(renderer._liveRigPools.liveUnitRigEffects.has(entity.id), false);

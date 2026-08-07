@@ -1,5 +1,5 @@
 {
-  "reason": "add authoritative artillery attack-move targeting and shared shell firing service",
+  "reason": "movement no longer mutates player economy after vehicle oil burn removal",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -2068,13 +2068,13 @@
     },
     {
       "path": "services/movement/mod.rs",
-      "line": 61,
-      "code": "players: &mut [PlayerState],"
+      "line": 58,
+      "code": "players: &[PlayerState],"
     },
     {
       "path": "services/movement/mod.rs",
-      "line": 87,
-      "code": "players: &mut [PlayerState],"
+      "line": 82,
+      "code": "players: &[PlayerState],"
     },
     {
       "path": "services/movement/pivot_drive.rs",
@@ -2093,8 +2093,8 @@
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 53,
-      "code": "players: &mut [PlayerState],"
+      "line": 50,
+      "code": "players: &[PlayerState],"
     },
     {
       "path": "services/order_queue.rs",

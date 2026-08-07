@@ -61,10 +61,7 @@
     "part.noseTick",
     "part.tank.flashCone",
     "part.tank.flashCore",
-    "part.tank.flashGlow",
-    "part.fuelCue.box",
-    "part.fuelCue.x1",
-    "part.fuelCue.x2"
+    "part.tank.flashGlow"
   ],
   "frameSources": {
     "part.track.left": "sprite.track",
