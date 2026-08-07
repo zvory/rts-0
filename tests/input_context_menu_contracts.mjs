@@ -44,7 +44,7 @@ function inputHarness() {
   const rightClicks = [];
   const input = Object.create(Input.prototype);
   input.pointerLocked = false;
-  input._suppressNextContextMenuUntil = 0;
+  input._suppressNextContextMenu = false;
   input._eventScreenPos = () => ({ x: 100, y: 120 });
   input._trackMouse = () => {};
   input._routeLockedPointerDown = () => false;
@@ -74,12 +74,33 @@ function inputHarness() {
   assert(menu.stopped, "follow-up contextmenu stops propagation");
   assert(rightClicks.length === 1, "follow-up contextmenu does not duplicate the order");
 
-  input._suppressNextContextMenuUntil = 0;
+  input._suppressNextContextMenu = false;
   const plainMenu = mouseEvent({ button: 2, shiftKey: false });
   input._handleContextMenu(plainMenu);
   assert(rightClicks.length === 2, "later contextmenu still issues a normal right-click order");
   assert(rightClicks[1].shiftKey === false, "later contextmenu does not inherit stale Shift state");
 }
+
+withNavigator({ platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }, () => {
+  const { input, rightClicks } = inputHarness();
+  const issued = [];
+  input._beginFormationGesture = () => {
+    input._formationGesture = { promoted: true };
+  };
+  input._finishFormationGesture = () => {
+    input._formationGesture = null;
+    issued.push("formationMove");
+    return true;
+  };
+
+  input._handleMouseDown(mouseEvent({ button: 2 }));
+  input._handleMouseUp(mouseEvent({ button: 2 }));
+  assert(issued.join(",") === "formationMove", "Windows right-drag release issues the formation once");
+
+  // WebView2 can deliver this after a drag longer than the old 500 ms suppression deadline.
+  input._handleContextMenu(mouseEvent({ button: 2 }));
+  assert(rightClicks.length === 0, "delayed Windows contextmenu does not overwrite the formation with a point move");
+});
 
 withNavigator({ platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)" }, () => {
   const { input, rightClicks } = inputHarness();
