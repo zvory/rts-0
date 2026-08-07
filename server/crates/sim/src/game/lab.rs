@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
+use super::{systems, Game, MapMetadata, PlayerInit};
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
 use crate::game::map::{Map, CURRENT_MAP_VERSION};
@@ -12,7 +13,6 @@ use crate::game::services::{production, standability};
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol::{terrain, Command, LabMapDraft};
 use crate::rules;
-use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod checkpoint_scenario;
 mod map_draft;

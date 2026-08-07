@@ -1,4 +1,5 @@
 use super::super::{Map, CURRENT_MAP_VERSION};
+use crate::protocol::MapSun;
 
 #[test]
 fn authored_relief_requires_valid_sun_and_round_trips_it() {
@@ -45,4 +46,34 @@ fn authored_relief_requires_valid_sun_and_round_trips_it() {
     let error = Map::from_authored_json(1, &authored.to_string(), 0)
         .expect_err("flat elevation with sun must be rejected");
     assert!(error.contains("require varying elevation"));
+}
+
+#[test]
+fn materialized_hash_preserves_flat_legacy_identity_and_tracks_relief() {
+    let legacy = Map {
+        width: 2,
+        height: 2,
+        terrain: vec![0; 4],
+        ..Default::default()
+    };
+    let mut normalized_flat = legacy.clone();
+    normalized_flat.elevation = vec![0; 4];
+    assert_eq!(
+        legacy.materialized_hash(),
+        normalized_flat.materialized_hash(),
+        "normalizing an omitted legacy elevation layer must not invalidate its checkpoint hash"
+    );
+
+    let mut relief = normalized_flat;
+    relief.elevation[3] = 1;
+    relief.sun = Some(MapSun {
+        azimuth_degrees: 315,
+        elevation_degrees: 12,
+        warmth: 75,
+    });
+    assert_ne!(
+        legacy.materialized_hash(),
+        relief.materialized_hash(),
+        "authored relief and lighting must participate in map identity"
+    );
 }

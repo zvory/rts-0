@@ -221,10 +221,13 @@ impl Map {
         hash = fnv_bytes(hash, &self.width.to_le_bytes());
         hash = fnv_bytes(hash, &self.height.to_le_bytes());
         hash = fnv_bytes(hash, &self.terrain);
-        hash = fnv_bytes(hash, b"elevation");
-        hash = fnv_bytes(hash, &self.elevation);
-        hash = fnv_bytes(hash, b"sun");
+        // Preserve the identity of pre-elevation flat-map checkpoints. Their missing elevation
+        // field is restored as zeroes, and no presentation semantics changed. Authored relief is
+        // always paired with sun conditions and remains identity-bearing.
         if let Some(sun) = self.sun {
+            hash = fnv_bytes(hash, b"elevation");
+            hash = fnv_bytes(hash, &self.elevation);
+            hash = fnv_bytes(hash, b"sun");
             hash = fnv_bytes(hash, &sun.azimuth_degrees.to_le_bytes());
             hash = fnv_bytes(hash, &[sun.elevation_degrees, sun.warmth]);
         }
