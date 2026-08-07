@@ -116,9 +116,15 @@ const PLAYER_STREAM_SAMPLE = Object.freeze({
       ) &&
       checkedArtifact.header.start?.map?.width === 126 &&
       checkedArtifact.header.start?.map?.height === 126 &&
+      checkedArtifact.header.start?.map?.sun?.azimuthDegrees === 330 &&
+      checkedArtifact.header.start?.map?.sun?.elevationDegrees === 12 &&
+      checkedArtifact.header.start?.map?.sun?.warmth === 78 &&
+      checkedArtifact.header.start?.map?.elevation?.length === 126 * 126 &&
+      Math.max(...checkedArtifact.header.start.map.elevation) === 5 &&
+      checkedArtifact.header.start.map.elevation.filter((level) => level > 0).length === 3_740 &&
       checkedArtifact.header.start.map.terrain.filter((tile) => tile === 1).length === 470 &&
       checkedArtifact.header.start?.snapshotStream?.sourceScenario === "fixed-roster-hellhole",
-    "checked-in Hellhole snapshot stream matches the canonical Player 1 2v2 projection",
+    "checked-in Hellhole snapshot stream matches the canonical sunset Player 1 2v2 projection",
   );
 
   const diagnostics = [];

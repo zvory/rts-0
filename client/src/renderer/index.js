@@ -113,6 +113,7 @@ import {
   _sweepTankMotion,
   _tankMotionVisual,
 } from "./units.js";
+import { ProjectedUnitShadowLayer } from "./projected_unit_shadows.js";
 
 const RENDER_ERROR_LOG_INTERVAL_MS = 5000;
 const MISSING_TEXTURE_SIZE_PX = 26;
@@ -204,6 +205,11 @@ export class Renderer {
     this._trenchDecals = new TrenchDecalLayer({
       layer: this.layers.trenches,
       pixi: PIXI,
+      recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
+    });
+    this._projectedUnitShadows = new ProjectedUnitShadowLayer({
+      pixi: PIXI,
+      layer: this.layers.decals,
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
     });
     this._visualSamples = new VisualSampleLayer({
@@ -646,6 +652,12 @@ export class Renderer {
     time("renderer.trenchOccupants", () => {
       this._drawSafely("trenchOccupants", () => this._drawOccupiedTrenches(regularEntities, state));
     });
+    time("renderer.projectedUnitShadows", () => {
+      this._drawSafely(
+        "projectedUnitShadows",
+        () => this._projectedUnitShadows?.update(regularEntities),
+      );
+    });
 
     // Nodes currently being mined: any worker latched to them. Used by
     // _drawResource to overlay an X marker.
@@ -683,6 +695,7 @@ export class Renderer {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
               visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
+              projectedShadow: this._projectedUnitShadows?.enabled,
               rememberRenderContext: true,
             });
           });
@@ -1265,6 +1278,8 @@ export class Renderer {
     this._trenchDecals = null;
     this._visualSamples?.destroy();
     this._visualSamples = null;
+    this._projectedUnitShadows?.destroy();
+    this._projectedUnitShadows = null;
     this._doodads?.destroy();
     this._doodads = null;
 
@@ -1297,6 +1312,7 @@ function destroyRendererOwnedTexture(texture) {
 
 function buildStaticMapWithDoodads(map) {
   buildStaticTerrainMap.call(this, map);
+  this._projectedUnitShadows?.setMap(this._map);
   this._doodads?.replace(map?.doodads || []);
 }
 

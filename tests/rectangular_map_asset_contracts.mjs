@@ -21,6 +21,12 @@ const u32le = (value) => {
   return buffer;
 };
 
+const u16le = (value) => {
+  const buffer = Buffer.alloc(2);
+  buffer.writeUInt16LE(value);
+  return buffer;
+};
+
 const usizeLe = (value) => {
   const buffer = Buffer.alloc(8);
   buffer.writeBigUInt64LE(BigInt(value));
@@ -31,6 +37,13 @@ const materializedHash = (data) => fnv1a64([
   u32le(data.width),
   u32le(data.height),
   Buffer.from(data.terrain),
+  ...(data.sun ? [
+    Buffer.from("elevation"),
+    Buffer.from(data.elevation),
+    Buffer.from("sun"),
+    u16le(data.sun.azimuthDegrees),
+    Buffer.from([data.sun.elevationDegrees, data.sun.warmth]),
+  ] : []),
   usizeLe(data.starts.length),
   ...data.starts.flatMap(({ x, y }) => [u32le(x), u32le(y)]),
   usizeLe(data.baseSites.length),
@@ -97,7 +110,7 @@ for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMa
 const bundledScenarioContracts = new Map([
   ["lategame.json", [9, "62f5e3ae24627171", "7918f89f6178e9c9"]],
   ["render-preview.json", [7, "9e6169128d81ed61", "f82d4bf8967c50c9"]],
-  ["fixed-roster-hellhole.json", [7, "4638fcdac85871c7", "b8b0dd056c34c92d"]],
+  ["fixed-roster-hellhole.json", [10, "37a3b26a9765b6f6", "dcca1927f8cc94ad"]],
   ["tank-trap-cluster-clear.json", [7, "9e6169128d81ed61", "7918f89f6178e9c9"]],
 ]);
 

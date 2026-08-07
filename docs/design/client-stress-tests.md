@@ -14,6 +14,10 @@ The roster is an authored mix—1 Worker, 1 Golem, 8 Riflemen, 8 Machine Gunners
 8 Anti-Tank Guns, 8 Mortar Teams, 1 Artillery, 9 Scout Cars, 16 Tanks, and 9 Command Cars per
 player. Supply costs are not an input to composition, so balance changes cannot silently alter the
 unit count or ratio used for performance comparisons.
+The static benchmark map carries two long parallel five-level ridges and a northwesterly sunset sun
+at 12 degrees above the horizon. This intentionally keeps terrain relief, long terrain shadows, and
+the active GPU unit-shadow path inside the canonical renderer workload rather than measuring the
+flat-map bypass.
 `?label=<text>` adds a bounded human label to every artifact. `?seconds=<2..25>` exists for local
 iteration; the shareable default is five seconds after a three-second warmup. The cap keeps the
 measurement inside the finite 30-second recording.

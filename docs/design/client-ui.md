@@ -2323,6 +2323,12 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   remain visible across camera scales and display resolutions; every seventh existing divider uses
   a heavier 1.5-world-pixel mark to identify approximately 105 HP without adding another mark.
   Construction and deconstruction keep their existing status colors on the shared bar layer.
+  On maps with authored elevation and sun, Rifleman, Machine Gunner, Scout Car, and Tank replace
+  their native rig shadows with one instanced GPU shadow layer. Coarse presentation-only box
+  volumes rotate with each unit and project along the authored sun vector; the fragment shader
+  samples the static elevation texture so the cast footprint terminates against raised receivers.
+  Rifleman, Machine Gunner, and Scout Car share a 22-pixel proxy height, while Tank is 33 pixels.
+  Flat maps retain their native unit shadows and allocate no active projected-shadow draw.
   Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values
