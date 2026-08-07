@@ -1391,6 +1391,25 @@ withFakeHudDocument(({ FakeElement }) => {
   });
 
   withFakeDocument(() => {
+    let unavailable = false;
+    let autoBuild = false;
+    const button = HUD.prototype._cmdButton({
+      icon: "TK",
+      label: "Tank",
+      enabled: false,
+      title: "Requires Tank Production",
+      onUnavailable: () => { unavailable = true; },
+      onContextMenu: () => { autoBuild = true; },
+    });
+    assert(!button.disabled, "research-locked production stays interactive for auto-build");
+    assert(button.className.includes("primary-disabled"), "research-locked production marks only its primary action disabled");
+    button.listeners.click({ preventDefault() {}, altKey: false });
+    assert(unavailable, "research-locked primary click should dispatch unavailable feedback");
+    button.listeners.contextmenu({ preventDefault() {} });
+    assert(autoBuild, "research-locked production should retain its auto-build action");
+  });
+
+  withFakeDocument(() => {
     const button = HUD.prototype._cmdButton({
       icon: "SMK",
       label: "Smoke",
