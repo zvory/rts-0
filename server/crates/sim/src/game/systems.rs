@@ -37,6 +37,7 @@ use crate::game::ground_decal::GroundDecalStore;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::panzerfaust_shot::PanzerfaustShotStore;
+use crate::game::replay_oil_analysis::VehicleOilCollector;
 use crate::game::services;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
@@ -153,6 +154,7 @@ pub(crate) fn run_tick(
     pending: Vec<crate::game::commands::PendingCommand>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
+    vehicle_oil_collector: Option<&mut VehicleOilCollector>,
     mut perf: Option<&mut crate::perf::TickPerf>,
 ) -> SpatialIndex {
     let mut occupancy_cache = OccupancyPhaseCache::new(map);
@@ -243,6 +245,9 @@ pub(crate) fn run_tick(
             ability_runtime,
         );
     });
+    if let Some(collector) = vehicle_oil_collector {
+        collector.observe(tick, entities);
+    }
     coordinator.begin_pathing_diagnostics("promote_queued_orders", entities);
     crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {
         services::order_queue::promote_ready_orders(
