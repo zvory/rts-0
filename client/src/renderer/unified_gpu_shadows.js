@@ -168,6 +168,11 @@ export class UnifiedGpuShadowLayer {
   update(entities) {
     this.projectedEntityIds.clear();
     if (!this.supported || !this.enabled || !this.map) return 0;
+    // The render-texture update and native-shadow suppression are one transaction. If the
+    // offscreen render fails, _drawSafely catches the error; keep this mesh hidden and leave the
+    // id set empty so the unit rigs fall back to their native shadows instead of combining them
+    // with stale GPU occluders from the previous frame.
+    this.mesh.visible = false;
     const shapes = [];
     for (const entity of entities || []) {
       const volumes = PROXIES[entity?.kind];
@@ -187,9 +192,9 @@ export class UnifiedGpuShadowLayer {
       )));
       graphics.poly(proxyPolygon(shape, OCCLUDER_TEXTURE_SCALE));
       graphics.fill({ color: (encoded << 16) | (encoded << 8) | encoded, alpha: 1 });
-      this.projectedEntityIds.add(shape.entityId);
     }
     this.renderer.render({ container: graphics, target: this.unitHeightTexture, clear: true, clearColor: [0, 0, 0, 0] });
+    for (const shape of shapes) this.projectedEntityIds.add(shape.entityId);
     this.mesh.visible = true;
     this.recordDiagnostic?.("renderer.unifiedGpuShadows.occluders", shapes.length);
     this.recordDiagnostic?.("renderer.unifiedGpuShadows.drawCalls", 2);
