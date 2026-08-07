@@ -10,7 +10,7 @@ const CASE_MINIMAL_NO_ENEMY: &str = "minimal_no_enemy";
 
 const REPLAY_SEED: u32 = 162_367_300;
 const REPLAY_PRE_COMMAND_TICK: u32 = 13_536;
-const REPLAY_NEXT_ENTITY_ID: u32 = 285;
+const REPLAY_NEXT_ENTITY_ID: u32 = 335;
 const GOAL: (f32, f32) = (1091.3671, 933.82385);
 const SOUPMAN: u32 = 15;
 const ALEX: u32 = 13;
