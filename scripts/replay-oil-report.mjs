@@ -85,8 +85,11 @@ function percentileSvg(summary) {
       if (value === null) return;
       const y = top + metricIndex * 14;
       const x = plotLeft + (value / globalMax) * plotWidth;
+      const labelOnLeft = x > plotLeft + plotWidth - 105;
+      const labelX = labelOnLeft ? x - 7 : x + 7;
+      const labelAnchor = labelOnLeft ? "end" : "start";
       lines.push(`<line x1="${plotLeft}" y1="${y}" x2="${x}" y2="${y}" stroke="${COLORS[row.unit_kind]}" stroke-width="3" opacity="0.75"/>`);
-      lines.push(`<circle cx="${x}" cy="${y}" r="4" fill="${COLORS[row.unit_kind]}"/><text x="${x + 7}" y="${y + 4}" font-family="system-ui" font-size="11">${metric.toUpperCase()} ${fmt(value)}</text>`);
+      lines.push(`<circle cx="${x}" cy="${y}" r="4" fill="${COLORS[row.unit_kind]}"/><text x="${labelX}" y="${y + 4}" text-anchor="${labelAnchor}" font-family="system-ui" font-size="11">${metric.toUpperCase()} ${fmt(value)}</text>`);
     });
   });
   lines.push(`<text x="535" y="492" text-anchor="middle" font-family="system-ui" font-size="13" fill="#555">modeled fractional oil</text></svg>`);

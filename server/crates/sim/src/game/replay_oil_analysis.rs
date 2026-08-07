@@ -37,17 +37,20 @@ impl VehicleOilCollector {
                 .as_ref()
                 .map(|movement| movement.lifetime_oil_used)
                 .unwrap_or(0.0);
-            let record = self.records.entry(entity.id).or_insert(VehicleOilRecord {
-                entity_id: entity.id,
-                owner_id: entity.owner,
-                unit_kind: unit_kind.to_string(),
-                first_seen_tick: tick,
-                last_seen_tick: tick,
-                first_moved_tick: (oil > 0.0).then_some(tick),
-                last_moved_tick: (oil > 0.0).then_some(tick),
-                lifetime_oil_spend: oil,
-                survived_to_end: false,
-            });
+            let record = self
+                .records
+                .entry(entity.id)
+                .or_insert_with(|| VehicleOilRecord {
+                    entity_id: entity.id,
+                    owner_id: entity.owner,
+                    unit_kind: unit_kind.to_string(),
+                    first_seen_tick: tick,
+                    last_seen_tick: tick,
+                    first_moved_tick: (oil > 0.0).then_some(tick),
+                    last_moved_tick: (oil > 0.0).then_some(tick),
+                    lifetime_oil_spend: oil,
+                    survived_to_end: false,
+                });
             record.last_seen_tick = tick;
             if oil > record.lifetime_oil_spend {
                 if record.first_moved_tick.is_none() {
