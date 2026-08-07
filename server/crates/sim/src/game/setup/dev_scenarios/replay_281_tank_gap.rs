@@ -1,7 +1,7 @@
 use super::*;
 use crate::game::entity::Entity;
 use crate::game::state::TrackedRng;
-use crate::game::trench::TrenchStore;
+use crate::game::trench::{Trench, TrenchStore};
 
 const CASE_TICK_PERFECT: &str = "tick_perfect";
 const CASE_MINIMAL_ATTACK_MOVE: &str = "minimal_attack_move";
@@ -10,6 +10,7 @@ const CASE_MINIMAL_NO_ENEMY: &str = "minimal_no_enemy";
 
 const REPLAY_SEED: u32 = 162_367_300;
 const REPLAY_PRE_COMMAND_TICK: u32 = 13_536;
+const REPLAY_NEXT_ENTITY_ID: u32 = 285;
 const GOAL: (f32, f32) = (1091.3671, 933.82385);
 const SOUPMAN: u32 = 15;
 const ALEX: u32 = 13;
@@ -74,7 +75,7 @@ impl Game {
             REPLAY_SEED,
             "dev:replay_281_tank_gap",
         );
-        restore_replay_clock_and_trenches(&mut game)?;
+        restore_replay_clock_and_trenches(&mut game);
 
         let (units, order) = if scenario_case == CASE_TICK_PERFECT {
             (EXACT_COMMAND_UNITS.to_vec(), DevScenarioOrder::AttackMove)
@@ -102,27 +103,18 @@ impl Game {
 }
 
 fn replay_entities(keep: &[u32]) -> Result<EntityStore, String> {
-    let replay_entities: Vec<Entity> =
+    let mut replay_entities: Vec<Entity> =
         serde_json::from_str(include_str!("fixtures/replay_281_tick_13536_entities.json"))
             .map_err(|error| format!("invalid replay-281 entity fixture: {error}"))?;
-    let mut entities = EntityStore::new();
-    for id in 1..=REAR_TANK {
-        if let Some(entity) = replay_entities.iter().find(|entity| entity.id == id) {
-            let inserted = entities.insert(entity.clone());
-            debug_assert_eq!(inserted, id);
-        } else {
-            let placeholder = Entity::new_unit(SOUPMAN, EntityKind::Rifleman, 5000.0, 5000.0)
-                .ok_or_else(|| "failed to allocate replay-281 id placeholder".to_string())?;
-            let inserted = entities.insert(placeholder);
-            debug_assert_eq!(inserted, id);
-            let _ = entities.remove(inserted);
-        }
+    replay_entities.retain(|entity| keep.contains(&entity.id));
+    replay_entities.sort_by_key(|entity| entity.id);
+    if replay_entities
+        .windows(2)
+        .any(|pair| pair[0].id == pair[1].id)
+    {
+        return Err("replay-281 entity fixture contains duplicate ids".to_string());
     }
-    for id in EXACT_ACTORS {
-        if !keep.contains(&id) {
-            let _ = entities.remove(id);
-        }
-    }
+    let entities = EntityStore::from_checkpoint_entities(REPLAY_NEXT_ENTITY_ID, replay_entities);
     if let Some(missing) = keep.iter().find(|id| !entities.contains(**id)) {
         return Err(format!(
             "replay-281 entity fixture is missing required actor {missing}"
@@ -131,26 +123,34 @@ fn replay_entities(keep: &[u32]) -> Result<EntityStore, String> {
     Ok(entities)
 }
 
-fn restore_replay_clock_and_trenches(game: &mut Game) -> Result<(), String> {
+fn restore_replay_clock_and_trenches(game: &mut Game) {
     game.state.tick = REPLAY_PRE_COMMAND_TICK;
     game.state.rng = TrackedRng::seed_from_match_seed(REPLAY_SEED);
     game.state.ground_decals.begin_tick(REPLAY_PRE_COMMAND_TICK);
-    game.state.trenches = TrenchStore::new();
-    for id in 1..=38 {
-        let (x, y) = match id {
-            6 => (1232.0, 816.0),
-            8 => (1232.0, 848.0),
-            38 => (1232.0, 912.0),
-            _ => (16.0 + id as f32, 16.0),
-        };
-        let created = game
-            .state
-            .trenches
-            .create(&game.state.map, x, y)
-            .ok_or_else(|| format!("failed to restore replay-281 trench {id}"))?;
-        debug_assert_eq!(created, id);
-    }
-    Ok(())
+    let radius_tiles = config::ENTRENCHMENT_TRENCH_RADIUS_TILES;
+    game.state.trenches = TrenchStore::from_scenario_trenches(
+        39,
+        vec![
+            Trench {
+                id: 6,
+                x: 1232.0,
+                y: 816.0,
+                radius_tiles,
+            },
+            Trench {
+                id: 8,
+                x: 1232.0,
+                y: 848.0,
+                radius_tiles,
+            },
+            Trench {
+                id: 38,
+                x: 1232.0,
+                y: 912.0,
+                radius_tiles,
+            },
+        ],
+    );
 }
 
 #[cfg(test)]
@@ -181,6 +181,21 @@ mod tests {
     fn tick_perfect_case_matches_every_recorded_replay_tick() {
         let mut setup = scenario(CASE_TICK_PERFECT);
         assert_eq!(setup.game.tick_count(), REPLAY_PRE_COMMAND_TICK);
+        assert_eq!(
+            setup.game.state.entities.next_id_for_test(),
+            REPLAY_NEXT_ENTITY_ID
+        );
+        assert_eq!(
+            setup
+                .game
+                .state
+                .trenches
+                .all()
+                .iter()
+                .map(|trench| trench.id)
+                .collect::<Vec<_>>(),
+            vec![6, 8, 38]
+        );
         setup.game.enqueue(setup.player_id, setup.command());
         let golden: Vec<GoldenTick> =
             serde_json::from_str(include_str!("fixtures/replay_281_ticks_13537_13620.json"))
