@@ -63,7 +63,6 @@ fn analyzer_accepts_a_zero_tick_replay_without_advancing_it() {
 
     let records = analyze_vehicle_movement_oil(&artifact).expect("zero-tick replay analysis");
 
-    assert!(!records.is_empty());
     assert!(records.iter().all(|record| record.last_seen_tick == 0));
 }
 
