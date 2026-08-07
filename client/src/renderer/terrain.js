@@ -13,8 +13,10 @@ import {
 
 const TERRAIN_TEXTURE_DOWNSAMPLE = 4;
 const GROUND_TRANSITION_DEPTH = 0.56;
-const HEIGHT_LIGHT_X = -0.58;
-const HEIGHT_LIGHT_Y = -0.58;
+const RELIEF_LIGHT_X = -0.46;
+const RELIEF_LIGHT_Y = -0.46;
+const RELIEF_LIGHT_Z = 0.76;
+const RELIEF_SLOPE_SCALE = 0.72;
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
@@ -67,66 +69,113 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   // Markings belong to the road surface and must remain legible above edge dither.
   drawRoadMarking(ctx, code, x, y, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
-  drawElevationRelief(ctx, map, tx, ty, textureTileSize);
 }
 
-function elevationAt(map, tx, ty, fallback = 0) {
-  if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return fallback;
-  return Number(map.elevation?.[ty * map.width + tx]) || 0;
+function elevationAt(map, tx, ty) {
+  const x = Math.max(0, Math.min(map.width - 1, tx));
+  const y = Math.max(0, Math.min(map.height - 1, ty));
+  return Number(map.elevation?.[y * map.width + x]) || 0;
 }
 
 /**
- * Paint cartographic relief without moving the ground plane. A fixed upper-left light makes
- * opposing slopes read consistently, while level tint and high/low lips disambiguate ridges from
- * valleys even when the viewer perceptually inverts the shading.
+ * Soften tile elevations into one continuous C2 surface, then light that surface in-place. Cubic
+ * B-spline sampling avoids visible level bands and never moves the ground plane or its hit targets.
  */
-function drawElevationRelief(ctx, map, tx, ty, size) {
-  const x = tx * size;
-  const y = ty * size;
-  const level = elevationAt(map, tx, ty);
-  const west = elevationAt(map, tx - 1, ty, level);
-  const east = elevationAt(map, tx + 1, ty, level);
-  const north = elevationAt(map, tx, ty - 1, level);
-  const south = elevationAt(map, tx, ty + 1, level);
-  const gradientX = (east - west) * 0.5;
-  const gradientY = (south - north) * 0.5;
-  const light = Math.max(-1, Math.min(1, gradientX * HEIGHT_LIGHT_X + gradientY * HEIGHT_LIGHT_Y));
-
-  // Absolute level remains visible on plateaus where directional hillshade is necessarily flat.
-  if (level > 0) {
-    const tintAlpha = Math.min(0.16, level * 0.035);
-    ctx.fillStyle = colorCss(0xe7cf8b, tintAlpha);
-    ctx.fillRect(x, y, size, size);
+function drawElevationRelief(ctx, map, tilePixels) {
+  const levels = map.elevation || [];
+  let minHeight = Infinity;
+  let maxHeight = -Infinity;
+  for (const raw of levels) {
+    const height = Number(raw) || 0;
+    minHeight = Math.min(minHeight, height);
+    maxHeight = Math.max(maxHeight, height);
   }
-  if (Math.abs(light) > 0.01) {
-    ctx.fillStyle = colorCss(light > 0 ? 0xfff4cb : 0x182129, Math.min(0.25, 0.08 + Math.abs(light) * 0.1));
-    ctx.fillRect(x, y, size, size);
-  }
+  if (!Number.isFinite(minHeight) || maxHeight <= minHeight) return;
 
-  const edge = Math.max(1, Math.floor(size * 0.18));
-  drawElevationEdge(ctx, "north", x, y, size, edge, level, north);
-  drawElevationEdge(ctx, "south", x, y, size, edge, level, south);
-  drawElevationEdge(ctx, "west", x, y, size, edge, level, west);
-  drawElevationEdge(ctx, "east", x, y, size, edge, level, east);
+  const width = map.width * tilePixels;
+  const height = map.height * tilePixels;
+  const image = ctx.getImageData(0, 0, width, height);
+  const pixels = image.data;
+  const heightRange = Math.max(1, maxHeight - minHeight);
+
+  for (let py = 0; py < height; py += 1) {
+    const sampleY = (py + 0.5) / tilePixels - 0.5;
+    for (let px = 0; px < width; px += 1) {
+      const sampleX = (px + 0.5) / tilePixels - 0.5;
+      const surface = sampleElevationSurface(map, sampleX, sampleY);
+      const normalX = -surface.dx * RELIEF_SLOPE_SCALE;
+      const normalY = -surface.dy * RELIEF_SLOPE_SCALE;
+      const inverseLength = 1 / Math.hypot(normalX, normalY, 1);
+      const light = (
+        normalX * RELIEF_LIGHT_X
+        + normalY * RELIEF_LIGHT_Y
+        + RELIEF_LIGHT_Z
+      ) * inverseLength;
+      const directional = clamp((light - RELIEF_LIGHT_Z) * 0.72, -0.14, 0.14);
+      const altitude = clamp((surface.height - minHeight) / heightRange, 0, 1);
+      // Convex crests receive a whisper of ambient lift; concave basins retain a cool shadow.
+      const ambientShape = clamp(-surface.laplacian * 0.018, -0.045, 0.035);
+      const brightness = 1 + directional + ambientShape + (altitude - 0.5) * 0.025;
+      const tint = altitude * 0.045;
+      const cool = (1 - altitude) * 0.012;
+      const index = (py * width + px) * 4;
+      pixels[index] = clampByte(pixels[index] * brightness * (1 - tint - cool) + 232 * tint + 54 * cool);
+      pixels[index + 1] = clampByte(pixels[index + 1] * brightness * (1 - tint - cool) + 211 * tint + 75 * cool);
+      pixels[index + 2] = clampByte(pixels[index + 2] * brightness * (1 - tint - cool) + 159 * tint + 84 * cool);
+    }
+  }
+  ctx.putImageData(image, 0, 0);
 }
 
-function drawElevationEdge(ctx, direction, x, y, size, edge, level, neighbor) {
-  if (level === neighbor) return;
-  const highSide = level > neighbor;
-  const difference = Math.min(4, Math.abs(level - neighbor));
-  ctx.fillStyle = colorCss(highSide ? 0xf5df9f : 0x1b2020, Math.min(0.82, 0.4 + difference * 0.1));
-  if (direction === "north") ctx.fillRect(x, y, size, edge);
-  else if (direction === "south") ctx.fillRect(x, y + size - edge, size, edge);
-  else if (direction === "west") ctx.fillRect(x, y, edge, size);
-  else ctx.fillRect(x + size - edge, y, edge, size);
+function sampleElevationSurface(map, x, y) {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const xBasis = cubicBasis(x - ix);
+  const yBasis = cubicBasis(y - iy);
+  let height = 0;
+  let dx = 0;
+  let dy = 0;
+  let dxx = 0;
+  let dyy = 0;
+  for (let oy = 0; oy < 4; oy += 1) {
+    for (let ox = 0; ox < 4; ox += 1) {
+      const elevation = elevationAt(map, ix + ox - 1, iy + oy - 1);
+      height += elevation * xBasis.weight[ox] * yBasis.weight[oy];
+      dx += elevation * xBasis.derivative[ox] * yBasis.weight[oy];
+      dy += elevation * xBasis.weight[ox] * yBasis.derivative[oy];
+      dxx += elevation * xBasis.second[ox] * yBasis.weight[oy];
+      dyy += elevation * xBasis.weight[ox] * yBasis.second[oy];
+    }
+  }
+  return { height, dx, dy, laplacian: dxx + dyy };
+}
 
-  // A hairline on the high tile is the explicit contour; the broader dark low-side strip is the lip.
-  if (!highSide) return;
-  ctx.fillStyle = colorCss(0xffefbd, 0.88);
-  if (direction === "north") ctx.fillRect(x, y, size, 1);
-  else if (direction === "south") ctx.fillRect(x, y + size - 1, size, 1);
-  else if (direction === "west") ctx.fillRect(x, y, 1, size);
-  else ctx.fillRect(x + size - 1, y, 1, size);
+function cubicBasis(t) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return {
+    weight: [
+      (1 - 3 * t + 3 * t2 - t3) / 6,
+      (4 - 6 * t2 + 3 * t3) / 6,
+      (1 + 3 * t + 3 * t2 - 3 * t3) / 6,
+      t3 / 6,
+    ],
+    derivative: [
+      (-3 + 6 * t - 3 * t2) / 6,
+      (-12 * t + 9 * t2) / 6,
+      (3 + 6 * t - 9 * t2) / 6,
+      t2 / 2,
+    ],
+    second: [1 - t, -2 + 3 * t, 1 - 3 * t, t],
+  };
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function clampByte(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
 }
 
 function drawTerrainVariantDetails(ctx, variant, tx, ty, x, y, size) {
@@ -298,6 +347,7 @@ export function buildStaticMap(map, {
       drawTerrainTile(ctx, this._map, tx, ty, textureTileSize);
     }
   }
+  drawElevationRelief(ctx, this._map, textureTileSize);
 
   const layer = this.layers.terrain;
   if (reusable) {
@@ -343,9 +393,18 @@ export function updateStaticTerrainTiles(changes) {
     dirty.add(`${x},${y - 1}`);
     dirty.add(`${x},${y + 1}`);
   }
-  for (const key of dirty) {
-    const [x, y] = key.split(",").map(Number);
-    drawTerrainTile(ctx, map, x, y, textureTileSize);
+  const hasRelief = map.elevation.some((height) => height !== 0);
+  if (hasRelief && dirty.size) {
+    // This path is editor-only in practice; repainting avoids stacking the alpha-free relief pass.
+    for (let y = 0; y < map.height; y += 1) {
+      for (let x = 0; x < map.width; x += 1) drawTerrainTile(ctx, map, x, y, textureTileSize);
+    }
+    drawElevationRelief(ctx, map, textureTileSize);
+  } else {
+    for (const key of dirty) {
+      const [x, y] = key.split(",").map(Number);
+      drawTerrainTile(ctx, map, x, y, textureTileSize);
+    }
   }
   if (dirty.size) this._terrainSprite.texture.source.update();
   return dirty.size;
