@@ -54,13 +54,13 @@ assert.equal(session.draft.sun.azimuthDegrees, 315, "sun settings participate in
 
 let builtMap = null;
 const worker = { terrainRevision: 0, renderer: {
-  buildStaticMap(map) { builtMap = map; },
+  previewStaticTerrain(map) { builtMap = map; },
   updateStaticTerrainTiles() {},
 } };
 MapEditorWorkerRenderer.prototype._applyTerrain.call(worker, viewport.pendingTerrainUpdate);
 assert.deepEqual(builtMap.sun, { azimuthDegrees: 90, elevationDegrees: 8, warmth: 95 });
 assert.deepEqual(builtMap.elevation, elevation,
-  "worker forwards live sun and elevation to the shared terrain renderer");
+  "worker forwards live sun and elevation through the layer-preserving terrain preview path");
 
 assert.throws(() => createMapEditorPresentation({
   frameId: 2,

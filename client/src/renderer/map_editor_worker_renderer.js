@@ -57,7 +57,7 @@ export class MapEditorWorkerRenderer {
   _applyTerrain(update) {
     if (!update || update.revision <= this.terrainRevision) return;
     if (update.kind === "replace") {
-      this.renderer.buildStaticMap({
+      this.renderer.previewStaticTerrain({
         width: update.width,
         height: update.height,
         tileSize: update.tileSize,
