@@ -47,7 +47,7 @@ fn panzerfaust_movement_locked(e: &Entity) -> bool {
 pub(super) fn advance_moving_units(
     map: &Map,
     entities: &mut EntityStore,
-    players: &mut [PlayerState],
+    players: &[PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,

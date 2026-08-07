@@ -55,7 +55,7 @@ use vehicle_profiles::TANK_BODY_TURN_RATE_RAD_PER_TICK;
 pub(crate) fn movement_system(
     map: &Map,
     entities: &mut EntityStore,
-    players: &mut [PlayerState],
+    players: &[PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
@@ -79,7 +79,7 @@ pub(crate) fn movement_system(
 pub(crate) fn movement_system_with_context(
     map: &Map,
     entities: &mut EntityStore,
-    players: &mut [PlayerState],
+    players: &[PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
