@@ -194,6 +194,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       submission,
     });
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
+    time("match.tabMenu", () => match.tabMenu?.update(frameViews));
     time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
     time("match.observerAnalysis", () => match.observerDiagnostics?.update(frameViews, { profiler: match.frameProfiler }));
     if (!capture) time("match.healthPublish", () => match.health.publish());

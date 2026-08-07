@@ -1284,7 +1284,15 @@ inside the settings mount point are `#pointer-lock-toggle`, `#unit-range-toggle`
 `#live-pause-open`; they may not exist until their owning
 tab/action is visible. Live controllable matches mount a separate `#tab-menu-button` hamburger and
 `#tab-menu` Auto-Build panel under `#game-screen`; the hamburger never replaces, moves, or aliases
-the Settings gear. `Match` owns `LivePauseOverlay` under `#game-screen` for reliable
+the Settings gear. The compact panel opens immediately to the hamburger's right, supports both a
+click/tap toggle and the existing hold-Tab interaction, and reserves Space for its global pause
+toggle. Below the resource floors it renders the local faction's production-building trainables on
+one `QWE / ASD / ZXC` grid (Barracks, Gunworks, then Vehicle Works for Kriegsia). An unmodified tile click or hotkey adds one standing
+repeat allocation across every owned compatible producer; Shift-click or Shift+hotkey removes one.
+Each tile uses the normal authoritative active/compatible producer count and Auto-Build swirl.
+Classic bindings are used only when all combined-grid unit bindings are present and distinct;
+otherwise the whole panel falls back to the deterministic grid. `Match` owns `LivePauseOverlay`
+under `#game-screen` for reliable
 `livePauseState` messages; the overlay resolves `pausedBy` through the match roster, exposes direct
 Game-settings and Hotkeys-tab actions, and raises only `#game-menu` above its screen blocker while
 paused. Resume remains visible only when the server grants `canUnpause`, and the overlay is

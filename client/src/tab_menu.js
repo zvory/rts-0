@@ -1,11 +1,18 @@
 import { createCommandButton } from "./hud_command_dom.js";
-import { cmd } from "./protocol.js";
+import { factionCommandId, GRID_HOTKEYS } from "./hud_command_card.js";
+import { factionCatalog, STATS } from "./config.js";
+import { cmd, KIND, isBuilding } from "./protocol.js";
 import { resourceIconHtml } from "./resource_icons.js";
 
 const DEFAULT_RESERVATIONS = Object.freeze({ steel: 0, oil: 0 });
 const RESERVATION_STEP = 100;
 const RESERVATION_MAX = 9_950;
 const POINTER_HOLD_DELAY_MS = 200;
+const PRODUCTION_BUILDING_PRIORITY = Object.freeze([
+  KIND.BARRACKS,
+  KIND.STEELWORKS,
+  KIND.FACTORY,
+]);
 
 /**
  * Hold-Tab controls for the player's authoritative automatic-production settings.
@@ -17,6 +24,7 @@ export class TabMenu {
     hotkeyProfiles = null,
     state = null,
     commandInteraction = null,
+    unitIconMarkupForKind = null,
     enabled = () => true,
     onOpenChange = null,
     windowLike = globalThis.window,
@@ -26,6 +34,7 @@ export class TabMenu {
     this.hotkeyProfiles = hotkeyProfiles;
     this.state = state;
     this.commandInteraction = commandInteraction;
+    this.unitIconMarkupForKind = unitIconMarkupForKind;
     this.enabled = enabled;
     this.onOpenChange = onOpenChange;
     this.windowLike = windowLike;
@@ -39,13 +48,14 @@ export class TabMenu {
     this.pointerId = null;
     this.pointerHoldOpened = false;
     this.suppressNextButtonClick = false;
+    this.renderSignature = "";
 
     this.button = document.createElement("button");
     this.button.id = "tab-menu-button";
     this.button.type = "button";
     this.button.className = "tab-menu-button";
-    this.button.setAttribute("aria-label", "Hold for Auto-Build menu");
-    this.button.setAttribute("title", "Hold Tab or press and hold for Auto-Build menu");
+    this.button.setAttribute("aria-label", "Open Auto-Build menu");
+    this.button.setAttribute("title", "Click to toggle or hold Tab for Auto-Build menu");
     this.button.setAttribute("aria-controls", "tab-menu");
     this.button.setAttribute("aria-expanded", "false");
     this.button.innerHTML =
@@ -71,10 +81,13 @@ export class TabMenu {
     this.onPointerUp = (event) => this.finishPointerHold(event);
     this.onPointerCancel = (event) => this.cancelPointerHold(event);
     this.onButtonClickCapture = (event) => {
-      if (!this.suppressNextButtonClick) return;
-      this.suppressNextButtonClick = false;
       event.preventDefault();
-      event.stopImmediatePropagation();
+      if (this.suppressNextButtonClick) {
+        this.suppressNextButtonClick = false;
+        event.stopImmediatePropagation();
+        return;
+      }
+      this.toggle("button");
     };
 
     this.windowLike?.addEventListener("keydown", this.onKeyDown, true);
@@ -95,7 +108,7 @@ export class TabMenu {
       paused: this.paused,
       status: this.paused ? "Paused" : "Working",
       reservations: { ...this.reservations },
-      pauseHotkey: profile?.mode === "direct" ? "A" : "Q",
+      pauseHotkey: "SPC",
       profileMode: profile?.mode === "direct" ? "classic" : "grid",
     };
   }
@@ -115,6 +128,11 @@ export class TabMenu {
     this.button?.classList.add("active");
     if (!wasOpen) this.onOpenChange?.(true);
     return this.status();
+  }
+
+  toggle(source) {
+    if (this.heldBy.has(source)) return this.release(source);
+    return this.hold(source);
   }
 
   release(source) {
@@ -184,6 +202,24 @@ export class TabMenu {
     return this.status();
   }
 
+  adjustProduction(unit, delta) {
+    const command = productionRepeatCommand(this.state, unit, delta);
+    if (!command) return this.status();
+    this.commandInteraction?.issueCommand?.(
+      command,
+      { predictMovement: false },
+    );
+    return this.status();
+  }
+
+  update(frameViews = null) {
+    if (!this.isOpen()) return;
+    this.syncFromState();
+    const entries = this.productionEntries(frameViews?.currentEntities);
+    const signature = this.currentRenderSignature(entries);
+    if (signature !== this.renderSignature) this.render(entries);
+  }
+
   commitSettings() {
     const issued = this.commandInteraction?.issueCommand?.(
       cmd.setAutoBuildSettings(
@@ -247,9 +283,7 @@ export class TabMenu {
     if (!this.isOpen() || event.metaKey || event.ctrlKey || event.altKey || isTextEntry(event.target)) {
       return;
     }
-    const profile = this.hotkeyProfiles?.getActiveProfile?.();
-    const pauseCode = profile?.mode === "direct" ? "KeyA" : "KeyQ";
-    if (event.code === pauseCode && !event.repeat) {
+    if (event.code === "Space" && !event.repeat) {
       consume(event);
       this.togglePause();
       return;
@@ -260,9 +294,15 @@ export class TabMenu {
       Digit3: ["oil", -1],
       Digit4: ["oil", 1],
     }[event.code];
-    if (!action) return;
+    if (action) {
+      consume(event);
+      this.adjustReservation(action[0], action[1]);
+      return;
+    }
+    const production = this.productionEntries().find((entry) => entry.hotkeyCode === event.code);
+    if (!production || event.repeat) return;
     consume(event);
-    this.adjustReservation(action[0], action[1]);
+    this.adjustProduction(production.unit, event.shiftKey ? -1 : 1);
   }
 
   handleKeyUp(event) {
@@ -272,7 +312,7 @@ export class TabMenu {
     consume(event);
   }
 
-  render() {
+  render(productionEntries = null) {
     const state = this.status();
     const title = document.createElement("div");
     title.className = "tab-menu-header";
@@ -311,7 +351,60 @@ export class TabMenu {
       this.reservationRow("oil", "Minimum Oil Reserve", "3", "4"),
     );
 
-    this.panel.replaceChildren(title, intro, pauseRow, reservations);
+    const entries = productionEntries || this.productionEntries();
+    const production = this.productionGrid(entries);
+    this.panel.replaceChildren(title, intro, pauseRow, reservations, production);
+    this.renderSignature = this.currentRenderSignature(entries);
+  }
+
+  productionGrid(entries = this.productionEntries()) {
+    const section = document.createElement("section");
+    section.className = "tab-menu-production";
+    const heading = document.createElement("div");
+    heading.className = "tab-menu-production-header";
+    heading.innerHTML = "<h3>Global Unit Auto-Build</h3><span>SHIFT + KEY TO REMOVE</span>";
+    const grid = document.createElement("div");
+    grid.className = "tab-menu-production-grid";
+    for (const entry of entries) {
+      const producerLabel = entry.producerLabel;
+      const button = createCommandButton({
+        commandId: entry.commandId,
+        icon: STATS[entry.unit]?.icon || entry.unit,
+        unitIconMarkup: this.unitIconMarkupForKind?.(entry.unit, {
+          teamColor: this.state?.localPlayer?.color,
+        }) || "",
+        label: STATS[entry.unit]?.label || entry.unit,
+        hotkey: entry.hotkey,
+        hotkeyCode: entry.hotkeyCode,
+        enabled: entry.producerIds.length > 0,
+        countBadge: `${entry.activeCount}/${entry.producerIds.length}`,
+        autobuildIndicatorCount: entry.activeCount,
+        cls: `tab-menu-unit${entry.activeCount > 0 ? " production-repeat-enabled" : ""}`,
+        title: entry.producerIds.length > 0
+          ? `${producerLabel}: add one ${STATS[entry.unit]?.label || entry.unit} auto-build. Shift-click or Shift+${entry.hotkey} removes one.`
+          : `Build a ${producerLabel} to assign auto-build.`,
+        onClick: (event) => this.adjustProduction(entry.unit, event.shiftKey ? -1 : 1),
+      });
+      button.dataset.producerKind = entry.producerKind;
+      grid.append(button);
+    }
+    section.append(heading, grid);
+    return section;
+  }
+
+  productionEntries(entities = null) {
+    return productionGridEntries(this.state, this.hotkeyProfiles, entities);
+  }
+
+  currentRenderSignature(entries = this.productionEntries()) {
+    return [
+      this.paused,
+      this.reservations.steel,
+      this.reservations.oil,
+      this.hotkeyProfiles?.revision || 0,
+      ...entries.map((entry) =>
+        `${entry.unit}:${entry.hotkeyCode}:${entry.producerIds.join(".")}:${entry.activeCount}`),
+    ].join("|");
   }
 
   reservationRow(resource, label, decreaseHotkey, increaseHotkey) {
@@ -372,6 +465,69 @@ export class TabMenu {
     this.button.remove();
     this.panel.remove();
   }
+}
+
+export function productionGridEntries(state, hotkeyProfiles = null, entities = null) {
+  const factionId = state?.localFactionId || state?.localPlayer?.factionId;
+  const catalog = factionCatalog(factionId);
+  const producerKinds = Object.keys(catalog.trainables)
+    .filter((kind) => kind !== KIND.RESOURCE_DEPOT)
+    .sort((a, b) => producerKindOrder(a) - producerKindOrder(b));
+  const base = producerKinds.flatMap((kind) =>
+    (catalog.trainables[kind] || []).map((unit) => ({
+      unit,
+      producerKind: kind,
+      producerLabel: STATS[kind]?.label || kind,
+      commandId: factionCommandId(factionId, "train", unit),
+    })));
+  const profile = hotkeyProfiles?.getActiveProfile?.();
+  let hotkeyCodes = base.map((entry) =>
+    hotkeyProfiles?.hotkeyCodeForCommand?.(entry.commandId, profile) || "");
+  if (
+    profile?.mode !== "direct" ||
+    hotkeyCodes.some((code) => !code) ||
+    new Set(hotkeyCodes).size !== hotkeyCodes.length
+  ) {
+    hotkeyCodes = base.map((_, index) => `Key${GRID_HOTKEYS[index] || ""}`);
+  }
+  return base.map((entry, index) => {
+    const producers = producersForUnit(state, entry.unit, entities);
+    return {
+      ...entry,
+      hotkeyCode: hotkeyCodes[index],
+      hotkey: hotkeyCodes[index]?.replace(/^Key/, "") || "",
+      producerIds: producers.map((producer) => producer.id),
+      activeCount: producers.filter((producer) => producer.prodRepeatKinds?.includes(entry.unit)).length,
+    };
+  });
+}
+
+function producerKindOrder(kind) {
+  const priority = PRODUCTION_BUILDING_PRIORITY.indexOf(kind);
+  return priority < 0 ? PRODUCTION_BUILDING_PRIORITY.length : priority;
+}
+
+function producersForUnit(state, unit, entities = null) {
+  const factionId = state?.localFactionId || state?.localPlayer?.factionId;
+  const trainables = factionCatalog(factionId).trainables;
+  const availableEntities = Array.isArray(entities)
+    ? entities
+    : state?.entitiesInterpolated?.(1, { includePrediction: false }) || [];
+  return availableEntities.filter((entity) =>
+    entity?.owner === state?.playerId &&
+    isBuilding(entity.kind) &&
+    (trainables[entity.kind] || []).includes(unit));
+}
+
+function producerIdsForUnit(state, unit) {
+  return producersForUnit(state, unit).map((producer) => producer.id);
+}
+
+export function productionRepeatCommand(state, unit, delta) {
+  const producerIds = producerIdsForUnit(state, unit);
+  return producerIds.length > 0
+    ? cmd.adjustProductionRepeat(producerIds, unit, delta < 0 ? -1 : 1)
+    : null;
 }
 
 function authoritativeSettings(state) {
