@@ -27,6 +27,10 @@ const EXACT_ACTORS: [u32; 6] = [
     REAR_TANK,
 ];
 const EXACT_COMMAND_UNITS: [u32; 7] = [COMMAND_CAR, 219, LEAD_TANK, 250, REAR_TANK, 271, 284];
+#[cfg(test)]
+const GOLDEN_ACTORS: [u32; 5] = [174, 177, COMMAND_CAR, LEAD_TANK, REAR_TANK];
+#[cfg(test)]
+const GOLDEN_LAST_TICK: u32 = 13_620;
 
 impl Game {
     pub fn new_replay_281_tank_gap_scenario(
@@ -181,6 +185,7 @@ mod tests {
     fn tick_perfect_case_matches_every_recorded_replay_tick() {
         let mut setup = scenario(CASE_TICK_PERFECT);
         assert_eq!(setup.game.tick_count(), REPLAY_PRE_COMMAND_TICK);
+        assert_eq!(setup.issue_after_ticks, REPLAY_PRE_COMMAND_TICK);
         assert_eq!(
             setup.game.state.entities.next_id_for_test(),
             REPLAY_NEXT_ENTITY_ID
@@ -200,8 +205,29 @@ mod tests {
         let golden: Vec<GoldenTick> =
             serde_json::from_str(include_str!("fixtures/replay_281_ticks_13537_13620.json"))
                 .expect("valid replay-281 golden trace");
+        assert_eq!(
+            golden.len(),
+            (GOLDEN_LAST_TICK - REPLAY_PRE_COMMAND_TICK) as usize,
+            "golden trace must cover every tick through {GOLDEN_LAST_TICK}"
+        );
 
-        for expected_tick in golden {
+        for (offset, expected_tick) in golden.into_iter().enumerate() {
+            let expected_tick_number = REPLAY_PRE_COMMAND_TICK + offset as u32 + 1;
+            assert_eq!(
+                expected_tick.tick, expected_tick_number,
+                "golden trace ticks must be consecutive"
+            );
+            let mut expected_ids = expected_tick
+                .entities
+                .iter()
+                .map(|entity| entity.id)
+                .collect::<Vec<_>>();
+            expected_ids.sort_unstable();
+            assert_eq!(
+                expected_ids, GOLDEN_ACTORS,
+                "golden tick {} must cover every surviving replay actor",
+                expected_tick.tick
+            );
             setup.game.tick();
             let snapshot = setup.game.snapshot_full_for_with_options(
                 SOUPMAN,
