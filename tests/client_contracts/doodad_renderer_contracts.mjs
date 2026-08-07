@@ -149,7 +149,7 @@ try {
   };
   const editor = new MapEditorWorkerRenderer(editorRenderer);
   editor.present({
-    version: 2,
+    version: 3,
     generation: 1,
     frameId: 1,
     visualTimeMs: 2400,

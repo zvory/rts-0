@@ -242,7 +242,7 @@ async function editorFatalContracts() {
   const fixture = createFixture({ surface: "mapEditor" });
   const { adapter } = fixture;
   const record = (frameId) => ({
-    version: 2,
+    version: 3,
     generation: 1,
     frameId,
     camera: { x: 0, y: 0, zoom: 1 },

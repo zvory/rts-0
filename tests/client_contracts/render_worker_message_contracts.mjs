@@ -101,7 +101,7 @@ assert(createDurableDecalMessage(representative).message.payload.revision === 9,
   "durable decal retention can be sent independently of a supersedable dynamic frame");
 assert(createDurableDecalMessage(representative, 3).message.payload.decalEpoch === 3,
   "durable decal retention is correlated to the current decal-only reset epoch");
-const editor = createEditorFrameMessage({ version: 2, frameId: 3, terrainUpdate: null, overlay: {} }, 2);
+const editor = createEditorFrameMessage({ version: 3, frameId: 3, terrainUpdate: null, overlay: {} }, 2);
 assert(editor.message.type === RENDER_WORKER_MESSAGE.FRAME && editor.message.payload.editor.frameId === 3,
   "Map Editor records use the same worker frame route and remain detached cloneable data");
 

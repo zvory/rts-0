@@ -5488,6 +5488,24 @@ input[type="text"]:focus {
   padding: 3px;
 }
 
+.map-editor-sun-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-editor-field .map-editor-sun-control input[type="range"] {
+  padding: 0;
+  accent-color: #d0ad63;
+}
+
+.map-editor-sun-control output {
+  color: #eee6d4;
+  font: 600 11px var(--mono);
+  text-align: right;
+}
+
 .map-editor-player-picker {
   grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
 }
