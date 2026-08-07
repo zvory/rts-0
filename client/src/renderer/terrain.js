@@ -16,9 +16,9 @@ const GROUND_TRANSITION_DEPTH = 0.56;
 const RELIEF_LIGHT_X = -0.46;
 const RELIEF_LIGHT_Y = -0.46;
 const RELIEF_LIGHT_Z = 0.76;
-const RELIEF_SLOPE_SCALE = 1.08;
-const RELIEF_DIRECTIONAL_STRENGTH = 1.05;
-const RELIEF_DIRECTIONAL_LIMIT = 0.24;
+const RELIEF_SLOPE_SCALE = 1.55;
+const RELIEF_DIRECTIONAL_STRENGTH = 1.35;
+const RELIEF_DIRECTIONAL_LIMIT = 0.34;
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
@@ -119,11 +119,10 @@ function drawElevationRelief(ctx, map, tilePixels) {
         RELIEF_DIRECTIONAL_LIMIT,
       );
       const altitude = clamp((surface.height - minHeight) / heightRange, 0, 1);
-      // Broad crest and basin separation reinforces the slope lighting without drawing contours.
-      const ambientShape = clamp(-surface.laplacian * 0.03, -0.075, 0.06);
-      const brightness = 1 + directional + ambientShape + (altitude - 0.5) * 0.05;
-      const tint = altitude * 0.065;
-      const cool = (1 - altitude) * 0.02;
+      const ambientShape = clamp(-surface.laplacian * 0.045, -0.11, 0.09);
+      const brightness = 1 + directional + ambientShape + (altitude - 0.5) * 0.075;
+      const tint = altitude * 0.09;
+      const cool = (1 - altitude) * 0.03;
       const index = (py * width + px) * 4;
       pixels[index] = clampByte(pixels[index] * brightness * (1 - tint - cool) + 232 * tint + 54 * cool);
       pixels[index + 1] = clampByte(pixels[index + 1] * brightness * (1 - tint - cool) + 211 * tint + 75 * cool);
