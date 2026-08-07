@@ -23,7 +23,8 @@ const vehicles = [
   [5, "scout_car", 0, true],
   [6, "command_car", 5, true],
 ].map(([entityId, unitKind, lifetimeOilSpend, survivedToEnd]) => ({ entityId, ownerId: 1, unitKind, firstSeenTick: 1, lastSeenTick: 99, firstMovedTick: lifetimeOilSpend ? 2 : null, lastMovedTick: lifetimeOilSpend ? 90 : null, lifetimeOilSpend, survivedToEnd }));
-fs.writeFileSync(path.join(analyses, "7.json"), JSON.stringify({ matchId: 7, analysisBuildSha: "abc", replay: { players: [{ id: 1, name: "Alex" }, { id: 2, name: "Soupman" }] }, vehicles }));
+const analysis = { matchId: 7, analysisBuildSha: "abc", replay: { serverBuildSha: "abc", mapName: "Fixture, Map", durationTicks: 100, players: [{ id: 1, name: "Alex" }, { id: 2, name: "Soupman" }] }, vehicles };
+fs.writeFileSync(path.join(analyses, "7.json"), JSON.stringify(analysis));
 
 const run = spawnSync(process.execPath, ["--no-warnings", "scripts/replay-oil-report.mjs", "--analyses", analyses, "--manifest", path.join(root, "manifest.json"), "--out", out], { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" });
 assert.equal(run.status, 0, run.stderr);
@@ -32,11 +33,20 @@ assert.deepEqual({ ...db.prepare("select total_observed,moved_count,unmoved_coun
 assert.equal(db.prepare("select count(*) count from unit_oil_spend").get().count, 6);
 assert.equal(db.prepare("select count(*) count from unit_oil_spend where moved=1").get().count, 5);
 db.close();
+const rerun = spawnSync(process.execPath, ["--no-warnings", "scripts/replay-oil-report.mjs", "--analyses", analyses, "--manifest", path.join(root, "manifest.json"), "--out", out], { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" });
+assert.equal(rerun.status, 0, rerun.stderr);
 const rawCsv = fs.readFileSync(path.join(out, "unit_oil_spend.csv"), "utf8");
 assert.match(rawCsv, /"Fixture, Map"/);
+assert.match(fs.readFileSync(path.join(out, "selected_replays.csv"), "utf8"), /\[""Alex"",""Soupman""\]/);
 for (const filename of ["oil-spend-percentiles.svg", "oil-spend-ecdf.svg", "oil-spend-inclusion.svg", "oil-spend-report.html"]) {
   const text = fs.readFileSync(path.join(out, filename), "utf8");
   assert.ok(text.length > 200);
   assert.doesNotMatch(text, /NaN|undefined/);
 }
+
+analysis.replay.durationTicks = 99;
+fs.writeFileSync(path.join(analyses, "7.json"), JSON.stringify(analysis));
+const rejected = spawnSync(process.execPath, ["--no-warnings", "scripts/replay-oil-report.mjs", "--analyses", analyses, "--manifest", path.join(root, "manifest.json"), "--out", path.join(root, "rejected")], { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" });
+assert.notEqual(rejected.status, 0);
+assert.match(rejected.stderr, /duration mismatch/);
 console.log("replay oil report fixture passed");

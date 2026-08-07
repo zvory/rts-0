@@ -245,9 +245,6 @@ pub(crate) fn run_tick(
             ability_runtime,
         );
     });
-    if let Some(collector) = vehicle_oil_collector {
-        collector.observe(tick, entities);
-    }
     coordinator.begin_pathing_diagnostics("promote_queued_orders", entities);
     crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {
         services::order_queue::promote_ready_orders(
@@ -400,6 +397,11 @@ pub(crate) fn run_tick(
         ability_runtime.tick_projectiles(map, entities, &teams, &post_movement.spatial, tick);
         ability_runtime.tick(entities, tick);
     });
+    // Observe at the last point before death cleanup. This retains vehicles killed on this tick
+    // while also including vehicles whose production completed after the movement phase.
+    if let Some(collector) = vehicle_oil_collector {
+        collector.observe(tick, entities);
+    }
     crate::perf::timed(perf.as_deref_mut(), "death", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         services::death::death_system(

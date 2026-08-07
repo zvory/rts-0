@@ -268,29 +268,38 @@ pub fn analyze_vehicle_movement_oil(
     let mut replay = artifact
         .restore_start_game(map, metadata)
         .map_err(|err| err.to_string())?;
+    if replay.tick_count() > artifact.duration_ticks {
+        return Err(format!(
+            "replay start tick {} is beyond replay length {}",
+            replay.tick_count(),
+            artifact.duration_ticks
+        ));
+    }
     let mut collector = VehicleOilCollector::default();
     collector.observe(replay.tick_count(), &replay.state.entities);
     let mut next_command = 0usize;
     let start_tick = replay.tick_count();
 
-    for tick in start_tick.saturating_add(1)..=artifact.duration_ticks {
-        while let Some(entry) = artifact.command_log.get(next_command) {
-            if entry.tick < tick {
-                return Err(format!(
-                    "command log entry {next_command} has tick {}, before replay cursor {tick}",
-                    entry.tick
-                ));
+    if start_tick < artifact.duration_ticks {
+        for tick in start_tick + 1..=artifact.duration_ticks {
+            while let Some(entry) = artifact.command_log.get(next_command) {
+                if entry.tick < tick {
+                    return Err(format!(
+                        "command log entry {next_command} has tick {}, before replay cursor {tick}",
+                        entry.tick
+                    ));
+                }
+                if entry.tick != tick {
+                    break;
+                }
+                replay.enqueue(
+                    entry.player_id,
+                    SimCommand::from_protocol(entry.command.clone()),
+                );
+                next_command += 1;
             }
-            if entry.tick != tick {
-                break;
-            }
-            replay.enqueue(
-                entry.player_id,
-                SimCommand::from_protocol(entry.command.clone()),
-            );
-            next_command += 1;
+            replay.tick_inner(None, Some(&mut collector));
         }
-        replay.tick_inner(None, Some(&mut collector));
     }
     if let Some(entry) = artifact.command_log.get(next_command) {
         return Err(format!(

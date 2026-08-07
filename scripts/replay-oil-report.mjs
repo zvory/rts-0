@@ -138,6 +138,7 @@ function inclusionSvg(summary) {
 }
 
 function writeDatabase(filename, matches, rows, summary, metadata) {
+  fs.rmSync(filename, { force: true });
   const db = new DatabaseSync(filename);
   db.exec("PRAGMA foreign_keys=ON; CREATE TABLE analysis_metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE matches(match_id INTEGER PRIMARY KEY,replay_number INTEGER NOT NULL,started_at TEXT NOT NULL,map_name TEXT NOT NULL,duration_ticks INTEGER NOT NULL,server_build_sha TEXT NOT NULL,analysis_build_sha TEXT NOT NULL,participants_json TEXT NOT NULL); CREATE TABLE unit_oil_spend(match_id INTEGER NOT NULL,entity_id INTEGER NOT NULL,owner_id INTEGER NOT NULL,owner_name TEXT NOT NULL,unit_kind TEXT NOT NULL CHECK(unit_kind IN ('scout_car','command_car','tank')),first_seen_tick INTEGER NOT NULL,last_seen_tick INTEGER NOT NULL,first_moved_tick INTEGER,last_moved_tick INTEGER,survived_to_end INTEGER NOT NULL CHECK(survived_to_end IN(0,1)),moved INTEGER NOT NULL CHECK(moved IN(0,1)),lifetime_oil_spend REAL NOT NULL CHECK(lifetime_oil_spend>=0),PRIMARY KEY(match_id,entity_id),FOREIGN KEY(match_id) REFERENCES matches(match_id)); CREATE TABLE unit_oil_summary(unit_kind TEXT PRIMARY KEY,total_observed INTEGER NOT NULL,moved_count INTEGER NOT NULL,unmoved_count INTEGER NOT NULL,mean REAL,p50 REAL,p75 REAL,p95 REAL,p99 REAL,max REAL,percentile_method TEXT NOT NULL); CREATE INDEX unit_oil_distribution ON unit_oil_spend(unit_kind,moved,lifetime_oil_spend); CREATE INDEX unit_oil_owner ON unit_oil_spend(owner_name,unit_kind);");
   const insertMeta = db.prepare("INSERT INTO analysis_metadata VALUES (?,?)");
@@ -164,15 +165,24 @@ for (const analysis of analyses) {
   const match = manifestById.get(analysis.matchId);
   if (!match) throw new Error(`analysis ${analysis.matchId} absent from manifest`);
   if (analysis.analysisBuildSha !== match.build_sha) throw new Error(`build mismatch for ${analysis.matchId}: ${analysis.analysisBuildSha} != ${match.build_sha}`);
+  if (analysis.replay.serverBuildSha !== match.build_sha) throw new Error(`replay build mismatch for ${analysis.matchId}: ${analysis.replay.serverBuildSha} != ${match.build_sha}`);
+  if (analysis.replay.mapName !== match.map_name) throw new Error(`map mismatch for ${analysis.matchId}: ${analysis.replay.mapName} != ${match.map_name}`);
+  if (analysis.replay.durationTicks !== match.duration_ticks) throw new Error(`duration mismatch for ${analysis.matchId}: ${analysis.replay.durationTicks} != ${match.duration_ticks}`);
   const names = new Map(analysis.replay.players.map((player) => [player.id, player.name]));
   matches.push({ match_id: analysis.matchId, started_at: match.started_at, map_name: match.map_name, duration_ticks: match.duration_ticks, server_build_sha: match.build_sha, analysis_build_sha: analysis.analysisBuildSha, participants: match.participants });
-  for (const vehicle of analysis.vehicles) rows.push({ match_id: analysis.matchId, replay_number: analysis.matchId, started_at: match.started_at, map_name: match.map_name, duration_ticks: match.duration_ticks, entity_id: vehicle.entityId, owner_id: vehicle.ownerId, owner_name: names.get(vehicle.ownerId) ?? "", unit_kind: vehicle.unitKind, first_seen_tick: vehicle.firstSeenTick, last_seen_tick: vehicle.lastSeenTick, first_moved_tick: vehicle.firstMovedTick, last_moved_tick: vehicle.lastMovedTick, survived_to_end: Number(vehicle.survivedToEnd), moved: Number(vehicle.lifetimeOilSpend > 0), lifetime_oil_spend: vehicle.lifetimeOilSpend });
+  for (const vehicle of analysis.vehicles) {
+    const ownerName = names.get(vehicle.ownerId);
+    if (ownerName === undefined) throw new Error(`vehicle ${vehicle.entityId} in analysis ${analysis.matchId} has unknown owner ${vehicle.ownerId}`);
+    rows.push({ match_id: analysis.matchId, replay_number: analysis.matchId, started_at: match.started_at, map_name: match.map_name, duration_ticks: match.duration_ticks, entity_id: vehicle.entityId, owner_id: vehicle.ownerId, owner_name: ownerName, unit_kind: vehicle.unitKind, first_seen_tick: vehicle.firstSeenTick, last_seen_tick: vehicle.lastSeenTick, first_moved_tick: vehicle.firstMovedTick, last_moved_tick: vehicle.lastMovedTick, survived_to_end: Number(vehicle.survivedToEnd), moved: Number(vehicle.lifetimeOilSpend > 0), lifetime_oil_spend: vehicle.lifetimeOilSpend });
+  }
 }
 rows.sort((a, b) => a.match_id - b.match_id || a.entity_id - b.entity_id);
 const summary = KINDS.map((kind) => summarize(rows, kind));
 fs.mkdirSync(options.out, { recursive: true });
 const unitHeaders = ["match_id","replay_number","started_at","map_name","duration_ticks","entity_id","owner_id","owner_name","unit_kind","first_seen_tick","last_seen_tick","first_moved_tick","last_moved_tick","survived_to_end","moved","lifetime_oil_spend"];
 const summaryHeaders = ["unit_kind","total_observed","moved_count","unmoved_count","mean","p50","p75","p95","p99","max","percentile_method"];
+const matchHeaders = ["match_id","started_at","map_name","duration_ticks","server_build_sha","analysis_build_sha","participants_json"];
+fs.writeFileSync(path.join(options.out, "selected_replays.csv"), csv(matchHeaders, matches.map((match) => ({ ...match, participants_json: JSON.stringify(match.participants) }))));
 fs.writeFileSync(path.join(options.out, "unit_oil_spend.csv"), csv(unitHeaders, rows));
 fs.writeFileSync(path.join(options.out, "moved_unit_oil_spend.csv"), csv(unitHeaders, rows.filter((row) => row.moved === 1)));
 fs.writeFileSync(path.join(options.out, "unit_oil_summary.csv"), csv(summaryHeaders, summary));

@@ -1,5 +1,19 @@
 use super::entity::{EntityKind, EntityStore};
+use super::replay::{analyze_vehicle_movement_oil, ReplayStartComposition};
 use super::replay_oil_analysis::VehicleOilCollector;
+use super::{Game, PlayerInit};
+use crate::protocol::DEFAULT_FACTION_ID;
+
+fn replay_players() -> [PlayerInit; 1] {
+    [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
+        name: "Replay oil".to_string(),
+        color: "#fff".to_string(),
+        is_ai: false,
+    }]
+}
 
 #[test]
 fn collector_retains_dead_vehicles_and_all_fuel_kinds() {
@@ -39,4 +53,29 @@ fn collector_retains_dead_vehicles_and_all_fuel_kinds() {
     assert!(records[2].survived_to_end);
     assert_eq!(records[1].last_seen_tick, 20);
     assert_eq!(records[1].lifetime_oil_spend, 2.5);
+}
+
+#[test]
+fn analyzer_accepts_a_zero_tick_replay_without_advancing_it() {
+    let game = Game::new(&replay_players(), 7);
+    let start = ReplayStartComposition::capture(&game, "test-sha").expect("replay start");
+    let artifact = start.finalize(&game, None, game.scores());
+
+    let records = analyze_vehicle_movement_oil(&artifact).expect("zero-tick replay analysis");
+
+    assert!(!records.is_empty());
+    assert!(records.iter().all(|record| record.last_seen_tick == 0));
+}
+
+#[test]
+fn analyzer_rejects_a_start_checkpoint_after_the_declared_end() {
+    let mut game = Game::new(&replay_players(), 7);
+    game.tick();
+    let start = ReplayStartComposition::capture(&game, "test-sha").expect("replay start");
+    let mut artifact = start.finalize(&game, None, game.scores());
+    artifact.duration_ticks = 0;
+
+    let error = analyze_vehicle_movement_oil(&artifact).expect_err("invalid replay length");
+
+    assert!(error.contains("start tick 1 is beyond replay length 0"));
 }
