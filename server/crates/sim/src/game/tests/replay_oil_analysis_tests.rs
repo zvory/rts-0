@@ -2,6 +2,7 @@ use super::entity::{EntityKind, EntityStore};
 use super::replay::{analyze_vehicle_movement_oil, ReplayStartComposition};
 use super::replay_oil_analysis::VehicleOilCollector;
 use super::{Game, PlayerInit};
+use crate::game::systems;
 use crate::protocol::DEFAULT_FACTION_ID;
 
 fn replay_players() -> [PlayerInit; 1] {
@@ -57,12 +58,19 @@ fn collector_retains_dead_vehicles_and_all_fuel_kinds() {
 
 #[test]
 fn analyzer_accepts_a_zero_tick_replay_without_advancing_it() {
-    let game = Game::new(&replay_players(), 7);
+    let mut game = Game::new(&replay_players(), 7);
+    let scout = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::ScoutCar, 64.0, 64.0)
+        .expect("scout car");
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
     let start = ReplayStartComposition::capture(&game, "test-sha").expect("replay start");
     let artifact = start.finalize(&game, None, game.scores());
 
     let records = analyze_vehicle_movement_oil(&artifact).expect("zero-tick replay analysis");
 
+    assert!(records.iter().any(|record| record.entity_id == scout));
     assert!(records.iter().all(|record| record.last_seen_tick == 0));
 }
 
