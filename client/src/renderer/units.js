@@ -115,13 +115,9 @@ export function _tankMotionVisual(e, facing, state, body) {
     activity = clamp01((Math.abs(leftDelta) + Math.abs(rightDelta)) / 4);
   }
 
-  const ownTank = e.owner === state.playerId;
-  const oil = state.resources ? state.resources.oil : null;
-  const oilStarved = ownTank && oil === 0 && (e.state === STATE.MOVE || e.state === STATE.ATTACK);
-  const lowOil = ownTank && typeof oil === "number" && oil > 0 && oil <= 5;
   const next = { x: e.x, y: e.y, facing, leftPhase, rightPhase };
   this._tankMotion.set(e.id, next);
-  return { leftPhase, rightPhase, leftDir, rightDir, activity, lowOil, oilStarved };
+  return { leftPhase, rightPhase, leftDir, rightDir, activity };
 }
 
 export function _frameStripMovementVisual(e, state) {

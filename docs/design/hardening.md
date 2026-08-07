@@ -269,14 +269,10 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   This is still a path-following approximation, not tire or Ackermann steering physics; replace it
   with proper truck/wheeled movement semantics when that model exists.
   Scout cars do not use tank armor or tank damage reduction.
-- **Vehicle movement oil burn**: tanks and scout cars consume oil based on distance actually moved,
-  using `TANK_OIL_COST_PER_PX` and `SCOUT_CAR_OIL_COST_PER_PX` respectively. Fractional movement
-  cost accumulates per vehicle until whole oil units are deducted from the owner's stockpile. Tanks
-  also track lifetime movement oil as `oilUsed` for the client selected-entity panel. If the owner
-  has zero oil at the start of a movement tick, that vehicle does not advance and waits
-  `TANK_OIL_STARVED_PAUSE_TICKS` (one second) before retrying, so sparse oil income does not
-  produce constant one-tick stuttering. Turret/combat behavior still runs through the combat system
-  while movement is paused.
+- **Vehicle movement has no resource charge**: Tank, Scout Car, and Command Car movement never
+  reads or mutates the owner's oil stockpile. Zero oil does not pause vehicle movement or hull
+  reaction, and snapshots carry no per-vehicle movement-oil telemetry. Purchase and ability costs
+  remain authoritative economy deductions.
 - **Methamphetamines research**: Training Centres can queue one permanent player upgrade costing
   100 steel / 25 oil and taking 600 ticks. Once completed, all current and future owned riflemen
   use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.

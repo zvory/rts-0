@@ -464,7 +464,7 @@ withFakeHudDocument(({ FakeElement }) => {
         return selector === "#selected-panel" ? panel : null;
       },
     };
-    const selected = { id: 2200, owner: 1, kind: KIND.TANK, hp: 80, maxHp: 100, oilUsed: 4.2 };
+    const selected = { id: 2200, owner: 1, kind: KIND.TANK, hp: 80, maxHp: 100 };
     const state = {
       selectionBudgetOverflow: null,
       selectedEntities() {

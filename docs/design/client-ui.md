@@ -306,7 +306,6 @@ export const ANIMATION_INPUTS = [
   "weaponVisualDoubleCos", "weaponVisualDoubleSin", "weaponRecoilX", "weaponRecoilY",
   "scoutGunnerX", "scoutGunnerY", "scoutMountX", "scoutMountY", "setupVisible",
   "setupMostlyDeployed", "setupBarrelVisible", "busy", "breakthroughTicks",
-  "lowOil", "oilStarved", "fuelCueVisible",
 ]
 export const ANIMATION_PROPERTIES = [
   "transform.x", "transform.y", "transform.rotation", "transform.scaleX", "transform.scaleY",
@@ -2357,7 +2356,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
-  main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: modular
+  main barrel, coax barrel, recoil, and nose tick; artillery: modular
   A-19 PNG components animated from raster-native support-weapon metadata).
   Riflemen normally carry a rifle; Panzerfausts with `panzerfaustLoaded: true` carry a tube launcher
   with a team-colored band and switch immediately to normal rifle art after launch. While
@@ -2438,9 +2437,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   `1.5px` clearance) so the visible body, selection ring, click target, and advisory build
   preview match the server's oriented vehicle body. Track tread offsets advance from actual
   interpolated movement and hull turn deltas: both tracks forward/backward for drive/reverse and
-  opposite track motion for pivot turns. Own tanks show a small amber/red fuel cue when oil is low
-  or movement is oil-starved; the selected-entity panel also exposes lifetime movement `oilUsed`
-  as `Oil Used:` when exactly one tank is selected.
+  opposite track motion for pivot turns. Vehicles have no movement-fuel cue or lifetime oil-spend
+  row because movement does not consume oil.
 - Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`40.8px` length, `21.6px` width,
   `1px` clearance), matching the authoritative oriented vehicle body used for collision and
   click targeting.

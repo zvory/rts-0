@@ -5,8 +5,6 @@
 //! weapon setup restrictions, and final overlap resolution live here so the tick pipeline has a
 //! single movement phase.
 
-use std::collections::HashMap;
-
 use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::EntityStore;
@@ -18,7 +16,6 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
-use crate::protocol::Event;
 
 mod armor_reaction;
 mod car_drive;
@@ -63,32 +60,29 @@ pub(crate) fn movement_system(
     spatial: &SpatialIndex,
     tick: u32,
 ) {
-    let mut ignored_events = HashMap::new();
     let smokes = SmokeCloudStore::new();
     let ability_runtime = AbilityRuntime::new();
-    movement_system_with_events(
+    movement_system_with_context(
         map,
         entities,
         players,
         occ,
         spatial,
         tick,
-        &mut ignored_events,
         &smokes,
         &ability_runtime,
     );
 }
 
-/// Movement entry point for the real tick loop, with access to transient player events.
+/// Movement entry point for the real tick loop, with live smoke and ability state.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn movement_system_with_events(
+pub(crate) fn movement_system_with_context(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
-    events: &mut HashMap<u32, Vec<Event>>,
     smokes: &SmokeCloudStore,
     ability_runtime: &AbilityRuntime,
 ) {
@@ -123,24 +117,11 @@ pub(crate) fn movement_system_with_events(
     armor_reaction::turn_stationary_tanks_toward_locked_ap_source(
         entities,
         tick,
-        |owner, kind, x, y, facing| {
-            let out_of_oil = players
-                .iter()
-                .find(|player| player.id == owner)
-                .is_some_and(|player| player.oil == 0);
-            !out_of_oil && standability::unit_static_standable(occ, map, kind, x, y, facing)
+        |_owner, kind, x, y, facing| {
+            standability::unit_static_standable(occ, map, kind, x, y, facing)
         },
     );
-    waypoints::advance_moving_units(
-        map,
-        entities,
-        players,
-        occ,
-        spatial,
-        tick,
-        events,
-        ability_runtime,
-    );
+    waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, ability_runtime);
     apply_magic_anchor_stationary_pull(map, entities, occ, tick, ability_runtime);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {

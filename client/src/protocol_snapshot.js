@@ -347,7 +347,7 @@ function decodeCompactEntity(record, index) {
   assignOptionalCode(entity, "setupState", fields, 16, SETUP_BY_CODE);
   assignOptional(entity, "remaining", fields, 17, readU32);
   assignRally(entity, fields, 18);
-  assignOptional(entity, "oilUsed", fields, 19, readNumber);
+  // Slot 19 is reserved after retirement of per-unit movement-oil telemetry.
   assignOptional(entity, "setupFacing", fields, 20, readNumber);
   assignOrderPlan(entity, fields, 21);
   assignOptional(entity, "chargeCooldownLeft", fields, 22, readU32);

@@ -27,7 +27,6 @@ import {
   drawInfantryRifle,
   drawRotatedRect,
   drawScoutCar,
-  drawTankFuelCue,
   drawTankHull,
   drawTankTracks,
   finiteNumber,

@@ -332,8 +332,8 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
         "reverse-ordered tank path should preserve the exact command goal"
     );
     assert!(
-        path.len() > 1,
-        "tank movement should keep clearance-shaped intermediate waypoints"
+        !path.is_empty(),
+        "tank should keep an active path after its first movement tick"
     );
 
     let (mut repeat_a, tank_a, goal_a) = flat_tank_move_fixture();

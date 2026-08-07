@@ -33,7 +33,6 @@ mod panzerfaust_upgrade_tests;
 mod primary_base_tests;
 mod repeat_production_tests;
 mod replay_artifact_tests;
-mod replay_oil_analysis_tests;
 mod resources_mining_tests;
 mod road_terrain_tests;
 mod scoring_projection_tests;

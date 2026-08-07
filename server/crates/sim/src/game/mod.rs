@@ -40,7 +40,6 @@ mod pathfinding;
 mod player_state;
 pub mod replay;
 mod replay_artifact;
-mod replay_oil_analysis;
 mod resource_placement;
 #[cfg(test)]
 mod resource_placement_tests;
@@ -231,20 +230,19 @@ impl Game {
     /// cleanup → collision/supply → sample fog on 15 Hz boundaries. The whole method is
     /// panic-free: every entity lookup is fallible and stale ids are ignored.
     pub fn tick(&mut self) -> Vec<(u32, Vec<Event>)> {
-        self.tick_inner(None, None)
+        self.tick_inner(None)
     }
 
     pub fn tick_with_perf(
         &mut self,
         perf: Option<&mut crate::perf::TickPerf>,
     ) -> Vec<(u32, Vec<Event>)> {
-        self.tick_inner(perf, None)
+        self.tick_inner(perf)
     }
 
     fn tick_inner(
         &mut self,
         mut perf: Option<&mut crate::perf::TickPerf>,
-        vehicle_oil_collector: Option<&mut replay_oil_analysis::VehicleOilCollector>,
     ) -> Vec<(u32, Vec<Event>)> {
         self.state.tick = self.state.tick.wrapping_add(1);
         self.state.ground_decals.begin_tick(self.state.tick);
@@ -293,7 +291,6 @@ impl Game {
             pending,
             &mut events,
             self.state.tick,
-            vehicle_oil_collector,
             perf.as_deref_mut(),
         );
         self.derived.set_final_spatial(final_spatial);

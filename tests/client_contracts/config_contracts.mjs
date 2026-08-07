@@ -47,7 +47,6 @@ import {
 } from "../../client/src/config.js";
 import {
   HUD,
-  formatTankOilUsed,
   groupCooldownClocks,
   playerHasCompletedKind,
 } from "../../client/src/hud.js";
@@ -162,7 +161,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Vehicle Works should put Command Car in the top-right train slot",
   );
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
-  assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].cost.oil === 60, "Scout Car oil cost mirrors server");
+  assert(STATS[KIND.TANK].cost.oil === 175, "Tank oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].rangeTiles === 7, "Scout Car weapon range mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 15, "Scout Car sight radius mirrors server");
   assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
@@ -209,7 +209,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assert(KIND_CODE[KIND.PANZERFAUST] === 24, "Panzerfaust compact entity-kind code should be restored");
   assert(
     STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
-      STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
+      STATS[KIND.COMMAND_CAR].cost.oil === 85 &&
       STATS[KIND.COMMAND_CAR].supply === 4 &&
       STATS[KIND.COMMAND_CAR].sight === 8 &&
       STATS[KIND.COMMAND_CAR].size < STATS[KIND.SCOUT_CAR].size &&
@@ -490,11 +490,6 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     playerHasCompletedKind(completedTrainingCentre, playerId, KIND.TRAINING_CENTRE),
     "Vehicle Works should unlock once the Training Centre is complete",
   );
-  assert(formatTankOilUsed(0.04) === "0.0", "tank oil panel rounds tiny values to tenths");
-  assert(formatTankOilUsed(9.94) === "9.9", "tank oil panel keeps tenths below ten oil");
-  assert(formatTankOilUsed(10.4) === "10", "tank oil panel rounds whole values above ten oil");
-  assert(formatTankOilUsed(-2) === "0.0", "tank oil panel clamps negative values");
-  assert(formatTankOilUsed(Number.NaN) === "0.0", "tank oil panel tolerates missing oilUsed");
   const genericCooldownTicks = TICK_HZ * 5;
   const groupedNearlySameCooldowns = groupCooldownClocks([150, 149, 146], genericCooldownTicks);
   assert(groupedNearlySameCooldowns.length === 1, "nearby cooldowns share one clock arm");

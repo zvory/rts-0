@@ -581,12 +581,6 @@ impl Entity {
         self.movement.as_ref().map(|m| m.facing).unwrap_or(0.0)
     }
 
-    pub fn lifetime_oil_used(&self) -> Option<f32> {
-        self.movement
-            .as_ref()
-            .and_then(|m| (self.kind == EntityKind::Tank).then_some(m.lifetime_oil_used))
-    }
-
     pub(crate) fn breakthrough_ticks(&self) -> u16 {
         self.movement
             .as_ref()
