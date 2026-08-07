@@ -35,6 +35,20 @@
       "map": "Chokes",
       "playerCount": 4,
       "filename": "fixed-roster-hellhole.json"
+    },
+    {
+      "id": "lighting-test",
+      "title": "Lighting Test",
+      "description": "Nine terrain studies under a northwesterly 12-degree sunset, each staged with a tank, scout car, machine gunner, and rifleman for unified terrain-and-unit shadow experiments.",
+      "tags": [
+        "shadows",
+        "terrain",
+        "gpu",
+        "playground"
+      ],
+      "map": "Lighting Test",
+      "playerCount": 2,
+      "filename": "lighting-test.json"
     }
   ]
 }

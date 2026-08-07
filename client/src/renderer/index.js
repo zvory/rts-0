@@ -113,7 +113,7 @@ import {
   _sweepTankMotion,
   _tankMotionVisual,
 } from "./units.js";
-import { ProjectedUnitShadowLayer } from "./projected_unit_shadows.js";
+import { UnifiedGpuShadowLayer } from "./unified_gpu_shadows.js";
 
 const RENDER_ERROR_LOG_INTERVAL_MS = 5000;
 const MISSING_TEXTURE_SIZE_PX = 26;
@@ -207,8 +207,9 @@ export class Renderer {
       pixi: PIXI,
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
     });
-    this._projectedUnitShadows = new ProjectedUnitShadowLayer({
+    this._projectedUnitShadows = new UnifiedGpuShadowLayer({
       pixi: PIXI,
+      renderer: this.app.renderer,
       layer: this.layers.decals,
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
     });
@@ -1311,7 +1312,9 @@ function destroyRendererOwnedTexture(texture) {
 }
 
 function buildStaticMapWithDoodads(map) {
-  buildStaticTerrainMap.call(this, map);
+  buildStaticTerrainMap.call(this, map, {
+    bakeLongShadows: !this._projectedUnitShadows?.supported,
+  });
   this._projectedUnitShadows?.setMap(this._map);
   this._doodads?.replace(map?.doodads || []);
 }

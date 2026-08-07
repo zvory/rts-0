@@ -18,7 +18,7 @@ import {
 import { renderFrameStripUnit } from "./rigs/frame_strip_runtime.js";
 import { renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
-import { hasProjectedUnitShadow } from "./projected_unit_shadows.js";
+import { hasProjectedUnitShadow } from "./unified_gpu_shadows.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
   DEPLOYED_WEAPON_ANIM_MS,
