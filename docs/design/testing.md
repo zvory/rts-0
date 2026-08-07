@@ -163,6 +163,13 @@ Current scenario ids:
   source: a Resource Depot produces four workers at the real 150-tick cadence and rallies them
   across the map. They naturally share the opening route beside a deployed Machine Gunner, making
   the scenario expose both excessive traffic steering and stale-waypoint recovery behavior.
+- `replay_281_tank_gap` — replay 281 at tick 13,537 reconstructed on the exact Schone Tage terrain:
+  after a ten-second inspection pause, five Tanks, one Scout Car, and the command-capacity Command
+  Car attack-move west through the northern seven-tile gap. Selectable `living_command_car`,
+  `enemy_screen`, and `command_car_death` cases isolate friendly formation traffic, the three
+  deployed Machine Gunners, and the full low-health Command Car death sequence. The death case also
+  restores replay seed 162367300, MG 226's Command Car target latch, and the Tanks' carried-over
+  reload window so the kill occurs before the MG screen is cleared.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.

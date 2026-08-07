@@ -375,6 +375,11 @@ Phase 7 release audit for the ownership sequence:
   unsupported-schema error. Replay seek still uses recorded commands plus in-process
   `clone_for_replay_keyframe` keyframes after the start game is rebuilt. Schema, map, faction, and
   loadout drift reject with explicit messages while build-SHA drift remains warning-compatible.
+  The offline `replay-oil-analyze` binary reconstructs one artifact through this same boundary and
+  samples Scout Car, Command Car, and Tank cumulative movement oil at the last point before death
+  cleanup. That phase placement retains vehicles that move and die on the same tick, and vehicles
+  produced on the final tick, without adding analysis state to `GameState`, checkpoints, snapshots,
+  or the wire protocol.
 - Lab timeline seek still replays lab timeline entries from in-process keyframes. Current lab
   import/export UI uses checkpoint-backed `LabCheckpointScenarioV1` containers:
   materialized map data/binding lives beside an embedded `GameCheckpointV1` text payload, and
