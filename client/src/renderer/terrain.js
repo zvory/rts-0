@@ -19,6 +19,8 @@ const RELIEF_LIGHT_Z = 0.76;
 const RELIEF_SLOPE_SCALE = 1.55;
 const RELIEF_DIRECTIONAL_STRENGTH = 1.35;
 const RELIEF_DIRECTIONAL_LIMIT = 0.34;
+const SHADOW_DIRECTION_X = Math.SQRT1_2;
+const SHADOW_DIRECTION_Y = Math.SQRT1_2;
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
@@ -128,6 +130,228 @@ function drawElevationRelief(ctx, map, tilePixels) {
       pixels[index + 1] = clampByte(pixels[index + 1] * brightness * (1 - tint - cool) + 211 * tint + 75 * cool);
       pixels[index + 2] = clampByte(pixels[index + 2] * brightness * (1 - tint - cool) + 159 * tint + 84 * cool);
     }
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
+function paintTerrainSurface(ctx, map, tilePixels) {
+  for (let ty = 0; ty < map.height; ty++) {
+    for (let tx = 0; tx < map.width; tx++) drawTerrainTile(ctx, map, tx, ty, tilePixels);
+  }
+  drawElevationRelief(ctx, map, tilePixels);
+}
+
+/**
+ * Local visual-study switch for three long-shadow techniques. The selected profile is immutable
+ * during normal play, so this expensive static terrain rebuild happens once, not per frame.
+ */
+export function applyTerrainLighting(rawLighting) {
+  if (!this._map || !this._terrainContext || !this._terrainTextureTileSize) return false;
+  const method = ["raymarch", "extrude", "ridge"].includes(rawLighting?.method)
+    ? rawLighting.method
+    : "none";
+  const sun = rawLighting?.sun === "low" ? "low" : "high";
+  const golden = rawLighting?.golden === true;
+  const signature = `${method}:${sun}:${golden ? "golden" : "neutral"}`;
+  if (signature === this._terrainLightingSignature) return false;
+  this._terrainLightingSignature = signature;
+
+  paintTerrainSurface(this._terrainContext, this._map, this._terrainTextureTileSize);
+  if (method !== "none") {
+    drawLongTerrainShadows(
+      this._terrainContext,
+      this._map,
+      this._terrainTextureTileSize,
+      method,
+      sun,
+    );
+  }
+  // Tinting the world container keeps units, effects, and fog in the same golden-hour palette.
+  this.world.tint = golden ? 0xffdda8 : 0xffffff;
+  this._terrainSprite?.texture?.source?.update?.();
+  return true;
+}
+
+function drawLongTerrainShadows(ctx, map, tilePixels, method, sun) {
+  const width = map.width * tilePixels;
+  const height = map.height * tilePixels;
+  let mask;
+  if (method === "raymarch") mask = rayMarchedShadowMask(map, tilePixels, width, height, sun);
+  else if (method === "extrude") mask = extrudedShadowMask(map, tilePixels, width, height, sun);
+  else mask = ridgeWedgeShadowMask(map, tilePixels, width, height, sun);
+  applyTerrainShadowMask(ctx, mask, width, height);
+}
+
+/** Continuous receiver-aware horizon test, sampled in texture-pixel space. */
+function rayMarchedShadowMask(map, tilePixels, width, height, sun) {
+  const low = sun === "low";
+  const maxDistance = low ? 42 : 13;
+  const distanceStep = low ? 0.72 : 0.58;
+  const sunSlope = low ? 0.115 : 0.62;
+  const mask = new Float32Array(width * height);
+  for (let py = 0; py < height; py++) {
+    const tileY = (py + 0.5) / tilePixels - 0.5;
+    for (let px = 0; px < width; px++) {
+      const tileX = (px + 0.5) / tilePixels - 0.5;
+      const receiver = bilinearElevation(map, tileX, tileY);
+      let shade = 0;
+      for (let distance = distanceStep; distance <= maxDistance; distance += distanceStep) {
+        const upstreamX = tileX - distance * SHADOW_DIRECTION_X;
+        const upstreamY = tileY - distance * SHADOW_DIRECTION_Y;
+        if (upstreamX < -0.5 || upstreamY < -0.5) break;
+        const blocker = bilinearElevation(map, upstreamX, upstreamY);
+        const clearance = blocker - receiver - distance * sunSlope;
+        if (clearance <= 0) continue;
+        const fade = 1 - distance / (maxDistance + distanceStep);
+        shade = Math.max(shade, clamp((0.2 + clearance * 0.15) * fade, 0, 0.78));
+      }
+      mask[py * width + px] = shade;
+    }
+  }
+  return boxBlurMask(mask, width, height, low ? 3 : 1);
+}
+
+/** Image-space elevation-mask extrusion. Fast and soft, but deliberately receiver-unaware. */
+function extrudedShadowMask(map, tilePixels, width, height, sun) {
+  const low = sun === "low";
+  const baseline = modalElevation(map.elevation);
+  const distancePerLevel = low ? 5.8 : 1.45;
+  const maxDistance = low ? 40 : 11;
+  const distanceStep = low ? 0.65 : 0.48;
+  const mask = new Float32Array(width * height);
+  for (let py = 0; py < height; py++) {
+    const tileY = (py + 0.5) / tilePixels - 0.5;
+    for (let px = 0; px < width; px++) {
+      const tileX = (px + 0.5) / tilePixels - 0.5;
+      let shade = 0;
+      for (let distance = distanceStep; distance <= maxDistance; distance += distanceStep) {
+        const upstream = bilinearElevation(
+          map,
+          tileX - distance * SHADOW_DIRECTION_X,
+          tileY - distance * SHADOW_DIRECTION_Y,
+        );
+        const rise = upstream - baseline;
+        const reach = rise * distancePerLevel;
+        if (rise <= 0 || distance >= reach) continue;
+        shade = Math.max(shade, (0.28 + rise * 0.065) * (1 - 0.66 * distance / reach));
+      }
+      mask[py * width + px] = clamp(shade, 0, 0.72);
+    }
+  }
+  return boxBlurMask(mask, width, height, low ? 7 : 2);
+}
+
+/** Geometry-only contour wedges extruded from southeast-facing discrete height edges. */
+function ridgeWedgeShadowMask(map, tilePixels, width, height, sun) {
+  const low = sun === "low";
+  const baseline = modalElevation(map.elevation);
+  const distancePerLevel = low ? 6.2 : 1.65;
+  const canvas = createWorkerSafeCanvas();
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return new Float32Array(width * height);
+  ctx.fillStyle = low ? "rgba(0,0,0,0.19)" : "rgba(0,0,0,0.23)";
+
+  for (let ty = 0; ty < map.height; ty++) {
+    for (let tx = 0; tx < map.width; tx++) {
+      const heightLevel = elevationAt(map, tx, ty);
+      if (heightLevel <= baseline) continue;
+      const castTiles = (heightLevel - baseline) * distancePerLevel;
+      const offsetX = castTiles * tilePixels * SHADOW_DIRECTION_X;
+      const offsetY = castTiles * tilePixels * SHADOW_DIRECTION_Y;
+      if (heightLevel > elevationAt(map, tx + 1, ty)) {
+        fillShadowWedge(ctx,
+          (tx + 1) * tilePixels, ty * tilePixels,
+          (tx + 1) * tilePixels, (ty + 1) * tilePixels,
+          offsetX, offsetY);
+      }
+      if (heightLevel > elevationAt(map, tx, ty + 1)) {
+        fillShadowWedge(ctx,
+          tx * tilePixels, (ty + 1) * tilePixels,
+          (tx + 1) * tilePixels, (ty + 1) * tilePixels,
+          offsetX, offsetY);
+      }
+    }
+  }
+
+  const alpha = ctx.getImageData(0, 0, width, height).data;
+  const mask = new Float32Array(width * height);
+  for (let index = 0; index < mask.length; index++) mask[index] = alpha[index * 4 + 3] / 255;
+  return boxBlurMask(mask, width, height, low ? 2 : 1);
+}
+
+function fillShadowWedge(ctx, x1, y1, x2, y2, offsetX, offsetY) {
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x2 + offsetX, y2 + offsetY);
+  ctx.lineTo(x1 + offsetX, y1 + offsetY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function bilinearElevation(map, x, y) {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  const top = elevationAt(map, x0, y0) * (1 - fx) + elevationAt(map, x0 + 1, y0) * fx;
+  const bottom = elevationAt(map, x0, y0 + 1) * (1 - fx) + elevationAt(map, x0 + 1, y0 + 1) * fx;
+  return top * (1 - fy) + bottom * fy;
+}
+
+function modalElevation(levels) {
+  const counts = new Map();
+  let mode = 0;
+  let best = -1;
+  for (const raw of levels || []) {
+    const level = Number(raw) || 0;
+    const count = (counts.get(level) || 0) + 1;
+    counts.set(level, count);
+    if (count > best) {
+      best = count;
+      mode = level;
+    }
+  }
+  return mode;
+}
+
+function boxBlurMask(source, width, height, radius) {
+  if (radius <= 0) return source;
+  const horizontal = new Float32Array(source.length);
+  const output = new Float32Array(source.length);
+  for (let y = 0; y < height; y++) {
+    let sum = 0;
+    for (let x = -radius; x <= radius; x++) sum += source[y * width + clamp(x, 0, width - 1)];
+    for (let x = 0; x < width; x++) {
+      horizontal[y * width + x] = sum / (radius * 2 + 1);
+      sum -= source[y * width + clamp(x - radius, 0, width - 1)];
+      sum += source[y * width + clamp(x + radius + 1, 0, width - 1)];
+    }
+  }
+  for (let x = 0; x < width; x++) {
+    let sum = 0;
+    for (let y = -radius; y <= radius; y++) sum += horizontal[clamp(y, 0, height - 1) * width + x];
+    for (let y = 0; y < height; y++) {
+      output[y * width + x] = sum / (radius * 2 + 1);
+      sum -= horizontal[clamp(y - radius, 0, height - 1) * width + x];
+      sum += horizontal[clamp(y + radius + 1, 0, height - 1) * width + x];
+    }
+  }
+  return output;
+}
+
+function applyTerrainShadowMask(ctx, mask, width, height) {
+  const image = ctx.getImageData(0, 0, width, height);
+  const pixels = image.data;
+  for (let index = 0; index < mask.length; index++) {
+    const shade = clamp(mask[index], 0, 0.82);
+    if (shade <= 0.001) continue;
+    const offset = index * 4;
+    pixels[offset] = clampByte(pixels[offset] * (1 - shade * 0.76));
+    pixels[offset + 1] = clampByte(pixels[offset + 1] * (1 - shade * 0.7));
+    pixels[offset + 2] = clampByte(pixels[offset + 2] * (1 - shade * 0.56));
   }
   ctx.putImageData(image, 0, 0);
 }
@@ -347,12 +571,9 @@ export function buildStaticMap(map, {
   this._terrainCanvas = canvas;
   this._terrainContext = ctx;
   this._terrainTextureTileSize = textureTileSize;
-  for (let ty = 0; ty < map.height; ty++) {
-    for (let tx = 0; tx < map.width; tx++) {
-      drawTerrainTile(ctx, this._map, tx, ty, textureTileSize);
-    }
-  }
-  drawElevationRelief(ctx, this._map, textureTileSize);
+  paintTerrainSurface(ctx, this._map, textureTileSize);
+  this._terrainLightingSignature = null;
+  this.world.tint = 0xffffff;
 
   const layer = this.layers.terrain;
   if (reusable) {
