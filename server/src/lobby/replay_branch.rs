@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::faction_validation::{
     validate_faction_request, FactionRejectReason, FactionRequestContext, FactionValidation,
@@ -139,7 +139,7 @@ impl BranchStagingState {
         }
 
         let game = self.seed.game.clone_for_replay_keyframe();
-        let active_seats: HashSet<u32> = seat_by_connection.values().copied().collect();
+        let match_human_count = seat_by_connection.len();
         let participants = self
             .seed
             .seats
@@ -151,7 +151,7 @@ impl BranchStagingState {
             game,
             seat_by_connection,
             match_player_count: self.seed.seats.len(),
-            match_human_count: active_seats.len(),
+            match_human_count,
             map_name: self.seed.source_replay.map_name.clone(),
             seed: self.seed.source_replay.seed,
             participants,

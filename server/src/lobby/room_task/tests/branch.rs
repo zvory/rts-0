@@ -344,6 +344,10 @@ fn branch_launch_keeps_unclaimed_players_inert_and_unmapped() {
     assert_eq!(task.match_player_count, 2);
     assert_eq!(task.match_human_count, 1);
     assert_eq!(
+        task.match_participants,
+        vec![players[0].name.clone(), players[1].name.clone()]
+    );
+    assert_eq!(
         task.branch_live_seat_by_connection.get(&100),
         Some(&players[0].id)
     );
