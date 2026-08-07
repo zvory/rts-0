@@ -130,13 +130,13 @@ function drawElevationRelief(ctx, map, tilePixels, sun) {
   ctx.putImageData(image, 0, 0);
 }
 
-function paintTerrainSurface(ctx, map, tilePixels) {
+function paintTerrainSurface(ctx, map, tilePixels, { bakeLongShadows = true } = {}) {
   for (let ty = 0; ty < map.height; ty++) {
     for (let tx = 0; tx < map.width; tx++) drawTerrainTile(ctx, map, tx, ty, tilePixels);
   }
   if (!hasElevationRelief(map) || !map.sun) return;
   drawElevationRelief(ctx, map, tilePixels, map.sun);
-  drawLongTerrainShadows(ctx, map, tilePixels, map.sun);
+  if (bakeLongShadows) drawLongTerrainShadows(ctx, map, tilePixels, map.sun);
 }
 
 function hasElevationRelief(map) {
@@ -454,6 +454,7 @@ function drawRoadMarking(ctx, code, x, y, size) {
 
 export function buildStaticMap(map, {
   preserveMapLayers = false,
+  bakeLongShadows = true,
 } = {}) {
   this._map = {
     width: map.width,
@@ -478,7 +479,7 @@ export function buildStaticMap(map, {
   this._terrainCanvas = canvas;
   this._terrainContext = ctx;
   this._terrainTextureTileSize = textureTileSize;
-  paintTerrainSurface(ctx, this._map, textureTileSize);
+  paintTerrainSurface(ctx, this._map, textureTileSize, { bakeLongShadows });
   this.world.tint = hasElevationRelief(this._map) ? worldSunTint(this._map.sun) : 0xffffff;
 
   const layer = this.layers.terrain;
