@@ -148,6 +148,7 @@ export class ProjectedUnitShadowLayer {
     this.elevationTexture = null;
     this.shader = null;
     this.mesh = null;
+    this.projectedEntityIds = new Set();
     if (!this.supported) return;
     this.instanceData = new Float32Array(MAX_INSTANCES * FLOATS_PER_INSTANCE);
     this.instanceBuffer = new pixi.Buffer({
@@ -196,6 +197,7 @@ export class ProjectedUnitShadowLayer {
     this.enabled = Boolean(this.map?.sun && this.map.maxElevation > this.map.minElevation);
     this.geometry.instanceCount = 0;
     this.mesh.visible = false;
+    this.projectedEntityIds.clear();
     if (!this.enabled) return;
 
     const texture = elevationTexture(this.pixi, this.map);
@@ -220,21 +222,27 @@ export class ProjectedUnitShadowLayer {
   }
 
   update(entities) {
+    this.projectedEntityIds.clear();
     if (!this.supported) return 0;
     if (!this.enabled || !this.map) {
       this.geometry.instanceCount = 0;
       this.mesh.visible = false;
       return 0;
     }
+    // Keep the native rig-shadow fallback active unless the whole GPU batch commits.
+    // A failed buffer upload must not leave stale projected geometry visible or suppress
+    // the corresponding native shadows for this frame.
+    this.geometry.instanceCount = 0;
+    this.mesh.visible = false;
     let count = 0;
+    const admittedEntityIds = [];
     for (const entity of entities || []) {
       const volumes = PROXIES[entity?.kind];
-      if (!volumes) continue;
+      if (!volumes || entity?.visionOnly || count + volumes.length > MAX_INSTANCES) continue;
       const facing = finite(entity.facing, 0);
       const baseLevel = bilinearElevation(this.map, finite(entity.x, 0), finite(entity.y, 0));
       const baseHeight = baseLevel * this.map.tileSize;
       for (const volume of volumes) {
-        if (count >= MAX_INSTANCES) break;
         const offset = count * FLOATS_PER_INSTANCE;
         this.instanceData[offset] = finite(entity.x, 0);
         this.instanceData[offset + 1] = finite(entity.y, 0);
@@ -249,13 +257,19 @@ export class ProjectedUnitShadowLayer {
         this.instanceData[offset + 10] = baseHeight - this.map.minElevation * this.map.tileSize + volume.z1;
         count += 1;
       }
+      admittedEntityIds.push(entity.id);
     }
     this.instanceBuffer.setDataWithSize(this.instanceData, count * FLOATS_PER_INSTANCE, true);
+    for (const entityId of admittedEntityIds) this.projectedEntityIds.add(entityId);
     this.geometry.instanceCount = count;
     this.mesh.visible = count > 0;
     this.recordDiagnostic?.("renderer.projectedUnitShadows.instances", count);
     this.recordDiagnostic?.("renderer.projectedUnitShadows.drawCalls", count > 0 ? 1 : 0);
     return count;
+  }
+
+  hasShadowFor(entityId) {
+    return this.projectedEntityIds.has(entityId);
   }
 
   _createShader(texture = this.elevationTexture) {
@@ -280,6 +294,7 @@ export class ProjectedUnitShadowLayer {
     this.elevationTexture = null;
     this.instanceBuffer = null;
     this.instanceData = null;
+    this.projectedEntityIds.clear();
     this.map = null;
     this.supported = false;
   }
@@ -301,7 +316,7 @@ function elevationTexture(pixi, map) {
   }
   ctx.putImageData(image, 0, 0);
   const texture = pixi.Texture.from(canvas);
-  if (texture.source?.style) texture.source.style.scaleMode = "linear";
+  if (texture.source) texture.source.scaleMode = "linear";
   return texture;
 }
 

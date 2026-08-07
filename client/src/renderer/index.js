@@ -695,7 +695,7 @@ export class Renderer {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
               visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
-              projectedShadow: this._projectedUnitShadows?.enabled,
+              projectedShadow: this._projectedUnitShadows?.hasShadowFor(e.id),
               rememberRenderContext: true,
             });
           });
