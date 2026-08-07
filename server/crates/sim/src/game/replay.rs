@@ -11,6 +11,8 @@ pub use super::replay_artifact::{
     is_supported_replay_artifact_schema, ChatLogEntry, CommandLogEntry, ReplayArtifactV1,
     ReplayStartComposition, ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
 };
+use super::replay_oil_analysis::VehicleOilCollector;
+pub use super::replay_oil_analysis::VehicleOilRecord;
 use super::{Game, Map, MapMetadata, PlayerInit, PlayerStartingLoadout};
 use crate::game::command::SimCommand;
 use crate::protocol::{Event, ReplayStartMetadata, Snapshot};
@@ -239,6 +241,74 @@ pub fn replay_commands(
         events,
         final_snapshots,
     })
+}
+
+/// Replay one persisted artifact and retain each vehicle's modeled fractional movement-oil
+/// liability, including vehicles removed by death cleanup before the match ends.
+pub fn analyze_vehicle_movement_oil(
+    artifact: &ReplayArtifactV1,
+) -> Result<Vec<VehicleOilRecord>, String> {
+    let metadata = Map::metadata_for_name(&artifact.map_name)
+        .map_err(|err| format!("cannot load replay map metadata: {err}"))?;
+    artifact
+        .validate_against(&artifact.server_build_sha, &metadata)
+        .map_err(|err| err.to_string())?;
+    let replay_start_players: Vec<_> = artifact
+        .players
+        .iter()
+        .map(|player| {
+            (
+                player.id,
+                super::teams::normalize_team_id(player.id, player.team_id),
+            )
+        })
+        .collect();
+    let map = Map::load_for_players(&artifact.map_name, &replay_start_players, artifact.seed)
+        .map_err(|err| format!("cannot load replay map: {err}"))?;
+    let mut replay = artifact
+        .restore_start_game(map, metadata)
+        .map_err(|err| err.to_string())?;
+    if replay.tick_count() > artifact.duration_ticks {
+        return Err(format!(
+            "replay start tick {} is beyond replay length {}",
+            replay.tick_count(),
+            artifact.duration_ticks
+        ));
+    }
+    let mut collector = VehicleOilCollector::default();
+    collector.observe(replay.tick_count(), &replay.state.entities);
+    let mut next_command = 0usize;
+    let start_tick = replay.tick_count();
+
+    if start_tick < artifact.duration_ticks {
+        for tick in start_tick + 1..=artifact.duration_ticks {
+            while let Some(entry) = artifact.command_log.get(next_command) {
+                if entry.tick < tick {
+                    return Err(format!(
+                        "command log entry {next_command} has tick {}, before replay cursor {tick}",
+                        entry.tick
+                    ));
+                }
+                if entry.tick != tick {
+                    break;
+                }
+                replay.enqueue(
+                    entry.player_id,
+                    SimCommand::from_protocol(entry.command.clone()),
+                );
+                next_command += 1;
+            }
+            replay.tick_inner(None, Some(&mut collector));
+        }
+    }
+    if let Some(entry) = artifact.command_log.get(next_command) {
+        return Err(format!(
+            "command log entry {next_command} has tick {}, beyond replay length {}",
+            entry.tick, artifact.duration_ticks
+        ));
+    }
+    collector.observe(replay.tick_count(), &replay.state.entities);
+    Ok(collector.finish(&replay.state.entities))
 }
 
 #[derive(Debug, Clone, PartialEq)]
