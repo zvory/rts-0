@@ -553,6 +553,10 @@ export class MapEditorSession {
     if (!this.draft) throw new Error("Map is not initialized.");
     const draft = clone(this.draft);
     normalizeDraft(draft);
+    // Keep legacy flat authored maps byte-shape compatible: elevation and sunlight are optional
+    // authoring fields and should only appear once a map actually opts into relief rendering.
+    if (!draft.elevation.length) delete draft.elevation;
+    if (!draft.sun) delete draft.sun;
     return draft;
   }
 
