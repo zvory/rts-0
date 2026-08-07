@@ -8,6 +8,7 @@ pub(in crate::lobby) enum DevScenarioId {
     Replay142VehicleLock,
     Replay238RiflemanCornerLock,
     Replay256WorkerExpansionRally,
+    Replay281TankGap,
     ScoutCarWallChokepoint,
     VehicleCornerWall,
     VehicleSmallBlockBaseline,
@@ -39,6 +40,7 @@ impl DevScenarioId {
             "replay_142_vehicle_lock" => Some(Self::Replay142VehicleLock),
             "replay_238_rifleman_corner_lock" => Some(Self::Replay238RiflemanCornerLock),
             "replay_256_worker_expansion_rally" => Some(Self::Replay256WorkerExpansionRally),
+            "replay_281_tank_gap" => Some(Self::Replay281TankGap),
             "scout_car_wall_chokepoint" => Some(Self::ScoutCarWallChokepoint),
             "vehicle_corner_wall" => Some(Self::VehicleCornerWall),
             "vehicle_small_block_baseline" => Some(Self::VehicleSmallBlockBaseline),
@@ -73,6 +75,7 @@ impl DevScenarioId {
             Self::Replay142VehicleLock => "replay_142_vehicle_lock",
             Self::Replay238RiflemanCornerLock => "replay_238_rifleman_corner_lock",
             Self::Replay256WorkerExpansionRally => "replay_256_worker_expansion_rally",
+            Self::Replay281TankGap => "replay_281_tank_gap",
             Self::ScoutCarWallChokepoint => "scout_car_wall_chokepoint",
             Self::VehicleCornerWall => "vehicle_corner_wall",
             Self::VehicleSmallBlockBaseline => "vehicle_small_block_baseline",
@@ -94,5 +97,17 @@ impl DevScenarioId {
             Self::TankReverseTraffic => "tank_reverse_traffic",
             Self::TankDamagePursuitPivot => "tank_damage_pursuit_pivot",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replay_281_id_round_trips() {
+        let id =
+            DevScenarioId::from_room_id("replay_281_tank_gap").expect("replay-281 scenario id");
+        assert_eq!(id.room_id(), "replay_281_tank_gap");
     }
 }
