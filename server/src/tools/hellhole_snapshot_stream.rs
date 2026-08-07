@@ -255,6 +255,24 @@ mod tests {
         }
         assert_eq!(header["start"]["map"]["width"], 126);
         assert_eq!(header["start"]["map"]["height"], 126);
+        assert_eq!(header["start"]["map"]["sun"]["azimuthDegrees"], 330);
+        assert_eq!(header["start"]["map"]["sun"]["elevationDegrees"], 12);
+        assert_eq!(header["start"]["map"]["sun"]["warmth"], 78);
+        let elevation = header["start"]["map"]["elevation"]
+            .as_array()
+            .expect("Hellhole stream carries its elevation grid");
+        assert_eq!(elevation.len(), 126 * 126);
+        assert_eq!(
+            elevation.iter().filter_map(|level| level.as_u64()).max(),
+            Some(5)
+        );
+        assert!(
+            elevation
+                .iter()
+                .filter(|level| level.as_u64().unwrap_or(0) > 0)
+                .count()
+                > 3_000
+        );
         assert_eq!(
             header["start"]["map"]["terrain"]
                 .as_array()

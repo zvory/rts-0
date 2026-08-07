@@ -18,6 +18,7 @@ import {
 import { renderFrameStripUnit } from "./rigs/frame_strip_runtime.js";
 import { renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
+import { hasProjectedUnitShadow } from "./projected_unit_shadows.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
   DEPLOYED_WEAPON_ANIM_MS,
@@ -166,6 +167,7 @@ function unitVehicleBody(kind, stat) {
 }
 
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
+  const projectedShadow = Boolean(pools.projectedShadow && hasProjectedUnitShadow(e.kind));
   const visualOverride = pools.visualOverride || null;
   const rigKey = liveRigKeyForEntity(e);
   const definition = visualOverride?.definition || liveRigDefinitionFor(this._liveRigDefinitionsByKind, rigKey);
@@ -194,7 +196,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     }
     rememberRigRenderContext(this, e, pools, renderContext);
     const drawPlan = frameStripDrawPlanFor(routePlan);
-    if (drawPlan.shadowRoute) {
+    if (drawPlan.shadowRoute && !projectedShadow) {
       const sampledAnimation = sampleRigAnimationInto(
         animationStageFor(definition, drawPlan.sampledParts),
         e,
@@ -214,7 +216,13 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
       alpha: pools.alpha,
       renderContext,
     });
-    reconcileActiveLiveRigPools(this, e.id, drawPlan.activePoolNames);
+    reconcileActiveLiveRigPools(
+      this,
+      e.id,
+      projectedShadow
+        ? drawPlan.activePoolNames.filter((name) => name !== drawPlan.shadowRoute?.poolName)
+        : drawPlan.activePoolNames,
+    );
     return null;
   }
 
@@ -237,6 +245,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
       renderContext,
     );
     for (const step of drawPlan.steps) {
+      if (projectedShadow && step.route === routePlan.shadowRoute) continue;
       if (step.runtime === "png") {
         renderPngUnitRig(this, e, colorByOwner, state, definition, {
           atlas: pngAtlas,
@@ -258,11 +267,20 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
         });
       }
     }
-    reconcileActiveLiveRigPools(this, e.id, drawPlan.activePoolNames);
+    reconcileActiveLiveRigPools(
+      this,
+      e.id,
+      projectedShadow
+        ? drawPlan.activePoolNames.filter((name) => name !== routePlan.shadowRoute?.poolName)
+        : drawPlan.activePoolNames,
+    );
     return null;
   }
 
-  reconcileActiveLiveRigPools(this, e.id, routePlan.poolNames);
+  const routes = projectedShadow
+    ? routePlan.routes.filter((route) => route !== routePlan.shadowRoute)
+    : routePlan.routes;
+  reconcileActiveLiveRigPools(this, e.id, routes.map((route) => route.poolName));
   const renderContext = pools.renderContext || this._rigRenderContextFor?.(e, colorByOwner, state) || {};
   applyRigAlpha(renderContext, pools.alpha);
   rememberRigRenderContext(this, e, pools, renderContext);
@@ -272,7 +290,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     renderContext,
   );
   return renderLiveUnitRig(this, e, colorByOwner, state, definition, {
-    routes: routePlan.routes,
+    routes,
     alpha: pools.alpha,
     renderContext,
     sampledAnimation,
