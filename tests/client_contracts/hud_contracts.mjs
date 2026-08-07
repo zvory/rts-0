@@ -893,6 +893,22 @@ withFakeHudDocument(({ FakeElement }) => {
     "construction cancel should explain its refund behavior",
   );
 
+  const unfinishedBarracks = {
+    id: 171,
+    owner: 1,
+    kind: KIND.BARRACKS,
+    buildProgress: 0.45,
+  };
+  const productionConstructionCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [unfinishedBarracks],
+    entities: [unfinishedBarracks],
+  }));
+  const unfinishedProduction = buttonByAction(productionConstructionCard, "train");
+  assert(
+    unfinishedProduction?.enabled === false && unfinishedProduction.onUnavailableIntent == null,
+    "unfinished production slots stay inert instead of playing manual-production failure feedback",
+  );
+
   const scoutPlane = { id: 18, owner: 1, kind: KIND.SCOUT_PLANE };
   const scoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutPlane],

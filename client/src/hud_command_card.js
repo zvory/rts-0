@@ -505,9 +505,11 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       tooltipKind: unit,
       ...productionRepeatAffordance(automatic, producerIds, repeatingIds, unit,
         !underConstruction && availability === "ready"),
-      onUnavailableIntent: availability === "locked"
-        ? { type: "playCannotBuild" }
-        : { type: "playNotEnough", cost: st.cost, supply: st.supply },
+      onUnavailableIntent: automatic || underConstruction
+        ? null
+        : availability === "locked"
+          ? { type: "playCannotBuild" }
+          : { type: "playNotEnough", cost: st.cost, supply: st.supply },
     };
   }
   for (const upgrade of researches) {
