@@ -57,10 +57,7 @@ impl Game {
         }
 
         let mut entities = EntityStore::new();
-        let tanks = spawn_replay_tanks(
-            &mut entities,
-            scenario_case == CASE_COMMAND_CAR_DEATH,
-        )?;
+        let tanks = spawn_replay_tanks(&mut entities, scenario_case == CASE_COMMAND_CAR_DEATH)?;
         let include_enemy_screen =
             matches!(scenario_case, CASE_ENEMY_SCREEN | CASE_COMMAND_CAR_DEATH);
 
@@ -106,10 +103,7 @@ impl Game {
     }
 }
 
-fn spawn_replay_tanks(
-    entities: &mut EntityStore,
-    delay_fire: bool,
-) -> Result<Vec<u32>, String> {
+fn spawn_replay_tanks(entities: &mut EntityStore, delay_fire: bool) -> Result<Vec<u32>, String> {
     TANK_SPECS
         .into_iter()
         .map(|(x, y, hp, facing)| {
@@ -250,10 +244,29 @@ mod tests {
         assert!(
             removed_at.is_some(),
             "the low-health lead car should die; final={:?}; enemies={:?}",
-            setup.game.state.entities.get(command_car).map(|entity|
-                (entity.hp, entity.pos_x, entity.pos_y, entity.order(), entity.target_id())),
-            setup.game.state.entities.iter().filter(|entity| entity.owner == 2).map(|entity|
-                (entity.id, entity.hp, entity.pos_x, entity.pos_y, entity.order(), entity.target_id(), entity.weapon_cooldown(WeaponKind::MachineGunnerMg))).collect::<Vec<_>>()
+            setup.game.state.entities.get(command_car).map(|entity| (
+                entity.hp,
+                entity.pos_x,
+                entity.pos_y,
+                entity.order(),
+                entity.target_id()
+            )),
+            setup
+                .game
+                .state
+                .entities
+                .iter()
+                .filter(|entity| entity.owner == 2)
+                .map(|entity| (
+                    entity.id,
+                    entity.hp,
+                    entity.pos_x,
+                    entity.pos_y,
+                    entity.order(),
+                    entity.target_id(),
+                    entity.weapon_cooldown(WeaponKind::MachineGunnerMg)
+                ))
+                .collect::<Vec<_>>()
         );
     }
 
