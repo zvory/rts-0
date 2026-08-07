@@ -11,6 +11,7 @@ pub(super) struct BranchLaunchPlan {
     pub(super) game: Game,
     pub(super) seat_by_connection: HashMap<u32, u32>,
     pub(super) match_player_count: usize,
+    pub(super) match_human_count: usize,
     pub(super) map_name: String,
     pub(super) seed: u32,
     pub(super) participants: Vec<String>,
@@ -45,11 +46,7 @@ impl BranchStagingState {
     }
 
     pub(super) fn can_start(&self) -> bool {
-        self.seed
-            .seats
-            .iter()
-            .filter(|seat| seat.claimable)
-            .all(|seat| self.claimed_by_seat.contains_key(&seat.player_id))
+        !self.claimed_by_seat.is_empty()
     }
 
     pub(super) fn claimant_for_occupant(&self, occupant_id: u32) -> Option<u32> {
@@ -147,14 +144,14 @@ impl BranchStagingState {
             .seed
             .seats
             .iter()
-            .filter(|seat| active_seats.contains(&seat.player_id))
             .map(|seat| seat.name.clone())
             .collect();
 
         Ok(BranchLaunchPlan {
             game,
             seat_by_connection,
-            match_player_count: active_seats.len(),
+            match_player_count: self.seed.seats.len(),
+            match_human_count: active_seats.len(),
             map_name: self.seed.source_replay.map_name.clone(),
             seed: self.seed.source_replay.seed,
             participants,
