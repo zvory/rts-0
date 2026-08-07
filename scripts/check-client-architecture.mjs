@@ -145,6 +145,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "map_editor_panel.js": "ui",
   "map_editor_preview_button.js": "ui",
   "map_editor_panel_workflow.js": "ui",
+  "map_editor_sun_controls.js": "ui",
   "map_editor_session.js": "ui",
   "map_editor_doodads.js": "ui",
   "panel_touch_activation.js": "ui",

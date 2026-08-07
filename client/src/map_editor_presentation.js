@@ -4,7 +4,7 @@ import {
   validateMapAuthoringLayerVisibility,
 } from "./map_authoring/layers.js";
 
-export const MAP_EDITOR_PRESENTATION_VERSION = 2;
+export const MAP_EDITOR_PRESENTATION_VERSION = 3;
 
 export function createMapEditorPresentation({
   generation = 1,
@@ -51,6 +51,11 @@ export function validateMapEditorPresentation(record) {
       if (!Array.isArray(update.terrain) || update.terrain.length !== update.width * update.height) {
         throw new RangeError("Map Editor replacement terrain shape does not match its payload");
       }
+      if (!Array.isArray(update.elevation) || update.elevation.length !== update.width * update.height
+        || update.elevation.some((level) => !Number.isInteger(level) || level < 0 || level > 9)) {
+        throw new RangeError("Map Editor replacement elevation shape does not match its payload");
+      }
+      validateSun(update.sun);
     } else if (update.kind === "patch") {
       if (!Array.isArray(update.changes)) throw new TypeError("Map Editor terrain patch requires changes");
     } else throw new TypeError("Map Editor terrain update kind is unsupported");
@@ -73,6 +78,16 @@ export function validateMapEditorPresentation(record) {
   }
   structuredClone(record);
   return record;
+}
+
+function validateSun(sun) {
+  if (sun == null) return;
+  if (typeof sun !== "object" || Array.isArray(sun)
+    || !Number.isInteger(sun.azimuthDegrees) || sun.azimuthDegrees < 0 || sun.azimuthDegrees > 359
+    || !Number.isInteger(sun.elevationDegrees) || sun.elevationDegrees < 1 || sun.elevationDegrees > 89
+    || !Number.isInteger(sun.warmth) || sun.warmth < 0 || sun.warmth > 100) {
+    throw new RangeError("Map Editor sun requires direction 0-359, height 1-89, and warmth 0-100");
+  }
 }
 
 function validateDoodads(records, label) {

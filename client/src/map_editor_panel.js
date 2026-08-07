@@ -3,6 +3,7 @@ import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import { createMapEditorPreviewButton } from "./map_editor_preview_button.js";
+import { createMapEditorSunSettings } from "./map_editor_sun_controls.js";
 import {
   MAP_EDITOR_CATEGORIES,
   MAP_EDITOR_OPERATIONS,
@@ -446,6 +447,7 @@ export class MapEditorPanel {
       body.append(
         this.renderMapSource(),
         this.renderDetails(),
+        createMapEditorSunSettings(this.session, this.viewport),
         this.renderDocumentUtilities(),
       );
     }

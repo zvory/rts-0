@@ -303,6 +303,10 @@ by tile and complete overlays remain pending until the worker acknowledges the e
 presented; edits made while that presentation is in flight merge into the next submission. This
 lets ordinary match frames remain latest-oriented without treating authoring changes as disposable
 presentation data. A failed editor worker stops new submissions and reports one visible error.
+Full editor terrain replacements carry the materialized elevation grid and authored sun conditions.
+Sun-control input replaces only the latest pending full terrain update, so direction, height,
+relief shadows, and world color temperature preview live while retaining the one-frame-in-flight
+backpressure contract.
 
 ## 5. Explicitly deferred
 

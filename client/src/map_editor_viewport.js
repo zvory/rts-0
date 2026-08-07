@@ -314,6 +314,17 @@ export class MapEditorViewport {
   rebuildTerrain() {
     if (!this.session.draft) return;
     const materialized = this.session.materialized();
+    MapEditorViewport.prototype.queueTerrainReplacement.call(this, materialized);
+  }
+
+  previewSunConditions(sun) {
+    if (!this.session.draft?.sun) return false;
+    const materialized = this.session.materialized();
+    MapEditorViewport.prototype.queueTerrainReplacement.call(this, { ...materialized, sun: { ...sun } });
+    return true;
+  }
+
+  queueTerrainReplacement(materialized) {
     this.terrainRevision += 1;
     this.pendingTerrainUpdate = {
       kind: "replace",
@@ -322,6 +333,8 @@ export class MapEditorViewport {
       height: materialized.height,
       tileSize: TILE_SIZE,
       terrain: materialized.terrain,
+      elevation: materialized.elevation,
+      sun: materialized.sun,
     };
     const worldWidth = materialized.width * TILE_SIZE;
     const worldHeight = materialized.height * TILE_SIZE;

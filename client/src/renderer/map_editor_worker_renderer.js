@@ -62,6 +62,8 @@ export class MapEditorWorkerRenderer {
         height: update.height,
         tileSize: update.tileSize,
         terrain: update.terrain,
+        elevation: update.elevation,
+        sun: update.sun,
       });
     } else {
       this.renderer.updateStaticTerrainTiles(update.changes);

@@ -129,6 +129,7 @@ src/
   map_editor_panel_workflow.js # Pure editor category/operation availability and current-tool labels
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
+  map_editor_sun_controls.js # relief-map sun sliders plus preview/commit behavior
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_startup_inbox.js # semantic buffering while asynchronous Match construction completes
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
@@ -154,7 +155,7 @@ so it never opens a WebSocket or constructs `App`, `Match`, `GameState`, Lab con
 orders, replay controls, or a simulation clock. It reuses the normal worker-owned Pixi `Renderer`, terrain cache,
 `Camera`, map schema, and player palette, but `MapEditorViewport` never constructs Pixi or reaches
 into renderer layers/application state. Input, hit math, session edits, and camera stay on the main
-thread; `MapEditorPresentationV2` carries revisioned terrain replacement/patch data, complete
+thread; `MapEditorPresentationV3` carries revisioned terrain replacement/patch data, complete
 authoring-layer visibility, and detached grid, symmetry, start/base, selection, label, and
 paint-preview records. The main-thread adapter owns
 the stable transferred HTML canvas while the same Pixi module worker owns display objects, ordered
@@ -987,7 +988,12 @@ import/export. The editor
 accepts authored-map JSON up to 8 MiB and only materialized authored maps containing terrain;
 agent-authored recipes remain a
 `scripts/map-author.mjs build` CLI input and are not a Map Editor document type. Import normalization
-preserves authored terrain verbatim, including impassable terrain in a protected base footprint, so
+preserves authored elevation and sun conditions. Relief maps expose live Direction, Height, and
+Color temperature controls in Map settings. Dragging them rebuilds the editor's worker-owned terrain
+preview with candidate sun conditions without adding intermediate undo entries; releasing a control
+commits one authored-map change. Flat maps keep the controls informational because the map contract
+permits sunlight only alongside varying elevation. Import normalization preserves authored terrain
+verbatim, including impassable terrain in a protected base footprint, so
 the advisory and authoritative checks can report the author's actual input. Interactive rock/water
 painting is still rejected in protected footprints, and moving or adding a location makes its
 footprint passable. Resize
