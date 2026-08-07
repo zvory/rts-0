@@ -290,6 +290,16 @@ pub struct MapInfo {
     pub tile_size: u32,
     /// Row-major terrain codes, length = width * height.
     pub terrain: Vec<u8>,
+    /// Row-major static elevation levels, length = width * height.
+    ///
+    /// Elevation is presentation-only for now: the server owns and distributes it, but no
+    /// movement, visibility, or combat rule consumes it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub elevation: Vec<u8>,
+    /// Optional authored presentation conditions for static elevation lighting. Flat maps omit
+    /// this field and retain the renderer's unlit terrain path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sun: Option<MapSun>,
     /// Positions of all neutral resource nodes (steel/oil). Included so the
     /// client can render them on the minimap before fog-of-war reveals them.
     pub resources: Vec<ResourceNode>,
@@ -317,6 +327,18 @@ pub struct MapInfo {
     /// Sparse tile overlay that reduces occupant movement speed by 25%.
     #[serde(default)]
     pub slow_movement_tiles: Vec<MapTile>,
+}
+
+/// Authored static sunlight used only to render elevated terrain.
+///
+/// Azimuth follows compass degrees in map space: 0 is north (negative tile Y), 90 is east.
+/// Elevation is degrees above the horizon. Warmth is a bounded 0-100 presentation grade.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MapSun {
+    pub azimuth_degrees: u16,
+    pub elevation_degrees: u8,
+    pub warmth: u8,
 }
 
 /// A canonical map tile coordinate used by sparse authored overlays.

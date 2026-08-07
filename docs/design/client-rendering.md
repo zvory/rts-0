@@ -251,7 +251,7 @@ Its payload lifetimes are explicit:
 
 - initialization: transferred canvas, CSS size, DPR, PresentationFrameV2/StaticMapPresentationV2
   versions, and immutable configuration;
-- map generation: one static-map payload and transferred terrain copy per generation;
+- map generation: one static-map payload and transferred terrain/elevation copies per generation;
 - durable update: monotonic ground-decal revision plus its detached records;
 - revisioned data: transferred visible/explored copies only when each revision changes;
 - frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
@@ -261,6 +261,12 @@ Responses are `ready` after all renderer assets are ready, `retained`, `presente
 update/present timings, `superseded`, bounded `failed`, and `destroyed`. The message builder never
 transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
 usable and unchanged.
+
+The immutable static-map DTO also carries optional authored sun conditions. When elevation varies,
+the terrain builder computes a smooth height-field relief and receiver-aware ray-marched horizon
+shadow mask once per map generation, then uploads the resulting terrain texture. `warmth` applies a
+matching static world tint. A flat elevation grid with no sun bypasses all height-field pixel reads,
+shadow work, and tinting, preserving the pre-elevation render path for existing maps.
 
 The worker treats an observed WebGL context loss as a terminal presentation failure; it does not
 silently keep acknowledging black frames. Worker uncaught errors, unhandled rejections, message

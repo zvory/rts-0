@@ -55,6 +55,8 @@ fn map_draft() -> LabMapDraft {
         width: 64,
         height: 64,
         terrain,
+        elevation: Vec::new(),
+        sun: None,
         starts: vec![LabMapTile { x: 12, y: 12 }, LabMapTile { x: 51, y: 51 }],
         base_sites: vec![LabBaseSite {
             x: 32,
@@ -242,6 +244,8 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
         width: 64,
         height: 64,
         terrain,
+        elevation: Vec::new(),
+        sun: None,
         starts: game
             .state
             .map

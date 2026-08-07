@@ -3,9 +3,20 @@ import { createWorkerPresentationState } from "../../client/src/renderer/worker_
 
 const state = createWorkerPresentationState();
 state.reset(1);
-state.map(request("mapGeneration", {
-  map: { version: 1, revision: 1, width: 1, height: 1, tileSize: 32, terrain: grid(1, [0]) },
+const staticMap = state.map(request("mapGeneration", {
+  map: {
+    version: 1,
+    revision: 1,
+    width: 1,
+    height: 1,
+    tileSize: 32,
+    terrain: grid(1, [0]),
+    elevation: grid(1, [3]),
+    sun: { azimuthDegrees: 315, elevationDegrees: 12, warmth: 75 },
+  },
 }));
+assert(staticMap.elevation.values[0] === 3 && staticMap.sun.warmth === 75,
+  "worker rehydration retains elevation and sun in the static map");
 state.revisions(request("revisionedGrids", {
   revisions: { visible: grid(1, [1]), explored: grid(1, [1]) },
 }));

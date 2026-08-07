@@ -13,6 +13,9 @@ import {
 
 const TERRAIN_TEXTURE_DOWNSAMPLE = 4;
 const GROUND_TRANSITION_DEPTH = 0.56;
+const RELIEF_SLOPE_SCALE = 1.55;
+const RELIEF_DIRECTIONAL_STRENGTH = 1.35;
+const RELIEF_DIRECTIONAL_LIMIT = 0.34;
 
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
@@ -65,6 +68,249 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   // Markings belong to the road surface and must remain legible above edge dither.
   drawRoadMarking(ctx, code, x, y, textureTileSize);
   fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
+}
+
+function elevationAt(map, tx, ty) {
+  const x = Math.max(0, Math.min(map.width - 1, tx));
+  const y = Math.max(0, Math.min(map.height - 1, ty));
+  return Number(map.elevation?.[y * map.width + x]) || 0;
+}
+
+/**
+ * Soften tile elevations into one continuous C2 surface, then light that surface in-place. Cubic
+ * B-spline sampling avoids visible level bands and never moves the ground plane or its hit targets.
+ */
+function drawElevationRelief(ctx, map, tilePixels, sun) {
+  const levels = map.elevation || [];
+  let minHeight = Infinity;
+  let maxHeight = -Infinity;
+  for (const raw of levels) {
+    const height = Number(raw) || 0;
+    minHeight = Math.min(minHeight, height);
+    maxHeight = Math.max(maxHeight, height);
+  }
+  if (!Number.isFinite(minHeight) || maxHeight <= minHeight) return;
+
+  const width = map.width * tilePixels;
+  const height = map.height * tilePixels;
+  const image = ctx.getImageData(0, 0, width, height);
+  const pixels = image.data;
+  const heightRange = Math.max(1, maxHeight - minHeight);
+  const light = sunVector(sun);
+
+  for (let py = 0; py < height; py += 1) {
+    const sampleY = (py + 0.5) / tilePixels - 0.5;
+    for (let px = 0; px < width; px += 1) {
+      const sampleX = (px + 0.5) / tilePixels - 0.5;
+      const surface = sampleElevationSurface(map, sampleX, sampleY);
+      const normalX = -surface.dx * RELIEF_SLOPE_SCALE;
+      const normalY = -surface.dy * RELIEF_SLOPE_SCALE;
+      const inverseLength = 1 / Math.hypot(normalX, normalY, 1);
+      const illumination = (
+        normalX * light.x
+        + normalY * light.y
+        + light.z
+      ) * inverseLength;
+      const directional = clamp(
+        (illumination - light.z) * RELIEF_DIRECTIONAL_STRENGTH,
+        -RELIEF_DIRECTIONAL_LIMIT,
+        RELIEF_DIRECTIONAL_LIMIT,
+      );
+      const altitude = clamp((surface.height - minHeight) / heightRange, 0, 1);
+      const ambientShape = clamp(-surface.laplacian * 0.045, -0.11, 0.09);
+      const brightness = 1 + directional + ambientShape + (altitude - 0.5) * 0.075;
+      const tint = altitude * 0.09;
+      const cool = (1 - altitude) * 0.03;
+      const index = (py * width + px) * 4;
+      pixels[index] = clampByte(pixels[index] * brightness * (1 - tint - cool) + 232 * tint + 54 * cool);
+      pixels[index + 1] = clampByte(pixels[index + 1] * brightness * (1 - tint - cool) + 211 * tint + 75 * cool);
+      pixels[index + 2] = clampByte(pixels[index + 2] * brightness * (1 - tint - cool) + 159 * tint + 84 * cool);
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
+function paintTerrainSurface(ctx, map, tilePixels) {
+  for (let ty = 0; ty < map.height; ty++) {
+    for (let tx = 0; tx < map.width; tx++) drawTerrainTile(ctx, map, tx, ty, tilePixels);
+  }
+  if (!hasElevationRelief(map) || !map.sun) return;
+  drawElevationRelief(ctx, map, tilePixels, map.sun);
+  drawLongTerrainShadows(ctx, map, tilePixels, map.sun);
+}
+
+function hasElevationRelief(map) {
+  const levels = map.elevation || [];
+  if (levels.length === 0) return false;
+  const first = Number(levels[0]) || 0;
+  return levels.some((height) => (Number(height) || 0) !== first);
+}
+
+function sunVector(sun) {
+  const azimuth = sun.azimuthDegrees * Math.PI / 180;
+  const elevation = sun.elevationDegrees * Math.PI / 180;
+  const horizontal = Math.cos(elevation);
+  return {
+    x: Math.sin(azimuth) * horizontal,
+    y: -Math.cos(azimuth) * horizontal,
+    z: Math.sin(elevation),
+  };
+}
+
+function drawLongTerrainShadows(ctx, map, tilePixels, sun) {
+  const width = map.width * tilePixels;
+  const height = map.height * tilePixels;
+  const mask = rayMarchedShadowMask(map, tilePixels, width, height, sun);
+  applyTerrainShadowMask(ctx, mask, width, height);
+}
+
+/** Continuous receiver-aware horizon test, sampled in texture-pixel space. */
+function rayMarchedShadowMask(map, tilePixels, width, height, sun) {
+  const azimuth = sun.azimuthDegrees * Math.PI / 180;
+  const direction = { x: Math.sin(azimuth), y: -Math.cos(azimuth) };
+  const sunSlope = Math.tan(sun.elevationDegrees * Math.PI / 180);
+  const levels = map.elevation || [];
+  let minHeight = Infinity;
+  let maxHeight = -Infinity;
+  for (const raw of levels) {
+    const heightLevel = Number(raw) || 0;
+    minHeight = Math.min(minHeight, heightLevel);
+    maxHeight = Math.max(maxHeight, heightLevel);
+  }
+  const maxDistance = clamp((maxHeight - minHeight) / Math.max(0.05, sunSlope) + 4, 8, 48);
+  const distanceStep = sun.elevationDegrees <= 20 ? 0.72 : 0.58;
+  const mask = new Float32Array(width * height);
+  for (let py = 0; py < height; py++) {
+    const tileY = (py + 0.5) / tilePixels - 0.5;
+    for (let px = 0; px < width; px++) {
+      const tileX = (px + 0.5) / tilePixels - 0.5;
+      const receiver = bilinearElevation(map, tileX, tileY);
+      let shade = 0;
+      for (let distance = distanceStep; distance <= maxDistance; distance += distanceStep) {
+        const upstreamX = tileX + distance * direction.x;
+        const upstreamY = tileY + distance * direction.y;
+        if (upstreamX < -0.5 || upstreamY < -0.5
+          || upstreamX > map.width - 0.5 || upstreamY > map.height - 0.5) break;
+        const blocker = bilinearElevation(map, upstreamX, upstreamY);
+        const clearance = blocker - receiver - distance * sunSlope;
+        if (clearance <= 0) continue;
+        const fade = 1 - distance / (maxDistance + distanceStep);
+        shade = Math.max(shade, clamp((0.2 + clearance * 0.15) * fade, 0, 0.78));
+      }
+      mask[py * width + px] = shade;
+    }
+  }
+  const blurRadius = sun.elevationDegrees <= 20 ? 3 : 1;
+  return boxBlurMask(mask, width, height, blurRadius);
+}
+
+function bilinearElevation(map, x, y) {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  const top = elevationAt(map, x0, y0) * (1 - fx) + elevationAt(map, x0 + 1, y0) * fx;
+  const bottom = elevationAt(map, x0, y0 + 1) * (1 - fx) + elevationAt(map, x0 + 1, y0 + 1) * fx;
+  return top * (1 - fy) + bottom * fy;
+}
+
+function boxBlurMask(source, width, height, radius) {
+  if (radius <= 0) return source;
+  const horizontal = new Float32Array(source.length);
+  const output = new Float32Array(source.length);
+  for (let y = 0; y < height; y++) {
+    let sum = 0;
+    for (let x = -radius; x <= radius; x++) sum += source[y * width + clamp(x, 0, width - 1)];
+    for (let x = 0; x < width; x++) {
+      horizontal[y * width + x] = sum / (radius * 2 + 1);
+      sum -= source[y * width + clamp(x - radius, 0, width - 1)];
+      sum += source[y * width + clamp(x + radius + 1, 0, width - 1)];
+    }
+  }
+  for (let x = 0; x < width; x++) {
+    let sum = 0;
+    for (let y = -radius; y <= radius; y++) sum += horizontal[clamp(y, 0, height - 1) * width + x];
+    for (let y = 0; y < height; y++) {
+      output[y * width + x] = sum / (radius * 2 + 1);
+      sum -= horizontal[clamp(y - radius, 0, height - 1) * width + x];
+      sum += horizontal[clamp(y + radius + 1, 0, height - 1) * width + x];
+    }
+  }
+  return output;
+}
+
+function applyTerrainShadowMask(ctx, mask, width, height) {
+  const image = ctx.getImageData(0, 0, width, height);
+  const pixels = image.data;
+  for (let index = 0; index < mask.length; index++) {
+    const shade = clamp(mask[index], 0, 0.82);
+    if (shade <= 0.001) continue;
+    const offset = index * 4;
+    pixels[offset] = clampByte(pixels[offset] * (1 - shade * 0.76));
+    pixels[offset + 1] = clampByte(pixels[offset + 1] * (1 - shade * 0.7));
+    pixels[offset + 2] = clampByte(pixels[offset + 2] * (1 - shade * 0.56));
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
+function sampleElevationSurface(map, x, y) {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const xBasis = cubicBasis(x - ix);
+  const yBasis = cubicBasis(y - iy);
+  let height = 0;
+  let dx = 0;
+  let dy = 0;
+  let dxx = 0;
+  let dyy = 0;
+  for (let oy = 0; oy < 4; oy += 1) {
+    for (let ox = 0; ox < 4; ox += 1) {
+      const elevation = elevationAt(map, ix + ox - 1, iy + oy - 1);
+      height += elevation * xBasis.weight[ox] * yBasis.weight[oy];
+      dx += elevation * xBasis.derivative[ox] * yBasis.weight[oy];
+      dy += elevation * xBasis.weight[ox] * yBasis.derivative[oy];
+      dxx += elevation * xBasis.second[ox] * yBasis.weight[oy];
+      dyy += elevation * xBasis.weight[ox] * yBasis.second[oy];
+    }
+  }
+  return { height, dx, dy, laplacian: dxx + dyy };
+}
+
+function cubicBasis(t) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return {
+    weight: [
+      (1 - 3 * t + 3 * t2 - t3) / 6,
+      (4 - 6 * t2 + 3 * t3) / 6,
+      (1 + 3 * t + 3 * t2 - 3 * t3) / 6,
+      t3 / 6,
+    ],
+    derivative: [
+      (-3 + 6 * t - 3 * t2) / 6,
+      (-12 * t + 9 * t2) / 6,
+      (3 + 6 * t - 9 * t2) / 6,
+      t2 / 2,
+    ],
+    second: [1 - t, -2 + 3 * t, 1 - 3 * t, t],
+  };
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function clampByte(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function worldSunTint(sun) {
+  if (!sun) return 0xffffff;
+  const amount = clamp(sun.warmth / 100, 0, 1);
+  const red = 0xff;
+  const green = clampByte(0xff + (0xd0 - 0xff) * amount);
+  const blue = clampByte(0xff + (0x8a - 0xff) * amount);
+  return (red << 16) | (green << 8) | blue;
 }
 
 function drawTerrainVariantDetails(ctx, variant, tx, ty, x, y, size) {
@@ -214,6 +460,8 @@ export function buildStaticMap(map, {
     height: map.height,
     tileSize: map.tileSize,
     terrain: Array.from(map.terrain || []),
+    elevation: Array.from(map.elevation || new Uint8Array(map.width * map.height)),
+    sun: map.sun ? { ...map.sun } : null,
   };
   const ts = map.tileSize;
   const textureTileSize = Math.max(1, Math.round(ts / TERRAIN_TEXTURE_DOWNSAMPLE));
@@ -230,11 +478,8 @@ export function buildStaticMap(map, {
   this._terrainCanvas = canvas;
   this._terrainContext = ctx;
   this._terrainTextureTileSize = textureTileSize;
-  for (let ty = 0; ty < map.height; ty++) {
-    for (let tx = 0; tx < map.width; tx++) {
-      drawTerrainTile(ctx, this._map, tx, ty, textureTileSize);
-    }
-  }
+  paintTerrainSurface(ctx, this._map, textureTileSize);
+  this.world.tint = hasElevationRelief(this._map) ? worldSunTint(this._map.sun) : 0xffffff;
 
   const layer = this.layers.terrain;
   if (reusable) {
@@ -280,9 +525,15 @@ export function updateStaticTerrainTiles(changes) {
     dirty.add(`${x},${y - 1}`);
     dirty.add(`${x},${y + 1}`);
   }
-  for (const key of dirty) {
-    const [x, y] = key.split(",").map(Number);
-    drawTerrainTile(ctx, map, x, y, textureTileSize);
+  const hasRelief = hasElevationRelief(map);
+  if (hasRelief && dirty.size) {
+    // This path is editor-only in practice; repainting avoids stacking the alpha-free relief pass.
+    paintTerrainSurface(ctx, map, textureTileSize);
+  } else {
+    for (const key of dirty) {
+      const [x, y] = key.split(",").map(Number);
+      drawTerrainTile(ctx, map, x, y, textureTileSize);
+    }
   }
   if (dirty.size) this._terrainSprite.texture.source.update();
   return dirty.size;

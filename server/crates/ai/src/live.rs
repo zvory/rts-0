@@ -621,6 +621,8 @@ mod tests {
                 height: 8,
                 tile_size: crate::config::TILE_SIZE,
                 terrain: vec![terrain::GRASS; 8 * 8],
+                elevation: vec![0; 8 * 8],
+                sun: None,
                 resources: vec![ResourceNode {
                     id: 10,
                     kind: rts_sim::protocol::kinds::STEEL.to_string(),

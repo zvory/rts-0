@@ -26,6 +26,8 @@ fn pending_tracker_start_payload() -> StartPayload {
             height: 96,
             tile_size: config::TILE_SIZE,
             terrain: vec![terrain::GRASS; 96 * 96],
+            elevation: vec![0; 96 * 96],
+            sun: None,
             resources: Vec::new(),
             doodads: Vec::new(),
             concealment_tiles: Vec::new(),

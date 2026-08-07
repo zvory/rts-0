@@ -20,7 +20,15 @@ import {
   validateRenderWorkerResponse,
 } from "../../client/src/renderer/worker_messages.js";
 
-const map = { width: 2, height: 2, tileSize: 32, terrain: [0, 1, 2, 3], resources: [] };
+const map = {
+  width: 2,
+  height: 2,
+  tileSize: 32,
+  terrain: [0, 1, 2, 3],
+  elevation: [0, 2, 4, 1],
+  sun: { azimuthDegrees: 315, elevationDegrees: 12, warmth: 75 },
+  resources: [],
+};
 const camera = new Camera(640, 480);
 camera.setBounds(64, 64, 640, 480);
 const assembler = new PresentationFrameAssembler({ map });
@@ -63,12 +71,15 @@ assert(init.transfer.length === 1 && init.transfer[0] === canvas,
 validateRenderWorkerRequest(init, { requireCanvas: true });
 
 const mapMessage = createMapGenerationMessage(assembler.staticMap);
-assert(mapMessage.transfer.length === 1 && mapMessage.message.payload.map.terrain.values !== assembler.staticMap.terrain.values,
-  "map-generation terrain owns a detached transferable copy");
+assert(mapMessage.transfer.length === 2 && mapMessage.message.payload.map.terrain.values !== assembler.staticMap.terrain.values,
+  "map-generation terrain and elevation own detached transferable copies");
 const mapClone = structuredClone(mapMessage.message, { transfer: [...mapMessage.transfer] });
-assert(mapMessage.transfer[0].byteLength === 0 && mapClone.payload.map.terrain.values.length === 4,
+assert(mapMessage.transfer.every((buffer) => buffer.byteLength === 0)
+  && mapClone.payload.map.terrain.values.length === 4
+  && mapClone.payload.map.elevation.values.length === 4,
   "map-generation transferable moves without detaching the assembler static map");
 assert(assembler.staticMap.terrain.values.length === 4, "map serialization never mutates its source snapshot");
+assert(mapClone.payload.map.sun.warmth === 75, "map generation preserves authored sun conditions");
 
 const state = createRenderWorkerWireState();
 const firstMessages = createFrameMessages(representative, state);
