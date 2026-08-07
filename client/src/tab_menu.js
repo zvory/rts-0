@@ -8,10 +8,10 @@ const DEFAULT_RESERVATIONS = Object.freeze({ steel: 0, oil: 0 });
 const RESERVATION_STEP = 100;
 const RESERVATION_MAX = 9_950;
 const POINTER_HOLD_DELAY_MS = 200;
-const PRODUCTION_BUILDINGS = Object.freeze([
-  Object.freeze({ kind: KIND.BARRACKS, label: "Barracks" }),
-  Object.freeze({ kind: KIND.STEELWORKS, label: "Gunworks" }),
-  Object.freeze({ kind: KIND.FACTORY, label: "Vehicle Works" }),
+const PRODUCTION_BUILDING_PRIORITY = Object.freeze([
+  KIND.BARRACKS,
+  KIND.STEELWORKS,
+  KIND.FACTORY,
 ]);
 
 /**
@@ -470,11 +470,14 @@ export class TabMenu {
 export function productionGridEntries(state, hotkeyProfiles = null, entities = null) {
   const factionId = state?.localFactionId || state?.localPlayer?.factionId;
   const catalog = factionCatalog(factionId);
-  const base = PRODUCTION_BUILDINGS.flatMap(({ kind, label }) =>
+  const producerKinds = Object.keys(catalog.trainables)
+    .filter((kind) => kind !== KIND.RESOURCE_DEPOT)
+    .sort((a, b) => producerKindOrder(a) - producerKindOrder(b));
+  const base = producerKinds.flatMap((kind) =>
     (catalog.trainables[kind] || []).map((unit) => ({
       unit,
       producerKind: kind,
-      producerLabel: label,
+      producerLabel: STATS[kind]?.label || kind,
       commandId: factionCommandId(factionId, "train", unit),
     })));
   const profile = hotkeyProfiles?.getActiveProfile?.();
@@ -497,6 +500,11 @@ export function productionGridEntries(state, hotkeyProfiles = null, entities = n
       activeCount: producers.filter((producer) => producer.prodRepeatKinds?.includes(entry.unit)).length,
     };
   });
+}
+
+function producerKindOrder(kind) {
+  const priority = PRODUCTION_BUILDING_PRIORITY.indexOf(kind);
+  return priority < 0 ? PRODUCTION_BUILDING_PRIORITY.length : priority;
 }
 
 function producersForUnit(state, unit, entities = null) {

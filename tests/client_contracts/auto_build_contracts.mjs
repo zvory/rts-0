@@ -1,5 +1,6 @@
 import { autoBuild } from "../../client/src/state_auto_build.js";
 import { productionGridEntries, productionRepeatCommand } from "../../client/src/tab_menu.js";
+import { EKAT_FACTION_ID } from "../../client/src/config.js";
 import { DEFAULT_FACTION_ID, KIND } from "../../client/src/protocol.js";
 import { assert, assertDeepEqual } from "./assertions.mjs";
 
@@ -52,4 +53,33 @@ assertDeepEqual(
   conflictingClassicEntries.map((entry) => entry.hotkey),
   ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"],
   "conflicting classic bindings fall back to the deterministic grid",
+);
+
+const ekatEntries = productionGridEntries({
+  playerId: 1,
+  localFactionId: EKAT_FACTION_ID,
+  entitiesInterpolated: () => [
+    { id: 40, owner: 1, kind: KIND.ZAMOK, prodRepeatKinds: [KIND.GOLEM] },
+  ],
+}, {
+  getActiveProfile: () => ({ mode: "grid" }),
+});
+assertDeepEqual(
+  ekatEntries.map(({ unit, producerKind, producerLabel, hotkey, producerIds, activeCount }) => ({
+    unit,
+    producerKind,
+    producerLabel,
+    hotkey,
+    producerIds,
+    activeCount,
+  })),
+  [{
+    unit: KIND.GOLEM,
+    producerKind: KIND.ZAMOK,
+    producerLabel: "Zamok",
+    hotkey: "Q",
+    producerIds: [40],
+    activeCount: 1,
+  }],
+  "global Auto-Build derives producer kinds and trainables from the local faction catalog",
 );
