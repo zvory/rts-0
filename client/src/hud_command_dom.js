@@ -50,7 +50,7 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {string[]} [opts.contextHotkeyModifiers] modifiers that invoke the context hotkey action.
  * @param {() => void} [opts.onMouseEnter] hover handler.
  * @param {() => void} [opts.onMouseLeave] hover-exit handler.
- * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
+ * @param {() => void} [opts.onUnavailable] primary click handler for unavailable buttons.
  * @param {(ev: MouseEvent) => void} [opts.onAltClick] Alt-click handler.
  * @param {(ev: MouseEvent) => void} [opts.onContextMenu] right-click handler.
  * @param {(ev: MouseEvent) => void} opts.onClick click handler (skipped when disabled).
@@ -146,7 +146,7 @@ export function createCommandButton(opts) {
   if (
     typeof opts.onAltClick === "function" ||
     (opts.enabled && typeof opts.onClick === "function") ||
-    (opts.unaffordable && typeof opts.onUnavailable === "function")
+    (!opts.enabled && typeof opts.onUnavailable === "function")
   ) {
     btn.addEventListener("click", (ev) => {
       ev.preventDefault();
@@ -154,7 +154,7 @@ export function createCommandButton(opts) {
         opts.onAltClick(ev);
       } else if (opts.enabled && typeof opts.onClick === "function") {
         opts.onClick(ev);
-      } else if (opts.unaffordable && typeof opts.onUnavailable === "function") {
+      } else if (!opts.enabled && typeof opts.onUnavailable === "function") {
         opts.onUnavailable(ev);
       }
     });

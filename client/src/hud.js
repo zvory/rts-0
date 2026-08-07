@@ -641,6 +641,9 @@ export class HUD {
       case "playNotEnough":
         this._playNotEnoughForCost(intent.cost, intent.supply);
         return;
+      case "playCannotBuild":
+        this.audio?.play("notice_cannot_build", { category: "alert", priority: 4 });
+        return;
       default:
         return;
     }

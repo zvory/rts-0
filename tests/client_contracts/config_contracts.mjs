@@ -952,6 +952,12 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       entitiesInterpolated: () => [selectedFactory],
     };
     factoryHud.commandInteraction = { issueCommand: (command) => sent.push(command) };
+    const lockedProductionNotices = [];
+    factoryHud.audio = {
+      play(id) {
+        lockedProductionNotices.push(id);
+      },
+    };
     factoryHud._cardSig = null;
     factoryHud._trainRoundRobin = new Map();
     factoryHud._cancelRoundRobin = new Map();
@@ -976,6 +982,13 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       commandCarButton?.dataset.contextHotkeyModifiers === "alt ctrl shift",
       "production buttons expose Alt, Ctrl, and Shift as their allocation hotkey modifiers",
     );
+    const sentBeforeLockedClick = sent.length;
+    commandCarButton.click({ altKey: false });
+    assert(sent.length === sentBeforeLockedClick, "research-locked production click should not queue a unit");
+    assert(
+      lockedProductionNotices.at(-1) === "notice_cannot_build",
+      "research-locked production click should play cannot-build feedback",
+    );
     globalThis.document.getElementById = () => ({
       querySelectorAll() {
         return [commandCarButton];
@@ -998,6 +1011,28 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
         addAutoBuildCommand?.c === "adjustProductionRepeat" &&
         addAutoBuildCommand.delta === 1 && addAutoBuildCommand.buildings[0] === selectedFactory.id,
       "Ctrl+production hotkeys dispatch one signed addition through the context-action path",
+    );
+    const noticesBeforeLockedHotkey = lockedProductionNotices.length;
+    const commandsBeforeLockedHotkey = sent.length;
+    const lockedPrimaryHotkeyEv = {
+      code: "KeyE",
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      repeat: false,
+      preventDefault() { this.prevented = true; },
+    };
+    const lockedPrimaryHotkeyResult = input._activateCommandHotkey(lockedPrimaryHotkeyEv);
+    assert(
+      lockedPrimaryHotkeyResult?.handled === true && lockedPrimaryHotkeyEv.prevented,
+      "research-locked production hotkey should be handled",
+    );
+    assert(sent.length === commandsBeforeLockedHotkey, "research-locked production hotkey should not queue a unit");
+    assert(
+      lockedProductionNotices.length === noticesBeforeLockedHotkey + 1 &&
+        lockedProductionNotices.at(-1) === "notice_cannot_build",
+      "research-locked production hotkey should play cannot-build feedback",
     );
     const removeAutoBuildEv = {
       code: "KeyE",

@@ -893,6 +893,22 @@ withFakeHudDocument(({ FakeElement }) => {
     "construction cancel should explain its refund behavior",
   );
 
+  const unfinishedBarracks = {
+    id: 171,
+    owner: 1,
+    kind: KIND.BARRACKS,
+    buildProgress: 0.45,
+  };
+  const productionConstructionCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [unfinishedBarracks],
+    entities: [unfinishedBarracks],
+  }));
+  const unfinishedProduction = buttonByAction(productionConstructionCard, "train");
+  assert(
+    unfinishedProduction?.enabled === false && unfinishedProduction.onUnavailableIntent == null,
+    "unfinished production slots stay inert instead of playing manual-production failure feedback",
+  );
+
   const scoutPlane = { id: 18, owner: 1, kind: KIND.SCOUT_PLANE };
   const scoutPlaneCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [scoutPlane],
@@ -1388,6 +1404,25 @@ withFakeHudDocument(({ FakeElement }) => {
     assert(button.title === "Not enough resources", "command title should preserve disabled reason");
     button.listeners.click({ preventDefault() {} });
     assert(unavailable, "unaffordable command click should dispatch unavailable handler");
+  });
+
+  withFakeDocument(() => {
+    let unavailable = false;
+    let autoBuild = false;
+    const button = HUD.prototype._cmdButton({
+      icon: "TK",
+      label: "Tank",
+      enabled: false,
+      title: "Requires Tank Production",
+      onUnavailable: () => { unavailable = true; },
+      onContextMenu: () => { autoBuild = true; },
+    });
+    assert(!button.disabled, "research-locked production stays interactive for auto-build");
+    assert(button.className.includes("primary-disabled"), "research-locked production marks only its primary action disabled");
+    button.listeners.click({ preventDefault() {}, altKey: false });
+    assert(unavailable, "research-locked primary click should dispatch unavailable feedback");
+    button.listeners.contextmenu({ preventDefault() {} });
+    assert(autoBuild, "research-locked production should retain its auto-build action");
   });
 
   withFakeDocument(() => {
