@@ -67,6 +67,7 @@ import { assert } from "./assertions.mjs";
   };
   globalThis.clearTimeout = (id) => timers.delete(id);
   const sent = [];
+  let closed = 0;
   const handlers = new Map();
   const net = {
     playerId: 10,
@@ -77,7 +78,7 @@ import { assert } from "./assertions.mjs";
     startBranch() { sent.push(["start"]); },
   };
   const root = fakeEl("section");
-  const staging = new BranchStaging(root, net);
+  const staging = new BranchStaging(root, net, { onClose: () => { closed += 1; } });
   staging.show();
   handlers.get("branchStaging")({
     t: "branchStaging",
@@ -94,6 +95,10 @@ import { assert } from "./assertions.mjs";
   assert(root.classList.contains("branch-staging-active"), "branch staging marks active root");
   const box = root.children[0];
   assert(box.className === "branch-staging-box", "branch staging renders focused room box");
+  const closeButton = box.children.find((child) => child.className === "branch-staging-close");
+  assert(closeButton?.["aria-label"] === "Leave replay branch setup", "branch staging close is accessible");
+  closeButton.onclick();
+  assert(closed === 1, "branch staging close leaves the setup flow");
   const seatList = box.children.find((child) => child.className === "branch-seat-list");
   assert(seatList.children.length === 2, "branch staging renders original seats");
   const claimButton = seatList.children[0].children[2];
@@ -101,7 +106,24 @@ import { assert } from "./assertions.mjs";
   assert(sent[0][0] === "claim" && sent[0][1] === 1, "claim button sends branch seat claim");
   const startButton = box.children.find((child) => child.className === "branch-actions").children[0];
   assert(startButton.hidden === false, "host sees start button");
-  assert(startButton.disabled === true, "start disabled until all seats claimed");
+  assert(startButton.disabled === true, "start follows the server's initial canStart state");
+  handlers.get("branchStaging")({
+    t: "branchStaging",
+    room: "__replay_branch__:abc",
+    sourceTick: 1200,
+    hostId: 10,
+    canStart: true,
+    seats: [
+      { playerId: 1, name: "Alpha", color: "#4878c8", claimantId: 10, claimantName: "Me" },
+      { playerId: 2, name: "Bravo", color: "#c84848" },
+    ],
+    occupants: [{ id: 10, name: "Me" }],
+  });
+  const partialStart = root.children[0]
+    .children.find((child) => child.className === "branch-actions").children[0];
+  assert(partialStart.disabled === false, "host can start with an unclaimed original seat");
+  partialStart.onclick();
+  assert(sent.some(([type]) => type === "start"), "partial branch start sends the launch request");
   handlers.get("matchCountdown")({
     t: "matchCountdown",
     durationMs: 3000,

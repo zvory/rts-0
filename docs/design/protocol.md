@@ -96,7 +96,7 @@ lobby/config dump replaces the source scrape.
 | `requestBranchFromTick` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `branchFromTickCreated` to all current viewers. |
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
-| `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server rejects launch until every original active seat is claimed; live promotion is handled by the branch promotion phase. |
+| `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server requires at least one claimed original seat. Unclaimed players remain in the restored simulation with no command issuer; their units retain automatic combat behavior but receive no player commands. Live promotion is handled by the branch promotion phase. |
 | `selectMap` | `map: string` | Host selects the lobby map by its stable map name. Ignored outside the lobby, from non-hosts, during match countdown, in dev-watch rooms, or in replay staging lobbies. The server broadcasts the selected value as lobby `map` and the available catalog as `maps[]`. |
 
 Live player `command` messages MUST include `clientSeq`; unsequenced live commands are
@@ -466,6 +466,8 @@ means that original seat is still available to claim.
 
 `BranchStagingOccupant`: `{ id: u32, name: string }`. Occupants are all human viewers currently in
 the branch staging room, whether they have claimed an original seat or are remaining spectators.
+`canStart` becomes true for the host once at least one original seat is claimed and launch is not
+otherwise blocked by countdown or deploy drain.
 
 ### 2.3 `start` payload
 Sent when a live match begins and when replay playback is rebuilt, including after replay seeks. Carries static match metadata and recipient-scoped capabilities for that start.

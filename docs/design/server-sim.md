@@ -939,7 +939,9 @@ branch seed.
   and post-match/dedicated replay start payloads.
 - `replay_branch.rs` owns branch staging state, original replay-seat claim/release policy, and
   branch live-launch preparation while `room_task.rs` still owns connected members and final phase
-  changes.
+  changes. A branch may launch with any non-empty subset of seats claimed. Unclaimed original
+  players remain in the cloned `Game`, but are absent from the connection-to-seat alias map, so
+  their units keep simulation-owned automatic combat behavior without accepting player commands.
 - `snapshot_fanout.rs` and `snapshots.rs` centralize compacting, replace-latest snapshot delivery,
   net-status metadata, and union-event helpers for live, spectator, replay, branch, and dev views.
 - `connection.rs`, `dev_replay.rs`, `crash_replay.rs`, `faction_validation.rs`, and

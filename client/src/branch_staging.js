@@ -1,9 +1,10 @@
 import { S } from "./protocol.js";
 
 export class BranchStaging {
-  constructor(rootEl, net) {
+  constructor(rootEl, net, { onClose = null } = {}) {
     this.root = rootEl;
     this.net = net;
+    this.onClose = typeof onClose === "function" ? onClose : null;
     this._active = false;
     this._last = null;
     this._countdownEl = null;
@@ -48,6 +49,14 @@ export class BranchStaging {
     const box = document.createElement("div");
     box.className = "branch-staging-box";
 
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "branch-staging-close";
+    close.setAttribute("aria-label", "Leave replay branch setup");
+    close.title = "Leave replay branch setup";
+    close.textContent = "×";
+    close.addEventListener("click", () => this.onClose?.());
+
     const title = document.createElement("h1");
     title.className = "logo";
     title.textContent = "Replay Branch";
@@ -56,6 +65,10 @@ export class BranchStaging {
     status.className = "branch-staging-status";
     const claimedCount = seats.filter((seat) => seat.claimantId != null).length;
     status.textContent = `Tick ${Number(m.sourceTick) || 0} - ${claimedCount} / ${seats.length} seats claimed`;
+
+    const hint = document.createElement("p");
+    hint.className = "branch-staging-hint";
+    hint.textContent = "Unclaimed armies stay in the battle, fight automatically, and receive no commands.";
 
     const list = document.createElement("div");
     list.className = "branch-seat-list";
@@ -97,7 +110,7 @@ export class BranchStaging {
     });
     actions.appendChild(start);
 
-    box.append(title, status, list, viewerBlock, actions);
+    box.append(close, title, status, hint, list, viewerBlock, actions);
     this.root.replaceChildren(box);
   }
 

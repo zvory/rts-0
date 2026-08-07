@@ -221,7 +221,9 @@ export class App {
       autoRefreshLobbies: !this.requiresConnectionOnStart(),
       onJoined: () => this.warmMatchRenderer(),
     });
-    this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
+    this.branchStaging = new BranchStaging(dom.branchScreen, this.net, {
+      onClose: () => this.onBackToLobby(),
+    });
     /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
     this.matchHistory = null;
     /** @type {Match|null} the currently running match, if any. */
