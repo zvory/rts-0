@@ -40,6 +40,21 @@ function withNavigator(value, fn) {
   }
 }
 
+function withPerformanceNow(initialNow, fn) {
+  const prior = Object.getOwnPropertyDescriptor(globalThis, "performance");
+  let now = initialNow;
+  Object.defineProperty(globalThis, "performance", {
+    configurable: true,
+    value: { now: () => now },
+  });
+  try {
+    fn((nextNow) => { now = nextNow; });
+  } finally {
+    if (prior) Object.defineProperty(globalThis, "performance", prior);
+    else delete globalThis.performance;
+  }
+}
+
 function inputHarness() {
   const rightClicks = [];
   const input = Object.create(Input.prototype);
@@ -82,24 +97,27 @@ function inputHarness() {
 }
 
 withNavigator({ platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }, () => {
-  const { input, rightClicks } = inputHarness();
-  const issued = [];
-  input._beginFormationGesture = () => {
-    input._formationGesture = { promoted: true };
-  };
-  input._finishFormationGesture = () => {
-    input._formationGesture = null;
-    issued.push("formationMove");
-    return true;
-  };
+  withPerformanceNow(1_000, (setNow) => {
+    const { input, rightClicks } = inputHarness();
+    const issued = [];
+    input._beginFormationGesture = () => {
+      input._formationGesture = { promoted: true };
+    };
+    input._finishFormationGesture = () => {
+      input._formationGesture = null;
+      issued.push("formationMove");
+      return true;
+    };
 
-  input._handleMouseDown(mouseEvent({ button: 2 }));
-  input._handleMouseUp(mouseEvent({ button: 2 }));
-  assert(issued.join(",") === "formationMove", "Windows right-drag release issues the formation once");
+    input._handleMouseDown(mouseEvent({ button: 2 }));
+    input._handleMouseUp(mouseEvent({ button: 2 }));
+    assert(issued.join(",") === "formationMove", "Windows right-drag release issues the formation once");
 
-  // WebView2 can deliver this after a drag longer than the old 500 ms suppression deadline.
-  input._handleContextMenu(mouseEvent({ button: 2 }));
-  assert(rightClicks.length === 0, "delayed Windows contextmenu does not overwrite the formation with a point move");
+    // WebView2 can deliver this after a drag longer than the old 500 ms suppression deadline.
+    setNow(2_000);
+    input._handleContextMenu(mouseEvent({ button: 2 }));
+    assert(rightClicks.length === 0, "delayed Windows contextmenu does not overwrite the formation with a point move");
+  });
 });
 
 withNavigator({ platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)" }, () => {
