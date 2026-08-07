@@ -163,13 +163,16 @@ Current scenario ids:
   source: a Resource Depot produces four workers at the real 150-tick cadence and rallies them
   across the map. They naturally share the opening route beside a deployed Machine Gunner, making
   the scenario expose both excessive traffic steering and stale-waypoint recovery behavior.
-- `replay_281_tank_gap` — replay 281 at tick 13,537 reconstructed on the exact Schone Tage terrain:
-  after a ten-second inspection pause, five Tanks, one Scout Car, and the command-capacity Command
-  Car attack-move west through the northern seven-tile gap. Selectable `living_command_car`,
-  `enemy_screen`, and `command_car_death` cases isolate friendly formation traffic, the three
-  deployed Machine Gunners, and the full low-health Command Car death sequence. The death case also
-  restores replay seed 162367300, MG 226's Command Car target latch, and the Tanks' carried-over
-  reload window so the kill occurs before the MG screen is cleared.
+- `replay_281_tank_gap` — replay 281 restored immediately before tick 13,537 on the exact Schone
+  Tage terrain. `tick_perfect` preserves the six live local actors and their hidden movement and
+  combat state; a golden trace verifies every actor position, HP, state, target, and path-stuck
+  counter through tick 13,620. Although the command carried a five-Tank selection label, only Tanks
+  251 and 269 were live at the choke; stale ids 219 and 250 and non-mobile ids 271 and 284 were
+  harmlessly ignored. The lead Tank acquires deployed Machine Gunner 232 and stops on attack-move,
+  leaving the rear Tank queued behind it. `minimal_attack_move` reduces the reproduction to those
+  two Tanks and one Machine Gunner; `minimal_no_enemy` and `minimal_move` are controls that clear
+  the gap. The previously suspected dead Command Car is not a collider: its stale id is absent from
+  authoritative state.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.

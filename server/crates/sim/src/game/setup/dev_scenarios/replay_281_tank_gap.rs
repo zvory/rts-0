@@ -1,30 +1,31 @@
 use super::*;
-use crate::game::entity::WeaponSetup;
-use crate::rules::combat::WeaponKind;
+use crate::game::entity::Entity;
+use crate::game::state::TrackedRng;
+use crate::game::trench::TrenchStore;
 
-const CASE_LIVING_COMMAND_CAR: &str = "living_command_car";
-const CASE_ENEMY_SCREEN: &str = "enemy_screen";
-const CASE_COMMAND_CAR_DEATH: &str = "command_car_death";
+const CASE_TICK_PERFECT: &str = "tick_perfect";
+const CASE_MINIMAL_ATTACK_MOVE: &str = "minimal_attack_move";
+const CASE_MINIMAL_MOVE: &str = "minimal_move";
+const CASE_MINIMAL_NO_ENEMY: &str = "minimal_no_enemy";
 
-const ISSUE_AFTER_TICKS: u32 = config::TICK_HZ * 10;
 const REPLAY_SEED: u32 = 162_367_300;
-const REPLAY_TANK_RELOAD_REMAINING: u32 = 45;
+const REPLAY_PRE_COMMAND_TICK: u32 = 13_536;
 const GOAL: (f32, f32) = (1091.3671, 933.82385);
-const START_TILE: (u32, u32) = (47, 30);
-
-const TANK_SPECS: [(f32, f32, u32, f32); 5] = [
-    (1389.6304, 975.1114, 282, -2.538_128_4),
-    (1641.5762, 1047.2806, 279, -2.658_286_8),
-    (1750.4877, 1046.1906, 292, -2.660_228),
-    (1464.993, 982.82104, 288, -2.838_678_1),
-    (1496.448, 935.6931, 283, -2.393_564),
+const SOUPMAN: u32 = 15;
+const ALEX: u32 = 13;
+const LEAD_TANK: u32 = 251;
+const REAR_TANK: u32 = 269;
+const COMMAND_CAR: u32 = 229;
+const TARGET_MACHINE_GUNNER: u32 = 232;
+const EXACT_ACTORS: [u32; 6] = [
+    174,
+    177,
+    COMMAND_CAR,
+    TARGET_MACHINE_GUNNER,
+    LEAD_TANK,
+    REAR_TANK,
 ];
-
-const MACHINE_GUNNER_SPECS: [(f32, f32, u32, f32, u32); 3] = [
-    (1232.0, 816.0, 55, 1.038_368_6, 1),
-    (1232.0, 848.0, 48, 0.934_669_8, 2),
-    (1200.0, 816.0, 55, 0.901_311_34, 3),
-];
+const EXACT_COMMAND_UNITS: [u32; 7] = [COMMAND_CAR, 219, LEAD_TANK, 250, REAR_TANK, 271, 284];
 
 impl Game {
     pub fn new_replay_281_tank_gap_scenario(
@@ -35,169 +36,119 @@ impl Game {
     ) -> Result<DevScenarioSetup, String> {
         if unit != EntityKind::Tank || unit_count != 5 {
             return Err(format!(
-                "replay-281 tank gap requires five Tanks, got {unit_count} {unit}"
+                "replay-281 tank gap requires the recorded five-Tank selection label, got {unit_count} {unit}"
             ));
         }
         let scenario_case = scenario_case.ok_or_else(|| {
-            "missing replay-281 tank gap case; expected living_command_car, enemy_screen, or command_car_death".to_string()
+            "missing replay-281 tank gap case; expected tick_perfect, minimal_attack_move, minimal_move, or minimal_no_enemy".to_string()
         })?;
         if !matches!(
             scenario_case,
-            CASE_LIVING_COMMAND_CAR | CASE_ENEMY_SCREEN | CASE_COMMAND_CAR_DEATH
+            CASE_TICK_PERFECT
+                | CASE_MINIMAL_ATTACK_MOVE
+                | CASE_MINIMAL_MOVE
+                | CASE_MINIMAL_NO_ENEMY
         ) {
             return Err(format!(
                 "unsupported replay-281 tank gap case {scenario_case}"
             ));
         }
 
-        let mut map = Map::load("Schone Tage", 2, REPLAY_SEED)
+        let keep = match scenario_case {
+            CASE_TICK_PERFECT => EXACT_ACTORS.as_slice(),
+            CASE_MINIMAL_NO_ENEMY => &[LEAD_TANK, REAR_TANK],
+            CASE_MINIMAL_ATTACK_MOVE | CASE_MINIMAL_MOVE => {
+                &[TARGET_MACHINE_GUNNER, LEAD_TANK, REAR_TANK]
+            }
+            _ => unreachable!("validated replay-281 case"),
+        };
+        let entities = replay_entities(keep)?;
+        let map = Map::load("Schone Tage", 2, REPLAY_SEED)
             .map_err(|error| format!("failed to load replay-281 map: {error}"))?;
-        if let Some(slot) = map.starts.get_mut(0) {
-            *slot = START_TILE;
-        }
-
-        let mut entities = EntityStore::new();
-        let tanks = spawn_replay_tanks(&mut entities, scenario_case == CASE_COMMAND_CAR_DEATH)?;
-        let include_enemy_screen =
-            matches!(scenario_case, CASE_ENEMY_SCREEN | CASE_COMMAND_CAR_DEATH);
-
-        let command_car = spawn_command_car(
-            &mut entities,
-            scenario_case == CASE_COMMAND_CAR_DEATH,
-            scenario_case == CASE_ENEMY_SCREEN,
-        )?;
-        let scout_car = spawn_scout_car(&mut entities)?;
-        if include_enemy_screen {
-            spawn_machine_gunner_screen(
-                &mut entities,
-                (scenario_case == CASE_COMMAND_CAR_DEATH).then_some(command_car),
-            )?;
-        }
-
-        // Preserve the replay's tick-13,537 command ordering so formation slot assignment is the
-        // same in the full case: Command Car, Scout Car, then Tanks 251/250/269/271/284.
-        let mut ordered_units = Vec::with_capacity(7);
-        ordered_units.push(command_car);
-        ordered_units.push(scout_car);
-        ordered_units.extend(tanks);
-
-        let game = build_dev_scenario_game_with_teams(
+        let mut game = build_dev_scenario_game_with_teams(
             map,
             entities,
-            [(1, 1), (2, 2)],
-            1,
-            START_TILE,
+            [(ALEX, 1), (SOUPMAN, 2)],
+            SOUPMAN,
+            (157, 47),
             REPLAY_SEED,
             "dev:replay_281_tank_gap",
         );
+        restore_replay_clock_and_trenches(&mut game)?;
+
+        let (units, order) = if scenario_case == CASE_TICK_PERFECT {
+            (EXACT_COMMAND_UNITS.to_vec(), DevScenarioOrder::AttackMove)
+        } else {
+            (
+                vec![LEAD_TANK, REAR_TANK],
+                if scenario_case == CASE_MINIMAL_MOVE {
+                    DevScenarioOrder::Move
+                } else {
+                    DevScenarioOrder::AttackMove
+                },
+            )
+        };
 
         DevScenarioSetup {
             game,
-            player_id: 1,
-            units: ordered_units,
+            player_id: SOUPMAN,
+            units,
             goal: GOAL,
-            issue_after_ticks: ISSUE_AFTER_TICKS,
-            order: DevScenarioOrder::AttackMove,
+            issue_after_ticks: REPLAY_PRE_COMMAND_TICK,
+            order,
         }
-        .checkpoint_backed("dev:replay_281_tank_gap")
+        .checkpoint_backed(&format!("dev:replay_281_tank_gap:{scenario_case}"))
     }
 }
 
-fn spawn_replay_tanks(entities: &mut EntityStore, delay_fire: bool) -> Result<Vec<u32>, String> {
-    TANK_SPECS
-        .into_iter()
-        .map(|(x, y, hp, facing)| {
-            let id = spawn_replay_unit(entities, 1, EntityKind::Tank, x, y, hp, facing)?;
-            if delay_fire {
-                let entity = entities
-                    .get_mut(id)
-                    .ok_or_else(|| "spawned replay-281 Tank is missing".to_string())?;
-                // The replay's MG 226 kill depended on the tanks still being inside their
-                // carried-over reload window instead of immediately deleting the MG screen.
-                let cooldown = ISSUE_AFTER_TICKS + REPLAY_TANK_RELOAD_REMAINING;
-                entity.set_weapon_cooldown(WeaponKind::TankCannon, cooldown);
-                entity.set_weapon_cooldown(WeaponKind::TankCoax, cooldown);
-            }
-            Ok(id)
-        })
-        .collect()
-}
-
-fn spawn_command_car(
-    entities: &mut EntityStore,
-    vulnerable: bool,
-    invulnerable: bool,
-) -> Result<u32, String> {
-    let hp = if vulnerable { 46 } else { 150 };
-    let id = spawn_replay_unit(
-        entities,
-        1,
-        EntityKind::CommandCar,
-        1325.2281,
-        974.233,
-        hp,
-        -2.502_215_1,
-    )?;
-    if let Some(entity) = entities.get_mut(id) {
-        entity.set_invulnerable(invulnerable);
-    }
-    Ok(id)
-}
-
-fn spawn_scout_car(entities: &mut EntityStore) -> Result<u32, String> {
-    spawn_replay_unit(
-        entities,
-        1,
-        EntityKind::ScoutCar,
-        1448.0062,
-        937.9907,
-        34,
-        -2.823_458,
-    )
-}
-
-fn spawn_replay_unit(
-    entities: &mut EntityStore,
-    owner: u32,
-    kind: EntityKind,
-    x: f32,
-    y: f32,
-    hp: u32,
-    facing: f32,
-) -> Result<u32, String> {
-    let id = entities
-        .spawn_unit(owner, kind, x, y)
-        .ok_or_else(|| format!("failed to spawn replay-281 {kind}"))?;
-    let entity = entities
-        .get_mut(id)
-        .ok_or_else(|| format!("spawned replay-281 {kind} is missing"))?;
-    let damage = entity.hp.saturating_sub(hp);
-    entity.apply_damage(damage, None);
-    entity.set_facing(facing);
-    entity.set_weapon_facing(facing);
-    Ok(id)
-}
-
-fn spawn_machine_gunner_screen(
-    entities: &mut EntityStore,
-    command_car_target: Option<u32>,
-) -> Result<(), String> {
-    for (index, (x, y, hp, facing, fire_offset)) in MACHINE_GUNNER_SPECS.into_iter().enumerate() {
-        let id = spawn_replay_unit(entities, 2, EntityKind::MachineGunner, x, y, hp, facing)?;
-        let entity = entities
-            .get_mut(id)
-            .ok_or_else(|| "spawned replay-281 Machine Gunner is missing".to_string())?;
-        entity.set_weapon_setup(WeaponSetup::Deployed);
-        entity.set_weapon_cooldown(
-            WeaponKind::MachineGunnerMg,
-            ISSUE_AFTER_TICKS.saturating_add(fire_offset),
-        );
-        if index == 2 {
-            if let Some(command_car) = command_car_target {
-                entity.set_order(crate::game::entity::Order::attack(command_car));
-                entity.set_target_id(Some(command_car));
-            }
+fn replay_entities(keep: &[u32]) -> Result<EntityStore, String> {
+    let replay_entities: Vec<Entity> =
+        serde_json::from_str(include_str!("fixtures/replay_281_tick_13536_entities.json"))
+            .map_err(|error| format!("invalid replay-281 entity fixture: {error}"))?;
+    let mut entities = EntityStore::new();
+    for id in 1..=REAR_TANK {
+        if let Some(entity) = replay_entities.iter().find(|entity| entity.id == id) {
+            let inserted = entities.insert(entity.clone());
+            debug_assert_eq!(inserted, id);
+        } else {
+            let placeholder = Entity::new_unit(SOUPMAN, EntityKind::Rifleman, 5000.0, 5000.0)
+                .ok_or_else(|| "failed to allocate replay-281 id placeholder".to_string())?;
+            let inserted = entities.insert(placeholder);
+            debug_assert_eq!(inserted, id);
+            let _ = entities.remove(inserted);
         }
+    }
+    for id in EXACT_ACTORS {
+        if !keep.contains(&id) {
+            let _ = entities.remove(id);
+        }
+    }
+    if let Some(missing) = keep.iter().find(|id| !entities.contains(**id)) {
+        return Err(format!(
+            "replay-281 entity fixture is missing required actor {missing}"
+        ));
+    }
+    Ok(entities)
+}
+
+fn restore_replay_clock_and_trenches(game: &mut Game) -> Result<(), String> {
+    game.state.tick = REPLAY_PRE_COMMAND_TICK;
+    game.state.rng = TrackedRng::seed_from_match_seed(REPLAY_SEED);
+    game.state.ground_decals.begin_tick(REPLAY_PRE_COMMAND_TICK);
+    game.state.trenches = TrenchStore::new();
+    for id in 1..=38 {
+        let (x, y) = match id {
+            6 => (1232.0, 816.0),
+            8 => (1232.0, 848.0),
+            38 => (1232.0, 912.0),
+            _ => (16.0 + id as f32, 16.0),
+        };
+        let created = game
+            .state
+            .trenches
+            .create(&game.state.map, x, y)
+            .ok_or_else(|| format!("failed to restore replay-281 trench {id}"))?;
+        debug_assert_eq!(created, id);
     }
     Ok(())
 }
@@ -205,112 +156,165 @@ fn spawn_machine_gunner_screen(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct GoldenTick {
+        tick: u32,
+        entities: Vec<GoldenEntity>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct GoldenEntity {
+        id: u32,
+        x: f32,
+        y: f32,
+        hp: u32,
+        state: String,
+        target_id: Option<u32>,
+        stuck_ticks: Option<u16>,
+    }
 
     #[test]
-    fn full_case_removes_the_command_car_and_keeps_all_five_tanks_live() {
-        let mut setup = Game::new_replay_281_tank_gap_scenario(
-            Some(CASE_COMMAND_CAR_DEATH),
-            EntityKind::Tank,
-            5,
-            0x0281_1357,
-        )
-        .expect("replay-281 full scenario");
-        let command = setup.command();
-        let command_car = setup.units[0];
-        let tank_ids = setup.units[2..].to_vec();
+    fn tick_perfect_case_matches_every_recorded_replay_tick() {
+        let mut setup = scenario(CASE_TICK_PERFECT);
+        assert_eq!(setup.game.tick_count(), REPLAY_PRE_COMMAND_TICK);
+        setup.game.enqueue(setup.player_id, setup.command());
+        let golden: Vec<GoldenTick> =
+            serde_json::from_str(include_str!("fixtures/replay_281_ticks_13537_13620.json"))
+                .expect("valid replay-281 golden trace");
 
-        for _ in 0..setup.issue_after_ticks {
+        for expected_tick in golden {
             setup.game.tick();
-        }
-        setup.game.enqueue(setup.player_id, command);
-
-        let mut removed_at = None;
-        for _ in 0..180 {
-            setup.game.tick();
-            let snapshot = setup.game.snapshot_full_for(setup.player_id);
-            if !snapshot
-                .entities
-                .iter()
-                .any(|entity| entity.id == command_car)
-            {
-                removed_at = Some(snapshot.tick);
-                assert!(tank_ids
+            let snapshot = setup.game.snapshot_full_for_with_options(
+                SOUPMAN,
+                SnapshotOptions {
+                    include_movement_paths: true,
+                    movement_paths_for_all_projected: true,
+                },
+            );
+            assert_eq!(snapshot.tick, expected_tick.tick);
+            for expected in expected_tick.entities {
+                let actual = snapshot
+                    .entities
                     .iter()
-                    .all(|tank_id| snapshot.entities.iter().any(|entity| entity.id == *tank_id)));
-                break;
+                    .find(|entity| entity.id == expected.id)
+                    .unwrap_or_else(|| panic!("missing replay actor {}", expected.id));
+                assert_eq!(
+                    actual.x.to_bits(),
+                    expected.x.to_bits(),
+                    "tick {} entity {} x",
+                    snapshot.tick,
+                    expected.id
+                );
+                assert_eq!(
+                    actual.y.to_bits(),
+                    expected.y.to_bits(),
+                    "tick {} entity {} y",
+                    snapshot.tick,
+                    expected.id
+                );
+                assert_eq!(
+                    actual.hp, expected.hp,
+                    "tick {} entity {} hp",
+                    snapshot.tick, expected.id
+                );
+                assert_eq!(
+                    actual.state, expected.state,
+                    "tick {} entity {} state",
+                    snapshot.tick, expected.id
+                );
+                assert_eq!(
+                    actual.target_id, expected.target_id,
+                    "tick {} entity {} target",
+                    snapshot.tick, expected.id
+                );
+                assert_eq!(
+                    actual.debug_path.as_ref().map(|path| path.stuck_ticks),
+                    expected.stuck_ticks,
+                    "tick {} entity {} stuck ticks",
+                    snapshot.tick,
+                    expected.id
+                );
             }
         }
+    }
+
+    #[test]
+    fn minimal_case_reproduces_attack_move_jam_and_move_control_clears_it() {
+        let attack = positions_after(CASE_MINIMAL_ATTACK_MOVE, 84);
+        let no_enemy = positions_after(CASE_MINIMAL_NO_ENEMY, 84);
+        let direct_move = positions_after(CASE_MINIMAL_MOVE, 84);
 
         assert!(
-            removed_at.is_some(),
-            "the low-health lead car should die; final={:?}; enemies={:?}",
-            setup.game.state.entities.get(command_car).map(|entity| (
-                entity.hp,
-                entity.pos_x,
-                entity.pos_y,
-                entity.order(),
-                entity.target_id()
-            )),
-            setup
-                .game
-                .state
-                .entities
-                .iter()
-                .filter(|entity| entity.owner == 2)
-                .map(|entity| (
-                    entity.id,
-                    entity.hp,
-                    entity.pos_x,
-                    entity.pos_y,
-                    entity.order(),
-                    entity.target_id(),
-                    entity.weapon_cooldown(WeaponKind::MachineGunnerMg)
-                ))
-                .collect::<Vec<_>>()
+            attack.0 > 1380.0,
+            "lead Tank should stop to attack the MG: {attack:?}"
+        );
+        assert!(
+            attack.1 > 1390.0,
+            "rear Tank should queue behind the stopped Tank: {attack:?}"
+        );
+        assert!(
+            no_enemy.0 < 1320.0 && no_enemy.1 < 1370.0,
+            "without the target both Tanks advance: {no_enemy:?}"
+        );
+        assert!(
+            direct_move.0 < 1320.0 && direct_move.1 < 1370.0,
+            "Move should ignore the target and advance: {direct_move:?}"
         );
     }
 
     #[test]
-    fn living_command_car_case_advances_through_the_real_gap() {
-        let mut setup = Game::new_replay_281_tank_gap_scenario(
-            Some(CASE_LIVING_COMMAND_CAR),
-            EntityKind::Tank,
-            5,
-            0x0281_1357,
-        )
-        .expect("replay-281 tanks-only scenario");
-        let command = setup.command();
-        for _ in 0..setup.issue_after_ticks {
+    fn replay_cause_is_lead_tank_target_acquisition_not_a_ghost_collider() {
+        let mut setup = scenario(CASE_TICK_PERFECT);
+        setup.game.enqueue(setup.player_id, setup.command());
+        let mut acquired_at = None;
+        let mut target_removed_at = None;
+        let mut rear_slowed_at = None;
+        while setup.game.tick_count() < 13_700 {
+            setup.game.tick();
+            let tick = setup.game.tick_count();
+            let lead = setup.game.state.entities.get(LEAD_TANK).expect("lead Tank");
+            if acquired_at.is_none() && lead.target_id() == Some(TARGET_MACHINE_GUNNER) {
+                acquired_at = Some(tick);
+            }
+            if target_removed_at.is_none()
+                && !setup.game.state.entities.contains(TARGET_MACHINE_GUNNER)
+            {
+                target_removed_at = Some(tick);
+            }
+            let rear = setup.game.state.entities.get(REAR_TANK).expect("rear Tank");
+            if rear_slowed_at.is_none()
+                && rear.movement.as_ref().is_some_and(|movement| {
+                    movement.last_move_delta.0.hypot(movement.last_move_delta.1) < 1.0
+                })
+            {
+                rear_slowed_at = Some(tick);
+            }
+        }
+        assert_eq!(acquired_at, Some(13_543));
+        assert_eq!(rear_slowed_at, Some(13_579));
+        assert_eq!(target_removed_at, Some(13_599));
+        assert!(setup.game.state.entities.contains(COMMAND_CAR));
+        assert!(!setup.game.state.entities.contains(219));
+        assert!(!setup.game.state.entities.contains(250));
+    }
+
+    fn scenario(case: &str) -> DevScenarioSetup {
+        Game::new_replay_281_tank_gap_scenario(Some(case), EntityKind::Tank, 5, 0)
+            .expect("replay-281 scenario")
+    }
+
+    fn positions_after(case: &str, ticks: usize) -> (f32, f32) {
+        let mut setup = scenario(case);
+        setup.game.enqueue(setup.player_id, setup.command());
+        for _ in 0..ticks {
             setup.game.tick();
         }
-        setup.game.enqueue(setup.player_id, command);
-        setup.game.tick();
-        assert!(
-            setup.units.iter().any(|id| setup
-                .game
-                .state
-                .entities
-                .get(*id)
-                .is_some_and(|entity| !matches!(entity.order(), crate::game::entity::Order::Idle))),
-            "attack-move should be accepted"
-        );
-        for _ in 1..360 {
-            setup.game.tick();
-        }
-        let snapshot = setup.game.snapshot_full_for(setup.player_id);
-        let tanks = snapshot
-            .entities
-            .iter()
-            .filter(|entity| entity.owner == setup.player_id && entity.kind == "tank")
-            .collect::<Vec<_>>();
-        assert_eq!(tanks.len(), 5);
-        assert!(
-            tanks.iter().any(|tank| tank.x < 1248.0),
-            "at least one Tank should clear the eastern edge of the seven-tile gap; positions={:?}",
-            tanks
-                .iter()
-                .map(|tank| (tank.id, tank.x, tank.y, tank.state.as_str()))
-                .collect::<Vec<_>>()
-        );
+        let lead = setup.game.state.entities.get(LEAD_TANK).expect("lead Tank");
+        let rear = setup.game.state.entities.get(REAR_TANK).expect("rear Tank");
+        (lead.pos_x, rear.pos_x)
     }
 }
