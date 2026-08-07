@@ -59,12 +59,11 @@ export function createMapGenerationMessage(staticMap) {
       tileSizePx: positiveFinite(staticMap.tileSizePx, "map tileSizePx"),
       terrain: gridRecord(staticMap.terrain, terrain),
       elevation: gridRecord(staticMap.elevation, elevation),
+      sun: clonePlain(staticMap.sun),
       resourceSites: clonePlain(staticMap.resourceSites || []),
       doodads: clonePlain(staticMap.doodads || []),
     },
-  // Terrain keeps the existing transferred lifetime; the small proof-of-concept elevation grid
-  // is cloned with the envelope so older map-generation queue assumptions stay undisturbed.
-  }, [terrain.buffer]);
+  }, [terrain.buffer, elevation.buffer]);
 }
 
 export function createFrameMessages(frame, state = createRenderWorkerWireState()) {
@@ -182,6 +181,7 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
     case RENDER_WORKER_MESSAGE.MAP_GENERATION:
       validateGrid(payload?.map?.terrain, "terrain");
       validateGrid(payload?.map?.elevation, "elevation");
+      validateMapSun(payload?.map?.sun);
       requireId(payload?.map?.revision, "map revision", { allowZero: false });
       validateDoodads(payload?.map?.doodads);
       break;
@@ -231,6 +231,20 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       break;
   }
   return message;
+}
+
+function validateMapSun(value) {
+  if (value == null) return;
+  if (typeof value !== "object" || Array.isArray(value)) throw new TypeError("sun must be an object");
+  if (!Number.isInteger(value.azimuthDegrees) || value.azimuthDegrees < 0 || value.azimuthDegrees > 359) {
+    throw new TypeError("sun azimuthDegrees must be between 0 and 359");
+  }
+  if (!Number.isInteger(value.elevationDegrees) || value.elevationDegrees < 1 || value.elevationDegrees > 89) {
+    throw new TypeError("sun elevationDegrees must be between 1 and 89");
+  }
+  if (!Number.isInteger(value.warmth) || value.warmth < 0 || value.warmth > 100) {
+    throw new TypeError("sun warmth must be between 0 and 100");
+  }
 }
 
 export function validateRenderWorkerResponse(message) {

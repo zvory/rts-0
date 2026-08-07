@@ -528,6 +528,12 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // 17 frosted ground. Grass, all roads, gravel, dirt, mud, and frosted
     // ground are passable; rock/water are impassable.
     terrain: number[],
+    // Server-authored presentation-only height levels, row-major and shape-matched to terrain.
+    // Omitted on flat maps (implicit zero). Current movement, sight, and combat rules remain 2D.
+    elevation?: number[],
+    // Present exactly when elevation varies. Azimuth is compass degrees in map space
+    // (0=north/-Y, 90=east); elevation is degrees above the horizon; warmth is 0-100.
+    sun?: { azimuthDegrees: u16, elevationDegrees: u8, warmth: u8 },
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ],
@@ -1440,6 +1446,8 @@ POST /api/map-handoffs
     width: u32,
     height: u32,
     terrain: u8[],
+    elevation: u8[],
+    sun?: { azimuthDegrees: u16, elevationDegrees: u8, warmth: u8 },
     starts: LabMapTile[],
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
     doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[],
@@ -1458,7 +1466,10 @@ POST /api/map-handoffs/{handoffId}
  | { destination: "editor", authoredMap: AuthoredMapV10 }
 ```
 `AuthoredMapV10` declares independent `width` and `height` tile dimensions, whose product must
-exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
+exactly match the row-major terrain body. Its optional `elevation` digit rows must have the same
+shape. Varying elevation requires a `sun` record (`azimuthDegrees` 0–359,
+`elevationDegrees` 1–89, `warmth` 0–100), while flat maps must omit `sun`; these fields are
+presentation-only. The schema also has flat `startLocations`, `baseSites`, and required
 `doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `noBuildingTiles`,
 `noEntrenchmentTiles`, `damageReductionTiles`, and `slowMovementTiles` arrays. A forest span is the compact encoding of the first-class composite
 Forest tile: `[y, xStart, xEnd]` with inclusive bounds. Spans may not overlap and each Forest tile

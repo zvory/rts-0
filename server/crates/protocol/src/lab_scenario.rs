@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub use rts_contract::{validate_map_doodads, MapDoodad, MapTile};
+pub use rts_contract::{validate_map_doodads, MapDoodad, MapSun, MapTile};
 use rts_contract::{InitialCamera, LabVisionMode};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -12,6 +12,8 @@ pub struct LabMapDraft {
     pub terrain: Vec<u8>,
     #[serde(default)]
     pub elevation: Vec<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sun: Option<MapSun>,
     pub starts: Vec<LabMapTile>,
     pub base_sites: Vec<LabBaseSite>,
     #[serde(default)]
@@ -96,6 +98,8 @@ pub struct LabCheckpointScenarioMapData {
     pub terrain: Vec<u8>,
     #[serde(default)]
     pub elevation: Vec<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sun: Option<MapSun>,
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
     pub base_sites: Vec<LabScenarioBaseSite>,
@@ -177,6 +181,8 @@ mod tests {
             width: 16,
             height: 12,
             terrain: vec![0; 16 * 12],
+            elevation: Vec::new(),
+            sun: None,
             starts: vec![LabScenarioTile { x: 4, y: 4 }],
             base_sites: vec![LabScenarioBaseSite {
                 x: 12,

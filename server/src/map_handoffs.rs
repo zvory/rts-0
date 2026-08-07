@@ -239,6 +239,9 @@ fn validate_materialized_binding(
     if authored.terrain != materialized.terrain {
         return Err("Authored and materialized terrain do not match.".to_string());
     }
+    if authored.elevation != materialized.elevation || authored.sun != materialized.sun {
+        return Err("Authored and materialized elevation lighting do not match.".to_string());
+    }
     if authored.doodads != materialized.doodads {
         return Err("Authored and materialized doodads do not match.".to_string());
     }
@@ -356,6 +359,8 @@ mod tests {
                 width: 126,
                 height: 126,
                 terrain: vec![terrain::GRASS; 126 * 126],
+                elevation: vec![0; 126 * 126],
+                sun: None,
                 starts,
                 base_sites,
                 doodads: Vec::new(),
@@ -546,6 +551,8 @@ mod tests {
             width,
             height,
             terrain: vec![terrain::GRASS; (width * height) as usize],
+            elevation: vec![0; (width * height) as usize],
+            sun: None,
             starts: starts.to_vec(),
             base_sites: starts
                 .iter()

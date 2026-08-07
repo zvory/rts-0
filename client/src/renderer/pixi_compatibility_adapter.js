@@ -15,7 +15,6 @@ export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
   Object.freeze({ id: "match.visualProfile.unitOverrides", reviewTrigger: "a playtest needs representative visuals" }),
   Object.freeze({ id: "match.visualProfile.frameStripOverrides", reviewTrigger: "a playtest needs representative visuals" }),
   Object.freeze({ id: "match.visualProfile.terrainPreviewReveal", reviewTrigger: "a terrain matrix needs fog-free material review" }),
-  Object.freeze({ id: "match.visualProfile.terrainLighting", reviewTrigger: "a terrain-shadow prototype needs controlled sun conditions" }),
   Object.freeze({ id: "match.presentationAssembler.staticMap", reviewTrigger: "A detached static-map consumer needs a shared DTO" }),
 ]);
 
@@ -94,7 +93,6 @@ export class PixiPresentationAdapter {
           this._lastFrame = frame;
           this._lastView = view;
         }
-        this._renderer.applyTerrainLighting?.(view.terrainLighting);
         const frameKey = `${frame.generation}:${frame.frameId}`;
         const decalRevision = Number.isSafeInteger(frame.groundDecalRevision)
           ? frame.groundDecalRevision
@@ -258,7 +256,6 @@ export class PixiPresentationAdapter {
       visualSamples,
       visualUnitOverrides: visualProfile?.unitOverrides || null,
       visualFrameStripOverrides: visualProfile?.frameStripOverrides || null,
-      terrainLighting: visualProfile?.terrainLighting || null,
       observerMapAnalysis: recordOfType(layers.tacticalFeedback, "observerMapAnalysis")?.model || null,
       feedback,
       marquee: marqueeForFrame(layers.screenOverlay),
@@ -280,6 +277,7 @@ function materializeStaticMap(staticMap) {
     tileSize: staticMap.tileSizePx,
     terrain,
     elevation,
+    sun: staticMap.sun ? { ...staticMap.sun } : null,
     resources: staticMap.resourceSites.map((resource) => ({ ...resource })),
     doodads: (staticMap.doodads || []).map((doodad) => ({ ...doodad })),
   };

@@ -12,7 +12,6 @@ use crate::game::services::{production, standability};
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol::{terrain, Command, LabMapDraft};
 use crate::rules;
-
 use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod checkpoint_scenario;
@@ -517,6 +516,7 @@ impl Game {
                 reason: "terrain contains an unknown code".to_string(),
             });
         }
+        let elevation = map_draft::normalized_elevation(&draft, name, tile_count)?;
         let players = self.player_inits();
         if draft.starts.len() != players.len() {
             return Err(LabError::InvalidMap {
@@ -573,11 +573,8 @@ impl Game {
             width: draft.width,
             height: draft.height,
             terrain: draft.terrain,
-            elevation: if draft.elevation.is_empty() {
-                vec![0; (draft.width * draft.height) as usize]
-            } else {
-                draft.elevation
-            },
+            elevation,
+            sun: draft.sun,
             starts,
             base_sites,
             base_resource_counts,

@@ -437,6 +437,8 @@ mod tests {
                 height: 64,
                 tile_size: config::TILE_SIZE,
                 terrain: vec![terrain::GRASS; 64 * 64],
+                elevation: vec![0; 64 * 64],
+                sun: None,
                 resources: Vec::new(),
                 doodads: Vec::new(),
                 concealment_tiles: Vec::new(),

@@ -27,6 +27,7 @@ export function createWorkerPresentationState() {
         elevation: map.elevation
           ? gridSnapshot(map.elevation)
           : emptyGridSnapshot(map.terrain),
+        sun: map.sun ? Object.freeze({ ...map.sun }) : null,
         doodads: Object.freeze((map.doodads || []).map((record) => Object.freeze({ ...record }))),
       });
       return staticMap;

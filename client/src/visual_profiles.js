@@ -142,23 +142,7 @@ const SCOUT_PLANE_FW189_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
   }),
 ]);
 
-const TERRAIN_SHADOW_PROFILES = Object.freeze([
-  ["ray-high", "Ray march / high sun", "raymarch", "high"],
-  ["ray-low", "Ray march / low sun", "raymarch", "low"],
-  ["extrude-high", "Mask extrusion / high sun", "extrude", "high"],
-  ["extrude-low", "Mask extrusion / low sun", "extrude", "low"],
-  ["ridge-high", "Contour wedges / high sun", "ridge", "high"],
-  ["ridge-low", "Contour wedges / low sun", "ridge", "low"],
-].map(([suffix, label, method, sun]) => Object.freeze({
-  id: `terrain-shadow-${suffix}`,
-  label,
-  description: "Local-only long terrain-shadow comparison profile.",
-  initialCamera: cameraSnapshot(1024, 1024, 0.54),
-  terrainLighting: Object.freeze({ method, sun, golden: sun === "low" }),
-})));
-
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
-  ...TERRAIN_SHADOW_PROFILES,
   Object.freeze({
     id: "trench-variants-1",
     label: "Trench variants 1",

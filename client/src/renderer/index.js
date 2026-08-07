@@ -101,12 +101,7 @@ import {
   _drawTreeOccludedUnitOutlines,
 } from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
-import {
-  applyTerrainLighting,
-  buildStaticMap as buildStaticTerrainMap,
-  previewStaticTerrain,
-  updateStaticTerrainTiles,
-} from "./terrain.js";
+import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
@@ -1319,7 +1314,6 @@ function updateStaticDoodadWind(visualTimeMs, camera) {
 
 Object.assign(Renderer.prototype, {
   buildStaticMap: buildStaticMapWithDoodads,
-  applyTerrainLighting,
   replaceStaticDoodads,
   patchStaticDoodads,
   updateStaticDoodadWind,

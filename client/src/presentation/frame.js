@@ -8,7 +8,7 @@ import { createRendererProjectionRecord } from "./projection_record.js";
 import { DOODAD_TYPE_IDS } from "../config.js";
 
 export const PRESENTATION_FRAME_VERSION = 2;
-export const STATIC_MAP_PRESENTATION_VERSION = 3;
+export const STATIC_MAP_PRESENTATION_VERSION = 4;
 export const MAX_PRESENTED_DOODADS = 4096;
 
 const STATIC_DOODAD_TYPES = new Set(DOODAD_TYPE_IDS);
@@ -285,10 +285,22 @@ export class PresentationFrameAssembler {
       tileSizePx,
       terrain,
       elevation,
+      sun: normalizeMapSun(map?.sun),
       resourceSites: Object.freeze(resourceSites),
       doodads,
     });
   }
+}
+
+function normalizeMapSun(value) {
+  if (!value || typeof value !== "object") return null;
+  const azimuthDegrees = Number(value.azimuthDegrees);
+  const elevationDegrees = Number(value.elevationDegrees);
+  const warmth = Number(value.warmth);
+  if (!Number.isInteger(azimuthDegrees) || azimuthDegrees < 0 || azimuthDegrees > 359) return null;
+  if (!Number.isInteger(elevationDegrees) || elevationDegrees < 1 || elevationDegrees > 89) return null;
+  if (!Number.isInteger(warmth) || warmth < 0 || warmth > 100) return null;
+  return Object.freeze({ azimuthDegrees, elevationDegrees, warmth });
 }
 
 function normalizeStaticDoodads(values, { widthPx, heightPx }) {

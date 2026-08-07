@@ -26,6 +26,7 @@ impl Default for Map {
             height: 0,
             terrain: Vec::new(),
             elevation: Vec::new(),
+            sun: None,
             starts: Vec::new(),
             base_sites: Vec::new(),
             base_resource_counts: HashMap::new(),

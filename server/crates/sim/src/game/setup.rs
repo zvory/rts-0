@@ -399,7 +399,13 @@ impl Game {
             height: self.state.map.height,
             tile_size: config::TILE_SIZE,
             terrain: self.state.map.terrain.clone(),
-            elevation: self.state.map.elevation.clone(),
+            elevation: self
+                .state
+                .map
+                .sun
+                .map(|_| self.state.map.elevation.clone())
+                .unwrap_or_default(),
+            sun: self.state.map.sun,
             resources,
             // Entity-backed authored objects must not bypass fog through the shared start payload.
             // They remain in the authoritative map for Lab/editor round-tripping, while clients

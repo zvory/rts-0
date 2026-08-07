@@ -6,7 +6,7 @@ use super::{LabEntityIdRemap, LabError};
 use crate::game::map::{BaseResourceCounts, Map};
 use crate::game::Game;
 use crate::game::MapMetadata;
-use crate::protocol::{terrain, validate_map_doodads, MapDoodad, MapTile};
+use crate::protocol::{terrain, validate_map_doodads, MapDoodad, MapSun, MapTile};
 use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 pub(super) const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 = 1;
@@ -46,6 +46,8 @@ pub struct LabCheckpointScenarioMapData {
     pub terrain: Vec<u8>,
     #[serde(default)]
     pub elevation: Vec<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sun: Option<MapSun>,
     pub starts: Vec<LabScenarioTile>,
     #[serde(rename = "baseSites", alias = "expansionSites")]
     pub base_sites: Vec<LabScenarioBaseSite>,
@@ -111,6 +113,7 @@ impl LabCheckpointScenarioMap {
                 height: map.height,
                 terrain: map.terrain.clone(),
                 elevation: map.elevation.clone(),
+                sun: map.sun,
                 starts: map
                     .starts
                     .iter()
@@ -143,6 +146,11 @@ impl LabCheckpointScenarioMap {
     pub(super) fn into_map(self) -> Result<(Map, MapMetadata), LabError> {
         self.validate()?;
         let data = self.data;
+        let elevation = if data.elevation.is_empty() {
+            vec![0; (data.width * data.height) as usize]
+        } else {
+            data.elevation.clone()
+        };
         let base_resource_counts = data
             .base_sites
             .iter()
@@ -160,7 +168,8 @@ impl LabCheckpointScenarioMap {
             width: data.width,
             height: data.height,
             terrain: data.terrain,
-            elevation: data.elevation,
+            elevation,
+            sun: data.sun,
             starts: data
                 .starts
                 .into_iter()
@@ -255,6 +264,23 @@ impl LabCheckpointScenarioMap {
                 });
             }
         }
+        if !self.data.elevation.is_empty() && self.data.elevation.len() != tile_count {
+            return Err(LabError::InvalidMap {
+                name: self.name.clone(),
+                reason: "checkpoint scenario map elevation length is invalid".to_string(),
+            });
+        }
+        let elevation = if self.data.elevation.is_empty() {
+            vec![0; tile_count]
+        } else {
+            self.data.elevation.clone()
+        };
+        crate::game::map::validate_elevation_sun(&elevation, self.data.sun).map_err(|reason| {
+            LabError::InvalidMap {
+                name: self.name.clone(),
+                reason,
+            }
+        })?;
         if self.data.starts.is_empty() || self.data.starts.len() > MAX_LAB_CHECKPOINT_MAP_STARTS {
             return Err(LabError::InvalidMap {
                 name: self.name.clone(),

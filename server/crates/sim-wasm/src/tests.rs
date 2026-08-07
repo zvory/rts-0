@@ -19,6 +19,8 @@ fn start_payload() -> StartPayload {
             height: 64,
             tile_size: balance::TILE_SIZE,
             terrain: vec![0; 64 * 64],
+            elevation: vec![0; 64 * 64],
+            sun: None,
             resources: Vec::new(),
             doodads: Vec::new(),
             concealment_tiles: Vec::new(),

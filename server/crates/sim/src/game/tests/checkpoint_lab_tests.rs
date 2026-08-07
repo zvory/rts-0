@@ -246,6 +246,8 @@ fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
         width: checkpoint.map.data.width,
         height: checkpoint.map.data.height,
         terrain: checkpoint.map.data.terrain.clone(),
+        elevation: checkpoint.map.data.elevation.clone(),
+        sun: checkpoint.map.data.sun,
         starts: checkpoint
             .map
             .data
