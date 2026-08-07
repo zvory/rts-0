@@ -202,9 +202,9 @@ function boxCorners(part) {
 function boxFaces(part) {
   const corners = boxCorners(part);
   const indices = [
-    [[0, 2, 6, 4], [-1, 0, 0]], [[1, 5, 7, 3], [1, 0, 0]],
+    [[0, 2, 6, 4], [0, 0, -1]], [[1, 5, 7, 3], [0, 0, 1]],
     [[0, 4, 5, 1], [0, -1, 0]], [[2, 3, 7, 6], [0, 1, 0]],
-    [[0, 1, 3, 2], [0, 0, -1]], [[4, 6, 7, 5], [0, 0, 1]],
+    [[0, 1, 3, 2], [-1, 0, 0]], [[4, 6, 7, 5], [1, 0, 0]],
   ];
   const cos = Math.cos(part.yaw);
   const sin = Math.sin(part.yaw);
