@@ -11,9 +11,9 @@ pub use super::replay_artifact::{
     is_supported_replay_artifact_schema, ChatLogEntry, CommandLogEntry, ReplayArtifactV1,
     ReplayStartComposition, ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
 };
-use super::{Game, Map, MapMetadata, PlayerInit, PlayerStartingLoadout};
-pub use super::replay_oil_analysis::VehicleOilRecord;
 use super::replay_oil_analysis::VehicleOilCollector;
+pub use super::replay_oil_analysis::VehicleOilRecord;
+use super::{Game, Map, MapMetadata, PlayerInit, PlayerStartingLoadout};
 use crate::game::command::SimCommand;
 use crate::protocol::{Event, ReplayStartMetadata, Snapshot};
 

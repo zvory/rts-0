@@ -563,6 +563,7 @@ mod tests {
             &mut events,
             1,
             None,
+            None,
         );
 
         assert!(

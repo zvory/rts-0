@@ -39,8 +39,8 @@ mod panzerfaust_shot;
 mod pathfinding;
 mod player_state;
 pub mod replay;
-mod replay_oil_analysis;
 mod replay_artifact;
+mod replay_oil_analysis;
 mod resource_placement;
 #[cfg(test)]
 mod resource_placement_tests;

@@ -15,9 +15,9 @@ struct AnalysisOutput {
 
 fn main() -> Result<(), String> {
     let mut args = env::args().skip(1);
-    let artifact_path = args
-        .next()
-        .ok_or_else(|| "usage: replay-oil-analyze ARTIFACT_JSON MATCH_ID ANALYSIS_BUILD_SHA".to_string())?;
+    let artifact_path = args.next().ok_or_else(|| {
+        "usage: replay-oil-analyze ARTIFACT_JSON MATCH_ID ANALYSIS_BUILD_SHA".to_string()
+    })?;
     let match_id = args
         .next()
         .ok_or_else(|| "missing MATCH_ID".to_string())?
