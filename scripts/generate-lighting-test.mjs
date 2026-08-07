@@ -97,6 +97,13 @@ for (let x = 0; x < WIDTH; x += 1) {
   terrain[123][x] = "=";
 }
 
+const noEntrenchmentTiles = [];
+for (let y = 0; y < HEIGHT; y += 1) {
+  for (let x = 0; x < WIDTH; x += 1) {
+    if ("=-|\\/".includes(terrain[y][x])) noEntrenchmentTiles.push({ x, y });
+  }
+}
+
 const map = {
   version: 10,
   name: "Lighting Test",
@@ -117,7 +124,7 @@ const map = {
   concealmentTiles: [],
   noVehicleTiles: [],
   noBuildingTiles: [],
-  noEntrenchmentTiles: [],
+  noEntrenchmentTiles,
   damageReductionTiles: [],
   slowMovementTiles: [],
 };
