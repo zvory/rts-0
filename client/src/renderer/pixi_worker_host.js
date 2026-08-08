@@ -6,6 +6,7 @@ import {
   createFrameMessages,
   createInitializeMessage,
   createMapGenerationMessage,
+  createPresentationPreferencesMessage,
   createRenderWorkerWireState,
   createResetGroundDecalsMessage,
   createResetGenerationMessage,
@@ -178,6 +179,13 @@ export class PixiWorkerPresentationAdapter {
   }
 
   setRenderClock() {}
+
+  setProjectedUnitShadowsEnabled(enabled) {
+    if (this._destroyed || this._fatal || this.surface !== "match") return;
+    this._post(createPresentationPreferencesMessage(this._generation, {
+      projectedUnitShadowsEnabled: !!enabled,
+    }));
+  }
 
   enterFixedCapture() {
     this._captureMode = true;

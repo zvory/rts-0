@@ -30,6 +30,7 @@ src/
   prediction_settings.js # localStorage-backed prediction toggle
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   health_bar_settings.js # localStorage-backed always-show HP-bar toggle (damaged-only by default)
+  unit_shadow_settings.js # localStorage-backed detailed-unit-shadow toggle (off by default)
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_runtime_reset.js # shared clearing of state derived from one authoritative timeline
@@ -1285,8 +1286,8 @@ context, conflict resolution prefers that command's grid key before falling back
 The long-lived `SettingsContainer` is constructed by `App` with `#settings-button` and the
 `#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
 spectator, and replay contexts through dependency-injected collaborators. The stable rendered ids
-inside the settings mount point are `#pointer-lock-toggle`, `#unit-range-toggle`,
-`#always-show-health-bars-toggle`, `#debug-path-toggle`, and `#give-up-open` plus live-match action
+inside the settings mount point are `#pointer-lock-toggle`, `#projected-unit-shadows-toggle`,
+`#unit-range-toggle`, `#always-show-health-bars-toggle`, `#debug-path-toggle`, and `#give-up-open` plus live-match action
 `#live-pause-open`; they may not exist until their owning
 tab/action is visible. Live controllable matches mount a separate `#tab-menu-button` hamburger and
 `#tab-menu` Auto-Build panel under `#game-screen`; the hamburger never replaces, moves, or aliases
@@ -2329,12 +2330,12 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   remain visible across camera scales and display resolutions; every seventh existing divider uses
   a heavier 1.5-world-pixel mark to identify approximately 105 HP without adding another mark.
   Construction and deconstruction keep their existing status colors on the shared bar layer.
-  On maps with authored elevation and sun, Rifleman, Machine Gunner, Scout Car, and Tank replace
-  their native rig shadows with one instanced GPU shadow layer. Coarse presentation-only box
-  volumes rotate with each unit and project along the authored sun vector; the fragment shader
-  samples the static elevation texture so the cast footprint terminates against raised receivers.
-  Rifleman, Machine Gunner, and Scout Car share a 22-pixel proxy height, while Tank is 33 pixels.
-  Flat maps retain their native unit shadows and allocate no active projected-shadow draw.
+  Detailed Unit Shadows are an opt-in Game setting and default off. When disabled, the render
+  worker skips every per-unit model projection and units retain their lightweight native rig
+  shadows. When enabled on maps with authored elevation and sun, simple presentation-only box
+  models for supported units rotate with each unit and project along the authored sun vector into
+  one GPU coverage layer; the terrain shader composites that mask with its separate static-height
+  ray march. Flat maps retain native unit shadows and allocate no active projected-shadow draw.
   Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values

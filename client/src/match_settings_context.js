@@ -22,6 +22,7 @@ export function buildMatchSettingsContextForMatch(match) {
     onDebugPathToggle: match.onDebugPathToggle,
     onUnitRangeToggle: match.onUnitRangeToggle,
     onHealthBarToggle: match.onHealthBarToggle,
+    onProjectedUnitShadowToggle: match.onProjectedUnitShadowToggle,
     onExclusiveFullscreenToggle: match.onExclusiveFullscreenToggle,
     exclusiveFullscreenEnabled: match.exclusiveFullscreenEnabled,
     livePauseActionLabel: () => match.livePauseActionLabel(),
@@ -49,6 +50,7 @@ export function buildMatchSettingsContext({
   onDebugPathToggle,
   onUnitRangeToggle,
   onHealthBarToggle,
+  onProjectedUnitShadowToggle,
   onExclusiveFullscreenToggle,
   exclusiveFullscreenEnabled,
   livePauseActionLabel,
@@ -111,6 +113,14 @@ export function buildMatchSettingsContext({
             enabled: !!state.showUnitRangesEnabled,
           }),
           onToggle: onUnitRangeToggle,
+        } : null,
+        projectedUnitShadows: state ? {
+          state: () => ({
+            hidden: false,
+            available: true,
+            enabled: !!state.showProjectedUnitShadowsEnabled,
+          }),
+          onToggle: onProjectedUnitShadowToggle,
         } : null,
         healthBars: state ? {
           state: () => ({

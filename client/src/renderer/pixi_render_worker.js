@@ -97,6 +97,11 @@ async function handleMessage(candidate) {
     case RENDER_WORKER_MESSAGE.CAPTURE:
       capture(message);
       break;
+    case RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES:
+      renderer?.setProjectedUnitShadowsEnabled?.(
+        message.payload.projectedUnitShadowsEnabled,
+      );
+      break;
     case RENDER_WORKER_MESSAGE.DESTROY:
       destroy(message.generation);
       break;

@@ -32,6 +32,10 @@ import {
   writeAlwaysShowHealthBarsEnabled,
 } from "../../client/src/health_bar_settings.js";
 import {
+  readProjectedUnitShadowsEnabled,
+  writeProjectedUnitShadowsEnabled,
+} from "../../client/src/unit_shadow_settings.js";
+import {
   configureMatchDisplayPreferences,
 } from "../../client/src/match_settings_toggles.js";
 import {
@@ -248,6 +252,11 @@ function hotkeyService() {
     assert(readAlwaysShowHealthBarsEnabled(storage), "always-show health bars persists enabled state");
     writeAlwaysShowHealthBarsEnabled(false, storage);
     assert(!readAlwaysShowHealthBarsEnabled(storage), "always-show health bars clears its override when disabled");
+    assert(!readProjectedUnitShadowsEnabled(storage), "detailed unit shadows default off");
+    writeProjectedUnitShadowsEnabled(true, storage);
+    assert(readProjectedUnitShadowsEnabled(storage), "detailed unit shadows persist explicit opt-in");
+    writeProjectedUnitShadowsEnabled(false, storage);
+    assert(!readProjectedUnitShadowsEnabled(storage), "disabling detailed unit shadows clears the opt-in");
     const unavailableStorage = {
       getItem() { throw new Error("storage unavailable"); },
       setItem() { throw new Error("storage unavailable"); },
@@ -268,10 +277,12 @@ function hotkeyService() {
     configureMatchDisplayPreferences(match, {
       unitRangesEnabled: false,
       healthBarsAlwaysEnabled: true,
+      projectedUnitShadowsEnabled: false,
       onHealthBarsAlwaysEnabledChange(enabled) { notified = enabled; },
     });
     assert(!state.showUnitRangesEnabled, "match display preferences initialize unit ranges");
     assert(state.showHealthBarsAlwaysEnabled, "match display preferences initialize health bars");
+    assert(!state.showProjectedUnitShadowsEnabled, "match display preferences default detailed shadows off");
 
     match.onHealthBarToggle();
     assert(!state.showHealthBarsAlwaysEnabled, "match health-bar toggle updates display state");
@@ -283,6 +294,7 @@ function hotkeyService() {
     let predictionToggled = false;
     let unitRangeToggled = false;
     let healthBarsToggled = false;
+    let projectedUnitShadowsToggled = false;
     const [gameTab] = buildSettingsTabs({
       game: {
         kind: "match",
@@ -293,6 +305,10 @@ function hotkeyService() {
         unitRanges: {
           state: () => ({ enabled: true, available: true }),
           onToggle: () => { unitRangeToggled = true; },
+        },
+        projectedUnitShadows: {
+          state: () => ({ enabled: false, available: true }),
+          onToggle: () => { projectedUnitShadowsToggled = true; },
         },
         healthBars: {
           state: () => ({ enabled: false, available: true }),
@@ -312,6 +328,11 @@ function hotkeyService() {
     assert(rangeToggle.textContent === "Show Unit Ranges: on", "settings: unit range toggle uses expected label");
     rangeToggle.listeners.click();
     assert(unitRangeToggled, "settings: unit range control calls injected toggle");
+    const shadowToggle = findFakeById(root, "projected-unit-shadows-toggle");
+    assert(shadowToggle, "settings: game tab renders detailed unit-shadow control with pinned id");
+    assert(shadowToggle.textContent === "Detailed Unit Shadows: off", "settings: detailed unit shadows default off");
+    shadowToggle.listeners.click();
+    assert(projectedUnitShadowsToggled, "settings: detailed unit-shadow control calls injected toggle");
     const healthBarToggle = findFakeById(root, "always-show-health-bars-toggle");
     assert(healthBarToggle, "settings: game tab renders always-show health bars control with pinned id");
     assert(healthBarToggle.textContent === "Always Show HP Bars: off", "settings: health bars default to damaged-only");

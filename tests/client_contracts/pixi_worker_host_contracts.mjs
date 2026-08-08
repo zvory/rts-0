@@ -14,6 +14,10 @@ globalThis.requestAnimationFrame = (callback) => { callback(10); return 1; };
 async function queueAndLifecycleContracts() {
   const fixture = createFixture();
   const { adapter, worker, canvas, root, assembler } = fixture;
+  adapter.setProjectedUnitShadowsEnabled(true);
+  assert(worker.messages.at(-1).type === "presentationPreferences"
+    && worker.messages.at(-1).payload.projectedUnitShadowsEnabled === true,
+  "projected unit-shadow preference crosses the worker control boundary immediately");
   const frame1 = assemble(assembler, 1);
   const frame2 = assemble(assembler, 2);
   const frame3 = assemble(assembler, 3);

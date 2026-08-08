@@ -255,7 +255,9 @@ Its payload lifetimes are explicit:
 - durable update: monotonic ground-decal revision plus its detached records;
 - revisioned data: transferred visible/explored copies only when each revision changes;
 - frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
-- control: resize, capture/flush, generation reset, and destroy.
+- control: resize, capture/flush, presentation preferences, generation reset, and destroy. The
+  presentation-preference payload currently carries the opt-in detailed-unit-shadow boolean so
+  disabling it stops worker-side model projection instead of merely hiding the result.
 
 Responses are `ready` after all renderer assets are ready, `retained`, `presented` with frame id and worker
 update/present timings, `superseded`, bounded `failed`, and `destroyed`. The message builder never
