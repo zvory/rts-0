@@ -90,6 +90,7 @@ export class PixiWorkerPresentationAdapter {
     this._lastReadiness = { frame: 0, assets: [], ready: false, failedAssets: [], pendingAssets: [] };
     this._backendInfo = null;
     this._statsEpoch = 0;
+    this._gpuTimingResetBeforeCurrentJob = false;
     this._stats = freshStats();
     this.app = {
       canvas,
@@ -399,6 +400,10 @@ export class PixiWorkerPresentationAdapter {
     const startedAt = performance.now();
     const countsInWindow = job.statsEpoch === this._statsEpoch;
     try {
+      if (countsInWindow && this._gpuTimingResetBeforeCurrentJob) {
+        this._post(createResetDiagnosticsMessage(this._generation));
+        this._gpuTimingResetBeforeCurrentJob = false;
+      }
       const packets = job.editor
         ? [createEditorFrameMessage(job.editor, job.generation)]
         : this._framePackets(job.frame);
@@ -691,6 +696,7 @@ export class PixiWorkerPresentationAdapter {
     this._statsEpoch += 1;
     this._stats = freshStats();
     this._stats.carriedInFlight = carriedInFlight;
+    this._gpuTimingResetBeforeCurrentJob = this._gpuShadowTimingEnabled && carriedInFlight > 0;
     Object.assign(this._stats, active);
     if (this._gpuShadowTimingEnabled && !this._destroyed && !this._fatal) {
       this._post(createResetDiagnosticsMessage(this._generation));

@@ -799,8 +799,14 @@ function normalizedMap(map) {
   const height = Math.max(1, Math.trunc(Number(map?.height)) || 1);
   const tileSize = Math.max(1, Number(map?.tileSize) || 32);
   const elevation = Array.from(map?.elevation || new Uint8Array(width * height));
-  const values = elevation.map((value) => Number(value) || 0);
-  return { width, height, tileSize, elevation, minElevation: Math.min(...values), maxElevation: Math.max(...values), sun: map?.sun ? { ...map.sun } : null };
+  let minElevation = Infinity;
+  let maxElevation = -Infinity;
+  for (const candidate of elevation) {
+    const value = Number(candidate) || 0;
+    minElevation = Math.min(minElevation, value);
+    maxElevation = Math.max(maxElevation, value);
+  }
+  return { width, height, tileSize, elevation, minElevation, maxElevation, sun: map?.sun ? { ...map.sun } : null };
 }
 
 function finite(value, fallback) {

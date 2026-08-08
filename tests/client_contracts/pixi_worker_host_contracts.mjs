@@ -308,7 +308,7 @@ async function measurementBoundaryContracts() {
       "display age includes host-pending and main-thread packet work instead of starting after cloning");
     adapter.destroy();
 
-    const boundaryFixture = createFixture();
+    const boundaryFixture = createFixture({ gpuShadowTiming: true });
     const boundaryFrame = assemble(boundaryFixture.assembler, 1);
     const pendingBoundaryFrame = assemble(boundaryFixture.assembler, 2);
     const carried = boundaryFixture.adapter.render(boundaryFrame);
@@ -337,7 +337,12 @@ async function measurementBoundaryContracts() {
       && boundaryStats.mainSubmitMs.samples === 0,
     "both carried presentations settle without leaking throughput, cloning, or timing samples across reset");
     const freshFrame = assemble(boundaryFixture.assembler, 3);
+    const messageCountBeforeFreshFrame = boundaryFixture.worker.messages.length;
     const fresh = boundaryFixture.adapter.render(freshFrame);
+    const freshFrameMessages = boundaryFixture.worker.messages.slice(messageCountBeforeFreshFrame);
+    assert(freshFrameMessages[0]?.type === "resetDiagnostics"
+      && freshFrameMessages.at(-1)?.type === "frame",
+    "the first current-window frame resets GPU timing after every prior-window carried frame has settled");
     boundaryFixture.worker.present(freshFrame);
     await fresh.settled;
     boundaryStats = boundaryFixture.adapter.diagnostics();
