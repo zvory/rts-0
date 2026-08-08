@@ -310,24 +310,41 @@ async function measurementBoundaryContracts() {
 
     const boundaryFixture = createFixture();
     const boundaryFrame = assemble(boundaryFixture.assembler, 1);
+    const pendingBoundaryFrame = assemble(boundaryFixture.assembler, 2);
     const carried = boundaryFixture.adapter.render(boundaryFrame);
+    const pendingCarried = boundaryFixture.adapter.render(pendingBoundaryFrame);
     boundaryFixture.adapter._control.reset();
     let boundaryStats = boundaryFixture.adapter.diagnostics();
-    assert(boundaryStats.submitted === 0 && boundaryStats.completed === 0 && boundaryStats.carriedInFlight === 1,
-      "reset exposes the already-submitted in-flight frame without charging it to the new window");
+    assert(boundaryStats.submitted === 0 && boundaryStats.completed === 0
+      && boundaryStats.dispatched === 0 && boundaryStats.carriedInFlight === 2
+      && boundaryStats.clonedBytes === 0 && boundaryStats.mainSubmitMs.samples === 0,
+    "reset exposes in-flight and pending frames without charging their diagnostics to the new window");
     boundaryFixture.worker.present(boundaryFrame);
     await carried.settled;
     boundaryStats = boundaryFixture.adapter.diagnostics();
     assert(boundaryStats.completed === 0 && boundaryStats.submitted === 0
-      && boundaryStats.carriedCompleted === 1 && boundaryStats.carriedInFlight === 0,
-    "a pre-reset completion settles normally but remains outside new-window throughput");
-    const freshFrame = assemble(boundaryFixture.assembler, 2);
+      && boundaryStats.dispatched === 0 && boundaryStats.carriedCompleted === 1
+      && boundaryStats.carriedInFlight === 1 && boundaryStats.clonedBytes === 0
+      && boundaryStats.mainSubmitMs.samples === 0
+      && boundaryFixture.worker.frameMessages().at(-1).payload.frame.frameId === pendingBoundaryFrame.frameId,
+    "a pre-reset pending frame dispatches normally but remains outside new-window diagnostics");
+    boundaryFixture.worker.present(pendingBoundaryFrame);
+    await pendingCarried.settled;
+    boundaryStats = boundaryFixture.adapter.diagnostics();
+    assert(boundaryStats.completed === 0 && boundaryStats.submitted === 0
+      && boundaryStats.dispatched === 0 && boundaryStats.carriedCompleted === 2
+      && boundaryStats.carriedInFlight === 0 && boundaryStats.clonedBytes === 0
+      && boundaryStats.mainSubmitMs.samples === 0,
+    "both carried presentations settle without leaking throughput, cloning, or timing samples across reset");
+    const freshFrame = assemble(boundaryFixture.assembler, 3);
     const fresh = boundaryFixture.adapter.render(freshFrame);
     boundaryFixture.worker.present(freshFrame);
     await fresh.settled;
     boundaryStats = boundaryFixture.adapter.diagnostics();
-    assert(boundaryStats.completed === 1 && boundaryStats.submitted === 1,
-      "new-window completed presentations never exceed matching submissions");
+    assert(boundaryStats.completed === 1 && boundaryStats.submitted === 1
+      && boundaryStats.dispatched === 1 && boundaryStats.clonedBytes > 0
+      && boundaryStats.mainSubmitMs.samples === 1,
+    "a new-window presentation contributes matching submission, dispatch, cloning, timing, and completion diagnostics");
     boundaryFixture.adapter.destroy();
   } finally {
     globalThis.performance = savedPerformance;

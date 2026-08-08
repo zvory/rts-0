@@ -397,6 +397,7 @@ export class PixiWorkerPresentationAdapter {
       return;
     }
     const startedAt = performance.now();
+    const countsInWindow = job.statsEpoch === this._statsEpoch;
     try {
       const packets = job.editor
         ? [createEditorFrameMessage(job.editor, job.generation)]
@@ -411,13 +412,15 @@ export class PixiWorkerPresentationAdapter {
             packet.message.payload.frame.visualProfile = cloneOptional(this._sources?.visualProfile?.());
           }
         }
-        this._stats.clonedBytes += packet.transfer.reduce((sum, item) => sum + (item?.byteLength || 0), 0);
+        if (countsInWindow) {
+          this._stats.clonedBytes += packet.transfer.reduce((sum, item) => sum + (item?.byteLength || 0), 0);
+        }
         this._post(packet);
       }
       const mainSubmitMs = performance.now() - startedAt;
-      pushTiming(this._stats.mainSubmitMs, mainSubmitMs);
+      if (countsInWindow) pushTiming(this._stats.mainSubmitMs, mainSubmitMs);
       this._inFlight = job;
-      this._stats.dispatched += 1;
+      if (countsInWindow) this._stats.dispatched += 1;
       this._publishStats();
     } catch (error) {
       this._settleJob(job, PRESENTATION_OUTCOME.FAILED, error);
