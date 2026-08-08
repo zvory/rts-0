@@ -329,6 +329,14 @@ function validateGpuTimingSummary(summary) {
     requireId(group.samples ?? 0, "gpu timing samples");
     for (const key of ["avgMs", "p50Ms", "p95Ms", "maxMs"]) nonNegativeFinite(group[key] ?? 0, `gpu timing ${key}`);
   }
+  if (summary.staticTerrain != null) {
+    const terrain = summary.staticTerrain;
+    if (typeof terrain !== "object" || Array.isArray(terrain)) throw new TypeError("static terrain timing must be an object");
+    for (const key of ["buildCount", "lifetimeBuildCount", "width", "height", "samplesPerTile"]) {
+      requireId(terrain[key] ?? 0, `static terrain ${key}`);
+    }
+    nonNegativeFinite(terrain.buildMs ?? 0, "static terrain buildMs");
+  }
 }
 
 function request(type, generation, payload, transfer = []) {

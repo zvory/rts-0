@@ -17,7 +17,9 @@ unit count or ratio used for performance comparisons.
 The static benchmark map carries two long parallel five-level ridges and a northwesterly sunset sun
 at 12 degrees above the horizon. This intentionally keeps terrain relief, long terrain shadows, and
 the active GPU unit-shadow path inside the canonical renderer workload rather than measuring the
-flat-map bypass.
+flat-map bypass. Static terrain visibility is a four-samples-per-tile light-space cache built once
+when that map enters the worker; it is invariant under benchmark viewport, DPR, zoom, and frame
+count. Dynamic unit receivers still update every submitted frame.
 `?label=<text>` adds a bounded human label to every artifact. `?seconds=<2..25>` exists for local
 iteration; the shareable default is five seconds after a three-second warmup. The cap keeps the
 measurement inside the finite 30-second recording.

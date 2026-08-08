@@ -38,6 +38,7 @@ async function queueAndLifecycleContracts() {
   worker.present(frame1, { gpuShadowTiming: {
     supported: true, pending: 1, dropped: 0, disjoint: 0,
     groups: [{ label: "renderer.unitShadows.mask", samples: 2, avgMs: 0.2, p50Ms: 0.2, p95Ms: 0.3, maxMs: 0.3 }],
+    staticTerrain: { buildCount: 1, lifetimeBuildCount: 1, buildMs: 3.5, width: 504, height: 504, samplesPerTile: 4 },
   } });
   assert((await first.settled).status === PRESENTATION_OUTCOME.PRESENTED,
     "the exact in-flight frame id settles as presented");
@@ -66,6 +67,8 @@ async function queueAndLifecycleContracts() {
     "worker diagnostics retain queue and compositor-observed display ages");
   assert(adapter.diagnostics().gpuShadowTiming?.groups?.[0]?.label === "renderer.unitShadows.mask",
     "opt-in worker GPU timing reaches the public diagnostic snapshot");
+  assert(adapter.diagnostics().gpuShadowTiming?.staticTerrain?.buildCount === 1,
+    "worker diagnostics prove static terrain visibility built once for the current map");
   adapter._control.reset();
   assert(worker.messages.at(-1).type === "resetDiagnostics",
     "host diagnostic reset also resets bounded worker GPU queries");

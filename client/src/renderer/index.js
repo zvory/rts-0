@@ -402,7 +402,11 @@ export class Renderer {
   }
 
   gpuShadowTimingSummary() {
-    return this._gpuShadowTimer?.summary?.() || null;
+    const timing = this._gpuShadowTimer?.summary?.();
+    return timing ? {
+      ...timing,
+      staticTerrain: this._projectedUnitShadows?.staticTerrainSummary?.() || null,
+    } : null;
   }
 
   resetGpuShadowTiming() {

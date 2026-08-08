@@ -265,18 +265,31 @@ transfers an assembler-owned buffer: it transfers copies so retained Phase 2 sou
 usable and unchanged.
 
 The immutable static-map DTO also carries optional authored sun conditions. When elevation varies,
-the terrain builder computes a smooth height-field relief and receiver-aware ray-marched horizon
-shadow mask once per map generation, then uploads the resulting terrain texture. `warmth` applies a
-matching static world tint. A flat elevation grid with no sun bypasses all height-field pixel reads,
-shadow work, and tinting, preserving the pre-elevation render path for existing maps.
+the terrain builder computes smooth height-field relief, while the detailed-shadow layer builds one
+map-space directional horizon cache in `setMap`. For each light ray it carries the maximum
+light-space height `z - tan(elevation) * dot(world, sunDirection)` from the sun-facing edge. This is
+the 2.5D equivalent of an orthographic directional-light depth comparison and is a linear sweep,
+not a viewport-pixel ray march. The cache has four samples per tile regardless of viewport, DPR,
+camera, or map-world pixel size and never rebuilds during entity/camera frames. Linear sampling on
+the non-dominant axis follows the authored light ray with at most one cache texel (one quarter tile)
+of angular rasterization error; sub-texel blockers can soften rather than widening with distance.
+`warmth` applies a matching static world tint. Flat elevation grids bypass the height-field shadow
+path, preserving the pre-elevation render path for existing maps.
 
-Opt-in detailed unit shadows keep their existing presentation models and 30-degree minimum unit
-sun elevation, but the worker uploads those boxes as one retained instanced mesh. It rasterizes
-coverage into an R8 camera-window target with a two-texel sampling gutter, rather than rebuilding
-immediate-mode convex hulls into a map-sized RGBA target. Camera origin, zoom, and CSS viewport are
-passed explicitly by the renderer owner; concealment-only entities remain excluded and a failed
-mask draw leaves native rig shadows active. Optional bounded GPU queries measure the unit-mask draw
-and total present without synchronously waiting for results.
+Opt-in detailed unit shadows keep their existing presentation models, but static and dynamic work
+now share the exact authored azimuth and elevation; there is no unit-only 30-degree clamp. The
+worker uploads the boxes as one retained instanced mesh. Each dynamic vertex starts at bilinearly
+sampled terrain elevation and performs three bounded receiver refinements against the same height
+texture while following the authored 3D light ray, so sloped receivers do not silently collapse to
+the `z=0` plane. Coverage is rasterized into an R8 camera-window target with a two-texel sampling
+gutter, rather than rebuilding immediate-mode convex hulls into a map-sized RGBA target. The final
+terrain mesh performs one static-cache sample and one dynamic-mask sample per fragment. Camera
+origin, zoom, and CSS viewport are passed explicitly by the renderer owner; concealment-only
+entities remain excluded and a failed mask draw leaves native rig shadows active. Optional bounded
+GPU queries measure the unit-mask draw and total present without synchronously waiting for results.
+The static transform is CPU map-load work, and Pixi composites the terrain mesh as part of the
+ordinary stage render, so neither interval is duplicated merely to manufacture a separate GPU
+query label; `staticBuilds`/`staticBuildMs` diagnostics and `renderer.present.total` cover them.
 
 The worker treats an observed WebGL context loss as a terminal presentation failure; it does not
 silently keep acknowledging black frames. Worker uncaught errors, unhandled rejections, message

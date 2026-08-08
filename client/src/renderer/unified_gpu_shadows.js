@@ -2,8 +2,8 @@ import { KIND } from "../protocol.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
 import { projectedUnitShadowCandidate } from "./projected_unit_shadow_model_candidates.js";
 
-// Presentation-only box models. Units are analytically projected into a coverage mask while
-// terrain keeps its separate height-field ray march.
+// Presentation-only box models. Static terrain uses a cached directional horizon transform;
+// units are projected into a camera-bounded coverage mask every presentation frame.
 const PROXIES = Object.freeze({
   [KIND.RIFLEMAN]: [{ length: 10, width: 7, height: 15 }, { length: 6, width: 6, height: 22, forward: 0.8 }],
   [KIND.MACHINE_GUNNER]: [{ length: 13, width: 10, height: 15 }, { length: 7, width: 7, height: 22, forward: 0.8 }],
@@ -24,11 +24,7 @@ const MASK_FILTER_GUTTER_TEXELS = 2;
 const INSTANCE_FLOATS = 11;
 const INSTANCE_STRIDE_BYTES = INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 const INITIAL_INSTANCE_CAPACITY = 1024;
-// Very low terrain sun remains dramatic, but literal unit projections become longer than the
-// sprites are readable. Clamp only their presentation-only projection angle.
-export const PROJECTED_UNIT_SHADOW_MIN_ELEVATION_DEGREES = 30;
-export const PROJECTED_SHADOW_MAX_MARCH_STEPS = 96;
-export const PROJECTED_SHADOW_MARCH_STEP_WORLD = 8;
+export const STATIC_SHADOW_SAMPLES_PER_TILE = 4;
 
 const VERTEX = `#version 300 es
 precision highp float;
@@ -51,49 +47,22 @@ const FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 vMapUv;
 in vec2 vWorldPosition;
-uniform sampler2D uTerrainHeightTexture;
+uniform sampler2D uStaticShadowTexture;
 uniform sampler2D uUnitShadowTexture;
 uniform vec2 uMapWorldSize;
-uniform vec2 uTerrainTextureSize;
-uniform vec2 uSunDirection;
-uniform float uTileSize;
-uniform float uSunSlope;
-uniform float uMarchStep;
-uniform float uMaxDistance;
-uniform float uPenumbra;
 uniform float uAlpha;
 uniform vec2 uUnitMaskOrigin;
 uniform vec2 uUnitMaskWorldSize;
 out vec4 finalColor;
 
-float terrainHeight(vec2 uv) {
-  vec2 halfTexel = 0.5 / uTerrainTextureSize;
-  return texture(uTerrainHeightTexture, clamp(uv, halfTexel, vec2(1.0) - halfTexel)).r * 255.0 * uTileSize;
-}
 void main(void) {
   if (vMapUv.x < 0.0 || vMapUv.y < 0.0 || vMapUv.x > 1.0 || vMapUv.y > 1.0) discard;
-  float receiver = terrainHeight(vMapUv);
-  float bestClearance = -10000.0;
-  float hitDistance = uMaxDistance;
-  for (int stepIndex = 1; stepIndex <= ${PROJECTED_SHADOW_MAX_MARCH_STEPS}; stepIndex += 1) {
-    float distance = float(stepIndex) * uMarchStep;
-    if (distance > uMaxDistance) break;
-    vec2 sampleUv = vMapUv + uSunDirection * distance / uMapWorldSize;
-    if (sampleUv.x < 0.0 || sampleUv.y < 0.0 || sampleUv.x > 1.0 || sampleUv.y > 1.0) break;
-    float rayHeight = receiver + distance * uSunSlope;
-    float clearance = terrainHeight(sampleUv) - rayHeight;
-    if (clearance > bestClearance) {
-      bestClearance = clearance;
-      hitDistance = distance;
-    }
-  }
-  float terrainCoverage = smoothstep(-uPenumbra, uPenumbra, bestClearance);
+  float terrainCoverage = texture(uStaticShadowTexture, vMapUv).r;
   vec2 unitUv = (vWorldPosition - uUnitMaskOrigin) / uUnitMaskWorldSize;
   float unitCoverage = unitUv.x >= 0.0 && unitUv.y >= 0.0 && unitUv.x <= 1.0 && unitUv.y <= 1.0
     ? texture(uUnitShadowTexture, unitUv).r
     : 0.0;
-  float fade = 1.0 - 0.12 * clamp(hitDistance / max(uMaxDistance, 1.0), 0.0, 1.0);
-  float coverage = max(terrainCoverage * fade, unitCoverage);
+  float coverage = max(terrainCoverage, unitCoverage);
   float alpha = coverage * uAlpha;
   if (alpha <= 0.001) discard;
   finalColor = vec4(vec3(0.075, 0.064, 0.052) * alpha, alpha);
@@ -114,6 +83,13 @@ uniform vec2 uMaskOrigin;
 uniform vec2 uSunDirection;
 uniform float uInverseSunSlope;
 uniform float uMaskScale;
+uniform sampler2D uTerrainHeightTexture;
+uniform vec2 uMapWorldSize;
+uniform float uTileSize;
+float terrainHeight(vec2 world) {
+  vec2 uv = clamp(world / uMapWorldSize, vec2(0.0), vec2(1.0));
+  return texture(uTerrainHeightTexture, uv).r * 255.0 * uTileSize;
+}
 void main(void) {
   float facingCos = cos(aInstanceOrigin.z);
   float facingSin = sin(aInstanceOrigin.z);
@@ -127,8 +103,15 @@ void main(void) {
   float pitchedX = local.x * pitchCos - local.z * pitchSin;
   float pitchedZ = local.x * pitchSin + local.z * pitchCos;
   vec2 world = partCenter + mat2(yawCos, yawSin, -yawSin, yawCos) * vec2(pitchedX, local.y);
-  float height = max(0.0, aPartCenter.z + pitchedZ);
-  vec2 projectedWorld = world - uSunDirection * height * uInverseSunSlope;
+  float worldHeight = terrainHeight(aInstanceOrigin.xy) + max(0.0, aPartCenter.z + pitchedZ);
+  vec2 projectedWorld = world;
+  // Solve the directional ray against the heightfield receiver. Three fixed refinements keep the
+  // dynamic cost proportional to box vertices, not viewport pixels, and align silhouettes on
+  // slopes without moving gameplay coordinates.
+  for (int refinement = 0; refinement < 3; refinement += 1) {
+    float receiverHeight = terrainHeight(projectedWorld);
+    projectedWorld = world - uSunDirection * max(0.0, worldHeight - receiverHeight) * uInverseSunSlope;
+  }
   vec2 maskPosition = (projectedWorld - uMaskOrigin) * uMaskScale;
   mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
   gl_Position = vec4((mvp * vec3(maskPosition, 1.0)).xy, 0.0, 1.0);
@@ -160,7 +143,7 @@ export function supportsUnifiedGpuShadowPass(map) {
   return maxElevation > minElevation;
 }
 
-/** GPU terrain ray march composited with an analytic projected-unit coverage mask. */
+/** Cached terrain visibility composited with an instanced projected-unit coverage mask. */
 export class UnifiedGpuShadowLayer {
   constructor({ pixi = globalThis.PIXI, renderer, layer, recordDiagnostic = null, gpuTimer = null } = {}) {
     this.pixi = pixi;
@@ -172,6 +155,11 @@ export class UnifiedGpuShadowLayer {
     this.enabled = false;
     this.unitShadowsEnabled = false;
     this.unitProjectionSlope = 1;
+    this.staticBuildCount = 0;
+    this.staticMapBuildCount = 0;
+    this.staticBuildDurationMs = 0;
+    this.staticCacheWidth = 0;
+    this.staticCacheHeight = 0;
     this.supported = Boolean(pixi?.Geometry && pixi?.Mesh && pixi?.Shader && pixi?.UniformGroup
       && pixi?.Buffer && pixi?.RenderTexture && renderer?.render);
     this.projectedEntityIds = new Set();
@@ -182,18 +170,16 @@ export class UnifiedGpuShadowLayer {
     });
     this.uniforms = new pixi.UniformGroup({
       uMapWorldSize: { value: new Float32Array([1, 1]), type: "vec2<f32>" },
-      uTerrainTextureSize: { value: new Float32Array([1, 1]), type: "vec2<f32>" },
-      uSunDirection: { value: new Float32Array([0, -1]), type: "vec2<f32>" },
-      uTileSize: { value: 32, type: "f32" },
-      uSunSlope: { value: 1, type: "f32" },
-      uMarchStep: { value: PROJECTED_SHADOW_MARCH_STEP_WORLD, type: "f32" },
-      uMaxDistance: { value: PROJECTED_SHADOW_MARCH_STEP_WORLD, type: "f32" },
-      uPenumbra: { value: 1.8, type: "f32" },
       uAlpha: { value: 0.25, type: "f32" },
       uUnitMaskOrigin: { value: new Float32Array([0, 0]), type: "vec2<f32>" },
       uUnitMaskWorldSize: { value: new Float32Array([1, 1]), type: "vec2<f32>" },
     });
     this.terrainHeightTexture = elevationTexture(pixi, { width: 1, height: 1, elevation: [0] });
+    this.staticShadowTexture = coverageTexture(pixi, {
+      width: 1,
+      height: 1,
+      data: new Uint8Array([0]),
+    });
     this.unitShadowTexture = createUnitMaskTexture(pixi, 1, 1);
     this.instanceCapacity = INITIAL_INSTANCE_CAPACITY;
     this.instanceData = new Float32Array(this.instanceCapacity * INSTANCE_FLOATS);
@@ -209,11 +195,10 @@ export class UnifiedGpuShadowLayer {
       uSunDirection: { value: new Float32Array([0, -1]), type: "vec2<f32>" },
       uInverseSunSlope: { value: 1, type: "f32" },
       uMaskScale: { value: OCCLUDER_TEXTURE_SCALE, type: "f32" },
+      uMapWorldSize: { value: new Float32Array([1, 1]), type: "vec2<f32>" },
+      uTileSize: { value: 32, type: "f32" },
     });
-    this.unitShader = pixi.Shader.from({
-      gl: { vertex: UNIT_VERTEX, fragment: UNIT_FRAGMENT, name: "instanced-projected-unit-shadows" },
-      resources: { unitShadowUniforms: this.unitUniforms },
-    });
+    this.unitShader = this._createUnitShader();
     this.unitMesh = new pixi.Mesh({ geometry: this.unitGeometry, shader: this.unitShader });
     this.unitMesh.eventMode = "none";
     this.unitMesh.visible = true;
@@ -227,51 +212,57 @@ export class UnifiedGpuShadowLayer {
   setMap(map) {
     if (!this.supported) return;
     this.map = normalizedMap(map);
+    this.staticMapBuildCount = 0;
+    this.staticBuildDurationMs = 0;
+    this.staticCacheWidth = 0;
+    this.staticCacheHeight = 0;
     this.enabled = supportsUnifiedGpuShadowPass(this.map);
     this.mesh.visible = false;
     this.projectedEntityIds.clear();
     if (!this.enabled) return;
     const worldWidth = this.map.width * this.map.tileSize;
     const worldHeight = this.map.height * this.map.tileSize;
+    const buildStarted = globalThis.performance?.now?.() ?? Date.now();
+    const staticMask = buildDirectionalHorizonMask(this.map);
+    const staticTexture = coverageTexture(this.pixi, staticMask);
+    this.staticBuildDurationMs = (globalThis.performance?.now?.() ?? Date.now()) - buildStarted;
+    this.staticBuildCount += 1;
+    this.staticMapBuildCount += 1;
+    this.staticCacheWidth = staticMask.width;
+    this.staticCacheHeight = staticMask.height;
+    this.recordDiagnostic?.("renderer.unifiedGpuShadows.staticBuilds", 1);
+    this.recordDiagnostic?.("renderer.unifiedGpuShadows.staticBuildMs", this.staticBuildDurationMs);
     const terrainTexture = elevationTexture(this.pixi, this.map);
     const unitTexture = createUnitMaskTexture(this.pixi, 1, 1);
     // This is ordinary coverage rather than encoded height data, so linear filtering is safe and
     // gives the half-resolution mask a stable one-pixel antialiased edge.
-    const shader = this._createShader(terrainTexture, unitTexture);
+    const shader = this._createShader(staticTexture, unitTexture);
+    const unitShader = this._createUnitShader(terrainTexture);
     this.mesh.shader = shader;
+    this.unitMesh.shader = unitShader;
     this.shader?.destroy?.();
+    this.unitShader?.destroy?.();
     this.terrainHeightTexture?.destroy?.(true);
+    this.staticShadowTexture?.destroy?.(true);
     this.unitShadowTexture?.destroy?.(true);
     this.shader = shader;
+    this.unitShader = unitShader;
     this.terrainHeightTexture = terrainTexture;
+    this.staticShadowTexture = staticTexture;
     this.unitShadowTexture = unitTexture;
     const positionBuffer = this.geometry.getAttribute("aPosition").buffer;
     positionBuffer.data.set([0, 0, worldWidth, 0, worldWidth, worldHeight, 0, worldHeight]);
     positionBuffer.update();
-    const azimuth = this.map.sun.azimuthDegrees * Math.PI / 180;
-    const elevation = this.map.sun.elevationDegrees * Math.PI / 180;
-    const slope = Math.max(0.05, Math.tan(elevation));
-    const unitElevation = Math.max(
-      elevation,
-      PROJECTED_UNIT_SHADOW_MIN_ELEVATION_DEGREES * Math.PI / 180,
-    );
-    this.unitProjectionSlope = Math.tan(unitElevation);
-    const maxVertical = (this.map.maxElevation - this.map.minElevation) * this.map.tileSize;
+    const sun = shadowSunModel(this.map.sun);
+    this.unitProjectionSlope = sun.slope;
     this.uniforms.uniforms.uMapWorldSize[0] = worldWidth;
     this.uniforms.uniforms.uMapWorldSize[1] = worldHeight;
-    this.uniforms.uniforms.uTerrainTextureSize[0] = this.map.width;
-    this.uniforms.uniforms.uTerrainTextureSize[1] = this.map.height;
-    this.uniforms.uniforms.uSunDirection[0] = Math.sin(azimuth);
-    this.uniforms.uniforms.uSunDirection[1] = -Math.cos(azimuth);
-    this.unitUniforms.uniforms.uSunDirection[0] = Math.sin(azimuth);
-    this.unitUniforms.uniforms.uSunDirection[1] = -Math.cos(azimuth);
+    this.unitUniforms.uniforms.uSunDirection[0] = sun.directionX;
+    this.unitUniforms.uniforms.uSunDirection[1] = sun.directionY;
     this.unitUniforms.uniforms.uInverseSunSlope = 1 / this.unitProjectionSlope;
-    this.uniforms.uniforms.uTileSize = this.map.tileSize;
-    this.uniforms.uniforms.uSunSlope = slope;
-    this.uniforms.uniforms.uMaxDistance = Math.min(
-      PROJECTED_SHADOW_MAX_MARCH_STEPS * PROJECTED_SHADOW_MARCH_STEP_WORLD,
-      maxVertical / slope + this.map.tileSize * 2);
-    this.uniforms.uniforms.uPenumbra = this.map.sun.elevationDegrees <= 20 ? 1.8 : 1.2;
+    this.unitUniforms.uniforms.uMapWorldSize[0] = worldWidth;
+    this.unitUniforms.uniforms.uMapWorldSize[1] = worldHeight;
+    this.unitUniforms.uniforms.uTileSize = this.map.tileSize;
     this.mesh.visible = true;
   }
 
@@ -354,10 +345,28 @@ export class UnifiedGpuShadowLayer {
 
   hasShadowFor(entityId) { return this.projectedEntityIds.has(entityId); }
 
-  _createShader(terrain = this.terrainHeightTexture, units = this.unitShadowTexture) {
+  staticTerrainSummary() {
+    return Object.freeze({
+      buildCount: this.staticMapBuildCount,
+      lifetimeBuildCount: this.staticBuildCount,
+      buildMs: Math.round(this.staticBuildDurationMs * 1000) / 1000,
+      width: this.staticCacheWidth,
+      height: this.staticCacheHeight,
+      samplesPerTile: STATIC_SHADOW_SAMPLES_PER_TILE,
+    });
+  }
+
+  _createShader(terrain = this.staticShadowTexture, units = this.unitShadowTexture) {
     return this.pixi.Shader.from({
-      gl: { vertex: VERTEX, fragment: FRAGMENT, name: "unified-gpu-height-field-shadows" },
-      resources: { shadowUniforms: this.uniforms, uTerrainHeightTexture: terrain.source, uUnitShadowTexture: units.source },
+      gl: { vertex: VERTEX, fragment: FRAGMENT, name: "cached-unified-height-field-shadows" },
+      resources: { shadowUniforms: this.uniforms, uStaticShadowTexture: terrain.source, uUnitShadowTexture: units.source },
+    });
+  }
+
+  _createUnitShader(terrain = this.terrainHeightTexture) {
+    return this.pixi.Shader.from({
+      gl: { vertex: UNIT_VERTEX, fragment: UNIT_FRAGMENT, name: "instanced-projected-unit-shadows" },
+      resources: { unitShadowUniforms: this.unitUniforms, uTerrainHeightTexture: terrain.source },
     });
   }
 
@@ -367,6 +376,7 @@ export class UnifiedGpuShadowLayer {
     this.geometry?.destroy?.(true);
     this.shader?.destroy?.();
     this.terrainHeightTexture?.destroy?.(true);
+    this.staticShadowTexture?.destroy?.(true);
     this.unitShadowTexture?.destroy?.(true);
     this.unitMesh?.destroy?.();
     this.unitGeometry?.destroy?.(true);
@@ -391,7 +401,7 @@ export function projectedProxyPolygon(shape, sunDirection, sunSlope, scale = 1) 
   const pitch = finite(shape.pitch, 0);
   const pitchCos = Math.cos(pitch);
   const pitchSin = Math.sin(pitch);
-  const inverseSlope = 1 / Math.max(0.05, finite(sunSlope, 1));
+  const inverseSlope = 1 / Math.max(0.001, finite(sunSlope, 1));
   const sunX = finite(sunDirection?.[0], 0);
   const sunY = finite(sunDirection?.[1], -1);
   const corners = [];
@@ -446,6 +456,116 @@ export function unitMaskBounds(viewport, map, scale = OCCLUDER_TEXTURE_SCALE, gu
     widthWorld: widthPx / safeScale,
     heightWorld: heightPx / safeScale,
   });
+}
+
+/** The single authored directional-light model shared by static terrain and dynamic receivers. */
+export function shadowSunModel(sun) {
+  const azimuth = finite(sun?.azimuthDegrees, 0) * Math.PI / 180;
+  const elevation = finite(sun?.elevationDegrees, 45) * Math.PI / 180;
+  return Object.freeze({
+    directionX: Math.sin(azimuth),
+    directionY: -Math.cos(azimuth),
+    // The tiny floor is only a division guard below 0.057 degrees, not a presentation clamp.
+    slope: Math.max(0.001, Math.tan(elevation)),
+  });
+}
+
+/**
+ * Build a light-space visibility cache in O(map pixels).
+ *
+ * Along one directional-light ray q=dot(world,sun), a blocker wins exactly when its transformed
+ * height (z - slope*q) exceeds the receiver's. Sweeping from the sun-facing map edge therefore
+ * carries the same maximum a conventional orthographic directional depth map would compare. The
+ * non-dominant coordinate lands between samples; linear interpolation follows that ray with an
+ * angular rasterization error bounded to one cache texel (1/4 tile by default).
+ */
+export function buildDirectionalHorizonMask(map, samplesPerTile = STATIC_SHADOW_SAMPLES_PER_TILE) {
+  const normalized = normalizedMap(map);
+  const samples = Math.max(1, Math.min(8, Math.trunc(finite(samplesPerTile, STATIC_SHADOW_SAMPLES_PER_TILE))));
+  const width = normalized.width * samples;
+  const height = normalized.height * samples;
+  const horizon = new Float32Array(width * height);
+  horizon.fill(Number.NEGATIVE_INFINITY);
+  const data = new Uint8Array(width * height);
+  const sun = shadowSunModel(normalized.sun);
+  const sampleWorld = normalized.tileSize / samples;
+  const penumbraWorld = normalized.tileSize * (normalized.sun?.elevationDegrees <= 20 ? 0.12 : 0.08);
+  const lightHeightAt = (x, y) => {
+    const worldX = (x + 0.5) * sampleWorld;
+    const worldY = (y + 0.5) * sampleWorld;
+    const elevation = bilinearElevationAtWorld(normalized, worldX, worldY) * normalized.tileSize;
+    return elevation - sun.slope * (worldX * sun.directionX + worldY * sun.directionY);
+  };
+  const write = (x, y, upstream) => {
+    const index = y * width + x;
+    const receiver = lightHeightAt(x, y);
+    const clearance = upstream - receiver;
+    data[index] = Number.isFinite(upstream)
+      ? Math.round(255 * smoothstep(0, Math.max(0.001, penumbraWorld), clearance))
+      : 0;
+    horizon[index] = Math.max(receiver, upstream);
+  };
+  const upstreamAt = (x, y) => {
+    const low = Math.floor(y);
+    const high = Math.ceil(y);
+    if (x < 0 || x >= width) return Number.NEGATIVE_INFINITY;
+    const lowValue = low >= 0 && low < height ? horizon[low * width + x] : Number.NEGATIVE_INFINITY;
+    const highValue = high >= 0 && high < height ? horizon[high * width + x] : Number.NEGATIVE_INFINITY;
+    return interpolateFinite(lowValue, highValue, y - low);
+  };
+  const upstreamAtTransposed = (x, y) => {
+    const low = Math.floor(x);
+    const high = Math.ceil(x);
+    if (y < 0 || y >= height) return Number.NEGATIVE_INFINITY;
+    const lowValue = low >= 0 && low < width ? horizon[y * width + low] : Number.NEGATIVE_INFINITY;
+    const highValue = high >= 0 && high < width ? horizon[y * width + high] : Number.NEGATIVE_INFINITY;
+    return interpolateFinite(lowValue, highValue, x - low);
+  };
+
+  if (Math.abs(sun.directionX) >= Math.abs(sun.directionY)) {
+    const stepX = sun.directionX >= 0 ? -1 : 1;
+    const startX = sun.directionX >= 0 ? width - 1 : 0;
+    const secondaryStep = sun.directionY / Math.max(0.001, Math.abs(sun.directionX));
+    for (let x = startX; x >= 0 && x < width; x += stepX) {
+      const upstreamX = x - stepX;
+      for (let y = 0; y < height; y += 1) write(x, y, upstreamAt(upstreamX, y + secondaryStep));
+    }
+  } else {
+    const stepY = sun.directionY >= 0 ? -1 : 1;
+    const startY = sun.directionY >= 0 ? height - 1 : 0;
+    const secondaryStep = sun.directionX / Math.max(0.001, Math.abs(sun.directionY));
+    for (let y = startY; y >= 0 && y < height; y += stepY) {
+      const upstreamY = y - stepY;
+      for (let x = 0; x < width; x += 1) write(x, y, upstreamAtTransposed(x + secondaryStep, upstreamY));
+    }
+  }
+  return Object.freeze({ width, height, data, samplesPerTile: samples });
+}
+
+function interpolateFinite(low, high, amount) {
+  if (!Number.isFinite(low)) return high;
+  if (!Number.isFinite(high)) return low;
+  return low * (1 - amount) + high * amount;
+}
+
+function coverageTexture(pixi, mask) {
+  const canvas = createWorkerSafeCanvas();
+  canvas.width = mask.width;
+  canvas.height = mask.height;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const image = ctx.createImageData(mask.width, mask.height);
+  for (let index = 0; index < mask.data.length; index += 1) {
+    const value = mask.data[index];
+    const offset = index * 4;
+    image.data[offset] = value;
+    image.data[offset + 1] = value;
+    image.data[offset + 2] = value;
+    image.data[offset + 3] = 255;
+  }
+  ctx.putImageData(image, 0, 0);
+  const texture = pixi.Texture.from(canvas);
+  texture.source.scaleMode = "linear";
+  return texture;
 }
 
 function createUnitMaskTexture(pixi, width, height) {
@@ -537,6 +657,28 @@ function elevationTexture(pixi, map) {
   const texture = pixi.Texture.from(canvas);
   texture.source.scaleMode = "linear";
   return texture;
+}
+
+function bilinearElevationAtWorld(map, worldX, worldY) {
+  const tileX = worldX / map.tileSize - 0.5;
+  const tileY = worldY / map.tileSize - 0.5;
+  const x0 = Math.floor(tileX);
+  const y0 = Math.floor(tileY);
+  const fx = tileX - x0;
+  const fy = tileY - y0;
+  const at = (x, y) => {
+    const clampedX = Math.max(0, Math.min(map.width - 1, x));
+    const clampedY = Math.max(0, Math.min(map.height - 1, y));
+    return finite(map.elevation[clampedY * map.width + clampedX], 0);
+  };
+  const top = at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx;
+  const bottom = at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx;
+  return top * (1 - fy) + bottom * fy;
+}
+
+function smoothstep(edge0, edge1, value) {
+  const amount = Math.max(0, Math.min(1, (value - edge0) / Math.max(0.000001, edge1 - edge0)));
+  return amount * amount * (3 - 2 * amount);
 }
 
 function normalizedMap(map) {

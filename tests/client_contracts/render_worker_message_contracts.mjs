@@ -132,7 +132,7 @@ for (const response of [
     frameId: 1, workerUpdateMs: 2, workerPresentMs: 1,
     gpuShadowTiming: { supported: true, pending: 1, dropped: 0, disjoint: 0, groups: [
       { label: "renderer.unitShadows.mask", samples: 3, avgMs: 0.2, p50Ms: 0.2, p95Ms: 0.3, maxMs: 0.3 },
-    ] },
+    ], staticTerrain: { buildCount: 1, lifetimeBuildCount: 1, buildMs: 4.2, width: 504, height: 504, samplesPerTile: 4 } },
   } },
   { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: {
     frameId: 1, captureId: 4, workerUpdateMs: 0, workerPresentMs: 0, rgba: new ArrayBuffer(4), width: 1, height: 1,

@@ -2,22 +2,21 @@ import assert from "node:assert/strict";
 
 import { KIND } from "../../client/src/protocol.js";
 import {
+  buildDirectionalHorizonMask,
   hasProjectedUnitShadow,
   projectedProxyPolygon,
-  PROJECTED_UNIT_SHADOW_MIN_ELEVATION_DEGREES,
-  PROJECTED_SHADOW_MARCH_STEP_WORLD,
-  PROJECTED_SHADOW_MAX_MARCH_STEPS,
+  shadowSunModel,
+  STATIC_SHADOW_SAMPLES_PER_TILE,
   supportsUnifiedGpuShadowPass,
   unitMaskBounds,
   UnifiedGpuShadowLayer,
 } from "../../client/src/renderer/unified_gpu_shadows.js";
 
-assert.equal(PROJECTED_SHADOW_MARCH_STEP_WORLD, 8, "terrain retains its coarse ray-march step");
-assert.equal(PROJECTED_UNIT_SHADOW_MIN_ELEVATION_DEGREES, 30, "unit silhouettes remain readable under low authored sun");
+assert.equal(STATIC_SHADOW_SAMPLES_PER_TILE, 4, "static visibility is map-relative, not viewport-relative");
 assert.equal(
-  PROJECTED_SHADOW_MARCH_STEP_WORLD * PROJECTED_SHADOW_MAX_MARCH_STEPS,
-  768,
-  "terrain preserves the previous maximum shadow reach without sampling unit geometry",
+  shadowSunModel({ azimuthDegrees: 90, elevationDegrees: 12 }).slope,
+  Math.tan(12 * Math.PI / 180),
+  "dynamic projection uses the authored low sun without the former 30-degree clamp",
 );
 assert.equal(
   supportsUnifiedGpuShadowPass({
@@ -40,6 +39,28 @@ assert.equal(
   }),
   true,
   "authored elevation and sun activate the unified terrain and unit shadow pass",
+);
+
+const flatStaticMask = buildDirectionalHorizonMask({
+  width: 3,
+  height: 3,
+  tileSize: 32,
+  elevation: Array(9).fill(0),
+  sun: { azimuthDegrees: 180, elevationDegrees: 12 },
+}, 2);
+assert.deepEqual([flatStaticMask.width, flatStaticMask.height], [6, 6]);
+assert(flatStaticMask.data.every((coverage) => coverage === 0), "flat light-space depth has no blockers");
+
+const ridgeStaticMask = buildDirectionalHorizonMask({
+  width: 3,
+  height: 3,
+  tileSize: 32,
+  elevation: [0, 0, 0, 0, 0, 0, 0, 8, 0],
+  sun: { azimuthDegrees: 180, elevationDegrees: 12 },
+}, 4);
+assert(
+  ridgeStaticMask.data.slice(0, ridgeStaticMask.width * 8).some((coverage) => coverage > 0),
+  "sun-facing ridge depth casts into downstream receivers",
 );
 
 const horizontalBarrel = projectedProxyPolygon({
@@ -82,6 +103,11 @@ layer.map = {
 layer.mesh = { visible: true };
 layer.uniforms = { uniforms: { uSunDirection: new Float32Array([0, -1]), uSunSlope: 1 } };
 layer.unitProjectionSlope = 1;
+layer.staticBuildCount = 1;
+layer.staticMapBuildCount = 1;
+layer.staticBuildDurationMs = 2.5;
+layer.staticCacheWidth = 504;
+layer.staticCacheHeight = 504;
 layer.map.width = 126;
 layer.map.height = 126;
 layer.unitUniforms = { uniforms: { uMaskOrigin: new Float32Array(2) } };
@@ -105,6 +131,15 @@ assert.equal(layer.update(entities), 0, "detailed unit shadows default off and s
 assert.equal(layer.hasShadowFor(entities[0].id), false, "disabled projection retains lightweight rig shadows");
 layer.setUnitShadowsEnabled(true);
 assert.equal(layer.update(entities, camera), 2);
+assert.equal(layer.staticBuildCount, 1, "entity and camera updates never rebuild static terrain visibility");
+assert.deepEqual(layer.staticTerrainSummary(), {
+  buildCount: 1,
+  lifetimeBuildCount: 1,
+  buildMs: 2.5,
+  width: 504,
+  height: 504,
+  samplesPerTile: 4,
+}, "worker diagnostics expose the one-shot cache build independently from frame updates");
 assert.equal(layer.mesh.visible, true);
 assert.equal(layer.hasShadowFor(entities[0].id), true);
 assert.equal(layer.hasShadowFor(entities[1].id), false, "concealment-only units do not cast shadows");
