@@ -10,6 +10,7 @@ import {
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
 import { initializeWorkloadSetup } from "./client-perf/workload_setup.mjs";
+import { applyShadowSetup, installShadowDiagnostics } from "./client-perf/shadow_diagnostics.mjs";
 import {
   cleanupBrowserProfile,
   configurePageEmulation,
@@ -240,13 +241,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     }
 
     await page.setViewport(puppeteerViewport(args.viewport, args.deviceScaleFactor));
-    await page.evaluateOnNewDocument((configuration) => {
-      window.__rtsPerfWorkloadId = configuration.workloadId;
-      window.__rtsGpuShadowTiming = configuration.gpuShadowTimingEnabled;
-    }, {
-      workloadId: workload.id,
-      gpuShadowTimingEnabled: workload.setup?.gpuShadowTimingEnabled === true,
-    });
+    await installShadowDiagnostics(page, workload);
     const targetUrl = new URL(workload.url, server.baseUrl).href;
     const startedAt = new Date().toISOString();
     const timeoutScale = workloadTimeoutScale(args);
@@ -1260,20 +1255,7 @@ async function applyWorkloadSetup(page, workload) {
   const setup = workload.setup || null;
   const result = await initializeWorkloadSetup(page, setup);
   if (!result) return null;
-  if (setup.gpuShadowTimingEnabled === true) {
-    result.actions.push({ action: "gpuShadowTiming", enabled: true });
-  }
-  if (setup.projectedUnitShadowsEnabled === true) {
-    const action = await page.evaluate(() => {
-      if (typeof window.__rts?.setProjectedUnitShadowsEnabled !== "function") {
-        return { action: "projectedUnitShadows", error: "App shadow preference control unavailable" };
-      }
-      window.__rts.setProjectedUnitShadowsEnabled(true);
-      return { action: "projectedUnitShadows", enabled: true };
-    });
-    result.actions.push(action);
-    if (action.error) result.error = action.error;
-  }
+  await applyShadowSetup(page, setup, result);
   if (setup.visionSelectionPlayerIndex != null || setup.visionSelectionPlayerId != null) {
     const action = await page.evaluate((replaySetup) => {
       const match = window.__rts?.match;
