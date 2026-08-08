@@ -371,6 +371,10 @@ export class Renderer {
     this._renderClock = renderClock;
   }
 
+  setProjectedUnitShadowsEnabled(enabled) {
+    this._projectedUnitShadows?.setUnitShadowsEnabled(enabled);
+  }
+
   enterFixedCapture(renderClock) {
     this.setRenderClock(renderClock);
   }

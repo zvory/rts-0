@@ -14,6 +14,7 @@ export const RENDER_WORKER_MESSAGE = Object.freeze({
   FRAME: "frame",
   RESIZE: "resize",
   CAPTURE: "capture",
+  PRESENTATION_PREFERENCES: "presentationPreferences",
   RESET_GROUND_DECALS: "resetGroundDecals",
   RESET_GENERATION: "resetGeneration",
   DESTROY: "destroy",
@@ -155,6 +156,14 @@ export function createCaptureMessage({ generation, frameId, captureId, readPixel
   });
 }
 
+export function createPresentationPreferencesMessage(generation, {
+  projectedUnitShadowsEnabled = false,
+} = {}) {
+  return request(RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES, generation, {
+    projectedUnitShadowsEnabled: !!projectedUnitShadowsEnabled,
+  });
+}
+
 export function createResetGenerationMessage(generation) {
   return request(RENDER_WORKER_MESSAGE.RESET_GENERATION, generation, {});
 }
@@ -225,6 +234,11 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       requireId(payload?.captureId, "capture id", { allowZero: false });
       if (payload?.readPixels != null && typeof payload.readPixels !== "boolean") {
         throw new TypeError("readPixels must be boolean");
+      }
+      break;
+    case RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES:
+      if (typeof payload?.projectedUnitShadowsEnabled !== "boolean") {
+        throw new TypeError("projectedUnitShadowsEnabled must be boolean");
       }
       break;
     default:

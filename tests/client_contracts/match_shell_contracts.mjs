@@ -504,10 +504,16 @@ withFakeSettingsDocument(() => {
   let pointerLockToggled = 0;
   let debugToggled = 0;
   let unitRangeToggled = 0;
+  let projectedUnitShadowToggled = 0;
   let exclusiveFullscreenToggled = 0;
   const context = buildMatchSettingsContext({
     replayViewer: false,
-    state: { spectator: false, debugPathOverlaysEnabled: true, showUnitRangesEnabled: false },
+    state: {
+      spectator: false,
+      debugPathOverlaysEnabled: true,
+      showUnitRangesEnabled: false,
+      showProjectedUnitShadowsEnabled: false,
+    },
     capabilities: {
       matchControls: { pause: true },
       diagnostics: { movementPaths: MOVEMENT_PATH_DIAGNOSTICS.ALL },
@@ -525,6 +531,7 @@ withFakeSettingsDocument(() => {
     onPointerLockToggle: () => { pointerLockToggled += 1; },
     onDebugPathToggle: () => { debugToggled += 1; },
     onUnitRangeToggle: () => { unitRangeToggled += 1; },
+    onProjectedUnitShadowToggle: () => { projectedUnitShadowToggled += 1; },
     onExclusiveFullscreenToggle: () => { exclusiveFullscreenToggled += 1; },
     exclusiveFullscreenEnabled: false,
     livePauseActionLabel: () => "Pause (2)",
@@ -546,6 +553,7 @@ withFakeSettingsDocument(() => {
   root.children.find((child) => child.id === "prediction-toggle").listeners.click();
   root.children.find((child) => child.id === "pointer-lock-toggle").listeners.click();
   root.children.find((child) => child.id === "unit-range-toggle").listeners.click();
+  root.children.find((child) => child.id === "projected-unit-shadows-toggle").listeners.click();
   const fullscreenButton = root.children.find((child) => child.id === "exclusive-fullscreen-toggle");
   assert(
     fullscreenButton.textContent === "Use fullscreen mode: off",
@@ -557,6 +565,8 @@ withFakeSettingsDocument(() => {
   assert(predictionToggled === false, "match settings context toggles prediction through the injected callback");
   assert(pointerLockToggled === 1, "match settings context toggles pointer lock through the injected callback");
   assert(unitRangeToggled === 1, "match settings context toggles unit ranges through the injected callback");
+  assert(projectedUnitShadowToggled === 1,
+    "match settings context toggles detailed unit shadows through the injected callback");
   assert(exclusiveFullscreenToggled === 1, "match settings context toggles Windows fullscreen through the injected callback");
   assert(debugToggled === 1, "match settings context toggles debug paths through the injected callback");
 });

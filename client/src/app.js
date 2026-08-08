@@ -32,13 +32,21 @@ import {
 } from "./bootstrap.js";
 import { Match } from "./match.js";
 import { MatchHistory, requestReplayRoom } from "./match_history.js";
-import { applyMatchHealthBars, applyMatchUnitRanges } from "./match_settings_toggles.js";
+import {
+  applyMatchHealthBars,
+  applyMatchProjectedUnitShadows,
+  applyMatchUnitRanges,
+} from "./match_settings_toggles.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import {
   readAlwaysShowHealthBarsEnabled,
   writeAlwaysShowHealthBarsEnabled,
 } from "./health_bar_settings.js";
+import {
+  readProjectedUnitShadowsEnabled,
+  writeProjectedUnitShadowsEnabled,
+} from "./unit_shadow_settings.js";
 import {
   applyExclusiveFullscreen,
   exclusiveFullscreenSupported,
@@ -283,6 +291,7 @@ export class App {
     this.predictionEnabled = readPredictionEnabled();
     this.unitRangesEnabled = readUnitRangesEnabled();
     this.healthBarsAlwaysEnabled = readAlwaysShowHealthBarsEnabled();
+    this.projectedUnitShadowsEnabled = readProjectedUnitShadowsEnabled();
     this.exclusiveFullscreenEnabled = exclusiveFullscreenSupported() &&
       readExclusiveFullscreenEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
@@ -847,11 +856,14 @@ export class App {
         predictionEnabled: this.predictionEnabled,
         unitRangesEnabled: this.unitRangesEnabled,
         healthBarsAlwaysEnabled: this.healthBarsAlwaysEnabled,
+        projectedUnitShadowsEnabled: this.projectedUnitShadowsEnabled,
         exclusiveFullscreenEnabled: this.exclusiveFullscreenEnabled,
         autoSpectatorEnabled: interactAutoSpectatorEnabled(),
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
         onHealthBarsAlwaysEnabledChange: (enabled) => this.setHealthBarsAlwaysEnabled(enabled),
+        onProjectedUnitShadowsEnabledChange: (enabled) =>
+          this.setProjectedUnitShadowsEnabled(enabled),
         onExclusiveFullscreenEnabledChange: (enabled) =>
           this.setExclusiveFullscreenEnabled(enabled),
         onAutoSpectatorEnabledChange: (enabled) => this.setAutoSpectatorEnabled(enabled),
@@ -1200,6 +1212,14 @@ export class App {
             }),
             onToggle: () => this.setUnitRangesEnabled(!this.unitRangesEnabled),
           },
+          projectedUnitShadows: {
+            state: () => ({
+              enabled: this.projectedUnitShadowsEnabled,
+              available: true,
+            }),
+            onToggle: () =>
+              this.setProjectedUnitShadowsEnabled(!this.projectedUnitShadowsEnabled),
+          },
           healthBars: {
             state: () => ({
               enabled: this.healthBarsAlwaysEnabled,
@@ -1263,6 +1283,13 @@ export class App {
         this.settings.open({ focus: false });
       }
     }
+  }
+
+  setProjectedUnitShadowsEnabled(enabled) {
+    this.projectedUnitShadowsEnabled = !!enabled;
+    writeProjectedUnitShadowsEnabled(this.projectedUnitShadowsEnabled);
+    applyMatchProjectedUnitShadows(this.match, this.projectedUnitShadowsEnabled);
+    this.refreshSettingsAfterPreferenceChange();
   }
 
   async setExclusiveFullscreenEnabled(enabled, {
