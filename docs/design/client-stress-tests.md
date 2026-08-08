@@ -58,6 +58,15 @@ and measured callbacks through independent tasks, so a diagnostic sample count d
 host display's rAF ceiling. It is a diagnostic building block: each renderer experiment still owns
 the exact draw callback and must report its GPU interval separately from worker CPU update/present
 and end-to-end display age.
+Set `RTS_CLIENT_PERF_DETAILED_SHADOWS=1` when invoking the performance harness or deterministic
+parity runner to enable the production detailed-unit-shadow preference in both the workload and
+its render worker. The action is recorded in the workload artifact so detailed-shadow results
+cannot be mistaken for the default-off path.
+Set `RTS_CLIENT_PERF_GPU_TIMING=1` on the performance harness to opt into bounded asynchronous GPU
+queries before renderer startup. Harness diagnostic resets also reset pending worker queries and
+samples; each presented acknowledgment returns the current bounded summary, which is persisted as
+`renderWorker.gpuShadowTiming` in the workload artifact. Unsupported implementations report
+`supported: false` rather than blocking or substituting a CPU timer.
 Worker display age covers the complete interval from host acceptance through acknowledgment,
 including bounded host-pending time, message construction/cloning, dispatch, worker update, and
 presentation. Queue age uses the same acceptance boundary through worker task start.

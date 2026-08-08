@@ -90,6 +90,15 @@ export function runFrameProfilerContracts() {
     assert(validateLiveLabScenarioSample({ ...liveLabSample, websocketOpen: false }, expectedLab).length > 0, "integrated Hellhole rejects a non-open WebSocket");
   }
 
+  const detailed = buildClientPerfWorkloads({ RTS_CLIENT_PERF_DETAILED_SHADOWS: "1" })
+    .find((workload) => workload.id === "fixed-roster-hellhole-stream");
+  assert(detailed.setup.projectedUnitShadowsEnabled === true,
+    "detailed-shadow benchmark opt-in reaches the canonical Hellhole workload");
+  const gpuTimed = buildClientPerfWorkloads({ RTS_CLIENT_PERF_GPU_TIMING: "1" })
+    .find((workload) => workload.id === "fixed-roster-hellhole-stream");
+  assert(gpuTimed.setup.gpuShadowTimingEnabled === true,
+    "GPU shadow timing opt-in reaches the canonical Hellhole workload before renderer startup");
+
   {
     let clock = 0;
     const profiler = new FrameProfiler({

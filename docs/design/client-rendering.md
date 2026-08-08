@@ -270,6 +270,14 @@ shadow mask once per map generation, then uploads the resulting terrain texture.
 matching static world tint. A flat elevation grid with no sun bypasses all height-field pixel reads,
 shadow work, and tinting, preserving the pre-elevation render path for existing maps.
 
+Opt-in detailed unit shadows keep their existing presentation models and 30-degree minimum unit
+sun elevation, but the worker uploads those boxes as one retained instanced mesh. It rasterizes
+coverage into an R8 camera-window target with a two-texel sampling gutter, rather than rebuilding
+immediate-mode convex hulls into a map-sized RGBA target. Camera origin, zoom, and CSS viewport are
+passed explicitly by the renderer owner; concealment-only entities remain excluded and a failed
+mask draw leaves native rig shadows active. Optional bounded GPU queries measure the unit-mask draw
+and total present without synchronously waiting for results.
+
 The worker treats an observed WebGL context loss as a terminal presentation failure; it does not
 silently keep acknowledging black frames. Worker uncaught errors, unhandled rejections, message
 decode failures, and context loss return a bounded stable code plus available source location.

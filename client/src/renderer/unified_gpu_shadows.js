@@ -20,6 +20,10 @@ const CANDIDATE_KINDS = new Set([
 ]);
 
 const OCCLUDER_TEXTURE_SCALE = 0.5;
+const MASK_FILTER_GUTTER_TEXELS = 2;
+const INSTANCE_FLOATS = 11;
+const INSTANCE_STRIDE_BYTES = INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
+const INITIAL_INSTANCE_CAPACITY = 1024;
 // Very low terrain sun remains dramatic, but literal unit projections become longer than the
 // sprites are readable. Clamp only their presentation-only projection angle.
 export const PROJECTED_UNIT_SHADOW_MIN_ELEVATION_DEGREES = 30;
@@ -34,8 +38,10 @@ uniform mat3 uWorldTransformMatrix;
 uniform mat3 uTransformMatrix;
 uniform vec2 uMapWorldSize;
 out vec2 vMapUv;
+out vec2 vWorldPosition;
 void main(void) {
   vMapUv = aPosition / uMapWorldSize;
+  vWorldPosition = aPosition;
   mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
   gl_Position = vec4((mvp * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
 }
@@ -44,6 +50,7 @@ void main(void) {
 const FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 vMapUv;
+in vec2 vWorldPosition;
 uniform sampler2D uTerrainHeightTexture;
 uniform sampler2D uUnitShadowTexture;
 uniform vec2 uMapWorldSize;
@@ -55,6 +62,8 @@ uniform float uMarchStep;
 uniform float uMaxDistance;
 uniform float uPenumbra;
 uniform float uAlpha;
+uniform vec2 uUnitMaskOrigin;
+uniform vec2 uUnitMaskWorldSize;
 out vec4 finalColor;
 
 float terrainHeight(vec2 uv) {
@@ -79,13 +88,57 @@ void main(void) {
     }
   }
   float terrainCoverage = smoothstep(-uPenumbra, uPenumbra, bestClearance);
-  float unitCoverage = texture(uUnitShadowTexture, vMapUv).r;
+  vec2 unitUv = (vWorldPosition - uUnitMaskOrigin) / uUnitMaskWorldSize;
+  float unitCoverage = unitUv.x >= 0.0 && unitUv.y >= 0.0 && unitUv.x <= 1.0 && unitUv.y <= 1.0
+    ? texture(uUnitShadowTexture, unitUv).r
+    : 0.0;
   float fade = 1.0 - 0.12 * clamp(hitDistance / max(uMaxDistance, 1.0), 0.0, 1.0);
   float coverage = max(terrainCoverage * fade, unitCoverage);
   float alpha = coverage * uAlpha;
   if (alpha <= 0.001) discard;
   finalColor = vec4(vec3(0.075, 0.064, 0.052) * alpha, alpha);
 }
+`;
+
+const UNIT_VERTEX = `#version 300 es
+precision highp float;
+in vec3 aCorner;
+in vec3 aInstanceOrigin;
+in vec3 aPartCenter;
+in vec3 aPartSize;
+in vec2 aPartRotation;
+uniform mat3 uProjectionMatrix;
+uniform mat3 uWorldTransformMatrix;
+uniform mat3 uTransformMatrix;
+uniform vec2 uMaskOrigin;
+uniform vec2 uSunDirection;
+uniform float uInverseSunSlope;
+uniform float uMaskScale;
+void main(void) {
+  float facingCos = cos(aInstanceOrigin.z);
+  float facingSin = sin(aInstanceOrigin.z);
+  vec2 partCenter = aInstanceOrigin.xy + mat2(facingCos, facingSin, -facingSin, facingCos) * aPartCenter.xy;
+  float yaw = aInstanceOrigin.z + aPartRotation.x;
+  float yawCos = cos(yaw);
+  float yawSin = sin(yaw);
+  float pitchCos = cos(aPartRotation.y);
+  float pitchSin = sin(aPartRotation.y);
+  vec3 local = aCorner * aPartSize;
+  float pitchedX = local.x * pitchCos - local.z * pitchSin;
+  float pitchedZ = local.x * pitchSin + local.z * pitchCos;
+  vec2 world = partCenter + mat2(yawCos, yawSin, -yawSin, yawCos) * vec2(pitchedX, local.y);
+  float height = max(0.0, aPartCenter.z + pitchedZ);
+  vec2 projectedWorld = world - uSunDirection * height * uInverseSunSlope;
+  vec2 maskPosition = (projectedWorld - uMaskOrigin) * uMaskScale;
+  mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
+  gl_Position = vec4((mvp * vec3(maskPosition, 1.0)).xy, 0.0, 1.0);
+}
+`;
+
+const UNIT_FRAGMENT = `#version 300 es
+precision highp float;
+out vec4 finalColor;
+void main(void) { finalColor = vec4(1.0); }
 `;
 
 export function hasProjectedUnitShadow(kind) {
@@ -109,17 +162,18 @@ export function supportsUnifiedGpuShadowPass(map) {
 
 /** GPU terrain ray march composited with an analytic projected-unit coverage mask. */
 export class UnifiedGpuShadowLayer {
-  constructor({ pixi = globalThis.PIXI, renderer, layer, recordDiagnostic = null } = {}) {
+  constructor({ pixi = globalThis.PIXI, renderer, layer, recordDiagnostic = null, gpuTimer = null } = {}) {
     this.pixi = pixi;
     this.renderer = renderer;
     this.layer = layer;
     this.recordDiagnostic = recordDiagnostic;
+    this.gpuTimer = gpuTimer;
     this.map = null;
     this.enabled = false;
     this.unitShadowsEnabled = false;
     this.unitProjectionSlope = 1;
     this.supported = Boolean(pixi?.Geometry && pixi?.Mesh && pixi?.Shader && pixi?.UniformGroup
-      && pixi?.Graphics && pixi?.RenderTexture && renderer?.render);
+      && pixi?.Buffer && pixi?.RenderTexture && renderer?.render);
     this.projectedEntityIds = new Set();
     if (!this.supported) return;
     this.geometry = new pixi.Geometry({
@@ -136,10 +190,33 @@ export class UnifiedGpuShadowLayer {
       uMaxDistance: { value: PROJECTED_SHADOW_MARCH_STEP_WORLD, type: "f32" },
       uPenumbra: { value: 1.8, type: "f32" },
       uAlpha: { value: 0.25, type: "f32" },
+      uUnitMaskOrigin: { value: new Float32Array([0, 0]), type: "vec2<f32>" },
+      uUnitMaskWorldSize: { value: new Float32Array([1, 1]), type: "vec2<f32>" },
     });
     this.terrainHeightTexture = elevationTexture(pixi, { width: 1, height: 1, elevation: [0] });
-    this.unitShadowTexture = pixi.RenderTexture.create({ width: 1, height: 1, resolution: 1 });
-    this.unitShadowGraphics = new pixi.Graphics();
+    this.unitShadowTexture = createUnitMaskTexture(pixi, 1, 1);
+    this.instanceCapacity = INITIAL_INSTANCE_CAPACITY;
+    this.instanceData = new Float32Array(this.instanceCapacity * INSTANCE_FLOATS);
+    this.instanceBuffer = new pixi.Buffer({
+      data: this.instanceData,
+      usage: pixi.BufferUsage.VERTEX | pixi.BufferUsage.COPY_DST,
+      shrinkToFit: false,
+      label: "projected-unit-shadow-instances",
+    });
+    this.unitGeometry = createUnitGeometry(pixi, this.instanceBuffer);
+    this.unitUniforms = new pixi.UniformGroup({
+      uMaskOrigin: { value: new Float32Array([0, 0]), type: "vec2<f32>" },
+      uSunDirection: { value: new Float32Array([0, -1]), type: "vec2<f32>" },
+      uInverseSunSlope: { value: 1, type: "f32" },
+      uMaskScale: { value: OCCLUDER_TEXTURE_SCALE, type: "f32" },
+    });
+    this.unitShader = pixi.Shader.from({
+      gl: { vertex: UNIT_VERTEX, fragment: UNIT_FRAGMENT, name: "instanced-projected-unit-shadows" },
+      resources: { unitShadowUniforms: this.unitUniforms },
+    });
+    this.unitMesh = new pixi.Mesh({ geometry: this.unitGeometry, shader: this.unitShader });
+    this.unitMesh.eventMode = "none";
+    this.unitMesh.visible = true;
     this.shader = this._createShader();
     this.mesh = new pixi.Mesh({ geometry: this.geometry, shader: this.shader });
     this.mesh.eventMode = "none";
@@ -157,14 +234,9 @@ export class UnifiedGpuShadowLayer {
     const worldWidth = this.map.width * this.map.tileSize;
     const worldHeight = this.map.height * this.map.tileSize;
     const terrainTexture = elevationTexture(this.pixi, this.map);
-    const unitTexture = this.pixi.RenderTexture.create({
-      width: Math.max(1, Math.ceil(worldWidth * OCCLUDER_TEXTURE_SCALE)),
-      height: Math.max(1, Math.ceil(worldHeight * OCCLUDER_TEXTURE_SCALE)),
-      resolution: 1,
-    });
+    const unitTexture = createUnitMaskTexture(this.pixi, 1, 1);
     // This is ordinary coverage rather than encoded height data, so linear filtering is safe and
     // gives the half-resolution mask a stable one-pixel antialiased edge.
-    unitTexture.source.scaleMode = "linear";
     const shader = this._createShader(terrainTexture, unitTexture);
     this.mesh.shader = shader;
     this.shader?.destroy?.();
@@ -191,6 +263,9 @@ export class UnifiedGpuShadowLayer {
     this.uniforms.uniforms.uTerrainTextureSize[1] = this.map.height;
     this.uniforms.uniforms.uSunDirection[0] = Math.sin(azimuth);
     this.uniforms.uniforms.uSunDirection[1] = -Math.cos(azimuth);
+    this.unitUniforms.uniforms.uSunDirection[0] = Math.sin(azimuth);
+    this.unitUniforms.uniforms.uSunDirection[1] = -Math.cos(azimuth);
+    this.unitUniforms.uniforms.uInverseSunSlope = 1 / this.unitProjectionSlope;
     this.uniforms.uniforms.uTileSize = this.map.tileSize;
     this.uniforms.uniforms.uSunSlope = slope;
     this.uniforms.uniforms.uMaxDistance = Math.min(
@@ -206,16 +281,15 @@ export class UnifiedGpuShadowLayer {
     this.unitShadowsEnabled = next;
     this.projectedEntityIds.clear();
     if (next || !this.supported || !this.enabled || !this.map) return;
-    this.unitShadowGraphics.clear();
     this.renderer.render({
-      container: this.unitShadowGraphics,
+      container: this.unitMesh,
       target: this.unitShadowTexture,
       clear: true,
       clearColor: [0, 0, 0, 0],
     });
   }
 
-  update(entities) {
+  update(entities, viewport = null) {
     this.projectedEntityIds.clear();
     if (!this.supported || !this.enabled || !this.map || !this.unitShadowsEnabled) return 0;
     // The render-texture update and native-shadow suppression are one transaction. If the
@@ -232,23 +306,50 @@ export class UnifiedGpuShadowLayer {
       const facing = finite(entity.facing, 0);
       for (const volume of volumes) shapes.push({ entityId: entity.id, x, y, facing, ...volume });
     }
-    const graphics = this.unitShadowGraphics;
-    graphics.clear();
-    for (const shape of shapes) {
-      graphics.poly(projectedProxyPolygon(
-        shape,
-        this.uniforms.uniforms.uSunDirection,
-        this.unitProjectionSlope,
-        OCCLUDER_TEXTURE_SCALE,
-      ));
-      graphics.fill({ color: 0xffffff, alpha: 1 });
-    }
-    this.renderer.render({ container: graphics, target: this.unitShadowTexture, clear: true, clearColor: [0, 0, 0, 0] });
+    const mask = unitMaskBounds(viewport, this.map, OCCLUDER_TEXTURE_SCALE, MASK_FILTER_GUTTER_TEXELS);
+    this.unitShadowTexture.resize(mask.widthPx, mask.heightPx, 1);
+    this.unitUniforms.uniforms.uMaskOrigin[0] = mask.minX;
+    this.unitUniforms.uniforms.uMaskOrigin[1] = mask.minY;
+    this.uniforms.uniforms.uUnitMaskOrigin[0] = mask.minX;
+    this.uniforms.uniforms.uUnitMaskOrigin[1] = mask.minY;
+    this.uniforms.uniforms.uUnitMaskWorldSize[0] = mask.widthWorld;
+    this.uniforms.uniforms.uUnitMaskWorldSize[1] = mask.heightWorld;
+    this._writeInstances(shapes);
+    const drawMask = () => this.renderer.render({
+      container: this.unitMesh,
+      target: this.unitShadowTexture,
+      clear: true,
+      clearColor: [0, 0, 0, 0],
+    });
+    if (this.gpuTimer) this.gpuTimer.measure("renderer.unitShadows.mask", drawMask);
+    else drawMask();
     for (const shape of shapes) this.projectedEntityIds.add(shape.entityId);
     this.mesh.visible = true;
     this.recordDiagnostic?.("renderer.unifiedGpuShadows.projectedBoxes", shapes.length);
     this.recordDiagnostic?.("renderer.unifiedGpuShadows.drawCalls", 2);
     return shapes.length;
+  }
+
+  _writeInstances(shapes) {
+    if (shapes.length > this.instanceCapacity) {
+      while (this.instanceCapacity < shapes.length) this.instanceCapacity *= 2;
+      this.instanceData = new Float32Array(this.instanceCapacity * INSTANCE_FLOATS);
+      this.instanceBuffer.data = this.instanceData;
+    }
+    let offset = 0;
+    for (const shape of shapes) {
+      const center = shape.center || [0, 0, 0];
+      const size = shape.size || [1, 1, 1];
+      this.instanceData.set([
+        finite(shape.x, 0), finite(shape.y, 0), finite(shape.facing, 0),
+        finite(center[0], 0), finite(center[1], 0), finite(center[2], 0),
+        finite(size[0], 1), finite(size[1], 1), finite(size[2], 1),
+        finite(shape.yaw, 0), finite(shape.pitch, 0),
+      ], offset);
+      offset += INSTANCE_FLOATS;
+    }
+    this.unitGeometry.instanceCount = shapes.length;
+    this.instanceBuffer.setDataWithSize(this.instanceData, offset, true);
   }
 
   hasShadowFor(entityId) { return this.projectedEntityIds.has(entityId); }
@@ -267,8 +368,11 @@ export class UnifiedGpuShadowLayer {
     this.shader?.destroy?.();
     this.terrainHeightTexture?.destroy?.(true);
     this.unitShadowTexture?.destroy?.(true);
-    this.unitShadowGraphics?.destroy?.();
+    this.unitMesh?.destroy?.();
+    this.unitGeometry?.destroy?.(true);
+    this.unitShader?.destroy?.();
     this.projectedEntityIds.clear();
+    this.gpuTimer = null;
     this.supported = false;
   }
 }
@@ -312,6 +416,73 @@ export function projectedProxyPolygon(shape, sunDirection, sunSlope, scale = 1) 
     }
   }
   return convexHull(corners).flatMap((point) => [point.x, point.y]);
+}
+
+export function unitMaskBounds(viewport, map, scale = OCCLUDER_TEXTURE_SCALE, gutterTexels = MASK_FILTER_GUTTER_TEXELS) {
+  const safeScale = Math.max(0.01, finite(scale, OCCLUDER_TEXTURE_SCALE));
+  const zoom = Math.max(0.01, finite(viewport?.zoom, 1));
+  const mapWidth = Math.max(1, finite(map?.width, 1) * finite(map?.tileSize, 32));
+  const mapHeight = Math.max(1, finite(map?.height, 1) * finite(map?.tileSize, 32));
+  const rawLeft = finite(viewport?.x, 0);
+  const rawTop = finite(viewport?.y, 0);
+  const rawRight = rawLeft + Math.max(1, finite(viewport?.viewportWidth, mapWidth)) / zoom;
+  const rawBottom = rawTop + Math.max(1, finite(viewport?.viewportHeight, mapHeight)) / zoom;
+  const left = Math.min(mapWidth, Math.max(0, rawLeft));
+  const top = Math.min(mapHeight, Math.max(0, rawTop));
+  const right = Math.min(mapWidth, Math.max(left, rawRight));
+  const bottom = Math.min(mapHeight, Math.max(top, rawBottom));
+  const gutter = Math.max(0, Math.trunc(finite(gutterTexels, MASK_FILTER_GUTTER_TEXELS)));
+  const minPixelX = Math.max(0, Math.floor(left * safeScale) - gutter);
+  const minPixelY = Math.max(0, Math.floor(top * safeScale) - gutter);
+  const maxPixelX = Math.min(Math.ceil(mapWidth * safeScale), Math.ceil(right * safeScale) + gutter);
+  const maxPixelY = Math.min(Math.ceil(mapHeight * safeScale), Math.ceil(bottom * safeScale) + gutter);
+  const widthPx = Math.max(1, maxPixelX - minPixelX);
+  const heightPx = Math.max(1, maxPixelY - minPixelY);
+  return Object.freeze({
+    minX: minPixelX / safeScale,
+    minY: minPixelY / safeScale,
+    widthPx,
+    heightPx,
+    widthWorld: widthPx / safeScale,
+    heightWorld: heightPx / safeScale,
+  });
+}
+
+function createUnitMaskTexture(pixi, width, height) {
+  const texture = pixi.RenderTexture.create({
+    width: Math.max(1, width),
+    height: Math.max(1, height),
+    resolution: 1,
+    dynamic: true,
+    format: "r8unorm",
+  });
+  texture.source.scaleMode = "linear";
+  return texture;
+}
+
+function createUnitGeometry(pixi, instanceBuffer) {
+  const corners = new Float32Array([
+    // bottom
+    -.5,-.5,-.5, .5,-.5,-.5, .5,.5,-.5, -.5,-.5,-.5, .5,.5,-.5, -.5,.5,-.5,
+    // top
+    -.5,-.5,.5, .5,.5,.5, .5,-.5,.5, -.5,-.5,.5, -.5,.5,.5, .5,.5,.5,
+    // front/back
+    -.5,-.5,-.5, .5,-.5,.5, .5,-.5,-.5, -.5,-.5,-.5, -.5,-.5,.5, .5,-.5,.5,
+    -.5,.5,-.5, .5,.5,-.5, .5,.5,.5, -.5,.5,-.5, .5,.5,.5, -.5,.5,.5,
+    // left/right
+    -.5,-.5,-.5, -.5,.5,-.5, -.5,.5,.5, -.5,-.5,-.5, -.5,.5,.5, -.5,-.5,.5,
+    .5,-.5,-.5, .5,-.5,.5, .5,.5,.5, .5,-.5,-.5, .5,.5,.5, .5,.5,-.5,
+  ]);
+  return new pixi.Geometry({
+    attributes: {
+      aCorner: { buffer: corners, format: "float32x3" },
+      aInstanceOrigin: { buffer: instanceBuffer, format: "float32x3", stride: INSTANCE_STRIDE_BYTES, offset: 0, instance: true },
+      aPartCenter: { buffer: instanceBuffer, format: "float32x3", stride: INSTANCE_STRIDE_BYTES, offset: 3 * 4, instance: true },
+      aPartSize: { buffer: instanceBuffer, format: "float32x3", stride: INSTANCE_STRIDE_BYTES, offset: 6 * 4, instance: true },
+      aPartRotation: { buffer: instanceBuffer, format: "float32x2", stride: INSTANCE_STRIDE_BYTES, offset: 9 * 4, instance: true },
+    },
+    instanceCount: 0,
+  });
 }
 
 function proxyVolumesFor(entity) {

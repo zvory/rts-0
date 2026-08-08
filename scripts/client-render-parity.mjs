@@ -30,6 +30,7 @@ export function parseClientRenderParityArgs(argv) {
     visualTimeMs: DEFAULT_VISUAL_TIME_MS,
     chrome: process.env.CHROME || "",
     outputRoot: DEFAULT_OUTPUT_ROOT,
+    detailedUnitShadows: process.env.RTS_CLIENT_PERF_DETAILED_SHADOWS === "1",
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -363,6 +364,9 @@ async function captureWorktree({ browser, server, side, ticks, workload, options
       window.__rtsParityNextFrame = 0;
       return { frameCount: net.frames.length, streamId: net.id };
     });
+    if (options.detailedUnitShadows) {
+      await page.evaluate(() => window.__rts.setProjectedUnitShadowsEnabled(true));
+    }
     if (initialized.frameCount !== stream.frameCount || initialized.streamId !== workload.setup.snapshotStreamId) {
       throw new Error(`${side} loaded the wrong snapshot stream`);
     }

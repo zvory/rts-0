@@ -8,6 +8,7 @@ import {
   PROJECTED_SHADOW_MARCH_STEP_WORLD,
   PROJECTED_SHADOW_MAX_MARCH_STEPS,
   supportsUnifiedGpuShadowPass,
+  unitMaskBounds,
   UnifiedGpuShadowLayer,
 } from "../../client/src/renderer/unified_gpu_shadows.js";
 
@@ -81,27 +82,33 @@ layer.map = {
 layer.mesh = { visible: true };
 layer.uniforms = { uniforms: { uSunDirection: new Float32Array([0, -1]), uSunSlope: 1 } };
 layer.unitProjectionSlope = 1;
-const projectedPolygons = [];
-const fills = [];
-layer.unitShadowGraphics = {
-  clear() { projectedPolygons.length = 0; fills.length = 0; },
-  poly(points) { projectedPolygons.push(points); },
-  fill(options) { fills.push(options); },
-};
-layer.unitShadowTexture = {};
+layer.map.width = 126;
+layer.map.height = 126;
+layer.unitUniforms = { uniforms: { uMaskOrigin: new Float32Array(2) } };
+layer.uniforms.uniforms.uUnitMaskOrigin = new Float32Array(2);
+layer.uniforms.uniforms.uUnitMaskWorldSize = new Float32Array(2);
+const textureSizes = [];
+layer.unitShadowTexture = { resize(width, height) { textureSizes.push([width, height]); } };
+let uploadedShapes = [];
+layer._writeInstances = (shapes) => { uploadedShapes = shapes; };
+layer.unitMesh = {};
 const entities = [
   { id: 1, kind: KIND.RIFLEMAN, x: 16, y: 16, facing: 0 },
   { id: 2, kind: KIND.RIFLEMAN, x: 16, y: 16, facing: 0, visionOnly: true },
 ];
 
 layer.renderer = { render() {} };
+const gpuLabels = [];
+layer.gpuTimer = { measure(label, draw) { gpuLabels.push(label); return draw(); } };
+const camera = { x: 100, y: 200, zoom: 1, viewportWidth: 800, viewportHeight: 600 };
 assert.equal(layer.update(entities), 0, "detailed unit shadows default off and skip projection work");
 assert.equal(layer.hasShadowFor(entities[0].id), false, "disabled projection retains lightweight rig shadows");
 layer.setUnitShadowsEnabled(true);
-assert.equal(layer.update(entities), 2);
+assert.equal(layer.update(entities, camera), 2);
 assert.equal(layer.mesh.visible, true);
 assert.equal(layer.hasShadowFor(entities[0].id), true);
 assert.equal(layer.hasShadowFor(entities[1].id), false, "concealment-only units do not cast shadows");
+assert.equal(gpuLabels.at(-1), "renderer.unitShadows.mask", "optional GPU diagnostics wrap the exact mask draw");
 
 const prototypePairs = [
   KIND.PANZERFAUST,
@@ -114,21 +121,30 @@ const prototypePairs = [
   { id: 101 + index * 2, kind, x: 16, y: 16, facing: 0 },
 ]);
 assert.equal(
-  layer.update(prototypePairs),
+  layer.update(prototypePairs, camera),
   58,
   "each model box becomes one analytic projected polygon with no barrel tessellation",
 );
 assert(prototypePairs.every((entity) => layer.hasShadowFor(entity.id)));
-assert.equal(projectedPolygons.length, 58);
-assert(projectedPolygons.every((points) => points.length >= 6 && points.length <= 12));
-assert(fills.every(({ color, alpha }) => color === 0xffffff && alpha === 1), "mask stores opaque coverage");
+assert.equal(uploadedShapes.length, 58, "one typed instance is uploaded per model box");
+assert.deepEqual(textureSizes.at(-1), [404, 304], "800x600 viewport uses a half-resolution R8 mask plus a two-texel filter gutter");
+assert.deepEqual(
+  unitMaskBounds(camera, layer.map),
+  { minX: 96, minY: 196, widthPx: 404, heightPx: 304, widthWorld: 808, heightWorld: 608 },
+  "mask bounds snap outward exactly and retain a two-texel linear-filter gutter",
+);
+assert.deepEqual(
+  unitMaskBounds({ ...camera, x: -100, y: -200 }, layer.map),
+  { minX: 0, minY: 0, widthPx: 352, heightPx: 202, widthWorld: 704, heightWorld: 404 },
+  "overscroll is clipped to the exact visible map interval before the filter gutter is added",
+);
 
 layer.setUnitShadowsEnabled(false);
-assert.equal(layer.update(prototypePairs), 0, "turning detailed unit shadows off bypasses every model polygon");
+assert.equal(layer.update(prototypePairs, camera), 0, "turning detailed unit shadows off bypasses every model instance");
 assert(prototypePairs.every((entity) => !layer.hasShadowFor(entity.id)));
 layer.setUnitShadowsEnabled(true);
 
 layer.renderer.render = () => { throw new Error("planned texture render failure"); };
-assert.throws(() => layer.update(entities), /planned texture render failure/);
+assert.throws(() => layer.update(entities, camera), /planned texture render failure/);
 assert.equal(layer.mesh.visible, false, "failed uploads leave the projected mesh hidden");
 assert.equal(layer.hasShadowFor(entities[0].id), false, "failed uploads retain native shadows");

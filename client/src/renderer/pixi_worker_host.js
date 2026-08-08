@@ -9,6 +9,7 @@ import {
   createPresentationPreferencesMessage,
   createRenderWorkerWireState,
   createResetGroundDecalsMessage,
+  createResetDiagnosticsMessage,
   createResetGenerationMessage,
   createResizeMessage,
   RENDER_WORKER_MESSAGE,
@@ -57,9 +58,10 @@ export class PixiWorkerPresentationAdapter {
     }
   }
 
-  constructor(canvasParent, canvas, worker, sources, { surface = "match" } = {}) {
+  constructor(canvasParent, canvas, worker, sources, { surface = "match", gpuShadowTiming = false } = {}) {
     this.id = "pixi";
     this.surface = surface === "mapEditor" ? "mapEditor" : "match";
+    this._gpuShadowTimingEnabled = gpuShadowTiming === true && this.surface === "match";
     this._parent = canvasParent;
     this._canvas = canvas;
     this._worker = worker;
@@ -319,7 +321,10 @@ export class PixiWorkerPresentationAdapter {
       this._post(createInitializeMessage({
         canvas,
         ...size,
-        configuration: { surface: this.surface },
+        configuration: {
+          surface: this.surface,
+          gpuShadowTiming: this._gpuShadowTimingEnabled,
+        },
       }));
     });
   }
@@ -538,6 +543,7 @@ export class PixiWorkerPresentationAdapter {
     pushTiming(this._stats.displayAgeMs, displayAgeMs);
     if (message.payload.workerUpdateMs + message.payload.workerPresentMs > 16.67) this._stats.longFrames += 1;
     if (message.payload.readiness) this._lastReadiness = message.payload.readiness;
+    if (message.payload.gpuShadowTiming) this._stats.gpuShadowTiming = message.payload.gpuShadowTiming;
     const outcome = outcomeRecord(PRESENTATION_OUTCOME.PRESENTED, job, {
       workerUpdateMs: message.payload.workerUpdateMs,
       workerPresentMs: message.payload.workerPresentMs,
@@ -668,6 +674,9 @@ export class PixiWorkerPresentationAdapter {
     };
     this._stats = freshStats();
     Object.assign(this._stats, active);
+    if (this._gpuShadowTimingEnabled && !this._destroyed && !this._fatal) {
+      this._post(createResetDiagnosticsMessage(this._generation));
+    }
     this._publishStats();
   }
 
@@ -709,6 +718,7 @@ export class PixiWorkerPresentationAdapter {
       displayAgeMs: summarize(this._stats.displayAgeMs),
       workerUpdateMs: summarize(this._stats.workerUpdateMs),
       workerPresentMs: summarize(this._stats.workerPresentMs),
+      gpuShadowTiming: this._stats.gpuShadowTiming,
     };
   }
 
@@ -893,6 +903,7 @@ function freshStats() {
     displayAgeMs: [],
     workerUpdateMs: [],
     workerPresentMs: [],
+    gpuShadowTiming: null,
   };
 }
 
