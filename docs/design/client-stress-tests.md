@@ -37,13 +37,27 @@ three seconds, then resets `Match.frameProfiler` immediately before measuring. S
 parsing, initial Pixi allocation, and shader warmup are therefore outside the result.
 
 The report includes main-thread frame-work, renderer submission, fog, scheduling, and
-diagnostic-counter summaries from `FrameProfiler`; render-worker submitted/completed/superseded/
-failed counts and queue/display/main-submit/worker-update/worker-present timings; actual average
+diagnostic-counter summaries from `FrameProfiler`; a separately reset render-worker measurement
+window with submitted/completed/superseded/failed counts and
+queue/display/main-submit/worker-update/worker-present timings; actual average
 completed-presentation throughput; the static stream
 identity; Long Tasks and Long Animation Frames
 when supported; and a JS trace/flame graph when supported. The result UI reports the p95 frame-work
 tier and the approximate work reduction or headroom against 16.67 ms. This is a relative
 frame-work indicator, not a claim that the display actually presented at 120 or 240 Hz.
+The host `requestAnimationFrame` callback rate is labeled separately and must never be reported as
+rendered or presented throughput. The server's indexed average-throughput headline is derived from
+worker `completed`, not host frame count. Submitted frames that the one-in-flight worker queue
+supersedes remain visible in the artifact rather than inflating throughput.
+
+Opt-in renderer experiments use `AsyncGpuTimerQueries` with
+`EXT_disjoint_timer_query_webgl2`. Query results are polled only after the browser reports them
+available; disjoint intervals are discarded, pending query and retained-sample counts are bounded,
+and teardown deletes every query. `runRafIndependentGpuSamples` schedules a fixed number of warmup
+and measured callbacks through independent tasks, so a diagnostic sample count does not inherit the
+host display's rAF ceiling. It is a diagnostic building block: each renderer experiment still owns
+the exact draw callback and must report its GPU interval separately from worker CPU update/present
+and end-to-end display age.
 Worker display age covers the complete interval from host acceptance through acknowledgment,
 including bounded host-pending time, message construction/cloning, dispatch, worker update, and
 presentation. Queue age uses the same acceptance boundary through worker task start.

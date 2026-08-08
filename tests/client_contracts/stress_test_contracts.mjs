@@ -4,6 +4,7 @@ import {
   stressTestForegroundReady,
   stressTestHasEnoughFrames,
   stressTestHeadroom,
+  stressTestPresentationSummary,
 } from "../../client/src/stress_test.js";
 import {
   analyzeSelfProfile,
@@ -37,6 +38,22 @@ import {
     "self-profile analysis retains inclusive parent time");
   assert(svg.includes("Fixture profile") && svg.includes("render"),
     "self-profile analysis renders a labeled SVG flame graph");
+}
+
+{
+  const summary = stressTestPresentationSummary({
+    mode: "pixi-webgl-module-worker",
+    submitted: 610,
+    completed: 487,
+    superseded: 122,
+    failed: 1,
+  }, 602, 5_000);
+  assert(summary.source === "renderWorker.completed" && summary.completedPerSecond === 97.4,
+    "stress-test throughput counts worker-completed presentations, not host rAF callbacks");
+  assert(summary.hostRafPerSecond === 120.4,
+    "stress-test reporting labels host rAF throughput separately");
+  assert(summary.submitted === 610 && summary.superseded === 122 && summary.failed === 1,
+    "stress-test reporting retains the render-worker lifecycle counts");
 }
 
 {

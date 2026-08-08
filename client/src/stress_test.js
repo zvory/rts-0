@@ -17,6 +17,23 @@ export function stressTestHasEnoughFrames(frameCount) {
   return Number(frameCount) >= MIN_MEASURED_FRAMES;
 }
 
+export function stressTestPresentationSummary(renderWorker, hostFrameCount, measuredDurationMs) {
+  const seconds = Math.max(0.001, Number(measuredDurationMs || 0) / 1000);
+  const hostFrames = nonNegativeNumber(hostFrameCount);
+  const workerActive = renderWorker?.mode === "pixi-webgl-module-worker";
+  const completed = workerActive ? nonNegativeNumber(renderWorker.completed) : hostFrames;
+  return {
+    source: workerActive ? "renderWorker.completed" : "hostRaf",
+    completed,
+    completedPerSecond: round2(completed / seconds),
+    hostRafFrames: hostFrames,
+    hostRafPerSecond: round2(hostFrames / seconds),
+    submitted: workerActive ? nonNegativeNumber(renderWorker.submitted) : hostFrames,
+    superseded: workerActive ? nonNegativeNumber(renderWorker.superseded) : 0,
+    failed: workerActive ? nonNegativeNumber(renderWorker.failed) : 0,
+  };
+}
+
 export function stressTestHeadroom(frameWorkP95Ms) {
   const p95 = Number(frameWorkP95Ms);
   if (!(p95 > 0)) return { sustainableFps: 0, text: "No frame samples were recorded." };
@@ -84,6 +101,7 @@ export class StressTestRunner {
         }
 
         attempt.match.frameProfiler?.reset();
+        resetRenderWorkerDiagnostics(attempt.match);
         this.setState("measuring");
         this.renderStatus(`Measuring ${this.launch.durationSeconds} seconds… Keep this tab visible.`);
         const observer = new BrowserTimingObserver();
@@ -95,6 +113,8 @@ export class StressTestRunner {
           this.launch.durationSeconds * 1000,
         );
         const measuredDurationMs = Math.round(performance.now() - measuredStarted);
+        const renderWorker = snapshotRenderWorkerDiagnostics(attempt.match);
+        const frameSummary = attempt.match.frameProfiler?.reportSummary?.() || {};
         const browserTiming = observer.stop();
 
         if (!measurementComplete || !this.isCurrentAttempt(attempt)) {
@@ -106,8 +126,12 @@ export class StressTestRunner {
 
         const profile = await finishBrowserProfiler(profilerState, this.launch.label);
         if (!this.isCurrentAttempt(attempt)) continue;
-        const frameSummary = attempt.match.frameProfiler?.reportSummary?.() || {};
-        if (!stressTestHasEnoughFrames(frameSummary.frameCount)) {
+        const presentationSummary = stressTestPresentationSummary(
+          renderWorker,
+          frameSummary.frameCount,
+          measuredDurationMs,
+        );
+        if (!stressTestHasEnoughFrames(presentationSummary.completed)) {
           this.setState("warmup");
           this.renderStatus("Too few rendered frames. Restarting with a fresh warmup…");
           await delay(250);
@@ -118,8 +142,10 @@ export class StressTestRunner {
           frameSummary,
           measuredAt,
           measuredDurationMs,
+          presentationSummary,
           profile,
           refreshRateHz,
+          renderWorker,
         };
       }
 
@@ -128,8 +154,10 @@ export class StressTestRunner {
         frameSummary,
         measuredAt,
         measuredDurationMs,
+        presentationSummary,
         profile,
         refreshRateHz,
+        renderWorker,
       } = completedAttempt;
       const payload = {
         schemaVersion: 1,
@@ -144,6 +172,8 @@ export class StressTestRunner {
         environment: { ...environment, refreshRateHz },
         stream: sanitizeStreamState(this.net?.publicState),
         frameSummary,
+        renderWorker,
+        presentationSummary,
         browserTiming,
         profile,
       };
@@ -159,7 +189,8 @@ export class StressTestRunner {
         runId: saved.runId,
         artifactLabel: saved.artifactLabel,
         frameWorkP95Ms: frameSummary.frameWorkP95Ms,
-        rendererP95Ms: frameSummary.rendererP95Ms,
+        workerCompletedPerSecond: presentationSummary.completedPerSecond,
+        hostRafPerSecond: presentationSummary.hostRafPerSecond,
         profileKind: profile.kind,
         profileSamples: profile.summary?.sampleCount || 0,
         persisted: saved.persisted,
@@ -230,15 +261,20 @@ export class StressTestRunner {
     const profile = result.profile || {};
     const saved = result.server || {};
     const headroom = stressTestHeadroom(frame.frameWorkP95Ms);
-    const averageFps = result.measuredDurationMs > 0
-      ? (Number(frame.frameCount || 0) * 1000 / result.measuredDurationMs)
-      : 0;
+    const presentations = result.presentationSummary
+      || stressTestPresentationSummary(result.renderWorker, frame.frameCount, result.measuredDurationMs);
+    const worker = result.renderWorker || {};
     const title = document.createElement("strong");
     title.textContent = result.status === "completed" ? "Stress Test Complete" : "Stress Test Invalid";
     const label = document.createElement("code");
     label.textContent = saved.artifactLabel || "unsaved-result";
     const metrics = document.createElement("dl");
-    addMetric(metrics, "Rendered average", `${averageFps.toFixed(1)} FPS`);
+    addMetric(metrics, "Worker completed average", `${presentations.completedPerSecond.toFixed(1)} /s`);
+    addMetric(metrics, "Host rAF average", `${presentations.hostRafPerSecond.toFixed(1)} /s`);
+    addMetric(metrics, "Worker frames", `${presentations.submitted} submitted · ${presentations.completed} completed · ${presentations.superseded} superseded · ${presentations.failed} failed`);
+    if (worker.mode === "pixi-webgl-module-worker") {
+      addMetric(metrics, "Worker timing p95", `queue ${timingP95(worker.queueAgeMs)} · display ${timingP95(worker.displayAgeMs)} · update ${timingP95(worker.workerUpdateMs)} · present ${timingP95(worker.workerPresentMs)}`);
+    }
     addMetric(metrics, "Frame work p95", `${frame.frameWorkP95Ms || 0} ms`);
     addMetric(metrics, "Renderer p95", `${frame.rendererP95Ms || 0} ms`);
     addMetric(metrics, "Frame-work tier", `${headroom.sustainableFps || "<1"} FPS`);
@@ -494,6 +530,28 @@ function collectGpuInfo(match) {
   }
 }
 
+function resetRenderWorkerDiagnostics(match) {
+  const control = globalThis.__rtsRenderWorkerControl;
+  if (typeof control?.reset === "function") {
+    control.reset();
+    return;
+  }
+  match?.renderer?.resetDiagnostics?.();
+}
+
+function snapshotRenderWorkerDiagnostics(match) {
+  const control = globalThis.__rtsRenderWorkerControl;
+  const snapshot = typeof control?.snapshot === "function"
+    ? control.snapshot()
+    : match?.renderer?.diagnostics?.();
+  if (!snapshot || typeof snapshot !== "object") return null;
+  try {
+    return JSON.parse(JSON.stringify(snapshot));
+  } catch {
+    return null;
+  }
+}
+
 async function estimateRefreshRate() {
   if (typeof requestAnimationFrame !== "function") return 0;
   const timestamps = [];
@@ -606,6 +664,20 @@ function finite(value) {
 
 function round1(value) {
   return Math.round(Number(value || 0) * 10) / 10;
+}
+
+function round2(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function nonNegativeNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : 0;
+}
+
+function timingP95(summary) {
+  const value = Number(summary?.p95);
+  return `${Number.isFinite(value) && value >= 0 ? round2(value) : 0} ms`;
 }
 
 function delay(ms) {
