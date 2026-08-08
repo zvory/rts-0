@@ -316,6 +316,10 @@ export class UnifiedGpuShadowLayer {
     this.unitShadowsEnabled = next;
     this.projectedEntityIds.clear();
     if (next || !this.supported || !this.enabled || !this.map) return;
+    // Clear with an empty instanced draw. Leaving the previous instance count in place would
+    // redraw the last frame's boxes into the target and keep frozen detailed shadows visible
+    // after the preference was disabled.
+    this.unitGeometry.instanceCount = 0;
     this.renderer.render({
       container: this.unitMesh,
       target: this.unitShadowTexture,

@@ -163,6 +163,7 @@ layer.unitShadowTexture = { resize(width, height) { textureSizes.push([width, he
 let uploadedShapes = [];
 layer._writeInstances = (shapes) => { uploadedShapes = shapes; };
 layer.unitMesh = {};
+layer.unitGeometry = { instanceCount: 0 };
 const entities = [
   { id: 1, kind: KIND.RIFLEMAN, x: 16, y: 16, facing: 0 },
   { id: 2, kind: KIND.RIFLEMAN, x: 16, y: 16, facing: 0, visionOnly: true },
@@ -222,6 +223,8 @@ assert.deepEqual(
 layer.setUnitShadowsEnabled(false);
 assert.equal(layer.update(prototypePairs, camera), 0, "turning detailed unit shadows off bypasses every model instance");
 assert(prototypePairs.every((entity) => !layer.hasShadowFor(entity.id)));
+assert.equal(layer.unitGeometry.instanceCount, 0,
+  "turning detailed unit shadows off clears the retained instanced draw instead of redrawing stale boxes");
 layer.setUnitShadowsEnabled(true);
 
 layer.renderer.render = () => { throw new Error("planned texture render failure"); };
