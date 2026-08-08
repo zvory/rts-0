@@ -12,6 +12,7 @@ import {
   createPresentationPreferencesMessage,
   createRenderWorkerWireState,
   createResetGroundDecalsMessage,
+  createResetDiagnosticsMessage,
   createResetGenerationMessage,
   createResizeMessage,
   RENDER_WORKER_MESSAGE,
@@ -64,7 +65,7 @@ assert(structuredClone(representative).layers.aboveFogReveal.length === 1,
   "representative presentation frame is structurally cloneable without losing visibility layers");
 
 const canvas = { transferMarker: true };
-const init = createInitializeMessage({ canvas, widthCssPx: 640, heightCssPx: 480, dpr: 2, configuration: { nearest: true } });
+const init = createInitializeMessage({ canvas, widthCssPx: 640, heightCssPx: 480, dpr: 2, configuration: { nearest: true, gpuShadowTiming: true } });
 assert(init.message.version === RENDER_WORKER_MESSAGE_VERSION && init.message.type === RENDER_WORKER_MESSAGE.INITIALIZE,
   "initialization carries message and presentation versions");
 assert(init.transfer.length === 1 && init.transfer[0] === canvas,
@@ -111,6 +112,7 @@ for (const control of [
   createCaptureMessage({ generation: 1, frameId: 1, captureId: 4, readPixels: true }),
   createPresentationPreferencesMessage(1, { projectedUnitShadowsEnabled: true }),
   createResetGroundDecalsMessage(1, 3),
+  createResetDiagnosticsMessage(1),
   createResetGenerationMessage(2),
   createDestroyMessage(2),
 ]) validateRenderWorkerRequest(control);
@@ -126,6 +128,12 @@ for (const response of [
   { version: 1, type: RENDER_WORKER_RESPONSE.READY, generation: 1, payload: { assets: { ready: true } } },
   { version: 1, type: RENDER_WORKER_RESPONSE.RETAINED, generation: 1, payload: { revision: 9 } },
   { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: { frameId: 1, workerUpdateMs: 2, workerPresentMs: 1 } },
+  { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: {
+    frameId: 1, workerUpdateMs: 2, workerPresentMs: 1,
+    gpuShadowTiming: { supported: true, pending: 1, dropped: 0, disjoint: 0, groups: [
+      { label: "renderer.unitShadows.mask", samples: 3, avgMs: 0.2, p50Ms: 0.2, p95Ms: 0.3, maxMs: 0.3 },
+    ], staticTerrain: { buildCount: 1, lifetimeBuildCount: 1, buildMs: 4.2, width: 504, height: 504, samplesPerTile: 4 } },
+  } },
   { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: {
     frameId: 1, captureId: 4, workerUpdateMs: 0, workerPresentMs: 0, rgba: new ArrayBuffer(4), width: 1, height: 1,
   } },
@@ -148,6 +156,12 @@ assertThrows(() => validateRenderWorkerResponse({
     frameId: 1, workerUpdateMs: 0, workerPresentMs: 0, rgba: new ArrayBuffer(3), width: 1, height: 1,
   },
 }), "wire rejects framebuffer captures whose decoded RGBA length does not match their dimensions");
+assertThrows(() => validateRenderWorkerResponse({
+  version: 1, type: "presented", generation: 1, payload: {
+    frameId: 1, workerUpdateMs: 0, workerPresentMs: 0,
+    gpuShadowTiming: { supported: true, pending: 0, dropped: 0, disjoint: 0, groups: new Array(9).fill({}) },
+  },
+}), "wire bounds worker GPU timing groups");
 
 function assertThrows(fn, message) {
   let threw = false;

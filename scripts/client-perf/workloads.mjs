@@ -34,6 +34,8 @@ export function buildClientPerfWorkloads(env = process.env) {
         snapshotStreamSpectator: false,
         snapshotStreamTeamIds: Object.freeze([1, 2, 1, 2]),
         snapshotStreamVisibilityTileCount: 126 * 126,
+        projectedUnitShadowsEnabled: env.RTS_CLIENT_PERF_DETAILED_SHADOWS === "1",
+        gpuShadowTimingEnabled: env.RTS_CLIENT_PERF_GPU_TIMING === "1",
         waitForMinEntities: 382,
         resetPerfAfterSetup: true,
       },

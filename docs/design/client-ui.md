@@ -2334,8 +2334,13 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   worker skips every per-unit model projection and units retain their lightweight native rig
   shadows. When enabled on maps with authored elevation and sun, simple presentation-only box
   models for supported units rotate with each unit and project along the authored sun vector into
-  one GPU coverage layer; the terrain shader composites that mask with its separate static-height
-  ray march. Flat maps retain native unit shadows and allocate no active projected-shadow draw.
+  one GPU coverage layer. Their cuboid faces are a retained instanced mesh: each frame streams one
+  compact transform record per model box instead of rebuilding Pixi Graphics polygons. The R8
+  coverage target is limited to the current camera window at half-world-pixel resolution, snapped
+  outward with a two-texel linear-filter gutter; it does not scale with total map area. The terrain
+  shader remaps world receivers into that window and composites the mask with its separate
+  static-height ray march. Flat maps retain native unit shadows and allocate no active
+  projected-shadow draw.
   Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values

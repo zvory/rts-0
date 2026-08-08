@@ -10,6 +10,7 @@ import {
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
 import { initializeWorkloadSetup } from "./client-perf/workload_setup.mjs";
+import { applyShadowSetup, installShadowDiagnostics } from "./client-perf/shadow_diagnostics.mjs";
 import {
   cleanupBrowserProfile,
   configurePageEmulation,
@@ -240,9 +241,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     }
 
     await page.setViewport(puppeteerViewport(args.viewport, args.deviceScaleFactor));
-    await page.evaluateOnNewDocument((workloadId) => {
-      window.__rtsPerfWorkloadId = workloadId;
-    }, workload.id);
+    await installShadowDiagnostics(page, workload);
     const targetUrl = new URL(workload.url, server.baseUrl).href;
     const startedAt = new Date().toISOString();
     const timeoutScale = workloadTimeoutScale(args);
@@ -1256,6 +1255,7 @@ async function applyWorkloadSetup(page, workload) {
   const setup = workload.setup || null;
   const result = await initializeWorkloadSetup(page, setup);
   if (!result) return null;
+  await applyShadowSetup(page, setup, result);
   if (setup.visionSelectionPlayerIndex != null || setup.visionSelectionPlayerId != null) {
     const action = await page.evaluate((replaySetup) => {
       const match = window.__rts?.match;

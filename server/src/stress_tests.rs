@@ -20,6 +20,7 @@ const MAX_CACHE_ENTRIES: usize = 64;
 const MAX_FLAMEGRAPH_BYTES: usize = 750 * 1024;
 const MAX_ENVIRONMENT_BYTES: usize = 32 * 1024;
 const MAX_FRAME_SUMMARY_BYTES: usize = 256 * 1024;
+const MAX_RENDER_WORKER_BYTES: usize = 128 * 1024;
 const MAX_BROWSER_TIMING_BYTES: usize = 128 * 1024;
 
 #[derive(Clone)]
@@ -53,6 +54,8 @@ pub(crate) struct StressTestSubmission {
     environment: Value,
     stream: Value,
     frame_summary: Value,
+    render_worker: Value,
+    presentation_summary: Value,
     browser_timing: Value,
     profile: ProfileSubmission,
 }
@@ -105,13 +108,13 @@ impl StressTestStore {
         let artifact_label = artifact_label(&submission, received_at, &run_id);
         let frame_work_p95_ms = headline_u16(&submission.frame_summary, "frameWorkP95Ms");
         let renderer_p95_ms = headline_u16(&submission.frame_summary, "rendererP95Ms");
-        let frame_count = submission
-            .frame_summary
-            .get("frameCount")
+        let presentation_count = submission
+            .render_worker
+            .get("completed")
             .and_then(Value::as_u64)
             .unwrap_or(0)
             .min(1_000_000);
-        let average_fps_x100 = ((frame_count as f64 * 100_000.0)
+        let average_fps_x100 = ((presentation_count as f64 * 100_000.0)
             / f64::from(submission.measured_duration_ms))
         .round()
         .clamp(0.0, 1_000_000.0) as i32;
@@ -130,6 +133,7 @@ impl StressTestStore {
             "artifactLabel": artifact_label,
             "receivedAt": received_at,
             "buildId": build_id,
+            "averageCompletedPresentationsPerSecondX100": average_fps_x100,
             "persisted": self.db.is_some() && self.record_to_db,
         });
 
@@ -375,6 +379,10 @@ fn validate_submission(submission: &StressTestSubmission) -> Result<(), String> 
         || json_size(&submission.environment) > MAX_ENVIRONMENT_BYTES
         || !submission.frame_summary.is_object()
         || json_size(&submission.frame_summary) > MAX_FRAME_SUMMARY_BYTES
+        || !submission.render_worker.is_object()
+        || json_size(&submission.render_worker) > MAX_RENDER_WORKER_BYTES
+        || !submission.presentation_summary.is_object()
+        || json_size(&submission.presentation_summary) > 16 * 1024
         || !submission.browser_timing.is_object()
         || json_size(&submission.browser_timing) > MAX_BROWSER_TIMING_BYTES
     {
@@ -402,6 +410,33 @@ fn validate_submission(submission: &StressTestSubmission) -> Result<(), String> 
         || !bounded_number(&submission.frame_summary, "rendererP95Ms", 10_000.0)
     {
         return Err("The frame summary is invalid.".to_string());
+    }
+    if submission.render_worker.get("mode").and_then(Value::as_str)
+        != Some("pixi-webgl-module-worker")
+        || ["submitted", "completed", "superseded", "failed"]
+            .into_iter()
+            .any(|key| {
+                submission
+                    .render_worker
+                    .get(key)
+                    .and_then(Value::as_u64)
+                    .is_none_or(|count| count > 1_000_000)
+            })
+        || submission
+            .render_worker
+            .get("completed")
+            .and_then(Value::as_u64)
+            == Some(0)
+        || [
+            "queueAgeMs",
+            "displayAgeMs",
+            "workerUpdateMs",
+            "workerPresentMs",
+        ]
+        .into_iter()
+        .any(|key| !valid_timing_summary(submission.render_worker.get(key)))
+    {
+        return Err("The render-worker summary is invalid.".to_string());
     }
     if !matches!(
         submission.profile.kind.as_str(),
@@ -472,6 +507,19 @@ fn bounded_number(value: &Value, key: &str, max: f64) -> bool {
         .get(key)
         .and_then(Value::as_f64)
         .is_some_and(|number| number.is_finite() && number >= 0.0 && number <= max)
+}
+
+fn valid_timing_summary(value: Option<&Value>) -> bool {
+    let Some(value) = value.filter(|value| value.is_object()) else {
+        return false;
+    };
+    value
+        .get("samples")
+        .and_then(Value::as_u64)
+        .is_some_and(|samples| samples <= 100_000)
+        && ["avg", "p50", "p95", "max"]
+            .into_iter()
+            .all(|key| bounded_number(value, key, 10_000.0))
 }
 
 fn create_run_id(timestamp_ms: i64) -> String {
@@ -615,6 +663,24 @@ mod tests {
                 "frameWorkP95Ms": 16,
                 "rendererP95Ms": 12,
             }),
+            render_worker: json!({
+                "mode": "pixi-webgl-module-worker",
+                "submitted": 120,
+                "completed": 100,
+                "superseded": 20,
+                "failed": 0,
+                "queueAgeMs": { "samples": 100, "avg": 1, "p50": 1, "p95": 2, "max": 3 },
+                "displayAgeMs": { "samples": 100, "avg": 7, "p50": 6, "p95": 9, "max": 12 },
+                "workerUpdateMs": { "samples": 100, "avg": 4, "p50": 4, "p95": 5, "max": 7 },
+                "workerPresentMs": { "samples": 100, "avg": 2, "p50": 2, "p95": 3, "max": 4 }
+            }),
+            presentation_summary: json!({
+                "source": "renderWorker.completed",
+                "completed": 100,
+                "completedPerSecond": 6.67,
+                "hostRafFrames": 120,
+                "hostRafPerSecond": 8
+            }),
             browser_timing: json!({}),
             profile: ProfileSubmission {
                 kind: "phase-timings".to_string(),
@@ -679,5 +745,9 @@ mod tests {
         let artifact = store.get(&saved.run_id).await.unwrap();
         assert_eq!(artifact.artifact["server"]["runId"], saved.run_id);
         assert_eq!(artifact.artifact["server"]["persisted"], false);
+        assert_eq!(
+            artifact.artifact["server"]["averageCompletedPresentationsPerSecondX100"],
+            667
+        );
     }
 }

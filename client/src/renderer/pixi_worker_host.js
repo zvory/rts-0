@@ -9,6 +9,7 @@ import {
   createPresentationPreferencesMessage,
   createRenderWorkerWireState,
   createResetGroundDecalsMessage,
+  createResetDiagnosticsMessage,
   createResetGenerationMessage,
   createResizeMessage,
   RENDER_WORKER_MESSAGE,
@@ -57,9 +58,10 @@ export class PixiWorkerPresentationAdapter {
     }
   }
 
-  constructor(canvasParent, canvas, worker, sources, { surface = "match" } = {}) {
+  constructor(canvasParent, canvas, worker, sources, { surface = "match", gpuShadowTiming = false } = {}) {
     this.id = "pixi";
     this.surface = surface === "mapEditor" ? "mapEditor" : "match";
+    this._gpuShadowTimingEnabled = gpuShadowTiming === true && this.surface === "match";
     this._parent = canvasParent;
     this._canvas = canvas;
     this._worker = worker;
@@ -87,6 +89,8 @@ export class PixiWorkerPresentationAdapter {
     this._lastWorkerMessageAtMs = 0;
     this._lastReadiness = { frame: 0, assets: [], ready: false, failedAssets: [], pendingAssets: [] };
     this._backendInfo = null;
+    this._statsEpoch = 0;
+    this._gpuTimingResetBeforeCurrentJob = false;
     this._stats = freshStats();
     this.app = {
       canvas,
@@ -319,7 +323,10 @@ export class PixiWorkerPresentationAdapter {
       this._post(createInitializeMessage({
         canvas,
         ...size,
-        configuration: { surface: this.surface },
+        configuration: {
+          surface: this.surface,
+          gpuShadowTiming: this._gpuShadowTimingEnabled,
+        },
       }));
     });
   }
@@ -371,6 +378,7 @@ export class PixiWorkerPresentationAdapter {
   }
 
   _schedule(job) {
+    job.statsEpoch = this._statsEpoch;
     this._stats.submitted += 1;
     this._recordCounter("renderWorker.frames.submitted");
     if (!this._inFlight) {
@@ -390,7 +398,12 @@ export class PixiWorkerPresentationAdapter {
       return;
     }
     const startedAt = performance.now();
+    const countsInWindow = job.statsEpoch === this._statsEpoch;
     try {
+      if (countsInWindow && this._gpuTimingResetBeforeCurrentJob) {
+        this._post(createResetDiagnosticsMessage(this._generation));
+        this._gpuTimingResetBeforeCurrentJob = false;
+      }
       const packets = job.editor
         ? [createEditorFrameMessage(job.editor, job.generation)]
         : this._framePackets(job.frame);
@@ -404,13 +417,15 @@ export class PixiWorkerPresentationAdapter {
             packet.message.payload.frame.visualProfile = cloneOptional(this._sources?.visualProfile?.());
           }
         }
-        this._stats.clonedBytes += packet.transfer.reduce((sum, item) => sum + (item?.byteLength || 0), 0);
+        if (countsInWindow) {
+          this._stats.clonedBytes += packet.transfer.reduce((sum, item) => sum + (item?.byteLength || 0), 0);
+        }
         this._post(packet);
       }
       const mainSubmitMs = performance.now() - startedAt;
-      pushTiming(this._stats.mainSubmitMs, mainSubmitMs);
+      if (countsInWindow) pushTiming(this._stats.mainSubmitMs, mainSubmitMs);
       this._inFlight = job;
-      this._stats.dispatched += 1;
+      if (countsInWindow) this._stats.dispatched += 1;
       this._publishStats();
     } catch (error) {
       this._settleJob(job, PRESENTATION_OUTCOME.FAILED, error);
@@ -527,17 +542,24 @@ export class PixiWorkerPresentationAdapter {
       this._lastCapturedPixels = null;
     }
     this._renderFrameCount += 1;
-    this._stats.presented += 1;
-    this._stats.completed += 1;
-    pushTiming(this._stats.workerUpdateMs, message.payload.workerUpdateMs);
-    pushTiming(this._stats.workerPresentMs, message.payload.workerPresentMs);
-    pushTiming(this._stats.queueAgeMs, message.payload.queueAgeMs);
     const displayAgeMs = Number.isFinite(job.enqueuedAtMs)
       ? Math.max(0, epochNow() - job.enqueuedAtMs)
       : message.payload.displayAgeMs;
-    pushTiming(this._stats.displayAgeMs, displayAgeMs);
-    if (message.payload.workerUpdateMs + message.payload.workerPresentMs > 16.67) this._stats.longFrames += 1;
+    const countsInWindow = job.statsEpoch === this._statsEpoch;
+    if (countsInWindow) {
+      this._stats.presented += 1;
+      this._stats.completed += 1;
+      pushTiming(this._stats.workerUpdateMs, message.payload.workerUpdateMs);
+      pushTiming(this._stats.workerPresentMs, message.payload.workerPresentMs);
+      pushTiming(this._stats.queueAgeMs, message.payload.queueAgeMs);
+      pushTiming(this._stats.displayAgeMs, displayAgeMs);
+      if (message.payload.workerUpdateMs + message.payload.workerPresentMs > 16.67) this._stats.longFrames += 1;
+    } else {
+      this._stats.carriedInFlight = Math.max(0, this._stats.carriedInFlight - 1);
+      this._stats.carriedCompleted += 1;
+    }
     if (message.payload.readiness) this._lastReadiness = message.payload.readiness;
+    if (countsInWindow && message.payload.gpuShadowTiming) this._stats.gpuShadowTiming = message.payload.gpuShadowTiming;
     const outcome = outcomeRecord(PRESENTATION_OUTCOME.PRESENTED, job, {
       workerUpdateMs: message.payload.workerUpdateMs,
       workerPresentMs: message.payload.workerPresentMs,
@@ -545,7 +567,7 @@ export class PixiWorkerPresentationAdapter {
       displayAgeMs,
     });
     job.settled.resolve(outcome);
-    this._recordCounter("renderWorker.frames.presented");
+    if (countsInWindow) this._recordCounter("renderWorker.frames.presented");
     const next = this._takePending();
     this._flushResize();
     this._publishStats();
@@ -554,8 +576,12 @@ export class PixiWorkerPresentationAdapter {
 
   _settleSuperseded(job) {
     if (!job) return;
-    this._stats.superseded += 1;
-    this._recordCounter("renderWorker.frames.superseded");
+    if (job.statsEpoch === this._statsEpoch) {
+      this._stats.superseded += 1;
+      this._recordCounter("renderWorker.frames.superseded");
+    } else {
+      this._stats.carriedInFlight = Math.max(0, this._stats.carriedInFlight - 1);
+    }
     this._settleJob(job, PRESENTATION_OUTCOME.SUPERSEDED);
   }
 
@@ -654,6 +680,7 @@ export class PixiWorkerPresentationAdapter {
   }
 
   _resetStats() {
+    const carriedInFlight = Number(!!this._inFlight) + Number(!!this._pending);
     const active = {
       lastPresentedFrameId: this._lastPresentedFrameId,
       destroyed: this._destroyed,
@@ -666,8 +693,14 @@ export class PixiWorkerPresentationAdapter {
       lastErrorColumn: this._stats.lastErrorColumn,
       contextLost: this._stats.contextLost,
     };
+    this._statsEpoch += 1;
     this._stats = freshStats();
+    this._stats.carriedInFlight = carriedInFlight;
+    this._gpuTimingResetBeforeCurrentJob = this._gpuShadowTimingEnabled && carriedInFlight > 0;
     Object.assign(this._stats, active);
+    if (this._gpuShadowTimingEnabled && !this._destroyed && !this._fatal) {
+      this._post(createResetDiagnosticsMessage(this._generation));
+    }
     this._publishStats();
   }
 
@@ -681,6 +714,8 @@ export class PixiWorkerPresentationAdapter {
       retained: this._stats.retained,
       presented: this._stats.presented,
       completed: this._stats.completed,
+      carriedInFlight: this._stats.carriedInFlight,
+      carriedCompleted: this._stats.carriedCompleted,
       superseded: this._stats.superseded,
       failed: this._stats.failed,
       longFrames: this._stats.longFrames,
@@ -709,6 +744,7 @@ export class PixiWorkerPresentationAdapter {
       displayAgeMs: summarize(this._stats.displayAgeMs),
       workerUpdateMs: summarize(this._stats.workerUpdateMs),
       workerPresentMs: summarize(this._stats.workerPresentMs),
+      gpuShadowTiming: this._stats.gpuShadowTiming,
     };
   }
 
@@ -876,6 +912,8 @@ function freshStats() {
     retained: 0,
     presented: 0,
     completed: 0,
+    carriedInFlight: 0,
+    carriedCompleted: 0,
     superseded: 0,
     failed: 0,
     longFrames: 0,
@@ -893,6 +931,7 @@ function freshStats() {
     displayAgeMs: [],
     workerUpdateMs: [],
     workerPresentMs: [],
+    gpuShadowTiming: null,
   };
 }
 

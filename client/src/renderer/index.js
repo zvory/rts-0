@@ -114,6 +114,7 @@ import {
   _tankMotionVisual,
 } from "./units.js";
 import { UnifiedGpuShadowLayer } from "./unified_gpu_shadows.js";
+import { AsyncGpuTimerQueries } from "./gpu_timer_queries.js";
 
 const RENDER_ERROR_LOG_INTERVAL_MS = 5000;
 const MISSING_TEXTURE_SIZE_PX = 26;
@@ -159,13 +160,16 @@ export class Renderer {
   /**
    * @param {HTMLElement} canvasParent element the Pixi canvas is appended to
    */
-  constructor(canvasParent, { renderClock = null, app = null } = {}) {
+  constructor(canvasParent, { renderClock = null, app = null, gpuShadowTiming = false } = {}) {
     this._parent = canvasParent;
     this._renderClock = renderClock;
 
     /** The PIXI.Application. Exposed for the render loop / ticker. */
     if (!app) throw new TypeError("Renderer.create() must initialize Pixi before construction.");
     this.app = app;
+    this._gpuShadowTimer = gpuShadowTiming === true
+      ? new AsyncGpuTimerQueries(this.app.renderer.gl, { maxPending: 8, maxSamples: 128 })
+      : null;
     PIXI.TextureStyle.defaultOptions.scaleMode = "nearest";
     // Keep interpolated entity positions fractional. Nearest scaling preserves
     // the low-res look without snapping smooth server-snapshot interpolation.
@@ -212,6 +216,7 @@ export class Renderer {
       renderer: this.app.renderer,
       layer: this.layers.decals,
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
+      gpuTimer: this._gpuShadowTimer,
     });
     this._visualSamples = new VisualSampleLayer({
       sampleLayer: this.layers.visualSamples,
@@ -385,10 +390,27 @@ export class Renderer {
 
   present() {
     if (this._destroyed) throw new Error("Cannot present a destroyed Pixi renderer.");
-    this.app.render();
+    if (this._gpuShadowTimer) {
+      this._gpuShadowTimer.measure("renderer.present.total", () => this.app.render());
+      this._gpuShadowTimer.poll();
+    } else {
+      this.app.render();
+    }
     this._renderFrameCount += 1;
     if (this._renderAttemptHadError) this._lastRenderErrorFrame = this._renderFrameCount;
     this._renderAttemptHadError = false;
+  }
+
+  gpuShadowTimingSummary() {
+    const timing = this._gpuShadowTimer?.summary?.();
+    return timing ? {
+      ...timing,
+      staticTerrain: this._projectedUnitShadows?.staticTerrainSummary?.() || null,
+    } : null;
+  }
+
+  resetGpuShadowTiming() {
+    this._gpuShadowTimer?.reset?.();
   }
 
   visualNow() {
@@ -660,7 +682,13 @@ export class Renderer {
     time("renderer.projectedUnitShadows", () => {
       this._drawSafely(
         "projectedUnitShadows",
-        () => this._projectedUnitShadows?.update(regularEntities),
+        () => this._projectedUnitShadows?.update(regularEntities, {
+          x: camera?.x,
+          y: camera?.y,
+          zoom: camera?.zoom,
+          viewportWidth: this.app.renderer.screen?.width,
+          viewportHeight: this.app.renderer.screen?.height,
+        }),
       );
     });
 
@@ -1285,6 +1313,8 @@ export class Renderer {
     this._visualSamples = null;
     this._projectedUnitShadows?.destroy();
     this._projectedUnitShadows = null;
+    this._gpuShadowTimer?.destroy?.();
+    this._gpuShadowTimer = null;
     this._doodads?.destroy();
     this._doodads = null;
 
