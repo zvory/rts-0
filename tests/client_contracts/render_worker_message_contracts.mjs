@@ -9,6 +9,7 @@ import {
   createFrameMessages,
   createInitializeMessage,
   createMapGenerationMessage,
+  createPresentationPreferencesMessage,
   createRenderWorkerWireState,
   createResetGroundDecalsMessage,
   createResetGenerationMessage,
@@ -108,10 +109,18 @@ assert(editor.message.type === RENDER_WORKER_MESSAGE.FRAME && editor.message.pay
 for (const control of [
   createResizeMessage({ generation: 1, frameId: 1, widthCssPx: 800, heightCssPx: 600, dpr: 2 }),
   createCaptureMessage({ generation: 1, frameId: 1, captureId: 4, readPixels: true }),
+  createPresentationPreferencesMessage(1, { projectedUnitShadowsEnabled: true }),
   createResetGroundDecalsMessage(1, 3),
   createResetGenerationMessage(2),
   createDestroyMessage(2),
 ]) validateRenderWorkerRequest(control);
+
+const preferences = createPresentationPreferencesMessage(1, {
+  projectedUnitShadowsEnabled: true,
+});
+assert(preferences.message.type === RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES
+  && preferences.message.payload.projectedUnitShadowsEnabled === true,
+"worker presentation preferences carry the projected-shadow toggle as a bounded boolean");
 
 for (const response of [
   { version: 1, type: RENDER_WORKER_RESPONSE.READY, generation: 1, payload: { assets: { ready: true } } },
