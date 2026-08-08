@@ -307,6 +307,28 @@ async function measurementBoundaryContracts() {
     assert(adapter.diagnostics().displayAgeMs.p95 >= 60,
       "display age includes host-pending and main-thread packet work instead of starting after cloning");
     adapter.destroy();
+
+    const boundaryFixture = createFixture();
+    const boundaryFrame = assemble(boundaryFixture.assembler, 1);
+    const carried = boundaryFixture.adapter.render(boundaryFrame);
+    boundaryFixture.adapter._control.reset();
+    let boundaryStats = boundaryFixture.adapter.diagnostics();
+    assert(boundaryStats.submitted === 0 && boundaryStats.completed === 0 && boundaryStats.carriedInFlight === 1,
+      "reset exposes the already-submitted in-flight frame without charging it to the new window");
+    boundaryFixture.worker.present(boundaryFrame);
+    await carried.settled;
+    boundaryStats = boundaryFixture.adapter.diagnostics();
+    assert(boundaryStats.completed === 0 && boundaryStats.submitted === 0
+      && boundaryStats.carriedCompleted === 1 && boundaryStats.carriedInFlight === 0,
+    "a pre-reset completion settles normally but remains outside new-window throughput");
+    const freshFrame = assemble(boundaryFixture.assembler, 2);
+    const fresh = boundaryFixture.adapter.render(freshFrame);
+    boundaryFixture.worker.present(freshFrame);
+    await fresh.settled;
+    boundaryStats = boundaryFixture.adapter.diagnostics();
+    assert(boundaryStats.completed === 1 && boundaryStats.submitted === 1,
+      "new-window completed presentations never exceed matching submissions");
+    boundaryFixture.adapter.destroy();
   } finally {
     globalThis.performance = savedPerformance;
   }

@@ -25,6 +25,8 @@ const INSTANCE_FLOATS = 11;
 const INSTANCE_STRIDE_BYTES = INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 const INITIAL_INSTANCE_CAPACITY = 1024;
 export const STATIC_SHADOW_SAMPLES_PER_TILE = 4;
+export const MAX_RECEIVER_MARCH_STEPS = 1536;
+export const RECEIVER_BISECTION_STEPS = 4;
 
 const VERTEX = `#version 300 es
 precision highp float;
@@ -82,10 +84,14 @@ uniform mat3 uTransformMatrix;
 uniform vec2 uMaskOrigin;
 uniform vec2 uSunDirection;
 uniform float uInverseSunSlope;
+uniform float uSunSlope;
 uniform float uMaskScale;
 uniform sampler2D uTerrainHeightTexture;
 uniform vec2 uMapWorldSize;
 uniform float uTileSize;
+uniform float uReceiverStep;
+uniform float uMapMinWorldHeight;
+uniform float uMapDiagonal;
 float terrainHeight(vec2 world) {
   vec2 uv = clamp(world / uMapWorldSize, vec2(0.0), vec2(1.0));
   return texture(uTerrainHeightTexture, uv).r * 255.0 * uTileSize;
@@ -104,14 +110,44 @@ void main(void) {
   float pitchedZ = local.x * pitchSin + local.z * pitchCos;
   vec2 world = partCenter + mat2(yawCos, yawSin, -yawSin, yawCos) * vec2(pitchedX, local.y);
   float worldHeight = terrainHeight(aInstanceOrigin.xy) + max(0.0, aPartCenter.z + pitchedZ);
-  vec2 projectedWorld = world;
-  // Solve the directional ray against the heightfield receiver. Three fixed refinements keep the
-  // dynamic cost proportional to box vertices, not viewport pixels, and align silhouettes on
-  // slopes without moving gameplay coordinates.
-  for (int refinement = 0; refinement < 3; refinement += 1) {
-    float receiverHeight = terrainHeight(projectedWorld);
-    projectedWorld = world - uSunDirection * max(0.0, worldHeight - receiverHeight) * uInverseSunSlope;
+  float distanceLimit = min(
+    uMapDiagonal,
+    max(0.0, (worldHeight - uMapMinWorldHeight) * uInverseSunSlope + uTileSize)
+  );
+  if (uSunDirection.x > 0.00001) distanceLimit = min(distanceLimit, max(0.0, world.x / uSunDirection.x));
+  if (uSunDirection.x < -0.00001) distanceLimit = min(distanceLimit, max(0.0, (uMapWorldSize.x - world.x) / -uSunDirection.x));
+  if (uSunDirection.y > 0.00001) distanceLimit = min(distanceLimit, max(0.0, world.y / uSunDirection.y));
+  if (uSunDirection.y < -0.00001) distanceLimit = min(distanceLimit, max(0.0, (uMapWorldSize.y - world.y) / -uSunDirection.y));
+
+  const float receiverEpsilon = 0.05;
+  float resolvedDistance = 0.0;
+  float previousDistance = 0.0;
+  float previousClearance = worldHeight - terrainHeight(world);
+  bool foundReceiver = previousClearance <= receiverEpsilon;
+  for (int marchIndex = 1; marchIndex <= ${MAX_RECEIVER_MARCH_STEPS}; marchIndex += 1) {
+    if (foundReceiver || previousDistance >= distanceLimit) break;
+    float nextDistance = min(float(marchIndex) * uReceiverStep, distanceLimit);
+    vec2 nextWorld = world - uSunDirection * nextDistance;
+    float nextClearance = worldHeight - uSunSlope * nextDistance - terrainHeight(nextWorld);
+    resolvedDistance = nextDistance;
+    if (nextClearance <= receiverEpsilon) {
+      float low = previousDistance;
+      float high = nextDistance;
+      for (int refinement = 0; refinement < ${RECEIVER_BISECTION_STEPS}; refinement += 1) {
+        float middle = (low + high) * 0.5;
+        vec2 middleWorld = world - uSunDirection * middle;
+        float middleClearance = worldHeight - uSunSlope * middle - terrainHeight(middleWorld);
+        if (middleClearance > receiverEpsilon) low = middle;
+        else high = middle;
+      }
+      resolvedDistance = high;
+      foundReceiver = true;
+      break;
+    }
+    previousDistance = nextDistance;
+    previousClearance = nextClearance;
   }
+  vec2 projectedWorld = world - uSunDirection * resolvedDistance;
   vec2 maskPosition = (projectedWorld - uMaskOrigin) * uMaskScale;
   mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
   gl_Position = vec4((mvp * vec3(maskPosition, 1.0)).xy, 0.0, 1.0);
@@ -194,9 +230,13 @@ export class UnifiedGpuShadowLayer {
       uMaskOrigin: { value: new Float32Array([0, 0]), type: "vec2<f32>" },
       uSunDirection: { value: new Float32Array([0, -1]), type: "vec2<f32>" },
       uInverseSunSlope: { value: 1, type: "f32" },
+      uSunSlope: { value: 1, type: "f32" },
       uMaskScale: { value: OCCLUDER_TEXTURE_SCALE, type: "f32" },
       uMapWorldSize: { value: new Float32Array([1, 1]), type: "vec2<f32>" },
       uTileSize: { value: 32, type: "f32" },
+      uReceiverStep: { value: 8, type: "f32" },
+      uMapMinWorldHeight: { value: 0, type: "f32" },
+      uMapDiagonal: { value: 1, type: "f32" },
     });
     this.unitShader = this._createUnitShader();
     this.unitMesh = new pixi.Mesh({ geometry: this.unitGeometry, shader: this.unitShader });
@@ -260,9 +300,13 @@ export class UnifiedGpuShadowLayer {
     this.unitUniforms.uniforms.uSunDirection[0] = sun.directionX;
     this.unitUniforms.uniforms.uSunDirection[1] = sun.directionY;
     this.unitUniforms.uniforms.uInverseSunSlope = 1 / this.unitProjectionSlope;
+    this.unitUniforms.uniforms.uSunSlope = this.unitProjectionSlope;
     this.unitUniforms.uniforms.uMapWorldSize[0] = worldWidth;
     this.unitUniforms.uniforms.uMapWorldSize[1] = worldHeight;
     this.unitUniforms.uniforms.uTileSize = this.map.tileSize;
+    this.unitUniforms.uniforms.uReceiverStep = this.map.tileSize / STATIC_SHADOW_SAMPLES_PER_TILE;
+    this.unitUniforms.uniforms.uMapMinWorldHeight = this.map.minElevation * this.map.tileSize;
+    this.unitUniforms.uniforms.uMapDiagonal = Math.hypot(worldWidth, worldHeight);
     this.mesh.visible = true;
   }
 
@@ -468,6 +512,75 @@ export function shadowSunModel(sun) {
     // The tiny floor is only a division guard below 0.057 degrees, not a presentation clamp.
     slope: Math.max(0.001, Math.tan(elevation)),
   });
+}
+
+/** Pure mirror of the vertex shader's monotonic first-receiver search. */
+export function projectRayToTerrainReceiver({
+  worldX,
+  worldY,
+  worldHeight,
+  sunDirection,
+  sunSlope,
+  mapWorldWidth,
+  mapWorldHeight,
+  tileSize = 32,
+  mapMinWorldHeight = 0,
+  samplesPerTile = STATIC_SHADOW_SAMPLES_PER_TILE,
+  terrainHeightAt,
+  epsilon = 0.05,
+} = {}) {
+  if (typeof terrainHeightAt !== "function") throw new TypeError("receiver projection requires terrainHeightAt");
+  const originX = finite(worldX, 0);
+  const originY = finite(worldY, 0);
+  const height = finite(worldHeight, 0);
+  const directionX = finite(sunDirection?.[0], 0);
+  const directionY = finite(sunDirection?.[1], -1);
+  const slope = Math.max(0.001, finite(sunSlope, 1));
+  const width = Math.max(0, finite(mapWorldWidth, 0));
+  const mapHeight = Math.max(0, finite(mapWorldHeight, 0));
+  const safeTileSize = Math.max(0.001, finite(tileSize, 32));
+  const step = safeTileSize / Math.max(1, Math.trunc(finite(samplesPerTile, STATIC_SHADOW_SAMPLES_PER_TILE)));
+  const threshold = Math.max(0, finite(epsilon, 0.05));
+  let distanceLimit = Math.min(
+    Math.hypot(width, mapHeight),
+    Math.max(0, (height - finite(mapMinWorldHeight, 0)) / slope + safeTileSize),
+  );
+  if (directionX > 0.00001) distanceLimit = Math.min(distanceLimit, Math.max(0, originX / directionX));
+  if (directionX < -0.00001) distanceLimit = Math.min(distanceLimit, Math.max(0, (width - originX) / -directionX));
+  if (directionY > 0.00001) distanceLimit = Math.min(distanceLimit, Math.max(0, originY / directionY));
+  if (directionY < -0.00001) distanceLimit = Math.min(distanceLimit, Math.max(0, (mapHeight - originY) / -directionY));
+  const clearanceAt = (distance) => {
+    const x = originX - directionX * distance;
+    const y = originY - directionY * distance;
+    return height - slope * distance - finite(terrainHeightAt(x, y), 0);
+  };
+  const result = (distance, hit, marchSteps, reason) => Object.freeze({
+    x: originX - directionX * distance,
+    y: originY - directionY * distance,
+    distance,
+    hit,
+    marchSteps,
+    reason,
+    spatialError: hit ? step / (2 ** RECEIVER_BISECTION_STEPS) : 0,
+  });
+  if (clearanceAt(0) <= threshold) return result(0, true, 0, "origin");
+  let previousDistance = 0;
+  for (let marchIndex = 1; marchIndex <= MAX_RECEIVER_MARCH_STEPS; marchIndex += 1) {
+    if (previousDistance >= distanceLimit) return result(previousDistance, false, marchIndex - 1, "limit");
+    const nextDistance = Math.min(marchIndex * step, distanceLimit);
+    if (clearanceAt(nextDistance) <= threshold) {
+      let low = previousDistance;
+      let high = nextDistance;
+      for (let refinement = 0; refinement < RECEIVER_BISECTION_STEPS; refinement += 1) {
+        const middle = (low + high) * 0.5;
+        if (clearanceAt(middle) > threshold) low = middle;
+        else high = middle;
+      }
+      return result(high, true, marchIndex, "receiver");
+    }
+    previousDistance = nextDistance;
+  }
+  return result(previousDistance, false, MAX_RECEIVER_MARCH_STEPS, "iterationLimit");
 }
 
 /**

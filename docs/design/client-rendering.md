@@ -279,11 +279,15 @@ path, preserving the pre-elevation render path for existing maps.
 Opt-in detailed unit shadows keep their existing presentation models, but static and dynamic work
 now share the exact authored azimuth and elevation; there is no unit-only 30-degree clamp. The
 worker uploads the boxes as one retained instanced mesh. Each dynamic vertex starts at bilinearly
-sampled terrain elevation and performs three bounded receiver refinements against the same height
-texture while following the authored 3D light ray, so sloped receivers do not silently collapse to
-the `z=0` plane. Coverage is rasterized into an R8 camera-window target with a two-texel sampling
-gutter, rather than rebuilding immediate-mode convex hulls into a map-sized RGBA target. The final
-terrain mesh performs one static-cache sample and one dynamic-mask sample per fragment. Camera
+sampled terrain elevation and marches monotonically down the authored 3D light ray at the static
+cache spacing until it brackets the first terrain receiver. Four bisection refinements resolve that
+bracket to at most `tileSize / 64` world pixels (0.5 px for 32 px tiles). The search is bounded by
+the map edge, map diagonal, and the distance at which the ray falls below the map's minimum height;
+missing receivers use the last valid boundary point rather than oscillating between height samples.
+Sloped receivers therefore do not silently collapse to the `z=0` plane. Coverage is rasterized into
+an R8 camera-window target with a two-texel sampling gutter, rather than rebuilding immediate-mode
+convex hulls into a map-sized RGBA target. The final terrain mesh performs one static-cache sample
+and one dynamic-mask sample per fragment. Camera
 origin, zoom, and CSS viewport are passed explicitly by the renderer owner; concealment-only
 entities remain excluded and a failed mask draw leaves native rig shadows active. Optional bounded
 GPU queries measure the unit-mask draw and total present without synchronously waiting for results.

@@ -47,6 +47,8 @@ import {
     completed: 487,
     superseded: 122,
     failed: 1,
+    carriedInFlight: 0,
+    carriedCompleted: 2,
   }, 602, 5_000);
   assert(summary.source === "renderWorker.completed" && summary.completedPerSecond === 97.4,
     "stress-test throughput counts worker-completed presentations, not host rAF callbacks");
@@ -54,6 +56,8 @@ import {
     "stress-test reporting labels host rAF throughput separately");
   assert(summary.submitted === 610 && summary.superseded === 122 && summary.failed === 1,
     "stress-test reporting retains the render-worker lifecycle counts");
+  assert(summary.carriedCompleted === 2 && summary.completed <= summary.submitted,
+    "stress-test reporting exposes prior-window completions without inflating new-window throughput");
 }
 
 {

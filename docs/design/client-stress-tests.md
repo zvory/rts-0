@@ -51,6 +51,10 @@ The host `requestAnimationFrame` callback rate is labeled separately and must ne
 rendered or presented throughput. The server's indexed average-throughput headline is derived from
 worker `completed`, not host frame count. Submitted frames that the one-in-flight worker queue
 supersedes remain visible in the artifact rather than inflating throughput.
+If reset occurs while a worker frame is already in flight, that job retains its prior-window epoch.
+Diagnostics expose it as `carriedInFlight` and, after settlement, `carriedCompleted`; it is excluded
+from new-window completion counts and timings. Thus every measurement window preserves
+`completed <= submitted` without cancelling or double-submitting a presentation.
 
 Opt-in renderer experiments use `AsyncGpuTimerQueries` with
 `EXT_disjoint_timer_query_webgl2`. Query results are polled only after the browser reports them

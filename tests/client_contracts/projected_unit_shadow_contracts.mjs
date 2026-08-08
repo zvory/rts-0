@@ -4,7 +4,10 @@ import { KIND } from "../../client/src/protocol.js";
 import {
   buildDirectionalHorizonMask,
   hasProjectedUnitShadow,
+  MAX_RECEIVER_MARCH_STEPS,
+  projectRayToTerrainReceiver,
   projectedProxyPolygon,
+  RECEIVER_BISECTION_STEPS,
   shadowSunModel,
   STATIC_SHADOW_SAMPLES_PER_TILE,
   supportsUnifiedGpuShadowPass,
@@ -13,6 +16,8 @@ import {
 } from "../../client/src/renderer/unified_gpu_shadows.js";
 
 assert.equal(STATIC_SHADOW_SAMPLES_PER_TILE, 4, "static visibility is map-relative, not viewport-relative");
+assert.equal(MAX_RECEIVER_MARCH_STEPS, 1536, "the fixed shader loop covers a maximum 256-tile map diagonal");
+assert.equal(RECEIVER_BISECTION_STEPS, 4, "first receiver brackets get four bounded refinements");
 assert.equal(
   shadowSunModel({ azimuthDegrees: 90, elevationDegrees: 12 }).slope,
   Math.tan(12 * Math.PI / 180),
@@ -62,6 +67,46 @@ assert(
   ridgeStaticMask.data.slice(0, ridgeStaticMask.width * 8).some((coverage) => coverage > 0),
   "sun-facing ridge depth casts into downstream receivers",
 );
+
+const receiverCase = (overrides = {}) => projectRayToTerrainReceiver({
+  worldX: 100,
+  worldY: 50,
+  worldHeight: 20,
+  sunDirection: [1, 0],
+  sunSlope: Math.tan(12 * Math.PI / 180),
+  mapWorldWidth: 300,
+  mapWorldHeight: 100,
+  tileSize: 32,
+  mapMinWorldHeight: 0,
+  terrainHeightAt: () => 0,
+  ...overrides,
+});
+const flatReceiver = receiverCase();
+assert(flatReceiver.hit && Math.abs(flatReceiver.distance - 93.75) <= 0.5,
+  "flat ground resolves the low-sun geometric receiver without oscillation");
+const risingReceiver = receiverCase({ terrainHeightAt: (x) => 100 - x });
+assert(risingReceiver.hit && Math.abs(risingReceiver.distance - 16.5) <= 0.5,
+  "slope=1, height=20, sun=12 degrees finds the first receiver near 16.5px instead of the old ~94px fixed-point result");
+const descendingReceiver = receiverCase({
+  worldX: 250,
+  mapWorldWidth: 500,
+  mapMinWorldHeight: -50,
+  terrainHeightAt: (x) => -(250 - x) * 0.1,
+});
+assert(descendingReceiver.hit && descendingReceiver.distance > 170 && descendingReceiver.distance < 180,
+  "descending terrain extends the ray monotonically until its later first hit");
+const edgeReceiver = receiverCase({ worldX: 40, mapWorldWidth: 100 });
+assert(!edgeReceiver.hit && edgeReceiver.reason === "limit" && edgeReceiver.distance === 40 && edgeReceiver.x === 0,
+  "a ray with no receiver ends consistently on its last valid map-boundary point");
+const lowSunReceiver = receiverCase({
+  sunSlope: Math.tan(2 * Math.PI / 180),
+  terrainHeightAt: (x) => 100 - x,
+});
+assert(lowSunReceiver.hit && lowSunReceiver.distance > 19 && lowSunReceiver.distance < 20,
+  "very low authored sun remains bounded and finds the first rising-slope receiver");
+const originReceiver = receiverCase({ worldHeight: 0 });
+assert(originReceiver.hit && originReceiver.distance === 0 && originReceiver.reason === "origin",
+  "a box corner already touching terrain resolves at the origin");
 
 const horizontalBarrel = projectedProxyPolygon({
   x: 100,

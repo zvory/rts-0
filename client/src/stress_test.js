@@ -31,6 +31,8 @@ export function stressTestPresentationSummary(renderWorker, hostFrameCount, meas
     submitted: workerActive ? nonNegativeNumber(renderWorker.submitted) : hostFrames,
     superseded: workerActive ? nonNegativeNumber(renderWorker.superseded) : 0,
     failed: workerActive ? nonNegativeNumber(renderWorker.failed) : 0,
+    carriedInFlight: workerActive ? nonNegativeNumber(renderWorker.carriedInFlight) : 0,
+    carriedCompleted: workerActive ? nonNegativeNumber(renderWorker.carriedCompleted) : 0,
   };
 }
 
@@ -271,7 +273,7 @@ export class StressTestRunner {
     const metrics = document.createElement("dl");
     addMetric(metrics, "Worker completed average", `${presentations.completedPerSecond.toFixed(1)} /s`);
     addMetric(metrics, "Host rAF average", `${presentations.hostRafPerSecond.toFixed(1)} /s`);
-    addMetric(metrics, "Worker frames", `${presentations.submitted} submitted · ${presentations.completed} completed · ${presentations.superseded} superseded · ${presentations.failed} failed`);
+    addMetric(metrics, "Worker frames", `${presentations.submitted} submitted · ${presentations.completed} completed · ${presentations.superseded} superseded · ${presentations.failed} failed · ${presentations.carriedCompleted || 0} prior-window carried`);
     if (worker.mode === "pixi-webgl-module-worker") {
       addMetric(metrics, "Worker timing p95", `queue ${timingP95(worker.queueAgeMs)} · display ${timingP95(worker.displayAgeMs)} · update ${timingP95(worker.workerUpdateMs)} · present ${timingP95(worker.workerPresentMs)}`);
     }
