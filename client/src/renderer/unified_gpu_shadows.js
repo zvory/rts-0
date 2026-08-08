@@ -92,6 +92,21 @@ export function hasProjectedUnitShadow(kind) {
   return Array.isArray(PROXIES[kind]) || CANDIDATE_KINDS.has(kind);
 }
 
+export function supportsUnifiedGpuShadowPass(map) {
+  if (!map?.sun) return false;
+  if (Number.isFinite(map.minElevation) && Number.isFinite(map.maxElevation)) {
+    return map.maxElevation > map.minElevation;
+  }
+  let minElevation = Infinity;
+  let maxElevation = -Infinity;
+  for (const value of map.elevation || []) {
+    const elevation = Number(value) || 0;
+    minElevation = Math.min(minElevation, elevation);
+    maxElevation = Math.max(maxElevation, elevation);
+  }
+  return maxElevation > minElevation;
+}
+
 /** GPU terrain ray march composited with an analytic projected-unit coverage mask. */
 export class UnifiedGpuShadowLayer {
   constructor({ pixi = globalThis.PIXI, renderer, layer, recordDiagnostic = null } = {}) {
@@ -135,7 +150,7 @@ export class UnifiedGpuShadowLayer {
   setMap(map) {
     if (!this.supported) return;
     this.map = normalizedMap(map);
-    this.enabled = Boolean(this.map?.sun);
+    this.enabled = supportsUnifiedGpuShadowPass(this.map);
     this.mesh.visible = false;
     this.projectedEntityIds.clear();
     if (!this.enabled) return;

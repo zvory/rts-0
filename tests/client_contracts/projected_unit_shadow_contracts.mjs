@@ -7,6 +7,7 @@ import {
   PROJECTED_UNIT_SHADOW_MIN_ELEVATION_DEGREES,
   PROJECTED_SHADOW_MARCH_STEP_WORLD,
   PROJECTED_SHADOW_MAX_MARCH_STEPS,
+  supportsUnifiedGpuShadowPass,
   UnifiedGpuShadowLayer,
 } from "../../client/src/renderer/unified_gpu_shadows.js";
 
@@ -16,6 +17,28 @@ assert.equal(
   PROJECTED_SHADOW_MARCH_STEP_WORLD * PROJECTED_SHADOW_MAX_MARCH_STEPS,
   768,
   "terrain preserves the previous maximum shadow reach without sampling unit geometry",
+);
+assert.equal(
+  supportsUnifiedGpuShadowPass({
+    width: 2,
+    height: 2,
+    tileSize: 32,
+    elevation: [0, 0, 0, 0],
+    sun: { azimuthDegrees: 0, elevationDegrees: 10, warmth: 0 },
+  }),
+  false,
+  "flat maps do not activate the full-map shadow shader even when they author a low sun",
+);
+assert.equal(
+  supportsUnifiedGpuShadowPass({
+    width: 2,
+    height: 2,
+    tileSize: 32,
+    elevation: [0, 1, 0, 0],
+    sun: { azimuthDegrees: 0, elevationDegrees: 10, warmth: 0 },
+  }),
+  true,
+  "authored elevation and sun activate the unified terrain and unit shadow pass",
 );
 
 const horizontalBarrel = projectedProxyPolygon({
