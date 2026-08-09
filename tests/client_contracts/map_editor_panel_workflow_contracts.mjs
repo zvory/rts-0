@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
+import { selectMapEditorElevationLevel } from "../../client/src/map_editor_elevation_controls.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { mapEditorContentLabel } from "../../client/src/map_editor_panel_workflow.js";
 import { MAP_EDITOR_DOODAD_TYPES } from "../../client/src/map_editor_doodads.js";
@@ -56,6 +57,33 @@ assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/
   panel.lastOperation = { terrain: "erase" };
   assert.equal(mapEditorContentLabel(panel, (value) => value, (value) => value), "Terrain to grass",
     "terrain erase describes the applied grass result instead of the retained material selection");
+  panel.terrainContent = "elevation";
+  panel.selectedElevation = 6;
+  panel.viewport.tool = { kind: "elevation", level: 6, shape: "brush" };
+  panel.lastOperation = { terrain: "brush" };
+  assert.equal(mapEditorContentLabel(panel, (value) => value, (value) => value), "Elevation level 6",
+    "elevation paint describes the selected height instead of the stale terrain material");
+  panel.viewport.tool = { kind: "elevation", level: 0, shape: "brush" };
+  panel.lastOperation.terrain = "erase";
+  assert.equal(mapEditorContentLabel(panel, (value) => value, (value) => value), "Elevation level 0",
+    "elevation erase describes the resulting height instead of terrain-to-grass");
+}
+
+{
+  const operations = [];
+  const panel = {
+    terrainContent: "elevation",
+    selectedElevation: 0,
+    lastOperation: { terrain: "erase" },
+    selectOperation(operation) { operations.push(operation); this.lastOperation.terrain = operation; },
+  };
+  selectMapEditorElevationLevel(panel, 5);
+  assert.equal(panel.selectedElevation, 5);
+  assert.deepEqual(operations, ["brush"],
+    "choosing a positive elevation exits level-zero erase mode and arms the chosen height");
+  panel.lastOperation.terrain = "box";
+  selectMapEditorElevationLevel(panel, 7);
+  assert.deepEqual(operations, ["brush", "box"], "positive elevation changes preserve box paint mode");
 }
 
 {

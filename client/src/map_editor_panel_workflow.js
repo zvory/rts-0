@@ -68,6 +68,10 @@ export function activeMapEditorOperation(panel) {
   if (panel.activeCategory === "terrain") {
     if (tool?.kind === "road") return "path";
     if (tool?.kind === "forest") return tool.paint ? "brush" : "erase";
+    if (tool?.kind === "elevation") {
+      if (tool.level === 0 && panel.lastOperation.terrain === "erase") return "erase";
+      return tool.shape === "box" ? "box" : "brush";
+    }
     if (tool?.kind === "terrain") {
       if (tool.terrain === TERRAIN.GRASS && panel.lastOperation.terrain === "erase") return "erase";
       return tool.shape === "box" ? "box" : "brush";
@@ -93,6 +97,9 @@ export function mapEditorOperationHelp(operation, category) {
 export function mapEditorContentLabel(panel, overlayEffectName, terrainName) {
   const operation = activeMapEditorOperation(panel);
   if (operation === "erase" && panel.activeCategory === "objects") return "All objects";
+  if (panel.activeCategory === "terrain" && panel.terrainContent === "elevation") {
+    return `Elevation level ${operation === "erase" ? 0 : panel.selectedElevation}`;
+  }
   if (operation === "erase" && panel.activeCategory === "terrain" && panel.terrainContent !== "forest") {
     return "Terrain to grass";
   }

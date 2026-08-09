@@ -98,8 +98,7 @@ pub(crate) fn validate_elevation_sun(elevation: &[u8], sun: Option<MapSun>) -> R
     match (sun, has_relief) {
         (None, false) => Ok(()),
         (None, true) => Err("maps with varying elevation must specify sun conditions".to_string()),
-        (Some(_), false) => Err("sun conditions require varying elevation".to_string()),
-        (Some(sun), true) => {
+        (Some(sun), _) => {
             if sun.azimuth_degrees > 359 {
                 return Err("sun.azimuthDegrees must be between 0 and 359".to_string());
             }

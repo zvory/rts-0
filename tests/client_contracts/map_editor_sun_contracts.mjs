@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createMapEditorPresentation } from "../../client/src/map_editor_presentation.js";
 import {
   commitMapEditorSunField,
+  disableMapEditorSun,
+  enableMapEditorSun,
   previewMapEditorSunField,
 } from "../../client/src/map_editor_sun_controls.js";
 import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
@@ -51,6 +53,32 @@ assert.equal(session.draft.sun.azimuthDegrees, 359,
   "committing a sun control records one bounded authored-map mutation");
 session.undo();
 assert.equal(session.draft.sun.azimuthDegrees, 315, "sun settings participate in undo history");
+
+const flatSession = new MapEditorSession({ storage: null });
+flatSession.initializeBlank({ size: 16, playerCount: 2 });
+assert.equal(enableMapEditorSun(flatSession), true, "flat maps can opt into authored sunlight");
+assert.deepEqual(flatSession.draft.sun, {
+  azimuthDegrees: 315, elevationDegrees: 35, warmth: 25,
+});
+assert.equal(flatSession.exportMap().elevation, undefined, "flat sunlight does not force an elevation payload");
+assert.deepEqual(flatSession.exportMap().sun, flatSession.draft.sun, "flat authored sunlight survives export");
+assert.equal(disableMapEditorSun(flatSession), true, "flat authored sunlight can be removed");
+assert.equal(flatSession.draft.sun, null);
+
+flatSession.beginElevationStroke("Raised ridge");
+assert.deepEqual(flatSession.paintElevationTiles([{ x: NaN, y: 3 }, { x: 2, y: Infinity }], 4), [],
+  "malformed elevation coordinates are ignored without disturbing the active stroke");
+assert.deepEqual(flatSession.paintElevationTiles([{ x: 2, y: 3 }], 4), [{ x: 2, y: 3, level: 4 }]);
+assert.equal(flatSession.commitElevationStroke(), true);
+assert.equal(flatSession.materialized().elevation[3 * 16 + 2], 4,
+  "elevation painting materializes the selected height level");
+assert.deepEqual(flatSession.draft.sun, {
+  azimuthDegrees: 315, elevationDegrees: 35, warmth: 25,
+}, "the first relief edit initializes valid sunlight");
+assert.equal(disableMapEditorSun(flatSession), false, "relief maps retain their required sunlight");
+flatSession.undo();
+assert.equal(flatSession.draft.elevation.length, 0, "elevation strokes participate in undo history");
+assert.equal(flatSession.draft.sun, null, "undo restores the pre-relief sunlight state atomically");
 
 let builtMap = null;
 const worker = { terrainRevision: 0, renderer: {

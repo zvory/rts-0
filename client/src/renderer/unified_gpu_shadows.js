@@ -165,18 +165,7 @@ export function hasProjectedUnitShadow(kind) {
 }
 
 export function supportsUnifiedGpuShadowPass(map) {
-  if (!map?.sun) return false;
-  if (Number.isFinite(map.minElevation) && Number.isFinite(map.maxElevation)) {
-    return map.maxElevation > map.minElevation;
-  }
-  let minElevation = Infinity;
-  let maxElevation = -Infinity;
-  for (const value of map.elevation || []) {
-    const elevation = Number(value) || 0;
-    minElevation = Math.min(minElevation, elevation);
-    maxElevation = Math.max(maxElevation, elevation);
-  }
-  return maxElevation > minElevation;
+  return Boolean(map?.sun);
 }
 
 /** Cached terrain visibility composited with an instanced projected-unit coverage mask. */

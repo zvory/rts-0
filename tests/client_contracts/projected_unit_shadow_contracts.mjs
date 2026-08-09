@@ -39,8 +39,8 @@ assert.equal(
     elevation: [0, 0, 0, 0],
     sun: { azimuthDegrees: 0, elevationDegrees: 10, warmth: 0 },
   }),
-  false,
-  "flat maps do not activate the full-map shadow shader even when they author a low sun",
+  true,
+  "flat maps with authored sunlight activate directional projected unit shadows",
 );
 assert.equal(
   supportsUnifiedGpuShadowPass({
