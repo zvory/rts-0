@@ -30,7 +30,7 @@ src/
   prediction_settings.js # localStorage-backed prediction toggle
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   health_bar_settings.js # localStorage-backed always-show HP-bar toggle (damaged-only by default)
-  unit_shadow_settings.js # localStorage-backed detailed-unit-shadow toggle (off by default)
+  unit_shadow_settings.js # localStorage-backed detailed-unit-shadow toggle (on by default)
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_runtime_reset.js # shared clearing of state derived from one authoritative timeline
@@ -2334,7 +2334,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   remain visible across camera scales and display resolutions; every seventh existing divider uses
   a heavier 1.5-world-pixel mark to identify approximately 105 HP without adding another mark.
   Construction and deconstruction keep their existing status colors on the shared bar layer.
-  Detailed Unit Shadows are an opt-in Game setting and default off. When disabled, the render
+  Detailed Unit Shadows are a default-enabled Game setting with a persistent opt-out. When disabled, the render
   worker skips every per-unit model projection and units retain their lightweight native rig
   shadows. When enabled on maps with authored elevation and sun, simple presentation-only box
   models for supported units rotate with each unit and project along the authored sun vector into
