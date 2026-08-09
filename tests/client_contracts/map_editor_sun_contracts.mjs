@@ -2,12 +2,22 @@ import assert from "node:assert/strict";
 
 import { createMapEditorPresentation } from "../../client/src/map_editor_presentation.js";
 import {
+  commitMapEditorStalingradTime,
   commitMapEditorSunField,
   disableMapEditorSun,
   enableMapEditorSun,
+  previewMapEditorStalingradTime,
   previewMapEditorSunDirectionField,
   previewMapEditorSunField,
+  restoreMapEditorSunPreview,
 } from "../../client/src/map_editor_sun_controls.js";
+import {
+  boundedStalingradTime,
+  formatStalingradTime,
+  STALINGRAD_SUN_PRESET,
+  stalingradSunAtTime,
+  stalingradTimeFromSun,
+} from "../../client/src/map_editor_stalingrad_sun.js";
 import {
   mapEditorSunDirectionPreview,
   MapEditorViewport,
@@ -67,6 +77,44 @@ assert.deepEqual(mapEditorSunDirectionPreview({ width: 100, height: 80 }, 0), {
 const eastGuide = mapEditorSunDirectionPreview({ width: 100, height: 80 }, 90);
 assert.equal(eastGuide.toX, 2060.8);
 assert(Math.abs(eastGuide.toY - 1280) < 1e-9, "90 degrees points east without vertical drift");
+assert.equal(STALINGRAD_SUN_PRESET.dateLabel, "23 Aug 1942");
+assert.equal(STALINGRAD_SUN_PRESET.latitudeDegrees, 48.7);
+assert.equal(boundedStalingradTime(3), 5.25);
+assert.equal(boundedStalingradTime(22), 18.75);
+assert.equal(formatStalingradTime(16.25), "16:15");
+const stalingradMorning = stalingradSunAtTime(6);
+const stalingradNoon = stalingradSunAtTime(12);
+const stalingradEvening = stalingradSunAtTime(18);
+assert(stalingradMorning.azimuthDegrees < 90, "late-August Stalingrad sunrise is north of east");
+assert.equal(stalingradNoon.azimuthDegrees, 180, "local solar noon places the sun due south");
+assert(stalingradEvening.azimuthDegrees > 270, "late-August Stalingrad sunset is north of west");
+assert(stalingradNoon.elevationDegrees > stalingradMorning.elevationDegrees);
+assert(stalingradNoon.warmth < stalingradMorning.warmth, "low sunlight is warmer than the noon sun");
+assert.equal(stalingradTimeFromSun(stalingradSunAtTime(16.5)), 16.5,
+  "the authored conditions recover their historical slider time");
+const historicalPreviews = [];
+const historicalDirections = [];
+const historicalViewport = {
+  previewSunDirection: (degrees) => historicalDirections.push(degrees),
+  previewSunConditions: (sun) => { historicalPreviews.push(sun); return true; },
+};
+assert.equal(previewMapEditorStalingradTime(session, historicalViewport, 16), true);
+assert.deepEqual(historicalPreviews, [stalingradSunAtTime(16)]);
+assert.deepEqual(historicalDirections, [stalingradSunAtTime(16).azimuthDegrees]);
+const restoredHistoricalPreviews = [];
+const clearedHistoricalDirections = [];
+assert.equal(restoreMapEditorSunPreview(session, {
+  clearSunDirectionPreview: () => clearedHistoricalDirections.push(true),
+  previewSunConditions: (sun) => { restoredHistoricalPreviews.push(sun); return true; },
+}), true);
+assert.deepEqual(restoredHistoricalPreviews, [authored.sun],
+  "cancelling a historical-time preview restores the committed sun conditions");
+assert.deepEqual(clearedHistoricalDirections, [true]);
+assert.equal(commitMapEditorStalingradTime(session, 16), true);
+assert.deepEqual(session.draft.sun, stalingradSunAtTime(16),
+  "one historical-time commit authors direction, height, and warmth atomically");
+session.undo();
+assert.deepEqual(session.draft.sun, authored.sun);
 assert.equal(commitMapEditorSunField(session, "azimuthDegrees", 400), true);
 assert.equal(session.draft.sun.azimuthDegrees, 359,
   "committing a sun control records one bounded authored-map mutation");

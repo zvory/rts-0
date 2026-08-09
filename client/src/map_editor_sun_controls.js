@@ -1,4 +1,11 @@
 import { MAP_EDITOR_DEFAULT_SUN } from "./map_editor_session.js";
+import {
+  boundedStalingradTime,
+  formatStalingradTime,
+  STALINGRAD_SUN_PRESET,
+  stalingradSunAtTime,
+  stalingradTimeFromSun,
+} from "./map_editor_stalingrad_sun.js";
 
 export function createMapEditorSunSettings(session, viewport) {
   const section = group("Sun & atmosphere");
@@ -10,7 +17,20 @@ export function createMapEditorSunSettings(session, viewport) {
     );
     return section;
   }
+  const stalingradTime = stalingradTimeFromSun(sun);
   section.append(
+    stalingradTimeField(stalingradTime, (value) => {
+      previewMapEditorStalingradTime(session, viewport, value);
+    }, (value) => {
+      commitMapEditorStalingradTime(session, value);
+      viewport.clearSunDirectionPreview?.();
+    }, {
+      onBegin: () => viewport.previewSunDirection?.(
+        stalingradSunAtTime(stalingradTime).azimuthDegrees,
+      ),
+      onEnd: () => viewport.clearSunDirectionPreview?.(),
+      onCancel: () => restoreMapEditorSunPreview(session, viewport),
+    }),
     sunRangeField("Direction", sun.azimuthDegrees, 0, 359, "°", (value) => {
       previewMapEditorSunDirectionField(session, viewport, value);
     }, (value) => {
@@ -26,6 +46,7 @@ export function createMapEditorSunSettings(session, viewport) {
     sunRangeField("Color temperature", sun.warmth, 0, 100, "% warm", (value) => {
       previewMapEditorSunField(session, viewport, "warmth", value);
     }, (value) => commitMapEditorSunField(session, "warmth", value)),
+    readout("Historical daylight: 23 Aug 1942 on the steppe west of Stalingrad (48.7°N, 44.3°E). Local solar time sets direction, height, and warmth together."),
     readout("Direction uses compass degrees: 0° north, 90° east, 180° south, 270° west. Drag it to show the sun-source arrow on the map."),
     readout("Drag any control to preview lighting, shadow direction, and atmosphere live. Changes are saved in the map and can be undone."),
   );
@@ -66,6 +87,60 @@ export function commitMapEditorSunField(session, fieldName, value) {
   if (!sun || !Object.prototype.hasOwnProperty.call(sun, fieldName)) return false;
   const next = boundedSunField(fieldName, value);
   return session.mutate("Changed sun conditions", (draft) => { draft.sun[fieldName] = next; });
+}
+
+export function previewMapEditorStalingradTime(session, viewport, value) {
+  if (!session.draft?.sun) return false;
+  const conditions = stalingradSunAtTime(value);
+  viewport.previewSunDirection?.(conditions.azimuthDegrees);
+  return viewport.previewSunConditions(conditions);
+}
+
+export function commitMapEditorStalingradTime(session, value) {
+  if (!session.draft?.sun) return false;
+  const conditions = stalingradSunAtTime(value);
+  return session.mutate("Set Stalingrad time of day", (draft) => {
+    draft.sun = { ...conditions };
+  });
+}
+
+export function restoreMapEditorSunPreview(session, viewport) {
+  const sun = session.draft?.sun;
+  if (!sun) return false;
+  viewport.clearSunDirectionPreview?.();
+  return viewport.previewSunConditions({ ...sun });
+}
+
+function stalingradTimeField(value, onInput, onChange, {
+  onBegin, onEnd, onCancel,
+} = {}) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "map-editor-sun-control";
+  const input = document.createElement("input");
+  input.type = "range";
+  input.min = String(STALINGRAD_SUN_PRESET.minTimeHours);
+  input.max = String(STALINGRAD_SUN_PRESET.maxTimeHours);
+  input.step = String(STALINGRAD_SUN_PRESET.timeStepHours);
+  input.value = String(value);
+  input.setAttribute("aria-label", "Stalingrad daylight time");
+  const output = document.createElement("output");
+  const updateOutput = (next) => {
+    output.value = formatStalingradTime(next);
+    output.textContent = output.value;
+  };
+  updateOutput(value);
+  input.addEventListener("input", () => {
+    const next = boundedStalingradTime(input.value);
+    updateOutput(next);
+    onInput(next);
+  });
+  input.addEventListener("change", () => onChange(input.value));
+  input.addEventListener("pointerdown", () => onBegin?.());
+  input.addEventListener("pointerup", () => onEnd?.());
+  input.addEventListener("pointercancel", () => (onCancel || onEnd)?.());
+  input.addEventListener("blur", () => onEnd?.());
+  wrapper.append(input, output);
+  return field("Time of day · Stalingrad steppe", wrapper);
 }
 
 function sunRangeField(labelText, value, min, max, suffix, onInput, onChange, { onBegin, onEnd } = {}) {
