@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-import { selectMapEditorElevationLevel } from "../../client/src/map_editor_elevation_controls.js";
+import {
+  boundedMapEditorElevationLevel,
+  selectMapEditorElevationLevel,
+} from "../../client/src/map_editor_elevation_controls.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { mapEditorContentLabel } from "../../client/src/map_editor_panel_workflow.js";
 import { MAP_EDITOR_DOODAD_TYPES } from "../../client/src/map_editor_doodads.js";
@@ -12,16 +15,21 @@ import {
 } from "../../client/src/map_editor_session.js";
 
 const shellStyles = fs.readFileSync(new URL("../../client/map_editor_shell.css", import.meta.url), "utf8");
+const elevationSource = fs.readFileSync(new URL("../../client/src/map_editor_elevation_controls.js", import.meta.url), "utf8");
 const panelSource = fs.readFileSync(new URL("../../client/src/map_editor_panel.js", import.meta.url), "utf8");
 const workflowSource = fs.readFileSync(new URL("../../client/src/map_editor_panel_workflow.js", import.meta.url), "utf8");
 
-for (const label of ["Terrain", "Objects", "Zones", "Locations"]) {
+for (const label of ["Textures", "Elevation", "Objects", "Zones", "Locations"]) {
   assert.match(workflowSource, new RegExp(`\\["[a-z]+", "${label}"\\]`), `${label} remains a first-class palette category`);
 }
 assert.match(shellStyles, /\.map-editor-tools-window \.map-editor-panel-body\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto/s,
   "palette tabs and current-tool context stay pinned around the one scrolling content region");
 assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/s,
   "editing operations live in a separate map-space rail");
+assert.match(elevationSource, /range\.addEventListener\("input", \(\) => \{ number\.value = range\.value; \}\)/,
+  "dragging the elevation slider synchronizes its numeric field without replacing the active range input through a panel render");
+assert.match(elevationSource, /range\.addEventListener\("change", \(\) => select\(range\.value\)\)/,
+  "releasing the elevation slider applies the synchronized paint level");
 
 {
   const panel = {
@@ -57,6 +65,7 @@ assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/
   panel.lastOperation = { terrain: "erase" };
   assert.equal(mapEditorContentLabel(panel, (value) => value, (value) => value), "Terrain to grass",
     "terrain erase describes the applied grass result instead of the retained material selection");
+  panel.activeCategory = "elevation";
   panel.terrainContent = "elevation";
   panel.selectedElevation = 6;
   panel.viewport.tool = { kind: "elevation", level: 6, shape: "brush" };
@@ -70,6 +79,9 @@ assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/
 }
 
 {
+  assert.equal(boundedMapEditorElevationLevel(-4), 0);
+  assert.equal(boundedMapEditorElevationLevel(6.9), 6);
+  assert.equal(boundedMapEditorElevationLevel(99), 9);
   const operations = [];
   const panel = {
     terrainContent: "elevation",
@@ -84,6 +96,23 @@ assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/
   panel.lastOperation.terrain = "box";
   selectMapEditorElevationLevel(panel, 7);
   assert.deepEqual(operations, ["brush", "box"], "positive elevation changes preserve box paint mode");
+}
+
+{
+  const calls = [];
+  const panel = {
+    activeCategory: "terrain",
+    terrainContent: "material",
+    lastOperation: { terrain: "box" },
+    availableOperations: MapEditorPanel.prototype.availableOperations,
+    selectOperation(operation) { calls.push(operation); },
+  };
+  MapEditorPanel.prototype.selectCategory.call(panel, "elevation");
+  assert.equal(panel.activeCategory, "elevation");
+  assert.equal(panel.terrainContent, "elevation");
+  assert.deepEqual(calls, ["box"], "Elevation is an independent palette category with remembered paint shape");
+  MapEditorPanel.prototype.selectCategory.call(panel, "terrain");
+  assert.equal(panel.terrainContent, "material", "Textures do not retain the elevation tool mode");
 }
 
 {

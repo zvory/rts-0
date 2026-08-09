@@ -994,9 +994,11 @@ preserves authored elevation and sun conditions. Any map can enable live Directi
 Color temperature controls in Map settings. Flat maps use those conditions for atmosphere and
 directional unit shadows; varied elevation additionally lights and shadows the terrain. Dragging
 the controls rebuilds the editor's worker-owned terrain
-preview with candidate sun conditions without adding intermediate undo entries; releasing a control
-commits one authored-map change. Terrain painting includes elevation levels 0–9 with Brush, Box,
-Erase, and the active symmetry; the first nonzero elevation edit initializes default sun conditions
+preview with candidate sun conditions without adding intermediate undo entries. While Direction is
+dragged, a temporary map-centred arrow points toward the sun source and labels the compass azimuth;
+0° is north and 90° is east. Releasing a control removes the guide and commits one authored-map
+change. Texture painting and Elevation are separate palette categories. Elevation uses synchronized
+slider and numeric level controls from 0–9 with Brush, Box, Erase, and the active symmetry; the first nonzero elevation edit initializes default sun conditions
 so the draft remains valid. Import normalization preserves authored terrain
 verbatim, including impassable terrain in a protected base footprint, so
 the advisory and authoritative checks can report the author's actual input. Interactive rock/water

@@ -10,7 +10,8 @@ import {
 } from "./map_editor_session.js";
 
 export const MAP_EDITOR_CATEGORIES = Object.freeze([
-  ["terrain", "Terrain"],
+  ["terrain", "Textures"],
+  ["elevation", "Elevation"],
   ["objects", "Objects"],
   ["zones", "Zones"],
   ["locations", "Locations"],
@@ -28,7 +29,15 @@ export const MAP_EDITOR_OPERATIONS = Object.freeze([
   ["remove", "Remove"],
 ]);
 
+export function selectMapEditorCategoryState(panel, category) {
+  panel.activeCategory = category;
+  if (category === "elevation") panel.terrainContent = "elevation";
+  else if (category === "terrain" && panel.terrainContent === "elevation") panel.terrainContent = "material";
+  return panel.lastOperation[category === "elevation" ? "terrain" : category];
+}
+
 export function availableMapEditorOperations(panel) {
+  if (panel.activeCategory === "elevation") return new Set(["brush", "box", "erase"]);
   if (panel.activeCategory === "objects") {
     const sprayable = isTreeDoodadType(panel.selectedDoodadType) || isWildflowerDoodadType(panel.selectedDoodadType);
     return new Set(sprayable ? ["place", "spray", "erase"] : ["place", "erase"]);
@@ -65,7 +74,7 @@ export function activeMapEditorOperation(panel) {
   if (panel.activeCategory === "locations" && ["start", "base"].includes(tool?.kind)) {
     return tool.add ? "add" : "move";
   }
-  if (panel.activeCategory === "terrain") {
+  if (["terrain", "elevation"].includes(panel.activeCategory)) {
     if (tool?.kind === "road") return "path";
     if (tool?.kind === "forest") return tool.paint ? "brush" : "erase";
     if (tool?.kind === "elevation") {
@@ -97,7 +106,7 @@ export function mapEditorOperationHelp(operation, category) {
 export function mapEditorContentLabel(panel, overlayEffectName, terrainName) {
   const operation = activeMapEditorOperation(panel);
   if (operation === "erase" && panel.activeCategory === "objects") return "All objects";
-  if (panel.activeCategory === "terrain" && panel.terrainContent === "elevation") {
+  if (panel.activeCategory === "elevation") {
     return `Elevation level ${operation === "erase" ? 0 : panel.selectedElevation}`;
   }
   if (operation === "erase" && panel.activeCategory === "terrain" && panel.terrainContent !== "forest") {

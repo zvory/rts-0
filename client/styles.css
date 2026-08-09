@@ -5506,6 +5506,18 @@ input[type="text"]:focus {
   text-align: right;
 }
 
+.map-editor-elevation-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 68px;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-editor-field .map-editor-elevation-control input[type="range"] {
+  padding: 0;
+  accent-color: #d0ad63;
+}
+
 .map-editor-player-picker {
   grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
 }

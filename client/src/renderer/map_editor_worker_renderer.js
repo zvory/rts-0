@@ -193,6 +193,41 @@ export class MapEditorWorkerRenderer {
         gfxNoFill(this.overlay);
       }
     }
+    if (overlay.sunDirectionPreview) this._drawSunDirectionPreview(overlay.sunDirectionPreview);
+  }
+
+  _drawSunDirectionPreview(preview) {
+    const angle = Math.atan2(preview.toY - preview.fromY, preview.toX - preview.fromX);
+    const headLength = 56;
+    const arrowPaths = [
+      [[preview.fromX, preview.fromY], [preview.toX, preview.toY]],
+      [[preview.toX, preview.toY], [
+        preview.toX - Math.cos(angle - 0.55) * headLength,
+        preview.toY - Math.sin(angle - 0.55) * headLength,
+      ]],
+      [[preview.toX, preview.toY], [
+        preview.toX - Math.cos(angle + 0.55) * headLength,
+        preview.toY - Math.sin(angle + 0.55) * headLength,
+      ]],
+    ];
+    gfxStrokePaths(this.overlay, arrowPaths, 12, 0x101418, 0.78);
+    gfxStrokePaths(this.overlay, arrowPaths, 6, 0xffd878, 0.98);
+    gfxCircle(gfxFill(this.overlay, 0xffd878, 0.96), preview.fromX, preview.fromY, 12);
+    gfxNoFill(this.overlay);
+    const label = new PIXI.Text({ text: preview.label, style: {
+      fontFamily: "Inter, system-ui, sans-serif",
+      fontSize: 56,
+      fontWeight: "800",
+      fill: 0xfff4cf,
+      stroke: { color: 0x101418, width: 10 },
+    } });
+    label.anchor.set(0.5);
+    label.position.set(
+      preview.toX + Math.cos(angle) * 58,
+      preview.toY + Math.sin(angle) * 58,
+    );
+    this.renderer.layers.feedback.addChild(label);
+    this.labels.push(label);
   }
 
   _drawSite(site) {

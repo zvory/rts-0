@@ -12,6 +12,7 @@ import {
   availableMapEditorOperations,
   mapEditorContentLabel,
   mapEditorOperationHelp,
+  selectMapEditorCategoryState,
 } from "./map_editor_panel_workflow.js";
 import {
   canonicalDoodadColor,
@@ -302,12 +303,10 @@ export class MapEditorPanel {
   operationHelp(operation) {
     return mapEditorOperationHelp(operation, this.activeCategory);
   }
-
   selectCategory(category) {
     if (!MAP_EDITOR_CATEGORIES.some(([value]) => value === category)) return;
-    this.activeCategory = category;
+    const preferred = selectMapEditorCategoryState(this, category);
     const available = this.availableOperations();
-    const preferred = this.lastOperation[category];
     const operation = available.has(preferred) ? preferred : available.values().next().value;
     if (operation) this.selectOperation(operation);
     else {
@@ -490,6 +489,7 @@ export class MapEditorPanel {
       content.className = "map-editor-category-content";
       content.dataset.category = this.activeCategory;
       if (this.activeCategory === "objects") content.appendChild(this.renderDoodads());
+      else if (this.activeCategory === "elevation") content.appendChild(createMapEditorElevationTool(this));
       else if (this.activeCategory === "zones") content.appendChild(this.renderMapOverlays());
       else if (this.activeCategory === "locations") content.appendChild(this.renderLocations());
       else content.append(this.renderTerrain(), this.renderForest());
@@ -626,7 +626,7 @@ export class MapEditorPanel {
       }
       palette.appendChild(control);
     }
-    section.append(createMapEditorElevationTool(this), palette, this.renderRoadTool());
+    section.append(palette, this.renderRoadTool());
     return section;
   }
   renderRoadTool() {
