@@ -66,6 +66,8 @@ assert.equal(disableMapEditorSun(flatSession), true, "flat authored sunlight can
 assert.equal(flatSession.draft.sun, null);
 
 flatSession.beginElevationStroke("Raised ridge");
+assert.deepEqual(flatSession.paintElevationTiles([{ x: NaN, y: 3 }, { x: 2, y: Infinity }], 4), [],
+  "malformed elevation coordinates are ignored without disturbing the active stroke");
 assert.deepEqual(flatSession.paintElevationTiles([{ x: 2, y: 3 }], 4), [{ x: 2, y: 3, level: 4 }]);
 assert.equal(flatSession.commitElevationStroke(), true);
 assert.equal(flatSession.materialized().elevation[3 * 16 + 2], 4,

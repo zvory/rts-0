@@ -12,15 +12,21 @@ export function createMapEditorElevationTool(panel) {
     control.textContent = `Level ${level}`;
     control.dataset.active = panel.terrainContent === "elevation" && panel.selectedElevation === level ? "true" : "false";
     control.addEventListener("click", () => {
-      panel.terrainContent = "elevation";
-      panel.selectedElevation = level;
-      if (!["brush", "box", "erase"].includes(panel.lastOperation.terrain)) panel.lastOperation.terrain = "brush";
-      panel.selectOperation(level === 0 ? "erase" : panel.lastOperation.terrain);
+      selectMapEditorElevationLevel(panel, level);
     });
     controls.appendChild(control);
   }
   label.append(title, controls);
   return label;
+}
+
+export function selectMapEditorElevationLevel(panel, level) {
+  panel.terrainContent = "elevation";
+  panel.selectedElevation = level;
+  const operation = level === 0
+    ? "erase"
+    : panel.lastOperation.terrain === "box" ? "box" : "brush";
+  panel.selectOperation(operation);
 }
 
 export function armMapEditorElevation(panel, level = panel.selectedElevation) {

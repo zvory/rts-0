@@ -97,6 +97,9 @@ export function mapEditorOperationHelp(operation, category) {
 export function mapEditorContentLabel(panel, overlayEffectName, terrainName) {
   const operation = activeMapEditorOperation(panel);
   if (operation === "erase" && panel.activeCategory === "objects") return "All objects";
+  if (panel.activeCategory === "terrain" && panel.terrainContent === "elevation") {
+    return `Elevation level ${operation === "erase" ? 0 : panel.selectedElevation}`;
+  }
   if (operation === "erase" && panel.activeCategory === "terrain" && panel.terrainContent !== "forest") {
     return "Terrain to grass";
   }

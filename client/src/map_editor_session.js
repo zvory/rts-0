@@ -405,7 +405,7 @@ export class MapEditorSession {
     for (const candidate of tiles) {
       const x = Math.trunc(Number(candidate?.x));
       const y = Math.trunc(Number(candidate?.y));
-      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+      if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= width || y >= height) continue;
       const row = byRow.get(y) || [...this.draft.elevation[y]];
       if (Number(row[x]) === level) continue;
       row[x] = String(level);
