@@ -12,7 +12,8 @@ export function readProjectedUnitShadowsEnabled(storage = undefined) {
 export function writeProjectedUnitShadowsEnabled(enabled, storage = undefined) {
   try {
     const target = storage === undefined ? globalThis.localStorage : storage;
-    target?.setItem(PROJECTED_UNIT_SHADOWS_STORAGE_KEY, enabled ? "1" : "0");
+    if (enabled) target?.removeItem(PROJECTED_UNIT_SHADOWS_STORAGE_KEY);
+    else target?.setItem(PROJECTED_UNIT_SHADOWS_STORAGE_KEY, "0");
   } catch {
     // Storage failures only make this preference session-local.
   }

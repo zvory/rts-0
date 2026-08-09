@@ -256,7 +256,8 @@ function hotkeyService() {
     writeProjectedUnitShadowsEnabled(false, storage);
     assert(!readProjectedUnitShadowsEnabled(storage), "detailed unit shadows persist explicit opt-out");
     writeProjectedUnitShadowsEnabled(true, storage);
-    assert(readProjectedUnitShadowsEnabled(storage), "re-enabling detailed unit shadows persists");
+    assert(readProjectedUnitShadowsEnabled(storage), "re-enabling detailed unit shadows clears the opt-out");
+    assert(values.size === 0, "default-valued settings leave no persisted overrides");
     const unavailableStorage = {
       getItem() { throw new Error("storage unavailable"); },
       setItem() { throw new Error("storage unavailable"); },
@@ -332,7 +333,7 @@ function hotkeyService() {
     assert(unitRangeToggled, "settings: unit range control calls injected toggle");
     const shadowToggle = findFakeById(root, "projected-unit-shadows-toggle");
     assert(shadowToggle, "settings: game tab renders detailed unit-shadow control with pinned id");
-    assert(shadowToggle.textContent === "Detailed Unit Shadows: off", "settings: detailed unit shadows default off");
+    assert(shadowToggle.textContent === "Detailed Unit Shadows: off", "settings: detailed unit shadows reflect disabled state");
     shadowToggle.listeners.click();
     assert(projectedUnitShadowsToggled, "settings: detailed unit-shadow control calls injected toggle");
     const healthBarToggle = findFakeById(root, "always-show-health-bars-toggle");
