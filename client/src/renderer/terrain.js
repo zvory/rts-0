@@ -480,7 +480,7 @@ export function buildStaticMap(map, {
   this._terrainContext = ctx;
   this._terrainTextureTileSize = textureTileSize;
   paintTerrainSurface(ctx, this._map, textureTileSize, { bakeLongShadows });
-  this.world.tint = hasElevationRelief(this._map) ? worldSunTint(this._map.sun) : 0xffffff;
+  this.world.tint = worldSunTint(this._map.sun);
 
   const layer = this.layers.terrain;
   if (reusable) {

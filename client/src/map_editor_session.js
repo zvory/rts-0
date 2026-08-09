@@ -51,6 +51,11 @@ export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
 export const MAP_EDITOR_SYMMETRY = MAP_AUTHORING_SYMMETRY;
 export const MAP_EDITOR_MAP_VERSION = CURRENT_AUTHORED_MAP_VERSION;
+export const MAP_EDITOR_DEFAULT_SUN = Object.freeze({
+  azimuthDegrees: 315,
+  elevationDegrees: 35,
+  warmth: 25,
+});
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -104,6 +109,7 @@ export class MapEditorSession {
     this.lastAction = "";
     this.savedFingerprint = "";
     this.terrainStroke = null;
+    this.elevationStroke = null;
     this.overlayStroke = null;
     this.doodadStroke = null;
   }
@@ -381,6 +387,60 @@ export class MapEditorSession {
     return true;
   }
 
+  beginElevationStroke(label = "Painted elevation") {
+    if (!this.draft || this.elevationStroke) return false;
+    this.elevationStroke = { label, before: clone(this.draft), dirty: new Map() };
+    return true;
+  }
+
+  paintElevationTiles(tiles, elevationLevel) {
+    if (!this.draft || !this.elevationStroke || !Array.isArray(tiles)) return [];
+    const level = Math.max(0, Math.min(9, Math.trunc(Number(elevationLevel)) || 0));
+    const width = this.draft.width;
+    const height = this.draft.height;
+    if (!this.draft.elevation.length && level === 0) return [];
+    if (!this.draft.elevation.length) this.draft.elevation = Array.from({ length: height }, () => "0".repeat(width));
+    const byRow = new Map();
+    const changed = [];
+    for (const candidate of tiles) {
+      const x = Math.trunc(Number(candidate?.x));
+      const y = Math.trunc(Number(candidate?.y));
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+      const row = byRow.get(y) || [...this.draft.elevation[y]];
+      if (Number(row[x]) === level) continue;
+      row[x] = String(level);
+      byRow.set(y, row);
+      const change = { x, y, level };
+      changed.push(change);
+      this.elevationStroke.dirty.set(`${x},${y}`, change);
+    }
+    for (const [y, row] of byRow) this.draft.elevation[y] = row.join("");
+    if (changed.length && !this.draft.sun) this.draft.sun = { ...MAP_EDITOR_DEFAULT_SUN };
+    return changed;
+  }
+
+  commitElevationStroke() {
+    const stroke = this.elevationStroke;
+    this.elevationStroke = null;
+    if (!stroke || stroke.dirty.size === 0) return false;
+    normalizeDraft(this.draft);
+    this.undoStack.push(stroke.before);
+    if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
+    this.redoStack = [];
+    this.lastAction = stroke.label;
+    this.notify("elevationStroke", { dirtyTiles: [...stroke.dirty.values()] });
+    return true;
+  }
+
+  cancelElevationStroke() {
+    const stroke = this.elevationStroke;
+    this.elevationStroke = null;
+    if (!stroke) return false;
+    this.draft = stroke.before;
+    this.notify("changed");
+    return true;
+  }
+
   beginOverlayStroke(label = "Painted map overlay") {
     if (!this.draft || this.overlayStroke) return false;
     this.overlayStroke = { label, before: clone(this.draft), dirty: new Map(), strippedForestDoodads: false };
@@ -553,8 +613,8 @@ export class MapEditorSession {
     if (!this.draft) throw new Error("Map is not initialized.");
     const draft = clone(this.draft);
     normalizeDraft(draft);
-    // Keep legacy flat authored maps byte-shape compatible: elevation and sunlight are optional
-    // authoring fields and should only appear once a map actually opts into relief rendering.
+    // Keep legacy flat authored maps byte-shape compatible. Elevation stays optional, while a sun
+    // record independently opts any map into directional lighting and atmosphere.
     if (!draft.elevation.length) delete draft.elevation;
     if (!draft.sun) delete draft.sun;
     return draft;
@@ -850,11 +910,7 @@ function normalizeDraft(draft) {
   const elevationValues = draft.elevation.flatMap((row) => [...row]);
   const hasRelief = elevationValues.length > 0
     && elevationValues.some((level) => level !== elevationValues[0]);
-  if (hasRelief !== !!draft.sun) {
-    throw new Error(hasRelief
-      ? "Maps with varying elevation must specify sun conditions."
-      : "Sun conditions require varying elevation.");
-  }
+  if (hasRelief && !draft.sun) throw new Error("Maps with varying elevation must specify sun conditions.");
   draft.sun = normalizeMapSun(draft.sun);
   const dimensions = { width, height };
   draft.width = width;

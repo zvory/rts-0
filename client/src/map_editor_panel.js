@@ -1,4 +1,5 @@
 import { TERRAIN } from "./protocol.js";
+import { createMapEditorElevationTool, selectMapEditorElevationOperation } from "./map_editor_elevation_controls.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
@@ -78,6 +79,7 @@ export class MapEditorPanel {
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
+    this.selectedElevation = 1;
     this.paintShape = "brush";
     this.selectedOverlayEffects = new Set(["concealment"]);
     this.overlayMode = "paint";
@@ -348,6 +350,8 @@ export class MapEditorPanel {
       this.setStatus(this.operationHelp(operation));
     } else if (this.terrainContent === "forest") {
       this.armForest(operation === "erase" ? "erase" : "paint");
+    } else if (this.terrainContent === "elevation") {
+      selectMapEditorElevationOperation(this, operation);
     } else {
       this.paintShape = operation === "box" ? "box" : "brush";
       this.armTerrain(operation === "erase" ? TERRAIN.GRASS : this.selectedTerrain);
@@ -622,13 +626,9 @@ export class MapEditorPanel {
       }
       palette.appendChild(control);
     }
-    section.append(
-      palette,
-      this.renderRoadTool(),
-    );
+    section.append(createMapEditorElevationTool(this), palette, this.renderRoadTool());
     return section;
   }
-
   renderRoadTool() {
     const controls = document.createElement("div");
     controls.className = "map-editor-road-tool";

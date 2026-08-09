@@ -68,6 +68,10 @@ export function activeMapEditorOperation(panel) {
   if (panel.activeCategory === "terrain") {
     if (tool?.kind === "road") return "path";
     if (tool?.kind === "forest") return tool.paint ? "brush" : "erase";
+    if (tool?.kind === "elevation") {
+      if (tool.level === 0 && panel.lastOperation.terrain === "erase") return "erase";
+      return tool.shape === "box" ? "box" : "brush";
+    }
     if (tool?.kind === "terrain") {
       if (tool.terrain === TERRAIN.GRASS && panel.lastOperation.terrain === "erase") return "erase";
       return tool.shape === "box" ? "box" : "brush";

@@ -43,9 +43,9 @@ fn authored_relief_requires_valid_sun_and_round_trips_it() {
         "elevationDegrees": 12,
         "warmth": 75
     });
-    let error = Map::from_authored_json(1, &authored.to_string(), 0)
-        .expect_err("flat elevation with sun must be rejected");
-    assert!(error.contains("require varying elevation"));
+    let map = Map::from_authored_json(1, &authored.to_string(), 0)
+        .expect("flat elevation may opt into authored sunlight");
+    assert_eq!(map.sun.expect("flat authored sun should survive").azimuth_degrees, 315);
 }
 
 #[test]

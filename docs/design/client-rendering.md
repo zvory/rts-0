@@ -268,7 +268,8 @@ update/present timings, `superseded`, bounded `failed`, and `destroyed`. The mes
 transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
 usable and unchanged.
 
-The immutable static-map DTO also carries optional authored sun conditions. When elevation varies,
+The immutable static-map DTO also carries optional authored sun conditions. Any authored sun applies
+the world warmth tint and directional projected unit shadows. When elevation varies,
 the terrain builder computes smooth height-field relief, while the detailed-shadow layer builds one
 map-space directional horizon cache in `setMap`. For each light ray it carries the maximum
 light-space height `z - tan(elevation) * dot(world, sunDirection)` from the sun-facing edge. This is
@@ -277,8 +278,9 @@ not a viewport-pixel ray march. The cache has four samples per tile regardless o
 camera, or map-world pixel size and never rebuilds during entity/camera frames. Linear sampling on
 the non-dominant axis follows the authored light ray with at most one cache texel (one quarter tile)
 of angular rasterization error; sub-texel blockers can soften rather than widening with distance.
-`warmth` applies a matching static world tint. Flat elevation grids bypass the height-field shadow
-path, preserving the pre-elevation render path for existing maps.
+`warmth` applies a matching static world tint. Flat maps without authored sunlight preserve the
+pre-elevation render path; flat maps that opt into sunlight skip terrain relief while retaining the
+authored atmosphere and unit-shadow direction.
 
 Default-enabled detailed unit shadows keep their existing presentation models, but static and dynamic work
 now share the exact authored azimuth and elevation; there is no unit-only 30-degree clamp. The

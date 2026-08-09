@@ -507,12 +507,14 @@ export class MapEditorViewport {
     }
     const tile = this.eventTile(event, { kind: this.tool.kind });
     if (!tile) return;
-    if (["terrain", "overlay", "forest", "road"].includes(this.tool.kind)) {
+    if (["terrain", "elevation", "overlay", "forest", "road"].includes(this.tool.kind)) {
       this.paintPointerId = event.pointerId;
       this.paintStartTile = tile;
       this.lastPaintTile = tile;
       const action = this.tool.shape === "box" ? "Filled" : "Painted";
-      if (this.tool.kind === "terrain" || this.tool.kind === "road") {
+      if (this.tool.kind === "elevation") {
+        this.session.beginElevationStroke(`${action} elevation level ${this.tool.level}`);
+      } else if (this.tool.kind === "terrain" || this.tool.kind === "road") {
         this.session.beginTerrainStroke(`${action} ${terrainLabel(this.tool.terrain)} terrain`);
       } else {
         this.session.beginOverlayStroke(this.tool.kind === "forest"
@@ -544,7 +546,7 @@ export class MapEditorViewport {
       }
       if (event.pointerId === this.doodadPointerId) return;
     }
-    if (event.pointerId !== this.paintPointerId || !["terrain", "overlay", "forest", "road"].includes(this.tool?.kind)) return;
+    if (event.pointerId !== this.paintPointerId || !["terrain", "elevation", "overlay", "forest", "road"].includes(this.tool?.kind)) return;
     const tile = this.eventTile(event);
     if (!tile || !this.lastPaintTile) return;
     if (this.tool.kind === "forest") this.paintForest(this.lastPaintTile, tile);
@@ -583,7 +585,7 @@ export class MapEditorViewport {
         if (tile) this.lastPaintTile = tile;
         if (this.tool?.kind === "road" && this.paintStartTile && this.lastPaintTile) {
           this.paintRoad(this.paintStartTile, this.lastPaintTile);
-        } else if (["terrain", "overlay"].includes(this.tool?.kind) && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
+        } else if (["terrain", "elevation", "overlay"].includes(this.tool?.kind) && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
           this.paintBox(this.paintStartTile, this.lastPaintTile);
         }
       }
@@ -591,7 +593,10 @@ export class MapEditorViewport {
       this.lastPaintTile = null;
       this.paintStartTile = null;
       let changed = false;
-      if (["overlay", "forest"].includes(this.tool?.kind)) {
+      if (this.tool?.kind === "elevation") {
+        if (cancelled) this.session.cancelElevationStroke();
+        else changed = this.session.commitElevationStroke();
+      } else if (["overlay", "forest"].includes(this.tool?.kind)) {
         if (cancelled) this.session.cancelOverlayStroke();
         else changed = this.session.commitOverlayStroke();
       } else if (cancelled) this.session.cancelTerrainStroke();
@@ -599,7 +604,7 @@ export class MapEditorViewport {
       this.drawOverlay();
       this.onStatus(
         cancelled
-          ? (["overlay", "forest"].includes(this.tool?.kind) ? "Overlay paint cancelled." : "Terrain paint cancelled.")
+          ? (["overlay", "forest"].includes(this.tool?.kind) ? "Overlay paint cancelled." : this.tool?.kind === "elevation" ? "Elevation paint cancelled." : "Terrain paint cancelled.")
           : changed ? "Map paint committed." : "No map tiles changed.",
         !cancelled && !changed,
       );
@@ -707,6 +712,11 @@ export class MapEditorViewport {
 
   paintTiles(tiles) {
     const dimensions = this.session.draft;
+    if (this.tool?.kind === "elevation") {
+      const symmetric = symmetricMapTiles(dimensions, tiles, this.tool.symmetry);
+      if (this.session.paintElevationTiles(symmetric, this.tool.level).length) this.rebuildTerrain();
+      return;
+    }
     if (this.tool?.kind === "forest") {
       const symmetric = symmetricMapTiles(dimensions, tiles, this.tool?.symmetry);
       if (this.session.paintForestTiles(symmetric, this.tool?.paint !== false).length) this.drawOverlay();

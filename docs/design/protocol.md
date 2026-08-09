@@ -533,7 +533,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // Server-authored presentation-only height levels, row-major and shape-matched to terrain.
     // Omitted on flat maps (implicit zero). Current movement, sight, and combat rules remain 2D.
     elevation?: number[],
-    // Present exactly when elevation varies. Azimuth is compass degrees in map space
+    // Required when elevation varies and optional on flat maps. Azimuth is compass degrees in map space
     // (0=north/-Y, 90=east); elevation is degrees above the horizon; warmth is 0-100.
     sun?: { azimuthDegrees: u16, elevationDegrees: u8, warmth: u8 },
     // All neutral resource nodes (static, never move). Sent so the client can
@@ -1470,8 +1470,8 @@ POST /api/map-handoffs/{handoffId}
 `AuthoredMapV10` declares independent `width` and `height` tile dimensions, whose product must
 exactly match the row-major terrain body. Its optional `elevation` digit rows must have the same
 shape. Varying elevation requires a `sun` record (`azimuthDegrees` 0–359,
-`elevationDegrees` 1–89, `warmth` 0–100), while flat maps must omit `sun`; these fields are
-presentation-only. The schema also has flat `startLocations`, `baseSites`, and required
+`elevationDegrees` 1–89, `warmth` 0–100); flat maps may also include one to opt into authored
+atmosphere and directional unit shadows. These fields are presentation-only. The schema also has flat `startLocations`, `baseSites`, and required
 `doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `noBuildingTiles`,
 `noEntrenchmentTiles`, `damageReductionTiles`, and `slowMovementTiles` arrays. A forest span is the compact encoding of the first-class composite
 Forest tile: `[y, xStart, xEnd]` with inclusive bounds. Spans may not overlap and each Forest tile
