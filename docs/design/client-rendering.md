@@ -260,7 +260,7 @@ Its payload lifetimes are explicit:
 - revisioned data: transferred visible/explored copies only when each revision changes;
 - frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
 - control: resize, capture/flush, presentation preferences, generation reset, and destroy. The
-  presentation-preference payload currently carries the opt-in detailed-unit-shadow boolean so
+  presentation-preference payload currently carries the configurable detailed-unit-shadow boolean so
   disabling it stops worker-side model projection instead of merely hiding the result.
 
 Responses are `ready` after all renderer assets are ready, `retained`, `presented` with frame id and worker
@@ -280,7 +280,7 @@ of angular rasterization error; sub-texel blockers can soften rather than wideni
 `warmth` applies a matching static world tint. Flat elevation grids bypass the height-field shadow
 path, preserving the pre-elevation render path for existing maps.
 
-Opt-in detailed unit shadows keep their existing presentation models, but static and dynamic work
+Default-enabled detailed unit shadows keep their existing presentation models, but static and dynamic work
 now share the exact authored azimuth and elevation; there is no unit-only 30-degree clamp. The
 worker uploads the boxes as one retained instanced mesh. Each dynamic vertex starts at bilinearly
 sampled terrain elevation and marches monotonically down the authored 3D light ray at the static

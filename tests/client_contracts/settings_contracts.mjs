@@ -252,17 +252,19 @@ function hotkeyService() {
     assert(readAlwaysShowHealthBarsEnabled(storage), "always-show health bars persists enabled state");
     writeAlwaysShowHealthBarsEnabled(false, storage);
     assert(!readAlwaysShowHealthBarsEnabled(storage), "always-show health bars clears its override when disabled");
-    assert(!readProjectedUnitShadowsEnabled(storage), "detailed unit shadows default off");
-    writeProjectedUnitShadowsEnabled(true, storage);
-    assert(readProjectedUnitShadowsEnabled(storage), "detailed unit shadows persist explicit opt-in");
+    assert(readProjectedUnitShadowsEnabled(storage), "detailed unit shadows default on");
     writeProjectedUnitShadowsEnabled(false, storage);
-    assert(!readProjectedUnitShadowsEnabled(storage), "disabling detailed unit shadows clears the opt-in");
+    assert(!readProjectedUnitShadowsEnabled(storage), "detailed unit shadows persist explicit opt-out");
+    writeProjectedUnitShadowsEnabled(true, storage);
+    assert(readProjectedUnitShadowsEnabled(storage), "re-enabling detailed unit shadows persists");
     const unavailableStorage = {
       getItem() { throw new Error("storage unavailable"); },
       setItem() { throw new Error("storage unavailable"); },
     };
     assert(!readAlwaysShowHealthBarsEnabled(unavailableStorage), "health-bar storage read failures use the safe default");
     writeAlwaysShowHealthBarsEnabled(true, unavailableStorage);
+    assert(readProjectedUnitShadowsEnabled(unavailableStorage), "shadow storage read failures use the enabled default");
+    writeProjectedUnitShadowsEnabled(false, unavailableStorage);
   }
 
   {

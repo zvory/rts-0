@@ -30,7 +30,7 @@ src/
   prediction_settings.js # localStorage-backed prediction toggle
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   health_bar_settings.js # localStorage-backed always-show HP-bar toggle (damaged-only by default)
-  unit_shadow_settings.js # localStorage-backed detailed-unit-shadow toggle (off by default)
+  unit_shadow_settings.js # localStorage-backed detailed-unit-shadow toggle (on by default)
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_runtime_reset.js # shared clearing of state derived from one authoritative timeline
