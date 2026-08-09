@@ -1,4 +1,4 @@
-import { assert, assertDeepEqual } from "./assertions.mjs";
+import { assert, assertDeepEqual, assertThrows } from "./assertions.mjs";
 import {
   RENDER_FRAME_BUDGET_MS,
   RENDER_FRAME_BUDGET_TARGETS,
@@ -112,6 +112,14 @@ export function runFrameProfilerContracts() {
     .find((workload) => workload.id === "fixed-roster-hellhole-stream");
   assert(terrainOnly.setup.castShadowsEnabled === true && terrainOnly.setup.projectedUnitShadowsEnabled === false,
     "terrain-only mode isolates the once-per-map cache from dynamic projected unit shadows");
+  assertThrows(
+    () => buildClientPerfWorkloads({ RTS_CLIENT_PERF_SHADOW_MODE: "typo" }),
+    "invalid shadow modes fail instead of silently measuring a different configuration",
+  );
+  assertThrows(
+    () => buildClientPerfWorkloads({ RTS_CLIENT_PERF_GPU_COMPLETE: "1" }),
+    "GPU-complete synchronization cannot silently contaminate an ordinary rAF measurement",
+  );
 
   {
     let clock = 0;

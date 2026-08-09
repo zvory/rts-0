@@ -5,9 +5,17 @@ export function buildClientPerfWorkloads(env = process.env) {
     ? path.resolve(env.RTS_CLIENT_PERF_INCIDENT_REPLAY)
     : null;
   const requestedShadowMode = String(env.RTS_CLIENT_PERF_SHADOW_MODE || "").toLowerCase();
-  const shadowMode = ["none", "terrain", "full"].includes(requestedShadowMode)
-    ? requestedShadowMode
-    : env.RTS_CLIENT_PERF_DETAILED_SHADOWS === "1" ? "full" : "terrain";
+  const validShadowModes = ["none", "terrain", "full"];
+  if (requestedShadowMode && !validShadowModes.includes(requestedShadowMode)) {
+    throw new Error(`RTS_CLIENT_PERF_SHADOW_MODE must be one of ${validShadowModes.join(", ")}.`);
+  }
+  const shadowMode = requestedShadowMode
+    || (env.RTS_CLIENT_PERF_DETAILED_SHADOWS === "1" ? "full" : "terrain");
+  const uncappedPresentationsEnabled = env.RTS_CLIENT_PERF_UNCAPPED === "1";
+  const gpuCompletePresentationsEnabled = env.RTS_CLIENT_PERF_GPU_COMPLETE === "1";
+  if (gpuCompletePresentationsEnabled && !uncappedPresentationsEnabled) {
+    throw new Error("RTS_CLIENT_PERF_GPU_COMPLETE requires RTS_CLIENT_PERF_UNCAPPED=1.");
+  }
 
   return Object.freeze([
     {
@@ -42,8 +50,8 @@ export function buildClientPerfWorkloads(env = process.env) {
         castShadowsEnabled: shadowMode !== "none",
         projectedUnitShadowsEnabled: shadowMode === "full",
         gpuShadowTimingEnabled: env.RTS_CLIENT_PERF_GPU_TIMING === "1",
-        uncappedPresentationsEnabled: env.RTS_CLIENT_PERF_UNCAPPED === "1",
-        gpuCompletePresentationsEnabled: env.RTS_CLIENT_PERF_GPU_COMPLETE === "1",
+        uncappedPresentationsEnabled,
+        gpuCompletePresentationsEnabled,
         waitForMinEntities: 382,
         resetPerfAfterSetup: true,
       },

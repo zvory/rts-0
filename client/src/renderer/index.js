@@ -101,7 +101,12 @@ import {
   _drawTreeOccludedUnitOutlines,
 } from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
-import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
+import {
+  buildStaticMap as buildStaticTerrainMap,
+  previewStaticTerrain,
+  shouldBakeLongTerrainShadows,
+  updateStaticTerrainTiles,
+} from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
@@ -180,6 +185,7 @@ export class Renderer {
     if (this._gpuCompletePresentations && typeof this.app.renderer.gl?.finish !== "function") {
       throw new Error("GPU-complete presentation benchmarking requires WebGL finish().");
     }
+    this._castShadowsEnabled = castShadowsEnabled !== false;
     PIXI.TextureStyle.defaultOptions.scaleMode = "nearest";
     // Keep interpolated entity positions fractional. Nearest scaling preserves
     // the low-res look without snapping smooth server-snapshot interpolation.
@@ -1361,7 +1367,10 @@ function destroyRendererOwnedTexture(texture) {
 
 function buildStaticMapWithDoodads(map) {
   buildStaticTerrainMap.call(this, map, {
-    bakeLongShadows: !this._projectedUnitShadows?.supported,
+    bakeLongShadows: shouldBakeLongTerrainShadows(
+      this._castShadowsEnabled,
+      this._projectedUnitShadows?.supported,
+    ),
   });
   this._projectedUnitShadows?.setMap(this._map);
   this._doodads?.replace(map?.doodads || []);
