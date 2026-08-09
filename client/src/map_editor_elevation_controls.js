@@ -13,7 +13,12 @@ export function createMapEditorElevationTool(panel) {
     number.value = String(level);
     selectMapEditorElevationLevel(panel, level);
   };
-  range.addEventListener("input", () => select(range.value));
+  range.addEventListener("input", () => { number.value = range.value; });
+  range.addEventListener("change", () => select(range.value));
+  number.addEventListener("input", () => {
+    const value = Number(number.value);
+    if (Number.isFinite(value)) range.value = String(boundedMapEditorElevationLevel(value));
+  });
   number.addEventListener("change", () => select(number.value));
   controls.append(range, number);
   label.append(title, controls);

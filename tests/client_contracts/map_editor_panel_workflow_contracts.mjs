@@ -15,6 +15,7 @@ import {
 } from "../../client/src/map_editor_session.js";
 
 const shellStyles = fs.readFileSync(new URL("../../client/map_editor_shell.css", import.meta.url), "utf8");
+const elevationSource = fs.readFileSync(new URL("../../client/src/map_editor_elevation_controls.js", import.meta.url), "utf8");
 const panelSource = fs.readFileSync(new URL("../../client/src/map_editor_panel.js", import.meta.url), "utf8");
 const workflowSource = fs.readFileSync(new URL("../../client/src/map_editor_panel_workflow.js", import.meta.url), "utf8");
 
@@ -25,6 +26,10 @@ assert.match(shellStyles, /\.map-editor-tools-window \.map-editor-panel-body\s*\
   "palette tabs and current-tool context stay pinned around the one scrolling content region");
 assert.match(shellStyles, /\.map-editor-tool-rail\s*\{[^}]*position:\s*absolute/s,
   "editing operations live in a separate map-space rail");
+assert.match(elevationSource, /range\.addEventListener\("input", \(\) => \{ number\.value = range\.value; \}\)/,
+  "dragging the elevation slider synchronizes its numeric field without replacing the active range input through a panel render");
+assert.match(elevationSource, /range\.addEventListener\("change", \(\) => select\(range\.value\)\)/,
+  "releasing the elevation slider applies the synchronized paint level");
 
 {
   const panel = {
