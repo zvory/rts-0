@@ -5,9 +5,13 @@ import {
   commitMapEditorSunField,
   disableMapEditorSun,
   enableMapEditorSun,
+  previewMapEditorSunDirectionField,
   previewMapEditorSunField,
 } from "../../client/src/map_editor_sun_controls.js";
-import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
+import {
+  mapEditorSunDirectionPreview,
+  MapEditorViewport,
+} from "../../client/src/map_editor_viewport.js";
 import { MapEditorWorkerRenderer } from "../../client/src/renderer/map_editor_worker_renderer.js";
 import { TERRAIN } from "../../client/src/protocol.js";
 import {
@@ -48,6 +52,21 @@ const previews = [];
 const previewViewport = { previewSunConditions: (sun) => { previews.push(sun); return true; } };
 assert.equal(previewMapEditorSunField(session, previewViewport, "elevationDegrees", 7), true);
 assert.deepEqual(previews, [{ azimuthDegrees: 315, elevationDegrees: 7, warmth: 70 }]);
+const directionPreviews = [];
+const directionViewport = {
+  previewSunDirection: (degrees) => directionPreviews.push(degrees),
+  previewSunConditions: (sun) => { previews.push(sun); return true; },
+};
+assert.equal(previewMapEditorSunDirectionField(session, directionViewport, 90), true);
+assert.deepEqual(directionPreviews, [90], "direction input publishes the temporary map guide");
+assert.equal(previews.at(-1).azimuthDegrees, 90, "the guide and live lighting use the same azimuth");
+assert.deepEqual(mapEditorSunDirectionPreview({ width: 100, height: 80 }, 0), {
+  fromX: 1600, fromY: 1280, toX: 1600, toY: 819.2,
+  azimuthDegrees: 0, label: "Sun source · 0° N",
+}, "zero degrees points from map centre toward north");
+const eastGuide = mapEditorSunDirectionPreview({ width: 100, height: 80 }, 90);
+assert.equal(eastGuide.toX, 2060.8);
+assert(Math.abs(eastGuide.toY - 1280) < 1e-9, "90 degrees points east without vertical drift");
 assert.equal(commitMapEditorSunField(session, "azimuthDegrees", 400), true);
 assert.equal(session.draft.sun.azimuthDegrees, 359,
   "committing a sun control records one bounded authored-map mutation");

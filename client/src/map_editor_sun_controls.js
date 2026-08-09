@@ -12,14 +12,21 @@ export function createMapEditorSunSettings(session, viewport) {
   }
   section.append(
     sunRangeField("Direction", sun.azimuthDegrees, 0, 359, "°", (value) => {
-      previewMapEditorSunField(session, viewport, "azimuthDegrees", value);
-    }, (value) => commitMapEditorSunField(session, "azimuthDegrees", value)),
+      previewMapEditorSunDirectionField(session, viewport, value);
+    }, (value) => {
+      commitMapEditorSunField(session, "azimuthDegrees", value);
+      viewport.clearSunDirectionPreview?.();
+    }, {
+      onBegin: () => viewport.previewSunDirection?.(sun.azimuthDegrees),
+      onEnd: () => viewport.clearSunDirectionPreview?.(),
+    }),
     sunRangeField("Height", sun.elevationDegrees, 1, 89, "°", (value) => {
       previewMapEditorSunField(session, viewport, "elevationDegrees", value);
     }, (value) => commitMapEditorSunField(session, "elevationDegrees", value)),
     sunRangeField("Color temperature", sun.warmth, 0, 100, "% warm", (value) => {
       previewMapEditorSunField(session, viewport, "warmth", value);
     }, (value) => commitMapEditorSunField(session, "warmth", value)),
+    readout("Direction uses compass degrees: 0° north, 90° east, 180° south, 270° west. Drag it to show the sun-source arrow on the map."),
     readout("Drag any control to preview lighting, shadow direction, and atmosphere live. Changes are saved in the map and can be undone."),
   );
   if (!hasElevationRelief(session.draft)) {
@@ -48,6 +55,12 @@ export function previewMapEditorSunField(session, viewport, fieldName, value) {
   return viewport.previewSunConditions({ ...sun, [fieldName]: boundedSunField(fieldName, value) });
 }
 
+export function previewMapEditorSunDirectionField(session, viewport, value) {
+  const direction = boundedSunField("azimuthDegrees", value);
+  viewport.previewSunDirection?.(direction);
+  return previewMapEditorSunField(session, viewport, "azimuthDegrees", direction);
+}
+
 export function commitMapEditorSunField(session, fieldName, value) {
   const sun = session.draft?.sun;
   if (!sun || !Object.prototype.hasOwnProperty.call(sun, fieldName)) return false;
@@ -55,7 +68,7 @@ export function commitMapEditorSunField(session, fieldName, value) {
   return session.mutate("Changed sun conditions", (draft) => { draft.sun[fieldName] = next; });
 }
 
-function sunRangeField(labelText, value, min, max, suffix, onInput, onChange) {
+function sunRangeField(labelText, value, min, max, suffix, onInput, onChange, { onBegin, onEnd } = {}) {
   const wrapper = document.createElement("div");
   wrapper.className = "map-editor-sun-control";
   const input = document.createElement("input");
@@ -75,6 +88,10 @@ function sunRangeField(labelText, value, min, max, suffix, onInput, onChange) {
     onInput(next);
   });
   input.addEventListener("change", () => onChange(input.value));
+  input.addEventListener("pointerdown", () => onBegin?.());
+  input.addEventListener("pointerup", () => onEnd?.());
+  input.addEventListener("pointercancel", () => onEnd?.());
+  input.addEventListener("blur", () => onEnd?.());
   wrapper.append(input, output);
   return field(labelText, wrapper);
 }

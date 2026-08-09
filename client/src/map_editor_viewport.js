@@ -82,6 +82,23 @@ export function mapEditorSymmetryGuideCentre(dimensions, symmetry) {
   return { x: width * TILE_SIZE / 2, y: height * TILE_SIZE / 2 };
 }
 
+export function mapEditorSunDirectionPreview(dimensions, azimuthDegrees) {
+  const { width, height } = mapDimensions(dimensions);
+  const degrees = Math.max(0, Math.min(359, Math.trunc(Number(azimuthDegrees)) || 0));
+  const radians = degrees * Math.PI / 180;
+  const centreX = width * TILE_SIZE / 2;
+  const centreY = height * TILE_SIZE / 2;
+  const length = Math.max(160, Math.min(640, Math.min(width, height) * TILE_SIZE * 0.18));
+  return {
+    fromX: centreX,
+    fromY: centreY,
+    toX: centreX + Math.sin(radians) * length,
+    toY: centreY - Math.cos(radians) * length,
+    azimuthDegrees: degrees,
+    label: `Sun source · ${degrees}° ${compassPoint(degrees)}`,
+  };
+}
+
 export class MapEditorViewport {
   static async create(options) {
     const presentation = await MapEditorPixiPresentationAdapter.create(options.root);
@@ -101,6 +118,7 @@ export class MapEditorViewport {
     this.tool = null;
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
     this.selectedBaseIndex = null;
+    this.sunDirectionPreviewDegrees = null;
     this.paintPointerId = null;
     this.doodadPointerId = null;
     this.doodadPointerMode = null;
@@ -324,6 +342,19 @@ export class MapEditorViewport {
     return true;
   }
 
+  previewSunDirection(azimuthDegrees) {
+    this.sunDirectionPreviewDegrees = Math.max(0, Math.min(359, Math.trunc(Number(azimuthDegrees)) || 0));
+    this.drawOverlay();
+    return true;
+  }
+
+  clearSunDirectionPreview() {
+    if (this.sunDirectionPreviewDegrees == null) return false;
+    this.sunDirectionPreviewDegrees = null;
+    this.drawOverlay();
+    return true;
+  }
+
   queueTerrainReplacement(materialized) {
     this.terrainRevision += 1;
     this.pendingTerrainUpdate = {
@@ -435,6 +466,9 @@ export class MapEditorViewport {
       forestTiles: structuredCloneSafe(this.session.forestTiles?.() || []),
       paintPreview: this.paintPreviewRecord(),
       doodadBrushPreview: this.doodadBrushPreviewRecord?.() || null,
+      sunDirectionPreview: this.sunDirectionPreviewDegrees == null
+        ? null
+        : mapEditorSunDirectionPreview(dimensions, this.sunDirectionPreviewDegrees),
     };
   }
 
@@ -980,6 +1014,10 @@ function mapDimensions(value) {
     width: Math.max(0, Math.trunc(Number(value?.width)) || 0),
     height: Math.max(0, Math.trunc(Number(value?.height)) || 0),
   };
+}
+
+function compassPoint(degrees) {
+  return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(degrees / 45) % 8];
 }
 
 function terrainLabel(code) {
