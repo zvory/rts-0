@@ -25,8 +25,11 @@ export function createMapEditorSunSettings(session, viewport) {
       commitMapEditorStalingradTime(session, value);
       viewport.clearSunDirectionPreview?.();
     }, {
-      onBegin: () => previewMapEditorStalingradTime(session, viewport, stalingradTime),
+      onBegin: () => viewport.previewSunDirection?.(
+        stalingradSunAtTime(stalingradTime).azimuthDegrees,
+      ),
       onEnd: () => viewport.clearSunDirectionPreview?.(),
+      onCancel: () => restoreMapEditorSunPreview(session, viewport),
     }),
     sunRangeField("Direction", sun.azimuthDegrees, 0, 359, "°", (value) => {
       previewMapEditorSunDirectionField(session, viewport, value);
@@ -101,7 +104,16 @@ export function commitMapEditorStalingradTime(session, value) {
   });
 }
 
-function stalingradTimeField(value, onInput, onChange, { onBegin, onEnd } = {}) {
+export function restoreMapEditorSunPreview(session, viewport) {
+  const sun = session.draft?.sun;
+  if (!sun) return false;
+  viewport.clearSunDirectionPreview?.();
+  return viewport.previewSunConditions({ ...sun });
+}
+
+function stalingradTimeField(value, onInput, onChange, {
+  onBegin, onEnd, onCancel,
+} = {}) {
   const wrapper = document.createElement("div");
   wrapper.className = "map-editor-sun-control";
   const input = document.createElement("input");
@@ -125,7 +137,7 @@ function stalingradTimeField(value, onInput, onChange, { onBegin, onEnd } = {}) 
   input.addEventListener("change", () => onChange(input.value));
   input.addEventListener("pointerdown", () => onBegin?.());
   input.addEventListener("pointerup", () => onEnd?.());
-  input.addEventListener("pointercancel", () => onEnd?.());
+  input.addEventListener("pointercancel", () => (onCancel || onEnd)?.());
   input.addEventListener("blur", () => onEnd?.());
   wrapper.append(input, output);
   return field("Time of day · Stalingrad steppe", wrapper);

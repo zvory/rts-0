@@ -9,6 +9,7 @@ import {
   previewMapEditorStalingradTime,
   previewMapEditorSunDirectionField,
   previewMapEditorSunField,
+  restoreMapEditorSunPreview,
 } from "../../client/src/map_editor_sun_controls.js";
 import {
   boundedStalingradTime,
@@ -100,6 +101,15 @@ const historicalViewport = {
 assert.equal(previewMapEditorStalingradTime(session, historicalViewport, 16), true);
 assert.deepEqual(historicalPreviews, [stalingradSunAtTime(16)]);
 assert.deepEqual(historicalDirections, [stalingradSunAtTime(16).azimuthDegrees]);
+const restoredHistoricalPreviews = [];
+const clearedHistoricalDirections = [];
+assert.equal(restoreMapEditorSunPreview(session, {
+  clearSunDirectionPreview: () => clearedHistoricalDirections.push(true),
+  previewSunConditions: (sun) => { restoredHistoricalPreviews.push(sun); return true; },
+}), true);
+assert.deepEqual(restoredHistoricalPreviews, [authored.sun],
+  "cancelling a historical-time preview restores the committed sun conditions");
+assert.deepEqual(clearedHistoricalDirections, [true]);
 assert.equal(commitMapEditorStalingradTime(session, 16), true);
 assert.deepEqual(session.draft.sun, stalingradSunAtTime(16),
   "one historical-time commit authors direction, height, and warmth atomically");
