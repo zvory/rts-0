@@ -1636,6 +1636,10 @@ The checked-in Hellhole client-performance stream follows the normal path: it is
 fog-filtered projection from the canonical `1+3` versus `2+4` scenario and carries the full
 server-authored visibility grid. It must not be converted to a full-world spectator projection,
 which would benchmark local fallback ray casting instead of ordinary player presentation.
+The opt-in uncapped harness temporarily replaces only the rAF scheduler with a bounded,
+completion-paced driver of the same live frame function. Snapshot delivery, state timing, fog,
+presentation assembly, worker rendering, HUD, and minimap remain live; fixed-capture shortcuts and
+unbounded worker flooding are not benchmark paths.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
 `command_budget.js`: 24 base command supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the

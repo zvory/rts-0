@@ -51,6 +51,24 @@ The host `requestAnimationFrame` callback rate is labeled separately and must ne
 rendered or presented throughput. The server's indexed average-throughput headline is derived from
 worker `completed`, not host frame count. Submitted frames that the one-in-flight worker queue
 supersedes remain visible in the artifact rather than inflating throughput.
+
+The local harness has an opt-in uncapped capacity lane (`RTS_CLIENT_PERF_UNCAPPED=1`) for the
+canonical stream. It pauses only Match's rAF ownership, keeps the snapshot stream at its authored
+30 Hz wall cadence, and drives the exact live frame path with a completion-paced two-frame pipeline.
+Every iteration still performs input, camera, entity-view preparation, fog, immutable presentation
+assembly and cloning, worker update/present, HUD, minimap, health, and observer work. The lane must
+finish with submitted = dispatched = completed, zero superseded/failed/stale responses, and no
+in-flight or pending frame. Its `match.liveFrame.workerAcknowledged` headline is independent of
+display refresh but remains a pipelined WebGL capacity measurement. Set
+`RTS_CLIENT_PERF_GPU_COMPLETE=1` to add `gl.finish()` before each worker acknowledgment; this emits
+the separately labeled conservative `match.liveFrame.gpuComplete` floor and must not be presented
+as ordinary gameplay FPS because it deliberately removes normal CPU/GPU overlap.
+
+For exact shadow-cost comparisons, `RTS_CLIENT_PERF_SHADOW_MODE=none|terrain|full` selects no cast
+shadows, the once-per-map terrain cache only, or cached terrain plus dynamic projected unit shadows.
+All three modes retain the same current ridge map, authored sun, elevation relief, entity stream,
+viewport, and presentation cadence. Historical pre-shadow fixtures were flat and are not a causal
+comparison for the current shadow workload.
 If reset occurs while a worker frame is already in flight, that job retains its prior-window epoch.
 Diagnostics expose it as `carriedInFlight` and, after settlement, `carriedCompleted`; it is excluded
 from new-window completion counts and timings. Thus every measurement window preserves

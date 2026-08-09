@@ -4,6 +4,10 @@ export function buildClientPerfWorkloads(env = process.env) {
   const incidentReplaySource = env.RTS_CLIENT_PERF_INCIDENT_REPLAY
     ? path.resolve(env.RTS_CLIENT_PERF_INCIDENT_REPLAY)
     : null;
+  const requestedShadowMode = String(env.RTS_CLIENT_PERF_SHADOW_MODE || "").toLowerCase();
+  const shadowMode = ["none", "terrain", "full"].includes(requestedShadowMode)
+    ? requestedShadowMode
+    : env.RTS_CLIENT_PERF_DETAILED_SHADOWS === "1" ? "full" : "terrain";
 
   return Object.freeze([
     {
@@ -34,8 +38,12 @@ export function buildClientPerfWorkloads(env = process.env) {
         snapshotStreamSpectator: false,
         snapshotStreamTeamIds: Object.freeze([1, 2, 1, 2]),
         snapshotStreamVisibilityTileCount: 126 * 126,
-        projectedUnitShadowsEnabled: env.RTS_CLIENT_PERF_DETAILED_SHADOWS === "1",
+        shadowMode,
+        castShadowsEnabled: shadowMode !== "none",
+        projectedUnitShadowsEnabled: shadowMode === "full",
         gpuShadowTimingEnabled: env.RTS_CLIENT_PERF_GPU_TIMING === "1",
+        uncappedPresentationsEnabled: env.RTS_CLIENT_PERF_UNCAPPED === "1",
+        gpuCompletePresentationsEnabled: env.RTS_CLIENT_PERF_GPU_COMPLETE === "1",
         waitForMinEntities: 382,
         resetPerfAfterSetup: true,
       },

@@ -98,6 +98,20 @@ export function runFrameProfilerContracts() {
     .find((workload) => workload.id === "fixed-roster-hellhole-stream");
   assert(gpuTimed.setup.gpuShadowTimingEnabled === true,
     "GPU shadow timing opt-in reaches the canonical Hellhole workload before renderer startup");
+  const uncapped = buildClientPerfWorkloads({
+    RTS_CLIENT_PERF_UNCAPPED: "1",
+    RTS_CLIENT_PERF_GPU_COMPLETE: "1",
+    RTS_CLIENT_PERF_SHADOW_MODE: "none",
+  }).find((workload) => workload.id === "fixed-roster-hellhole-stream");
+  assert(uncapped.setup.uncappedPresentationsEnabled === true
+      && uncapped.setup.gpuCompletePresentationsEnabled === true
+      && uncapped.setup.castShadowsEnabled === false
+      && uncapped.setup.projectedUnitShadowsEnabled === false,
+    "uncapped GPU-complete no-shadow controls reach the canonical Hellhole workload before renderer startup");
+  const terrainOnly = buildClientPerfWorkloads({ RTS_CLIENT_PERF_SHADOW_MODE: "terrain" })
+    .find((workload) => workload.id === "fixed-roster-hellhole-stream");
+  assert(terrainOnly.setup.castShadowsEnabled === true && terrainOnly.setup.projectedUnitShadowsEnabled === false,
+    "terrain-only mode isolates the once-per-map cache from dynamic projected unit shadows");
 
   {
     let clock = 0;

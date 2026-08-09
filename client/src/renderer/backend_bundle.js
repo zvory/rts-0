@@ -12,6 +12,8 @@ export function createPixiBackendBundle() {
     async createRenderer(canvasParent, sources) {
       return PixiWorkerPresentationAdapter.create(canvasParent, sources, {
         gpuShadowTiming: globalThis.__rtsGpuShadowTiming === true,
+        gpuCompletePresentations: globalThis.__rtsGpuCompletePresentations === true,
+        castShadowsEnabled: globalThis.__rtsCastShadowsEnabled !== false,
       });
     },
   });

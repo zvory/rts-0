@@ -223,6 +223,10 @@ a hidden enemy.
 
 `frame_recovery.js` samples one projection and visual time, updates fog, builds feedback, reconciles
 one monotonic ground-decal revision, assembles one frame, and calls `renderer.render(frame)`.
+The local uncapped performance controller may temporarily cancel Match's rAF and call that same live
+path directly; it does not use fixed capture, skip recurring systems, or retain stale presentation
+state. Its completion-paced producer is bounded to the worker host's one active plus one pending
+frame and restores exactly one rAF callback after draining.
 `PresentationCoordinator` owns the pending metadata for every accepted generation/frame id and is
 the only consumer of renderer lifecycle outcomes. A submission exposes an independent `retained`
 promise plus one terminal `presented`, `superseded`, `failed`, or `destroyed` promise. `retained`

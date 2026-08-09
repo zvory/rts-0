@@ -1209,6 +1209,7 @@ export class Match {
   /** Pause the loop (used while the game-over overlay is up). Idempotent. */
   stop() {
     this.captureRafWasRunning = false;
+    this.uncappedPerfBenchmark = null;
     this.running = false;
     this.closeMenus();
     if (this.rafId !== undefined) {
