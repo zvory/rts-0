@@ -35,6 +35,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "stress_test_profile.js": "app-shell",
   "frame_recovery.js": "app-shell",
   "match_fixed_capture.js": "app-shell",
+  "match_perf_benchmark.js": "app-shell",
   "visual_clock.js": "app-shell",
   "frame_entity_views.js": "app-shell",
   "ai_diagnostics_panel.js": "app-shell",

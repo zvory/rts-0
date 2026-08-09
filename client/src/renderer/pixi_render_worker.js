@@ -140,6 +140,8 @@ async function initialize(message) {
     autoDensity: true,
     renderClock: { now: () => visualTimeMs },
     gpuShadowTiming: message.payload.configuration?.gpuShadowTiming === true,
+    gpuCompletePresentations: message.payload.configuration?.gpuCompletePresentations === true,
+    castShadowsEnabled: message.payload.configuration?.castShadowsEnabled !== false,
   });
   if (renderer.app?.renderer?.type !== pixi.RendererType.WEBGL) {
     throw new Error("Pixi worker initialized a non-WebGL backend.");

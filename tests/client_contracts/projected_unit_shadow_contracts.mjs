@@ -14,6 +14,14 @@ import {
   unitMaskBounds,
   UnifiedGpuShadowLayer,
 } from "../../client/src/renderer/unified_gpu_shadows.js";
+import { shouldBakeLongTerrainShadows } from "../../client/src/renderer/terrain.js";
+
+assert.equal(shouldBakeLongTerrainShadows(false, false), false,
+  "no-shadow mode does not re-enable legacy baked terrain shadows when the unified layer is absent");
+assert.equal(shouldBakeLongTerrainShadows(true, false), true,
+  "legacy terrain shadows remain the fallback when cast shadows are enabled without unified GPU support");
+assert.equal(shouldBakeLongTerrainShadows(true, true), false,
+  "the unified terrain pass suppresses duplicate legacy baked shadows");
 
 assert.equal(STATIC_SHADOW_SAMPLES_PER_TILE, 4, "static visibility is map-relative, not viewport-relative");
 assert.equal(MAX_RECEIVER_MARCH_STEPS, 1536, "the fixed shader loop covers a maximum 256-tile map diagonal");

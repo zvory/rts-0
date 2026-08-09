@@ -101,7 +101,12 @@ import {
   _drawTreeOccludedUnitOutlines,
 } from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
-import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
+import {
+  buildStaticMap as buildStaticTerrainMap,
+  previewStaticTerrain,
+  shouldBakeLongTerrainShadows,
+  updateStaticTerrainTiles,
+} from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
@@ -160,7 +165,13 @@ export class Renderer {
   /**
    * @param {HTMLElement} canvasParent element the Pixi canvas is appended to
    */
-  constructor(canvasParent, { renderClock = null, app = null, gpuShadowTiming = false } = {}) {
+  constructor(canvasParent, {
+    renderClock = null,
+    app = null,
+    gpuShadowTiming = false,
+    gpuCompletePresentations = false,
+    castShadowsEnabled = true,
+  } = {}) {
     this._parent = canvasParent;
     this._renderClock = renderClock;
 
@@ -170,6 +181,11 @@ export class Renderer {
     this._gpuShadowTimer = gpuShadowTiming === true
       ? new AsyncGpuTimerQueries(this.app.renderer.gl, { maxPending: 8, maxSamples: 128 })
       : null;
+    this._gpuCompletePresentations = gpuCompletePresentations === true;
+    if (this._gpuCompletePresentations && typeof this.app.renderer.gl?.finish !== "function") {
+      throw new Error("GPU-complete presentation benchmarking requires WebGL finish().");
+    }
+    this._castShadowsEnabled = castShadowsEnabled !== false;
     PIXI.TextureStyle.defaultOptions.scaleMode = "nearest";
     // Keep interpolated entity positions fractional. Nearest scaling preserves
     // the low-res look without snapping smooth server-snapshot interpolation.
@@ -211,7 +227,7 @@ export class Renderer {
       pixi: PIXI,
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
     });
-    this._projectedUnitShadows = new UnifiedGpuShadowLayer({
+    this._projectedUnitShadows = castShadowsEnabled === false ? null : new UnifiedGpuShadowLayer({
       pixi: PIXI,
       renderer: this.app.renderer,
       layer: this.layers.decals,
@@ -395,6 +411,10 @@ export class Renderer {
       this._gpuShadowTimer.poll();
     } else {
       this.app.render();
+    }
+    if (this._gpuCompletePresentations) {
+      this.app.renderer.gl.finish();
+      this._gpuShadowTimer?.poll?.();
     }
     this._renderFrameCount += 1;
     if (this._renderAttemptHadError) this._lastRenderErrorFrame = this._renderFrameCount;
@@ -1347,7 +1367,10 @@ function destroyRendererOwnedTexture(texture) {
 
 function buildStaticMapWithDoodads(map) {
   buildStaticTerrainMap.call(this, map, {
-    bakeLongShadows: !this._projectedUnitShadows?.supported,
+    bakeLongShadows: shouldBakeLongTerrainShadows(
+      this._castShadowsEnabled,
+      this._projectedUnitShadows?.supported,
+    ),
   });
   this._projectedUnitShadows?.setMap(this._map);
   this._doodads?.replace(map?.doodads || []);

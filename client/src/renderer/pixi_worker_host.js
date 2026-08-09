@@ -58,10 +58,17 @@ export class PixiWorkerPresentationAdapter {
     }
   }
 
-  constructor(canvasParent, canvas, worker, sources, { surface = "match", gpuShadowTiming = false } = {}) {
+  constructor(canvasParent, canvas, worker, sources, {
+    surface = "match",
+    gpuShadowTiming = false,
+    gpuCompletePresentations = false,
+    castShadowsEnabled = true,
+  } = {}) {
     this.id = "pixi";
     this.surface = surface === "mapEditor" ? "mapEditor" : "match";
     this._gpuShadowTimingEnabled = gpuShadowTiming === true && this.surface === "match";
+    this._gpuCompletePresentations = gpuCompletePresentations === true && this.surface === "match";
+    this._castShadowsEnabled = castShadowsEnabled !== false;
     this._parent = canvasParent;
     this._canvas = canvas;
     this._worker = worker;
@@ -326,6 +333,8 @@ export class PixiWorkerPresentationAdapter {
         configuration: {
           surface: this.surface,
           gpuShadowTiming: this._gpuShadowTimingEnabled,
+          gpuCompletePresentations: this._gpuCompletePresentations,
+          castShadowsEnabled: this._castShadowsEnabled,
         },
       }));
     });

@@ -502,6 +502,10 @@ export function buildStaticMap(map, {
   }
 }
 
+export function shouldBakeLongTerrainShadows(castShadowsEnabled, unifiedShadowSupported) {
+  return castShadowsEnabled === true && unifiedShadowSupported !== true;
+}
+
 /** Replace only the cached terrain pixels for a browser-local map-editor preview. */
 export function previewStaticTerrain(map) {
   return buildStaticMap.call(this, map, { preserveMapLayers: true });

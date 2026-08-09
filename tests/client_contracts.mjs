@@ -74,6 +74,7 @@ await import("./client_contracts/net_contracts.mjs");
 await import("./client_contracts/snapshot_stream_contracts.mjs");
 await import("./client_contracts/stress_test_contracts.mjs");
 await import("./client_contracts/gpu_timer_query_contracts.mjs");
+await import("./client_contracts/match_perf_benchmark_contracts.mjs");
 await import("./client_contracts/lab_scenario_authoring_contracts.mjs");
 await import("./client_contracts/lab_contracts.mjs");
 await import("./interact_driver_contracts.mjs");

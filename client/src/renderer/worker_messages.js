@@ -194,6 +194,14 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
         && typeof payload.configuration.gpuShadowTiming !== "boolean") {
         throw new TypeError("initialize gpuShadowTiming must be boolean");
       }
+      if (payload?.configuration?.gpuCompletePresentations != null
+        && typeof payload.configuration.gpuCompletePresentations !== "boolean") {
+        throw new TypeError("initialize gpuCompletePresentations must be boolean");
+      }
+      if (payload?.configuration?.castShadowsEnabled != null
+        && typeof payload.configuration.castShadowsEnabled !== "boolean") {
+        throw new TypeError("initialize castShadowsEnabled must be boolean");
+      }
       if (requireCanvas && !payload?.canvas) throw new TypeError("initialize requires a transferred canvas");
       break;
     case RENDER_WORKER_MESSAGE.MAP_GENERATION:

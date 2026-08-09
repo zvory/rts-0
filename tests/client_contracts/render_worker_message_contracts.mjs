@@ -65,12 +65,26 @@ assert(structuredClone(representative).layers.aboveFogReveal.length === 1,
   "representative presentation frame is structurally cloneable without losing visibility layers");
 
 const canvas = { transferMarker: true };
-const init = createInitializeMessage({ canvas, widthCssPx: 640, heightCssPx: 480, dpr: 2, configuration: { nearest: true, gpuShadowTiming: true } });
+const init = createInitializeMessage({
+  canvas,
+  widthCssPx: 640,
+  heightCssPx: 480,
+  dpr: 2,
+  configuration: {
+    nearest: true,
+    gpuShadowTiming: true,
+    gpuCompletePresentations: true,
+    castShadowsEnabled: false,
+  },
+});
 assert(init.message.version === RENDER_WORKER_MESSAGE_VERSION && init.message.type === RENDER_WORKER_MESSAGE.INITIALIZE,
   "initialization carries message and presentation versions");
 assert(init.transfer.length === 1 && init.transfer[0] === canvas,
   "initialization transfers the sole visible canvas instead of cloning or constructing a hidden renderer");
 validateRenderWorkerRequest(init, { requireCanvas: true });
+assert(init.message.payload.configuration.gpuCompletePresentations === true
+    && init.message.payload.configuration.castShadowsEnabled === false,
+  "uncapped GPU completion and exact no-cast-shadow controls cross the worker initialization boundary");
 
 const mapMessage = createMapGenerationMessage(assembler.staticMap);
 assert(mapMessage.transfer.length === 2 && mapMessage.message.payload.map.terrain.values !== assembler.staticMap.terrain.values,
