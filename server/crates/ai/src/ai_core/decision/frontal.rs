@@ -131,6 +131,7 @@ pub(super) fn issue_frontal_wave(
                 plan,
                 enemy_base,
                 containment,
+                profile.id == JEFFS_AI_ID,
                 memory,
             ) {
                 return Some(intent);
@@ -300,6 +301,7 @@ fn issue_expansion_containment_wave(
     plan: &FrontalWavePlan,
     enemy_base: EnemyBaseFact,
     policy: ExpansionContainmentPolicy,
+    tight_formation: bool,
     memory: &mut AiDecisionMemory,
 ) -> Option<AiIntent> {
     let natural_objective = enemy_natural_edge(observation, enemy_base)?;
@@ -349,17 +351,42 @@ fn issue_expansion_containment_wave(
             && !scouts.is_empty()
             && compact_group_near(observation, &cohort, regroup_point, regroup_radius);
         if !grouped_at_home {
-            actions::move_units(
-                actions,
-                tanks.iter().copied(),
-                regroup_point.0,
-                regroup_point.1,
-            );
+            if tight_formation {
+                let toward_enemy = normalized_direction(own_base, (enemy_base.x, enemy_base.y))?;
+                for (tank_id, point) in compact_tank_formation_assignments(
+                    observation,
+                    &tanks,
+                    regroup_point,
+                    toward_enemy,
+                    observation.map,
+                    1.5,
+                ) {
+                    actions::move_units(actions, [tank_id], point.0, point.1);
+                }
+            } else {
+                actions::move_units(
+                    actions,
+                    tanks.iter().copied(),
+                    regroup_point.0,
+                    regroup_point.1,
+                );
+            }
+            let scout_regroup = if tight_formation {
+                scout_trailing_point(
+                    regroup_point,
+                    own_base,
+                    (enemy_base.x, enemy_base.y),
+                    observation.map,
+                    policy.scout_trailing_tiles,
+                )?
+            } else {
+                regroup_point
+            };
             actions::move_units(
                 actions,
                 scouts.iter().copied(),
-                regroup_point.0,
-                regroup_point.1,
+                scout_regroup.0,
+                scout_regroup.1,
             );
             cohort.sort_unstable();
             cohort.dedup();
@@ -388,7 +415,7 @@ fn issue_expansion_containment_wave(
     } else {
         natural_objective
     };
-    let (tank_point, scout_point) = if endgame_search_active {
+    let (tank_point, legacy_scout_point) = if endgame_search_active {
         let scout_point = scout_forward_from_tanks(
             objective,
             own_base,
@@ -400,19 +427,39 @@ fn issue_expansion_containment_wave(
     } else {
         containment_points(own_base, objective, observation.map, policy)?
     };
-    // Multiple Tanks cannot occupy the same point. A two-tile arrival radius
-    // lets the formation settle and charge its stationary range instead of
-    // repeatedly translating because of collision separation.
-    let tolerance = tile_size * 2.0;
+    let toward_objective = normalized_direction(own_base, objective)?;
+    let tank_assignments = if tight_formation {
+        compact_tank_formation_assignments(
+            observation,
+            &tanks,
+            tank_point,
+            toward_objective,
+            observation.map,
+            1.5,
+        )
+    } else {
+        tanks.iter().map(|tank_id| (*tank_id, tank_point)).collect()
+    };
+    let tolerance = tile_size * if tight_formation { 1.0 } else { 2.0 };
     let tolerance2 = tolerance * tolerance;
-    let tanks_in_position = observation
+    let tanks_by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
         .iter()
         .filter(|unit| tanks.contains(&unit.id))
-        .all(|unit| dist2(unit.x, unit.y, tank_point.0, tank_point.1) <= tolerance2);
-    let tank_center = group_center(observation, &tanks)?;
+        .map(|unit| (unit.id, unit))
+        .collect();
+    let tanks_in_position = tank_assignments.iter().all(|(tank_id, point)| {
+        tanks_by_id
+            .get(tank_id)
+            .is_some_and(|tank| dist2(tank.x, tank.y, point.0, point.1) <= tolerance2)
+    });
+    let tank_anchor = if tight_formation {
+        frontmost_unit_position(observation, &tanks, toward_objective)?
+    } else {
+        group_center(observation, &tanks)?
+    };
     let trailing_point = scout_trailing_point(
-        tank_center,
+        tank_anchor,
         own_base,
         objective,
         observation.map,
@@ -469,10 +516,26 @@ fn issue_expansion_containment_wave(
     } else {
         // Attack-move handles interceptors without converting them into a chase
         // target, so the formation continues toward the containment anchor.
-        actions::attack_move_units(actions, tanks.iter().copied(), tank_point.0, tank_point.1);
+        if tight_formation {
+            for (tank_id, point) in &tank_assignments {
+                actions::attack_move_units(actions, [*tank_id], point.0, point.1);
+            }
+        } else {
+            actions::attack_move_units(actions, tanks.iter().copied(), tank_point.0, tank_point.1);
+        }
     }
     let scout_point = if stationary_range_ready && tanks_in_position {
-        scout_point
+        if tight_formation {
+            scout_forward_from_tanks(
+                tank_anchor,
+                own_base,
+                objective,
+                observation.map,
+                policy.scout_forward_tiles,
+            )?
+        } else {
+            legacy_scout_point
+        }
     } else {
         trailing_point
     };
@@ -657,6 +720,72 @@ fn scout_forward_from_tanks(
         ),
         map,
     ))
+}
+
+fn compact_tank_formation_assignments(
+    observation: &AiObservation,
+    tank_ids: &[u32],
+    center: (f32, f32),
+    toward_objective: (f32, f32),
+    map: AiMapSummary,
+    spacing_tiles: f32,
+) -> Vec<(u32, (f32, f32))> {
+    let mut tank_ids = tank_ids.to_vec();
+    let perpendicular = (-toward_objective.1, toward_objective.0);
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|unit| (unit.id, unit))
+        .collect();
+    tank_ids.sort_by(|left, right| {
+        let lateral_position = |id: &u32| {
+            by_id
+                .get(id)
+                .map(|unit| unit.x * perpendicular.0 + unit.y * perpendicular.1)
+                .unwrap_or(0.0)
+        };
+        lateral_position(left)
+            .total_cmp(&lateral_position(right))
+            .then_with(|| left.cmp(right))
+    });
+    let tile_size = map.tile_size as f32;
+    let middle = tank_ids.len().saturating_sub(1) as f32 / 2.0;
+    tank_ids
+        .into_iter()
+        .enumerate()
+        .map(|(index, tank_id)| {
+            let offset = (index as f32 - middle) * spacing_tiles * tile_size;
+            (
+                tank_id,
+                clamp_to_map(
+                    (
+                        center.0 + perpendicular.0 * offset,
+                        center.1 + perpendicular.1 * offset,
+                    ),
+                    map,
+                ),
+            )
+        })
+        .collect()
+}
+
+fn frontmost_unit_position(
+    observation: &AiObservation,
+    unit_ids: &[u32],
+    toward_objective: (f32, f32),
+) -> Option<(f32, f32)> {
+    observation
+        .owned
+        .iter()
+        .filter(|unit| unit_ids.contains(&unit.id))
+        .max_by(|left, right| {
+            let left_progress = left.x * toward_objective.0 + left.y * toward_objective.1;
+            let right_progress = right.x * toward_objective.0 + right.y * toward_objective.1;
+            left_progress
+                .total_cmp(&right_progress)
+                .then_with(|| left.id.cmp(&right.id))
+        })
+        .map(|unit| (unit.x, unit.y))
 }
 
 fn enemy_natural_edge(
@@ -917,9 +1046,9 @@ mod tests {
         assert_eq!(containment_repush_tank_count(policy, 1), 3);
         assert_eq!(containment_repush_tank_count(policy, 2), 4);
         assert_eq!(containment_repush_tank_count(policy, 3), 5);
-        assert_eq!(containment_regroup_radius_tiles(policy, 3), 5.0);
-        assert_eq!(containment_regroup_radius_tiles(policy, 4), 6.5);
-        assert_eq!(containment_regroup_radius_tiles(policy, 5), 8.0);
+        assert_eq!(containment_regroup_radius_tiles(policy, 3), 3.0);
+        assert_eq!(containment_regroup_radius_tiles(policy, 4), 4.5);
+        assert_eq!(containment_regroup_radius_tiles(policy, 5), 6.0);
     }
 
     #[test]

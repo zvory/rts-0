@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rts_rules::faction::UpgradeKind;
 use rts_rules::EntityKind;
+use rts_sim::game::entity::RallyKind;
 use rts_sim::game::upgrade;
 
 use super::AiFrame;
@@ -364,6 +365,33 @@ impl AiActions {
         Ok(producer)
     }
 
+    /// Set the route followed by units as soon as they leave a production building.
+    pub fn set_rally(
+        &mut self,
+        building: u32,
+        x: f32,
+        y: f32,
+        kind: RallyKind,
+        queued: bool,
+    ) -> Result<(), ActionError> {
+        if !self
+            .owned_kinds
+            .get(&building)
+            .is_some_and(|kind| kind.is_building())
+        {
+            return Err(ActionBlocker::NoKnownCandidate(ReservationNamespace::Producer).into());
+        }
+        self.preflight_capacity()?;
+        self.requests.push(AiActionRequest::SetRally {
+            building,
+            x,
+            y,
+            kind,
+            queued,
+        });
+        Ok(())
+    }
+
     /// Enable or disable one standing production allocation without spending its eventual cost.
     /// The simulation remains authoritative over producer compatibility, repeat state, resources,
     /// and queue insertion. Multiple kinds may be enabled on the same producer in one step.
@@ -698,6 +726,13 @@ pub(crate) enum AiActionRequest {
     Train {
         building: u32,
         unit: EntityKind,
+    },
+    SetRally {
+        building: u32,
+        x: f32,
+        y: f32,
+        kind: RallyKind,
+        queued: bool,
     },
     AdjustProductionRepeat {
         buildings: Vec<u32>,

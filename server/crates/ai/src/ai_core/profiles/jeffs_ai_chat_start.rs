@@ -8,7 +8,7 @@ use super::{
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 
-pub(crate) const JEFFS_AI_ID: &str = "jeffs_ai";
+pub(crate) const JEFFS_AI_CHAT_START_ID: &str = "jeffs_ai_chat_start";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -24,13 +24,13 @@ const OPTIONAL_UPGRADES: [UpgradeKind; 1] = [UpgradeKind::Methamphetamines];
 /// Server-authoritative port of the champion V3 policy developed in the standalone
 /// `Jeff's AI` workspace. The live controller still emits ordinary fog-constrained
 /// commands through the shared AI action layer.
-pub(crate) static JEFFS_AI: AiProfile = AiProfile {
-    id: JEFFS_AI_ID,
+pub(crate) static JEFFS_AI_CHAT_START: AiProfile = AiProfile {
+    id: JEFFS_AI_CHAT_START_ID,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: Some(40),
         extra_oil_workers: 10,
-        extra_builder_workers: 0,
+        extra_builder_workers: 1,
         train_workers_for_oil: false,
         reuse_idle_before_training: true,
     },
@@ -120,7 +120,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         minimum_tanks_to_continue: 2,
         recovery_tanks_to_continue: 3,
         additional_tanks_per_repush: 1,
-        repush_regroup_radius_tiles: 3.0,
+        repush_regroup_radius_tiles: 5.0,
     }),
     home_anti_tank: Some(HomeAntiTankPolicy {
         defensive_tanks: 1,
@@ -128,9 +128,9 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         // Keep the guns three tiles behind the six-tile home Tank line while
         // remaining forward of the production-building belt.
         anti_tank_position_tiles: 3.0,
-        // Keep the valuable MGs behind the Rifle screen, but one tile ahead
-        // of the home Tank so all three layers acquire the same raid.
-        machine_gunner_screen_tiles: 1.0,
+        // Screen 7.5 tiles ahead of the defensive Tanks: deep enough to meet
+        // infantry first without detaching the Machine Gunners from support.
+        machine_gunner_screen_tiles: 7.5,
         lateral_spacing_tiles: 4.5,
     }),
     tech_transition: Some(TechTransitionPolicy {
@@ -153,7 +153,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         },
     }),
     fast_tank_timing: Some(FastTankTimingPolicy {
-        workers_before_barracks: 1,
+        workers_before_barracks: 2,
         pump_jacks_before_barracks: 2,
         tanks_before_scout_car: 2,
         scout_car_target: 1,
@@ -169,50 +169,68 @@ mod tests {
 
     #[test]
     fn server_profile_preserves_the_local_v3_champion_targets() {
-        let transition = JEFFS_AI.tech_transition.expect("armored transition");
-        assert_eq!(JEFFS_AI.workers.steel_worker_cap, Some(40));
-        assert_eq!(JEFFS_AI.workers.extra_oil_workers, 10);
-        assert_eq!(JEFFS_AI.workers.extra_builder_workers, 0);
-        assert!(!JEFFS_AI.workers.train_workers_for_oil);
-        assert!(JEFFS_AI.workers.reuse_idle_before_training);
-        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 2);
+        let transition = JEFFS_AI_CHAT_START
+            .tech_transition
+            .expect("armored transition");
+        assert_eq!(JEFFS_AI_CHAT_START.workers.steel_worker_cap, Some(40));
+        assert_eq!(JEFFS_AI_CHAT_START.workers.extra_oil_workers, 10);
+        assert_eq!(JEFFS_AI_CHAT_START.workers.extra_builder_workers, 1);
+        assert!(!JEFFS_AI_CHAT_START.workers.train_workers_for_oil);
+        assert!(JEFFS_AI_CHAT_START.workers.reuse_idle_before_training);
         assert_eq!(
-            JEFFS_AI
+            JEFFS_AI_CHAT_START
                 .defensive_machine_gunners
                 .unwrap()
-                .lateral_spacing_tiles,
-            4.5
+                .target_count,
+            2
         );
         assert_eq!(transition.production.unit_priorities, &ARMORED_UNITS);
-        assert_eq!(JEFFS_AI.production.queue_depth, 1);
+        assert_eq!(JEFFS_AI_CHAT_START.production.queue_depth, 1);
         assert_eq!(transition.production.queue_depth, 1);
         assert_eq!(transition.attack.first_attack_size, 3);
         assert_eq!(transition.attack.required_unit, Some(EntityKind::ScoutCar));
         assert_eq!(transition.attack.regroup_reset_ticks, 120);
-        assert_eq!(JEFFS_AI.frontal_wave.exclude_launched_ticks, Some(120));
-        assert_eq!(JEFFS_AI.expansion.unwrap().defensive_unit_count, 1);
-        let containment = JEFFS_AI.expansion_containment.unwrap();
+        assert_eq!(
+            JEFFS_AI_CHAT_START.frontal_wave.exclude_launched_ticks,
+            Some(120)
+        );
+        assert_eq!(
+            JEFFS_AI_CHAT_START.expansion.unwrap().defensive_unit_count,
+            1
+        );
+        let containment = JEFFS_AI_CHAT_START.expansion_containment.unwrap();
         assert_eq!(containment.minimum_tanks_to_continue, 2);
         assert_eq!(containment.recovery_tanks_to_continue, 3);
         assert_eq!(containment.additional_tanks_per_repush, 1);
-        assert_eq!(containment.repush_regroup_radius_tiles, 3.0);
+        assert_eq!(containment.repush_regroup_radius_tiles, 5.0);
         assert_eq!(containment.contact_stop_tiles, 18.0);
-        let home_anti_tank = JEFFS_AI.home_anti_tank.unwrap();
+        let home_anti_tank = JEFFS_AI_CHAT_START.home_anti_tank.unwrap();
         assert_eq!(home_anti_tank.defensive_tanks, 1);
         assert_eq!(home_anti_tank.target_guns, 2);
         assert_eq!(home_anti_tank.anti_tank_position_tiles, 3.0);
-        assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 1.0);
+        assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 7.5);
         assert_eq!(
             transition.resource_float,
             ResourceFloatThreshold { steel: 0, oil: 0 }
         );
-        let timing = JEFFS_AI.fast_tank_timing.expect("fast tank timing");
-        assert_eq!(timing.workers_before_barracks, 1);
+        let timing = JEFFS_AI_CHAT_START
+            .fast_tank_timing
+            .expect("fast tank timing");
+        assert_eq!(timing.workers_before_barracks, 2);
         assert_eq!(timing.pump_jacks_before_barracks, 2);
         assert_eq!(timing.tanks_before_scout_car, 2);
         assert_eq!(timing.scout_car_target, 1);
         assert_eq!(timing.optional_upgrades, &OPTIONAL_UPGRADES);
-        assert_eq!(JEFFS_AI.surplus_steel_production.unwrap().reserve, 600);
-        assert_eq!(JEFFS_AI.extra_factories.unwrap().minimum_units, 3);
+        assert_eq!(
+            JEFFS_AI_CHAT_START
+                .surplus_steel_production
+                .unwrap()
+                .reserve,
+            600
+        );
+        assert_eq!(
+            JEFFS_AI_CHAT_START.extra_factories.unwrap().minimum_units,
+            3
+        );
     }
 }

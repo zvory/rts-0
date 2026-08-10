@@ -1,3 +1,4 @@
+use super::geometry::{clamp_to_map, normalized_direction};
 use super::*;
 
 pub(super) const PRODUCTION_BUILDINGS: [EntityKind; 4] = [
@@ -88,6 +89,119 @@ where
             placeable: |tx, ty| placeable(kind, tx, ty),
         },
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn relocate_machine_gunners_blocking_factory<F>(
+    observation: &AiObservation,
+    actions: &mut AiActionContext<'_>,
+    profile: &AiProfile,
+    build_search: ai_shared::BuildSearch,
+    machine_gunners: &[u32],
+    enemy_base: EnemyBaseFact,
+    placeable: &mut F,
+) -> Option<Vec<u32>>
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    if machine_gunners.is_empty() || !actions.budget().can_afford_building(EntityKind::Factory) {
+        return None;
+    }
+    let stats = config::building_stats(EntityKind::Factory)?;
+    let search = build_search_for_kind(build_search, profile, EntityKind::Factory);
+    let empty = BTreeSet::new();
+    let units_by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|entity| machine_gunners.contains(&entity.id))
+        .map(|entity| (entity.id, entity))
+        .collect();
+    let blocked_site = ai_shared::find_build_spot_near_start_with(
+        observation.map.width,
+        observation.map.height,
+        observation.own_start_tile,
+        EntityKind::Factory,
+        search,
+        &empty,
+        |tile_x, tile_y| {
+            if placeable(EntityKind::Factory, tile_x, tile_y) {
+                return false;
+            }
+            units_by_id.values().any(|unit| {
+                let unit_tile = (
+                    (unit.x / observation.map.tile_size as f32).floor() as u32,
+                    (unit.y / observation.map.tile_size as f32).floor() as u32,
+                );
+                unit_tile.0 >= tile_x
+                    && unit_tile.0 < tile_x.saturating_add(stats.foot_w)
+                    && unit_tile.1 >= tile_y
+                    && unit_tile.1 < tile_y.saturating_add(stats.foot_h)
+            })
+        },
+    )?;
+    let blockers: Vec<u32> = units_by_id
+        .values()
+        .filter_map(|unit| {
+            let unit_tile = (
+                (unit.x / observation.map.tile_size as f32).floor() as u32,
+                (unit.y / observation.map.tile_size as f32).floor() as u32,
+            );
+            (unit_tile.0 >= blocked_site.0
+                && unit_tile.0 < blocked_site.0.saturating_add(stats.foot_w)
+                && unit_tile.1 >= blocked_site.1
+                && unit_tile.1 < blocked_site.1.saturating_add(stats.foot_h))
+            .then_some(unit.id)
+        })
+        .collect();
+    relocate_machine_gunners_from_factory_site(
+        observation,
+        actions,
+        blocked_site,
+        &blockers,
+        enemy_base,
+    )
+}
+
+pub(super) fn relocate_machine_gunners_from_factory_site(
+    observation: &AiObservation,
+    actions: &mut AiActionContext<'_>,
+    site: (u32, u32),
+    machine_gunners: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<u32>> {
+    let stats = config::building_stats(EntityKind::Factory)?;
+    let tile_size = observation.map.tile_size as f32;
+    let clearance = tile_size;
+    let left = site.0 as f32 * tile_size - clearance;
+    let top = site.1 as f32 * tile_size - clearance;
+    let right = site.0.saturating_add(stats.foot_w) as f32 * tile_size + clearance;
+    let bottom = site.1.saturating_add(stats.foot_h) as f32 * tile_size + clearance;
+    let machine_gunners: BTreeSet<u32> = machine_gunners.iter().copied().collect();
+    let mut moved = Vec::new();
+    for unit in observation.owned.iter().filter(|unit| {
+        machine_gunners.contains(&unit.id)
+            && unit.kind == EntityKind::MachineGunner
+            && unit.x >= left
+            && unit.x <= right
+            && unit.y >= top
+            && unit.y <= bottom
+    }) {
+        let Some(direction) = normalized_direction((unit.x, unit.y), (enemy_base.x, enemy_base.y))
+        else {
+            continue;
+        };
+        let destination = clamp_to_map(
+            (
+                unit.x + direction.0 * 4.0 * tile_size,
+                unit.y + direction.1 * 4.0 * tile_size,
+            ),
+            observation.map,
+        );
+        if let Some(units) = actions::move_units(actions, [unit.id], destination.0, destination.1) {
+            moved.extend(units);
+        }
+    }
+    (!moved.is_empty()).then_some(moved)
 }
 
 pub(super) fn build_search_for_kind(

@@ -200,7 +200,7 @@ fn economy_manager_can_hold_oil_at_current_assignment() {
 }
 
 #[test]
-fn jeff_trains_exactly_one_additional_engineer() {
+fn jeff_keeps_the_starting_engineer_without_training_an_extra() {
     let mut owned = vec![building_at(
         1,
         EntityKind::ResourceDepot,
@@ -209,7 +209,7 @@ fn jeff_trains_exactly_one_additional_engineer() {
         8.0 * config::TILE_SIZE as f32,
     )];
     owned.push(worker(2, AiEntityState::Idle));
-    let mut observation = observation(
+    let observation = observation(
         AiEconomy {
             steel: 500,
             oil: 500,
@@ -237,20 +237,6 @@ fn jeff_trains_exactly_one_additional_engineer() {
         },
     });
 
-    assert_eq!(output.plan.target_workers, 2);
-    assert!(output.proposes(EconomyProposal::TrainWorker));
-
-    observation.owned[1].state = AiEntityState::Gather;
-    let facts = AiFacts::from_observation(&observation);
-    let output = propose_economy(EconomyManagerInput {
-        observation: &observation,
-        facts: &facts,
-        profile: &JEFFS_AI,
-        expansion_plan: &expansion_plan,
-        signals: EconomyManagerSignals {
-            oil_demand: OilDemandSignal::ExactWorkers(10),
-            defer_worker_training_for_tech: false,
-        },
-    });
-    assert!(output.proposes(EconomyProposal::TrainWorker));
+    assert_eq!(output.plan.target_workers, 1);
+    assert!(!output.proposes(EconomyProposal::TrainWorker));
 }

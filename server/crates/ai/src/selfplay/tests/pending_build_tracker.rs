@@ -1,4 +1,6 @@
-use super::super::pending_build::{PendingBuildTracker, PENDING_BUILD_STALE_TICKS};
+use super::super::pending_build::{
+    PendingBuildTracker, BUILD_SITE_CLEARANCE_GRACE_TICKS, PENDING_BUILD_STALE_TICKS,
+};
 use super::super::player_view::PlayerView;
 use crate::config;
 use rts_sim::game::command::SimCommand as Command;
@@ -151,4 +153,36 @@ fn pending_build_tracker_expires_stuck_worker() {
 
     assert!(tracker.intents().is_empty());
     assert!(tracker.failed(EntityKind::ResourceDepot, 48, 70));
+}
+
+#[test]
+fn pending_factory_build_waits_for_clearance_and_retries_same_site() {
+    let start = pending_tracker_start_payload();
+    let mut tracker = PendingBuildTracker::default();
+    tracker.record_commands_with_factory_clearance(
+        10,
+        &[Command::Build {
+            units: vec![2],
+            building: EntityKind::Factory,
+            tile_x: 20,
+            tile_y: 70,
+            queued: false,
+        }],
+        true,
+    );
+
+    let idle_snapshot = pending_tracker_snapshot(20, 100.0, 200.0);
+    let mut idle_snapshot = idle_snapshot;
+    idle_snapshot.entities[0].state = states::IDLE.to_string();
+    tracker.observe(pending_tracker_view(20, &start, &idle_snapshot));
+    assert_eq!(tracker.intents().len(), 1);
+
+    let expiry_tick = 10 + BUILD_SITE_CLEARANCE_GRACE_TICKS;
+    let expiry_snapshot = pending_tracker_snapshot(expiry_tick, 100.0, 200.0);
+    let mut expiry_snapshot = expiry_snapshot;
+    expiry_snapshot.entities[0].state = states::IDLE.to_string();
+    tracker.observe(pending_tracker_view(expiry_tick, &start, &expiry_snapshot));
+
+    assert!(tracker.intents().is_empty());
+    assert!(!tracker.failed(EntityKind::Factory, 20, 70));
 }

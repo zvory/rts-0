@@ -213,6 +213,9 @@ const approvedCurrentFactionFiles = new Set([
   // faction catalog routing exists.
   "server/crates/ai/src/ai_core/decision/turtle.rs",
   "server/crates/ai/src/ai_core/profiles/jeffs_ai.rs",
+  // Frozen Jeff comparison profile intentionally preserves a historical Kriegsia roster policy;
+  // it is available only through explicit internal profile lookup, not public profile selection.
+  "server/crates/ai/src/ai_core/profiles/jeffs_ai_chat_start.rs",
   "server/crates/ai/src/ai_core/profiles/turtle.rs",
   "server/crates/ai/src/ai_core/facts.rs",
   "server/crates/ai/src/ai_core/observation.rs",
@@ -233,6 +236,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/selfplay/player_view.rs",
   "server/crates/ai/src/selfplay/replay.rs",
   "server/crates/ai/src/selfplay/scripts.rs",
+  // Live AI command filtering translates current-roster movement/build intents and its inline
+  // regression fixtures name those kinds directly; public faction admission remains catalog-owned.
+  "server/crates/ai/src/live.rs",
   "server/crates/rules/src/balance.rs",
   // Balance Phase 4 split: these modules contain constants/helpers moved from balance.rs without
   // changing current-faction ownership.
