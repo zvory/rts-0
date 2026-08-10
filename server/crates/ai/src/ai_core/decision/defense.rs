@@ -618,8 +618,7 @@ pub(super) fn stage_defensive_machine_gunner_perimeter(
         ready_units,
         enemy_base,
         policy.perimeter_distance_tiles,
-        policy.lateral_spacing_tiles,
-        policy.target_count,
+        (policy.lateral_spacing_tiles, policy.target_count),
     )
 }
 
@@ -744,9 +743,9 @@ fn stage_machine_gunner_defensive_line(
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
     distance_tiles: f32,
-    lateral_spacing_tiles: f32,
-    formation_slots: usize,
+    formation: (f32, usize),
 ) -> Option<Vec<u32>> {
+    let (lateral_spacing_tiles, formation_slots) = formation;
     let assignments = main_steel_defensive_line_assignments(
         observation,
         ready_units,
