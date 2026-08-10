@@ -30,7 +30,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: Some(40),
         extra_oil_workers: 10,
-        extra_builder_workers: 1,
+        extra_builder_workers: 0,
         train_workers_for_oil: false,
         reuse_idle_before_training: true,
     },
@@ -152,7 +152,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         },
     }),
     fast_tank_timing: Some(FastTankTimingPolicy {
-        workers_before_barracks: 2,
+        workers_before_barracks: 1,
         pump_jacks_before_barracks: 2,
         tanks_before_scout_car: 2,
         scout_car_target: 1,
@@ -171,7 +171,7 @@ mod tests {
         let transition = JEFFS_AI.tech_transition.expect("armored transition");
         assert_eq!(JEFFS_AI.workers.steel_worker_cap, Some(40));
         assert_eq!(JEFFS_AI.workers.extra_oil_workers, 10);
-        assert_eq!(JEFFS_AI.workers.extra_builder_workers, 1);
+        assert_eq!(JEFFS_AI.workers.extra_builder_workers, 0);
         assert!(!JEFFS_AI.workers.train_workers_for_oil);
         assert!(JEFFS_AI.workers.reuse_idle_before_training);
         assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 2);
@@ -199,7 +199,7 @@ mod tests {
             ResourceFloatThreshold { steel: 0, oil: 0 }
         );
         let timing = JEFFS_AI.fast_tank_timing.expect("fast tank timing");
-        assert_eq!(timing.workers_before_barracks, 2);
+        assert_eq!(timing.workers_before_barracks, 1);
         assert_eq!(timing.pump_jacks_before_barracks, 2);
         assert_eq!(timing.tanks_before_scout_car, 2);
         assert_eq!(timing.scout_car_target, 1);

@@ -200,7 +200,7 @@ fn economy_manager_can_hold_oil_at_current_assignment() {
 }
 
 #[test]
-fn jeff_trains_exactly_one_additional_engineer() {
+fn jeff_uses_the_free_starting_engineer_without_training_another() {
     let mut owned = vec![building_at(
         1,
         EntityKind::ResourceDepot,
@@ -237,8 +237,8 @@ fn jeff_trains_exactly_one_additional_engineer() {
         },
     });
 
-    assert_eq!(output.plan.target_workers, 2);
-    assert!(output.proposes(EconomyProposal::TrainWorker));
+    assert_eq!(output.plan.target_workers, 1);
+    assert!(!output.proposes(EconomyProposal::TrainWorker));
 
     observation.owned[1].state = AiEntityState::Gather;
     let facts = AiFacts::from_observation(&observation);
@@ -252,5 +252,5 @@ fn jeff_trains_exactly_one_additional_engineer() {
             defer_worker_training_for_tech: false,
         },
     });
-    assert!(output.proposes(EconomyProposal::TrainWorker));
+    assert!(!output.proposes(EconomyProposal::TrainWorker));
 }
