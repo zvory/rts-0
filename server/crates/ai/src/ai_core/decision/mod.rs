@@ -12,7 +12,7 @@ use crate::ai_core::observation::{
 };
 use crate::ai_core::profiles::{
     AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy,
-    ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy, JEFFS_AI_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -35,11 +35,12 @@ mod trace;
 mod turtle;
 
 use self::defense::{
-    defensive_machine_gunner_units, defensive_panic_barracks_target, defensive_panic_plan,
-    defensive_panic_response, home_defensive_tank_is_positioned, local_defense_target,
-    local_defense_units, machine_gunner_meets_replacement_health,
-    stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
-    stage_home_machine_gunner_screen, stage_main_steel_defensive_line, DefensivePanicPlan,
+    defensive_machine_gunner_units, defensive_machine_gunner_units_for_build_clearance,
+    defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
+    home_defensive_tank_is_positioned, local_defense_target, local_defense_units,
+    machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
+    stage_home_anti_tank_line, stage_home_defensive_tank, stage_home_machine_gunner_screen,
+    stage_home_rifleman_screen, stage_main_steel_defensive_line, DefensivePanicPlan,
     DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
 use self::economy_manager::{
@@ -48,7 +49,9 @@ use self::economy_manager::{
 };
 use self::expansion::{plan_expansion, try_build_expansion_resource_depot, ExpansionBlocker};
 use self::frontal::{issue_frontal_wave, plan_frontal_wave, sync_containment_recovery};
-use self::geometry::footprint_top_left_for_center;
+use self::geometry::{
+    clamp_to_map, footprint_top_left_for_center, normalized_direction, tile_center,
+};
 pub(crate) use self::memory::AiDecisionMemory;
 use self::policies::{
     active_attack_policy, active_barracks_curve, active_production_policy,
@@ -56,6 +59,7 @@ use self::policies::{
 };
 use self::production::{
     producer_for_unit, production_building_order, production_uses_building,
+    relocate_machine_gunners_blocking_factory, relocate_machine_gunners_from_factory_site,
     should_build_extra_factory, should_build_extra_turtle_gun_works,
     should_save_for_first_tech_unit, should_save_for_required_tech_building, try_build_kind,
     unit_counts_for_priorities,
@@ -316,7 +320,7 @@ where
         if facts.building_count(*kind) + planned_in_intents(&intents, *kind) > 0 {
             continue;
         }
-        if try_build_kind(
+        if let Some(build_action) = try_build_kind(
             observation,
             &facts,
             &mut actions,
@@ -325,9 +329,25 @@ where
             *kind,
             build_search,
             &mut placeable,
-        )
-        .is_some()
-        {
+        ) {
+            if *kind == EntityKind::Factory {
+                if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                    let defensive_machine_gunners =
+                        defensive_machine_gunner_units_for_build_clearance(observation, profile);
+                    if let Some(units) = relocate_machine_gunners_from_factory_site(
+                        observation,
+                        &mut actions,
+                        (build_action.tile_x, build_action.tile_y),
+                        &defensive_machine_gunners,
+                        enemy_base,
+                    ) {
+                        // Clearing a construction footprint is a tactical move, not a new
+                        // staging assignment. The live adapter suppresses repeated staging
+                        // commands for units that are already in position.
+                        intents.push(AiIntent::Move { units });
+                    }
+                }
+            }
             intents.push(AiIntent::Build { kind: *kind });
         }
     }
@@ -372,14 +392,15 @@ where
         });
     }
 
-    if production_uses_building(production_policy, EntityKind::Factory)
+    let first_factory_needed = production_uses_building(production_policy, EntityKind::Factory)
         && facts.building_count(EntityKind::Factory)
             + planned_in_intents(&intents, EntityKind::Factory)
             < profile.buildings.factory_target
         && !expansion_blocks_tech_path
         && !save_for_unplanned_expansion
-        && planned_in_intents(&intents, EntityKind::Factory) == 0
-        && try_build_kind(
+        && planned_in_intents(&intents, EntityKind::Factory) == 0;
+    if first_factory_needed {
+        if let Some(build_action) = try_build_kind(
             observation,
             &facts,
             &mut actions,
@@ -388,12 +409,38 @@ where
             EntityKind::Factory,
             build_search,
             &mut placeable,
-        )
-        .is_some()
-    {
-        intents.push(AiIntent::Build {
-            kind: EntityKind::Factory,
-        });
+        ) {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                let defensive_machine_gunners =
+                    defensive_machine_gunner_units_for_build_clearance(observation, profile);
+                if let Some(units) = relocate_machine_gunners_from_factory_site(
+                    observation,
+                    &mut actions,
+                    (build_action.tile_x, build_action.tile_y),
+                    &defensive_machine_gunners,
+                    enemy_base,
+                ) {
+                    intents.push(AiIntent::Move { units });
+                }
+            }
+            intents.push(AiIntent::Build {
+                kind: EntityKind::Factory,
+            });
+        } else if let Some(enemy_base) = facts.nearest_public_enemy_base {
+            let defensive_machine_gunners =
+                defensive_machine_gunner_units_for_build_clearance(observation, profile);
+            if let Some(units) = relocate_machine_gunners_blocking_factory(
+                observation,
+                &mut actions,
+                profile,
+                build_search,
+                &defensive_machine_gunners,
+                enemy_base,
+                &mut placeable,
+            ) {
+                intents.push(AiIntent::Move { units });
+            }
+        }
     }
 
     if !expansion_blocks_tech_path
@@ -505,6 +552,7 @@ where
             UpgradeKind::Methamphetamines,
         );
     }
+    queue_jeff_infantry_mass_methamphetamines(&mut actions, &facts, memory, &mut intents, profile);
     if profile.turtle_defense.is_none() {
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
@@ -605,7 +653,10 @@ where
                 current.saturating_add(affordable_above_reserve),
             ));
         }
-        let trained_units = actions::train_units(
+        let production_rally = (profile.id == JEFFS_AI_ID)
+            .then(|| jeffs_production_rally(observation, &facts))
+            .flatten();
+        let trained_units = actions::train_units_with_rally(
             &mut actions,
             TrainUnitsRequest {
                 buildings,
@@ -618,6 +669,7 @@ where
                 max_counts: &building_max_counts,
                 balance_unit_priorities: production_policy.balance_unit_priorities,
             },
+            production_rally,
         );
         for trained in trained_units {
             memory.note_turtle_train(profile, trained.unit);
@@ -675,10 +727,44 @@ where
                 }
             }
         }
-        if let Some(target) = local_defense_target(observation) {
+        let local_target = local_defense_target(observation);
+        let jeff_layered_home_defense =
+            local_target.is_some() && profile.id == JEFFS_AI_ID && profile.home_anti_tank.is_some();
+        let mut local_defenders = local_ready_units.clone();
+        local_defenders.extend(defensive_machine_gunners.iter().copied());
+        local_defenders.sort_unstable();
+        local_defenders.dedup();
+        if jeff_layered_home_defense {
+            let local_targets: Vec<u32> = defense::local_defense_targets(observation)
+                .into_iter()
+                .collect();
+            let interceptors: Vec<u32> = local_defense_units(observation, &local_defenders)
+                .into_iter()
+                .filter(|id| {
+                    observation.owned.iter().any(|unit| {
+                        unit.id == *id
+                            && matches!(
+                                unit.kind,
+                                EntityKind::Rifleman
+                                    | EntityKind::MachineGunner
+                                    | EntityKind::ScoutCar
+                            )
+                    })
+                })
+                .collect();
+            for (index, unit_id) in interceptors.into_iter().enumerate() {
+                let Some(target) = local_targets.get(index % local_targets.len().max(1)) else {
+                    break;
+                };
+                if let Some(units) = actions::attack_units(&mut actions, [unit_id], *target) {
+                    local_defense_assigned.extend(units.iter().copied());
+                    intents.push(AiIntent::Attack { units });
+                }
+            }
+        } else if let Some(target) = local_target {
             if let Some(units) = actions::attack_units(
                 &mut actions,
-                local_defense_units(observation, &local_ready_units),
+                local_defense_units(observation, &local_defenders),
                 target,
             ) {
                 local_defense_assigned.extend(units.iter().copied());
@@ -686,6 +772,10 @@ where
                 handled_local_defense = true;
             }
         }
+        // Preserve Jeff's layered firing line on contact. Automatic target
+        // acquisition meets the raid without dog-piling every defender into
+        // one Tank overpenetration lane.
+        handled_local_defense |= jeff_layered_home_defense;
 
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
@@ -693,6 +783,46 @@ where
             .filter(|id| !local_defense_assigned.contains(id))
             .collect();
         let turtle_defense_active = profile.turtle_defense.is_some();
+
+        if !handled_local_defense && profile.id == JEFFS_AI_ID && profile.home_anti_tank.is_some() {
+            let riflemen: Vec<u32> =
+                actions::select_ready_combat_units(&observation.owned, &[EntityKind::Rifleman])
+                    .into_iter()
+                    .filter(|id| !local_defense_assigned.contains(id))
+                    .collect();
+            let own_base =
+                geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
+            let fallback_armor = observation
+                .owned
+                .iter()
+                .filter(|entity| {
+                    entity.is_complete
+                        && matches!(entity.kind, EntityKind::Tank | EntityKind::ScoutCar)
+                        && !memory.containment_active_tanks.contains(&entity.id)
+                        && memory.containment_active_scout != Some(entity.id)
+                })
+                .min_by(|left, right| {
+                    geometry::dist2(left.x, left.y, own_base.0, own_base.1)
+                        .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
+                })
+                .map(|entity| entity.id);
+            if let (Some(armor_id), Some(enemy_base)) = (
+                memory.home_defensive_tank.or(fallback_armor),
+                facts.nearest_public_enemy_base,
+            ) {
+                if let Some(units) = stage_home_rifleman_screen(
+                    &mut actions,
+                    observation,
+                    &riflemen,
+                    armor_id,
+                    enemy_base,
+                    3.0,
+                    1.75,
+                ) {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
 
         if !handled_local_defense && turtle_defense_active {
             if let Some(policy) = profile.turtle_defense {
@@ -708,7 +838,10 @@ where
             }
         }
 
-        if !turtle_defense_active && !defensive_machine_gunners_available.is_empty() {
+        if !handled_local_defense
+            && !turtle_defense_active
+            && !defensive_machine_gunners_available.is_empty()
+        {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 let staged = if memory.home_defensive_tank.is_some() {
                     let distance = profile
@@ -722,6 +855,7 @@ where
                     stage_home_machine_gunner_screen(
                         &mut actions,
                         observation,
+                        map_analysis,
                         &defensive_machine_gunners_available,
                         enemy_base,
                         distance,
@@ -734,6 +868,7 @@ where
                     stage_defensive_machine_gunner_perimeter(
                         &mut actions,
                         observation,
+                        map_analysis,
                         profile,
                         &defensive_machine_gunners_available,
                         enemy_base,
@@ -815,6 +950,23 @@ where
         commands: actions.into_commands(),
         trace,
     }
+}
+
+/// Jeff's producers send fresh combat units to a safe forward staging point immediately.
+/// The normal frontal and defense planners remain authoritative and can redirect them on
+/// the next think; this route only removes the idle interval at the production building.
+fn jeffs_production_rally(observation: &AiObservation, facts: &AiFacts) -> Option<(f32, f32)> {
+    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let enemy_base = facts.nearest_public_enemy_base?;
+    let direction = normalized_direction(own_base, (enemy_base.x, enemy_base.y))?;
+    let forward_distance = observation.map.tile_size as f32 * 8.0;
+    Some(clamp_to_map(
+        (
+            own_base.0 + direction.0 * forward_distance,
+            own_base.1 + direction.1 * forward_distance,
+        ),
+        observation.map,
+    ))
 }
 
 fn planned_in_intents(intents: &[AiIntent], kind: EntityKind) -> usize {
@@ -1137,7 +1289,11 @@ fn queue_profile_upgrades(
     for upgrade in profile.upgrade_priorities {
         if profile.fast_tank_timing.is_some()
             && *upgrade == UpgradeKind::TankUnlock
-            && facts.building_count(EntityKind::Factory) == 0
+            && if profile.id == JEFFS_AI_ID {
+                facts.building_counts(EntityKind::Factory).existing == 0
+            } else {
+                facts.building_count(EntityKind::Factory) == 0
+            }
         {
             continue;
         }
@@ -1163,6 +1319,30 @@ fn queue_fast_tank_optional_upgrades(
     }
 }
 
+fn queue_jeff_infantry_mass_methamphetamines(
+    actions: &mut AiActionContext<'_>,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+    profile: &AiProfile,
+) {
+    if profile.id != JEFFS_AI_ID
+        || facts
+            .unit_count(EntityKind::Rifleman)
+            .saturating_add(facts.unit_count(EntityKind::MachineGunner))
+            <= 15
+    {
+        return;
+    }
+    queue_upgrade_if_available(
+        actions,
+        facts,
+        memory,
+        intents,
+        UpgradeKind::Methamphetamines,
+    );
+}
+
 fn queue_required_unit_unlocks(
     actions: &mut AiActionContext<'_>,
     facts: &AiFacts,
@@ -1177,7 +1357,11 @@ fn queue_required_unit_unlocks(
         };
         if profile.fast_tank_timing.is_some()
             && upgrade == UpgradeKind::TankUnlock
-            && facts.building_count(EntityKind::Factory) == 0
+            && if profile.id == JEFFS_AI_ID {
+                facts.building_counts(EntityKind::Factory).existing == 0
+            } else {
+                facts.building_count(EntityKind::Factory) == 0
+            }
         {
             continue;
         }

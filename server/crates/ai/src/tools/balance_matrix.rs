@@ -124,6 +124,7 @@ pub fn run_from_env() {
                 verify_replay: config.verify_replay,
                 save_replay_name: Some(name),
                 replay_dir: Some(config.out_dir.clone()),
+                map_name: None,
             })
             .unwrap_or_else(|err| {
                 eprintln!(
@@ -527,6 +528,7 @@ mod tests {
         player_two_army: u32,
     ) -> ProfileMatchupResult {
         ProfileMatchupResult {
+            map_name: "Chokes".to_string(),
             profile_a: "left".to_string(),
             profile_b: "right".to_string(),
             seed: 0,

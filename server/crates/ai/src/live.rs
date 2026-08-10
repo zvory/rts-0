@@ -21,6 +21,7 @@ use crate::selfplay::player_view::PlayerView;
 use rand::Rng;
 use rts_protocol::{ObserverMapAnalysisDiagnostics, ObserverMapAnalysisLayer};
 use rts_sim::game::command::SimCommand;
+use rts_sim::game::entity::EntityKind;
 use rts_sim::game::Game;
 use rts_sim::protocol::{Snapshot, StartPayload};
 
@@ -414,12 +415,28 @@ impl AiController {
             trace_tick: tick,
             lines: bounded_decision_trace_lines(decision.trace.format_lines()),
         });
+        let factory_clearance_ordered = decision
+            .intents
+            .iter()
+            .any(|intent| matches!(intent, crate::ai_core::decision::AiIntent::Move { .. }))
+            && decision.intents.iter().any(|intent| {
+                matches!(
+                    intent,
+                    crate::ai_core::decision::AiIntent::Build {
+                        kind: EntityKind::Factory
+                    }
+                )
+            });
         commands.extend(self.filter_repeated_stage_commands(
             tick,
             &decision.intents,
             decision.commands,
         ));
-        self.pending_builds.record_commands(tick, &commands);
+        self.pending_builds.record_commands_with_factory_clearance(
+            tick,
+            &commands,
+            factory_clearance_ordered,
+        );
         commands
     }
 
@@ -934,6 +951,34 @@ mod tests {
             }]
         );
         assert!(second.is_empty());
+    }
+
+    #[test]
+    fn live_stage_filter_keeps_clearance_move_for_already_staged_unit() {
+        let mut ai = AiController::new(1);
+        let stage_intent = [crate::ai_core::decision::AiIntent::Stage { units: vec![42] }];
+        let initial = SimCommand::Move {
+            units: vec![42],
+            x: 100.0,
+            y: 100.0,
+            queued: false,
+        };
+        assert_eq!(
+            ai.filter_repeated_stage_commands(10, &stage_intent, vec![initial.clone()]),
+            vec![initial]
+        );
+
+        let clearance_intent = [crate::ai_core::decision::AiIntent::Move { units: vec![42] }];
+        let clearance = SimCommand::Move {
+            units: vec![42],
+            x: 228.0,
+            y: 100.0,
+            queued: false,
+        };
+        assert_eq!(
+            ai.filter_repeated_stage_commands(19, &clearance_intent, vec![clearance.clone()]),
+            vec![clearance]
+        );
     }
 
     #[test]

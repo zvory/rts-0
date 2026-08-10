@@ -213,18 +213,13 @@ fn jeff_opening_observation(worker_count: usize, pump_jacks: usize) -> AiObserva
 }
 
 #[test]
-fn jeff_waits_for_two_engineers_and_two_pump_jacks_before_barracks() {
-    for observation in [
-        jeff_opening_observation(1, 2),
-        jeff_opening_observation(2, 1),
-    ] {
-        let decision = decide_with_profile(&observation, &JEFFS_AI);
-        assert!(!decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::Barracks
-        }));
-    }
+fn jeff_waits_for_two_pump_jacks_but_not_a_second_engineer_before_barracks() {
+    let decision = decide_with_profile(&jeff_opening_observation(1, 1), &JEFFS_AI);
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Barracks
+    }));
 
-    let decision = decide_with_profile(&jeff_opening_observation(2, 2), &JEFFS_AI);
+    let decision = decide_with_profile(&jeff_opening_observation(1, 2), &JEFFS_AI);
     assert!(decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Barracks
     }));
@@ -330,6 +325,142 @@ fn jeff_starts_vehicle_works_before_tank_production_research() {
             }
         )
     }));
+}
+
+#[test]
+fn jeff_moves_machine_gunner_off_blocked_vehicle_works_footprint() {
+    let mut observation = jeff_armored_tech_observation(None);
+    let ts = observation.map.tile_size as f32;
+    let mut machine_gunner = combat_unit(30, EntityKind::MachineGunner);
+    machine_gunner.hp = config::unit_stats(EntityKind::MachineGunner)
+        .expect("Machine Gunner stats")
+        .hp;
+    machine_gunner.x = 2.5 * ts;
+    machine_gunner.y = 2.5 * ts;
+    observation.owned.push(machine_gunner);
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+
+    let decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, _, _| false,
+    );
+
+    assert!(!decision.commands.iter().any(|command| matches!(
+        command,
+        Command::Build {
+            building: EntityKind::Factory,
+            ..
+        }
+    )));
+    assert!(decision.commands.iter().any(|command| matches!(
+        command,
+        Command::Move { units, .. } if units == &[30]
+    )));
+    assert!(decision
+        .intents
+        .iter()
+        .any(|intent| matches!(intent, AiIntent::Move { units } if units == &[30])));
+}
+
+#[test]
+fn jeff_clears_machine_gunner_when_issuing_vehicle_works_build() {
+    let mut observation = jeff_armored_tech_observation(None);
+    let ts = observation.map.tile_size as f32;
+    let mut machine_gunner = combat_unit(30, EntityKind::MachineGunner);
+    machine_gunner.hp = config::unit_stats(EntityKind::MachineGunner)
+        .expect("Machine Gunner stats")
+        .hp;
+    machine_gunner.x = 2.5 * ts;
+    machine_gunner.y = 2.5 * ts;
+    observation.owned.push(machine_gunner);
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+
+    let decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |kind, tx, ty| kind == EntityKind::Factory && (tx, ty) == (2, 2),
+    );
+
+    assert!(decision.commands.iter().any(|command| matches!(
+        command,
+        Command::Build {
+            building: EntityKind::Factory,
+            tile_x: 2,
+            tile_y: 2,
+            ..
+        }
+    )));
+    let destination = decision.commands.iter().find_map(|command| match command {
+        Command::Move { units, x, y, .. } if units == &[30] => Some((*x, *y)),
+        _ => None,
+    });
+    let destination = destination.expect("Machine Gunner move alongside Factory build");
+    let moved_tiles =
+        ((destination.0 - 2.5 * ts).powi(2) + (destination.1 - 2.5 * ts).powi(2)).sqrt() / ts;
+    assert!((moved_tiles - 4.0).abs() < 0.001);
+}
+
+#[test]
+fn jeff_interrupts_busy_machine_gunner_to_clear_vehicle_works_site() {
+    let mut observation = jeff_armored_tech_observation(None);
+    let ts = observation.map.tile_size as f32;
+    let mut machine_gunner = combat_unit(30, EntityKind::MachineGunner);
+    machine_gunner.hp = config::unit_stats(EntityKind::MachineGunner)
+        .expect("Machine Gunner stats")
+        .hp;
+    machine_gunner.x = 2.5 * ts;
+    machine_gunner.y = 2.5 * ts;
+    machine_gunner.state = AiEntityState::Attack;
+    machine_gunner.target_id = Some(99);
+    machine_gunner.free_for_combat = false;
+    observation.owned.push(machine_gunner);
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+
+    let decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |kind, tx, ty| kind == EntityKind::Factory && (tx, ty) == (2, 2),
+    );
+
+    assert!(decision.commands.iter().any(|command| matches!(
+        command,
+        Command::Build {
+            building: EntityKind::Factory,
+            tile_x: 2,
+            tile_y: 2,
+            ..
+        }
+    )));
+    assert!(decision.commands.iter().any(|command| matches!(
+        command,
+        Command::Move { units, .. } if units == &[30]
+    )));
+    assert!(decision
+        .intents
+        .iter()
+        .any(|intent| matches!(intent, AiIntent::Move { units } if units == &[30])));
 }
 
 #[test]

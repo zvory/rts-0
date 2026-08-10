@@ -6,7 +6,7 @@ use crate::ai_shared;
 use crate::sdk::actions::{ActionBudget, ActionReservations, AiActionRequest};
 use rts_rules;
 use rts_sim::game::command::SimCommand as Command;
-use rts_sim::game::entity::EntityKind;
+use rts_sim::game::entity::{EntityKind, RallyKind};
 use rts_sim::game::upgrade::{self, UpgradeKind};
 
 pub(crate) type SpendBudget = ActionBudget;
@@ -444,6 +444,14 @@ pub(crate) fn train_units(
     ctx: &mut AiActionContext<'_>,
     request: TrainUnitsRequest<'_>,
 ) -> Vec<TrainAction> {
+    train_units_with_rally(ctx, request, None)
+}
+
+pub(crate) fn train_units_with_rally(
+    ctx: &mut AiActionContext<'_>,
+    request: TrainUnitsRequest<'_>,
+    rally: Option<(f32, f32)>,
+) -> Vec<TrainAction> {
     if request.save_for_tech {
         return Vec::new();
     }
@@ -479,6 +487,15 @@ pub(crate) fn train_units(
         }
         ctx.reservations.reserve_production_building(building.id);
         *current_counts.entry(unit).or_default() += 1;
+        if let Some((x, y)) = rally {
+            ctx.emit_action(AiActionRequest::SetRally {
+                building: building.id,
+                x,
+                y,
+                kind: RallyKind::AttackMove,
+                queued: false,
+            });
+        }
         ctx.emit_action(AiActionRequest::Train {
             building: building.id,
             unit,
