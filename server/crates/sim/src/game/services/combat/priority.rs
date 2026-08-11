@@ -64,6 +64,28 @@ pub(super) fn choose_target<'a>(
         .map(|target| target.id)
 }
 
+pub(super) fn ranked_candidates(
+    context: &AttackPriorityContext,
+    candidates: Vec<TargetCandidate>,
+    require_in_weapon_range: bool,
+    prefer_in_weapon_range: bool,
+) -> Vec<TargetCandidate> {
+    let mut ranked = candidates
+        .into_iter()
+        .filter(|candidate| !require_in_weapon_range || candidate.in_weapon_range)
+        .filter_map(|candidate| rank_candidate(context, &candidate).map(|rank| (candidate, rank)))
+        .collect::<Vec<_>>();
+    ranked.sort_unstable_by(|(left, left_rank), (right, right_rank)| {
+        let range_order = if prefer_in_weapon_range {
+            right.in_weapon_range.cmp(&left.in_weapon_range)
+        } else {
+            Ordering::Equal
+        };
+        range_order.then_with(|| compare_ranks(left_rank, right_rank))
+    });
+    ranked.into_iter().map(|(candidate, _)| candidate).collect()
+}
+
 fn compare_ranks(left_rank: &TargetRank, right_rank: &TargetRank) -> Ordering {
     left_rank
         .priority_bucket

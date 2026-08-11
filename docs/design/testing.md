@@ -203,11 +203,10 @@ Current scenario ids:
 - `tank_coax_inspection` — one held Tank with its cannon cooldown delayed faces infantry-priority
   targets, support weapons, Ekat/Golem units, armored fallback targets, blockers, resources, smoke,
   and buildings around the coax arc for secondary-machine-gun inspection.
-- `attack_move_reload_acquisition` — one Tank begins with its cannon and coax reloading, then after
-  a ten-second inspection pause receives a real attack-move through an invulnerable enemy Tank
-  already inside its current moving-range boundary. On the known failure, it keeps advancing until
-  reload permits fresh acquisition; after a fix, the same scene should stop at the initial boundary
-  and wait there to fire.
+- `attack_move_reload_acquisition` — one Tank begins with its cannon and coax reloading beside an
+  invulnerable enemy Tank already inside its current moving-range boundary. During the ten-second
+  inspection pause, the five-tick Tank scan should prepare that target; the subsequent real
+  attack-move should retain it, stop at the initial boundary, and wait there to fire.
 - `move_reload_acquisition` — after a ten-second inspection pause, one reloading Tank receives a
   plain move past an invulnerable Anti-Tank Gun. The gun enters the Tank's moving cannon range while
   fully visible; the Tank should acquire and turn its turret during reload without stopping its

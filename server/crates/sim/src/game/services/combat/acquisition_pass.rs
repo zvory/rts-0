@@ -9,6 +9,8 @@ use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::auto_target_legality;
 use super::weapons::auto_retention_target_inside_field_of_fire;
 
+const TANK_REACQUIRE_INTERVAL_TICKS: u32 = 5;
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn acquire(
     map: &Map,
@@ -119,6 +121,30 @@ pub(super) fn select(
                     entities, teams, fog, spatial, owner, id, target_id, tick,
                 ))
     };
+    if tank_periodic_reacquisition_due(entities, id, mode, tick) {
+        return acquire(
+            map,
+            entities,
+            blockers,
+            teams,
+            spatial,
+            los,
+            fog,
+            smokes,
+            id,
+            owner,
+            px,
+            py,
+            acquire_px,
+            mode,
+            can_move_fire,
+            is_mortar_team,
+            min_range_px,
+            range_px,
+            require_safe_mortar_target,
+            tick,
+        );
+    }
     let retained = retained_target(
         map,
         entities,
@@ -162,6 +188,22 @@ pub(super) fn select(
         require_safe_mortar_target,
         tick,
     )
+}
+
+fn tank_periodic_reacquisition_due(
+    entities: &EntityStore,
+    id: u32,
+    mode: CombatMode,
+    tick: u32,
+) -> bool {
+    matches!(mode, CombatMode::Aggressive | CombatMode::Opportunistic)
+        && entities.get(id).is_some_and(|entity| {
+            crate::rules::combat::default_weapon_kind(entity.kind)
+                == Some(crate::rules::combat::WeaponKind::TankCannon)
+        })
+        && tick
+            .wrapping_add(id)
+            .is_multiple_of(TANK_REACQUIRE_INTERVAL_TICKS)
 }
 
 #[allow(clippy::too_many_arguments)]

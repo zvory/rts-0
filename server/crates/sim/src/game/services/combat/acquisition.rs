@@ -13,9 +13,9 @@ use crate::rules::target as target_rules;
 use super::priority::{AttackPriorityContext, TargetCandidate};
 use super::projection::max_building_combat_extent_px;
 use super::shot_blocker_index::ShotBlockerIndex;
-use super::target_legality::auto_target_legality;
+use super::target_legality::{auto_target_candidate, auto_target_has_legal_shot};
 use super::weapons::{
-    choose_target_inside_anti_tank_field, effective_attack_profile,
+    auto_retention_target_inside_field_of_fire, effective_attack_profile,
     moving_fire_move_order_holds_path,
 };
 
@@ -175,15 +175,11 @@ pub(super) fn resolve_target_for_weapon(
         policy_id: combat_rules::default_target_priority_policy(attacker.kind),
         can_retain_moving_target: attacker_can_fire_while_moving,
     };
-    let candidates = legal_target_candidates(
+    let candidates = target_candidates(
         map,
         entities,
-        blockers,
         teams,
         spatial,
-        los,
-        fog,
-        smokes,
         self_id,
         owner,
         px,
@@ -192,27 +188,40 @@ pub(super) fn resolve_target_for_weapon(
         weapon_range_px,
         attacker.target_id(),
     );
-    if mode_requires_currently_fireable_targets(mode)
-        || aggressive_auto_acquisition_prefers_currently_fireable_targets(mode)
-    {
-        let fireable_target = choose_target_inside_anti_tank_field(
-            &context,
-            attacker,
-            px,
-            py,
-            &candidates,
-            |candidate| candidate.in_weapon_range && target_filter(candidate.id),
-        );
-        if mode_requires_currently_fireable_targets(mode) {
-            return fireable_target;
+    for candidate in super::priority::ranked_candidates(
+        &context,
+        candidates,
+        mode_requires_currently_fireable_targets(mode),
+        aggressive_auto_acquisition_prefers_currently_fireable_targets(mode),
+    ) {
+        if !target_filter(candidate.id)
+            || !auto_retention_target_inside_field_of_fire(
+                attacker,
+                (candidate.pos_y - py).atan2(candidate.pos_x - px),
+            )
+        {
+            continue;
         }
-        if fireable_target.is_some() {
-            return fireable_target;
+        let Some(target) = entities.get(candidate.id) else {
+            continue;
+        };
+        if auto_target_has_legal_shot(
+            map,
+            entities,
+            blockers,
+            teams,
+            los,
+            fog,
+            smokes,
+            attacker,
+            owner,
+            (px, py),
+            target,
+        ) {
+            return Some(candidate.id);
         }
     }
-    choose_target_inside_anti_tank_field(&context, attacker, px, py, &candidates, |candidate| {
-        target_filter(candidate.id)
-    })
+    None
 }
 
 fn mode_requires_currently_fireable_targets(mode: CombatMode) -> bool {
@@ -224,15 +233,11 @@ fn aggressive_auto_acquisition_prefers_currently_fireable_targets(mode: CombatMo
 }
 
 #[allow(clippy::too_many_arguments)]
-fn legal_target_candidates(
+fn target_candidates(
     map: &Map,
     entities: &EntityStore,
-    blockers: &ShotBlockerIndex,
     teams: &TeamRelations,
     spatial: &SpatialIndex,
-    los: &LineOfSight<'_>,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -242,6 +247,9 @@ fn legal_target_candidates(
     retained_target_id: Option<u32>,
 ) -> Vec<TargetCandidate> {
     let mut candidates = Vec::new();
+    let Some(attacker) = entities.get(self_id) else {
+        return candidates;
+    };
     let query_radius = acquire_px + max_building_combat_extent_px();
     for id in spatial.ids_in_circle_bbox(px, py, query_radius) {
         let Some(target) = entities.get(id) else {
@@ -250,22 +258,13 @@ fn legal_target_candidates(
         if target.is_neutral_obstacle() {
             continue;
         }
-        // Retained target status is only a ranker fact. It must still pass the
-        // same hostile, visible, smoke, LOS, and blocker checks as any other
-        // auto-acquired candidate.
         let retained_target = retained_target_id == Some(id);
-        let Some(legality) = auto_target_legality(
+        let Some(legality) = auto_target_candidate(
             map,
-            entities,
-            blockers,
             teams,
-            los,
-            fog,
-            smokes,
-            self_id,
+            attacker,
             owner,
-            px,
-            py,
+            (px, py),
             acquire_px,
             weapon_range_px,
             target,

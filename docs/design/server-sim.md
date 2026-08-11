@@ -1502,9 +1502,12 @@ General rules:
   its movement path and stops to engage; after combat clears before arrival, it resumes the original
   player-issued destination. Moving-fire units keep advancing along that destination while firing.
   Direct `Attack` and idle behavior are stationary as well.
-- Normal combat auto-acquisition first filters already-legal hostile candidates in
-  `services::combat::acquisition`, then chooses between them through the sim-local
-  `services::combat::priority` ranker. Candidate construction stores a `rules::target::TargetFacts`
+- Normal combat auto-acquisition builds cheap hostile, weapon-fit, and range-qualified candidates
+  in `services::combat::acquisition`, orders them through the sim-local
+  `services::combat::priority` ranker, then checks fog, smoke, line of sight, blockers, and
+  weapon-specific legality in rank order until the first legal target. This is equivalent to
+  choosing the minimum-ranked member of the fully legal set while avoiding expensive ray tests for
+  candidates that cannot win. Candidate construction stores a `rules::target::TargetFacts`
   snapshot so ranking consumes explicit facts instead of re-classifying kind-specific fields. The
   ranker selects one named `rules::combat::TargetPriorityPolicyId` and applies that policy's
   declarative terms: default-weapon fit, Tank cannon immediate-threat order, vehicle Tank Trap route
@@ -1539,7 +1542,10 @@ General rules:
   target, or independent turret aim. Static standability may block a rotation but never translate
   the Tank to make room. Stationary preference rotation preserves the stationary range ramp; path
   translation and path-driven hull rotation still reset it.
-  Direct-fire legality is centralized in `services::combat::acquisition::direct_fire_target_legal`:
+  Direct-fire visibility and line-of-sight evaluation is shared by retained-target validation,
+  automatic acquisition, and `services::combat::acquisition::direct_fire_target_legal`, so the
+  auto-acquisition path does not repeat concealment, team-visibility, smoke, or LOS work for one
+  candidate. Default direct-fire legality remains centralized there:
   default auto-acquisition/firing uses the current resolved-target mode that rejects friendly hard
   blockers but may resolve to an intervening enemy hard blocker, while ordered/intended-target uses
   a stricter mode that requires the shot to hit the intended target. Secondary-weapon acquisition
@@ -1559,14 +1565,17 @@ General rules:
   Default-weapon acquisition is cycle-based. A full spatial candidate pass runs when a ready weapon
   has no target, immediately after a shot to prepare the next target during reload, or on the ready
   tick when that prepared target fails current hostile, visibility, smoke, range, line-of-sight,
-  blocker, or weapon-specific legality. Cooldown, setup, and aiming ticks validate only the
-  committed target and never rank alternatives. A targetless travelling movement order is the
+  blocker, or weapon-specific legality. Tanks also perform a full automatic rerank every five ticks,
+  staggered by entity id; a scheduled rerank goes directly to candidate selection instead of first
+  validating the retained target. Other cooldown, setup, and aiming ticks validate only the
+  committed target and do not rank alternatives. A targetless travelling movement order is the
   narrow exception: Attack Move may scan during reload so a non-Mortar unit stops when an enemy
   first enters weapon range, while an ordinary Move may scan only for a moving-fire unit and never
   changes its commanded path in response. After committing that target, both follow the normal
-  no-rerank reload policy. If the prepared target remains fireable when the weapon becomes ready,
-  it receives the shot without a full rerank; the post-shot pass can then choose a newly
-  higher-priority threat for the following cycle. Explicit Attack orders retain their
+  no-rerank reload policy. Except for a Tank's scheduled five-tick rerank, if the prepared target
+  remains fireable when the weapon becomes ready, it receives the shot without a full rerank; the
+  post-shot pass can then choose a newly higher-priority threat for the following cycle. Explicit
+  Attack orders retain their
   commanded-target semantics.
 - The auto-acquisition ranker chooses only for the current default attack profile. Future grenades,
   satchels, sticky bombs, melee demolition, or other special attacks must be represented as separate

@@ -56,31 +56,20 @@ pub(super) fn direct_fire_target_legal(
     if !targetable {
         return false;
     }
-    if crate::rules::projection::entity_hidden_by_concealment_from_team(
-        attacker_owner,
-        target_entity,
-        map,
-        fog,
-        teams,
-    ) {
-        return false;
-    }
     let end = (target_entity.pos_x, target_entity.pos_y);
-    let target_team_visible =
-        crate::rules::projection::team_visible_world(attacker_owner, end.0, end.1, fog, teams);
-    let smoke_melee_visibility = smokes.units_have_melee_visibility(attacker_entity, target_entity);
-    if !target_team_visible
-        || ((smokes.point_inside(start.0, start.1) || smokes.point_inside(end.0, end.1))
-            && !smoke_melee_visibility)
-    {
+    let Some(smoke_melee_visibility) = target_visible_for_fire(
+        map,
+        teams,
+        fog,
+        smokes,
+        attacker_owner,
+        attacker_entity,
+        target_entity,
+        start,
+    ) else {
         return false;
-    }
-    let clear_los = if smoke_melee_visibility {
-        LineOfSight::new(map).clear_between_world_points(start, end)
-    } else {
-        los.clear_between_world_points(start, end)
     };
-    if !clear_los {
+    if !direct_fire_los_clear(map, los, start, end, smoke_melee_visibility) {
         return false;
     }
     if legality == DirectFireLegality::IntendedTarget {
@@ -113,6 +102,46 @@ pub(super) struct AutoTargetLegality {
 }
 
 #[allow(clippy::too_many_arguments)]
+pub(super) fn auto_target_candidate(
+    map: &Map,
+    teams: &TeamRelations,
+    attacker: &Entity,
+    owner: u32,
+    start: (f32, f32),
+    acquire_px: f32,
+    weapon_range_px: f32,
+    target: &Entity,
+) -> Option<AutoTargetLegality> {
+    if target.is_neutral_obstacle()
+        || !crate::game::services::world_query::is_enemy_targetable(
+            target,
+            teams,
+            owner,
+            attacker.id,
+        )
+        || (attacker.kind != EntityKind::MortarTeam
+            && !crate::rules::target::default_weapon_can_target(attacker.kind, target.kind))
+    {
+        return None;
+    }
+    let concealment = terrain::concealment_modifier(target.kind, TerrainKind::Open).max(0.0);
+    let effective_acquire_px = acquire_px * concealment;
+    let effective_weapon_range_px = weapon_range_px * concealment;
+    let distance_sq = combat_target_distance_sq(map, start, target);
+    if !distance_sq.is_finite()
+        || !effective_acquire_px.is_finite()
+        || distance_sq > effective_acquire_px * effective_acquire_px
+    {
+        return None;
+    }
+    Some(AutoTargetLegality {
+        distance_sq,
+        in_weapon_range: effective_weapon_range_px.is_finite()
+            && distance_sq <= effective_weapon_range_px * effective_weapon_range_px,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(super) fn auto_target_legality(
     map: &Map,
     entities: &EntityStore,
@@ -129,33 +158,35 @@ pub(super) fn auto_target_legality(
     weapon_range_px: f32,
     target: &Entity,
 ) -> Option<AutoTargetLegality> {
-    if target.is_neutral_obstacle()
-        || !crate::game::services::world_query::is_enemy_targetable(target, teams, owner, self_id)
-    {
-        return None;
-    }
-    let concealment = terrain::concealment_modifier(target.kind, TerrainKind::Open).max(0.0);
-    let effective_acquire_px = acquire_px * concealment;
-    let effective_weapon_range_px = weapon_range_px * concealment;
-    let distance_sq = combat_target_distance_sq(map, (px, py), target);
-    if !distance_sq.is_finite()
-        || !effective_acquire_px.is_finite()
-        || distance_sq > effective_acquire_px * effective_acquire_px
-        || !target_has_legal_shot(
-            map, entities, blockers, teams, los, fog, smokes, self_id, owner, px, py, target,
-        )
-    {
-        return None;
-    }
-    Some(AutoTargetLegality {
-        distance_sq,
-        in_weapon_range: effective_weapon_range_px.is_finite()
-            && distance_sq <= effective_weapon_range_px * effective_weapon_range_px,
-    })
+    let attacker = entities.get(self_id)?;
+    let candidate = auto_target_candidate(
+        map,
+        teams,
+        attacker,
+        owner,
+        (px, py),
+        acquire_px,
+        weapon_range_px,
+        target,
+    )?;
+    auto_target_has_legal_shot(
+        map,
+        entities,
+        blockers,
+        teams,
+        los,
+        fog,
+        smokes,
+        attacker,
+        owner,
+        (px, py),
+        target,
+    )
+    .then_some(candidate)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn target_has_legal_shot(
+pub(super) fn auto_target_has_legal_shot(
     map: &Map,
     entities: &EntityStore,
     blockers: &ShotBlockerIndex,
@@ -163,41 +194,66 @@ fn target_has_legal_shot(
     los: &LineOfSight<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
-    self_id: u32,
+    attacker: &Entity,
     owner: u32,
-    px: f32,
-    py: f32,
+    start: (f32, f32),
     target: &Entity,
 ) -> bool {
+    let end = (target.pos_x, target.pos_y);
+    let Some(smoke_melee_visibility) =
+        target_visible_for_fire(map, teams, fog, smokes, owner, attacker, target, start)
+    else {
+        return false;
+    };
+    if attacker.kind == EntityKind::MortarTeam {
+        return true;
+    }
+    direct_fire_los_clear(map, los, start, end, smoke_melee_visibility)
+        && !friendly_hard_blocker_between(map, entities, blockers, attacker.id, owner, start, end)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn target_visible_for_fire(
+    map: &Map,
+    teams: &TeamRelations,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    owner: u32,
+    attacker: &Entity,
+    target: &Entity,
+    start: (f32, f32),
+) -> Option<bool> {
     if crate::rules::projection::entity_hidden_by_concealment_from_team(
         owner, target, map, fog, teams,
+    ) || !crate::rules::projection::team_visible_world(
+        owner,
+        target.pos_x,
+        target.pos_y,
+        fog,
+        teams,
     ) {
-        return false;
+        return None;
     }
-    let target_team_visible =
-        crate::rules::projection::team_visible_world(owner, target.pos_x, target.pos_y, fog, teams);
-    let smoke_melee_visibility = entities
-        .get(self_id)
-        .is_some_and(|attacker| smokes.units_have_melee_visibility(attacker, target));
-    let visible = target_team_visible
-        && (smoke_melee_visibility
-            || (!smokes.point_inside(px, py) && !smokes.point_inside(target.pos_x, target.pos_y)));
-    visible
-        && (entities
-            .get(self_id)
-            .is_some_and(|entity| entity.kind == EntityKind::MortarTeam)
-            || direct_fire_target_legal(
-                map,
-                entities,
-                blockers,
-                teams,
-                los,
-                fog,
-                smokes,
-                self_id,
-                owner,
-                (px, py),
-                target.id,
-                DirectFireLegality::AutoAcquire,
-            ))
+    let smoke_melee_visibility = smokes.units_have_melee_visibility(attacker, target);
+    if !smoke_melee_visibility
+        && (smokes.point_inside(start.0, start.1)
+            || smokes.point_inside(target.pos_x, target.pos_y))
+    {
+        return None;
+    }
+    Some(smoke_melee_visibility)
+}
+
+fn direct_fire_los_clear(
+    map: &Map,
+    los: &LineOfSight<'_>,
+    start: (f32, f32),
+    end: (f32, f32),
+    smoke_melee_visibility: bool,
+) -> bool {
+    if smoke_melee_visibility {
+        LineOfSight::new(map).clear_between_world_points(start, end)
+    } else {
+        los.clear_between_world_points(start, end)
+    }
 }

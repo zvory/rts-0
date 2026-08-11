@@ -177,6 +177,54 @@ fn cooling_down_unit_keeps_committed_target_instead_of_rescanning() {
 }
 
 #[test]
+fn cooling_down_tank_reranks_on_its_staggered_five_tick_cadence() {
+    let mut entities = EntityStore::new();
+    let unscheduled_tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let unscheduled_committed = entities
+        .spawn_unit(2, EntityKind::Worker, 180.0, 100.0)
+        .expect("committed target should spawn");
+    let _unscheduled_priority = entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 140.0, 100.0)
+        .expect("higher-priority target should spawn");
+    entities
+        .spawn_unit(1, EntityKind::Worker, 1_000.0, 1_000.0)
+        .expect("id spacer should spawn");
+    let scheduled_tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 500.0)
+        .expect("scheduled tank should spawn");
+    let scheduled_committed = entities
+        .spawn_unit(2, EntityKind::Worker, 180.0, 500.0)
+        .expect("scheduled committed target should spawn");
+    let scheduled_priority = entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 140.0, 500.0)
+        .expect("scheduled priority target should spawn");
+    for (tank_id, target_id) in [
+        (unscheduled_tank, unscheduled_committed),
+        (scheduled_tank, scheduled_committed),
+    ] {
+        let tank = entities.get_mut(tank_id).expect("tank should exist");
+        tank.set_order(Order::HoldPosition);
+        tank.set_target_id(Some(target_id));
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCannon, 20);
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 20);
+    }
+
+    run_combat_tick(&mut entities);
+    assert_eq!(
+        entities.get(unscheduled_tank).and_then(Entity::target_id),
+        Some(unscheduled_committed),
+        "id 1 should retain its target on tick 10"
+    );
+    assert_eq!(
+        entities.get(scheduled_tank).and_then(Entity::target_id),
+        Some(scheduled_priority),
+        "id 5 should rerank to the higher-priority threat on tick 10"
+    );
+}
+
+#[test]
 fn ready_tank_keeps_acquired_target_while_turret_rotates() {
     let mut entities = EntityStore::new();
     let attacker = entities
