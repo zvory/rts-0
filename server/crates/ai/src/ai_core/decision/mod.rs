@@ -191,6 +191,7 @@ where
     let start_budget = budget;
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
+    let mut construction_clearance_units = BTreeSet::new();
 
     let local_threat_response = defensive_panic_response(observation);
     let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
@@ -343,6 +344,7 @@ where
                         &defensive_machine_gunners,
                         enemy_base,
                     ) {
+                        construction_clearance_units.extend(units.iter().copied());
                         // Clearing a construction footprint is a tactical move, not a new
                         // staging assignment. The live adapter suppresses repeated staging
                         // commands for units that are already in position.
@@ -422,6 +424,7 @@ where
                     &defensive_machine_gunners,
                     enemy_base,
                 ) {
+                    construction_clearance_units.extend(units.iter().copied());
                     intents.push(AiIntent::Move { units });
                 }
             }
@@ -440,6 +443,7 @@ where
                 enemy_base,
                 &mut placeable,
             ) {
+                construction_clearance_units.extend(units.iter().copied());
                 intents.push(AiIntent::Move { units });
             }
         }
@@ -716,7 +720,10 @@ where
         || !defensive_machine_gunners.is_empty()
     {
         let mut handled_local_defense = false;
-        let mut local_defense_assigned = BTreeSet::new();
+        // A construction-clearance move was issued earlier in this same decision. Treat those
+        // units as assigned so attack-path staging cannot overwrite the move before the build
+        // command is applied; on the next decision the submitted footprint is avoided normally.
+        let mut local_defense_assigned = construction_clearance_units.clone();
         if profile.home_anti_tank.is_some() {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 if let Some(units) = stage_home_anti_tank_line(
