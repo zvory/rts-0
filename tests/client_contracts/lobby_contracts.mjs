@@ -102,6 +102,8 @@ import { textWithin } from "./dom_text.mjs";
 {
   const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");
   const styles = fs.readFileSync(new URL("../../client/styles.css", import.meta.url), "utf8");
+  assert(/<aside\s+id="birthday-banner"[^>]*\shidden(?:\s|>)/.test(indexHtml),
+    "birthday banner starts hidden so non-birthday page loads cannot flash the announcement");
   assert(!indexHtml.includes("birthday-shot") && !styles.includes("birthday-tank-recoil"),
     "birthday banner delegates recoil and muzzle flash to the live icon rig without parallel CSS effects");
   assert(!indexHtml.includes("birthday-banner-dismiss") && !styles.includes("birthday-banner-dismiss"),

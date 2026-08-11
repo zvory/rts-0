@@ -10,6 +10,7 @@ const clientSrc = path.join(repoRoot, "client/src");
 const AREA_BY_FILE = new Map(Object.entries({
   "main.js": "app-shell",
   "app.js": "app-shell",
+  "birthday_banner_composition.js": "app-shell",
   "match.js": "app-shell",
   "match_startup_inbox.js": "app-shell",
   "prediction_runtime_startup.js": "app-shell",

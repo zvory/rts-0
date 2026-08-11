@@ -1522,7 +1522,6 @@ input[type="text"]:focus {
     white-space: normal;
   }
 
-
   .lobby-masthead,
   .lab-entry-header {
     grid-template-columns: 1fr;
@@ -1643,7 +1642,6 @@ input[type="text"]:focus {
     min-width: 104px;
   }
 }
-
 
 .hint {
   margin: 14px 0 0;
