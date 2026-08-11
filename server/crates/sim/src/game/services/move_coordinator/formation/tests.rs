@@ -676,6 +676,63 @@ fn unreachable_compact_slots_use_nearby_reachable_tiles() {
 }
 
 #[test]
+fn impassable_click_ignores_large_but_unreachable_island() {
+    let mut map = flat_map(80);
+    for ty in 0..72 {
+        for tx in 35..=45 {
+            let index = map.index(tx, ty);
+            map.terrain[index] = terrain::WATER;
+        }
+    }
+    for ty in 27..=33 {
+        for tx in 37..=43 {
+            let index = map.index(tx, ty);
+            map.terrain[index] = terrain::GRASS;
+        }
+    }
+    let click_tile = (40, 30);
+    let click_index = map.index(click_tile.0, click_tile.1);
+    map.terrain[click_index] = terrain::WATER;
+
+    let mut entities = EntityStore::new();
+    let ids = [(20, 29), (20, 31)]
+        .into_iter()
+        .map(|tile| {
+            let position = map.tile_center(tile.0, tile.1);
+            entities
+                .spawn_unit(1, EntityKind::Rifleman, position.0, position.1)
+                .expect("rifleman should spawn")
+        })
+        .collect::<Vec<_>>();
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(32_768, 256);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    coordinator.order_group_move(
+        &mut entities,
+        1,
+        &ids,
+        map.tile_center(click_tile.0, click_tile.1),
+        false,
+    );
+
+    let goals = ids
+        .iter()
+        .map(|id| {
+            let goal = entities
+                .get(*id)
+                .and_then(|entity| entity.path_goal())
+                .expect("rifleman should receive a formation goal");
+            map.tile_of(goal.0, goal.1)
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        goals.iter().all(|goal| (30..35).contains(&goal.0)),
+        "the reachable source bank should beat the isolated island: {goals:?}"
+    );
+}
+
+#[test]
 fn impassable_river_click_keeps_vehicle_formation_on_source_bank() {
     let goals = vehicle_goals_across_barrier((40, 32), Some(terrain::WATER));
 

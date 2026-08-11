@@ -35,13 +35,17 @@ impl LandingPatch {
 /// Choose one locally connected destination patch for the complete selection. Global terrain
 /// connectivity is intentionally insufficient here: opposite river banks may connect only after a
 /// long detour around an endpoint and should not split one compact formation.
-pub(super) fn cohesive_landing_patch(
+pub(super) fn cohesive_landing_patch<F>(
     map: &Map,
     occ: &Occupancy<'_>,
     units: &[FormationUnit],
     click: (f32, f32),
     desired_points: &[(f32, f32)],
-) -> LandingPatch {
+    is_goal_reachable: &mut F,
+) -> LandingPatch
+where
+    F: FnMut(&FormationUnit, (u32, u32)) -> bool,
+{
     let mut allowed = vec![false; map.width.saturating_mul(map.height) as usize];
     if units.is_empty() || map.width == 0 || map.height == 0 {
         return LandingPatch {
@@ -126,15 +130,32 @@ pub(super) fn cohesive_landing_patch(
         .iter()
         .find(|component| component.contains(&click_tile))
         .or_else(|| {
-            components.iter().min_by(|a, b| {
-                component_score(map, a, click, centroid, units.len()).cmp(&component_score(
-                    map,
-                    b,
-                    click,
-                    centroid,
-                    units.len(),
-                ))
-            })
+            components
+                .iter()
+                .map(|component| {
+                    let reachable_units = units
+                        .iter()
+                        .filter(|unit| {
+                            component
+                                .iter()
+                                .copied()
+                                .any(|tile| is_goal_reachable(unit, tile))
+                        })
+                        .count();
+                    (
+                        component_score(
+                            map,
+                            component,
+                            click,
+                            centroid,
+                            units.len(),
+                            reachable_units,
+                        ),
+                        component,
+                    )
+                })
+                .min_by_key(|(score, _)| *score)
+                .map(|(_, component)| component)
         });
 
     if let Some(component) = selected {
@@ -154,7 +175,15 @@ fn component_score(
     click: (f32, f32),
     centroid: (f32, f32),
     unit_count: usize,
-) -> (bool, u32, u32, std::cmp::Reverse<usize>, (u32, u32)) {
+    reachable_units: usize,
+) -> (
+    std::cmp::Reverse<usize>,
+    bool,
+    u32,
+    u32,
+    std::cmp::Reverse<usize>,
+    (u32, u32),
+) {
     let mut click_distance = u32::MAX;
     let mut centroid_distance = u32::MAX;
     let mut first = (u32::MAX, u32::MAX);
@@ -165,6 +194,7 @@ fn component_score(
         first = first.min(tile);
     }
     (
+        std::cmp::Reverse(reachable_units),
         component.len() < unit_count,
         click_distance,
         centroid_distance,

@@ -155,8 +155,14 @@ where
         occupied_trenches,
     };
     let desired_points = layout::compact_formation_points(map, units, goal);
-    let landing_patch =
-        landing_patch::cohesive_landing_patch(map, occ, units, goal, &desired_points);
+    let landing_patch = landing_patch::cohesive_landing_patch(
+        map,
+        occ,
+        units,
+        goal,
+        &desired_points,
+        &mut is_goal_reachable,
+    );
     let mut out = Vec::with_capacity(units.len());
     let mut assigned: Vec<FormationAssignment> = Vec::new();
 
