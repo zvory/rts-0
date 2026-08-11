@@ -14,7 +14,7 @@ use rts_sim::game::map::{Map, CURRENT_MAP_VERSION};
 use rts_sim::game::{Game, MapMetadata, PlayerInit};
 use rts_sim::protocol::{MapInfo, StartPayload};
 
-use crate::ai_core::map_analysis::{AiMapAnalysis, AiMapAnalysisDebugSnapshot};
+use crate::ai_core::map_analysis::{AiAttackPathReport, AiMapAnalysis, AiMapAnalysisDebugSnapshot};
 
 const DEFAULT_MAP: &str = "Chokes";
 const DEFAULT_PLAYERS: u32 = 2;
@@ -36,6 +36,9 @@ struct CliConfig {
     tile_px: u32,
     layers: LayerSelection,
     show_grid: bool,
+    defender_player_id: u32,
+    base_count: usize,
+    paths_per_base: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -56,6 +59,7 @@ pub fn run_from_env() {
                 report.map_name, report.players, report.seed, report.debug.choke_count
             );
             println!("svg: {}", report.out.display());
+            println!("json: {}", report.json_out.display());
         }
         Err(err) => {
             eprintln!("ai-map-analysis-debug failed: {err}");
@@ -84,6 +88,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
     let mut tile_px = DEFAULT_TILE_PX;
     let mut layers = LayerSelection::All;
     let mut show_grid = true;
+    let mut defender_player_id = 1;
+    let mut base_count = 1_usize;
+    let mut paths_per_base = 3_usize;
 
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
@@ -113,6 +120,15 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
             "--no-grid" => {
                 show_grid = false;
             }
+            "--defender" => {
+                defender_player_id = parse_u32_flag(&arg, &mut args)?;
+            }
+            "--bases" => {
+                base_count = parse_u32_flag(&arg, &mut args)? as usize;
+            }
+            "--paths-per-base" => {
+                paths_per_base = parse_u32_flag(&arg, &mut args)? as usize;
+            }
             _ => return Err(format!("unknown flag: {arg}")),
         }
     }
@@ -122,6 +138,15 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
     }
     if tile_px == 0 {
         return Err("--tile-px must be greater than zero".to_string());
+    }
+    if defender_player_id == 0 || defender_player_id > players {
+        return Err("--defender must identify one of the active players".to_string());
+    }
+    if base_count == 0 || base_count > 8 {
+        return Err("--bases must be between 1 and 8".to_string());
+    }
+    if paths_per_base == 0 || paths_per_base > 6 {
+        return Err("--paths-per-base must be between 1 and 6".to_string());
     }
 
     let out = out.unwrap_or_else(|| default_out_path(&map_name, seed, &layers));
@@ -133,6 +158,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
         tile_px,
         layers,
         show_grid,
+        defender_player_id,
+        base_count,
+        paths_per_base,
     }))
 }
 
@@ -146,7 +174,10 @@ fn print_usage() {
            --seed <n|0xhex>    deterministic map seed (default: 0x12345678)\n\
            --out <path>        SVG output path (default: /tmp/rts-map-analysis/...svg)\n\
            --tile-px <n>       rendered pixels per map tile (default: 7)\n\
-           --layers <list>     all, or comma-list of chokes,bases,resources\n\
+           --layers <list>     all, or comma-list of attack-paths,chokes,bases,resources\n\
+           --defender <id>     player whose bases are defended (default: 1)\n\
+           --bases <n>         home plus defensibility-ranked expansions (default: 1)\n\
+           --paths-per-base <n> primary/alternate routes per enemy and base (default: 3)\n\
            --no-grid           omit tile grid lines"
     );
 }
@@ -157,6 +188,7 @@ struct RenderReport {
     players: u32,
     seed: u32,
     out: PathBuf,
+    json_out: PathBuf,
     debug: AiMapAnalysisDebugSnapshot,
 }
 
@@ -164,8 +196,16 @@ fn render_map_analysis_svg(config: &CliConfig) -> Result<RenderReport, String> {
     let start = start_payload_for_map(&config.map_name, config.players, config.seed)?;
     let analysis = AiMapAnalysis::analyze(&start);
     let debug = analysis.debug_snapshot();
-    let overlay = analysis.debug_overlay();
-    let svg = render_svg(config, &start, &debug, &overlay.layers)?;
+    let attack_paths = analysis.likely_attack_paths(
+        config.defender_player_id,
+        config.base_count,
+        config.paths_per_base,
+    );
+    let mut overlay = analysis.debug_overlay();
+    overlay
+        .layers
+        .push(attack_path_layer(&attack_paths, start.map.tile_size));
+    let svg = render_svg(config, &start, &debug, &attack_paths, &overlay.layers)?;
 
     if let Some(parent) = config
         .out
@@ -175,12 +215,16 @@ fn render_map_analysis_svg(config: &CliConfig) -> Result<RenderReport, String> {
         std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
     std::fs::write(&config.out, svg).map_err(|err| err.to_string())?;
+    let json_out = config.out.with_extension("json");
+    let json = serde_json::to_string_pretty(&attack_paths).map_err(|err| err.to_string())?;
+    std::fs::write(&json_out, json).map_err(|err| err.to_string())?;
 
     Ok(RenderReport {
         map_name: config.map_name.clone(),
         players: config.players,
         seed: config.seed,
         out: config.out.clone(),
+        json_out,
         debug,
     })
 }
@@ -219,6 +263,7 @@ fn render_svg(
     config: &CliConfig,
     start: &StartPayload,
     debug: &AiMapAnalysisDebugSnapshot,
+    attack_paths: &AiAttackPathReport,
     layers: &[ObserverMapAnalysisLayer],
 ) -> Result<String, String> {
     let map = &start.map;
@@ -248,13 +293,12 @@ fn render_svg(
     .unwrap();
     writeln!(
         out,
-        r#"<text x="8" y="22" fill="{TEXT_FILL}" font-family="monospace" font-size="16" font-weight="700">{} players={} seed={} chokes={} passable={} blocked={}</text>"#,
+        r#"<text x="8" y="22" fill="{TEXT_FILL}" font-family="monospace" font-size="16" font-weight="700">{} defender=P{} bases={} paths={} chokes={}</text>"#,
         escape_xml(&config.map_name),
-        config.players,
-        config.seed,
-        debug.choke_count,
-        debug.passable_tiles,
-        debug.blocked_tiles
+        attack_paths.defender_player_id,
+        attack_paths.bases.len(),
+        attack_paths.paths.len(),
+        debug.choke_count
     )
     .unwrap();
     writeln!(out, r#"<g transform="translate(0 {HEADER_PX})">"#).unwrap();
@@ -268,6 +312,87 @@ fn render_svg(
     writeln!(out, "</g>").unwrap();
     writeln!(out, "</svg>").unwrap();
     Ok(out)
+}
+
+fn attack_path_layer(report: &AiAttackPathReport, tile_size: u32) -> ObserverMapAnalysisLayer {
+    let mut primitives = Vec::new();
+    let tile_size = tile_size as f32;
+    for base in &report.bases {
+        primitives.push(ObserverMapAnalysisPrimitive::Marker {
+            id: format!("defendedBase:{}", base.id),
+            x: (base.tile_x as f32 + 0.5) * tile_size,
+            y: (base.tile_y as f32 + 0.5) * tile_size,
+            radius: tile_size * 1.2,
+            shape: "square".to_string(),
+            color: "#4cc9f0".to_string(),
+            label: Some(format!("B{} {}", base.id, base.label)),
+            tooltip: Some(format!(
+                "Defended base B{}: +{} new vectors, {}% route sharing, {} open approaches, {:.1} tiles from home.",
+                base.id,
+                base.added_attack_vectors,
+                base.shared_route_percent,
+                base.open_approaches,
+                base.distance_from_home_tiles
+            )),
+        });
+    }
+    for path in &report.paths {
+        let color = match path.alternative_rank {
+            1 => "#ff3b30",
+            2 => "#ff9f0a",
+            _ => "#ffd60a",
+        };
+        for (segment, pair) in path.tiles.windows(2).enumerate() {
+            primitives.push(ObserverMapAnalysisPrimitive::Line {
+                id: format!("attackPath:{}:{segment}", path.id),
+                x1: (pair[0][0] as f32 + 0.5) * tile_size,
+                y1: (pair[0][1] as f32 + 0.5) * tile_size,
+                x2: (pair[1][0] as f32 + 0.5) * tile_size,
+                y2: (pair[1][1] as f32 + 0.5) * tile_size,
+                color: color.to_string(),
+                alpha: if path.alternative_rank == 1 {
+                    0.92
+                } else {
+                    0.64
+                },
+                width: if path.alternative_rank == 1 { 5.0 } else { 3.0 },
+                label: None,
+                tooltip: None,
+            });
+        }
+        primitives.push(ObserverMapAnalysisPrimitive::Marker {
+            id: format!("bottleneck:{}", path.id),
+            x: (path.bottleneck_tile_x as f32 + 0.5) * tile_size,
+            y: (path.bottleneck_tile_y as f32 + 0.5) * tile_size,
+            radius: tile_size * 0.55,
+            shape: "diamond".to_string(),
+            color: "#d000ff".to_string(),
+            label: Some(format!("P{} W{}", path.id, path.bottleneck_width_tiles)),
+            tooltip: Some(format!(
+                "Path {} bottleneck/opening, estimated clearance {} tiles; crossed chokes {:?}.",
+                path.id, path.bottleneck_width_tiles, path.crossed_choke_ids
+            )),
+        });
+        primitives.push(ObserverMapAnalysisPrimitive::Marker {
+            id: format!("intercept:{}", path.id),
+            x: (path.intercept_tile_x as f32 + 0.5) * tile_size,
+            y: (path.intercept_tile_y as f32 + 0.5) * tile_size,
+            radius: tile_size * 0.42,
+            shape: "square".to_string(),
+            color: "#00f5d4".to_string(),
+            label: Some(format!("I{}", path.id)),
+            tooltip: Some(format!(
+                "Suggested static interception point for path {}.",
+                path.id
+            )),
+        });
+    }
+    ObserverMapAnalysisLayer {
+        id: "attack-paths".to_string(),
+        label: "Likely attack paths".to_string(),
+        default_visible: true,
+        primitives,
+    }
 }
 
 fn render_terrain(out: &mut String, map: &MapInfo, tile_px: u32, show_grid: bool) {
@@ -512,7 +637,7 @@ fn parse_layers(value: &str) -> Result<LayerSelection, String> {
         if id.is_empty() {
             continue;
         }
-        if !matches!(id, "chokes" | "bases" | "resources") {
+        if !matches!(id, "attack-paths" | "chokes" | "bases" | "resources") {
             return Err(format!("unknown map-analysis layer: {id}"));
         }
         ids.insert(id.to_string());
@@ -623,13 +748,18 @@ mod tests {
             tile_px: 2,
             layers: parse_layers("chokes").unwrap(),
             show_grid: false,
+            defender_player_id: 1,
+            base_count: 1,
+            paths_per_base: 2,
         };
         let start = start_payload_for_map(&config.map_name, config.players, config.seed)
             .expect("default map should load");
         let analysis = AiMapAnalysis::analyze(&start);
         let debug = analysis.debug_snapshot();
         let overlay = analysis.debug_overlay();
-        let svg = render_svg(&config, &start, &debug, &overlay.layers).expect("svg renders");
+        let attack_paths = analysis.likely_attack_paths(1, 1, 2);
+        let svg = render_svg(&config, &start, &debug, &attack_paths, &overlay.layers)
+            .expect("svg renders");
 
         assert!(svg.contains("Chokes"));
         assert!(svg.contains("layer-chokes"));
