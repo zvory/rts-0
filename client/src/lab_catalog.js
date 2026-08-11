@@ -68,35 +68,45 @@ export class LabCatalogScreen {
     this.error = "";
     this.render();
     try {
-      const [scenarioResponse, mapResponse] = await Promise.all([
-        this.fetchImpl(LAB_CATALOG_ENDPOINT, { cache: "no-store" }),
-        this.fetchImpl(MAP_CATALOG_ENDPOINT, { cache: "no-store" }),
+      const [scenarioResult, mapResult] = await Promise.allSettled([
+        this.fetchScenarioCatalog(),
+        this.fetchMapCatalog(),
       ]);
-      if (!scenarioResponse?.ok) {
-        throw new Error(`setup catalog request failed: ${scenarioResponse?.status || "network"}`);
-      }
-      if (!mapResponse?.ok) {
-        throw new Error(`map catalog request failed: ${mapResponse?.status || "network"}`);
-      }
-      const rows = await scenarioResponse.json();
-      const mapCatalog = await mapResponse.json();
-      this.entries = Array.isArray(rows)
-        ? rows.map((entry) => normalizeLabScenarioEntry(entry)).filter((entry) => entry.id)
-        : [];
-      this.maps = Array.isArray(mapCatalog?.maps)
-        ? mapCatalog.maps.map((entry) => normalizeLabMapEntry(entry)).filter(Boolean)
-        : [];
-      if (this.maps.length === 0) throw new Error("map catalog is empty");
-      this.status = "";
-    } catch (_) {
-      this.entries = [];
-      this.maps = [];
-      this.error = "Setup catalog unavailable.";
+      this.entries = scenarioResult.status === "fulfilled" ? scenarioResult.value : [];
+      this.maps = mapResult.status === "fulfilled" ? mapResult.value : [];
+      const errors = [];
+      if (scenarioResult.status === "rejected") errors.push("Setup catalog unavailable.");
+      if (mapResult.status === "rejected") errors.push("Map catalog unavailable.");
+      this.error = errors.join(" ");
       this.status = this.error;
     } finally {
       this.loading = false;
       this.render();
     }
+  }
+
+  async fetchScenarioCatalog() {
+    const response = await this.fetchImpl(LAB_CATALOG_ENDPOINT, { cache: "no-store" });
+    if (!response?.ok) {
+      throw new Error(`setup catalog request failed: ${response?.status || "network"}`);
+    }
+    const rows = await response.json();
+    return Array.isArray(rows)
+      ? rows.map((entry) => normalizeLabScenarioEntry(entry)).filter((entry) => entry.id)
+      : [];
+  }
+
+  async fetchMapCatalog() {
+    const response = await this.fetchImpl(MAP_CATALOG_ENDPOINT, { cache: "no-store" });
+    if (!response?.ok) {
+      throw new Error(`map catalog request failed: ${response?.status || "network"}`);
+    }
+    const catalog = await response.json();
+    const maps = Array.isArray(catalog?.maps)
+      ? catalog.maps.map((entry) => normalizeLabMapEntry(entry)).filter(Boolean)
+      : [];
+    if (maps.length === 0) throw new Error("map catalog is empty");
+    return maps;
   }
 
   render() {

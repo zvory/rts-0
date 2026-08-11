@@ -226,6 +226,74 @@ await withFakeDocument(() => {
   );
 });
 
+await withFakeDocument(async () => {
+  const root = document.createElement("section");
+  const starts = [];
+  const screen = new LabCatalogScreen({
+    root,
+    initialRoom: "partial",
+    fetchImpl: async (url) => {
+      if (url === "/maps/catalog") return { ok: false, status: 500 };
+      return {
+        ok: true,
+        async json() {
+          return [{ id: "lategame", title: "Lategame Arsenal", map: "Chokes" }];
+        },
+      };
+    },
+    onStart: (launch) => starts.push(launch),
+  });
+  await screen.loadCatalog();
+  screen.setConnected(true);
+
+  const newLabButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start lab",
+  )[0];
+  const scenarioButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start setup",
+  )[0];
+  assert(newLabButton.disabled, "LabCatalogScreen disables new Labs when map discovery fails");
+  scenarioButton.listeners.click();
+  assert(
+    starts[0]?.scenario === "lategame" && starts[0]?.map === "Chokes",
+    "LabCatalogScreen keeps bundled setups usable when map discovery fails",
+  );
+});
+
+await withFakeDocument(async () => {
+  const root = document.createElement("section");
+  const starts = [];
+  const screen = new LabCatalogScreen({
+    root,
+    initialRoom: "partial",
+    fetchImpl: async (url) => {
+      if (url === "/api/lab-scenarios") return { ok: false, status: 500 };
+      return {
+        ok: true,
+        async json() {
+          return { maps: [{ name: "Chokes" }] };
+        },
+      };
+    },
+    onStart: (launch) => starts.push(launch),
+  });
+  await screen.loadCatalog();
+  screen.setConnected(true);
+
+  const newLabButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start lab",
+  )[0];
+  assert(!newLabButton.disabled, "LabCatalogScreen enables new Labs when map discovery succeeds");
+  newLabButton.listeners.click();
+  assert(
+    starts[0]?.scenario === "blank" && starts[0]?.map === "Chokes",
+    "LabCatalogScreen keeps new Labs usable when setup discovery fails",
+  );
+});
+
 {
   const sent = [];
   const net = new Net("ws://example.test/ws");
