@@ -46,7 +46,7 @@ fn parse_lab_room(raw: &str) -> Option<LabRoomConfig> {
     let mut scenario = None;
     for part in parts {
         if let Some(map) = part.strip_prefix("map=") {
-            if !safe_lab_token(map, 48) {
+            if !safe_lab_map_name(map) {
                 return None;
             }
             map_name = map.to_string();
@@ -82,6 +82,15 @@ fn safe_lab_token(value: &str, max_len: usize) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
+fn safe_lab_map_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 48
+        && value.trim() == value
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b' ' | b'_' | b'-'))
 }
 
 pub(super) fn match_seed() -> u32 {
@@ -191,6 +200,14 @@ mod tests {
     }
 
     #[test]
+    fn room_mode_for_accepts_bundled_map_names_with_spaces() {
+        match room_mode_for("__lab__:sandbox:map=Open Basin") {
+            RoomMode::Lab(config) => assert_eq!(config.map_name, "Open Basin"),
+            _ => panic!("safe bundled map name should parse as lab mode"),
+        }
+    }
+
+    #[test]
     fn room_mode_for_accepts_default_lab_scenario_preset() {
         match room_mode_for("__lab__:sandbox:scenario=blank") {
             RoomMode::Lab(config) => {
@@ -221,7 +238,7 @@ mod tests {
             RoomMode::Normal
         ));
         assert!(matches!(
-            room_mode_for("__lab__:sandbox:map=Low Econ"),
+            room_mode_for("__lab__:sandbox:map=bad/map"),
             RoomMode::Normal
         ));
         assert!(matches!(
