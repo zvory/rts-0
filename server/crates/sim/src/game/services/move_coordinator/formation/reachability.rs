@@ -74,7 +74,7 @@ impl ReachabilityGrid {
         for ty in 0..map.height {
             for tx in 0..map.width {
                 let idx = map.index(tx, ty);
-                passable[idx] = reachability_tile_passable(map, occ, kind, tx as i32, ty as i32);
+                passable[idx] = tile_passable_for_kind(map, occ, kind, tx as i32, ty as i32);
             }
         }
 
@@ -160,7 +160,7 @@ impl ReachabilityGrid {
     }
 }
 
-fn reachability_tile_passable(
+pub(super) fn tile_passable_for_kind(
     map: &Map,
     occ: &Occupancy<'_>,
     kind: EntityKind,

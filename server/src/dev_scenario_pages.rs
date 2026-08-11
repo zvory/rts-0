@@ -302,6 +302,7 @@ mod tests {
             html.contains("/dev/scenarios?id=scout_car_lake_reverse_l_path&unit=scout_car&count=1")
         );
         assert!(html.contains("/dev/scenarios?id=replay_142_vehicle_lock&unit=scout_car&count=2"));
+        assert!(html.contains("/dev/scenarios?id=replay_296_scout_car_stop&unit=scout_car&count=5"));
         assert!(html
             .contains("/dev/scenarios?id=replay_238_rifleman_corner_lock&unit=rifleman&count=1"));
         assert!(

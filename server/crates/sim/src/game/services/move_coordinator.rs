@@ -1385,44 +1385,6 @@ mod tests {
     }
 
     #[test]
-    fn path_failed_is_set_on_unreachable_goal() {
-        let map = Map::generate(1, 0x1234_5678);
-        let mut entities = EntityStore::new();
-        let (ux, uy) = map.tile_center(10, 10);
-        let id = entities
-            .spawn_unit(1, EntityKind::Rifleman, ux, uy)
-            .unwrap();
-
-        // Completely surround tile (10, 10) with a ring of 2x2 depots so the unit
-        // cannot leave.  Depots centered at tile-centers that keep (10,10) open.
-        let ring = [(8.0, 10.0), (12.0, 10.0), (10.0, 8.0), (10.0, 12.0)];
-        for &(cx, cy) in &ring {
-            let (wx, wy) = map.tile_center(cx as u32, cy as u32);
-            entities.spawn_building(1, EntityKind::Depot, wx, wy, true);
-        }
-
-        let occ = Occupancy::build(&map, &entities);
-        let mut pathing = PathingService::new(8_192, 256);
-        pathing.advance_tick(1);
-        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-
-        let (gx, gy) = map.tile_center(30, 30);
-        coordinator.order_group_move(&mut entities, 1, &[id], (gx, gy), false);
-
-        // The unit should be in AwaitingPath after the order.
-        let e = entities.get(id).unwrap();
-        assert_eq!(e.move_phase(), Some(MovePhase::AwaitingPath));
-
-        // Process awaiting paths.
-        coordinator.process_awaiting_paths(&mut entities);
-
-        // The unit is fully enclosed, so no route exists → PathFailed.
-        let e = entities.get(id).unwrap();
-        assert_eq!(e.move_phase(), Some(MovePhase::PathFailed));
-        assert!(e.path_is_empty());
-    }
-
-    #[test]
     fn same_tile_plain_move_arrives_and_clears_active_order() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();

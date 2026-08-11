@@ -1,8 +1,7 @@
 use super::{is_free_goal, preferred_gap_tiles, FormationAssignment, FormationUnit, Occupancy};
 use crate::game::map::Map;
 
-/// Keep compact vehicle spacing strict while looking for the nearest local fallback tile. Reachable
-/// candidates are preferred; a free fallback can still let normal path processing report failure.
+/// Keep compact vehicle spacing strict while looking for the nearest reachable local tile.
 pub(super) fn find_unique_tile_near<F>(
     map: &Map,
     occ: &Occupancy,
@@ -21,11 +20,6 @@ where
     find_tile_near(anchor, |tile| {
         is_free_goal(map, occ, unit, tile, assigned, require_spacing)
             && is_goal_reachable(unit, tile)
-    })
-    .or_else(|| {
-        find_tile_near(anchor, |tile| {
-            is_free_goal(map, occ, unit, tile, assigned, require_spacing)
-        })
     })
 }
 
