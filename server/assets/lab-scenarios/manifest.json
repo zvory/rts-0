@@ -4,7 +4,6 @@
       "id": "lategame",
       "title": "Lategame Arsenal",
       "description": "Two-player late-game lab with full tech, large armies, and maximum resources.",
-      "tags": ["two-player", "lategame", "full-tech"],
       "map": "1v1",
       "playerCount": 2,
       "filename": "lategame.json"
@@ -13,7 +12,6 @@
       "id": "render-preview",
       "title": "Render Preview",
       "description": "Imported two-player lab setup for checking exported render coverage.",
-      "tags": ["two-player", "render-preview", "imported"],
       "map": "1v1",
       "playerCount": 2,
       "filename": "render-preview.json"
@@ -22,7 +20,6 @@
       "id": "tank-trap-cluster-clear",
       "title": "Tank Trap Cluster Clearing",
       "description": "Three tanks and ten neutral Tank Traps arranged to demonstrate four-tile A-click cluster clearing, with two out-of-radius controls.",
-      "tags": ["combat", "tank-trap", "attack-command"],
       "map": "1v1",
       "playerCount": 2,
       "filename": "tank-trap-cluster-clear.json"
@@ -31,7 +28,6 @@
       "id": "fixed-roster-hellhole",
       "title": "Fixed Roster 2v2 Hellhole",
       "description": "Four-player 2v2 Lab stress setup with a fixed 77-unit mix per player, 470 isolated stone occluders, two dense interleaved central armies, and two scripted diagonal shuttle armies.",
-      "tags": ["four-player", "2v2", "stress", "frame-budget"],
       "map": "Chokes",
       "playerCount": 4,
       "filename": "fixed-roster-hellhole.json"
@@ -40,12 +36,6 @@
       "id": "lighting-test",
       "title": "Lighting Test",
       "description": "Nine terrain studies under a northwesterly 12-degree sunset, each staged with a tank, scout car, machine gunner, and rifleman for unified terrain-and-unit shadow experiments.",
-      "tags": [
-        "shadows",
-        "terrain",
-        "gpu",
-        "playground"
-      ],
       "map": "Lighting Test",
       "playerCount": 2,
       "filename": "lighting-test.json"

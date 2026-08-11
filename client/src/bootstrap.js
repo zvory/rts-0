@@ -167,6 +167,12 @@ function safeLabToken(value, fallback, maxLen) {
   return raw;
 }
 
+function safeLabMapName(value, fallback = "1v1") {
+  const raw = String(value || "").trim() || fallback;
+  if (!/^[A-Za-z0-9 _-]+$/.test(raw) || raw.length > 48) return fallback;
+  return raw;
+}
+
 function safeLabSeed(value) {
   const raw = String(value || "").trim();
   return /^[0-9]+$/.test(raw) && Number(raw) <= 0xffffffff ? raw : "";
@@ -187,7 +193,7 @@ function isLabPath(pathname) {
 
 export function buildLabLaunchConfig({ room, map, seed = "", scenario = "", visualProfile = "" } = {}) {
   const publicRoom = safeLabToken(room, "default", 40);
-  const mapName = safeLabToken(map, "1v1", 48);
+  const mapName = safeLabMapName(map);
   const seedPart = safeLabSeed(seed);
   const scenarioId = safeLabToken(scenario, "", 48);
   const visualProfileResult = safeLabVisualProfile(visualProfile);
@@ -238,7 +244,7 @@ export function replaceLabCatalogRoute(launch, {
   params.delete("rtsRenderer");
   params.set("scenario", safeLabToken(launch.scenario, "blank", 48));
 
-  const mapName = safeLabToken(launch.map, "1v1", 48);
+  const mapName = safeLabMapName(launch.map);
   if (mapName === "1v1") params.delete("map");
   else params.set("map", mapName);
 

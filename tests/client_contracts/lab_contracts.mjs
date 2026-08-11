@@ -101,6 +101,7 @@ import { textWithin } from "./dom_text.mjs";
   });
   assert(normalized.id === "lategame", "lab catalog entry keeps stable setup id");
   assert(normalized.playerCount === 2, "lab catalog entry keeps bounded player count metadata");
+  assert(!("tags" in normalized), "lab catalog entries discard obsolete tag metadata");
   assert(!("scenario" in normalized), "lab catalog entry normalization keeps full setup JSON out of the listing model");
 }
 
@@ -140,13 +141,21 @@ import { textWithin } from "./dom_text.mjs";
 await withFakeDocument(async () => {
   const root = document.createElement("section");
   const starts = [];
-  let requestedUrl = "";
+  const requestedUrls = [];
   const screen = new LabCatalogScreen({
     root,
     initialRoom: "sandbox",
     fetchImpl: async (url, options) => {
-      requestedUrl = url;
+      requestedUrls.push(url);
       assert(options.cache === "no-store", "LabCatalogScreen requests the catalog without cache");
+      if (url === "/maps/catalog") {
+        return {
+          ok: true,
+          async json() {
+            return { maps: [{ name: "1v1" }, { name: "Chokes" }] };
+          },
+        };
+      }
       return {
         ok: true,
         async json() {
@@ -155,7 +164,6 @@ await withFakeDocument(async () => {
               id: "lategame",
               title: "Lategame Arsenal",
               description: "Full tech setup",
-              tags: ["two-player", "lategame"],
               map: "Chokes",
               playerCount: 2,
               filename: "lategame.json",
@@ -167,12 +175,14 @@ await withFakeDocument(async () => {
     onStart: (launch) => starts.push(launch),
   });
   screen.mount();
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert(requestedUrl === "/api/lab-scenarios", "LabCatalogScreen loads the server catalog endpoint");
-  assert(textWithin(root).includes("Blank Lab"), "LabCatalogScreen renders a blank lab start row");
+  assert(
+    requestedUrls.includes("/api/lab-scenarios") && requestedUrls.includes("/maps/catalog"),
+    "LabCatalogScreen loads the setup and map catalogs",
+  );
+  assert(textWithin(root).includes("New Lab"), "LabCatalogScreen renders the new Lab map row first");
+  assert(!textWithin(root).includes("two-player"), "LabCatalogScreen does not render scenario tags");
   assert(textWithin(root).includes("Lategame Arsenal"), "LabCatalogScreen renders bundled setup metadata");
   screen.setConnected(true);
   const scenarioButton = findFakes(
@@ -196,17 +206,91 @@ await withFakeDocument(() => {
     initialRoom: "sandbox",
     onStart: (launch) => starts.push(launch),
   });
+  screen.maps = [{ name: "1v1" }, { name: "Chokes" }];
   screen.setConnected(true);
-  const blankButton = findFakes(
+  const mapSelect = findFakes(
     root,
-    (el) => el.tagName === "BUTTON" && el.textContent === "Start blank",
+    (el) => el.tagName === "SELECT" && el["aria-label"] === "New Lab map",
   )[0];
-  blankButton.listeners.click();
+  mapSelect.value = "Chokes";
+  const newLabButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start lab",
+  )[0];
+  newLabButton.listeners.click();
   assert(
     starts[0]?.room === "sandbox" &&
-      starts[0]?.map === "1v1" &&
+      starts[0]?.map === "Chokes" &&
       starts[0]?.scenario === "blank",
-    "LabCatalogScreen starts blank labs on the current default 1v1 map",
+    "LabCatalogScreen starts a new Lab on the selected bundled map",
+  );
+});
+
+await withFakeDocument(async () => {
+  const root = document.createElement("section");
+  const starts = [];
+  const screen = new LabCatalogScreen({
+    root,
+    initialRoom: "partial",
+    fetchImpl: async (url) => {
+      if (url === "/maps/catalog") return { ok: false, status: 500 };
+      return {
+        ok: true,
+        async json() {
+          return [{ id: "lategame", title: "Lategame Arsenal", map: "Chokes" }];
+        },
+      };
+    },
+    onStart: (launch) => starts.push(launch),
+  });
+  await screen.loadCatalog();
+  screen.setConnected(true);
+
+  const newLabButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start lab",
+  )[0];
+  const scenarioButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start setup",
+  )[0];
+  assert(newLabButton.disabled, "LabCatalogScreen disables new Labs when map discovery fails");
+  scenarioButton.listeners.click();
+  assert(
+    starts[0]?.scenario === "lategame" && starts[0]?.map === "Chokes",
+    "LabCatalogScreen keeps bundled setups usable when map discovery fails",
+  );
+});
+
+await withFakeDocument(async () => {
+  const root = document.createElement("section");
+  const starts = [];
+  const screen = new LabCatalogScreen({
+    root,
+    initialRoom: "partial",
+    fetchImpl: async (url) => {
+      if (url === "/api/lab-scenarios") return { ok: false, status: 500 };
+      return {
+        ok: true,
+        async json() {
+          return { maps: [{ name: "Chokes" }] };
+        },
+      };
+    },
+    onStart: (launch) => starts.push(launch),
+  });
+  await screen.loadCatalog();
+  screen.setConnected(true);
+
+  const newLabButton = findFakes(
+    root,
+    (el) => el.tagName === "BUTTON" && el.textContent === "Start lab",
+  )[0];
+  assert(!newLabButton.disabled, "LabCatalogScreen enables new Labs when map discovery succeeds");
+  newLabButton.listeners.click();
+  assert(
+    starts[0]?.scenario === "blank" && starts[0]?.map === "Chokes",
+    "LabCatalogScreen keeps new Labs usable when setup discovery fails",
   );
 });
 
@@ -281,12 +365,11 @@ await withFakeDocument(() => {
     name: "Saved setup",
     title: "Saved setup",
     description: "Ready to review.",
-    tags: ["test"],
   });
   assert(
     sent.at(-1).op.op === "validateScenario" &&
       sent.at(-1).op.metadata.slug === "saved-setup" &&
-      sent.at(-1).op.metadata.tags[0] === "test",
+      !("tags" in sent.at(-1).op.metadata),
     "LabClient sends setup authoring validation requests with metadata",
   );
   labClient.resetScenario();
@@ -1105,13 +1188,12 @@ await withFakeDocument(async () => {
   panel.fields.get("scenario-title").value = "Saved Setup";
   panel.fields.get("scenario-slug").value = "saved-setup";
   panel.fields.get("scenario-description").value = "A catalog-ready saved setup.";
-  panel.fields.get("scenario-tags").value = "two-player, test";
   const validatePromise = buttonByText("Validate setup").listeners.click();
   assert(
     sent.at(-1).op.op === "validateScenario" &&
       sent.at(-1).op.metadata.slug === "saved-setup" &&
       sent.at(-1).op.metadata.description === "A catalog-ready saved setup." &&
-      sent.at(-1).op.metadata.tags.length === 2,
+      !("tags" in sent.at(-1).op.metadata),
     "LabPanel validates setup authoring metadata through LabClient",
   );
   resolveLastLabResult({

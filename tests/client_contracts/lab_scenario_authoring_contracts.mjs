@@ -16,21 +16,18 @@ const valid = validateLabScenarioAuthoringState({
   name: "Two Player Test",
   title: "Two Player Test",
   description: "Small deterministic setup.",
-  tags: "two-player, test",
 });
-assert(valid.ok && valid.metadata.tags.length === 2, "lab setup authoring accepts catalog-ready metadata");
+assert(valid.ok && !("tags" in valid.metadata), "lab setup authoring metadata has no tag concept");
 
 const invalid = validateLabScenarioAuthoringState({
   slug: "bad slug",
   name: "",
   title: "Bad",
   description: "",
-  tags: "bad tag",
 });
 assert(
   !invalid.ok &&
     invalid.errors.some((error) => error.includes("Slug")) &&
-    invalid.errors.some((error) => error.includes("Name")) &&
-    invalid.errors.some((error) => error.includes("Tag")),
+    invalid.errors.some((error) => error.includes("Name")),
   "lab setup authoring reports blocking metadata errors before server validation",
 );

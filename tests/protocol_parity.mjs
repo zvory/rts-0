@@ -493,13 +493,13 @@ assert(
   "lab checkpoint setup import builder must emit the exact wire shape",
 );
 assert(
-  JSON.stringify(msg.labValidateScenario(16, { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] })) ===
+  JSON.stringify(msg.labValidateScenario(16, { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready" })) ===
     JSON.stringify({
       t: "lab",
       requestId: 16,
       op: {
         op: "validateScenario",
-        metadata: { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready", tags: ["test"] },
+        metadata: { slug: "new-lab", name: "New Lab", title: "New Lab", description: "Ready" },
       },
     }),
   "lab setup validation builder must emit the exact wire shape",

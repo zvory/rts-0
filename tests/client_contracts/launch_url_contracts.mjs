@@ -163,7 +163,14 @@ async function testLabLaunchConfig() {
       "lab launch should build the server lab room id",
     );
 
-    globalThis.window.location = new URL("http://localhost/lab?room=bad/room&map=bad map");
+    globalThis.window.location = new URL("http://localhost/lab?room=sandbox&map=Open%20Basin");
+    config = labLaunchConfig();
+    assert(
+      config.map === "Open Basin" && config.room === "__lab__:sandbox:map=Open Basin",
+      "lab launch preserves safe bundled map names containing spaces",
+    );
+
+    globalThis.window.location = new URL("http://localhost/lab?room=bad/room&map=bad/map");
     config = labLaunchConfig();
     assert(
       config.room === "__lab__:default:map=1v1",

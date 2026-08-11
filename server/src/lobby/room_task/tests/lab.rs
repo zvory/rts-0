@@ -256,7 +256,6 @@ fn lab_authoring_validation_returns_catalog_preview_without_mutating_lab() {
                 name: "Room Dry Run".to_string(),
                 title: "Room Dry Run".to_string(),
                 description: "Dry-run validation from the authoritative lab game.".to_string(),
-                tags: vec!["test".to_string()],
             },
         },
     );
