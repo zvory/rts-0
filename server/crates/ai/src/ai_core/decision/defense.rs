@@ -26,6 +26,8 @@ const JEFF_DEFENSIVE_LINE_RIFLEMEN_PER_EXTRA_TILE: usize = 2;
 const JEFF_SHARED_APPROACH_RADIUS_TILES: f32 = 6.0;
 const JEFF_FLANK_RESERVE_SEPARATION_TILES: f32 = 12.0;
 const JEFF_PRIMARY_LINE_MIN_RIFLEMEN: usize = 6;
+const JEFF_PRIMARY_LINE_RIFLEMEN_BUDGET: usize = 40;
+const JEFF_RIFLEMEN_PER_LATTICE_BAND: usize = 20;
 const JEFF_BREAKTHROUGH_WARNING_TILES: f32 = 6.0;
 const JEFF_STATIONARY_TANK_RANGE_TILES: f32 = 14.0;
 const JEFF_RESERVE_LINE_DEPTH_TILES: f32 = 4.0;
@@ -580,6 +582,14 @@ mod tests {
         .sqrt();
         assert!((diagonal_spacing - 10.0).abs() < 0.001);
 
+        let next_band_front = jeff_rifle_lattice_slot(2, 20, 12.0, 11.0, 10.0);
+        let next_band_rear = jeff_rifle_lattice_slot(2, 22, 12.0, 11.0, 10.0);
+        assert_eq!(next_band_front.lateral_tiles, -17.0);
+        assert!(
+            (next_band_front.depth_tiles - 10.0_f32.mul_add(3.0_f32.sqrt(), 0.0)).abs() < 0.001
+        );
+        assert!((next_band_rear.depth_tiles - 15.0_f32.mul_add(3.0_f32.sqrt(), 0.0)).abs() < 0.001);
+
         let no_anchor_left = jeff_rifle_lattice_slot(0, 0, 12.0, 11.0, 10.0);
         let no_anchor_right = jeff_rifle_lattice_slot(0, 1, 12.0, 11.0, 10.0);
         let no_anchor_rear = jeff_rifle_lattice_slot(0, 2, 12.0, 11.0, 10.0);
@@ -587,6 +597,14 @@ mod tests {
         assert_eq!(no_anchor_right.lateral_tiles, 5.0);
         assert_eq!(no_anchor_rear.lateral_tiles, 0.0);
         assert!((no_anchor_rear.depth_tiles - 5.0_f32.mul_add(3.0_f32.sqrt(), 0.0)).abs() < 0.001);
+    }
+
+    #[test]
+    fn jeff_defense_keeps_late_surplus_available_for_attacks() {
+        assert_eq!(jeff_primary_rifle_count(12, 0), 12);
+        assert_eq!(jeff_primary_rifle_count(30, 1), 28);
+        assert_eq!(jeff_primary_rifle_count(54, 0), 40);
+        assert_eq!(jeff_primary_rifle_count(54, 1), 40);
     }
 
     #[test]
@@ -1147,8 +1165,11 @@ pub(super) fn stage_jeff_attack_path_defense(
         .saturating_sub(center_routes.len() * JEFF_PRIMARY_LINE_MIN_RIFLEMEN)
         / 2;
     reserve_routes.truncate(affordable_reserve_pairs);
-    let primary_rifle_count = riflemen.len().saturating_sub(reserve_routes.len() * 2);
-    let mut rifle_assignments = Vec::with_capacity(riflemen.len());
+    // A mature line needs depth, but consuming every late Rifleman here leaves no coherent push.
+    // Forty primary defenders produce two staggered bands on one route or one band on each of two
+    // protected-base routes; later Riflemen remain available to the normal attack-wave planner.
+    let primary_rifle_count = jeff_primary_rifle_count(riflemen.len(), reserve_routes.len());
+    let mut rifle_assignments = Vec::with_capacity(primary_rifle_count + reserve_routes.len() * 2);
     for index in 0..primary_rifle_count {
         rifle_assignments.push(center_routes[(index / 2) % center_routes.len()]);
     }
@@ -1243,6 +1264,8 @@ fn jeff_rifle_lattice_slot(
     rifle_from_mg_spacing: f32,
     rifle_spacing: f32,
 ) -> JeffRifleLatticeSlot {
+    let lattice_band = slot_index / JEFF_RIFLEMEN_PER_LATTICE_BAND;
+    let slot_index = slot_index % JEFF_RIFLEMEN_PER_LATTICE_BAND;
     let first_rifle_offset = if machine_gunners_on_route == 0 {
         rifle_spacing * 0.5
     } else {
@@ -1288,8 +1311,15 @@ fn jeff_rifle_lattice_slot(
 
     JeffRifleLatticeSlot {
         lateral_tiles,
-        depth_tiles: if rear_rank { rear_depth } else { 0.0 },
+        depth_tiles: lattice_band as f32 * rear_depth * 2.0
+            + if rear_rank { rear_depth } else { 0.0 },
     }
+}
+
+fn jeff_primary_rifle_count(total_riflemen: usize, reserve_route_count: usize) -> usize {
+    total_riflemen
+        .saturating_sub(reserve_route_count * 2)
+        .min(JEFF_PRIMARY_LINE_RIFLEMEN_BUDGET)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

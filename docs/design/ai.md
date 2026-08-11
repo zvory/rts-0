@@ -217,8 +217,11 @@ production, and combat. Its entrenched infantry defense is anchored to the final
 10-14 tiles from each protected Resource Depot, including a submitted expansion while its builder
 is traveling. Additional Rifleman coverage can move that line outward gradually, with a hard
 36-tile cap. The first two Machine Gunners hold the approach center while Riflemen form a
-two-tile-overlap triangular lattice; only surplus Riflemen may form one two-unit reserve on a
-meaningfully separate flank per base. Submitted construction footprints remain clear. Threats are
+two-tile-overlap triangular lattice. Each 20-Rifleman band wraps into another staggered pair of
+rear ranks instead of widening without bound, and at most 40 Riflemen are committed to the primary
+wall so a mature army retains a coherent offensive surplus. Only Riflemen beyond the six-per-line
+core may form one two-unit reserve on a meaningfully separate flank per base. Submitted
+construction footprints remain clear. Threats are
 reinforced before they cross the line, without pulling stationary Tanks or entrenched infantry out
 of their positional bonuses, and borrowed mobile responders return behind the same line afterward.
 
