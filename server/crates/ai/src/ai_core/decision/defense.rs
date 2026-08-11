@@ -20,9 +20,9 @@ const DEFENSIVE_FIRING_POSITION_SEARCH_TILES: i32 = 6;
 const JEFF_DEFENSIVE_RANGE_OVERLAP_TILES: f32 = 2.0;
 const JEFF_DEFENSIVE_LINE_MIN_DISTANCE_TILES: u32 = 10;
 const JEFF_DEFENSIVE_LINE_EARLY_MAX_DISTANCE_TILES: u32 = 14;
-const JEFF_DEFENSIVE_LINE_MAX_DISTANCE_TILES: u32 = 22;
+const JEFF_DEFENSIVE_LINE_MAX_DISTANCE_TILES: u32 = 36;
 const JEFF_DEFENSIVE_LINE_GROWTH_RIFLEMEN: usize = 12;
-const JEFF_DEFENSIVE_LINE_RIFLEMEN_PER_EXTRA_TILE: usize = 4;
+const JEFF_DEFENSIVE_LINE_RIFLEMEN_PER_EXTRA_TILE: usize = 2;
 const JEFF_SHARED_APPROACH_RADIUS_TILES: f32 = 6.0;
 const JEFF_FLANK_RESERVE_SEPARATION_TILES: f32 = 12.0;
 const JEFF_PRIMARY_LINE_MIN_RIFLEMEN: usize = 6;
@@ -602,11 +602,11 @@ mod tests {
         );
         assert_eq!(
             jeff_defense_distance_tiles(&primary, &base, &routes, 16),
-            15
+            16
         );
         assert_eq!(
             jeff_defense_distance_tiles(&primary, &base, &routes, usize::MAX),
-            22
+            36
         );
     }
 

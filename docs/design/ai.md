@@ -216,7 +216,7 @@ fog-filtered observations, and issues ordinary validated player commands for spe
 production, and combat. Its entrenched infantry defense is anchored to the final shared approach
 10-14 tiles from each protected Resource Depot, including a submitted expansion while its builder
 is traveling. Additional Rifleman coverage can move that line outward gradually, with a hard
-22-tile cap. The first two Machine Gunners hold the approach center while Riflemen form a
+36-tile cap. The first two Machine Gunners hold the approach center while Riflemen form a
 two-tile-overlap triangular lattice; only surplus Riflemen may form one two-unit reserve on a
 meaningfully separate flank per base. Submitted construction footprints remain clear. Threats are
 reinforced before they cross the line, without pulling stationary Tanks or entrenched infantry out
