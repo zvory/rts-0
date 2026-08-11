@@ -140,7 +140,7 @@ export function _vehicleShadow(g, cx, cy, body, facing) {
 
 export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
   const selected = selection.has(e.id);
-  const hasHealth = Number.isFinite(e.maxHp) && e.maxHp > 0;
+  const hasHealth = !isResource(e.kind) && Number.isFinite(e.maxHp) && e.maxHp > 0;
   const damaged = hasHealth && Number.isFinite(e.hp) && e.hp < e.maxHp;
   const alwaysShow = !!state?.showHealthBarsAlwaysEnabled;
   const progressStatus = buildingProgressStatus(e);
@@ -177,7 +177,7 @@ export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
 }
 
 export function _drawAboveFogHp(e, state, ownerColor = null) {
-  const hasHealth = Number.isFinite(e?.maxHp) && e.maxHp > 0;
+  const hasHealth = !isResource(e?.kind) && Number.isFinite(e?.maxHp) && e.maxHp > 0;
   const damaged = Number.isFinite(e?.hp)
     && hasHealth
     && e.hp < e.maxHp;

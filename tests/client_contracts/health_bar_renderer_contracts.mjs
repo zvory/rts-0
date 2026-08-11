@@ -89,6 +89,32 @@ try {
     showHealthBarsAlwaysEnabled: true,
   });
   assert(barsDrawn === 1, "always-show preference reveals full-health unit HP bars");
+
+  for (const kind of [KIND.STEEL, KIND.OIL]) {
+    _drawSelectionAndHp.call(renderer, {
+      id: kind === KIND.STEEL ? 8 : 9,
+      kind,
+      owner: 0,
+      x: 100,
+      y: 120,
+      hp: 1,
+      maxHp: 1,
+    }, new Set(), { showHealthBarsAlwaysEnabled: true });
+  }
+  assert(barsDrawn === 1, "always-show preference excludes underlying steel and oil patch HP");
+
+  for (const kind of [KIND.STEEL_MINE, KIND.PUMP_JACK]) {
+    _drawSelectionAndHp.call(renderer, {
+      id: kind === KIND.STEEL_MINE ? 10 : 11,
+      kind,
+      owner: 1,
+      x: 100,
+      y: 120,
+      hp: 100,
+      maxHp: 100,
+    }, new Set(), { showHealthBarsAlwaysEnabled: true });
+  }
+  assert(barsDrawn === 3, "always-show preference keeps extractor building HP visible");
 } finally {
   restorePixi();
 }
