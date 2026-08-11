@@ -720,16 +720,31 @@ fn branch_live_give_up_resolves_by_original_seat_and_skips_public_history() {
     staging.claim(101, players[1].id).unwrap();
     task.phase = Phase::BranchStaging(Box::new(staging));
     task.start_branch_live();
+    task.on_tick(TokioInstant::now());
 
     assert!(!task.should_persist_match_history());
     task.on_give_up(100);
 
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
-    assert!(
-        std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).any(|msg| {
-            matches!(msg, ServerMessage::GameOver { winner_id: Some(id), you, .. }
-            if id == players[1].id && you == "lost")
+    let messages: Vec<_> = std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
+    assert!(messages.iter().any(|msg| {
+        matches!(msg, ServerMessage::GameOver { winner_id: Some(id), you, .. }
+            if *id == players[1].id && you == "lost")
+    }));
+    let replay_start = messages
+        .iter()
+        .find_map(|msg| match msg {
+            ServerMessage::Start(payload) if payload.replay.is_some() => Some(payload),
+            _ => None,
         })
+        .expect("resolved replay branch should send a replay start payload");
+    assert!(replay_start.spectator);
+    assert!(replay_start.capabilities.room_time.timeline);
+
+    task.on_tick(TokioInstant::now());
+    assert!(
+        writer_a.snapshots.take().is_some(),
+        "resolved replay branch should advance and publish replay snapshots"
     );
     assert!(task.branch_live_seat_by_connection.is_empty());
 }

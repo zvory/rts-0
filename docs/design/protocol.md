@@ -675,6 +675,8 @@ the replay simulation after the last viewer leaves; for normal public rooms, tha
 asks the lobby registry to dispose the public name rather than holding it for reconnect. Dedicated
 replay rooms created for match-history or dev replay viewing follow the same per-viewer detach rule
 after playback has started; they keep the shared replay session alive until the room empties.
+Playable replay branches use this same post-match replay transition after give-up or ordinary match
+resolution while retaining their private replay-branch room identity.
 Automatic post-match replay rooms remain listed and joinable as replay rooms for that entire
 shared-viewing lifetime.
 
