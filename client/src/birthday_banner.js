@@ -19,6 +19,9 @@ export class BirthdayBanner {
     now = () => Date.now(),
     setTimeoutFn = globalThis.setTimeout?.bind(globalThis),
     clearTimeoutFn = globalThis.clearTimeout?.bind(globalThis),
+    createVisibilityObserver = typeof globalThis.MutationObserver === "function"
+      ? (callback) => new globalThis.MutationObserver(callback)
+      : null,
   } = {}) {
     this.root = root;
     this.tankIconElements = tankIconElements;
@@ -28,30 +31,46 @@ export class BirthdayBanner {
     this.clearTimeoutFn = clearTimeoutFn;
     this.iconControllers = [];
     this.refreshTimer = null;
+    this.isBirthday = false;
+    this.lobbyScreen = this.root?.closest?.(".screen") || null;
+    this.visibilityObserver = null;
 
     if (!this.root) return;
+    if (this.lobbyScreen && typeof createVisibilityObserver === "function") {
+      this.visibilityObserver = createVisibilityObserver(() => this._syncIcons());
+      this.visibilityObserver?.observe?.(this.lobbyScreen, {
+        attributes: true,
+        attributeFilter: ["hidden"],
+      });
+    }
     this._refresh();
   }
 
   destroy() {
     if (this.refreshTimer !== null) this.clearTimeoutFn?.(this.refreshTimer);
     this.refreshTimer = null;
+    this.visibilityObserver?.disconnect?.();
+    this.visibilityObserver = null;
     this._destroyIcons();
   }
 
   _refresh() {
     const timestamp = Number(new Date(this.now()));
-    const visible = isSoupmanBirthday(timestamp);
-    this.root.hidden = !visible;
-
-    if (visible && this.iconControllers.length === 0 && typeof this.mountTankIcon === "function") {
-      this.iconControllers = this.tankIconElements.map((element, index) => this.mountTankIcon(element, index));
-    } else if (!visible) {
-      this._destroyIcons();
-    }
+    this.isBirthday = isSoupmanBirthday(timestamp);
+    this.root.hidden = !this.isBirthday;
+    this._syncIcons();
 
     const nextMinuteDelay = 60_050 - (timestamp % 60_000);
     this.refreshTimer = this.setTimeoutFn?.(() => this._refresh(), nextMinuteDelay) ?? null;
+  }
+
+  _syncIcons() {
+    const active = this.isBirthday && !this.lobbyScreen?.hidden;
+    if (active && this.iconControllers.length === 0 && typeof this.mountTankIcon === "function") {
+      this.iconControllers = this.tankIconElements.map((element, index) => this.mountTankIcon(element, index));
+    } else if (!active) {
+      this._destroyIcons();
+    }
   }
 
   _destroyIcons() {

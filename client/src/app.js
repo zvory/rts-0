@@ -196,8 +196,8 @@ export class App {
     this.statusBadge = new StatusBadge(dom.statusBadge);
     this.birthdayBanner = new BirthdayBanner(dom.birthdayBanner, { tankIconElements: [dom.birthdayTankLeftIcon, dom.birthdayTankRightIcon],
       mountTankIcon: (element, index) => mountLiveUnitIcon(element, KIND.TANK, { teamColor: "#c7d07a",
-        delayMs: 250 + index * 1200, sampleCycle: (elapsedMs) => sampleWeaponRecoilCycle(KIND.TANK, elapsedMs) }),
-    });
+        delayMs: 250 + index * 1200, sampleCycle: (elapsedMs) => sampleWeaponRecoilCycle(KIND.TANK, elapsedMs),
+      }), });
     this.hotkeyProfiles = new HotkeyProfileService({
       catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
     });

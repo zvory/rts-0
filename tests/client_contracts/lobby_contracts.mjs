@@ -48,14 +48,25 @@ import { textWithin } from "./dom_text.mjs";
 
 {
   const root = { hidden: false };
+  const lobbyScreen = { hidden: false };
+  root.closest = () => lobbyScreen;
   const tankIconElements = [{ innerHTML: "" }, { innerHTML: "" }];
   const mountedIcons = [];
   let timestamp = Date.parse("2026-08-12T03:59:30Z");
   let refresh = null;
+  let visibilityChanged = null;
+  let observerDisconnected = false;
   const banner = new BirthdayBanner(root, {
     now: () => timestamp,
     setTimeoutFn(callback) { refresh = callback; return 1; },
     clearTimeoutFn() {},
+    createVisibilityObserver(callback) {
+      visibilityChanged = callback;
+      return {
+        observe() {},
+        disconnect() { observerDisconnected = true; },
+      };
+    },
     tankIconElements,
     mountTankIcon(element, index) {
       const controller = { element, index, destroyed: false, destroy() { this.destroyed = true; } };
@@ -66,11 +77,20 @@ import { textWithin } from "./dom_text.mjs";
   assert(!root.hidden, "birthday banner remains visible late on August 11 in New York");
   assert(mountedIcons.length === 2 && mountedIcons.every((controller, index) => controller.index === index),
     "birthday banner mounts one renderer-authored tank icon controller on each side");
+  lobbyScreen.hidden = true;
+  visibilityChanged();
+  assert(mountedIcons.every((controller) => controller.destroyed),
+    "birthday banner stops decorative icon animation while the lobby screen is hidden");
+  lobbyScreen.hidden = false;
+  visibilityChanged();
+  assert(mountedIcons.length === 4 && mountedIcons.slice(2).every((controller) => !controller.destroyed),
+    "birthday banner restarts decorative icon animation when the lobby screen returns");
   timestamp = Date.parse("2026-08-12T04:00:00.050Z");
   refresh();
   assert(root.hidden && mountedIcons.every((controller) => controller.destroyed),
     "birthday banner hides at New York midnight and stops both icon animation cycles");
   banner.destroy();
+  assert(observerDisconnected, "birthday banner disconnects its lobby visibility observer on teardown");
 
   assert(isSoupmanBirthday(Date.parse("2026-08-11T04:00:00Z")),
     "birthday date begins at midnight in New York");
