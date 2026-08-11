@@ -591,7 +591,10 @@ function sentSeqs(sent) {
     oil: 0,
     supplyUsed: 1,
     supplyCap: 10,
-    entities: [{ id: 10, owner: 1, kind: "worker", x: 32, y: 32, hp: 40, maxHp: 40, state: "idle" }],
+    entities: [{
+      id: 10, owner: 1, kind: "worker", x: 32, y: 32, facing: 0.25,
+      hp: 40, maxHp: 40, state: "idle",
+    }],
     events: [],
   });
   state.applyPredictionDisplayOverlay({
@@ -607,7 +610,7 @@ function sentSeqs(sent) {
     "authoritative reads can ignore prediction for fog",
   );
   assert(state.entityById(10).x === 52, "entityById exposes predicted owned position for local UX");
-  assert(state.entityById(10).facing === 1.5, "entityById composes predicted body facing onto authority");
+  assert(state.entityById(10).facing === 0.25, "entityById keeps body facing authoritative");
   state.applyPredictionDisplayOverlay({ optimisticCommands: { production: [], rally: [] } });
   assert(state.entitiesInterpolated(1)[0].x === 52, "optimistic overlay updates do not clear predicted movement");
   assert(state.localFactionId === DEFAULT_FACTION_ID, "GameState exposes normalized local faction identity");
@@ -677,7 +680,10 @@ function sentSeqs(sent) {
     applyBusyFrame(offset);
     const gather = state.entityById(20);
     const build = state.entityById(21);
-    assert(gather.x === 32 + offset && gather.facing === 1, "sparse prediction keeps owned pose responsive");
+    assert(
+      gather.x === 32 + offset && gather.facing === 0.25,
+      "sparse prediction keeps owned position responsive without replacing authoritative facing",
+    );
     assert(gather.state === "gather" && gather.latchedNode === 90, "missing motion preserves gathering activity across prediction frames");
     assert(createRigRenderContext(gather).busy === true, "gathering worker keeps the yellow busy indicator across prediction frames");
     assert(gather.hp === 31 && gather.weaponFacing === 2.4 && gather.targetId === 90, "prediction cannot overwrite authoritative combat and health fields");

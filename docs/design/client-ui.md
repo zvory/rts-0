@@ -263,7 +263,8 @@ passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, 
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
 `GameState.applySnapshot` remains authoritative. The partial WASM predictor returns a sparse
 `PredictionFrame` whose entity patches may identify an existing locally owned entity and claim only
-predicted position, body facing, and an optional explicit motion presentation. It never returns an
+predicted position and an optional explicit motion presentation. Body facing remains authoritative
+even when the predictor supplies a facing value. The predictor never returns an
 `EntityView`, cannot create or replace entity identity, and cannot claim health, gameplay activity,
 weapon facing, gathering, combat, ability, or future snapshot fields. A missing motion
 claim preserves the authoritative gameplay `state`; a motion claim is admitted only when a modeled

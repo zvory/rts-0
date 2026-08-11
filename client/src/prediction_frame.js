@@ -8,7 +8,6 @@ export function normalizePredictionPatch(candidate) {
     return null;
   }
   const patch = { id: candidate.id, x: candidate.x, y: candidate.y };
-  if (Number.isFinite(candidate.facing)) patch.facing = candidate.facing;
   if (candidate.motion === "move" || candidate.motion === "idle") patch.motion = candidate.motion;
   return patch;
 }
@@ -33,7 +32,6 @@ export function normalizeProgressPatch(candidate) {
  */
 export function composePredictionPatch(entity, patch) {
   const out = { ...entity, x: patch.x, y: patch.y, predicted: true };
-  if (Object.prototype.hasOwnProperty.call(patch, "facing")) out.facing = patch.facing;
   if (patch.motion === "move" || patch.motion === "idle") out.state = patch.motion;
   return out;
 }
