@@ -1027,12 +1027,21 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
         .entities
         .get_mut(armored_outer)
         .expect("outer armored target should exist")
-        .set_position(impact_pos.0, impact_pos.1 + config::TILE_SIZE as f32 * 0.75);
+        .set_position(
+            impact_pos.0,
+            impact_pos.1
+                + config::TILE_SIZE as f32
+                    * (config::MORTAR_INNER_RADIUS_TILES + config::MORTAR_OUTER_RADIUS_TILES)
+                    / 2.0,
+        );
     game.state
         .entities
         .get_mut(armored_outside)
         .expect("outside armored target should exist")
-        .set_position(impact_pos.0, impact_pos.1 + config::TILE_SIZE as f32 * 1.25);
+        .set_position(
+            impact_pos.0,
+            impact_pos.1 + config::TILE_SIZE as f32 * (config::MORTAR_OUTER_RADIUS_TILES + 0.25),
+        );
     for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         game.tick();
     }
@@ -1067,7 +1076,7 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
     );
     assert_eq!(
         armored_outside_hp_before, armored_outside_hp_after,
-        "mortar splash should stop at the one-tile outer radius"
+        "mortar splash should stop at the configured outer radius"
     );
 }
 
