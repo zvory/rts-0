@@ -337,15 +337,6 @@ impl Entity {
     pub(crate) fn reset_movement_delta(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.last_move_delta = (0.0, 0.0);
-            m.path_translated_this_tick = false;
-        }
-    }
-
-    pub(crate) fn set_path_movement_delta(&mut self, dx: f32, dy: f32) {
-        self.set_movement_delta(dx, dy);
-        if let Some(m) = self.movement.as_mut() {
-            m.path_translated_this_tick =
-                dx.is_finite() && dy.is_finite() && (dx != 0.0 || dy != 0.0);
         }
     }
 
@@ -354,12 +345,6 @@ impl Entity {
             .as_ref()
             .map(|m| m.last_move_delta)
             .unwrap_or((0.0, 0.0))
-    }
-
-    fn path_translated_this_tick(&self) -> bool {
-        self.movement
-            .as_ref()
-            .is_some_and(|movement| movement.path_translated_this_tick)
     }
 
     pub fn set_last_repath_tick(&mut self, tick: u32) {
@@ -982,11 +967,6 @@ impl Entity {
         amount: u32,
         attribution: Option<(u32, (f32, f32), u32)>,
     ) -> bool {
-        let amount = config::damage_after_rifleman_movement(
-            self.kind,
-            amount,
-            self.path_translated_this_tick(),
-        );
         if self.hp == 0 || amount == 0 || self.invulnerable {
             return false;
         }

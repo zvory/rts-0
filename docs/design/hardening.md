@@ -217,10 +217,8 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
 - **Rifleman Methamphetamines fire**: upgraded riflemen gain permanent moving fire and keep their
   movement path while firing at enemies in range instead of stopping to shoot. While on a plain
   `Move` or active `AttackMove`, upgraded riflemen only fire opportunistically at enemies already in
-  range and never create enemy-directed movement. Moving Methamphetamines shots use normal rifleman accuracy and do not add
-  a movement miss roll, and the upgrade resets their rifle cooldown to 8 ticks. Riflemen also take
-  25% less incoming damage whenever the movement phase records actual path-following translation;
-  a queued or blocked path without translation and later collision shoves do not qualify.
+  range and never create enemy-directed movement. Moving Methamphetamines shots use normal Rifleman
+  accuracy, do not add a movement miss roll, and reset the rifle cooldown to 10 ticks.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks and fire while moving, but they use simplified
