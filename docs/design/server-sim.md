@@ -1305,11 +1305,15 @@ Automatic acquisition considers only legal enemy candidates inside the attacker'
 
 After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the Engineering Complex, Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a Resource Depot requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
-Group move formation assignment checks cached reachability components before issuing per-unit goals,
-avoiding command-time A* probes outside the move coordinator pathing budget. A blocked or unreachable
-compact slot is smudged independently to a nearby standable tile; the planner does not translate the
-whole formation around an obstacle. If no reachable local alternative exists, it may preserve a free
-local goal so normal path processing can report `PathFailed`.
+Group move formation assignment chooses one bounded, locally connected landing patch before issuing
+per-unit goals, avoiding command-time A* probes outside the move coordinator pathing budget. The
+patch uses the passability intersection of every movement kind in the selection, so a mixed group
+cannot split across water, rock, or vehicle-blocking forest. A passable click anchors the patch on
+the clicked side of an obstacle; an impassable click deterministically prefers a sufficiently large
+nearby patch on the selection's approach side. Blocked compact slots are smudged independently only
+within that patch and must also pass the existing cached global-reachability check. If no reachable
+local alternative exists, the unit keeps its current position instead of receiving a free but
+unreachable fallback goal.
 
 `FormationMove` accepts a bounded, sanitized world-space polyline and assigns deterministic slots
 by arc length. A stroke with enough length uses a single rank across the complete stroke; a shorter
@@ -1390,7 +1394,8 @@ selections also keep clear of vehicle bodies. Vehicle groups of six or more use 
 along the footprint's long side, reducing deep same-lane traffic queues while remaining at least two
 slots deep. In partially filled rectangles, the deeper cells are centered so central units lead and
 outside units trail through constrained routes; when folding a one-deep line, that leading edge
-follows the move direction. Blocked-slot fallback keeps vehicle spacing strict.
+follows the move direction. Blocked-slot search stays inside the command's cohesive landing patch
+and keeps vehicle spacing strict.
 Player-drawn formation lines remain an explicitly authored layout with their separate line-and-rank
 assignment policy.
 

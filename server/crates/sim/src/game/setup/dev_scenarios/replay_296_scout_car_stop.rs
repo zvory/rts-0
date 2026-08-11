@@ -28,10 +28,13 @@ impl Game {
         }
         let specs = [
             (273.12808, 2_106.571, -2.014_803),
-            (272.43066, 1_892.0328, -2.031_6966),
-            (221.18274, 1_914.6713, -2.023_0997),
-            (219.92749, 1_975.5981, -2.038_9102),
-            (286.04916, 2_009.069, -1.991_0679),
+            (272.43066, 1_892.032_8, -2.031_696_6),
+            // The current Schone Tage revision added forest over these two recorded hull
+            // positions. Shift them one tile east while preserving the replay's relative lanes
+            // closely enough to keep this a stable west-edge formation regression.
+            (253.18274, 1_914.671_3, -2.023_099_7),
+            (251.92749, 1_975.598_1, -2.038_910_2),
+            (286.04916, 2_009.069, -1.991_067_9),
         ];
         let mut units = Vec::with_capacity(specs.len());
         for (x, y, facing) in specs {
@@ -77,7 +80,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn replay_geometry_reproduces_two_scout_cars_stopping_on_move() {
+    fn replay_geometry_routes_all_five_scout_cars_after_edge_fix() {
         let mut setup =
             Game::new_replay_296_scout_car_stop_scenario(EntityKind::ScoutCar, 5, REPLAY_SEED)
                 .expect("scenario");
@@ -113,19 +116,20 @@ mod tests {
                 (entity.x - start[index].0).hypot(entity.y - start[index].1)
             })
             .collect::<Vec<_>>();
-        assert_eq!(moved.iter().filter(|distance| **distance < 1.0).count(), 2);
-        assert!(moved[0] > 60.0 && moved[1] > 60.0 && moved[4] > 60.0);
-        for &index in &[2, 3] {
+        assert!(
+            moved.iter().all(|distance| *distance > 1.0),
+            "every Scout Car should make progress, got {moved:?}"
+        );
+        for id in &setup.units {
             let entity = snapshot
                 .entities
                 .iter()
-                .find(|entity| entity.id == setup.units[index])
-                .expect("stopped Scout Car snapshot");
+                .find(|entity| entity.id == *id)
+                .expect("Scout Car snapshot");
             assert_eq!(entity.state, "move");
-            assert_eq!(entity.order_plan[0].x, 16.0);
             assert!(
-                entity.debug_path.is_none(),
-                "stopped car must have no route"
+                entity.debug_path.is_some(),
+                "every moving car must have a route"
             );
         }
         assert_eq!(

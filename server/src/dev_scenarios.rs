@@ -1,5 +1,4 @@
 use rts_sim::game::entity::EntityKind;
-
 mod command_car_corner;
 mod move_reload_acquisition;
 mod replay_142_vehicle_lock;
@@ -19,7 +18,6 @@ use scout_car_open_ground_l_path::SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC;
 use tank_retreat::{
     TANK_DAMAGE_PURSUIT_PIVOT_SPEC, TANK_REVERSE_TRAFFIC_SPEC, TANK_UNDER_FIRE_RETREAT_SPEC,
 };
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DevScenarioLaunch {
     pub id: &'static str,

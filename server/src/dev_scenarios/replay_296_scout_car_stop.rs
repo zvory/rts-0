@@ -11,8 +11,8 @@ const LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
 
 pub(super) const REPLAY_296_SCOUT_CAR_STOP_SPEC: DevScenarioSpec = DevScenarioSpec {
     id: "replay_296_scout_car_stop",
-    title: "Replay 296 Scout Car Edge Stop",
-    description: "Recreates Alex's five-Scout-Car move at replay tick 8,242. The west-edge formation assigns two cars destinations in tile column zero; both retain Move orders but receive no path, while the other three continue. Alex starts with the replay's 39 oil to demonstrate that fuel is unrelated.",
+    title: "Replay 296 Scout Car Edge Regression",
+    description: "Exercises Alex's replay-derived five-Scout-Car west-edge move at tick 8,242. The cohesive landing-region planner keeps every destination in one reachable patch and all five cars receive paths. Alex starts with the replay's 39 oil to demonstrate that fuel is unrelated.",
     launches: &LAUNCHES,
 };
 

@@ -65,6 +65,52 @@ fn set_passable(map: &mut Map, tx: u32, ty: u32) {
     map.terrain[(ty * map.width + tx) as usize] = terrain::GRASS;
 }
 
+fn vehicle_goals_across_barrier(
+    click_tile: (u32, u32),
+    terrain_barrier: Option<u8>,
+) -> Vec<(u32, u32)> {
+    let mut map = flat_map(80);
+    for ty in 0..72 {
+        if let Some(terrain_code) = terrain_barrier {
+            let index = map.index(40, ty);
+            map.terrain[index] = terrain_code;
+        } else {
+            map.no_vehicle_tiles.push((40, ty));
+        }
+    }
+    let mut entities = EntityStore::new();
+    let mut ids = Vec::new();
+    for (index, ty) in [28, 30, 32, 34, 36].into_iter().enumerate() {
+        let position = map.tile_center(30, ty);
+        ids.push(
+            entities
+                .spawn_unit(1, EntityKind::ScoutCar, position.0, position.1)
+                .unwrap_or_else(|| panic!("failed to spawn Scout Car {index}")),
+        );
+    }
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(32_768, 256);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    coordinator.order_group_move(
+        &mut entities,
+        1,
+        &ids,
+        map.tile_center(click_tile.0, click_tile.1),
+        false,
+    );
+
+    ids.into_iter()
+        .map(|id| {
+            let goal = entities
+                .get(id)
+                .and_then(|entity| entity.path_goal())
+                .expect("Scout Car should receive a formation goal");
+            map.tile_of(goal.0, goal.1)
+        })
+        .collect()
+}
+
 #[test]
 fn long_polyline_spreads_one_rank_across_full_stroke() {
     let map = flat_map(64);
@@ -627,6 +673,80 @@ fn unreachable_compact_slots_use_nearby_reachable_tiles() {
     );
     assert!(tile_chebyshev_distance(left_tile, isolated_tile) <= 6);
     assert!(map.is_passable(left_tile.0 as i32, left_tile.1 as i32));
+}
+
+#[test]
+fn impassable_river_click_keeps_vehicle_formation_on_source_bank() {
+    let goals = vehicle_goals_across_barrier((40, 32), Some(terrain::WATER));
+
+    assert!(
+        goals.iter().all(|goal| goal.0 < 40),
+        "an accidental river click must keep the complete formation on its approach bank: {goals:?}"
+    );
+}
+
+#[test]
+fn passable_click_across_river_keeps_vehicle_formation_on_clicked_bank() {
+    let goals = vehicle_goals_across_barrier((46, 32), Some(terrain::WATER));
+
+    assert!(
+        goals.iter().all(|goal| goal.0 > 40),
+        "an intentional passable click across the river must keep the complete formation on the clicked bank: {goals:?}"
+    );
+}
+
+#[test]
+fn stone_click_keeps_vehicle_formation_on_source_side() {
+    let goals = vehicle_goals_across_barrier((40, 32), Some(terrain::ROCK));
+
+    assert!(goals.iter().all(|goal| goal.0 < 40), "{goals:?}");
+}
+
+#[test]
+fn vehicle_blocking_forest_click_keeps_vehicle_formation_on_source_side() {
+    let goals = vehicle_goals_across_barrier((40, 32), None);
+
+    assert!(goals.iter().all(|goal| goal.0 < 40), "{goals:?}");
+}
+
+#[test]
+fn mixed_formation_uses_one_group_compatible_landing_patch() {
+    let mut map = flat_map(80);
+    map.no_vehicle_tiles.extend((0..72).map(|ty| (40, ty)));
+    let mut entities = EntityStore::new();
+    let mut ids = Vec::new();
+    for (kind, tile) in [
+        (EntityKind::ScoutCar, (30, 30)),
+        (EntityKind::Rifleman, (30, 32)),
+        (EntityKind::Rifleman, (30, 34)),
+    ] {
+        let position = map.tile_center(tile.0, tile.1);
+        ids.push(
+            entities
+                .spawn_unit(1, kind, position.0, position.1)
+                .expect("mixed formation unit should spawn"),
+        );
+    }
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(32_768, 256);
+    pathing.advance_tick(1);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+    coordinator.order_group_move(&mut entities, 1, &ids, map.tile_center(40, 32), false);
+
+    let goals = ids
+        .iter()
+        .map(|id| {
+            let goal = entities
+                .get(*id)
+                .and_then(|entity| entity.path_goal())
+                .expect("mixed formation unit should receive a goal");
+            map.tile_of(goal.0, goal.1)
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        goals.iter().all(|goal| goal.0 < 40),
+        "infantry must not split through terrain that blocks the selected vehicles: {goals:?}"
+    );
 }
 
 #[test]
