@@ -40,7 +40,7 @@ use self::defense::{
     home_defensive_tank_is_positioned, local_defense_target, local_defense_units,
     machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
     stage_home_anti_tank_line, stage_home_defensive_tank, stage_home_machine_gunner_screen,
-    stage_home_rifleman_screen, stage_main_steel_defensive_line, DefensivePanicPlan,
+    stage_jeff_attack_path_defense, stage_main_steel_defensive_line, DefensivePanicPlan,
     DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
 use self::economy_manager::{
@@ -742,13 +742,9 @@ where
                 .into_iter()
                 .filter(|id| {
                     observation.owned.iter().any(|unit| {
-                        unit.id == *id
-                            && matches!(
-                                unit.kind,
-                                EntityKind::Rifleman
-                                    | EntityKind::MachineGunner
-                                    | EntityKind::ScoutCar
-                            )
+                        // The entrenched infantry wall covers the approach by automatic fire.
+                        // Do not uproot its centre or flank anchors to chase one contact.
+                        unit.id == *id && unit.kind == EntityKind::ScoutCar
                     })
                 })
                 .collect();
@@ -784,43 +780,22 @@ where
             .collect();
         let turtle_defense_active = profile.turtle_defense.is_some();
 
+        let mut attack_path_defense_staged = false;
         if !handled_local_defense && profile.id == JEFFS_AI_ID && profile.home_anti_tank.is_some() {
             let riflemen: Vec<u32> =
                 actions::select_ready_combat_units(&observation.owned, &[EntityKind::Rifleman])
                     .into_iter()
                     .filter(|id| !local_defense_assigned.contains(id))
                     .collect();
-            let own_base =
-                geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
-            let fallback_armor = observation
-                .owned
-                .iter()
-                .filter(|entity| {
-                    entity.is_complete
-                        && matches!(entity.kind, EntityKind::Tank | EntityKind::ScoutCar)
-                        && !memory.containment_active_tanks.contains(&entity.id)
-                        && memory.containment_active_scout != Some(entity.id)
-                })
-                .min_by(|left, right| {
-                    geometry::dist2(left.x, left.y, own_base.0, own_base.1)
-                        .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
-                })
-                .map(|entity| entity.id);
-            if let (Some(armor_id), Some(enemy_base)) = (
-                memory.home_defensive_tank.or(fallback_armor),
-                facts.nearest_public_enemy_base,
+            if let Some(units) = stage_jeff_attack_path_defense(
+                &mut actions,
+                observation,
+                map_analysis,
+                &defensive_machine_gunners_available,
+                &riflemen,
             ) {
-                if let Some(units) = stage_home_rifleman_screen(
-                    &mut actions,
-                    observation,
-                    &riflemen,
-                    armor_id,
-                    enemy_base,
-                    3.0,
-                    1.75,
-                ) {
-                    intents.push(AiIntent::Stage { units });
-                }
+                attack_path_defense_staged = true;
+                intents.push(AiIntent::Stage { units });
             }
         }
 
@@ -840,6 +815,7 @@ where
 
         if !handled_local_defense
             && !turtle_defense_active
+            && !attack_path_defense_staged
             && !defensive_machine_gunners_available.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {

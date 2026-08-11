@@ -16,6 +16,7 @@ pub(super) const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 
 const DEFENSIVE_FIRING_LANE_TILES: f32 = 14.0;
 const DEFENSIVE_FIRING_POSITION_SEARCH_TILES: i32 = 6;
+const JEFF_DEFENSIVE_RANGE_OVERLAP_TILES: f32 = 2.0;
 
 pub(super) const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 
@@ -428,6 +429,33 @@ mod tests {
     }
 
     #[test]
+    fn jeff_defensive_slots_overlap_entrenched_ranges_by_two_tiles() {
+        assert_eq!(
+            entrenched_coverage_spacing_tiles(EntityKind::MachineGunner, EntityKind::Rifleman),
+            11.0
+        );
+        assert_eq!(
+            entrenched_coverage_spacing_tiles(EntityKind::Rifleman, EntityKind::Rifleman),
+            10.0
+        );
+        assert_eq!(
+            entrenched_coverage_spacing_tiles(
+                EntityKind::MachineGunner,
+                EntityKind::MachineGunner
+            ),
+            12.0
+        );
+        assert_eq!(
+            jeff_rifle_flank_offset_tiles(2, 0, 1.0, 12.0, 11.0, 10.0),
+            17.0
+        );
+        assert_eq!(
+            jeff_rifle_flank_offset_tiles(2, 1, -1.0, 12.0, 11.0, 10.0),
+            -27.0
+        );
+    }
+
+    #[test]
     fn defensive_firing_lane_rejects_opaque_building_but_not_pump_jack() {
         let ts = config::TILE_SIZE as f32;
         let origin = (5.5 * ts, 5.5 * ts);
@@ -734,6 +762,265 @@ pub(super) fn stage_home_rifleman_screen(
     staged.sort_unstable();
     staged.dedup();
     (!staged.is_empty()).then_some(staged)
+}
+
+pub(super) fn stage_jeff_attack_path_defense(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    machine_gunners: &[u32],
+    riflemen: &[u32],
+) -> Option<Vec<u32>> {
+    let analysis = map_analysis?;
+    let base_count = observation
+        .owned
+        .iter()
+        .filter(|entity| {
+            entity.kind == EntityKind::ResourceDepot && entity.is_complete && entity.hp > 0
+        })
+        .count()
+        .clamp(1, 2);
+    let report = analysis.likely_attack_paths(observation.player_id, base_count, 3);
+    let mut routes = report.paths.iter().collect::<Vec<_>>();
+    routes.sort_by_key(|path| (path.alternative_rank, path.defended_base_id, path.id));
+    if routes.is_empty() {
+        return None;
+    }
+
+    let mut machine_gunners = machine_gunners.to_vec();
+    machine_gunners.sort_unstable();
+    machine_gunners.dedup();
+    machine_gunners.truncate(2);
+    let machine_gunner_count = machine_gunners.len();
+    let mut riflemen = riflemen.to_vec();
+    riflemen.sort_unstable();
+    riflemen.dedup();
+
+    let entities_by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|entity| (entity.id, entity))
+        .collect();
+    let tile_size = observation.map.tile_size.max(1) as f32;
+    let tolerance2 = squared(EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES * tile_size);
+    let mut staged = Vec::new();
+    let rifle_from_mg_spacing =
+        entrenched_coverage_spacing_tiles(EntityKind::MachineGunner, EntityKind::Rifleman);
+    let rifle_spacing =
+        entrenched_coverage_spacing_tiles(EntityKind::Rifleman, EntityKind::Rifleman);
+    let machine_gunner_spacing = entrenched_coverage_spacing_tiles(
+        EntityKind::MachineGunner,
+        EntityKind::MachineGunner,
+    );
+    let primary_routes = routes
+        .iter()
+        .copied()
+        .filter(|path| path.alternative_rank == 1)
+        .collect::<Vec<_>>();
+    let center_routes = if primary_routes.is_empty() {
+        &routes
+    } else {
+        &primary_routes
+    };
+
+    for (index, unit_id) in machine_gunners.into_iter().enumerate() {
+        let route_index = index % center_routes.len();
+        let route = center_routes[route_index];
+        let units_on_route = (route_index..machine_gunner_count)
+            .step_by(center_routes.len())
+            .count();
+        let slot_on_route = index / center_routes.len();
+        let center_index = units_on_route.saturating_sub(1) as f32 * 0.5;
+        let lateral_offset_tiles =
+            (slot_on_route as f32 - center_index) * machine_gunner_spacing;
+        let Some(lane) = attack_lane_for_path(route, tile_size) else {
+            continue;
+        };
+        let Some(target) = clear_attack_path_assignment(
+            observation,
+            analysis,
+            lane.center,
+            lane.toward_attacker,
+            lateral_offset_tiles,
+        ) else {
+            continue;
+        };
+        let Some(unit) = entities_by_id.get(&unit_id).copied() else {
+            continue;
+        };
+        let command = if dist2(unit.x, unit.y, target.0, target.1) <= tolerance2 {
+            actions::hold_position_units(actions, [unit_id])
+        } else {
+            actions::attack_move_units(actions, [unit_id], target.0, target.1)
+        };
+        if let Some(units) = command {
+            staged.extend(units);
+        }
+    }
+
+    let flank_routes = if primary_routes.is_empty() {
+        &routes
+    } else {
+        &primary_routes
+    };
+    for (index, unit_id) in riflemen.into_iter().enumerate() {
+        let route_index = (index / 2) % flank_routes.len();
+        let side = if index % 2 == 0 { -1.0 } else { 1.0 };
+        let rank = index / (flank_routes.len() * 2);
+        let machine_gunners_on_route = if machine_gunner_count > route_index {
+            (route_index..machine_gunner_count)
+                .step_by(flank_routes.len())
+                .count()
+        } else {
+            0
+        };
+        let offset_tiles = jeff_rifle_flank_offset_tiles(
+            machine_gunners_on_route,
+            rank,
+            side,
+            machine_gunner_spacing,
+            rifle_from_mg_spacing,
+            rifle_spacing,
+        );
+        let Some(lane) = attack_lane_for_path(flank_routes[route_index], tile_size) else {
+            continue;
+        };
+        let Some(target) = clear_attack_path_assignment(
+            observation,
+            analysis,
+            lane.center,
+            lane.toward_attacker,
+            offset_tiles,
+        ) else {
+            continue;
+        };
+        let Some(unit) = entities_by_id.get(&unit_id).copied() else {
+            continue;
+        };
+        let command = if dist2(unit.x, unit.y, target.0, target.1) <= tolerance2 {
+            actions::hold_position_units(actions, [unit_id])
+        } else {
+            actions::attack_move_units(actions, [unit_id], target.0, target.1)
+        };
+        if let Some(units) = command {
+            staged.extend(units);
+        }
+    }
+
+    staged.sort_unstable();
+    staged.dedup();
+    (!staged.is_empty()).then_some(staged)
+}
+
+fn entrenched_coverage_spacing_tiles(left: EntityKind, right: EntityKind) -> f32 {
+    let range = |kind| {
+        config::unit_stats(kind)
+            .map(|stats| stats.range_tiles as f32)
+            .unwrap_or(0.0)
+            + config::ENTRENCHMENT_RANGE_BONUS_TILES as f32
+    };
+    (range(left) + range(right) - JEFF_DEFENSIVE_RANGE_OVERLAP_TILES).max(1.0)
+}
+
+fn jeff_rifle_flank_offset_tiles(
+    machine_gunners_on_route: usize,
+    rifle_rank: usize,
+    side: f32,
+    machine_gunner_spacing: f32,
+    rifle_from_mg_spacing: f32,
+    rifle_spacing: f32,
+) -> f32 {
+    let machine_gunner_half_span = machine_gunners_on_route.saturating_sub(1) as f32
+        * machine_gunner_spacing
+        * 0.5;
+    side
+        * (machine_gunner_half_span
+            + rifle_from_mg_spacing
+            + rifle_rank as f32 * rifle_spacing)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct AttackPathLane {
+    center: (f32, f32),
+    toward_attacker: (f32, f32),
+}
+
+fn attack_lane_for_path(
+    path: &crate::ai_core::map_analysis::AiAttackPath,
+    tile_size: f32,
+) -> Option<AttackPathLane> {
+    let intercept = (path.intercept_tile_x, path.intercept_tile_y);
+    let intercept_index = path
+        .tiles
+        .iter()
+        .position(|tile| *tile == [intercept.0, intercept.1])
+        .unwrap_or_else(|| {
+            path.tiles
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, tile)| {
+                    let dx = i64::from(tile[0]) - i64::from(intercept.0);
+                    let dy = i64::from(tile[1]) - i64::from(intercept.1);
+                    dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy))
+                })
+                .map(|(index, _)| index)
+                .unwrap_or(0)
+        });
+    let before = path.tiles.get(intercept_index.saturating_sub(3))?;
+    let after = path
+        .tiles
+        .get((intercept_index + 3).min(path.tiles.len().saturating_sub(1)))?;
+    let toward_attacker = normalized_direction(
+        (after[0] as f32, after[1] as f32),
+        (before[0] as f32, before[1] as f32),
+    )?;
+    Some(AttackPathLane {
+        center: (
+            (intercept.0 as f32 + 0.5) * tile_size,
+            (intercept.1 as f32 + 0.5) * tile_size,
+        ),
+        toward_attacker,
+    })
+}
+
+fn clear_attack_path_assignment(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    center: (f32, f32),
+    toward_attacker: (f32, f32),
+    lateral_offset_tiles: f32,
+) -> Option<(f32, f32)> {
+    let tile_size = observation.map.tile_size.max(1) as f32;
+    let perpendicular = (-toward_attacker.1, toward_attacker.0);
+    let desired = (
+        center.0 + perpendicular.0 * lateral_offset_tiles * tile_size,
+        center.1 + perpendicular.1 * lateral_offset_tiles * tile_size,
+    );
+    let mut offsets = vec![0.0_f32];
+    for radius in 1..=DEFENSIVE_FIRING_POSITION_SEARCH_TILES {
+        offsets.extend([radius as f32, -(radius as f32)]);
+    }
+    offsets
+        .into_iter()
+        .map(|offset| {
+            clamp_to_map(
+                (
+                    desired.0 + perpendicular.0 * offset * tile_size,
+                    desired.1 + perpendicular.1 * offset * tile_size,
+                ),
+                observation.map,
+            )
+        })
+        .find(|candidate| {
+            defensive_position_is_open(observation, Some(analysis), candidate.0, candidate.1)
+                && defensive_firing_sector_is_clear(
+                    observation,
+                    Some(analysis),
+                    *candidate,
+                    toward_attacker,
+                    DEFENSIVE_FIRING_LANE_TILES,
+                )
+        })
 }
 
 fn stage_machine_gunner_defensive_line(
