@@ -742,9 +742,13 @@ fn branch_live_give_up_resolves_by_original_seat_and_skips_public_history() {
     assert!(replay_start.capabilities.room_time.timeline);
 
     task.on_tick(TokioInstant::now());
-    assert!(
-        writer_a.snapshots.take().is_some(),
-        "resolved replay branch should advance and publish replay snapshots"
+    let replay_snapshot = writer_a
+        .snapshots
+        .take()
+        .expect("resolved replay branch should publish a replay snapshot");
+    assert_eq!(
+        replay_snapshot.tick, 1,
+        "resolved replay branch should advance past replay tick zero"
     );
     assert!(task.branch_live_seat_by_connection.is_empty());
 }
