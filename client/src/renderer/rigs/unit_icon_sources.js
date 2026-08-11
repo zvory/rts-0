@@ -4,6 +4,8 @@ import { createLiveFrameStrips } from "./frame_strip_routing.js";
 import { liveRigIconSvgFor, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
 import { createLivePngRigAtlases } from "./png_routing.js";
 import { resolvePngSpriteTransform } from "./png_transform.js";
+import { RASTER_RIG_DEFINITIONS } from "./raster_rig_definitions.js";
+import { createRigRenderContext, sampleRigAnimation } from "./animation.js";
 
 const LIVE_FRAME_STRIPS = createLiveFrameStrips();
 const LIVE_PNG_ATLASES = createLivePngRigAtlases();
@@ -57,6 +59,204 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
   if (atlasIcon) return rasterIconMarkup({ ...atlasIcon, teamColor: tintColor });
 
   return tintRigIconMarkup(liveRigIconSvgFor(kind), tintColor);
+}
+
+/**
+ * Mount a renderer-authored PNG rig icon and drive its articulated parts from sampled rig poses.
+ * The caller supplies the recoil envelope so gameplay state and decorative icon cycles can share
+ * one authoritative timing model without teaching the icon system about attack events.
+ */
+export function mountLiveUnitIcon(root, kind, {
+  teamColor = "#0072b2",
+  periodMs = 2400,
+  delayMs = 0,
+  sampleCycle = null,
+  requestFrame = globalThis.requestAnimationFrame?.bind(globalThis),
+  cancelFrame = globalThis.cancelAnimationFrame?.bind(globalThis),
+  now = () => globalThis.performance?.now?.() ?? Date.now(),
+  reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true,
+} = {}) {
+  const atlas = LIVE_PNG_ATLASES.get(kind);
+  const definition = RASTER_RIG_DEFINITIONS.get(kind);
+  if (!root || !atlas?.image || !definition) {
+    if (root) root.innerHTML = liveUnitIconMarkupFor(kind, { teamColor });
+    return { destroy() {} };
+  }
+
+  const icon = createAnimatedRasterIcon(root, kind, atlas, definition, normalizeTeamColor(teamColor));
+  icon.setPose(0, 0);
+  if (reducedMotion || typeof requestFrame !== "function" || typeof sampleCycle !== "function") {
+    return { destroy() { icon.destroy(); } };
+  }
+
+  const startedAt = now();
+  let frameId = null;
+  let destroyed = false;
+  const tick = (frameNow) => {
+    if (destroyed) return;
+    const cycleNow = Number.isFinite(frameNow) ? frameNow : now();
+    const period = Math.max(1, Number(periodMs) || 1);
+    const elapsed = ((cycleNow - startedAt - delayMs) % period + period) % period;
+    const sample = sampleCycle(elapsed) || {};
+    icon.setPose(sample.active ? sample.progress : 0, sample.active ? sample.phase : 0);
+    frameId = requestFrame(tick);
+  };
+  frameId = requestFrame(tick);
+
+  return {
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      if (frameId != null) cancelFrame?.(frameId);
+      icon.destroy();
+    },
+  };
+}
+
+export function liveUnitIconRigPoseFor(kind, {
+  teamColor = "#0072b2",
+  recoilProgress = 0,
+  recoilPhase = 0,
+  facing = 0,
+  weaponFacing = facing,
+} = {}) {
+  const definition = RASTER_RIG_DEFINITIONS.get(kind);
+  if (!definition) return null;
+  const entity = {
+    id: 0,
+    kind,
+    owner: 1,
+    facing,
+    weaponFacing,
+    teamColor: normalizeTeamColor(teamColor),
+    recoilProgress,
+    recoilPhase,
+  };
+  const context = createRigRenderContext(entity);
+  return sampleRigAnimation(definition, entity, context);
+}
+
+function createAnimatedRasterIcon(root, kind, atlas, definition, teamColor) {
+  const tintId = `unit-icon-animated-tint-${++animatedIconSequence}`;
+  const spriteEntries = (atlas.sprites || []).filter((sprite) => sprite?.frame);
+  const rasterParts = new Set(spriteEntries.map((sprite) => sprite.animationPart));
+  const nativeEntries = (definition.parts || []).filter((part) => (
+    !rasterParts.has(part.id) && part.id !== "part.shadow" && nativeGeometryMarkup(part.geometry)
+  ));
+  const ordered = [
+    ...spriteEntries.map((sprite) => ({ type: "raster", drawOrder: sprite.drawOrder || 0, value: sprite })),
+    ...nativeEntries.map((part) => ({ type: "native", drawOrder: part.drawOrder || 0, value: part })),
+  ].sort((a, b) => a.drawOrder - b.drawOrder);
+  const viewBox = atlas.viewBox || { x: -40, y: -32, width: 80, height: 64 };
+  const tintFilter = `<defs><filter id="${tintId}" color-interpolation-filters="sRGB">` +
+    `<feFlood flood-color="${teamColor}" result="teamColor" />` +
+    `<feComposite in="teamColor" in2="SourceGraphic" operator="in" result="maskedTeamColor" />` +
+    `<feBlend in="SourceGraphic" in2="maskedTeamColor" mode="multiply" />` +
+    `</filter></defs>`;
+  const layers = ordered.map((entry) => entry.type === "raster"
+    ? animatedRasterLayerMarkup(entry.value, atlas, tintId)
+    : animatedNativeLayerMarkup(entry.value)).join("");
+  root.innerHTML = `<svg class="unit-raster-icon unit-rig-animated-icon" ` +
+    `data-unit-icon-source="png-atlas-rig" aria-hidden="true" focusable="false" ` +
+    `viewBox="${number(viewBox.x)} ${number(viewBox.y)} ${number(viewBox.width)} ${number(viewBox.height)}" ` +
+    `preserveAspectRatio="xMidYMid meet">${tintFilter}${layers}</svg>`;
+
+  const records = [...root.querySelectorAll("[data-unit-icon-animation-part]")].map((node) => ({
+    node,
+    animationPart: node.getAttribute("data-unit-icon-animation-part"),
+    sprite: spriteEntries.find((candidate) => candidate.id === node.getAttribute("data-unit-icon-sprite")) || null,
+    scaleNode: node.querySelector("[data-unit-icon-scale]"),
+  }));
+  let lastProgress = null;
+  let lastPhase = null;
+  return {
+    setPose(recoilProgress, recoilPhase) {
+      const progress = Math.max(0, Math.min(1, Number(recoilProgress) || 0));
+      const phase = Math.max(0, Math.min(1, Number(recoilPhase) || 0));
+      if (progress === lastProgress && phase === lastPhase) return;
+      lastProgress = progress;
+      lastPhase = phase;
+      const sampled = liveUnitIconRigPoseFor(kind, {
+        teamColor,
+        recoilProgress: progress,
+        recoilPhase: phase,
+      });
+      for (const record of records) applyAnimatedIconPart(record, sampled.parts[record.animationPart]);
+    },
+    destroy() {
+      root.replaceChildren?.();
+    },
+  };
+}
+
+let animatedIconSequence = 0;
+
+function animatedRasterLayerMarkup(sprite, atlas, tintId) {
+  const frame = sprite.frame;
+  const pixelsPerUnitX = frame.pixelsPerUnitX || frame.pixelsPerUnit || 1;
+  const pixelsPerUnitY = frame.pixelsPerUnitY || frame.pixelsPerUnit || 1;
+  const w = frame.w / Math.abs(pixelsPerUnitX);
+  const h = frame.h / Math.abs(pixelsPerUnitY);
+  const x = Math.min(
+    -finiteNumber(frame.originX) / pixelsPerUnitX,
+    (frame.w - finiteNumber(frame.originX)) / pixelsPerUnitX,
+  );
+  const y = Math.min(
+    -finiteNumber(frame.originY) / pixelsPerUnitY,
+    (frame.h - finiteNumber(frame.originY)) / pixelsPerUnitY,
+  );
+  const filter = sprite.tintSlot === "fixed" ? "" : ` filter="url(#${tintId})"`;
+  return `<g data-unit-icon-animation-part="${sprite.animationPart}" data-unit-icon-sprite="${sprite.id}">` +
+    `<g data-unit-icon-scale>` +
+      `<svg x="${number(x)}" y="${number(y)}" width="${number(w)}" height="${number(h)}" ` +
+        `viewBox="${frame.x} ${frame.y} ${frame.w} ${frame.h}" preserveAspectRatio="none" overflow="hidden">` +
+        `<image href="${atlas.image}" x="0" y="0" width="${atlas.grid.width}" height="${atlas.grid.height}" ` +
+          `preserveAspectRatio="none"${filter} />` +
+      `</svg>` +
+    `</g>` +
+  `</g>`;
+}
+
+function animatedNativeLayerMarkup(part) {
+  return `<g data-unit-icon-animation-part="${part.id}" opacity="0">` +
+    `<g data-unit-icon-scale>${nativeGeometryMarkup(part.geometry, part.paint)}</g>` +
+  `</g>`;
+}
+
+function nativeGeometryMarkup(geometry, paint = {}) {
+  if (!geometry) return "";
+  const attrs = `fill="${paint.fill || "none"}" fill-opacity="${number(paint.fillOpacity ?? 1)}" ` +
+    `stroke="${paint.stroke || "none"}" stroke-width="${number(paint.strokeWidth || 0)}" ` +
+    `stroke-opacity="${number(paint.strokeOpacity ?? 1)}"`;
+  if (geometry.type === "circle") {
+    return `<circle cx="${number(geometry.cx)}" cy="${number(geometry.cy)}" r="${number(geometry.r)}" ${attrs} />`;
+  }
+  if (geometry.type === "polygon") {
+    const points = (geometry.points || []).map((point) => `${number(point.x)},${number(point.y)}`).join(" ");
+    return points ? `<polygon points="${points}" ${attrs} />` : "";
+  }
+  return "";
+}
+
+function applyAnimatedIconPart(record, state) {
+  if (!state) return;
+  let transform;
+  let scaleX;
+  let scaleY;
+  if (record.sprite) {
+    const resolved = resolvePngSpriteTransform(state, record.sprite.frame, record.sprite);
+    transform = `translate(${number(resolved.x)} ${number(resolved.y)}) rotate(${number(resolved.rotation * 180 / Math.PI)})`;
+    scaleX = resolved.scaleX * Math.abs(record.sprite.frame.pixelsPerUnitX || record.sprite.frame.pixelsPerUnit || 1);
+    scaleY = resolved.scaleY * Math.abs(record.sprite.frame.pixelsPerUnitY || record.sprite.frame.pixelsPerUnit || 1);
+  } else {
+    transform = `translate(${number(state.transform.x + state.localOffset.x)} ${number(state.transform.y + state.localOffset.y)}) ` +
+      `rotate(${number(state.transform.rotation * 180 / Math.PI)})`;
+    scaleX = state.transform.scaleX * state.geometryScale.x;
+    scaleY = state.transform.scaleY * state.geometryScale.y;
+  }
+  record.node.setAttribute("transform", transform);
+  record.node.setAttribute("opacity", number(state.alpha));
+  record.scaleNode?.setAttribute("transform", `scale(${number(scaleX)} ${number(scaleY)})`);
 }
 
 function atlasPortrait(atlas, teamColor) {

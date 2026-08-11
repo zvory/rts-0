@@ -35,12 +35,58 @@ import {
 } from "../../client/src/lobby_browser_view.js";
 import { AI_PROFILES, LobbyRosterView, PLAYABLE_FACTIONS } from "../../client/src/lobby_view.js";
 import {
+  BirthdayBanner,
+  isSoupmanBirthday,
+} from "../../client/src/birthday_banner.js";
+import {
   LOBBY_MAP_PRESENTATION,
   LobbyMapSelector,
   lobbyMapPresentation,
 } from "../../client/src/lobby_map_selector.js";
 
 import { textWithin } from "./dom_text.mjs";
+
+{
+  const root = { hidden: false };
+  const tankIconElements = [{ innerHTML: "" }, { innerHTML: "" }];
+  const mountedIcons = [];
+  let timestamp = Date.parse("2026-08-12T03:59:30Z");
+  let refresh = null;
+  const banner = new BirthdayBanner(root, {
+    now: () => timestamp,
+    setTimeoutFn(callback) { refresh = callback; return 1; },
+    clearTimeoutFn() {},
+    tankIconElements,
+    mountTankIcon(element, index) {
+      const controller = { element, index, destroyed: false, destroy() { this.destroyed = true; } };
+      mountedIcons.push(controller);
+      return controller;
+    },
+  });
+  assert(!root.hidden, "birthday banner remains visible late on August 11 in New York");
+  assert(mountedIcons.length === 2 && mountedIcons.every((controller, index) => controller.index === index),
+    "birthday banner mounts one renderer-authored tank icon controller on each side");
+  timestamp = Date.parse("2026-08-12T04:00:00.050Z");
+  refresh();
+  assert(root.hidden && mountedIcons.every((controller) => controller.destroyed),
+    "birthday banner hides at New York midnight and stops both icon animation cycles");
+  banner.destroy();
+
+  assert(isSoupmanBirthday(Date.parse("2026-08-11T04:00:00Z")),
+    "birthday date begins at midnight in New York");
+  assert(!isSoupmanBirthday(Date.parse("2026-08-11T03:59:59Z"))
+    && !isSoupmanBirthday(Date.parse("2026-08-12T04:00:00Z")),
+  "birthday date excludes the instants immediately outside August 11 in New York");
+}
+
+{
+  const indexHtml = fs.readFileSync(new URL("../../client/index.html", import.meta.url), "utf8");
+  const styles = fs.readFileSync(new URL("../../client/styles.css", import.meta.url), "utf8");
+  assert(!indexHtml.includes("birthday-shot") && !styles.includes("birthday-tank-recoil"),
+    "birthday banner delegates recoil and muzzle flash to the live icon rig without parallel CSS effects");
+  assert(!indexHtml.includes("birthday-banner-dismiss") && !styles.includes("birthday-banner-dismiss"),
+    "birthday banner has no dismissal control or dismissal styling");
+}
 
 {
   const lobby = Object.assign(Object.create(Lobby.prototype), {

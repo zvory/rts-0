@@ -1,28 +1,9 @@
 import { ARTILLERY_OUTER_RADIUS_TILES, MORTAR_OUTER_RADIUS_TILES } from "./config.js";
 import { EVENT, KIND, STATE, WEAPON_KIND, isUnit } from "./protocol.js";
+import { sampleWeaponRecoilCycle } from "./weapon_recoil_cycle.js";
 
 const SHOT_REVEAL_MS = 1500;
 const MISS_TOAST_MS = 760;
-const WEAPON_RECOIL_MS = Object.freeze({
-  [KIND.RIFLEMAN]: 420,
-  [KIND.PANZERFAUST]: 420,
-  [KIND.MACHINE_GUNNER]: 160,
-  [KIND.ANTI_TANK_GUN]: 820,
-  [KIND.MORTAR_TEAM]: 520,
-  [KIND.ARTILLERY]: 980,
-  [KIND.SCOUT_CAR]: 160,
-  [KIND.TANK]: 650,
-});
-const WEAPON_RECOIL_MS_BY_WEAPON_KIND = Object.freeze({
-  [WEAPON_KIND.RIFLEMAN_RIFLE]: WEAPON_RECOIL_MS[KIND.RIFLEMAN],
-  [WEAPON_KIND.MACHINE_GUNNER_MG]: WEAPON_RECOIL_MS[KIND.MACHINE_GUNNER],
-  [WEAPON_KIND.ANTI_TANK_GUN]: WEAPON_RECOIL_MS[KIND.ANTI_TANK_GUN],
-  [WEAPON_KIND.MORTAR_TEAM_MORTAR]: WEAPON_RECOIL_MS[KIND.MORTAR_TEAM],
-  [WEAPON_KIND.ARTILLERY_GUN]: WEAPON_RECOIL_MS[KIND.ARTILLERY],
-  [WEAPON_KIND.SCOUT_CAR_MG]: WEAPON_RECOIL_MS[KIND.SCOUT_CAR],
-  [WEAPON_KIND.PANZERFAUST_LOADED_SHOT]: 620,
-  [WEAPON_KIND.TANK_CANNON]: WEAPON_RECOIL_MS[KIND.TANK],
-});
 const WEAPON_KINDS = new Set(Object.values(WEAPON_KIND));
 
 export class VisualEffectBuffers {
@@ -368,14 +349,12 @@ export class VisualEffectBuffers {
   weaponRecoil(id, kind, now, weaponKind) {
     const sample = this._weaponRecoilSample(id, kind, now, weaponKind);
     if (!sample) return 0;
-    if (sample.age < 0) return 1;
-    return recoilCurve(sample.age / sample.ttlMs);
+    return sample.progress;
   }
 
   weaponRecoilPhase(id, kind, now, weaponKind) {
     const sample = this._weaponRecoilSample(id, kind, now, weaponKind);
-    if (!sample || sample.age < 0) return 0;
-    return clamp01(sample.age / sample.ttlMs);
+    return sample?.phase || 0;
   }
 
   weaponRecoilKind(id) {
@@ -392,14 +371,12 @@ export class VisualEffectBuffers {
     const startedAt = typeof record === "number" ? record : record?.startedAt;
     if (typeof startedAt !== "number") return null;
     const recoilWeaponKind = normalizedWeaponKind(weaponKind) || normalizedWeaponKind(record?.weaponKind);
-    if (recoilWeaponKind === WEAPON_KIND.TANK_COAX) return null;
-    const ttlMs = recoilMsFor(kind, recoilWeaponKind);
     const age = now - startedAt;
-    if (age > ttlMs) {
+    const sample = sampleWeaponRecoilCycle(kind, age, recoilWeaponKind);
+    if (!sample.active && recoilWeaponKind !== WEAPON_KIND.TANK_COAX) {
       this.weaponRecoilById.delete(id);
-      return null;
     }
-    return { age, ttlMs };
+    return sample.active ? sample : null;
   }
 
   shotRevealEntityViews(now, visibleIds) {
@@ -538,10 +515,6 @@ function normalizedWeaponKind(weaponKind) {
   return WEAPON_KINDS.has(weaponKind) ? weaponKind : undefined;
 }
 
-function recoilMsFor(kind, weaponKind) {
-  return WEAPON_RECOIL_MS_BY_WEAPON_KIND[weaponKind] || WEAPON_RECOIL_MS[kind] || 300;
-}
-
 function eventTargetPos(ev) {
   return Array.isArray(ev.toPos) && ev.toPos.length === 2
     ? { x: ev.toPos[0], y: ev.toPos[1] }
@@ -552,15 +525,6 @@ function trimHead(items, limit) {
   if (items.length > limit) {
     items.splice(0, items.length - limit);
   }
-}
-
-function recoilCurve(t) {
-  const progress = t < 0 ? 0 : t > 1 ? 1 : t;
-  if (progress < 0.18) {
-    return 1 - progress * 0.12;
-  }
-  const settle = (progress - 0.18) / 0.82;
-  return Math.cos(settle * Math.PI * 0.5) * 0.88;
 }
 
 function clamp01(value) {

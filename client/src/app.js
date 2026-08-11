@@ -9,12 +9,12 @@
 // Everything below codes strictly against the export signatures in docs/design/client-ui.md §4.1;
 // the modules themselves are owned by other files. Keep this layer thin: it should
 // orchestrate, not implement game logic.
-
 import { Net } from "./net.js";
 import { Lobby } from "./lobby.js";
 import { BranchStaging } from "./branch_staging.js";
+import { BirthdayBanner } from "./birthday_banner.js";
 import { Audio, SOUND_MANIFEST } from "./audio.js";
-import { S } from "./protocol.js";
+import { KIND, S } from "./protocol.js";
 import { TOAST_MS } from "./alerts.js";
 import {
   buildLabLaunchConfig,
@@ -96,7 +96,8 @@ import {
   installMapPreviewStartupStatus,
   MapPreviewBridge,
 } from "./map_preview_bridge.js";
-
+import { mountLiveUnitIcon } from "./renderer/rigs/unit_icon_sources.js";
+import { sampleWeaponRecoilCycle } from "./weapon_recoil_cycle.js";
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
  * so we ping well inside that window to keep a healthy connection alive.
@@ -193,6 +194,10 @@ export class App {
     this.audio = new Audio();
     void this.audio.preload(SOUND_MANIFEST);
     this.statusBadge = new StatusBadge(dom.statusBadge);
+    this.birthdayBanner = new BirthdayBanner(dom.birthdayBanner, { tankIconElements: [dom.birthdayTankLeftIcon, dom.birthdayTankRightIcon],
+      mountTankIcon: (element, index) => mountLiveUnitIcon(element, KIND.TANK, { teamColor: "#c7d07a",
+        delayMs: 250 + index * 1200, sampleCycle: (elapsedMs) => sampleWeaponRecoilCycle(KIND.TANK, elapsedMs) }),
+    });
     this.hotkeyProfiles = new HotkeyProfileService({
       catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
     });
