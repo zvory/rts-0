@@ -359,7 +359,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s autocast travel),
   `MORTAR_MANUAL_SHELL_DELAY_TICKS = 34` (~1.13s manual travel),
-  `MORTAR_OUTER_RADIUS_TILES = 1.0`,
+  `MORTAR_OUTER_RADIUS_TILES = 2.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`,
   `MORTAR_VISIBLE_MEDIAN_SCATTER_TILES = 1.0`, and
