@@ -243,7 +243,7 @@ function renderHealthBarControl(root, healthBars) {
     button.disabled = state.available === false;
     button.setAttribute("aria-checked", String(enabled));
     button.textContent = enabled ? "Always Show HP Bars: on" : "Always Show HP Bars: off";
-    button.title = "Show every visible entity's HP bar, including at full health.";
+    button.title = "Show every visible unit and building HP bar, including at full health.";
   }
   sync();
   healthBars.onMount?.(sync);

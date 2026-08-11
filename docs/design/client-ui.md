@@ -2335,8 +2335,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   are removed when an entity id no longer needs them. The SVG and PNG runtimes share one
   sampled render context per entity draw so renderer-local motion state advances once. Units use low-detail hard-edged silhouettes tinted by player color, a dark
   drop shadow, dark outline, HP bar above when damaged/selected, and glowing selection ring when
-  selected. The Game settings toggle can instead keep every visible entity's HP bar on, including
-  at full health; damaged-only remains the default. Normal HP fills use the owning player's color,
+  selected. The Game settings toggle can instead keep every visible unit and building HP bar on,
+  including at full health; raw steel and oil patches never show HP bars, while Steel Mine and
+  Pump Jack extractor buildings do. Damaged-only remains the default. Normal HP fills use the owning player's color,
   and black internal dividers split the span into `round(maxHp / 15)` whole cells (at least one).
   Any remainder is distributed across those cells rather than drawing a fractional final cell, so
   each cell represents approximately 15 HP. Those cell dividers use 0.75-world-pixel marks so they
