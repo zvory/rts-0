@@ -64,6 +64,29 @@ pub(super) fn choose_target<'a>(
         .map(|target| target.id)
 }
 
+pub(super) fn take_best_candidate(
+    context: &AttackPriorityContext,
+    candidates: &mut Vec<TargetCandidate>,
+    require_in_weapon_range: bool,
+    prefer_in_weapon_range: bool,
+) -> Option<TargetCandidate> {
+    let best = candidates
+        .iter()
+        .filter(|candidate| !require_in_weapon_range || candidate.in_weapon_range)
+        .filter_map(|candidate| rank_candidate(context, candidate).map(|rank| (candidate, rank)))
+        .min_by(|(left, left_rank), (right, right_rank)| {
+            let range_order = if prefer_in_weapon_range {
+                right.in_weapon_range.cmp(&left.in_weapon_range)
+            } else {
+                Ordering::Equal
+            };
+            range_order.then_with(|| compare_ranks(left_rank, right_rank))
+        })
+        .map(|(candidate, _)| *candidate)?;
+    candidates.retain(|candidate| candidate.id != best.id);
+    Some(best)
+}
+
 fn compare_ranks(left_rank: &TargetRank, right_rank: &TargetRank) -> Ordering {
     left_rank
         .priority_bucket
