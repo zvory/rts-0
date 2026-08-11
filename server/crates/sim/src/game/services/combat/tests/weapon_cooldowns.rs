@@ -99,7 +99,7 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
 }
 
 #[test]
-fn methamphetamines_sets_rifleman_weapon_cooldown_to_eight_ticks() {
+fn methamphetamines_sets_rifleman_weapon_cooldown_to_ten_ticks() {
     let mut entities = EntityStore::new();
     let attacker_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -121,6 +121,6 @@ fn methamphetamines_sets_rifleman_weapon_cooldown_to_eight_ticks() {
             .get(attacker_id)
             .expect("rifleman should exist")
             .attack_cd(),
-        8
+        10
     );
 }

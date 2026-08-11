@@ -217,10 +217,8 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
 - **Rifleman Methamphetamines fire**: upgraded riflemen gain permanent moving fire and keep their
   movement path while firing at enemies in range instead of stopping to shoot. While on a plain
   `Move` or active `AttackMove`, upgraded riflemen only fire opportunistically at enemies already in
-  range and never create enemy-directed movement. Moving Methamphetamines shots use normal rifleman accuracy and do not add
-  a movement miss roll, and the upgrade resets their rifle cooldown to 8 ticks. Riflemen also take
-  25% less incoming damage whenever the movement phase records actual path-following translation;
-  a queued or blocked path without translation and later collision shoves do not qualify.
+  range and never create enemy-directed movement. Moving Methamphetamines shots use normal Rifleman
+  accuracy, do not add a movement miss roll, and reset the rifle cooldown to 10 ticks.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks and fire while moving, but they use simplified
@@ -275,7 +273,8 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   remain authoritative economy deductions.
 - **Methamphetamines research**: Training Centres can queue one permanent player upgrade costing
   100 steel / 25 oil and taking 600 ticks. Once completed, all current and future owned riflemen
-  use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.
+  use the moving-fire rifleman model permanently, move at tank speed, and reset their rifle cooldown
+  to 10 ticks instead of the base 16 ticks.
   Legacy `charge` commands remain decodable but have no eligible carriers, cooldown, or runtime
   status.
 - **Advanced research locks**: Engineering Complex can queue `anti_tank_gun_unlock` for 100 steel / 50 oil
