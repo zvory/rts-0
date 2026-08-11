@@ -241,7 +241,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Barracks exposes the standalone Panzerfaust unit",
   );
   assert(
-    STATS[KIND.RIFLEMAN].cost.steel === 25 &&
+    STATS[KIND.RIFLEMAN].cost.steel === 35 &&
       STATS[KIND.RIFLEMAN].cost.oil === 0 &&
       STATS[KIND.PANZERFAUST].cost.steel === 55 &&
       STATS[KIND.PANZERFAUST].cost.oil === 5 &&

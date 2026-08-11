@@ -280,9 +280,8 @@ AP damage autonomously turns its hull toward the damage source without changing 
 path, turret aim, or stationary range. The first Tank cannon, Anti-Tank Gun, or Panzerfaust hit locks
 its source for three seconds. Hits during that window neither redirect the hull nor extend the lock;
 after it expires, the next qualifying hit may establish a new lock. Active movement paths and zero
-oil prevent this response, while Hold Position explicitly allows it. Riflemen take 25% less damage
-on ticks when path-following movement actually translates them; blocked movement and collision
-shoves do not qualify. Riflemen upgraded with Methamphetamines gain permanent moving fire, keep
+oil prevent this response, while Hold Position explicitly allows it. Riflemen take full incoming
+damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, keep
 advancing while firing with normal accuracy, move at tank speed, and use an 8-tick rifle cooldown.
 Panzerfausts upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
 movement, and 25% faster rifle attacks plus the Panzerfaust windup boost. Machine Gunners upgraded with
@@ -626,7 +625,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 25  | 0   | 1   | 300 (~10s) |
+| rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |

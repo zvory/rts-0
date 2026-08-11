@@ -356,12 +356,6 @@ impl Entity {
             .unwrap_or((0.0, 0.0))
     }
 
-    fn path_translated_this_tick(&self) -> bool {
-        self.movement
-            .as_ref()
-            .is_some_and(|movement| movement.path_translated_this_tick)
-    }
-
     pub fn set_last_repath_tick(&mut self, tick: u32) {
         if let Some(m) = self.movement.as_mut() {
             m.last_repath_tick = tick;
@@ -982,11 +976,6 @@ impl Entity {
         amount: u32,
         attribution: Option<(u32, (f32, f32), u32)>,
     ) -> bool {
-        let amount = config::damage_after_rifleman_movement(
-            self.kind,
-            amount,
-            self.path_translated_this_tick(),
-        );
         if self.hp == 0 || amount == 0 || self.invulnerable {
             return false;
         }
