@@ -49,7 +49,9 @@
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-observation, #game-over-scores,
                 #game-over-button
-        App:    #status-badge, #discord-invite-badge, #toast, #connection-lost, #connection-lost-drag,
+        App:    #status-badge, #discord-invite-badge, #birthday-banner,
+                #birthday-tank-left-icon, #birthday-tank-right-icon,
+                #toast, #connection-lost, #connection-lost-drag,
                 #connection-lost-close
     -->
     <div id="app">
@@ -84,6 +86,15 @@
 
       <!-- ============================ LOBBY ============================ -->
       <section id="lobby-screen" class="screen">
+        <aside id="birthday-banner" class="birthday-banner" aria-label="Birthday announcement" hidden>
+          <div class="birthday-tank birthday-tank-left" aria-hidden="true">
+            <span id="birthday-tank-left-icon" class="birthday-tank-icon"></span>
+          </div>
+          <p>Happy Birthday Soupman!</p>
+          <div class="birthday-tank birthday-tank-right" aria-hidden="true">
+            <span id="birthday-tank-right-icon" class="birthday-tank-icon"></span>
+          </div>
+        </aside>
         <div class="lobby-shell">
           <div class="lobby-box">
             <header class="lobby-masthead">

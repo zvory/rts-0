@@ -365,6 +365,66 @@ body {
   overflow-y: auto;
 }
 
+.birthday-banner {
+  position: relative;
+  width: min(1180px, 100%);
+  min-height: 78px;
+  margin: 0 auto 18px;
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto minmax(90px, 1fr);
+  align-items: center;
+  gap: clamp(12px, 3vw, 36px);
+  overflow: hidden;
+  padding: 11px 24px;
+  border: 1px solid rgba(199, 208, 122, 0.72);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(90deg, rgba(199, 208, 122, 0.08), rgba(199, 208, 122, 0.18), rgba(199, 208, 122, 0.08)),
+    rgba(39, 37, 31, 0.98);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.birthday-banner[hidden] {
+  display: none;
+}
+
+.birthday-banner p {
+  margin: 0;
+  color: #f2dfa0;
+  font-size: clamp(25px, 3.1vw, 42px);
+  line-height: 1;
+  text-align: center;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+}
+
+.birthday-tank {
+  position: relative;
+  width: min(130px, 100%);
+  color: var(--accent);
+}
+
+.birthday-tank-left {
+  justify-self: end;
+}
+
+.birthday-tank-right {
+  justify-self: start;
+  transform: scaleX(-1);
+}
+
+.birthday-tank-icon {
+  display: block;
+  width: 100%;
+  filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.45));
+}
+
+.birthday-tank-icon .unit-raster-icon {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .lobby-shell {
   width: min(1180px, 100%);
   margin: 0 auto;
@@ -1448,6 +1508,18 @@ input[type="text"]:focus {
   #lobby-screen,
   #lab-entry-screen {
     padding: 72px 12px 18px;
+  }
+
+  .birthday-banner {
+    grid-template-columns: 58px minmax(0, 1fr) 58px;
+    min-height: 68px;
+    gap: 7px;
+    padding: 10px 9px;
+  }
+
+  .birthday-banner p {
+    font-size: clamp(19px, 6.2vw, 30px);
+    white-space: normal;
   }
 
   .lobby-masthead,

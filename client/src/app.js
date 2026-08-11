@@ -9,10 +9,10 @@
 // Everything below codes strictly against the export signatures in docs/design/client-ui.md §4.1;
 // the modules themselves are owned by other files. Keep this layer thin: it should
 // orchestrate, not implement game logic.
-
 import { Net } from "./net.js";
 import { Lobby } from "./lobby.js";
 import { BranchStaging } from "./branch_staging.js";
+import { createBirthdayBanner } from "./birthday_banner_composition.js";
 import { Audio, SOUND_MANIFEST } from "./audio.js";
 import { S } from "./protocol.js";
 import { TOAST_MS } from "./alerts.js";
@@ -193,6 +193,7 @@ export class App {
     this.audio = new Audio();
     void this.audio.preload(SOUND_MANIFEST);
     this.statusBadge = new StatusBadge(dom.statusBadge);
+    this.birthdayBanner = createBirthdayBanner(dom);
     this.hotkeyProfiles = new HotkeyProfileService({
       catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
     });

@@ -302,6 +302,9 @@ export function replaceReplayPermalink(matchId, {
 export const dom = {
   app: document.getElementById("app"),
   statusBadge: document.getElementById("status-badge"),
+  birthdayBanner: document.getElementById("birthday-banner"),
+  birthdayTankLeftIcon: document.getElementById("birthday-tank-left-icon"),
+  birthdayTankRightIcon: document.getElementById("birthday-tank-right-icon"),
   lobbyScreen: document.getElementById("lobby-screen"),
   labEntryScreen: document.getElementById("lab-entry-screen"),
   branchScreen: document.getElementById("branch-screen"),

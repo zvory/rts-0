@@ -10,6 +10,7 @@ const clientSrc = path.join(repoRoot, "client/src");
 const AREA_BY_FILE = new Map(Object.entries({
   "main.js": "app-shell",
   "app.js": "app-shell",
+  "birthday_banner_composition.js": "app-shell",
   "match.js": "app-shell",
   "match_startup_inbox.js": "app-shell",
   "prediction_runtime_startup.js": "app-shell",
@@ -80,6 +81,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "state_queries.js": "model",
   "state_ground_decals.js": "model",
   "state_visual_effects.js": "model",
+  "weapon_recoil_cycle.js": "model",
   "apm_tracker.js": "model",
   "client_intent.js": "model",
   "command_interaction.js": "model",
@@ -122,6 +124,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "hotkey_editor.js": "ui",
   "hotkey_profiles.js": "ui",
   "lobby.js": "ui",
+  "birthday_banner.js": "ui",
   "lobby_map_selector.js": "ui",
   "lobby_browser_view.js": "ui",
   "lobby_view.js": "ui",
