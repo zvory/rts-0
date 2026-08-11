@@ -27,8 +27,6 @@ const MAX_SCENARIO_ID_LEN: usize = 48;
 const MAX_SCENARIO_FILENAME_LEN: usize = 80;
 const MAX_SCENARIO_TITLE_LEN: usize = 96;
 const MAX_SCENARIO_DESCRIPTION_LEN: usize = 320;
-const MAX_SCENARIO_TAGS: usize = 8;
-const MAX_SCENARIO_TAG_LEN: usize = 32;
 const MAX_SCENARIO_NAME_LEN: usize = 80;
 const MAX_SCENARIO_CATALOG_ENTRIES: usize = 256;
 const MAX_AUTHORING_SCENARIO_ENTITIES: usize = 2000;
@@ -36,12 +34,11 @@ pub const MAX_LAB_SCENARIO_IMPORT_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAX_AUTHORING_SCENARIO_JSON_BYTES: usize = MAX_LAB_SCENARIO_IMPORT_JSON_BYTES;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LabScenarioCatalogEntry {
     pub id: String,
     pub title: String,
     pub description: String,
-    pub tags: Vec<String>,
     pub map: String,
     pub player_count: usize,
     pub filename: String,
@@ -142,13 +139,6 @@ pub fn validate_lab_scenario_authoring(
     let name = metadata.name.trim().to_string();
     let title = metadata.title.trim().to_string();
     let description = metadata.description.trim().to_string();
-    let tags: Vec<_> = metadata
-        .tags
-        .into_iter()
-        .map(|tag| tag.trim().to_string())
-        .filter(|tag| !tag.is_empty())
-        .collect();
-
     if name.is_empty() || name.len() > MAX_SCENARIO_NAME_LEN {
         return Err(format!(
             "setup name must be non-empty and at most {MAX_SCENARIO_NAME_LEN} bytes"
@@ -162,7 +152,6 @@ pub fn validate_lab_scenario_authoring(
         id: slug.clone(),
         title,
         description,
-        tags,
         map: facts.map.clone(),
         player_count: facts.player_count,
         filename: filename.clone(),
@@ -294,17 +283,6 @@ fn validate_manifest_entry(entry: &LabScenarioCatalogEntry) -> Result<(), String
     if entry.description.trim().is_empty() || entry.description.len() > MAX_SCENARIO_DESCRIPTION_LEN
     {
         return Err(format!("invalid description for lab setup {:?}", entry.id));
-    }
-    if entry.tags.len() > MAX_SCENARIO_TAGS {
-        return Err(format!("too many tags for lab setup {:?}", entry.id));
-    }
-    for tag in &entry.tags {
-        if !safe_scenario_tag(tag) {
-            return Err(format!(
-                "invalid tag {:?} for lab setup {:?}",
-                tag, entry.id
-            ));
-        }
     }
     if entry.map.trim().is_empty() {
         return Err(format!("missing map for lab setup {:?}", entry.id));
@@ -649,14 +627,6 @@ fn safe_scenario_filename(value: &str) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-' || b == b'.')
-}
-
-fn safe_scenario_tag(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= MAX_SCENARIO_TAG_LEN
-        && value
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
 fn lab_error_text(err: &LabError) -> String {
@@ -1259,7 +1229,6 @@ mod tests {
                 name: "Fresh Lab Scenario".to_string(),
                 title: "Fresh Lab Scenario".to_string(),
                 description: "A deterministic lab setup ready for catalog review.".to_string(),
-                tags: vec!["two-player".to_string(), "test".to_string()],
             },
             loaded.scenario,
         )
@@ -1290,7 +1259,6 @@ mod tests {
                 name: "Duplicate".to_string(),
                 title: "Duplicate".to_string(),
                 description: "Duplicates the bundled lategame scenario id.".to_string(),
-                tags: vec!["test".to_string()],
             },
             loaded.scenario,
         )
@@ -1300,25 +1268,6 @@ mod tests {
             err.contains("duplicate lab setup id"),
             "unexpected error: {err}"
         );
-    }
-
-    #[test]
-    fn lab_scenario_authoring_validation_rejects_malformed_tags() {
-        let loaded =
-            load_lab_scenario_by_id("lategame").expect("bundled lategame scenario should load");
-        let err = validate_lab_scenario_authoring(
-            LabScenarioAuthoringMetadata {
-                slug: "bad-tag-scenario".to_string(),
-                name: "Bad Tag Scenario".to_string(),
-                title: "Bad Tag Scenario".to_string(),
-                description: "Uses malformed authoring tags.".to_string(),
-                tags: vec!["bad tag".to_string()],
-            },
-            loaded.scenario,
-        )
-        .expect_err("malformed tags should be rejected");
-
-        assert!(err.contains("invalid tag"), "unexpected error: {err}");
     }
 
     #[test]
@@ -1341,7 +1290,6 @@ mod tests {
                 name: "Oversized Payload".to_string(),
                 title: "Oversized Payload".to_string(),
                 description: "Exercises the authoring JSON byte cap.".to_string(),
-                tags: vec!["test".to_string()],
             },
             LabScenarioPayload::Checkpoint(scenario),
         )
@@ -1379,7 +1327,7 @@ mod tests {
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"legacy-v1","title":"Legacy V1","description":"Legacy compatibility fixture","tags":["test"],"map":"Chokes","playerCount":2,"filename":"legacy-v1.json"}
+                {"id":"legacy-v1","title":"Legacy V1","description":"Legacy compatibility fixture","map":"Chokes","playerCount":2,"filename":"legacy-v1.json"}
               ]
             }"#,
         )
@@ -1415,8 +1363,8 @@ mod tests {
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"dupe","title":"One","description":"First","tags":[],"map":"Chokes","playerCount":2,"filename":"dupe.json"},
-                {"id":"dupe","title":"Two","description":"Second","tags":[],"map":"Chokes","playerCount":2,"filename":"dupe.json"}
+                {"id":"dupe","title":"One","description":"First","map":"Chokes","playerCount":2,"filename":"dupe.json"},
+                {"id":"dupe","title":"Two","description":"Second","map":"Chokes","playerCount":2,"filename":"dupe.json"}
               ]
             }"#,
         )
@@ -1437,7 +1385,7 @@ mod tests {
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"safe-id","title":"Safe","description":"Filename mismatch","tags":[],"map":"Chokes","playerCount":2,"filename":"other-safe-id.json"}
+                {"id":"safe-id","title":"Safe","description":"Filename mismatch","map":"Chokes","playerCount":2,"filename":"other-safe-id.json"}
               ]
             }"#,
         )
@@ -1455,7 +1403,7 @@ mod tests {
         let entries = (0..=MAX_SCENARIO_CATALOG_ENTRIES)
             .map(|index| {
                 format!(
-                    r#"{{"id":"scenario-{index}","title":"Scenario {index}","description":"Catalog cap test","tags":[],"map":"Chokes","playerCount":2,"filename":"scenario-{index}.json"}}"#
+                    r#"{{"id":"scenario-{index}","title":"Scenario {index}","description":"Catalog cap test","map":"Chokes","playerCount":2,"filename":"scenario-{index}.json"}}"#
                 )
             })
             .collect::<Vec<_>>()
@@ -1479,7 +1427,7 @@ mod tests {
             dir.join(LAB_SCENARIO_MANIFEST),
             r#"{
               "scenarios": [
-                {"id":"../bad","title":"Bad","description":"Bad id","tags":[],"map":"Chokes","playerCount":2,"filename":"bad.json"}
+                {"id":"../bad","title":"Bad","description":"Bad id","map":"Chokes","playerCount":2,"filename":"bad.json"}
               ]
             }"#,
         )

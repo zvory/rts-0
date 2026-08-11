@@ -9,7 +9,6 @@ const AUTHORING_FIELD_IDS = Object.freeze([
   ["name", "scenario-name"],
   ["title", "scenario-title"],
   ["slug", "scenario-slug"],
-  ["tags", "scenario-tags"],
   ["description", "scenario-description"],
   ["scenarioJson", "scenario-json"],
 ]);
@@ -53,10 +52,6 @@ export function renderLabScenarioOptions(panel) {
       panel.inputField("scenario-slug", "Slug", "text", panel.authoring.slug, {
         maxLength: limits.slug,
         onChange: (value) => { panel.authoring.slug = value; panel.authoringSlugEdited = true; },
-      }),
-      panel.inputField("scenario-tags", "Tags", "text", panel.authoring.tags, {
-        maxLength: (limits.tag + 1) * limits.tags,
-        onChange: setAuthoring("tags"),
       }),
       panel.textAreaField("scenario-description", "Description", panel.authoring.description, {
         maxLength: limits.description,

@@ -52,14 +52,12 @@ pub const MAX_STEEL_PATCHES_PER_BASE: u32 = 36;
 pub const MAX_OIL_PATCHES_PER_BASE: u32 = 9;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LabScenarioAuthoringMetadata {
     pub slug: String,
     pub name: String,
     pub title: String,
     pub description: String,
-    #[serde(default)]
-    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

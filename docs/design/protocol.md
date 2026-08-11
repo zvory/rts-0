@@ -424,7 +424,7 @@ count, phase, and join state. Active replay rows use `phase: "inGame"` and
 spectator.
 
 `GET /api/lab-scenarios` returns a bounded catalog of bundled lab checkpoint setup metadata:
-`[{ id, title, description, tags, map, playerCount, filename }]`. `id` is the stable safe token used
+`[{ id, title, description, map, playerCount, filename }]`. `id` is the stable safe token used
 in direct lab room URLs as `scenario=<id>`, `map` and `playerCount` mirror the listed setup
 payload, and `filename` is the safe bundled JSON filename under
 `server/assets/lab-scenarios/`. The listing deliberately omits the full setup JSON; lab starts
@@ -1580,8 +1580,7 @@ API without mutating the room or writing server state.
   slug: string,        // future catalog id and filename stem, max 48 catalog-safe bytes
   name: string,        // exported setup name, max 80 bytes
   title: string,       // catalog title, max 96 bytes
-  description: string, // catalog description, max 320 bytes
-  tags?: string[]      // up to 8 catalog-safe tags, max 32 bytes each
+  description: string  // catalog description, max 320 bytes
 }
 ```
 `LabReplayArtifactV1` is the portable lab-session artifact contract owned by `rts-protocol`

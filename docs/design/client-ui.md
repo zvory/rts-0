@@ -961,8 +961,8 @@ setup import/export/reset, and result status; Tools owns target player, player s
 active tool status, and the remove setup tool. Vision presents one `Full` button plus one button per
 team; `Full` requests the authoritative union of every current team's fog, and Lab exposes no
 omniscient/no-fog control.
-The supported author workflow starts at `/lab`: choose a bundled catalog setup or blank setup,
-edit authoritative state with lab tools, fill in setup name/title/slug/description/tags, run
+The supported author workflow starts at `/lab`: choose a bundled catalog setup or start a new Lab
+on any bundled map, edit authoritative state with lab tools, fill in setup name/title/slug/description, run
 validation, and export the setup JSON locally. Bundled setups remain build-time assets; the browser
 has no server-persistent setup or map write API. The lab replay controls are visually separate from
 setup checkpoint JSON controls; replay

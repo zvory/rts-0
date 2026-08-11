@@ -1,4 +1,5 @@
 const LAB_CATALOG_ENDPOINT = "/api/lab-scenarios";
+const MAP_CATALOG_ENDPOINT = "/maps/catalog";
 const DEFAULT_LAB_MAP = "1v1";
 
 export function normalizeLabScenarioEntry(entry) {
@@ -7,17 +8,18 @@ export function normalizeLabScenarioEntry(entry) {
   const description = safeCatalogText(entry?.description, "");
   const map = safeCatalogText(entry?.map, DEFAULT_LAB_MAP);
   const playerCount = Math.max(0, Math.trunc(Number(entry?.playerCount) || 0));
-  const tags = Array.isArray(entry?.tags)
-    ? entry.tags.map((tag) => safeCatalogText(tag, "")).filter(Boolean).slice(0, 8)
-    : [];
   return {
     id,
     title,
     description,
     map,
     playerCount,
-    tags,
   };
+}
+
+export function normalizeLabMapEntry(entry) {
+  const name = safeCatalogText(entry?.name, "");
+  return name ? { name } : null;
 }
 
 export class LabCatalogScreen {
@@ -32,11 +34,13 @@ export class LabCatalogScreen {
     this.initialRoom = initialRoom;
     this.onStart = onStart;
     this.entries = [];
+    this.maps = [];
     this.status = "";
     this.error = "";
     this.connected = false;
     this.loading = false;
     this.roomInput = null;
+    this.mapSelect = null;
     this.starting = false;
   }
 
@@ -64,15 +68,29 @@ export class LabCatalogScreen {
     this.error = "";
     this.render();
     try {
-      const response = await this.fetchImpl(LAB_CATALOG_ENDPOINT, { cache: "no-store" });
-      if (!response?.ok) throw new Error(`catalog request failed: ${response?.status || "network"}`);
-      const rows = await response.json();
+      const [scenarioResponse, mapResponse] = await Promise.all([
+        this.fetchImpl(LAB_CATALOG_ENDPOINT, { cache: "no-store" }),
+        this.fetchImpl(MAP_CATALOG_ENDPOINT, { cache: "no-store" }),
+      ]);
+      if (!scenarioResponse?.ok) {
+        throw new Error(`setup catalog request failed: ${scenarioResponse?.status || "network"}`);
+      }
+      if (!mapResponse?.ok) {
+        throw new Error(`map catalog request failed: ${mapResponse?.status || "network"}`);
+      }
+      const rows = await scenarioResponse.json();
+      const mapCatalog = await mapResponse.json();
       this.entries = Array.isArray(rows)
         ? rows.map((entry) => normalizeLabScenarioEntry(entry)).filter((entry) => entry.id)
         : [];
+      this.maps = Array.isArray(mapCatalog?.maps)
+        ? mapCatalog.maps.map((entry) => normalizeLabMapEntry(entry)).filter(Boolean)
+        : [];
+      if (this.maps.length === 0) throw new Error("map catalog is empty");
       this.status = "";
     } catch (_) {
       this.entries = [];
+      this.maps = [];
       this.error = "Setup catalog unavailable.";
       this.status = this.error;
     } finally {
@@ -120,7 +138,7 @@ export class LabCatalogScreen {
     const catalog = document.createElement("section");
     catalog.className = "lab-entry-list";
     catalog.setAttribute("aria-label", "Lab checkpoint setups");
-    catalog.appendChild(this.renderBlankRow());
+    catalog.appendChild(this.renderNewLabRow());
     for (const entry of this.entries) catalog.appendChild(this.renderScenarioRow(entry));
     if (this.loading) catalog.appendChild(this.renderStateRow("Loading setups"));
     else if (this.error && this.entries.length === 0) {
@@ -131,31 +149,44 @@ export class LabCatalogScreen {
     this.root.appendChild(shell);
   }
 
-  renderBlankRow() {
-    return this.renderRow({
-      title: "Blank Lab",
-      description: "Current default 1v1 map with the normal two-player lab setup.",
-      map: DEFAULT_LAB_MAP,
-      playerCount: 2,
-      tags: ["blank"],
-      action: "Start blank",
-      onStart: () => this.start({ scenario: "blank", map: DEFAULT_LAB_MAP }),
+  renderNewLabRow() {
+    const selectedMap = this.currentMap();
+    const row = this.renderRow({
+      title: "New Lab",
+      description: "Start an empty Lab on a bundled map.",
+      action: "Start lab",
+      disabled: this.maps.length === 0,
+      onStart: () => this.start({ scenario: "blank", map: this.currentMap() }),
     });
+    const picker = document.createElement("label");
+    picker.className = "lab-entry-map-picker";
+    const label = document.createElement("span");
+    label.textContent = "Map";
+    this.mapSelect = document.createElement("select");
+    this.mapSelect.setAttribute("aria-label", "New Lab map");
+    for (const entry of this.maps) {
+      const option = document.createElement("option");
+      option.value = entry.name;
+      option.textContent = entry.name;
+      option.selected = entry.name === selectedMap;
+      this.mapSelect.appendChild(option);
+    }
+    this.mapSelect.disabled = this.maps.length === 0 || this.starting;
+    picker.append(label, this.mapSelect);
+    row.children[0]?.appendChild(picker);
+    return row;
   }
 
   renderScenarioRow(entry) {
     return this.renderRow({
       title: entry.title,
       description: entry.description,
-      map: entry.map,
-      playerCount: entry.playerCount,
-      tags: entry.tags,
       action: "Start setup",
       onStart: () => this.start({ scenario: entry.id, map: entry.map }),
     });
   }
 
-  renderRow({ title, description, map, playerCount, tags, action, onStart }) {
+  renderRow({ title, description, action, disabled = false, onStart }) {
     const row = document.createElement("article");
     row.className = "lab-entry-row";
     const copy = document.createElement("div");
@@ -164,20 +195,13 @@ export class LabCatalogScreen {
     heading.textContent = title;
     const body = document.createElement("p");
     body.textContent = description;
-    const meta = document.createElement("div");
-    meta.className = "lab-entry-meta";
-    meta.append(
-      this.metaChip(map || DEFAULT_LAB_MAP),
-      this.metaChip(`${playerCount || 2} players`),
-      ...tags.map((tag) => this.metaChip(tag)),
-    );
-    copy.append(heading, body, meta);
+    copy.append(heading, body);
 
     const button = document.createElement("button");
     button.type = "button";
     button.className = "btn primary";
     button.textContent = action;
-    button.disabled = !this.connected || this.starting;
+    button.disabled = disabled || !this.connected || this.starting;
     button.addEventListener("click", onStart);
     row.append(copy, button);
     return row;
@@ -188,12 +212,6 @@ export class LabCatalogScreen {
     row.className = "lab-entry-message";
     row.textContent = text;
     return row;
-  }
-
-  metaChip(text) {
-    const chip = document.createElement("span");
-    chip.textContent = text;
-    return chip;
   }
 
   start({ scenario, map }) {
@@ -212,6 +230,13 @@ export class LabCatalogScreen {
 
   currentRoom() {
     return this.roomInput?.value || this.initialRoom || "default";
+  }
+
+  currentMap() {
+    const selected = this.mapSelect?.value;
+    if (this.maps.some((entry) => entry.name === selected)) return selected;
+    if (this.maps.some((entry) => entry.name === DEFAULT_LAB_MAP)) return DEFAULT_LAB_MAP;
+    return this.maps[0]?.name || DEFAULT_LAB_MAP;
   }
 }
 
