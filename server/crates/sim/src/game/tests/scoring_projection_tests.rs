@@ -44,6 +44,13 @@ fn scores_record_kills_and_losses_on_death() {
         .find(|e| e.owner == 2 && e.kind == EntityKind::ResourceDepot)
         .map(|e| e.id)
         .expect("victim building should exist");
+    let attacker_unit = game
+        .state
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
+        .map(|e| e.id)
+        .expect("attacker unit should exist");
     for id in [victim_unit, victim_building] {
         let entity = game
             .state
@@ -52,6 +59,7 @@ fn scores_record_kills_and_losses_on_death() {
             .expect("victim should exist");
         entity.hp = 0;
         entity.set_last_damage_owner(Some(1));
+        entity.set_last_damage_entity_for_test(Some(attacker_unit));
     }
 
     let mut events: HashMap<u32, Vec<Event>> = game
@@ -90,6 +98,15 @@ fn scores_record_kills_and_losses_on_death() {
     assert_eq!(attacker.buildings_killed, 1);
     assert_eq!(victim.units_lost, 1);
     assert_eq!(victim.buildings_lost, 1);
+    assert_eq!(
+        game.state
+            .entities
+            .get(attacker_unit)
+            .expect("attacker unit should survive")
+            .units_killed(),
+        1,
+        "only the destroyed unit increments the attacking unit's counter"
+    );
 }
 
 #[test]

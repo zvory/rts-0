@@ -343,12 +343,17 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
             continue;
         }
         let damaged = entities.get_mut(id).is_some_and(|target| {
-            let attribution = teams.is_enemy_owner(shell.owner, target.owner).then_some((
-                shell.owner,
-                (shell.x, shell.y),
-                tick,
-            ));
-            target.apply_damage(effective, attribution)
+            if teams.is_enemy_owner(shell.owner, target.owner) {
+                target.apply_damage_from_entity(
+                    effective,
+                    shell.owner,
+                    shell.attacker,
+                    (shell.x, shell.y),
+                    tick,
+                )
+            } else {
+                target.apply_damage(effective, None)
+            }
         });
         if damaged {
             if teams.is_enemy_owner(shell.owner, victim_owner) && reveal.is_some() {

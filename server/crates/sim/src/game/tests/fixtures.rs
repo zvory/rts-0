@@ -64,6 +64,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
 
     if e.is_unit() {
         v.facing = Some(e.facing());
+        v.units_killed = Some(e.units_killed());
     }
     let active_combat_target = matches!(e.order(), Order::Attack(_) | Order::AttackMove(_))
         || (e.is_building() && e.can_attack());

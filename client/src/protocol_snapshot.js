@@ -26,9 +26,9 @@ import { decodeCompactEvent } from "./protocol_snapshot_events.js";
 import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
-  // Version 52 only appends the Steel Mine kind code, so version-51 fixture/replay frames retain
-  // the same field layout and remain safe to decode.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 51) {
+  // Version 53 appends unitsKilled to entity records. Versions 51 and 52 use the same shorter
+  // entity layout and remain safe to decode for fixture and replay compatibility.
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 
@@ -323,7 +323,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 42);
+  const fields = readArray(record, `entity ${index}`, 43);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -370,6 +370,7 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "extractorActive", fields, 39, readBool);
   assignOptionalCodeList(entity, "prodUpgradeQueue", fields, 40, UPGRADE_BY_CODE);
   assignOptional(entity, "panzerfaustWindupProgress", fields, 41, readNumber);
+  assignOptional(entity, "unitsKilled", fields, 42, readU32);
   return entity;
 }
 

@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ArtilleryShell {
     owner: u32,
+    #[serde(default)]
+    attacker: u32,
     x: f32,
     y: f32,
     impact_tick: u32,
@@ -31,12 +33,13 @@ impl ArtilleryShellStore {
         self.shells.len()
     }
 
-    pub(crate) fn schedule(&mut self, owner: u32, _attacker: u32, x: f32, y: f32, tick: u32) {
+    pub(crate) fn schedule(&mut self, owner: u32, attacker: u32, x: f32, y: f32, tick: u32) {
         if !x.is_finite() || !y.is_finite() {
             return;
         }
         self.shells.push(ArtilleryShell {
             owner,
+            attacker,
             x,
             y,
             impact_tick: tick.saturating_add(config::ARTILLERY_SHELL_DELAY_TICKS),
@@ -114,12 +117,18 @@ fn resolve_shell(
         }
         let mut damaged_owner = None;
         if let Some(target) = entities.get_mut(id) {
-            let attribution = teams.is_enemy_owner(shell.owner, target.owner).then_some((
-                shell.owner,
-                (shell.x, shell.y),
-                tick,
-            ));
-            if target.apply_damage(damage, attribution) {
+            let damaged = if teams.is_enemy_owner(shell.owner, target.owner) {
+                target.apply_damage_from_entity(
+                    damage,
+                    shell.owner,
+                    shell.attacker,
+                    (shell.x, shell.y),
+                    tick,
+                )
+            } else {
+                target.apply_damage(damage, None)
+            };
+            if damaged {
                 damaged_owner = Some((target.owner, target.pos_x, target.pos_y));
             }
         }
@@ -315,6 +324,7 @@ mod tests {
         let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
         let shell = ArtilleryShell {
             owner: 1,
+            attacker: 1,
             x: 160.0,
             y: 160.0,
             impact_tick: 0,

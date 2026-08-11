@@ -220,6 +220,7 @@ assert(
         true,
         ...Array(5).fill(null),
         0.6,
+        3,
       ],
       [
         7,
@@ -391,6 +392,20 @@ assert(
     decoded.entities[5].panzerfaustWindupProgress === 0.6,
     "entity Panzerfaust wind-up progress decodes",
   );
+  assert(decoded.entities[5].unitsKilled === 3, "entity unit-kill count decodes");
+  for (const legacyVersion of [51, 52]) {
+    const legacy = decodeServerMessage({
+      t: "snapshot",
+      v: legacyVersion,
+      s: [1, 0, 0, 0, 0],
+      n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 0, null],
+      e: [[1, 1, KIND_CODE[KIND.WORKER], 0, 0, 40, 40, STATE_CODE[STATE.IDLE]]],
+    });
+    assert(
+      legacy.entities[0].unitsKilled === undefined,
+      `compact snapshot v${legacyVersion} decodes without the appended unit-kill slot`,
+    );
+  }
   assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
   assert(
     decoded.smokes[0].id === 50 &&

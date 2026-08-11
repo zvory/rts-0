@@ -398,6 +398,10 @@ export class HudSelectionPanel {
       ? `<div class="sel-stat sel-trench-status"><span>${entrenchment.label}:</span>` +
         `<strong>${entrenchment.value}</strong></div>`
       : "";
+    const unitsKilledHtml = Number.isFinite(Number(e.unitsKilled))
+      ? `<div class="sel-stat sel-unit-kills"><span>Units killed:</span>` +
+        `<strong>${Math.max(0, Math.floor(Number(e.unitsKilled)))}</strong></div>`
+      : "";
 
     node.innerHTML =
       `<div class="sel-name"><span class="sel-icon">${st.icon || ""}</span>` +
@@ -405,6 +409,7 @@ export class HudSelectionPanel {
       `<div class="sel-hpbar"><div class="sel-hpfill ${hpClass}" ` +
       `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
       `<div class="sel-hptext">${hp} / ${maxHp}</div>` +
+      unitsKilledHtml +
       resourceRemainingHtml +
       entrenchmentHtml +
       prodHtml;
@@ -467,6 +472,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.label),
     sigValue(entity.hp),
     sigValue(entity.maxHp),
+    sigValue(entity.unitsKilled),
     sigValue(entity.occupiedTrenchId),
     entrenchment ? `${entrenchment.label}:${entrenchment.value}` : "",
     isResourceNodeKind(entity.kind) ? formatResourceRemaining(entity.remaining) : "",

@@ -196,7 +196,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 52;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 53;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -930,6 +930,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(39, "extractorActive"),
             optional_code_field(40, "prodUpgradeQueue", "upgrade"),
             optional_field(41, "panzerfaustWindupProgress"),
+            optional_field(42, "unitsKilled"),
         ],
         event: event_slot_schemas(),
         trench: vec![

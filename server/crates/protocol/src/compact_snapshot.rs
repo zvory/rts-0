@@ -779,6 +779,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.panzerfaust_windup_progress.is_some() {
             len = 42;
         }
+        if entity.units_killed.is_some() {
+            len = 43;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -920,6 +923,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 41 {
             seq.serialize_element(&entity.panzerfaust_windup_progress)?;
+        }
+        if len > 42 {
+            seq.serialize_element(&entity.units_killed)?;
         }
         seq.end()
     }

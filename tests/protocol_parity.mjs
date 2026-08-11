@@ -337,7 +337,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "panzerfaustWindupProgress",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "unitsKilled",
   "compact entity slot schema must include the latest appended field",
 );
 assert(

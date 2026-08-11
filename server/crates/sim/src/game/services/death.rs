@@ -46,6 +46,7 @@ pub(crate) fn death_system(
             facing: e.facing(),
             weapon_facing: e.weapon_facing(),
             killer: e.last_damage_owner(),
+            killer_entity: e.last_damage_entity(),
             construction_producer: e.construction_producer_id(),
             extractor_producer: e.resource_extractor_producer_id(),
             queued_units: e
@@ -62,6 +63,24 @@ pub(crate) fn death_system(
                 .collect(),
         })
         .collect();
+
+    for dead_entity in &dead {
+        if config::unit_stats(dead_entity.kind).is_none() {
+            continue;
+        }
+        let Some((killer_owner, killer_entity)) = dead_entity
+            .killer
+            .filter(|killer_owner| *killer_owner != dead_entity.owner)
+            .zip(dead_entity.killer_entity)
+        else {
+            continue;
+        };
+        if let Some(killer) = entities.get_mut(killer_entity) {
+            if killer.owner == killer_owner && killer.is_unit() {
+                killer.record_unit_killed();
+            }
+        }
+    }
 
     for dead in dead {
         if let Some(producer_id) = dead.extractor_producer {
@@ -255,6 +274,7 @@ struct DeadEntity {
     facing: f32,
     weapon_facing: Option<f32>,
     killer: Option<u32>,
+    killer_entity: Option<u32>,
     construction_producer: Option<u32>,
     extractor_producer: Option<u32>,
     queued_units: Vec<EntityKind>,

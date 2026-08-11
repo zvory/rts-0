@@ -50,6 +50,12 @@ pub struct Entity {
     /// Player id that most recently damaged this target. Used for score attribution when the
     /// death system removes the entity.
     last_damage_owner: Option<u32>,
+    /// Entity id that most recently dealt hostile damage. Used for per-unit kill attribution.
+    #[serde(default)]
+    last_damage_entity: Option<u32>,
+    /// Enemy units this entity has killed over its lifetime.
+    #[serde(default)]
+    units_killed: u32,
     /// Tick on which this entity was most recently damaged by a direct hit, plus the attacker's
     /// position. Set together by combat for diagnostics and future public observation surfaces.
     last_damage_tick: Option<u32>,
@@ -84,6 +90,8 @@ impl Entity {
             max_hp: s.hp,
             invulnerable: false,
             last_damage_owner: None,
+            last_damage_entity: None,
+            units_killed: 0,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: Some(MovementState::default()),
@@ -133,6 +141,8 @@ impl Entity {
             max_hp: s.hp,
             invulnerable: false,
             last_damage_owner: None,
+            last_damage_entity: None,
+            units_killed: 0,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: None,
@@ -182,6 +192,8 @@ impl Entity {
             max_hp: 1,
             invulnerable: false,
             last_damage_owner: None,
+            last_damage_entity: None,
+            units_killed: 0,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: None,
@@ -947,6 +959,26 @@ impl Entity {
 
     pub fn set_last_damage_owner(&mut self, owner: Option<u32>) {
         self.last_damage_owner = owner;
+        if owner.is_none() {
+            self.last_damage_entity = None;
+        }
+    }
+
+    pub(in crate::game) fn last_damage_entity(&self) -> Option<u32> {
+        self.last_damage_entity
+    }
+
+    #[cfg(test)]
+    pub(in crate::game) fn set_last_damage_entity_for_test(&mut self, entity: Option<u32>) {
+        self.last_damage_entity = entity;
+    }
+
+    pub(crate) fn units_killed(&self) -> u32 {
+        self.units_killed
+    }
+
+    pub(in crate::game) fn record_unit_killed(&mut self) {
+        self.units_killed = self.units_killed.saturating_add(1);
     }
 
     pub fn invulnerable(&self) -> bool {
@@ -984,14 +1016,31 @@ impl Entity {
         }
         if let Some((owner, pos, tick)) = attribution {
             self.last_damage_owner = Some(owner);
+            self.last_damage_entity = None;
             self.last_damage_tick = Some(tick);
             self.last_damage_pos = Some(pos);
         } else if self.hp == 0 {
             self.last_damage_owner = None;
+            self.last_damage_entity = None;
             self.last_damage_tick = None;
             self.last_damage_pos = None;
         }
         true
+    }
+
+    pub(in crate::game) fn apply_damage_from_entity(
+        &mut self,
+        amount: u32,
+        owner: u32,
+        attacker: u32,
+        attacker_pos: (f32, f32),
+        tick: u32,
+    ) -> bool {
+        let damaged = self.apply_damage(amount, Some((owner, attacker_pos, tick)));
+        if damaged {
+            self.last_damage_entity = Some(attacker);
+        }
+        damaged
     }
 
     pub fn restore_hp(&mut self, amount: u32) -> bool {
