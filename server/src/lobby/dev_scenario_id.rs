@@ -10,6 +10,7 @@ pub(in crate::lobby) enum DevScenarioId {
     Replay256WorkerExpansionRally,
     Replay281TankGap,
     Replay296ScoutCarStop,
+    Replay303ScoutCarForestLock,
     ScoutCarWallChokepoint,
     VehicleCornerWall,
     VehicleSmallBlockBaseline,
@@ -43,6 +44,7 @@ impl DevScenarioId {
             "replay_256_worker_expansion_rally" => Some(Self::Replay256WorkerExpansionRally),
             "replay_281_tank_gap" => Some(Self::Replay281TankGap),
             "replay_296_scout_car_stop" => Some(Self::Replay296ScoutCarStop),
+            "replay_303_scout_car_forest_lock" => Some(Self::Replay303ScoutCarForestLock),
             "scout_car_wall_chokepoint" => Some(Self::ScoutCarWallChokepoint),
             "vehicle_corner_wall" => Some(Self::VehicleCornerWall),
             "vehicle_small_block_baseline" => Some(Self::VehicleSmallBlockBaseline),
@@ -79,6 +81,7 @@ impl DevScenarioId {
             Self::Replay256WorkerExpansionRally => "replay_256_worker_expansion_rally",
             Self::Replay281TankGap => "replay_281_tank_gap",
             Self::Replay296ScoutCarStop => "replay_296_scout_car_stop",
+            Self::Replay303ScoutCarForestLock => "replay_303_scout_car_forest_lock",
             Self::ScoutCarWallChokepoint => "scout_car_wall_chokepoint",
             Self::VehicleCornerWall => "vehicle_corner_wall",
             Self::VehicleSmallBlockBaseline => "vehicle_small_block_baseline",
@@ -112,5 +115,12 @@ mod tests {
         let id =
             DevScenarioId::from_room_id("replay_281_tank_gap").expect("replay-281 scenario id");
         assert_eq!(id.room_id(), "replay_281_tank_gap");
+    }
+
+    #[test]
+    fn replay_303_id_round_trips() {
+        let id = DevScenarioId::from_room_id("replay_303_scout_car_forest_lock")
+            .expect("replay-303 scenario id");
+        assert_eq!(id.room_id(), "replay_303_scout_car_forest_lock");
     }
 }

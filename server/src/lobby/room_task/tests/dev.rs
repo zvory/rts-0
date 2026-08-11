@@ -124,6 +124,44 @@ fn paused_dev_scenario_steps_one_tick_at_a_time() {
 }
 
 #[test]
+fn replay_303_driver_issues_every_recorded_move_and_preserves_the_lock() {
+    let mut task = RoomTask::new(
+        "replay-303-driver-test".to_string(),
+        RoomMode::DevScenario(DevScenarioConfig {
+            id: DevScenarioId::Replay303ScoutCarForestLock,
+            unit: EntityKind::ScoutCar,
+            count: 1,
+            blocker: None,
+            case: None,
+        }),
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let (msg_tx, writer) = ConnectionSink::new();
+    let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(99, "Viewer".to_string(), true, false, msg_tx, ack);
+
+    assert_eq!(ack_rx.try_recv(), Ok(true));
+    assert_eq!(in_game_tick(&task), 15_275);
+    task.on_set_room_time_speed(99, 0.0);
+    for _ in 15_275..15_360 {
+        task.on_step_room_time(99);
+    }
+    assert_eq!(in_game_tick(&task), 15_360);
+
+    let snapshot = writer.snapshots.take().expect("replay-303 snapshot");
+    let scout = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == 403)
+        .expect("Scout Car 403");
+    assert_eq!(scout.x.to_bits(), 2_148.724_6_f32.to_bits());
+    assert_eq!(scout.y.to_bits(), 3_983.101_6_f32.to_bits());
+    assert_eq!(scout.state, "move");
+}
+
+#[test]
 fn dev_full_world_snapshot_receives_event_from_non_view_player_bucket() {
     let mut task = RoomTask::new(
         "dev-full-world-event-union-test".to_string(),

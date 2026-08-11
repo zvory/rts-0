@@ -174,6 +174,10 @@ Current scenario ids:
   reproduction to those two Tanks and one Machine Gunner; `minimal_no_enemy` and `minimal_move` are
   controls that clear the gap. The previously suspected dead Command Car is not a collider: its
   stale id is absent from authoritative state.
+- `replay_303_scout_car_forest_lock` — replay 303 reduced to Soupman's seven ordered vehicles and
+  the exact 21-tile Schone Tage forest footprint at the bottom of the map. It starts at tick 15,275
+  and issues the six recorded group moves from ticks 15,283 through 15,308. Scout Car 403 reaches
+  `(2148.72, 3983.10)` and remains stuck in `move` while the other vehicles continue.
 - `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
 - `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
 - `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.

@@ -12,6 +12,7 @@ pub struct DevScenarioSetup {
 #[derive(Clone, Copy)]
 pub(super) enum DevScenarioOrder {
     Move,
+    MoveSequence(&'static [(u32, (f32, f32))]),
     AttackMove,
     MoveWithPanzerfaustWindup {
         attacker: u32,
@@ -23,12 +24,21 @@ pub(super) enum DevScenarioOrder {
 impl DevScenarioSetup {
     pub fn command(&self) -> SimCommand {
         match self.order {
-            DevScenarioOrder::Move => SimCommand::Move {
+            DevScenarioOrder::Move | DevScenarioOrder::MoveSequence(&[]) => SimCommand::Move {
                 units: self.units.clone(),
                 x: self.goal.0,
                 y: self.goal.1,
                 queued: false,
             },
+            DevScenarioOrder::MoveSequence(sequence) => {
+                let (_, (x, y)) = sequence[0];
+                SimCommand::Move {
+                    units: self.units.clone(),
+                    x,
+                    y,
+                    queued: false,
+                }
+            }
             DevScenarioOrder::AttackMove => SimCommand::AttackMove {
                 units: self.units.clone(),
                 x: self.goal.0,
@@ -41,6 +51,26 @@ impl DevScenarioSetup {
                 y: self.goal.1,
                 queued: false,
             },
+        }
+    }
+
+    pub fn scheduled_commands(&self) -> Vec<(u32, SimCommand)> {
+        match self.order {
+            DevScenarioOrder::MoveSequence(sequence) => sequence
+                .iter()
+                .map(|&(tick, (x, y))| {
+                    (
+                        tick,
+                        SimCommand::Move {
+                            units: self.units.clone(),
+                            x,
+                            y,
+                            queued: false,
+                        },
+                    )
+                })
+                .collect(),
+            _ => vec![(self.issue_after_ticks, self.command())],
         }
     }
 

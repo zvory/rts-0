@@ -6,6 +6,7 @@ mod replay_238_rifleman_corner_lock;
 mod replay_256_worker_expansion_rally;
 mod replay_281_tank_gap;
 mod replay_296_scout_car_stop;
+mod replay_303_scout_car_forest_lock;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_retreat;
@@ -769,7 +770,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 28] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 29] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -796,6 +797,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 28] = [
     replay_256_worker_expansion_rally::REPLAY_256_WORKER_EXPANSION_RALLY_SPEC,
     replay_281_tank_gap::REPLAY_281_TANK_GAP_SPEC,
     replay_296_scout_car_stop::REPLAY_296_SCOUT_CAR_STOP_SPEC,
+    replay_303_scout_car_forest_lock::REPLAY_303_SCOUT_CAR_FOREST_LOCK_SPEC,
     DevScenarioSpec {
         id: "scout_car_wall_chokepoint",
         title: "Vehicle Wall Chokepoint",
