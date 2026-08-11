@@ -384,7 +384,7 @@ fn moving_rifleman_takes_full_damage() {
         Entity::new_unit(1, EntityKind::Rifleman, 10.0, 20.0).expect("rifleman should spawn");
     let starting_hp = rifleman.hp;
 
-    rifleman.set_path_movement_delta(1.6, 0.0);
+    rifleman.set_movement_delta(1.6, 0.0);
     assert!(rifleman.apply_damage(20, None));
     assert_eq!(rifleman.hp, starting_hp - 20);
 }
