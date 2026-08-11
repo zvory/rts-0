@@ -40,6 +40,8 @@ pub(crate) struct AiDecisionMemory {
     pub(super) containment_repush_count: usize,
     pub(super) home_defensive_tank: Option<u32>,
     pub(super) home_defensive_tank_assigned_once: bool,
+    pub(super) jeff_breakthrough_units: BTreeSet<u32>,
+    jeff_breakthrough_last_tick: Option<u32>,
     pub(super) enemy_natural_resource_depot: Option<u32>,
     pub(super) enemy_natural_destroyed: bool,
     pub(super) enemy_main_resource_depot: Option<u32>,
@@ -70,6 +72,8 @@ impl AiDecisionMemory {
             containment_repush_count: 0,
             home_defensive_tank: None,
             home_defensive_tank_assigned_once: false,
+            jeff_breakthrough_units: BTreeSet::new(),
+            jeff_breakthrough_last_tick: None,
             enemy_natural_resource_depot: None,
             enemy_natural_destroyed: false,
             enemy_main_resource_depot: None,
@@ -152,6 +156,8 @@ impl AiDecisionMemory {
         self.containment_repush_count = 0;
         self.home_defensive_tank = None;
         self.home_defensive_tank_assigned_once = false;
+        self.jeff_breakthrough_units.clear();
+        self.jeff_breakthrough_last_tick = None;
         self.enemy_natural_resource_depot = None;
         self.enemy_natural_destroyed = false;
         self.enemy_main_resource_depot = None;
@@ -305,6 +311,41 @@ impl AiDecisionMemory {
             })
             .map(|entity| entity.id);
         self.home_defensive_tank_assigned_once = self.home_defensive_tank.is_some();
+    }
+
+    pub(super) fn note_jeff_breakthrough_units(&mut self, units: &[u32], tick: u32) {
+        self.jeff_breakthrough_units.extend(units.iter().copied());
+        self.jeff_breakthrough_last_tick = Some(tick);
+    }
+
+    pub(super) fn retain_live_jeff_breakthrough_units(&mut self, observation: &AiObservation) {
+        self.jeff_breakthrough_units.retain(|id| {
+            observation
+                .owned
+                .iter()
+                .any(|entity| entity.id == *id && entity.hp > 0)
+        });
+    }
+
+    pub(super) fn clear_jeff_breakthrough_units(&mut self) {
+        self.jeff_breakthrough_units.clear();
+        self.jeff_breakthrough_last_tick = None;
+    }
+
+    pub(super) fn jeff_breakthrough_should_release(&self, observation: &AiObservation) -> bool {
+        let Some(last_tick) = self.jeff_breakthrough_last_tick else {
+            return true;
+        };
+        let elapsed = observation.tick.saturating_sub(last_tick);
+        let all_settled = self.jeff_breakthrough_units.iter().all(|id| {
+            observation.owned.iter().any(|entity| {
+                entity.id == *id
+                    && entity.hp > 0
+                    && entity.state == crate::ai_core::observation::AiEntityState::Idle
+                    && entity.target_id.is_none()
+            })
+        });
+        (elapsed >= config::TICK_HZ * 3 && all_settled) || elapsed > config::TICK_HZ * 30
     }
 
     pub(super) fn note_turtle_train(&mut self, profile: &AiProfile, unit: EntityKind) {

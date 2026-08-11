@@ -37,10 +37,11 @@ mod turtle;
 use self::defense::{
     defensive_machine_gunner_units, defensive_machine_gunner_units_for_build_clearance,
     defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
-    home_defensive_tank_is_positioned, local_defense_target, local_defense_units,
-    machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
-    stage_home_anti_tank_line, stage_home_defensive_tank, stage_home_machine_gunner_screen,
-    stage_jeff_attack_path_defense, stage_main_steel_defensive_line, DefensivePanicPlan,
+    home_defensive_tank_is_positioned, jeff_breakthrough_response, local_defense_target,
+    local_defense_units, machine_gunner_meets_replacement_health,
+    stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
+    stage_home_machine_gunner_screen, stage_jeff_attack_path_defense,
+    stage_jeff_borrowed_defenders_return, stage_main_steel_defensive_line, DefensivePanicPlan,
     DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
 use self::economy_manager::{
@@ -178,6 +179,7 @@ where
 
     let facts = AiFacts::from_observation(observation);
     memory.sync_home_defensive_tank(observation, profile);
+    memory.retain_live_jeff_breakthrough_units(observation);
     memory.sync_turtle_opening(profile, observation);
     let budget = SpendBudget::with_committed_steel(
         observation.economy.steel,
@@ -684,6 +686,7 @@ where
     if let Some(tank_id) = memory.home_defensive_tank {
         frontal_exclusions.insert(tank_id);
     }
+    frontal_exclusions.extend(memory.jeff_breakthrough_units.iter().copied());
     sync_containment_recovery(observation, profile, memory);
     let frontal_wave = plan_frontal_wave(
         observation,
@@ -735,21 +738,22 @@ where
         local_defenders.sort_unstable();
         local_defenders.dedup();
         if jeff_layered_home_defense {
-            let local_targets: Vec<u32> = defense::local_defense_targets(observation)
-                .into_iter()
-                .collect();
-            let interceptors: Vec<u32> = local_defense_units(observation, &local_defenders)
-                .into_iter()
-                .filter(|id| {
-                    observation.owned.iter().any(|unit| {
-                        // The entrenched infantry wall covers the approach by automatic fire.
-                        // Do not uproot its centre or flank anchors to chase one contact.
-                        unit.id == *id && unit.kind == EntityKind::ScoutCar
-                    })
-                })
-                .collect();
-            for (index, unit_id) in interceptors.into_iter().enumerate() {
-                let Some(target) = local_targets.get(index % local_targets.len().max(1)) else {
+            let mut unavailable = memory.containment_active_tanks.clone();
+            if let Some(scout_id) = memory.containment_active_scout {
+                unavailable.insert(scout_id);
+            }
+            let response = jeff_breakthrough_response(
+                observation,
+                map_analysis,
+                &unavailable,
+                memory.home_defensive_tank,
+            );
+            if !response.targets.is_empty() {
+                memory.note_jeff_breakthrough_units(&response.responders, observation.tick);
+            }
+            for (index, unit_id) in response.responders.iter().copied().enumerate() {
+                let Some(target) = response.targets.get(index % response.targets.len().max(1))
+                else {
                     break;
                 };
                 if let Some(units) = actions::attack_units(&mut actions, [unit_id], *target) {
@@ -772,6 +776,25 @@ where
         // acquisition meets the raid without dog-piling every defender into
         // one Tank overpenetration lane.
         handled_local_defense |= jeff_layered_home_defense;
+
+        if profile.id == JEFFS_AI_ID
+            && local_target.is_none()
+            && !memory.jeff_breakthrough_units.is_empty()
+        {
+            if memory.jeff_breakthrough_should_release(observation) {
+                memory.clear_jeff_breakthrough_units();
+            } else {
+                if let Some(units) = stage_jeff_borrowed_defenders_return(
+                    &mut actions,
+                    observation,
+                    map_analysis,
+                    &memory.jeff_breakthrough_units,
+                    memory.home_defensive_tank,
+                ) {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
 
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
