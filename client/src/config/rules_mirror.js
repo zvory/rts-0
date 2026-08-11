@@ -71,7 +71,7 @@ export const MORTAR_MIN_RANGE_TILES = 5;
 export const MORTAR_FIELD_OF_FIRE_RAD = Math.PI * 2;
 export const MORTAR_SETUP_TICKS = TICK_HZ * 1.5;
 export const MORTAR_TEARDOWN_TICKS = TICK_HZ * 0.5;
-export const MORTAR_OUTER_RADIUS_TILES = 1.5;
+export const MORTAR_OUTER_RADIUS_TILES = 1;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
 export const PANZERFAUST_RANGE_TILES = 5;
@@ -149,16 +149,16 @@ export const STATS = Object.freeze({
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
     upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 15, body: SCOUT_CAR_BODY,
-    rangeTiles: 7, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
+    rangeTiles: 7, cost: { steel: 125, oil: 60 }, supply: 3, buildTicks: 480 },
   [KIND.SCOUT_PLANE]: { label: "Scout Plane", icon: "SP", size: 17, sight: 19, body: SCOUT_PLANE_BODY,
     blocksGroundPlacement: false,
     rangeTiles: 0, cost: { steel: 50, oil: 75 }, supply: 0, buildTicks: 0 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 9, body: TANK_BODY,
-    rangeTiles: 5, cost: { steel: 425, oil: 150 }, supply: 8, buildTicks: 750,
+    rangeTiles: 5, cost: { steel: 425, oil: 175 }, supply: 8, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 12.6, sight: 8, body: COMMAND_CAR_BODY,
-    rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
+    rangeTiles: 0, cost: { steel: 150, oil: 85 }, supply: 4, buildTicks: TICK_HZ * 15,
     requires: KIND.ENGINEERING_COMPLEX },
   [KIND.EKAT]: { label: "Ekat", icon: "EK", size: 10, sight: 12,
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },

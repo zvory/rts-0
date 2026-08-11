@@ -14,6 +14,8 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
         width: map.width,
         height: map.height,
         terrain: map.terrain.clone(),
+        elevation: map.elevation.clone(),
+        sun: map.sun,
         starts: map
             .starts
             .iter()
@@ -73,6 +75,33 @@ pub(super) fn resource_counts(
         }
     }
     Ok(counts)
+}
+
+pub(super) fn normalized_elevation(
+    draft: &LabMapDraft,
+    name: &str,
+    tile_count: usize,
+) -> Result<Vec<u8>, LabError> {
+    let elevation = if draft.elevation.is_empty() {
+        vec![0; tile_count]
+    } else if draft.elevation.len() == tile_count {
+        draft.elevation.clone()
+    } else {
+        return Err(LabError::InvalidMap {
+            name: name.to_string(),
+            reason: format!(
+                "elevation has {} tiles; expected {tile_count}",
+                draft.elevation.len()
+            ),
+        });
+    };
+    crate::game::map::validate_elevation_sun(&elevation, draft.sun).map_err(|reason| {
+        LabError::InvalidMap {
+            name: name.to_string(),
+            reason,
+        }
+    })?;
+    Ok(elevation)
 }
 
 pub(super) fn canonical_doodads(

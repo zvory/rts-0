@@ -238,23 +238,6 @@ export function drawTankHull(g, body, tint, facing) {
   gfxNoFill(g);
 }
 
-export function drawTankFuelCue(g, body, facing, motion) {
-  if (!motion.lowOil && !motion.oilStarved) return;
-  const x = -body.halfLen + 6;
-  const y = -body.halfWidth - 4;
-  const color = motion.oilStarved ? 0xd47a5f : 0xc9b56a;
-  drawRotatedRectOutline(g, x, y, 8, 5, facing, 2, color, motion.oilStarved ? 0.95 : 0.75);
-  if (motion.oilStarved) {
-    const a = facing;
-    const p1 = rotatePoint(x - 3, y - 1.5, a);
-    const p2 = rotatePoint(x + 3, y + 1.5, a);
-    const p3 = rotatePoint(x + 3, y - 1.5, a);
-    const p4 = rotatePoint(x - 3, y + 1.5, a);
-    gfxStrokePaths(g, [[[p1.x, p1.y], [p2.x, p2.y]], [[p3.x, p3.y], [p4.x, p4.y]]],
-      2, color, 0.95);
-  }
-}
-
 export function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil) {
   const sideAlpha = lerp(0.62, 0.88, motion.activity);
 

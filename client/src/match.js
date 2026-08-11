@@ -301,6 +301,9 @@ export class Match {
     );
     if (!options.rendererInstance) throw new TypeError("Match.create() must prepare the renderer.");
     this.renderer = options.rendererInstance;
+    this.renderer.setProjectedUnitShadowsEnabled?.(
+      this.state.showProjectedUnitShadowsEnabled,
+    );
     this.fog = this._timeInit(
       "match.fog",
       () => new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain),
@@ -1206,6 +1209,7 @@ export class Match {
   /** Pause the loop (used while the game-over overlay is up). Idempotent. */
   stop() {
     this.captureRafWasRunning = false;
+    this.uncappedPerfBenchmark = null;
     this.running = false;
     this.closeMenus();
     if (this.rafId !== undefined) {

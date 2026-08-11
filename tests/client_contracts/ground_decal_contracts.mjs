@@ -103,7 +103,7 @@ function authoritativeRecord(id, overrides = {}) {
     decalClass: GROUND_DECAL_CLASS.MORTAR_BLAST,
     sourceKind: KIND.MORTAR_TEAM,
     owner: 0,
-    radiusTiles: 1.5,
+    radiusTiles: 1,
   }), { tileSize: 40 });
   const artillery = normalizeAuthoritativeGroundDecal(authoritativeRecord(21, {
     decalClass: GROUND_DECAL_CLASS.ARTILLERY_BLAST,
@@ -111,7 +111,7 @@ function authoritativeRecord(id, overrides = {}) {
     owner: 0,
     radiusTiles: 3,
   }), { tileSize: 40 });
-  assert(mortar.radiusWorld === 60, "mortar radius uses the map tile size");
+  assert(mortar.radiusWorld === 40, "mortar radius uses the map tile size");
   assert(artillery.radiusWorld === 120, "artillery radius uses the map tile size");
   const fallback = normalizeAuthoritativeGroundDecal(authoritativeRecord(22, {
     decalClass: GROUND_DECAL_CLASS.ARTILLERY_BLAST,
@@ -196,7 +196,7 @@ function authoritativeRecord(id, overrides = {}) {
         decalClass: GROUND_DECAL_CLASS.MORTAR_BLAST,
         sourceKind: KIND.MORTAR_TEAM,
         owner: 0,
-        radiusTiles: 1.5,
+        radiusTiles: 1,
       }),
       authoritativeRecord(701, {
         decalClass: GROUND_DECAL_CLASS.ARTILLERY_BLAST,
@@ -207,7 +207,7 @@ function authoritativeRecord(id, overrides = {}) {
     ],
   });
   const decals = state.consumePendingGroundDecals();
-  assert(decals[0].radiusWorld === 48 && decals[1].radiusWorld === 64,
+  assert(decals[0].radiusWorld === 32 && decals[1].radiusWorld === 64,
     "GameState supplies its map tile size for authoritative impact marks");
   state.applyAuthoritativeGroundDecals({ revision: 3, decals: [authoritativeRecord(700)] });
   assert(state.consumePendingGroundDecals().length === 0,

@@ -10,7 +10,11 @@ export function createPixiBackendBundle() {
       return new Camera(0, 0, options);
     },
     async createRenderer(canvasParent, sources) {
-      return PixiWorkerPresentationAdapter.create(canvasParent, sources);
+      return PixiWorkerPresentationAdapter.create(canvasParent, sources, {
+        gpuShadowTiming: globalThis.__rtsGpuShadowTiming === true,
+        gpuCompletePresentations: globalThis.__rtsGpuCompletePresentations === true,
+        castShadowsEnabled: globalThis.__rtsCastShadowsEnabled !== false,
+      });
     },
   });
 }

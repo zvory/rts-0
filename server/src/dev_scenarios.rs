@@ -1,10 +1,11 @@
 use rts_sim::game::entity::EntityKind;
-
 mod command_car_corner;
 mod move_reload_acquisition;
 mod replay_142_vehicle_lock;
 mod replay_238_rifleman_corner_lock;
 mod replay_256_worker_expansion_rally;
+mod replay_281_tank_gap;
+mod replay_296_scout_car_stop;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_retreat;
@@ -12,15 +13,11 @@ use command_car_corner::{
     COMMAND_CAR_BUILDING_CORNER_SPEC, COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
 };
 use move_reload_acquisition::MOVE_RELOAD_ACQUISITION_SPEC;
-use replay_142_vehicle_lock::REPLAY_142_VEHICLE_LOCK_SPEC;
-use replay_238_rifleman_corner_lock::REPLAY_238_RIFLEMAN_CORNER_LOCK_SPEC;
-use replay_256_worker_expansion_rally::REPLAY_256_WORKER_EXPANSION_RALLY_SPEC;
 use scout_car_lake_reverse_l_path::SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC;
 use scout_car_open_ground_l_path::SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC;
 use tank_retreat::{
     TANK_DAMAGE_PURSUIT_PIVOT_SPEC, TANK_REVERSE_TRAFFIC_SPEC, TANK_UNDER_FIRE_RETREAT_SPEC,
 };
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DevScenarioLaunch {
     pub id: &'static str,
@@ -772,7 +769,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     case: None,
 }];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 26] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 28] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -794,9 +791,11 @@ const DEV_SCENARIOS: [DevScenarioSpec; 26] = [
     },
     SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC,
     SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC,
-    REPLAY_142_VEHICLE_LOCK_SPEC,
-    REPLAY_238_RIFLEMAN_CORNER_LOCK_SPEC,
-    REPLAY_256_WORKER_EXPANSION_RALLY_SPEC,
+    replay_142_vehicle_lock::REPLAY_142_VEHICLE_LOCK_SPEC,
+    replay_238_rifleman_corner_lock::REPLAY_238_RIFLEMAN_CORNER_LOCK_SPEC,
+    replay_256_worker_expansion_rally::REPLAY_256_WORKER_EXPANSION_RALLY_SPEC,
+    replay_281_tank_gap::REPLAY_281_TANK_GAP_SPEC,
+    replay_296_scout_car_stop::REPLAY_296_SCOUT_CAR_STOP_SPEC,
     DevScenarioSpec {
         id: "scout_car_wall_chokepoint",
         title: "Vehicle Wall Chokepoint",
@@ -987,6 +986,7 @@ pub fn parse_dev_scenario_case(id: &str, case: Option<&str>) -> Option<Option<&'
             Some(Some(TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK))
         }
         ("tank_trap_pathing_matrix", _) => None,
+        ("replay_281_tank_gap", case) => replay_281_tank_gap::parse_case(case),
         (_, None) => Some(None),
         (_, Some(_)) => None,
     }
@@ -1001,7 +1001,7 @@ pub fn dev_scenario_case_label(case: &str) -> &'static str {
         TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE => "enemy vehicle reroute",
         TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH => "infantry pass-through",
         TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK => "explicit infantry attack",
-        _ => "case",
+        _ => replay_281_tank_gap::case_label(case).unwrap_or("case"),
     }
 }
 

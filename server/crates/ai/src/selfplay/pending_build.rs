@@ -12,6 +12,9 @@ const FAILED_SPOTS_CAP: usize = 16;
 /// Force a pending build to be treated as failed after this many ticks without worker movement so
 /// stale commands do not suppress future build attempts forever if a worker gets stuck.
 pub(super) const PENDING_BUILD_STALE_TICKS: u32 = 300;
+/// Allow a unit ordered off a construction footprint time to move clear before the builder
+/// abandons the selected site. The simulation runs at 30 Hz, so this is six seconds.
+pub(super) const BUILD_SITE_CLEARANCE_GRACE_TICKS: u32 = 180;
 const PENDING_BUILD_PROGRESS_EPS_PX: f32 = 4.0;
 
 #[derive(Clone, Copy)]
@@ -22,6 +25,7 @@ struct PendingBuild {
     last_x: Option<f32>,
     last_y: Option<f32>,
     last_progress_tick: u32,
+    clearance_grace_until: Option<u32>,
 }
 
 impl PendingBuild {
@@ -77,7 +81,11 @@ impl PendingBuildTracker {
                     pending.observe_worker(worker, view.tick);
                     !pending.stale_at(view.tick)
                 })
-                .unwrap_or(false);
+                .unwrap_or_else(|| {
+                    pending
+                        .clearance_grace_until
+                        .is_some_and(|until| view.tick < until)
+                });
             if !keep {
                 dropped.push(*pending);
             }
@@ -91,7 +99,7 @@ impl PendingBuildTracker {
             });
             if succeeded {
                 self.failed_spots.remove(&pending.kind);
-            } else {
+            } else if pending.clearance_grace_until.is_none() {
                 let set = self.failed_spots.entry(pending.kind).or_default();
                 set.insert((pending.tile_x, pending.tile_y));
                 if set.len() > FAILED_SPOTS_CAP {
@@ -111,6 +119,15 @@ impl PendingBuildTracker {
     }
 
     pub(crate) fn record_commands(&mut self, tick: u32, commands: &[Command]) {
+        self.record_commands_with_factory_clearance(tick, commands, false);
+    }
+
+    pub(crate) fn record_commands_with_factory_clearance(
+        &mut self,
+        tick: u32,
+        commands: &[Command],
+        factory_clearance_ordered: bool,
+    ) {
         for command in commands {
             let Command::Build {
                 units,
@@ -137,6 +154,9 @@ impl PendingBuildTracker {
                     last_x: None,
                     last_y: None,
                     last_progress_tick: tick,
+                    clearance_grace_until: (factory_clearance_ordered
+                        && *building == EntityKind::Factory)
+                        .then_some(tick.saturating_add(BUILD_SITE_CLEARANCE_GRACE_TICKS)),
                 },
             );
         }

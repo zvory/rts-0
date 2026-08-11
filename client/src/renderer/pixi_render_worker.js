@@ -88,6 +88,9 @@ async function handleMessage(candidate) {
       presentation.resetDecals(message);
       adapter?.resetGroundDecals?.();
       break;
+    case RENDER_WORKER_MESSAGE.RESET_DIAGNOSTICS:
+      renderer?.resetGpuShadowTiming?.();
+      break;
     case RENDER_WORKER_MESSAGE.FRAME:
       await presentFrame(message);
       break;
@@ -96,6 +99,11 @@ async function handleMessage(candidate) {
       break;
     case RENDER_WORKER_MESSAGE.CAPTURE:
       capture(message);
+      break;
+    case RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES:
+      renderer?.setProjectedUnitShadowsEnabled?.(
+        message.payload.projectedUnitShadowsEnabled,
+      );
       break;
     case RENDER_WORKER_MESSAGE.DESTROY:
       destroy(message.generation);
@@ -131,6 +139,9 @@ async function initialize(message) {
     resolution: message.payload.dpr,
     autoDensity: true,
     renderClock: { now: () => visualTimeMs },
+    gpuShadowTiming: message.payload.configuration?.gpuShadowTiming === true,
+    gpuCompletePresentations: message.payload.configuration?.gpuCompletePresentations === true,
+    castShadowsEnabled: message.payload.configuration?.castShadowsEnabled !== false,
   });
   if (renderer.app?.renderer?.type !== pixi.RendererType.WEBGL) {
     throw new Error("Pixi worker initialized a non-WebGL backend.");
@@ -216,6 +227,8 @@ async function presentFrame(message) {
     presentedAtMs: presentedAtEpochMs,
     readiness: readinessSnapshot(),
   };
+  const gpuShadowTiming = renderer.gpuShadowTimingSummary?.();
+  if (gpuShadowTiming) response.gpuShadowTiming = gpuShadowTiming;
   const transfer = [];
   if (message.payload.capturePixels) {
     const pixels = readPresentedPixels();

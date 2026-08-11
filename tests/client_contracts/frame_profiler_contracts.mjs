@@ -1,4 +1,4 @@
-import { assert, assertDeepEqual } from "./assertions.mjs";
+import { assert, assertDeepEqual, assertThrows } from "./assertions.mjs";
 import {
   RENDER_FRAME_BUDGET_MS,
   RENDER_FRAME_BUDGET_TARGETS,
@@ -89,6 +89,37 @@ export function runFrameProfilerContracts() {
     assert(validateLiveLabScenarioSample({ ...liveLabSample, offline: true }, expectedLab).length > 0, "integrated Hellhole rejects an offline client lane");
     assert(validateLiveLabScenarioSample({ ...liveLabSample, websocketOpen: false }, expectedLab).length > 0, "integrated Hellhole rejects a non-open WebSocket");
   }
+
+  const detailed = buildClientPerfWorkloads({ RTS_CLIENT_PERF_DETAILED_SHADOWS: "1" })
+    .find((workload) => workload.id === "fixed-roster-hellhole-stream");
+  assert(detailed.setup.projectedUnitShadowsEnabled === true,
+    "detailed-shadow benchmark opt-in reaches the canonical Hellhole workload");
+  const gpuTimed = buildClientPerfWorkloads({ RTS_CLIENT_PERF_GPU_TIMING: "1" })
+    .find((workload) => workload.id === "fixed-roster-hellhole-stream");
+  assert(gpuTimed.setup.gpuShadowTimingEnabled === true,
+    "GPU shadow timing opt-in reaches the canonical Hellhole workload before renderer startup");
+  const uncapped = buildClientPerfWorkloads({
+    RTS_CLIENT_PERF_UNCAPPED: "1",
+    RTS_CLIENT_PERF_GPU_COMPLETE: "1",
+    RTS_CLIENT_PERF_SHADOW_MODE: "none",
+  }).find((workload) => workload.id === "fixed-roster-hellhole-stream");
+  assert(uncapped.setup.uncappedPresentationsEnabled === true
+      && uncapped.setup.gpuCompletePresentationsEnabled === true
+      && uncapped.setup.castShadowsEnabled === false
+      && uncapped.setup.projectedUnitShadowsEnabled === false,
+    "uncapped GPU-complete no-shadow controls reach the canonical Hellhole workload before renderer startup");
+  const terrainOnly = buildClientPerfWorkloads({ RTS_CLIENT_PERF_SHADOW_MODE: "terrain" })
+    .find((workload) => workload.id === "fixed-roster-hellhole-stream");
+  assert(terrainOnly.setup.castShadowsEnabled === true && terrainOnly.setup.projectedUnitShadowsEnabled === false,
+    "terrain-only mode isolates the once-per-map cache from dynamic projected unit shadows");
+  assertThrows(
+    () => buildClientPerfWorkloads({ RTS_CLIENT_PERF_SHADOW_MODE: "typo" }),
+    "invalid shadow modes fail instead of silently measuring a different configuration",
+  );
+  assertThrows(
+    () => buildClientPerfWorkloads({ RTS_CLIENT_PERF_GPU_COMPLETE: "1" }),
+    "GPU-complete synchronization cannot silently contaminate an ordinary rAF measurement",
+  );
 
   {
     let clock = 0;

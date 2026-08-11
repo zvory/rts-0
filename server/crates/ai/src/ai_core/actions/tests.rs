@@ -295,6 +295,56 @@ fn unit_training_respects_local_budget_and_supply() {
 }
 
 #[test]
+fn unit_training_sets_rally_before_train_when_requested() {
+    let observation = observation(
+        AiEconomy {
+            steel: 500,
+            oil: 500,
+            supply_used: 0,
+            supply_cap: 20,
+        },
+        vec![production_building(20, EntityKind::ResourceDepot, 0)],
+        Vec::new(),
+    );
+    let facts = AiFacts::from_observation(&observation);
+    let mut ctx = AiActionContext::new(&facts, SpendBudget::new(500, 500, 0, 20));
+
+    let trained = train_units_with_rally(
+        &mut ctx,
+        TrainUnitsRequest {
+            buildings: facts.production_buildings(EntityKind::ResourceDepot),
+            unit_priorities: &[EntityKind::Worker],
+            completed_building_kinds: facts.complete_building_kinds(),
+            completed_upgrades: facts.completed_upgrades(),
+            max_queue_depth: 1,
+            save_for_tech: false,
+            current_counts: &[(EntityKind::Worker, 0)],
+            max_counts: &[(EntityKind::Worker, 1)],
+            balance_unit_priorities: false,
+        },
+        Some((320.0, 480.0)),
+    );
+
+    assert_eq!(trained.len(), 1);
+    assert!(matches!(
+        ctx.into_commands().as_slice(),
+        [
+            Command::SetRally {
+                building: 20,
+                x: 320.0,
+                y: 480.0,
+                kind: RallyKind::AttackMove,
+                queued: false,
+            },
+            Command::Train {
+                building: 20,
+                unit: EntityKind::Worker,
+            },
+        ]
+    ));
+}
+
+#[test]
 fn support_training_requires_tech_and_can_balance_priorities() {
     let without_tech = observation(
         AiEconomy {

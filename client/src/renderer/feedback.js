@@ -57,7 +57,6 @@ import {
   drawInfantryMachineGun,
   drawInfantryRifle,
   drawScoutCar,
-  drawTankFuelCue,
   drawTankHull,
   drawTankTracks,
   finiteNumber,
@@ -833,7 +832,7 @@ export function _drawMortarTargets(state) {
     const age = now - target.createdAt;
     const t = clamp01(age / duration);
     const fade = 1 - smoothstep01(Math.max(0, t - 0.78) / 0.22);
-    const radius = Math.max(20, (target.radiusTiles || 1.5) * ts);
+    const radius = Math.max(20, (target.radiusTiles || 1) * ts);
     const pulse = 1 + Math.sin(t * Math.PI * 5) * 0.035;
 
     if (finiteNumber(target.fromX) && finiteNumber(target.fromY)) {
@@ -908,7 +907,7 @@ export function _drawMortarImpacts(state) {
     const blastFade = 1 - smoothstep01(Math.max(0, t - 0.36) / 0.28);
     const dustFade = 1 - smoothstep01(Math.max(0, t - 0.48) / 0.52);
     const outerRadius = Math.max(innerRadius + 8, impact.radiusTiles * ts);
-    const dustRadius = outerRadius * 2;
+    const dustRadius = outerRadius * 1.35;
     gfxStroke(g, 0, 0x000000, 0);
 
     gfxFill(g, 0xffb22e, 0.28 * blastFade);

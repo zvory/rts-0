@@ -57,7 +57,7 @@ checked-in PNG atlas and explicit raster metadata are the production source.
 
 - Tank uses the enabled pass-11 white-painted Tiger I hull, turret/coax, and separate barrel atlas.
   The track cells are intentionally transparent. Raster metadata preserves separate turret facing,
-  barrel recoil, fuel cues, and muzzle flashes.
+  barrel recoil and muzzle flashes.
 - Anti-Tank Gun, Mortar Team, and Artillery use modular atlases so setup and weapon recoil can move
   assemblies independently.
 - Scout Car uses a team-palette atlas selected by owner.

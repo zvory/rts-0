@@ -96,7 +96,7 @@ lobby/config dump replaces the source scrape.
 | `requestBranchFromTick` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `branchFromTickCreated` to all current viewers. |
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
-| `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server rejects launch until every original active seat is claimed; live promotion is handled by the branch promotion phase. |
+| `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server requires at least one claimed original seat. Unclaimed players remain in the restored simulation with no command issuer; their units retain automatic combat behavior but receive no player commands. Live promotion is handled by the branch promotion phase. |
 | `selectMap` | `map: string` | Host selects the lobby map by its stable map name. Ignored outside the lobby, from non-hosts, during match countdown, in dev-watch rooms, or in replay staging lobbies. The server broadcasts the selected value as lobby `map` and the available catalog as `maps[]`. |
 
 Live player `command` messages MUST include `clientSeq`; unsequenced live commands are
@@ -466,6 +466,8 @@ means that original seat is still available to claim.
 
 `BranchStagingOccupant`: `{ id: u32, name: string }`. Occupants are all human viewers currently in
 the branch staging room, whether they have claimed an original seat or are remaining spectators.
+`canStart` becomes true for the host once at least one original seat is claimed and launch is not
+otherwise blocked by countdown or deploy drain.
 
 ### 2.3 `start` payload
 Sent when a live match begins and when replay playback is rebuilt, including after replay seeks. Carries static match metadata and recipient-scoped capabilities for that start.
@@ -528,6 +530,12 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // 17 frosted ground. Grass, all roads, gravel, dirt, mud, and frosted
     // ground are passable; rock/water are impassable.
     terrain: number[],
+    // Server-authored presentation-only height levels, row-major and shape-matched to terrain.
+    // Omitted on flat maps (implicit zero). Current movement, sight, and combat rules remain 2D.
+    elevation?: number[],
+    // Required when elevation varies and optional on flat maps. Azimuth is compass degrees in map space
+    // (0=north/-Y, 90=east); elevation is degrees above the horizon; warmth is 0-100.
+    sun?: { azimuthDegrees: u16, elevationDegrees: u8, warmth: u8 },
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ],
@@ -667,6 +675,8 @@ the replay simulation after the last viewer leaves; for normal public rooms, tha
 asks the lobby registry to dispose the public name rather than holding it for reconnect. Dedicated
 replay rooms created for match-history or dev replay viewing follow the same per-viewer detach rule
 after playback has started; they keep the shared replay session alive until the room empties.
+Playable replay branches use this same post-match replay transition after give-up or ordinary match
+resolution while retaining their private replay-branch room identity.
 Automatic post-match replay rooms remain listed and joinable as replay rooms for that entire
 shared-viewing lifetime.
 
@@ -868,7 +878,7 @@ adds an explicit application compression envelope.
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
-      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
+      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, reservedMovementOil?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, breakthroughTicks?,
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
@@ -1107,9 +1117,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   rallyPlan?: [                  // building rally stages; owner-private except full-world diagnostics
     { kind: "move"|"attackMove", x: f32, y: f32 }
   ],
-  // tanks:
-  oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
-  setupFacing?: f32,             // anti_tank_gun/mortar_team/artillery only: owner/allied deployed arc center; appended after oilUsed in compact snapshots
+  // compact slot 19 remains null after retirement of movement-oil telemetry
+  setupFacing?: f32,             // anti_tank_gun/mortar_team/artillery only: owner/allied deployed arc center; compact slot 20
   orderPlan?: [                  // current + queued order stages; owner-private except full-world diagnostics
     { kind: "move"|"attackMove"|"holdPosition"|"attack"|"gather"|"build"|"deconstruct"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"setupAntiTankGuns", x: f32, y: f32 }
   ],
@@ -1441,6 +1450,8 @@ POST /api/map-handoffs
     width: u32,
     height: u32,
     terrain: u8[],
+    elevation: u8[],
+    sun?: { azimuthDegrees: u16, elevationDegrees: u8, warmth: u8 },
     starts: LabMapTile[],
     baseSites: { x: u32, y: u32, steelPatches: u32, oilPatches: u32 }[],
     doodads: { id: u32, typeId: string, x: u32, y: u32, color?: string }[],
@@ -1459,7 +1470,10 @@ POST /api/map-handoffs/{handoffId}
  | { destination: "editor", authoredMap: AuthoredMapV10 }
 ```
 `AuthoredMapV10` declares independent `width` and `height` tile dimensions, whose product must
-exactly match the row-major terrain body, and has flat `startLocations`, `baseSites`, and required
+exactly match the row-major terrain body. Its optional `elevation` digit rows must have the same
+shape. Varying elevation requires a `sun` record (`azimuthDegrees` 0–359,
+`elevationDegrees` 1–89, `warmth` 0–100); flat maps may also include one to opt into authored
+atmosphere and directional unit shadows. These fields are presentation-only. The schema also has flat `startLocations`, `baseSites`, and required
 `doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `noBuildingTiles`,
 `noEntrenchmentTiles`, `damageReductionTiles`, and `slowMovementTiles` arrays. A forest span is the compact encoding of the first-class composite
 Forest tile: `[y, xStart, xEnd]` with inclusive bounds. Spans may not overlap and each Forest tile

@@ -141,7 +141,7 @@ for (const asset of allAssets) {
     id: 99,
     kind: KIND.MORTAR_TEAM,
     decalClass: "mortarBlast",
-    radiusWorld: 48,
+    radiusWorld: 32,
     seed: 441122,
   };
   const artillery = {
@@ -163,7 +163,7 @@ for (const asset of allAssets) {
     artilleryPlan.variantIndex === artillery.seed % GROUND_DECAL_ASSET_MANIFEST.artilleryBlast.length,
     "artillery blast uses the authored artillery mask",
   );
-  assert(mortarPlan.scale > 0.94 && mortarPlan.scale < 1.06, "mortar blast preserves its 1.5-tile authored footprint");
+  assert(mortarPlan.scale > 0.63 && mortarPlan.scale < 0.71, "mortar blast scales to its one-tile footprint");
   assert(
     artilleryPlan.scale > 0.63 && artilleryPlan.scale < 0.71,
     "artillery blast scales its unchanged three-tile authored mask to the new two-tile footprint",

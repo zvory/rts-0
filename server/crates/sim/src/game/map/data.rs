@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::BaseResourceCounts;
-use crate::protocol::MapDoodad;
+use crate::protocol::{MapDoodad, MapSun};
 
 /// Canonical materialization of an authored-map document before player starts are assigned.
 ///
@@ -13,6 +13,8 @@ pub struct AuthoredMapData {
     pub width: u32,
     pub height: u32,
     pub terrain: Vec<u8>,
+    pub elevation: Vec<u8>,
+    pub sun: Option<MapSun>,
     pub starts: Vec<(u32, u32)>,
     pub base_sites: Vec<(u32, u32)>,
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,

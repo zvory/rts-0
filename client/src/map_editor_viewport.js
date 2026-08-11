@@ -82,6 +82,23 @@ export function mapEditorSymmetryGuideCentre(dimensions, symmetry) {
   return { x: width * TILE_SIZE / 2, y: height * TILE_SIZE / 2 };
 }
 
+export function mapEditorSunDirectionPreview(dimensions, azimuthDegrees) {
+  const { width, height } = mapDimensions(dimensions);
+  const degrees = Math.max(0, Math.min(359, Math.trunc(Number(azimuthDegrees)) || 0));
+  const radians = degrees * Math.PI / 180;
+  const centreX = width * TILE_SIZE / 2;
+  const centreY = height * TILE_SIZE / 2;
+  const length = Math.max(160, Math.min(640, Math.min(width, height) * TILE_SIZE * 0.18));
+  return {
+    fromX: centreX,
+    fromY: centreY,
+    toX: centreX + Math.sin(radians) * length,
+    toY: centreY - Math.cos(radians) * length,
+    azimuthDegrees: degrees,
+    label: `Sun source · ${degrees}° ${compassPoint(degrees)}`,
+  };
+}
+
 export class MapEditorViewport {
   static async create(options) {
     const presentation = await MapEditorPixiPresentationAdapter.create(options.root);
@@ -101,6 +118,7 @@ export class MapEditorViewport {
     this.tool = null;
     this.symmetry = MAP_EDITOR_SYMMETRY.NONE;
     this.selectedBaseIndex = null;
+    this.sunDirectionPreviewDegrees = null;
     this.paintPointerId = null;
     this.doodadPointerId = null;
     this.doodadPointerMode = null;
@@ -314,6 +332,30 @@ export class MapEditorViewport {
   rebuildTerrain() {
     if (!this.session.draft) return;
     const materialized = this.session.materialized();
+    MapEditorViewport.prototype.queueTerrainReplacement.call(this, materialized);
+  }
+
+  previewSunConditions(sun) {
+    if (!this.session.draft?.sun) return false;
+    const materialized = this.session.materialized();
+    MapEditorViewport.prototype.queueTerrainReplacement.call(this, { ...materialized, sun: { ...sun } });
+    return true;
+  }
+
+  previewSunDirection(azimuthDegrees) {
+    this.sunDirectionPreviewDegrees = Math.max(0, Math.min(359, Math.trunc(Number(azimuthDegrees)) || 0));
+    this.drawOverlay();
+    return true;
+  }
+
+  clearSunDirectionPreview() {
+    if (this.sunDirectionPreviewDegrees == null) return false;
+    this.sunDirectionPreviewDegrees = null;
+    this.drawOverlay();
+    return true;
+  }
+
+  queueTerrainReplacement(materialized) {
     this.terrainRevision += 1;
     this.pendingTerrainUpdate = {
       kind: "replace",
@@ -322,6 +364,8 @@ export class MapEditorViewport {
       height: materialized.height,
       tileSize: TILE_SIZE,
       terrain: materialized.terrain,
+      elevation: materialized.elevation,
+      sun: materialized.sun,
     };
     const worldWidth = materialized.width * TILE_SIZE;
     const worldHeight = materialized.height * TILE_SIZE;
@@ -422,6 +466,9 @@ export class MapEditorViewport {
       forestTiles: structuredCloneSafe(this.session.forestTiles?.() || []),
       paintPreview: this.paintPreviewRecord(),
       doodadBrushPreview: this.doodadBrushPreviewRecord?.() || null,
+      sunDirectionPreview: this.sunDirectionPreviewDegrees == null
+        ? null
+        : mapEditorSunDirectionPreview(dimensions, this.sunDirectionPreviewDegrees),
     };
   }
 
@@ -494,12 +541,14 @@ export class MapEditorViewport {
     }
     const tile = this.eventTile(event, { kind: this.tool.kind });
     if (!tile) return;
-    if (["terrain", "overlay", "forest", "road"].includes(this.tool.kind)) {
+    if (["terrain", "elevation", "overlay", "forest", "road"].includes(this.tool.kind)) {
       this.paintPointerId = event.pointerId;
       this.paintStartTile = tile;
       this.lastPaintTile = tile;
       const action = this.tool.shape === "box" ? "Filled" : "Painted";
-      if (this.tool.kind === "terrain" || this.tool.kind === "road") {
+      if (this.tool.kind === "elevation") {
+        this.session.beginElevationStroke(`${action} elevation level ${this.tool.level}`);
+      } else if (this.tool.kind === "terrain" || this.tool.kind === "road") {
         this.session.beginTerrainStroke(`${action} ${terrainLabel(this.tool.terrain)} terrain`);
       } else {
         this.session.beginOverlayStroke(this.tool.kind === "forest"
@@ -531,7 +580,7 @@ export class MapEditorViewport {
       }
       if (event.pointerId === this.doodadPointerId) return;
     }
-    if (event.pointerId !== this.paintPointerId || !["terrain", "overlay", "forest", "road"].includes(this.tool?.kind)) return;
+    if (event.pointerId !== this.paintPointerId || !["terrain", "elevation", "overlay", "forest", "road"].includes(this.tool?.kind)) return;
     const tile = this.eventTile(event);
     if (!tile || !this.lastPaintTile) return;
     if (this.tool.kind === "forest") this.paintForest(this.lastPaintTile, tile);
@@ -570,7 +619,7 @@ export class MapEditorViewport {
         if (tile) this.lastPaintTile = tile;
         if (this.tool?.kind === "road" && this.paintStartTile && this.lastPaintTile) {
           this.paintRoad(this.paintStartTile, this.lastPaintTile);
-        } else if (["terrain", "overlay"].includes(this.tool?.kind) && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
+        } else if (["terrain", "elevation", "overlay"].includes(this.tool?.kind) && this.tool.shape === "box" && this.paintStartTile && this.lastPaintTile) {
           this.paintBox(this.paintStartTile, this.lastPaintTile);
         }
       }
@@ -578,7 +627,10 @@ export class MapEditorViewport {
       this.lastPaintTile = null;
       this.paintStartTile = null;
       let changed = false;
-      if (["overlay", "forest"].includes(this.tool?.kind)) {
+      if (this.tool?.kind === "elevation") {
+        if (cancelled) this.session.cancelElevationStroke();
+        else changed = this.session.commitElevationStroke();
+      } else if (["overlay", "forest"].includes(this.tool?.kind)) {
         if (cancelled) this.session.cancelOverlayStroke();
         else changed = this.session.commitOverlayStroke();
       } else if (cancelled) this.session.cancelTerrainStroke();
@@ -586,7 +638,7 @@ export class MapEditorViewport {
       this.drawOverlay();
       this.onStatus(
         cancelled
-          ? (["overlay", "forest"].includes(this.tool?.kind) ? "Overlay paint cancelled." : "Terrain paint cancelled.")
+          ? (["overlay", "forest"].includes(this.tool?.kind) ? "Overlay paint cancelled." : this.tool?.kind === "elevation" ? "Elevation paint cancelled." : "Terrain paint cancelled.")
           : changed ? "Map paint committed." : "No map tiles changed.",
         !cancelled && !changed,
       );
@@ -694,6 +746,11 @@ export class MapEditorViewport {
 
   paintTiles(tiles) {
     const dimensions = this.session.draft;
+    if (this.tool?.kind === "elevation") {
+      const symmetric = symmetricMapTiles(dimensions, tiles, this.tool.symmetry);
+      if (this.session.paintElevationTiles(symmetric, this.tool.level).length) this.rebuildTerrain();
+      return;
+    }
     if (this.tool?.kind === "forest") {
       const symmetric = symmetricMapTiles(dimensions, tiles, this.tool?.symmetry);
       if (this.session.paintForestTiles(symmetric, this.tool?.paint !== false).length) this.drawOverlay();
@@ -957,6 +1014,10 @@ function mapDimensions(value) {
     width: Math.max(0, Math.trunc(Number(value?.width)) || 0),
     height: Math.max(0, Math.trunc(Number(value?.height)) || 0),
   };
+}
+
+function compassPoint(degrees) {
+  return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(degrees / 45) % 8];
 }
 
 function terrainLabel(code) {

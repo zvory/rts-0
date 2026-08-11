@@ -169,6 +169,15 @@ fn typed_helpers_preserve_mixed_call_order_and_flags() {
     batch
         .resume_build(&[5], EntityKind::Barracks, 12, 13)
         .unwrap();
+    batch
+        .set_rally(
+            20,
+            40.0,
+            50.0,
+            rts_sim::game::entity::RallyKind::AttackMove,
+            false,
+        )
+        .unwrap();
     batch.train(&[20], EntityKind::Worker).unwrap();
     batch.research(&[21], UpgradeKind::Entrenchment).unwrap();
     batch.gather(&[6], &[30], true).unwrap();
@@ -188,6 +197,7 @@ fn typed_helpers_preserve_mixed_call_order_and_flags() {
         [
             AiActionRequest::Build { units: build, queued: false, .. },
             AiActionRequest::Build { units: resume, queued: false, .. },
+            AiActionRequest::SetRally { building: 20, queued: false, .. },
             AiActionRequest::Train { building: 20, .. },
             AiActionRequest::Research { building: 21, .. },
             AiActionRequest::Gather { units: gather, node: 30, queued: true },

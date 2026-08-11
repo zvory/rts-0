@@ -223,6 +223,10 @@ a hidden enemy.
 
 `frame_recovery.js` samples one projection and visual time, updates fog, builds feedback, reconciles
 one monotonic ground-decal revision, assembles one frame, and calls `renderer.render(frame)`.
+The local uncapped performance controller may temporarily cancel Match's rAF and call that same live
+path directly; it does not use fixed capture, skip recurring systems, or retain stale presentation
+state. Its completion-paced producer is bounded to the worker host's one active plus one pending
+frame and restores exactly one rAF callback after draining.
 `PresentationCoordinator` owns the pending metadata for every accepted generation/frame id and is
 the only consumer of renderer lifecycle outcomes. A submission exposes an independent `retained`
 promise plus one terminal `presented`, `superseded`, `failed`, or `destroyed` promise. `retained`
@@ -251,16 +255,51 @@ Its payload lifetimes are explicit:
 
 - initialization: transferred canvas, CSS size, DPR, PresentationFrameV2/StaticMapPresentationV2
   versions, and immutable configuration;
-- map generation: one static-map payload and transferred terrain copy per generation;
+- map generation: one static-map payload and transferred terrain/elevation copies per generation;
 - durable update: monotonic ground-decal revision plus its detached records;
 - revisioned data: transferred visible/explored copies only when each revision changes;
 - frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
-- control: resize, capture/flush, generation reset, and destroy.
+- control: resize, capture/flush, presentation preferences, generation reset, and destroy. The
+  presentation-preference payload currently carries the configurable detailed-unit-shadow boolean so
+  disabling it stops worker-side model projection instead of merely hiding the result.
 
 Responses are `ready` after all renderer assets are ready, `retained`, `presented` with frame id and worker
 update/present timings, `superseded`, bounded `failed`, and `destroyed`. The message builder never
 transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
 usable and unchanged.
+
+The immutable static-map DTO also carries optional authored sun conditions. Any authored sun applies
+the world warmth tint and directional projected unit shadows. When elevation varies,
+the terrain builder computes smooth height-field relief, while the detailed-shadow layer builds one
+map-space directional horizon cache in `setMap`. For each light ray it carries the maximum
+light-space height `z - tan(elevation) * dot(world, sunDirection)` from the sun-facing edge. This is
+the 2.5D equivalent of an orthographic directional-light depth comparison and is a linear sweep,
+not a viewport-pixel ray march. The cache has four samples per tile regardless of viewport, DPR,
+camera, or map-world pixel size and never rebuilds during entity/camera frames. Linear sampling on
+the non-dominant axis follows the authored light ray with at most one cache texel (one quarter tile)
+of angular rasterization error; sub-texel blockers can soften rather than widening with distance.
+`warmth` applies a matching static world tint. Flat maps without authored sunlight preserve the
+pre-elevation render path; flat maps that opt into sunlight skip terrain relief while retaining the
+authored atmosphere and unit-shadow direction.
+
+Default-enabled detailed unit shadows keep their existing presentation models, but static and dynamic work
+now share the exact authored azimuth and elevation; there is no unit-only 30-degree clamp. The
+worker uploads the boxes as one retained instanced mesh. Each dynamic vertex starts at bilinearly
+sampled terrain elevation and marches monotonically down the authored 3D light ray at the static
+cache spacing until it brackets the first terrain receiver. Four bisection refinements resolve that
+bracket to at most `tileSize / 64` world pixels (0.5 px for 32 px tiles). The search is bounded by
+the map edge, map diagonal, and the distance at which the ray falls below the map's minimum height;
+missing receivers use the last valid boundary point rather than oscillating between height samples.
+Sloped receivers therefore do not silently collapse to the `z=0` plane. Coverage is rasterized into
+an R8 camera-window target with a two-texel sampling gutter, rather than rebuilding immediate-mode
+convex hulls into a map-sized RGBA target. The final terrain mesh performs one static-cache sample
+and one dynamic-mask sample per fragment. Camera
+origin, zoom, and CSS viewport are passed explicitly by the renderer owner; concealment-only
+entities remain excluded and a failed mask draw leaves native rig shadows active. Optional bounded
+GPU queries measure the unit-mask draw and total present without synchronously waiting for results.
+The static transform is CPU map-load work, and Pixi composites the terrain mesh as part of the
+ordinary stage render, so neither interval is duplicated merely to manufacture a separate GPU
+query label; `staticBuilds`/`staticBuildMs` diagnostics and `renderer.present.total` cover them.
 
 The worker treats an observed WebGL context loss as a terminal presentation failure; it does not
 silently keep acknowledging black frames. Worker uncaught errors, unhandled rejections, message
@@ -297,6 +336,10 @@ by tile and complete overlays remain pending until the worker acknowledges the e
 presented; edits made while that presentation is in flight merge into the next submission. This
 lets ordinary match frames remain latest-oriented without treating authoring changes as disposable
 presentation data. A failed editor worker stops new submissions and reports one visible error.
+Full editor terrain replacements carry the materialized elevation grid and authored sun conditions.
+Sun-control input replaces only the latest pending full terrain update, so direction, height,
+relief shadows, and world color temperature preview live while retaining the one-frame-in-flight
+backpressure contract.
 
 ## 5. Explicitly deferred
 

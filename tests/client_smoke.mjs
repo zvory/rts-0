@@ -507,9 +507,9 @@ try {
   await page.keyboard.press("3");
   await page.keyboard.press("4");
   await page.keyboard.press("4");
-  await page.keyboard.press("q");
+  await page.keyboard.press("Space");
   await page.evaluate(() => window.__rts.hotkeyProfiles.setActiveProfile("preset.classicRts"));
-  await page.keyboard.press("a");
+  await page.keyboard.press("Space");
   await page.waitForFunction(
     () => {
       const settings = window.__rts.match.state.autoBuild;
@@ -532,10 +532,10 @@ try {
     tabMenuPrototype.visible &&
       tabMenuPrototype.repeatConsumed &&
       !tabMenuPrototype.paused &&
-      tabMenuPrototype.pauseHotkey === "A" &&
+      tabMenuPrototype.pauseHotkey === "SPC" &&
       tabMenuPrototype.reservations.steel === 100 &&
       tabMenuPrototype.reservations.oil === 200,
-    `TAB MENU: held Tab sends authoritative Grid/Classic pause and reserve hotkeys (${JSON.stringify(tabMenuPrototype)})`,
+    `TAB MENU: held Tab sends authoritative production, pause, and reserve hotkeys (${JSON.stringify(tabMenuPrototype)})`,
   );
   await page.evaluate(() => {
     window.__rts.hotkeyProfiles.setActiveProfile("preset.grid");
@@ -574,7 +574,7 @@ try {
     };
   });
   ok(
-    separatedMenuControls.hamburgerLabel === "Hold for Auto-Build menu" &&
+    separatedMenuControls.hamburgerLabel === "Open Auto-Build menu" &&
       separatedMenuControls.settingsLabel === "Settings" &&
       separatedMenuControls.settingsText === "⚙" &&
       separatedMenuControls.hamburgerLeft < separatedMenuControls.settingsLeft &&

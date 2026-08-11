@@ -248,6 +248,7 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
             verify_replay: config.verify_replay,
             save_replay_name: Some(replay_name),
             replay_dir: Some(replay_dir.clone()),
+            map_name: None,
         })?;
         let artifact_dir = result
             .replay_artifact
@@ -761,6 +762,7 @@ mod tests {
         player_two_army: u32,
     ) -> ProfileMatchupResult {
         ProfileMatchupResult {
+            map_name: "Chokes".to_string(),
             profile_a: DEFAULT_CANDIDATE.to_string(),
             profile_b: DEFAULT_BASELINE.to_string(),
             seed: 0,

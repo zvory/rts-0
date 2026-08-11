@@ -85,8 +85,36 @@ function renderGamePanel(root, game) {
     renderExclusiveFullscreenControl(root, game.exclusiveFullscreen);
   }
   if (game?.pointerLock) renderPointerLockControl(root, game.pointerLock);
+  if (game?.projectedUnitShadows) {
+    renderProjectedUnitShadowControl(root, game.projectedUnitShadows);
+  }
   if (game?.unitRanges) renderUnitRangeControl(root, game.unitRanges);
   if (game?.healthBars) renderHealthBarControl(root, game.healthBars);
+}
+
+function renderProjectedUnitShadowControl(root, projectedUnitShadows) {
+  const button = document.createElement("button");
+  button.id = "projected-unit-shadows-toggle";
+  button.type = "button";
+  button.className = "settings-toggle";
+  button.setAttribute("role", "switch");
+  button.addEventListener("click", () => {
+    projectedUnitShadows.onToggle?.();
+    sync();
+  });
+  root.appendChild(button);
+
+  function sync() {
+    const state = projectedUnitShadows.state?.() || {};
+    const enabled = !!state.enabled;
+    button.hidden = !!state.hidden;
+    button.disabled = state.available === false;
+    button.setAttribute("aria-checked", String(enabled));
+    button.textContent = enabled ? "Detailed Unit Shadows: on" : "Detailed Unit Shadows: off";
+    button.title = "Project simple 3D unit models onto terrain. Off uses lightweight standard unit shadows.";
+  }
+  sync();
+  projectedUnitShadows.onMount?.(sync);
 }
 
 function renderExclusiveFullscreenControl(root, exclusiveFullscreen) {
@@ -215,7 +243,7 @@ function renderHealthBarControl(root, healthBars) {
     button.disabled = state.available === false;
     button.setAttribute("aria-checked", String(enabled));
     button.textContent = enabled ? "Always Show HP Bars: on" : "Always Show HP Bars: off";
-    button.title = "Show every visible entity's HP bar, including at full health.";
+    button.title = "Show every visible unit and building HP bar, including at full health.";
   }
   sync();
   healthBars.onMount?.(sync);

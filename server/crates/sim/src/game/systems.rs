@@ -231,14 +231,13 @@ pub(crate) fn run_tick(
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "movement", || {
-        services::movement::movement_system_with_events(
+        services::movement::movement_system_with_context(
             map,
             entities,
             players,
             &pre_command.occupancy,
             &pre_command.spatial,
             tick,
-            events,
             smokes,
             ability_runtime,
         );

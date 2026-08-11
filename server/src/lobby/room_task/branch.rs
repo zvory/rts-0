@@ -107,7 +107,7 @@ impl RoomTask {
         self.branch_live_seat_by_connection = launch.seat_by_connection;
         self.record_live_match_started(
             launch.match_player_count,
-            launch.match_player_count,
+            launch.match_human_count,
             launch.map_name,
             launch.participants,
         );
@@ -215,10 +215,7 @@ impl RoomTask {
             return;
         };
         if !staging.can_start() {
-            self.send_error_to(
-                player_id,
-                "All original branch seats must be claimed before launch.",
-            );
+            self.send_error_to(player_id, "Claim at least one branch seat before launch.");
             return;
         }
         self.start_match_countdown();

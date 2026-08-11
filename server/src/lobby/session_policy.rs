@@ -500,6 +500,13 @@ impl SessionPolicy {
                 policy.countdown_eligible = false;
             }
             SessionMode::ReplayBranch => {
+                // Once a playable branch resolves, it uses the ordinary post-match replay
+                // runtime. Keep the private ReplayBranch room identity, but do not stamp replay
+                // playback with branch-staging policy: that would omit replay metadata from the
+                // replacement Start payload and leave the room ticker idle at tick zero.
+                if phase == SessionPhase::ReplayViewer {
+                    return policy;
+                }
                 policy.state_source = match phase {
                     SessionPhase::LiveMatch => StateSource::BranchLiveGame,
                     _ => StateSource::ReplayBranchSeed,
@@ -1235,6 +1242,17 @@ mod tests {
         assert_eq!(live.persistence, PersistencePolicy::REPLAY_BRANCH_LIVE);
         assert_eq!(live.start_payload, StartPayloadPolicy::ReplayBranchLive);
         assert!(!live.countdown_eligible);
+
+        let replay = SessionPolicy::new(SessionMode::ReplayBranch, SessionPhase::ReplayViewer);
+        assert_eq!(replay.state_source, StateSource::PostMatchReplaySession);
+        assert_eq!(replay.join, JoinPolicy::ReplayPromptOrAttach);
+        assert_eq!(replay.clock, ClockCapability::REPLAY_PLAYBACK);
+        assert_eq!(replay.authority, AuthorityPolicy::ReplayViewers);
+        assert_eq!(replay.visibility, VisibilityPolicy::SelectablePerspective);
+        assert_eq!(replay.mutation, MutationPolicy::ReplayPlaybackCursor);
+        assert_eq!(replay.persistence, PersistencePolicy::NONE);
+        assert_eq!(replay.start_payload, StartPayloadPolicy::ReplayViewer);
+        assert!(!replay.countdown_eligible);
     }
 
     #[test]

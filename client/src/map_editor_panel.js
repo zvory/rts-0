@@ -1,8 +1,10 @@
 import { TERRAIN } from "./protocol.js";
+import { createMapEditorElevationTool, selectMapEditorElevationOperation } from "./map_editor_elevation_controls.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import { createMapEditorPreviewButton } from "./map_editor_preview_button.js";
+import { createMapEditorSunSettings } from "./map_editor_sun_controls.js";
 import {
   MAP_EDITOR_CATEGORIES,
   MAP_EDITOR_OPERATIONS,
@@ -10,6 +12,7 @@ import {
   availableMapEditorOperations,
   mapEditorContentLabel,
   mapEditorOperationHelp,
+  selectMapEditorCategoryState,
 } from "./map_editor_panel_workflow.js";
 import {
   canonicalDoodadColor,
@@ -77,6 +80,7 @@ export class MapEditorPanel {
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
+    this.selectedElevation = 1;
     this.paintShape = "brush";
     this.selectedOverlayEffects = new Set(["concealment"]);
     this.overlayMode = "paint";
@@ -299,12 +303,10 @@ export class MapEditorPanel {
   operationHelp(operation) {
     return mapEditorOperationHelp(operation, this.activeCategory);
   }
-
   selectCategory(category) {
     if (!MAP_EDITOR_CATEGORIES.some(([value]) => value === category)) return;
-    this.activeCategory = category;
+    const preferred = selectMapEditorCategoryState(this, category);
     const available = this.availableOperations();
-    const preferred = this.lastOperation[category];
     const operation = available.has(preferred) ? preferred : available.values().next().value;
     if (operation) this.selectOperation(operation);
     else {
@@ -347,6 +349,8 @@ export class MapEditorPanel {
       this.setStatus(this.operationHelp(operation));
     } else if (this.terrainContent === "forest") {
       this.armForest(operation === "erase" ? "erase" : "paint");
+    } else if (this.terrainContent === "elevation") {
+      selectMapEditorElevationOperation(this, operation);
     } else {
       this.paintShape = operation === "box" ? "box" : "brush";
       this.armTerrain(operation === "erase" ? TERRAIN.GRASS : this.selectedTerrain);
@@ -446,6 +450,7 @@ export class MapEditorPanel {
       body.append(
         this.renderMapSource(),
         this.renderDetails(),
+        createMapEditorSunSettings(this.session, this.viewport),
         this.renderDocumentUtilities(),
       );
     }
@@ -484,6 +489,7 @@ export class MapEditorPanel {
       content.className = "map-editor-category-content";
       content.dataset.category = this.activeCategory;
       if (this.activeCategory === "objects") content.appendChild(this.renderDoodads());
+      else if (this.activeCategory === "elevation") content.appendChild(createMapEditorElevationTool(this));
       else if (this.activeCategory === "zones") content.appendChild(this.renderMapOverlays());
       else if (this.activeCategory === "locations") content.appendChild(this.renderLocations());
       else content.append(this.renderTerrain(), this.renderForest());
@@ -620,13 +626,9 @@ export class MapEditorPanel {
       }
       palette.appendChild(control);
     }
-    section.append(
-      palette,
-      this.renderRoadTool(),
-    );
+    section.append(palette, this.renderRoadTool());
     return section;
   }
-
   renderRoadTool() {
     const controls = document.createElement("div");
     controls.className = "map-editor-road-tool";

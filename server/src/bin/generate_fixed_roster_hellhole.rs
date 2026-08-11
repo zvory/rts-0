@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use rts_protocol::{
     Command, InitialCamera, LabCheckpointScenarioV1 as ProtocolLabCheckpointScenarioV1,
-    LabScenarioLabMetadata, LabScenarioPayload, LabVisionMode, DEFAULT_FACTION_ID,
+    LabScenarioLabMetadata, LabScenarioPayload, LabVisionMode, MapSun, DEFAULT_FACTION_ID,
 };
 use rts_rules::balance::building_stats;
 use rts_rules::terrain::{MAP_TERRAIN_GRASS, MAP_TERRAIN_ROCK};
@@ -31,6 +31,11 @@ const ROCK_CELL_TILES: u32 = 5;
 const TARGET_ROCK_TILES: usize = 470;
 const TANK_TRAP_OWNER: u32 = 1;
 const UNIT_FOOTPRINT_CLEARANCE_TILES: i32 = 1;
+const RIDGE_CENTER_TILES: [i32; 2] = [45, 81];
+const RIDGE_HALF_WIDTH_TILES: i32 = 8;
+const SUN_AZIMUTH_DEGREES: u16 = 330;
+const SUN_ELEVATION_DEGREES: u8 = 12;
+const SUN_WARMTH: u8 = 78;
 const BUILDING_CLUSTERS: [(u32, u32, u32); 4] = [(1, 4, 54), (2, 94, 54), (3, 54, 4), (4, 54, 104)];
 const BUILDING_LAYOUT: [(EntityKind, u32, u32); 10] = [
     (EntityKind::ResourceDepot, 0, 0),
@@ -144,6 +149,7 @@ fn blank_hellhole_lab(composition: &[EntityKind]) -> Result<Game, String> {
     // occluders below. This keeps the stress fixture independent of incidental terrain on the
     // selectable four-player base map.
     map.terrain.fill(MAP_TERRAIN_GRASS);
+    populate_parallel_elevation_ridges(&mut map);
     let rock_count = populate_sparse_rock_occluders(&mut map, composition)?;
     if rock_count < 128 {
         return Err(format!(
@@ -151,6 +157,39 @@ fn blank_hellhole_lab(composition: &[EntityKind]) -> Result<Game, String> {
         ));
     }
     Ok(Game::new_lab(&players, SEED, map, map_metadata))
+}
+
+fn populate_parallel_elevation_ridges(map: &mut Map) {
+    map.elevation.resize((map.width * map.height) as usize, 0);
+    map.elevation.fill(0);
+    for tile_y in 0..map.height {
+        for tile_x in 0..map.width {
+            // Leave a flat apron at both ends so the ridges read as long hills rather than
+            // map-spanning contour bands in benchmark captures.
+            if tile_x < 8 || tile_x >= map.width.saturating_sub(8) {
+                continue;
+            }
+            let nearest = RIDGE_CENTER_TILES
+                .iter()
+                .map(|center| (tile_y as i32 - center).abs())
+                .min()
+                .unwrap_or(i32::MAX);
+            let level = match nearest {
+                0 | 1 => 5,
+                2 | 3 => 4,
+                4 | 5 => 3,
+                6 | 7 => 2,
+                RIDGE_HALF_WIDTH_TILES => 1,
+                _ => 0,
+            };
+            map.elevation[(tile_y * map.width + tile_x) as usize] = level;
+        }
+    }
+    map.sun = Some(MapSun {
+        azimuth_degrees: SUN_AZIMUTH_DEGREES,
+        elevation_degrees: SUN_ELEVATION_DEGREES,
+        warmth: SUN_WARMTH,
+    });
 }
 
 fn populate_sparse_rock_occluders(

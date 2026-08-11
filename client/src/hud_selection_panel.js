@@ -16,14 +16,6 @@ const SELECTION_BUDGET_BLOCK_ROWS = 2;
 const SELECTION_BUDGET_COLS = Math.ceil(BASE_COMMAND_SUPPLY_CAP / SELECTION_BUDGET_BLOCK_ROWS);
 const SELECTION_OVERFLOW_FLASH_MS = 1400;
 
-/** Format tank lifetime movement oil for the selected-entity detail panel. */
-export function formatTankOilUsed(value) {
-  const oilUsed = typeof value === "number" && Number.isFinite(value)
-    ? Math.max(0, value)
-    : 0;
-  return oilUsed >= 10 ? `${Math.round(oilUsed)}` : oilUsed.toFixed(1);
-}
-
 export function selectionBudgetBlockShape(weight) {
   const safeWeight = Math.max(1, Math.ceil(Number.isFinite(weight) ? weight : 1));
   if (safeWeight === 1) return { cols: 1, rows: 1 };
@@ -397,10 +389,6 @@ export class HudSelectionPanel {
         `<div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
     }
 
-    const tankOilHtml = e.kind === KIND.TANK
-      ? `<div class="sel-stat"><span>Oil Used:</span>` +
-        `<strong>${formatTankOilUsed(e.oilUsed)}</strong></div>`
-      : "";
     const resourceRemainingHtml = isResourceNodeKind(e.kind)
       ? `<div class="sel-stat sel-resource-remaining"><span>${st.label || e.kind} Remaining:</span>` +
         `<strong>${formatResourceRemaining(e.remaining)}</strong></div>`
@@ -417,7 +405,6 @@ export class HudSelectionPanel {
       `<div class="sel-hpbar"><div class="sel-hpfill ${hpClass}" ` +
       `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
       `<div class="sel-hptext">${hp} / ${maxHp}</div>` +
-      tankOilHtml +
       resourceRemainingHtml +
       entrenchmentHtml +
       prodHtml;
@@ -482,7 +469,6 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.maxHp),
     sigValue(entity.occupiedTrenchId),
     entrenchment ? `${entrenchment.label}:${entrenchment.value}` : "",
-    entity.kind === KIND.TANK ? formatTankOilUsed(entity.oilUsed) : "",
     isResourceNodeKind(entity.kind) ? formatResourceRemaining(entity.remaining) : "",
     sigValue(entity.prodQueue),
     sigValue(entity.prodKind),

@@ -59,6 +59,8 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
                 width: 3,
                 height: 2,
                 terrain: vec![terrain::GRASS; 6],
+                elevation: Vec::new(),
+                sun: None,
                 starts: vec![
                     LabScenarioTile { x: 0, y: 0 },
                     LabScenarioTile { x: 1, y: 1 },

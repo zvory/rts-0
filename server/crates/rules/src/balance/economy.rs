@@ -1,10 +1,4 @@
-//! Economy, resource-node, and movement-fuel balance constants.
-
-use super::{TICK_HZ, TILE_SIZE};
-
-pub const TANK_OIL_COST_PER_PX: f32 = 20.0 / (96.0 * TILE_SIZE as f32);
-pub const SCOUT_CAR_OIL_COST_PER_PX: f32 = 5.0 / (96.0 * TILE_SIZE as f32);
-pub const TANK_OIL_STARVED_PAUSE_TICKS: u16 = TICK_HZ as u16;
+//! Economy and resource-node balance constants.
 
 pub const STARTING_STEEL: u32 = 75;
 pub const STARTING_OIL: u32 = 0;

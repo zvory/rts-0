@@ -10,6 +10,7 @@ import {
   runSnapshotCodecBakeoff,
 } from "./snapshot-codec-bakeoff.mjs";
 import { initializeWorkloadSetup } from "./client-perf/workload_setup.mjs";
+import { applyShadowSetup, installShadowDiagnostics } from "./client-perf/shadow_diagnostics.mjs";
 import {
   cleanupBrowserProfile,
   configurePageEmulation,
@@ -19,16 +20,10 @@ import {
   stopCpuProfile,
 } from "./client-perf/browser_profile.mjs";
 import {
-  buildPresentationMetrics,
-  cancelRenderWorkerProfile,
-  presentationConsoleLine,
-  renderWorkerErrors,
-  resetPerfDiagnostics,
-  scaledTimeoutMs,
-  snapshotPacketBudgetSummary,
-  startRenderWorkerProfile,
-  stopRenderWorkerProfile,
-  workloadTimeoutScale,
+  buildPresentationMetrics, cancelRenderWorkerProfile, endUncappedPresentations,
+  measurePresentationWindow, presentationConsoleLine, preparePresentationWindow,
+  renderWorkerErrors, resetPerfDiagnostics, scaledTimeoutMs, snapshotPacketBudgetSummary,
+  startRenderWorkerProfile, stopRenderWorkerProfile, uncappedPresentationErrors, workloadTimeoutScale,
 } from "./client-perf/harness_runtime.mjs";
 export { buildPresentationMetrics } from "./client-perf/harness_runtime.mjs";
 import { buildClientPerfWorkloads, defaultClientPerfWorkloads } from "./client-perf/workloads.mjs";
@@ -211,6 +206,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
   let summary = null;
   let snapshotCodecBakeoff = null;
   let workloadSetup = null;
+  let uncappedPresentations = null;
 
   try {
     await prepareWorkload(workload);
@@ -240,9 +236,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     }
 
     await page.setViewport(puppeteerViewport(args.viewport, args.deviceScaleFactor));
-    await page.evaluateOnNewDocument((workloadId) => {
-      window.__rtsPerfWorkloadId = workloadId;
-    }, workload.id);
+    await installShadowDiagnostics(page, workload);
     const targetUrl = new URL(workload.url, server.baseUrl).href;
     const startedAt = new Date().toISOString();
     const timeoutScale = workloadTimeoutScale(args);
@@ -260,15 +254,17 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       () => (window.__rtsPerf?.summary?.()?.frameCount || 0) >= 30,
       { timeout: scaledTimeoutMs(Math.max(args.durationMs, 1000) + 10000, timeoutScale) },
     );
-    await resetPerfDiagnostics(page);
+    const uncapped = workload.setup?.uncappedPresentationsEnabled === true;
+    await preparePresentationWindow(page, uncapped);
     cpuProfile = await startCpuProfile(page, args.cpuProfileIntervalUs, cdpSession);
     renderWorkerCpuProfile = await startRenderWorkerProfile(page, args.cpuProfileIntervalUs);
-    await sleep(args.durationMs);
+    uncappedPresentations = await measurePresentationWindow(page, args.durationMs, uncapped);
     cpuProfilePath = cpuProfile ? path.join(artifactDir, "cpu-profile.cpuprofile") : null;
     await stopCpuProfile(cpuProfile, cpuProfilePath);
     renderWorkerCpuProfilePath = await stopRenderWorkerProfile(renderWorkerCpuProfile, artifactDir);
 
     summary = await collectPageSummary(page);
+    if (uncapped) await endUncappedPresentations(page);
     if (args.snapshotCodecBakeoff) {
       const frames = normalizeCapturedSnapshotCodecFrames(await collectSnapshotCodecFrames(page));
       const framesPath = path.join(artifactDir, "snapshot-frames.jsonl");
@@ -315,7 +311,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
     const endedAt = new Date().toISOString();
     const renderBudget = buildRenderBudgetReport(summary.perf?.summary, summary.perf?.reportSummary);
     const renderDiagnostics = buildRenderDiagnosticsReport(summary.perf?.summary, summary.perf?.reportSummary);
-    const presentations = buildPresentationMetrics(summary, args.durationMs);
+    const presentations = uncappedPresentations || buildPresentationMetrics(summary, args.durationMs);
     const artifact = {
       schemaVersion: 1,
       status: "passed",
@@ -337,6 +333,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
         cpuProfileIntervalUs: args.cpuProfileIntervalUs,
       },
       workloadSetup,
+      uncappedPresentations,
       stressMatrix: args.activeMatrixCell ? serializeMatrixCell(args.activeMatrixCell) : null,
       browser: {
         chrome,
@@ -384,6 +381,7 @@ async function runWorkload({ workload, server, browser, outputRoot, args, chrome
       errors.push("ClientNetReport snapshot could not be generated");
     }
     errors.push(...renderWorkerErrors(summary.renderWorker));
+    errors.push(...uncappedPresentationErrors(uncappedPresentations, summary.renderWorker));
     errors.push(...workloadSetupErrors(workload, workloadSetup));
     errors.push(...consoleErrors.map((error) => `console error: ${error}`));
     errors.push(...pageErrors.map((error) => `page error: ${error}`));
@@ -1256,6 +1254,7 @@ async function applyWorkloadSetup(page, workload) {
   const setup = workload.setup || null;
   const result = await initializeWorkloadSetup(page, setup);
   if (!result) return null;
+  await applyShadowSetup(page, setup, result);
   if (setup.visionSelectionPlayerIndex != null || setup.visionSelectionPlayerId != null) {
     const action = await page.evaluate((replaySetup) => {
       const match = window.__rts?.match;

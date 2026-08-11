@@ -31,6 +31,7 @@ struct CliConfig {
     save_replay_name: Option<String>,
     replay_dir: Option<PathBuf>,
     output_format: OutputFormat,
+    map_name: String,
 }
 
 pub fn run_from_env() {
@@ -46,6 +47,7 @@ pub fn run_from_env() {
         save_replay_name,
         replay_dir,
         output_format,
+        map_name,
     } = config;
 
     let result = run_profile_matchup_result(ProfileMatchupOptions {
@@ -56,6 +58,7 @@ pub fn run_from_env() {
         verify_replay,
         save_replay_name,
         replay_dir,
+        map_name: Some(map_name),
     });
 
     match result {
@@ -97,6 +100,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
     let mut save_replay_name = None;
     let mut replay_dir = None;
     let mut output_format = OutputFormat::Table;
+    let mut map_name = "Chokes".to_string();
     let mut positionals = Vec::new();
 
     let mut args = args.into_iter();
@@ -121,6 +125,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
             }
             "--ticks" => {
                 ticks = parse_u32_flag(&arg, &mut args)?;
+            }
+            "--map" => {
+                map_name = required_value(&arg, &mut args)?;
             }
             "--format" => {
                 let value = required_value(&arg, &mut args)?;
@@ -181,6 +188,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
         save_replay_name,
         replay_dir,
         output_format,
+        map_name,
     }))
 }
 
@@ -427,6 +435,7 @@ mod tests {
         winner_player_id: Option<u32>,
     ) -> ProfileMatchupResult {
         ProfileMatchupResult {
+            map_name: "Chokes".to_string(),
             profile_a: "left".to_string(),
             profile_b: "right".to_string(),
             seed: 0,

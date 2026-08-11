@@ -9,10 +9,10 @@
 // Everything below codes strictly against the export signatures in docs/design/client-ui.md §4.1;
 // the modules themselves are owned by other files. Keep this layer thin: it should
 // orchestrate, not implement game logic.
-
 import { Net } from "./net.js";
 import { Lobby } from "./lobby.js";
 import { BranchStaging } from "./branch_staging.js";
+import { createBirthdayBanner } from "./birthday_banner_composition.js";
 import { Audio, SOUND_MANIFEST } from "./audio.js";
 import { S } from "./protocol.js";
 import { TOAST_MS } from "./alerts.js";
@@ -32,13 +32,21 @@ import {
 } from "./bootstrap.js";
 import { Match } from "./match.js";
 import { MatchHistory, requestReplayRoom } from "./match_history.js";
-import { applyMatchHealthBars, applyMatchUnitRanges } from "./match_settings_toggles.js";
+import {
+  applyMatchHealthBars,
+  applyMatchProjectedUnitShadows,
+  applyMatchUnitRanges,
+} from "./match_settings_toggles.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import {
   readAlwaysShowHealthBarsEnabled,
   writeAlwaysShowHealthBarsEnabled,
 } from "./health_bar_settings.js";
+import {
+  readProjectedUnitShadowsEnabled,
+  writeProjectedUnitShadowsEnabled,
+} from "./unit_shadow_settings.js";
 import {
   applyExclusiveFullscreen,
   exclusiveFullscreenSupported,
@@ -185,6 +193,7 @@ export class App {
     this.audio = new Audio();
     void this.audio.preload(SOUND_MANIFEST);
     this.statusBadge = new StatusBadge(dom.statusBadge);
+    this.birthdayBanner = createBirthdayBanner(dom);
     this.hotkeyProfiles = new HotkeyProfileService({
       catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
     });
@@ -221,7 +230,9 @@ export class App {
       autoRefreshLobbies: !this.requiresConnectionOnStart(),
       onJoined: () => this.warmMatchRenderer(),
     });
-    this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
+    this.branchStaging = new BranchStaging(dom.branchScreen, this.net, {
+      onClose: () => this.onBackToLobby(),
+    });
     /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
     this.matchHistory = null;
     /** @type {Match|null} the currently running match, if any. */
@@ -281,6 +292,7 @@ export class App {
     this.predictionEnabled = readPredictionEnabled();
     this.unitRangesEnabled = readUnitRangesEnabled();
     this.healthBarsAlwaysEnabled = readAlwaysShowHealthBarsEnabled();
+    this.projectedUnitShadowsEnabled = readProjectedUnitShadowsEnabled();
     this.exclusiveFullscreenEnabled = exclusiveFullscreenSupported() &&
       readExclusiveFullscreenEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
@@ -845,11 +857,14 @@ export class App {
         predictionEnabled: this.predictionEnabled,
         unitRangesEnabled: this.unitRangesEnabled,
         healthBarsAlwaysEnabled: this.healthBarsAlwaysEnabled,
+        projectedUnitShadowsEnabled: this.projectedUnitShadowsEnabled,
         exclusiveFullscreenEnabled: this.exclusiveFullscreenEnabled,
         autoSpectatorEnabled: interactAutoSpectatorEnabled(),
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
         onUnitRangesEnabledChange: (enabled) => this.setUnitRangesEnabled(enabled),
         onHealthBarsAlwaysEnabledChange: (enabled) => this.setHealthBarsAlwaysEnabled(enabled),
+        onProjectedUnitShadowsEnabledChange: (enabled) =>
+          this.setProjectedUnitShadowsEnabled(enabled),
         onExclusiveFullscreenEnabledChange: (enabled) =>
           this.setExclusiveFullscreenEnabled(enabled),
         onAutoSpectatorEnabledChange: (enabled) => this.setAutoSpectatorEnabled(enabled),
@@ -1198,6 +1213,14 @@ export class App {
             }),
             onToggle: () => this.setUnitRangesEnabled(!this.unitRangesEnabled),
           },
+          projectedUnitShadows: {
+            state: () => ({
+              enabled: this.projectedUnitShadowsEnabled,
+              available: true,
+            }),
+            onToggle: () =>
+              this.setProjectedUnitShadowsEnabled(!this.projectedUnitShadowsEnabled),
+          },
           healthBars: {
             state: () => ({
               enabled: this.healthBarsAlwaysEnabled,
@@ -1261,6 +1284,13 @@ export class App {
         this.settings.open({ focus: false });
       }
     }
+  }
+
+  setProjectedUnitShadowsEnabled(enabled) {
+    this.projectedUnitShadowsEnabled = !!enabled;
+    writeProjectedUnitShadowsEnabled(this.projectedUnitShadowsEnabled);
+    applyMatchProjectedUnitShadows(this.match, this.projectedUnitShadowsEnabled);
+    this.refreshSettingsAfterPreferenceChange();
   }
 
   async setExclusiveFullscreenEnabled(enabled, {

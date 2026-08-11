@@ -24,6 +24,10 @@ export function createWorkerPresentationState() {
         ...map,
         generation: message.generation,
         terrain: gridSnapshot(map.terrain),
+        elevation: map.elevation
+          ? gridSnapshot(map.elevation)
+          : emptyGridSnapshot(map.terrain),
+        sun: map.sun ? Object.freeze({ ...map.sun }) : null,
         doodads: Object.freeze((map.doodads || []).map((record) => Object.freeze({ ...record }))),
       });
       return staticMap;
@@ -126,6 +130,16 @@ function gridSnapshot(record) {
       target.set(values, offset);
       return values.length;
     },
+  });
+}
+
+function emptyGridSnapshot(shape) {
+  return gridSnapshot({
+    version: shape.version,
+    revision: shape.revision,
+    width: shape.width,
+    height: shape.height,
+    values: new Uint8Array(shape.width * shape.height).buffer,
   });
 }
 

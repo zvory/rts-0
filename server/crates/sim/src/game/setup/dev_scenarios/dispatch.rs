@@ -40,6 +40,12 @@ impl Game {
             "replay_256_worker_expansion_rally" => {
                 Self::new_replay_256_worker_expansion_rally_scenario(unit, unit_count, seed)
             }
+            "replay_281_tank_gap" => {
+                Self::new_replay_281_tank_gap_scenario(scenario_case, unit, unit_count, seed)
+            }
+            "replay_296_scout_car_stop" => {
+                Self::new_replay_296_scout_car_stop_scenario(unit, unit_count, seed)
+            }
             "scout_car_wall_chokepoint" => {
                 Self::new_scout_car_wall_chokepoint_scenario(unit, unit_count, seed)
             }

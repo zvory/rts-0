@@ -73,6 +73,8 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
         width: size,
         height: size,
         terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
+        elevation: Vec::new(),
+        sun: None,
         starts: vec![
             crate::protocol::LabMapTile { x: 8, y: 8 },
             crate::protocol::LabMapTile {

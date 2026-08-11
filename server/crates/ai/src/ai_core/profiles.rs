@@ -3,9 +3,11 @@ use rts_sim::game::upgrade::UpgradeKind;
 use serde::Serialize;
 
 mod jeffs_ai;
+mod jeffs_ai_chat_start;
 mod turtle;
 
 pub(crate) use self::jeffs_ai::{JEFFS_AI, JEFFS_AI_ID};
+pub(crate) use self::jeffs_ai_chat_start::{JEFFS_AI_CHAT_START, JEFFS_AI_CHAT_START_ID};
 pub(crate) use self::turtle::AI_TURTLE;
 
 /// Canonical identities are also the only accepted persisted/profile-selection ids.
@@ -195,6 +197,7 @@ pub(crate) struct AttackPolicy {
 pub(crate) struct DefensiveMachineGunnerPolicy {
     pub(crate) target_count: usize,
     pub(crate) perimeter_distance_tiles: f32,
+    pub(crate) lateral_spacing_tiles: f32,
     pub(crate) replacement_health_percent: Option<u8>,
 }
 
@@ -359,6 +362,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 4,
         perimeter_distance_tiles: 20.0,
+        lateral_spacing_tiles: 1.5,
         replacement_health_percent: None,
     }),
     turtle_defense: None,
@@ -390,11 +394,17 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
     fast_tank_timing: None,
 };
 
+/// Canonical profiles that must be complete for live play and profile manifests.
+/// The frozen chat-start snapshot remains addressable by id for internal comparisons,
+/// but must not weaken the completeness contract for the active Jeff profile.
 pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
     [&AI_2_1, &JEFFS_AI, &AI_TURTLE]
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
+    if id == JEFFS_AI_CHAT_START_ID {
+        return Some(&JEFFS_AI_CHAT_START);
+    }
     required_profiles()
         .into_iter()
         .find(|profile| profile.id == id)
@@ -412,6 +422,10 @@ mod tests {
         );
         assert_eq!(profile_by_id(AI_2_1_ID).unwrap().id, AI_2_1_ID);
         assert_eq!(profile_by_id(AI_TURTLE_ID).unwrap().id, AI_TURTLE_ID);
+        assert_eq!(
+            profile_by_id(JEFFS_AI_CHAT_START_ID).unwrap().id,
+            JEFFS_AI_CHAT_START_ID
+        );
     }
 
     #[test]

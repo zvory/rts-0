@@ -47,6 +47,8 @@ const map = {
   height: 2,
   tileSize: 32,
   terrain: new Uint8Array([0, 1, 2, 3]),
+  elevation: new Uint8Array([0, 2, 4, 1]),
+  sun: { azimuthDegrees: 315, elevationDegrees: 12, warmth: 75 },
   resources: [{ id: 90, kind: "steel", x: 16, y: 16, remaining: 1200 }],
 };
 const visibleGrid = new Uint8Array([1, 1, 0, 0]);
@@ -229,6 +231,9 @@ assert(frame.layers.belowFogIntel.length === 1, "a malformed entity does not pre
 assert(frame.visible.revision === 4 && frame.explored.revision === 7, "fog snapshots use post-update revisions");
 assert(frame.staticMapRevision === assembler.staticMap.revision, "dynamic frames reference the separately versioned static map");
 assert(assembler.staticMap.widthPx === 64 && assembler.staticMap.heightPx === 64, "static map dimensions are world pixels");
+assert(assembler.staticMap.elevation.values.join(",") === "0,2,4,1", "static map retains authoritative elevation");
+assert(Object.isFrozen(assembler.staticMap.sun) && assembler.staticMap.sun.warmth === 75,
+  "static map retains immutable authored sun conditions");
 assert(assembler.staticMap.resourceSites[0].remaining === undefined, "static resource sites exclude mutable remaining amounts");
 assert(Object.keys(frame.visible).join(",") === "version,revision,width,height,values", "grid snapshot exposes the cloneable V2 shape");
 assert(frame.version === 2 && frame.projection.version === 2, "renderer frame and projection use PresentationFrameV2 data");
@@ -296,6 +301,8 @@ assert(gridSnapshotValue(oldStaticMap.terrain, 0) === 0, "reset does not mutate 
 
 const rematchAssembler = new PresentationFrameAssembler({ map: { width: 1, height: 1, tileSize: 16, terrain: [0] } });
 assert(rematchAssembler.staticMap !== assembler.staticMap, "a rematch owns a fresh static presentation object");
+assert(rematchAssembler.staticMap.sun === null && gridSnapshotValue(rematchAssembler.staticMap.elevation, 0) === 0,
+  "legacy flat maps normalize to zero elevation with no sun conditions");
 assertThrows(() => detachedRecord({ value: new Uint8Array([1]) }), "ordinary records reject typed-array views");
 assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source: [1] }), "grid snapshots reject short sources");
 

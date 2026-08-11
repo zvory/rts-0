@@ -255,7 +255,7 @@ fn branch_staging_one_occupant_cannot_claim_multiple_seats() {
 }
 
 #[test]
-fn branch_staging_requires_all_original_seats_before_can_start() {
+fn branch_staging_requires_at_least_one_claimed_seat_before_can_start() {
     let players = replay_test_players(2);
     let seed = replay_branch_test_seed(&players, 0);
     let mut task = RoomTask::new(
@@ -271,7 +271,7 @@ fn branch_staging_requires_all_original_seats_before_can_start() {
 
     task.broadcast_branch_staging();
     task.on_claim_branch_seat(100, players[0].id);
-    task.on_claim_branch_seat(101, players[1].id);
+    task.on_release_branch_seat(100, players[0].id);
 
     let updates = branch_staging_messages(&mut writer_a);
     assert!(matches!(
@@ -282,9 +282,16 @@ fn branch_staging_requires_all_original_seats_before_can_start() {
         })
     ));
     assert!(matches!(
-        updates.last(),
+        updates.get(1),
         Some(ServerMessage::BranchStaging {
             can_start: true,
+            ..
+        })
+    ));
+    assert!(matches!(
+        updates.last(),
+        Some(ServerMessage::BranchStaging {
+            can_start: false,
             ..
         })
     ));
@@ -309,6 +316,53 @@ fn branch_launch_preparation_preserves_original_replay_seat_mapping() {
         vec![players[0].name.clone(), players[1].name.clone()]
     );
     assert_eq!(launch.game.tick_count(), 0);
+}
+
+#[test]
+fn branch_launch_keeps_unclaimed_players_inert_and_unmapped() {
+    let players = replay_test_players(2);
+    let seed = replay_branch_test_seed(&players, 0);
+    let mut task = RoomTask::new(
+        "branch-partial-launch-test".to_string(),
+        RoomMode::ReplayBranch { seed: seed.clone() },
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let _writer_a = add_branch_occupant(&mut task, 100);
+    let _writer_b = add_branch_occupant(&mut task, 101);
+    let mut staging = BranchStagingState::new(seed);
+    staging.claim(100, players[0].id).unwrap();
+    task.phase = Phase::BranchStaging(Box::new(staging));
+
+    task.start_branch_live();
+
+    let Phase::InGame(game) = &task.phase else {
+        panic!("partially claimed branch should launch");
+    };
+    assert_eq!(game.player_inits().len(), 2);
+    assert_eq!(task.match_player_count, 2);
+    assert_eq!(task.match_human_count, 1);
+    assert_eq!(
+        task.match_participants,
+        vec![players[0].name.clone(), players[1].name.clone()]
+    );
+    assert_eq!(
+        task.branch_live_seat_by_connection.get(&100),
+        Some(&players[0].id)
+    );
+    assert!(!task.branch_live_seat_by_connection.contains_key(&101));
+    assert!(!task.players.get(&100).unwrap().spectator);
+    assert!(task.players.get(&101).unwrap().spectator);
+
+    task.on_command(
+        101,
+        1,
+        SimCommand::Stop {
+            units: vec![1, 2, 3],
+        },
+    );
+    assert!(task.pending_client_command_acks.is_empty());
 }
 
 #[test]
@@ -666,16 +720,35 @@ fn branch_live_give_up_resolves_by_original_seat_and_skips_public_history() {
     staging.claim(101, players[1].id).unwrap();
     task.phase = Phase::BranchStaging(Box::new(staging));
     task.start_branch_live();
+    task.on_tick(TokioInstant::now());
 
     assert!(!task.should_persist_match_history());
     task.on_give_up(100);
 
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
-    assert!(
-        std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).any(|msg| {
-            matches!(msg, ServerMessage::GameOver { winner_id: Some(id), you, .. }
-            if id == players[1].id && you == "lost")
+    let messages: Vec<_> = std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
+    assert!(messages.iter().any(|msg| {
+        matches!(msg, ServerMessage::GameOver { winner_id: Some(id), you, .. }
+            if *id == players[1].id && you == "lost")
+    }));
+    let replay_start = messages
+        .iter()
+        .find_map(|msg| match msg {
+            ServerMessage::Start(payload) if payload.replay.is_some() => Some(payload),
+            _ => None,
         })
+        .expect("resolved replay branch should send a replay start payload");
+    assert!(replay_start.spectator);
+    assert!(replay_start.capabilities.room_time.timeline);
+
+    task.on_tick(TokioInstant::now());
+    let replay_snapshot = writer_a
+        .snapshots
+        .take()
+        .expect("resolved replay branch should publish a replay snapshot");
+    assert_eq!(
+        replay_snapshot.tick, 1,
+        "resolved replay branch should advance past replay tick zero"
     );
     assert!(task.branch_live_seat_by_connection.is_empty());
 }

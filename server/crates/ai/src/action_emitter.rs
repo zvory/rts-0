@@ -57,6 +57,19 @@ pub(crate) fn emit_request(request: AiActionRequest) -> SimCommand {
             queued,
         },
         AiActionRequest::Train { building, unit } => SimCommand::Train { building, unit },
+        AiActionRequest::SetRally {
+            building,
+            x,
+            y,
+            kind,
+            queued,
+        } => SimCommand::SetRally {
+            building,
+            x,
+            y,
+            kind,
+            queued,
+        },
         AiActionRequest::AdjustProductionRepeat {
             buildings,
             unit,

@@ -213,6 +213,9 @@ const approvedCurrentFactionFiles = new Set([
   // faction catalog routing exists.
   "server/crates/ai/src/ai_core/decision/turtle.rs",
   "server/crates/ai/src/ai_core/profiles/jeffs_ai.rs",
+  // Frozen Jeff comparison profile intentionally preserves a historical Kriegsia roster policy;
+  // it is available only through explicit internal profile lookup, not public profile selection.
+  "server/crates/ai/src/ai_core/profiles/jeffs_ai_chat_start.rs",
   "server/crates/ai/src/ai_core/profiles/turtle.rs",
   "server/crates/ai/src/ai_core/facts.rs",
   "server/crates/ai/src/ai_core/observation.rs",
@@ -233,6 +236,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/selfplay/player_view.rs",
   "server/crates/ai/src/selfplay/replay.rs",
   "server/crates/ai/src/selfplay/scripts.rs",
+  // Live AI command filtering translates current-roster movement/build intents and its inline
+  // regression fixtures name those kinds directly; public faction admission remains catalog-owned.
+  "server/crates/ai/src/live.rs",
   "server/crates/rules/src/balance.rs",
   // Balance Phase 4 split: these modules contain constants/helpers moved from balance.rs without
   // changing current-faction ownership.
@@ -374,6 +380,12 @@ const approvedCurrentFactionFiles = new Set([
   // Replay-derived worker oscillation fixture intentionally recreates the current Kriegsia Worker
   // and Machine Gunner interaction; public faction admission remains routed through the launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/replay_256_worker_expansion_rally.rs",
+  // Replay-derived Tank gap fixture intentionally recreates a current Kriegsia combined-vehicle
+  // formation; public faction admission remains routed through the dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/replay_281_tank_gap.rs",
+  // Replay-derived Scout Car fixture intentionally recreates a current Kriegsia formation;
+  // public faction admission remains routed through the dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/replay_296_scout_car_stop.rs",
   // The lake reverse-path fixture deliberately isolates current Scout Car movement; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/scout_car_lake_reverse_l_path.rs",
@@ -407,6 +419,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/src/dev_scenarios/replay_142_vehicle_lock.rs",
   "server/src/dev_scenarios/replay_238_rifleman_corner_lock.rs",
   "server/src/dev_scenarios/replay_256_worker_expansion_rally.rs",
+  "server/src/dev_scenarios/replay_281_tank_gap.rs",
+  "server/src/dev_scenarios/replay_296_scout_car_stop.rs",
   // This catalog entry exposes the intentionally Kriegsia-specific Scout Car lake fixture; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/scout_car_lake_reverse_l_path.rs",

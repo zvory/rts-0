@@ -4,6 +4,11 @@
 import { assert } from "./assertions.mjs";
 import { GameState } from "../../client/src/state.js";
 import { EVENT, KIND, SETUP, STATE, WEAPON_KIND } from "../../client/src/protocol.js";
+import {
+  sampleWeaponRecoilCycle,
+  weaponRecoilDurationMs,
+} from "../../client/src/weapon_recoil_cycle.js";
+import { liveUnitIconRigPoseFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
 
 const start = {
   playerId: 1,
@@ -20,6 +25,53 @@ const start = {
     { id: 2, name: "B", color: "#00ff00", startTileX: 2, startTileY: 2 },
   ],
 };
+
+{
+  assert(
+    weaponRecoilDurationMs(KIND.TANK, WEAPON_KIND.TANK_CANNON) === 650,
+    "tank cannon recoil retains its authored 650 ms duration",
+  );
+  assert(
+    weaponRecoilDurationMs(KIND.RIFLEMAN, WEAPON_KIND.ARTILLERY_GUN) === 980,
+    "explicit weapon identity overrides the attacker's fallback recoil duration",
+  );
+  assert(
+    weaponRecoilDurationMs(KIND.RIFLEMAN, "unknown_future_weapon") === 420,
+    "unknown weapon identity falls back to the attacker's recoil duration",
+  );
+  assert(
+    sampleWeaponRecoilCycle(KIND.TANK, 0, WEAPON_KIND.TANK_COAX).active === false,
+    "tank coax feedback does not create a cannon recoil cycle",
+  );
+
+  const initial = sampleWeaponRecoilCycle(KIND.TANK, 0, WEAPON_KIND.TANK_CANNON);
+  const kickBoundary = sampleWeaponRecoilCycle(KIND.TANK, 650 * 0.18, WEAPON_KIND.TANK_CANNON);
+  const complete = sampleWeaponRecoilCycle(KIND.TANK, 650, WEAPON_KIND.TANK_CANNON);
+  assert(initial.active && initial.phase === 0 && initial.progress === 1,
+    "recoil cycle begins at full authored displacement");
+  assert(
+    kickBoundary.active && Math.abs(kickBoundary.progress - 0.88) < 1e-12 && kickBoundary.phase === 0.18,
+    "recoil cycle preserves the cosine-settlement boundary after the held kick",
+  );
+  assert(
+    complete.active && complete.phase === 1 && Math.abs(complete.progress) < 1e-12,
+    "recoil cycle settles to rest at its inclusive duration boundary",
+  );
+  assert(
+    sampleWeaponRecoilCycle(KIND.TANK, 650.001, WEAPON_KIND.TANK_CANNON).active === false,
+    "recoil cycle expires immediately after its authored duration",
+  );
+
+  const tankRecoilPose = liveUnitIconRigPoseFor(KIND.TANK, { recoilProgress: 1, recoilPhase: 0 });
+  assert(
+    Math.abs(tankRecoilPose.parts["part.hull"].transform.x + 7.65) < 0.0001 &&
+      Math.abs(tankRecoilPose.parts["part.barrel"].transform.scaleX - 0.728915663) < 0.0001 &&
+      Math.abs(tankRecoilPose.parts["part.tank.flashCone"].alpha - 1) < 0.0001 &&
+      Math.abs(tankRecoilPose.parts["part.tank.flashCore"].geometryScale.x - 3.4) < 0.0001 &&
+      Math.abs(tankRecoilPose.parts["part.tank.flashGlow"].geometryScale.x - 3) < 0.0001,
+    "animated Tank icons sample the live rig's body kick, barrel contraction, and muzzle flash bindings",
+  );
+}
 
 {
   const renderClock = { now: () => 500_000 };

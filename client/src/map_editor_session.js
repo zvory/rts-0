@@ -51,6 +51,11 @@ export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
 export const MAP_EDITOR_SYMMETRY = MAP_AUTHORING_SYMMETRY;
 export const MAP_EDITOR_MAP_VERSION = CURRENT_AUTHORED_MAP_VERSION;
+export const MAP_EDITOR_DEFAULT_SUN = Object.freeze({
+  azimuthDegrees: 315,
+  elevationDegrees: 35,
+  warmth: 25,
+});
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -104,6 +109,7 @@ export class MapEditorSession {
     this.lastAction = "";
     this.savedFingerprint = "";
     this.terrainStroke = null;
+    this.elevationStroke = null;
     this.overlayStroke = null;
     this.doodadStroke = null;
   }
@@ -122,6 +128,8 @@ export class MapEditorSession {
       width,
       height,
       terrain: map.terrain,
+      elevation: map.elevation,
+      sun: map.sun,
       starts: (startPayload?.players || []).map((player) => ({ x: Number(player.startTileX), y: Number(player.startTileY) })),
       baseSites: [],
       doodads: map.doodads,
@@ -147,6 +155,8 @@ export class MapEditorSession {
       width: data.width ?? data.size,
       height: data.height ?? data.size,
       terrain: data.terrain,
+      elevation: data.elevation,
+      sun: data.sun,
       starts: data.starts,
       baseSites: data.baseSites || data.expansionSites,
       doodads: data.doodads,
@@ -377,6 +387,60 @@ export class MapEditorSession {
     return true;
   }
 
+  beginElevationStroke(label = "Painted elevation") {
+    if (!this.draft || this.elevationStroke) return false;
+    this.elevationStroke = { label, before: clone(this.draft), dirty: new Map() };
+    return true;
+  }
+
+  paintElevationTiles(tiles, elevationLevel) {
+    if (!this.draft || !this.elevationStroke || !Array.isArray(tiles)) return [];
+    const level = Math.max(0, Math.min(9, Math.trunc(Number(elevationLevel)) || 0));
+    const width = this.draft.width;
+    const height = this.draft.height;
+    if (!this.draft.elevation.length && level === 0) return [];
+    if (!this.draft.elevation.length) this.draft.elevation = Array.from({ length: height }, () => "0".repeat(width));
+    const byRow = new Map();
+    const changed = [];
+    for (const candidate of tiles) {
+      const x = Math.trunc(Number(candidate?.x));
+      const y = Math.trunc(Number(candidate?.y));
+      if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= width || y >= height) continue;
+      const row = byRow.get(y) || [...this.draft.elevation[y]];
+      if (Number(row[x]) === level) continue;
+      row[x] = String(level);
+      byRow.set(y, row);
+      const change = { x, y, level };
+      changed.push(change);
+      this.elevationStroke.dirty.set(`${x},${y}`, change);
+    }
+    for (const [y, row] of byRow) this.draft.elevation[y] = row.join("");
+    if (changed.length && !this.draft.sun) this.draft.sun = { ...MAP_EDITOR_DEFAULT_SUN };
+    return changed;
+  }
+
+  commitElevationStroke() {
+    const stroke = this.elevationStroke;
+    this.elevationStroke = null;
+    if (!stroke || stroke.dirty.size === 0) return false;
+    normalizeDraft(this.draft);
+    this.undoStack.push(stroke.before);
+    if (this.undoStack.length > this.historyLimit) this.undoStack.shift();
+    this.redoStack = [];
+    this.lastAction = stroke.label;
+    this.notify("elevationStroke", { dirtyTiles: [...stroke.dirty.values()] });
+    return true;
+  }
+
+  cancelElevationStroke() {
+    const stroke = this.elevationStroke;
+    this.elevationStroke = null;
+    if (!stroke) return false;
+    this.draft = stroke.before;
+    this.notify("changed");
+    return true;
+  }
+
   beginOverlayStroke(label = "Painted map overlay") {
     if (!this.draft || this.overlayStroke) return false;
     this.overlayStroke = { label, before: clone(this.draft), dirty: new Map(), strippedForestDoodads: false };
@@ -529,6 +593,10 @@ export class MapEditorSession {
       width: draft.width,
       height: draft.height,
       terrain: draft.terrain.flatMap((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch])),
+      elevation: draft.elevation?.length
+        ? draft.elevation.flatMap((row) => [...row].map(Number))
+        : new Array(draft.width * draft.height).fill(0),
+      sun: draft.sun ? { ...draft.sun } : null,
       starts: draft.startLocations.map(copyLocation),
       baseSites: draft.baseSites.map(copyBaseSite),
       doodads: draft.doodads.map(copyDoodad),
@@ -545,6 +613,10 @@ export class MapEditorSession {
     if (!this.draft) throw new Error("Map is not initialized.");
     const draft = clone(this.draft);
     normalizeDraft(draft);
+    // Keep legacy flat authored maps byte-shape compatible. Elevation stays optional, while a sun
+    // record independently opts any map into directional lighting and atmosphere.
+    if (!draft.elevation.length) delete draft.elevation;
+    if (!draft.sun) delete draft.sun;
     return draft;
   }
 
@@ -727,6 +799,8 @@ export function authoredMapFromMaterialized({
   width = size,
   height = size,
   terrain,
+  elevation = [],
+  sun = null,
   starts,
   baseSites,
   doodads = [],
@@ -743,6 +817,14 @@ export function authoredMapFromMaterialized({
   const terrainRows = Array.from({ length: mapHeight }, (_, y) => (
     Array.from({ length: mapWidth }, (_, x) => TERRAIN_TO_CHAR[codes[y * mapWidth + x]] || ".").join("")
   ));
+  const elevationCodes = Array.from(elevation || [], (level) => Number(level));
+  const validElevation = elevationCodes.length === mapWidth * mapHeight
+    && elevationCodes.every((level) => Number.isInteger(level) && level >= 0 && level <= 9);
+  const elevationRows = validElevation && elevationCodes.some((level) => level !== 0)
+    ? Array.from({ length: mapHeight }, (_, y) => (
+      elevationCodes.slice(y * mapWidth, (y + 1) * mapWidth).join("")
+    ))
+    : [];
   const dimensions = { width: mapWidth, height: mapHeight };
   const startLocations = normalizeLocations(starts, dimensions);
   const bases = normalizeBaseSiteRecords(baseSites, dimensions);
@@ -755,6 +837,8 @@ export function authoredMapFromMaterialized({
     width: mapWidth,
     height: mapHeight,
     terrain: terrainRows,
+    elevation: elevationRows,
+    sun: sun ? { ...sun } : null,
     startLocations,
     baseSites: bases,
     doodads: normalizeDraftDoodads(doodads, dimensions),
@@ -776,6 +860,8 @@ export function authoredMapFromMaterialized({
 export function materializedMapsEqual(left, right) {
   if (!left || !right || left.name !== right.name || left.width !== right.width || left.height !== right.height) return false;
   if (!sameFlatArray(left.terrain, right.terrain)) return false;
+  if (!sameFlatArray(left.elevation || [], right.elevation || [])) return false;
+  if (JSON.stringify(left.sun || null) !== JSON.stringify(right.sun || null)) return false;
   return sameLocationSet(left.starts, right.starts)
     && sameBaseSiteSet(left.baseSites, right.baseSites)
     && sameDoodadSet(left.doodads, right.doodads)
@@ -815,6 +901,17 @@ function normalizeDraft(draft) {
   draft.description = String(draft.description || "");
   draft._design = String(draft._design || "Flat map locations.");
   draft.terrain = draft.terrain.map((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch] === undefined ? "." : ch).join(""));
+  if (draft.elevation == null) draft.elevation = [];
+  if (!Array.isArray(draft.elevation)
+    || (draft.elevation.length !== 0 && (draft.elevation.length !== height
+      || draft.elevation.some((row) => typeof row !== "string" || !/^[0-9]+$/.test(row) || [...row].length !== width)))) {
+    throw new Error("Map elevation rows must be empty or match its width and height using digits 0-9.");
+  }
+  const elevationValues = draft.elevation.flatMap((row) => [...row]);
+  const hasRelief = elevationValues.length > 0
+    && elevationValues.some((level) => level !== elevationValues[0]);
+  if (hasRelief && !draft.sun) throw new Error("Maps with varying elevation must specify sun conditions.");
+  draft.sun = normalizeMapSun(draft.sun);
   const dimensions = { width, height };
   draft.width = width;
   draft.height = height;
@@ -836,6 +933,9 @@ function resizeDraftCentered(source, width, height) {
   const offsetX = Math.floor((width - current.width) / 2);
   const offsetY = Math.floor((height - current.height) / 2);
   const terrain = Array.from({ length: height }, () => Array(width).fill(TERRAIN_TO_CHAR[TERRAIN.GRASS]));
+  const elevation = source.elevation?.length
+    ? Array.from({ length: height }, () => Array(width).fill("0"))
+    : null;
   for (let y = 0; y < current.height; y++) {
     const targetY = y + offsetY;
     if (targetY < 0 || targetY >= height) continue;
@@ -843,6 +943,7 @@ function resizeDraftCentered(source, width, height) {
     for (let x = 0; x < current.width; x++) {
       const targetX = x + offsetX;
       if (targetX >= 0 && targetX < width) terrain[targetY][targetX] = row[x];
+      if (elevation && targetX >= 0 && targetX < width) elevation[targetY][targetX] = source.elevation[y][x];
     }
   }
   const shift = (location) => ({ ...location, x: location.x + offsetX, y: location.y + offsetY });
@@ -863,6 +964,7 @@ function resizeDraftCentered(source, width, height) {
     width,
     height,
     terrain: terrain.map((row) => row.join("")),
+    elevation: elevation ? elevation.map((row) => row.join("")) : [],
     startLocations,
     baseSites,
     doodads,
@@ -1082,6 +1184,20 @@ function sameDoodadSet(left, right) {
   return a.size === b.size && [...a].every((key) => b.has(key));
 }
 function sameFlatArray(left, right) { return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((value, index) => value === right[index]); }
+function normalizeMapSun(value) {
+  if (value == null) return null;
+  const sun = {
+    azimuthDegrees: Number(value.azimuthDegrees),
+    elevationDegrees: Number(value.elevationDegrees),
+    warmth: Number(value.warmth),
+  };
+  if (!Number.isInteger(sun.azimuthDegrees) || sun.azimuthDegrees < 0 || sun.azimuthDegrees > 359
+    || !Number.isInteger(sun.elevationDegrees) || sun.elevationDegrees < 1 || sun.elevationDegrees > 89
+    || !Number.isInteger(sun.warmth) || sun.warmth < 0 || sun.warmth > 100) {
+    throw new Error("Map sun conditions require azimuth 0-359, elevation 1-89, and warmth 0-100.");
+  }
+  return sun;
+}
 function draftFingerprint(draft) { return JSON.stringify(draft); }
 function clone(value) { return structuredCloneSafe(value); }
 function structuredCloneSafe(value) { return typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value)); }

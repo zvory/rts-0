@@ -12,7 +12,7 @@ use super::{
     BASE_PROTECTION_RADIUS_TILES, BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
-use rts_protocol::{MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
+use rts_protocol::{MapSun, MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
 
 /// Bound authored locations before any game entities are allocated from them. The game currently
 /// supports four active players, while a map can contain many more permanent resource bases.
@@ -75,6 +75,8 @@ pub(super) fn load_for_players(
         width: materialized.width,
         height: materialized.height,
         terrain: materialized.terrain,
+        elevation: materialized.elevation,
+        sun: materialized.sun,
         starts,
         base_sites: materialized.base_sites,
         base_resource_counts: materialized.base_resource_counts,
@@ -103,6 +105,8 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
             "map width/height must match the {width}x{height} terrain grid"
         ));
     }
+    let elevation = parse_elevation(&authored.elevation, width, height)?;
+    super::validate_elevation_sun(&elevation, authored.sun)?;
     let start_locations =
         parse_locations(width, height, &authored.start_locations, "startLocations")?;
     let base_sites = parse_base_sites(width, height, &authored.base_sites)?;
@@ -190,6 +194,8 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         width,
         height,
         terrain,
+        elevation,
+        sun: authored.sun,
         starts: start_locations,
         base_sites: base_locations,
         base_resource_counts,
@@ -216,6 +222,10 @@ struct AuthoredMap {
     #[serde(rename = "_design")]
     design: String,
     terrain: Vec<String>,
+    #[serde(default)]
+    elevation: Vec<String>,
+    #[serde(default)]
+    sun: Option<MapSun>,
     start_locations: Vec<AuthoredLocation>,
     base_sites: Vec<AuthoredBaseSite>,
     #[serde(default)]
@@ -300,6 +310,41 @@ fn parse_terrain(rows: &[String]) -> Result<(u32, u32, Vec<u8>), String> {
     }
 
     Ok((width_u32, height_u32, out))
+}
+
+fn parse_elevation(rows: &[String], width: u32, height: u32) -> Result<Vec<u8>, String> {
+    let tile_count = (width as usize)
+        .checked_mul(height as usize)
+        .ok_or_else(|| {
+            "elevation width multiplied by height overflows addressable memory".to_string()
+        })?;
+    if rows.is_empty() {
+        return Ok(vec![0; tile_count]);
+    }
+    if rows.len() != height as usize {
+        return Err(format!(
+            "elevation has {} rows; expected {height}",
+            rows.len()
+        ));
+    }
+
+    let mut out = Vec::with_capacity(tile_count);
+    for (y, row) in rows.iter().enumerate() {
+        let row_width = row.chars().count();
+        if row_width != width as usize {
+            return Err(format!(
+                "elevation row {y} has width {row_width}; expected {width}"
+            ));
+        }
+        for (x, ch) in row.chars().enumerate() {
+            let level = ch
+                .to_digit(10)
+                .ok_or_else(|| format!("unknown elevation character '{ch}' at tile ({x},{y})"))?
+                as u8;
+            out.push(level);
+        }
+    }
+    Ok(out)
 }
 
 fn parse_locations(

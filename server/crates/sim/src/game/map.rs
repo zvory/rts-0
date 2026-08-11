@@ -24,7 +24,7 @@ mod team_assignment_tests;
 use crate::rules::terrain as terrain_rules;
 use crate::{
     config,
-    protocol::{terrain, MapDoodad, MapTile},
+    protocol::{terrain, MapDoodad, MapSun, MapTile},
 };
 use serde::{Deserialize, Serialize};
 
@@ -63,6 +63,11 @@ pub struct Map {
     pub height: u32,
     /// Row-major terrain codes, length `width * height`.
     pub terrain: Vec<u8>,
+    /// Row-major authoritative static elevation levels, length `width * height`.
+    /// No gameplay rule consumes these levels yet.
+    pub elevation: Vec<u8>,
+    /// Optional authored presentation conditions for elevated-terrain lighting.
+    pub sun: Option<MapSun>,
     /// One start tile `(tile_x, tile_y)` per player, in player-index order.
     pub starts: Vec<(u32, u32)>,
     /// Every authored base location. These always receive resource clusters; selected starts
@@ -84,6 +89,28 @@ pub struct Map {
     pub damage_reduction_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing occupant movement speed by 25%.
     pub slow_movement_tiles: Vec<(u32, u32)>,
+}
+
+pub(crate) fn validate_elevation_sun(elevation: &[u8], sun: Option<MapSun>) -> Result<(), String> {
+    let has_relief = elevation
+        .first()
+        .is_some_and(|first| elevation.iter().any(|level| level != first));
+    match (sun, has_relief) {
+        (None, false) => Ok(()),
+        (None, true) => Err("maps with varying elevation must specify sun conditions".to_string()),
+        (Some(sun), _) => {
+            if sun.azimuth_degrees > 359 {
+                return Err("sun.azimuthDegrees must be between 0 and 359".to_string());
+            }
+            if !(1..=89).contains(&sun.elevation_degrees) {
+                return Err("sun.elevationDegrees must be between 1 and 89".to_string());
+            }
+            if sun.warmth > 100 {
+                return Err("sun.warmth must be between 0 and 100".to_string());
+            }
+            Ok(())
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -193,6 +220,16 @@ impl Map {
         hash = fnv_bytes(hash, &self.width.to_le_bytes());
         hash = fnv_bytes(hash, &self.height.to_le_bytes());
         hash = fnv_bytes(hash, &self.terrain);
+        // Preserve the identity of pre-elevation flat-map checkpoints. Their missing elevation
+        // field is restored as zeroes, and no presentation semantics changed. Authored relief is
+        // always paired with sun conditions and remains identity-bearing.
+        if let Some(sun) = self.sun {
+            hash = fnv_bytes(hash, b"elevation");
+            hash = fnv_bytes(hash, &self.elevation);
+            hash = fnv_bytes(hash, b"sun");
+            hash = fnv_bytes(hash, &sun.azimuth_degrees.to_le_bytes());
+            hash = fnv_bytes(hash, &[sun.elevation_degrees, sun.warmth]);
+        }
         hash = fnv_usize(hash, self.starts.len());
         for &(x, y) in &self.starts {
             hash = fnv_bytes(hash, &x.to_le_bytes());
@@ -523,8 +560,8 @@ mod tests {
     mod base_limits;
     mod crossroads;
     mod doodads;
+    mod elevation;
     mod four_player;
-    mod kreuzung;
     mod open_basin;
     mod overlays;
     mod schone_tage;
@@ -537,6 +574,9 @@ mod tests {
             assert_eq!(map.width, 126);
             assert_eq!(map.height, 126);
             assert_eq!(map.terrain.len(), (map.width * map.height) as usize);
+            assert_eq!(map.elevation.len(), map.terrain.len());
+            assert!(map.elevation.iter().all(|height| *height == 0));
+            assert_eq!(map.sun, None);
             assert_eq!(map.starts.len(), player_count);
             assert!(!map.base_sites.is_empty());
 

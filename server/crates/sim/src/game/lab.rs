@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
+use super::{systems, Game, MapMetadata, PlayerInit};
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
 use crate::game::map::{Map, CURRENT_MAP_VERSION};
@@ -12,8 +13,6 @@ use crate::game::services::{production, standability};
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol::{terrain, Command, LabMapDraft};
 use crate::rules;
-
-use super::{systems, Game, MapMetadata, PlayerInit};
 
 mod checkpoint_scenario;
 mod map_draft;
@@ -517,6 +516,7 @@ impl Game {
                 reason: "terrain contains an unknown code".to_string(),
             });
         }
+        let elevation = map_draft::normalized_elevation(&draft, name, tile_count)?;
         let players = self.player_inits();
         if draft.starts.len() != players.len() {
             return Err(LabError::InvalidMap {
@@ -573,6 +573,8 @@ impl Game {
             width: draft.width,
             height: draft.height,
             terrain: draft.terrain,
+            elevation,
+            sun: draft.sun,
             starts,
             base_sites,
             base_resource_counts,

@@ -21,6 +21,12 @@ const u32le = (value) => {
   return buffer;
 };
 
+const u16le = (value) => {
+  const buffer = Buffer.alloc(2);
+  buffer.writeUInt16LE(value);
+  return buffer;
+};
+
 const usizeLe = (value) => {
   const buffer = Buffer.alloc(8);
   buffer.writeBigUInt64LE(BigInt(value));
@@ -31,6 +37,13 @@ const materializedHash = (data) => fnv1a64([
   u32le(data.width),
   u32le(data.height),
   Buffer.from(data.terrain),
+  ...(data.sun ? [
+    Buffer.from("elevation"),
+    Buffer.from(data.elevation),
+    Buffer.from("sun"),
+    u16le(data.sun.azimuthDegrees),
+    Buffer.from([data.sun.elevationDegrees, data.sun.warmth]),
+  ] : []),
   usizeLe(data.starts.length),
   ...data.starts.flatMap(({ x, y }) => [u32le(x), u32le(y)]),
   usizeLe(data.baseSites.length),
@@ -48,7 +61,7 @@ const bundledMapContracts = new Map([
   ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "b59f1702ca3bd0fb"]],
   ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "aba66d9bf954174f"]],
   ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "37a3b26a9765b6f6"]],
-  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "f2d57ce723a85120"]],
+  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "d1f0a1f85da12e28"]],
 ]);
 
 for (const fileName of fs.readdirSync(new URL("server/assets/maps/", repoRoot)).filter((name) => name.endsWith(".json"))) {
@@ -64,9 +77,9 @@ for (const fileName of fs.readdirSync(new URL("server/assets/maps/", repoRoot)).
     }
   }
   assert.deepEqual(
-    map.noEntrenchmentTiles,
+    [...map.noEntrenchmentTiles].sort((left, right) => left.y - right.y || left.x - right.x),
     expectedNoEntrenchment,
-    `${fileName} marks every road tile and only road tiles as no-entrenchment`,
+    `${fileName} marks every road tile and only road tiles as no-entrenchment regardless of serialization order`,
   );
 }
 
@@ -97,7 +110,7 @@ for (const [fileName, [width, height, contentDigest, authoredHash]] of bundledMa
 const bundledScenarioContracts = new Map([
   ["lategame.json", [9, "62f5e3ae24627171", "7918f89f6178e9c9"]],
   ["render-preview.json", [7, "9e6169128d81ed61", "f82d4bf8967c50c9"]],
-  ["fixed-roster-hellhole.json", [7, "4638fcdac85871c7", "b8b0dd056c34c92d"]],
+  ["fixed-roster-hellhole.json", [10, "37a3b26a9765b6f6", "dcca1927f8cc94ad"]],
   ["tank-trap-cluster-clear.json", [7, "9e6169128d81ed61", "7918f89f6178e9c9"]],
 ]);
 

@@ -9,8 +9,10 @@ import {
   createFrameMessages,
   createInitializeMessage,
   createMapGenerationMessage,
+  createPresentationPreferencesMessage,
   createRenderWorkerWireState,
   createResetGroundDecalsMessage,
+  createResetDiagnosticsMessage,
   createResetGenerationMessage,
   createResizeMessage,
   RENDER_WORKER_MESSAGE,
@@ -20,7 +22,15 @@ import {
   validateRenderWorkerResponse,
 } from "../../client/src/renderer/worker_messages.js";
 
-const map = { width: 2, height: 2, tileSize: 32, terrain: [0, 1, 2, 3], resources: [] };
+const map = {
+  width: 2,
+  height: 2,
+  tileSize: 32,
+  terrain: [0, 1, 2, 3],
+  elevation: [0, 2, 4, 1],
+  sun: { azimuthDegrees: 315, elevationDegrees: 12, warmth: 75 },
+  resources: [],
+};
 const camera = new Camera(640, 480);
 camera.setBounds(64, 64, 640, 480);
 const assembler = new PresentationFrameAssembler({ map });
@@ -55,20 +65,37 @@ assert(structuredClone(representative).layers.aboveFogReveal.length === 1,
   "representative presentation frame is structurally cloneable without losing visibility layers");
 
 const canvas = { transferMarker: true };
-const init = createInitializeMessage({ canvas, widthCssPx: 640, heightCssPx: 480, dpr: 2, configuration: { nearest: true } });
+const init = createInitializeMessage({
+  canvas,
+  widthCssPx: 640,
+  heightCssPx: 480,
+  dpr: 2,
+  configuration: {
+    nearest: true,
+    gpuShadowTiming: true,
+    gpuCompletePresentations: true,
+    castShadowsEnabled: false,
+  },
+});
 assert(init.message.version === RENDER_WORKER_MESSAGE_VERSION && init.message.type === RENDER_WORKER_MESSAGE.INITIALIZE,
   "initialization carries message and presentation versions");
 assert(init.transfer.length === 1 && init.transfer[0] === canvas,
   "initialization transfers the sole visible canvas instead of cloning or constructing a hidden renderer");
 validateRenderWorkerRequest(init, { requireCanvas: true });
+assert(init.message.payload.configuration.gpuCompletePresentations === true
+    && init.message.payload.configuration.castShadowsEnabled === false,
+  "uncapped GPU completion and exact no-cast-shadow controls cross the worker initialization boundary");
 
 const mapMessage = createMapGenerationMessage(assembler.staticMap);
-assert(mapMessage.transfer.length === 1 && mapMessage.message.payload.map.terrain.values !== assembler.staticMap.terrain.values,
-  "map-generation terrain owns a detached transferable copy");
+assert(mapMessage.transfer.length === 2 && mapMessage.message.payload.map.terrain.values !== assembler.staticMap.terrain.values,
+  "map-generation terrain and elevation own detached transferable copies");
 const mapClone = structuredClone(mapMessage.message, { transfer: [...mapMessage.transfer] });
-assert(mapMessage.transfer[0].byteLength === 0 && mapClone.payload.map.terrain.values.length === 4,
+assert(mapMessage.transfer.every((buffer) => buffer.byteLength === 0)
+  && mapClone.payload.map.terrain.values.length === 4
+  && mapClone.payload.map.elevation.values.length === 4,
   "map-generation transferable moves without detaching the assembler static map");
 assert(assembler.staticMap.terrain.values.length === 4, "map serialization never mutates its source snapshot");
+assert(mapClone.payload.map.sun.warmth === 75, "map generation preserves authored sun conditions");
 
 const state = createRenderWorkerWireState();
 const firstMessages = createFrameMessages(representative, state);
@@ -90,22 +117,37 @@ assert(createDurableDecalMessage(representative).message.payload.revision === 9,
   "durable decal retention can be sent independently of a supersedable dynamic frame");
 assert(createDurableDecalMessage(representative, 3).message.payload.decalEpoch === 3,
   "durable decal retention is correlated to the current decal-only reset epoch");
-const editor = createEditorFrameMessage({ version: 2, frameId: 3, terrainUpdate: null, overlay: {} }, 2);
+const editor = createEditorFrameMessage({ version: 3, frameId: 3, terrainUpdate: null, overlay: {} }, 2);
 assert(editor.message.type === RENDER_WORKER_MESSAGE.FRAME && editor.message.payload.editor.frameId === 3,
   "Map Editor records use the same worker frame route and remain detached cloneable data");
 
 for (const control of [
   createResizeMessage({ generation: 1, frameId: 1, widthCssPx: 800, heightCssPx: 600, dpr: 2 }),
   createCaptureMessage({ generation: 1, frameId: 1, captureId: 4, readPixels: true }),
+  createPresentationPreferencesMessage(1, { projectedUnitShadowsEnabled: true }),
   createResetGroundDecalsMessage(1, 3),
+  createResetDiagnosticsMessage(1),
   createResetGenerationMessage(2),
   createDestroyMessage(2),
 ]) validateRenderWorkerRequest(control);
+
+const preferences = createPresentationPreferencesMessage(1, {
+  projectedUnitShadowsEnabled: true,
+});
+assert(preferences.message.type === RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES
+  && preferences.message.payload.projectedUnitShadowsEnabled === true,
+"worker presentation preferences carry the projected-shadow toggle as a bounded boolean");
 
 for (const response of [
   { version: 1, type: RENDER_WORKER_RESPONSE.READY, generation: 1, payload: { assets: { ready: true } } },
   { version: 1, type: RENDER_WORKER_RESPONSE.RETAINED, generation: 1, payload: { revision: 9 } },
   { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: { frameId: 1, workerUpdateMs: 2, workerPresentMs: 1 } },
+  { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: {
+    frameId: 1, workerUpdateMs: 2, workerPresentMs: 1,
+    gpuShadowTiming: { supported: true, pending: 1, dropped: 0, disjoint: 0, groups: [
+      { label: "renderer.unitShadows.mask", samples: 3, avgMs: 0.2, p50Ms: 0.2, p95Ms: 0.3, maxMs: 0.3 },
+    ], staticTerrain: { buildCount: 1, lifetimeBuildCount: 1, buildMs: 4.2, width: 504, height: 504, samplesPerTile: 4 } },
+  } },
   { version: 1, type: RENDER_WORKER_RESPONSE.PRESENTED, generation: 1, payload: {
     frameId: 1, captureId: 4, workerUpdateMs: 0, workerPresentMs: 0, rgba: new ArrayBuffer(4), width: 1, height: 1,
   } },
@@ -128,6 +170,12 @@ assertThrows(() => validateRenderWorkerResponse({
     frameId: 1, workerUpdateMs: 0, workerPresentMs: 0, rgba: new ArrayBuffer(3), width: 1, height: 1,
   },
 }), "wire rejects framebuffer captures whose decoded RGBA length does not match their dimensions");
+assertThrows(() => validateRenderWorkerResponse({
+  version: 1, type: "presented", generation: 1, payload: {
+    frameId: 1, workerUpdateMs: 0, workerPresentMs: 0,
+    gpuShadowTiming: { supported: true, pending: 0, dropped: 0, disjoint: 0, groups: new Array(9).fill({}) },
+  },
+}), "wire bounds worker GPU timing groups");
 
 function assertThrows(fn, message) {
   let threw = false;

@@ -14,6 +14,7 @@ use crate::live::{
     DEFAULT_LIVE_PROFILE_ID,
 };
 use rts_sim::game::entity::EntityKind;
+use rts_sim::game::map::Map;
 use rts_sim::game::replay::{
     replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayOutcome,
     ReplayStartComposition,
@@ -90,11 +91,13 @@ pub struct ProfileMatchupOptions {
     pub verify_replay: bool,
     pub save_replay_name: Option<String>,
     pub replay_dir: Option<PathBuf>,
+    pub map_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfileMatchupResult {
+    pub map_name: String,
     pub profile_a: String,
     pub profile_b: String,
     pub seed: u32,
@@ -363,7 +366,19 @@ pub fn run_profile_matchup_result(
             is_ai: true,
         },
     ];
-    let mut game = Game::new_without_ai_controllers(&players, options.seed);
+    let map_name = options.map_name.unwrap_or_else(|| "Chokes".to_string());
+    let player_slots: Vec<(u32, u32)> = players
+        .iter()
+        .map(|player| (player.id, player.team_id))
+        .collect();
+    let map = Map::load_for_players(&map_name, &player_slots, options.seed)?;
+    let map_metadata = Map::metadata_for_name(&map_name)?;
+    let mut game = Game::new_with_random_ai_profiles_and_map_metadata(
+        &players,
+        options.seed,
+        map,
+        map_metadata,
+    );
     let replay_start = ReplayStartComposition::capture(&game, server_build_sha())?;
     let start = game.start_payload();
     let mut objective = StartingResourceDepotObjective::capture(&game, &start, &players)?;
@@ -527,6 +542,7 @@ pub fn run_profile_matchup_result(
         .collect();
 
     Ok(ProfileMatchupResult {
+        map_name,
         profile_a: profile_a.id.to_string(),
         profile_b: profile_b.id.to_string(),
         seed: options.seed,
@@ -1131,6 +1147,7 @@ mod tests {
             verify_replay: false,
             save_replay_name: None,
             replay_dir: None,
+            map_name: None,
         })
         .expect("short profile matchup should run");
 

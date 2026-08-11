@@ -26,6 +26,7 @@ export function createMatchTabMenu(match, rootEl) {
     hotkeyProfiles: match.hotkeyProfiles,
     state: match.state,
     commandInteraction: match.commandInteraction,
+    unitIconMarkupForKind: match.rendererBackendBundle.unitIconMarkupForKind,
     enabled: () => match.running !== false,
     onOpenChange: (open) => match.handleInteractiveMenuStateChange(open),
   });

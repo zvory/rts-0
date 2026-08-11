@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
@@ -16,14 +14,13 @@ use crate::game::services::standability as static_standability;
 use crate::game::services::standability::unit_static_segment_standable;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
-use crate::protocol::Event;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
 
 use super::car_drive::plan_scout_car_motion;
 use super::pivot_drive::{
     angle_delta, close_nudge_hull_axis_motion, distance_between, normalize_angle,
     pivot_drive_intent, pivot_drive_speed_scale, rotate_toward, vehicle_body_turn_rate,
-    vehicle_oil_starves_movement, vehicle_traffic_adjustment,
+    vehicle_traffic_adjustment,
 };
 use super::standability::{
     footing_profile, requires_weapon_setup, unit_static_standable, FootingProfile,
@@ -50,11 +47,10 @@ fn panzerfaust_movement_locked(e: &Entity) -> bool {
 pub(super) fn advance_moving_units(
     map: &Map,
     entities: &mut EntityStore,
-    players: &mut [PlayerState],
+    players: &[PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
-    events: &mut HashMap<u32, Vec<Event>>,
     ability_runtime: &AbilityRuntime,
 ) {
     for id in entities.ids() {
@@ -141,19 +137,6 @@ pub(super) fn advance_moving_units(
         let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
         let is_pivot_vehicle = uses_pivot_vehicle_movement(kind);
         let is_car = uses_car_movement_semantics(kind);
-        let vehicle_oil_cost_per_px = match kind {
-            EntityKind::Tank => Some(config::TANK_OIL_COST_PER_PX),
-            EntityKind::ScoutCar | EntityKind::CommandCar => {
-                Some(config::SCOUT_CAR_OIL_COST_PER_PX)
-            }
-            _ => None,
-        };
-        // Oil-starved vehicles pause before retrying instead of lurching on sparse income ticks.
-        if vehicle_oil_cost_per_px.is_some()
-            && vehicle_oil_starves_movement(entities, players, events, id)
-        {
-            continue;
-        }
         let orig_x = x;
         let orig_y = y;
         let mut budget = speed;
@@ -625,41 +608,6 @@ pub(super) fn advance_moving_units(
                         .unwrap_or(1);
                     if far_from_goal && sidestep_cooldown == 0 {
                         inject_sidestep(e, id, x, y, map, occ, repulsion_dir, tick);
-                    }
-                }
-            }
-        }
-
-        // Experimental vehicle fuel: charge oil for the distance actually moved this tick.
-        if let Some(oil_cost_per_px) = vehicle_oil_cost_per_px {
-            let (final_x, final_y, owner) = match entities.get(id) {
-                Some(e) => (e.pos_x, e.pos_y, e.owner),
-                None => continue,
-            };
-            let dx = final_x - orig_x;
-            let dy = final_y - orig_y;
-            let dist = (dx * dx + dy * dy).sqrt();
-            if dist > 0.0 {
-                let cost = dist * oil_cost_per_px;
-                if let Some(e) = entities.get_mut(id) {
-                    if let Some(m) = e.movement.as_mut() {
-                        m.lifetime_oil_used += cost;
-                        m.oil_debt += cost;
-                        if m.oil_debt >= 1.0 {
-                            let whole = m.oil_debt.floor() as u32;
-                            m.oil_debt -= whole as f32;
-                            if let Some(p) = players.iter_mut().find(|p| p.id == owner) {
-                                let charged = whole.min(p.oil);
-                                p.spend_resources(0, charged);
-                                // If we couldn't pay full amount, drop the unpaid remainder
-                                // so debt does not accumulate while the player has no oil.
-                                if charged < whole {
-                                    m.oil_debt = 0.0;
-                                }
-                            } else {
-                                m.oil_debt = 0.0;
-                            }
-                        }
                     }
                 }
             }

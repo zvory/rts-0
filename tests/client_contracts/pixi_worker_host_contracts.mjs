@@ -12,8 +12,12 @@ const priorControl = globalThis.__rtsRenderWorkerControl;
 globalThis.requestAnimationFrame = (callback) => { callback(10); return 1; };
 
 async function queueAndLifecycleContracts() {
-  const fixture = createFixture();
+  const fixture = createFixture({ gpuShadowTiming: true });
   const { adapter, worker, canvas, root, assembler } = fixture;
+  adapter.setProjectedUnitShadowsEnabled(true);
+  assert(worker.messages.at(-1).type === "presentationPreferences"
+    && worker.messages.at(-1).payload.projectedUnitShadowsEnabled === true,
+  "projected unit-shadow preference crosses the worker control boundary immediately");
   const frame1 = assemble(assembler, 1);
   const frame2 = assemble(assembler, 2);
   const frame3 = assemble(assembler, 3);
@@ -31,7 +35,11 @@ async function queueAndLifecycleContracts() {
   assert(!worker.messages.some((message) => message.type === "resize"),
     "resize waits behind the in-flight frame so it cannot clear a frame before its acknowledgment commits");
 
-  worker.present(frame1);
+  worker.present(frame1, { gpuShadowTiming: {
+    supported: true, pending: 1, dropped: 0, disjoint: 0,
+    groups: [{ label: "renderer.unitShadows.mask", samples: 2, avgMs: 0.2, p50Ms: 0.2, p95Ms: 0.3, maxMs: 0.3 }],
+    staticTerrain: { buildCount: 1, lifetimeBuildCount: 1, buildMs: 3.5, width: 504, height: 504, samplesPerTile: 4 },
+  } });
   assert((await first.settled).status === PRESENTATION_OUTCOME.PRESENTED,
     "the exact in-flight frame id settles as presented");
   assert(worker.messages.at(-1).type === "resize", "deferred resize follows the in-flight acknowledgment");
@@ -57,6 +65,13 @@ async function queueAndLifecycleContracts() {
     "worker diagnostics count transferable bytes before postMessage detaches their buffers");
   assert(adapter.diagnostics().displayAgeMs.samples === 2 && adapter.diagnostics().queueAgeMs.samples === 2,
     "worker diagnostics retain queue and compositor-observed display ages");
+  assert(adapter.diagnostics().gpuShadowTiming?.groups?.[0]?.label === "renderer.unitShadows.mask",
+    "opt-in worker GPU timing reaches the public diagnostic snapshot");
+  assert(adapter.diagnostics().gpuShadowTiming?.staticTerrain?.buildCount === 1,
+    "worker diagnostics prove static terrain visibility built once for the current map");
+  adapter._control.reset();
+  assert(worker.messages.at(-1).type === "resetDiagnostics",
+    "host diagnostic reset also resets bounded worker GPU queries");
 
   adapter.enterFixedCapture();
   const frame5 = assemble(assembler, 5);
@@ -242,7 +257,7 @@ async function editorFatalContracts() {
   const fixture = createFixture({ surface: "mapEditor" });
   const { adapter } = fixture;
   const record = (frameId) => ({
-    version: 2,
+    version: 3,
     generation: 1,
     frameId,
     camera: { x: 0, y: 0, zoom: 1 },
@@ -292,12 +307,56 @@ async function measurementBoundaryContracts() {
     assert(adapter.diagnostics().displayAgeMs.p95 >= 60,
       "display age includes host-pending and main-thread packet work instead of starting after cloning");
     adapter.destroy();
+
+    const boundaryFixture = createFixture({ gpuShadowTiming: true });
+    const boundaryFrame = assemble(boundaryFixture.assembler, 1);
+    const pendingBoundaryFrame = assemble(boundaryFixture.assembler, 2);
+    const carried = boundaryFixture.adapter.render(boundaryFrame);
+    const pendingCarried = boundaryFixture.adapter.render(pendingBoundaryFrame);
+    boundaryFixture.adapter._control.reset();
+    let boundaryStats = boundaryFixture.adapter.diagnostics();
+    assert(boundaryStats.submitted === 0 && boundaryStats.completed === 0
+      && boundaryStats.dispatched === 0 && boundaryStats.carriedInFlight === 2
+      && boundaryStats.clonedBytes === 0 && boundaryStats.mainSubmitMs.samples === 0,
+    "reset exposes in-flight and pending frames without charging their diagnostics to the new window");
+    boundaryFixture.worker.present(boundaryFrame);
+    await carried.settled;
+    boundaryStats = boundaryFixture.adapter.diagnostics();
+    assert(boundaryStats.completed === 0 && boundaryStats.submitted === 0
+      && boundaryStats.dispatched === 0 && boundaryStats.carriedCompleted === 1
+      && boundaryStats.carriedInFlight === 1 && boundaryStats.clonedBytes === 0
+      && boundaryStats.mainSubmitMs.samples === 0
+      && boundaryFixture.worker.frameMessages().at(-1).payload.frame.frameId === pendingBoundaryFrame.frameId,
+    "a pre-reset pending frame dispatches normally but remains outside new-window diagnostics");
+    boundaryFixture.worker.present(pendingBoundaryFrame);
+    await pendingCarried.settled;
+    boundaryStats = boundaryFixture.adapter.diagnostics();
+    assert(boundaryStats.completed === 0 && boundaryStats.submitted === 0
+      && boundaryStats.dispatched === 0 && boundaryStats.carriedCompleted === 2
+      && boundaryStats.carriedInFlight === 0 && boundaryStats.clonedBytes === 0
+      && boundaryStats.mainSubmitMs.samples === 0,
+    "both carried presentations settle without leaking throughput, cloning, or timing samples across reset");
+    const freshFrame = assemble(boundaryFixture.assembler, 3);
+    const messageCountBeforeFreshFrame = boundaryFixture.worker.messages.length;
+    const fresh = boundaryFixture.adapter.render(freshFrame);
+    const freshFrameMessages = boundaryFixture.worker.messages.slice(messageCountBeforeFreshFrame);
+    assert(freshFrameMessages[0]?.type === "resetDiagnostics"
+      && freshFrameMessages.at(-1)?.type === "frame",
+    "the first current-window frame resets GPU timing after every prior-window carried frame has settled");
+    boundaryFixture.worker.present(freshFrame);
+    await fresh.settled;
+    boundaryStats = boundaryFixture.adapter.diagnostics();
+    assert(boundaryStats.completed === 1 && boundaryStats.submitted === 1
+      && boundaryStats.dispatched === 1 && boundaryStats.clonedBytes > 0
+      && boundaryStats.mainSubmitMs.samples === 1,
+    "a new-window presentation contributes matching submission, dispatch, cloning, timing, and completion diagnostics");
+    boundaryFixture.adapter.destroy();
   } finally {
     globalThis.performance = savedPerformance;
   }
 }
 
-function createFixture({ surface = "match" } = {}) {
+function createFixture({ surface = "match", gpuShadowTiming = false } = {}) {
   const map = { width: 2, height: 2, tileSize: 32, terrain: [0, 1, 2, 3], resources: [] };
   const assembler = new PresentationFrameAssembler({ map });
   const worker = new FakeWorker();
@@ -328,7 +387,7 @@ function createFixture({ surface = "match" } = {}) {
     state: () => ({ resources: {}, _curById: new Map(), _prevById: new Map() }),
     staticMap: () => assembler.staticMap,
     renderIncident: (incident) => incidents.push(incident),
-  }, { surface });
+  }, { surface, gpuShadowTiming });
   return { adapter, worker, canvas, root, assembler, map, incidents };
 }
 

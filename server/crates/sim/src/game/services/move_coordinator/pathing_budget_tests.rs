@@ -173,3 +173,33 @@ fn footprint_retry_progress_is_independent_of_the_rebuildable_cache() {
         assert!(warm_attempt > initial_attempt);
     }
 }
+
+#[test]
+fn path_failed_is_set_on_unreachable_imported_goal() {
+    let map = Map::generate(1, 0x1234_5678);
+    let mut entities = EntityStore::new();
+    let start = map.tile_center(10, 10);
+    let unit_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    for tile in [(8, 10), (12, 10), (10, 8), (10, 12)] {
+        let center = map.tile_center(tile.0, tile.1);
+        entities
+            .spawn_building(1, EntityKind::Depot, center.0, center.1, true)
+            .expect("blocking depot should spawn");
+    }
+    let goal = map.tile_center(30, 30);
+    let unit = entities.get_mut(unit_id).expect("rifleman should remain");
+    unit.replace_active_order(Order::move_to(goal.0, goal.1));
+    unit.set_path_goal(Some(goal));
+    unit.mark_move_phase(MovePhase::AwaitingPath);
+
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(8_192, 256);
+    pathing.advance_tick(1);
+    MoveCoordinator::new(&mut pathing, &map, &occ, 1).process_awaiting_paths(&mut entities);
+
+    let unit = entities.get(unit_id).expect("rifleman should remain");
+    assert_eq!(unit.move_phase(), Some(MovePhase::PathFailed));
+    assert!(unit.path_is_empty());
+}

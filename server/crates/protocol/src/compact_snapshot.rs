@@ -713,9 +713,6 @@ impl Serialize for CompactEntity<'_> {
         if entity.rally.is_some() {
             len = 19;
         }
-        if entity.oil_used.is_some() {
-            len = 20;
-        }
         if entity.setup_facing.is_some() {
             len = 21;
         }
@@ -826,7 +823,7 @@ impl Serialize for CompactEntity<'_> {
             seq.serialize_element(&entity.rally)?;
         }
         if len > 19 {
-            seq.serialize_element(&entity.oil_used)?;
+            seq.serialize_element(&Option::<f32>::None)?;
         }
         if len > 20 {
             seq.serialize_element(&entity.setup_facing)?;

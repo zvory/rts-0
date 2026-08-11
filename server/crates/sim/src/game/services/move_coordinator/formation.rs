@@ -7,6 +7,7 @@ use crate::game::map::Map;
 use crate::protocol::TrenchView;
 
 mod goal_search;
+mod landing_patch;
 mod layout;
 mod polyline;
 mod reachability;
@@ -154,6 +155,14 @@ where
         occupied_trenches,
     };
     let desired_points = layout::compact_formation_points(map, units, goal);
+    let landing_patch = landing_patch::cohesive_landing_patch(
+        map,
+        occ,
+        units,
+        goal,
+        &desired_points,
+        &mut is_goal_reachable,
+    );
     let mut out = Vec::with_capacity(units.len());
     let mut assigned: Vec<FormationAssignment> = Vec::new();
 
@@ -161,7 +170,9 @@ where
         let anchor = map.tile_of(desired.0, desired.1);
         let context = inputs.with_assigned(&assigned);
         if let Some(formation_goal) =
-            assign_formation_goal(&context, unit, anchor, desired, &mut is_goal_reachable)
+            assign_formation_goal(&context, unit, anchor, desired, &mut |unit, tile| {
+                landing_patch.contains(tile) && is_goal_reachable(unit, tile)
+            })
         {
             assigned.push(FormationAssignment {
                 kind: unit.kind,

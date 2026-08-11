@@ -907,7 +907,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_code_field(16, "setupState", "setupState"),
             optional_field(17, "remaining"),
             optional_field(18, "rally"),
-            optional_field(19, "oilUsed"),
+            optional_field(19, "reservedMovementOil"),
             optional_field(20, "setupFacing"),
             optional_field(21, "orderPlan"),
             optional_field(22, "chargeCooldownLeft"),

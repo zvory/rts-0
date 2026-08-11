@@ -101,7 +101,12 @@ import {
   _drawTreeOccludedUnitOutlines,
 } from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
-import { buildStaticMap as buildStaticTerrainMap, previewStaticTerrain, updateStaticTerrainTiles } from "./terrain.js";
+import {
+  buildStaticMap as buildStaticTerrainMap,
+  previewStaticTerrain,
+  shouldBakeLongTerrainShadows,
+  updateStaticTerrainTiles,
+} from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
   _drawShotRevealUnit,
@@ -113,6 +118,8 @@ import {
   _sweepTankMotion,
   _tankMotionVisual,
 } from "./units.js";
+import { UnifiedGpuShadowLayer } from "./unified_gpu_shadows.js";
+import { AsyncGpuTimerQueries } from "./gpu_timer_queries.js";
 
 const RENDER_ERROR_LOG_INTERVAL_MS = 5000;
 const MISSING_TEXTURE_SIZE_PX = 26;
@@ -158,13 +165,27 @@ export class Renderer {
   /**
    * @param {HTMLElement} canvasParent element the Pixi canvas is appended to
    */
-  constructor(canvasParent, { renderClock = null, app = null } = {}) {
+  constructor(canvasParent, {
+    renderClock = null,
+    app = null,
+    gpuShadowTiming = false,
+    gpuCompletePresentations = false,
+    castShadowsEnabled = true,
+  } = {}) {
     this._parent = canvasParent;
     this._renderClock = renderClock;
 
     /** The PIXI.Application. Exposed for the render loop / ticker. */
     if (!app) throw new TypeError("Renderer.create() must initialize Pixi before construction.");
     this.app = app;
+    this._gpuShadowTimer = gpuShadowTiming === true
+      ? new AsyncGpuTimerQueries(this.app.renderer.gl, { maxPending: 8, maxSamples: 128 })
+      : null;
+    this._gpuCompletePresentations = gpuCompletePresentations === true;
+    if (this._gpuCompletePresentations && typeof this.app.renderer.gl?.finish !== "function") {
+      throw new Error("GPU-complete presentation benchmarking requires WebGL finish().");
+    }
+    this._castShadowsEnabled = castShadowsEnabled !== false;
     PIXI.TextureStyle.defaultOptions.scaleMode = "nearest";
     // Keep interpolated entity positions fractional. Nearest scaling preserves
     // the low-res look without snapping smooth server-snapshot interpolation.
@@ -205,6 +226,13 @@ export class Renderer {
       layer: this.layers.trenches,
       pixi: PIXI,
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
+    });
+    this._projectedUnitShadows = castShadowsEnabled === false ? null : new UnifiedGpuShadowLayer({
+      pixi: PIXI,
+      renderer: this.app.renderer,
+      layer: this.layers.decals,
+      recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
+      gpuTimer: this._gpuShadowTimer,
     });
     this._visualSamples = new VisualSampleLayer({
       sampleLayer: this.layers.visualSamples,
@@ -364,6 +392,10 @@ export class Renderer {
     this._renderClock = renderClock;
   }
 
+  setProjectedUnitShadowsEnabled(enabled) {
+    this._projectedUnitShadows?.setUnitShadowsEnabled(enabled);
+  }
+
   enterFixedCapture(renderClock) {
     this.setRenderClock(renderClock);
   }
@@ -374,10 +406,31 @@ export class Renderer {
 
   present() {
     if (this._destroyed) throw new Error("Cannot present a destroyed Pixi renderer.");
-    this.app.render();
+    if (this._gpuShadowTimer) {
+      this._gpuShadowTimer.measure("renderer.present.total", () => this.app.render());
+      this._gpuShadowTimer.poll();
+    } else {
+      this.app.render();
+    }
+    if (this._gpuCompletePresentations) {
+      this.app.renderer.gl.finish();
+      this._gpuShadowTimer?.poll?.();
+    }
     this._renderFrameCount += 1;
     if (this._renderAttemptHadError) this._lastRenderErrorFrame = this._renderFrameCount;
     this._renderAttemptHadError = false;
+  }
+
+  gpuShadowTimingSummary() {
+    const timing = this._gpuShadowTimer?.summary?.();
+    return timing ? {
+      ...timing,
+      staticTerrain: this._projectedUnitShadows?.staticTerrainSummary?.() || null,
+    } : null;
+  }
+
+  resetGpuShadowTiming() {
+    this._gpuShadowTimer?.reset?.();
   }
 
   visualNow() {
@@ -646,6 +699,18 @@ export class Renderer {
     time("renderer.trenchOccupants", () => {
       this._drawSafely("trenchOccupants", () => this._drawOccupiedTrenches(regularEntities, state));
     });
+    time("renderer.projectedUnitShadows", () => {
+      this._drawSafely(
+        "projectedUnitShadows",
+        () => this._projectedUnitShadows?.update(regularEntities, {
+          x: camera?.x,
+          y: camera?.y,
+          zoom: camera?.zoom,
+          viewportWidth: this.app.renderer.screen?.width,
+          viewportHeight: this.app.renderer.screen?.height,
+        }),
+      );
+    });
 
     // Nodes currently being mined: any worker latched to them. Used by
     // _drawResource to overlay an X marker.
@@ -683,6 +748,7 @@ export class Renderer {
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
               visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,
+              projectedShadow: this._projectedUnitShadows?.hasShadowFor(e.id),
               rememberRenderContext: true,
             });
           });
@@ -1265,6 +1331,10 @@ export class Renderer {
     this._trenchDecals = null;
     this._visualSamples?.destroy();
     this._visualSamples = null;
+    this._projectedUnitShadows?.destroy();
+    this._projectedUnitShadows = null;
+    this._gpuShadowTimer?.destroy?.();
+    this._gpuShadowTimer = null;
     this._doodads?.destroy();
     this._doodads = null;
 
@@ -1296,7 +1366,13 @@ function destroyRendererOwnedTexture(texture) {
 }
 
 function buildStaticMapWithDoodads(map) {
-  buildStaticTerrainMap.call(this, map);
+  buildStaticTerrainMap.call(this, map, {
+    bakeLongShadows: shouldBakeLongTerrainShadows(
+      this._castShadowsEnabled,
+      this._projectedUnitShadows?.supported,
+    ),
+  });
+  this._projectedUnitShadows?.setMap(this._map);
   this._doodads?.replace(map?.doodads || []);
 }
 

@@ -358,13 +358,17 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
   `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
-  `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`,
+  `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s autocast travel),
+  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 34` (~1.13s manual travel),
+  `MORTAR_OUTER_RADIUS_TILES = 1.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`,
   `MORTAR_VISIBLE_MEDIAN_SCATTER_TILES = 1.0`, and
   `MORTAR_BLIND_MEDIAN_SCATTER_TILES = 4.0`.
   Mortar facing uses sim-local `mortar::TURN_RATE_RAD_PER_TICK = PI / 6`, so a 180-degree turn
   takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
+  Manual shots use half the shell flight time of autocast shots; launch events carry the selected
+  delay so the client projectile animation stays synchronized with the authoritative impact.
   Neither radius has armor penetration: armored targets take the standard non-piercing reduction,
   resulting in 25 inner damage or 10 outer damage before other modifiers. Manual Fire uses hotkey
   `X` and remains a player-directed override that does not require setup, but it must land in the
@@ -424,12 +428,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   its rendered rig and shrinking both its visual and authoritative gameplay footprint. It costs
   150 steel / 50 oil to train. Impacts deal 75 armor-piercing damage within 2/3 tile and
   non-armor-piercing falloff down to 20 damage at 2 tiles, including friendly fire.
-- `TANK_OIL_COST_PER_PX = 20 / (96 * TILE_SIZE)`: tank movement still uses the original
-  96-tile calibration, so driving the wider 126-tile map costs proportionally more oil than
-  before.
-- `SCOUT_CAR_OIL_COST_PER_PX = 5 / (96 * TILE_SIZE)`: scout cars burn oil for movement at
-  half the previous tank movement rate. Command Cars use this same movement-oil cost. Tanks, scout
-  cars, and command cars cannot advance while their owner has zero oil.
+- Tanks, Scout Cars, and Command Cars do not consume oil while moving. Zero oil does not pause
+  their path movement or prevent a stationary Tank from turning its hull toward an anti-armor hit.
 - Scout Plane constants for the Command Car Scout Plane ability:
   `SCOUT_PLANE_COST_STEEL = 50`, `SCOUT_PLANE_COST_OIL = 75`,
   `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 19`,
@@ -632,10 +632,10 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 108 | 1.52 | 9    | 150 | 40  | 6   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in Engineering Complex |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
-| scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 50  | 3   | 480 (~16s) |
+| scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a Resource Depot requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
-| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 150 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
-| command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 75  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
+| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 175 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
+| command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 85  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured

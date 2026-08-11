@@ -1,5 +1,9 @@
 import { KIND } from "../../client/src/protocol.js";
-import { _drawSelectionAndHp, _hpBar } from "../../client/src/renderer/entities.js";
+import {
+  _drawAboveFogHp,
+  _drawSelectionAndHp,
+  _hpBar,
+} from "../../client/src/renderer/entities.js";
 import { buildingProgressStatus } from "../../client/src/renderer/entity_state.js";
 import { assert } from "./assertions.mjs";
 import { installFakePixi } from "./pixi_fakes.mjs";
@@ -89,6 +93,56 @@ try {
     showHealthBarsAlwaysEnabled: true,
   });
   assert(barsDrawn === 1, "always-show preference reveals full-health unit HP bars");
+
+  for (const kind of [KIND.STEEL, KIND.OIL]) {
+    _drawSelectionAndHp.call(renderer, {
+      id: kind === KIND.STEEL ? 8 : 9,
+      kind,
+      owner: 0,
+      x: 100,
+      y: 120,
+      hp: 1,
+      maxHp: 1,
+    }, new Set(), { showHealthBarsAlwaysEnabled: true });
+  }
+  assert(barsDrawn === 1, "always-show preference excludes underlying steel and oil patch HP");
+
+  for (const kind of [KIND.STEEL_MINE, KIND.PUMP_JACK]) {
+    _drawSelectionAndHp.call(renderer, {
+      id: kind === KIND.STEEL_MINE ? 10 : 11,
+      kind,
+      owner: 1,
+      x: 100,
+      y: 120,
+      hp: 100,
+      maxHp: 100,
+    }, new Set(), { showHealthBarsAlwaysEnabled: true });
+  }
+  assert(barsDrawn === 3, "always-show preference keeps extractor building HP visible");
+
+  _drawAboveFogHp.call(renderer, {
+    id: 12,
+    kind: KIND.STEEL,
+    owner: 0,
+    x: 100,
+    y: 120,
+    hp: 1,
+    maxHp: 2,
+    aboveFogReveal: true,
+  }, { showHealthBarsAlwaysEnabled: true });
+  assert(barsDrawn === 3, "above-fog rendering also excludes raw resource HP bars");
+
+  _drawAboveFogHp.call(renderer, {
+    id: 13,
+    kind: KIND.STEEL_MINE,
+    owner: 1,
+    x: 100,
+    y: 120,
+    hp: 100,
+    maxHp: 100,
+    aboveFogReveal: true,
+  }, { showHealthBarsAlwaysEnabled: true });
+  assert(barsDrawn === 4, "above-fog rendering keeps extractor building HP visible");
 } finally {
   restorePixi();
 }

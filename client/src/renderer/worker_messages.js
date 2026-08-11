@@ -14,7 +14,9 @@ export const RENDER_WORKER_MESSAGE = Object.freeze({
   FRAME: "frame",
   RESIZE: "resize",
   CAPTURE: "capture",
+  PRESENTATION_PREFERENCES: "presentationPreferences",
   RESET_GROUND_DECALS: "resetGroundDecals",
+  RESET_DIAGNOSTICS: "resetDiagnostics",
   RESET_GENERATION: "resetGeneration",
   DESTROY: "destroy",
 });
@@ -49,6 +51,7 @@ export function createInitializeMessage({ canvas, widthCssPx, heightCssPx, dpr, 
 export function createMapGenerationMessage(staticMap) {
   requireGeneration(staticMap?.generation);
   const terrain = cloneGridValues(staticMap?.terrain, "terrain");
+  const elevation = cloneGridValues(staticMap?.elevation, "elevation");
   return request(RENDER_WORKER_MESSAGE.MAP_GENERATION, staticMap.generation, {
     map: {
       version: staticMap.version,
@@ -57,10 +60,12 @@ export function createMapGenerationMessage(staticMap) {
       heightPx: positiveFinite(staticMap.heightPx, "map heightPx"),
       tileSizePx: positiveFinite(staticMap.tileSizePx, "map tileSizePx"),
       terrain: gridRecord(staticMap.terrain, terrain),
+      elevation: gridRecord(staticMap.elevation, elevation),
+      sun: clonePlain(staticMap.sun),
       resourceSites: clonePlain(staticMap.resourceSites || []),
       doodads: clonePlain(staticMap.doodads || []),
     },
-  }, [terrain.buffer]);
+  }, [terrain.buffer, elevation.buffer]);
 }
 
 export function createFrameMessages(frame, state = createRenderWorkerWireState()) {
@@ -125,6 +130,10 @@ export function createResetGroundDecalsMessage(generation, decalEpoch) {
   });
 }
 
+export function createResetDiagnosticsMessage(generation) {
+  return request(RENDER_WORKER_MESSAGE.RESET_DIAGNOSTICS, generation, {});
+}
+
 export function createEditorFrameMessage(record, generation = 1) {
   if (record?.version !== MAP_EDITOR_PRESENTATION_VERSION
     || !Number.isSafeInteger(record?.frameId) || record.frameId <= 0) {
@@ -152,6 +161,14 @@ export function createCaptureMessage({ generation, frameId, captureId, readPixel
   });
 }
 
+export function createPresentationPreferencesMessage(generation, {
+  projectedUnitShadowsEnabled = false,
+} = {}) {
+  return request(RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES, generation, {
+    projectedUnitShadowsEnabled: !!projectedUnitShadowsEnabled,
+  });
+}
+
 export function createResetGenerationMessage(generation) {
   return request(RENDER_WORKER_MESSAGE.RESET_GENERATION, generation, {});
 }
@@ -173,10 +190,24 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       if (!["match", "mapEditor"].includes(payload?.configuration?.surface || "match")) {
         throw new TypeError("initialize surface must be match or mapEditor");
       }
+      if (payload?.configuration?.gpuShadowTiming != null
+        && typeof payload.configuration.gpuShadowTiming !== "boolean") {
+        throw new TypeError("initialize gpuShadowTiming must be boolean");
+      }
+      if (payload?.configuration?.gpuCompletePresentations != null
+        && typeof payload.configuration.gpuCompletePresentations !== "boolean") {
+        throw new TypeError("initialize gpuCompletePresentations must be boolean");
+      }
+      if (payload?.configuration?.castShadowsEnabled != null
+        && typeof payload.configuration.castShadowsEnabled !== "boolean") {
+        throw new TypeError("initialize castShadowsEnabled must be boolean");
+      }
       if (requireCanvas && !payload?.canvas) throw new TypeError("initialize requires a transferred canvas");
       break;
     case RENDER_WORKER_MESSAGE.MAP_GENERATION:
       validateGrid(payload?.map?.terrain, "terrain");
+      validateGrid(payload?.map?.elevation, "elevation");
+      validateMapSun(payload?.map?.sun);
       requireId(payload?.map?.revision, "map revision", { allowZero: false });
       validateDoodads(payload?.map?.doodads);
       break;
@@ -222,10 +253,29 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
         throw new TypeError("readPixels must be boolean");
       }
       break;
+    case RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES:
+      if (typeof payload?.projectedUnitShadowsEnabled !== "boolean") {
+        throw new TypeError("projectedUnitShadowsEnabled must be boolean");
+      }
+      break;
     default:
       break;
   }
   return message;
+}
+
+function validateMapSun(value) {
+  if (value == null) return;
+  if (typeof value !== "object" || Array.isArray(value)) throw new TypeError("sun must be an object");
+  if (!Number.isInteger(value.azimuthDegrees) || value.azimuthDegrees < 0 || value.azimuthDegrees > 359) {
+    throw new TypeError("sun azimuthDegrees must be between 0 and 359");
+  }
+  if (!Number.isInteger(value.elevationDegrees) || value.elevationDegrees < 1 || value.elevationDegrees > 89) {
+    throw new TypeError("sun elevationDegrees must be between 1 and 89");
+  }
+  if (!Number.isInteger(value.warmth) || value.warmth < 0 || value.warmth > 100) {
+    throw new TypeError("sun warmth must be between 0 and 100");
+  }
 }
 
 export function validateRenderWorkerResponse(message) {
@@ -249,6 +299,7 @@ export function validateRenderWorkerResponse(message) {
         throw new TypeError("presented capture rgba must match its dimensions");
       }
     }
+    validateGpuTimingSummary(payload?.gpuShadowTiming);
   }
   if (message.type === RENDER_WORKER_RESPONSE.RETAINED) {
     requireId(payload?.decalEpoch ?? 0, "ground decal epoch");
@@ -271,6 +322,29 @@ export function validateRenderWorkerResponse(message) {
     requireOptionalLocation(payload?.column, "failed response column");
   }
   return message;
+}
+
+function validateGpuTimingSummary(summary) {
+  if (summary == null) return;
+  if (typeof summary !== "object" || Array.isArray(summary)) throw new TypeError("gpu timing summary must be an object");
+  for (const key of ["pending", "dropped", "disjoint"]) requireId(summary[key] ?? 0, `gpu timing ${key}`);
+  if (typeof summary.supported !== "boolean") throw new TypeError("gpu timing supported must be boolean");
+  if (!Array.isArray(summary.groups) || summary.groups.length > 8) throw new TypeError("gpu timing groups must be bounded");
+  for (const group of summary.groups) {
+    if (typeof group?.label !== "string" || !group.label || group.label.length > 64) {
+      throw new TypeError("gpu timing label must be bounded");
+    }
+    requireId(group.samples ?? 0, "gpu timing samples");
+    for (const key of ["avgMs", "p50Ms", "p95Ms", "maxMs"]) nonNegativeFinite(group[key] ?? 0, `gpu timing ${key}`);
+  }
+  if (summary.staticTerrain != null) {
+    const terrain = summary.staticTerrain;
+    if (typeof terrain !== "object" || Array.isArray(terrain)) throw new TypeError("static terrain timing must be an object");
+    for (const key of ["buildCount", "lifetimeBuildCount", "width", "height", "samplesPerTile"]) {
+      requireId(terrain[key] ?? 0, `static terrain ${key}`);
+    }
+    nonNegativeFinite(terrain.buildMs ?? 0, "static terrain buildMs");
+  }
 }
 
 function request(type, generation, payload, transfer = []) {

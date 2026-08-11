@@ -330,18 +330,6 @@ const TANK_NATIVE_PARTS = Object.freeze([
     geometry: { type: "circle", cx: 0, cy: 0, r: 3 },
     paint: paint({ fill: "#fff06a", fillOpacity: 0.58, stroke: "#d8d0b0", strokeWidth: 1.1, strokeOpacity: 0.62 }),
   }),
-  part("part.fuelCue.box", 32, {
-    geometry: { type: "rect", x: -23.2, y: -20.9, width: 8, height: 5 },
-    paint: paint({ stroke: "#c9b56a", strokeWidth: 2, opacity: 0.75 }),
-  }),
-  part("part.fuelCue.x1", 33, {
-    geometry: { type: "line", from: { x: -22.2, y: -19.4 }, to: { x: -16.2, y: -16.4 }, strokeWidth: 2 },
-    paint: paint({ stroke: "#d47a5f", strokeWidth: 2, opacity: 0.95 }),
-  }),
-  part("part.fuelCue.x2", 34, {
-    geometry: { type: "line", from: { x: -16.2, y: -19.4 }, to: { x: -22.2, y: -16.4 }, strokeWidth: 2 },
-    paint: paint({ stroke: "#d47a5f", strokeWidth: 2, opacity: 0.95 }),
-  }),
 ]);
 const TANK_FLASH_IDS = Object.freeze(["part.tank.flashCone", "part.tank.flashCore", "part.tank.flashGlow"]);
 const TANK_ANIMATION_PARTS = animatedRasterParts(TANK_PNG_RIG_ATLAS, {
@@ -364,8 +352,6 @@ const TANK_ANIMATIONS = [
   binding("part.tank.flashCone", "recoilPx", "geometry.scaleY", 0.281481481481),
   ...bindingsFor(["part.tank.flashCore"], [["recoilPx", "geometry.scaleX", 0.266666666667], ["recoilPx", "geometry.scaleY", 0.266666666667]]),
   ...bindingsFor(["part.tank.flashGlow"], [["recoilPx", "geometry.scaleX", 0.222222222222], ["recoilPx", "geometry.scaleY", 0.222222222222]]),
-  ...bindingsFor(["part.fuelCue.box"], [["facing", "transform.rotation"], ["fuelCueVisible", "visible"], ...SHADOW_RECOIL]),
-  ...bindingsFor(["part.fuelCue.x1", "part.fuelCue.x2"], [["facing", "transform.rotation"], ["oilStarved", "visible"], ...SHADOW_RECOIL]),
 ];
 const TANK_DEFINITION = definition({
   id: "tank.raster",
@@ -389,7 +375,6 @@ const RASTER_DEFINITION_ENTRIES = Object.freeze([
 ]);
 const RASTER_RIG_KEYS = new Set(RASTER_DEFINITION_ENTRIES.map(([kind]) => kind));
 
-const TANK_UNIT_OVERLAYS = Object.freeze(["part.fuelCue.box", "part.fuelCue.x1", "part.fuelCue.x2"]);
 const RASTER_PART_ENTRIES = Object.freeze([
   [KIND.ANTI_TANK_GUN, { shadow: ["part.shadow"], unit: atlasSourceParts(ANTI_TANK_GUN_PNG_RIG_ATLAS) }],
   [KIND.ARTILLERY, { shadow: ["part.shadow"], unit: [...atlasSourceParts(ARTILLERY_PNG_RIG_ATLAS), ...ARTILLERY_FLASH_IDS] }],
@@ -401,7 +386,7 @@ const RASTER_PART_ENTRIES = Object.freeze([
   [KIND.SCOUT_PLANE, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
   [KIND.TANK, {
     shadow: ["part.shadow"],
-    unit: [...atlasSourceParts(TANK_PNG_RIG_ATLAS), ...TANK_UNIT_OVERLAYS],
+    unit: atlasSourceParts(TANK_PNG_RIG_ATLAS),
     effects: TANK_FLASH_IDS,
   }],
 ]);

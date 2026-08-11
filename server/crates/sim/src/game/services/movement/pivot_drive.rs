@@ -1,13 +1,9 @@
-use std::collections::HashMap;
-
 use crate::config;
 use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::geometry::unit_body_for_entity;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
-use crate::game::PlayerState;
-use crate::protocol::{Event, NoticeSeverity};
 
 use super::standability::{footing_profile, footing_resistance, FootingProfile};
 use super::traffic::{
@@ -28,53 +24,6 @@ const VEHICLE_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 const VEHICLE_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
 const VEHICLE_FOLLOW_ALIGNMENT_COS_MIN: f32 = 0.5;
 const VEHICLE_FOLLOW_LONGITUDINAL_DEADBAND_PX: f32 = 1.0;
-
-pub(super) fn vehicle_oil_starves_movement(
-    entities: &mut EntityStore,
-    players: &[PlayerState],
-    events: &mut HashMap<u32, Vec<Event>>,
-    id: u32,
-) -> bool {
-    let (owner, x, y) = match entities.get(id) {
-        Some(e) => (e.owner, e.pos_x, e.pos_y),
-        None => return false,
-    };
-
-    let pause_ticks = entities
-        .get(id)
-        .and_then(|e| e.movement.as_ref())
-        .map(|m| m.oil_starved_pause_ticks)
-        .unwrap_or(0);
-    if pause_ticks > 0 {
-        if let Some(e) = entities.get_mut(id) {
-            if let Some(m) = e.movement.as_mut() {
-                m.oil_starved_pause_ticks = pause_ticks.saturating_sub(1);
-            }
-        }
-        return true;
-    }
-
-    let out_of_oil = players
-        .iter()
-        .find(|p| p.id == owner)
-        .is_some_and(|p| p.oil == 0);
-    if out_of_oil {
-        if let Some(e) = entities.get_mut(id) {
-            if let Some(m) = e.movement.as_mut() {
-                m.oil_starved_pause_ticks = config::TANK_OIL_STARVED_PAUSE_TICKS.saturating_sub(1);
-            }
-        }
-        events.entry(owner).or_default().push(Event::Notice {
-            msg: "alert:out_of_oil".to_string(),
-            x: Some(x),
-            y: Some(y),
-            severity: NoticeSeverity::Alert,
-        });
-        return true;
-    }
-
-    false
-}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct PivotDriveIntent {

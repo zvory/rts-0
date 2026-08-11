@@ -62,7 +62,8 @@ pub struct Game { /* private */ }
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Loads the hardcoded handcrafted map and assigns ordered players to fixed authored start
-    /// locations. A map owns flat `startLocations`, `baseSites`, and static `doodads`: start locations determine its
+    /// locations. A map owns flat `startLocations`, `baseSites`, presentation-only `elevation` and
+    /// `sun`, and static `doodads`: start locations determine its
     /// capacity, while every base site receives its authored 0–36 Steel and 0–9 Oil patches.
     /// Singleton-team FFA
     /// matches shuffle fixed start locations by `seed`; team matches choose ordered starts from the
@@ -938,7 +939,9 @@ branch seed.
   and post-match/dedicated replay start payloads.
 - `replay_branch.rs` owns branch staging state, original replay-seat claim/release policy, and
   branch live-launch preparation while `room_task.rs` still owns connected members and final phase
-  changes.
+  changes. A branch may launch with any non-empty subset of seats claimed. Unclaimed original
+  players remain in the cloned `Game`, but are absent from the connection-to-seat alias map, so
+  their units keep simulation-owned automatic combat behavior without accepting player commands.
 - `snapshot_fanout.rs` and `snapshots.rs` centralize compacting, replace-latest snapshot delivery,
   net-status metadata, and union-event helpers for live, spectator, replay, branch, and dev views.
 - `connection.rs`, `dev_replay.rs`, `crash_replay.rs`, `faction_validation.rs`, and
@@ -1302,11 +1305,15 @@ Automatic acquisition considers only legal enemy candidates inside the attacker'
 
 After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the Engineering Complex, Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a Resource Depot requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
-Group move formation assignment checks cached reachability components before issuing per-unit goals,
-avoiding command-time A* probes outside the move coordinator pathing budget. A blocked or unreachable
-compact slot is smudged independently to a nearby standable tile; the planner does not translate the
-whole formation around an obstacle. If no reachable local alternative exists, it may preserve a free
-local goal so normal path processing can report `PathFailed`.
+Group move formation assignment chooses one bounded, locally connected landing patch before issuing
+per-unit goals, avoiding command-time A* probes outside the move coordinator pathing budget. The
+patch uses the passability intersection of every movement kind in the selection, so a mixed group
+cannot split across water, rock, or vehicle-blocking forest. A passable click anchors the patch on
+the clicked side of an obstacle; an impassable click deterministically prefers a sufficiently large
+nearby patch on the selection's approach side. Blocked compact slots are smudged independently only
+within that patch and must also pass the existing cached global-reachability check. If no reachable
+local alternative exists, the unit keeps its current position instead of receiving a free but
+unreachable fallback goal.
 
 `FormationMove` accepts a bounded, sanitized world-space polyline and assigns deterministic slots
 by arc length. A stroke with enough length uses a single rank across the complete stroke; a shorter
@@ -1387,7 +1394,8 @@ selections also keep clear of vehicle bodies. Vehicle groups of six or more use 
 along the footprint's long side, reducing deep same-lane traffic queues while remaining at least two
 slots deep. In partially filled rectangles, the deeper cells are centered so central units lead and
 outside units trail through constrained routes; when folding a one-deep line, that leading edge
-follows the move direction. Blocked-slot fallback keeps vehicle spacing strict.
+follows the move direction. Blocked-slot search stays inside the command's cohesive landing patch
+and keeps vehicle spacing strict.
 Player-drawn formation lines remain an explicitly authored layout with their separate line-and-rank
 assignment policy.
 
@@ -1526,7 +1534,7 @@ General rules:
   suitably aligned, including through intermediate waypoints. After the preference expires,
   ordinary distance-based forward/reverse movement resumes.
   Vehicle traffic sensing follows travel direction rather than hull direction, so reversing Tanks
-  yield to traffic behind them. Zero oil and static standability still gate movement. Idle, Hold
+  yield to traffic behind them. Static standability still gates hull rotation. Idle, Hold
   Position, in-range Attack, and arrived Attack Move react without changing their order, path,
   target, or independent turret aim. Static standability may block a rotation but never translate
   the Tank to make room. Stationary preference rotation preserves the stationary range ramp; path

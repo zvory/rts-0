@@ -148,7 +148,6 @@ export { footprintValidAgainstEntities };
 
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const TOUCH_EVENT_OPTIONS = { passive: false };
-const CONTEXT_MENU_SUPPRESS_MS = 500;
 
 function isMacPlatform() {
   const nav = globalThis.navigator;
@@ -251,7 +250,7 @@ export class Input {
     this._cursorLockMode = null;
     this._pointerLockCursor = null;
     this._pendingPointerLockCursor = null;
-    this._suppressNextContextMenuUntil = 0;
+    this._suppressNextContextMenu = false;
     this._pointerLockAttempt = 0;
     this._lastPointerLockFocusAttempt = null;
     this._lastPointerLockRequest = null;
@@ -578,7 +577,10 @@ export class Input {
     if (!this.pointerLocked) this._trackMouse(p);
     if (ev.button === 2) {
       clearPostQuickCastSelectionGuard(this);
-      this._suppressNextContextMenuUntil = performance.now() + CONTEXT_MENU_SUPPRESS_MS;
+      // WebView2 may emit contextmenu after a long right-button drag has already completed.
+      // Tie suppression to this physical press instead of a deadline so that follow-up event
+      // cannot turn the released formation into a second point move.
+      this._suppressNextContextMenu = true;
       if (!this._routeLockedPointerDown(ev, { ...p, button: 2 })) this._beginFormationGesture(p, ev);
       ev.preventDefault();
       ev.stopPropagation();
@@ -763,9 +765,9 @@ export class Input {
     // Always suppress the native menu over the viewport; treat as a right-click.
     ev.preventDefault();
     ev.stopPropagation();
-    if (performance.now() <= this._suppressNextContextMenuUntil) {
-      this._suppressNextContextMenuUntil = 0;
-      return;
+    if (this._suppressNextContextMenu) {
+      this._suppressNextContextMenu = false;
+      if (!Number.isFinite(ev.button) || ev.button === 2) return;
     }
     if (this._formationGesture) return;
     const p = this._eventScreenPos(ev);

@@ -259,9 +259,6 @@ pub fn project_entity(
     if entity.is_unit() {
         view.facing = Some(entity.facing());
     }
-    if let Some(oil_used) = entity.lifetime_oil_used() {
-        view.oil_used = Some(oil_used);
-    }
     if entity.kind == EntityKind::Tank && owner_or_ally {
         if let Some(stats) = config::unit_stats(entity.kind) {
             view.weapon_range_tiles =
@@ -1040,34 +1037,6 @@ mod tests {
         assert_eq!(viewer_view.state, "idle");
         assert_eq!(viewer_view.target_id, None);
         assert_eq!(viewer_view.weapon_facing, None);
-    }
-
-    #[test]
-    fn tank_projects_lifetime_oil_used() {
-        let mut entities = EntityStore::new();
-        let tank_id = entities
-            .spawn_unit(1, EntityKind::Tank, 120.0, 100.0)
-            .expect("tank should spawn");
-        {
-            let tank = entities.get_mut(tank_id).expect("tank should exist");
-            if let Some(movement) = tank.movement.as_mut() {
-                movement.lifetime_oil_used = 3.25;
-            }
-        }
-        let map = Map {
-            width: 64,
-            height: 64,
-            terrain: vec![terrain::GRASS; 64 * 64],
-            starts: vec![(1, 1)],
-            ..Default::default()
-        };
-        let mut fog = Fog::new(map.width, map.height);
-        fog.recompute(&[1], &entities, &map);
-        let tank = entities.get(tank_id).expect("tank should exist");
-
-        let view = project_for_test(1, tank, &fog, true, &entities, None, false)
-            .expect("tank should be visible");
-        assert_eq!(view.oil_used, Some(3.25));
     }
 
     #[test]

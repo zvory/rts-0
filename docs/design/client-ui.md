@@ -30,6 +30,7 @@ src/
   prediction_settings.js # localStorage-backed prediction toggle
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   health_bar_settings.js # localStorage-backed always-show HP-bar toggle (damaged-only by default)
+  unit_shadow_settings.js # localStorage-backed detailed-unit-shadow toggle (on by default)
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_runtime_reset.js # shared clearing of state derived from one authoritative timeline
@@ -129,6 +130,8 @@ src/
   map_editor_panel_workflow.js # Pure editor category/operation availability and current-tool labels
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
+  map_editor_elevation_controls.js # elevation palette and tool arming
+  map_editor_sun_controls.js # optional map sun sliders plus preview/commit behavior
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_startup_inbox.js # semantic buffering while asynchronous Match construction completes
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
@@ -154,7 +157,7 @@ so it never opens a WebSocket or constructs `App`, `Match`, `GameState`, Lab con
 orders, replay controls, or a simulation clock. It reuses the normal worker-owned Pixi `Renderer`, terrain cache,
 `Camera`, map schema, and player palette, but `MapEditorViewport` never constructs Pixi or reaches
 into renderer layers/application state. Input, hit math, session edits, and camera stay on the main
-thread; `MapEditorPresentationV2` carries revisioned terrain replacement/patch data, complete
+thread; `MapEditorPresentationV3` carries revisioned terrain replacement/patch data, complete
 authoring-layer visibility, and detached grid, symmetry, start/base, selection, label, and
 paint-preview records. The main-thread adapter owns
 the stable transferred HTML canvas while the same Pixi module worker owns display objects, ordered
@@ -306,7 +309,6 @@ export const ANIMATION_INPUTS = [
   "weaponVisualDoubleCos", "weaponVisualDoubleSin", "weaponRecoilX", "weaponRecoilY",
   "scoutGunnerX", "scoutGunnerY", "scoutMountX", "scoutMountY", "setupVisible",
   "setupMostlyDeployed", "setupBarrelVisible", "busy", "breakthroughTicks",
-  "lowOil", "oilStarved", "fuelCueVisible",
 ]
 export const ANIMATION_PROPERTIES = [
   "transform.x", "transform.y", "transform.rotation", "transform.scaleX", "transform.scaleY",
@@ -988,7 +990,20 @@ import/export. The editor
 accepts authored-map JSON up to 8 MiB and only materialized authored maps containing terrain;
 agent-authored recipes remain a
 `scripts/map-author.mjs build` CLI input and are not a Map Editor document type. Import normalization
-preserves authored terrain verbatim, including impassable terrain in a protected base footprint, so
+preserves authored elevation and sun conditions. Any map can enable live Direction, Height, and
+Color temperature controls in Map settings. Flat maps use those conditions for atmosphere and
+directional unit shadows; varied elevation additionally lights and shadows the terrain. Dragging
+the controls rebuilds the editor's worker-owned terrain
+preview with candidate sun conditions without adding intermediate undo entries. While Direction is
+dragged, a temporary map-centred arrow points toward the sun source and labels the compass azimuth;
+0° is north and 90° is east. A daylight-only time-of-day slider models 23 August 1942 at 48.7°N,
+44.3°E on the steppe west of Stalingrad. It uses local solar time and NOAA/Meeus solar-position
+equations to author direction, height, and a presentation warmth derived from solar elevation in one
+undoable change; dragging it previews the same sun-source guide. Releasing a control removes the
+guide and commits one authored-map change. Texture painting and Elevation are separate palette categories. Elevation uses synchronized
+slider and numeric level controls from 0–9 with Brush, Box, Erase, and the active symmetry; the first nonzero elevation edit initializes default sun conditions
+so the draft remains valid. Import normalization preserves authored terrain
+verbatim, including impassable terrain in a protected base footprint, so
 the advisory and authoritative checks can report the author's actual input. Interactive rock/water
 painting is still rejected in protected footprints, and moving or adding a location makes its
 footprint passable. Resize
@@ -1280,12 +1295,20 @@ context, conflict resolution prefers that command's grid key before falling back
 The long-lived `SettingsContainer` is constructed by `App` with `#settings-button` and the
 `#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
 spectator, and replay contexts through dependency-injected collaborators. The stable rendered ids
-inside the settings mount point are `#pointer-lock-toggle`, `#unit-range-toggle`,
-`#always-show-health-bars-toggle`, `#debug-path-toggle`, and `#give-up-open` plus live-match action
+inside the settings mount point are `#pointer-lock-toggle`, `#projected-unit-shadows-toggle`,
+`#unit-range-toggle`, `#always-show-health-bars-toggle`, `#debug-path-toggle`, and `#give-up-open` plus live-match action
 `#live-pause-open`; they may not exist until their owning
 tab/action is visible. Live controllable matches mount a separate `#tab-menu-button` hamburger and
 `#tab-menu` Auto-Build panel under `#game-screen`; the hamburger never replaces, moves, or aliases
-the Settings gear. `Match` owns `LivePauseOverlay` under `#game-screen` for reliable
+the Settings gear. The compact panel opens immediately to the hamburger's right, supports both a
+click/tap toggle and the existing hold-Tab interaction, and reserves Space for its global pause
+toggle. Below the resource floors it renders the local faction's production-building trainables on
+one `QWE / ASD / ZXC` grid (Barracks, Gunworks, then Vehicle Works for Kriegsia). An unmodified tile click or hotkey adds one standing
+repeat allocation across every owned compatible producer; Shift-click or Shift+hotkey removes one.
+Each tile uses the normal authoritative active/compatible producer count and Auto-Build swirl.
+Classic bindings are used only when all combined-grid unit bindings are present and distinct;
+otherwise the whole panel falls back to the deterministic grid. `Match` owns `LivePauseOverlay`
+under `#game-screen` for reliable
 `livePauseState` messages; the overlay resolves `pausedBy` through the match roster, exposes direct
 Game-settings and Hotkeys-tab actions, and raises only `#game-menu` above its screen blocker while
 paused. Resume remains visible only when the server grants `canUnpause`, and the overlay is
@@ -1622,6 +1645,10 @@ The checked-in Hellhole client-performance stream follows the normal path: it is
 fog-filtered projection from the canonical `1+3` versus `2+4` scenario and carries the full
 server-authored visibility grid. It must not be converted to a full-world spectator projection,
 which would benchmark local fallback ray casting instead of ordinary player presentation.
+The opt-in uncapped harness temporarily replaces only the rAF scheduler with a bounded,
+completion-paced driver of the same live frame function. Snapshot delivery, state timing, fog,
+presentation assembly, worker rendering, HUD, and minimap remain live; fixed-capture shortcuts and
+unbounded worker flooding are not benchmark paths.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
 `command_budget.js`: 24 base command supply plus `COMMAND_CAR_SUPPLY_CAP_BONUS = 20` and the
@@ -2308,14 +2335,26 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   are removed when an entity id no longer needs them. The SVG and PNG runtimes share one
   sampled render context per entity draw so renderer-local motion state advances once. Units use low-detail hard-edged silhouettes tinted by player color, a dark
   drop shadow, dark outline, HP bar above when damaged/selected, and glowing selection ring when
-  selected. The Game settings toggle can instead keep every visible entity's HP bar on, including
-  at full health; damaged-only remains the default. Normal HP fills use the owning player's color,
+  selected. The Game settings toggle can instead keep every visible unit and building HP bar on,
+  including at full health; raw steel and oil patches never show HP bars, while Steel Mine and
+  Pump Jack extractor buildings do. Damaged-only remains the default. Normal HP fills use the owning player's color,
   and black internal dividers split the span into `round(maxHp / 15)` whole cells (at least one).
   Any remainder is distributed across those cells rather than drawing a fractional final cell, so
   each cell represents approximately 15 HP. Those cell dividers use 0.75-world-pixel marks so they
   remain visible across camera scales and display resolutions; every seventh existing divider uses
   a heavier 1.5-world-pixel mark to identify approximately 105 HP without adding another mark.
   Construction and deconstruction keep their existing status colors on the shared bar layer.
+  Detailed Unit Shadows are a default-enabled Game setting with a persistent opt-out. When disabled, the render
+  worker skips every per-unit model projection and units retain their lightweight native rig
+  shadows. When enabled on maps with authored elevation and sun, simple presentation-only box
+  models for supported units rotate with each unit and project along the authored sun vector into
+  one GPU coverage layer. Their cuboid faces are a retained instanced mesh: each frame streams one
+  compact transform record per model box instead of rebuilding Pixi Graphics polygons. The R8
+  coverage target is limited to the current camera window at half-world-pixel resolution, snapped
+  outward with a two-texel linear-filter gutter; it does not scale with total map area. The terrain
+  shader remaps world receivers into that window and composites the mask with its separate
+  static-height ray march. Flat maps retain native unit shadows and allocate no active
+  projected-shadow draw.
   Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values
@@ -2357,7 +2396,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
   WW2-style truck silhouette with enclosed wheels and a rear-top machine gun; tank: chunky
   flat-shaded armor with movement-facing tracks, hull, nose, and shadow plus weapon-facing turret,
-  main barrel, coax barrel, recoil, nose tick, and low-oil/oil-starved fuel cues; artillery: modular
+  main barrel, coax barrel, recoil, and nose tick; artillery: modular
   A-19 PNG components animated from raster-native support-weapon metadata).
   Riflemen normally carry a rifle; Panzerfausts with `panzerfaustLoaded: true` carry a tube launcher
   with a team-colored band and switch immediately to normal rifle art after launch. While
@@ -2438,9 +2477,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   `1.5px` clearance) so the visible body, selection ring, click target, and advisory build
   preview match the server's oriented vehicle body. Track tread offsets advance from actual
   interpolated movement and hull turn deltas: both tracks forward/backward for drive/reverse and
-  opposite track motion for pivot turns. Own tanks show a small amber/red fuel cue when oil is low
-  or movement is oil-starved; the selected-entity panel also exposes lifetime movement `oilUsed`
-  as `Oil Used:` when exactly one tank is selected.
+  opposite track motion for pivot turns. Vehicles have no movement-fuel cue or lifetime oil-spend
+  row because movement does not consume oil.
 - Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`40.8px` length, `21.6px` width,
   `1px` clearance), matching the authoritative oriented vehicle body used for collision and
   click targeting.

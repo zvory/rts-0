@@ -205,7 +205,7 @@ assert(
     revision: 3,
     decals: [
       { id: 10, decalClass: "infantry", sourceKind: KIND.RIFLEMAN, x: 32, y: 48, owner: 1, seed: 5 },
-      { id: 11, decalClass: "mortarBlast", sourceKind: KIND.MORTAR_TEAM, x: 64, y: 80, owner: 0, seed: 6, radiusTiles: 1.5 },
+      { id: 11, decalClass: "mortarBlast", sourceKind: KIND.MORTAR_TEAM, x: 64, y: 80, owner: 0, seed: 6, radiusTiles: 1 },
     ],
   });
   assert(buffer.authoritativeRevision === 3 && buffer.peekPending().length === 2,

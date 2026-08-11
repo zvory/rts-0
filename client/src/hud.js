@@ -39,7 +39,6 @@ import { HudSelectionPanel } from "./hud_selection_panel.js";
 import { HOTKEY_COMMAND_SELECT_IDLE_WORKERS } from "./hotkey_profiles.js";
 import { resourceIconHtml } from "./resource_icons.js";
 export {
-  formatTankOilUsed,
   selectionBudgetBlockShape,
   selectionBudgetGridModel,
 } from "./hud_selection_panel.js";
@@ -640,6 +639,9 @@ export class HUD {
         return;
       case "playNotEnough":
         this._playNotEnoughForCost(intent.cost, intent.supply);
+        return;
+      case "playCannotBuild":
+        this.audio?.play("notice_cannot_build", { category: "alert", priority: 4 });
         return;
       default:
         return;

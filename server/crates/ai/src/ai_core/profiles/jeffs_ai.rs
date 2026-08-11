@@ -30,7 +30,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: Some(40),
         extra_oil_workers: 10,
-        extra_builder_workers: 1,
+        extra_builder_workers: 0,
         train_workers_for_oil: false,
         reuse_idle_before_training: true,
     },
@@ -100,6 +100,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 2,
         perimeter_distance_tiles: 6.0,
+        lateral_spacing_tiles: 4.5,
         replacement_health_percent: Some(50),
     }),
     turtle_defense: None,
@@ -119,7 +120,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         minimum_tanks_to_continue: 2,
         recovery_tanks_to_continue: 3,
         additional_tanks_per_repush: 1,
-        repush_regroup_radius_tiles: 5.0,
+        repush_regroup_radius_tiles: 3.0,
     }),
     home_anti_tank: Some(HomeAntiTankPolicy {
         defensive_tanks: 1,
@@ -127,9 +128,9 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         // Keep the guns three tiles behind the six-tile home Tank line while
         // remaining forward of the production-building belt.
         anti_tank_position_tiles: 3.0,
-        // Screen 7.5 tiles ahead of the defensive Tanks: deep enough to meet
-        // infantry first without detaching the Machine Gunners from support.
-        machine_gunner_screen_tiles: 7.5,
+        // Keep the valuable MGs behind the Rifle screen, but one tile ahead
+        // of the home Tank so all three layers acquire the same raid.
+        machine_gunner_screen_tiles: 1.0,
         lateral_spacing_tiles: 4.5,
     }),
     tech_transition: Some(TechTransitionPolicy {
@@ -152,7 +153,7 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         },
     }),
     fast_tank_timing: Some(FastTankTimingPolicy {
-        workers_before_barracks: 2,
+        workers_before_barracks: 1,
         pump_jacks_before_barracks: 2,
         tanks_before_scout_car: 2,
         scout_car_target: 1,
@@ -171,10 +172,17 @@ mod tests {
         let transition = JEFFS_AI.tech_transition.expect("armored transition");
         assert_eq!(JEFFS_AI.workers.steel_worker_cap, Some(40));
         assert_eq!(JEFFS_AI.workers.extra_oil_workers, 10);
-        assert_eq!(JEFFS_AI.workers.extra_builder_workers, 1);
+        assert_eq!(JEFFS_AI.workers.extra_builder_workers, 0);
         assert!(!JEFFS_AI.workers.train_workers_for_oil);
         assert!(JEFFS_AI.workers.reuse_idle_before_training);
         assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 2);
+        assert_eq!(
+            JEFFS_AI
+                .defensive_machine_gunners
+                .unwrap()
+                .lateral_spacing_tiles,
+            4.5
+        );
         assert_eq!(transition.production.unit_priorities, &ARMORED_UNITS);
         assert_eq!(JEFFS_AI.production.queue_depth, 1);
         assert_eq!(transition.production.queue_depth, 1);
@@ -187,19 +195,19 @@ mod tests {
         assert_eq!(containment.minimum_tanks_to_continue, 2);
         assert_eq!(containment.recovery_tanks_to_continue, 3);
         assert_eq!(containment.additional_tanks_per_repush, 1);
-        assert_eq!(containment.repush_regroup_radius_tiles, 5.0);
+        assert_eq!(containment.repush_regroup_radius_tiles, 3.0);
         assert_eq!(containment.contact_stop_tiles, 18.0);
         let home_anti_tank = JEFFS_AI.home_anti_tank.unwrap();
         assert_eq!(home_anti_tank.defensive_tanks, 1);
         assert_eq!(home_anti_tank.target_guns, 2);
         assert_eq!(home_anti_tank.anti_tank_position_tiles, 3.0);
-        assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 7.5);
+        assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 1.0);
         assert_eq!(
             transition.resource_float,
             ResourceFloatThreshold { steel: 0, oil: 0 }
         );
         let timing = JEFFS_AI.fast_tank_timing.expect("fast tank timing");
-        assert_eq!(timing.workers_before_barracks, 2);
+        assert_eq!(timing.workers_before_barracks, 1);
         assert_eq!(timing.pump_jacks_before_barracks, 2);
         assert_eq!(timing.tanks_before_scout_car, 2);
         assert_eq!(timing.scout_car_target, 1);

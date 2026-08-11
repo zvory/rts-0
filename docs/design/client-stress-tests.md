@@ -14,6 +14,12 @@ The roster is an authored mix—1 Worker, 1 Golem, 8 Riflemen, 8 Machine Gunners
 8 Anti-Tank Guns, 8 Mortar Teams, 1 Artillery, 9 Scout Cars, 16 Tanks, and 9 Command Cars per
 player. Supply costs are not an input to composition, so balance changes cannot silently alter the
 unit count or ratio used for performance comparisons.
+The static benchmark map carries two long parallel five-level ridges and a northwesterly sunset sun
+at 12 degrees above the horizon. This intentionally keeps terrain relief, long terrain shadows, and
+the active GPU unit-shadow path inside the canonical renderer workload rather than measuring the
+flat-map bypass. Static terrain visibility is a four-samples-per-tile light-space cache built once
+when that map enters the worker; it is invariant under benchmark viewport, DPR, zoom, and frame
+count. Dynamic unit receivers still update every submitted frame.
 `?label=<text>` adds a bounded human label to every artifact. `?seconds=<2..25>` exists for local
 iteration; the shareable default is five seconds after a three-second warmup. The cap keeps the
 measurement inside the finite 30-second recording.
@@ -33,13 +39,58 @@ three seconds, then resets `Match.frameProfiler` immediately before measuring. S
 parsing, initial Pixi allocation, and shader warmup are therefore outside the result.
 
 The report includes main-thread frame-work, renderer submission, fog, scheduling, and
-diagnostic-counter summaries from `FrameProfiler`; render-worker submitted/completed/superseded/
-failed counts and queue/display/main-submit/worker-update/worker-present timings; actual average
+diagnostic-counter summaries from `FrameProfiler`; a separately reset render-worker measurement
+window with submitted/completed/superseded/failed counts and
+queue/display/main-submit/worker-update/worker-present timings; actual average
 completed-presentation throughput; the static stream
 identity; Long Tasks and Long Animation Frames
 when supported; and a JS trace/flame graph when supported. The result UI reports the p95 frame-work
 tier and the approximate work reduction or headroom against 16.67 ms. This is a relative
 frame-work indicator, not a claim that the display actually presented at 120 or 240 Hz.
+The host `requestAnimationFrame` callback rate is labeled separately and must never be reported as
+rendered or presented throughput. The server's indexed average-throughput headline is derived from
+worker `completed`, not host frame count. Submitted frames that the one-in-flight worker queue
+supersedes remain visible in the artifact rather than inflating throughput.
+
+The local harness has an opt-in uncapped capacity lane (`RTS_CLIENT_PERF_UNCAPPED=1`) for the
+canonical stream. It pauses only Match's rAF ownership, keeps the snapshot stream at its authored
+30 Hz wall cadence, and drives the exact live frame path with a completion-paced two-frame pipeline.
+Every iteration still performs input, camera, entity-view preparation, fog, immutable presentation
+assembly and cloning, worker update/present, HUD, minimap, health, and observer work. The lane must
+finish with submitted = dispatched = completed, zero superseded/failed/stale responses, and no
+in-flight or pending frame. Its `match.liveFrame.workerAcknowledged` headline is independent of
+display refresh but remains a pipelined WebGL capacity measurement. Set
+`RTS_CLIENT_PERF_GPU_COMPLETE=1` to add `gl.finish()` before each worker acknowledgment; this emits
+the separately labeled conservative `match.liveFrame.gpuComplete` floor and must not be presented
+as ordinary gameplay FPS because it deliberately removes normal CPU/GPU overlap.
+
+For exact shadow-cost comparisons, `RTS_CLIENT_PERF_SHADOW_MODE=none|terrain|full` selects no cast
+shadows, the once-per-map terrain cache only, or cached terrain plus dynamic projected unit shadows.
+All three modes retain the same current ridge map, authored sun, elevation relief, entity stream,
+viewport, and presentation cadence. Historical pre-shadow fixtures were flat and are not a causal
+comparison for the current shadow workload.
+If reset occurs while a worker frame is already in flight, that job retains its prior-window epoch.
+Diagnostics expose it as `carriedInFlight` and, after settlement, `carriedCompleted`; it is excluded
+from new-window completion counts and timings. Thus every measurement window preserves
+`completed <= submitted` without cancelling or double-submitting a presentation.
+
+Opt-in renderer experiments use `AsyncGpuTimerQueries` with
+`EXT_disjoint_timer_query_webgl2`. Query results are polled only after the browser reports them
+available; disjoint intervals are discarded, pending query and retained-sample counts are bounded,
+and teardown deletes every query. `runRafIndependentGpuSamples` schedules a fixed number of warmup
+and measured callbacks through independent tasks, so a diagnostic sample count does not inherit the
+host display's rAF ceiling. It is a diagnostic building block: each renderer experiment still owns
+the exact draw callback and must report its GPU interval separately from worker CPU update/present
+and end-to-end display age.
+Set `RTS_CLIENT_PERF_DETAILED_SHADOWS=1` when invoking the performance harness or deterministic
+parity runner to enable the production detailed-unit-shadow preference in both the workload and
+its render worker. The action is recorded in the workload artifact so detailed-shadow results
+cannot be mistaken for the default-off path.
+Set `RTS_CLIENT_PERF_GPU_TIMING=1` on the performance harness to opt into bounded asynchronous GPU
+queries before renderer startup. Harness diagnostic resets also reset pending worker queries and
+samples; each presented acknowledgment returns the current bounded summary, which is persisted as
+`renderWorker.gpuShadowTiming` in the workload artifact. Unsupported implementations report
+`supported: false` rather than blocking or substituting a CPU timer.
 Worker display age covers the complete interval from host acceptance through acknowledgment,
 including bounded host-pending time, message construction/cloning, dispatch, worker update, and
 presentation. Queue age uses the same acceptance boundary through worker task start.
