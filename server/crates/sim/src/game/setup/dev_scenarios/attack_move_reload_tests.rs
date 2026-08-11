@@ -3,7 +3,7 @@ use crate::game::entity::Order;
 use crate::rules::combat::WeaponKind;
 
 #[test]
-fn scenario_starts_on_the_failure_boundary() {
+fn scenario_prepares_target_during_reload_and_attack_move_stops() {
     let setup = Game::new_attack_move_reload_acquisition_scenario(EntityKind::Tank, 1, 0x5150_0719)
         .expect("attack-move reload acquisition scenario setup should succeed");
     assert_eq!(setup.issue_after_ticks, config::TICK_HZ * 10);
@@ -61,7 +61,11 @@ fn scenario_starts_on_the_failure_boundary() {
         .entities
         .get(attacker_id)
         .expect("scenario attacker should survive the inspection pause");
-    assert_eq!(attacker.target_id(), None);
+    assert_eq!(
+        attacker.target_id(),
+        Some(target_id),
+        "the periodic Tank scan should prepare the visible target during the inspection pause"
+    );
     assert_eq!(
         attacker.weapon_cooldown(WeaponKind::TankCannon),
         cannon.cooldown,
@@ -78,7 +82,7 @@ fn scenario_starts_on_the_failure_boundary() {
     assert_eq!(
         attacker.target_id(),
         Some(target_id),
-        "attack-move should acquire the already in-range target while reloading"
+        "attack-move should retain the prepared in-range target while reloading"
     );
     assert!(
         attacker.path_is_empty(),
