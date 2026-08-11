@@ -272,7 +272,13 @@ fn apply_projectile_hits(
         if let Some(target) = entities.get_mut(id) {
             let damage =
                 map.damage_after_reduction_tile(target.pos_x, target.pos_y, projectile.damage);
-            target.apply_damage(damage, Some((projectile.owner, start, tick)));
+            target.apply_damage_from_entity(
+                damage,
+                projectile.owner,
+                projectile.caster_id,
+                start,
+                tick,
+            );
         }
     }
 }

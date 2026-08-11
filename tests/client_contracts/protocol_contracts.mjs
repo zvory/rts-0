@@ -220,6 +220,7 @@ assert(
         true,
         ...Array(5).fill(null),
         0.6,
+        3,
       ],
       [
         7,
@@ -391,6 +392,7 @@ assert(
     decoded.entities[5].panzerfaustWindupProgress === 0.6,
     "entity Panzerfaust wind-up progress decodes",
   );
+  assert(decoded.entities[5].unitsKilled === 3, "entity unit-kill count decodes");
   assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
   assert(
     decoded.smokes[0].id === 50 &&

@@ -1037,6 +1037,7 @@ mod tests {
 
     fn representative_snapshot() -> Snapshot {
         let mut worker = EntityView::new(1, 1, kinds::WORKER, 10.0, 20.0, 40, 40, states::GATHER);
+        worker.units_killed = Some(3);
         worker.facing = Some(1.5);
         worker.weapon_facing = Some(1.75);
         worker.latched_node = Some(200);
@@ -1307,6 +1308,7 @@ mod tests {
         assert_eq!(value["e"][0][9], serde_json::json!(1.75));
         assert_eq!(value["e"][0][14], serde_json::json!(200));
         assert_eq!(value["e"][0][15], serde_json::json!(9));
+        assert_eq!(value["e"][0][42], serde_json::json!(3));
         assert_eq!(
             value["e"][0][21],
             serde_json::json!([

@@ -930,6 +930,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(39, "extractorActive"),
             optional_code_field(40, "prodUpgradeQueue", "upgrade"),
             optional_field(41, "panzerfaustWindupProgress"),
+            optional_field(42, "unitsKilled"),
         ],
         event: event_slot_schemas(),
         trench: vec![

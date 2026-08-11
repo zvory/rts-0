@@ -765,7 +765,9 @@ Allied
 non-resource entities visible through team current fog expose full read-only
 inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
 legacy Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough
-status, and safe combat tracers.
+status, per-unit enemy-unit kill totals, and safe combat tracers. `unitsKilled` is present on units
+only, starts at zero, increments when that unit deals the final hostile damage to another unit, and
+does not count destroyed buildings or friendly fire.
 Combat `targetId` and `weaponFacing` for allied units are sent whenever an attack-capable entity has
 a visible acquired target, including autonomous acquisition while its explicit order state remains
 idle. They are omitted when the target is not visible in the recipient's team-current actionable
@@ -999,8 +1001,8 @@ normal Rifleman art. It is omitted for Riflemen and all other entities.
 `panzerfaustWindupProgress` is present only while a visible Panzerfaust is in its cancellable loaded
 shot wind-up. It is an authoritative normalized `0..1` value using that owner's actual 15-tick
 wind-up, or 12 ticks with Methamphetamines, so renderers can select wind-up frames without receiving
-private upgrade state. It remains the optional trailing compact entity slot in compact snapshot
-version 48.
+private upgrade state. `unitsKilled` is the optional trailing compact entity slot in compact
+snapshot version 48; it is an append-only compatible addition, so the version remains unchanged.
 `scoutPlane` is owner/full-world diagnostic private state for `scout_plane` entities. It carries
 the current orbit center and source Command Car id; enemy projections that can see the plane omit
 this state. Scout Plane

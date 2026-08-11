@@ -114,6 +114,37 @@ import { KIND } from "../../client/src/protocol.js";
 
   withFakeHudDocument(({ FakeElement }) => {
     const panel = new FakeElement("section");
+    const selectedUnit = {
+      id: 999,
+      owner: 1,
+      kind: KIND.RIFLEMAN,
+      hp: 45,
+      maxHp: 45,
+      unitsKilled: 7,
+    };
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    const state = {
+      selectedEntities() {
+        return [selectedUnit];
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+    hud._renderSelectedPanel();
+    const detail = panel.children[0];
+    assert(
+      detail?.innerHTML.includes("sel-unit-kills") &&
+        detail.innerHTML.includes("Units killed:") &&
+        detail.innerHTML.includes("<strong>7</strong>"),
+      "HUD shows the authoritative unit-kill total for exactly one selected unit",
+    );
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
     const root = {
       querySelector(selector) {
         return selector === "#selected-panel" ? panel : null;

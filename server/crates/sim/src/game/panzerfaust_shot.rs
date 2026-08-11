@@ -145,12 +145,13 @@ fn resolve(
         let damage = combat::panzerfaust_loaded_shot_damage(victim_kind, Some(TerrainKind::Open));
         let damage = map.damage_after_reduction_tile(victim_pos.0, victim_pos.1, damage);
         let source_pos = (shot.source_x, shot.source_y);
-        let attribution = teams
-            .is_enemy_owner(shot.owner, victim_owner)
-            .then_some((shot.owner, source_pos, tick));
-        let enemy_hit = attribution.is_some();
+        let enemy_hit = teams.is_enemy_owner(shot.owner, victim_owner);
         let damaged = entities.get_mut(shot.target).is_some_and(|target| {
-            let damaged = target.apply_damage(damage, attribution);
+            let damaged = if enemy_hit {
+                target.apply_damage_from_entity(damage, shot.owner, shot.attacker, source_pos, tick)
+            } else {
+                target.apply_damage(damage, None)
+            };
             if damaged && enemy_hit && triggers_tank_armor_reaction {
                 target.lock_tank_armor_reaction_source(source_pos, tick);
             }

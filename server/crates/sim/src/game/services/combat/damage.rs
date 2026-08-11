@@ -136,12 +136,11 @@ pub(super) fn apply_damage(
     let damaged = if primary_missed {
         false
     } else if let Some(v) = entities.get_mut(shot_victim) {
-        let attribution = teams.is_enemy_owner(attacker_owner, v.owner).then_some((
-            attacker_owner,
-            (ax, ay),
-            tick,
-        ));
-        v.apply_damage(effective_dmg, attribution)
+        if teams.is_enemy_owner(attacker_owner, v.owner) {
+            v.apply_damage_from_entity(effective_dmg, attacker_owner, attacker, (ax, ay), tick)
+        } else {
+            v.apply_damage(effective_dmg, None)
+        }
     } else {
         false
     };
@@ -335,7 +334,7 @@ fn apply_overpenetration(
             .map(|e| e.kind == EntityKind::Tank || e.is_building())
             .unwrap_or(false);
         if let Some(v) = entities.get_mut(id) {
-            if v.apply_damage(effective_dmg, Some((attacker_owner, (ax, ay), tick)))
+            if v.apply_damage_from_entity(effective_dmg, attacker_owner, attacker, (ax, ay), tick)
                 && combat_rules::weapon_triggers_tank_armor_reaction(weapon_profile)
             {
                 v.lock_tank_armor_reaction_source((ax, ay), tick);

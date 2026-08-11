@@ -165,7 +165,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
 - **Team-safe damage attribution**: direct-fire damage, shot interception, overpenetration, damage
   metadata, worker-retreat triggers, under-attack notices, and kill credit use the authoritative
   team relationship snapshot. Same-team entities are not legal direct-fire or overpenetration
-  victims, and same-team damage does not update `last_damage_*` metadata or award kill credit.
+  victims, and same-team damage does not update `last_damage_*` metadata or award player/unit kill credit.
   If unattributed damage deals the killing blow, stale prior damage attribution is cleared so an
   older enemy hit cannot receive credit for a friendly-fire kill. Mortar and artillery splash remain
   intentional friendly-fire surfaces: they can damage owned and allied entities in the blast radius,

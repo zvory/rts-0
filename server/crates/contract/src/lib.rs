@@ -876,6 +876,10 @@ pub struct EntityView {
     pub max_hp: u32,
     pub state: String,
 
+    /// Enemy units killed by this unit. Omitted for buildings and resource nodes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub units_killed: Option<u32>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub facing: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -981,6 +985,7 @@ impl EntityView {
             hp,
             max_hp,
             state: state.to_string(),
+            units_killed: None,
             facing: None,
             weapon_facing: None,
             weapon_range_tiles: None,

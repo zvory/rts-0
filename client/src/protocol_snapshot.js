@@ -323,7 +323,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 42);
+  const fields = readArray(record, `entity ${index}`, 43);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -370,6 +370,7 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "extractorActive", fields, 39, readBool);
   assignOptionalCodeList(entity, "prodUpgradeQueue", fields, 40, UPGRADE_BY_CODE);
   assignOptional(entity, "panzerfaustWindupProgress", fields, 41, readNumber);
+  assignOptional(entity, "unitsKilled", fields, 42, readU32);
   return entity;
 }
 
