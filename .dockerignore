@@ -86,3 +86,4 @@ client/assets/rigs/**/*.*
 !client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png
 !client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png
 !client/assets/rigs/tank-ps1/tank-atlas.png
+!client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png

@@ -277,6 +277,7 @@ function atlasPortrait(atlas, teamColor) {
   const referenceIndex = atlas.grid.cells?.indexOf?.("reference.full") ?? -1;
   if (
     referenceIndex >= 0 &&
+    atlas.iconImage &&
     Number.isInteger(atlas.grid.columns) &&
     Number.isInteger(atlas.grid.rows)
   ) {
@@ -284,7 +285,7 @@ function atlasPortrait(atlas, teamColor) {
     const frameHeight = Math.ceil(atlas.grid.height / atlas.grid.rows);
     return {
       source: "png-atlas-reference",
-      image: sourceAssetUrl(atlas.grid.sourceSheet, atlas.grid.imageVersion),
+      image: atlas.iconImage,
       sheetWidth: atlas.grid.width,
       sheetHeight: atlas.grid.height,
       frame: {
@@ -380,12 +381,6 @@ function translatedVisibleFrame(visibleFrame, baseFrame, selectedFrame) {
     x: visibleFrame.x + finiteNumber(selectedFrame.x) - finiteNumber(baseFrame.x),
     y: visibleFrame.y + finiteNumber(selectedFrame.y) - finiteNumber(baseFrame.y),
   };
-}
-
-function sourceAssetUrl(sourcePath, version = "") {
-  if (!sourcePath) return "";
-  const path = sourcePath.startsWith("client/") ? sourcePath.slice("client".length) : sourcePath;
-  return version ? `${path}?v=${encodeURIComponent(version)}` : path;
 }
 
 function rasterIconMarkup({
