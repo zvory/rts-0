@@ -273,7 +273,8 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   remain authoritative economy deductions.
 - **Methamphetamines research**: Training Centres can queue one permanent player upgrade costing
   100 steel / 25 oil and taking 600 ticks. Once completed, all current and future owned riflemen
-  use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.
+  use the moving-fire rifleman model permanently, move at tank speed, and reset their rifle cooldown
+  to 10 ticks instead of the base 16 ticks.
   Legacy `charge` commands remain decodable but have no eligible carriers, cooldown, or runtime
   status.
 - **Advanced research locks**: Engineering Complex can queue `anti_tank_gun_unlock` for 100 steel / 50 oil
