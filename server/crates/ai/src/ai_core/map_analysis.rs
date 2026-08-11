@@ -14,7 +14,7 @@ use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload}
 mod attack_paths;
 mod chokes;
 mod regions;
-pub(crate) use attack_paths::{AiAttackPath, AiAttackPathReport};
+pub(crate) use attack_paths::{AiAttackPath, AiAttackPathReport, AiDefendedBase};
 use chokes::build_chokes;
 use regions::{build_regions, nearest_region, region_id_for_tile};
 

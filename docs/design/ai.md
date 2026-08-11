@@ -213,7 +213,14 @@ takes temporary Factory priority and joins those Tanks as a single vision-suppor
 Expansion, a second Factory, Methamphetamines, and other optional spending wait until the initial
 Tank core exists. The profile uses the shared decision and action layers, receives only
 fog-filtered observations, and issues ordinary validated player commands for spending, placement,
-production, and combat.
+production, and combat. Its entrenched infantry defense is anchored to the final shared approach
+10-14 tiles from each protected Resource Depot, including a submitted expansion while its builder
+is traveling. Additional Rifleman coverage can move that line outward gradually, with a hard
+22-tile cap. The first two Machine Gunners hold the approach center while Riflemen form a
+two-tile-overlap triangular lattice; only surplus Riflemen may form one two-unit reserve on a
+meaningfully separate flank per base. Submitted construction footprints remain clear. Threats are
+reinforced before they cross the line, without pulling stationary Tanks or entrenched infantry out
+of their positional bonuses, and borrowed mobile responders return behind the same line afterward.
 
 ### Self-play and arena tools
 

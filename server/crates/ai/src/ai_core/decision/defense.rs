@@ -1,6 +1,7 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, squared, tile_center};
 use super::resources::forward_steel_cluster_center;
 use super::*;
+use crate::ai_core::map_analysis::{AiAttackPath, AiDefendedBase};
 
 pub(super) const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
 
@@ -17,7 +18,15 @@ pub(super) const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 const DEFENSIVE_FIRING_LANE_TILES: f32 = 14.0;
 const DEFENSIVE_FIRING_POSITION_SEARCH_TILES: i32 = 6;
 const JEFF_DEFENSIVE_RANGE_OVERLAP_TILES: f32 = 2.0;
-const JEFF_BREAKTHROUGH_BUFFER_TILES: f32 = 2.0;
+const JEFF_DEFENSIVE_LINE_MIN_DISTANCE_TILES: u32 = 10;
+const JEFF_DEFENSIVE_LINE_EARLY_MAX_DISTANCE_TILES: u32 = 14;
+const JEFF_DEFENSIVE_LINE_MAX_DISTANCE_TILES: u32 = 22;
+const JEFF_DEFENSIVE_LINE_GROWTH_RIFLEMEN: usize = 12;
+const JEFF_DEFENSIVE_LINE_RIFLEMEN_PER_EXTRA_TILE: usize = 4;
+const JEFF_SHARED_APPROACH_RADIUS_TILES: f32 = 6.0;
+const JEFF_FLANK_RESERVE_SEPARATION_TILES: f32 = 12.0;
+const JEFF_PRIMARY_LINE_MIN_RIFLEMEN: usize = 6;
+const JEFF_BREAKTHROUGH_WARNING_TILES: f32 = 6.0;
 const JEFF_STATIONARY_TANK_RANGE_TILES: f32 = 14.0;
 const JEFF_RESERVE_LINE_DEPTH_TILES: f32 = 4.0;
 
@@ -375,7 +384,7 @@ pub(super) fn machine_gunner_meets_replacement_health(hp: u32, threshold: u8) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_core::observation::{AiEconomy, AiResourceSummary};
+    use crate::ai_core::observation::{AiBuildIntent, AiEconomy, AiResourceSummary};
     use rts_sim::protocol::{terrain, MapInfo, PlayerStart, StartPayload};
 
     fn los_test_observation(blocker: EntityKind) -> AiObservation {
@@ -496,6 +505,38 @@ mod tests {
         }
     }
 
+    fn test_defended_base(tile_x: u32, tile_y: u32) -> AiDefendedBase {
+        AiDefendedBase {
+            id: 1,
+            label: "home".to_string(),
+            tile_x,
+            tile_y,
+            resource_cluster_id: None,
+            added_attack_vectors: 0,
+            open_approaches: 0,
+            shared_route_percent: 100,
+            distance_from_home_tiles: 0.0,
+        }
+    }
+
+    fn test_attack_path(id: u32, alternative_rank: u32, tiles: Vec<[u32; 2]>) -> AiAttackPath {
+        let intercept = tiles[tiles.len() / 2];
+        AiAttackPath {
+            id,
+            attacker_player_id: 2,
+            defended_base_id: 1,
+            alternative_rank,
+            length_tiles: tiles.len() as f32,
+            bottleneck_width_tiles: 4,
+            bottleneck_tile_x: intercept[0],
+            bottleneck_tile_y: intercept[1],
+            intercept_tile_x: intercept[0],
+            intercept_tile_y: intercept[1],
+            crossed_choke_ids: Vec::new(),
+            tiles,
+        }
+    }
+
     #[test]
     fn machine_gunner_below_half_health_requires_replacement() {
         let max_hp = config::unit_stats(EntityKind::MachineGunner)
@@ -549,6 +590,52 @@ mod tests {
     }
 
     #[test]
+    fn jeff_defense_line_stays_in_early_ring_then_expands_with_rifle_coverage() {
+        let base = test_defended_base(50, 50);
+        let primary = test_attack_path(1, 1, (50..=80).rev().map(|x| [x, 50]).collect());
+        let alternative = test_attack_path(2, 2, primary.tiles.clone());
+        let routes = vec![&primary, &alternative];
+
+        assert_eq!(
+            jeff_defense_distance_tiles(&primary, &base, &routes, 12),
+            14
+        );
+        assert_eq!(
+            jeff_defense_distance_tiles(&primary, &base, &routes, 16),
+            15
+        );
+        assert_eq!(
+            jeff_defense_distance_tiles(&primary, &base, &routes, usize::MAX),
+            22
+        );
+    }
+
+    #[test]
+    fn jeff_defense_line_concentrates_near_base_and_reserves_only_a_real_flank() {
+        let base = test_defended_base(50, 50);
+        let primary = test_attack_path(1, 1, (50..=80).rev().map(|x| [x, 50]).collect());
+        let shared = test_attack_path(2, 2, primary.tiles.clone());
+        let flank = test_attack_path(3, 2, (50..=80).rev().map(|y| [50, y]).collect());
+
+        let shared_routes = vec![&primary, &shared];
+        assert_eq!(
+            jeff_defense_distance_tiles(&primary, &base, &shared_routes, 8),
+            14
+        );
+        assert!(most_divergent_alternative_route(&primary, &base, &shared_routes, 8).is_none());
+
+        let flank_routes = vec![&primary, &flank];
+        assert_eq!(
+            jeff_defense_distance_tiles(&primary, &base, &flank_routes, 8),
+            10
+        );
+        assert_eq!(
+            most_divergent_alternative_route(&primary, &base, &flank_routes, 8).map(|path| path.id),
+            Some(3)
+        );
+    }
+
+    #[test]
     fn jeff_breakthrough_preserves_covering_tank_then_pulls_only_mobile_value_needed() {
         let analysis = open_test_map_analysis();
         let mut observation = los_test_observation(EntityKind::Depot);
@@ -581,6 +668,57 @@ mod tests {
             jeff_breakthrough_response(&observation, Some(&analysis), &BTreeSet::new(), Some(2));
         assert_eq!(uncovered.targets, vec![30]);
         assert_eq!(uncovered.responders, vec![3]);
+    }
+
+    #[test]
+    fn jeff_breakthrough_keeps_stationary_entrenched_line_coherent() {
+        let analysis = open_test_map_analysis();
+        let mut observation = los_test_observation(EntityKind::Depot);
+        observation.owned = vec![
+            test_entity(1, EntityKind::ResourceDepot, 5.5, 5.5),
+            test_entity(2, EntityKind::Rifleman, 5.5, 5.5),
+            test_entity(3, EntityKind::Rifleman, 25.5, 25.5),
+        ];
+        observation.owned[2].state = AiEntityState::Move;
+        observation.visible_enemies = vec![test_entity(30, EntityKind::Rifleman, 18.5, 5.5)];
+        observation.upgrades.push(UpgradeKind::Entrenchment);
+
+        let response =
+            jeff_breakthrough_response(&observation, Some(&analysis), &BTreeSet::new(), None);
+        assert_eq!(response.targets, vec![30]);
+        assert_eq!(response.responders, vec![3]);
+    }
+
+    #[test]
+    fn jeff_protects_a_resource_depot_while_it_is_under_construction() {
+        let mut observation = los_test_observation(EntityKind::Depot);
+        observation.owned = vec![test_entity(1, EntityKind::ResourceDepot, 5.5, 5.5)];
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            10,
+            EntityKind::ResourceDepot,
+            20,
+            20,
+        ));
+
+        assert_eq!(protected_resource_depot_count(&observation), 2);
+        let tile_size = observation.map.tile_size as f32;
+        assert!(defensive_position_conflicts_with_pending_build(
+            &observation,
+            20.5 * tile_size,
+            20.5 * tile_size,
+        ));
+        assert!(!defensive_position_conflicts_with_pending_build(
+            &observation,
+            10.5 * tile_size,
+            10.5 * tile_size,
+        ));
+
+        observation.pending_builds.clear();
+        observation
+            .owned
+            .push(test_entity(2, EntityKind::ResourceDepot, 20.5, 20.5));
+        observation.owned[1].is_complete = false;
+        assert_eq!(protected_resource_depot_count(&observation), 2);
     }
 
     #[test]
@@ -900,14 +1038,7 @@ pub(super) fn stage_jeff_attack_path_defense(
     riflemen: &[u32],
 ) -> Option<Vec<u32>> {
     let analysis = map_analysis?;
-    let base_count = observation
-        .owned
-        .iter()
-        .filter(|entity| {
-            entity.kind == EntityKind::ResourceDepot && entity.is_complete && entity.hp > 0
-        })
-        .count()
-        .clamp(1, 2);
+    let base_count = protected_resource_depot_count(observation).clamp(1, 2);
     let report = analysis.likely_attack_paths(observation.player_id, base_count, 3);
     let mut routes = report.paths.iter().collect::<Vec<_>>();
     routes.sort_by_key(|path| (path.alternative_rank, path.defended_base_id, path.id));
@@ -948,6 +1079,7 @@ pub(super) fn stage_jeff_attack_path_defense(
     } else {
         &primary_routes
     };
+    let riflemen_per_primary = riflemen.len().div_ceil(center_routes.len());
 
     for (index, unit_id) in machine_gunners.into_iter().enumerate() {
         let route_index = index % center_routes.len();
@@ -958,7 +1090,17 @@ pub(super) fn stage_jeff_attack_path_defense(
         let slot_on_route = index / center_routes.len();
         let center_index = units_on_route.saturating_sub(1) as f32 * 0.5;
         let lateral_offset_tiles = (slot_on_route as f32 - center_index) * machine_gunner_spacing;
-        let Some(lane) = attack_lane_for_path(route, tile_size) else {
+        let Some(base) = report
+            .bases
+            .iter()
+            .find(|base| base.id == route.defended_base_id)
+        else {
+            continue;
+        };
+        let base_routes = routes_for_defended_base(&routes, route.defended_base_id);
+        let Some(lane) =
+            jeff_defense_lane(route, base, &base_routes, riflemen_per_primary, tile_size)
+        else {
             continue;
         };
         let Some(target) = clear_attack_path_assignment(
@@ -983,18 +1125,44 @@ pub(super) fn stage_jeff_attack_path_defense(
         }
     }
 
-    // Riflemen cover the edges of every plausible lane, not just the primary route. Extra units
-    // alternate between a front 010101 rank and a rear 101010 rank. The half-slot lateral stagger
-    // and equilateral-triangle depth preserve the requested two-tile range overlap diagonally as
-    // well as along each rank.
-    let flank_routes = &routes;
-    for (index, unit_id) in riflemen.into_iter().enumerate() {
-        let route_index = (index / 2) % flank_routes.len();
-        let pair_on_route = index / (flank_routes.len() * 2);
-        let slot_on_route = pair_on_route * 2 + index % 2;
+    // Keep the triangular 010101 / 101010 lattice concentrated on the final shared approach.
+    // Only riflemen beyond a six-per-primary core may form one bounded two-unit reserve for a
+    // genuinely separate approach to each defended base. This prevents synthetic alternative
+    // routes from fragmenting the line while still watching a real roundabout flank.
+    let mut reserve_routes = center_routes
+        .iter()
+        .filter_map(|primary| {
+            let base = report
+                .bases
+                .iter()
+                .find(|base| base.id == primary.defended_base_id)?;
+            let base_routes = routes_for_defended_base(&routes, primary.defended_base_id);
+            most_divergent_alternative_route(primary, base, &base_routes, riflemen_per_primary)
+        })
+        .collect::<Vec<_>>();
+    reserve_routes.sort_by_key(|path| (path.defended_base_id, path.alternative_rank, path.id));
+    reserve_routes.dedup_by_key(|path| path.defended_base_id);
+    let affordable_reserve_pairs = riflemen
+        .len()
+        .saturating_sub(center_routes.len() * JEFF_PRIMARY_LINE_MIN_RIFLEMEN)
+        / 2;
+    reserve_routes.truncate(affordable_reserve_pairs);
+    let primary_rifle_count = riflemen.len().saturating_sub(reserve_routes.len() * 2);
+    let mut rifle_assignments = Vec::with_capacity(riflemen.len());
+    for index in 0..primary_rifle_count {
+        rifle_assignments.push(center_routes[(index / 2) % center_routes.len()]);
+    }
+    for route in reserve_routes {
+        rifle_assignments.extend([route, route]);
+    }
+    let mut slots_by_route = BTreeMap::<u32, usize>::new();
+
+    for (unit_id, route) in riflemen.into_iter().zip(rifle_assignments) {
+        let slot_on_route = *slots_by_route.entry(route.id).or_default();
+        slots_by_route.insert(route.id, slot_on_route + 1);
         let machine_gunners_on_route = center_routes
             .iter()
-            .position(|center_path| center_path.id == flank_routes[route_index].id)
+            .position(|center_path| center_path.id == route.id)
             .map(|center_route_index| {
                 (center_route_index..machine_gunner_count)
                     .step_by(center_routes.len())
@@ -1008,7 +1176,17 @@ pub(super) fn stage_jeff_attack_path_defense(
             rifle_from_mg_spacing,
             rifle_spacing,
         );
-        let Some(lane) = attack_lane_for_path(flank_routes[route_index], tile_size) else {
+        let Some(base) = report
+            .bases
+            .iter()
+            .find(|base| base.id == route.defended_base_id)
+        else {
+            continue;
+        };
+        let base_routes = routes_for_defended_base(&routes, route.defended_base_id);
+        let Some(lane) =
+            jeff_defense_lane(route, base, &base_routes, riflemen_per_primary, tile_size)
+        else {
             continue;
         };
         let rank_center = (
@@ -1120,39 +1298,142 @@ struct AttackPathLane {
     toward_attacker: (f32, f32),
 }
 
-fn attack_lane_for_path(
-    path: &crate::ai_core::map_analysis::AiAttackPath,
+fn routes_for_defended_base<'a>(
+    routes: &[&'a AiAttackPath],
+    defended_base_id: u32,
+) -> Vec<&'a AiAttackPath> {
+    routes
+        .iter()
+        .copied()
+        .filter(|path| path.defended_base_id == defended_base_id)
+        .collect()
+}
+
+fn jeff_defense_distance_tiles(
+    primary_path: &AiAttackPath,
+    base: &AiDefendedBase,
+    base_routes: &[&AiAttackPath],
+    riflemen_for_primary: usize,
+) -> u32 {
+    let early_distance = (JEFF_DEFENSIVE_LINE_MIN_DISTANCE_TILES
+        ..=JEFF_DEFENSIVE_LINE_EARLY_MAX_DISTANCE_TILES)
+        .rev()
+        .find(|distance| {
+            let Some((_, primary_tile)) =
+                path_tile_at_base_distance(primary_path, base, *distance as f32)
+            else {
+                return false;
+            };
+            base_routes.iter().all(|route| {
+                path_tile_at_base_distance(route, base, *distance as f32)
+                    .map(|(_, tile)| {
+                        tile_separation_tiles(primary_tile, tile)
+                            <= JEFF_SHARED_APPROACH_RADIUS_TILES
+                    })
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(JEFF_DEFENSIVE_LINE_MIN_DISTANCE_TILES);
+    let added_distance = riflemen_for_primary.saturating_sub(JEFF_DEFENSIVE_LINE_GROWTH_RIFLEMEN)
+        / JEFF_DEFENSIVE_LINE_RIFLEMEN_PER_EXTRA_TILE;
+    early_distance
+        .saturating_add(added_distance as u32)
+        .min(JEFF_DEFENSIVE_LINE_MAX_DISTANCE_TILES)
+}
+
+fn path_tile_at_base_distance(
+    path: &AiAttackPath,
+    base: &AiDefendedBase,
+    distance_tiles: f32,
+) -> Option<(usize, [u32; 2])> {
+    path.tiles
+        .iter()
+        .copied()
+        .enumerate()
+        .min_by(|(_, left), (_, right)| {
+            let left_delta = (tile_distance_from_base(*left, base) - distance_tiles).abs();
+            let right_delta = (tile_distance_from_base(*right, base) - distance_tiles).abs();
+            left_delta.total_cmp(&right_delta)
+        })
+}
+
+fn tile_distance_from_base(tile: [u32; 2], base: &AiDefendedBase) -> f32 {
+    let dx = tile[0] as f32 - base.tile_x as f32;
+    let dy = tile[1] as f32 - base.tile_y as f32;
+    dx.hypot(dy)
+}
+
+fn tile_separation_tiles(left: [u32; 2], right: [u32; 2]) -> f32 {
+    let dx = left[0] as f32 - right[0] as f32;
+    let dy = left[1] as f32 - right[1] as f32;
+    dx.hypot(dy)
+}
+
+fn most_divergent_alternative_route<'a>(
+    primary_path: &AiAttackPath,
+    base: &AiDefendedBase,
+    base_routes: &[&'a AiAttackPath],
+    riflemen_for_primary: usize,
+) -> Option<&'a AiAttackPath> {
+    let distance =
+        jeff_defense_distance_tiles(primary_path, base, base_routes, riflemen_for_primary) as f32;
+    let (_, primary_tile) = path_tile_at_base_distance(primary_path, base, distance)?;
+    base_routes
+        .iter()
+        .copied()
+        .filter(|route| route.alternative_rank > 1)
+        .filter_map(|route| {
+            let (_, route_tile) = path_tile_at_base_distance(route, base, distance)?;
+            Some((route, tile_separation_tiles(primary_tile, route_tile)))
+        })
+        .filter(|(_, separation)| separation > &JEFF_FLANK_RESERVE_SEPARATION_TILES)
+        .max_by(
+            |(left_path, left_separation), (right_path, right_separation)| {
+                left_separation
+                    .total_cmp(right_separation)
+                    .then_with(|| right_path.alternative_rank.cmp(&left_path.alternative_rank))
+                    .then_with(|| right_path.id.cmp(&left_path.id))
+            },
+        )
+        .map(|(route, _)| route)
+}
+
+fn jeff_defense_lane(
+    path: &AiAttackPath,
+    base: &AiDefendedBase,
+    base_routes: &[&AiAttackPath],
+    riflemen_for_primary: usize,
     tile_size: f32,
 ) -> Option<AttackPathLane> {
-    let intercept = (path.intercept_tile_x, path.intercept_tile_y);
-    let intercept_index = path
-        .tiles
+    let primary_path = base_routes
         .iter()
-        .position(|tile| *tile == [intercept.0, intercept.1])
-        .unwrap_or_else(|| {
-            path.tiles
-                .iter()
-                .enumerate()
-                .min_by_key(|(_, tile)| {
-                    let dx = i64::from(tile[0]) - i64::from(intercept.0);
-                    let dy = i64::from(tile[1]) - i64::from(intercept.1);
-                    dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy))
-                })
-                .map(|(index, _)| index)
-                .unwrap_or(0)
-        });
-    let before = path.tiles.get(intercept_index.saturating_sub(3))?;
+        .copied()
+        .find(|route| route.alternative_rank == 1)
+        .unwrap_or(path);
+    let distance =
+        jeff_defense_distance_tiles(primary_path, base, base_routes, riflemen_for_primary) as f32;
+    let (line_index, line_tile) = path_tile_at_base_distance(path, base, distance)?;
+    attack_lane_for_path_index(path, line_index, line_tile, tile_size)
+}
+
+fn attack_lane_for_path_index(
+    path: &AiAttackPath,
+    line_index: usize,
+    line_tile: [u32; 2],
+    tile_size: f32,
+) -> Option<AttackPathLane> {
+    let before = path.tiles.get(line_index.saturating_sub(3))?;
     let after = path
         .tiles
-        .get((intercept_index + 3).min(path.tiles.len().saturating_sub(1)))?;
+        .get((line_index + 3).min(path.tiles.len().saturating_sub(1)))?;
     let toward_attacker = normalized_direction(
         (after[0] as f32, after[1] as f32),
         (before[0] as f32, before[1] as f32),
     )?;
     Some(AttackPathLane {
         center: (
-            (intercept.0 as f32 + 0.5) * tile_size,
-            (intercept.1 as f32 + 0.5) * tile_size,
+            (line_tile[0] as f32 + 0.5) * tile_size,
+            (line_tile[1] as f32 + 0.5) * tile_size,
         ),
         toward_attacker,
     })
@@ -1187,7 +1468,8 @@ fn clear_attack_path_assignment(
             )
         })
         .find(|candidate| {
-            defensive_position_is_open(observation, Some(analysis), candidate.0, candidate.1)
+            !defensive_position_conflicts_with_pending_build(observation, candidate.0, candidate.1)
+                && defensive_position_is_open(observation, Some(analysis), candidate.0, candidate.1)
                 && defensive_firing_sector_is_clear(
                     observation,
                     Some(analysis),
@@ -1196,6 +1478,26 @@ fn clear_attack_path_assignment(
                     DEFENSIVE_FIRING_LANE_TILES,
                 )
         })
+}
+
+fn defensive_position_conflicts_with_pending_build(
+    observation: &AiObservation,
+    x: f32,
+    y: f32,
+) -> bool {
+    let (unit_tile_x, unit_tile_y) = world_tile(observation.map, x, y);
+    observation.pending_builds.iter().any(|build| {
+        let Some(stats) = config::building_stats(build.kind) else {
+            return false;
+        };
+        // One tile of clearance accounts for the unit body and prevents a defender standing just
+        // outside the authored footprint from still blocking authoritative placement.
+        let left = build.tile_x.saturating_sub(1);
+        let top = build.tile_y.saturating_sub(1);
+        let right = build.tile_x.saturating_add(stats.foot_w);
+        let bottom = build.tile_y.saturating_add(stats.foot_h);
+        unit_tile_x >= left && unit_tile_x <= right && unit_tile_y >= top && unit_tile_y <= bottom
+    })
 }
 
 fn stage_machine_gunner_defensive_line(
@@ -1727,8 +2029,20 @@ pub(super) fn jeff_breakthrough_response(
     let Some(analysis) = map_analysis else {
         return JeffBreakthroughResponse::default();
     };
-    let base_count = completed_resource_depot_count(observation).clamp(1, 2);
-    let report = analysis.likely_attack_paths(observation.player_id, base_count, 1);
+    let base_count = protected_resource_depot_count(observation).clamp(1, 2);
+    let report = analysis.likely_attack_paths(observation.player_id, base_count, 3);
+    let routes = report.paths.iter().collect::<Vec<_>>();
+    let primary_route_count = routes
+        .iter()
+        .filter(|path| path.alternative_rank == 1)
+        .count()
+        .max(1);
+    let riflemen_per_primary = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Rifleman && unit.hp > 0 && unit.is_complete)
+        .count()
+        .div_ceil(primary_route_count);
     let tile_size = observation.map.tile_size.max(1) as f32;
     let building_danger2 = squared(BUILDING_DEFENSE_RADIUS_TILES * tile_size);
     let buildings = observation
@@ -1745,32 +2059,39 @@ pub(super) fn jeff_breakthrough_response(
                 dist2(enemy.x, enemy.y, building.x, building.y) <= building_danger2
             });
             immediate_building_danger
-                || report.paths.iter().any(|path| {
-                    let Some(base) = report
-                        .bases
-                        .iter()
-                        .find(|base| base.id == path.defended_base_id)
-                    else {
-                        return false;
-                    };
-                    let base_world = (
-                        (base.tile_x as f32 + 0.5) * tile_size,
-                        (base.tile_y as f32 + 0.5) * tile_size,
-                    );
-                    let intercept_world = (
-                        (path.intercept_tile_x as f32 + 0.5) * tile_size,
-                        (path.intercept_tile_y as f32 + 0.5) * tile_size,
-                    );
-                    let enemy_distance = dist2(enemy.x, enemy.y, base_world.0, base_world.1).sqrt();
-                    let line_distance = dist2(
-                        intercept_world.0,
-                        intercept_world.1,
-                        base_world.0,
-                        base_world.1,
-                    )
-                    .sqrt();
-                    enemy_distance <= line_distance + JEFF_BREAKTHROUGH_BUFFER_TILES * tile_size
-                })
+                || report
+                    .paths
+                    .iter()
+                    .filter(|path| path.alternative_rank == 1)
+                    .any(|path| {
+                        let Some(base) = report
+                            .bases
+                            .iter()
+                            .find(|base| base.id == path.defended_base_id)
+                        else {
+                            return false;
+                        };
+                        let base_world = (
+                            (base.tile_x as f32 + 0.5) * tile_size,
+                            (base.tile_y as f32 + 0.5) * tile_size,
+                        );
+                        let base_routes = routes_for_defended_base(&routes, path.defended_base_id);
+                        let Some(line) = jeff_defense_lane(
+                            path,
+                            base,
+                            &base_routes,
+                            riflemen_per_primary,
+                            tile_size,
+                        ) else {
+                            return false;
+                        };
+                        let enemy_distance =
+                            dist2(enemy.x, enemy.y, base_world.0, base_world.1).sqrt();
+                        let line_distance =
+                            dist2(line.center.0, line.center.1, base_world.0, base_world.1).sqrt();
+                        enemy_distance
+                            <= line_distance + JEFF_BREAKTHROUGH_WARNING_TILES * tile_size
+                    })
         })
         .collect::<Vec<_>>();
     threats.sort_by(|left, right| {
@@ -1794,8 +2115,11 @@ pub(super) fn jeff_breakthrough_response(
         .filter(|unit| {
             matches!(
                 unit.kind,
-                EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::AntiTankGun
-            ) || Some(unit.id) == home_defensive_tank
+                EntityKind::Rifleman
+                    | EntityKind::MachineGunner
+                    | EntityKind::AntiTankGun
+                    | EntityKind::Tank
+            )
         })
         .filter(|unit| {
             let range_tiles = preserved_defensive_range_tiles(unit.kind, entrenched);
@@ -1826,6 +2150,17 @@ pub(super) fn jeff_breakthrough_response(
             EntityKind::Tank | EntityKind::ScoutCar | EntityKind::CommandCar
         )
     });
+    let positionally_committed_units = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.hp > 0 && unit.is_complete && unit.state != AiEntityState::Move)
+        .filter(|unit| {
+            unit.kind == EntityKind::Tank
+                || (entrenched
+                    && matches!(unit.kind, EntityKind::Rifleman | EntityKind::MachineGunner))
+        })
+        .map(|unit| unit.id)
+        .collect::<BTreeSet<_>>();
     let mut candidates = observation
         .owned
         .iter()
@@ -1842,6 +2177,10 @@ pub(super) fn jeff_breakthrough_response(
         // again would double-count its value and throw away the positional benefit we are trying
         // to preserve.
         .filter(|unit| !covering_units.contains(&unit.id))
+        // A stationary tank or entrenched infantry group is still part of the coherent line even
+        // before its target enters firing range. Pull mobile reserves first instead of dismantling
+        // that line one unit at a time.
+        .filter(|unit| !positionally_committed_units.contains(&unit.id))
         .collect::<Vec<_>>();
     candidates.sort_by(|left, right| {
         responder_priority(left, armored_threat, home_defensive_tank)
@@ -1871,14 +2210,19 @@ pub(super) fn jeff_breakthrough_response(
     }
 }
 
-fn completed_resource_depot_count(observation: &AiObservation) -> usize {
-    observation
+fn protected_resource_depot_count(observation: &AiObservation) -> usize {
+    let visible_depots = observation
         .owned
         .iter()
-        .filter(|entity| {
-            entity.kind == EntityKind::ResourceDepot && entity.is_complete && entity.hp > 0
-        })
-        .count()
+        .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.hp > 0)
+        .count();
+    let submitted_expansion = observation
+        .pending_builds
+        .iter()
+        .any(|build| build.kind == EntityKind::ResourceDepot);
+    // A submitted expansion is already a paid strategic commitment even while its builder is
+    // traveling and before the scaffold enters the entity list. Start protecting it immediately.
+    visible_depots.saturating_add(usize::from(submitted_expansion))
 }
 
 fn preserved_defensive_range_tiles(kind: EntityKind, entrenched: bool) -> f32 {
@@ -1953,15 +2297,32 @@ pub(super) fn stage_jeff_borrowed_defenders_return(
     let analysis = map_analysis?;
     let report = analysis.likely_attack_paths(
         observation.player_id,
-        completed_resource_depot_count(observation).clamp(1, 2),
-        1,
+        protected_resource_depot_count(observation).clamp(1, 2),
+        3,
     );
+    let routes = report.paths.iter().collect::<Vec<_>>();
     let path = report
         .paths
         .iter()
         .find(|path| path.alternative_rank == 1)?;
+    let base = report
+        .bases
+        .iter()
+        .find(|base| base.id == path.defended_base_id)?;
+    let primary_route_count = routes
+        .iter()
+        .filter(|route| route.alternative_rank == 1)
+        .count()
+        .max(1);
+    let riflemen_per_primary = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Rifleman && unit.hp > 0 && unit.is_complete)
+        .count()
+        .div_ceil(primary_route_count);
+    let base_routes = routes_for_defended_base(&routes, path.defended_base_id);
     let tile_size = observation.map.tile_size.max(1) as f32;
-    let lane = attack_lane_for_path(path, tile_size)?;
+    let lane = jeff_defense_lane(path, base, &base_routes, riflemen_per_primary, tile_size)?;
     let perpendicular = (-lane.toward_attacker.1, lane.toward_attacker.0);
     let ready = borrowed_units
         .iter()
