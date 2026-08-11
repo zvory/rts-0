@@ -175,7 +175,7 @@ pub(super) fn resolve_target_for_weapon(
         policy_id: combat_rules::default_target_priority_policy(attacker.kind),
         can_retain_moving_target: attacker_can_fire_while_moving,
     };
-    let mut candidates = target_candidates(
+    let candidates = target_candidates(
         map,
         entities,
         teams,
@@ -188,9 +188,9 @@ pub(super) fn resolve_target_for_weapon(
         weapon_range_px,
         attacker.target_id(),
     );
-    while let Some(candidate) = super::priority::take_best_candidate(
+    for candidate in super::priority::ranked_candidates(
         &context,
-        &mut candidates,
+        candidates,
         mode_requires_currently_fireable_targets(mode),
         aggressive_auto_acquisition_prefers_currently_fireable_targets(mode),
     ) {

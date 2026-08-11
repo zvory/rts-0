@@ -197,12 +197,10 @@ fn tank_periodic_reacquisition_due(
     tick: u32,
 ) -> bool {
     matches!(mode, CombatMode::Aggressive | CombatMode::Opportunistic)
-        && entities
-            .get(id)
-            .is_some_and(|entity| {
-                crate::rules::combat::default_weapon_kind(entity.kind)
-                    == Some(crate::rules::combat::WeaponKind::TankCannon)
-            })
+        && entities.get(id).is_some_and(|entity| {
+            crate::rules::combat::default_weapon_kind(entity.kind)
+                == Some(crate::rules::combat::WeaponKind::TankCannon)
+        })
         && tick
             .wrapping_add(id)
             .is_multiple_of(TANK_REACQUIRE_INTERVAL_TICKS)
