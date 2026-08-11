@@ -22,6 +22,14 @@ const ENDGAME_SEARCH_OFFSETS: [(f32, f32); 17] = [
 ];
 
 pub(super) const OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES: f32 = 14.0;
+const JEFF_RIFLE_SCREEN_MIN: usize = 6;
+const JEFF_RIFLE_SCREEN_MAX: usize = 16;
+const JEFF_RIFLE_SCREEN_AHEAD_TILES: f32 = 5.0;
+const JEFF_RIFLE_SCREEN_LATERAL_SPACING_TILES: f32 = 2.0;
+const JEFF_RIFLE_SCREEN_RANK_DEPTH_TILES: f32 = 2.0;
+const JEFF_ANTI_TANK_GUN_DETECTION_TILES: f32 = 24.0;
+const JEFF_ANTI_TANK_GUN_RANGE_BUFFER_TILES: f32 = 3.0;
+const JEFF_ANTI_TANK_GUN_RETREAT_BUFFER_TILES: f32 = 2.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum FrontalWaveBlocker {
@@ -35,6 +43,7 @@ pub(super) enum FrontalWaveBlocker {
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct FrontalWavePlan {
     pub(super) ready_units: Vec<u32>,
+    pub(super) jeff_offensive_riflemen: Vec<u32>,
     pub(super) desired_size: usize,
     pub(super) attack_due: bool,
     pub(super) required_unit_ready: bool,
@@ -106,6 +115,7 @@ pub(super) fn plan_frontal_wave(
 
     FrontalWavePlan {
         ready_units,
+        jeff_offensive_riflemen: Vec::new(),
         desired_size,
         attack_due,
         required_unit_ready,
@@ -155,11 +165,18 @@ pub(super) fn issue_frontal_wave(
         return None;
     }
 
+    let mut staging_units = plan.ready_units.clone();
+    let rifle_screen = usable_jeff_rifle_screen(&plan.jeff_offensive_riflemen);
+    if profile.id == JEFFS_AI_ID {
+        staging_units.extend(rifle_screen);
+        staging_units.sort_unstable();
+        staging_units.dedup();
+    }
     let staged = if profile.frontal_wave.line_staging {
         stage_main_steel_defensive_line(
             actions,
             observation,
-            &plan.ready_units,
+            &staging_units,
             enemy_base,
             attack.stage_distance_tiles,
         )
@@ -167,7 +184,7 @@ pub(super) fn issue_frontal_wave(
         let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
         actions::stage_units_toward(
             actions,
-            plan.ready_units.clone(),
+            staging_units,
             own_base,
             (enemy_base.x, enemy_base.y),
             observation.map.tile_size,
@@ -175,6 +192,88 @@ pub(super) fn issue_frontal_wave(
         )
     };
     staged.map(|units| AiIntent::Stage { units })
+}
+
+pub(super) fn issue_jeff_anti_tank_gun_reaction(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    plan: &FrontalWavePlan,
+    memory: &mut AiDecisionMemory,
+) -> Option<AiIntent> {
+    let mut tanks = memory
+        .containment_active_tanks
+        .iter()
+        .copied()
+        .filter(|id| observation.owned.iter().any(|unit| unit.id == *id))
+        .collect::<Vec<_>>();
+    tanks.sort_unstable();
+    let tank_anchor = group_center(observation, &tanks)?;
+    let anti_tank_gun = visible_anti_tank_gun_threat(observation, tank_anchor)?;
+    let owned_riflemen = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Rifleman)
+        .map(|unit| unit.id)
+        .collect::<BTreeSet<_>>();
+    let mut riflemen = plan
+        .jeff_offensive_riflemen
+        .iter()
+        .copied()
+        .filter(|id| owned_riflemen.contains(id))
+        .collect::<Vec<_>>();
+    select_nearest_units(
+        observation,
+        &mut riflemen,
+        tank_anchor,
+        JEFF_RIFLE_SCREEN_MAX,
+    );
+    let riflemen = usable_jeff_rifle_screen(&riflemen);
+    if riflemen.is_empty() {
+        return None;
+    }
+
+    actions::attack_units(actions, riflemen.iter().copied(), anti_tank_gun.id);
+    if let Some(avoidance_point) =
+        anti_tank_gun_avoidance_point(tank_anchor, anti_tank_gun, observation.map)
+    {
+        memory.containment_stationary_since = None;
+        let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+        let formation_direction = normalized_direction(own_base, tank_anchor).unwrap_or((1.0, 0.0));
+        for (tank_id, point) in compact_tank_formation_assignments(
+            observation,
+            &tanks,
+            avoidance_point,
+            formation_direction,
+            observation.map,
+            1.5,
+        ) {
+            actions::move_units(actions, [tank_id], point.0, point.1);
+        }
+    } else {
+        actions::hold_position_units(actions, tanks.iter().copied());
+    }
+
+    let mut cohort = tanks;
+    if let Some(scout_id) = memory
+        .containment_active_scout
+        .filter(|id| observation.owned.iter().any(|unit| unit.id == *id))
+    {
+        let away = normalized_direction((anti_tank_gun.x, anti_tank_gun.y), tank_anchor)
+            .unwrap_or((1.0, 0.0));
+        let scout_point = clamp_to_map(
+            (
+                tank_anchor.0 + away.0 * 2.0 * observation.map.tile_size as f32,
+                tank_anchor.1 + away.1 * 2.0 * observation.map.tile_size as f32,
+            ),
+            observation.map,
+        );
+        actions::move_units(actions, [scout_id], scout_point.0, scout_point.1);
+        cohort.push(scout_id);
+    }
+    cohort.extend(riflemen);
+    cohort.sort_unstable();
+    cohort.dedup();
+    Some(AiIntent::Attack { units: cohort })
 }
 
 pub(super) fn sync_containment_recovery(
@@ -244,6 +343,102 @@ fn containment_regroup_point(
     ))
 }
 
+fn rifle_screen_assignments(
+    riflemen: &[u32],
+    tank_anchor: (f32, f32),
+    objective: (f32, f32),
+    map: AiMapSummary,
+) -> Option<Vec<(u32, (f32, f32))>> {
+    let toward_objective = normalized_direction(tank_anchor, objective)?;
+    let perpendicular = (-toward_objective.1, toward_objective.0);
+    let tile_size = map.tile_size as f32;
+    let front_center = (
+        tank_anchor.0 + toward_objective.0 * JEFF_RIFLE_SCREEN_AHEAD_TILES * tile_size,
+        tank_anchor.1 + toward_objective.1 * JEFF_RIFLE_SCREEN_AHEAD_TILES * tile_size,
+    );
+    let per_rank = JEFF_RIFLE_SCREEN_MAX / 2;
+    Some(
+        riflemen
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, unit_id)| {
+                let rank = index / per_rank;
+                let rank_start = rank * per_rank;
+                let rank_count = riflemen.len().saturating_sub(rank_start).min(per_rank);
+                let position_in_rank = index - rank_start;
+                let lateral_tiles = (position_in_rank as f32
+                    - rank_count.saturating_sub(1) as f32 * 0.5)
+                    * JEFF_RIFLE_SCREEN_LATERAL_SPACING_TILES;
+                let rank_depth_tiles = rank as f32 * JEFF_RIFLE_SCREEN_RANK_DEPTH_TILES;
+                let point = clamp_to_map(
+                    (
+                        front_center.0 + perpendicular.0 * lateral_tiles * tile_size
+                            - toward_objective.0 * rank_depth_tiles * tile_size,
+                        front_center.1 + perpendicular.1 * lateral_tiles * tile_size
+                            - toward_objective.1 * rank_depth_tiles * tile_size,
+                    ),
+                    map,
+                );
+                (unit_id, point)
+            })
+            .collect(),
+    )
+}
+
+fn visible_anti_tank_gun_threat(
+    observation: &AiObservation,
+    tank_anchor: (f32, f32),
+) -> Option<&AiEntitySummary> {
+    let detection2 =
+        (JEFF_ANTI_TANK_GUN_DETECTION_TILES * observation.map.tile_size as f32).powi(2);
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind == EntityKind::AntiTankGun)
+        .filter(|enemy| dist2(tank_anchor.0, tank_anchor.1, enemy.x, enemy.y) <= detection2)
+        .min_by(|left, right| {
+            dist2(tank_anchor.0, tank_anchor.1, left.x, left.y)
+                .total_cmp(&dist2(tank_anchor.0, tank_anchor.1, right.x, right.y))
+                .then_with(|| left.id.cmp(&right.id))
+        })
+}
+
+fn anti_tank_gun_avoidance_point(
+    tank_anchor: (f32, f32),
+    anti_tank_gun: &AiEntitySummary,
+    map: AiMapSummary,
+) -> Option<(f32, f32)> {
+    let tile_size = map.tile_size as f32;
+    let gun_range_tiles = config::unit_stats(EntityKind::AntiTankGun)
+        .map(|stats| stats.range_tiles as f32)
+        .unwrap_or(12.0);
+    let safe_distance_tiles = gun_range_tiles + JEFF_ANTI_TANK_GUN_RANGE_BUFFER_TILES;
+    let distance_tiles = dist2(
+        tank_anchor.0,
+        tank_anchor.1,
+        anti_tank_gun.x,
+        anti_tank_gun.y,
+    )
+    .sqrt()
+        / tile_size;
+    if distance_tiles >= safe_distance_tiles {
+        return None;
+    }
+    let away =
+        normalized_direction((anti_tank_gun.x, anti_tank_gun.y), tank_anchor).unwrap_or((1.0, 0.0));
+    let retreat_tiles = (safe_distance_tiles - distance_tiles
+        + JEFF_ANTI_TANK_GUN_RETREAT_BUFFER_TILES)
+        .clamp(2.0, 8.0);
+    Some(clamp_to_map(
+        (
+            tank_anchor.0 + away.0 * retreat_tiles * tile_size,
+            tank_anchor.1 + away.1 * retreat_tiles * tile_size,
+        ),
+        map,
+    ))
+}
+
 fn select_nearest_units(
     observation: &AiObservation,
     candidates: &mut Vec<u32>,
@@ -267,6 +462,17 @@ fn select_nearest_units(
             .then_with(|| left.cmp(right))
     });
     candidates.truncate(count);
+}
+
+fn usable_jeff_rifle_screen(candidates: &[u32]) -> Vec<u32> {
+    let mut riflemen = candidates.to_vec();
+    riflemen.sort_unstable();
+    riflemen.dedup();
+    if riflemen.len() < JEFF_RIFLE_SCREEN_MIN {
+        return Vec::new();
+    }
+    riflemen.truncate(JEFF_RIFLE_SCREEN_MAX);
+    riflemen
 }
 
 fn unit_position(observation: &AiObservation, unit_id: u32) -> Option<(f32, f32)> {
@@ -326,6 +532,39 @@ fn issue_expansion_containment_wave(
     }
     tanks.sort_unstable();
     scouts.sort_unstable();
+    let owned_riflemen = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Rifleman)
+        .map(|unit| unit.id)
+        .collect::<BTreeSet<_>>();
+    let mut riflemen = plan
+        .jeff_offensive_riflemen
+        .iter()
+        .copied()
+        .filter(|id| owned_riflemen.contains(id))
+        .collect::<Vec<_>>();
+    let forward_rally = containment_regroup_point(own_base, enemy_base, observation.map)?;
+    let rifle_selection_point = if memory.containment_wave_launched
+        && !memory.containment_recovery_active
+        && !memory.containment_active_tanks.is_empty()
+    {
+        let active_tanks = memory
+            .containment_active_tanks
+            .iter()
+            .copied()
+            .collect::<Vec<_>>();
+        group_center(observation, &active_tanks).unwrap_or(forward_rally)
+    } else {
+        forward_rally
+    };
+    select_nearest_units(
+        observation,
+        &mut riflemen,
+        rifle_selection_point,
+        JEFF_RIFLE_SCREEN_MAX,
+    );
+    riflemen = usable_jeff_rifle_screen(&riflemen);
     if !memory.containment_wave_launched {
         if tanks.len() < policy.minimum_tanks_to_continue {
             return None;
@@ -338,15 +577,20 @@ fn issue_expansion_containment_wave(
         memory.containment_wave_launched = true;
     } else if memory.containment_recovery_active {
         let required = containment_repush_tank_count(policy, memory.containment_repush_count);
-        let forward_rally = containment_regroup_point(own_base, enemy_base, observation.map)?;
         select_nearest_units(observation, &mut tanks, forward_rally, required);
         select_nearest_units(observation, &mut scouts, forward_rally, 1);
         let regroup_point = tanks
             .first()
             .and_then(|tank| unit_position(observation, *tank))?;
-        let regroup_radius = containment_regroup_radius_tiles(policy, required) * tile_size;
+        let regroup_radius_tiles = containment_regroup_radius_tiles(policy, required);
+        let regroup_radius = if riflemen.is_empty() {
+            regroup_radius_tiles
+        } else {
+            regroup_radius_tiles.max(JEFF_RIFLE_SCREEN_AHEAD_TILES + 3.0)
+        } * tile_size;
         let mut cohort = tanks.clone();
         cohort.extend(scouts.iter().copied());
+        cohort.extend(riflemen.iter().copied());
         let grouped_at_home = tanks.len() == required
             && !scouts.is_empty()
             && compact_group_near(observation, &cohort, regroup_point, regroup_radius);
@@ -388,6 +632,16 @@ fn issue_expansion_containment_wave(
                 scout_regroup.0,
                 scout_regroup.1,
             );
+            if !riflemen.is_empty() {
+                for (rifle_id, point) in rifle_screen_assignments(
+                    &riflemen,
+                    regroup_point,
+                    (enemy_base.x, enemy_base.y),
+                    observation.map,
+                )? {
+                    actions::move_units(actions, [rifle_id], point.0, point.1);
+                }
+            }
             cohort.sort_unstable();
             cohort.dedup();
             return Some(AiIntent::Stage { units: cohort });
@@ -465,6 +719,44 @@ fn issue_expansion_containment_wave(
         observation.map,
         policy.scout_trailing_tiles,
     )?;
+    if !riflemen.is_empty() {
+        if let Some(anti_tank_gun) = visible_anti_tank_gun_threat(observation, tank_anchor) {
+            // Riflemen are deliberately the contact layer: deployed anti-tank guns cannot fire
+            // at infantry, while translating the Tanks would discard their charged range bonus
+            // and expose the expensive cohort. Let the screen clear the gun and keep armor out.
+            actions::attack_units(actions, riflemen.iter().copied(), anti_tank_gun.id);
+            if let Some(avoidance_point) =
+                anti_tank_gun_avoidance_point(tank_anchor, anti_tank_gun, observation.map)
+            {
+                memory.containment_stationary_since = None;
+                let avoidance_assignments = compact_tank_formation_assignments(
+                    observation,
+                    &tanks,
+                    avoidance_point,
+                    toward_objective,
+                    observation.map,
+                    1.5,
+                );
+                for (tank_id, point) in avoidance_assignments {
+                    actions::move_units(actions, [tank_id], point.0, point.1);
+                }
+            } else {
+                actions::hold_position_units(actions, tanks.iter().copied());
+            }
+            actions::move_units(
+                actions,
+                scouts.iter().copied(),
+                trailing_point.0,
+                trailing_point.1,
+            );
+            let mut cohort = tanks;
+            cohort.extend(scouts);
+            cohort.extend(riflemen);
+            cohort.sort_unstable();
+            cohort.dedup();
+            return Some(AiIntent::Attack { units: cohort });
+        }
+    }
     let contact_target =
         visible_combat_target_within_tiles(observation, &tanks, policy.contact_stop_tiles);
     let should_stop = tanks_in_position || contact_target.is_some();
@@ -545,8 +837,24 @@ fn issue_expansion_containment_wave(
         scout_point.0,
         scout_point.1,
     );
+    if !riflemen.is_empty() {
+        if let Some(target) = visible_combat_target_within_tiles(
+            observation,
+            &riflemen,
+            OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES,
+        ) {
+            actions::attack_units(actions, riflemen.iter().copied(), target);
+        } else {
+            for (rifle_id, point) in
+                rifle_screen_assignments(&riflemen, tank_anchor, objective, observation.map)?
+            {
+                actions::attack_move_units(actions, [rifle_id], point.0, point.1);
+            }
+        }
+    }
 
     tanks.extend(scouts);
+    tanks.extend(riflemen);
     tanks.sort_unstable();
     tanks.dedup();
     Some(AiIntent::Attack { units: tanks })
@@ -1049,6 +1357,120 @@ mod tests {
         assert_eq!(containment_regroup_radius_tiles(policy, 3), 3.0);
         assert_eq!(containment_regroup_radius_tiles(policy, 4), 4.5);
         assert_eq!(containment_regroup_radius_tiles(policy, 5), 6.0);
+    }
+
+    #[test]
+    fn jeff_rifle_screen_waits_for_six_then_caps_at_sixteen() {
+        assert!(usable_jeff_rifle_screen(&[1, 2, 3, 4, 5]).is_empty());
+        assert_eq!(
+            usable_jeff_rifle_screen(&(1..=20).rev().collect::<Vec<_>>()),
+            (1..=16).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn jeff_rifle_screen_forms_two_ranks_ahead_of_tanks() {
+        let map = AiMapSummary {
+            width: 64,
+            height: 64,
+            tile_size: 32,
+        };
+        let assignments = rifle_screen_assignments(
+            &(1..=16).collect::<Vec<_>>(),
+            (10.0 * 32.0, 20.0 * 32.0),
+            (50.0 * 32.0, 20.0 * 32.0),
+            map,
+        )
+        .unwrap();
+
+        assert!(assignments[..8]
+            .iter()
+            .all(|(_, point)| (point.0 / 32.0 - 15.0).abs() < 0.001));
+        assert!(assignments[8..]
+            .iter()
+            .all(|(_, point)| (point.0 / 32.0 - 13.0).abs() < 0.001));
+        assert!(assignments.iter().all(|(_, point)| point.0 > 10.0 * 32.0));
+    }
+
+    #[test]
+    fn jeff_tanks_back_out_of_a_revealed_anti_tank_gun_envelope() {
+        let map = AiMapSummary {
+            width: 64,
+            height: 64,
+            tile_size: 32,
+        };
+        let tank_anchor = (10.0 * 32.0, 10.0 * 32.0);
+        let gun = target_test_entity(90, EntityKind::AntiTankGun, 14.0 * 32.0, 10.0 * 32.0);
+        let avoidance = anti_tank_gun_avoidance_point(tank_anchor, &gun, map).unwrap();
+
+        let original_distance = dist2(tank_anchor.0, tank_anchor.1, gun.x, gun.y);
+        let avoidance_distance = dist2(avoidance.0, avoidance.1, gun.x, gun.y);
+        assert!(avoidance.0 < tank_anchor.0);
+        assert!(avoidance_distance > original_distance);
+
+        let mut observation = regroup_test_observation(Vec::new());
+        observation.visible_enemies = vec![
+            target_test_entity(91, EntityKind::AntiTankGun, 20.0 * 32.0, 10.0 * 32.0),
+            gun,
+        ];
+        assert_eq!(
+            visible_anti_tank_gun_threat(&observation, tank_anchor).map(|enemy| enemy.id),
+            Some(90)
+        );
+    }
+
+    #[test]
+    fn active_jeff_push_immediately_sends_rifles_not_tanks_into_anti_tank_gun() {
+        let mut observation = regroup_test_observation(vec![
+            target_test_entity(1, EntityKind::Tank, 10.0 * 32.0, 10.0 * 32.0),
+            target_test_entity(2, EntityKind::Tank, 10.5 * 32.0, 10.0 * 32.0),
+            target_test_entity(3, EntityKind::ScoutCar, 9.0 * 32.0, 10.0 * 32.0),
+        ]);
+        observation.owned.extend(
+            (10..=15)
+                .map(|id| target_test_entity(id, EntityKind::Rifleman, 11.0 * 32.0, 10.0 * 32.0)),
+        );
+        observation.visible_enemies.push(target_test_entity(
+            90,
+            EntityKind::AntiTankGun,
+            14.0 * 32.0,
+            10.0 * 32.0,
+        ));
+        let facts = AiFacts::from_observation(&observation);
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(0, 0, 0, 100));
+        let plan = FrontalWavePlan {
+            ready_units: Vec::new(),
+            jeff_offensive_riflemen: (10..=15).collect(),
+            desired_size: 3,
+            attack_due: false,
+            required_unit_ready: true,
+            methamphetamines_ready: true,
+            blockers: vec![FrontalWaveBlocker::AttackCadence],
+        };
+        let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+        memory.containment_active_tanks = BTreeSet::from([1, 2]);
+        memory.containment_active_scout = Some(3);
+
+        let intent =
+            issue_jeff_anti_tank_gun_reaction(&mut actions, &observation, &plan, &mut memory)
+                .expect("anti-tank gun reaction");
+        let commands = actions.into_commands();
+
+        assert!(matches!(intent, AiIntent::Attack { .. }));
+        assert!(commands.iter().any(|command| matches!(
+            command,
+            Command::Attack { units, target: 90, .. }
+                if units == &(10..=15).collect::<Vec<_>>()
+        )));
+        assert!(commands.iter().any(|command| matches!(
+            command,
+            Command::Move { units, .. } if units == &[1] || units == &[2]
+        )));
+        assert!(!commands.iter().any(|command| matches!(
+            command,
+            Command::Attack { units, target: 90, .. }
+                if units.contains(&1) || units.contains(&2)
+        )));
     }
 
     #[test]

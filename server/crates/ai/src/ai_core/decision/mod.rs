@@ -37,8 +37,8 @@ mod turtle;
 use self::defense::{
     defensive_machine_gunner_units, defensive_machine_gunner_units_for_build_clearance,
     defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
-    home_defensive_tank_is_positioned, jeff_breakthrough_response, local_defense_target,
-    local_defense_units, machine_gunner_meets_replacement_health,
+    home_defensive_tank_is_positioned, jeff_breakthrough_response, jeff_surplus_offensive_riflemen,
+    local_defense_target, local_defense_units, machine_gunner_meets_replacement_health,
     stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
     stage_home_machine_gunner_screen, stage_jeff_attack_path_defense,
     stage_jeff_borrowed_defenders_return, stage_main_steel_defensive_line, DefensivePanicPlan,
@@ -49,7 +49,10 @@ use self::economy_manager::{
     EconomyProposal, OilDemandSignal,
 };
 use self::expansion::{plan_expansion, try_build_expansion_resource_depot, ExpansionBlocker};
-use self::frontal::{issue_frontal_wave, plan_frontal_wave, sync_containment_recovery};
+use self::frontal::{
+    issue_frontal_wave, issue_jeff_anti_tank_gun_reaction, plan_frontal_wave,
+    sync_containment_recovery,
+};
 use self::geometry::{
     clamp_to_map, footprint_top_left_for_center, normalized_direction, tile_center,
 };
@@ -692,7 +695,7 @@ where
     }
     frontal_exclusions.extend(memory.jeff_breakthrough_units.iter().copied());
     sync_containment_recovery(observation, profile, memory);
-    let frontal_wave = plan_frontal_wave(
+    let mut frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
         memory,
@@ -718,6 +721,7 @@ where
     if !frontal_wave.ready_units.is_empty()
         || !local_ready_units.is_empty()
         || !defensive_machine_gunners.is_empty()
+        || !memory.containment_active_tanks.is_empty()
     {
         let mut handled_local_defense = false;
         // A construction-clearance move was issued earlier in this same decision. Treat those
@@ -827,6 +831,12 @@ where
                 attack_path_defense_staged = true;
                 intents.push(AiIntent::Stage { units });
             }
+            if attack_path_defense_staged {
+                let mut unavailable = local_defense_assigned.clone();
+                unavailable.extend(memory.jeff_breakthrough_units.iter().copied());
+                frontal_wave.jeff_offensive_riflemen =
+                    jeff_surplus_offensive_riflemen(observation, &unavailable);
+            }
         }
 
         if !handled_local_defense && turtle_defense_active {
@@ -905,7 +915,17 @@ where
             }
         }
 
-        if !handled_local_defense && !turtle_defense_active && !frontal_wave.ready_units.is_empty()
+        let anti_tank_gun_reaction =
+            if !handled_local_defense && !turtle_defense_active && profile.id == JEFFS_AI_ID {
+                issue_jeff_anti_tank_gun_reaction(&mut actions, observation, &frontal_wave, memory)
+            } else {
+                None
+            };
+        if let Some(intent) = anti_tank_gun_reaction {
+            intents.push(intent);
+        } else if !handled_local_defense
+            && !turtle_defense_active
+            && !frontal_wave.ready_units.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 if let Some(intent) = issue_frontal_wave(

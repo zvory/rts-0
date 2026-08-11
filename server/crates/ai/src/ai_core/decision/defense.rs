@@ -26,8 +26,9 @@ const JEFF_DEFENSIVE_LINE_RIFLEMEN_PER_EXTRA_TILE: usize = 2;
 const JEFF_SHARED_APPROACH_RADIUS_TILES: f32 = 6.0;
 const JEFF_FLANK_RESERVE_SEPARATION_TILES: f32 = 12.0;
 const JEFF_PRIMARY_LINE_MIN_RIFLEMEN: usize = 6;
-const JEFF_PRIMARY_LINE_RIFLEMEN_BUDGET: usize = 40;
+const JEFF_PRIMARY_LINE_RIFLEMEN_BUDGET: usize = 24;
 const JEFF_RIFLEMEN_PER_LATTICE_BAND: usize = 20;
+const JEFF_FLANK_RESERVE_RIFLEMEN_PER_BASE: usize = 2;
 const JEFF_BREAKTHROUGH_WARNING_TILES: f32 = 6.0;
 const JEFF_STATIONARY_TANK_RANGE_TILES: f32 = 14.0;
 const JEFF_RESERVE_LINE_DEPTH_TILES: f32 = 4.0;
@@ -602,9 +603,29 @@ mod tests {
     #[test]
     fn jeff_defense_keeps_late_surplus_available_for_attacks() {
         assert_eq!(jeff_primary_rifle_count(12, 0), 12);
-        assert_eq!(jeff_primary_rifle_count(30, 1), 28);
-        assert_eq!(jeff_primary_rifle_count(54, 0), 40);
-        assert_eq!(jeff_primary_rifle_count(54, 1), 40);
+        assert_eq!(jeff_primary_rifle_count(30, 1), 24);
+        assert_eq!(jeff_primary_rifle_count(54, 0), 24);
+        assert_eq!(jeff_primary_rifle_count(54, 1), 24);
+    }
+
+    #[test]
+    fn jeff_offensive_rifles_start_after_the_wall_and_flank_reserves() {
+        let mut observation = los_test_observation(EntityKind::Depot);
+        observation.owned = vec![test_entity(1, EntityKind::ResourceDepot, 5.5, 5.5)];
+        observation
+            .owned
+            .extend((10..=39).map(|id| test_entity(id, EntityKind::Rifleman, 6.5, 6.5)));
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            2,
+            EntityKind::ResourceDepot,
+            20,
+            20,
+        ));
+
+        let offensive = jeff_surplus_offensive_riflemen(&observation, &BTreeSet::from([38]));
+
+        // Twenty-four wall Riflemen plus two reserves for each protected base stay home.
+        assert_eq!(offensive, vec![39]);
     }
 
     #[test]
@@ -1166,8 +1187,8 @@ pub(super) fn stage_jeff_attack_path_defense(
         / 2;
     reserve_routes.truncate(affordable_reserve_pairs);
     // A mature line needs depth, but consuming every late Rifleman here leaves no coherent push.
-    // Forty primary defenders produce two staggered bands on one route or one band on each of two
-    // protected-base routes; later Riflemen remain available to the normal attack-wave planner.
+    // Twenty-four primary defenders produce a substantial two-rank wall while later Riflemen
+    // remain available to screen the armored attack wave.
     let primary_rifle_count = jeff_primary_rifle_count(riflemen.len(), reserve_routes.len());
     let mut rifle_assignments = Vec::with_capacity(primary_rifle_count + reserve_routes.len() * 2);
     for index in 0..primary_rifle_count {
@@ -1320,6 +1341,27 @@ fn jeff_primary_rifle_count(total_riflemen: usize, reserve_route_count: usize) -
     total_riflemen
         .saturating_sub(reserve_route_count * 2)
         .min(JEFF_PRIMARY_LINE_RIFLEMEN_BUDGET)
+}
+
+pub(super) fn jeff_surplus_offensive_riflemen(
+    observation: &AiObservation,
+    unavailable: &BTreeSet<u32>,
+) -> Vec<u32> {
+    let protected_bases = protected_resource_depot_count(observation).clamp(1, 2);
+    let home_rifle_budget =
+        JEFF_PRIMARY_LINE_RIFLEMEN_BUDGET + protected_bases * JEFF_FLANK_RESERVE_RIFLEMEN_PER_BASE;
+    let mut riflemen = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Rifleman && unit.is_complete)
+        .map(|unit| unit.id)
+        .collect::<Vec<_>>();
+    riflemen.sort_unstable();
+    riflemen
+        .into_iter()
+        .skip(home_rifle_budget)
+        .filter(|id| !unavailable.contains(id))
+        .collect()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
