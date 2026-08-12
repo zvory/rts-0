@@ -52,7 +52,8 @@ export const ANIMATION_INPUTS = Object.freeze([
   "busy",
   "breakthroughTicks",
   "panzerfaustLoaded",
-  "extractorPickaxeRotation",
+  "extractorSteelToolOffsetX",
+  "extractorSteelToolOffsetY",
   "extractorPumpRotation",
 ]);
 export const ANIMATION_PROPERTIES = Object.freeze([

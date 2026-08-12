@@ -68,7 +68,7 @@ for (const [kind, footprint] of expectedFootprints) {
   const hasSilhouetteShadow = silhouetteShadowKinds.has(kind);
   const hasEmblem = emblemKinds.has(kind);
   const componentBodyParts = kind === KIND.STEEL_MINE
-    ? ["part.pickaxe"]
+    ? ["part.jackhammer"]
     : kind === KIND.PUMP_JACK
       ? ["part.frame", "part.beam"]
       : null;
@@ -99,7 +99,7 @@ for (const [kind, footprint] of expectedFootprints) {
   strictAssert.deepEqual(
     atlas.sprites.map((sprite) => sprite.tintSlot),
     componentBodyParts
-      ? componentBodyParts.map(() => "fixed")
+      ? componentBodyParts.map(() => kind === KIND.STEEL_MINE ? "team-light" : "fixed")
       : [
         "fixed",
         "team",
@@ -120,7 +120,11 @@ for (const [kind, footprint] of expectedFootprints) {
         && sprite.frame.y + sprite.frame.h <= atlas.grid.height,
       `${kind}.${sprite.id} frame fits grid`,
     );
-    const expectedVisualScale = kind === KIND.RESOURCE_DEPOT ? 1.1 : 1;
+    const expectedVisualScale = kind === KIND.RESOURCE_DEPOT
+      ? 1.1
+      : kind === KIND.STEEL_MINE
+        ? 1.35
+        : 1;
     strictAssert.equal(
       sprite.frame.w / sprite.frame.pixelsPerUnitX,
       footprint[0] * 32 * expectedVisualScale,
@@ -151,32 +155,37 @@ for (const [kind, footprint] of expectedFootprints) {
 
 const extractorCycleMs = (HARVEST_TICKS / TICK_HZ) * 1000;
 const steelDefinition = definitions.get(KIND.STEEL_MINE);
-const activeSteel = { id: 901, kind: KIND.STEEL_MINE, extractorActive: true };
-const woundSteel = sampleRigAnimation(
+const activeSteel = { id: 1000, kind: KIND.STEEL_MINE, extractorActive: true };
+const plantedSteel = sampleRigAnimation(
   steelDefinition,
   activeSteel,
-  createRigRenderContext(activeSteel, { now: extractorCycleMs * 0.45 }),
+  createRigRenderContext(activeSteel, { now: 0 }),
 );
-const impactSteel = sampleRigAnimation(
+const liftedSteel = sampleRigAnimation(
   steelDefinition,
   activeSteel,
-  createRigRenderContext(activeSteel, { now: extractorCycleMs * 0.70 }),
+  createRigRenderContext(activeSteel, { now: 1000 / 14 }),
 );
 strictAssert.ok(
-  woundSteel.parts["part.pickaxe"].transform.rotation > 0.7,
-  "steel extractor winds the pickaxe back before the strike",
+  liftedSteel.parts["part.jackhammer"].transform.y
+    < plantedSteel.parts["part.jackhammer"].transform.y - 3,
+  "steel extractor lifts the jackhammer primarily along its impact axis",
 );
 strictAssert.ok(
-  Math.abs(impactSteel.parts["part.pickaxe"].transform.rotation) < 0.001,
-  "steel extractor reaches the ore at the payout beat",
+  Math.abs(
+    liftedSteel.parts["part.jackhammer"].transform.x
+      - plantedSteel.parts["part.jackhammer"].transform.x,
+  ) < 0.2,
+  "steel extractor drifts only slightly across one impact stroke",
 );
 const inactiveSteel = { ...activeSteel, extractorActive: false };
 const inactiveSample = sampleRigAnimation(
   steelDefinition,
   inactiveSteel,
-  createRigRenderContext(inactiveSteel, { now: extractorCycleMs * 0.70 }),
+  createRigRenderContext(inactiveSteel, { now: extractorCycleMs }),
 );
-strictAssert.ok(inactiveSample.parts["part.pickaxe"].transform.rotation > 0.7);
+strictAssert.equal(inactiveSample.parts["part.jackhammer"].transform.x, 0);
+strictAssert.equal(inactiveSample.parts["part.jackhammer"].transform.y, 8);
 
 const pumpDefinition = definitions.get(KIND.PUMP_JACK);
 const activePump = { id: 902, kind: KIND.PUMP_JACK, extractorActive: true };

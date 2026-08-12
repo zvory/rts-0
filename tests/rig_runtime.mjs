@@ -49,6 +49,10 @@ import { ANTI_TANK_GUN_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/anti_ta
 import { COMMAND_CAR_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/command_car_png_atlas.js";
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/mortar_team_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "../client/src/renderer/rigs/tank_png_atlas.js";
+import {
+  createBuildingPngRigAtlases,
+  createBuildingPngRigDefinitions,
+} from "../client/src/renderer/rigs/building_png.js";
 import { liveUnitIconMarkupFor } from "../client/src/renderer/rigs/unit_icon_sources.js";
 import {
   COMMAND_CAR_RIG_SVG,
@@ -99,6 +103,40 @@ test("animation sampler applies game-state bindings without Pixi", () => {
   assert.equal(sampled.parts["part.hull"].transform.rotation, Math.PI / 2);
   assert.equal(sampled.parts["part.turret"].transform.rotation, Math.PI);
   assert.equal(sampled.parts["part.barrel"].transform.rotation, Math.PI);
+});
+
+test("steel mine jackhammer is team-tinted and keeps a primarily vertical active stroke", () => {
+  const definition = createBuildingPngRigDefinitions().get(KIND.STEEL_MINE);
+  const atlas = createBuildingPngRigAtlases().get(KIND.STEEL_MINE);
+  const sprite = atlas.sprites.find((candidate) => candidate.animationPart === "part.jackhammer");
+  assert.ok(definition);
+  assert.ok(sprite);
+  assert.equal(sprite.tintSlot, "team-light");
+  assert.match(atlas.image, /steel-mine-jackhammer\/jackhammer-1940s-white\.png/);
+  assert.ok(sprite.frame.pixelsPerUnitX < 128 / 32);
+
+  const entity = {
+    id: 23,
+    kind: KIND.STEEL_MINE,
+    owner: 1,
+    x: 100,
+    y: 100,
+    extractorActive: true,
+  };
+  const first = sampleRigAnimation(definition, entity, createRigRenderContext(entity, { now: 0 }));
+  const lifted = sampleRigAnimation(definition, entity, createRigRenderContext(entity, { now: 1000 / 14 }));
+  const firstPart = first.parts["part.jackhammer"];
+  const liftedPart = lifted.parts["part.jackhammer"];
+  assert.ok(liftedPart.transform.y < firstPart.transform.y - 3);
+  assert.ok(Math.abs(liftedPart.transform.x - firstPart.transform.x) < 0.2);
+  assert.equal(liftedPart.transform.rotation, 0);
+  assert.equal(liftedPart.transform.scaleX, 1);
+  assert.equal(liftedPart.transform.scaleY, 1);
+
+  const inactive = { ...entity, extractorActive: false };
+  const resting = sampleRigAnimation(definition, inactive, createRigRenderContext(inactive, { now: 1000 }));
+  assert.equal(resting.parts["part.jackhammer"].transform.x, 0);
+  assert.equal(resting.parts["part.jackhammer"].transform.y, 8);
 });
 
 test("reusable animation staging preserves sampled values while reusing storage", () => {
