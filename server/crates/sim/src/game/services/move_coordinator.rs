@@ -34,7 +34,7 @@ use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_tiles, Occupancy,
 };
 use crate::game::services::pathing::{
-    finalize_reverse_waypoints, tree_detour_between, PathCacheStatus, PathRequest,
+    finalize_reverse_waypoints_or_raw, tree_detour_between, PathCacheStatus, PathRequest,
     PathingRequestDiagnostics, PathingRequestOutcome, PathingService, RouteShape,
 };
 use crate::game::services::standability;

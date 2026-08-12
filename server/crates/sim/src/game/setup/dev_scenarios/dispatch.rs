@@ -46,6 +46,9 @@ impl Game {
             "replay_296_scout_car_stop" => {
                 Self::new_replay_296_scout_car_stop_scenario(unit, unit_count, seed)
             }
+            "replay_303_scout_car_forest_lock" => {
+                Self::new_replay_303_scout_car_forest_lock_scenario(unit, unit_count, seed)
+            }
             "scout_car_wall_chokepoint" => {
                 Self::new_scout_car_wall_chokepoint_scenario(unit, unit_count, seed)
             }

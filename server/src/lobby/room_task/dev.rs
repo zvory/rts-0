@@ -1,4 +1,7 @@
-use std::{collections::HashMap, time::Instant as StdInstant};
+use std::{
+    collections::{HashMap, VecDeque},
+    time::Instant as StdInstant,
+};
 
 use tokio::time::Instant as TokioInstant;
 
@@ -29,22 +32,29 @@ impl DevDriver {
 
 pub(super) struct DevScenarioDriver {
     player_id: u32,
-    command: SimCommand,
-    issue_after_ticks: u32,
+    commands: VecDeque<(u32, SimCommand)>,
     panzerfaust_windup: Option<(u32, u32, u16)>,
-    issued: bool,
+    panzerfaust_started: bool,
 }
 
 impl DevScenarioDriver {
     fn enqueue_for_tick(&mut self, game: &mut Game) {
-        if self.issued || game.tick_count() < self.issue_after_ticks {
-            return;
+        while self
+            .commands
+            .front()
+            .is_some_and(|(tick, _)| game.tick_count() >= *tick)
+        {
+            if !self.panzerfaust_started {
+                self.panzerfaust_started = true;
+                if let Some((attacker, target, windup_ticks)) = self.panzerfaust_windup {
+                    game.start_dev_scenario_panzerfaust_windup(attacker, target, windup_ticks);
+                }
+            }
+            let Some((_, command)) = self.commands.pop_front() else {
+                break;
+            };
+            game.enqueue(self.player_id, command);
         }
-        self.issued = true;
-        if let Some((attacker, target, windup_ticks)) = self.panzerfaust_windup {
-            game.start_dev_scenario_panzerfaust_windup(attacker, target, windup_ticks);
-        }
-        game.enqueue(self.player_id, self.command.clone());
     }
 }
 
@@ -119,13 +129,11 @@ impl RoomTask {
                     ($setup:expr $(,)?) => {{
                         let setup = $setup;
                         let player_id = setup.player_id;
-                        let command = setup.command();
                         let driver = DevScenarioDriver {
                             player_id,
-                            command,
-                            issue_after_ticks: setup.issue_after_ticks,
+                            commands: setup.scheduled_commands().into(),
                             panzerfaust_windup: setup.panzerfaust_windup(),
-                            issued: false,
+                            panzerfaust_started: false,
                         };
                         Ok((setup.game, DevDriver::Scenario(driver), player_id))
                     }};

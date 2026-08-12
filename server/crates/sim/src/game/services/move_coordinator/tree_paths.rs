@@ -62,7 +62,7 @@ impl MoveCoordinator<'_> {
         route_shape: RouteShape,
         waypoints: Vec<(f32, f32)>,
     ) -> Vec<(f32, f32)> {
-        finalize_reverse_waypoints(
+        finalize_reverse_waypoints_or_raw(
             self.map,
             self.occ,
             kind,
@@ -71,6 +71,5 @@ impl MoveCoordinator<'_> {
             route_shape,
             waypoints,
         )
-        .unwrap_or_default()
     }
 }
