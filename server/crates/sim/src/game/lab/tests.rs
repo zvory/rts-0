@@ -205,11 +205,16 @@ fn lab_map_draft_rejects_blocked_base_protection_area() {
 fn lab_map_draft_allows_terrain_immediately_beyond_starting_unit_area() {
     let mut game = new_game();
     let mut draft = map_draft();
-    draft.terrain[12 * 64 + 17] = terrain::ROCK;
+    let protection_radius = super::super::setup::starting_protection_radius_tiles(&lab_players());
+    let rock_x = 12 + u32::try_from(protection_radius).expect("non-negative protection radius") + 1;
+    draft.terrain[12 * 64 + rock_x as usize] = terrain::ROCK;
 
     game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft)))
         .expect("terrain beyond the starting unit area should remain editable");
-    assert_eq!(game.state.map.terrain[12 * 64 + 17], terrain::ROCK);
+    assert_eq!(
+        game.state.map.terrain[12 * 64 + rock_x as usize],
+        terrain::ROCK
+    );
 }
 
 #[test]
