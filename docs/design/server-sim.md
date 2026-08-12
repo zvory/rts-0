@@ -831,7 +831,7 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
 - Replay seek is an incremental room-owned state machine. It restores the nearest retained keyframe
   immediately, clears timeline-derived client presentation through `roomTimeSeekStarted`, and
   advances the authoritative `Game`/command cursor in bounded CPU slices. The actor yields between
-  slices so room controls and membership remain responsive, records exact 2,000-tick keyframes, and
+  slices so room controls and membership remain responsive, records exact 1,000-tick keyframes, and
   publishes coalesced room-time state plus complete fog-scoped snapshots at a sampled wall-clock
   cadence rather than once per simulated tick. Replay pause governs ordinary playback, not this
   internal reconstruction: a seek reaches its target and then remains paused there. No seek-time

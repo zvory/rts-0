@@ -116,7 +116,7 @@ impl ReplaySession {
     const MAX_COMMAND_LOG_ENTRIES: usize = 200_000;
     const MAX_CHAT_NAME_CHARS: usize = 24;
     const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
-    const KEYFRAME_INTERVAL_TICKS: u32 = 2_000;
+    const KEYFRAME_INTERVAL_TICKS: u32 = 1_000;
 
     #[allow(dead_code)]
     pub(super) fn new(artifact: ReplayArtifactV1) -> Result<Self, String> {
@@ -963,7 +963,7 @@ mod tests {
                 .iter()
                 .map(|keyframe| keyframe.tick)
                 .collect::<Vec<_>>(),
-            vec![0, 2_000]
+            vec![0, 1_000, 2_000]
         );
 
         let mut expected = replay
@@ -1025,7 +1025,7 @@ mod tests {
         assert!(!keyframe.completed);
         assert!(keyframe.keyframe_recorded);
         assert_eq!(replay.current_tick(), 2_000);
-        assert_eq!(replay.state().keyframe_ticks, vec![0, 2_000]);
+        assert_eq!(replay.state().keyframe_ticks, vec![0, 1_000, 2_000]);
 
         let completed = replay
             .advance_seek_slice(1, Duration::MAX, Duration::ZERO)
