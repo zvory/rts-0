@@ -399,8 +399,8 @@ export class HudSelectionPanel {
         `<strong>${entrenchment.value}</strong></div>`
       : "";
     const unitsKilledHtml = Number.isFinite(Number(e.unitsKilled))
-      ? `<div class="sel-stat sel-unit-kills"><span>Units killed:</span>` +
-        `<strong>${Math.max(0, Math.floor(Number(e.unitsKilled)))}</strong></div>`
+      ? `<div class="sel-stat sel-unit-kills">Units killed: ` +
+        `${Math.max(0, Math.floor(Number(e.unitsKilled)))}</div>`
       : "";
 
     node.innerHTML =
