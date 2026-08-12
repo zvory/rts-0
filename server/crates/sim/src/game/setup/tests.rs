@@ -357,6 +357,21 @@ fn starting_riflemen_form_an_outward_facing_defensive_line() {
 }
 
 #[test]
+fn starting_protection_covers_the_defensive_line_without_manhattan_overreach() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: DEFAULT_FACTION_ID.to_string(),
+        name: "One".to_string(),
+        color: "#cc1111".to_string(),
+        is_ai: false,
+    }];
+
+    // The outer rifleman is four tiles forward and 1.5 tiles lateral: 4.27 tiles radially.
+    assert_eq!(starting_protection_radius_tiles(&players), 5);
+}
+
+#[test]
 fn free_for_all_defensive_line_targets_the_nearest_enemy_base() {
     let players = [
         PlayerInit {

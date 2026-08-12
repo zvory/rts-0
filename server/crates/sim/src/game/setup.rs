@@ -634,7 +634,7 @@ fn oil_patch_local_offset(index: u32, count: u32) -> (f32, f32) {
     (pair.0, lateral)
 }
 
-/// Maximum tile offset that can contain a ring-spawned starting entity center.
+/// Maximum tile offset that can contain a formation-spawned starting entity center.
 pub(in crate::game) fn starting_protection_radius_tiles(players: &[PlayerInit]) -> i32 {
     players
         .iter()
@@ -642,20 +642,21 @@ pub(in crate::game) fn starting_protection_radius_tiles(players: &[PlayerInit]) 
         .flat_map(|catalog| catalog.loadout.starting_entities)
         .filter(|group| group.count > 0)
         .filter_map(|group| match group.formation {
-            StartingFormation::Ring { radius_tiles_x10 } => Some(radius_tiles_x10),
+            StartingFormation::Ring { radius_tiles_x10 } => {
+                Some(f64::from(radius_tiles_x10) / 10.0)
+            }
             StartingFormation::DefensiveLine {
                 distance_tiles_x10,
                 spacing_tiles_x10,
-            } => Some(
-                distance_tiles_x10
-                    .saturating_add(spacing_tiles_x10.saturating_mul(group.count / 2)),
-            ),
+            } => {
+                let distance = f64::from(distance_tiles_x10) / 10.0;
+                let lateral_extent =
+                    f64::from(spacing_tiles_x10) * f64::from(group.count.saturating_sub(1)) / 20.0;
+                Some(distance.hypot(lateral_extent))
+            }
             StartingFormation::Center | StartingFormation::ResourcePatches => None,
         })
-        .map(|radius_tiles_x10| {
-            let whole_tiles = radius_tiles_x10 / 10 + u32::from(radius_tiles_x10 % 10 != 0);
-            whole_tiles.min(i32::MAX as u32) as i32
-        })
+        .map(|radius_tiles| radius_tiles.ceil().min(f64::from(i32::MAX)) as i32)
         .max()
         .unwrap_or(0)
 }
