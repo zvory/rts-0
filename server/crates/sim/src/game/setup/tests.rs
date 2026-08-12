@@ -301,6 +301,106 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         .all(|player| player.faction_id == DEFAULT_FACTION_ID));
 }
 
+#[test]
+fn starting_riflemen_form_an_outward_facing_defensive_line() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "One".to_string(),
+            color: "#cc1111".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "Two".to_string(),
+            color: "#1133bb".to_string(),
+            is_ai: false,
+        },
+    ];
+    let game = Game::new(&players, 7);
+    let tile_size = config::TILE_SIZE as f32;
+
+    for (index, player) in players.iter().enumerate() {
+        let start = game.state.map.starts[index];
+        let depot = game.state.map.tile_center(start.0, start.1);
+        let target = defensive_target_for_player(&game.state.map, &players, index, start);
+        let angle = (target.1 - depot.1).atan2(target.0 - depot.0);
+        let forward = (angle.cos(), angle.sin());
+        let lateral = (-forward.1, forward.0);
+        let mut lateral_offsets = game
+            .state
+            .entities
+            .iter()
+            .filter(|entity| entity.owner == player.id && entity.kind == EntityKind::Rifleman)
+            .map(|entity| {
+                let offset = (entity.pos_x - depot.0, entity.pos_y - depot.1);
+                let forward_distance = offset.0 * forward.0 + offset.1 * forward.1;
+                assert!((forward_distance - 4.0 * tile_size).abs() < 0.01);
+                assert!((entity.facing() - angle).abs() < 0.001);
+                assert!(
+                    (entity.weapon_facing().expect("rifleman weapon facing") - angle).abs() < 0.001
+                );
+                offset.0 * lateral.0 + offset.1 * lateral.1
+            })
+            .collect::<Vec<_>>();
+        lateral_offsets.sort_by(f32::total_cmp);
+
+        let expected = [-1.5, -0.5, 0.5, 1.5].map(|tiles| tiles * tile_size);
+        for (actual, expected) in lateral_offsets.into_iter().zip(expected) {
+            assert!((actual - expected).abs() < 0.01);
+        }
+    }
+}
+
+#[test]
+fn free_for_all_defensive_line_targets_the_nearest_enemy_base() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "One".to_string(),
+            color: "#cc1111".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "Two".to_string(),
+            color: "#11cc33".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 3,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
+            name: "Three".to_string(),
+            color: "#1133bb".to_string(),
+            is_ai: false,
+        },
+    ];
+    let game = Game::new(&players, 7);
+    let start = game.state.map.starts[0];
+    let target = defensive_target_for_player(&game.state.map, &players, 0, start);
+    let enemy_starts = [game.state.map.starts[1], game.state.map.starts[2]];
+    let expected = enemy_starts
+        .into_iter()
+        .min_by_key(|(x, y)| {
+            let dx = i64::from(*x) - i64::from(start.0);
+            let dy = i64::from(*y) - i64::from(start.1);
+            dx * dx + dy * dy
+        })
+        .map(|tile| game.state.map.tile_center(tile.0, tile.1))
+        .expect("FFA should have an enemy start");
+
+    assert_eq!(target, expected);
+}
+
 fn spawned_resource_sites(map: &Map) -> EntityStore {
     let mut entities = EntityStore::new();
     for &start in &map.starts {

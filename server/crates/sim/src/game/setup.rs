@@ -7,6 +7,9 @@ use std::str::FromStr;
 mod checkpoint_start;
 mod dev_scenarios;
 mod resource_patch_start;
+mod starting_formation;
+
+use starting_formation::defensive_target_for_player;
 
 const LIVE_PATHING_DEFAULT_BUDGET: usize = 32_768;
 const LIVE_PATHING_CACHE_CAPACITY: usize = 256;
@@ -270,6 +273,7 @@ impl Game {
         let mut starts_with_resources = Vec::with_capacity(players.len());
         for (i, p) in players.iter().enumerate() {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
+            let defensive_target = defensive_target_for_player(&map, players, i, start);
             let faction_id = if p.faction_id.is_empty() {
                 DEFAULT_FACTION_ID.to_string()
             } else {
@@ -303,7 +307,14 @@ impl Game {
                 auto_build: Default::default(),
             };
             if let Some(loadout) = loadout {
-                spawn_player_start(&mut entities, &map, &mut ps, start, loadout);
+                spawn_player_start(
+                    &mut entities,
+                    &map,
+                    &mut ps,
+                    start,
+                    defensive_target,
+                    loadout,
+                );
                 starts_with_resources.push(start);
             }
             if let Some(loadout) = loadout {
@@ -632,6 +643,13 @@ pub(in crate::game) fn starting_protection_radius_tiles(players: &[PlayerInit]) 
         .filter(|group| group.count > 0)
         .filter_map(|group| match group.formation {
             StartingFormation::Ring { radius_tiles_x10 } => Some(radius_tiles_x10),
+            StartingFormation::DefensiveLine {
+                distance_tiles_x10,
+                spacing_tiles_x10,
+            } => Some(
+                distance_tiles_x10
+                    .saturating_add(spacing_tiles_x10.saturating_mul(group.count / 2)),
+            ),
             StartingFormation::Center | StartingFormation::ResourcePatches => None,
         })
         .map(|radius_tiles_x10| {
@@ -648,11 +666,15 @@ fn spawn_player_start(
     map: &Map,
     player: &mut PlayerState,
     start: (u32, u32),
+    defensive_target: (f32, f32),
     loadout: FactionLoadout,
 ) {
     let (stx, sty) = start;
     let (hx, hy) = map.tile_center(stx, sty);
     let ts = config::TILE_SIZE as f32;
+    let defensive_angle = (defensive_target.1 - hy).atan2(defensive_target.0 - hx);
+    let defensive_forward = (defensive_angle.cos(), defensive_angle.sin());
+    let defensive_lateral = (-defensive_forward.1, defensive_forward.0);
 
     for group in loadout.starting_entities {
         if group.formation == StartingFormation::ResourcePatches {
@@ -666,6 +688,19 @@ fn spawn_player_start(
                     let ang = std::f32::consts::TAU * (i as f32) / (group.count.max(1) as f32);
                     (hx + ring_r * ang.cos(), hy + ring_r * ang.sin())
                 }
+                StartingFormation::DefensiveLine {
+                    distance_tiles_x10,
+                    spacing_tiles_x10,
+                } => {
+                    let distance = ts * (distance_tiles_x10 as f32 / 10.0);
+                    let spacing = ts * (spacing_tiles_x10 as f32 / 10.0);
+                    let lateral_offset =
+                        (i as f32 - (group.count.saturating_sub(1) as f32 / 2.0)) * spacing;
+                    (
+                        hx + defensive_forward.0 * distance + defensive_lateral.0 * lateral_offset,
+                        hy + defensive_forward.1 * distance + defensive_lateral.1 * lateral_offset,
+                    )
+                }
                 StartingFormation::ResourcePatches => continue,
             };
             let spawned = if group.kind.is_building() {
@@ -675,7 +710,14 @@ fn spawn_player_start(
             } else {
                 None
             };
-            if spawned.is_some() {
+            if let Some(id) = spawned {
+                if matches!(group.formation, StartingFormation::DefensiveLine { .. }) {
+                    if let Some(entity) = entities.get_mut(id) {
+                        entity.set_facing(defensive_angle);
+                        entity.set_weapon_facing(defensive_angle);
+                        entity.set_desired_weapon_facing(defensive_angle);
+                    }
+                }
                 player.record_entity_created(group.kind);
             }
         }

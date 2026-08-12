@@ -183,8 +183,9 @@ const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
         kind: EntityKind::Rifleman,
         count: crate::balance::STARTING_RIFLEMEN,
-        formation: StartingFormation::Ring {
-            radius_tiles_x10: 35,
+        formation: StartingFormation::DefensiveLine {
+            distance_tiles_x10: 40,
+            spacing_tiles_x10: 10,
         },
         completed: true,
     },
@@ -743,7 +744,13 @@ impl AbilityCatalogEntry {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StartingFormation {
     Center,
-    Ring { radius_tiles_x10: u32 },
+    Ring {
+        radius_tiles_x10: u32,
+    },
+    DefensiveLine {
+        distance_tiles_x10: u32,
+        spacing_tiles_x10: u32,
+    },
     ResourcePatches,
 }
 
