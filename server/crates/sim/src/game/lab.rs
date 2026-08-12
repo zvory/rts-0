@@ -24,7 +24,6 @@ pub use checkpoint_scenario::{
 
 pub const LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION: u32 =
     checkpoint_scenario::LAB_CHECKPOINT_SCENARIO_V1_SCHEMA_VERSION;
-const LAB_MAP_MAIN_PROTECTION_RADIUS_TILES: i32 = 4;
 const LAB_MAP_BASE_SITE_PROTECTION_RADIUS_TILES: i32 = 0;
 const LAB_MAP_MAX_BASE_SITES: usize = 32;
 const LAB_MAX_MUTATION_BATCH: usize = 400;
@@ -518,6 +517,7 @@ impl Game {
         }
         let elevation = map_draft::normalized_elevation(&draft, name, tile_count)?;
         let players = self.player_inits();
+        let main_protection_radius = super::setup::starting_protection_radius_tiles(&players);
         if draft.starts.len() != players.len() {
             return Err(LabError::InvalidMap {
                 name: name.to_string(),
@@ -551,7 +551,7 @@ impl Game {
                 &draft.terrain,
                 x,
                 y,
-                LAB_MAP_MAIN_PROTECTION_RADIUS_TILES,
+                main_protection_radius,
                 &mut occupied_sites,
             )?;
         }
