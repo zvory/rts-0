@@ -124,7 +124,7 @@ fn paused_dev_scenario_steps_one_tick_at_a_time() {
 }
 
 #[test]
-fn replay_303_driver_issues_every_recorded_move_and_preserves_the_lock() {
+fn replay_303_driver_runs_recorded_moves_and_scout_recovers() {
     let mut task = RoomTask::new(
         "replay-303-driver-test".to_string(),
         RoomMode::DevScenario(DevScenarioConfig {
@@ -156,8 +156,13 @@ fn replay_303_driver_issues_every_recorded_move_and_preserves_the_lock() {
         .iter()
         .find(|entity| entity.id == 403)
         .expect("Scout Car 403");
-    assert_eq!(scout.x.to_bits(), 2_148.724_6_f32.to_bits());
-    assert_eq!(scout.y.to_bits(), 3_983.101_6_f32.to_bits());
+    let former_lock = (2_148.724_6_f32, 3_983.101_6_f32);
+    assert!(
+        (scout.x - former_lock.0).hypot(scout.y - former_lock.1) > 10.0,
+        "Scout Car remained at the former forest lock: ({}, {})",
+        scout.x,
+        scout.y
+    );
     assert_eq!(scout.state, "move");
 }
 

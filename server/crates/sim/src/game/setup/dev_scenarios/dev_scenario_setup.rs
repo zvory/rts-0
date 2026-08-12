@@ -56,6 +56,9 @@ impl DevScenarioSetup {
 
     pub fn scheduled_commands(&self) -> Vec<(u32, SimCommand)> {
         match self.order {
+            DevScenarioOrder::MoveSequence(&[]) => {
+                vec![(self.issue_after_ticks, self.command())]
+            }
             DevScenarioOrder::MoveSequence(sequence) => sequence
                 .iter()
                 .map(|&(tick, (x, y))| {

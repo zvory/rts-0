@@ -12,7 +12,7 @@ const LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
 pub(super) const REPLAY_303_SCOUT_CAR_FOREST_LOCK_SPEC: DevScenarioSpec = DevScenarioSpec {
     id: "replay_303_scout_car_forest_lock",
     title: "Replay 303 Scout Car Forest Lock",
-    description: "Reduces Soupman's Schone Tage replay to the seven ordered vehicles and the exact 21-tile forest footprint. Six recorded group moves run from ticks 15,283 through 15,308; Scout Car 403 locks against the forest at (2148.72, 3983.10) while the rest of the group keeps moving.",
+    description: "Reduces Soupman's Schone Tage replay to the seven ordered vehicles and the exact 21-tile forest footprint. Six recorded group moves run from ticks 15,283 through 15,308; Scout Car 403 passes its former forest lock at (2148.72, 3983.10) and keeps moving.",
     launches: &LAUNCHES,
 };
 
