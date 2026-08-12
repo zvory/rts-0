@@ -581,12 +581,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
   compatibility; it is the original 96×96 handcrafted map padded with 15 passable grass tiles on
   every edge. Both map JSON assets use terrain row strings, flat `startLocations`, and flat
   `baseSites`.
-- Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 1`,
-  one Resource Depot, one completed Pump Jack on a home Oil patch, and six completed Steel Mines at
-  the player's start, with 12 steel patches holding 625 steel each split into
-  two six-wide fields four tiles out on opposite sides of the base + 3 oil patches with 962 oil
-  each nearby. Each base therefore holds 7,500 steel and 2,886 oil, a 2.599:1 Steel/Oil ratio (the
-  nearest whole-unit node capacity to the 2.6:1 target).
+- Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 1`, and
+  `STARTING_RIFLEMEN = 4`: one Engineer, four Riflemen, one Resource Depot, one completed Pump Jack
+  on a home Oil patch, and six completed Steel Mines at the player's start, with 12 steel patches
+  holding 625 steel each split into two six-wide fields four tiles out on opposite sides of the
+  base + 3 oil patches with 962 oil each nearby. Each base therefore holds 7,500 steel and 2,886
+  oil, a 2.599:1 Steel/Oil ratio (the nearest whole-unit node capacity to the 2.6:1 target).
 - Supply: every active player has an intrinsic `300` supply allowance, which is also the hard cap.
   Buildings do not provide supply: Resource Depots, Zamoks, and legacy fixture/replay Depots all grant
   `+0`. Supply remains an army-size limit without forcing expansion or supply-building chores.

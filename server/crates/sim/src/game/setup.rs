@@ -623,7 +623,26 @@ fn oil_patch_local_offset(index: u32, count: u32) -> (f32, f32) {
     (pair.0, lateral)
 }
 
-/// Spawn a Resource Depot, starting workers, and resource clusters for one player.
+/// Maximum tile offset that can contain a ring-spawned starting entity center.
+pub(in crate::game) fn starting_protection_radius_tiles(players: &[PlayerInit]) -> i32 {
+    players
+        .iter()
+        .filter_map(|player| catalog_for_or_default_empty(&player.faction_id))
+        .flat_map(|catalog| catalog.loadout.starting_entities)
+        .filter(|group| group.count > 0)
+        .filter_map(|group| match group.formation {
+            StartingFormation::Ring { radius_tiles_x10 } => Some(radius_tiles_x10),
+            StartingFormation::Center | StartingFormation::ResourcePatches => None,
+        })
+        .map(|radius_tiles_x10| {
+            let whole_tiles = radius_tiles_x10 / 10 + u32::from(radius_tiles_x10 % 10 != 0);
+            whole_tiles.min(i32::MAX as u32) as i32
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+/// Spawn a player's catalog-defined starting entities and resource clusters.
 fn spawn_player_start(
     entities: &mut EntityStore,
     map: &Map,

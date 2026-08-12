@@ -192,7 +192,7 @@ fn lab_map_draft_rejects_duplicate_base_resource_records() {
 fn lab_map_draft_rejects_blocked_base_protection_area() {
     let mut game = new_game();
     let mut draft = map_draft();
-    draft.terrain[12 * 64 + 12] = terrain::ROCK;
+    draft.terrain[12 * 64 + 16] = terrain::ROCK;
 
     assert!(matches!(
         game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft))),
@@ -205,11 +205,11 @@ fn lab_map_draft_rejects_blocked_base_protection_area() {
 fn lab_map_draft_allows_terrain_immediately_beyond_starting_unit_area() {
     let mut game = new_game();
     let mut draft = map_draft();
-    draft.terrain[12 * 64 + 16] = terrain::ROCK;
+    draft.terrain[12 * 64 + 17] = terrain::ROCK;
 
     game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft)))
         .expect("terrain beyond the starting unit area should remain editable");
-    assert_eq!(game.state.map.terrain[12 * 64 + 16], terrain::ROCK);
+    assert_eq!(game.state.map.terrain[12 * 64 + 17], terrain::ROCK);
 }
 
 #[test]
@@ -801,6 +801,7 @@ fn lab_set_owner_and_delete_repair_supply_and_references() {
     assert_eq!(
         game.snapshot_for(1).supply_used,
         rules::economy::supply_cost(EntityKind::Worker) * config::STARTING_WORKERS
+            + rules::economy::supply_cost(EntityKind::Rifleman) * config::STARTING_RIFLEMEN
     );
     assert!(game.snapshot_for(2).supply_used >= rules::economy::supply_cost(EntityKind::Tank));
 

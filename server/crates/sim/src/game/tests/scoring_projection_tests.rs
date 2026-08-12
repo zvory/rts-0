@@ -14,6 +14,7 @@ fn scores_count_starting_entities() {
     assert_eq!(
         human.unit_score,
         config::STARTING_WORKERS * entity_score_value(EntityKind::Worker)
+            + config::STARTING_RIFLEMEN * entity_score_value(EntityKind::Rifleman)
     );
     assert_eq!(
         human.structure_score,
@@ -190,6 +191,10 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         .units
         .iter()
         .any(|row| row.kind == "worker" && row.count == config::STARTING_WORKERS));
+    assert!(player_one
+        .units
+        .iter()
+        .any(|row| row.kind == "rifleman" && row.count == config::STARTING_RIFLEMEN));
     assert!(player_one.production.iter().any(|row| {
         row.building_id == resource_depot
             && row.building_kind == "resource_depot"
