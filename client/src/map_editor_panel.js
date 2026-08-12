@@ -1,5 +1,8 @@
 import { TERRAIN } from "./protocol.js";
-import { createMapEditorBrushWidthInput } from "./map_editor_brush_controls.js";
+import {
+  createMapEditorBrushWidthInput,
+  createMapEditorNumericInput,
+} from "./map_editor_brush_controls.js";
 import { createMapEditorElevationTool, selectMapEditorElevationOperation } from "./map_editor_elevation_controls.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
@@ -836,11 +839,11 @@ export class MapEditorPanel {
       }
     });
 
-    const radius = numericInput(this.doodadRadius, 4, 256, (value) => {
+    const radius = createMapEditorNumericInput(this.doodadRadius, 4, 256, (value) => {
       this.doodadRadius = value;
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Doodad brush radius");
-    const density = numericInput(this.doodadDensity, 1, MAP_EDITOR_MAX_SPRAY_DENSITY, (value) => {
+    const density = createMapEditorNumericInput(this.doodadDensity, 1, MAP_EDITOR_MAX_SPRAY_DENSITY, (value) => {
       this.doodadDensity = value;
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Doodad spray density");
