@@ -137,9 +137,9 @@ import { KIND } from "../../client/src/protocol.js";
     const detail = panel.children[0];
     assert(
       detail?.innerHTML.includes("sel-unit-kills") &&
-        detail.innerHTML.includes("Units killed:") &&
-        detail.innerHTML.includes("<strong>7</strong>"),
-      "HUD shows the authoritative unit-kill total for exactly one selected unit",
+        detail.innerHTML.includes(">Units killed: 7</div>") &&
+        !detail.innerHTML.includes("<strong>7</strong>"),
+      "HUD shows the authoritative unit-kill total inline for exactly one selected unit",
     );
   });
 
