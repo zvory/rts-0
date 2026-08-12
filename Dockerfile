@@ -64,7 +64,7 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/building-emblems-preview/steelworks-atlas-team-tint.png \
     && test -s ./client/assets/rigs/building-emblems-preview/training_centre-atlas-mg42-panzerfaust-team-tint.png \
     && test -s ./client/assets/rigs/extractor-animation-poc/pump-jack-atlas.png \
-    && test -s ./client/assets/rigs/extractor-animation-poc/steel-mine-atlas.png \
+    && test -s ./client/assets/rigs/steel-mine-jackhammer/jackhammer-1940s-white.png \
     && test -s ./client/assets/rigs/buildings-b3-corrected-preview/factory-atlas.png \
     && test -s ./client/assets/rigs/buildings-b4-selected-pass-01/engineering_complex-atlas.png \
     && test -s ./client/assets/rigs/buildings-b4-selected-pass-01/steelworks-atlas.png \
