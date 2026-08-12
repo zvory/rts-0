@@ -9,9 +9,11 @@ const ARTILLERY_VISUAL_SCALE = 0.75;
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
 const HARVEST_CYCLE_MS = (HARVEST_TICKS / TICK_HZ) * 1000;
 const PUMP_JACK_CYCLE_MS = HARVEST_CYCLE_MS * 3;
-const PICKAXE_WIND_BACK_RAD = 0.72;
+const JACKHAMMER_STROKES_PER_SECOND = 7;
+const JACKHAMMER_LIFT_PX = 3.5;
 const RESTING_EXTRACTOR_ANIMATION = Object.freeze({
-  pickaxeRotation: PICKAXE_WIND_BACK_RAD,
+  steelToolOffsetX: 0,
+  steelToolOffsetY: 0,
   pumpRotation: 0,
 });
 
@@ -112,7 +114,8 @@ export function createRigRenderContext(entity, {
     busy: isBusy(entity),
     breakthroughTicks: finite(entity.breakthroughTicks, 0),
     panzerfaustLoaded: entity.panzerfaustLoaded !== false,
-    extractorPickaxeRotation: extractor.pickaxeRotation,
+    extractorSteelToolOffsetX: extractor.steelToolOffsetX,
+    extractorSteelToolOffsetY: extractor.steelToolOffsetY,
     extractorPumpRotation: extractor.pumpRotation,
   };
   Object.defineProperty(context, RIG_CONTEXT_READY, { value: true });
@@ -125,27 +128,24 @@ function extractorAnimation(entity, now) {
   }
 
   if (entity.kind === KIND.STEEL_MINE) {
-    const phase = ((now % HARVEST_CYCLE_MS) + HARVEST_CYCLE_MS) % HARVEST_CYCLE_MS
-      / HARVEST_CYCLE_MS;
-    let pickaxeRotation;
-    if (phase < 0.45) {
-      pickaxeRotation = PICKAXE_WIND_BACK_RAD + smoothstep01(phase / 0.45) * 0.08;
-    } else if (phase < 0.68) {
-      pickaxeRotation = PICKAXE_WIND_BACK_RAD
-        * (1 - smoothstep01((phase - 0.45) / 0.23));
-    } else if (phase < 0.76) {
-      pickaxeRotation = 0;
-    } else {
-      pickaxeRotation = PICKAXE_WIND_BACK_RAD * smoothstep01((phase - 0.76) / 0.24);
-    }
-    return { pickaxeRotation, pumpRotation: 0 };
+    const entityPhase = (finite(entity.id, 0) * 0.173) % 1;
+    const strokePhase = (((now / 1000) * JACKHAMMER_STROKES_PER_SECOND) + entityPhase) % 1;
+    const lift = Math.sin(strokePhase * Math.PI);
+    const driftTime = now / 1000 + entityPhase * Math.PI * 2;
+    return {
+      steelToolOffsetX: Math.sin(driftTime * 1.35) * 0.55
+        + Math.sin(driftTime * 0.57 + 1.1) * 0.2,
+      steelToolOffsetY: -lift * JACKHAMMER_LIFT_PX,
+      pumpRotation: 0,
+    };
   }
 
   if (entity.kind === KIND.PUMP_JACK) {
     const phase = ((now % PUMP_JACK_CYCLE_MS) + PUMP_JACK_CYCLE_MS) % PUMP_JACK_CYCLE_MS
       / PUMP_JACK_CYCLE_MS;
     return {
-      pickaxeRotation: PICKAXE_WIND_BACK_RAD,
+      steelToolOffsetX: 0,
+      steelToolOffsetY: 0,
       pumpRotation: Math.sin(phase * Math.PI * 2) * 0.16,
     };
   }

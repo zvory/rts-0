@@ -37,10 +37,20 @@ function buildingSpec(kind, frameWidth, frameHeight, image, {
 
 const STEEL_MINE_COMPONENT_RIG = Object.freeze({
   parts: Object.freeze([
-    Object.freeze({ id: "part.pickaxe", drawOrder: 11, column: 0, originX: 100, originY: 97, x: 15, y: 11 }),
+    Object.freeze({
+      id: "part.jackhammer",
+      drawOrder: 11,
+      column: 0,
+      originX: 64,
+      originY: 125,
+      x: 0,
+      y: 8,
+      tintSlot: "team-light",
+    }),
   ]),
   animations: Object.freeze([
-    Object.freeze({ partId: "part.pickaxe", input: "extractorPickaxeRotation", property: "transform.rotation" }),
+    Object.freeze({ partId: "part.jackhammer", input: "extractorSteelToolOffsetX", property: "transform.x" }),
+    Object.freeze({ partId: "part.jackhammer", input: "extractorSteelToolOffsetY", property: "transform.y" }),
   ]),
 });
 
@@ -75,8 +85,13 @@ const BUILDING_PNG_SPECS = Object.freeze([
     "/assets/rigs/building-emblems-preview/steelworks-atlas-team-tint.png?v=building-emblems-preview-03",
     { emblem: true }),
   buildingSpec(KIND.STEEL_MINE, 128, 128,
-    "/assets/rigs/extractor-animation-poc/steel-mine-atlas.png?v=extractor-animation-poc-01",
-    { silhouetteShadow: false, componentRig: STEEL_MINE_COMPONENT_RIG, omitFootprintShadow: true }),
+    "/assets/rigs/steel-mine-jackhammer/jackhammer-1940s-white.png?v=steel-mine-jackhammer-01",
+    {
+      silhouetteShadow: false,
+      visualScale: 1.35,
+      componentRig: STEEL_MINE_COMPONENT_RIG,
+      omitFootprintShadow: true,
+    }),
   buildingSpec(KIND.PUMP_JACK, 128, 128,
     "/assets/rigs/extractor-animation-poc/pump-jack-atlas.png?v=extractor-animation-poc-01",
     { silhouetteShadow: false, componentRig: PUMP_JACK_COMPONENT_RIG, omitFootprintShadow: true }),
@@ -103,7 +118,7 @@ function part(id, drawOrder, tintSlot, opacity = 1) {
 
 function componentPart(component) {
   return {
-    ...part(component.id, component.drawOrder, "fixed"),
+    ...part(component.id, component.drawOrder, component.tintSlot ?? "fixed"),
     transform: Object.freeze({
       x: component.x ?? 0,
       y: component.y ?? 0,
@@ -189,7 +204,7 @@ function atlas(spec) {
       id: `sprite.${component.id.slice("part.".length)}`,
       animationPart: component.id,
       sourceParts: [component.id],
-      tintSlot: "fixed",
+      tintSlot: component.tintSlot ?? "fixed",
       drawOrder: component.drawOrder,
       frame: {
         ...frame(frameWidth * component.column),
