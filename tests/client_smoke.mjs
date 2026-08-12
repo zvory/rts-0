@@ -892,6 +892,8 @@ try {
   );
   await editorPage.evaluate(() => [...document.querySelectorAll(".map-editor-category-tab")]
     .find((button) => button.textContent === "Objects")?.click());
+  await editorPage.waitForFunction(() => [...document.querySelectorAll(".map-editor-doodad-palette button")]
+    .some((button) => button.textContent === "Tank Trap"));
   const objectUi = await editorPage.evaluate(() => ({
     content: [...document.querySelectorAll(".map-editor-doodad-palette button")].map((button) => button.textContent),
     enabledOperations: [...document.querySelectorAll(".map-editor-tool-rail button:not(:disabled)")]
@@ -913,7 +915,8 @@ try {
       .map((button) => button.textContent),
   }));
   await editorPage.evaluate(() => [...document.querySelectorAll(".map-editor-category-tab")]
-    .find((button) => button.textContent === "Terrain")?.click());
+    .find((button) => button.textContent === "Textures")?.click());
+  await editorPage.waitForSelector("input[aria-label='Terrain brush width in tiles']");
   await editorPage.evaluate(() => {
     const input = document.querySelector("input[aria-label='Terrain brush width in tiles']");
     input.value = "7";
