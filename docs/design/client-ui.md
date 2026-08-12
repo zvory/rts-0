@@ -1031,6 +1031,7 @@ same count, centre-facing field geometry, tile snapping, passability search, and
 as match setup and the production resource-node drawing primitives; editing either patch count
 updates those stand-ins immediately. The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
+Texture Brush and Erase operations share a configurable 1–31-tile brush-width number control; Box fills remain independent of brush width.
 Grass, Gravel A/B/C, Dirt A/B/C, Mud A/B/C, Frosted Ground, bare road, and the four marked road
 orientations are passable paint materials; all may cross protected start/base areas while rock and
 water remain rejected there. Authored map rows

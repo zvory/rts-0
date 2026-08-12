@@ -719,6 +719,10 @@ try {
       maxScroll: (refreshedPanel?.scrollHeight ?? 0) - (refreshedPanel?.clientHeight ?? 0),
       terrainPreviews: [...document.querySelectorAll(".map-editor-terrain-icon")]
         .map((icon) => ({ width: icon.width, height: icon.height })),
+      terrainBrush: (() => {
+        const input = document.querySelector("input[aria-label='Terrain brush width in tiles']");
+        return input && { type: input.type, min: input.min, max: input.max, value: input.value };
+      })(),
       headers: [...document.querySelectorAll(".map-editor-header")]
         .map((header) => header.textContent?.trim() || ""),
       floatingChrome,
@@ -795,7 +799,9 @@ try {
       editorUi.headers.some((header) => header.includes("Palette")) &&
       editorUi.noInitialStatus &&
       editorUi.terrainPreviews.length === 18 &&
-      editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0),
+      editorUi.terrainPreviews.every((preview) => preview.width > 0 && preview.height > 0) &&
+      editorUi.terrainBrush?.type === "number" && editorUi.terrainBrush.min === "1" &&
+      editorUi.terrainBrush.max === "31" && editorUi.terrainBrush.value === "1",
     `MAP EDITOR: document settings, visibility, and palette surfaces omit initial status slop and show all 18 terrain previews (headers=${editorUi.headers.join("/")}, previews=${editorUi.terrainPreviews.length})`,
   );
   ok(
@@ -908,6 +914,14 @@ try {
   }));
   await editorPage.evaluate(() => [...document.querySelectorAll(".map-editor-category-tab")]
     .find((button) => button.textContent === "Terrain")?.click());
+  await editorPage.evaluate(() => {
+    const input = document.querySelector("input[aria-label='Terrain brush width in tiles']");
+    input.value = "7";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.tool?.kind === "terrain"
+    && window.__mapEditor.viewport.tool.width === 7);
+  ok(true, "MAP EDITOR: terrain brush number controls update the active paint width");
   ok(
     editorUi.actionButtons.includes("Import") &&
       editorUi.actionButtons.includes("Export") &&
