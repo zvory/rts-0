@@ -3,6 +3,24 @@ use crate::config;
 
 const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
+/// Refine a resolved tile route without allowing the optional tree-detour pass to erase it.
+pub(in crate::game::services) fn finalize_reverse_waypoints_or_raw(
+    map: &Map,
+    occupancy: &Occupancy<'_>,
+    kind: EntityKind,
+    start: (f32, f32),
+    goal: (f32, f32),
+    route_shape: RouteShape,
+    waypoints: Vec<(f32, f32)>,
+) -> Vec<(f32, f32)> {
+    let mut raw = waypoints.clone();
+    if let Some(final_waypoint) = raw.first_mut() {
+        *final_waypoint = goal;
+    }
+    finalize_reverse_waypoints(map, occupancy, kind, start, goal, route_shape, waypoints)
+        .unwrap_or(raw)
+}
+
 /// Apply the same final tree expansion and Scout Car segment simplification to a resolved path.
 pub(in crate::game::services) fn finalize_reverse_waypoints(
     map: &Map,
@@ -36,7 +54,7 @@ pub(in crate::game::services) fn finalize_reverse_waypoints(
 mod tests {
     use super::*;
     use crate::game::entity::EntityStore;
-    use crate::protocol::terrain;
+    use crate::protocol::{terrain, MapDoodad};
 
     #[test]
     fn scout_car_finalization_applies_live_three_tile_segment_limit() {
@@ -72,5 +90,59 @@ mod tests {
             from = to;
         }
         assert_eq!(from, goal);
+    }
+
+    #[test]
+    fn every_oriented_vehicle_keeps_raw_route_when_tree_refinement_is_bounded_out() {
+        let mut map = Map {
+            width: 16,
+            height: 16,
+            terrain: vec![terrain::GRASS; 16 * 16],
+            ..Default::default()
+        };
+        let trunk = map.tile_center(8, 8);
+        map.doodads = (1..=9)
+            .map(|id| MapDoodad {
+                id,
+                type_id: "tree.alder".to_string(),
+                x: trunk.0 as u32,
+                y: trunk.1 as u32,
+                color: None,
+            })
+            .collect();
+        let entities = EntityStore::new();
+        let occupancy = Occupancy::build(&map, &entities);
+        let start = map.tile_center(6, 8);
+        let goal = map.tile_center(10, 8);
+        let raw = vec![goal];
+
+        for kind in EntityKind::ALL
+            .into_iter()
+            .filter(|kind| uses_oriented_vehicle_body(*kind))
+        {
+            assert!(finalize_reverse_waypoints(
+                &map,
+                &occupancy,
+                kind,
+                start,
+                goal,
+                RouteShape::VehicleClearance,
+                raw.clone(),
+            )
+            .is_none());
+            assert_eq!(
+                finalize_reverse_waypoints_or_raw(
+                    &map,
+                    &occupancy,
+                    kind,
+                    start,
+                    goal,
+                    RouteShape::VehicleClearance,
+                    raw.clone(),
+                ),
+                raw,
+                "{kind} lost its resolved tile route"
+            );
+        }
     }
 }

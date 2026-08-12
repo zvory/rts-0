@@ -94,7 +94,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reduced_replay_group_reproduces_scout_car_forest_lock() {
+    fn reduced_replay_group_recovers_from_scout_car_forest_lock() {
         let mut setup = Game::new_replay_303_scout_car_forest_lock_scenario(
             EntityKind::ScoutCar,
             1,
@@ -107,7 +107,7 @@ mod tests {
 
         let schedule = setup.scheduled_commands();
         let mut next_command = 0;
-        let mut lock_position = None;
+        let mut former_lock_position = None;
         let tank_start = position(&setup.game, 322);
         while setup.game.tick_count() < 15_360 {
             while schedule
@@ -121,19 +121,23 @@ mod tests {
             }
             setup.game.tick();
             if setup.game.tick_count() == 15_290 {
-                lock_position = Some(position(&setup.game, SCOUT_CAR));
+                former_lock_position = Some(position(&setup.game, SCOUT_CAR));
             }
         }
 
-        let locked = lock_position.expect("lock tick");
-        assert_eq!(locked.0.to_bits(), 2_148.724_6_f32.to_bits());
-        assert_eq!(locked.1.to_bits(), 3_983.101_6_f32.to_bits());
-        assert_eq!(position(&setup.game, SCOUT_CAR), locked);
+        let former_lock = former_lock_position.expect("former lock tick");
+        assert_eq!(former_lock.0.to_bits(), 2_148.724_6_f32.to_bits());
+        assert_eq!(former_lock.1.to_bits(), 3_983.101_6_f32.to_bits());
+        assert!(distance(former_lock, position(&setup.game, SCOUT_CAR)) > 10.0);
         assert!(distance(tank_start, position(&setup.game, 322)) > 10.0);
         let scout = setup.game.state.entities.get(SCOUT_CAR).expect("Scout Car");
         assert!(matches!(
             scout.movement.as_ref().map(|movement| &movement.order),
             Some(crate::game::entity::Order::Move(_))
+        ));
+        assert!(!matches!(
+            scout.move_phase(),
+            Some(crate::game::entity::MovePhase::PathFailed)
         ));
     }
 

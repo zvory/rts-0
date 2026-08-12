@@ -10,9 +10,6 @@ mod replay_303_scout_car_forest_lock;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_retreat;
-use command_car_corner::{
-    COMMAND_CAR_BUILDING_CORNER_SPEC, COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
-};
 use move_reload_acquisition::MOVE_RELOAD_ACQUISITION_SPEC;
 use scout_car_lake_reverse_l_path::SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC;
 use scout_car_open_ground_l_path::SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC;
@@ -822,8 +819,8 @@ const DEV_SCENARIOS: [DevScenarioSpec; 29] = [
         description: "One vehicle starts flush against the east side of a factory, waits half a second, then moves ten tiles directly east.",
         launches: &FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES,
     },
-    COMMAND_CAR_BUILDING_CORNER_SPEC,
-    COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
+    command_car_corner::COMMAND_CAR_BUILDING_CORNER_SPEC,
+    command_car_corner::COMMAND_CAR_BUILDING_CORNER_WEST_SOUTHWEST_SPEC,
     DevScenarioSpec {
         id: "factory_wall_rally_spawn",
         title: "Factory Wall Rally Spawn",

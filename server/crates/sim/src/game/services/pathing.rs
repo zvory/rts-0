@@ -22,7 +22,7 @@ mod tree_detours;
 pub(in crate::game) use authoring::StaticRouteAnalyzer;
 #[cfg(test)]
 mod tree_detours_tests;
-pub(in crate::game::services) use route_finalize::finalize_reverse_waypoints;
+pub(in crate::game::services) use route_finalize::finalize_reverse_waypoints_or_raw;
 pub(in crate::game::services) use tree_detours::tree_detour_between;
 
 const VEHICLE_HARD_CLEARANCE_TILES: u16 = 1;

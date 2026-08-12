@@ -1378,7 +1378,11 @@ non-vehicle move formations bypass A* only when the existing body standability c
 exact world-space segment clear; interaction routes and blocked direct segments retain the full
 tile-guided search. Direct results are not stored in the tile-keyed cache. `PathingService` reuses
 cleared A* working containers between sequential room requests; that scratch state remains derived
-and is never serialized. Pump Jack standability
+and is never serialized. Tree-trunk waypoint refinement is best-effort: if its bounded local detour
+graph cannot refine a successful tile route, the movement coordinator retains the original route
+instead of converting the active order to `PathFailed`. Static movement legality still prevents a
+vehicle from entering blocked terrain, and retaining the path keeps normal blocked-route recovery
+active. Pump Jack standability
 permits a Pump Jack to coexist with its oil node, and simulation invariant checks use that same
 Pump Jack policy.
 
