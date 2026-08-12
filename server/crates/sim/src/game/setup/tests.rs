@@ -209,6 +209,7 @@ fn unknown_faction_start_and_commands_fail_closed() {
 #[test]
 fn standard_starting_loadout_matches_phase0_inventory() {
     assert_eq!(config::STARTING_WORKERS, 1);
+    assert_eq!(config::STARTING_RIFLEMEN, 4);
     assert_eq!(config::STARTING_STEEL_MINES, 6);
     assert_eq!(config::STARTING_PUMP_JACKS, 1);
     let players = [
@@ -243,7 +244,12 @@ fn standard_starting_loadout_matches_phase0_inventory() {
             game.snapshot_for(player.id).supply_cap,
             config::PLAYER_SUPPLY_CAP
         );
-        assert_eq!(player.supply_used, config::STARTING_WORKERS);
+        assert_eq!(
+            player.supply_used,
+            crate::rules::economy::supply_cost(EntityKind::Worker) * config::STARTING_WORKERS
+                + crate::rules::economy::supply_cost(EntityKind::Rifleman)
+                    * config::STARTING_RIFLEMEN
+        );
         assert_eq!(
             owned_kind_count(&game, player.id, EntityKind::ResourceDepot),
             1
@@ -251,6 +257,10 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         assert_eq!(
             owned_kind_count(&game, player.id, EntityKind::Worker),
             config::STARTING_WORKERS as usize
+        );
+        assert_eq!(
+            owned_kind_count(&game, player.id, EntityKind::Rifleman),
+            config::STARTING_RIFLEMEN as usize
         );
         assert_eq!(
             owned_kind_count(&game, player.id, EntityKind::SteelMine),

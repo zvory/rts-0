@@ -469,10 +469,11 @@ const approvedSpecialCaseBudgets = new Map([
   // Entrenchment Phase 1 adds one Training Centre research entry and its negative Ekat assertion.
   // Stewardship Phase 3 moved ability and upgrade identity into this authoritative catalog owner;
   // the typed enum declarations and catalog rows intentionally raise the owner-file baseline.
+  // The standard opening roster adds Rifleman to the authoritative Kriegsia loadout.
   ["server/crates/ai/src/sdk/frame.rs", 1],
   ["server/crates/ai/src/sdk/rulebook.rs", 6],
   ["server/crates/ai/src/sdk/world_queries.rs", 12],
-  ["server/crates/rules/src/faction.rs", 121],
+  ["server/crates/rules/src/faction.rs", 122],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],

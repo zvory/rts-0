@@ -801,6 +801,7 @@ fn lab_set_owner_and_delete_repair_supply_and_references() {
     assert_eq!(
         game.snapshot_for(1).supply_used,
         rules::economy::supply_cost(EntityKind::Worker) * config::STARTING_WORKERS
+            + rules::economy::supply_cost(EntityKind::Rifleman) * config::STARTING_RIFLEMEN
     );
     assert!(game.snapshot_for(2).supply_used >= rules::economy::supply_cost(EntityKind::Tank));
 

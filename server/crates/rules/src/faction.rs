@@ -181,6 +181,14 @@ const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
         completed: true,
     },
     StartingEntityGroup {
+        kind: EntityKind::Rifleman,
+        count: crate::balance::STARTING_RIFLEMEN,
+        formation: StartingFormation::Ring {
+            radius_tiles_x10: 35,
+        },
+        completed: true,
+    },
+    StartingEntityGroup {
         kind: EntityKind::SteelMine,
         count: crate::balance::STARTING_STEEL_MINES,
         formation: StartingFormation::ResourcePatches,

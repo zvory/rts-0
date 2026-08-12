@@ -623,7 +623,7 @@ fn oil_patch_local_offset(index: u32, count: u32) -> (f32, f32) {
     (pair.0, lateral)
 }
 
-/// Spawn a Resource Depot, starting workers, and resource clusters for one player.
+/// Spawn a player's catalog-defined starting entities and resource clusters.
 fn spawn_player_start(
     entities: &mut EntityStore,
     map: &Map,
