@@ -145,6 +145,64 @@ import { KIND } from "../../client/src/protocol.js";
 
   withFakeHudDocument(({ FakeElement }) => {
     const panel = new FakeElement("section");
+    const selections = [
+      { id: 2001, owner: 0, kind: KIND.STEEL, x: 96, y: 128, hp: 1, maxHp: 1, remaining: 412 },
+      { id: 2002, owner: 0, kind: KIND.OIL, x: 160, y: 128, hp: 1, maxHp: 1, remaining: 701 },
+      { id: 2003, owner: 1, kind: KIND.STEEL_MINE, x: 96, y: 128, hp: 73, maxHp: 100 },
+      { id: 2004, owner: 1, kind: KIND.PUMP_JACK, x: 160, y: 128, hp: 84, maxHp: 100 },
+    ];
+    let selectionIndex = 0;
+    const state = {
+      map: { resources: selections.slice(0, 2) },
+      selectedEntities() {
+        return [selections[selectionIndex]];
+      },
+    };
+    const root = {
+      querySelector(selector) {
+        return selector === "#selected-panel" ? panel : null;
+      },
+    };
+    const hud = new HUD(root, state, {}, null);
+
+    hud._renderSelectedPanel();
+    let detail = panel.children[0]?.innerHTML || "";
+    assert(
+      detail.includes("Steel Remaining:</span><strong>412</strong>") &&
+        !detail.includes("sel-hpbar") && !detail.includes("sel-hptext"),
+      "HUD shows remaining Steel but no HP for a selected raw Steel patch",
+    );
+
+    selectionIndex = 1;
+    hud._renderSelectedPanel();
+    detail = panel.children[0]?.innerHTML || "";
+    assert(
+      detail.includes("Oil Remaining:</span><strong>701</strong>") &&
+        !detail.includes("sel-hpbar") && !detail.includes("sel-hptext"),
+      "HUD shows remaining Oil but no HP for a selected raw Oil patch",
+    );
+
+    selectionIndex = 2;
+    hud._renderSelectedPanel();
+    detail = panel.children[0]?.innerHTML || "";
+    assert(
+      detail.includes("Steel Remaining:</span><strong>412</strong>") &&
+        detail.includes("sel-hpbar") && detail.includes("73 / 100"),
+      "HUD shows both HP and underlying Steel remaining for a selected Steel Mine",
+    );
+
+    selectionIndex = 3;
+    hud._renderSelectedPanel();
+    detail = panel.children[0]?.innerHTML || "";
+    assert(
+      detail.includes("Oil Remaining:</span><strong>701</strong>") &&
+        detail.includes("sel-hpbar") && detail.includes("84 / 100"),
+      "HUD shows both HP and underlying Oil remaining for a selected Pump Jack",
+    );
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
     const root = {
       querySelector(selector) {
         return selector === "#selected-panel" ? panel : null;

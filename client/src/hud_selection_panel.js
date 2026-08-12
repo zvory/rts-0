@@ -15,6 +15,7 @@ const SELECTION_BUDGET_ROWS = 4;
 const SELECTION_BUDGET_BLOCK_ROWS = 2;
 const SELECTION_BUDGET_COLS = Math.ceil(BASE_COMMAND_SUPPLY_CAP / SELECTION_BUDGET_BLOCK_ROWS);
 const SELECTION_OVERFLOW_FLASH_MS = 1400;
+const RESOURCE_MATCH_EPSILON_PX = 0.01;
 
 export function selectionBudgetBlockShape(weight) {
   const safeWeight = Math.max(1, Math.ceil(Number.isFinite(weight) ? weight : 1));
@@ -357,7 +358,7 @@ export class HudSelectionPanel {
     return now <= this._selectionOverflowUntil ? overflow : null;
   }
 
-  /** Build the detail node for a single selected entity (icon, name, HP bar). */
+  /** Build the detail node for a single selected entity. */
   _singleSelectionNode(e) {
     const st = STATS[e.kind] || {};
     const node = document.createElement("div");
@@ -389,10 +390,16 @@ export class HudSelectionPanel {
         `<div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
     }
 
-    const resourceRemainingHtml = isResourceNodeKind(e.kind)
-      ? `<div class="sel-stat sel-resource-remaining"><span>${st.label || e.kind} Remaining:</span>` +
-        `<strong>${formatResourceRemaining(e.remaining)}</strong></div>`
+    const resource = selectionResourceDetails(e, this.state);
+    const resourceRemainingHtml = resource
+      ? `<div class="sel-stat sel-resource-remaining"><span>${resource.label} Remaining:</span>` +
+        `<strong>${formatResourceRemaining(resource.remaining)}</strong></div>`
       : "";
+    const hpHtml = isResourceNodeKind(e.kind)
+      ? ""
+      : `<div class="sel-hpbar"><div class="sel-hpfill ${hpClass}" ` +
+        `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
+        `<div class="sel-hptext">${hp} / ${maxHp}</div>`;
     const entrenchment = entrenchmentSelectionStatus(e, this.state);
     const entrenchmentHtml = entrenchment
       ? `<div class="sel-stat sel-trench-status"><span>${entrenchment.label}:</span>` +
@@ -406,9 +413,7 @@ export class HudSelectionPanel {
     node.innerHTML =
       `<div class="sel-name"><span class="sel-icon">${st.icon || ""}</span>` +
       `${st.label || e.kind}</div>` +
-      `<div class="sel-hpbar"><div class="sel-hpfill ${hpClass}" ` +
-      `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
-      `<div class="sel-hptext">${hp} / ${maxHp}</div>` +
+      hpHtml +
       unitsKilledHtml +
       resourceRemainingHtml +
       entrenchmentHtml +
@@ -466,6 +471,7 @@ function selectionDetailSignature(entity, state = null) {
   if (!entity) return "missing";
   const productionPct = Math.round(clamp01(Number(entity.prodProgress) || 0) * 100);
   const entrenchment = entrenchmentSelectionStatus(entity, state);
+  const resource = selectionResourceDetails(entity, state);
   return [
     sigValue(entity.id),
     sigValue(entity.kind),
@@ -475,7 +481,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.unitsKilled),
     sigValue(entity.occupiedTrenchId),
     entrenchment ? `${entrenchment.label}:${entrenchment.value}` : "",
-    isResourceNodeKind(entity.kind) ? formatResourceRemaining(entity.remaining) : "",
+    resource ? `${resource.kind}:${formatResourceRemaining(resource.remaining)}` : "",
     sigValue(entity.prodQueue),
     sigValue(entity.prodKind),
     sigValue(entity.prodUpgrade),
@@ -487,6 +493,37 @@ function selectionDetailSignature(entity, state = null) {
 
 function isResourceNodeKind(kind) {
   return kind === KIND.STEEL || kind === KIND.OIL;
+}
+
+function selectionResourceDetails(entity, state = null) {
+  const resourceKind = resourceKindForSelection(entity?.kind);
+  if (!resourceKind) return null;
+  if (isResourceNodeKind(entity.kind)) {
+    return {
+      kind: resourceKind,
+      label: STATS[resourceKind]?.label || resourceKind,
+      remaining: entity.remaining,
+    };
+  }
+
+  const resources = state?.map?.resources || [];
+  const resource = resources.find((node) =>
+    node?.kind === resourceKind &&
+    Math.abs(Number(node.x) - Number(entity.x)) <= RESOURCE_MATCH_EPSILON_PX &&
+    Math.abs(Number(node.y) - Number(entity.y)) <= RESOURCE_MATCH_EPSILON_PX
+  );
+  if (!resource) return null;
+  return {
+    kind: resourceKind,
+    label: STATS[resourceKind]?.label || resourceKind,
+    remaining: resource.remaining,
+  };
+}
+
+function resourceKindForSelection(kind) {
+  if (kind === KIND.STEEL || kind === KIND.STEEL_MINE) return KIND.STEEL;
+  if (kind === KIND.OIL || kind === KIND.PUMP_JACK) return KIND.OIL;
+  return null;
 }
 
 function formatResourceRemaining(value) {
