@@ -7,6 +7,7 @@ import {
 } from "../../client/src/map_editor_elevation_controls.js";
 import { MapEditorPanel } from "../../client/src/map_editor_panel.js";
 import { mapEditorContentLabel } from "../../client/src/map_editor_panel_workflow.js";
+import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
 import { MAP_EDITOR_DOODAD_TYPES } from "../../client/src/map_editor_doodads.js";
 import { TERRAIN } from "../../client/src/protocol.js";
 import {
@@ -136,6 +137,42 @@ assert.match(elevationSource, /range\.addEventListener\("change", \(\) => select
   assert.equal(panel.lastOperation.terrain, "erase");
   assert.deepEqual(statuses, ["Remove editable content under the eraser."],
     "the persistent status dock describes the newly armed terrain operation");
+}
+
+{
+  const armed = [];
+  const panel = {
+    selectedTerrain: TERRAIN.ROCK,
+    paintShape: "brush",
+    terrainBrushWidth: 7,
+    symmetry: "none",
+    viewport: { armTool(tool) { armed.push(tool); } },
+  };
+  MapEditorPanel.prototype.armTerrain.call(panel);
+  assert.deepEqual(armed, [{
+    kind: "terrain",
+    terrain: TERRAIN.ROCK,
+    shape: "brush",
+    width: 7,
+    symmetry: "none",
+  }], "terrain tools carry the configured brush width into viewport input");
+}
+
+{
+  const strokes = [];
+  const viewport = {
+    tool: { kind: "terrain", width: 5 },
+    session: { draft: { width: 20, height: 20 } },
+    paintTiles(tiles) { strokes.push(tiles); },
+  };
+  MapEditorViewport.prototype.paintLine.call(viewport, { x: 10, y: 10 }, { x: 10, y: 10 });
+  assert.equal(strokes[0].length, 21, "a five-tile terrain brush paints a five-tile-wide circular footprint");
+  assert(strokes[0].some(({ x, y }) => x === 8 && y === 10));
+  assert(strokes[0].some(({ x, y }) => x === 12 && y === 10));
+
+  viewport.tool.width = 1;
+  MapEditorViewport.prototype.paintLine.call(viewport, { x: 10, y: 10 }, { x: 10, y: 10 });
+  assert.deepEqual(strokes[1], [{ x: 10, y: 10 }], "the default one-tile brush preserves precise terrain painting");
 }
 
 {

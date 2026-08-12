@@ -720,6 +720,15 @@ export class MapEditorViewport {
   }
 
   paintLine(from, to) {
+    if (this.tool?.kind === "terrain" && Number(this.tool.width) > 1) {
+      const { tiles } = pathTiles(this.session.draft, {
+        points: [[from.x, from.y], [to.x, to.y]],
+        width: this.tool.width,
+        roughness: 0,
+      });
+      this.paintTiles(tiles);
+      return;
+    }
     this.paintTiles(lineTiles(from, to));
   }
 

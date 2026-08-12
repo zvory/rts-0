@@ -1,4 +1,8 @@
 import { TERRAIN } from "./protocol.js";
+import {
+  createMapEditorBrushWidthInput,
+  createMapEditorNumericInput,
+} from "./map_editor_brush_controls.js";
 import { createMapEditorElevationTool, selectMapEditorElevationOperation } from "./map_editor_elevation_controls.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
@@ -82,6 +86,7 @@ export class MapEditorPanel {
     this.selectedTerrain = TERRAIN.ROCK;
     this.selectedElevation = 1;
     this.paintShape = "brush";
+    this.terrainBrushWidth = 1;
     this.selectedOverlayEffects = new Set(["concealment"]);
     this.overlayMode = "paint";
     this.forestMode = "paint";
@@ -588,6 +593,12 @@ export class MapEditorPanel {
 
   renderTerrain() {
     const section = group("Terrain paint");
+    const width = createMapEditorBrushWidthInput(this.terrainBrushWidth, (value) => {
+      this.terrainBrushWidth = value;
+      if (this.viewport.tool?.kind === "terrain" && this.viewport.tool.shape === "brush") {
+        this.armTerrain(this.viewport.tool.terrain);
+      }
+    }, "Terrain brush width in tiles");
     const palette = document.createElement("div");
     palette.className = "map-editor-palette";
     for (const [code, label] of [
@@ -626,7 +637,7 @@ export class MapEditorPanel {
       }
       palette.appendChild(control);
     }
-    section.append(palette, this.renderRoadTool());
+    section.append(field("Brush width (tiles)", width), palette, this.renderRoadTool());
     return section;
   }
   renderRoadTool() {
@@ -700,7 +711,7 @@ export class MapEditorPanel {
 
   renderForest() {
     const section = group("Forest");
-    const width = numericInput(this.forestBrushWidth, 1, 31, (value) => {
+    const width = createMapEditorBrushWidthInput(this.forestBrushWidth, (value) => {
       this.forestBrushWidth = value;
       if (this.viewport.tool?.kind === "forest") this.armForest(this.forestMode);
     }, "Forest brush width in tiles");
@@ -828,11 +839,11 @@ export class MapEditorPanel {
       }
     });
 
-    const radius = numericInput(this.doodadRadius, 4, 256, (value) => {
+    const radius = createMapEditorNumericInput(this.doodadRadius, 4, 256, (value) => {
       this.doodadRadius = value;
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Doodad brush radius");
-    const density = numericInput(this.doodadDensity, 1, MAP_EDITOR_MAX_SPRAY_DENSITY, (value) => {
+    const density = createMapEditorNumericInput(this.doodadDensity, 1, MAP_EDITOR_MAX_SPRAY_DENSITY, (value) => {
       this.doodadDensity = value;
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Doodad spray density");
@@ -933,6 +944,7 @@ export class MapEditorPanel {
       kind: "terrain",
       terrain,
       shape: this.paintShape,
+      width: this.terrainBrushWidth,
       symmetry: this.symmetry,
     });
   }
@@ -1400,22 +1412,6 @@ function patchCountField(labelText, value, max, onChange, disabled = false) {
   input.disabled = disabled;
   input.addEventListener("change", () => onChange(input.value));
   return field(labelText, input);
-}
-
-function numericInput(value, min, max, onChange, ariaLabel) {
-  const input = document.createElement("input");
-  input.type = "number";
-  input.min = String(min);
-  input.max = String(max);
-  input.step = "1";
-  input.value = String(value);
-  input.setAttribute("aria-label", ariaLabel);
-  input.addEventListener("change", () => {
-    const next = Math.max(min, Math.min(max, Math.trunc(Number(input.value)) || min));
-    input.value = String(next);
-    onChange(next);
-  });
-  return input;
 }
 
 function dimensionInput(label, value, onInput) {
