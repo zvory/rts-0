@@ -529,9 +529,9 @@ Recipe operations:
   {"type":"base","at":[30,30]}
   {"type":"start","at":[20,20]}
 
-Recipe symmetry supports none, horizontal, vertical, halfTurn, threeWay, radial, diagonalMain,
-and diagonalAnti. Quarter-turn, three-way, and diagonal symmetry require a square map. Validation
-is advisory and never rejects a readable map.
+Recipe symmetry supports none, horizontal, vertical, halfTurn, threeWay, radial, quadrantMirror,
+diagonalMain, and diagonalAnti. Quarter-turn, three-way, and diagonal symmetry require a square
+map. Validation is advisory and never rejects a readable map.
 
 Preview layers: ${MAP_AUTHORING_LAYER_IDS.join(", ")}. Omit --layers (or use all) to show every
 layer; pass a comma-separated subset to isolate authoring layers.

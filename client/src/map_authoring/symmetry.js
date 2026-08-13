@@ -5,6 +5,7 @@ export const MAP_AUTHORING_SYMMETRY = Object.freeze({
   HALF_TURN: "halfTurn",
   THREE_WAY: "threeWay",
   RADIAL: "radial",
+  QUADRANT_MIRROR: "quadrantMirror",
   DIAGONAL_MAIN: "diagonalMain",
   DIAGONAL_ANTI: "diagonalAnti",
 });
@@ -17,6 +18,7 @@ const TRANSFORMS = Object.freeze({
   [MAP_AUTHORING_SYMMETRY.HALF_TURN]: ["identity", "rotate180"],
   [MAP_AUTHORING_SYMMETRY.THREE_WAY]: ["identity", "rotate120", "rotate240"],
   [MAP_AUTHORING_SYMMETRY.RADIAL]: ["identity", "rotate90", "rotate180", "rotate270"],
+  [MAP_AUTHORING_SYMMETRY.QUADRANT_MIRROR]: ["identity", "horizontal", "vertical", "rotate180"],
   [MAP_AUTHORING_SYMMETRY.DIAGONAL_MAIN]: ["identity", "diagonalMain"],
   [MAP_AUTHORING_SYMMETRY.DIAGONAL_ANTI]: ["identity", "diagonalAnti"],
 });
