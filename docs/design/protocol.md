@@ -1060,8 +1060,12 @@ remembered buildings target ids.
 Union views build remembered buildings from the selected real
 players' memory stores. If more than one selected player has stale memory for the same building id,
 the server sends one record: the newest `observedTick` wins, with selected-player order as the
-deterministic tie-breaker. This avoids adding a memory-source wire field while keeping one-player
-replay vision isolated to that player's memory.
+deterministic tie-breaker. The server also retains per-player, checkpointed clear ticks when a
+remembered footprint is observed empty. A selected player's clear at or after the newest positive
+observation suppresses that building from the union even after current vision leaves, preventing
+older selected-player memory from resurrecting destroyed buildings. Clear ticks remain internal;
+the wire continues to carry only positive `RememberedBuilding` rows. This keeps one-player replay
+vision isolated to that player's memory without adding a memory-source wire field.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends

@@ -322,6 +322,14 @@ impl Game {
                 if self.live_entity_projects(player, memory_players, entry.id, fog, teams) {
                     continue;
                 }
+                if self
+                    .state
+                    .building_memory
+                    .latest_cleared_tick_for_players(memory_players, entry.id)
+                    .is_some_and(|cleared_tick| cleared_tick >= entry.observed_tick)
+                {
+                    continue;
+                }
                 let view = RememberedBuildingView {
                     id: entry.id,
                     owner: entry.owner,
