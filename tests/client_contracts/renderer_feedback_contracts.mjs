@@ -258,6 +258,47 @@ function nearPoint(call, point, epsilon = 0.001) {
     "remembered anti-tank cones remain unfilled",
   );
 
+  const spectatorFeedbackView = buildRendererFeedbackView({
+    ...state,
+    spectator: true,
+    players: [
+      { id: 1, teamId: 1, color: "#4f8cff" },
+      { id: 2, teamId: 2, color: "#ed5a5a" },
+      { id: 3, teamId: 1, color: "#65c97a" },
+    ],
+  }, { entities: visibleEntities });
+  assertDeepEqual(
+    spectatorFeedbackView.enemyAntiTankGunThreats().map((entity) => entity.id),
+    [301, 303, 304],
+    "omniscient spectators receive every deployed anti-tank field of fire regardless of team",
+  );
+  assertDeepEqual(
+    spectatorFeedbackView.enemyAntiTankGunThreats().map((entity) => entity.threatTeamColor),
+    ["#ed5a5a", "#65c97a", "#4f8cff"],
+    "spectator anti-tank fields of fire retain their owners' team tints",
+  );
+
+  const spectatorGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: spectatorGfx, _map: { tileSize: 32 } },
+    spectatorFeedbackView,
+  );
+  assert(
+    spectatorGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1 && call[2] === 0xed5a5a && call[3] === 0.42),
+    "spectator anti-tank cones use a clearly readable light owning-team hatch",
+  );
+  assert(
+    spectatorGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1.95 && call[2] === 0xed5a5a && call[3] === 0.38),
+    "spectator anti-tank cones keep a legible team-tinted boundary",
+  );
+  assert(
+    !spectatorGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1.25 && call[3] === 0.58),
+    "live spectator cones do not use the stale-intel question-mark cue",
+  );
+
   const friendlyGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(
     { _feedbackGfx: friendlyGfx, _map: { tileSize: 32 } },

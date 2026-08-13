@@ -34,6 +34,7 @@ export function buildRendererFeedbackView(
   const entityLookup = buildEntityLookup(entities, selected);
   const enemyAntiTankGunThreats = visibleEnemyAntiTankGunThreats(state, entities, {
     rememberedThreats: rememberedEnemyAntiTankGunThreats,
+    spectatorThreats: !!state?.spectator && controlPolicy?.kind !== "lab",
   });
   const intent = clientIntent || null;
   const controlOwner = buildControlOwnerReadModel(state, selected, controlPolicy);
@@ -130,8 +131,11 @@ export function buildRendererFeedbackView(
 function visibleEnemyAntiTankGunThreats(
   state,
   entities,
-  { rememberedThreats = EMPTY_ARRAY } = {},
+  { rememberedThreats = EMPTY_ARRAY, spectatorThreats = false } = {},
 ) {
+  if (spectatorThreats) {
+    return spectatorAntiTankGunThreats(state?.players, entities, rememberedThreats);
+  }
   const perspectivePlayerId = resolveThreatPerspectivePlayerId({
     players: state?.players,
     playerId: state?.playerId,
@@ -154,6 +158,35 @@ function visibleEnemyAntiTankGunThreats(
   ];
 }
 
+function spectatorAntiTankGunThreats(players, entities, rememberedThreats) {
+  const liveThreats = arrayOrEmpty(entities).filter((entity) =>
+    entity?.kind === KIND.ANTI_TANK_GUN &&
+    entity?.setupState === SETUP.DEPLOYED);
+  const liveIds = new Set(liveThreats.map((entity) => Number(entity.id)));
+  const staleThreats = arrayOrEmpty(rememberedThreats).filter((memory) =>
+    !liveIds.has(Number(memory?.id)));
+  if (liveThreats.length === 0 && staleThreats.length === 0) return EMPTY_ARRAY;
+  return [
+    ...liveThreats.map((entity) => spectatorThreat(entity, players, false)),
+    ...staleThreats.map((memory) => spectatorThreat(memory, players, true)),
+  ];
+}
+
+function spectatorThreat(entity, players, threatMemory) {
+  return {
+    ...entity,
+    threatMemory,
+    spectatorThreat: true,
+    threatTeamColor: playerColor(players, entity?.owner),
+  };
+}
+
+function playerColor(players, owner) {
+  const color = arrayOrEmpty(players).find((player) =>
+    Number(player?.id) === Number(owner))?.color;
+  return /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : null;
+}
+
 function resolveThreatPerspectivePlayerId({
   players = EMPTY_ARRAY,
   playerId = null,
@@ -161,10 +194,9 @@ function resolveThreatPerspectivePlayerId({
   playerResources = EMPTY_ARRAY,
 } = {}) {
   if (spectator) {
-    // Observer snapshots carry playerResources only for the real owners included in that
-    // authoritative projection. Exactly one row therefore identifies a single-player view
-    // atomically with its entities, fog grids, and threat memory. Do not trust the eager local
-    // vision-control selection: it can lead or lag the matching snapshot during rapid switches.
+    // Lab spectators retain the threat relationship of the authoritative player
+    // projection. The viewer's connection id is not necessarily a simulated
+    // player id, and the local vision selector can lead or lag the snapshot.
     const projectedPlayers = arrayOrEmpty(playerResources);
     if (projectedPlayers.length !== 1) return null;
     const projectedPlayerId = normalizeOwner(projectedPlayers[0]?.id);
