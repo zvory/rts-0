@@ -299,6 +299,49 @@ function nearPoint(call, point, epsilon = 0.001) {
     "live spectator cones do not use the stale-intel question-mark cue",
   );
 
+  const spectatorFallbackGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: spectatorFallbackGfx, _map: { tileSize: 32 } },
+    buildRendererFeedbackView({ ...state, spectator: true }, { entities: visibleEntities }),
+  );
+  assert(
+    spectatorFallbackGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1 && call[2] === 0xffb000 && call[3] === 0.42),
+    "spectator cones without a valid owner color retain the established threat-color fallback",
+  );
+
+  const spectatorMemoryView = buildRendererFeedbackView({
+    ...state,
+    spectator: true,
+    players: [{ id: 1, teamId: 1, color: "#4f8cff" }, { id: 2, teamId: 2, color: "#ed5a5a" }],
+  }, {
+    entities: [],
+    rememberedEnemyAntiTankGunThreats: [{
+      id: 306,
+      owner: 2,
+      kind: KIND.ANTI_TANK_GUN,
+      x: 320,
+      y: 256,
+      weaponFacing: 0,
+      setupState: SETUP.DEPLOYED,
+    }],
+  });
+  const spectatorMemoryGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: spectatorMemoryGfx, _map: { tileSize: 32 } },
+    spectatorMemoryView,
+  );
+  assert(
+    spectatorMemoryGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 0.65 && call[2] === 0xed5a5a && call[3] === 0.18),
+    "spectator stale-intel cones retain their owning-team tint with remembered opacity",
+  );
+  assert(
+    spectatorMemoryGfx.calls.some((call) =>
+      call[0] === "lineStyle" && call[1] === 1.25 && call[2] === 0xfff1f5 && call[3] === 0.58),
+    "spectator stale-intel cones retain the remembered question-mark cue",
+  );
+
   const friendlyGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(
     { _feedbackGfx: friendlyGfx, _map: { tileSize: 32 } },

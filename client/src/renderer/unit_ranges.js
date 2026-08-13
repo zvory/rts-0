@@ -105,28 +105,33 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
     );
     const remembered = entity?.threatMemory === true;
     const spectator = entity?.spectatorThreat === true;
-    const teamColor = spectator ? hexToInt(entity?.threatTeamColor) : null;
+    const teamColor = spectator && entity?.threatTeamColor
+      ? hexToInt(entity.threatTeamColor)
+      : null;
     const color = Number.isFinite(teamColor)
       ? teamColor
       : remembered ? ENEMY_AT_MEMORY_COLOR : ENEMY_AT_THREAT_COLOR;
     const darkColor = spectator
       ? darkenColor(color, 0.38)
       : remembered ? ENEMY_AT_MEMORY_DARK_COLOR : ENEMY_AT_THREAT_DARK_COLOR;
-    const darkAlpha = spectator
-      ? SPECTATOR_AT_THREAT_DARK_ALPHA
-      : remembered ? 0.05 : 0.26;
-    const hatchAlpha = spectator
-      ? SPECTATOR_AT_THREAT_HATCH_ALPHA
-      : remembered ? 0.18 : 0.78;
-    const hatchWidth = spectator
-      ? SPECTATOR_AT_THREAT_HATCH_WIDTH
-      : remembered ? 0.65 : 1.3;
-    const keylineWidth = spectator
-      ? SPECTATOR_AT_THREAT_KEYLINE_WIDTH
-      : remembered ? 1.35 : 2.8;
-    const outlineAlpha = spectator
-      ? SPECTATOR_AT_THREAT_OUTLINE_ALPHA
-      : remembered ? 0.14 : 0.68;
+    // Spectator tint controls hue, while remembered status still controls
+    // certainty. A fog-limited observer must not mistake stale intel for a
+    // confirmed live gun merely because both cones use the owner's color.
+    const darkAlpha = remembered
+      ? 0.05
+      : spectator ? SPECTATOR_AT_THREAT_DARK_ALPHA : 0.26;
+    const hatchAlpha = remembered
+      ? 0.18
+      : spectator ? SPECTATOR_AT_THREAT_HATCH_ALPHA : 0.78;
+    const hatchWidth = remembered
+      ? 0.65
+      : spectator ? SPECTATOR_AT_THREAT_HATCH_WIDTH : 1.3;
+    const keylineWidth = remembered
+      ? 1.35
+      : spectator ? SPECTATOR_AT_THREAT_KEYLINE_WIDTH : 2.8;
+    const outlineAlpha = remembered
+      ? 0.14
+      : spectator ? SPECTATOR_AT_THREAT_OUTLINE_ALPHA : 0.68;
     // Luminance and stroke weight distinguish live threats from stale intel even
     // without red/green hue perception. The dark keyline remains legible on snow.
     gfxStrokePaths(g, paths, keylineWidth, darkColor, darkAlpha);
@@ -144,7 +149,7 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
       0,
       ENEMY_AT_THREAT_OUTLINE_WIDTH,
     );
-    if (remembered && !spectator) {
+    if (remembered) {
       drawRememberedThreatMarker(g, entity.x, entity.y, weapon.maxRadius, facing);
     }
   }

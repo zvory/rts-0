@@ -139,8 +139,6 @@ function visibleEnemyAntiTankGunThreats(
   const perspectivePlayerId = resolveThreatPerspectivePlayerId({
     players: state?.players,
     playerId: state?.playerId,
-    spectator: false,
-    playerResources: state?.playerResources,
   });
   if (!Array.isArray(entities) || perspectivePlayerId == null) return EMPTY_ARRAY;
   const liveThreats = entities.filter((entity) =>
@@ -190,19 +188,7 @@ function playerColor(players, owner) {
 function resolveThreatPerspectivePlayerId({
   players = EMPTY_ARRAY,
   playerId = null,
-  spectator = false,
-  playerResources = EMPTY_ARRAY,
 } = {}) {
-  if (spectator) {
-    // Observer snapshots carry playerResources only for the real owners included in that
-    // authoritative projection. Exactly one row therefore identifies a single-player view
-    // atomically with its entities, fog grids, and threat memory. Do not trust the eager local
-    // vision-control selection: it can lead or lag the matching snapshot during rapid switches.
-    const projectedPlayers = arrayOrEmpty(playerResources);
-    if (projectedPlayers.length !== 1) return null;
-    const projectedPlayerId = normalizeOwner(projectedPlayers[0]?.id);
-    return teamIdForPlayer(players, projectedPlayerId) != null ? projectedPlayerId : null;
-  }
   const localPlayerId = normalizeOwner(playerId);
   if (teamIdForPlayer(players, localPlayerId) != null) return localPlayerId;
   return null;
