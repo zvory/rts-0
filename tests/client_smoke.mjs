@@ -900,10 +900,11 @@ try {
       .map((button) => button.textContent),
   }));
   ok(
-    ["Oak", "Pine", "Spruce", "Alder", "Single flowers", "Flower cluster", "Tank Trap"]
+    ["Single flowers", "Flower cluster", "Tank Trap"]
       .every((label) => objectUi.content.includes(label)) &&
+      ["Oak", "Pine", "Spruce", "Alder"].every((label) => !objectUi.content.includes(label)) &&
       ["Place", "Spray", "Erase"].every((label) => objectUi.enabledOperations.includes(label)),
-    `MAP EDITOR: Objects separates the catalog from place/spray/erase operations (${JSON.stringify(objectUi)})`,
+    `MAP EDITOR: Objects omits raw trees while retaining place/spray/erase for supported doodads (${JSON.stringify(objectUi)})`,
   );
   await editorPage.evaluate(() => [...document.querySelectorAll(".map-editor-category-tab")]
     .find((button) => button.textContent === "Locations")?.click());

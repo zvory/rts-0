@@ -1097,18 +1097,18 @@ history, or handoff. The shared pure `map_authoring/layers.js` vocabulary also d
 `map-author.mjs preview --layers <csv>`, whose SVG preview shows every layer by default and can
 isolate any comma-separated subset.
 
-The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Tree species are independently
-toggleable visual variants. Place adds one selected doodad; spray continuously adds selected trees or
-chosen-tint wildflowers at 1–256 density, without a per-location tree-density limit. Repeating a
-spray adds more in-bounds doodads until the authored-map cap of 4,096 is reached. Erase continuously
-removes doodads in its brush. All trees share one mechanical tree semantic with a tiny authoritative
-trunk; wildflowers can be placed singly or sprayed with a chosen tint.
+The doodad palette exposes wildflowers and Tank Traps. Place adds one selected doodad; spray
+continuously adds chosen-tint wildflowers at 1–256 density. Repeating a spray adds more in-bounds
+doodads until the authored-map cap of 4,096 is reached. Erase continuously removes doodads in its
+brush, including trees already present in imported maps. Trees cannot be placed as independent
+doodads in the editor; the Forest brush is their only placement surface so newly authored trees
+always carry the compound forest gameplay effects.
 Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
 deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved; the
 erase brush removes them continuously. Symmetry applies when placing and erasing doodads, while undo/redo
-apply to all authored doodads. Individually placed trees retain only their tiny trunk collision;
-forest-owned trees receive their shared effects from the compact forest span mask. Trees do not change line of sight, cover, or
+apply to all authored doodads. Forest-owned trees receive their shared effects from the compact
+forest span mask. Trees do not change line of sight, cover, or
 combat damage, and wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.

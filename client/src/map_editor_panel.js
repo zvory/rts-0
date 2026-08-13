@@ -25,7 +25,6 @@ import {
   MAP_EDITOR_DOODAD_TYPES,
   MAP_EDITOR_MAX_DOODADS,
   MAP_EDITOR_MAX_SPRAY_DENSITY,
-  isTreeDoodadType,
   isWildflowerDoodadType,
 } from "./map_editor_doodads.js";
 import {
@@ -92,8 +91,7 @@ export class MapEditorPanel {
     this.forestMode = "paint";
     this.forestBrushWidth = 9;
     this.roadWidth = 5;
-    this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.TREE_OAK;
-    this.selectedTreeTypes = new Set([MAP_EDITOR_DOODAD_TYPES.TREE_OAK]);
+    this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE;
     this.doodadMode = "place";
     this.doodadColor = MAP_EDITOR_DEFAULT_FLOWER_COLOR;
     this.doodadRadius = 48;
@@ -822,10 +820,8 @@ export class MapEditorPanel {
 
   renderDoodads() {
     const section = group(`Doodads (${this.session.draft.doodads.length} / ${MAP_EDITOR_MAX_DOODADS})`);
-    const trees = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "tree");
     const flowers = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "wildflower");
     const neutralUnits = MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "neutral-unit");
-    const treePalette = this.renderDoodadPalette(trees, { multiple: true });
     const flowerPalette = this.renderDoodadPalette(flowers);
     const neutralUnitPalette = this.renderDoodadPalette(neutralUnits);
 
@@ -849,8 +845,6 @@ export class MapEditorPanel {
       if (this.viewport.tool?.kind === "doodad") this.armDoodad(this.doodadMode);
     }, "Doodad spray density");
     section.append(
-      readout("Trees"),
-      treePalette,
       readout("Wildflowers"),
       flowerPalette,
       readout("Neutral units"),
@@ -863,31 +857,19 @@ export class MapEditorPanel {
     return section;
   }
 
-  renderDoodadPalette(entries, { multiple = false } = {}) {
+  renderDoodadPalette(entries) {
     const palette = document.createElement("div");
     palette.className = "map-editor-palette map-editor-doodad-palette";
     for (const entry of entries) {
       palette.appendChild(button(entry.label, () => {
-        if (multiple) {
-          if (this.selectedTreeTypes.has(entry.typeId) && this.selectedTreeTypes.size > 1) {
-            this.selectedTreeTypes.delete(entry.typeId);
-            this.selectedDoodadType = this.selectedTreeTypes.values().next().value;
-          } else {
-            this.selectedTreeTypes.add(entry.typeId);
-            this.selectedDoodadType = entry.typeId;
-          }
-        } else this.selectedDoodadType = entry.typeId;
-        if (!isTreeDoodadType(this.selectedDoodadType) && !isWildflowerDoodadType(this.selectedDoodadType)
+        this.selectedDoodadType = entry.typeId;
+        if (!isWildflowerDoodadType(this.selectedDoodadType)
           && this.lastOperation.objects === "spray") this.lastOperation.objects = "place";
         this.selectOperation(this.lastOperation.objects);
-        if (multiple) this.setStatus(`Tree mix: ${this.selectedTreeTypes.size} species selected.`);
       }, {
-        active: multiple
-          ? this.selectedTreeTypes.has(entry.typeId)
-          : this.viewport.tool?.kind === "doodad"
-            && !["remove", "erase"].includes(this.viewport.tool?.mode)
-            && this.selectedDoodadType === entry.typeId,
-        pressed: multiple ? this.selectedTreeTypes.has(entry.typeId) : null,
+        active: this.viewport.tool?.kind === "doodad"
+          && !["remove", "erase"].includes(this.viewport.tool?.mode)
+          && this.selectedDoodadType === entry.typeId,
       }));
     }
     return palette;
@@ -996,14 +978,15 @@ export class MapEditorPanel {
   }
 
   armDoodad(mode) {
+    if (!MAP_EDITOR_DOODAD_CATALOG.some(({ typeId }) => typeId === this.selectedDoodadType)) {
+      this.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE;
+    }
     this.doodadMode = ["place", "spray", "erase"].includes(mode) ? mode : "place";
     this.viewport.armTool({
       kind: "doodad",
       mode: this.doodadMode,
       typeId: this.selectedDoodadType,
-      typeIds: isTreeDoodadType(this.selectedDoodadType)
-        ? [...this.selectedTreeTypes]
-        : [this.selectedDoodadType],
+      typeIds: [this.selectedDoodadType],
       color: isWildflowerDoodadType(this.selectedDoodadType) ? this.doodadColor : null,
       radius: this.doodadRadius,
       density: this.doodadDensity,

@@ -17,11 +17,6 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
   const panel = {
     viewport,
     selectedDoodadType: MAP_EDITOR_DOODAD_TYPES.TREE_PINE,
-    selectedTreeTypes: new Set([
-      MAP_EDITOR_DOODAD_TYPES.TREE_OAK,
-      MAP_EDITOR_DOODAD_TYPES.TREE_PINE,
-      MAP_EDITOR_DOODAD_TYPES.TREE_ALDER,
-    ]),
     doodadColor: "#e8b84a",
     doodadRadius: 48,
     doodadDensity: 4,
@@ -29,12 +24,11 @@ import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
     render() {},
   };
   MapEditorPanel.prototype.armDoodad.call(panel, "spray");
-  assert.deepEqual(viewport.tool.typeIds, [
-    MAP_EDITOR_DOODAD_TYPES.TREE_OAK,
-    MAP_EDITOR_DOODAD_TYPES.TREE_PINE,
-    MAP_EDITOR_DOODAD_TYPES.TREE_ALDER,
-  ], "the spray tool carries the complete selected tree-species set");
-  assert.equal(viewport.tool.density, 4, "tree spray retains the selected density");
+  assert.equal(viewport.tool.typeId, MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE,
+    "arming doodad placement cannot retain a raw tree selection outside the catalog");
+  assert.deepEqual(viewport.tool.typeIds, [MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE],
+    "the doodad tool falls back to a placeable palette object");
+  assert.equal(viewport.tool.density, 4, "wildflower spray retains the selected density");
   MapEditorPanel.prototype.armDoodad.call(panel, "remove");
   assert.equal(viewport.tool.mode, "place", "the palette no longer arms the removed box-selection tool");
 }
