@@ -193,9 +193,10 @@ fn visible_to_team(
 }
 
 fn enemy_building_memory_eligible(player_id: u32, entity: &Entity, teams: &TeamRelations) -> bool {
-    !teams.same_team_or_same_owner(player_id, entity.owner)
-        && entity.owner != NEUTRAL
-        && entity.is_building()
+    entity.is_building()
+        && (entity.is_neutral_obstacle()
+            || (!teams.same_team_or_same_owner(player_id, entity.owner)
+                && entity.owner != NEUTRAL))
 }
 
 fn entry_from_entity(
@@ -318,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn forgets_scouted_tank_trap_scaffold_when_it_becomes_neutral() {
+    fn retains_scouted_tank_trap_when_it_becomes_neutral() {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
         let mut fog = Fog::new(map.width, map.height);
@@ -346,10 +347,11 @@ mod tests {
         assert_eq!(trap.advance_construction(), Some(true));
         refresh(&mut memory, &entities, &mut fog, &map, &smokes, 2);
 
-        assert!(
-            memory.get(1, trap_id).is_none(),
-            "completed neutral Tank Traps must not retain player-owned building memory"
-        );
+        let remembered = memory
+            .get(1, trap_id)
+            .expect("completed neutral Tank Trap should remain remembered");
+        assert_eq!(remembered.owner, NEUTRAL);
+        assert!(!remembered.under_construction);
     }
 
     #[test]

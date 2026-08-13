@@ -135,6 +135,11 @@ pub enum RequestedOrder {
     AttackMove {
         to: Point,
     },
+    ClearObstacleArea {
+        anchor: EntityId,
+        center: Point,
+        target_valid: bool,
+    },
     HoldPosition,
     AttackTarget {
         target: EntityId,
@@ -195,6 +200,10 @@ impl Default for PlannerConfig {
 pub enum OrderIntent {
     Move(Point),
     AttackMove(Point),
+    ClearObstacleArea {
+        anchor: EntityId,
+        center: Point,
+    },
     HoldPosition,
     AttackTarget(EntityId),
     AttackCluster(Vec<EntityId>),
@@ -267,6 +276,17 @@ pub fn plan_order(
             &ordered_facts,
             |u| u.can_attack_move,
             OrderIntent::AttackMove(to),
+        ),
+        RequestedOrder::ClearObstacleArea {
+            anchor,
+            center,
+            target_valid: true,
+        } if center.valid() => plan_filtered_units(
+            config,
+            request.mode,
+            &ordered_facts,
+            |unit| unit.can_attack_move && unit.can_attack,
+            OrderIntent::ClearObstacleArea { anchor, center },
         ),
         RequestedOrder::HoldPosition => plan_filtered_units(
             config,

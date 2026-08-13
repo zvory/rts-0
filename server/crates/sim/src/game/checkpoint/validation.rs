@@ -471,6 +471,7 @@ fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadE
         SimCommand::Move { units, .. }
         | SimCommand::FormationMove { units, .. }
         | SimCommand::AttackMove { units, .. }
+        | SimCommand::ClearObstacleArea { units, .. }
         | SimCommand::Attack { units, .. }
         | SimCommand::AttackTankTrapCluster { units, .. }
         | SimCommand::Deconstruct { units, .. }

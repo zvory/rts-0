@@ -1,6 +1,72 @@
 use super::*;
 
 #[test]
+fn clear_obstacle_area_preempts_enemy_units_with_actionable_tank_traps() {
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let enemy = entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 135.0, 100.0)
+        .expect("enemy should spawn");
+    let trap = entities
+        .spawn_building(2, EntityKind::TankTrap, 180.0, 100.0, true)
+        .expect("Tank Trap should spawn");
+    if let Some(tank) = entities.get_mut(tank) {
+        tank.set_order(Order::clear_obstacle_area_to(
+            150.0, 100.0, trap, 180.0, 100.0,
+        ));
+        tank.set_target_id(Some(enemy));
+    }
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &open_map(16),
+    );
+
+    assert_eq!(
+        entities.get(tank).and_then(|entity| entity.target_id()),
+        Some(trap),
+        "an actionable objective Tank Trap must outrank a nearer enemy unit"
+    );
+}
+
+#[test]
+fn clear_obstacle_area_fights_enemy_units_when_no_trap_is_actionable() {
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let enemy = entities
+        .spawn_unit(2, EntityKind::AntiTankGun, 135.0, 100.0)
+        .expect("enemy should spawn");
+    let enemy_hp = entities.get(enemy).expect("enemy should exist").hp;
+    if let Some(tank) = entities.get_mut(tank) {
+        tank.set_order(Order::clear_obstacle_area_to(
+            150.0, 100.0, 999, 180.0, 100.0,
+        ));
+        tank.set_path(vec![(150.0, 100.0)]);
+        tank.set_path_goal(Some((150.0, 100.0)));
+        tank.mark_move_phase(MovePhase::Moving);
+    }
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &open_map(16),
+    );
+
+    assert!(
+        entities.get(tank).and_then(|entity| entity.target_id()) == Some(enemy)
+            || entities
+                .get(enemy)
+                .is_none_or(|entity| entity.hp < enemy_hp),
+        "clear-area approach should retain ordinary attack-move enemy engagement"
+    );
+}
+
+#[test]
 fn completed_tank_traps_are_valid_only_as_explicit_attack_targets() {
     let map = open_map(8);
     let mut entities = EntityStore::new();

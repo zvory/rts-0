@@ -1481,6 +1481,17 @@ General rules:
 - Scout Plane entities are non-combat aerial units. Normal selection and command surfaces filter
   them out; direct move, attack, attack-move, hold-position, gather/build/repair/setup, rally,
   train, and research semantics are ignored for planes.
+- A contextual Tank Trap A-click is planned as `ClearObstacleArea`, not as a direct attack list.
+  The server accepts the clicked id only when it names a currently team-visible completed neutral
+  Tank Trap or an equivalent entry in that player's authoritative building memory, then resolves
+  the objective center itself. The active order keeps a normal attack-move approach goal separate
+  from the four-tile clear-area objective. Units therefore fight ordinary enemies encountered on
+  the approach, while every currently visible, weapon-actionable completed neutral Tank Trap in the
+  objective area preempts ordinary target retention and acquisition. Hidden traps never become
+  combat targets merely because the server knows they exist. The inspection goal is close enough
+  to reveal the complete objective radius and remains standability/pathing-authoritative. Queued
+  clears preserve the resolved objective center as one future intent; there is no arbitrary-point
+  clear command.
 - Direct attack orders against visible enemies keep the explicit target when a friendly or enemy
   hard blocker would absorb the current shot, but remain stationary and wait rather than seeking a
   fireable position. Shared line-of-sight raycasts stop as reached when a grid-corner side
@@ -1489,9 +1500,9 @@ General rules:
   target behind them; tanks and normal buildings still block shots.
   Tank Trap scaffolds remain player-owned through construction, then become owner-0 neutral
   obstacles on completion. Neutral obstacles keep attack/deconstruct, area-damage, and cleanup
-  behavior without owner vision, alerts, scoring, or elimination survival. Idle units exclude
-  neutral obstacles from autonomous acquisition; direct Attack and active Attack Move orders can
-  still target them. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
+  behavior without owner vision, alerts, scoring, or elimination survival. Idle units and ordinary
+  Attack Move exclude neutral obstacles from autonomous acquisition; direct Attack and an active
+  ClearObstacleArea objective can still target them. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
   acquisition considers only currently fireable targets inside weapon range. Setup weapons that
   stopped to engage during an unfinished attack-move keep their
@@ -1825,12 +1836,12 @@ without adding current visibility or a sight radius.
 
 `game::building_memory::BuildingMemory` is server-only stale intel owned by `Game`. After live,
 smoke-aware fog is recomputed, the store records one latest-seen entry per
-`(viewer_player_id, enemy_building_entity_id)` for non-neutral enemy buildings currently
-projectable to that viewer through team-current actionable fog. Records copy id, owner, kind,
+`(viewer_player_id, enemy_building_entity_id)` for non-neutral enemy buildings and completed
+neutral obstacles currently projectable to that viewer through team-current actionable fog. Records copy id, owner, kind,
 center position, footprint tiles, hp/max hp, construction progress/completion state, and the tick
 observed. At match setup it also seeds each player's memory with entity-backed neutral buildings
-authored into the map. This exposes their initial position below fog but does not extend to neutral
-buildings created during play. Five-second lingering death vision is normal temporary fog, so it refreshes remembered
+authored into the map. This exposes their initial position below fog; player-built Tank Traps enter
+the same memory only after they are actually observed. Five-second lingering death vision is normal temporary fog, so it refreshes remembered
 building intel while the source remains active. If a remembered building no longer exists, the
 record remains while its footprint is hidden from the viewer's team and is removed once that team
 scouts any remembered footprint tile. This keeps hidden destruction stale until the location is

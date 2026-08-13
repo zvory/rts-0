@@ -1506,10 +1506,8 @@ function buttonByLabel(card, label) {
   clickTarget(targetedInput, { x: 304, y: 304 });
   lastSent = sentCommands[sentCommands.length - 1];
   assert(
-    lastSent.c === "attack" &&
-      lastSent.target === 100 &&
-      lastSent.tankTrapCluster === true,
-    "A-clicking a neutral Tank Trap requests one authoritative cluster attack",
+    lastSent.c === "clearObstacleArea" && lastSent.target === 100,
+    "A-clicking a visible neutral Tank Trap requests an authoritative clear-area order",
   );
 
   targetedInput.clientIntent.beginCommandTarget("attack");

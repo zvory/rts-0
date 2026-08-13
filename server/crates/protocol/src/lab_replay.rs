@@ -549,7 +549,9 @@ fn validate_command(
             validate_unit_list(units, unit_cap, "command.units", state)?;
             validate_finite_point(*x, *y, "command")?;
         }
-        Command::Attack { units, target, .. } | Command::Deconstruct { units, target, .. } => {
+        Command::Attack { units, target, .. }
+        | Command::ClearObstacleArea { units, target, .. }
+        | Command::Deconstruct { units, target, .. } => {
             validate_unit_list(units, unit_cap, "command.units", state)?;
             validate_entity_id(*target, "command.target", state)?;
         }

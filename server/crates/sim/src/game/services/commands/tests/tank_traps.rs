@@ -1,6 +1,161 @@
 use super::*;
 
 #[test]
+fn visible_tank_trap_authorizes_clear_area_without_memory() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 160.0, 160.0)
+        .expect("tank should spawn");
+    let trap = entities
+        .spawn_building(2, EntityKind::TankTrap, 256.0, 160.0, true)
+        .expect("Tank Trap should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::ClearObstacleArea {
+                units: vec![tank],
+                target: trap,
+                queued: false,
+            },
+        )],
+    );
+
+    assert_eq!(
+        entities
+            .get(tank)
+            .and_then(|entity| entity.order().clear_obstacle_area())
+            .map(|objective| objective.anchor),
+        Some(trap)
+    );
+}
+
+#[test]
+fn remembered_hidden_tank_trap_clear_uses_a_real_approach_goal() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let tank_pos = map.tile_center(5, 8);
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, tank_pos.0, tank_pos.1)
+        .expect("tank should spawn");
+    let trap_pos = map.tile_center(30, 8);
+    let trap = entities
+        .spawn_building(2, EntityKind::TankTrap, trap_pos.0, trap_pos.1, true)
+        .expect("Tank Trap should spawn");
+    let mut memory = BuildingMemory::default();
+    memory.seed_authored_neutral_buildings(&[1, 2], &[trap], &entities, &map, 0);
+    let mut players = vec![player_state(1), player_state(2)];
+    let mut smokes = SmokeCloudStore::new();
+
+    apply_with_players_and_smokes(
+        &map,
+        &mut entities,
+        &mut players,
+        &mut smokes,
+        Some(&memory),
+        normal_pending(vec![(
+            1,
+            SimCommand::ClearObstacleArea {
+                units: vec![tank],
+                target: trap,
+                queued: false,
+            },
+        )]),
+    );
+
+    let tank = entities.get(tank).expect("tank should survive");
+    let objective = tank
+        .order()
+        .clear_obstacle_area()
+        .expect("remembered Tank Trap should authorize the clear-area order");
+    assert_eq!(objective.anchor, trap);
+    assert_eq!((objective.center_x, objective.center_y), trap_pos);
+    let goal = tank.path_goal().expect("clear-area order should receive an approach goal");
+    assert_ne!(goal, tank_pos, "hidden Tank Trap clear must not collapse to a no-op");
+    assert_ne!(goal, trap_pos, "approach goal must not occupy the blocked Tank Trap tile");
+    assert!(
+        (goal.0 - trap_pos.0).hypot(goal.1 - trap_pos.1)
+            <= 3.0 * crate::config::TILE_SIZE as f32 + 0.01,
+        "approach goal must bring the complete four-tile objective radius into sight"
+    );
+}
+
+#[test]
+fn remembered_hidden_tank_trap_clear_can_be_queued_as_one_objective() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let tank_pos = map.tile_center(5, 8);
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, tank_pos.0, tank_pos.1)
+        .expect("tank should spawn");
+    let trap_pos = map.tile_center(30, 8);
+    let trap = entities
+        .spawn_building(2, EntityKind::TankTrap, trap_pos.0, trap_pos.1, true)
+        .expect("Tank Trap should spawn");
+    let mut memory = BuildingMemory::default();
+    memory.seed_authored_neutral_buildings(&[1, 2], &[trap], &entities, &map, 0);
+    let mut players = vec![player_state(1), player_state(2)];
+    let mut smokes = SmokeCloudStore::new();
+
+    apply_with_players_and_smokes(
+        &map,
+        &mut entities,
+        &mut players,
+        &mut smokes,
+        Some(&memory),
+        normal_pending(vec![(
+            1,
+            SimCommand::ClearObstacleArea {
+                units: vec![tank],
+                target: trap,
+                queued: true,
+            },
+        )]),
+    );
+
+    let tank = entities.get(tank).expect("tank should survive");
+    assert!(matches!(tank.order(), Order::Idle));
+    assert!(matches!(
+        tank.queued_orders(),
+        [OrderIntent::ClearObstacleArea(intent)]
+            if intent.anchor == trap
+                && (intent.center_x, intent.center_y) == trap_pos
+    ));
+}
+
+#[test]
+fn never_observed_hidden_tank_trap_cannot_authorize_clear_area() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let tank_pos = map.tile_center(5, 8);
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, tank_pos.0, tank_pos.1)
+        .expect("tank should spawn");
+    let trap_pos = map.tile_center(30, 8);
+    let trap = entities
+        .spawn_building(2, EntityKind::TankTrap, trap_pos.0, trap_pos.1, true)
+        .expect("Tank Trap should spawn");
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::ClearObstacleArea {
+                units: vec![tank],
+                target: trap,
+                queued: false,
+            },
+        )],
+    );
+
+    assert!(matches!(entities.get(tank).expect("tank should survive").order(), Order::Idle));
+}
+
+#[test]
 fn tank_trap_cluster_flag_falls_back_to_direct_attack_for_other_targets() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();

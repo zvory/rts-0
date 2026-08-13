@@ -171,6 +171,7 @@ fn lab_command_admission_ignores_budget_and_uses_large_bounded_window() {
         &mut entities,
         &mut players,
         &mut smokes,
+        None,
         vec![PendingCommand {
             player: 1,
             command: SimCommand::Stop {
@@ -212,6 +213,7 @@ fn lab_raw_cap_accepts_then_dedupes_and_cap_plus_one_rejects_whole_command() {
             &mut entities,
             &mut players,
             &mut smokes,
+            None,
             vec![PendingCommand {
                 player: 1,
                 command: SimCommand::Stop {

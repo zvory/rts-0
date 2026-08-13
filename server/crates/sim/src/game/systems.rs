@@ -30,6 +30,7 @@ mod occupancy_phase_cache;
 
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
+use crate::game::building_memory::BuildingMemory;
 use crate::game::entity::EntityStore;
 use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::{Fog, LingeringSightSource};
@@ -138,6 +139,7 @@ pub(crate) fn run_tick(
     players: &mut [PlayerState],
     active_vision_players: &BTreeSet<u32>,
     fog: &Fog,
+    building_memory: &BuildingMemory,
     pathing: &mut PathingService,
     rng: &mut impl Rng,
     lingering_sight: &mut Vec<LingeringSightSource>,
@@ -189,6 +191,7 @@ pub(crate) fn run_tick(
             &pre_command.spatial,
             &mut coordinator,
             fog,
+            building_memory,
             smokes,
             ability_runtime,
             mortar_shells,
@@ -541,6 +544,7 @@ mod tests {
             &mut players,
             &active_vision_players,
             &fog,
+            &BuildingMemory::default(),
             &mut pathing,
             &mut SmallRng::seed_from_u64(0),
             &mut lingering_sight,

@@ -46,6 +46,7 @@ use crate::rules::projection;
 
 mod footprint_pathing;
 mod formation;
+mod clear_obstacle_area;
 #[cfg(test)]
 mod pathing_budget_tests;
 mod rally;

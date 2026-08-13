@@ -89,6 +89,7 @@ export const CMD = Object.freeze({
   MOVE: "move",
   FORMATION_MOVE: "formationMove",
   ATTACK_MOVE: "attackMove",
+  CLEAR_OBSTACLE_AREA: "clearObstacleArea",
   ATTACK: "attack",
   DECONSTRUCT: "deconstruct",
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",

@@ -7,6 +7,7 @@ const EPSILON = 1e-7;
 
 export function buildSelectionScene({
   entities,
+  rememberedEntities = null,
   preparedEntities = null,
   projection,
   tileSize = DEFAULT_TILE_SIZE,
@@ -22,12 +23,18 @@ export function buildSelectionScene({
     const proxy = selectionProxyForEntity(sourceEntities[index], tileSize, preparedEntities?.[index]);
     if (proxy) proxies.push(proxy);
   }
+  const rememberedProxies = [];
+  for (const entity of Array.isArray(rememberedEntities) ? rememberedEntities : []) {
+    const proxy = selectionProxyForEntity(entity, tileSize);
+    if (proxy) rememberedProxies.push(proxy);
+  }
   return Object.freeze({
     version: 1,
     generation: finiteInteger(generation, 1),
     frameId: finiteInteger(frameId, 0),
     projection,
     proxies: Object.freeze(proxies),
+    rememberedProxies: Object.freeze(rememberedProxies),
   });
 }
 

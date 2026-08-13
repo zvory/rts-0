@@ -287,6 +287,46 @@ pub(crate) fn unit_explicit_attack_target_valid(
         })
 }
 
+/// Highest-priority currently actionable Tank Trap inside a contextual clear-area objective.
+/// The objective itself may come from stale authoritative memory, but returned entity ids always
+/// pass the ordinary current-vision explicit-attack boundary.
+pub(crate) fn unit_clear_obstacle_area_target(
+    query: ExplicitAttackQuery<'_>,
+    attacker_id: u32,
+) -> Option<u32> {
+    let attacker = query.entities.get(attacker_id)?;
+    let objective = attacker.order().clear_obstacle_area()?;
+    let radius = config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * config::TILE_SIZE as f32;
+    let radius_sq = radius * radius;
+    query
+        .entities
+        .iter()
+        .filter(|target| target.hp > 0 && target.is_neutral_obstacle())
+        .filter_map(|target| {
+            let dx = target.pos_x - objective.center_x;
+            let dy = target.pos_y - objective.center_y;
+            let objective_distance_sq = dx * dx + dy * dy;
+            (objective_distance_sq <= radius_sq
+                && unit_explicit_attack_target_valid(query, attacker_id, target.id))
+            .then_some((
+                target.id,
+                target.id != objective.anchor,
+                objective_distance_sq,
+                (target.pos_x - attacker.pos_x).mul_add(
+                    target.pos_x - attacker.pos_x,
+                    (target.pos_y - attacker.pos_y) * (target.pos_y - attacker.pos_y),
+                ),
+            ))
+        })
+        .min_by(|a, b| {
+            a.1.cmp(&b.1)
+                .then_with(|| a.2.total_cmp(&b.2))
+                .then_with(|| a.3.total_cmp(&b.3))
+                .then_with(|| a.0.cmp(&b.0))
+        })
+        .map(|candidate| candidate.0)
+}
+
 fn explicit_attack_target_inside_fixed_arc(attacker: &Entity, target: &Entity) -> bool {
     if attacker.kind != EntityKind::AntiTankGun
         || !matches!(attacker.weapon_setup(), WeaponSetup::Deployed)
