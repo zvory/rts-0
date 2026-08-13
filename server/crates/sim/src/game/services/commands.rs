@@ -296,7 +296,7 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
-                let center = clear_obstacle_area_center(
+                let Some((center_x, center_y)) = clear_obstacle_area_center(
                     entities,
                     building_memory,
                     &teams,
@@ -304,16 +304,15 @@ pub(in crate::game) fn apply_commands(
                     smokes,
                     player,
                     target,
-                );
+                ) else {
+                    continue;
+                };
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),
                     order: planner::RequestedOrder::ClearObstacleArea {
                         anchor: target,
-                        center: center
-                            .map(|(x, y)| planner::Point::new(x, y))
-                            .unwrap_or_else(|| planner::Point::new(f32::NAN, f32::NAN)),
-                        target_valid: center.is_some(),
+                        center: planner::Point::new(center_x, center_y),
                     },
                 };
                 apply_planned!(

@@ -138,7 +138,6 @@ pub enum RequestedOrder {
     ClearObstacleArea {
         anchor: EntityId,
         center: Point,
-        target_valid: bool,
     },
     HoldPosition,
     AttackTarget {
@@ -277,17 +276,15 @@ pub fn plan_order(
             |u| u.can_attack_move,
             OrderIntent::AttackMove(to),
         ),
-        RequestedOrder::ClearObstacleArea {
-            anchor,
-            center,
-            target_valid: true,
-        } if center.valid() => plan_filtered_units(
-            config,
-            request.mode,
-            &ordered_facts,
-            |unit| unit.can_attack_move && unit.can_attack,
-            OrderIntent::ClearObstacleArea { anchor, center },
-        ),
+        RequestedOrder::ClearObstacleArea { anchor, center } if center.valid() => {
+            plan_filtered_units(
+                config,
+                request.mode,
+                &ordered_facts,
+                |unit| unit.can_attack_move && unit.can_attack,
+                OrderIntent::ClearObstacleArea { anchor, center },
+            )
+        }
         RequestedOrder::HoldPosition => plan_filtered_units(
             config,
             request.mode,
