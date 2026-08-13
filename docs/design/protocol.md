@@ -531,8 +531,9 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // 17 frosted ground. Grass, all roads, gravel, dirt, mud, and frosted
     // ground are passable; rock/water are impassable.
     terrain: number[],
-    // Server-authored presentation-only height levels, row-major and shape-matched to terrain.
-    // Omitted on flat maps (implicit zero). Current movement, sight, and combat rules remain 2D.
+    // Server-authored height levels, row-major and shape-matched to terrain.
+    // Omitted on flat maps (implicit zero). Local grade affects movement speed; sight and combat
+    // otherwise remain 2D.
     elevation?: number[],
     // Required when elevation varies and optional on flat maps. Azimuth is compass degrees in map space
     // (0=north/-Y, 90=east); elevation is degrees above the horizon; warmth is 0-100.
@@ -1483,7 +1484,8 @@ POST /api/map-handoffs/{handoffId}
 exactly match the row-major terrain body. Its optional `elevation` digit rows must have the same
 shape. Varying elevation requires a `sun` record (`azimuthDegrees` 0–359,
 `elevationDegrees` 1–89, `warmth` 0–100); flat maps may also include one to opt into authored
-atmosphere and directional unit shadows. These fields are presentation-only. The schema also has flat `startLocations`, `baseSites`, and required
+atmosphere and directional unit shadows. `sun` is presentation-only; local elevation grade affects
+authoritative movement speed as defined in `balance.md`. The schema also has flat `startLocations`, `baseSites`, and required
 `doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `noBuildingTiles`,
 `noEntrenchmentTiles`, `damageReductionTiles`, and `slowMovementTiles` arrays. A forest span is the compact encoding of the first-class composite
 Forest tile: `[y, xStart, xEnd]` with inclusive bounds. Spans may not overlap and each Forest tile

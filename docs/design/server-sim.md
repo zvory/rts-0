@@ -62,8 +62,8 @@ pub struct Game { /* private */ }
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Loads the hardcoded handcrafted map and assigns ordered players to fixed authored start
-    /// locations. A map owns flat `startLocations`, `baseSites`, presentation-only `elevation` and
-    /// `sun`, and static `doodads`: start locations determine its
+    /// locations. A map owns flat `startLocations`, `baseSites`, movement-affecting `elevation`,
+    /// presentation-only `sun`, and static `doodads`: start locations determine its
     /// capacity, while every base site receives its authored 0–36 Steel and 0–9 Oil patches.
     /// Singleton-team FFA
     /// matches shuffle fixed start locations by `seed`; team matches choose ordered starts from the

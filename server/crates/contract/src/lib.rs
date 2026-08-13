@@ -292,8 +292,8 @@ pub struct MapInfo {
     pub terrain: Vec<u8>,
     /// Row-major static elevation levels, length = width * height.
     ///
-    /// Elevation is presentation-only for now: the server owns and distributes it, but no
-    /// movement, visibility, or combat rule consumes it.
+    /// The server owns and distributes elevation. The simulation consumes local grade for
+    /// directional movement speed; visibility and combat otherwise remain two-dimensional.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub elevation: Vec<u8>,
     /// Optional authored presentation conditions for static elevation lighting. Flat maps omit

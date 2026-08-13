@@ -128,6 +128,7 @@ pub(super) fn advance_moving_units(
             })
             .unwrap_or(0.0);
         if let Some((wx, wy)) = movement_target {
+            speed *= map.elevation_movement_multiplier_at(x, y, (wx - x, wy - y));
             speed *= ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick);
         }
         if speed <= 0.0 {

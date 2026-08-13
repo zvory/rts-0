@@ -64,7 +64,7 @@ pub struct Map {
     /// Row-major terrain codes, length `width * height`.
     pub terrain: Vec<u8>,
     /// Row-major authoritative static elevation levels, length `width * height`.
-    /// No gameplay rule consumes these levels yet.
+    /// Movement samples local elevation changes for directional slope speed.
     pub elevation: Vec<u8>,
     /// Optional authored presentation conditions for elevated-terrain lighting.
     pub sun: Option<MapSun>,
@@ -398,6 +398,35 @@ impl Map {
             self.is_slow_movement_tile(tx, ty)
         };
         terrain_rules::slow_movement_tile_multiplier(active)
+    }
+
+    /// Movement multiplier for the local grade up to one tile ahead in the travel direction.
+    #[inline]
+    pub(super) fn elevation_movement_multiplier_at(
+        &self,
+        x: f32,
+        y: f32,
+        direction: (f32, f32),
+    ) -> f32 {
+        let length = direction.0.hypot(direction.1);
+        if !length.is_finite() || length <= f32::EPSILON {
+            return 1.0;
+        }
+        let (current_tx, current_ty) = self.tile_of(x, y);
+        let lookahead = length.min(config::TILE_SIZE as f32) / length;
+        let (ahead_tx, ahead_ty) =
+            self.tile_of(x + direction.0 * lookahead, y + direction.1 * lookahead);
+        let current = self
+            .elevation
+            .get(self.index(current_tx, current_ty))
+            .copied()
+            .unwrap_or(0);
+        let ahead = self
+            .elevation
+            .get(self.index(ahead_tx, ahead_ty))
+            .copied()
+            .unwrap_or(0);
+        terrain_rules::elevation_movement_speed_multiplier(current, ahead)
     }
 
     pub(super) fn protocol_overlay_tiles(&self) -> MapOverlayTiles<MapTile> {

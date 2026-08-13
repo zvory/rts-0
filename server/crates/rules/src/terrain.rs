@@ -25,6 +25,10 @@ pub const MAP_TERRAIN_FROSTED_GROUND: u8 = 17;
 
 pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
 pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 = 0.75;
+pub const UPHILL_MOVEMENT_SLOWDOWN_PER_GRADE: f32 = 0.12;
+pub const MIN_UPHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 0.30;
+pub const DOWNHILL_MOVEMENT_BOOST_PER_GRADE: f32 = 0.06;
+pub const MAX_DOWNHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.35;
 /// Body-edge distance at which an ordinary unit detects a concealed hostile unit.
 pub const CONCEALMENT_CLOSE_DETECTION_RANGE_TILES: f32 = 2.0;
 /// Maximum number of concealment tiles an ordinary fog-of-war sight ray may enter.
@@ -89,6 +93,21 @@ pub fn movement_speed_multiplier(_kind: EntityKind, terrain: TerrainKind) -> f32
 pub fn slow_movement_tile_multiplier(active: bool) -> f32 {
     if active {
         SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER
+    } else {
+        1.0
+    }
+}
+
+/// Multiplier on movement from the current elevation toward a locally sampled elevation.
+/// Uphill penalties and downhill boosts saturate so authored extremes stay controllable.
+pub fn elevation_movement_speed_multiplier(current: u8, ahead: u8) -> f32 {
+    let grade = i16::from(ahead) - i16::from(current);
+    if grade > 0 {
+        (1.0 - f32::from(grade) * UPHILL_MOVEMENT_SLOWDOWN_PER_GRADE)
+            .max(MIN_UPHILL_MOVEMENT_SPEED_MULTIPLIER)
+    } else if grade < 0 {
+        (1.0 + f32::from(-grade) * DOWNHILL_MOVEMENT_BOOST_PER_GRADE)
+            .min(MAX_DOWNHILL_MOVEMENT_SPEED_MULTIPLIER)
     } else {
         1.0
     }
@@ -221,5 +240,14 @@ mod tests {
         assert_eq!(damage_after_reduction_tile(1, true), 1);
         assert_eq!(damage_after_reduction_tile(0, true), 0);
         assert_eq!(damage_after_reduction_tile(99, false), 99);
+    }
+
+    #[test]
+    fn elevation_movement_is_directional_and_capped() {
+        assert_eq!(elevation_movement_speed_multiplier(4, 4), 1.0);
+        assert_eq!(elevation_movement_speed_multiplier(4, 5), 0.88);
+        assert_eq!(elevation_movement_speed_multiplier(5, 4), 1.06);
+        assert_eq!(elevation_movement_speed_multiplier(0, 9), 0.30);
+        assert_eq!(elevation_movement_speed_multiplier(9, 0), 1.35);
     }
 }
