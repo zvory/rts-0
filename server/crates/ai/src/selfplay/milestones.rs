@@ -448,6 +448,7 @@ impl PlayerMilestones {
         let before = self.clone();
         let attack_units = match command {
             Command::AttackMove { units, .. }
+            | Command::ClearObstacleArea { units, .. }
             | Command::Attack { units, .. }
             | Command::AttackTankTrapCluster { units, .. }
             | Command::FormationMove {

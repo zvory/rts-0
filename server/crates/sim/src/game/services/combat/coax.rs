@@ -35,6 +35,7 @@ struct TankCoaxSnapshot {
     weapon_facing: f32,
     range_px: f32,
     explicit_neutral_obstacle_target: Option<u32>,
+    clear_obstacle_area: Option<(u32, f32, f32)>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -168,6 +169,10 @@ fn tank_coax_snapshot(
         weapon_facing,
         range_px,
         explicit_neutral_obstacle_target: tank.order().attack_target(),
+        clear_obstacle_area: tank
+            .order()
+            .clear_obstacle_area()
+            .map(|objective| (objective.anchor, objective.center_x, objective.center_y)),
     })
 }
 
@@ -219,8 +224,19 @@ fn tank_coax_target_candidates(
         let Some(target) = entities.get(id) else {
             continue;
         };
+        let clear_area_trap = target.is_neutral_obstacle()
+            && snapshot
+                .clear_obstacle_area
+                .is_some_and(|(_, center_x, center_y)| {
+                    let dx = target.pos_x - center_x;
+                    let dy = target.pos_y - center_y;
+                    let radius =
+                        config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * config::TILE_SIZE as f32;
+                    dx.mul_add(dx, dy * dy) <= radius * radius
+                });
         if target.is_neutral_obstacle()
             && snapshot.explicit_neutral_obstacle_target != Some(target.id)
+            && !clear_area_trap
         {
             continue;
         }
@@ -268,6 +284,19 @@ fn tank_coax_target_candidates(
             facts: target_rules::target_facts(target.kind),
             in_weapon_range: true,
             retained_target: false,
+        });
+    }
+    if snapshot.clear_obstacle_area.is_some()
+        && candidates.iter().any(|candidate| {
+            entities
+                .get(candidate.id)
+                .is_some_and(|target| target.is_neutral_obstacle())
+        })
+    {
+        candidates.retain(|candidate| {
+            entities
+                .get(candidate.id)
+                .is_some_and(|target| target.is_neutral_obstacle())
         });
     }
     candidates

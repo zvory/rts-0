@@ -61,7 +61,8 @@ export function _issueTargetedCommand(p, ev = {}) {
   const landUnits = selectedOwnLandUnitIds(this, ownUnits);
   const producers = ownUnits.length === 0 ? this._selectedProducerBuildingIds() : [];
   const pickedTarget = commandTarget === "attack"
-    ? this._entityAtScreen(p, /*ownPreferred=*/ false)
+    ? this._entityAtScreen(p, /*ownPreferred=*/ false) ||
+      this._rememberedEntityAtScreen?.(p, isNeutralObstacle)
     : null;
   const resource = this._resourceAtScreen(p);
   const world = this._groundAtScreen(p.x, p.y);
@@ -179,13 +180,9 @@ export function _issueTargetedCommand(p, ev = {}) {
 
   const target = pickedTarget;
   if (explicitAttackCommandTarget(this.state, target, this.controlPolicy)) {
-    const issuedAttack = issueTargetAttackForLandUnits(
-      this,
-      landUnits,
-      target,
-      !!ev.shiftKey,
-      isNeutralObstacle(target),
-    );
+    const issuedAttack = isNeutralObstacle(target)
+      ? issueClearObstacleAreaForLandUnits(this, landUnits, target, !!ev.shiftKey)
+      : issueTargetAttackForLandUnits(this, landUnits, target, !!ev.shiftKey);
     if (issuedAttack) {
       this._addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
     }
@@ -328,14 +325,9 @@ function issueNormalRightClickAction(input, action, queued) {
   }
 }
 
-function issueTargetAttackForLandUnits(input, landUnits, target, queued, tankTrapCluster = false) {
+function issueTargetAttackForLandUnits(input, landUnits, target, queued) {
   if (landUnits.length > 0) {
-    input.commandInteraction.issueCommand(cmd.attack(
-      landUnits,
-      target.id,
-      queued,
-      tankTrapCluster,
-    ));
+    input.commandInteraction.issueCommand(cmd.attack(landUnits, target.id, queued));
     return true;
   }
   return false;
@@ -347,6 +339,12 @@ function issueAttackMoveForLandUnits(input, landUnits, x, y, queued) {
     return true;
   }
   return false;
+}
+
+function issueClearObstacleAreaForLandUnits(input, landUnits, target, queued) {
+  if (landUnits.length === 0) return false;
+  input.commandInteraction.issueCommand(cmd.clearObstacleArea(landUnits, target.id, queued));
+  return true;
 }
 
 function rightClickFeedback(kind, x, y) {
@@ -388,7 +386,7 @@ function attackTargetPreviewForEntity(
 ) {
   const clustered = isNeutralObstacle(target);
   const targets = clustered
-    ? tankTrapClusterPreviewTargets(target, clusterEntities, tileSize)
+    ? clearObstacleAreaPreviewTargets(target, clusterEntities, tileSize)
     : [target];
   return {
     targetId: target.id,
@@ -405,7 +403,7 @@ function attackTargetPreviewForEntity(
   };
 }
 
-function tankTrapClusterPreviewTargets(anchor, entities, tileSize) {
+function clearObstacleAreaPreviewTargets(anchor, entities, tileSize) {
   const radiusPx = TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * tileSize;
   const radiusSq = radiusPx * radiusPx;
   return entities
@@ -805,12 +803,13 @@ export function _refreshAttackTargetPreview() {
   }
 
   if (intent.commandTarget === "attack") {
-    const target = this._entityAtScreen(this.mouse, /*ownPreferred=*/ false);
+    const target = this._entityAtScreen(this.mouse, /*ownPreferred=*/ false) ||
+      this._rememberedEntityAtScreen?.(this.mouse, isNeutralObstacle);
     intent.updateAttackTargetPreview(
       explicitAttackCommandTarget(this.state, target, this.controlPolicy)
         ? attackTargetPreviewForEntity(
           target,
-          this._selectionEntities(),
+          clearObstaclePreviewEntities(this),
           this.state.map?.tileSize || DEFAULT_TILE_SIZE,
         )
         : null,
@@ -820,6 +819,13 @@ export function _refreshAttackTargetPreview() {
   intent.updateAttackTargetPreview(
     attackTargetPreviewForRightClickAction(normalRightClickAction(this, this.mouse)),
   );
+}
+
+function clearObstaclePreviewEntities(input) {
+  const byId = new Map();
+  for (const entity of input.state?.rememberedBuildings || []) byId.set(entity.id, entity);
+  for (const entity of input._selectionEntities()) byId.set(entity.id, entity);
+  return [...byId.values()];
 }
 
 export function _nearestCompletedMiningAnchor(x, y, includeAllies = false) {

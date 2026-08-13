@@ -29,6 +29,11 @@ pub enum SimCommand {
         y: f32,
         queued: bool,
     },
+    ClearObstacleArea {
+        units: Vec<u32>,
+        target: u32,
+        queued: bool,
+    },
     Attack {
         units: Vec<u32>,
         target: u32,
@@ -185,6 +190,15 @@ impl SimCommand {
                 units,
                 x,
                 y,
+                queued,
+            },
+            protocol::Command::ClearObstacleArea {
+                units,
+                target,
+                queued,
+            } => SimCommand::ClearObstacleArea {
+                units,
+                target,
                 queued,
             },
             protocol::Command::Attack {
@@ -434,6 +448,15 @@ impl SimCommand {
                 units: units.clone(),
                 x: *x,
                 y: *y,
+                queued: *queued,
+            },
+            SimCommand::ClearObstacleArea {
+                units,
+                target,
+                queued,
+            } => protocol::Command::ClearObstacleArea {
+                units: units.clone(),
+                target: *target,
                 queued: *queued,
             },
             SimCommand::Attack {

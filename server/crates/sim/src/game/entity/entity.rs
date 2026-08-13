@@ -1208,10 +1208,11 @@ impl Entity {
 
     pub(in crate::game) fn neutralize_completed_tank_trap(&mut self) -> bool {
         let completed_tank_trap = self.kind == EntityKind::TankTrap && !self.under_construction();
+        let changed_owner = completed_tank_trap && self.owner != NEUTRAL;
         if completed_tank_trap {
             self.owner = NEUTRAL;
         }
-        completed_tank_trap
+        changed_owner
     }
 
     pub fn set_construction_progress(&mut self, progress: u32) -> bool {

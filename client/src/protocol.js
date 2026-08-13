@@ -309,6 +309,8 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.FORMATION_MOVE, units, points, ...(attackMove ? { attackMove: true } : {}) }, queued),
   attackMove: (units, x, y, queued = false) =>
     withQueued({ c: CMD.ATTACK_MOVE, units, x, y }, queued),
+  clearObstacleArea: (units, target, queued = false) =>
+    withQueued({ c: CMD.CLEAR_OBSTACLE_AREA, units, target }, queued),
   attack: (units, target, queued = false, tankTrapCluster = false) =>
     withQueued({
       c: CMD.ATTACK,

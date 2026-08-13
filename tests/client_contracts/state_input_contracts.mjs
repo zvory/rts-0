@@ -1496,21 +1496,22 @@ function buttonByLabel(card, label) {
   );
 
   targetedInput.clientIntent.beginCommandTarget("attack");
-  targetedInput._entityAtScreen = () => ({
-    id: 100,
-    owner: 0,
-    kind: KIND.TANK_TRAP,
-    x: 304,
-    y: 304,
-  });
+  targetedInput._entityAtScreen = () => ({ id: 100, owner: 0, kind: KIND.TANK_TRAP, x: 304, y: 304 });
   clickTarget(targetedInput, { x: 304, y: 304 });
   lastSent = sentCommands[sentCommands.length - 1];
   assert(
-    lastSent.c === "attack" &&
-      lastSent.target === 100 &&
-      lastSent.tankTrapCluster === true,
-    "A-clicking a neutral Tank Trap requests one authoritative cluster attack",
+    lastSent.c === "clearObstacleArea" && lastSent.target === 100,
+    "A-clicking a visible neutral Tank Trap requests an authoritative clear-area order",
   );
+
+  targetedInput.clientIntent.beginCommandTarget("attack");
+  targetedInput._entityAtScreen = () => null;
+  targetedInput._rememberedEntityAtScreen = () => ({ id: 101, owner: 0, kind: KIND.TANK_TRAP });
+  clickTarget(targetedInput, { x: 312, y: 312 }, { shiftKey: true });
+  lastSent = sentCommands[sentCommands.length - 1];
+  assert(lastSent.c === "clearObstacleArea" && lastSent.target === 101 && lastSent.queued === true,
+    "A-clicking a remembered Tank Trap requests one queued authoritative clear-area order");
+  targetedInput._rememberedEntityAtScreen = () => null;
 
   targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput.clientIntent.holdCommandTarget("attack", "KeyA", true);

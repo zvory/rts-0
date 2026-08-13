@@ -34,6 +34,9 @@ pub(super) fn acquire(
     require_safe_mortar_target: bool,
     tick: u32,
 ) -> Option<u32> {
+    if let Some(target) = clear_obstacle_area_target(map, entities, teams, fog, smokes, id, owner) {
+        return Some(target);
+    }
     resolve_target(
         map,
         entities,
@@ -92,6 +95,9 @@ pub(super) fn select(
     require_safe_mortar_target: bool,
     tick: u32,
 ) -> Option<u32> {
+    if let Some(target) = clear_obstacle_area_target(map, entities, teams, fog, smokes, id, owner) {
+        return Some(target);
+    }
     let ready = entities
         .get(id)
         .is_some_and(|entity| entity.weapon_cooldown(weapon) == 0);
@@ -187,6 +193,28 @@ pub(super) fn select(
         range_px,
         require_safe_mortar_target,
         tick,
+    )
+}
+
+fn clear_obstacle_area_target(
+    map: &Map,
+    entities: &EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    id: u32,
+    owner: u32,
+) -> Option<u32> {
+    crate::game::services::world_query::unit_clear_obstacle_area_target(
+        crate::game::services::world_query::ExplicitAttackQuery::new(
+            map,
+            entities,
+            teams,
+            fog,
+            Some(smokes),
+            owner,
+        ),
+        id,
     )
 }
 

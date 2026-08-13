@@ -34,6 +34,7 @@ use self::attack::{direct_panzerfaust_shot_spent, panzerfaust_attack_cycle_activ
 
 mod artillery;
 mod attack;
+mod clear_obstacle_area;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct PointPromotionKey {
@@ -64,13 +65,10 @@ impl PointPromotionKey {
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
     PointMove(PointPromotionKey),
+    ClearObstacleArea(u32, (f32, f32)),
     HoldPosition,
-    Attack {
-        targets: Vec<u32>,
-    },
-    Gather {
-        node: u32,
-    },
+    Attack(Vec<u32>),
+    Gather(u32),
     Build {
         kind: EntityKind,
         tx: u32,
@@ -130,6 +128,7 @@ pub(crate) fn promote_ready_orders(
     }
 
     let mut groups: BTreeMap<PointPromotionKey, Vec<u32>> = BTreeMap::new();
+    let mut clear_area_groups = clear_obstacle_area::PromotionGroups::default();
     for id in ready {
         if let Some((ability, x, y, MovePhase::PathFailed)) = entities
             .get(id)
@@ -196,6 +195,9 @@ pub(crate) fn promote_ready_orders(
             PromotedIntent::PointMove(key) => {
                 groups.entry(key).or_default().push(id);
             }
+            PromotedIntent::ClearObstacleArea(anchor, center) => {
+                clear_area_groups.push(entities, id, anchor, center);
+            }
             PromotedIntent::HoldPosition => {
                 entities.release_miner(id);
                 if let Some(entity) = entities.get_mut(id) {
@@ -203,14 +205,14 @@ pub(crate) fn promote_ready_orders(
                     entity.clear_worker_carry();
                 }
             }
-            PromotedIntent::Attack { targets } => {
+            PromotedIntent::Attack(targets) => {
                 if targets.len() == 1 {
                     coordinator.order_attack(entities, id, targets[0]);
                 } else {
                     coordinator.order_attack_cluster(entities, id, targets);
                 }
             }
-            PromotedIntent::Gather { node } => {
+            PromotedIntent::Gather(node) => {
                 coordinator.order_gather(entities, id, node);
             }
             PromotedIntent::Build { kind, tx, ty } => {
@@ -316,6 +318,15 @@ pub(crate) fn promote_ready_orders(
     for (key, ids) in groups {
         coordinator.order_group_move(entities, key.owner, &ids, key.point(), key.attack_move);
     }
+    for ((owner, anchor, x_bits, y_bits), ids) in clear_area_groups.into_groups() {
+        coordinator.order_group_clear_obstacle_area(
+            entities,
+            owner,
+            &ids,
+            anchor,
+            (f32::from_bits(x_bits), f32::from_bits(y_bits)),
+        );
+    }
 }
 fn ready_for_next_order(
     map: &Map,
@@ -392,9 +403,16 @@ fn pop_next_valid_intent(
                     return Some(PromotedIntent::PointMove(key));
                 }
             }
+            OrderIntent::ClearObstacleArea(intent) => {
+                if let Some(promoted) =
+                    clear_obstacle_area::promoted(intent.anchor, intent.center_x, intent.center_y)
+                {
+                    return Some(promoted);
+                }
+            }
             OrderIntent::Gather(gather) => {
                 if gather_intent_valid(entities, owner, id, gather.node) {
-                    return Some(PromotedIntent::Gather { node: gather.node });
+                    return Some(PromotedIntent::Gather(gather.node));
                 }
             }
             OrderIntent::Build(build) => {
@@ -454,7 +472,7 @@ fn pop_next_valid_intent(
                     {
                         targets.swap(0, index);
                     }
-                    return Some(PromotedIntent::Attack { targets });
+                    return Some(PromotedIntent::Attack(targets));
                 }
             }
             OrderIntent::WorldAbility(ability) => {

@@ -341,11 +341,27 @@ pub(in crate::game) fn combat_system(
             continue; // Auto-acquisition stays hostile/obstacle-only; self-attacks are ordered.
         }
         let dist = target_distance_sq.sqrt();
-        let commanded_direct_target = mode == CombatMode::Ordered
-            && entities
-                .get(id)
-                .and_then(|entity| entity.order().attack_target())
-                == Some(tid);
+        let clear_area_priority_target = entities.get(id).is_some_and(|entity| {
+            entity
+                .order()
+                .clear_obstacle_area()
+                .is_some_and(|objective| {
+                    neutral_obstacle
+                        && entities.get(tid).is_some_and(|target| {
+                            let dx = target.pos_x - objective.center_x;
+                            let dy = target.pos_y - objective.center_y;
+                            let radius = config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES
+                                * config::TILE_SIZE as f32;
+                            dx.mul_add(dx, dy * dy) <= radius * radius
+                        })
+                })
+        });
+        let commanded_direct_target = clear_area_priority_target
+            || (mode == CombatMode::Ordered
+                && entities
+                    .get(id)
+                    .and_then(|entity| entity.order().attack_target())
+                    == Some(tid));
         let target_in_weapon_range = dist >= min_range_px && dist <= range_px;
         if commanded_direct_target && target_in_weapon_range {
             if let Some(e) = entities.get_mut(id) {
@@ -365,7 +381,7 @@ pub(in crate::game) fn combat_system(
             .unwrap_or(false);
         let clear_shot = if is_mortar_team {
             true
-        } else if mode == CombatMode::Ordered {
+        } else if mode == CombatMode::Ordered || clear_area_priority_target {
             direct_fire_target_legal(
                 map,
                 entities,
@@ -535,7 +551,7 @@ pub(in crate::game) fn combat_system(
                     fired = true;
                 }
             }
-        } else if mode == CombatMode::Ordered {
+        } else if mode == CombatMode::Ordered || clear_area_priority_target {
             if let Some(e) = entities.get_mut(id) {
                 e.mark_attack_phase(AttackPhase::Waiting);
             }
