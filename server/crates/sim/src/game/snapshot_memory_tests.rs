@@ -301,6 +301,108 @@ fn spectator_remembered_buildings_follow_selected_player_union() {
 }
 
 #[test]
+fn spectator_union_keeps_newer_destroyed_building_knowledge_after_vision_leaves() {
+    let mut game = empty_flat_game_with_players(&three_players());
+    let scout_pos = game.state.map.tile_center(20, 20);
+    let depot_pos = game.state.map.tile_center(22, 20);
+    let p1_scout = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
+        .expect("p1 scout should spawn");
+    let depot = game
+        .state
+        .entities
+        .spawn_building(3, EntityKind::Depot, depot_pos.0, depot_pos.1, true)
+        .expect("enemy depot should spawn");
+    advance_to_next_fog_refresh(&mut game);
+
+    game.state.entities.remove(p1_scout);
+    let p2_scout = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
+        .expect("p2 scout should spawn");
+    advance_to_next_fog_refresh(&mut game);
+    game.state.entities.remove(depot);
+    advance_to_next_fog_refresh(&mut game);
+    game.state.entities.remove(p2_scout);
+    advance_to_next_fog_refresh(&mut game);
+
+    assert!(game
+        .snapshot_for_observer(&ObserverView::Players(vec![1]))
+        .remembered_buildings
+        .iter()
+        .any(|building| building.id == depot));
+    assert!(game
+        .snapshot_for_observer(&ObserverView::Players(vec![2]))
+        .remembered_buildings
+        .iter()
+        .all(|building| building.id != depot));
+    assert!(game
+        .snapshot_for_observer(&ObserverView::Players(vec![1, 2]))
+        .remembered_buildings
+        .iter()
+        .all(|building| building.id != depot));
+
+    let checkpoint = game
+        .checkpoint_payload_text_for_test()
+        .expect("building-memory clear should serialize");
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &checkpoint,
+        game.state.map.clone(),
+        game.map_metadata().clone(),
+    )
+    .expect("building-memory clear should restore");
+    assert!(restored
+        .snapshot_for_observer(&ObserverView::Players(vec![1, 2]))
+        .remembered_buildings
+        .iter()
+        .all(|building| building.id != depot));
+}
+
+#[test]
+fn spectator_union_does_not_resurrect_destroyed_authored_tank_trap() {
+    let mut game = empty_flat_game_with_players(&three_players());
+    let trap_pos = game.state.map.tile_center(22, 20);
+    let trap = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::TankTrap, trap_pos.0, trap_pos.1, true)
+        .expect("authored Tank Trap should spawn");
+    let tick = game.tick_count();
+    game.state.building_memory.seed_authored_neutral_buildings(
+        &[1, 2, 3],
+        &[trap],
+        &game.state.entities,
+        &game.state.map,
+        tick,
+    );
+    let scout_pos = game.state.map.tile_center(20, 20);
+    let p2_scout = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, scout_pos.0, scout_pos.1)
+        .expect("p2 scout should spawn");
+    advance_to_next_fog_refresh(&mut game);
+    game.state.entities.remove(trap);
+    advance_to_next_fog_refresh(&mut game);
+    game.state.entities.remove(p2_scout);
+    advance_to_next_fog_refresh(&mut game);
+
+    assert!(game
+        .snapshot_for_observer(&ObserverView::Players(vec![1]))
+        .remembered_buildings
+        .iter()
+        .any(|building| building.id == trap));
+    assert!(game
+        .snapshot_for_observer(&ObserverView::Players(vec![1, 2]))
+        .remembered_buildings
+        .iter()
+        .all(|building| building.id != trap));
+}
+
+#[test]
 fn does_not_expose_never_scouted_building_memory() {
     let mut game = empty_flat_game();
     let scout_pos = game.state.map.tile_center(4, 4);

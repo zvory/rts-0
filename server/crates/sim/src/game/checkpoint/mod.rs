@@ -381,7 +381,7 @@ impl GameCheckpointV1 {
             &entity_ids,
             &self.fog,
         )?;
-        validate_building_memory(&self.building_memory, &player_ids)?;
+        validate_building_memory(&self.building_memory, &player_ids, self.tick)?;
         validate_anti_tank_gun_memory(&self.anti_tank_gun_memory, &player_ids, map, self.tick)?;
         validate_pending_commands(&self.pending_commands, &player_ids)?;
         validate_command_log(&self.command_log, self.tick, &player_ids)?;
@@ -473,6 +473,8 @@ impl FogStateV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BuildingMemoryV1 {
     entries: Vec<BuildingMemoryEntryV1>,
+    #[serde(default)]
+    cleared: Vec<BuildingMemoryClearedV1>,
 }
 
 impl BuildingMemoryV1 {
@@ -487,6 +489,17 @@ impl BuildingMemoryV1 {
                     entry,
                 })
                 .collect(),
+            cleared: memory
+                .checkpoint_cleared_ticks()
+                .into_iter()
+                .map(
+                    |(player_id, building_id, cleared_tick)| BuildingMemoryClearedV1 {
+                        player_id,
+                        building_id,
+                        cleared_tick,
+                    },
+                )
+                .collect(),
         }
     }
 
@@ -495,6 +508,10 @@ impl BuildingMemoryV1 {
             self.entries
                 .into_iter()
                 .map(|entry| (entry.player_id, entry.building_id, entry.entry))
+                .collect(),
+            self.cleared
+                .into_iter()
+                .map(|clear| (clear.player_id, clear.building_id, clear.cleared_tick))
                 .collect(),
         )
     }
@@ -506,4 +523,12 @@ struct BuildingMemoryEntryV1 {
     player_id: u32,
     building_id: u32,
     entry: BuildingMemoryEntry,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BuildingMemoryClearedV1 {
+    player_id: u32,
+    building_id: u32,
+    cleared_tick: u32,
 }
