@@ -349,7 +349,15 @@ impl ReplaySession {
     }
 
     pub(super) fn cancel_seek(&mut self) {
-        self.active_seek = None;
+        if self.active_seek.take().is_some() {
+            // begin_seek positions transient chat at the requested target so reconstruction does
+            // not replay historical messages. If that target is abandoned, resume from the
+            // actual reconstructed tick or messages between here and the target are skipped.
+            self.next_chat = self
+                .artifact
+                .chat_log
+                .partition_point(|entry| entry.tick <= self.current_tick());
+        }
     }
 
     pub(super) fn effective_speed(&self) -> f32 {
@@ -424,6 +432,7 @@ impl ReplaySession {
 
     pub(super) fn set_speed(&mut self, controller_id: u32, speed: f32) {
         self.speed = if speed == Self::PAUSED_SPEED {
+            self.cancel_seek();
             Self::PAUSED_SPEED
         } else {
             speed.clamp(Self::MIN_SPEED, Self::MAX_SPEED)
@@ -1152,6 +1161,54 @@ mod tests {
         let target = replay.seek_back("test", 1, 42, u32::MAX).unwrap();
         assert_eq!(target, 0);
         assert_eq!(replay.state().current_tick, 0);
+    }
+
+    #[test]
+    fn pausing_during_a_seek_cancels_reconstruction_at_the_current_tick() {
+        use crate::protocol::ChatChannel;
+        use rts_sim::game::replay::ChatLogEntry;
+
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.duration_ticks = 2_001;
+        artifact.chat_log.push(ChatLogEntry {
+            tick: 2,
+            sender_id: 1,
+            sender_name: "Player 1".to_string(),
+            channel: ChatChannel::All,
+            text: "after cancellation".to_string(),
+        });
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        let plan = replay.plan_seek_to(2_001).unwrap();
+        replay.begin_seek(42, plan).unwrap();
+        replay
+            .advance_seek_slice(1, Duration::MAX, Duration::ZERO)
+            .unwrap();
+
+        assert!(replay.is_seeking());
+        assert_eq!(replay.current_tick(), 1);
+
+        replay.set_speed(42, ReplaySession::PAUSED_SPEED);
+
+        assert!(!replay.is_seeking());
+        assert!(replay.is_paused());
+        assert_eq!(replay.current_tick(), 1);
+        assert!(replay.state().seek.is_none());
+
+        replay.set_speed(42, 1.0);
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+        assert_eq!(
+            replay.take_chat_through_current_tick().as_slice(),
+            &[ChatLogEntry {
+                tick: 2,
+                sender_id: 1,
+                sender_name: "Player 1".to_string(),
+                channel: ChatChannel::All,
+                text: "after cancellation".to_string(),
+            }],
+            "resuming after cancellation must not skip chat before the abandoned target"
+        );
     }
 
     #[test]

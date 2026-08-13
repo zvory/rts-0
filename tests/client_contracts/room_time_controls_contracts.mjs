@@ -496,6 +496,29 @@ assert(
     replayControls.querySelectorAll(".room-time-timeline-mark").length === 2,
   "intermediate seek state advances the normal timeline and publishes newly created keyframes",
 );
+assert(replayUi.stopSeekingAndPause(), "active replay seeking exposes an immediate stop-and-pause action");
+assert(
+  replayNet.speeds.at(-1) === 0 &&
+    replayUi.roomTimeSeekPending === false &&
+    !replayControls.querySelector(".room-time-tick-status").textContent.includes("Seeking to"),
+  "stop-and-pause sends zero speed and clears the local seeking presentation immediately",
+);
+replayUi.applyRoomTimeState({
+  currentTick: 35,
+  durationTicks: 1_000,
+  speed: 0,
+  paused: true,
+  controllerId: 41,
+});
+assert(replayControls.dataset.roomTimePending === "false", "authoritative pause confirms stop-and-pause");
+replayUi.applyRoomTimeState({
+  currentTick: 35,
+  durationTicks: 1_000,
+  speed: 2,
+  paused: false,
+  controllerId: 41,
+  seek: { id: 4, controllerId: 41, fromTick: 120, targetTick: 30 },
+});
 replayUi.requestRoomTimeAction(
   { kind: "seek", mode: "absolute", baselineTick: 35, expectedTick: 700 },
   () => true,
