@@ -103,6 +103,12 @@
   cursor: pointer;
 }
 
+.lobby-map-archive-group {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
 .lobby-map-archive-heading {
   margin: 7px 2px 1px;
   padding: 8px 6px 3px;

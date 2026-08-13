@@ -186,10 +186,16 @@ import { textWithin } from "./dom_text.mjs";
         "1v1 No Terrain", "1v1", "Chokes", "Lighting Test", "Open Basin"],
       "custom map selector groups archived maps after active maps",
     );
+    const archivedGroup = findFakes(
+      selector.optionList,
+      (child) => child.className === "lobby-map-archive-group",
+    )[0];
     assert(
-      selector.optionList.children[0].children.some?.((child) =>
-        child.className === "lobby-map-archive-heading" && child.textContent === "Archived"),
-      "custom map selector labels the archived map section",
+      archivedGroup?.role === "group" && archivedGroup?.["aria-label"] === "Archived maps" &&
+        archivedGroup.children[0]?.className === "lobby-map-archive-heading" &&
+        archivedGroup.children[0]?.textContent === "Archived" &&
+        archivedGroup.children.slice(1).every((child) => child.classList.contains("is-archived")),
+      "custom map selector exposes archived options as a labeled accessibility group",
     );
     selector.open();
     const schoneTage = selector.optionButtons.find((button) => button.dataset.mapName === "Schone Tage");

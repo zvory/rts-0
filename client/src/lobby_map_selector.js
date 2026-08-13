@@ -181,16 +181,20 @@ export class LobbyMapSelector {
   _rebuildOptions() {
     this.optionButtons = [];
     const fragment = document.createDocumentFragment();
-    let archivedSectionStarted = false;
+    let archivedGroup = null;
     for (const entry of this.maps) {
       const archived = !!lobbyMapPresentation(entry.name).archived;
-      if (archived && !archivedSectionStarted) {
-        archivedSectionStarted = true;
+      if (archived && !archivedGroup) {
+        archivedGroup = document.createElement("div");
+        archivedGroup.className = "lobby-map-archive-group";
+        archivedGroup.setAttribute("role", "group");
+        archivedGroup.setAttribute("aria-label", "Archived maps");
         const heading = document.createElement("div");
         heading.className = "lobby-map-archive-heading";
         heading.textContent = "Archived";
-        heading.setAttribute("role", "presentation");
-        fragment.appendChild(heading);
+        heading.setAttribute("aria-hidden", "true");
+        archivedGroup.appendChild(heading);
+        fragment.appendChild(archivedGroup);
       }
       const button = document.createElement("button");
       button.type = "button";
@@ -204,7 +208,7 @@ export class LobbyMapSelector {
       button.addEventListener("focus", () => this.preview(entry.name));
       button.addEventListener("click", () => this._select(entry.name));
       this.optionButtons.push(button);
-      fragment.appendChild(button);
+      (archived ? archivedGroup : fragment).appendChild(button);
     }
     this.optionList.replaceChildren(fragment);
   }
