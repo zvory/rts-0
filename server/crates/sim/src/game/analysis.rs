@@ -29,7 +29,11 @@ impl Game {
                         .map(|upgrade| upgrade.to_protocol_str().to_string())
                         .collect(),
                     units_lost: unit_loss_rows(&player.score.units_lost_by_kind),
-                    resources_lost: resources_lost(&player.score.units_lost_by_kind),
+                    buildings_lost: kind_count_rows(&player.score.buildings_lost_by_kind),
+                    resources_lost: resources_lost(
+                        &player.score.units_lost_by_kind,
+                        &player.score.buildings_lost_by_kind,
+                    ),
                     resources: player.observer_analysis_resources(self.tick_count()),
                     ai_diagnostics: None,
                 })
@@ -102,10 +106,13 @@ fn kind_count_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ObserverAnalysisKi
         .collect()
 }
 
-fn resources_lost(counts: &BTreeMap<EntityKind, u32>) -> ObserverAnalysisResourcesLost {
+fn resources_lost(
+    unit_counts: &BTreeMap<EntityKind, u32>,
+    building_counts: &BTreeMap<EntityKind, u32>,
+) -> ObserverAnalysisResourcesLost {
     let mut total_steel = 0u32;
     let mut total_oil = 0u32;
-    for (&kind, &count) in counts {
+    for (&kind, &count) in unit_counts.iter().chain(building_counts) {
         let (steel, oil) = economy_rules::cost(kind);
         total_steel = total_steel.saturating_add(steel.saturating_mul(count));
         total_oil = total_oil.saturating_add(oil.saturating_mul(count));

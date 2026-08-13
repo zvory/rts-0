@@ -449,26 +449,27 @@ export class ObserverAnalysisOverlay {
   }
 
   renderUnitsLost(analysis) {
-    const wrap = this.renderAnalysisMetric("replay-units-lost", "Destroyed units");
+    const wrap = this.renderAnalysisMetric("replay-units-lost", "Destroyed units and buildings");
     const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
     if (!analysis) {
       wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
       return wrap;
     }
-    if (!rows.some((row) => row.unitsLost.length > 0)) {
-      wrap.appendChild(renderEmptyMetric("No units lost"));
+    if (!rows.some((row) => row.unitsLost.length > 0 || row.buildingsLost.length > 0)) {
+      wrap.appendChild(renderEmptyMetric("No units or buildings lost"));
       return wrap;
     }
 
     for (const player of rows) {
       const unitsLost = [...player.unitsLost].sort(compareKindRows(this.stats));
-      if (!unitsLost.length) continue;
+      const buildingsLost = [...player.buildingsLost].sort(compareKindRows(this.stats));
+      if (!unitsLost.length && !buildingsLost.length) continue;
       wrap.appendChild(this.renderPlayerHeading(player));
 
-      const total = unitsLost.reduce((acc, unit) => {
-        acc.count += unit.count;
-        acc.steel += unit.steelValue;
-        acc.oil += unit.oilValue;
+      const total = [...unitsLost, ...buildingsLost].reduce((acc, item) => {
+        acc.count += item.count;
+        acc.steel += item.steelValue;
+        acc.oil += item.oilValue;
         return acc;
       }, { count: 0, steel: 0, oil: 0 });
       wrap.appendChild(renderUnitRow({
@@ -490,15 +491,25 @@ export class ObserverAnalysisOverlay {
           oil: unit.oilValue,
         }));
       }
+      for (const building of buildingsLost) {
+        wrap.appendChild(renderUnitRow({
+          className: "replay-units-row replay-units-lost-row",
+          label: kindLabel(building.kind, this.stats),
+          icon: itemIcon(building.kind, "building", this.stats),
+          count: building.count,
+          steel: building.steelValue,
+          oil: building.oilValue,
+        }));
+      }
     }
     return wrap;
   }
 
   renderResourcesLost(analysis) {
-    const wrap = this.renderAnalysisMetric("replay-resources-lost", "Dead unit value");
+    const wrap = this.renderAnalysisMetric("replay-resources-lost", "Destroyed resource value");
     const note = document.createElement("div");
     note.className = "replay-analysis-note";
-    note.textContent = "Spent steel and oil value of units that died. Buildings, cancelled queues, refunds, harvesting, and stockpile changes are excluded.";
+    note.textContent = "Spent steel and oil value of units and buildings that were destroyed. Cancelled queues, refunds, harvesting, and stockpile changes are excluded.";
     wrap.appendChild(note);
 
     const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
@@ -616,6 +627,7 @@ function normalizeAnalysisPlayer(player) {
       ? player.upgrades.map((upgrade) => String(upgrade || "")).filter(Boolean)
       : [],
     unitsLost: normalizeKindRows(player.unitsLost),
+    buildingsLost: normalizeKindRows(player.buildingsLost),
     resourcesLost: {
       steel: Math.max(0, Math.trunc(Number(player.resourcesLost?.steel) || 0)),
       oil: Math.max(0, Math.trunc(Number(player.resourcesLost?.oil) || 0)),

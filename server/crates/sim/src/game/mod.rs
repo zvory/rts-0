@@ -185,6 +185,8 @@ pub(crate) struct ScoreState {
     buildings_killed: u32,
     buildings_lost: u32,
     units_lost_by_kind: BTreeMap<EntityKind, u32>,
+    #[serde(default)]
+    buildings_lost_by_kind: BTreeMap<EntityKind, u32>,
     resources_mined: ResourceTotals,
     resource_income_history: Vec<ResourceIncomeRecord>,
 }

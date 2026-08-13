@@ -577,9 +577,9 @@ payload. Alive Resources subtracts dead-unit steel/oil value from lifetime mined
 because starting resources are not lifetime mined income, the derived value can be negative.
 Research groups
 completed permanent upgrades by player, retaining an explicit empty row when a player has
-completed none. Resources Lost follows the protocol's narrow
-definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
-harvesting, refunds, and cancelled queues.
+completed none. The Units Lost tab also lists destroyed buildings by kind, including zero-cost
+Steel Mines and Pump Jacks. Resources Lost is the spent steel/oil value of units and buildings that
+died, excluding stockpile changes, harvesting, refunds, and cancelled queues.
 
 `ai_diagnostics_panel.js`
 ```js

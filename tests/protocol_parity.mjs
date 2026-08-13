@@ -689,6 +689,7 @@ assert(
 );
 for (const field of [
   "units_lost",
+  "buildings_lost",
   "resources_lost",
   "resources",
   "lifetime",
@@ -718,6 +719,7 @@ const observerAnalysis = decodeServerMessage({
     production: [{ buildingId: 7, buildingKind: "resource_depot", itemKind: "worker", itemType: "unit", progress: 0.25, queueDepth: 1 }],
     upgrades: ["tank_unlock"],
     unitsLost: [],
+    buildingsLost: [{ kind: "steel_mine", count: 2, steelValue: 0, oilValue: 0 }],
     resourcesLost: { steel: 0, oil: 0 },
     resources: {
       lifetime: { steel: 100, oil: 20 },

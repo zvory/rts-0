@@ -26,6 +26,8 @@ impl PlayerState {
             *count = count.saturating_add(1);
         } else if kind.is_building() {
             self.score.buildings_lost = self.score.buildings_lost.saturating_add(1);
+            let count = self.score.buildings_lost_by_kind.entry(kind).or_insert(0);
+            *count = count.saturating_add(1);
         }
     }
 

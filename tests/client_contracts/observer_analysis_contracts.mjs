@@ -566,7 +566,7 @@ import { textWithin } from "./dom_text.mjs";
     restored.selectedTab = "units-lost";
     overlay.render();
     assert(
-      textWithin(root).includes("No units lost"),
+      textWithin(root).includes("No units or buildings lost"),
       "units lost tab handles analysis with no loss rows cleanly",
     );
     overlay.applyObserverAnalysis({
@@ -580,6 +580,10 @@ import { textWithin } from "./dom_text.mjs";
             { kind: KIND.RIFLEMAN, count: 2, steelValue: 100, oilValue: 0 },
             { kind: KIND.TANK, count: 1, steelValue: 300, oilValue: 150 },
           ],
+          buildingsLost: [
+            { kind: KIND.STEEL_MINE, count: 2, steelValue: 0, oilValue: 0 },
+            { kind: KIND.PUMP_JACK, count: 1, steelValue: 0, oilValue: 0 },
+          ],
           resourcesLost: { steel: 400, oil: 150 },
         },
         {
@@ -587,6 +591,7 @@ import { textWithin } from "./dom_text.mjs";
           units: [],
           production: [],
           unitsLost: [{ kind: KIND.WORKER, count: 3, steelValue: 150, oilValue: 0 }],
+          buildingsLost: [],
           resourcesLost: { steel: 150, oil: 0 },
         },
       ],
@@ -599,6 +604,10 @@ import { textWithin } from "./dom_text.mjs";
     assert(
       unitsLostText.includes("Rifleman") && unitsLostText.includes("Tank") && unitsLostText.includes("Engineer"),
       "units lost tab renders per-kind loss rows for multiple players",
+    );
+    assert(
+      unitsLostText.includes("Steel Mine") && unitsLostText.includes("Pump Jack"),
+      "units lost tab includes zero-cost resource buildings in the loss counts",
     );
 
     restored.selectedTab = "resources";
@@ -664,7 +673,7 @@ import { textWithin } from "./dom_text.mjs";
     const aliveResourcesText = textWithin(root);
     assert(
       aliveResourcesText.includes("Lifetime resources still alive")
-        && aliveResourcesText.includes("Lifetime mined resources minus dead unit value")
+        && aliveResourcesText.includes("Lifetime mined resources minus destroyed unit and building value")
         && aliveResourcesText.includes("Red")
         && aliveResourcesText.includes("Blue"),
       "alive resources tab explains and renders the derived metric for every player",
@@ -680,19 +689,19 @@ import { textWithin } from "./dom_text.mjs";
           ?.querySelector(".resource-value-number")?.textContent === "-95"
         && aliveRows[1].querySelector(".replay-resources-lost-oil")
           ?.querySelector(".resource-value-number")?.textContent === "25",
-      "alive resources subtracts dead unit value from lifetime mined resources, including negative results",
+      "alive resources subtracts destroyed unit and building value from lifetime mined resources, including negative results",
     );
 
     restored.selectedTab = "resources-lost";
     overlay.render();
     const resourcesLostText = textWithin(root);
     assert(
-      resourcesLostText.includes("Dead unit value")
-        && resourcesLostText.includes("Spent steel and oil value of units that died")
+      resourcesLostText.includes("Destroyed resource value")
+        && resourcesLostText.includes("Spent steel and oil value of units and buildings that were destroyed")
         && resourcesLostText.includes("Total")
         && resourcesLostText.includes("550")
         && resourcesLostText.includes("150"),
-      "resources lost tab labels the narrow observer analysis definition and totals killed unit value",
+      "resources lost tab labels the observer analysis definition and totals destroyed entity value",
     );
     assert(
       resourcesLostText.includes("Red") && resourcesLostText.includes("Blue"),
