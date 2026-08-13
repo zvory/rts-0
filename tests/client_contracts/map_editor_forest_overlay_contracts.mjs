@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 
 import { MapEditorSession } from "../../client/src/map_editor_session.js";
-import { FOREST_DOODAD_ID_BASE } from "../../client/src/map_authoring/forests.js";
+import {
+  FOREST_DOODAD_ID_BASE,
+  generatedForestDoodads,
+} from "../../client/src/map_authoring/forests.js";
 
 const tile = { x: 8, y: 8 };
 const session = new MapEditorSession({ storage: null });
@@ -54,3 +57,24 @@ assert(collisionSession.exportMap().doodads.some((doodad) => (
 )), "forest erase preserves a colliding manual tree");
 assert.deepEqual(collisionSession.exportMap().doodads, [generatedCollision],
   "forest erase does not leave a repaired-id duplicate of the colliding generated tree");
+
+const quadrantMirrorSpans = [
+  [3, 2, 2],
+  [3, 17, 17],
+  [14, 2, 2],
+  [14, 17, 17],
+];
+assert.deepEqual(
+  generatedForestDoodads(quadrantMirrorSpans, { width: 20, height: 18 }, { max: 3 }),
+  [],
+  "rectangular quadrant-mirror forests do not emit a partial four-tree symmetry orbit",
+);
+const quadrantMirrorTrees = generatedForestDoodads(
+  quadrantMirrorSpans,
+  { width: 20, height: 18 },
+  { max: 4 },
+);
+assert.equal(quadrantMirrorTrees.length, 4,
+  "rectangular quadrant-mirror forests emit the complete orbit when capacity permits");
+assert.equal(new Set(quadrantMirrorTrees.map(({ typeId }) => typeId)).size, 1,
+  "all trees in a rectangular quadrant-mirror orbit use the same tree type");

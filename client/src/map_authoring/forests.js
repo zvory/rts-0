@@ -1,5 +1,6 @@
 import {
   MAP_AUTHORING_SYMMETRY,
+  symmetrySupported,
   symmetryTransforms,
   transformPoint,
 } from "./symmetry.js";
@@ -381,6 +382,7 @@ function scaledFoliage(foliage, variation) {
 
 function strongestExactSymmetry(tileSet, dimensions) {
   for (const symmetry of SYMMETRY_PREFERENCE) {
+    if (!symmetrySupported(dimensions, symmetry)) continue;
     const transforms = symmetryTransforms(dimensions, symmetry);
     if (transforms.every((transform) => [...tileSet].every((key) => {
       const transformed = transformPoint(pointFromKey(key), dimensions, transform);
