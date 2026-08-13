@@ -65,8 +65,8 @@ const spectatorView = buildRendererFeedbackView(
   { entities: visibleEntities },
 );
 assert(
-  spectatorView.enemyAntiTankGunThreats().length === 0,
-  "an eager local observer selector cannot create threat cones before its projected snapshot arrives",
+  spectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301,303,304",
+  "live and replay spectators render every deployed anti-tank cone in the current projection",
 );
 
 const playerOneSpectatorView = buildRendererFeedbackView(
@@ -79,8 +79,8 @@ const playerOneSpectatorView = buildRendererFeedbackView(
   { entities: visibleEntities },
 );
 assert(
-  playerOneSpectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301",
-  "live and replay spectators receive enemy threat cones from a single-player authoritative projection",
+  playerOneSpectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301,303,304",
+  "a player-vision spectator projection still renders every deployed anti-tank gun it receives",
 );
 
 const playerOneSnapshotDuringSwitch = buildRendererFeedbackView(
@@ -93,8 +93,8 @@ const playerOneSnapshotDuringSwitch = buildRendererFeedbackView(
   { entities: visibleEntities },
 );
 assert(
-  playerOneSnapshotDuringSwitch.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301",
-  "a pending switch keeps the prior snapshot's threat relationship until new fog and memory arrive",
+  playerOneSnapshotDuringSwitch.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301,303,304",
+  "a pending vision switch does not change the observer cone treatment before the new snapshot arrives",
 );
 
 const playerTwoSpectatorView = buildRendererFeedbackView(
@@ -107,8 +107,8 @@ const playerTwoSpectatorView = buildRendererFeedbackView(
   { entities: visibleEntities },
 );
 assert(
-  playerTwoSpectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "303,304",
-  "switching authoritative snapshots reverses enemy relationships even if local control state is stale",
+  playerTwoSpectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301,303,304",
+  "switching authoritative snapshots keeps observer cones independent of enemy relationships",
 );
 
 const rememberedDuringPlayerOneView = buildRendererFeedbackView(
@@ -151,8 +151,8 @@ const sameMemoryDuringPlayerTwoView = buildRendererFeedbackView(
   },
 );
 assert(
-  sameMemoryDuringPlayerTwoView.enemyAntiTankGunThreats().length === 0,
-  "switching to the remembered gun owner's view never renders its own gun as an enemy memory",
+  sameMemoryDuringPlayerTwoView.enemyAntiTankGunThreats()[0]?.threatMemory === true,
+  "spectators retain any server-projected anti-tank memory independently of team relationship",
 );
 
 const unionSpectatorView = buildRendererFeedbackView(
@@ -164,8 +164,8 @@ const unionSpectatorView = buildRendererFeedbackView(
   { entities: visibleEntities },
 );
 assert(
-  unionSpectatorView.enemyAntiTankGunThreats().length === 0,
-  "multi-player union and omniscient projections do not invent one player's enemy threat perspective",
+  unionSpectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301,303,304",
+  "multi-player union and omniscient projections show every deployed anti-tank cone",
 );
 
 const labSpectatorView = buildRendererFeedbackView(

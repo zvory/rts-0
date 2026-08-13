@@ -11,7 +11,7 @@ import {
 } from "../config.js";
 import { ABILITY, KIND, SETUP, isUnit } from "../protocol.js";
 import { feedbackOwner } from "./feedback_ownership.js";
-import { drawFacingWedge, finiteNumber } from "./shared.js";
+import { drawFacingWedge, finiteNumber, hexToInt } from "./shared.js";
 
 const UNIT_RANGE_COLOR = 0x8eb7ff;
 const UNIT_RANGE_MIN_COLOR = 0x9f3a34;
@@ -28,6 +28,11 @@ const ENEMY_AT_THREAT_HATCH_SPACING_PX = 60;
 const ENEMY_AT_THREAT_HATCH_ANGLE = Math.PI / 4;
 const ENEMY_AT_THREAT_ARC_STEP_PX = 42;
 const ENEMY_AT_THREAT_OUTLINE_WIDTH = 1.95;
+const SPECTATOR_AT_THREAT_DARK_ALPHA = 0.14;
+const SPECTATOR_AT_THREAT_HATCH_ALPHA = 0.42;
+const SPECTATOR_AT_THREAT_HATCH_WIDTH = 1;
+const SPECTATOR_AT_THREAT_KEYLINE_WIDTH = 1.9;
+const SPECTATOR_AT_THREAT_OUTLINE_ALPHA = 0.38;
 const ENEMY_AT_MEMORY_MARK_DISTANCE_RATIO = 0.48;
 const ENEMY_AT_MEMORY_MARK_WIDTH_PX = 12;
 const ENEMY_AT_MEMORY_MARK_HEIGHT_PX = 20;
@@ -99,13 +104,29 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
       ENEMY_AT_THREAT_HATCH_ANGLE,
     );
     const remembered = entity?.threatMemory === true;
-    const color = remembered ? ENEMY_AT_MEMORY_COLOR : ENEMY_AT_THREAT_COLOR;
-    const darkColor = remembered ? ENEMY_AT_MEMORY_DARK_COLOR : ENEMY_AT_THREAT_DARK_COLOR;
-    const darkAlpha = remembered ? 0.05 : 0.26;
-    const hatchAlpha = remembered ? 0.18 : 0.78;
-    const hatchWidth = remembered ? 0.65 : 1.3;
-    const keylineWidth = remembered ? 1.35 : 2.8;
-    const outlineAlpha = remembered ? 0.14 : 0.68;
+    const spectator = entity?.spectatorThreat === true;
+    const teamColor = spectator ? hexToInt(entity?.threatTeamColor) : null;
+    const color = Number.isFinite(teamColor)
+      ? teamColor
+      : remembered ? ENEMY_AT_MEMORY_COLOR : ENEMY_AT_THREAT_COLOR;
+    const darkColor = spectator
+      ? darkenColor(color, 0.38)
+      : remembered ? ENEMY_AT_MEMORY_DARK_COLOR : ENEMY_AT_THREAT_DARK_COLOR;
+    const darkAlpha = spectator
+      ? SPECTATOR_AT_THREAT_DARK_ALPHA
+      : remembered ? 0.05 : 0.26;
+    const hatchAlpha = spectator
+      ? SPECTATOR_AT_THREAT_HATCH_ALPHA
+      : remembered ? 0.18 : 0.78;
+    const hatchWidth = spectator
+      ? SPECTATOR_AT_THREAT_HATCH_WIDTH
+      : remembered ? 0.65 : 1.3;
+    const keylineWidth = spectator
+      ? SPECTATOR_AT_THREAT_KEYLINE_WIDTH
+      : remembered ? 1.35 : 2.8;
+    const outlineAlpha = spectator
+      ? SPECTATOR_AT_THREAT_OUTLINE_ALPHA
+      : remembered ? 0.14 : 0.68;
     // Luminance and stroke weight distinguish live threats from stale intel even
     // without red/green hue perception. The dark keyline remains legible on snow.
     gfxStrokePaths(g, paths, keylineWidth, darkColor, darkAlpha);
@@ -123,10 +144,17 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
       0,
       ENEMY_AT_THREAT_OUTLINE_WIDTH,
     );
-    if (remembered) {
+    if (remembered && !spectator) {
       drawRememberedThreatMarker(g, entity.x, entity.y, weapon.maxRadius, facing);
     }
   }
+}
+
+function darkenColor(color, factor) {
+  const red = Math.round(((color >> 16) & 0xff) * factor);
+  const green = Math.round(((color >> 8) & 0xff) * factor);
+  const blue = Math.round((color & 0xff) * factor);
+  return (red << 16) | (green << 8) | blue;
 }
 
 function drawRememberedThreatMarker(g, x, y, radius, facing) {
