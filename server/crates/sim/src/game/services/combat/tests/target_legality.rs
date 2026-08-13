@@ -35,6 +35,54 @@ fn direct_fire_legal(
     )
 }
 
+#[test]
+fn tank_fires_through_friendly_tank() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let blocker = entities
+        .spawn_unit(1, EntityKind::Tank, 140.0, 100.0)
+        .expect("friendly blocker should spawn");
+    let intended = entities
+        .spawn_unit(2, EntityKind::Worker, 190.0, 100.0)
+        .expect("intended target should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(intended));
+    if let Some(blocker_entity) = entities.get_mut(blocker) {
+        blocker_entity.set_attack_cd(99);
+        blocker_entity.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 99);
+    }
+    let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
+    let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
+
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &open_map(12),
+    );
+
+    assert_eq!(
+        entities.get(blocker).expect("blocker should exist").hp,
+        blocker_hp_before,
+        "friendly tanks must not take damage from the shot"
+    );
+    assert!(
+        entities.get(intended).expect("intended should exist").hp < intended_hp_before,
+        "the target behind the friendly tank should take damage"
+    );
+    assert!(
+        events
+            .get(&1)
+            .expect("attacker owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == intended)),
+        "the tank should fire at the intended target through the friendly tank"
+    );
+}
+
 fn secondary_weapon_activation_legal(
     map: &Map,
     entities: &EntityStore,
