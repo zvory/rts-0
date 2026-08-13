@@ -8,7 +8,7 @@ export const OBSERVER_ANALYSIS_TABS = Object.freeze([
   { id: "units", label: "Units" },
   { id: "resources", label: "Resources" },
   { id: "alive-resources", label: "Alive resources" },
-  { id: "units-lost", label: "Units lost" },
+  { id: "units-lost", label: "Losses" },
   { id: "resources-lost", label: "Resources lost" },
 ]);
 

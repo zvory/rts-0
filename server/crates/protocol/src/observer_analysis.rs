@@ -18,6 +18,8 @@ pub struct ObserverAnalysisPlayer {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub upgrades: Vec<String>,
     pub units_lost: Vec<ObserverAnalysisKindCount>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub buildings_lost: Vec<ObserverAnalysisKindCount>,
     pub resources_lost: ObserverAnalysisResourcesLost,
     pub resources: ObserverAnalysisResources,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -214,6 +216,12 @@ mod tests {
                     steel_value: 50,
                     oil_value: 0,
                 }],
+                buildings_lost: vec![ObserverAnalysisKindCount {
+                    kind: kinds::STEEL_MINE.to_string(),
+                    count: 2,
+                    steel_value: 0,
+                    oil_value: 0,
+                }],
                 resources_lost: ObserverAnalysisResourcesLost { steel: 50, oil: 0 },
                 resources: ObserverAnalysisResources {
                     lifetime: ObserverAnalysisResourceTotals {
@@ -268,6 +276,8 @@ mod tests {
         assert_eq!(json["players"][0]["production"][0]["queueDepth"], 2);
         assert_eq!(json["players"][0]["upgrades"][0], "tank_unlock");
         assert_eq!(json["players"][0]["unitsLost"][0]["kind"], "worker");
+        assert_eq!(json["players"][0]["buildingsLost"][0]["kind"], "steel_mine");
+        assert_eq!(json["players"][0]["buildingsLost"][0]["count"], 2);
         assert_eq!(json["players"][0]["resourcesLost"]["steel"], 50);
         assert_eq!(json["players"][0]["resources"]["lifetime"]["steel"], 120);
         assert_eq!(json["players"][0]["resources"]["last5s"]["oil"], 10);

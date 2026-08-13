@@ -151,13 +151,35 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         .find(|e| e.owner == 2 && e.kind == EntityKind::Worker)
         .map(|e| e.id)
         .expect("victim unit should exist");
-    let entity = game
+    let victim_depot = game
         .state
         .entities
-        .get_mut(victim_unit)
-        .expect("victim unit should still exist");
-    entity.hp = 0;
-    entity.set_last_damage_owner(Some(1));
+        .spawn_building(2, EntityKind::Depot, 320.0, 320.0, true)
+        .expect("victim depot should spawn");
+    let victim_steel_mine = game
+        .state
+        .entities
+        .spawn_building(2, EntityKind::SteelMine, 352.0, 320.0, true)
+        .expect("victim steel mine should spawn");
+    let victim_pump_jack = game
+        .state
+        .entities
+        .spawn_building(2, EntityKind::PumpJack, 384.0, 320.0, true)
+        .expect("victim pump jack should spawn");
+    for id in [
+        victim_unit,
+        victim_depot,
+        victim_steel_mine,
+        victim_pump_jack,
+    ] {
+        let entity = game
+            .state
+            .entities
+            .get_mut(id)
+            .expect("victim entity should still exist");
+        entity.hp = 0;
+        entity.set_last_damage_owner(Some(1));
+    }
     let mut events: HashMap<u32, Vec<Event>> = game
         .state
         .players
@@ -219,14 +241,24 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         .units_lost
         .iter()
         .any(|row| row.kind == "worker" && row.count == 1 && row.steel_value > 0));
-    assert_eq!(
-        player_two.resources_lost.steel,
-        player_two.units_lost[0].steel_value
-    );
-    assert_eq!(
-        player_two.resources_lost.oil,
-        player_two.units_lost[0].oil_value
-    );
+    assert!(player_two
+        .buildings_lost
+        .iter()
+        .any(|row| row.kind == "steel_mine" && row.count == 1 && row.steel_value == 0));
+    assert!(player_two
+        .buildings_lost
+        .iter()
+        .any(|row| row.kind == "pump_jack" && row.count == 1 && row.oil_value == 0));
+    assert!(player_two
+        .buildings_lost
+        .iter()
+        .any(|row| row.kind == "depot" && row.count == 1 && row.steel_value > 0));
+    let expected_steel =
+        economy_rules::cost(EntityKind::Worker).0 + economy_rules::cost(EntityKind::Depot).0;
+    let expected_oil =
+        economy_rules::cost(EntityKind::Worker).1 + economy_rules::cost(EntityKind::Depot).1;
+    assert_eq!(player_two.resources_lost.steel, expected_steel);
+    assert_eq!(player_two.resources_lost.oil, expected_oil);
 }
 
 #[test]

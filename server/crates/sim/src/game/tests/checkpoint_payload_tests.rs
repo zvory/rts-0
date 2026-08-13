@@ -15,6 +15,10 @@ fn checkpoint_payload_round_trips_through_text_and_normalizes_output() {
         reserve_steel: 250,
         reserve_oil: 150,
     };
+    baseline.state.players[0]
+        .score
+        .buildings_lost_by_kind
+        .insert(EntityKind::PumpJack, 2);
     baseline.tick();
 
     let mut restored =
@@ -416,12 +420,13 @@ fn checkpoint_payload_rejects_invalid_coordinates_and_queue_caps() {
 }
 
 #[test]
-fn checkpoint_payload_accepts_legacy_score_rows_without_resource_income_fields() {
+fn checkpoint_payload_accepts_legacy_score_rows_without_new_optional_fields() {
     let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2007);
     let text = checkpoint_payload_text_for(&game, "legacy score resource income fixture");
     let legacy_text = mutate_payload(&text, |value| {
         for player in value["players"].as_array_mut().expect("players array") {
             let score = player["score"].as_object_mut().expect("score object");
+            score.remove("buildingsLostByKind");
             score.remove("resourcesMined");
             score.remove("resourceIncomeHistory");
         }

@@ -35,7 +35,7 @@ export function renderAliveResourcesMetric({ analysis, players }) {
   const wrap = renderAnalysisMetric("replay-alive-resources", "Lifetime resources still alive");
   const note = document.createElement("div");
   note.className = "replay-analysis-note";
-  note.textContent = "Lifetime mined resources minus dead unit value.";
+  note.textContent = "Lifetime mined resources minus destroyed unit and building value.";
   wrap.appendChild(note);
 
   const rows = playerAnalysisRows({ analysis, players });

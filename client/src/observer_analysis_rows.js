@@ -21,6 +21,7 @@ export function playerAnalysisRows({ analysis, players }) {
       production: player.production,
       upgrades: player.upgrades,
       unitsLost: player.unitsLost,
+      buildingsLost: player.buildingsLost,
       resourcesLost: player.resourcesLost,
       resources: player.resources,
       aiDiagnostics: player.aiDiagnostics,
