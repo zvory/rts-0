@@ -349,7 +349,15 @@ impl ReplaySession {
     }
 
     pub(super) fn cancel_seek(&mut self) {
-        self.active_seek = None;
+        if self.active_seek.take().is_some() {
+            // begin_seek positions transient chat at the requested target so reconstruction does
+            // not replay historical messages. If that target is abandoned, resume from the
+            // actual reconstructed tick or messages between here and the target are skipped.
+            self.next_chat = self
+                .artifact
+                .chat_log
+                .partition_point(|entry| entry.tick <= self.current_tick());
+        }
     }
 
     pub(super) fn effective_speed(&self) -> f32 {
@@ -1157,9 +1165,19 @@ mod tests {
 
     #[test]
     fn pausing_during_a_seek_cancels_reconstruction_at_the_current_tick() {
+        use crate::protocol::ChatChannel;
+        use rts_sim::game::replay::ChatLogEntry;
+
         let players = replay_test_players(2);
         let (_live, mut artifact) = replay_test_artifact(&players, 0);
         artifact.duration_ticks = 2_001;
+        artifact.chat_log.push(ChatLogEntry {
+            tick: 2,
+            sender_id: 1,
+            sender_name: "Player 1".to_string(),
+            channel: ChatChannel::All,
+            text: "after cancellation".to_string(),
+        });
         let mut replay = ReplaySession::new(artifact).unwrap();
         let plan = replay.plan_seek_to(2_001).unwrap();
         replay.begin_seek(42, plan).unwrap();
@@ -1176,6 +1194,21 @@ mod tests {
         assert!(replay.is_paused());
         assert_eq!(replay.current_tick(), 1);
         assert!(replay.state().seek.is_none());
+
+        replay.set_speed(42, 1.0);
+        replay.enqueue_for_current_tick().unwrap();
+        replay.tick(None);
+        assert_eq!(
+            replay.take_chat_through_current_tick().as_slice(),
+            &[ChatLogEntry {
+                tick: 2,
+                sender_id: 1,
+                sender_name: "Player 1".to_string(),
+                channel: ChatChannel::All,
+                text: "after cancellation".to_string(),
+            }],
+            "resuming after cancellation must not skip chat before the abandoned target"
+        );
     }
 
     #[test]
