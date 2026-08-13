@@ -143,7 +143,8 @@ StaticMapPresentationV2 = {
   widthPx, heightPx, tileSizePx,
   terrain: GridSnapshotV2,
   resourceSites: readonly detached records[],
-  doodads: readonly detached records[]
+  doodads: readonly detached records[],
+  concealmentTiles: readonly { x, y }[]
 }
 
 PresentationFrameV2 = {
@@ -155,6 +156,11 @@ PresentationFrameV2 = {
   diagnosticsContext
 }
 ```
+
+The static concealment mask crosses the renderer boundary because it drives the ordinary-unit
+readability outline. A unit is outlined when its ground point occupies concealment or when its
+presentation footprint overlaps a foreground concealment tile; decorative doodad pixels are never
+the semantic source of that cue.
 
 Presented entity records include backend-neutral `visualBounds` (`class`, `widthPx`, `depthPx`,
 `heightPx`) derived from the mirrored entity stats. Placement feedback includes a detached

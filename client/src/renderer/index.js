@@ -98,7 +98,7 @@ import {
   _attachForestUnitOutline,
   _destroyForestUnitOutlineGroup,
   _drawConcealmentUnitOutlines,
-  _drawTreeOccludedUnitOutlines,
+  _drawConcealmentTileUnitOutlines,
 } from "./tree_unit_occlusion.js";
 import { applyWorldYDepth } from "./world_y_depth.js";
 import {
@@ -758,7 +758,7 @@ export class Renderer {
     time("renderer.forestUnitOutlines", () => {
       this._drawSafely(
         "forestUnitOutlines",
-        () => this._drawTreeOccludedUnitOutlines(regularEntities, state, colorByOwner, {
+        () => this._drawConcealmentTileUnitOutlines(regularEntities, state, colorByOwner, {
           renderContexts: this._unitRenderContexts,
           visualUnitOverrides: visualUnitOverrideMap,
           visualFrameStripOverrides: visualFrameStripOverrideMap,
@@ -1418,7 +1418,7 @@ Object.assign(Renderer.prototype, {
   _attachForestUnitOutline,
   _destroyForestUnitOutlineGroup,
   _drawConcealmentUnitOutlines,
-  _drawTreeOccludedUnitOutlines,
+  _drawConcealmentTileUnitOutlines,
   _rigRenderContextFor,
   _drawShotRevealUnit,
   _drawAboveFogHp,

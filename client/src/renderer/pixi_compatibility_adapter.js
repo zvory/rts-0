@@ -280,6 +280,7 @@ function materializeStaticMap(staticMap) {
     sun: staticMap.sun ? { ...staticMap.sun } : null,
     resources: staticMap.resourceSites.map((resource) => ({ ...resource })),
     doodads: (staticMap.doodads || []).map((doodad) => ({ ...doodad })),
+    concealmentTiles: (staticMap.concealmentTiles || []).map((tile) => ({ ...tile })),
   };
 }
 

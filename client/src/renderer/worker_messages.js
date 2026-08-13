@@ -64,6 +64,7 @@ export function createMapGenerationMessage(staticMap) {
       sun: clonePlain(staticMap.sun),
       resourceSites: clonePlain(staticMap.resourceSites || []),
       doodads: clonePlain(staticMap.doodads || []),
+      concealmentTiles: clonePlain(staticMap.concealmentTiles || []),
     },
   }, [terrain.buffer, elevation.buffer]);
 }

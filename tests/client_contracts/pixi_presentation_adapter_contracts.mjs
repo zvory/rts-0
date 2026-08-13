@@ -153,6 +153,8 @@ assert((await first.settled).status === PRESENTATION_OUTCOME.PRESENTED
 assert((await first.retained)?.groundDecalRevision === 1, "Pixi reports the exact durable revision independently from presentation");
 assert(engine.staticMaps.length === 1, "unchanged static-map revision is materialized once into Pixi-owned staging");
 assert(engine.staticMaps[0].terrain instanceof Uint8Array, "Pixi owns its copied terrain staging buffer");
+assert(engine.staticMaps[0].concealmentTiles.length === assembler.staticMap.concealmentTiles.length,
+  "Pixi receives the immutable concealment mask from the renderer-neutral static map");
 assert(engine.renders.length === 2, "repeated render(frame) calls reach the backend without reassembly");
 assert(engine.presents === 2 && engine._renderFrameCount === 2, "each successful adapter call explicitly presents exactly once");
 assert(measuredPhases.filter((label) => label === "renderer.update").length === 2, "Pixi scene update is measured for every adapter call");

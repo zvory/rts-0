@@ -9,20 +9,20 @@ const FOREST_OUTLINE_POOL_NAMES = Object.freeze([
 ]);
 
 /**
- * Duplicate the actual presented unit rig into a filtered surface when a canopy occludes it.
+ * Duplicate the actual presented unit rig when the authoritative concealment mask obscures it.
  * Enemy admission remains server/fog-owned: this pass only sees the filtered entity list.
  */
-export function _drawTreeOccludedUnitOutlines(entities, state, colorByOwner, options = {}) {
+export function _drawConcealmentTileUnitOutlines(entities, state, colorByOwner, options = {}) {
   // Outline rig instances are retained while their ordinary unit remains alive. Hide their
   // filtered parents up front, then reactivate only the units still occluded this frame.
   if (this._forestUnitOutlineGroups) {
     for (const entry of this._forestUnitOutlineGroups.values()) entry.group.visible = false;
   }
-  if (!this._doodads || !Array.isArray(entities)) return 0;
+  if (!Array.isArray(entities)) return 0;
   let count = 0;
   for (const entity of entities) {
     if (!isUnit(entity?.kind) || entity.visionOnly) continue;
-    if (!this._doodads.occludesUnit(entity, unitTreeOutlineRadius(entity))) continue;
+    if (!concealmentTilesOccludeUnit(this._map, entity, unitConcealmentOutlineRadius(entity))) continue;
     const renderContext = options.renderContexts?.get?.(entity.id);
     if (!renderContext) continue;
     if (drawActualUnitOutline.call(this, entity, state, colorByOwner, {
@@ -35,7 +35,7 @@ export function _drawTreeOccludedUnitOutlines(entities, state, colorByOwner, opt
       teamFill: true,
     })) count += 1;
   }
-  this._recordRenderDiagnostic?.("renderer.doodads.forestUnitOutlines", count);
+  this._recordRenderDiagnostic?.("renderer.concealmentTileUnitOutlines", count);
   return count;
 }
 
@@ -58,9 +58,48 @@ export function _drawConcealmentUnitOutlines(entities, state, colorByOwner, opti
   return count;
 }
 
-export function unitTreeOutlineRadius(entity) {
+export function unitConcealmentOutlineRadius(entity) {
   const width = Number(entity?.visualBounds?.widthPx);
   return Math.max(7, Number.isFinite(width) ? width * 0.5 : 7);
+}
+
+/**
+ * Match the readability outline to authored concealment rather than decorative canopy pixels.
+ * The unit's ground point counts as occupying a tile; tiles immediately south of that point count
+ * as foreground occluders when they overlap the unit's presentation footprint.
+ */
+export function concealmentTilesOccludeUnit(map, entity, radiusPx = 0) {
+  const x = Number(entity?.x);
+  const y = Number(entity?.y);
+  const tileSize = Number(map?.tileSize);
+  const radius = Math.max(0, Number(radiusPx) || 0);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(tileSize) || tileSize <= 0) {
+    return false;
+  }
+
+  const concealmentTiles = map?.concealmentTiles;
+  if (!Array.isArray(concealmentTiles) || concealmentTiles.length === 0) return false;
+  const concealmentTileKeys = map?._concealmentTileKeys;
+  const hasConcealment = concealmentTileKeys instanceof Set
+    ? (tileX, tileY) => concealmentTileKeys.has(`${tileX},${tileY}`)
+    : (tileX, tileY) => concealmentTiles.some((tile) => tile?.x === tileX && tile?.y === tileY);
+  const unitTileX = Math.floor(x / tileSize);
+  const unitTileY = Math.floor(y / tileSize);
+  const minTileX = Math.floor((x - radius) / tileSize);
+  const maxTileX = Math.floor((x + radius) / tileSize);
+  const maxTileY = Math.floor((y + radius) / tileSize);
+
+  if (hasConcealment(unitTileX, unitTileY)) return true;
+  for (let tileY = unitTileY + 1; tileY <= maxTileY; tileY += 1) {
+    for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+      if (!hasConcealment(tileX, tileY)) continue;
+      const left = tileX * tileSize;
+      const right = left + tileSize;
+      const top = tileY * tileSize;
+      if (x + radius >= left && x - radius <= right && y + radius >= top) return true;
+    }
+  }
+  return false;
 }
 
 function drawActualUnitOutline(entity, state, colorByOwner, options) {

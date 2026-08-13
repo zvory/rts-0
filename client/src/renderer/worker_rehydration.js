@@ -29,6 +29,9 @@ export function createWorkerPresentationState() {
           : emptyGridSnapshot(map.terrain),
         sun: map.sun ? Object.freeze({ ...map.sun }) : null,
         doodads: Object.freeze((map.doodads || []).map((record) => Object.freeze({ ...record }))),
+        concealmentTiles: Object.freeze(
+          (map.concealmentTiles || []).map((record) => Object.freeze({ ...record })),
+        ),
       });
       return staticMap;
     },
