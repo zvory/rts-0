@@ -424,6 +424,7 @@ impl ReplaySession {
 
     pub(super) fn set_speed(&mut self, controller_id: u32, speed: f32) {
         self.speed = if speed == Self::PAUSED_SPEED {
+            self.cancel_seek();
             Self::PAUSED_SPEED
         } else {
             speed.clamp(Self::MIN_SPEED, Self::MAX_SPEED)
@@ -1152,6 +1153,29 @@ mod tests {
         let target = replay.seek_back("test", 1, 42, u32::MAX).unwrap();
         assert_eq!(target, 0);
         assert_eq!(replay.state().current_tick, 0);
+    }
+
+    #[test]
+    fn pausing_during_a_seek_cancels_reconstruction_at_the_current_tick() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.duration_ticks = 2_001;
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        let plan = replay.plan_seek_to(2_001).unwrap();
+        replay.begin_seek(42, plan).unwrap();
+        replay
+            .advance_seek_slice(1, Duration::MAX, Duration::ZERO)
+            .unwrap();
+
+        assert!(replay.is_seeking());
+        assert_eq!(replay.current_tick(), 1);
+
+        replay.set_speed(42, ReplaySession::PAUSED_SPEED);
+
+        assert!(!replay.is_seeking());
+        assert!(replay.is_paused());
+        assert_eq!(replay.current_tick(), 1);
+        assert!(replay.state().seek.is_none());
     }
 
     #[test]

@@ -361,6 +361,21 @@ export class RoomTimeControls {
     this.updateRoomTimeTimeline();
   }
 
+  stopSeekingAndPause() {
+    if (!this.roomTime.pause || this.roomTimeAccessDenied || !this.roomTimeSeekPending) return false;
+    const sent = this.requestRoomTimeAction(
+      { kind: "speed", expectedSpeed: 0 },
+      () => this.net.setRoomTimeSpeed(0),
+    );
+    if (!sent) return false;
+    this.roomTimeSeekPending = false;
+    this.roomTimeSeekFromTick = null;
+    this.roomTimeSeekTargetTick = null;
+    this.syncRoomTimePendingPresentation();
+    this.updateRoomTimeStatus();
+    return true;
+  }
+
   setRoomTimeConcluded(concluded) {
     const status = dom.roomTimeControls?.querySelector("#room-time-concluded");
     if (!status) return;

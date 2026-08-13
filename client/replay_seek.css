@@ -39,6 +39,27 @@
   letter-spacing: 0.04em;
 }
 
+.replay-seek-stop {
+  margin-top: 22px;
+  padding: 10px 18px;
+  border: 1px solid var(--accent);
+  background: rgba(25, 23, 16, 0.92);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.replay-seek-stop:hover,
+.replay-seek-stop:focus-visible {
+  background: var(--accent);
+  color: #191710;
+  outline: 2px solid #191710;
+  outline-offset: 2px;
+}
+
 .replay-seek-close {
   position: absolute;
   top: -28px;

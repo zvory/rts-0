@@ -713,6 +713,7 @@ export class RoomTimeControls {
   constructor({ net, state, replayViewer?, capabilities, label? })
   applyRoomTimeState(state)
   noteSnapshotTick(tick)
+  stopSeekingAndPause()
   destroy()
 }
 export class ReplayControls extends RoomTimeControls
@@ -731,8 +732,9 @@ clears replay timeline-derived state in place without reconstructing `Match` or 
 shows every viewer a `Seeking forward/backward X seconds…` notice. Authoritative
 `roomTimeState.seek` metadata owns the continuing progress lifecycle. During that lifecycle, a
 dismissible center-screen `Seeking` notice in the title typeface distinguishes reconstruction from
-ordinary fast playback; each new seek shows it again. Sampled snapshots advance the existing
-timeline and growing keyframe marks until a state at the target omits `seek`.
+ordinary fast playback; each new seek shows it again. Its `Stop seeking` action cancels
+reconstruction at the latest authoritative tick and pauses replay playback. Sampled snapshots
+advance the existing timeline and growing keyframe marks until a state omits `seek`.
 
 Async `Match.create` startup uses semantic latest-only inbox slots for snapshots, room-time state,
 live-pause state, and observer analysis, plus a bounded ordered command-receipt queue. High-rate

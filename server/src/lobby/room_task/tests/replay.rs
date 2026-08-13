@@ -174,6 +174,16 @@ fn room_task_tick_control_preserves_current_intervals_by_mode() {
         base.div_f32(ReplaySession::MAX_SPEED),
         "paused playback must still schedule incremental seek work"
     );
+    replay_task.on_set_room_time_speed(99, 0.0);
+    assert_eq!(replay_task.current_tick_interval(), base);
+    let Phase::ReplayViewer(replay) = &replay_task.phase else {
+        panic!("replay task should remain in replay viewer phase");
+    };
+    assert!(replay.is_paused());
+    assert!(
+        !replay.is_seeking(),
+        "pausing an active seek must cancel it"
+    );
 
     let mut dev = RoomTask::new(
         "tick-dev".to_string(),

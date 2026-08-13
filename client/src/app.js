@@ -213,7 +213,10 @@ export class App {
       sendButton: dom.chatSend,
       lobbyDock: dom.lobbyChatDock,
     });
-    this.replaySeekOverlay = new ReplaySeekOverlay({ root: dom.gameScreen });
+    this.replaySeekOverlay = new ReplaySeekOverlay({
+      root: dom.gameScreen,
+      onStopSeeking: () => this.match?.roomTimeControls?.stopSeekingAndPause?.(),
+    });
     this.rendererPreparationSlot = new RendererPreparationSlot({
       onCountdownReady: (countdownId) => this.net.matchLoadReady(countdownId),
       onFailure: (error) => {

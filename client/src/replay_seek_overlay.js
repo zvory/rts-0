@@ -1,7 +1,8 @@
 /** Center-screen progress notice for authoritative replay reconstruction. */
 export class ReplaySeekOverlay {
-  constructor({ root }) {
+  constructor({ root, onStopSeeking = null }) {
     this.root = root;
+    this.onStopSeeking = onStopSeeking;
     this.dismissed = false;
 
     this.el = document.createElement("div");
@@ -31,7 +32,15 @@ export class ReplaySeekOverlay {
     this.detail = document.createElement("div");
     this.detail.className = "replay-seek-detail";
 
-    this.panel.append(this.closeButton, this.title, this.detail);
+    this.stopButton = document.createElement("button");
+    this.stopButton.type = "button";
+    this.stopButton.className = "replay-seek-stop";
+    this.stopButton.textContent = "Stop seeking";
+    this.stopButton.title = "Stop seeking at the current replay position and pause playback.";
+    this.onStop = () => this.onStopSeeking?.();
+    this.stopButton.addEventListener("click", this.onStop);
+
+    this.panel.append(this.closeButton, this.title, this.detail, this.stopButton);
     this.el.appendChild(this.panel);
     this.root?.appendChild(this.el);
   }
@@ -54,6 +63,7 @@ export class ReplaySeekOverlay {
 
   destroy() {
     this.closeButton.removeEventListener("click", this.onClose);
+    this.stopButton.removeEventListener("click", this.onStop);
     this.el.remove();
   }
 }
