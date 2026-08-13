@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
 use crate::game::fog::Fog;
@@ -91,6 +91,17 @@ impl BuildingMemory {
                 self.cleared_ticks.remove(&key);
             }
         }
+        self.discard_irrelevant_clears();
+    }
+
+    fn discard_irrelevant_clears(&mut self) {
+        let remembered_buildings = self
+            .entries
+            .keys()
+            .map(|&(_, building_id)| building_id)
+            .collect::<HashSet<_>>();
+        self.cleared_ticks
+            .retain(|&(_, building_id), _| remembered_buildings.contains(&building_id));
     }
 
     fn remove_ineligible_or_scouted_destroyed(
@@ -428,10 +439,11 @@ mod tests {
             memory.get(1, depot).is_none(),
             "scouting the remembered footprint clears destroyed building memory"
         );
-        assert_eq!(
-            memory.latest_cleared_tick_for_players(&[1], depot),
-            Some(3),
-            "the negative observation must survive after the positive row is removed"
+        assert!(
+            memory
+                .latest_cleared_tick_for_players(&[1], depot)
+                .is_none(),
+            "a clear is irrelevant once no player's positive memory remains"
         );
     }
 

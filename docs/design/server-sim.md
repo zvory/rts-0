@@ -1835,9 +1835,10 @@ building intel while the source remains active. If a remembered building no long
 record remains while its footprint is hidden from the viewer's team and is removed once that team
 scouts any remembered footprint tile. The store retains that per-player clear tick so a selected
 observer union compares its newest positive sighting with its newest clear; a clear at the same or
-a later tick wins and keeps the destroyed building absent after current vision leaves. Individual
-player views retain their independent knowledge, and no clear record is sent on the wire. This
-keeps hidden destruction stale until the location is checked without adding wire-protocol fields.
+a later tick wins and keeps the destroyed building absent after current vision leaves. Clears are
+discarded once no positive memory of that building remains. Individual player views retain their
+independent knowledge, and no clear record is sent on the wire. This keeps hidden destruction stale
+until the location is checked without adding wire-protocol fields.
 
 `game::anti_tank_gun_memory::AntiTankGunMemory` is the corresponding server-authoritative
 per-player knowledge store for deployed enemy Anti-Tank Gun firing arcs. It refreshes from ordinary
