@@ -572,12 +572,13 @@ their temporary placement over the saved desktop position. Analysis buttons acti
 touch release and suppress the synthesized compatibility click. The overlay owns its generated DOM
 and is read-only. The Army Value tab is client-side and viewport-specific, excludes economy workers
 (Engineer and Golem), and counts only combat units. Production, Research, Units, Resources, Alive
-Resources, Units Lost, and Resources Lost render the latest server-authored `observerAnalysis`
-payload. Alive Resources subtracts dead-unit steel/oil value from lifetime mined resources;
-because starting resources are not lifetime mined income, the derived value can be negative.
+Resources, Losses, and Resources Lost render the latest server-authored `observerAnalysis`
+payload. Alive Resources subtracts destroyed-unit and destroyed-building steel/oil value from
+lifetime mined resources; because starting resources are not lifetime mined income, the derived
+value can be negative.
 Research groups
 completed permanent upgrades by player, retaining an explicit empty row when a player has
-completed none. The Units Lost tab also lists destroyed buildings by kind, including zero-cost
+completed none. The Losses tab lists destroyed units and buildings by kind, including zero-cost
 Steel Mines and Pump Jacks. Resources Lost is the spent steel/oil value of units and buildings that
 died, excluding stockpile changes, harvesting, refunds, and cancelled queues.
 
