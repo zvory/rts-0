@@ -21,7 +21,10 @@ impl MoveCoordinator<'_> {
         let approach = approach_center(self.map, &units, center);
         self.order_group_move(entities, player, ids, approach, true);
         for unit in units {
-            let Some(goal) = entities.get(unit.id).and_then(|entity| entity.move_intent()) else {
+            let Some(goal) = entities
+                .get(unit.id)
+                .and_then(|entity| entity.move_intent())
+            else {
                 continue;
             };
             let Some(entity) = entities.get_mut(unit.id) else {
@@ -57,9 +60,8 @@ fn approach_center(
         (-1.0, 0.0)
     };
     // The shortest-sighted attack-move units can see the complete objective radius from here.
-    let approach_distance = (config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES - 1.0)
-        .max(0.0)
-        * config::TILE_SIZE as f32;
+    let approach_distance =
+        (config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES - 1.0).max(0.0) * config::TILE_SIZE as f32;
     (
         (center.0 + nx * approach_distance).clamp(0.0, map.world_width_px() - 0.01),
         (center.1 + ny * approach_distance).clamp(0.0, map.world_height_px() - 0.01),

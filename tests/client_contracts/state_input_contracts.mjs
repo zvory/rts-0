@@ -1511,6 +1511,25 @@ function buttonByLabel(card, label) {
   );
 
   targetedInput.clientIntent.beginCommandTarget("attack");
+  targetedInput._entityAtScreen = () => null;
+  targetedInput._rememberedEntityAtScreen = () => ({
+    id: 101,
+    owner: 0,
+    kind: KIND.TANK_TRAP,
+    x: 312,
+    y: 312,
+  });
+  clickTarget(targetedInput, { x: 312, y: 312 }, { shiftKey: true });
+  lastSent = sentCommands[sentCommands.length - 1];
+  assert(
+    lastSent.c === "clearObstacleArea" &&
+      lastSent.target === 101 &&
+      lastSent.queued === true,
+    "A-clicking a remembered Tank Trap requests one queued authoritative clear-area order",
+  );
+  targetedInput._rememberedEntityAtScreen = () => null;
+
+  targetedInput.clientIntent.beginCommandTarget("attack");
   targetedInput.clientIntent.holdCommandTarget("attack", "KeyA", true);
   targetedInput._entityAtScreen = () => null;
   clickTarget(targetedInput, { x: 320, y: 320 }, { shiftKey: true });

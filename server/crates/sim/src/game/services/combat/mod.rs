@@ -342,16 +342,19 @@ pub(in crate::game) fn combat_system(
         }
         let dist = target_distance_sq.sqrt();
         let clear_area_priority_target = entities.get(id).is_some_and(|entity| {
-            entity.order().clear_obstacle_area().is_some_and(|objective| {
-                neutral_obstacle
-                    && entities.get(tid).is_some_and(|target| {
-                        let dx = target.pos_x - objective.center_x;
-                        let dy = target.pos_y - objective.center_y;
-                        let radius = config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES
-                            * config::TILE_SIZE as f32;
-                        dx.mul_add(dx, dy * dy) <= radius * radius
-                    })
-            })
+            entity
+                .order()
+                .clear_obstacle_area()
+                .is_some_and(|objective| {
+                    neutral_obstacle
+                        && entities.get(tid).is_some_and(|target| {
+                            let dx = target.pos_x - objective.center_x;
+                            let dy = target.pos_y - objective.center_y;
+                            let radius = config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES
+                                * config::TILE_SIZE as f32;
+                            dx.mul_add(dx, dy * dy) <= radius * radius
+                        })
+                })
         });
         let commanded_direct_target = clear_area_priority_target
             || (mode == CombatMode::Ordered

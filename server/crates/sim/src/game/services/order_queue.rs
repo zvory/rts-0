@@ -404,11 +404,9 @@ fn pop_next_valid_intent(
                 }
             }
             OrderIntent::ClearObstacleArea(intent) => {
-                if let Some(promoted) = clear_obstacle_area::promoted(
-                    intent.anchor,
-                    intent.center_x,
-                    intent.center_y,
-                ) {
+                if let Some(promoted) =
+                    clear_obstacle_area::promoted(intent.anchor, intent.center_x, intent.center_y)
+                {
                     return Some(promoted);
                 }
             }

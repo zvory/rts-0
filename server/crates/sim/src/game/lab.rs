@@ -1378,7 +1378,8 @@ fn command_authority_entities(command: &Command) -> Vec<u32> {
         Command::Move { units, .. }
         | Command::FormationMove { units, .. }
         | Command::AttackMove { units, .. }
-        | Command::ClearObstacleArea { units, .. } | Command::Attack { units, .. }
+        | Command::ClearObstacleArea { units, .. }
+        | Command::Attack { units, .. }
         | Command::SetupAntiTankGuns { units, .. }
         | Command::TearDownAntiTankGuns { units }
         | Command::Charge { units }

@@ -115,7 +115,10 @@ fn clear_obstacle_area_makes_coax_prioritize_traps_over_infantry() {
         &map,
     );
 
-    assert_eq!(entities.get(worker).expect("worker should exist").hp, worker_hp);
+    assert_eq!(
+        entities.get(worker).expect("worker should exist").hp,
+        worker_hp
+    );
     assert!(entities.get(trap).expect("trap should exist").hp < trap_hp);
 }
 

@@ -34,9 +34,7 @@ pub(super) fn acquire(
     require_safe_mortar_target: bool,
     tick: u32,
 ) -> Option<u32> {
-    if let Some(target) = clear_obstacle_area_target(
-        map, entities, teams, fog, smokes, id, owner,
-    ) {
+    if let Some(target) = clear_obstacle_area_target(map, entities, teams, fog, smokes, id, owner) {
         return Some(target);
     }
     resolve_target(
@@ -97,9 +95,7 @@ pub(super) fn select(
     require_safe_mortar_target: bool,
     tick: u32,
 ) -> Option<u32> {
-    if let Some(target) = clear_obstacle_area_target(
-        map, entities, teams, fog, smokes, id, owner,
-    ) {
+    if let Some(target) = clear_obstacle_area_target(map, entities, teams, fog, smokes, id, owner) {
         return Some(target);
     }
     let ready = entities

@@ -59,10 +59,9 @@ fn attack_command_round_trips_tank_trap_cluster_mode() {
 
 #[test]
 fn clear_obstacle_area_round_trips_with_optional_queueing() {
-    let command: Command = serde_json::from_str(
-        r#"{"c":"clearObstacleArea","units":[3,4],"target":9,"queued":true}"#,
-    )
-    .expect("clear obstacle area should deserialize");
+    let command: Command =
+        serde_json::from_str(r#"{"c":"clearObstacleArea","units":[3,4],"target":9,"queued":true}"#)
+            .expect("clear obstacle area should deserialize");
     assert!(matches!(
         command,
         Command::ClearObstacleArea {

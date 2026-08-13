@@ -1257,13 +1257,9 @@ fn clear_obstacle_area_center(
         if !entity.is_neutral_obstacle() || entity.hp == 0 || entity.under_construction() {
             return None;
         }
-        let currently_actionable = rules::projection::team_visible_world(
-            player,
-            entity.pos_x,
-            entity.pos_y,
-            fog,
-            teams,
-        ) && !smokes.point_inside(entity.pos_x, entity.pos_y);
+        let currently_actionable =
+            rules::projection::team_visible_world(player, entity.pos_x, entity.pos_y, fog, teams)
+                && !smokes.point_inside(entity.pos_x, entity.pos_y);
         if currently_actionable {
             return Some((entity.pos_x, entity.pos_y));
         }

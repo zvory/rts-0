@@ -30,6 +30,8 @@ impl PromotionGroups {
 }
 
 pub(super) fn promoted(anchor: u32, center_x: f32, center_y: f32) -> Option<PromotedIntent> {
-    (center_x.is_finite() && center_y.is_finite())
-        .then_some(PromotedIntent::ClearObstacleArea(anchor, (center_x, center_y)))
+    (center_x.is_finite() && center_y.is_finite()).then_some(PromotedIntent::ClearObstacleArea(
+        anchor,
+        (center_x, center_y),
+    ))
 }

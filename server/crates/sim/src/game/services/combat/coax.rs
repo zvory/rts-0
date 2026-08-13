@@ -225,13 +225,15 @@ fn tank_coax_target_candidates(
             continue;
         };
         let clear_area_trap = target.is_neutral_obstacle()
-            && snapshot.clear_obstacle_area.is_some_and(|(_, center_x, center_y)| {
-                let dx = target.pos_x - center_x;
-                let dy = target.pos_y - center_y;
-                let radius = config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES
-                    * config::TILE_SIZE as f32;
-                dx.mul_add(dx, dy * dy) <= radius * radius
-            });
+            && snapshot
+                .clear_obstacle_area
+                .is_some_and(|(_, center_x, center_y)| {
+                    let dx = target.pos_x - center_x;
+                    let dy = target.pos_y - center_y;
+                    let radius =
+                        config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * config::TILE_SIZE as f32;
+                    dx.mul_add(dx, dy * dy) <= radius * radius
+                });
         if target.is_neutral_obstacle()
             && snapshot.explicit_neutral_obstacle_target != Some(target.id)
             && !clear_area_trap
@@ -284,11 +286,13 @@ fn tank_coax_target_candidates(
             retained_target: false,
         });
     }
-    if snapshot.clear_obstacle_area.is_some() && candidates.iter().any(|candidate| {
-        entities
-            .get(candidate.id)
-            .is_some_and(|target| target.is_neutral_obstacle())
-    }) {
+    if snapshot.clear_obstacle_area.is_some()
+        && candidates.iter().any(|candidate| {
+            entities
+                .get(candidate.id)
+                .is_some_and(|target| target.is_neutral_obstacle())
+        })
+    {
         candidates.retain(|candidate| {
             entities
                 .get(candidate.id)

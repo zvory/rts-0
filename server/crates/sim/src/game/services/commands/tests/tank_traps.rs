@@ -73,9 +73,17 @@ fn remembered_hidden_tank_trap_clear_uses_a_real_approach_goal() {
         .expect("remembered Tank Trap should authorize the clear-area order");
     assert_eq!(objective.anchor, trap);
     assert_eq!((objective.center_x, objective.center_y), trap_pos);
-    let goal = tank.path_goal().expect("clear-area order should receive an approach goal");
-    assert_ne!(goal, tank_pos, "hidden Tank Trap clear must not collapse to a no-op");
-    assert_ne!(goal, trap_pos, "approach goal must not occupy the blocked Tank Trap tile");
+    let goal = tank
+        .path_goal()
+        .expect("clear-area order should receive an approach goal");
+    assert_ne!(
+        goal, tank_pos,
+        "hidden Tank Trap clear must not collapse to a no-op"
+    );
+    assert_ne!(
+        goal, trap_pos,
+        "approach goal must not occupy the blocked Tank Trap tile"
+    );
     assert!(
         (goal.0 - trap_pos.0).hypot(goal.1 - trap_pos.1)
             <= 3.0 * crate::config::TILE_SIZE as f32 + 0.01,
@@ -152,7 +160,10 @@ fn never_observed_hidden_tank_trap_cannot_authorize_clear_area() {
         )],
     );
 
-    assert!(matches!(entities.get(tank).expect("tank should survive").order(), Order::Idle));
+    assert!(matches!(
+        entities.get(tank).expect("tank should survive").order(),
+        Order::Idle
+    ));
 }
 
 #[test]

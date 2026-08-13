@@ -72,11 +72,7 @@ impl Order {
         center_y: f32,
     ) -> Self {
         Order::AttackMove(MoveOrder::with_clear_obstacle_area(
-            approach_x,
-            approach_y,
-            anchor,
-            center_x,
-            center_y,
+            approach_x, approach_y, anchor, center_x, center_y,
         ))
     }
 
