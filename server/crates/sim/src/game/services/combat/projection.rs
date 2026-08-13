@@ -170,6 +170,9 @@ fn friendly_hard_blocker_between_except(
     if !start.0.is_finite() || !start.1.is_finite() || !end.0.is_finite() || !end.1.is_finite() {
         return true;
     }
+    let tank_fired_shot = entities
+        .get(attacker)
+        .is_some_and(|entity| entity.kind == EntityKind::Tank);
     blockers
         .owned_by(attacker_owner)
         .iter()
@@ -179,6 +182,7 @@ fn friendly_hard_blocker_between_except(
             candidate.id != attacker
                 && Some(candidate.id) != ignored_target
                 && candidate.hp > 0
+                && !(tank_fired_shot && candidate.kind == EntityKind::Tank)
                 && shot_blocker_intersection(map, candidate, start, end).is_some()
         })
 }

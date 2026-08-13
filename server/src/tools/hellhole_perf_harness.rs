@@ -480,7 +480,11 @@ mod tests {
         assert_eq!(summary.ticks, 2);
         assert_eq!(summary.serialized_snapshots, 2);
         assert_eq!(summary.initial_entities, INITIAL_ENTITY_COUNT);
-        assert_eq!(summary.final_entities, INITIAL_ENTITY_COUNT);
+        assert_eq!(
+            summary.final_entities,
+            INITIAL_ENTITY_COUNT - 1,
+            "friendly tank pass-through lets one opening shot become lethal"
+        );
         assert!(summary.snapshot_bytes > 0);
     }
 }
