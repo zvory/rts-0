@@ -49,7 +49,9 @@ export function mapEditorSymmetryGuideLines(dimensions, symmetry) {
     return [-Math.PI / 2, Math.PI / 6, 5 * Math.PI / 6]
       .map((angle) => symmetryGuideRay(centreX, centreY, worldWidth, worldHeight, angle));
   }
-  if (symmetry === MAP_EDITOR_SYMMETRY.RADIAL) return [horizontal, vertical];
+  if ([MAP_EDITOR_SYMMETRY.RADIAL, MAP_EDITOR_SYMMETRY.QUADRANT_MIRROR].includes(symmetry)) {
+    return [horizontal, vertical];
+  }
   if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN) {
     return [{ x0: 0, y0: 0, x1: worldWidth, y1: worldHeight }];
   }

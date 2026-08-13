@@ -392,6 +392,7 @@ export class MapEditorPanel {
       [MAP_EDITOR_SYMMETRY.HALF_TURN, "Half-turn (180°)"],
       [MAP_EDITOR_SYMMETRY.THREE_WAY, "3-way rotation (120°, square-grid approximation)"],
       [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (4-way)"],
+      [MAP_EDITOR_SYMMETRY.QUADRANT_MIRROR, "Quadrant mirror (4-way)"],
       [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN, "Diagonal ↘ (top-left ↔ bottom-right)"],
       [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI, "Diagonal ↙ (top-right ↔ bottom-left)"],
     ]) {

@@ -1023,17 +1023,20 @@ a simulation; Lab-directed handoffs still require a playable start/base layout. 
 reuses any base sites already present at the target locations. There is no
 active layout, player slot, or per-player natural assignment. The viewport draws blue start
 markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain content supports brush
-and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial, or either
-single-diagonal symmetry; Grass remains an ordinary selectable material, while the separate Erase
+and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial,
+four-way quadrant mirror, or either single-diagonal symmetry. Quadrant mirror reflects a source
+across both centre axes, so adjacent quadrants are single mirrors and the opposite quadrant is
+double-mirrored; Grass remains an ordinary selectable material, while the separate Erase
 operation applies grass internally. Rectangular maps retain axis reflection and
-half-turn symmetry, while three-way, four-way, and diagonal transforms are disabled because they
-would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
+half-turn and quadrant-mirror symmetry, while three-way, radial, and diagonal transforms are
+disabled because they would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
 The editor viewport also draws non-authoritative Steel and Oil stand-ins for every base using the
 same count, centre-facing field geometry, tile snapping, passability search, and Oil spacing rules
 as match setup and the production resource-node drawing primitives; editing either patch count
 updates those stand-ins immediately. The selected neutral base has a pale map ring. The viewport draws the selected
-centre axis, a centre marker for half-turn symmetry, a cross for radial symmetry, or the selected diagonal.
+centre axis, a centre marker for half-turn symmetry, a cross for radial or quadrant-mirror symmetry,
+or the selected diagonal.
 Texture Brush and Erase operations share a configurable 1–31-tile brush-width number control; Box fills remain independent of brush width.
 Grass, Gravel A/B/C, Dirt A/B/C, Mud A/B/C, Frosted Ground, bare road, and the four marked road
 orientations are passable paint materials; all may cross protected start/base areas while rock and

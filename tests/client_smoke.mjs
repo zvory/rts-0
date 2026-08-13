@@ -946,6 +946,7 @@ try {
       editorUi.symmetryOptions.includes("Half-turn (180°)") &&
       editorUi.symmetryOptions.includes("3-way rotation (120°, square-grid approximation)") &&
       editorUi.symmetryOptions.includes("Radial (4-way)") &&
+      editorUi.symmetryOptions.includes("Quadrant mirror (4-way)") &&
       editorUi.symmetryOptions.includes("Diagonal ↘ (top-left ↔ bottom-right)") &&
       editorUi.symmetryOptions.includes("Diagonal ↙ (top-right ↔ bottom-left)") &&
       editorUi.blankMapWidth?.type === "number" &&
