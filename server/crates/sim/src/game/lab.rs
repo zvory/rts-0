@@ -1372,7 +1372,6 @@ fn validate_lab_map_site(
     }
     Ok(())
 }
-
 fn command_authority_entities(command: &Command) -> Vec<u32> {
     match command {
         Command::Move { units, .. }
