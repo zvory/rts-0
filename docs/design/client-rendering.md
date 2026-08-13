@@ -143,7 +143,8 @@ StaticMapPresentationV2 = {
   widthPx, heightPx, tileSizePx,
   terrain: GridSnapshotV2,
   resourceSites: readonly detached records[],
-  doodads: readonly detached records[]
+  doodads: readonly detached records[],
+  concealmentTiles: readonly { x, y }[]
 }
 
 PresentationFrameV2 = {
@@ -155,6 +156,11 @@ PresentationFrameV2 = {
   diagnosticsContext
 }
 ```
+
+The static concealment mask crosses the renderer boundary because it drives the ordinary-unit
+readability outline. A unit is outlined when its ground point occupies concealment or when its
+presentation footprint overlaps a foreground concealment tile; decorative doodad pixels are never
+the semantic source of that cue.
 
 Presented entity records include backend-neutral `visualBounds` (`class`, `widthPx`, `depthPx`,
 `heightPx`) derived from the mirrored entity stats. Placement feedback includes a detached
@@ -212,9 +218,10 @@ Each descriptor is `{id, order, space, visibilityPolicy, depthPolicy}`. Later wo
 namespaced metadata but cannot rename/reorder layers or weaken visibility policy.
 Within Pixi's fog-gated world, tree canopies and unit body/overlay/effect containers share
 back-to-front world-Y ordering; tree understory and shadows remain below them, while selection, HP,
-and fog remain above. Any received ordinary unit occluded by a tree gets a white outer edge plus an
-85%-opacity owner/team-color silhouette derived from the alpha of its current production rig/frame
-above the canopy. Authoritative `visionOnly`
+and fog remain above. Any received ordinary unit occupying concealment, or overlapping a foreground
+concealment tile with its presentation footprint, gets a white outer edge plus an 85%-opacity
+owner/team-color silhouette derived from the alpha of its current production rig/frame above the
+canopy. Decorative tree overlap alone does not trigger this pass. Authoritative `visionOnly`
 concealment reveals omit that rig from the normal full-color layer, redraw the same current production
 rig into a filtered above-fog outline layer, and keep damaged-unit HP above it. The filter samples
 alpha only and never copies faction-colored pixels; concealment reveals retain the white edge without

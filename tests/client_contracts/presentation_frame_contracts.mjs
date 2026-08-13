@@ -50,6 +50,7 @@ const map = {
   elevation: new Uint8Array([0, 2, 4, 1]),
   sun: { azimuthDegrees: 315, elevationDegrees: 12, warmth: 75 },
   resources: [{ id: 90, kind: "steel", x: 16, y: 16, remaining: 1200 }],
+  concealmentTiles: [{ x: 1, y: 1 }, { x: 1, y: 1 }, { x: 3, y: 3 }],
 };
 const visibleGrid = new Uint8Array([1, 1, 0, 0]);
 const exploredGrid = new Uint8Array([1, 1, 1, 0]);
@@ -235,6 +236,8 @@ assert(assembler.staticMap.elevation.values.join(",") === "0,2,4,1", "static map
 assert(Object.isFrozen(assembler.staticMap.sun) && assembler.staticMap.sun.warmth === 75,
   "static map retains immutable authored sun conditions");
 assert(assembler.staticMap.resourceSites[0].remaining === undefined, "static resource sites exclude mutable remaining amounts");
+assert(JSON.stringify(assembler.staticMap.concealmentTiles) === '[{"x":1,"y":1}]',
+  "static map retains a normalized immutable concealment mask for renderer readability cues");
 assert(Object.keys(frame.visible).join(",") === "version,revision,width,height,values", "grid snapshot exposes the cloneable V2 shape");
 assert(frame.version === 2 && frame.projection.version === 2, "renderer frame and projection use PresentationFrameV2 data");
 assert(

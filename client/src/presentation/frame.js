@@ -8,7 +8,7 @@ import { createRendererProjectionRecord } from "./projection_record.js";
 import { DOODAD_TYPE_IDS } from "../config.js";
 
 export const PRESENTATION_FRAME_VERSION = 2;
-export const STATIC_MAP_PRESENTATION_VERSION = 4;
+export const STATIC_MAP_PRESENTATION_VERSION = 5;
 export const MAX_PRESENTED_DOODADS = 4096;
 
 const STATIC_DOODAD_TYPES = new Set(DOODAD_TYPE_IDS);
@@ -275,6 +275,7 @@ export class PresentationFrameAssembler {
       widthPx: width * tileSizePx,
       heightPx: height * tileSizePx,
     });
+    const concealmentTiles = normalizeStaticTiles(map?.concealmentTiles, { width, height });
     this._mapSource = map;
     this._staticMap = Object.freeze({
       version: STATIC_MAP_PRESENTATION_VERSION,
@@ -288,8 +289,28 @@ export class PresentationFrameAssembler {
       sun: normalizeMapSun(map?.sun),
       resourceSites: Object.freeze(resourceSites),
       doodads,
+      concealmentTiles,
     });
   }
+}
+
+function normalizeStaticTiles(records, { width, height }) {
+  if (!Array.isArray(records)) return Object.freeze([]);
+  const seen = new Set();
+  const tiles = [];
+  for (const record of records) {
+    const x = Number(record?.x);
+    const y = Number(record?.y);
+    if (
+      !Number.isInteger(x) || !Number.isInteger(y)
+      || x < 0 || y < 0 || x >= width || y >= height
+    ) continue;
+    const key = `${x},${y}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tiles.push(Object.freeze({ x, y }));
+  }
+  return Object.freeze(tiles);
 }
 
 function normalizeMapSun(value) {

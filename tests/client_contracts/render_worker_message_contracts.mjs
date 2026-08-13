@@ -30,6 +30,7 @@ const map = {
   elevation: [0, 2, 4, 1],
   sun: { azimuthDegrees: 315, elevationDegrees: 12, warmth: 75 },
   resources: [],
+  concealmentTiles: [{ x: 1, y: 1 }],
 };
 const camera = new Camera(640, 480);
 camera.setBounds(64, 64, 640, 480);
@@ -96,6 +97,8 @@ assert(mapMessage.transfer.every((buffer) => buffer.byteLength === 0)
   "map-generation transferable moves without detaching the assembler static map");
 assert(assembler.staticMap.terrain.values.length === 4, "map serialization never mutates its source snapshot");
 assert(mapClone.payload.map.sun.warmth === 75, "map generation preserves authored sun conditions");
+assert(mapClone.payload.map.concealmentTiles[0].x === 1 && mapClone.payload.map.concealmentTiles[0].y === 1,
+  "map generation preserves authored concealment tiles across the worker boundary");
 
 const state = createRenderWorkerWireState();
 const firstMessages = createFrameMessages(representative, state);

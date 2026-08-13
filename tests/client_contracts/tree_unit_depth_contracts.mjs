@@ -5,8 +5,9 @@ import { DoodadLayer } from "../../client/src/renderer/doodad_layer.js";
 import { _drawAboveFogHp } from "../../client/src/renderer/entities.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
+  concealmentTilesOccludeUnit,
   _drawConcealmentUnitOutlines,
-  _drawTreeOccludedUnitOutlines,
+  _drawConcealmentTileUnitOutlines,
 } from "../../client/src/renderer/tree_unit_occlusion.js";
 import {
   createUnitOutlineFilter,
@@ -56,6 +57,12 @@ try {
   const rifleFrameStripOverride = { strip: { id: "real-rifle-strip" }, texture: { id: "real-rifle-texture" } };
   const visualFrameStripOverrides = new Map([[KIND.RIFLEMAN, rifleFrameStripOverride]]);
   const outlineRenderer = {
+    _map: {
+      tileSize: 32,
+      concealmentTiles: [
+        { x: 3, y: 2 },
+      ],
+    },
     _doodads: doodads,
     _drawUnit(entity, colors, renderState, pools) {
       outlineCalls.push({ entity, colors, renderState, pools });
@@ -67,17 +74,32 @@ try {
     _recordRenderError(_label, error) { throw error; },
   };
   assert.equal(
-    _drawTreeOccludedUnitOutlines.call(outlineRenderer, entities, state, colorByOwner, {
+    _drawConcealmentTileUnitOutlines.call(outlineRenderer, entities, state, colorByOwner, {
       renderContexts,
       visualFrameStripOverrides,
     }),
     3,
-    "ordinary friendly, allied, and visible enemy units behind a canopy use filtered real-rig outlines",
+    "ordinary friendly, allied, and visible enemy units on concealment use filtered real-rig outlines",
   );
   assert.deepEqual(outlineCalls.map((call) => call.entity.id), [1, 2, 5],
     "in-front units remain unchanged and reveal-only units use their dedicated pass");
   assert.deepEqual(teamFillCalls, [[1, 0x0072b2], [2, 0xd55e00], [5, 0xcc79a7]],
     "forest silhouettes receive each visible unit's actual owner color");
+  assert.equal(concealmentTilesOccludeUnit(
+    { tileSize: 32, concealmentTiles: [{ x: 3, y: 2 }] },
+    unit(20, 1, KIND.RIFLEMAN, 100, 70),
+    7,
+  ), true, "a unit whose ground point is on concealment receives the readability outline");
+  assert.equal(concealmentTilesOccludeUnit(
+    { tileSize: 32, concealmentTiles: [{ x: 3, y: 3 }] },
+    unit(21, 1, KIND.RIFLEMAN, 100, 92),
+    7,
+  ), true, "a foreground concealment tile overlapping the unit footprint receives the outline");
+  assert.equal(concealmentTilesOccludeUnit(
+    { tileSize: 32, concealmentTiles: [] },
+    unit(22, 1, KIND.RIFLEMAN, 100, 70),
+    7,
+  ), false, "decorative canopy overlap without authored concealment does not receive an outline");
   for (const call of outlineCalls) {
     assert.equal(call.colors, colorByOwner);
     assert.equal(call.renderState, state);
@@ -97,7 +119,7 @@ try {
   outlineCalls.length = 0;
   teamFillCalls.length = 0;
   assert.equal(
-    _drawTreeOccludedUnitOutlines.call(
+    _drawConcealmentTileUnitOutlines.call(
       outlineRenderer,
       entities.filter((entity) => entity.owner !== 3),
       state,
@@ -219,7 +241,7 @@ try {
     "the production forest group uses the selected fill opacity",
   );
   assert.equal(
-    renderer._drawTreeOccludedUnitOutlines([], {}, colorByOwner),
+    renderer._drawConcealmentTileUnitOutlines([], {}, colorByOwner),
     0,
     "a frame without occluded units draws no forest silhouettes",
   );

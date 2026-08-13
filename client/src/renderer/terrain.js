@@ -456,11 +456,17 @@ export function buildStaticMap(map, {
   preserveMapLayers = false,
   bakeLongShadows = true,
 } = {}) {
+  const concealmentTiles = Array.from(map.concealmentTiles || [], (tile) => ({
+    x: Number(tile?.x),
+    y: Number(tile?.y),
+  }));
   this._map = {
     width: map.width,
     height: map.height,
     tileSize: map.tileSize,
     terrain: Array.from(map.terrain || []),
+    concealmentTiles,
+    _concealmentTileKeys: new Set(concealmentTiles.map((tile) => `${tile.x},${tile.y}`)),
     elevation: Array.from(map.elevation || new Uint8Array(map.width * map.height)),
     sun: map.sun ? { ...map.sun } : null,
   };
