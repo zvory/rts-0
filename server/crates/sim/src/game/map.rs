@@ -63,8 +63,7 @@ pub struct Map {
     pub height: u32,
     /// Row-major terrain codes, length `width * height`.
     pub terrain: Vec<u8>,
-    /// Row-major authoritative static elevation levels, length `width * height`.
-    /// Movement samples local elevation changes for directional slope speed.
+    /// Row-major elevation levels used by directional movement speed and capped fog sight bonuses.
     pub elevation: Vec<u8>,
     /// Optional authored presentation conditions for elevated-terrain lighting.
     pub sun: Option<MapSun>,

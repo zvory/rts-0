@@ -532,8 +532,10 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // ground are passable; rock/water are impassable.
     terrain: number[],
     // Server-authored height levels, row-major and shape-matched to terrain.
-    // Omitted on flat maps (implicit zero). Local grade affects movement speed; sight and combat
-    // otherwise remain 2D.
+    // Omitted on flat maps (implicit zero). Local grade affects movement speed. Ordinary
+    // unit/sight-granting building sight gains one
+    // tile per two absolute elevation levels, capped at four; zero-sight buildings stay visionless,
+    // and elevation does not block sight or alter combat LOS.
     elevation?: number[],
     // Required when elevation varies and optional on flat maps. Azimuth is compass degrees in map space
     // (0=north/-Y, 90=east); elevation is degrees above the horizon; warmth is 0-100.

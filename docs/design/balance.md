@@ -8,6 +8,10 @@ line-of-sight behavior. The visual open-ground variants retain grass's 1.0x move
 alone applies a 1.5x movement-speed multiplier. Independent authored slow-movement tiles apply a
 0.75x multiplier, while authored damage-reduction tiles reduce incoming damage by 25% after existing damage
 policy; both sample the entity-centre tile and may overlap any base terrain or other overlay.
+Authored elevation grants ordinary units and sight-granting buildings one additional fog-of-war
+sight tile per two absolute levels (`0–1` +0, `2–3` +1, `4–5` +2, `6–7` +3, `8–9` +4). The
+bonus caps at four tiles; zero-sight buildings remain visionless, low elevation never reduces base
+sight, elevation does not occlude sight, and Scout Plane aerial sight remains unchanged.
 `server/crates/rules/src/balance.rs` is the stable public re-export surface for timings, tile size,
 starting resources, supply caps, mining amounts, support-weapon constants, body dimensions, upgrade
 and ability scalars, and stat helpers. Its internal `server/crates/rules/src/balance/*.rs` modules

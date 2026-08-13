@@ -113,6 +113,78 @@ fn building_sight_reveals_footprint_and_one_tile_perimeter() {
 }
 
 #[test]
+fn ordinary_unit_sight_gains_capped_radius_from_absolute_elevation() {
+    let mut low_map = open_map(40);
+    low_map.elevation = vec![0; (low_map.width * low_map.height) as usize];
+    let origin_tile = (20, 20);
+    let origin = low_map.tile_center(origin_tile.0, origin_tile.1);
+    let mut entities = EntityStore::new();
+    let worker_id = entities
+        .spawn_unit(1, EntityKind::Worker, origin.0, origin.1)
+        .expect("worker should spawn");
+    let base_sight = entities
+        .get(worker_id)
+        .expect("worker should remain present")
+        .sight_tiles();
+
+    let mut low_fog = Fog::new(low_map.width, low_map.height);
+    low_fog.recompute(&[1], &entities, &low_map);
+    assert!(low_fog.is_visible(1, origin_tile.0 + base_sight, origin_tile.1));
+    assert!(!low_fog.is_visible(1, origin_tile.0 + base_sight + 1, origin_tile.1));
+
+    let mut high_map = low_map.clone();
+    let origin_index = high_map.index(origin_tile.0, origin_tile.1);
+    high_map.elevation[origin_index] = 9;
+    let mut high_fog = Fog::new(high_map.width, high_map.height);
+    high_fog.recompute(&[1], &entities, &high_map);
+
+    assert!(high_fog.is_visible(1, origin_tile.0 + base_sight + 4, origin_tile.1));
+    assert!(!high_fog.is_visible(1, origin_tile.0 + base_sight + 5, origin_tile.1));
+}
+
+#[test]
+fn building_sight_gains_elevation_bonus_outward_from_its_footprint() {
+    let mut map = open_map(32);
+    map.elevation = vec![0; (map.width * map.height) as usize];
+    let center_tile = (16, 16);
+    let center = map.tile_center(center_tile.0, center_tile.1);
+    let center_index = map.index(center_tile.0, center_tile.1);
+    map.elevation[center_index] = 8;
+    let mut entities = EntityStore::new();
+    entities
+        .spawn_building(1, EntityKind::Barracks, center.0, center.1, true)
+        .expect("barracks should spawn");
+    let mut fog = Fog::new(map.width, map.height);
+
+    fog.recompute(&[1], &entities, &map);
+
+    assert!(
+        fog.is_visible(1, 10, 16),
+        "level eight adds four perimeter tiles"
+    );
+    assert!(
+        !fog.is_visible(1, 9, 16),
+        "building bonus remains capped at four tiles"
+    );
+}
+
+#[test]
+fn elevation_does_not_turn_zero_sight_buildings_into_vision_sources() {
+    let mut map = open_map(16);
+    map.elevation = vec![9; (map.width * map.height) as usize];
+    let center = map.tile_center(8, 8);
+    let mut entities = EntityStore::new();
+    entities
+        .spawn_building(1, EntityKind::TankTrap, center.0, center.1, true)
+        .expect("Tank Trap should spawn");
+    let mut fog = Fog::new(map.width, map.height);
+
+    fog.recompute(&[1], &entities, &map);
+
+    assert!(!fog.is_visible(1, 8, 8));
+}
+
+#[test]
 fn smoke_blocks_authoritative_fog_behind_it_but_reveals_cloud_edge() {
     let map = map_with_rock_at((7, 7));
     let mut entities = EntityStore::new();
@@ -270,4 +342,31 @@ fn every_scout_plane_stamps_independent_team_vision() {
         !fog.is_visible_world(3, first.0, first.1) && !fog.is_visible_world(3, second.0, second.1),
         "enemy players must not receive Scout Plane vision"
     );
+}
+
+#[test]
+fn scout_plane_sight_does_not_gain_an_elevation_bonus() {
+    let mut map = open_map(48);
+    map.elevation = vec![0; (map.width * map.height) as usize];
+    let origin_tile = (24, 24);
+    let origin = map.tile_center(origin_tile.0, origin_tile.1);
+    let origin_index = map.index(origin_tile.0, origin_tile.1);
+    map.elevation[origin_index] = 9;
+    let mut entities = EntityStore::new();
+    let plane_id = entities
+        .spawn_unit(1, EntityKind::ScoutPlane, origin.0, origin.1)
+        .expect("Scout Plane should spawn");
+    let base_sight = entities
+        .get(plane_id)
+        .expect("Scout Plane should remain present")
+        .sight_tiles();
+    let smokes = SmokeCloudStore::new();
+    let teams = TeamRelations::from_player_teams([(1, 1)]);
+    let mut fog = Fog::new(map.width, map.height);
+
+    fog.recompute_with_smoke(&[1], &entities, &map, &smokes);
+    fog.stamp_scout_plane_sources_for_teams_with_smoke(&map, &entities, &smokes, &teams);
+
+    assert!(fog.is_visible(1, origin_tile.0 + base_sight, origin_tile.1));
+    assert!(!fog.is_visible(1, origin_tile.0 + base_sight + 1, origin_tile.1));
 }

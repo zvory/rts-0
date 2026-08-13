@@ -62,8 +62,8 @@ pub struct Game { /* private */ }
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Loads the hardcoded handcrafted map and assigns ordered players to fixed authored start
-    /// locations. A map owns flat `startLocations`, `baseSites`, movement-affecting `elevation`,
-    /// presentation-only `sun`, and static `doodads`: start locations determine its
+    /// locations. A map owns flat `startLocations`, `baseSites`, movement- and sight-affecting
+    /// `elevation`, presentation-only `sun`, and static `doodads`: start locations determine its
     /// capacity, while every base site receives its authored 0–36 Steel and 0–9 Oil patches.
     /// Singleton-team FFA
     /// matches shuffle fixed start locations by `seed`; team matches choose ordered starts from the
@@ -1003,7 +1003,10 @@ policy is centralized instead of scattered through services.
   opacity modifiers. `Open`, bare road, and all four marked road orientations project to passable
   `Road` terrain and share combat/visibility defaults, raw stone blocks LOS, and `Road` supplies
   the authoritative 1.5x movement multiplier sampled from a moving unit's center tile each tick.
-  Future forest/hill behavior grows through the same rules seam.
+  Authored elevation grants ordinary unit/sight-granting building fog sight one extra tile per two
+  absolute levels, capped at four tiles; zero-sight buildings remain visionless, and elevation
+  does not occlude fog or alter combat line-of-sight. Future
+  forest/hill behavior grows through the same rules seam.
 - `rules::projection` — fog-gated `EntityView` construction, legacy/special `visionOnly`
   projection support, and event visibility predicates.
 
@@ -1823,12 +1826,14 @@ bypasses an in-progress reaction gate without changing the weapon's reload. Expl
 autonomous target acquisition both count ordinary allied sight because firing legality and reaction
 provenance share the same team-current scope.
 Lingering death sight is stamped into live fog as ordinary temporary team sight for five seconds.
-The invisible source stays at the dead unit/building's final position, uses that entity's sight
-radius, respects smoke and line-of-sight blockers, and is stamped into every tracked teammate fog
+The invisible source stays at the dead unit/building's final position, uses that entity's base sight
+radius plus the elevation bonus at its final tile, respects smoke and line-of-sight blockers, and is stamped into every tracked teammate fog
 grid. Because it is normal fog, snapshots project current enemy positions without `visionOnly`,
 direct and queued attacks validate through it, remembered buildings/trenches refresh from it, and
 idle/attack-move auto-acquisition can choose targets it reveals. Unit live fog stamps a
-center-origin sight circle. Building live fog stamps the whole building footprint plus `sight_tiles`
+center-origin sight circle. The observer's absolute authored elevation adds one sight tile per two
+levels, capped at four tiles, without any low-ground penalty or elevation-based occlusion; Scout
+Plane aerial sight remains independent of elevation. Building live fog stamps the whole building footprint plus `sight_tiles`
 outward from each footprint edge, so a building with 1-tile sight sees itself and the one-tile
 perimeter around its edges. Neutral resource nodes never stamp vision. Match setup marks the exact
 footprints of entity-backed neutral buildings authored into the map as explored for every player,

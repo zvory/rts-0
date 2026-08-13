@@ -29,6 +29,8 @@ pub const UPHILL_MOVEMENT_SLOWDOWN_PER_GRADE: f32 = 0.12;
 pub const MIN_UPHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 0.30;
 pub const DOWNHILL_MOVEMENT_BOOST_PER_GRADE: f32 = 0.06;
 pub const MAX_DOWNHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.35;
+/// Maximum ordinary fog-of-war sight granted by authored elevation.
+pub const MAX_ELEVATION_SIGHT_BONUS_TILES: u32 = 4;
 /// Body-edge distance at which an ordinary unit detects a concealed hostile unit.
 pub const CONCEALMENT_CLOSE_DETECTION_RANGE_TILES: f32 = 2.0;
 /// Maximum number of concealment tiles an ordinary fog-of-war sight ray may enter.
@@ -111,6 +113,14 @@ pub fn elevation_movement_speed_multiplier(current: u8, ahead: u8) -> f32 {
     } else {
         1.0
     }
+}
+
+/// Extra ordinary sight granted by the observer's absolute authored elevation.
+///
+/// Two elevation levels grant one tile, capped so high plateaus remain a modest positional
+/// advantage. Low ground never reduces the entity's base sight.
+pub fn elevation_sight_bonus_tiles(elevation: u8) -> u32 {
+    (u32::from(elevation) / 2).min(MAX_ELEVATION_SIGHT_BONUS_TILES)
 }
 
 /// Reduce incoming damage by 25% while the target center occupies an authored reduction tile.
@@ -249,5 +259,14 @@ mod tests {
         assert_eq!(elevation_movement_speed_multiplier(5, 4), 1.06);
         assert_eq!(elevation_movement_speed_multiplier(0, 9), 0.30);
         assert_eq!(elevation_movement_speed_multiplier(9, 0), 1.35);
+    }
+
+    #[test]
+    fn elevation_sight_bonus_steps_every_two_levels_and_caps_at_four_tiles() {
+        let expected = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4];
+        for (elevation, expected_bonus) in expected.into_iter().enumerate() {
+            assert_eq!(elevation_sight_bonus_tiles(elevation as u8), expected_bonus);
+        }
+        assert_eq!(elevation_sight_bonus_tiles(u8::MAX), 4);
     }
 }
