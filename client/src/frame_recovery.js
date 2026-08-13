@@ -175,6 +175,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
 
     const selectionScene = time("match.selectionScene", () => buildSelectionScene({
       entities: frameViews.interpolatedEntities,
+      rememberedEntities: match.state.rememberedBuildings,
       preparedEntities: frameViews.preparedEntities,
       projection,
       tileSize: match.state.map?.tileSize,

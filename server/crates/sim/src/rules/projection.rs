@@ -638,6 +638,9 @@ fn intent_plan_marker(
     match intent {
         OrderIntent::Move(point) => point_marker("move", point.x, point.y),
         OrderIntent::AttackMove(point) => point_marker("attackMove", point.x, point.y),
+        OrderIntent::ClearObstacleArea(intent) => {
+            point_marker("attackMove", intent.center_x, intent.center_y)
+        }
         OrderIntent::HoldPosition => {
             point_marker("holdPosition", stage_position.0, stage_position.1)
         }

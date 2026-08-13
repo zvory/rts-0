@@ -78,6 +78,12 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    ClearObstacleArea {
+        units: Vec<u32>,
+        target: u32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
+    },
     Attack {
         units: Vec<u32>,
         target: u32,

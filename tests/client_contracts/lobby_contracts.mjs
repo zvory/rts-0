@@ -42,6 +42,7 @@ import {
   LOBBY_MAP_PRESENTATION,
   LobbyMapSelector,
   lobbyMapPresentation,
+  orderLobbyMaps,
 } from "../../client/src/lobby_map_selector.js";
 
 import { textWithin } from "./dom_text.mjs";
@@ -135,6 +136,21 @@ import { textWithin } from "./dom_text.mjs";
   "all Alex-authored maps credit Alex");
   assert(mapNames.every((name) => lobbyMapPresentation(name).preview.endsWith(".jpg")),
     "bundled lobby previews use high-DPR JPEG assets");
+  assertDeepEqual(
+    mapNames.filter((name) => lobbyMapPresentation(name).archived),
+    ["1v1 No Terrain", "1v1", "Chokes", "Lighting Test", "Open Basin"],
+    "retired maps are explicitly marked as archived in lobby presentation metadata",
+  );
+  assertDeepEqual(
+    orderLobbyMaps([
+      { name: "1v1" },
+      { name: "Crossroads" },
+      { name: "Open Basin" },
+      { name: "Doppelganger" },
+    ]).map((entry) => entry.name),
+    ["Crossroads", "Doppelganger", "1v1", "Open Basin"],
+    "lobby map ordering preserves catalog order within active and archived sections",
+  );
 }
 
 {
@@ -164,6 +180,23 @@ import { textWithin } from "./dom_text.mjs";
       "selected map preview renders above the dropdown control");
     assert(selector.optionButtons.length === maps.length,
       "custom map selector renders every server-advertised map name");
+    assertDeepEqual(
+      selector.optionButtons.map((button) => button.dataset.mapName),
+      ["3 Player Map", "4 Player Map", "Crossroads", "Doppelganger", "Schone Tage",
+        "1v1 No Terrain", "1v1", "Chokes", "Lighting Test", "Open Basin"],
+      "custom map selector groups archived maps after active maps",
+    );
+    const archivedGroup = findFakes(
+      selector.optionList,
+      (child) => child.className === "lobby-map-archive-group",
+    )[0];
+    assert(
+      archivedGroup?.role === "group" && archivedGroup?.["aria-label"] === "Archived maps" &&
+        archivedGroup.children[0]?.className === "lobby-map-archive-heading" &&
+        archivedGroup.children[0]?.textContent === "Archived" &&
+        archivedGroup.children.slice(1).every((child) => child.classList.contains("is-archived")),
+      "custom map selector exposes archived options as a labeled accessibility group",
+    );
     selector.open();
     const schoneTage = selector.optionButtons.find((button) => button.dataset.mapName === "Schone Tage");
     schoneTage.listeners.mouseenter();

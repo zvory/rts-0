@@ -88,6 +88,41 @@ fn tank_coax_fires_in_arc_with_small_arms_damage_and_weapon_event() {
 }
 
 #[test]
+fn clear_obstacle_area_makes_coax_prioritize_traps_over_infantry() {
+    let map = open_map(16);
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+        .expect("tank should spawn");
+    let worker = entities
+        .spawn_unit(2, EntityKind::Worker, 180.0, 100.0)
+        .expect("worker should spawn");
+    let trap = entities
+        .spawn_building(2, EntityKind::TankTrap, 220.0, 100.0, true)
+        .expect("Tank Trap should spawn");
+    prepare_coax_tank(&mut entities, tank);
+    if let Some(tank) = entities.get_mut(tank) {
+        tank.set_order(Order::clear_obstacle_area_to(
+            160.0, 100.0, trap, 220.0, 100.0,
+        ));
+    }
+    let worker_hp = entities.get(worker).expect("worker should exist").hp;
+    let trap_hp = entities.get(trap).expect("trap should exist").hp;
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert_eq!(
+        entities.get(worker).expect("worker should exist").hp,
+        worker_hp
+    );
+    assert!(entities.get(trap).expect("trap should exist").hp < trap_hp);
+}
+
+#[test]
 fn moving_breakthrough_halves_tank_coax_cooldown() {
     let map = open_map(16);
     let mut entities = EntityStore::new();

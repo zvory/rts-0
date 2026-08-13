@@ -110,6 +110,27 @@ function orthographic({ x = 0, y = 0, zoom = 1, width = 400, height = 300 } = {}
   );
 }
 
+{
+  const rememberedTrap = {
+    id: 19,
+    owner: 0,
+    kind: KIND.TANK_TRAP,
+    x: 140,
+    y: 120,
+  };
+  const built = buildSelectionScene({
+    entities: [],
+    rememberedEntities: [rememberedTrap],
+    projection: orthographic(),
+    tileSize: 32,
+  });
+  assert(built.proxies.length === 0, "remembered buildings stay outside ordinary selection");
+  assert(
+    built.rememberedProxies.length === 1 && built.rememberedProxies[0].id === rememberedTrap.id,
+    "remembered buildings expose a separate command-targeting proxy",
+  );
+}
+
 function fakePerspective({ groundAtScreen = true } = {}) {
   const viewport = Object.freeze({ widthCssPx: 400, heightCssPx: 300 });
   return Object.freeze({

@@ -93,6 +93,7 @@ fn is_combat_command(command: &Command) -> bool {
     match command {
         Command::Attack { .. }
         | Command::AttackTankTrapCluster { .. }
+        | Command::ClearObstacleArea { .. }
         | Command::AttackMove { .. }
         | Command::Move { .. }
         | Command::SetupAntiTankGuns { .. }

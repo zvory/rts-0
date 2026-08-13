@@ -53,6 +53,9 @@ pub(super) fn entity_order_intent_from_planner(
         planner::OrderIntent::AttackMove(point) => {
             Some(OrderIntent::attack_move_to(point.x, point.y))
         }
+        planner::OrderIntent::ClearObstacleArea { anchor, center } => {
+            Some(OrderIntent::clear_obstacle_area(anchor, center.x, center.y))
+        }
         planner::OrderIntent::HoldPosition => Some(OrderIntent::hold_position()),
         planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
         planner::OrderIntent::AttackCluster(targets) => OrderIntent::attack_cluster(targets),

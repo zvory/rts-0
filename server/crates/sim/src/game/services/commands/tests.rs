@@ -40,7 +40,14 @@ fn apply_with_players(
     pending: Vec<(u32, SimCommand)>,
 ) -> HashMap<u32, Vec<Event>> {
     let mut smokes = SmokeCloudStore::new();
-    apply_with_players_and_smokes(map, entities, players, &mut smokes, normal_pending(pending))
+    apply_with_players_and_smokes(
+        map,
+        entities,
+        players,
+        &mut smokes,
+        None,
+        normal_pending(pending),
+    )
 }
 
 fn apply_with_players_and_smokes(
@@ -48,8 +55,11 @@ fn apply_with_players_and_smokes(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     smokes: &mut SmokeCloudStore,
+    building_memory: Option<&BuildingMemory>,
     pending: Vec<PendingCommand>,
 ) -> HashMap<u32, Vec<Event>> {
+    let empty_memory = BuildingMemory::default();
+    let building_memory = building_memory.unwrap_or(&empty_memory);
     let spatial = SpatialIndex::build(entities, map.width, map.height);
     let occ = Occupancy::build(map, entities);
     let mut pathing = PathingService::new(1024, 32);
@@ -72,6 +82,7 @@ fn apply_with_players_and_smokes(
         &spatial,
         &mut coordinator,
         &fog,
+        building_memory,
         smokes,
         &mut ability_runtime,
         &mut mortar_shells,

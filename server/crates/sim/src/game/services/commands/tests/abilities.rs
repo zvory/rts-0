@@ -398,6 +398,7 @@ fn in_range_smoke_launches_from_furthest_selected_carrier() {
         &mut entities,
         &mut players,
         &mut smokes,
+        None,
         normal_pending(vec![(
             1,
             SimCommand::UseAbility {
@@ -509,6 +510,7 @@ fn in_range_smoke_preserves_active_move_and_future_queue() {
         &mut entities,
         &mut players,
         &mut smokes,
+        None,
         normal_pending(vec![(
             1,
             SimCommand::UseAbility {
@@ -764,6 +766,7 @@ fn smoke_launches_without_resource_cost() {
         &mut entities,
         &mut players,
         &mut smokes,
+        None,
         normal_pending(vec![(
             1,
             SimCommand::UseAbility {

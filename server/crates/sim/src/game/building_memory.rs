@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
 use crate::game::fog::Fog;
@@ -29,6 +29,8 @@ pub(crate) struct BuildingMemoryEntry {
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub(crate) struct BuildingMemory {
     entries: HashMap<(u32, u32), BuildingMemoryEntry>,
+    #[serde(default)]
+    cleared_ticks: HashMap<(u32, u32), u32>,
 }
 
 impl BuildingMemory {
@@ -48,10 +50,10 @@ impl BuildingMemory {
                 if entity.owner != NEUTRAL || !entity.is_building() || entity.hp == 0 {
                     continue;
                 }
-                self.entries.insert(
-                    (player_id, entity.id),
-                    entry_from_entity(entity, map, tick, true),
-                );
+                let key = (player_id, entity.id);
+                self.entries
+                    .insert(key, entry_from_entity(entity, map, tick, true));
+                self.cleared_ticks.remove(&key);
             }
         }
     }
@@ -68,7 +70,7 @@ impl BuildingMemory {
         tick: u32,
     ) {
         for &player_id in player_ids {
-            self.remove_ineligible_or_scouted_destroyed(player_id, entities, fog, teams);
+            self.remove_ineligible_or_scouted_destroyed(player_id, entities, fog, teams, tick);
             for entity in entities.iter() {
                 let map_authored = self
                     .entries
@@ -83,12 +85,23 @@ impl BuildingMemory {
                 {
                     continue;
                 }
-                self.entries.insert(
-                    (player_id, entity.id),
-                    entry_from_entity(entity, map, tick, map_authored),
-                );
+                let key = (player_id, entity.id);
+                self.entries
+                    .insert(key, entry_from_entity(entity, map, tick, map_authored));
+                self.cleared_ticks.remove(&key);
             }
         }
+        self.discard_irrelevant_clears();
+    }
+
+    fn discard_irrelevant_clears(&mut self) {
+        let remembered_buildings = self
+            .entries
+            .keys()
+            .map(|&(_, building_id)| building_id)
+            .collect::<HashSet<_>>();
+        self.cleared_ticks
+            .retain(|&(_, building_id), _| remembered_buildings.contains(&building_id));
     }
 
     fn remove_ineligible_or_scouted_destroyed(
@@ -97,7 +110,9 @@ impl BuildingMemory {
         entities: &EntityStore,
         fog: &Fog,
         teams: &TeamRelations,
+        tick: u32,
     ) {
+        let mut cleared_ids = Vec::new();
         self.entries.retain(|(entry_player, entity_id), entry| {
             if *entry_player != player_id {
                 return true;
@@ -112,13 +127,20 @@ impl BuildingMemory {
                 }
                 return enemy_building_memory_eligible(player_id, entity, teams);
             }
-            !entry.footprint.iter().any(|&(tx, ty)| {
+            let footprint_visible = entry.footprint.iter().any(|&(tx, ty)| {
                 teams
                     .same_team_player_ids(player_id)
                     .into_iter()
                     .any(|team_player| fog.is_visible(team_player, tx, ty))
-            })
+            });
+            if footprint_visible {
+                cleared_ids.push(*entity_id);
+            }
+            !footprint_visible
         });
+        for entity_id in cleared_ids {
+            self.cleared_ticks.insert((player_id, entity_id), tick);
+        }
     }
 
     pub(crate) fn get(&self, player_id: u32, building_id: u32) -> Option<&BuildingMemoryEntry> {
@@ -136,13 +158,29 @@ impl BuildingMemory {
             })
     }
 
+    pub(crate) fn latest_cleared_tick_for_players(
+        &self,
+        player_ids: &[u32],
+        building_id: u32,
+    ) -> Option<u32> {
+        player_ids
+            .iter()
+            .filter_map(|player_id| self.cleared_ticks.get(&(*player_id, building_id)).copied())
+            .max()
+    }
+
     pub(in crate::game) fn from_checkpoint_entries(
         entries: Vec<(u32, u32, BuildingMemoryEntry)>,
+        cleared_ticks: Vec<(u32, u32, u32)>,
     ) -> Self {
         BuildingMemory {
             entries: entries
                 .into_iter()
                 .map(|(player_id, building_id, entry)| ((player_id, building_id), entry))
+                .collect(),
+            cleared_ticks: cleared_ticks
+                .into_iter()
+                .map(|(player_id, building_id, tick)| ((player_id, building_id), tick))
                 .collect(),
         }
     }
@@ -155,6 +193,16 @@ impl BuildingMemory {
             .collect::<Vec<_>>();
         entries.sort_by_key(|(player_id, building_id, _)| (*player_id, *building_id));
         entries
+    }
+
+    pub(in crate::game) fn checkpoint_cleared_ticks(&self) -> Vec<(u32, u32, u32)> {
+        let mut cleared_ticks = self
+            .cleared_ticks
+            .iter()
+            .map(|(&(player_id, building_id), &tick)| (player_id, building_id, tick))
+            .collect::<Vec<_>>();
+        cleared_ticks.sort_unstable();
+        cleared_ticks
     }
 
     #[cfg(test)]
@@ -193,9 +241,9 @@ fn visible_to_team(
 }
 
 fn enemy_building_memory_eligible(player_id: u32, entity: &Entity, teams: &TeamRelations) -> bool {
-    !teams.same_team_or_same_owner(player_id, entity.owner)
-        && entity.owner != NEUTRAL
-        && entity.is_building()
+    entity.is_building()
+        && (entity.is_neutral_obstacle()
+            || (!teams.same_team_or_same_owner(player_id, entity.owner) && entity.owner != NEUTRAL))
 }
 
 fn entry_from_entity(
@@ -318,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn forgets_scouted_tank_trap_scaffold_when_it_becomes_neutral() {
+    fn retains_scouted_tank_trap_when_it_becomes_neutral() {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
         let mut fog = Fog::new(map.width, map.height);
@@ -346,10 +394,11 @@ mod tests {
         assert_eq!(trap.advance_construction(), Some(true));
         refresh(&mut memory, &entities, &mut fog, &map, &smokes, 2);
 
-        assert!(
-            memory.get(1, trap_id).is_none(),
-            "completed neutral Tank Traps must not retain player-owned building memory"
-        );
+        let remembered = memory
+            .get(1, trap_id)
+            .expect("completed neutral Tank Trap should remain remembered");
+        assert_eq!(remembered.owner, NEUTRAL);
+        assert!(!remembered.under_construction);
     }
 
     #[test]
@@ -390,6 +439,12 @@ mod tests {
         assert!(
             memory.get(1, depot).is_none(),
             "scouting the remembered footprint clears destroyed building memory"
+        );
+        assert!(
+            memory
+                .latest_cleared_tick_for_players(&[1], depot)
+                .is_none(),
+            "a clear is irrelevant once no player's positive memory remains"
         );
     }
 

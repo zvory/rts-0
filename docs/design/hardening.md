@@ -161,7 +161,11 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   not raw owner inequality. A malicious client can still send arbitrary entity ids, but allied,
   neutral, dead, hidden, smoke-hidden, stale, or non-targetable ids remain no-ops and do not become
   hostile attack orders or retained combat targets. Strict raw-owner checks are still required for
-  command authority and economy operations.
+  command authority and economy operations. `clearObstacleArea` is the narrow neutral exception:
+  its target id must resolve to a completed neutral Tank Trap in current team visibility or in the
+  issuer's own authoritative remembered-building store. The server derives the center from that
+  record rather than accepting a client coordinate, rejects never-observed ids, and still requires
+  current visibility before any hidden trap becomes a combat target.
 - **Team-safe damage attribution**: direct-fire damage, shot interception, overpenetration, damage
   metadata, worker-retreat triggers, under-attack notices, and kill credit use the authoritative
   team relationship snapshot. Same-team entities are not legal direct-fire or overpenetration

@@ -64,6 +64,18 @@ impl Order {
         Order::AttackMove(MoveOrder::new(x, y))
     }
 
+    pub(in crate::game) fn clear_obstacle_area_to(
+        approach_x: f32,
+        approach_y: f32,
+        anchor: u32,
+        center_x: f32,
+        center_y: f32,
+    ) -> Self {
+        Order::AttackMove(MoveOrder::with_clear_obstacle_area(
+            approach_x, approach_y, anchor, center_x, center_y,
+        ))
+    }
+
     pub fn attack(target: u32) -> Self {
         Order::Attack(AttackOrder::new(target))
     }
@@ -143,6 +155,13 @@ impl Order {
         }
     }
 
+    pub(in crate::game) fn clear_obstacle_area(&self) -> Option<ClearObstacleAreaIntent> {
+        match self {
+            Order::AttackMove(order) => order.clear_obstacle_area,
+            _ => None,
+        }
+    }
+
     pub fn gather_phase(&self) -> Option<GatherPhase> {
         match self {
             Order::Gather(order) => Some(order.execution.phase),
@@ -157,6 +176,7 @@ impl Order {
 pub enum OrderIntent {
     Move(PointIntent),
     AttackMove(PointIntent),
+    ClearObstacleArea(ClearObstacleAreaIntent),
     /// Terminal future stance: clear the active order and stand ground when promoted.
     HoldPosition,
     Attack(AttackIntent),
@@ -180,6 +200,14 @@ impl OrderIntent {
 
     pub fn attack_move_to(x: f32, y: f32) -> Self {
         OrderIntent::AttackMove(PointIntent { x, y })
+    }
+
+    pub(in crate::game) fn clear_obstacle_area(anchor: u32, center_x: f32, center_y: f32) -> Self {
+        OrderIntent::ClearObstacleArea(ClearObstacleAreaIntent {
+            anchor,
+            center_x,
+            center_y,
+        })
     }
 
     pub fn hold_position() -> Self {
@@ -302,6 +330,8 @@ pub struct SelfAbilityIntent {
 pub struct MoveOrder {
     pub intent: PointIntent,
     pub execution: MoveExecution,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clear_obstacle_area: Option<ClearObstacleAreaIntent>,
 }
 
 impl MoveOrder {
@@ -311,8 +341,39 @@ impl MoveOrder {
             execution: MoveExecution {
                 phase: MovePhase::AwaitingPath,
             },
+            clear_obstacle_area: None,
         }
     }
+
+    fn with_clear_obstacle_area(
+        approach_x: f32,
+        approach_y: f32,
+        anchor: u32,
+        center_x: f32,
+        center_y: f32,
+    ) -> Self {
+        MoveOrder {
+            intent: PointIntent {
+                x: approach_x,
+                y: approach_y,
+            },
+            execution: MoveExecution {
+                phase: MovePhase::AwaitingPath,
+            },
+            clear_obstacle_area: Some(ClearObstacleAreaIntent {
+                anchor,
+                center_x,
+                center_y,
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ClearObstacleAreaIntent {
+    pub anchor: u32,
+    pub center_x: f32,
+    pub center_y: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

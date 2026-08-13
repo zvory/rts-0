@@ -48,6 +48,7 @@ pub(crate) fn run(
             entity.kind == EntityKind::Artillery
                 && entity.hp > 0
                 && matches!(entity.order(), Order::AttackMove(_))
+                && entity.order().clear_obstacle_area().is_none()
         })
         .map(|entity| entity.id)
         .collect();

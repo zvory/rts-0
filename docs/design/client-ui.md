@@ -1097,18 +1097,18 @@ history, or handoff. The shared pure `map_authoring/layers.js` vocabulary also d
 `map-author.mjs preview --layers <csv>`, whose SVG preview shows every layer by default and can
 isolate any comma-separated subset.
 
-The doodad palette exposes oak, pine, spruce, alder, and Tank Traps. Tree species are independently
-toggleable visual variants. Place adds one selected doodad; spray continuously adds selected trees or
-chosen-tint wildflowers at 1–256 density, without a per-location tree-density limit. Repeating a
-spray adds more in-bounds doodads until the authored-map cap of 4,096 is reached. Erase continuously
-removes doodads in its brush. All trees share one mechanical tree semantic with a tiny authoritative
-trunk; wildflowers can be placed singly or sprayed with a chosen tint.
+The doodad palette exposes wildflowers and Tank Traps. Place adds one selected doodad; spray
+continuously adds chosen-tint wildflowers at 1–256 density. Repeating a spray adds more in-bounds
+doodads until the authored-map cap of 4,096 is reached. Erase continuously removes doodads in its
+brush, including trees already present in imported maps. Trees cannot be placed as independent
+doodads in the editor; the Forest brush is their only placement surface so newly authored trees
+always carry the compound forest gameplay effects.
 Tank Traps snap to tile centres and materialize at match setup
 as completed owner-0 Tank Trap entities, so they use the live rendering, fog, combat,
 deconstruction, and vehicle-pathing behavior. Authored doodads cannot be picked up or moved; the
 erase brush removes them continuously. Symmetry applies when placing and erasing doodads, while undo/redo
-apply to all authored doodads. Individually placed trees retain only their tiny trunk collision;
-forest-owned trees receive their shared effects from the compact forest span mask. Trees do not change line of sight, cover, or
+apply to all authored doodads. Forest-owned trees receive their shared effects from the compact
+forest span mask. Trees do not change line of sight, cover, or
 combat damage, and wildflowers remain mechanically inert.
 
 `Open in Lab` posts the authored map plus its flat materialized locations to `/api/map-handoffs`.
@@ -2531,9 +2531,14 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
 - Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
-  While Attack targeting is armed over a completed neutral Tank Trap, every visible trap captured
-  by the authoritative four-tile cluster-clear radius receives the red attack-target ring and a
-  dashed red boundary shows the radius before the click.
+  While Attack targeting is armed over a visible or remembered completed neutral Tank Trap, known
+  traps inside the four-tile clear-area preview receive red attack-target rings and a dashed red
+  boundary shows the radius before the click. Clicking emits the contextual `clearObstacleArea`
+  command; it has no separate hotkey and ordinary terrain A-clicks remain `attackMove`. Remembered
+  building proxies are kept outside the ordinary selection scene and are eligible only for this
+  attack-target lookup, so stale silhouettes do not become selectable live entities. The preview is
+  advisory: the server resolves the objective from authoritative current/remembered intel and
+  dynamically prioritizes only traps that become currently actionable.
 - Renderer failures must fail soft: one broken entity or feedback effect should log a throttled
   `[RTS_RENDER]` error, skip that visual path, and let the rest of the frame continue. Broken
   entity art draws a magenta/black checkerboard fallback instead of stopping the match loop; the

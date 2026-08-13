@@ -1237,10 +1237,8 @@ assert(
   assert.equal(MAP_EDITOR_MAX_DOODADS, 4096, "the editor mirrors the authoritative doodad cap");
   assert.deepEqual(
     MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "tree").map((entry) => entry.typeId),
-    [
-      "tree.oak", "tree.pine", "tree.spruce", "tree.alder",
-    ],
-    "the tree palette exposes four visual species sharing one authoritative tree/trunk semantic",
+    [],
+    "the doodad palette does not expose raw trees outside the compound forest brush",
   );
   assert.deepEqual(
     MAP_EDITOR_DOODAD_CATALOG.filter((entry) => entry.kind === "neutral-unit").map((entry) => entry.typeId),

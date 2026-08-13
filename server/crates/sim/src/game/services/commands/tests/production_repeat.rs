@@ -330,6 +330,7 @@ fn repeat_adjustment_accepts_raw_cap_then_rejects_cap_plus_one_whole() {
             &mut entities,
             &mut players,
             &mut smokes,
+            None,
             vec![PendingCommand {
                 player: 1,
                 command: SimCommand::AdjustProductionRepeat {
@@ -358,6 +359,7 @@ fn repeat_adjustment_accepts_raw_cap_then_rejects_cap_plus_one_whole() {
             &mut entities,
             &mut players,
             &mut smokes,
+            None,
             vec![PendingCommand {
                 player: 1,
                 command: SimCommand::AdjustProductionRepeat {

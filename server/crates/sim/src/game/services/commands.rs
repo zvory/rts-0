@@ -2,6 +2,7 @@ use crate::config::{self, support_weapon_teardown_ticks};
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::artillery::ArtilleryShellStore;
+use crate::game::building_memory::BuildingMemory;
 use crate::game::command::SimCommand;
 #[cfg(test)]
 use crate::game::commands::CommandAdmission;
@@ -92,6 +93,7 @@ pub(in crate::game) fn apply_commands(
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
+    building_memory: &BuildingMemory,
     smokes: &mut SmokeCloudStore,
     ability_runtime: &mut AbilityRuntime,
     mortar_shells: &mut MortarShellStore,
@@ -275,6 +277,42 @@ pub(in crate::game) fn apply_commands(
                     mode: issue_mode(queued),
                     order: planner::RequestedOrder::AttackMove {
                         to: planner::Point::new(x, y),
+                    },
+                };
+                apply_planned!(
+                    player,
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
+                );
+            }
+            SimCommand::ClearObstacleArea {
+                units,
+                target,
+                queued,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, command_admission)
+                else {
+                    continue;
+                };
+                let Some((center_x, center_y)) = clear_obstacle_area_center(
+                    entities,
+                    building_memory,
+                    &teams,
+                    fog,
+                    smokes,
+                    player,
+                    target,
+                ) else {
+                    continue;
+                };
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::ClearObstacleArea {
+                        anchor: target,
+                        center: planner::Point::new(center_x, center_y),
                     },
                 };
                 apply_planned!(
@@ -851,8 +889,10 @@ mod planned_actions {
         let output = planner::plan_order(planner_config(max_units_per_command), facts, request);
         let mut move_units = Vec::new();
         let mut attack_move_units = Vec::new();
+        let mut clear_obstacle_area_units = Vec::new();
         let mut move_goal = None;
         let mut attack_move_goal = None;
+        let mut clear_obstacle_area = None;
         for action in output.actions {
             match action {
                 planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
@@ -866,6 +906,12 @@ mod planned_actions {
                         if immediate_unit_can_replace(entities, player, unit) {
                             attack_move_goal = Some((point.x, point.y));
                             attack_move_units.push(unit);
+                        }
+                    }
+                    planner::OrderIntent::ClearObstacleArea { anchor, center } => {
+                        if immediate_unit_can_replace(entities, player, unit) {
+                            clear_obstacle_area = Some((anchor, (center.x, center.y)));
+                            clear_obstacle_area_units.push(unit);
                         }
                     }
                     planner::OrderIntent::HoldPosition => {
@@ -1175,6 +1221,18 @@ mod planned_actions {
             clear_queued_orders(entities, &attack_move_units);
             coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
         }
+        if let Some((anchor, center)) =
+            clear_obstacle_area.filter(|_| !clear_obstacle_area_units.is_empty())
+        {
+            clear_queued_orders(entities, &clear_obstacle_area_units);
+            coordinator.order_group_clear_obstacle_area(
+                entities,
+                player,
+                &clear_obstacle_area_units,
+                anchor,
+                center,
+            );
+        }
         for planner_notice in output.notices {
             match planner_notice {
                 planner::PlannerNotice::QueueFull { .. } => {
@@ -1184,6 +1242,37 @@ mod planned_actions {
         }
     }
 }
+
+fn clear_obstacle_area_center(
+    entities: &EntityStore,
+    building_memory: &BuildingMemory,
+    teams: &TeamRelations,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    player: u32,
+    target: u32,
+) -> Option<(f32, f32)> {
+    if let Some(entity) = entities.get(target) {
+        if !entity.is_neutral_obstacle() || entity.hp == 0 || entity.under_construction() {
+            return None;
+        }
+        let currently_actionable =
+            rules::projection::team_visible_world(player, entity.pos_x, entity.pos_y, fog, teams)
+                && !smokes.point_inside(entity.pos_x, entity.pos_y);
+        if currently_actionable {
+            return Some((entity.pos_x, entity.pos_y));
+        }
+    }
+    building_memory.get(player, target).and_then(|memory| {
+        (memory.owner == 0
+            && memory.kind == EntityKind::TankTrap
+            && !memory.under_construction
+            && memory.x.is_finite()
+            && memory.y.is_finite())
+        .then_some((memory.x, memory.y))
+    })
+}
+
 fn attack_query<'a>(
     map: &'a Map,
     entities: &'a EntityStore,

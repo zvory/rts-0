@@ -132,6 +132,16 @@ fn command_trace_label(command: &Command) -> String {
             target,
             queued
         ),
+        Command::ClearObstacleArea {
+            units,
+            target,
+            queued,
+        } => format!(
+            "clear_obstacle_area units={} target={} queued={}",
+            id_list(units),
+            target,
+            queued
+        ),
         Command::AttackMove {
             units,
             x,

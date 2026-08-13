@@ -647,6 +647,7 @@ impl CorePredictor {
                 self.note_disabled("buildPredictionUnsupported");
             }
             Command::Attack { .. }
+            | Command::ClearObstacleArea { .. }
             | Command::SetupAntiTankGuns { .. }
             | Command::TearDownAntiTankGuns { .. }
             | Command::Charge { .. }
@@ -1122,6 +1123,7 @@ fn command_kind(command: &Command) -> &'static str {
         Command::Move { .. } => "move",
         Command::FormationMove { .. } => "formationMove",
         Command::AttackMove { .. } => "attackMove",
+        Command::ClearObstacleArea { .. } => "clearObstacleArea",
         Command::Attack { .. } => "attack",
         Command::Deconstruct { .. } => "deconstruct",
         Command::SetupAntiTankGuns { .. } => "setupAntiTankGuns",

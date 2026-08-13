@@ -278,6 +278,7 @@ impl Game {
             &mut self.state.players,
             &active_vision_players,
             &self.state.fog,
+            &self.state.building_memory,
             self.derived.pathing_mut(),
             &mut self.state.rng,
             &mut self.state.lingering_sight,

@@ -58,6 +58,25 @@ fn attack_command_round_trips_tank_trap_cluster_mode() {
 }
 
 #[test]
+fn clear_obstacle_area_round_trips_with_optional_queueing() {
+    let command: Command =
+        serde_json::from_str(r#"{"c":"clearObstacleArea","units":[3,4],"target":9,"queued":true}"#)
+            .expect("clear obstacle area should deserialize");
+    assert!(matches!(
+        command,
+        Command::ClearObstacleArea {
+            ref units,
+            target: 9,
+            queued: true,
+        } if units.as_slice() == [3, 4]
+    ));
+    assert_eq!(
+        serde_json::to_string(&command).expect("serialize clear obstacle area"),
+        r#"{"c":"clearObstacleArea","units":[3,4],"target":9,"queued":true}"#
+    );
+}
+
+#[test]
 fn command_messages_require_client_sequence_envelope() {
     let msg: ClientMessage = serde_json::from_str(
         r#"{"t":"command","clientSeq":7,"cmd":{"c":"move","units":[1,2],"x":10.0,"y":20.0}}"#,

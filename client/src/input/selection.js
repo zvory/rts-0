@@ -40,6 +40,15 @@ export function _entityAtScreen(
   return entityForProxy(proxy);
 }
 
+export function _rememberedEntityAtScreen(screen, eligible = () => true) {
+  const proxy = pickSelectionProxy(
+    { ...this.selectionScene, proxies: this.selectionScene?.rememberedProxies || [] },
+    screen,
+    { eligible: (candidate) => eligible(entityForProxy(candidate), candidate) },
+  );
+  return entityForProxy(proxy);
+}
+
 export function _resourceAtScreen(screen) {
   return this._entityAtScreen(screen, false, (entity) => isResource(entity?.kind) && entity.remaining !== 0);
 }

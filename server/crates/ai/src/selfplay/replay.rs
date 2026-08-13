@@ -576,6 +576,7 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
         player.command_count += 1;
         match &entry.command {
             WireCommand::AttackMove { .. }
+            | WireCommand::ClearObstacleArea { .. }
             | WireCommand::Attack { .. }
             | WireCommand::FormationMove {
                 attack_move: true, ..
@@ -746,6 +747,7 @@ fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]>
         rts_sim::game::command::SimCommand::Move { units, .. }
         | rts_sim::game::command::SimCommand::FormationMove { units, .. }
         | rts_sim::game::command::SimCommand::AttackMove { units, .. }
+        | rts_sim::game::command::SimCommand::ClearObstacleArea { units, .. }
         | rts_sim::game::command::SimCommand::Attack { units, .. }
         | rts_sim::game::command::SimCommand::AttackTankTrapCluster { units, .. }
         | rts_sim::game::command::SimCommand::SetupAntiTankGuns { units, .. }
@@ -773,6 +775,7 @@ fn is_attack_command(command: &rts_sim::game::command::SimCommand) -> bool {
     matches!(
         command,
         rts_sim::game::command::SimCommand::AttackMove { .. }
+            | rts_sim::game::command::SimCommand::ClearObstacleArea { .. }
             | rts_sim::game::command::SimCommand::Attack { .. }
             | rts_sim::game::command::SimCommand::AttackTankTrapCluster { .. }
             | rts_sim::game::command::SimCommand::FormationMove {

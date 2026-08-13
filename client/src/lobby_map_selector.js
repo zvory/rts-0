@@ -5,10 +5,12 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
   "1v1 No Terrain": Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/1v1-no-terrain.jpg",
+    archived: true,
   }),
   "1v1": Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/1v1.jpg",
+    archived: true,
   }),
   "3 Player Map": Object.freeze({
     author: "Alex",
@@ -21,6 +23,7 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
   Chokes: Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/chokes.jpg",
+    archived: true,
   }),
   Crossroads: Object.freeze({
     author: "Alex",
@@ -33,10 +36,12 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
   "Lighting Test": Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/lighting-test.jpg",
+    archived: true,
   }),
   "Open Basin": Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/open-basin.jpg",
+    archived: true,
   }),
   "Schone Tage": Object.freeze({
     author: "oti",
@@ -48,7 +53,18 @@ export function lobbyMapPresentation(name) {
   return LOBBY_MAP_PRESENTATION[String(name || "")] || Object.freeze({
     author: "Unknown",
     preview: "",
+    archived: false,
   });
+}
+
+export function orderLobbyMaps(maps) {
+  const available = Array.isArray(maps)
+    ? maps.filter((entry) => String(entry?.name || ""))
+    : [];
+  return [
+    ...available.filter((entry) => !lobbyMapPresentation(entry.name).archived),
+    ...available.filter((entry) => lobbyMapPresentation(entry.name).archived),
+  ];
 }
 
 export class LobbyMapSelector {
@@ -141,7 +157,7 @@ export class LobbyMapSelector {
 
   render({ maps = [], selectedMap = "", visible = false, disabled = false, readOnly = false } = {}) {
     if (!this.root || !this.trigger) return;
-    this.maps = Array.isArray(maps) ? maps.filter((entry) => String(entry?.name || "")) : [];
+    this.maps = orderLobbyMaps(maps);
     this.selectedMap = String(selectedMap || this.maps[0]?.name || "");
     this.disabled = !!disabled;
     this.readOnly = !!readOnly;
@@ -165,10 +181,25 @@ export class LobbyMapSelector {
   _rebuildOptions() {
     this.optionButtons = [];
     const fragment = document.createDocumentFragment();
+    let archivedGroup = null;
     for (const entry of this.maps) {
+      const archived = !!lobbyMapPresentation(entry.name).archived;
+      if (archived && !archivedGroup) {
+        archivedGroup = document.createElement("div");
+        archivedGroup.className = "lobby-map-archive-group";
+        archivedGroup.setAttribute("role", "group");
+        archivedGroup.setAttribute("aria-label", "Archived maps");
+        const heading = document.createElement("div");
+        heading.className = "lobby-map-archive-heading";
+        heading.textContent = "Archived";
+        heading.setAttribute("aria-hidden", "true");
+        archivedGroup.appendChild(heading);
+        fragment.appendChild(archivedGroup);
+      }
       const button = document.createElement("button");
       button.type = "button";
       button.className = "lobby-map-option";
+      button.classList.toggle("is-archived", archived);
       button.textContent = entry.name;
       button.dataset.mapName = entry.name;
       button.setAttribute("role", "option");
@@ -177,7 +208,7 @@ export class LobbyMapSelector {
       button.addEventListener("focus", () => this.preview(entry.name));
       button.addEventListener("click", () => this._select(entry.name));
       this.optionButtons.push(button);
-      fragment.appendChild(button);
+      (archived ? archivedGroup : fragment).appendChild(button);
     }
     this.optionList.replaceChildren(fragment);
   }

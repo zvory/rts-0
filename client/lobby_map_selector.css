@@ -103,6 +103,31 @@
   cursor: pointer;
 }
 
+.lobby-map-archive-group {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.lobby-map-archive-heading {
+  margin: 7px 2px 1px;
+  padding: 8px 6px 3px;
+  border-top: 1px solid rgba(91, 83, 65, 0.72);
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lobby-map-option.is-archived {
+  color: var(--ink-faint);
+}
+
+.lobby-map-option.is-archived.is-selected {
+  color: var(--accent);
+}
+
 .lobby-map-option:hover,
 .lobby-map-option:focus-visible {
   border-color: rgba(91, 83, 65, 0.9);

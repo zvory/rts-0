@@ -44,6 +44,7 @@ use crate::game::trench::TrenchStore;
 use crate::perf::{PathingPassDiagnostics, PathingRequestSample, PathingRequestSource};
 use crate::rules::projection;
 
+mod clear_obstacle_area;
 mod footprint_pathing;
 mod formation;
 #[cfg(test)]

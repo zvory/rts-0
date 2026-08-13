@@ -1,7 +1,6 @@
 import { TERRAIN } from "./protocol.js";
 import {
   MAP_EDITOR_DOODAD_CATALOG,
-  isTreeDoodadType,
   isWildflowerDoodadType,
 } from "./map_editor_doodads.js";
 import {
@@ -39,7 +38,7 @@ export function selectMapEditorCategoryState(panel, category) {
 export function availableMapEditorOperations(panel) {
   if (panel.activeCategory === "elevation") return new Set(["brush", "box", "erase"]);
   if (panel.activeCategory === "objects") {
-    const sprayable = isTreeDoodadType(panel.selectedDoodadType) || isWildflowerDoodadType(panel.selectedDoodadType);
+    const sprayable = isWildflowerDoodadType(panel.selectedDoodadType);
     return new Set(sprayable ? ["place", "spray", "erase"] : ["place", "erase"]);
   }
   if (panel.activeCategory === "zones") {
