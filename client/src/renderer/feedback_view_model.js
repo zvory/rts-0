@@ -139,6 +139,8 @@ function visibleEnemyAntiTankGunThreats(
   const perspectivePlayerId = resolveThreatPerspectivePlayerId({
     players: state?.players,
     playerId: state?.playerId,
+    spectator: !!state?.spectator,
+    playerResources: state?.playerResources,
   });
   if (!Array.isArray(entities) || perspectivePlayerId == null) return EMPTY_ARRAY;
   const liveThreats = entities.filter((entity) =>
@@ -188,7 +190,18 @@ function playerColor(players, owner) {
 function resolveThreatPerspectivePlayerId({
   players = EMPTY_ARRAY,
   playerId = null,
+  spectator = false,
+  playerResources = EMPTY_ARRAY,
 } = {}) {
+  if (spectator) {
+    // Lab spectators retain the threat relationship of the authoritative player
+    // projection. The viewer's connection id is not necessarily a simulated
+    // player id, and the local vision selector can lead or lag the snapshot.
+    const projectedPlayers = arrayOrEmpty(playerResources);
+    if (projectedPlayers.length !== 1) return null;
+    const projectedPlayerId = normalizeOwner(projectedPlayers[0]?.id);
+    return teamIdForPlayer(players, projectedPlayerId) != null ? projectedPlayerId : null;
+  }
   const localPlayerId = normalizeOwner(playerId);
   if (teamIdForPlayer(players, localPlayerId) != null) return localPlayerId;
   return null;

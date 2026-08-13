@@ -173,6 +173,7 @@ assert(
 const labSpectatorView = buildRendererFeedbackView(
   {
     ...state,
+    playerId: 2,
     spectator: true,
     playerResources: [{ id: 1 }],
   },
@@ -184,8 +185,8 @@ const labSpectatorView = buildRendererFeedbackView(
   },
 );
 assert(
-  labSpectatorView.enemyAntiTankGunThreats().length === 1,
-  "Lab operators use the same authoritative player-view threat projection",
+  labSpectatorView.enemyAntiTankGunThreats().map((entity) => entity.id).join(",") === "301",
+  "Lab operators use the authoritative player-view projection rather than their viewer id",
 );
 
 const spectatorFallbackGfx = new RecordingGraphics();
