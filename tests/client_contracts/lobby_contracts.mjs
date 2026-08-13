@@ -127,11 +127,12 @@ import { textWithin } from "./dom_text.mjs";
 // ---------------------------------------------------------------------------
 {
   const mapNames = Object.keys(LOBBY_MAP_PRESENTATION);
-  assert(lobbyMapPresentation("Schone Tage").author === "oti",
-    "Schone Tage credits lowercase oti");
-  assert(mapNames.filter((name) => name !== "Schone Tage")
+  assert(["Doppelganger", "Schone Tage"]
+    .every((name) => lobbyMapPresentation(name).author === "oti"),
+  "oti-authored maps credit lowercase oti");
+  assert(mapNames.filter((name) => !["Doppelganger", "Schone Tage"].includes(name))
     .every((name) => lobbyMapPresentation(name).author === "Alex"),
-  "all other bundled maps credit Alex");
+  "all Alex-authored maps credit Alex");
   assert(mapNames.every((name) => lobbyMapPresentation(name).preview.endsWith(".jpg")),
     "bundled lobby previews use high-DPR JPEG assets");
 }
