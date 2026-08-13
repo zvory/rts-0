@@ -218,9 +218,10 @@ Each descriptor is `{id, order, space, visibilityPolicy, depthPolicy}`. Later wo
 namespaced metadata but cannot rename/reorder layers or weaken visibility policy.
 Within Pixi's fog-gated world, tree canopies and unit body/overlay/effect containers share
 back-to-front world-Y ordering; tree understory and shadows remain below them, while selection, HP,
-and fog remain above. Any received ordinary unit occluded by a tree gets a white outer edge plus an
-85%-opacity owner/team-color silhouette derived from the alpha of its current production rig/frame
-above the canopy. Authoritative `visionOnly`
+and fog remain above. Any received ordinary unit occupying concealment, or overlapping a foreground
+concealment tile with its presentation footprint, gets a white outer edge plus an 85%-opacity
+owner/team-color silhouette derived from the alpha of its current production rig/frame above the
+canopy. Decorative tree overlap alone does not trigger this pass. Authoritative `visionOnly`
 concealment reveals omit that rig from the normal full-color layer, redraw the same current production
 rig into a filtered above-fog outline layer, and keep damaged-unit HP above it. The filter samples
 alpha only and never copies faction-colored pixels; concealment reveals retain the white edge without
