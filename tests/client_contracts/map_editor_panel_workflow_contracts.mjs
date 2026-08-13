@@ -35,12 +35,12 @@ assert.match(elevationSource, /range\.addEventListener\("change", \(\) => select
 {
   const panel = {
     activeCategory: "objects",
-    selectedDoodadType: MAP_EDITOR_DOODAD_TYPES.TREE_OAK,
+    selectedDoodadType: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE,
   };
   assert.deepEqual(
     [...MapEditorPanel.prototype.availableOperations.call(panel)],
     ["place", "spray", "erase"],
-    "tree content admits place, spray, and erase",
+    "wildflower content admits place, spray, and erase",
   );
   panel.selectedDoodadType = MAP_EDITOR_DOODAD_TYPES.TANK_TRAP;
   assert.deepEqual(
@@ -195,7 +195,7 @@ assert.match(elevationSource, /range\.addEventListener\("change", \(\) => select
   const calls = [];
   const panel = {
     activeCategory: "terrain",
-    selectedDoodadType: MAP_EDITOR_DOODAD_TYPES.TREE_OAK,
+    selectedDoodadType: MAP_EDITOR_DOODAD_TYPES.WILDFLOWER_SINGLE,
     lastOperation: { objects: "spray" },
     availableOperations: MapEditorPanel.prototype.availableOperations,
     selectOperation(operation) { calls.push(operation); },
