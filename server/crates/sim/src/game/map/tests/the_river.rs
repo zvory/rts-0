@@ -46,3 +46,21 @@ fn the_river_is_selectable_and_loads_for_a_two_player_match() {
         "The River should not expose a third start location"
     );
 }
+
+#[test]
+fn the_river_terrain_is_rotationally_symmetric() {
+    let map =
+        Map::load("The River", 2, 0x1234_5678).expect("The River should load for symmetry checks");
+
+    for y in 0..map.height as usize {
+        for x in 0..map.width as usize {
+            let rotated_x = map.width as usize - 1 - x;
+            let rotated_y = map.height as usize - 1 - y;
+            assert_eq!(
+                map.terrain[y * map.width as usize + x],
+                map.terrain[rotated_y * map.width as usize + rotated_x],
+                "The River terrain differs at ({x},{y}) and its 180-degree rotation ({rotated_x},{rotated_y})"
+            );
+        }
+    }
+}
