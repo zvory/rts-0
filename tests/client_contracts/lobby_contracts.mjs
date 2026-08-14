@@ -131,7 +131,9 @@ import { textWithin } from "./dom_text.mjs";
   assert(["Doppelganger", "Schone Tage"]
     .every((name) => lobbyMapPresentation(name).author === "oti"),
   "oti-authored maps credit lowercase oti");
-  assert(mapNames.filter((name) => !["Doppelganger", "Schone Tage"].includes(name))
+  assert(lobbyMapPresentation("The River").author === "Jeff",
+    "The River credits Jeff");
+  assert(mapNames.filter((name) => !["Doppelganger", "Schone Tage", "The River"].includes(name))
     .every((name) => lobbyMapPresentation(name).author === "Alex"),
   "all Alex-authored maps credit Alex");
   assert(mapNames.every((name) => lobbyMapPresentation(name).preview.endsWith(".jpg")),
@@ -183,7 +185,7 @@ import { textWithin } from "./dom_text.mjs";
     assertDeepEqual(
       selector.optionButtons.map((button) => button.dataset.mapName),
       ["3 Player Map", "4 Player Map", "Crossroads", "Doppelganger", "Schone Tage",
-        "1v1 No Terrain", "1v1", "Chokes", "Lighting Test", "Open Basin"],
+        "The River", "1v1 No Terrain", "1v1", "Chokes", "Lighting Test", "Open Basin"],
       "custom map selector groups archived maps after active maps",
     );
     const archivedGroup = findFakes(

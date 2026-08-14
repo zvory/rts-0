@@ -594,6 +594,7 @@ mod tests {
     mod open_basin;
     mod overlays;
     mod schone_tage;
+    mod the_river;
     mod terrain_variants;
 
     #[test]

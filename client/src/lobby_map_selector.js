@@ -47,6 +47,10 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
     author: "oti",
     preview: "/assets/map-previews/schone-tage.jpg",
   }),
+  "The River": Object.freeze({
+    author: "Jeff",
+    preview: "/assets/map-previews/the-river.jpg",
+  }),
 });
 
 export function lobbyMapPresentation(name) {
