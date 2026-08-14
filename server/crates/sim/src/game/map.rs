@@ -1,5 +1,4 @@
-//! The tile map: terrain grid, authored map loading, and passability. See
-//! `docs/design/server-sim.md` (`map.rs`).
+//! The tile map: terrain grid, authored map loading, and passability. See `docs/design/server-sim.md` (`map.rs`).
 //!
 //! The live game loads authored maps from the server asset bundle. Map files define terrain,
 //! flat start locations and permanent base sites with per-site Steel/Oil patch counts. The
@@ -595,6 +594,7 @@ mod tests {
     mod overlays;
     mod schone_tage;
     mod terrain_variants;
+    mod the_river;
 
     #[test]
     fn hardcoded_map_loads_for_every_supported_player_count() {
