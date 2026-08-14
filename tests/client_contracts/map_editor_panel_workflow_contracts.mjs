@@ -46,7 +46,6 @@ assert.match(terrainControlsSource, /featurePalette\.insertBefore\(eraseControl,
     terrainContent: "material",
     selectedTerrain: TERRAIN.WATER,
     selectedTerrainLayer: "feature",
-    semanticFeatureEraseMode: false,
     lastOperation: { terrain: "erase" },
     paintShape: "box",
     terrainBrushWidth: 1,
@@ -81,7 +80,6 @@ assert.match(terrainControlsSource, /featurePalette\.insertBefore\(eraseControl,
     activeCategory: "terrain",
     terrainContent: "material",
     selectedTerrainLayer: "feature",
-    semanticFeatureEraseMode: true,
     lastOperation: { terrain: "box" },
     viewport: { tool: { kind: "terrain", terrain: TERRAIN.GRASS, eraseFeature: true } },
   };
@@ -126,8 +124,9 @@ assert.match(terrainControlsSource, /featurePalette\.insertBefore\(eraseControl,
     "ground erase describes the applied grass result instead of the retained material selection");
   panel.selectedTerrainLayer = "feature";
   panel.viewport.tool = { kind: "terrain", terrain: TERRAIN.GRASS, eraseFeature: true, shape: "brush" };
+  panel.lastOperation.terrain = "brush";
   assert.equal(mapEditorContentLabel(panel, (value) => value, (value) => value), "Remove terrain features",
-    "feature erase describes removing semantic terrain instead of repainting ground");
+    "feature erase describes removing semantic terrain while Brush remains the application shape");
   panel.activeCategory = "elevation";
   panel.terrainContent = "elevation";
   panel.selectedElevation = 6;
@@ -208,7 +207,6 @@ assert.match(terrainControlsSource, /featurePalette\.insertBefore\(eraseControl,
     terrainContent: "material",
     selectedTerrain: TERRAIN.ROCK,
     selectedTerrainLayer: "feature",
-    semanticFeatureEraseMode: true,
     paintShape: "brush",
     terrainBrushWidth: 3,
     symmetry: "none",
