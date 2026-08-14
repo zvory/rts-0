@@ -1046,8 +1046,9 @@ as match setup and the production resource-node drawing primitives; editing eith
 updates those stand-ins immediately. The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial or quadrant-mirror symmetry,
 or the selected diagonal.
-Texture Brush and Erase operations share a configurable 1–31-tile brush-width number control; Box fills remain independent of brush width.
-The palette presents separate Cosmetic ground and Semantic features groups. Cosmetic ground is
+Texture Brush operations use a configurable 1–31-tile brush-width number control; Box fills remain independent of brush width.
+Feature Erase is selected as palette content and stays armed while the author switches its Apply shape between Brush and Box.
+The palette presents separate Cosmetic and Features groups. Cosmetic ground is
 mechanically open and may cross protected start/base areas. Roads are passable semantic features;
 stone and water remain rejected in protected footprints. Authored map rows
 encode bare, horizontal-marked, vertical-marked, NW-SE diagonal-marked, and NE-SW diagonal-marked

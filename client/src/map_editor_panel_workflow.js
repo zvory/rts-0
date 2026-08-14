@@ -108,7 +108,10 @@ export function mapEditorContentLabel(panel, overlayEffectName, terrainName) {
   if (panel.activeCategory === "elevation") {
     return `Elevation level ${operation === "erase" ? 0 : panel.selectedElevation}`;
   }
-  if (operation === "erase" && panel.activeCategory === "terrain" && panel.terrainContent !== "forest") {
+  const erasesTerrainFeature = panel.viewport.tool?.kind === "terrain"
+    && panel.viewport.tool.eraseFeature === true;
+  if (panel.activeCategory === "terrain" && panel.terrainContent !== "forest"
+    && (operation === "erase" || erasesTerrainFeature)) {
     return panel.terrainContent === "road" || panel.selectedTerrainLayer === "feature"
       ? "Remove terrain features"
       : "Ground to grass";
