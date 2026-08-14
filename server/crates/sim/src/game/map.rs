@@ -399,7 +399,7 @@ impl Map {
         terrain_rules::slow_movement_tile_multiplier(active)
     }
 
-    /// Movement multiplier for the local grade up to one tile ahead in the travel direction.
+    /// Movement multiplier for local elevation direction up to one tile ahead in travel.
     #[inline]
     pub(super) fn elevation_movement_multiplier_at(
         &self,

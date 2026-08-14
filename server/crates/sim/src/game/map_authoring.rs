@@ -449,7 +449,7 @@ mod tests {
         let uphill = analyze_authored_json(&uphill.to_string()).expect("uphill fixture");
         assert!(
             route(&uphill, "infantry").estimated_travel_seconds > flat_seconds,
-            "uphill grade should increase estimated travel time"
+            "uphill movement should increase estimated travel time"
         );
 
         let mut downhill: Value = serde_json::from_str(&flat_json).expect("fixture JSON");
@@ -458,7 +458,7 @@ mod tests {
         let downhill = analyze_authored_json(&downhill.to_string()).expect("downhill fixture");
         assert!(
             route(&downhill, "infantry").estimated_travel_seconds < flat_seconds,
-            "downhill grade should reduce estimated travel time"
+            "downhill movement should reduce estimated travel time"
         );
     }
 }

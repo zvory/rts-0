@@ -352,10 +352,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   center at the start of each authoritative movement tick; roads otherwise behave like grass,
   including passability, construction, cover, concealment, and line of sight.
 - Elevation changes movement directionally. A moving unit compares its current elevation with the
-  elevation up to one tile ahead toward its next local waypoint. Each grade uphill reduces speed by
-  12%, capped at a 70% reduction (0.30x); each grade downhill increases speed by 6%, capped at a
-  35% boost (1.35x). Level movement remains 1.0x. Elevation does not change passability or create
-  cliffs.
+  elevation up to one tile ahead toward its next local waypoint. Any uphill difference uses 0.70x
+  speed and any downhill difference uses 1.30x speed, regardless of the number of elevation levels;
+  level movement remains 1.0x. Elevation does not change passability or create cliffs.
 - `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.75` and
   `DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER = 0.75`. These independent sparse authored overlays sample
   the entity-centre tile. Slow movement multiplies the movement budget after the base-terrain

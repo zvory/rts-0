@@ -532,7 +532,7 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     // ground are passable; rock/water are impassable.
     terrain: number[],
     // Server-authored height levels, row-major and shape-matched to terrain.
-    // Omitted on flat maps (implicit zero). Local grade affects movement speed. Ordinary
+    // Omitted on flat maps (implicit zero). Local elevation direction affects movement speed. Ordinary
     // unit/sight-granting building sight gains one
     // tile per two absolute elevation levels, capped at four; zero-sight buildings stay visionless,
     // and elevation does not block sight or alter combat LOS.
@@ -1486,7 +1486,7 @@ POST /api/map-handoffs/{handoffId}
 exactly match the row-major terrain body. Its optional `elevation` digit rows must have the same
 shape. Varying elevation requires a `sun` record (`azimuthDegrees` 0–359,
 `elevationDegrees` 1–89, `warmth` 0–100); flat maps may also include one to opt into authored
-atmosphere and directional unit shadows. `sun` is presentation-only; local elevation grade affects
+atmosphere and directional unit shadows. `sun` is presentation-only; local elevation direction affects
 authoritative movement speed as defined in `balance.md`. The schema also has flat `startLocations`, `baseSites`, and required
 `doodads`, `forestSpans`, `concealmentTiles`, `noVehicleTiles`, `noBuildingTiles`,
 `noEntrenchmentTiles`, `damageReductionTiles`, and `slowMovementTiles` arrays. A forest span is the compact encoding of the first-class composite

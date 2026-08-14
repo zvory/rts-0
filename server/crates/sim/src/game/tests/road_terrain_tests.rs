@@ -108,7 +108,7 @@ fn authored_slow_tiles_reduce_movement_by_a_quarter_and_stack_with_roads() {
 }
 
 #[test]
-fn local_elevation_grade_slows_uphill_and_boosts_downhill_movement() {
+fn local_elevation_direction_slows_uphill_and_boosts_downhill_movement() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
@@ -149,15 +149,15 @@ fn local_elevation_grade_slows_uphill_and_boosts_downhill_movement() {
         &game,
         uphill,
         uphill_start,
-        base_speed * 0.88,
-        "one grade uphill",
+        base_speed * crate::rules::terrain::UPHILL_MOVEMENT_SPEED_MULTIPLIER,
+        "uphill",
     );
     assert_moved_distance(
         &game,
         downhill,
         downhill_start,
-        base_speed * 1.06,
-        "one grade downhill",
+        base_speed * crate::rules::terrain::DOWNHILL_MOVEMENT_SPEED_MULTIPLIER,
+        "downhill",
     );
 }
 
