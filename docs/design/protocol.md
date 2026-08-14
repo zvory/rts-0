@@ -1223,10 +1223,11 @@ Smoke launch events are team-visible local feedback for the scout-car canister a
 do not receive hidden smoke launch data. The authoritative smoke cloud appears later in `smokes`
 after the reported launch delay. Mortar launch events are always sent to the firing team, with
 shooter id, shell origin, impact point, radius, and delay so clients can draw launch dust, recoil,
-the projectile, and the warning marker until detonation. Mortar launch events remain hidden from
-enemies without current team sight, so they do not receive pre-impact warning markers. Mortar
-impact events are sent to the firing team, to enemy recipients with team-current visibility at the
-impact point, and to enemy players whose entities were damaged by the shell. An enemy damaged victim
+the projectile, and the warning marker until detonation. Mortar launch events are withheld from
+all enemy recipients, even when their team currently sees the mortar, so enemies do not receive
+pre-impact warning markers. Mortar impact events are sent to the firing team and to enemy recipients
+with team-current visibility at the impact point, plus enemy players whose entities were damaged by
+the shell. An enemy damaged victim
 owner receives `from` + `reveal` so the attacking mortar can be shown briefly above fog after
 indirect fire lands. Allied or owned entities can still take mortar splash damage, but that damage
 is unattributed and does not reveal the firing mortar as hostile. Enemy players do not receive
