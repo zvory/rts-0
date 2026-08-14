@@ -219,12 +219,14 @@ impl Map {
         hash = fnv_bytes(hash, &self.width.to_le_bytes());
         hash = fnv_bytes(hash, &self.height.to_le_bytes());
         hash = fnv_bytes(hash, &self.terrain);
-        // Preserve the identity of pre-elevation flat-map checkpoints. Their missing elevation
-        // field is restored as zeroes, and no presentation semantics changed. Authored relief is
-        // always paired with sun conditions and remains identity-bearing.
-        if let Some(sun) = self.sun {
+        // Preserve the identity of pre-elevation flat-map checkpoints: an omitted elevation field
+        // and an all-zero grid have identical gameplay. Any non-zero elevation is identity-bearing
+        // now that absolute level affects sight, including a uniform grid that legally omits sun.
+        if self.sun.is_some() || self.elevation.iter().any(|&level| level != 0) {
             hash = fnv_bytes(hash, b"elevation");
             hash = fnv_bytes(hash, &self.elevation);
+        }
+        if let Some(sun) = self.sun {
             hash = fnv_bytes(hash, b"sun");
             hash = fnv_bytes(hash, &sun.azimuth_degrees.to_le_bytes());
             hash = fnv_bytes(hash, &[sun.elevation_degrees, sun.warmth]);

@@ -81,4 +81,12 @@ fn materialized_hash_preserves_flat_legacy_identity_and_tracks_relief() {
         relief.materialized_hash(),
         "authored relief and lighting must participate in map identity"
     );
+
+    let mut uniform_high_ground = legacy.clone();
+    uniform_high_ground.elevation = vec![8; 4];
+    assert_ne!(
+        legacy.materialized_hash(),
+        uniform_high_ground.materialized_hash(),
+        "uniform nonzero elevation affects sight and must participate in map identity"
+    );
 }
