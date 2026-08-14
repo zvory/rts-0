@@ -79,17 +79,13 @@ function checkpointPayload(scenario) {
   return JSON.parse(scenario.checkpointPayload);
 }
 
-function writeCheckpointPayload(scenario, checkpoint) {
-  scenario.checkpointPayload = JSON.stringify(checkpoint);
-}
-
 async function importScenario(client, requestId, scenario, oldMortarId) {
   const importStartMessageIndex = client.msgs.length;
   const result = await labRequest(
     client,
     requestId,
     { op: "importScenario", scenario },
-    "import deployed mortar scenario",
+    "import mortar scenario",
   );
   const remap = result.outcome?.entityIdMap || [];
   const entry = remap.find((item) => item.oldId === oldMortarId);
@@ -97,7 +93,7 @@ async function importScenario(client, requestId, scenario, oldMortarId) {
   return { mortarId: entry.newId, importStartMessageIndex };
 }
 
-async function prepareDeployedPlayerTwoMortar(client) {
+async function preparePlayerTwoMortar(client) {
   const mortarPosition = tileCenter(30, 30);
   const targetPosition = tileCenter(38, 30);
   const mortarId = await spawnLabEntity(client, 1, {
@@ -108,15 +104,10 @@ async function prepareDeployedPlayerTwoMortar(client) {
 
   const scenario = await exportScenario(client, 3);
   const checkpoint = checkpointPayload(scenario);
-  const mortar = checkpoint.entities.entities.find((entity) => entity.id === mortarId);
-  requireCondition(mortar, "exported scenario includes spawned P2 mortar");
-  const setupFacing = Math.atan2(targetPosition.y - mortar.pos_y, targetPosition.x - mortar.pos_x);
-  mortar.combat.setup = "Deployed";
-  mortar.combat.weapon_facing = setupFacing;
-  mortar.combat.desired_weapon_facing = setupFacing;
-  mortar.combat.emplacement_facing = setupFacing;
-  if (mortar.movement) mortar.movement.facing = setupFacing;
-  writeCheckpointPayload(scenario, checkpoint);
+  requireCondition(
+    checkpoint.entities.entities.some((entity) => entity.id === mortarId),
+    "exported scenario includes spawned P2 mortar",
+  );
 
   const { mortarId: remappedMortarId, importStartMessageIndex } = await importScenario(
     client,
@@ -136,11 +127,11 @@ async function waitForRestoredMortarSnapshot(client, mortarId, startMessageIndex
         entity.id === mortarId &&
         entity.owner === PLAYER_TWO_ID &&
         entity.kind === KIND.MORTAR_TEAM &&
-        entity.setupState === "deployed",
+        entity.setupState == null,
     );
   const existing = client.msgs.slice(startMessageIndex).find(restored);
   if (existing) return existing;
-  return client.waitNext(restored, 5_000, "post-import deployed mortar snapshot");
+  return client.waitNext(restored, 5_000, "post-import setup-free mortar snapshot");
 }
 
 async function waitForMortarLaunchBeforeImpact(client, mortarId, startMessageIndex) {
@@ -194,7 +185,7 @@ async function runLabMortarRegressionAttempt(attempt) {
       "initial lab snapshot",
     );
 
-    const { mortarId, targetPosition } = await prepareDeployedPlayerTwoMortar(operator);
+    const { mortarId, targetPosition } = await preparePlayerTwoMortar(operator);
     const commandStartMessageIndex = operator.msgs.length;
     await labRequest(
       operator,
