@@ -1,4 +1,5 @@
 import { transformRoadCharacter } from "./operations.js";
+import { composeTerrainRows } from "./terrain_layers.js";
 import { forestOwnedDoodadIds, forestTilesFromSpans } from "./forests.js";
 import {
   MAP_AUTHORING_SYMMETRY,
@@ -48,18 +49,19 @@ export function mapSymmetryWarnings(map, symmetry = MAP_AUTHORING_SYMMETRY.NONE)
 }
 
 function terrainMismatchCount(map, dimensions, symmetry) {
+  const terrain = composeTerrainRows(map);
   const transforms = symmetryTransforms(dimensions, symmetry).slice(1);
-  const background = dominantTerrainCharacter(map.terrain);
+  const background = dominantTerrainCharacter(terrain);
   const backgroundIsInvariant = transforms.every((transform) => (
     transformRoadCharacter(background, transform) === background
   ));
   if (symmetry === MAP_AUTHORING_SYMMETRY.THREE_WAY) {
-    return generatedTerrainMismatchCount(map, dimensions, background, backgroundIsInvariant);
+    return generatedTerrainMismatchCount(terrain, dimensions, background, backgroundIsInvariant);
   }
   let mismatches = 0;
   for (let y = 0; y < dimensions.height; y += 1) {
     for (let x = 0; x < dimensions.width; x += 1) {
-      const source = map.terrain[y][x];
+      const source = terrain[y][x];
       // Checking authored features is sufficient: if one symmetric copy is erased to the dominant
       // background, another retained copy still reports the missing partner. This also avoids
       // false positives from the documented square-grid approximation of three-way rotation.
@@ -67,18 +69,18 @@ function terrainMismatchCount(map, dimensions, symmetry) {
       if (transforms.some((transform) => {
         const target = transformPoint({ x, y }, dimensions, transform);
         const expected = transformRoadCharacter(source, transform);
-        return target && map.terrain[target.y]?.[target.x] !== expected;
+        return target && terrain[target.y]?.[target.x] !== expected;
       })) mismatches += 1;
     }
   }
   return mismatches;
 }
 
-function generatedTerrainMismatchCount(map, dimensions, background, backgroundIsInvariant) {
+function generatedTerrainMismatchCount(terrain, dimensions, background, backgroundIsInvariant) {
   const records = [];
   for (let y = 0; y < dimensions.height; y += 1) {
     for (let x = 0; x < dimensions.width; x += 1) {
-      const character = map.terrain[y][x];
+      const character = terrain[y][x];
       if (!backgroundIsInvariant || character !== background) records.push({ x, y, character });
     }
   }
@@ -90,7 +92,7 @@ function generatedTerrainMismatchCount(map, dimensions, background, backgroundIs
         character: transformRoadCharacter(seed.character, transform),
       }),
     });
-    if (orbit.every((expected) => map.terrain[expected.y]?.[expected.x] === expected.character)) {
+    if (orbit.every((expected) => terrain[expected.y]?.[expected.x] === expected.character)) {
       for (const expected of orbit) covered.add(locationKey(expected));
     }
   }
@@ -201,9 +203,13 @@ function generatedDoodadCoverage(records, dimensions) {
 }
 
 function rectangularTerrain(map, dimensions) {
-  return Array.isArray(map.terrain)
-    && map.terrain.length === dimensions.height
-    && map.terrain.every((row) => typeof row === "string" && [...row].length === dimensions.width);
+  try {
+    const terrain = composeTerrainRows(map);
+    return terrain.length === dimensions.height
+      && terrain.every((row) => typeof row === "string" && [...row].length === dimensions.width);
+  } catch {
+    return false;
+  }
 }
 
 function boundedRecord(record, dimensions) {

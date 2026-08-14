@@ -251,8 +251,10 @@ function normalizedWorldDimensions(value) {
 
 function draftWorldDimensions(draft) {
   const widthTiles = Math.trunc(Number(draft?.width))
+    || (typeof draft?.ground?.[0] === "string" ? [...draft.ground[0]].length : 0)
     || (typeof draft?.terrain?.[0] === "string" ? [...draft.terrain[0]].length : 0);
   const heightTiles = Math.trunc(Number(draft?.height))
+    || (Array.isArray(draft?.ground) ? draft.ground.length : 0)
     || (Array.isArray(draft?.terrain) ? draft.terrain.length : 0);
   return normalizedWorldDimensions({ width: widthTiles * 32, height: heightTiles * 32 });
 }

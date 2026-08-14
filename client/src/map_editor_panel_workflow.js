@@ -81,7 +81,7 @@ export function activeMapEditorOperation(panel) {
       return tool.shape === "box" ? "box" : "brush";
     }
     if (tool?.kind === "terrain") {
-      if (tool.terrain === TERRAIN.GRASS && panel.lastOperation.terrain === "erase") return "erase";
+      if ((tool.eraseFeature || tool.terrain === TERRAIN.GRASS) && panel.lastOperation.terrain === "erase") return "erase";
       return tool.shape === "box" ? "box" : "brush";
     }
   }
@@ -109,7 +109,9 @@ export function mapEditorContentLabel(panel, overlayEffectName, terrainName) {
     return `Elevation level ${operation === "erase" ? 0 : panel.selectedElevation}`;
   }
   if (operation === "erase" && panel.activeCategory === "terrain" && panel.terrainContent !== "forest") {
-    return "Terrain to grass";
+    return panel.terrainContent === "road" || panel.selectedTerrainLayer === "feature"
+      ? "Remove terrain features"
+      : "Ground to grass";
   }
   if (panel.activeCategory === "objects") {
     return MAP_EDITOR_DOODAD_CATALOG.find(({ typeId }) => typeId === panel.selectedDoodadType)?.label || "Object";

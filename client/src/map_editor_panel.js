@@ -8,6 +8,7 @@ import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import { createMapEditorPreviewButton } from "./map_editor_preview_button.js";
+import { MAP_EDITOR_FEATURE_PALETTE, MAP_EDITOR_GROUND_PALETTE } from "./map_editor_terrain_palette.js";
 import { createMapEditorSunSettings } from "./map_editor_sun_controls.js";
 import {
   MAP_EDITOR_CATEGORIES,
@@ -83,6 +84,7 @@ export class MapEditorPanel {
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
+    this.selectedTerrainLayer = "feature";
     this.selectedElevation = 1;
     this.paintShape = "brush";
     this.terrainBrushWidth = 1;
@@ -347,16 +349,25 @@ export class MapEditorPanel {
       return true;
     }
     this.lastOperation.terrain = operation;
-    if (this.terrainContent === "road" && operation === "path") {
-      this.armRoad();
-      this.setStatus(this.operationHelp(operation));
+    if (this.terrainContent === "road") {
+      if (operation === "path") {
+        this.armRoad();
+        this.setStatus(this.operationHelp(operation));
+      } else {
+        this.armTerrain(TERRAIN.GRASS, { layer: "feature", eraseFeature: true });
+        this.setStatus("Erase roads to reveal open ground underneath.");
+      }
     } else if (this.terrainContent === "forest") {
       this.armForest(operation === "erase" ? "erase" : "paint");
     } else if (this.terrainContent === "elevation") {
       selectMapEditorElevationOperation(this, operation);
     } else {
       this.paintShape = operation === "box" ? "box" : "brush";
-      this.armTerrain(operation === "erase" ? TERRAIN.GRASS : this.selectedTerrain);
+      const eraseFeature = operation === "erase" && this.selectedTerrainLayer === "feature";
+      this.armTerrain(operation === "erase" ? TERRAIN.GRASS : this.selectedTerrain, {
+        layer: this.selectedTerrainLayer,
+        eraseFeature,
+      });
       this.setStatus(this.operationHelp(operation));
     }
     return true;
@@ -595,48 +606,52 @@ export class MapEditorPanel {
     const width = createMapEditorBrushWidthInput(this.terrainBrushWidth, (value) => {
       this.terrainBrushWidth = value;
       if (this.viewport.tool?.kind === "terrain" && this.viewport.tool.shape === "brush") {
-        this.armTerrain(this.viewport.tool.terrain);
+        this.armTerrain(this.viewport.tool.terrain, {
+          layer: this.viewport.tool.terrainLayer,
+          eraseFeature: this.viewport.tool.eraseFeature,
+        });
       }
     }, "Terrain brush width in tiles");
-    const palette = document.createElement("div");
-    palette.className = "map-editor-palette";
-    for (const [code, label] of [
-      [TERRAIN.GRASS, "Grass"],
-      [TERRAIN.GRAVEL_A, "Gravel A — Slate"],
-      [TERRAIN.GRAVEL_B, "Gravel B — Limestone"],
-      [TERRAIN.GRAVEL_C, "Gravel C — Chalk"],
-      [TERRAIN.DIRT_A, "Dirt A — Loam"],
-      [TERRAIN.DIRT_B, "Dirt B — Red Clay"],
-      [TERRAIN.DIRT_C, "Dirt C — Dry Ochre"],
-      [TERRAIN.MUD_A, "Mud A — Churned"],
-      [TERRAIN.MUD_B, "Mud B — Waterlogged"],
-      [TERRAIN.MUD_C, "Mud C — Clay"],
-      [TERRAIN.FROSTED_GROUND, "Frosted Ground"],
-      [TERRAIN.ROCK, "Stone"],
-      [TERRAIN.WATER, "Water"],
-      [TERRAIN.ROAD_BARE, "Road — bare"],
-      [TERRAIN.ROAD_HORIZONTAL, "Road — horizontal"],
-      [TERRAIN.ROAD_VERTICAL, "Road — vertical"],
-      [TERRAIN.ROAD_DIAGONAL_NW_SE, "Road — diagonal ↘"],
-      [TERRAIN.ROAD_DIAGONAL_NE_SW, "Road — diagonal ↙"],
+    const groundPalette = document.createElement("div");
+    groundPalette.className = "map-editor-palette";
+    const featurePalette = document.createElement("div");
+    featurePalette.className = "map-editor-palette";
+    for (const [layer, palette, entries] of [
+      ["ground", groundPalette, MAP_EDITOR_GROUND_PALETTE],
+      ["feature", featurePalette, MAP_EDITOR_FEATURE_PALETTE],
     ]) {
-      const control = button(label, () => {
-        this.terrainContent = "material";
-        this.selectedTerrain = code;
-        if (!["brush", "box", "erase"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
-        this.selectOperation(this.lastOperation.terrain);
-      }, { active: this.terrainContent === "material" && this.selectedTerrain === code });
-      control.dataset.terrain = terrainName(code);
-      control.classList.add("map-editor-terrain-button");
-      const preview = this.viewport.createTerrainPreview?.(code);
-      if (preview) {
-        preview.className = "map-editor-terrain-icon";
-        preview.setAttribute("aria-hidden", "true");
-        control.prepend(preview);
+      for (const [code, label] of entries) {
+        const control = button(label, () => {
+          this.terrainContent = "material";
+          this.selectedTerrain = code;
+          this.selectedTerrainLayer = layer;
+          if (!["brush", "box", "erase"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
+          this.selectOperation(this.lastOperation.terrain);
+        }, {
+          active: this.terrainContent === "material"
+            && this.selectedTerrain === code
+            && this.selectedTerrainLayer === layer,
+        });
+        control.dataset.terrain = terrainName(code);
+        control.dataset.terrainLayer = layer;
+        control.classList.add("map-editor-terrain-button");
+        const preview = this.viewport.createTerrainPreview?.(code);
+        if (preview) {
+          preview.className = "map-editor-terrain-icon";
+          preview.setAttribute("aria-hidden", "true");
+          control.prepend(preview);
+        }
+        palette.appendChild(control);
       }
-      palette.appendChild(control);
     }
-    section.append(field("Brush width (tiles)", width), palette, this.renderRoadTool());
+    section.append(
+      field("Brush width (tiles)", width),
+      field("Cosmetic ground", groundPalette),
+      readout("Ground changes appearance only and never replaces terrain features."),
+      field("Semantic features", featurePalette),
+      readout("Stone, water, and roads keep their inherent pathing and movement effects."),
+      this.renderRoadTool(),
+    );
     return section;
   }
   renderRoadTool() {
@@ -922,14 +937,17 @@ export class MapEditorPanel {
     this.setStatus(changed ? "Base resource counts updated." : "Base resource count unchanged.");
   }
 
-  armTerrain(terrain = this.selectedTerrain) {
-    this.viewport.armTool({
+  armTerrain(terrain = this.selectedTerrain, { layer = this.selectedTerrainLayer, eraseFeature = false } = {}) {
+    const tool = {
       kind: "terrain",
       terrain,
       shape: this.paintShape,
       width: this.terrainBrushWidth,
       symmetry: this.symmetry,
-    });
+    };
+    if (layer) tool.terrainLayer = layer;
+    if (eraseFeature) tool.eraseFeature = true;
+    this.viewport.armTool(tool);
   }
 
   armRoad() {

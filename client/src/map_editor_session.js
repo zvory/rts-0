@@ -7,6 +7,12 @@ import {
   removeMapEditorDoodads,
 } from "./map_editor_doodads.js";
 import { applyMapOperation, transformRoadCharacter } from "./map_authoring/operations.js";
+import {
+  composeTerrainRows,
+  splitTerrainRows,
+  terrainCharacterAt,
+  validateTerrainLayers,
+} from "./map_authoring/terrain_layers.js";
 import { rectTiles } from "./map_authoring/geometry.js";
 import {
   editForestSpans,
@@ -329,7 +335,7 @@ export class MapEditorSession {
     return true;
   }
 
-  paintTerrainTiles(tiles, terrainCode) {
+  paintTerrainTiles(tiles, terrainCode, { eraseFeature = false } = {}) {
     if (!this.draft || !this.terrainStroke || !Array.isArray(tiles)) return [];
     const source = tiles.map((tile) => ({
       ...tile,
@@ -339,6 +345,7 @@ export class MapEditorSession {
       type: "paintTiles",
       tiles: source,
       expandSymmetry: false,
+      eraseFeature,
     }, {
       protectedTerrain: ({ x, y }) => protectedTerrainTile(this.draft, x, y),
     });
@@ -592,7 +599,7 @@ export class MapEditorSession {
       name: draft.name,
       width: draft.width,
       height: draft.height,
-      terrain: draft.terrain.flatMap((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch])),
+      terrain: composeTerrainRows(draft).flatMap((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch])),
       elevation: draft.elevation?.length
         ? draft.elevation.flatMap((row) => [...row].map(Number))
         : new Array(draft.width * draft.height).fill(0),
@@ -613,6 +620,9 @@ export class MapEditorSession {
     if (!this.draft) throw new Error("Map is not initialized.");
     const draft = clone(this.draft);
     normalizeDraft(draft);
+    draft.terrain = composeTerrainRows(draft);
+    delete draft.ground;
+    delete draft.features;
     // Keep legacy flat authored maps byte-shape compatible. Elevation stays optional, while a sun
     // record independently opts any map into directional lighting and atmosphere.
     if (!draft.elevation.length) delete draft.elevation;
@@ -763,33 +773,40 @@ export function removeDraftLocation(draft, { kind = "base", locationIndex = 0 } 
 
 export function paintDraftRect(draft, rect, terrainCode) {
   const ch = TERRAIN_TO_CHAR[terrainCode];
-  if (!ch || !Array.isArray(draft?.terrain) || !draft.terrain.length) return;
+  if (!ch || (!Array.isArray(draft?.terrain) && !Array.isArray(draft?.ground))) return;
   const { width, height } = draftDimensions(draft);
   const x0 = clampTile(Math.min(rect.x0, rect.x1), width);
   const x1 = clampTile(Math.max(rect.x0, rect.x1), width);
   const y0 = clampTile(Math.min(rect.y0, rect.y1), height);
   const y1 = clampTile(Math.max(rect.y0, rect.y1), height);
+  const tiles = [];
   for (let y = y0; y <= y1; y++) {
-    const chars = [...draft.terrain[y]];
-    for (let x = x0; x <= x1; x++) chars[x] = ch;
-    draft.terrain[y] = chars.join("");
+    for (let x = x0; x <= x1; x++) tiles.push({ x, y, character: ch });
   }
+  applyMapOperation(draft, { type: "paintTiles", tiles, expandSymmetry: false });
 }
 
 export function protectDraftBaseTerrain(draft) {
-  if (!Array.isArray(draft?.terrain)) return;
+  if (!Array.isArray(draft?.terrain) && !Array.isArray(draft?.features)) return;
   const starts = new Set((draft.startLocations || []).map(locationKey));
+  const blocked = [];
   for (const site of draft.baseSites || []) {
     const radius = starts.has(locationKey(site)) ? MAP_EDITOR_MAIN_CLEARANCE_TILES : MAP_EDITOR_BASE_SITE_CLEARANCE_TILES;
     const { width, height } = draftDimensions(draft);
     for (let y = clampTile(site.y - radius, height); y <= clampTile(site.y + radius, height); y++) {
-      const chars = [...draft.terrain[y]];
       for (let x = clampTile(site.x - radius, width); x <= clampTile(site.x + radius, width); x++) {
-        if (PASSABLE[CHAR_TO_TERRAIN[chars[x]]] !== true) chars[x] = TERRAIN_TO_CHAR[TERRAIN.GRASS];
+        if (PASSABLE[CHAR_TO_TERRAIN[terrainCharacterAt(draft, x, y)]] !== true) {
+          blocked.push({ x, y, character: TERRAIN_TO_CHAR[TERRAIN.GRASS] });
+        }
       }
-      draft.terrain[y] = chars.join("");
     }
   }
+  applyMapOperation(draft, {
+    type: "paintTiles",
+    tiles: blocked,
+    expandSymmetry: false,
+    eraseFeature: true,
+  });
 }
 
 export function authoredMapFromMaterialized({
@@ -836,7 +853,7 @@ export function authoredMapFromMaterialized({
     _design: "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
     width: mapWidth,
     height: mapHeight,
-    terrain: terrainRows,
+    ...splitTerrainRows(terrainRows, mapWidth, mapHeight),
     elevation: elevationRows,
     sun: sun ? { ...sun } : null,
     startLocations,
@@ -894,13 +911,16 @@ function normalizeDraft(draft) {
   }
   const height = positiveInteger(draft.height);
   const width = positiveInteger(draft.width);
-  if (!width || !height || !Array.isArray(draft.terrain) || draft.terrain.length !== height || draft.terrain.some((row) => typeof row !== "string" || [...row].length !== width)) {
-    throw new Error("Map terrain rows must match its width and height.");
+  if (Array.isArray(draft.terrain)) {
+    const layers = splitTerrainRows(draft.terrain, width, height);
+    draft.ground = layers.ground;
+    draft.features = layers.features;
+    delete draft.terrain;
   }
+  validateTerrainLayers(draft, width, height);
   draft.name = String(draft.name || "Map").trim() || "Map";
   draft.description = String(draft.description || "");
   draft._design = String(draft._design || "Flat map locations.");
-  draft.terrain = draft.terrain.map((row) => [...row].map((ch) => CHAR_TO_TERRAIN[ch] === undefined ? "." : ch).join(""));
   if (draft.elevation == null) draft.elevation = [];
   if (!Array.isArray(draft.elevation)
     || (draft.elevation.length !== 0 && (draft.elevation.length !== height
@@ -932,17 +952,20 @@ function resizeDraftCentered(source, width, height) {
   const current = draftDimensions(source);
   const offsetX = Math.floor((width - current.width) / 2);
   const offsetY = Math.floor((height - current.height) / 2);
-  const terrain = Array.from({ length: height }, () => Array(width).fill(TERRAIN_TO_CHAR[TERRAIN.GRASS]));
+  const ground = Array.from({ length: height }, () => Array(width).fill(TERRAIN_TO_CHAR[TERRAIN.GRASS]));
+  const features = Array.from({ length: height }, () => Array(width).fill("."));
   const elevation = source.elevation?.length
     ? Array.from({ length: height }, () => Array(width).fill("0"))
     : null;
   for (let y = 0; y < current.height; y++) {
     const targetY = y + offsetY;
     if (targetY < 0 || targetY >= height) continue;
-    const row = [...source.terrain[y]];
+    const groundRow = [...source.ground[y]];
+    const featureRow = [...source.features[y]];
     for (let x = 0; x < current.width; x++) {
       const targetX = x + offsetX;
-      if (targetX >= 0 && targetX < width) terrain[targetY][targetX] = row[x];
+      if (targetX >= 0 && targetX < width) ground[targetY][targetX] = groundRow[x];
+      if (targetX >= 0 && targetX < width) features[targetY][targetX] = featureRow[x];
       if (elevation && targetX >= 0 && targetX < width) elevation[targetY][targetX] = source.elevation[y][x];
     }
   }
@@ -963,7 +986,8 @@ function resizeDraftCentered(source, width, height) {
     ...clone(source),
     width,
     height,
-    terrain: terrain.map((row) => row.join("")),
+    ground: ground.map((row) => row.join("")),
+    features: features.map((row) => row.join("")),
     elevation: elevation ? elevation.map((row) => row.join("")) : [],
     startLocations,
     baseSites,
@@ -1207,9 +1231,10 @@ function boundedMapDimension(value) {
   return Math.max(MAP_EDITOR_MIN_SIZE, Math.min(MAP_EDITOR_MAX_SIZE, Math.trunc(Number(value)) || MAP_EDITOR_DEFAULT_SIZE));
 }
 function inferredDraftDimensions(draft) {
-  const height = positiveInteger(draft?.height) || (Array.isArray(draft?.terrain) ? draft.terrain.length : 0);
-  const inferredWidth = Array.isArray(draft?.terrain) && typeof draft.terrain[0] === "string"
-    ? [...draft.terrain[0]].length
+  const rows = Array.isArray(draft?.terrain) ? draft.terrain : draft?.ground;
+  const height = positiveInteger(draft?.height) || (Array.isArray(rows) ? rows.length : 0);
+  const inferredWidth = Array.isArray(rows) && typeof rows[0] === "string"
+    ? [...rows[0]].length
     : 0;
   return {
     width: positiveInteger(draft?.width) || inferredWidth,

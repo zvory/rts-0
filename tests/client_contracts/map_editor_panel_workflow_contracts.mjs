@@ -62,10 +62,15 @@ assert.match(elevationSource, /range\.addEventListener\("change", \(\) => select
   panel.activeCategory = "terrain";
   panel.terrainContent = "material";
   panel.selectedTerrain = TERRAIN.WATER;
+  panel.selectedTerrainLayer = "ground";
   panel.viewport.tool = { kind: "terrain", terrain: TERRAIN.GRASS, shape: "brush" };
   panel.lastOperation = { terrain: "erase" };
-  assert.equal(mapEditorContentLabel(panel, (value) => value, (value) => value), "Terrain to grass",
-    "terrain erase describes the applied grass result instead of the retained material selection");
+  assert.equal(mapEditorContentLabel(panel, (value) => value, (value) => value), "Ground to grass",
+    "ground erase describes the applied grass result instead of the retained material selection");
+  panel.selectedTerrainLayer = "feature";
+  panel.viewport.tool = { kind: "terrain", terrain: TERRAIN.GRASS, eraseFeature: true, shape: "brush" };
+  assert.equal(mapEditorContentLabel(panel, (value) => value, (value) => value), "Remove terrain features",
+    "feature erase describes removing semantic terrain instead of repainting ground");
   panel.activeCategory = "elevation";
   panel.terrainContent = "elevation";
   panel.selectedElevation = 6;

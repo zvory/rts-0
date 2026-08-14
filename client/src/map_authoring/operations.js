@@ -5,6 +5,7 @@ import {
   boundedAuthoredPatchCount,
 } from "./limits.js";
 import { expandSymmetricPoints, MAP_AUTHORING_SYMMETRY, normalizeDimensions } from "./symmetry.js";
+import { setTerrainCharacter, terrainCharacterAt } from "./terrain_layers.js";
 
 export const AUTHORING_TERRAIN = Object.freeze({
   grass: ".",
@@ -41,12 +42,15 @@ export function applyMapOperation(draft, operation, {
   defaultOilPatches = 3,
 } = {}) {
   const dimensions = normalizeDimensions(draft);
-  if (!dimensions || !Array.isArray(draft?.terrain)) throw new Error("Map draft needs valid dimensions and terrain rows");
+  if (!dimensions || (!Array.isArray(draft?.terrain)
+    && (!Array.isArray(draft?.ground) || !Array.isArray(draft?.features)))) {
+    throw new Error("Map draft needs valid dimensions and terrain layers");
+  }
   const type = String(operation?.type || "");
   const symmetry = operation.symmetry ?? defaultSymmetry;
   if (type === "fill") {
     const character = terrainCharacter(operation.material ?? operation.character);
-    return paintTerrain(draft, allTiles(dimensions, character), () => false);
+    return paintTerrain(draft, allTiles(dimensions, character), () => false, operation);
   }
   if (["rect", "blob", "stroke"].includes(type)) {
     const character = terrainCharacter(operation.material ?? operation.character);
@@ -55,7 +59,7 @@ export function applyMapOperation(draft, operation, {
       : type === "blob"
         ? blobTiles(dimensions, operation)
         : pathTiles(dimensions, operation).tiles;
-    return paintTerrain(draft, expandTerrain(dimensions, source, character, symmetry), protectedTerrain);
+    return paintTerrain(draft, expandTerrain(dimensions, source, character, symmetry), protectedTerrain, operation);
   }
   if (type === "road") {
     const { points, tiles, radius } = pathTiles(dimensions, { ...operation, roughness: operation.roughness ?? 0 });
@@ -66,7 +70,7 @@ export function applyMapOperation(draft, operation, {
     });
     return paintTerrain(draft, expandSymmetricPoints(dimensions, decorated, symmetry, {
       decorate: (tile, transform) => ({ ...tile, character: transformRoadCharacter(tile.character, transform) }),
-    }), protectedTerrain);
+    }), protectedTerrain, operation);
   }
   if (type === "paintTiles") {
     const character = operation.character == null ? null : terrainCharacter(operation.character);
@@ -79,7 +83,12 @@ export function applyMapOperation(draft, operation, {
           character: transformRoadCharacter(terrainCharacter(tile.character ?? character), transform),
         }),
       });
-    return paintTerrain(draft, tiles.map((tile) => ({ ...tile, character: terrainCharacter(tile.character ?? character) })), protectedTerrain);
+    return paintTerrain(
+      draft,
+      tiles.map((tile) => ({ ...tile, character: terrainCharacter(tile.character ?? character) })),
+      protectedTerrain,
+      operation,
+    );
   }
   if (type === "overlayTiles") {
     const source = Array.isArray(operation.tiles) ? operation.tiles : [];
@@ -149,28 +158,25 @@ function expandTerrain(dimensions, source, character, symmetry) {
   });
 }
 
-function paintTerrain(draft, tiles, protectedTerrain) {
+function paintTerrain(draft, tiles, protectedTerrain, { eraseFeature = false } = {}) {
   const dimensions = normalizeDimensions(draft);
-  const byRow = new Map();
   const terrainPatch = [];
   const noEntrenchment = new Map((draft.noEntrenchmentTiles || []).map((tile) => [locationKey(tile), tile]));
   for (const candidate of tiles) {
     const point = expandSymmetricPoints(dimensions, [candidate], MAP_AUTHORING_SYMMETRY.NONE)[0];
     const character = terrainCharacter(candidate.character);
     if (!point || (!AUTHORING_PASSABLE_CHARACTERS.has(character) && protectedTerrain(point, draft))) continue;
-    const row = byRow.get(point.y) || [...draft.terrain[point.y]];
     const key = locationKey(point);
-    const previous = row[point.x];
+    const previous = terrainCharacterAt(draft, point.x, point.y);
     const hadNoEntrenchment = noEntrenchment.has(key);
-    if (AUTHORING_ROAD_CHARACTERS.has(character)) noEntrenchment.set(key, { x: point.x, y: point.y });
+    const next = setTerrainCharacter(draft, point.x, point.y, character, { eraseFeature });
+    const composed = next ?? terrainCharacterAt(draft, point.x, point.y);
+    if (AUTHORING_ROAD_CHARACTERS.has(composed)) noEntrenchment.set(key, { x: point.x, y: point.y });
     else if (AUTHORING_ROAD_CHARACTERS.has(previous)) noEntrenchment.delete(key);
     const overlayChanged = hadNoEntrenchment !== noEntrenchment.has(key);
-    if (previous === character && !overlayChanged) continue;
-    row[point.x] = character;
-    byRow.set(point.y, row);
-    terrainPatch.push({ x: point.x, y: point.y, character });
+    if (next == null && !overlayChanged) continue;
+    terrainPatch.push({ x: point.x, y: point.y, character: composed });
   }
-  for (const [y, row] of byRow) draft.terrain[y] = row.join("");
   draft.noEntrenchmentTiles = [...noEntrenchment.values()];
   return { terrainPatch };
 }
@@ -190,7 +196,7 @@ function paintOverlays(draft, tiles, edit) {
     applyOverlayEdit(noVehicle, key, tile, edit.noVehicle);
     applyOverlayEdit(noBuilding, key, tile, edit.noBuilding);
     applyOverlayEdit(noEntrenchment, key, tile, edit.noEntrenchment);
-    if (AUTHORING_ROAD_CHARACTERS.has(draft.terrain[tile.y]?.[tile.x])) {
+    if (AUTHORING_ROAD_CHARACTERS.has(terrainCharacterAt(draft, tile.x, tile.y))) {
       noEntrenchment.set(key, { x: tile.x, y: tile.y });
     }
     applyOverlayEdit(damageReduction, key, tile, edit.damageReduction);

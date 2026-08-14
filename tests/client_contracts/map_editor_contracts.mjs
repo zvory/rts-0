@@ -823,7 +823,7 @@ assert(
   session.beginTerrainStroke();
   for (const tile of roadTiles) {
     assert.deepEqual(
-      session.paintTerrainTiles([tile], TERRAIN.GRASS),
+      session.paintTerrainTiles([tile], TERRAIN.GRASS, { eraseFeature: true }),
       [{ x: tile.x, y: tile.y, code: TERRAIN.GRASS }],
     );
   }
@@ -831,7 +831,7 @@ assert(
   assert.deepEqual(
     session.draft.noEntrenchmentTiles,
     [],
-    "painting open ground over roads removes their automatic no-entrenchment overlay",
+    "erasing roads removes their automatic no-entrenchment overlay",
   );
 }
 

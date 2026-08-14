@@ -864,7 +864,7 @@ try {
       editorUi.layerPanel?.outsideTools && editorUi.layerPanel.columns === 2 &&
       editorUi.layerPanel.height < 210 && editorUi.layerPanel.maxToggleHeight < 32 &&
       editorUi.layerPanel.movePreservedSize &&
-      ["Terrain & bases", "Forest", "Concealment", "No vehicles", "No buildings", "No entrenchment", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
+      ["Ground, features & bases", "Forest", "Concealment", "No vehicles", "No buildings", "No entrenchment", "Damage reduction", "Slowed movement", "Trees", "Gameplay doodads", "Decorative doodads"]
         .every((label) => editorUi.layers.some((layer) => layer.label === label)),
     `MAP EDITOR: compact floating Layers panel exposes eleven independent visibility toggles (${JSON.stringify(editorUi.layerPanel)})`,
   );

@@ -15,8 +15,8 @@ export const MAP_AUTHORING_LAYER = Object.freeze({
 export const MAP_AUTHORING_LAYERS = Object.freeze([
   Object.freeze({
     id: MAP_AUTHORING_LAYER.BASE,
-    label: "Terrain & bases",
-    description: "Terrain, start locations, and base sites",
+    label: "Ground, features & bases",
+    description: "Cosmetic ground, semantic terrain features, start locations, and base sites",
   }),
   Object.freeze({
     id: MAP_AUTHORING_LAYER.FOREST,
