@@ -5617,6 +5617,30 @@ input[type="text"]:focus {
   image-rendering: pixelated;
 }
 
+.map-editor-erase-icon {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+  background: #d9d2c2;
+}
+
+.map-editor-erase-icon::before {
+  content: "";
+  position: absolute;
+  width: 15px;
+  height: 8px;
+  left: 4px;
+  top: 7px;
+  border: 1px solid #443e38;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #d77c7c 0 55%, #f2dfbd 55%);
+  box-shadow: 1px 2px 0 rgba(56, 50, 43, 0.25);
+  transform: rotate(-32deg);
+}
+
 .map-editor-player-picker .map-editor-button::before {
   content: "";
   display: inline-block;
