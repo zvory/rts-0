@@ -138,7 +138,7 @@ export const STATS = Object.freeze({
     rangeTiles: MORTAR_RANGE_TILES, minRangeTiles: MORTAR_MIN_RANGE_TILES,
     cost: { steel: 100, oil: 40 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS,
-    description: "Indirect fire, extremely inaccurate without vision. Upgrade auto cast in Engineering Complex." },
+    description: "Manual indirect fire, extremely inaccurate without vision. Every shell requires a Mortar Fire command." },
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 13.5, sight: 7, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
     cost: { steel: 150, oil: 50 }, supply: 4, buildTicks: TICK_HZ * 20,

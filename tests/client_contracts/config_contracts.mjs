@@ -1045,8 +1045,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     const separateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
     assert(
-      mortarButton?.innerHTML.includes("Indirect fire, extremely inaccurate without vision. Upgrade auto cast in Engineering Complex."),
-      "Mortar Team tooltip should explain indirect fire inaccuracy and Engineering Complex autocast",
+      mortarButton?.innerHTML.includes("Manual indirect fire, extremely inaccurate without vision. Every shell requires a Mortar Fire command."),
+      "Mortar Team tooltip should explain indirect fire inaccuracy and explicit manual fire",
     );
     assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
     assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
