@@ -708,13 +708,24 @@ try {
       .find((control) => control.textContent === "Erase")?.click();
     const eraseFromRail = {
       tileActive: document.querySelector(".map-editor-terrain-button[data-terrain=erase]")?.dataset.active,
+      activeOperation: [...document.querySelectorAll(".map-editor-tool-rail button")]
+        .find((control) => control.getAttribute("aria-pressed") === "true")?.textContent,
       toolTerrain: window.__mapEditor?.viewport?.tool?.terrain,
       eraseFeature: window.__mapEditor?.viewport?.tool?.eraseFeature,
     };
     document.querySelector(".map-editor-terrain-button[data-terrain=erase]")?.click();
     const eraseFromTile = {
       activeOperation: [...document.querySelectorAll(".map-editor-tool-rail button")]
-        .find((control) => control.textContent === "Erase")?.getAttribute("aria-pressed"),
+        .find((control) => control.getAttribute("aria-pressed") === "true")?.textContent,
+      eraseFeature: window.__mapEditor?.viewport?.tool?.eraseFeature,
+    };
+    [...document.querySelectorAll(".map-editor-tool-rail button")]
+      .find((control) => control.textContent === "Box")?.click();
+    const eraseWithBox = {
+      tileActive: document.querySelector(".map-editor-terrain-button[data-terrain=erase]")?.dataset.active,
+      activeOperation: [...document.querySelectorAll(".map-editor-tool-rail button")]
+        .find((control) => control.getAttribute("aria-pressed") === "true")?.textContent,
+      shape: window.__mapEditor?.viewport?.tool?.shape,
       eraseFeature: window.__mapEditor?.viewport?.tool?.eraseFeature,
     };
     document.querySelector(".map-editor-terrain-button[data-terrain=water]")?.click();
@@ -743,6 +754,9 @@ try {
       noInitialStatus,
       eraseFromRail,
       eraseFromTile,
+      eraseWithBox,
+      terrainGroupLabels: [...document.querySelectorAll(".map-editor-tools-window .map-editor-field > span")]
+        .map((label) => label.textContent),
       settingsHidden: optionsWindow?.hidden === true,
       panelsDoNotOverlap: [layersRect, panelRect].every(Boolean) &&
         (layersRect.right <= panelRect.left || panelRect.right <= layersRect.left || layersRect.bottom <= panelRect.top || panelRect.bottom <= layersRect.top),
@@ -822,10 +836,22 @@ try {
   );
   ok(
     editorUi.eraseFromRail.tileActive === "true" &&
+      editorUi.eraseFromRail.activeOperation === "Brush" &&
       editorUi.eraseFromRail.eraseFeature === true &&
-      editorUi.eraseFromTile.activeOperation === "true" &&
-      editorUi.eraseFromTile.eraseFeature === true,
-    `MAP EDITOR: semantic Erase tile and Apply rail share selection and feature-removal behavior (${JSON.stringify({ rail: editorUi.eraseFromRail, tile: editorUi.eraseFromTile })})`,
+      editorUi.eraseFromTile.activeOperation === "Brush" &&
+      editorUi.eraseFromTile.eraseFeature === true &&
+      editorUi.eraseWithBox.tileActive === "true" &&
+      editorUi.eraseWithBox.activeOperation === "Box" &&
+      editorUi.eraseWithBox.shape === "box" &&
+      editorUi.eraseWithBox.eraseFeature === true,
+    `MAP EDITOR: semantic Erase remains armed across Brush and Box application shapes (${JSON.stringify({ rail: editorUi.eraseFromRail, tile: editorUi.eraseFromTile, box: editorUi.eraseWithBox })})`,
+  );
+  ok(
+    editorUi.terrainGroupLabels.includes("Cosmetic") &&
+      editorUi.terrainGroupLabels.includes("Features") &&
+      !editorUi.terrainGroupLabels.includes("Cosmetic ground") &&
+      !editorUi.terrainGroupLabels.includes("Semantic features"),
+    `MAP EDITOR: terrain groups use the concise Cosmetic and Features labels (${editorUi.terrainGroupLabels.join(", ")})`,
   );
   ok(
     editorUi.floatingChrome && editorUi.settingsHidden && editorUi.panelsDoNotOverlap && editorUi.withinViewport && editorUi.belowToolbar && editorUi.noHorizontalOverflow,
@@ -940,6 +966,8 @@ try {
   }));
   await editorPage.evaluate(() => [...document.querySelectorAll(".map-editor-category-tab")]
     .find((button) => button.textContent === "Textures")?.click());
+  await editorPage.evaluate(() => [...document.querySelectorAll(".map-editor-tool-rail button")]
+    .find((button) => button.textContent === "Brush")?.click());
   await editorPage.waitForSelector("input[aria-label='Terrain brush width in tiles']");
   await editorPage.evaluate(() => {
     const input = document.querySelector("input[aria-label='Terrain brush width in tiles']");

@@ -85,6 +85,7 @@ export class MapEditorPanel {
     this.selectedBaseIndex = 0;
     this.selectedTerrain = TERRAIN.ROCK;
     this.selectedTerrainLayer = "feature";
+    this.semanticFeatureEraseMode = false;
     this.selectedElevation = 1;
     this.paintShape = "brush";
     this.terrainBrushWidth = 1;
@@ -324,6 +325,7 @@ export class MapEditorPanel {
     this.terrainContent = "material";
     this.selectedTerrain = code;
     this.selectedTerrainLayer = layer;
+    this.semanticFeatureEraseMode = false;
     if (!["brush", "box"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
     this.selectOperation(this.lastOperation.terrain);
   }
@@ -331,14 +333,19 @@ export class MapEditorPanel {
   selectSemanticFeatureErase() {
     this.terrainContent = "material";
     this.selectedTerrainLayer = "feature";
-    this.selectOperation("erase");
+    this.semanticFeatureEraseMode = true;
+    this.paintShape = this.paintShape === "box" ? "box" : "brush";
+    this.lastOperation.terrain = this.paintShape;
+    this.armTerrain(TERRAIN.GRASS, { layer: "feature", eraseFeature: true });
+    this.setStatus(`${this.paintShape === "box" ? "Drag a box" : "Paint"} to remove terrain features.`);
   }
 
   semanticFeatureEraseSelected() {
     return this.activeCategory === "terrain"
       && this.terrainContent === "material"
       && this.selectedTerrainLayer === "feature"
-      && MapEditorPanel.prototype.activeOperation.call(this) === "erase";
+      && this.semanticFeatureEraseMode === true && this.viewport.tool?.kind === "terrain"
+      && this.viewport.tool.eraseFeature === true;
   }
 
   selectOperation(operation) {
@@ -369,6 +376,8 @@ export class MapEditorPanel {
       this.armLocation(kind, operation === "add" ? null : index, operation === "add");
       return true;
     }
+    const featureEraseSelected = this.terrainContent === "material" && this.selectedTerrainLayer === "feature"
+      && MapEditorPanel.prototype.semanticFeatureEraseSelected.call(this);
     this.lastOperation.terrain = operation;
     if (this.terrainContent === "road") {
       if (operation === "path") {
@@ -383,13 +392,16 @@ export class MapEditorPanel {
     } else if (this.terrainContent === "elevation") {
       selectMapEditorElevationOperation(this, operation);
     } else {
-      this.paintShape = operation === "box" ? "box" : "brush";
-      const eraseFeature = operation === "erase" && this.selectedTerrainLayer === "feature";
-      this.armTerrain(operation === "erase" ? TERRAIN.GRASS : this.selectedTerrain, {
+      if (operation === "box" || operation === "brush") this.paintShape = operation;
+      const eraseFeature = this.selectedTerrainLayer === "feature" && (operation === "erase" || featureEraseSelected);
+      this.semanticFeatureEraseMode = eraseFeature;
+      if (eraseFeature) this.lastOperation.terrain = this.paintShape;
+      this.armTerrain(operation === "erase" || eraseFeature ? TERRAIN.GRASS : this.selectedTerrain, {
         layer: this.selectedTerrainLayer,
         eraseFeature,
       });
-      this.setStatus(this.operationHelp(operation));
+      if (eraseFeature) this.setStatus(`${this.paintShape === "box" ? "Drag a box" : "Paint"} to remove terrain features.`);
+      else this.setStatus(this.operationHelp(operation));
     }
     return true;
   }
@@ -636,9 +648,9 @@ export class MapEditorPanel {
     const { groundPalette, featurePalette } = createMapEditorTerrainPalettes(this, { button, terrainName });
     section.append(
       field("Brush width (tiles)", width),
-      field("Cosmetic ground", groundPalette),
+      field("Cosmetic", groundPalette),
       readout("Ground changes appearance only and never replaces terrain features."),
-      field("Semantic features", featurePalette),
+      field("Features", featurePalette),
       readout("Stone, water, and roads keep their inherent pathing and movement effects."),
       this.renderRoadTool(),
     );
