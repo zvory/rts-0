@@ -376,9 +376,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   5-to-17-tile range band. Mortar Teams never acquire or fire at targets through Idle, Hold Position,
   Attack, or Attack Move; every shell requires an explicit Mortar Fire command. Manual shots always
   land exactly on the clicked point, including in fog.
-  Mortar impacts apply the same damage to friendly and enemy units/buildings; autocast skips
-  deterministic scattered impact points that would hit any same-team unit or building at its current position,
-  while manual fire remains unrestricted.
+  Mortar impacts apply the same damage to friendly and enemy units/buildings, and manual fire
+  remains unrestricted even when the selected impact point would hit same-team units or buildings.
 - anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20` and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 30 degrees total`; packed, setting-up, and tearing-down guns
   cannot fire. A deployed gun's setup cone remains fixed while its body and barrel turn together at

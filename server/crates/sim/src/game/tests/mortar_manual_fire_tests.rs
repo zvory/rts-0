@@ -130,7 +130,7 @@ fn manual_mortar_fire_launches_once() {
     assert_eq!(
         mortar_launch_count(&events, 1, mortar),
         1,
-        "manual mortar fire should consume the weapon cycle so same-tick autocast cannot double launch"
+        "manual mortar fire should consume exactly one weapon cycle"
     );
     assert!(
         game.state
@@ -448,6 +448,6 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
             .copied()
             .zip(expected_targets)
             .all(|(actual, expected)| points_nearly_equal(actual, expected)),
-        "queued manual mortar fire should produce finite manual shots before autocast can take the weapon cycle"
+        "queued manual mortar fire should produce exactly the finite queued shots"
     );
 }
