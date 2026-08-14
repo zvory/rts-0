@@ -128,6 +128,7 @@ src/
   map_authoring/ # Pure browser/Node geometry, symmetry, and serializable map operations shared by the editor and CLI
   map_editor_panel.js # Dedicated editor controls for maps, terrain, start/base locations, JSON files, and Lab launch
   map_editor_panel_workflow.js # Pure editor category/operation availability and current-tool labels
+  map_editor_terrain_palette.js # Cosmetic-ground and semantic-feature palette descriptors
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
   map_editor_elevation_controls.js # elevation palette and tool arming
@@ -1022,12 +1023,20 @@ layout. Editor-directed handoffs preserve that in-progress zero-start state with
 a simulation; Lab-directed handoffs still require a playable start/base layout. Adding symmetric starts
 reuses any base sites already present at the target locations. There is no
 active layout, player slot, or per-player natural assignment. The viewport draws blue start
-markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. Terrain content supports brush
+markers and neutral base markers over the shared Pixi terrain and owns editor-only pan/zoom/paint/site input. The editor draft splits terrain into
+cosmetic `ground` rows and semantic `features` rows. Ground accepts Grass, Gravel, Dirt, Mud, and
+Frosted Ground; features accept Stone, Water, and the five Road variants, with `.` meaning no
+feature. Import splits the legacy authored `terrain` rows, and export, Lab handoff, symmetry checks,
+and rendering recompose them with features above ground. Existing authored maps and the
+authoritative flat terrain contract therefore remain byte-for-byte compatible while cosmetic paint
+can no longer hide a meaningful feature. Terrain content supports brush
 and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial,
 four-way quadrant mirror, or either single-diagonal symmetry. Quadrant mirror reflects a source
 across both centre axes, so adjacent quadrants are single mirrors and the opposite quadrant is
-double-mirrored; Grass remains an ordinary selectable material, while the separate Erase
-operation applies grass internally. Rectangular maps retain axis reflection and
+double-mirrored. Ground Erase applies grass; Feature Erase removes the feature and reveals open
+ground underneath. Until a layered authored-map schema exists, painting a feature canonicalizes
+its hidden ground to Grass and ground painting skips feature tiles, avoiding state that legacy
+export cannot preserve. Rectangular maps retain axis reflection and
 half-turn and quadrant-mirror symmetry, while three-way, radial, and diagonal transforms are
 disabled because they would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
@@ -1038,16 +1047,17 @@ updates those stand-ins immediately. The selected neutral base has a pale map ri
 centre axis, a centre marker for half-turn symmetry, a cross for radial or quadrant-mirror symmetry,
 or the selected diagonal.
 Texture Brush and Erase operations share a configurable 1–31-tile brush-width number control; Box fills remain independent of brush width.
-Grass, Gravel A/B/C, Dirt A/B/C, Mud A/B/C, Frosted Ground, bare road, and the four marked road
-orientations are passable paint materials; all may cross protected start/base areas while rock and
-water remain rejected there. Authored map rows
+The palette presents separate Cosmetic ground and Semantic features groups. Cosmetic ground is
+mechanically open and may cross protected start/base areas. Roads are passable semantic features;
+stone and water remain rejected in protected footprints. Authored map rows
 encode bare, horizontal-marked, vertical-marked, NW-SE diagonal-marked, and NE-SW diagonal-marked
 roads with `=`, `-`, `|`, `\`, and `/`, respectively. The ten visual Open-terrain variants use
 `0` through `9` in protocol-code order: Gravel A/B/C, Dirt A/B/C, Mud A/B/C, then Frosted Ground.
 The dedicated road tool drags a configurable-width road snapped to the eight cardinal/diagonal
 directions, paints bare-road shoulders, and chooses the yellow centre-mark orientation automatically.
-Every road paint also adds the independent No entrenchment overlay to the affected tiles; painting
-non-road terrain back over those tiles removes that automatic overlay.
+Every road paint also adds the independent No entrenchment overlay to the affected tiles; erasing
+or replacing the road feature removes that automatic overlay. Cosmetic ground edits underneath a
+road leave both the road and its overlay intact.
 The same five road tile variants remain in the ordinary terrain palette for brush and box detail work.
 The selected symmetry runs the shared advisory checker against the current draft and renders any
 terrain, start/base, overlay, resource, or doodad mismatch directly below the selector. Three-way
@@ -1089,7 +1099,7 @@ overlay strokes use the same brush/box, symmetry, undo/redo, resize, local JSON 
 Lab handoff paths as terrain. Sparse coordinate pairs remain authoritative.
 
 The editor's compact floating Layers panel independently toggles ten presentation-only authoring
-layers in a two-column grid: Terrain & bases, Forest, Concealment, No vehicles, No buildings, Damage reduction, Slowed
+layers in a two-column grid: Ground, features & bases, Forest, Concealment, No vehicles, No buildings, Damage reduction, Slowed
 movement, Trees, Gameplay doodads, and Decorative doodads. Full labels and descriptions remain available through accessible checkbox names
 and hover tooltips when narrow panel geometry truncates visible text. Tank Traps are gameplay
 doodads; wildflowers are decorative doodads. Visibility never mutates the draft, export, undo

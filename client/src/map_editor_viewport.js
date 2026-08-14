@@ -775,6 +775,7 @@ export class MapEditorViewport {
     const changes = this.session.paintTerrainTiles(
       symmetricTerrainTiles(dimensions, tiles, this.tool.terrain, this.tool?.symmetry),
       this.tool.terrain,
+      { eraseFeature: this.tool?.eraseFeature === true },
     );
     if (changes.length > 0) this.queueTerrainChanges(changes);
   }
