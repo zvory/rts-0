@@ -34,10 +34,10 @@ fn the_river_is_selectable_and_loads_for_a_two_player_match() {
             (93, 39),
         ]
     );
-    assert_eq!(map.doodads.len(), 38);
-    assert_eq!(map.concealment_tiles.len(), 98);
-    assert_eq!(map.no_vehicle_tiles.len(), 98);
-    assert_eq!(map.no_building_tiles.len(), 98);
+    assert_eq!(map.doodads.len(), 66);
+    assert_eq!(map.concealment_tiles.len(), 154);
+    assert_eq!(map.no_vehicle_tiles.len(), 154);
+    assert_eq!(map.no_building_tiles.len(), 154);
     assert!(
         Map::load("The River", 3, 0x1234_5678).is_err(),
         "The River should not expose a third start location"
