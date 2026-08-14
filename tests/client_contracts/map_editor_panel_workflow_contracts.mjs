@@ -31,6 +31,43 @@ assert.match(elevationSource, /range\.addEventListener\("input", \(\) => \{ numb
   "dragging the elevation slider synchronizes its numeric field without replacing the active range input through a panel render");
 assert.match(elevationSource, /range\.addEventListener\("change", \(\) => select\(range\.value\)\)/,
   "releasing the elevation slider applies the synchronized paint level");
+assert.match(panelSource, /button\("Erase", \(\) => this\.selectSemanticFeatureErase\(\)/,
+  "the semantic feature palette exposes a dedicated Erase tile");
+assert.match(panelSource, /eraseIcon\.className = "map-editor-erase-icon"/,
+  "the semantic Erase tile carries a recognizable eraser icon");
+assert.match(panelSource, /featurePalette\.insertBefore\(eraseControl, featurePalette\.children\[2\]/,
+  "Erase stays immediately after Stone and Water instead of falling below the road variants");
+
+{
+  const operations = [];
+  const panel = {
+    terrainContent: "material",
+    selectedTerrain: TERRAIN.WATER,
+    selectedTerrainLayer: "feature",
+    lastOperation: { terrain: "erase" },
+    selectOperation(operation) { operations.push(operation); this.lastOperation.terrain = operation; },
+  };
+  MapEditorPanel.prototype.selectTerrainMaterial.call(panel, TERRAIN.ROCK, "feature");
+  assert.equal(panel.selectedTerrain, TERRAIN.ROCK);
+  assert.deepEqual(operations, ["brush"],
+    "choosing a semantic material exits the Erase tile and resumes painting");
+  MapEditorPanel.prototype.selectSemanticFeatureErase.call(panel);
+  assert.equal(panel.selectedTerrainLayer, "feature");
+  assert.deepEqual(operations, ["brush", "erase"],
+    "the semantic Erase tile arms the same operation as the Apply rail");
+}
+
+{
+  const panel = {
+    activeCategory: "terrain",
+    terrainContent: "material",
+    selectedTerrainLayer: "feature",
+    lastOperation: { terrain: "erase" },
+    viewport: { tool: { kind: "terrain", terrain: TERRAIN.GRASS, eraseFeature: true } },
+  };
+  assert.equal(MapEditorPanel.prototype.semanticFeatureEraseSelected.call(panel), true,
+    "Apply > Erase selects the semantic Erase tile through shared active-operation state");
+}
 
 {
   const panel = {

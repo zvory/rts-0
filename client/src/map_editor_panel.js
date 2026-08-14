@@ -320,6 +320,27 @@ export class MapEditorPanel {
     }
   }
 
+  selectTerrainMaterial(code, layer) {
+    this.terrainContent = "material";
+    this.selectedTerrain = code;
+    this.selectedTerrainLayer = layer;
+    if (!["brush", "box"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
+    this.selectOperation(this.lastOperation.terrain);
+  }
+
+  selectSemanticFeatureErase() {
+    this.terrainContent = "material";
+    this.selectedTerrainLayer = "feature";
+    this.selectOperation("erase");
+  }
+
+  semanticFeatureEraseSelected() {
+    return this.activeCategory === "terrain"
+      && this.terrainContent === "material"
+      && this.selectedTerrainLayer === "feature"
+      && MapEditorPanel.prototype.activeOperation.call(this) === "erase";
+  }
+
   selectOperation(operation) {
     if (!this.availableOperations().has(operation)) return false;
     if (this.activeCategory === "objects") {
@@ -621,16 +642,11 @@ export class MapEditorPanel {
       ["feature", featurePalette, MAP_EDITOR_FEATURE_PALETTE],
     ]) {
       for (const [code, label] of entries) {
-        const control = button(label, () => {
-          this.terrainContent = "material";
-          this.selectedTerrain = code;
-          this.selectedTerrainLayer = layer;
-          if (!["brush", "box", "erase"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
-          this.selectOperation(this.lastOperation.terrain);
-        }, {
+        const control = button(label, () => this.selectTerrainMaterial(code, layer), {
           active: this.terrainContent === "material"
             && this.selectedTerrain === code
-            && this.selectedTerrainLayer === layer,
+            && this.selectedTerrainLayer === layer
+            && !(layer === "feature" && this.semanticFeatureEraseSelected()),
         });
         control.dataset.terrain = terrainName(code);
         control.dataset.terrainLayer = layer;
@@ -644,6 +660,18 @@ export class MapEditorPanel {
         palette.appendChild(control);
       }
     }
+    const eraseControl = button("Erase", () => this.selectSemanticFeatureErase(), {
+      active: this.semanticFeatureEraseSelected(),
+      title: "Remove semantic terrain features to reveal the cosmetic ground underneath.",
+    });
+    eraseControl.dataset.terrain = "erase";
+    eraseControl.dataset.terrainLayer = "feature";
+    eraseControl.classList.add("map-editor-terrain-button");
+    const eraseIcon = document.createElement("span");
+    eraseIcon.className = "map-editor-erase-icon";
+    eraseIcon.setAttribute("aria-hidden", "true");
+    eraseControl.prepend(eraseIcon);
+    featurePalette.insertBefore(eraseControl, featurePalette.children[2] || null);
     section.append(
       field("Brush width (tiles)", width),
       field("Cosmetic ground", groundPalette),
