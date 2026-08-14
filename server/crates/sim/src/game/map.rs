@@ -594,8 +594,8 @@ mod tests {
     mod open_basin;
     mod overlays;
     mod schone_tage;
-    mod the_river;
     mod terrain_variants;
+    mod the_river;
 
     #[test]
     fn hardcoded_map_loads_for_every_supported_player_count() {

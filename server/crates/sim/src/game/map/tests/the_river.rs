@@ -16,7 +16,10 @@ fn the_river_is_selectable_and_loads_for_a_two_player_match() {
     assert_eq!((map.width, map.height), (126, 126));
     assert_eq!(map.terrain.len(), 126 * 126);
     assert_eq!(
-        map.terrain.iter().filter(|&&tile| tile == terrain::WATER).count(),
+        map.terrain
+            .iter()
+            .filter(|&&tile| tile == terrain::WATER)
+            .count(),
         1_492
     );
     map.starts.sort_unstable();
