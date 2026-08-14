@@ -30,7 +30,6 @@ const CLASSIC_DIRECT_BINDINGS = Object.freeze({
   [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SMOKE)]: "KeyD",
   [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SCOUT_PLANE)]: "KeyP",
   [factionCommandId(DEFAULT_FACTION_ID, "train", KIND.ARTILLERY)]: "KeyR",
-  [factionCommandId(DEFAULT_FACTION_ID, "research", UPGRADE.MORTAR_AUTOCAST)]: "KeyO",
 });
 
 const GLOBAL_HOTKEY_CONTEXTS = Object.freeze([Object.freeze({

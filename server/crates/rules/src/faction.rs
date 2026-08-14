@@ -24,7 +24,6 @@ pub enum UpgradeKind {
     ArtilleryUnlock,
     BallisticTables,
     TankUnlock,
-    MortarAutocast,
     SmokePlus,
     ScoutPlaneUnlock,
 }
@@ -38,7 +37,6 @@ impl UpgradeKind {
         Self::ArtilleryUnlock,
         Self::BallisticTables,
         Self::TankUnlock,
-        Self::MortarAutocast,
         Self::SmokePlus,
         Self::ScoutPlaneUnlock,
     ];
@@ -52,7 +50,6 @@ impl UpgradeKind {
             Self::ArtilleryUnlock => "artillery_unlock",
             Self::BallisticTables => "ballistic_tables",
             Self::TankUnlock => "tank_unlock",
-            Self::MortarAutocast => "mortar_autocast",
             Self::SmokePlus => "smoke_plus",
             Self::ScoutPlaneUnlock => "scout_plane_unlock",
         }
@@ -148,7 +145,6 @@ pub const ANTI_TANK_GUN_UNLOCK_UPGRADE: &str = UpgradeKind::AntiTankGunUnlock.st
 pub const ARTILLERY_UNLOCK_UPGRADE: &str = UpgradeKind::ArtilleryUnlock.stable_id();
 pub const BALLISTIC_TABLES_UPGRADE: &str = UpgradeKind::BallisticTables.stable_id();
 pub const TANK_UNLOCK_UPGRADE: &str = UpgradeKind::TankUnlock.stable_id();
-pub const MORTAR_AUTOCAST_UPGRADE: &str = UpgradeKind::MortarAutocast.stable_id();
 pub const SMOKE_PLUS_UPGRADE: &str = UpgradeKind::SmokePlus.stable_id();
 pub const SCOUT_PLANE_UNLOCK_UPGRADE: &str = UpgradeKind::ScoutPlaneUnlock.stable_id();
 
@@ -301,7 +297,7 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 
-const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
+const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::Methamphetamines,
         researched_at: EntityKind::TrainingCentre,
@@ -328,10 +324,6 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::TankUnlock,
-        researched_at: EntityKind::EngineeringComplex,
-    },
-    UpgradeCatalogEntry {
-        kind: UpgradeKind::MortarAutocast,
         researched_at: EntityKind::EngineeringComplex,
     },
     UpgradeCatalogEntry {
@@ -409,7 +401,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         tech_requirement: None,
         upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueWaitUntilReady,
-        autocast: true,
+        autocast: false,
         command_card: true,
         protocol_code: 3,
         order_stage_code: 9,
@@ -906,7 +898,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
-    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, mortar_autocast, smoke_plus, scout_plane_unlock] =
+    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock] =
         DEFAULT_UPGRADES;
     match kind {
         UpgradeKind::Methamphetamines => methamphetamines,
@@ -915,7 +907,6 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::AntiTankGunUnlock => anti_tank_gun_unlock,
         UpgradeKind::BallisticTables => ballistic_tables,
         UpgradeKind::TankUnlock => tank_unlock,
-        UpgradeKind::MortarAutocast => mortar_autocast,
         UpgradeKind::SmokePlus => smoke_plus,
         UpgradeKind::ArtilleryUnlock => artillery_unlock,
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
@@ -980,7 +971,6 @@ mod tests {
         assert!(catalog.allows_research(UpgradeKind::BallisticTables, engineering_complex));
         assert!(catalog.allows_research(UpgradeKind::ArtilleryUnlock, engineering_complex));
         assert!(catalog.allows_research(UpgradeKind::TankUnlock, engineering_complex));
-        assert!(catalog.allows_research(UpgradeKind::MortarAutocast, engineering_complex));
         assert!(catalog.allows_research(UpgradeKind::SmokePlus, engineering_complex));
         assert!(!catalog.allows_research(UpgradeKind::TankUnlock, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));

@@ -287,11 +287,6 @@ pub(crate) fn run_tick(
     });
 
     crate::perf::timed(perf.as_deref_mut(), "combat", || {
-        let mortar_autocast_researched = |owner| {
-            players
-                .iter()
-                .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::MortarAutocast))
-        };
         let methamphetamines_researched = |owner| {
             players
                 .iter()
@@ -301,13 +296,11 @@ pub(crate) fn run_tick(
             map,
             entities,
             &teams,
-            &mortar_autocast_researched,
             &methamphetamines_researched,
             &post_movement.spatial,
             &mut coordinator,
             fog,
             smokes,
-            mortar_shells,
             panzerfaust_shots,
             rng,
             events,

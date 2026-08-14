@@ -76,7 +76,6 @@ fn advanced_unlocks_research_only_at_engineering_complex() {
         (EntityKind::Steelworks, UpgradeKind::AntiTankGunUnlock),
         (EntityKind::Steelworks, UpgradeKind::ArtilleryUnlock),
         (EntityKind::Factory, UpgradeKind::TankUnlock),
-        (EntityKind::Steelworks, UpgradeKind::MortarAutocast),
         (EntityKind::Steelworks, UpgradeKind::SmokePlus),
         (EntityKind::Steelworks, UpgradeKind::ScoutPlaneUnlock),
     ] {

@@ -1,9 +1,7 @@
 use super::super::activation::{
     secondary_weapon_target_passes_activation, SecondaryWeaponActivationConstraints,
 };
-use super::super::target_legality::{
-    auto_target_legality, direct_fire_target_legal, DirectFireLegality,
-};
+use super::super::target_legality::{direct_fire_target_legal, DirectFireLegality};
 use super::*;
 
 fn direct_fire_legal(
@@ -172,56 +170,6 @@ fn direct_fire_legality_rejects_resource_nodes() {
         resource,
         DirectFireLegality::AutoAcquire,
     ));
-}
-
-#[test]
-fn mortar_autocast_rejects_unrevealed_units_on_concealment_tiles() {
-    let mut map = open_map(16);
-    let mut entities = EntityStore::new();
-    let mortar_pos = map.tile_center(2, 8);
-    let target_pos = map.tile_center(8, 8);
-    let spotter_pos = map.tile_center(8, 4);
-    let mortar = entities
-        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
-        .expect("mortar should spawn");
-    entities
-        .spawn_unit(1, EntityKind::ScoutCar, spotter_pos.0, spotter_pos.1)
-        .expect("spotter should spawn");
-    let target = entities
-        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
-        .expect("target should spawn");
-    map.concealment_tiles = vec![(8, 8)];
-
-    let teams = default_team_relations();
-    let fog = visible_fog(&map, &entities);
-    assert!(
-        crate::rules::projection::team_visible_world(1, target_pos.0, target_pos.1, &fog, &teams),
-        "the spotter must expose the ground beneath the concealed target"
-    );
-    let smokes = SmokeCloudStore::new();
-    let los = LineOfSight::with_smoke(&map, &smokes);
-    let blockers = ShotBlockerIndex::build(&map, &entities);
-
-    assert!(
-        auto_target_legality(
-            &map,
-            &entities,
-            &blockers,
-            &teams,
-            &los,
-            &fog,
-            &smokes,
-            mortar,
-            1,
-            mortar_pos.0,
-            mortar_pos.1,
-            1_000.0,
-            1_000.0,
-            entities.get(target).expect("target should exist"),
-        )
-        .is_none(),
-        "indirect autocast must not bypass authoritative concealment concealment"
-    );
 }
 
 #[test]

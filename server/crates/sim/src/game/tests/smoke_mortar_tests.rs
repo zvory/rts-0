@@ -462,146 +462,6 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
 }
 
 #[test]
-fn set_autocast_command_enables_mortar_autocast_from_default_off() {
-    let players = [
-        PlayerInit {
-            id: 1,
-            team_id: 1,
-            faction_id: "kriegsia".to_string(),
-            name: "One".into(),
-            color: "#fff".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 2,
-            team_id: 2,
-            faction_id: "kriegsia".to_string(),
-            name: "Two".into(),
-            color: "#000".into(),
-            is_ai: false,
-        },
-    ];
-    let mut game = empty_flat_game(&players);
-    let mortar_pos = game.state.map.tile_center(8, 8);
-    let mortar = game
-        .state
-        .entities
-        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
-        .expect("mortar should spawn");
-
-    assert_eq!(
-        game.state
-            .entities
-            .get(mortar)
-            .expect("mortar should exist")
-            .autocast_enabled(ability::AbilityKind::MortarFire),
-        Some(false),
-        "mortar autocast should start disabled"
-    );
-    game.state.players[0]
-        .upgrades
-        .insert(upgrade::UpgradeKind::MortarAutocast);
-
-    game.enqueue(
-        1,
-        Command::SetAutocast {
-            ability: ability::AbilityKind::MortarFire,
-            units: vec![mortar],
-            enabled: true,
-        },
-    );
-    for _ in 0..10 {
-        game.tick();
-    }
-
-    assert_eq!(
-        game.state
-            .entities
-            .get(mortar)
-            .expect("mortar should exist")
-            .autocast_enabled(ability::AbilityKind::MortarFire),
-        Some(true),
-        "setAutocast should enable mortar autofire"
-    );
-}
-
-#[test]
-fn visible_autocast_mortar_launch_is_sent_to_enemy() {
-    let players = [
-        PlayerInit {
-            id: 1,
-            team_id: 1,
-            faction_id: "kriegsia".to_string(),
-            name: "One".into(),
-            color: "#fff".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 2,
-            team_id: 2,
-            faction_id: "kriegsia".to_string(),
-            name: "Two".into(),
-            color: "#000".into(),
-            is_ai: false,
-        },
-    ];
-    let mut game = empty_flat_game(&players);
-    let mortar_pos = game.state.map.tile_center(8, 8);
-    let target_pos = game.state.map.tile_center(14, 8);
-    let mortar = game
-        .state
-        .entities
-        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
-        .expect("mortar should spawn");
-    {
-        let mortar_entity = game
-            .state
-            .entities
-            .get_mut(mortar)
-            .expect("mortar should exist");
-        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
-        mortar_entity.set_emplacement_facing(Some(0.0));
-        mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
-    }
-    game.state
-        .entities
-        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
-        .expect("target should spawn");
-    game.state.players[0]
-        .upgrades
-        .insert(upgrade::UpgradeKind::MortarAutocast);
-    systems::recompute_supply(&mut game.state.players, &game.state.entities);
-    game.rebuild_final_spatial();
-    let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
-    game.state
-        .fog
-        .recompute(&ids, &game.state.entities, &game.state.map);
-    assert!(
-        game.state
-            .fog
-            .is_visible_world(2, mortar_pos.0, mortar_pos.1),
-        "test setup requires the enemy to see the autocasting mortar"
-    );
-
-    let events = game.tick();
-    let enemy_events = events
-        .iter()
-        .find(|(player_id, _)| *player_id == 2)
-        .map(|(_, events)| events.as_slice())
-        .unwrap_or(&[]);
-
-    assert!(
-        enemy_events.iter().any(|event| matches!(
-            event,
-            Event::MortarLaunch { from, delay_ticks, .. }
-                if *from == mortar
-                    && *delay_ticks == config::MORTAR_SHELL_DELAY_TICKS
-        )),
-        "visible autocast mortar fire should show enemy launch preview markers: {enemy_events:?}"
-    );
-}
-
-#[test]
 fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
     let players = [
         PlayerInit {
@@ -692,7 +552,7 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
     );
 
     let mut impact_seen = false;
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         let events = game.tick();
         impact_seen |= events.iter().any(|(player_id, events)| {
             *player_id == 1
@@ -834,7 +694,7 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         .expect("target should still exist")
         .set_position(impact_pos.0, impact_pos.1);
 
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         game.tick();
     }
 
@@ -918,7 +778,7 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
         .get_mut(enemy)
         .expect("enemy should still exist")
         .set_position(impact_pos.0, impact_pos.1);
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         game.tick();
     }
 
@@ -1154,7 +1014,7 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
         .get_mut(ally)
         .expect("ally should still exist")
         .set_position(impact_pos.0, impact_pos.1);
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         game.tick();
     }
 
@@ -1232,7 +1092,7 @@ fn manual_mortar_fire_damages_friendly_buildings() {
         },
     );
     game.tick();
-    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         game.tick();
     }
 

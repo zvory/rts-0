@@ -396,10 +396,6 @@ fn print_client_constants(indent: &str) {
         balance::SMOKE_ABILITY_COST_OIL
     );
     println!(
-        "{indent}    \"mortarShellDelayTicks\": {},",
-        balance::MORTAR_SHELL_DELAY_TICKS
-    );
-    println!(
         "{indent}    \"mortarOuterRadiusTiles\": {},",
         json_f32(balance::MORTAR_OUTER_RADIUS_TILES)
     );
@@ -575,15 +571,6 @@ fn print_upgrades(indent: &str) {
         balance::TANK_UNLOCK_COST_STEEL,
         balance::TANK_UNLOCK_COST_OIL,
         balance::TANK_UNLOCK_RESEARCH_TICKS,
-        None,
-        true,
-    );
-    print_upgrade(
-        indent,
-        faction::MORTAR_AUTOCAST_UPGRADE,
-        balance::MORTAR_AUTOCAST_COST_STEEL,
-        balance::MORTAR_AUTOCAST_COST_OIL,
-        balance::MORTAR_AUTOCAST_RESEARCH_TICKS,
         None,
         true,
     );

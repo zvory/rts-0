@@ -168,28 +168,3 @@ fn standing_repeat_does_not_create_unpaid_queue_items() {
     assert_eq!(queue.len(), 1);
     assert!(queue[0].paid);
 }
-
-#[test]
-fn produced_mortars_start_with_autocast_after_research() {
-    let map = flat_map(24);
-    let mut entities = EntityStore::new();
-    spawn_building_training(
-        &map,
-        &mut entities,
-        10,
-        10,
-        EntityKind::Steelworks,
-        EntityKind::MortarTeam,
-    );
-    let mut player = player(1);
-    player.upgrades.insert(UpgradeKind::MortarAutocast);
-    let mut players = vec![player];
-
-    tick_production(&map, &mut entities, &mut players);
-
-    let mortar = entities
-        .iter()
-        .find(|e| e.owner == 1 && e.kind == EntityKind::MortarTeam)
-        .expect("produced mortar should exist");
-    assert_eq!(mortar.autocast_enabled(AbilityKind::MortarFire), Some(true));
-}

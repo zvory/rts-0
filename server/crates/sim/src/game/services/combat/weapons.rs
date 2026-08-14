@@ -285,22 +285,6 @@ pub(super) fn auto_retention_target_inside_field_of_fire(e: &Entity, target_angl
     e.kind != EntityKind::AntiTankGun || anti_tank_gun_target_inside_field_of_fire(e, target_angle)
 }
 
-pub(super) fn mortar_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
-    if e.kind != EntityKind::MortarTeam
-        || !matches!(e.weapon_setup(), WeaponSetup::Deployed)
-        || !target_angle.is_finite()
-    {
-        return false;
-    }
-    if config::MORTAR_FIELD_OF_FIRE_RAD >= std::f32::consts::TAU {
-        return true;
-    }
-    let Some(center) = e.emplacement_facing().filter(|facing| facing.is_finite()) else {
-        return false;
-    };
-    angle_delta(center, target_angle).abs() <= config::MORTAR_FIELD_OF_FIRE_RAD * 0.5
-}
-
 fn anti_tank_gun_field_center(e: &Entity) -> Option<f32> {
     e.emplacement_facing()
         .or_else(|| e.weapon_facing())

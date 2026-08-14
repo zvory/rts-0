@@ -2146,10 +2146,8 @@ the input module enters targeted cursor mode:
   allowed to omit full per-gun artillery cone or blanket previews rather than drawing simplified
   feedback that could disagree with world targeting.
 Selected owned Mortar Teams also draw dotted firing-range circles even when the Fire command is not
-armed. The Mortar Team Fire command-card button shows an autocast swirl while any selected mortar's
-owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that button or pressing
-Alt plus its resolved command-card hotkey sends `setAutocast(mortarFire, enabled=<toggle>)` and
-does not arm manual targeting.
+armed. The Mortar Team Fire command has no context action or autocast state; every shell is issued
+manually through the normal target click.
 
 `client_intent.js` holds `commandTarget` (null or `{ kind, ability }`), ability previews, and a
 small local planned-stage map keyed by unit id. The local map stores only pending move, attack-move,

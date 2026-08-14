@@ -307,50 +307,6 @@ fn concealment_does_not_leak_deployed_anti_tank_guns_through_remembered_intel() 
 }
 
 #[test]
-fn concealment_mortar_autocast_reveals_the_shooter_when_the_shell_launches() {
-    let mut game = empty_flat_game(&human_vs_ai_players());
-    let scout_pos = game.state.map.tile_center(10, 12);
-    let mortar_pos = game.state.map.tile_center(16, 12);
-    game.state.map.concealment_tiles = vec![(16, 12)];
-    game.state.players[1]
-        .upgrades
-        .insert(crate::game::upgrade::UpgradeKind::MortarAutocast);
-    game.state
-        .entities
-        .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
-        .expect("scout car should spawn");
-    let mortar = game
-        .state
-        .entities
-        .spawn_unit(2, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
-        .expect("mortar team should spawn");
-    let mortar_entity = game
-        .state
-        .entities
-        .get_mut(mortar)
-        .expect("mortar team should exist");
-    mortar_entity.set_weapon_setup(crate::game::entity::WeaponSetup::Deployed);
-    mortar_entity.set_emplacement_facing(Some(std::f32::consts::PI));
-    mortar_entity.set_weapon_facing(std::f32::consts::PI);
-    mortar_entity.set_facing(std::f32::consts::PI);
-    mortar_entity.set_autocast_enabled(crate::game::ability::AbilityKind::MortarFire, true);
-    refresh_visibility(&mut game);
-
-    for _ in 0..config::TICK_HZ {
-        game.tick();
-        if game
-            .state
-            .firing_reveals
-            .iter()
-            .any(|source| source.viewer() == 1 && source.entity_id() == mortar)
-        {
-            return;
-        }
-    }
-    panic!("a concealed autocast mortar must reveal itself on launch, before shell impact");
-}
-
-#[test]
 fn scout_car_waits_for_hidden_rifle_fire_and_the_reveal_reaction_delay() {
     let (mut game, scout, rifles) = scout_and_hidden_rifles();
     let rifle_hp_before = game

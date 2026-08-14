@@ -112,18 +112,12 @@ fn points_nearly_equal(a: (f32, f32), b: (f32, f32)) -> bool {
 }
 
 #[test]
-fn manual_mortar_fire_with_autocast_enabled_only_launches_once() {
+fn manual_mortar_fire_launches_once() {
     let (mut game, mortar, target_pos) = manual_fire_fixture();
-    if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
-        mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
-    }
     game.state
         .entities
         .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
         .expect("target should spawn");
-    game.state.players[0]
-        .upgrades
-        .insert(upgrade::UpgradeKind::MortarAutocast);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
     game.state
@@ -411,9 +405,6 @@ fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
 fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
     let (mut game, mortar, target_pos) = manual_fire_fixture();
     let enemy_pos = game.state.map.tile_center(8, 14);
-    if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
-        mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
-    }
     let enemy = game
         .state
         .entities
@@ -424,9 +415,6 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
         .get_mut(enemy)
         .expect("enemy should exist")
         .hold_position();
-    game.state.players[0]
-        .upgrades
-        .insert(upgrade::UpgradeKind::MortarAutocast);
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();
     game.state

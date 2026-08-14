@@ -9,7 +9,6 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
         (EntityKind::MachineGunner, 220.0),
         (EntityKind::ScoutCar, 180.0),
         (EntityKind::AntiTankGun, 220.0),
-        (EntityKind::MortarTeam, 320.0),
         (EntityKind::Tank, 180.0),
     ];
 
@@ -28,14 +27,8 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
             attacker.set_facing(0.0);
             attacker.set_weapon_facing(0.0);
             attacker.set_emplacement_facing(Some(0.0));
-            if matches!(
-                kind,
-                EntityKind::MachineGunner | EntityKind::AntiTankGun | EntityKind::MortarTeam
-            ) {
+            if matches!(kind, EntityKind::MachineGunner | EntityKind::AntiTankGun) {
                 attacker.set_weapon_setup(WeaponSetup::Deployed);
-            }
-            if kind == EntityKind::MortarTeam {
-                attacker.set_autocast_enabled(AbilityKind::MortarFire, true);
             }
             if kind == EntityKind::Tank {
                 attacker.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 999);

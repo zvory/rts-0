@@ -200,7 +200,6 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assert(EVENT_CODE[EVENT.PANZERFAUST_LAUNCH] === 12, "Panzerfaust launch compact event code should be reserved");
   assert(EVENT_CODE[EVENT.PANZERFAUST_IMPACT] === 13, "Panzerfaust impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MISS] === 15, "Miss compact event code should be reserved");
-  assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.BALLISTIC_TABLES] === 7, "Artillery Fire Control should retain compact upgrade code 7");
   assert(UPGRADE_CODE[UPGRADE.ENTRENCHMENT] === 8, "Entrenchment compact upgrade code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.SMOKE_PLUS] === 9, "Smoke Plus compact upgrade code should be reserved");
@@ -344,7 +343,6 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
-      UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
       UPGRADE.SCOUT_PLANE_UNLOCK,
     ],
@@ -379,12 +377,6 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       ENTRENCHMENT_AREA_DAMAGE_REDUCTION === 0.25 &&
       ENTRENCHMENT_TRENCH_RADIUS_TILES === 0.375,
     "Entrenchment constants mirror server",
-  );
-  assert(
-    UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.steel === 150 &&
-      UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.oil === 150 &&
-      UPGRADES[UPGRADE.MORTAR_AUTOCAST].researchTicks === 600,
-    "Mortar Autocast research cost and time mirror server",
   );
   assert(
     UPGRADES[UPGRADE.SMOKE_PLUS].cost.steel === 150 &&
@@ -695,7 +687,6 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       abilities: [{
         ability: ABILITY.MORTAR_FIRE,
         cooldownLeft: 30,
-        autocastEnabled: true,
       }],
     };
     const mortarHud = Object.create(HUD.prototype);
@@ -722,8 +713,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       "selected Mortar Team should render an ability command button",
     );
     const coolingMortarButton = renderedButtons.find((button) => button.innerHTML.includes("Fire"));
-    assert(coolingMortarButton?.dataset.contextAction === "true", "Mortar Fire button exposes its context hotkey action");
-    assert(coolingMortarButton?.dataset.contextHotkeyModifiers === "alt", "only Alt invokes Mortar Fire's autocast hotkey action");
+    assert(coolingMortarButton?.dataset.contextAction == null, "Mortar Fire has no autocast context action");
     assert(!coolingMortarButton?.disabled, "cooling-down Mortar Fire remains armable for queued manual fire");
     const coolingMortarCard = buildCommandCardDescriptors({
       playerId,
@@ -738,77 +728,12 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       [selectedMortar.id],
       "cooling-down Mortar Fire descriptor targets the waitable mortar carrier",
     );
-    globalThis.document.getElementById = (id) => {
-      assert(id === "command-card", "Mortar autocast hotkey should query the command card");
-      return {
-        querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey-code]", "Mortar autocast hotkey should query physical-code buttons");
-          return [coolingMortarButton];
-        },
-      };
-    };
-    const disableAutocastEv = {
-      code: coolingMortarButton.dataset.hotkeyCode,
-      altKey: true,
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      repeat: false,
-      preventDefault() { this.prevented = true; },
-    };
-    const input = Object.create(Input.prototype);
-    input.state = mortarHud.state;
-    const disableAutocastResult = input._activateCommandHotkey(disableAutocastEv);
-    const disableAutocastCommand = sent[sent.length - 1];
-    assert(disableAutocastResult?.contextAction === true, "Alt+Mortar Fire hotkey should take the context-action path");
-    assert(disableAutocastEv.prevented, "Alt+Mortar Fire hotkey should prevent browser handling");
-    assert(
-      disableAutocastCommand?.c === "setAutocast" &&
-        disableAutocastCommand.ability === ABILITY.MORTAR_FIRE &&
-        disableAutocastCommand.enabled === false &&
-        disableAutocastCommand.units[0] === selectedMortar.id,
-      "Alt+Mortar Fire hotkey should disable selected mortar autocast even while manual fire is cooling down",
-    );
-
     selectedMortar.abilities[0].cooldownLeft = 29;
     renderCommandCard(mortarHud);
     assert(
       renderedButtons.length === mortarButtonCount,
       "Mortar Fire cooldown ticks should update in place without rebuilding the command button",
     );
-    selectedMortar.abilities[0].cooldownLeft = 0;
-    selectedMortar.abilities[0].autocastEnabled = false;
-    mortarHud._cardSig = null;
-    renderedButtons.length = 0;
-    renderCommandCard(mortarHud);
-    const readyMortarButton = renderedButtons.find((button) => button.innerHTML.includes("Fire"));
-    globalThis.document.getElementById = (id) => {
-      assert(id === "command-card", "Mortar autocast enable hotkey should query the command card");
-      return {
-        querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey-code]", "Mortar autocast enable hotkey should query physical-code buttons");
-          return [readyMortarButton];
-        },
-      };
-    };
-    input._activateCommandHotkey({
-      code: readyMortarButton.dataset.hotkeyCode,
-      altKey: true,
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      repeat: false,
-      preventDefault() {},
-    });
-    const enableAutocastCommand = sent[sent.length - 1];
-    assert(
-      enableAutocastCommand?.c === "setAutocast" &&
-        enableAutocastCommand.ability === ABILITY.MORTAR_FIRE &&
-        enableAutocastCommand.enabled === true &&
-        enableAutocastCommand.units[0] === selectedMortar.id,
-      "Alt+Mortar Fire hotkey should enable selected mortar autocast when it is currently off",
-    );
-
     renderedButtons.length = 0;
     const selectedCommandCar = {
       id: 601,
@@ -905,6 +830,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       "Breakthrough should issue from the most central ready Command Car only",
     );
 
+    const input = Object.create(Input.prototype);
     globalThis.document.getElementById = (id) => {
       assert(id === "command-card", "Methamphetamines hotkey should query the command card");
       return {
@@ -1153,7 +1079,6 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     const engineeringArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     const engineeringSeparateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const engineeringTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
-    const engineeringMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     const engineeringSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
     const engineeringScoutPlaneButton = renderedButtons.find((button) => button.innerHTML.includes("SP+"));
     assert(engineeringAtGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in Engineering Complex");
@@ -1163,9 +1088,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     assert(engineeringArtilleryFireControlButton?.disabled, "Artillery Fire Control should require Artillery");
     assert(engineeringArtilleryFireControlButton?.title === "Requires Artillery", "Artillery Fire Control should name its prerequisite");
     assert(engineeringTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in Engineering Complex");
-    assert(engineeringMortarAutocastButton?.dataset.hotkey === "S", "Mortar Autocast research should appear in Engineering Complex");
-    assert(engineeringSmokePlusButton?.dataset.hotkey === "D", "Smoke Plus research should appear in Engineering Complex");
-    assert(engineeringScoutPlaneButton?.dataset.hotkey === "Z", "Scout Plane research should appear in Engineering Complex");
+    assert(engineeringSmokePlusButton?.dataset.hotkey === "S", "Smoke Plus research should appear in Engineering Complex");
+    assert(engineeringScoutPlaneButton?.dataset.hotkey === "D", "Scout Plane research should appear in Engineering Complex");
     assert(!renderedButtons.some((button) => button.innerHTML.includes("CC+")), "Engineering Complex should not expose Command Car research");
     assert(!engineeringSeparateArtilleryResearchButton, "Engineering Complex should not expose separate Artillery research");
 

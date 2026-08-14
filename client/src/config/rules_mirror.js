@@ -65,7 +65,6 @@ export const SMOKE_ABILITY_COOLDOWN_TICKS = 0;
 export const SCOUT_CAR_SMOKE_CHARGES = 2;
 export const SCOUT_CAR_SMOKE_CHARGE_RECHARGE_TICKS = TICK_HZ * 15;
 export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
-export const MORTAR_SHELL_DELAY_TICKS = Math.round(TICK_HZ * 2.25);
 export const MORTAR_RANGE_TILES = 17;
 export const MORTAR_MIN_RANGE_TILES = 5;
 export const MORTAR_FIELD_OF_FIRE_RAD = Math.PI * 2;
@@ -92,7 +91,6 @@ export const ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 10;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
 export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 15;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
-export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 export const SCOUT_PLANE_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const SMOKE_PLUS_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 9;
@@ -183,7 +181,6 @@ export const STATS = Object.freeze({
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
-      UPGRADE.MORTAR_AUTOCAST,
       UPGRADE.SMOKE_PLUS,
       UPGRADE.SCOUT_PLANE_UNLOCK,
     ],
@@ -253,7 +250,6 @@ export const ABILITIES = Object.freeze({
     radiusTiles: MORTAR_OUTER_RADIUS_TILES,
     queued: true,
     queuePolicy: "waitUntilReady",
-    autocast: true,
   }),
   [ABILITY.POINT_FIRE]: Object.freeze({
     ability: ABILITY.POINT_FIRE,
@@ -456,15 +452,6 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 150, oil: 100 }),
     researchTicks: TANK_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Tank training",
-    researchedAt: KIND.ENGINEERING_COMPLEX,
-  }),
-  [UPGRADE.MORTAR_AUTOCAST]: Object.freeze({
-    upgrade: UPGRADE.MORTAR_AUTOCAST,
-    label: "Mortar Autocast",
-    icon: "MT+",
-    cost: Object.freeze({ steel: 150, oil: 150 }),
-    researchTicks: MORTAR_AUTOCAST_RESEARCH_TICKS,
-    description: "Enable Mortar Team autocast by default",
     researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
   [UPGRADE.SMOKE_PLUS]: Object.freeze({
