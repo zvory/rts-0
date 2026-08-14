@@ -1,4 +1,5 @@
 use super::super::Map;
+use crate::protocol::terrain;
 
 #[test]
 fn the_river_is_selectable_and_loads_for_a_two_player_match() {
@@ -14,6 +15,10 @@ fn the_river_is_selectable_and_loads_for_a_two_player_match() {
         .expect("The River should load for two active players");
     assert_eq!((map.width, map.height), (126, 126));
     assert_eq!(map.terrain.len(), 126 * 126);
+    assert_eq!(
+        map.terrain.iter().filter(|&&tile| tile == terrain::WATER).count(),
+        1_446
+    );
     map.starts.sort_unstable();
     assert_eq!(map.starts, [(9, 9), (116, 116)]);
     assert_eq!(map.base_sites, [(9, 9), (116, 116)]);
