@@ -25,7 +25,7 @@ pub const MAP_TERRAIN_FROSTED_GROUND: u8 = 17;
 
 pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
 pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 = 0.75;
-pub const UPHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 0.70;
+pub const UPHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 0.80;
 pub const DOWNHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.30;
 /// Maximum ordinary fog-of-war sight granted by authored elevation.
 pub const MAX_ELEVATION_SIGHT_BONUS_TILES: u32 = 4;
@@ -250,8 +250,8 @@ mod tests {
     #[test]
     fn elevation_movement_is_directional_and_independent_of_grade_size() {
         assert_eq!(elevation_movement_speed_multiplier(4, 4), 1.0);
-        assert_eq!(elevation_movement_speed_multiplier(4, 5), 0.70);
-        assert_eq!(elevation_movement_speed_multiplier(0, 9), 0.70);
+        assert_eq!(elevation_movement_speed_multiplier(4, 5), 0.80);
+        assert_eq!(elevation_movement_speed_multiplier(0, 9), 0.80);
         assert_eq!(elevation_movement_speed_multiplier(5, 4), 1.30);
         assert_eq!(elevation_movement_speed_multiplier(9, 0), 1.30);
     }

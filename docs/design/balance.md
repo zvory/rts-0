@@ -352,7 +352,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   center at the start of each authoritative movement tick; roads otherwise behave like grass,
   including passability, construction, cover, concealment, and line of sight.
 - Elevation changes movement directionally. A moving unit compares its current elevation with the
-  elevation up to one tile ahead toward its next local waypoint. Any uphill difference uses 0.70x
+  elevation up to one tile ahead toward its next local waypoint. Any uphill difference uses 0.80x
   speed and any downhill difference uses 1.30x speed, regardless of the number of elevation levels;
   level movement remains 1.0x. Elevation does not change passability or create cliffs.
 - `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.75` and
