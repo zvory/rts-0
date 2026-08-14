@@ -777,12 +777,12 @@ function pointerEvent(canvas, clientX, clientY, {
   assert(preview?.source === "minimap", "setup minimap hover records the minimap as preview source");
   assertApprox(preview.mouseX, 90, 0.001, "setup minimap preview world x");
   assertApprox(preview.mouseY, 90, 0.001, "setup minimap preview world y");
-  assert(preview.guns.length === 3, "setup minimap preview filters to support weapons");
+  assert(preview.guns.length === 2, "setup minimap preview filters to setup-capable support weapons");
   assert(
-    preview.guns.some((e) => e.id === 31) &&
+      preview.guns.some((e) => e.id === 31) &&
       preview.guns.some((e) => e.id === 32) &&
-      preview.guns.some((e) => e.id === 33),
-    "setup minimap preview includes anti-tank guns, artillery, and mortars",
+      !preview.guns.some((e) => e.id === 33),
+    "setup minimap preview includes anti-tank guns and artillery but excludes mortars",
   );
   assert(h.router.releaseSource("locked"), "pointer-lock exit releases minimap preview ownership");
   h.clientIntent.updateAntiTankGunSetupPreview({
@@ -970,8 +970,8 @@ function pointerEvent(canvas, clientX, clientY, {
   assert(
     h.net.sent[0].units.includes(31) &&
       h.net.sent[0].units.includes(32) &&
-      h.net.sent[0].units.includes(33),
-    "setup minimap click includes all support weapons in one admission unit list",
+      !h.net.sent[0].units.includes(33),
+    "setup minimap click excludes mortars from the admission unit list",
   );
   assertApprox(h.net.sent[0].x, 100, 0.001, "setup minimap command x");
   assertApprox(h.net.sent[0].y, 100, 0.001, "setup minimap command y");

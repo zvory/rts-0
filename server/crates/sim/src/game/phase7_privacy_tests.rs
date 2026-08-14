@@ -268,7 +268,7 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
         .iter()
         .find(|entity| entity.id == mortar)
         .expect("ally mortar should be visible");
-    assert_eq!(mortar_view.setup_state.as_deref(), Some("deployed"));
+    assert_eq!(mortar_view.setup_state, None);
     assert_eq!(mortar_view.target_id, None);
     assert_eq!(mortar_view.weapon_facing, None);
     assert!(mortar_view.abilities.is_empty());

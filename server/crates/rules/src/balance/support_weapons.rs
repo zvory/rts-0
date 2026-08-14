@@ -7,8 +7,6 @@ pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 pub const METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS: u16 = MACHINE_GUNNER_SETUP_TICKS / 2;
 pub const ANTI_TANK_GUN_SETUP_TICKS: u16 = ((TICK_HZ as u16) * 15).div_ceil(4);
 pub const ANTI_TANK_GUN_TEARDOWN_TICKS: u16 = (TICK_HZ as u16) * 3 / 2;
-pub const MORTAR_TEAM_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3 / 2;
-pub const MORTAR_TEAM_TEARDOWN_TICKS: u16 = (TICK_HZ as u16) / 2;
 pub const MORTAR_RANGE_TILES: u32 = 17;
 pub const MORTAR_MIN_RANGE_TILES: u32 = 5;
 pub const MORTAR_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::TAU;
@@ -45,7 +43,6 @@ pub const fn support_weapon_setup_ticks(kind: EntityKind) -> Option<u16> {
     match kind {
         EntityKind::MachineGunner => Some(MACHINE_GUNNER_SETUP_TICKS),
         EntityKind::AntiTankGun => Some(ANTI_TANK_GUN_SETUP_TICKS),
-        EntityKind::MortarTeam => Some(MORTAR_TEAM_SETUP_TICKS),
         EntityKind::Artillery => Some(ARTILLERY_SETUP_TICKS),
         _ => None,
     }
@@ -55,7 +52,6 @@ pub const fn support_weapon_teardown_ticks(kind: EntityKind) -> Option<u16> {
     match kind {
         EntityKind::MachineGunner => Some(MACHINE_GUNNER_SETUP_TICKS),
         EntityKind::AntiTankGun => Some(ANTI_TANK_GUN_TEARDOWN_TICKS),
-        EntityKind::MortarTeam => Some(MORTAR_TEAM_TEARDOWN_TICKS),
         EntityKind::Artillery => Some(ARTILLERY_SETUP_TICKS),
         _ => None,
     }
@@ -85,14 +81,8 @@ mod tests {
             support_weapon_teardown_ticks(EntityKind::AntiTankGun),
             Some(ANTI_TANK_GUN_TEARDOWN_TICKS)
         );
-        assert_eq!(
-            support_weapon_setup_ticks(EntityKind::MortarTeam),
-            Some(MORTAR_TEAM_SETUP_TICKS)
-        );
-        assert_eq!(
-            support_weapon_teardown_ticks(EntityKind::MortarTeam),
-            Some(MORTAR_TEAM_TEARDOWN_TICKS)
-        );
+        assert_eq!(support_weapon_setup_ticks(EntityKind::MortarTeam), None);
+        assert_eq!(support_weapon_teardown_ticks(EntityKind::MortarTeam), None);
         assert_eq!(
             support_weapon_setup_ticks(EntityKind::Artillery),
             Some(ARTILLERY_SETUP_TICKS)

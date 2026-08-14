@@ -894,8 +894,8 @@ function nearPoint(call, point, epsilon = 0.001) {
     "selected unit range rings draw at doubled opacity",
   );
   assert(
-    !rangeGfx.calls.some((call) => call[0] === "beginFill"),
-    "the regular artillery range indicator does not tint its enormous range area",
+    rangeGfx.calls.filter((call) => call[0] === "beginFill").length === 1,
+    "only the mortar annulus is tinted; the regular artillery range indicator remains unfilled",
   );
   assert(
     rangeGfx.calls.some((call) => call[0] === "lineTo" && call[1] > 446 && Math.abs(call[2] - 96) < 8),
@@ -936,19 +936,18 @@ function nearPoint(call, point, epsilon = 0.001) {
         kind: KIND.MORTAR_TEAM,
         x: 224,
         y: 96,
-        setupState: SETUP.DEPLOYED,
       }],
     },
   );
   const mortarCircles = mortarRangeGfx.calls.filter((call) => call[0] === "drawCircle");
   assert(
     mortarCircles.some((call) => call[3] === 544) && mortarCircles.some((call) => call[3] === 160),
-    "selected deployed mortar draws its 17-tile outer circle and five-tile dead zone",
+    "selected mortar draws its 17-tile outer circle and five-tile dead zone without setup state",
   );
   assert(
     mortarRangeGfx.calls.some((call) => call[0] === "cut") &&
       !mortarRangeGfx.calls.some((call) => call[0] === "lineTo"),
-    "selected deployed mortar draws a seamless full-circle range band without requiring facing metadata",
+    "selected mortar draws a seamless full-circle range band without setup or facing metadata",
   );
   assert(
     mortarRangeGfx.calls.findIndex((call) => call[0] === "beginFill") <

@@ -310,7 +310,6 @@ export function buildUnitCard(ctx, selection) {
   const setupGunIds = ownUnits
     .filter((e) =>
       e.kind === KIND.ANTI_TANK_GUN ||
-      e.kind === KIND.MORTAR_TEAM ||
       e.kind === KIND.ARTILLERY)
     .map((e) => e.id);
   const setupWeapons = ownUnits.filter((e) => setupGunIds.includes(e.id));

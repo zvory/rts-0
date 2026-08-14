@@ -245,9 +245,9 @@ Core unit roles:
   range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
   infantry and cannot fire outside their emplacement arc.
-- **Mortar Team** is the Superior Firepower path-entry pressure unit from Gun Works: its setup time
-  is provisionally set to zero ticks for balance improvement, it cannot shoot while moving, and it
-  lands delayed area shells that punish static positions and clumped units.
+- **Mortar Team** is the Superior Firepower path-entry pressure unit from Gun Works: it has no
+  setup/teardown state, cannot shoot while moving, and lands delayed area shells that punish static
+  positions and clumped units.
 - **Artillery** is the Superior Firepower late capstone from Gun Works: it uses a tank-sized
   gameplay footprint but renders at 75% of its prior authored size as an exposed field piece, must
   deploy into a narrow firing arc,
@@ -367,8 +367,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
 - Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 113` (~3.77s) and
   `ANTI_TANK_GUN_TEARDOWN_TICKS = 45` (~1.5s).
-- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
-  `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
+- Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_MANUAL_SHELL_DELAY_TICKS = 34` (~1.13s manual travel),
   `MORTAR_OUTER_RADIUS_TILES = 2.0`,
@@ -380,7 +379,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   with the authoritative impact.
   Neither radius has armor penetration: armored targets take the standard non-piercing reduction,
   resulting in 25 inner damage or 10 outer damage before other modifiers. Manual Fire uses hotkey
-  `X` and remains a player-directed override that does not require setup, but it must land in the
+  `X` and is the only way to fire; it must land in the
   5-to-17-tile range band. Mortar Teams never acquire or fire at targets through Idle, Hold Position,
   Attack, or Attack Move; every shell requires an explicit Mortar Fire command. Manual shots always
   land exactly on the clicked point, including in fog.

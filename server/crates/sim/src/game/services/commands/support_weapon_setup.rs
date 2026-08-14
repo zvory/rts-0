@@ -16,7 +16,7 @@ pub(super) struct SetupTargetGroup {
 
 /// Resolve the AT-gun formation from one admitted player command. Keeping this authoritative means
 /// the action is budgeted once and every command source (human, AI, replay, or Lab) gets the same
-/// setup behavior. Mortars and artillery retain the literal requested point.
+/// setup behavior. Artillery retains the literal requested point.
 pub(super) fn target_groups(
     entities: &EntityStore,
     player: u32,

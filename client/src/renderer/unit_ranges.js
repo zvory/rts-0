@@ -1,6 +1,5 @@
 import { gfxStrokePaths } from "./native_graphics.js";
 import {
-  ABILITIES,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
@@ -9,7 +8,7 @@ import {
   MORTAR_RANGE_TILES,
   STATS,
 } from "../config.js";
-import { ABILITY, KIND, SETUP, isUnit } from "../protocol.js";
+import { KIND, SETUP, isUnit } from "../protocol.js";
 import { feedbackOwner } from "./feedback_ownership.js";
 import { drawFacingWedge, finiteNumber, hexToInt } from "./shared.js";
 
@@ -331,10 +330,7 @@ function staticUnitRangeProfile(e, tileSize) {
     };
   }
 
-  if (
-    e.kind === KIND.ANTI_TANK_GUN ||
-    (e.kind === KIND.MORTAR_TEAM && e.setupState === SETUP.DEPLOYED)
-  ) {
+  if (e.kind === KIND.ANTI_TANK_GUN) {
     if (e.setupState !== SETUP.DEPLOYED) return null;
     const weapon = fieldOfFireProfile(e.kind, tileSize);
     if (!weapon) return null;
@@ -349,10 +345,20 @@ function staticUnitRangeProfile(e, tileSize) {
     };
   }
 
+  if (e.kind === KIND.MORTAR_TEAM) {
+    const weapon = fieldOfFireProfile(e.kind, tileSize);
+    if (!weapon) return null;
+    return {
+      kind: "fieldOfFire",
+      minRadius: weapon.minRadius,
+      maxRadius: weapon.maxRadius,
+      arc: weapon.arc,
+      facing: 0,
+    };
+  }
+
   const stat = STATS[e.kind] || {};
-  const rangeTiles = e.kind === KIND.MORTAR_TEAM
-    ? ABILITIES[ABILITY.MORTAR_FIRE]?.rangeTiles || stat.rangeTiles || 0
-    : stat.rangeTiles || 0;
+  const rangeTiles = stat.rangeTiles || 0;
   const maxRadius = rangeTiles * tileSize;
   if (!(maxRadius > 0)) return null;
   const minRadius = Math.max(0, (stat.minRangeTiles || 0) * tileSize);

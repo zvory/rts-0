@@ -1,7 +1,5 @@
 import {
   ARTILLERY_SETUP_TICKS,
-  MORTAR_SETUP_TICKS,
-  MORTAR_TEARDOWN_TICKS,
   TICK_HZ,
 } from "../config.js";
 import { KIND } from "../protocol.js";
@@ -13,8 +11,6 @@ export const SWEEP_EVICT_FRAMES = 120;
 // transition reads smoothly between snapshots.
 export const DEPLOYED_WEAPON_ANIM_MS = 1000;
 export const ARTILLERY_DEPLOYED_WEAPON_ANIM_MS = (ARTILLERY_SETUP_TICKS / TICK_HZ) * 1000;
-export const MORTAR_DEPLOYED_WEAPON_ANIM_MS = (MORTAR_SETUP_TICKS / TICK_HZ) * 1000;
-export const MORTAR_TEARDOWN_WEAPON_ANIM_MS = (MORTAR_TEARDOWN_TICKS / TICK_HZ) * 1000;
 export const WEAPON_RECOIL_PX = {
   [KIND.RIFLEMAN]: 8.0,
   [KIND.MACHINE_GUNNER]: 5.5,

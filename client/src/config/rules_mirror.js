@@ -68,8 +68,6 @@ export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
 export const MORTAR_RANGE_TILES = 17;
 export const MORTAR_MIN_RANGE_TILES = 5;
 export const MORTAR_FIELD_OF_FIRE_RAD = Math.PI * 2;
-export const MORTAR_SETUP_TICKS = TICK_HZ * 1.5;
-export const MORTAR_TEARDOWN_TICKS = TICK_HZ * 0.5;
 export const MORTAR_OUTER_RADIUS_TILES = 2;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
@@ -140,7 +138,7 @@ export const STATS = Object.freeze({
     rangeTiles: MORTAR_RANGE_TILES, minRangeTiles: MORTAR_MIN_RANGE_TILES,
     cost: { steel: 100, oil: 40 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS,
-    description: "Indirect fire, extremely inaccurate without vision. Upgrade auto cast in Engineering Complex." },
+    description: "Manual indirect fire, extremely inaccurate without vision. Every shell requires a Mortar Fire command." },
   [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 13.5, sight: 7, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
     cost: { steel: 150, oil: 50 }, supply: 4, buildTicks: TICK_HZ * 20,

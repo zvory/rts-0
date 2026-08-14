@@ -459,7 +459,6 @@ function selectedOwnSupportWeaponEntities(input) {
   return selectedEntities(input.state)
     .filter((e) => ownOwner(input.state, e.owner, input.controlPolicy) && (
       e.kind === KIND.ANTI_TANK_GUN ||
-      e.kind === KIND.MORTAR_TEAM ||
       e.kind === KIND.ARTILLERY));
 }
 
@@ -660,7 +659,6 @@ export function _refreshAntiTankGunSetupPreview() {
     .selectedEntities()
     .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && (
       e.kind === KIND.ANTI_TANK_GUN ||
-      e.kind === KIND.MORTAR_TEAM ||
       e.kind === KIND.ARTILLERY))
     .map((e) => supportWeaponSetupPreviewEntity(plannedEntityForIntent(intent, e), setupPreviewQueued(this, intent)));
   if (guns.length === 0) {

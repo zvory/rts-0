@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn mortar_setup_and_teardown_commands_use_mortar_timings() {
+fn mortar_setup_and_teardown_commands_are_ignored() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let mortar = entities
@@ -24,7 +24,8 @@ fn mortar_setup_and_teardown_commands_use_mortar_timings() {
 
     let mortar_entity = entities.get(mortar).expect("mortar should exist");
     assert_eq!(mortar_entity.weapon_setup(), WeaponSetup::Packed);
-    assert_eq!(mortar_entity.emplacement_facing(), Some(0.0));
+    assert_eq!(mortar_entity.emplacement_facing(), None);
+    assert!(matches!(mortar_entity.order(), Order::Idle));
 
     entities
         .get_mut(mortar)
@@ -46,23 +47,18 @@ fn mortar_setup_and_teardown_commands_use_mortar_timings() {
             .get(mortar)
             .expect("mortar should exist")
             .weapon_setup(),
-        WeaponSetup::TearingDown {
-            ticks: config::MORTAR_TEAM_TEARDOWN_TICKS,
-        }
+        WeaponSetup::Deployed,
+        "legacy mortar setup state must not make teardown a valid player command"
     );
 }
 
 #[test]
-fn queued_mortar_setup_is_terminal_and_retains_current_facing() {
+fn queued_mortar_setup_does_not_enter_the_order_queue() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let mortar = entities
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
         .expect("mortar should spawn");
-    entities
-        .get_mut(mortar)
-        .expect("mortar should exist")
-        .set_facing(std::f32::consts::FRAC_PI_2);
 
     apply(
         &map,
@@ -103,44 +99,6 @@ fn queued_mortar_setup_is_terminal_and_retains_current_facing() {
     assert!(matches!(mortar.queued_orders()[0], OrderIntent::Move(_)));
     assert!(matches!(
         mortar.queued_orders()[1],
-        OrderIntent::SetupAntiTankGuns(_)
+        OrderIntent::AttackMove(_)
     ));
-}
-
-#[test]
-fn immediate_mortar_setup_allows_a_later_queued_order() {
-    let map = flat_map(24);
-    let mut entities = EntityStore::new();
-    let mortar = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
-        .expect("mortar should spawn");
-
-    apply(
-        &map,
-        &mut entities,
-        vec![
-            (
-                1,
-                SimCommand::SetupAntiTankGuns {
-                    units: vec![mortar],
-                    x: 100.0,
-                    y: 100.0,
-                    queued: false,
-                },
-            ),
-            (
-                1,
-                SimCommand::Move {
-                    units: vec![mortar],
-                    x: 180.0,
-                    y: 100.0,
-                    queued: true,
-                },
-            ),
-        ],
-    );
-
-    let mortar = entities.get(mortar).expect("mortar should exist");
-    assert_eq!(mortar.queued_orders().len(), 1);
-    assert!(matches!(mortar.queued_orders()[0], OrderIntent::Move(_)));
 }

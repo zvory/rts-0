@@ -174,10 +174,7 @@ pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
 }
 
 pub fn supports_manual_emplacement(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::AntiTankGun | EntityKind::MortarTeam | EntityKind::Artillery
-    )
+    matches!(kind, EntityKind::AntiTankGun | EntityKind::Artillery)
 }
 
 pub fn is_anti_tank_gun(kind: EntityKind) -> bool {
