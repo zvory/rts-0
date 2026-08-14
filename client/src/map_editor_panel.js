@@ -8,7 +8,7 @@ import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import { createMapEditorPreviewButton } from "./map_editor_preview_button.js";
-import { MAP_EDITOR_FEATURE_PALETTE, MAP_EDITOR_GROUND_PALETTE } from "./map_editor_terrain_palette.js";
+import { createMapEditorTerrainPalettes } from "./map_editor_terrain_controls.js";
 import { createMapEditorSunSettings } from "./map_editor_sun_controls.js";
 import {
   MAP_EDITOR_CATEGORIES,
@@ -320,6 +320,27 @@ export class MapEditorPanel {
     }
   }
 
+  selectTerrainMaterial(code, layer) {
+    this.terrainContent = "material";
+    this.selectedTerrain = code;
+    this.selectedTerrainLayer = layer;
+    if (!["brush", "box"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
+    this.selectOperation(this.lastOperation.terrain);
+  }
+
+  selectSemanticFeatureErase() {
+    this.terrainContent = "material";
+    this.selectedTerrainLayer = "feature";
+    this.selectOperation("erase");
+  }
+
+  semanticFeatureEraseSelected() {
+    return this.activeCategory === "terrain"
+      && this.terrainContent === "material"
+      && this.selectedTerrainLayer === "feature"
+      && MapEditorPanel.prototype.activeOperation.call(this) === "erase";
+  }
+
   selectOperation(operation) {
     if (!this.availableOperations().has(operation)) return false;
     if (this.activeCategory === "objects") {
@@ -612,38 +633,7 @@ export class MapEditorPanel {
         });
       }
     }, "Terrain brush width in tiles");
-    const groundPalette = document.createElement("div");
-    groundPalette.className = "map-editor-palette";
-    const featurePalette = document.createElement("div");
-    featurePalette.className = "map-editor-palette";
-    for (const [layer, palette, entries] of [
-      ["ground", groundPalette, MAP_EDITOR_GROUND_PALETTE],
-      ["feature", featurePalette, MAP_EDITOR_FEATURE_PALETTE],
-    ]) {
-      for (const [code, label] of entries) {
-        const control = button(label, () => {
-          this.terrainContent = "material";
-          this.selectedTerrain = code;
-          this.selectedTerrainLayer = layer;
-          if (!["brush", "box", "erase"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
-          this.selectOperation(this.lastOperation.terrain);
-        }, {
-          active: this.terrainContent === "material"
-            && this.selectedTerrain === code
-            && this.selectedTerrainLayer === layer,
-        });
-        control.dataset.terrain = terrainName(code);
-        control.dataset.terrainLayer = layer;
-        control.classList.add("map-editor-terrain-button");
-        const preview = this.viewport.createTerrainPreview?.(code);
-        if (preview) {
-          preview.className = "map-editor-terrain-icon";
-          preview.setAttribute("aria-hidden", "true");
-          control.prepend(preview);
-        }
-        palette.appendChild(control);
-      }
-    }
+    const { groundPalette, featurePalette } = createMapEditorTerrainPalettes(this, { button, terrainName });
     section.append(
       field("Brush width (tiles)", width),
       field("Cosmetic ground", groundPalette),

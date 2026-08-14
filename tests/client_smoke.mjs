@@ -704,6 +704,20 @@ try {
     water?.scrollIntoView({ block: "center" });
     const beforeScrollTop = panel?.scrollTop ?? -1;
     water?.click();
+    [...document.querySelectorAll(".map-editor-tool-rail button")]
+      .find((control) => control.textContent === "Erase")?.click();
+    const eraseFromRail = {
+      tileActive: document.querySelector(".map-editor-terrain-button[data-terrain=erase]")?.dataset.active,
+      toolTerrain: window.__mapEditor?.viewport?.tool?.terrain,
+      eraseFeature: window.__mapEditor?.viewport?.tool?.eraseFeature,
+    };
+    document.querySelector(".map-editor-terrain-button[data-terrain=erase]")?.click();
+    const eraseFromTile = {
+      activeOperation: [...document.querySelectorAll(".map-editor-tool-rail button")]
+        .find((control) => control.textContent === "Erase")?.getAttribute("aria-pressed"),
+      eraseFeature: window.__mapEditor?.viewport?.tool?.eraseFeature,
+    };
+    document.querySelector(".map-editor-terrain-button[data-terrain=water]")?.click();
     const refreshedPanel = document.querySelector(".map-editor-tools-window .map-editor-category-content");
     const floatingChrome = [
       [optionsWindow, "map settings"],
@@ -727,6 +741,8 @@ try {
         .map((header) => header.textContent?.trim() || ""),
       floatingChrome,
       noInitialStatus,
+      eraseFromRail,
+      eraseFromTile,
       settingsHidden: optionsWindow?.hidden === true,
       panelsDoNotOverlap: [layersRect, panelRect].every(Boolean) &&
         (layersRect.right <= panelRect.left || panelRect.right <= layersRect.left || layersRect.bottom <= panelRect.top || panelRect.bottom <= layersRect.top),
@@ -803,6 +819,13 @@ try {
       editorUi.terrainBrush?.type === "number" && editorUi.terrainBrush.min === "1" &&
       editorUi.terrainBrush.max === "31" && editorUi.terrainBrush.value === "1",
     `MAP EDITOR: document settings, visibility, and palette surfaces omit initial status slop and show all 18 terrain previews (headers=${editorUi.headers.join("/")}, previews=${editorUi.terrainPreviews.length})`,
+  );
+  ok(
+    editorUi.eraseFromRail.tileActive === "true" &&
+      editorUi.eraseFromRail.eraseFeature === true &&
+      editorUi.eraseFromTile.activeOperation === "true" &&
+      editorUi.eraseFromTile.eraseFeature === true,
+    `MAP EDITOR: semantic Erase tile and Apply rail share selection and feature-removal behavior (${JSON.stringify({ rail: editorUi.eraseFromRail, tile: editorUi.eraseFromTile })})`,
   );
   ok(
     editorUi.floatingChrome && editorUi.settingsHidden && editorUi.panelsDoNotOverlap && editorUi.withinViewport && editorUi.belowToolbar && editorUi.noHorizontalOverflow,
