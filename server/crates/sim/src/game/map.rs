@@ -219,9 +219,8 @@ impl Map {
         hash = fnv_bytes(hash, &self.width.to_le_bytes());
         hash = fnv_bytes(hash, &self.height.to_le_bytes());
         hash = fnv_bytes(hash, &self.terrain);
-        // Preserve the identity of pre-elevation flat-map checkpoints: an omitted elevation field
-        // and an all-zero grid have identical gameplay. Any non-zero elevation is identity-bearing
-        // now that absolute level affects sight, including a uniform grid that legally omits sun.
+        // Omitted and all-zero elevation share legacy flat-map identity. Any nonzero level is
+        // identity-bearing now that absolute elevation affects sight, including uniform maps without sun.
         if self.sun.is_some() || self.elevation.iter().any(|&level| level != 0) {
             hash = fnv_bytes(hash, b"elevation");
             hash = fnv_bytes(hash, &self.elevation);
