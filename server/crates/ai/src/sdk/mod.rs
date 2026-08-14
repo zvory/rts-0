@@ -22,6 +22,7 @@ pub use rts_rules::faction::UpgradeKind;
 pub use rts_rules::EntityKind;
 pub use rulebook::{AiCost, AiEntityRule, AiFootprint, AiPrerequisites, AiRulebook};
 pub use strategy::AiStrategy;
+pub(crate) use world_queries::{unit_circle_touches_rect, unit_placement_radius};
 pub use world_queries::{
     AiTile, AiWorldPoint, KnownBuildSite, KnownBuildSiteBlocker, KnownBuildSiteExclusions,
     KnownResourceState, WorldQueries,

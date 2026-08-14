@@ -59,6 +59,7 @@ pub enum KnownBuildSiteBlocker {
     KnownTerrain,
     KnownResource,
     CurrentBuilding,
+    CurrentUnit,
     ProductionExit,
 }
 
@@ -323,6 +324,24 @@ impl<'a> WorldQueries<'a> {
             return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::CurrentBuilding);
         }
 
+        let tile_size = self.frame.map().tile_size as f32;
+        let footprint = (
+            tile.x as f32 * tile_size,
+            tile.y as f32 * tile_size,
+            right as f32 * tile_size,
+            bottom as f32 * tile_size,
+        );
+        if self.owned().iter().any(|entity| {
+            entity.kind.is_unit()
+                && unit_circle_touches_rect(
+                    entity.position,
+                    unit_placement_radius(entity.kind),
+                    footprint,
+                )
+        }) {
+            return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::CurrentUnit);
+        }
+
         let has_production_exit = if faction_aware_production {
             !rts_rules::economy::trainable_units_for_faction(self.frame.faction_id(), building)
                 .is_empty()
@@ -483,6 +502,61 @@ fn point_overlaps_building(point: (f32, f32), building: &AiEntity, tile_size: u3
         && point.1 <= building.position.1 + half_h + POINT_IN_RECT_EPS_PX
 }
 
+pub(crate) fn unit_circle_touches_rect(
+    position: (f32, f32),
+    radius: f32,
+    rect: (f32, f32, f32, f32),
+) -> bool {
+    let nearest_x = position.0.clamp(rect.0, rect.2);
+    let nearest_y = position.1.clamp(rect.1, rect.3);
+    let dx = position.0 - nearest_x;
+    let dy = position.1 - nearest_y;
+    dx * dx + dy * dy <= radius * radius
+}
+
+pub(crate) fn unit_placement_radius(kind: EntityKind) -> f32 {
+    use rts_rules::balance::*;
+
+    let oriented_half_diagonal = match kind {
+        EntityKind::Tank => Some((
+            TANK_BODY_LENGTH_PX,
+            TANK_BODY_WIDTH_PX,
+            TANK_BODY_CLEARANCE_PX,
+        )),
+        EntityKind::ScoutCar => Some((
+            SCOUT_CAR_BODY_LENGTH_PX,
+            SCOUT_CAR_BODY_WIDTH_PX,
+            SCOUT_CAR_BODY_CLEARANCE_PX,
+        )),
+        EntityKind::CommandCar => Some((
+            COMMAND_CAR_BODY_LENGTH_PX,
+            COMMAND_CAR_BODY_WIDTH_PX,
+            COMMAND_CAR_BODY_CLEARANCE_PX,
+        )),
+        EntityKind::AntiTankGun => Some((
+            ANTI_TANK_GUN_BODY_LENGTH_PX,
+            ANTI_TANK_GUN_BODY_WIDTH_PX,
+            ANTI_TANK_GUN_BODY_CLEARANCE_PX,
+        )),
+        EntityKind::Artillery => Some((
+            ARTILLERY_BODY_LENGTH_PX,
+            ARTILLERY_BODY_WIDTH_PX,
+            ARTILLERY_BODY_CLEARANCE_PX,
+        )),
+        _ => None,
+    };
+    oriented_half_diagonal.map_or_else(
+        || {
+            unit_stats(kind)
+                .map(|stats| stats.radius)
+                .unwrap_or_default()
+        },
+        |(length, width, clearance)| {
+            ((length * 0.5).powi(2) + (width * 0.5).powi(2)).sqrt() + clearance
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -492,7 +566,7 @@ mod tests {
         footprint_placeable_from_snapshot, occupied_tiles_from_snapshot,
     };
     use rts_sim::game::{Game, PlayerInit};
-    use rts_sim::protocol::{self, states, ResourceNode};
+    use rts_sim::protocol::{self, kinds, states, ResourceNode};
 
     fn players() -> Vec<PlayerInit> {
         vec![
@@ -702,7 +776,7 @@ mod tests {
                 for y in 0..start.map.height {
                     for x in 0..start.map.width {
                         let old = footprint_placeable_from_snapshot(
-                            &start.map, &snapshot, building, x, y, &occupied,
+                            &start.map, &snapshot, 1, building, x, y, &occupied,
                         );
                         let new = queries.tile(x, y).is_some_and(|tile| {
                             queries.known_build_site(building, tile, &exclusions)
@@ -730,6 +804,7 @@ mod tests {
                     footprint_placeable_from_snapshot(
                         &start.map,
                         &snapshot,
+                        1,
                         EntityKind::Depot,
                         x,
                         y,
@@ -761,6 +836,7 @@ mod tests {
                         footprint_placeable_from_snapshot(
                             &start.map,
                             &snapshot,
+                            1,
                             EntityKind::Depot,
                             x,
                             y,
@@ -818,5 +894,54 @@ mod tests {
             ),
             KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::KnownTerrain),
         );
+    }
+
+    #[test]
+    fn known_placement_rejects_owned_unit_touching_footprint() {
+        let game = Game::new_without_ai_controllers(&players(), 73);
+        let start = game.start_payload();
+        let mut snapshot = game.snapshot_for(1);
+        let initial = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2])).unwrap();
+        let initial_queries = WorldQueries::new(&initial);
+        let exclusions = KnownBuildSiteExclusions::default();
+        let clear = (0..start.map.height)
+            .flat_map(|y| (0..start.map.width).map(move |x| (x, y)))
+            .find(|&(x, y)| {
+                initial_queries.tile(x, y).is_some_and(|tile| {
+                    initial_queries.known_build_site(EntityKind::TankTrap, tile, &exclusions)
+                        == KnownBuildSite::NoKnownConflict
+                })
+            })
+            .expect("map should have a clear Tank Trap site");
+        let tile_size = start.map.tile_size as f32;
+        let worker = snapshot
+            .entities
+            .iter_mut()
+            .find(|entity| entity.owner == 1 && entity.kind == kinds::WORKER)
+            .expect("player should have a worker");
+        worker.x = clear.0 as f32 * tile_size + tile_size * 0.5;
+        worker.y = clear.1 as f32 * tile_size + tile_size * 0.5;
+
+        let frame = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2])).unwrap();
+        let queries = WorldQueries::new(&frame);
+        let tile = queries.tile(clear.0, clear.1).unwrap();
+        assert_eq!(
+            queries.known_build_site(EntityKind::TankTrap, tile, &exclusions),
+            KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::CurrentUnit)
+        );
+    }
+
+    #[test]
+    fn unit_touching_footprint_edge_counts_as_blocked() {
+        assert!(unit_circle_touches_rect(
+            (110.0, 105.0),
+            10.0,
+            (100.0, 100.0, 105.0, 110.0),
+        ));
+        assert!(!unit_circle_touches_rect(
+            (110.01, 105.0),
+            5.0,
+            (100.0, 100.0, 105.0, 110.0),
+        ));
     }
 }
