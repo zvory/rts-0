@@ -157,8 +157,52 @@
     }
   ],
   "_design": "Terrain-only layout study. A six-tile river runs from northeast to southwest. The center crossing is ten tiles wide; paired side crossings are six tiles wide and sit two-thirds of the way from the center toward the map edges.",
-  "doodads": [],
-  "forestSpans": [],
+  "doodads": [
+    {
+      "id": 2147490773,
+      "typeId": "tree.spruce",
+      "x": 2210,
+      "y": 1888
+    },
+    {
+      "id": 2147490898,
+      "typeId": "tree.alder",
+      "x": 2179,
+      "y": 1900
+    },
+    {
+      "id": 2147490900,
+      "typeId": "tree.alder",
+      "x": 2203,
+      "y": 1906
+    },
+    {
+      "id": 2147492273,
+      "typeId": "tree.alder",
+      "x": 1827,
+      "y": 2224
+    },
+    {
+      "id": 2147492275,
+      "typeId": "tree.alder",
+      "x": 1854,
+      "y": 2223
+    },
+    {
+      "id": 2147492400,
+      "typeId": "tree.spruce",
+      "x": 1861,
+      "y": 2249
+    }
+  ],
+  "forestSpans": [
+    [56, 68, 68],
+    [57, 67, 69],
+    [58, 67, 69],
+    [67, 56, 58],
+    [68, 56, 58],
+    [69, 57, 57]
+  ],
   "concealmentTiles": [],
   "noVehicleTiles": [],
   "noBuildingTiles": [],
