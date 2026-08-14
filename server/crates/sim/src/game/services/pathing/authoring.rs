@@ -221,7 +221,10 @@ mod tests {
         map.elevation[beyond_waypoint] = 9;
         let base_speed = 2.0;
 
-        let ticks = estimate_segment_ticks(&map, EntityKind::Rifleman, from, to, base_speed);
+        let kind = crate::rules::faction::catalog_for(crate::rules::faction::DEFAULT_FACTION_ID)
+            .and_then(|catalog| catalog.units.first().copied())
+            .expect("default faction should have a unit mobility profile");
+        let ticks = estimate_segment_ticks(&map, kind, from, to, base_speed);
 
         assert!((ticks - distance(from, to) / base_speed).abs() < f64::EPSILON);
     }
