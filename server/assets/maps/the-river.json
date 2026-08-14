@@ -154,6 +154,18 @@
       "y": 116,
       "steelPatches": 12,
       "oilPatches": 3
+    },
+    {
+      "x": 18,
+      "y": 34,
+      "steelPatches": 12,
+      "oilPatches": 3
+    },
+    {
+      "x": 107,
+      "y": 91,
+      "steelPatches": 12,
+      "oilPatches": 3
     }
   ],
   "_design": "A six-tile river runs from northeast to southwest with a ten-tile center crossing and paired six-tile side crossings. Mirrored forest clumps frame the center. A broad shallow crescent pair and a narrower forked inlet pair discourage base wraparounds without crowding the starting footprints.",
