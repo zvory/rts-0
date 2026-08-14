@@ -40,29 +40,37 @@ assert.match(terrainControlsSource, /featurePalette\.insertBefore\(eraseControl,
   "Erase stays immediately after Stone and Water instead of falling below the road variants");
 
 {
-  const operations = [];
   const panel = {
     activeCategory: "terrain",
     terrainContent: "material",
     selectedTerrain: TERRAIN.WATER,
     selectedTerrainLayer: "feature",
-    lastOperation: { terrain: "erase" },
+    lastOperation: { terrain: "box" },
     paintShape: "box",
     terrainBrushWidth: 1,
     symmetry: "none",
-    viewport: { tool: null, armTool(tool) { this.tool = tool; } },
-    selectOperation(operation) { operations.push(operation); this.lastOperation.terrain = operation; },
+    viewport: {
+      tool: { kind: "terrain", terrain: TERRAIN.GRASS, shape: "box", eraseFeature: true },
+      armTool(tool) { this.tool = tool; },
+    },
+    availableOperations: MapEditorPanel.prototype.availableOperations,
+    operationHelp: MapEditorPanel.prototype.operationHelp,
+    selectOperation: MapEditorPanel.prototype.selectOperation,
     armTerrain: MapEditorPanel.prototype.armTerrain,
     setStatus() {},
   };
   MapEditorPanel.prototype.selectTerrainMaterial.call(panel, TERRAIN.ROCK, "feature");
   assert.equal(panel.selectedTerrain, TERRAIN.ROCK);
-  assert.deepEqual(operations, ["brush"],
-    "choosing a semantic material exits the Erase tile and resumes painting");
+  assert.deepEqual(panel.viewport.tool, {
+    kind: "terrain",
+    terrain: TERRAIN.ROCK,
+    shape: "box",
+    width: 1,
+    symmetry: "none",
+    terrainLayer: "feature",
+  }, "choosing a semantic material exits Erase and preserves the selected box shape");
   MapEditorPanel.prototype.selectSemanticFeatureErase.call(panel);
   assert.equal(panel.selectedTerrainLayer, "feature");
-  assert.deepEqual(operations, ["brush"],
-    "the semantic Erase tile stays independent from the Apply shape rail");
   assert.deepEqual(panel.viewport.tool, {
     kind: "terrain",
     terrain: TERRAIN.GRASS,

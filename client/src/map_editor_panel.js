@@ -324,6 +324,7 @@ export class MapEditorPanel {
     this.terrainContent = "material";
     this.selectedTerrain = code;
     this.selectedTerrainLayer = layer;
+    if (this.viewport.tool?.kind === "terrain" && this.viewport.tool.eraseFeature) this.viewport.armTool(null);
     if (!["brush", "box"].includes(this.lastOperation.terrain)) this.lastOperation.terrain = "brush";
     this.selectOperation(this.lastOperation.terrain);
   }
