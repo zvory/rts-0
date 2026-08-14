@@ -151,6 +151,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "map_editor_panel.js": "ui",
   "map_editor_preview_button.js": "ui",
   "map_editor_panel_workflow.js": "ui",
+  "map_editor_terrain_controls.js": "ui",
   "map_editor_terrain_palette.js": "ui",
   "map_editor_sun_controls.js": "ui",
   "map_editor_stalingrad_sun.js": "ui",
