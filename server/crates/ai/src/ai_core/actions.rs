@@ -462,6 +462,19 @@ pub(crate) fn train_units_with_rally(
     request: TrainUnitsRequest<'_>,
     rally: Option<(f32, f32)>,
 ) -> Vec<TrainAction> {
+    train_units_with_rally_for_unit(ctx, request, move |_| {
+        rally.map(|(x, y)| (x, y, RallyKind::AttackMove))
+    })
+}
+
+pub(crate) fn train_units_with_rally_for_unit<F>(
+    ctx: &mut AiActionContext<'_>,
+    request: TrainUnitsRequest<'_>,
+    mut rally_for_unit: F,
+) -> Vec<TrainAction>
+where
+    F: FnMut(EntityKind) -> Option<(f32, f32, RallyKind)>,
+{
     if request.save_for_tech {
         return Vec::new();
     }
@@ -497,12 +510,12 @@ pub(crate) fn train_units_with_rally(
         }
         ctx.reservations.reserve_production_building(building.id);
         *current_counts.entry(unit).or_default() += 1;
-        if let Some((x, y)) = rally {
+        if let Some((x, y, kind)) = rally_for_unit(unit) {
             ctx.emit_action(AiActionRequest::SetRally {
                 building: building.id,
                 x,
                 y,
-                kind: RallyKind::AttackMove,
+                kind,
                 queued: false,
             });
         }

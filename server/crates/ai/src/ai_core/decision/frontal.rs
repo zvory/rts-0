@@ -131,7 +131,7 @@ pub(super) fn issue_frontal_wave(
                 plan,
                 enemy_base,
                 containment,
-                profile.id == JEFFS_AI_ID,
+                is_jeffs_ai_profile(profile.id),
                 memory,
             ) {
                 return Some(intent);

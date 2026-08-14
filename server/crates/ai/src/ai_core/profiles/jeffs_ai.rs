@@ -9,6 +9,7 @@ use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 
 pub(crate) const JEFFS_AI_ID: &str = "jeffs_ai";
+pub(crate) const JEFFS_AI_PRE_RIFLE_COVERAGE_ID: &str = "jeffs_ai_pre_rifle_coverage";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -24,7 +25,7 @@ const OPTIONAL_UPGRADES: [UpgradeKind; 1] = [UpgradeKind::Methamphetamines];
 /// Server-authoritative port of the champion V3 policy developed in the standalone
 /// `Jeff's AI` workspace. The live controller still emits ordinary fog-constrained
 /// commands through the shared AI action layer.
-pub(crate) static JEFFS_AI: AiProfile = AiProfile {
+const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
     id: JEFFS_AI_ID,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
@@ -161,6 +162,15 @@ pub(crate) static JEFFS_AI: AiProfile = AiProfile {
         optional_upgrades: &OPTIONAL_UPGRADES,
         preserve_during_defensive_panic: true,
     }),
+};
+
+pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_TEMPLATE;
+
+/// Frozen immediately before the home-Rifleman coverage change. This remains internal and
+/// addressable only for deterministic balance comparisons.
+pub(crate) static JEFFS_AI_PRE_RIFLE_COVERAGE: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    ..JEFFS_AI_TEMPLATE
 };
 
 #[cfg(test)]
