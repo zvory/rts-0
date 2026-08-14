@@ -37,6 +37,20 @@ import { MapEditorSession } from "../../client/src/map_editor_session.js";
 }
 
 {
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const tile = { x: 16, y: 16 };
+  session.draft.features[tile.y] = `${".".repeat(tile.x)}=${".".repeat(31 - tile.x)}`;
+  session.draft.noEntrenchmentTiles = [];
+  session.beginTerrainStroke();
+  assert.deepEqual(session.paintTerrainTiles([tile], TERRAIN.ROAD_BARE), [
+    { ...tile, code: TERRAIN.ROAD_BARE },
+  ], "repainting an unchanged road reports the restored automatic overlay");
+  assert.deepEqual(session.draft.noEntrenchmentTiles, [tile],
+    "repainting an imported road restores its automatic no-entrenchment overlay");
+}
+
+{
   const mapDirectory = new URL("../../server/assets/maps/", import.meta.url);
   for (const filename of fs.readdirSync(mapDirectory).filter((name) => name.endsWith(".json"))) {
     const source = JSON.parse(fs.readFileSync(new URL(filename, mapDirectory), "utf8"));

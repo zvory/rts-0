@@ -1,4 +1,5 @@
 import { PASSABLE } from "./protocol.js";
+import { terrainCharacterAt } from "./map_authoring/terrain_layers.js";
 
 const TILE_SIZE = 32;
 const STEEL_BLOCK_DIST_TILES = 4;
@@ -148,8 +149,7 @@ function oilPatchLocalOffset(index, count) {
 }
 
 function tilePassable(draft, tile) {
-  const row = draft?.terrain?.[tile.y];
-  const value = typeof row === "string" ? row[tile.x] : row?.[tile.x];
+  const value = terrainCharacterAt(draft, tile.x, tile.y);
   if (typeof value === "number") return PASSABLE[value] === true;
   return value !== "#" && value !== "~";
 }

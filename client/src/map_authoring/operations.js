@@ -170,12 +170,12 @@ function paintTerrain(draft, tiles, protectedTerrain, { eraseFeature = false } =
     const previous = terrainCharacterAt(draft, point.x, point.y);
     const hadNoEntrenchment = noEntrenchment.has(key);
     const next = setTerrainCharacter(draft, point.x, point.y, character, { eraseFeature });
-    if (next == null) continue;
-    if (AUTHORING_ROAD_CHARACTERS.has(next)) noEntrenchment.set(key, { x: point.x, y: point.y });
+    const composed = next ?? terrainCharacterAt(draft, point.x, point.y);
+    if (AUTHORING_ROAD_CHARACTERS.has(composed)) noEntrenchment.set(key, { x: point.x, y: point.y });
     else if (AUTHORING_ROAD_CHARACTERS.has(previous)) noEntrenchment.delete(key);
     const overlayChanged = hadNoEntrenchment !== noEntrenchment.has(key);
-    if (previous === next && !overlayChanged && Array.isArray(draft.terrain)) continue;
-    terrainPatch.push({ x: point.x, y: point.y, character: next });
+    if (next == null && !overlayChanged) continue;
+    terrainPatch.push({ x: point.x, y: point.y, character: composed });
   }
   draft.noEntrenchmentTiles = [...noEntrenchment.values()];
   return { terrainPatch };

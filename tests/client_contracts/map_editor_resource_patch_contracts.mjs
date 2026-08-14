@@ -25,6 +25,19 @@ withoutOil.baseSites[0].oilPatches = 0;
 assert.equal(mapEditorResourcePatches(withoutOil).length, 12,
   "editing a base patch count changes the next editor presentation");
 
+const splitDraft = structuredClone(draft);
+splitDraft.ground = splitDraft.terrain;
+splitDraft.features = Array(32).fill(".".repeat(32));
+delete splitDraft.terrain;
+const blockedFeatureRow = [...splitDraft.features[4]];
+blockedFeatureRow[4] = "~";
+splitDraft.features[4] = blockedFeatureRow.join("");
+assert.deepEqual(
+  mapEditorResourcePatches(splitDraft).filter(({ kind }) => kind === "oil").map(({ x, y }) => [x, y]),
+  [[144, 112], [208, 80], [80, 176]],
+  "editor Oil stand-ins avoid impassable semantic features in split Map Editor drafts",
+);
+
 const viewport = {
   session: {
     draft: { width: 16, height: 16, terrain: Array(16).fill("."), baseSites: [], startLocations: [] },
