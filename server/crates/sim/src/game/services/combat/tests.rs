@@ -1795,6 +1795,42 @@ fn idle_anti_tank_gun_does_not_auto_setup() {
 }
 
 #[test]
+fn movement_delta_clears_when_target_stops_to_fire() {
+    let mut entities = EntityStore::new();
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("target should spawn");
+    let enemy_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 235.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(target) = entities.get_mut(target_id) {
+        target.set_order(Order::attack_move_to(500.0, 100.0));
+        target.set_path(vec![(500.0, 100.0)]);
+        target.mark_move_phase(MovePhase::Moving);
+        target.set_movement_delta(1.6, 0.0);
+    }
+    if let Some(enemy) = entities.get_mut(enemy_id) {
+        enemy.set_attack_cd(10);
+    }
+
+    run_combat_tick_with_players(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+    );
+
+    let target = entities.get(target_id).expect("target should exist");
+    assert!(
+        target.path_is_empty(),
+        "target should clear its path when stopping to fire"
+    );
+    assert_eq!(
+        target.movement_delta(),
+        (0.0, 0.0),
+        "target should not retain stale movement delta after combat clears its path"
+    );
+}
+
+#[test]
 fn mortar_does_not_fire_without_manual_ability_command() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
