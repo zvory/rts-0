@@ -653,15 +653,20 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
             second_rifle_pos.1,
         )
         .expect("second rifleman should spawn");
-    let mortar_pos = game.state.map.tile_center(4, 2);
-    let mortar = game
+    let anti_tank_gun_pos = game.state.map.tile_center(4, 2);
+    let anti_tank_gun = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
-        .expect("mortar should spawn");
-    if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
-        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
-        mortar_entity.set_emplacement_facing(Some(0.0));
+        .spawn_unit(
+            1,
+            EntityKind::AntiTankGun,
+            anti_tank_gun_pos.0,
+            anti_tank_gun_pos.1,
+        )
+        .expect("anti-tank gun should spawn");
+    if let Some(anti_tank_gun_entity) = game.state.entities.get_mut(anti_tank_gun) {
+        anti_tank_gun_entity.set_weapon_setup(WeaponSetup::Deployed);
+        anti_tank_gun_entity.set_emplacement_facing(Some(0.0));
     }
     let spotter_pos = game.state.map.tile_center(15, 2);
     let spotter = game
@@ -742,13 +747,13 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         Some(enemy),
         "queued attack promotion should validate against team-shared death vision"
     );
-    let mortar_entity = game
+    let anti_tank_gun_entity = game
         .state
         .entities
-        .get(mortar)
-        .expect("mortar should remain alive");
+        .get(anti_tank_gun)
+        .expect("anti-tank gun should remain alive");
     assert_eq!(
-        mortar_entity.target_id(),
+        anti_tank_gun_entity.target_id(),
         Some(enemy),
         "allied death vision should drive teammate auto-acquisition"
     );
