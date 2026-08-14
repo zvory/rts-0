@@ -1236,9 +1236,9 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       setupCommands[0]?.c === "setupAntiTankGuns" &&
         setupCommands[0].units.includes(selectedAntiTankGun.id) &&
         setupCommands[0].units.includes(selectedArtillery.id) &&
-        setupCommands[0].units.includes(setupSelectedMortar.id) &&
+        !setupCommands[0].units.includes(setupSelectedMortar.id) &&
         setupCommands[0].queued === true,
-      "setupAntiTankGuns targeting includes selected artillery and mortars as setup-capable support weapons",
+      "setupAntiTankGuns targeting excludes selected mortars",
     );
 
     const movingAntiTankGun = {

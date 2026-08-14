@@ -41,8 +41,7 @@ assertDeepEqual(
   "an immediate Hold Position still replaces a locally queued plan",
 );
 
-// Queued mortar setup is terminal, while the shared support-weapon setup stage remains
-// non-terminal for directional Anti-Tank Guns and Artillery.
+// Stale setup commands never create local Mortar Team order stages.
 const mortarSetupIntent = new ClientIntent();
 const mortar = { id: 77, kind: KIND.MORTAR_TEAM, x: 96, y: 96, orderPlan: [] };
 mortarSetupIntent.recordPlannedCommand(
@@ -64,12 +63,12 @@ assertDeepEqual(
   mortarSetupIntent.plannedOrderPlanForEntity(mortar),
   [
     { kind: "move", x: 320, y: 288 },
-    { kind: "setupAntiTankGuns", x: 320, y: 288 },
+    { kind: "move", x: 448, y: 288 },
   ],
-  "queued mortar setup stays at the preceding movement destination and stops later queued commands",
+  "queued mortar setup is ignored without interrupting later queued commands",
 );
 
-// Immediate mortar setup replaces the old plan but does not prevent a later queued command.
+// An immediate stale setup command is ignored as well.
 const immediateMortarSetupIntent = new ClientIntent();
 immediateMortarSetupIntent.recordPlannedCommand(
   cmd.setupAntiTankGuns([mortar.id], mortar.x, mortar.y),
@@ -84,8 +83,7 @@ immediateMortarSetupIntent.recordPlannedCommand(
 assertDeepEqual(
   immediateMortarSetupIntent.plannedOrderPlanForEntity(mortar),
   [
-    { kind: "setupAntiTankGuns", x: mortar.x, y: mortar.y },
     { kind: "move", x: 512, y: 288 },
   ],
-  "immediate mortar setup still allows a subsequent queued command",
+  "immediate mortar setup does not create a local setup stage",
 );

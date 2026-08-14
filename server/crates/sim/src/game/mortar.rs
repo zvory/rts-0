@@ -316,7 +316,7 @@ fn mortar_reveal_for(attacker: Option<&Entity>, owner: u32) -> Option<AttackReve
         y: attacker.pos_y,
         facing: Some(attacker.facing()),
         weapon_facing: attacker.weapon_facing(),
-        setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
+        setup_state: None,
     })
 }
 

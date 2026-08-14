@@ -134,9 +134,6 @@ pub(super) fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32)
     let Some(e) = entities.get_mut(id) else {
         return false;
     };
-    if e.kind == EntityKind::MortarTeam {
-        return matches!(e.weapon_setup(), WeaponSetup::Deployed);
-    }
     if !requires_weapon_setup(e.kind) || e.kind == EntityKind::AntiTankGun {
         return true;
     }
@@ -305,12 +302,7 @@ fn rotate_anti_tank_gun_toward_setup_facing(e: &mut Entity) {
     };
     e.set_desired_weapon_facing(target);
     let current = e.facing();
-    let turn_rate = if e.kind == EntityKind::MortarTeam {
-        crate::game::mortar::TURN_RATE_RAD_PER_TICK
-    } else {
-        ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK
-    };
-    let rotated = rotate_toward(current, target, turn_rate);
+    let rotated = rotate_toward(current, target, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
@@ -336,12 +328,7 @@ fn maybe_begin_anti_tank_gun_setup_after_alignment(e: &mut Entity) {
         .weapon_facing()
         .filter(|facing| facing.is_finite())
         .unwrap_or_else(|| e.facing());
-    let tolerance = if e.kind == EntityKind::MortarTeam {
-        crate::game::mortar::FIRE_TOLERANCE_RAD
-    } else {
-        ANTI_TANK_GUN_FIRE_TOLERANCE_RAD
-    };
-    if angle_delta(current, target).abs() <= tolerance {
+    if angle_delta(current, target).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD {
         let Some(ticks) = config::support_weapon_setup_ticks(e.kind) else {
             return;
         };

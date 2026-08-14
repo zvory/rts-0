@@ -1344,7 +1344,6 @@ export class Minimap {
     return sel.filter((e) =>
       ownOwner(this.state, e.owner, this.controlPolicy) &&
       (e.kind === KIND.ANTI_TANK_GUN ||
-        e.kind === KIND.MORTAR_TEAM ||
         e.kind === KIND.ARTILLERY));
   }
 

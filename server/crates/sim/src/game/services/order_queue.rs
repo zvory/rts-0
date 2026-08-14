@@ -718,7 +718,6 @@ mod tests {
     mod artillery_point_fire_tests;
     mod construction_tests;
     mod hold_position_tests;
-    mod mortar_setup_tests;
     mod queued_attack_tests;
 
     use super::*;

@@ -483,10 +483,10 @@ function buttonSlots(card) {
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
-  assert.deepEqual(
+  assert.equal(
     buttonSlots(mortarCard).find((slot) => slot.commandId === "unit.setupSupportWeapon"),
-    { commandId: "unit.setupSupportWeapon", slotIndex: 6, hotkey: "Z" },
-    "mortar setup occupies the bottom-left Z slot",
+    undefined,
+    "mortar has no setup command",
   );
 }
 

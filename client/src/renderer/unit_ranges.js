@@ -331,10 +331,7 @@ function staticUnitRangeProfile(e, tileSize) {
     };
   }
 
-  if (
-    e.kind === KIND.ANTI_TANK_GUN ||
-    (e.kind === KIND.MORTAR_TEAM && e.setupState === SETUP.DEPLOYED)
-  ) {
+  if (e.kind === KIND.ANTI_TANK_GUN) {
     if (e.setupState !== SETUP.DEPLOYED) return null;
     const weapon = fieldOfFireProfile(e.kind, tileSize);
     if (!weapon) return null;

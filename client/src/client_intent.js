@@ -300,6 +300,9 @@ export class ClientIntent {
     );
     for (const unitId of units) {
       const entity = selectedById.get(unitId) || null;
+      if (stage.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS && entity?.kind === KIND.MORTAR_TEAM) {
+        continue;
+      }
       if (command.queued) {
         this._appendPlannedStage(unitId, stage, entity);
       } else {
@@ -600,27 +603,11 @@ function planHasTerminal(plan, entity = null) {
 }
 
 function stageIsTerminalForEntity(stage, entity = null) {
-  return QUEUE_TERMINAL_STAGES.has(stage?.kind) ||
-    (entity?.kind === KIND.MORTAR_TEAM &&
-      stage?.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS &&
-      !stage?.replacesAuthority);
+  return QUEUE_TERMINAL_STAGES.has(stage?.kind);
 }
 
 function queuedStageForEntity(stage, precedingStages, entity = null) {
-  if (
-    entity?.kind !== KIND.MORTAR_TEAM ||
-    stage?.kind !== ORDER_STAGE.SETUP_ANTI_TANK_GUNS
-  ) {
-    return cloneStage(stage);
-  }
-  const precedingPoint = [...precedingStages]
-    .reverse()
-    .find((candidate) => Number.isFinite(candidate?.x) && Number.isFinite(candidate?.y));
-  const x = Number.isFinite(precedingPoint?.x) ? precedingPoint.x : entity?.x;
-  const y = Number.isFinite(precedingPoint?.y) ? precedingPoint.y : entity?.y;
-  return Number.isFinite(x) && Number.isFinite(y)
-    ? cloneStage(stage, { x, y })
-    : cloneStage(stage);
+  return cloneStage(stage);
 }
 
 function stageConfirmedByAuthority(stage, authorityPlan) {

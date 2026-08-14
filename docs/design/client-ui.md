@@ -1498,15 +1498,15 @@ rather than relying on the full mutable `GameState`. Queued support-weapon setup
 accepted move or attack-move order-plan endpoints as their field-of-fire origin, plus local pending
 move/setup stages when the command has been sent but no owner-only `orderPlan` echo has arrived;
 unqueued setup previews use the current support-weapon position. Minimap hover and click targeting
-feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns,
-Mortar Teams, and Artillery. Anti-Tank Gun group setup interprets cursor distance from the selected
+feed support-weapon setup previews and commands from minimap world coordinates for Anti-Tank Guns
+and Artillery. Anti-Tank Gun group setup interprets cursor distance from the selected
 guns' centroid as a formation-facing control: clicks through 14 tiles converge on the literal
 point; from 14 to 20 tiles a smoothstep interpolation straightens the guns until their facings are
 parallel; from 20 to 25 tiles a second smoothstep opens a lateral-rank fan that reaches 90 degrees
 total (leftmost −45 degrees, median straight ahead, rightmost +45 degrees). The client submits the
 whole selection and literal click as one budgeted setup command; the authoritative simulation
-resolves individualized Anti-Tank Gun facing rays, while Mortar Teams and Artillery in a mixed
-selection retain the literal clicked setup point. Viewport and minimap previews mirror those same
+resolves individualized Anti-Tank Gun facing rays, while Artillery in a mixed selection retains the
+literal clicked setup point. Viewport and minimap previews mirror those same
 curves. The input router owns the
 active preview surface: while the minimap is hovered it
 suppresses viewport-derived attack, resource, ability, placement, and Lab-tool previews without
@@ -1918,12 +1918,11 @@ ring remain valid and produce sorties that expire before arrival.
 Unit abilities remain on their declared grid slots in mixed selections rather than spilling into an
 unrelated empty hotkey. When abilities collide, Artillery Fire has the lowest command-card
 priority: Mortar Fire replaces it on `X`.
-The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns, Mortar Teams,
-or Artillery are present and that slot is available. Mortar-only setup issues in place directly
-from the button or hotkey; holding Shift appends a terminal setup after existing queued movement.
-Selections containing Anti-Tank Guns or Artillery retain the directional world-point target step.
-A deployed selected Mortar Team draws its
-5-to-17-tile full-circle range band. Artillery-only selections expose Fire and Set Up together.
+The support-weapon Set Up command has a fixed `Z` slot when selected Anti-Tank Guns or Artillery
+are present and that slot is available. Mortar Teams never expose setup controls or setup targeting.
+A Mortar Team uses its packed pose while moving and deployed pose while stationary as presentation
+only, without an authoritative setup transition. A selected Mortar Team draws its 5-to-17-tile
+full-circle range band. Artillery-only selections expose Fire and Set Up together.
 Command identities are stable and split by scope: global tactical/navigation/production-control
 buttons remain un-namespaced, while build, train, research, and ability buttons emitted for a
 faction catalog use the local player's faction id as the command-id prefix.

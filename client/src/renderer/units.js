@@ -22,8 +22,6 @@ import { hasProjectedUnitShadow } from "./unified_gpu_shadows.js";
 import {
   ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
   DEPLOYED_WEAPON_ANIM_MS,
-  MORTAR_DEPLOYED_WEAPON_ANIM_MS,
-  MORTAR_TEARDOWN_WEAPON_ANIM_MS,
 } from "./palette.js";
 import {
   angleDelta,
@@ -37,6 +35,14 @@ import {
 const FRAME_STRIP_MOVEMENT_HOLD_MS = SNAPSHOT_MS * 3;
 
 export function _deployedWeaponSetupVisual(e) {
+  if (e.kind === KIND.MORTAR_TEAM) {
+    const deployed = e.state === STATE.MOVE ? 0 : 1;
+    return {
+      prongFactor: deployed,
+      frameProgress: deployed,
+      barrel: deployed === 1,
+    };
+  }
   const now = rendererVisualNow(this);
   const setupState = e.setupState || SETUP.PACKED;
   const prev = this._setupVisuals.get(e.id);
@@ -47,11 +53,7 @@ export function _deployedWeaponSetupVisual(e) {
   const elapsed = now - rec.changedAt;
   const durationMs = e.kind === KIND.ARTILLERY
     ? ARTILLERY_DEPLOYED_WEAPON_ANIM_MS
-    : e.kind === KIND.MORTAR_TEAM
-      ? setupState === SETUP.TEARING_DOWN
-        ? MORTAR_TEARDOWN_WEAPON_ANIM_MS
-        : MORTAR_DEPLOYED_WEAPON_ANIM_MS
-      : DEPLOYED_WEAPON_ANIM_MS;
+    : DEPLOYED_WEAPON_ANIM_MS;
   const progress = clamp01(elapsed / durationMs);
   const t = smoothstep01(progress);
 
