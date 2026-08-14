@@ -395,7 +395,6 @@ export const UPGRADE = Object.freeze({
   TANK_UNLOCK: "tank_unlock",
   ARTILLERY_UNLOCK: "artillery_unlock",
   BALLISTIC_TABLES: "ballistic_tables",
-  MORTAR_AUTOCAST: "mortar_autocast",
   SMOKE_PLUS: "smoke_plus",
   SCOUT_PLANE_UNLOCK: "scout_plane_unlock",
 });
@@ -406,7 +405,6 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.ANTI_TANK_GUN_UNLOCK]: 2,
   [UPGRADE.TANK_UNLOCK]: 3,
   [UPGRADE.ARTILLERY_UNLOCK]: 4,
-  [UPGRADE.MORTAR_AUTOCAST]: 5,
   [UPGRADE.BALLISTIC_TABLES]: 7,
   [UPGRADE.ENTRENCHMENT]: 8,
   [UPGRADE.SMOKE_PLUS]: 9,

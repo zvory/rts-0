@@ -79,14 +79,6 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::TANK_UNLOCK_COST_OIL,
             research_ticks: crate::config::TANK_UNLOCK_RESEARCH_TICKS,
         },
-        UpgradeKind::MortarAutocast => UpgradeDefinition {
-            kind,
-            researched_at: catalog.researched_at,
-            requires_upgrade: None,
-            cost_steel: crate::config::MORTAR_AUTOCAST_COST_STEEL,
-            cost_oil: crate::config::MORTAR_AUTOCAST_COST_OIL,
-            research_ticks: crate::config::MORTAR_AUTOCAST_RESEARCH_TICKS,
-        },
         UpgradeKind::SmokePlus => UpgradeDefinition {
             kind,
             researched_at: catalog.researched_at,
@@ -137,7 +129,6 @@ mod tests {
                 UpgradeKind::ArtilleryUnlock,
                 UpgradeKind::BallisticTables,
                 UpgradeKind::TankUnlock,
-                UpgradeKind::MortarAutocast,
                 UpgradeKind::SmokePlus,
                 UpgradeKind::ScoutPlaneUnlock,
             ]

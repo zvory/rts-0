@@ -121,7 +121,7 @@ Artillery research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
 `client/src/config.js`. Training Centre researches Methamphetamines. Engineering Complex researches
-AT Guns, Artillery, Tank Production, Mortar Autocast, and Smoke Plus; Artillery requires
+AT Guns, Artillery, Tank Production, and Smoke Plus; Artillery requires
 AT Guns.
 Each dependency may already be complete or earlier in the same Engineering Complex queue when its dependent is
 ordered, while completion still gates the actual unlock. Tank Production unlocks Tanks; Command

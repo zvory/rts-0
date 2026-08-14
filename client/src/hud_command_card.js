@@ -414,7 +414,7 @@ export function buildUnitCard(ctx, selection) {
         affordance.autocastEnabledIds.length > 0 ? "autocast-enabled" : "",
       ].filter(Boolean).join(" "),
       onUnavailableIntent: { type: "playNotEnough", cost: definition.cost },
-      contextIntent: definition.ability === ABILITY.MORTAR_FIRE
+      contextIntent: definition.autocast
         ? {
             type: "setAutocast",
             ability: definition.ability,
@@ -422,7 +422,7 @@ export function buildUnitCard(ctx, selection) {
             enabled: affordance.autocastEnabledIds.length === 0,
           }
         : null,
-      contextHotkeyModifiers: definition.ability === ABILITY.MORTAR_FIRE ? ["alt"] : [],
+      contextHotkeyModifiers: definition.autocast ? ["alt"] : [],
     };
   }
 

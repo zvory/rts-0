@@ -240,46 +240,6 @@ fn out_of_range_direct_attacks_create_and_refresh_pursuit_paths() {
 }
 
 #[test]
-fn mortar_autocast_candidates_respect_exact_max_range() {
-    let map = open_map(32);
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
-        .expect("mortar should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-    }
-    let mortar = entities
-        .get(mortar_id)
-        .expect("mortar should exist for range setup");
-    let profile = effective_attack_profile(mortar);
-    let exact_range = profile.range_tiles * config::TILE_SIZE as f32;
-    let padded_range = exact_range + mortar.radius() + RANGE_SLACK;
-    let target_x = 100.0 + (exact_range + (padded_range - exact_range) * 0.5);
-    let _target_id = spawn_target(&mut entities, EntityKind::Rifleman, target_x, 100.0);
-    let attacker = entities.get(mortar_id).expect("mortar should still exist");
-    let target = resolve_target(
-        &map,
-        &entities,
-        &default_team_relations(),
-        &SpatialIndex::build(&entities, map.width, map.height),
-        &LineOfSight::new(&map),
-        &visible_fog(&map, &entities),
-        &SmokeCloudStore::new(),
-        mortar_id,
-        attacker.owner,
-        attacker.pos_x,
-        attacker.pos_y,
-        padded_range,
-        combat_mode(attacker),
-    );
-    assert_eq!(
-        target, None,
-        "mortar should not select targets outside its exact max range"
-    );
-}
-
-#[test]
 fn deployed_anti_tank_gun_fires_at_long_range() {
     const TARGET_RANGE_TILES: f32 = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32 - 1.0;
     let map = open_map(64);

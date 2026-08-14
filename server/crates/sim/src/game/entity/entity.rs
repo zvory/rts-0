@@ -640,29 +640,6 @@ impl Entity {
             .filter(|until| *until > tick)
     }
 
-    pub fn autocast_enabled(&self, ability: AbilityKind) -> Option<bool> {
-        match (self.kind, ability) {
-            (EntityKind::MortarTeam, AbilityKind::MortarFire) => Some(
-                self.combat
-                    .as_ref()
-                    .map(|c| c.autocast_enabled)
-                    .unwrap_or(false),
-            ),
-            _ => None,
-        }
-    }
-
-    pub fn set_autocast_enabled(&mut self, ability: AbilityKind, enabled: bool) {
-        if matches!(
-            (self.kind, ability),
-            (EntityKind::MortarTeam, AbilityKind::MortarFire)
-        ) {
-            if let Some(c) = self.combat.as_mut() {
-                c.autocast_enabled = enabled;
-            }
-        }
-    }
-
     pub fn ability_uses_remaining(&self, ability: AbilityKind) -> Option<u16> {
         let max_charges = crate::game::ability::definition(ability).charges?;
         Some(

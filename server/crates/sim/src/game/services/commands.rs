@@ -559,40 +559,11 @@ pub(in crate::game) fn apply_commands(
                     tick,
                 );
             }
-            SimCommand::SetAutocast {
-                ability,
-                units,
-                enabled,
-            } => {
-                let Some(units) =
-                    validate_command_units(entities, events, player, units, command_admission)
-                else {
-                    continue;
-                };
-                let definition = ability::definition(ability);
-                if !definition.autocast {
-                    continue;
-                }
-                if ability == AbilityKind::MortarFire
-                    && !players.iter().any(|p| {
-                        p.id == player && p.upgrades.contains(&UpgradeKind::MortarAutocast)
-                    })
+            SimCommand::SetAutocast { units, .. } => {
+                if validate_command_units(entities, events, player, units, command_admission)
+                    .is_none()
                 {
                     continue;
-                }
-                for id in units {
-                    if owns_unit(entities, player, id)
-                        && ability_orders::caster_allowed_by_faction(
-                            entities,
-                            &faction_id,
-                            id,
-                            ability,
-                        )
-                    {
-                        if let Some(e) = entities.get_mut(id) {
-                            e.set_autocast_enabled(ability, enabled);
-                        }
-                    }
                 }
             }
             SimCommand::Gather {

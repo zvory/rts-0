@@ -33,7 +33,6 @@ pub mod lab;
 pub mod map;
 mod map_authoring;
 mod mortar;
-mod mortar_scatter;
 mod observer_snapshot;
 mod panzerfaust_shot;
 mod pathfinding;

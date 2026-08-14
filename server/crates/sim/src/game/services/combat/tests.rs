@@ -1,7 +1,6 @@
 use super::*;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
-use crate::game::mortar;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::{angle_delta, movement_system};
 use crate::game::services::occupancy::Occupancy;
@@ -20,7 +19,6 @@ mod anti_tank_behavior;
 mod coax;
 mod entrenchment;
 mod fog_visibility;
-mod mortar_autocast;
 mod moving_fire_policy;
 mod range_targeting;
 mod retention;
@@ -151,9 +149,7 @@ fn team_relations(assignments: &[(u32, u32)]) -> TeamRelations {
 }
 
 fn run_combat_tick(entities: &mut EntityStore) -> HashMap<u32, Vec<Event>> {
-    let mut player = player_state(1, false);
-    player.upgrades.insert(UpgradeKind::MortarAutocast);
-    run_combat_tick_with_players(entities, &[player, player_state(2, false)])
+    run_combat_tick_with_players(entities, &[player_state(1, false), player_state(2, false)])
 }
 
 fn run_combat_tick_with_players(
@@ -204,14 +200,8 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
         .collect();
 
     let mut rng = SmallRng::seed_from_u64(rng_seed);
-    let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
     let mut panzerfaust_shots = crate::game::panzerfaust_shot::PanzerfaustShotStore::default();
     let mut firing_reveals = Vec::new();
-    let mortar_autocast_researched = |owner| {
-        players
-            .iter()
-            .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::MortarAutocast))
-    };
     let methamphetamines_researched = |owner| {
         players
             .iter()
@@ -221,13 +211,11 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
         map,
         entities,
         &teams,
-        &mortar_autocast_researched,
         &methamphetamines_researched,
         &spatial,
         &mut coordinator,
         &fog,
         smokes,
-        &mut mortar_shells,
         &mut panzerfaust_shots,
         &mut rng,
         &mut events,
@@ -237,29 +225,6 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     events
 }
 
-fn test_mortar_scattered_impact(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    player_ids: &[u32],
-    owner: u32,
-    attacker: u32,
-    target: u32,
-    tick: u32,
-) -> (f32, f32) {
-    let map = Map::generate(2, 0x00C0_FFEE);
-    let mut fog = Fog::new(map.width, map.height);
-    fog.recompute(player_ids, entities, &map);
-    let target = entities.get(target).expect("target should exist");
-    crate::game::mortar_scatter::scattered_mortar_impact(
-        &fog,
-        teams,
-        owner,
-        attacker,
-        target.pos_x,
-        target.pos_y,
-        tick,
-    )
-}
 fn run_movement_tick(entities: &mut EntityStore) {
     let map = Map::generate(2, 0x00C0_FFEE);
     run_movement_tick_on_map(entities, &map, 0);
@@ -1242,25 +1207,21 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     let mut fog = Fog::new(map.width, map.height);
     fog.recompute(&[1], &entities, &map);
     let smokes = SmokeCloudStore::new();
-    let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
     let mut panzerfaust_shots = crate::game::panzerfaust_shot::PanzerfaustShotStore::default();
     let mut events = HashMap::from([(1, Vec::new())]);
     let mut firing_reveals = Vec::new();
 
     let mut rng = SmallRng::seed_from_u64(0);
-    let mortar_autocast_researched = |_owner| false;
     let methamphetamines_researched = |_owner| false;
     combat_system(
         &map,
         &mut entities,
         &TeamRelations::from_player_teams([(1, 1)]),
-        &mortar_autocast_researched,
         &methamphetamines_researched,
         &spatial,
         &mut coordinator,
         &fog,
         &smokes,
-        &mut mortar_shells,
         &mut panzerfaust_shots,
         &mut rng,
         &mut events,
@@ -1834,37 +1795,6 @@ fn idle_anti_tank_gun_does_not_auto_setup() {
 }
 
 #[test]
-fn mortar_turns_fast_before_auto_firing() {
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 300.0, 300.0)
-        .expect("mortar should spawn");
-    entities
-        .spawn_unit(2, EntityKind::Rifleman, 428.6, 146.8)
-        .expect("enemy should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-        mortar.set_emplacement_facing(Some(0.0));
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
-    }
-    run_combat_tick(&mut entities);
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert!(angle_delta(mortar.facing(), -mortar::TURN_RATE_RAD_PER_TICK).abs() <= 0.001);
-    assert_eq!(mortar.attack_cd(), 0);
-    for _ in 0..2 {
-        run_combat_tick(&mut entities);
-    }
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert!(
-        angle_delta(mortar.facing(), -50_f32.to_radians()).abs()
-            <= mortar::FIRE_TOLERANCE_RAD + 0.001
-    );
-    assert!(mortar.attack_cd() > 0);
-}
-
-#[test]
 fn movement_delta_clears_when_target_stops_to_fire() {
     let mut entities = EntityStore::new();
     let target_id = entities
@@ -1901,259 +1831,40 @@ fn movement_delta_clears_when_target_stops_to_fire() {
 }
 
 #[test]
-fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
+fn mortar_does_not_fire_without_manual_ability_command() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
         .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
         .expect("mortar should spawn");
-    let enemy_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("enemy should spawn");
-    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
-    let (impact_x, impact_y) =
-        test_mortar_scattered_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
-    entities
-        .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
-        .expect("friendly should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-        mortar.set_emplacement_facing(Some(0.0));
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
-    }
-
-    run_combat_tick(&mut entities);
-
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert_eq!(
-        mortar.attack_cd(),
-        0,
-        "autocast mortar should hold fire when the scattered impact would hit an owned unit"
-    );
-}
-
-#[test]
-fn mortar_autocast_skips_shot_that_would_hit_allied_unit() {
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
-        .expect("mortar should spawn");
-    let enemy_id = entities
-        .spawn_unit(3, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("enemy should spawn");
-    let teams = TeamRelations::from_player_teams([(1, 7), (2, 7), (3, 3)]);
-    let (impact_x, impact_y) =
-        test_mortar_scattered_impact(&entities, &teams, &[1, 2, 3], 1, mortar_id, enemy_id, 10);
-    entities
-        .spawn_unit(2, EntityKind::Rifleman, impact_x, impact_y + 24.0)
-        .expect("allied unit should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
-    }
-    let mut p1 = player_state(1, false);
-    let mut p2 = player_state(2, false);
-    let mut p3 = player_state(3, false);
-    p1.team_id = 7;
-    p2.team_id = 7;
-    p3.team_id = 3;
-
-    run_combat_tick_with_players(&mut entities, &[p1, p2, p3]);
-
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert_eq!(
-        mortar.attack_cd(),
-        0,
-        "autocast mortar should hold fire when the scattered impact would hit an allied unit"
-    );
-}
-
-#[test]
-fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
-        .expect("mortar should spawn");
-    let enemy_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("enemy should spawn");
-    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
-    let (impact_x, impact_y) =
-        test_mortar_scattered_impact(&entities, &teams, &[1, 2], 1, mortar_id, enemy_id, 10);
-    entities
-        .spawn_building(1, EntityKind::Depot, impact_x, impact_y + 40.0, true)
-        .expect("depot should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
-    }
-
-    run_combat_tick(&mut entities);
-
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert_eq!(
-        mortar.attack_cd(),
-        0,
-        "autocast mortar should hold fire when the scattered impact would hit an owned building"
-    );
-}
-
-#[test]
-fn mortar_autocast_fires_when_scattered_impact_is_clear_of_owned_entities() {
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
-        .expect("mortar should spawn");
-    entities
+    let target_id = entities
         .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
-        .expect("enemy should spawn");
+        .expect("target should spawn");
     if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
+        mortar.set_order(Order::attack(target_id));
         mortar.set_weapon_setup(WeaponSetup::Deployed);
         mortar.set_emplacement_facing(Some(0.0));
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
+    let target_hp = entities.get(target_id).expect("target should exist").hp;
 
-    run_combat_tick(&mut entities);
-
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert!(
-        mortar.attack_cd() > 0,
-        "autocast mortar should fire when no owned entity is inside the scattered impact"
-    );
-}
-
-#[test]
-fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
-    let map = map_with_rock_at((4, 3));
-    let mortar_pos = map.tile_center(2, 3);
-    let target_pos = map.tile_center(8, 3);
-    let spotter_pos = map.tile_center(8, 6);
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
-        .expect("mortar should spawn");
-    entities
-        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
-        .expect("enemy should spawn");
-    entities
-        .spawn_unit(1, EntityKind::Rifleman, spotter_pos.0, spotter_pos.1)
-        .expect("spotter should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-        mortar.set_emplacement_facing(Some(0.0));
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
+    for _ in 0..(config::TICK_HZ * 3) {
+        run_combat_tick(&mut entities);
     }
-
-    let mut player = player_state(1, false);
-    player.upgrades.insert(UpgradeKind::MortarAutocast);
-    run_combat_tick_on_map(&mut entities, &[player, player_state(2, false)], &map);
-
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert!(
-        mortar.attack_cd() > 0,
-        "mortar autocast should fire indirectly at owner-visible targets behind LOS blockers"
-    );
-}
-
-#[test]
-fn mortar_autocast_does_not_fire_at_hidden_target_behind_blocking_terrain() {
-    let map = map_with_rock_at((4, 3));
-    let mortar_pos = map.tile_center(2, 3);
-    let target_pos = map.tile_center(8, 3);
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
-        .expect("mortar should spawn");
-    entities
-        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
-        .expect("enemy should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-        mortar.set_emplacement_facing(Some(0.0));
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
-    }
-
-    run_combat_tick_on_map(
-        &mut entities,
-        &[player_state(1, false), player_state(2, false)],
-        &map,
-    );
 
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert_eq!(
-        mortar.attack_cd(),
-        0,
-        "mortar autocast should still require the target to be visible to the owner"
-    );
-}
-
-#[test]
-fn mortar_autocast_disabled_holds_fire_without_blocking_manual_state() {
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
-        .expect("mortar should spawn");
-    entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("enemy should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-    }
-
-    run_combat_tick(&mut entities);
-
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
-    assert_eq!(
-        mortar.autocast_enabled(AbilityKind::MortarFire),
-        Some(false),
-        "mortar autocast should default to disabled"
+        mortar.target_id(),
+        None,
+        "mortar must not acquire an attack target"
     );
     assert_eq!(
         mortar.attack_cd(),
         0,
-        "disabled autocast mortar should hold fire against visible in-range targets"
+        "mortar must not launch automatic shells"
     );
-}
-
-#[test]
-fn mortar_autocast_requires_research_even_if_entity_flag_is_enabled() {
-    let mut entities = EntityStore::new();
-    let mortar_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
-        .expect("mortar should spawn");
-    entities
-        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
-        .expect("enemy should spawn");
-    if let Some(mortar) = entities.get_mut(mortar_id) {
-        mortar.set_facing(0.0);
-        mortar.set_weapon_facing(0.0);
-        mortar.set_weapon_setup(WeaponSetup::Deployed);
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
-    }
-
-    run_combat_tick_with_players(
-        &mut entities,
-        &[player_state(1, false), player_state(2, false)],
-    );
-
-    let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert_eq!(
-        mortar.attack_cd(),
-        0,
-        "mortar autocast should not fire before Mortar Autocast research completes"
+        entities.get(target_id).expect("target should exist").hp,
+        target_hp,
+        "even an explicit Attack order must not bypass manual Mortar Fire",
     );
 }
 

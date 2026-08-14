@@ -9,7 +9,7 @@ use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, Order, OrderIntent, NEUTRAL};
 use crate::game::map::{Map, CURRENT_MAP_VERSION};
 use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
-use crate::game::services::{production, standability};
+use crate::game::services::standability;
 use crate::game::upgrade::UpgradeKind;
 use crate::protocol::{terrain, Command, LabMapDraft};
 use crate::rules;
@@ -742,12 +742,6 @@ impl Game {
         } else {
             return Err(invalid_kind(input.kind, "spawnEntity"));
         };
-        production::sync_spawned_upgrade_effects(
-            &mut self.state.entities,
-            &self.state.players,
-            input.owner,
-            id,
-        );
         Ok(LabOpOutcome::Spawned { entity_id: id })
     }
 
@@ -822,18 +816,6 @@ impl Game {
             entity.clear_orders();
             clear_lab_production_state(entity);
         }
-        if let Some(player) = self
-            .state
-            .players
-            .iter()
-            .find(|player| player.id == input.owner)
-        {
-            production::sync_owned_upgrade_effects(
-                &mut self.state.entities,
-                input.owner,
-                &player.upgrades,
-            );
-        }
         self.state.entities.release_miner(input.entity_id);
         self.cleanup_entity_references(input.entity_id);
         Ok(LabOpOutcome::OwnerSet {
@@ -896,11 +878,6 @@ impl Game {
         } else {
             player.upgrades.remove(&input.upgrade);
         }
-        production::sync_owned_upgrade_effects(
-            &mut self.state.entities,
-            input.player_id,
-            &player.upgrades,
-        );
         Ok(LabOpOutcome::CompletedResearchSet {
             player_id: input.player_id,
             upgrade: input.upgrade,
@@ -985,7 +962,6 @@ impl Game {
     fn repair_lab_state(&mut self) {
         self.state.entities.clear_stale_miner_slots();
         self.sync_lab_god_mode_flags();
-        production::sync_all_owned_upgrade_effects(&mut self.state.entities, &self.state.players);
         systems::recompute_supply(&mut self.state.players, &self.state.entities);
         self.reset_derived_state();
         let ids = self.state.player_ids();

@@ -289,7 +289,7 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
         .get(shell_target)
         .expect("shell target should exist");
     let mut launch_events = event_map_for(&baseline);
-    baseline.state.mortar_shells.schedule_autocast(
+    baseline.state.mortar_shells.schedule_manual(
         &mut launch_events,
         &baseline.state.fog,
         &baseline.team_relations(),
@@ -626,7 +626,6 @@ fn seed_combat_state(
             .entities
             .get_mut(mortar)
             .expect("mortar should exist");
-        mortar.set_autocast_enabled(ability::AbilityKind::MortarFire, false);
         mortar.start_ability_cooldown(ability::AbilityKind::MortarFire, 11);
     }
     let scout_id = game

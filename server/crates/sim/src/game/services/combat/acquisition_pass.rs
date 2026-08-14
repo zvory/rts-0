@@ -28,11 +28,6 @@ pub(super) fn acquire(
     acquire_px: f32,
     mode: CombatMode,
     can_move_fire: bool,
-    is_mortar_team: bool,
-    min_range_px: f32,
-    range_px: f32,
-    require_safe_mortar_target: bool,
-    tick: u32,
 ) -> Option<u32> {
     if let Some(target) = clear_obstacle_area_target(map, entities, teams, fog, smokes, id, owner) {
         return Some(target);
@@ -53,21 +48,7 @@ pub(super) fn acquire(
         acquire_px,
         mode,
         can_move_fire,
-        &|target_id| {
-            (!is_mortar_team
-                || super::mortar_autocast_target_eligible(
-                    map,
-                    entities,
-                    id,
-                    target_id,
-                    min_range_px,
-                    range_px,
-                ))
-                && (!require_safe_mortar_target
-                    || super::mortar_autocast_target_safe(
-                        entities, teams, fog, spatial, owner, id, target_id, tick,
-                    ))
-        },
+        &|_| true,
     )
 }
 
@@ -89,10 +70,7 @@ pub(super) fn select(
     mode: CombatMode,
     can_move_fire: bool,
     weapon: crate::rules::combat::WeaponKind,
-    is_mortar_team: bool,
-    min_range_px: f32,
     range_px: f32,
-    require_safe_mortar_target: bool,
     tick: u32,
 ) -> Option<u32> {
     if let Some(target) = clear_obstacle_area_target(map, entities, teams, fog, smokes, id, owner) {
@@ -101,32 +79,14 @@ pub(super) fn select(
     let ready = entities
         .get(id)
         .is_some_and(|entity| entity.weapon_cooldown(weapon) == 0);
-    let targetless_travelling_order = !is_mortar_team
-        && entities.get(id).is_some_and(|entity| {
-            entity.target_id().is_none()
-                && match entity.order() {
-                    Order::AttackMove(_) => {
-                        mode == CombatMode::Aggressive && !entity.path_is_empty()
-                    }
-                    Order::Move(_) => mode == CombatMode::Opportunistic && can_move_fire,
-                    _ => false,
-                }
-        });
-    let target_filter = |target_id| {
-        (!is_mortar_team
-            || super::mortar_autocast_target_eligible(
-                map,
-                entities,
-                id,
-                target_id,
-                min_range_px,
-                range_px,
-            ))
-            && (!require_safe_mortar_target
-                || super::mortar_autocast_target_safe(
-                    entities, teams, fog, spatial, owner, id, target_id, tick,
-                ))
-    };
+    let targetless_travelling_order = entities.get(id).is_some_and(|entity| {
+        entity.target_id().is_none()
+            && match entity.order() {
+                Order::AttackMove(_) => mode == CombatMode::Aggressive && !entity.path_is_empty(),
+                Order::Move(_) => mode == CombatMode::Opportunistic && can_move_fire,
+                _ => false,
+            }
+    });
     if tank_periodic_reacquisition_due(entities, id, mode, tick) {
         return acquire(
             map,
@@ -144,11 +104,6 @@ pub(super) fn select(
             acquire_px,
             mode,
             can_move_fire,
-            is_mortar_team,
-            min_range_px,
-            range_px,
-            require_safe_mortar_target,
-            tick,
         );
     }
     let retained = retained_target(
@@ -167,7 +122,7 @@ pub(super) fn select(
         mode,
         range_px,
         ready,
-        &target_filter,
+        &|_| true,
     );
     if retained.is_some() || (!ready && !targetless_travelling_order) {
         return retained;
@@ -188,11 +143,6 @@ pub(super) fn select(
         acquire_px,
         mode,
         can_move_fire,
-        is_mortar_team,
-        min_range_px,
-        range_px,
-        require_safe_mortar_target,
-        tick,
     )
 }
 

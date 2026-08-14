@@ -287,8 +287,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   `artillery_unlock` for 200 steel / 100 oil over 750 ticks after completed
   `anti_tank_gun_unlock`, unlocking Artillery training at Gun Works;
   `tank_unlock` for 150 steel / 100 oil over 600 ticks, unlocking Tank and Command Car training at
-  Vehicle Works; and `mortar_autocast` for 150 steel / 150 oil
-  over 600 ticks, enabling Mortar Team autocast for current and future owned Mortar Teams; and
+  Vehicle Works;
   `smoke_plus` for 150 steel / 150 oil over 600 ticks, doubling future Scout Car Smoke radius and
   duration; and `scout_plane_unlock` for 50 steel / 100 oil over 600 ticks, unlocking the Command
   Car Scout Plane ability.

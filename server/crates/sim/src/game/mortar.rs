@@ -6,7 +6,6 @@ use crate::game::entrenchment_combat;
 use crate::game::firing_reveal::{record_mortar_impact_firing_reveals, FiringRevealSource};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
-use crate::game::mortar_scatter::scattered_mortar_impact;
 use crate::game::services::dist2;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
@@ -18,29 +17,6 @@ use serde::{Deserialize, Serialize};
 pub(crate) const FIRE_TOLERANCE_RAD: f32 = 15.0_f32.to_radians();
 pub(crate) const HALF_TURN_TICKS: u32 = config::TICK_HZ / 5;
 pub(crate) const TURN_RATE_RAD_PER_TICK: f32 = std::f32::consts::PI / HALF_TURN_TICKS as f32;
-
-#[derive(Debug, Clone, Copy)]
-enum MortarFireMode {
-    Manual,
-    Autocast,
-}
-
-impl MortarFireMode {
-    fn scatters(self) -> bool {
-        matches!(self, Self::Autocast)
-    }
-
-    fn reveals_launch_to_enemies(self) -> bool {
-        matches!(self, Self::Autocast)
-    }
-
-    fn delay_ticks(self) -> u32 {
-        match self {
-            Self::Manual => config::MORTAR_MANUAL_SHELL_DELAY_TICKS,
-            Self::Autocast => config::MORTAR_SHELL_DELAY_TICKS,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct MortarShell {
@@ -121,76 +97,12 @@ impl MortarShellStore {
         y: f32,
         tick: u32,
     ) {
-        self.schedule(
-            events,
-            fog,
-            teams,
-            owner,
-            attacker,
-            from_x,
-            from_y,
-            x,
-            y,
-            tick,
-            MortarFireMode::Manual,
-        );
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn schedule_autocast(
-        &mut self,
-        events: &mut HashMap<u32, Vec<Event>>,
-        fog: &Fog,
-        teams: &TeamRelations,
-        owner: u32,
-        attacker: u32,
-        from_x: f32,
-        from_y: f32,
-        x: f32,
-        y: f32,
-        tick: u32,
-    ) {
-        self.schedule(
-            events,
-            fog,
-            teams,
-            owner,
-            attacker,
-            from_x,
-            from_y,
-            x,
-            y,
-            tick,
-            MortarFireMode::Autocast,
-        );
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn schedule(
-        &mut self,
-        events: &mut HashMap<u32, Vec<Event>>,
-        fog: &Fog,
-        teams: &TeamRelations,
-        owner: u32,
-        attacker: u32,
-        from_x: f32,
-        from_y: f32,
-        x: f32,
-        y: f32,
-        tick: u32,
-        fire_mode: MortarFireMode,
-    ) {
-        let (impact_x, impact_y) = if fire_mode.scatters() {
-            scattered_mortar_impact(fog, teams, owner, attacker, x, y, tick)
-        } else {
-            (x, y)
-        };
-        let delay_ticks = fire_mode.delay_ticks();
+        let delay_ticks = config::MORTAR_MANUAL_SHELL_DELAY_TICKS;
         self.shells.push(MortarShell {
             owner,
             attacker,
-            x: impact_x,
-            y: impact_y,
+            x,
+            y,
             impact_tick: tick.saturating_add(delay_ticks),
         });
         emit_launch(
@@ -201,9 +113,9 @@ impl MortarShellStore {
             attacker,
             from_x,
             from_y,
-            impact_x,
-            impact_y,
-            fire_mode.reveals_launch_to_enemies(),
+            x,
+            y,
+            false,
             delay_ticks,
         );
     }

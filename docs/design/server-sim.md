@@ -1228,25 +1228,15 @@ removes the Golem permanently, restores Ekat to max HP, and emits an owner-visib
 notice. If no Golem is in range, the command is a no-op. Ekat has no passive regeneration.
 
 Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
-Every manual and autocast shell scatters from its intended impact point when scheduled: targets
-visible to the firing team use a one-tile median miss radius, while blind target points use a
-four-tile median miss radius.
 They damage owned, allied, and enemy units/buildings with the same falloff and armor rules; resource
 nodes are ignored. Same-team mortar damage is intentionally real friendly fire, but it is
 unattributed: it does not update `last_damage_owner`/position/tick, does not trigger AI worker
 retreat, does not emit enemy under-attack notices, and does not award kill credit or combat score.
-Idle/attack-move autocast is conservative and requires completed `mortar_autocast` research plus a
-fully deployed Mortar Team. Acquisition and firing are restricted to the full 360-degree field of
-fire and the five-to-17-tile range band. Autocast targets each unit's current position without
-movement lead, then applies normal deterministic scatter. Before
-scheduling a shell, combat checks the deterministic scattered impact point against owned and allied
-units/buildings at their current positions and holds fire if any would be inside the damaging radius. Autocast
-target acquisition uses the same safety check, so Mortar Teams face the nearest target that can be
-autocast safely instead of tracking an unsafe closer enemy. Manual mortar fire is intentionally
-allowed onto same-team positions, so players can still take risky shots deliberately. Mortar
-autocast is stored on the authoritative combat state, is enabled for current and future Mortar Teams
-when research completes, and can be toggled through `SetAutocast(mortarFire, enabled=<bool>)`;
-disabled mortars still accept manual `mortarFire` commands.
+Mortar Teams do not participate in ordinary combat acquisition: Idle, Hold Position, Attack Move,
+and even direct Attack orders cannot launch a shell. Every shot requires an explicit `mortarFire`
+ability command, lands exactly on the selected point, and remains intentionally allowed onto
+same-team positions so players can take risky shots deliberately. Manual commands still obey the
+five-to-17-tile range band, setup/repositioning rules, weapon reload, and queued-command semantics.
 
 Artillery point-fire shells follow the same support-weapon friendly-fire contract: blast damage can
 hit owned and allied entities in the radius, but same-team damage is unattributed and cannot award

@@ -370,30 +370,22 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 45` (~1.5s),
   `MORTAR_TEAM_TEARDOWN_TICKS = 15` (~0.5s), `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
-  `MORTAR_SHELL_DELAY_TICKS = 68` (~2.27s autocast travel),
   `MORTAR_MANUAL_SHELL_DELAY_TICKS = 34` (~1.13s manual travel),
   `MORTAR_OUTER_RADIUS_TILES = 2.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
-  `MORTAR_OUTER_DAMAGE = 40`, `MORTAR_INNER_DAMAGE = 100`,
-  `MORTAR_VISIBLE_MEDIAN_SCATTER_TILES = 1.0`, and
-  `MORTAR_BLIND_MEDIAN_SCATTER_TILES = 4.0`.
+  `MORTAR_OUTER_DAMAGE = 40`, and `MORTAR_INNER_DAMAGE = 100`.
   Mortar facing uses sim-local `mortar::TURN_RATE_RAD_PER_TICK = PI / 6`, so a 180-degree turn
   takes 6 ticks (~200ms at 30 Hz) instead of snapping instantly.
-  Manual shots use half the shell flight time of autocast shots; launch events carry the selected
-  delay so the client projectile animation stays synchronized with the authoritative impact.
+  Launch events carry the manual shell delay so the client projectile animation stays synchronized
+  with the authoritative impact.
   Neither radius has armor penetration: armored targets take the standard non-piercing reduction,
   resulting in 25 inner damage or 10 outer damage before other modifiers. Manual Fire uses hotkey
   `X` and remains a player-directed override that does not require setup, but it must land in the
-  5-to-17-tile range band. Autocast uses normal idle/attack-move acquisition after Mortar Autocast
-  research completes and fires only while fully deployed, at targets inside the same range band and
-  its full 360-degree field of fire. Autocast aims at a target's current position and does not lead
-  movement. Manual shots always land exactly on the clicked point, including in fog. Autocast shots
-  retain deterministic radial scatter with a one-tile median miss radius on visible targets and a
-  four-tile median miss radius otherwise. Autocast prefers targets whose deterministic scattered
-  impact avoids same-team units/buildings when alternatives are available.
-  Mortar impacts apply the same damage to friendly and enemy units/buildings; autocast skips
-  deterministic scattered impact points that would hit any same-team unit or building at its current position,
-  while manual fire remains unrestricted.
+  5-to-17-tile range band. Mortar Teams never acquire or fire at targets through Idle, Hold Position,
+  Attack, or Attack Move; every shell requires an explicit Mortar Fire command. Manual shots always
+  land exactly on the clicked point, including in fog.
+  Mortar impacts apply the same damage to friendly and enemy units/buildings, and manual fire
+  remains unrestricted even when the selected impact point would hit same-team units or buildings.
 - anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20` and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 30 degrees total`; packed, setting-up, and tearing-down guns
   cannot fire. A deployed gun's setup cone remains fixed while its body and barrel turn together at
@@ -506,10 +498,6 @@ profiles and explicit activation/autocast policy instead of being folded into de
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works; Command Cars require only a
   completed Engineering Complex and do not require Tank Production.
-- **Mortar Autocast** (Engineering Complex research, protocol id `mortar_autocast`): costs 150 steel /
-  150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
-  complete, all current and future Mortar Teams for that player start with autocast enabled; players
-  can still turn autocast off per selected Mortar Team.
 - **Smoke Plus** (Engineering Complex research, protocol id `smoke_plus`): costs 150 steel / 150 oil and
   takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
   cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
@@ -661,7 +649,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
 | training_centre            | Training Centre    | 200 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a Resource Depot and Barracks |
-| engineering_complex           | Engineering Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Mortar Autocast, Smoke Plus, and Scout Plane; requires a Resource Depot and Training Centre |
+| engineering_complex           | Engineering Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Guns, Artillery, Tank Production, Smoke Plus, and Scout Plane; requires a Resource Depot and Training Centre |
 | factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, command_car after a completed Engineering Complex, and tank after Tank Production research; requires a Resource Depot and Training Centre |
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, and Artillery after Artillery research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |

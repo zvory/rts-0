@@ -153,7 +153,6 @@ pub mod upgrades {
     pub const TANK_UNLOCK: &str = "tank_unlock";
     pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
     pub const BALLISTIC_TABLES: &str = "ballistic_tables";
-    pub const MORTAR_AUTOCAST: &str = "mortar_autocast";
     pub const SMOKE_PLUS: &str = "smoke_plus";
     pub const SCOUT_PLANE_UNLOCK: &str = "scout_plane_unlock";
     pub const ALL: &[&str] = &[
@@ -164,7 +163,6 @@ pub mod upgrades {
         ARTILLERY_UNLOCK,
         BALLISTIC_TABLES,
         TANK_UNLOCK,
-        MORTAR_AUTOCAST,
         SMOKE_PLUS,
         SCOUT_PLANE_UNLOCK,
     ];
@@ -475,7 +473,6 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::ANTI_TANK_GUN_UNLOCK, 2),
     (upgrades::TANK_UNLOCK, 3),
     (upgrades::ARTILLERY_UNLOCK, 4),
-    (upgrades::MORTAR_AUTOCAST, 5),
     (upgrades::BALLISTIC_TABLES, 7),
     (upgrades::ENTRENCHMENT, 8),
     (upgrades::SMOKE_PLUS, 9),
@@ -777,7 +774,6 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("TANK_UNLOCK", upgrades::TANK_UNLOCK),
         ("ARTILLERY_UNLOCK", upgrades::ARTILLERY_UNLOCK),
         ("BALLISTIC_TABLES", upgrades::BALLISTIC_TABLES),
-        ("MORTAR_AUTOCAST", upgrades::MORTAR_AUTOCAST),
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
         ("SCOUT_PLANE_UNLOCK", upgrades::SCOUT_PLANE_UNLOCK),
     ])
