@@ -63,8 +63,7 @@ pub struct Map {
     pub height: u32,
     /// Row-major terrain codes, length `width * height`.
     pub terrain: Vec<u8>,
-    /// Row-major authoritative static elevation levels, length `width * height`.
-    /// No gameplay rule consumes these levels yet.
+    /// Row-major elevation levels used by directional movement speed and capped fog sight bonuses.
     pub elevation: Vec<u8>,
     /// Optional authored presentation conditions for elevated-terrain lighting.
     pub sun: Option<MapSun>,
@@ -220,12 +219,13 @@ impl Map {
         hash = fnv_bytes(hash, &self.width.to_le_bytes());
         hash = fnv_bytes(hash, &self.height.to_le_bytes());
         hash = fnv_bytes(hash, &self.terrain);
-        // Preserve the identity of pre-elevation flat-map checkpoints. Their missing elevation
-        // field is restored as zeroes, and no presentation semantics changed. Authored relief is
-        // always paired with sun conditions and remains identity-bearing.
-        if let Some(sun) = self.sun {
+        // Omitted and all-zero elevation share legacy flat-map identity. Any nonzero level is
+        // identity-bearing now that absolute elevation affects sight, including uniform maps without sun.
+        if self.sun.is_some() || self.elevation.iter().any(|&level| level != 0) {
             hash = fnv_bytes(hash, b"elevation");
             hash = fnv_bytes(hash, &self.elevation);
+        }
+        if let Some(sun) = self.sun {
             hash = fnv_bytes(hash, b"sun");
             hash = fnv_bytes(hash, &sun.azimuth_degrees.to_le_bytes());
             hash = fnv_bytes(hash, &[sun.elevation_degrees, sun.warmth]);
@@ -398,6 +398,35 @@ impl Map {
             self.is_slow_movement_tile(tx, ty)
         };
         terrain_rules::slow_movement_tile_multiplier(active)
+    }
+
+    /// Movement multiplier for local elevation direction up to one tile ahead in travel.
+    #[inline]
+    pub(super) fn elevation_movement_multiplier_at(
+        &self,
+        x: f32,
+        y: f32,
+        direction: (f32, f32),
+    ) -> f32 {
+        let length = direction.0.hypot(direction.1);
+        if !length.is_finite() || length <= f32::EPSILON {
+            return 1.0;
+        }
+        let (current_tx, current_ty) = self.tile_of(x, y);
+        let lookahead = length.min(config::TILE_SIZE as f32) / length;
+        let (ahead_tx, ahead_ty) =
+            self.tile_of(x + direction.0 * lookahead, y + direction.1 * lookahead);
+        let current = self
+            .elevation
+            .get(self.index(current_tx, current_ty))
+            .copied()
+            .unwrap_or(0);
+        let ahead = self
+            .elevation
+            .get(self.index(ahead_tx, ahead_ty))
+            .copied()
+            .unwrap_or(0);
+        terrain_rules::elevation_movement_speed_multiplier(current, ahead)
     }
 
     pub(super) fn protocol_overlay_tiles(&self) -> MapOverlayTiles<MapTile> {

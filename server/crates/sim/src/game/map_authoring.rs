@@ -436,4 +436,29 @@ mod tests {
             "authoritative road multiplier should reduce estimated travel time"
         );
     }
+
+    #[test]
+    fn report_travel_time_accounts_for_directional_elevation_speed() {
+        let flat_json = authored_map(flat_rows('.'), json!([]), json!([]));
+        let flat = analyze_authored_json(&flat_json).expect("flat fixture should analyze");
+        let flat_seconds = route(&flat, "infantry").estimated_travel_seconds;
+
+        let mut uphill: Value = serde_json::from_str(&flat_json).expect("fixture JSON");
+        uphill["elevation"] = json!(vec![format!("{}{}", "0".repeat(20), "1".repeat(20)); 25]);
+        uphill["sun"] = json!({"azimuthDegrees": 315, "elevationDegrees": 30, "warmth": 50});
+        let uphill = analyze_authored_json(&uphill.to_string()).expect("uphill fixture");
+        assert!(
+            route(&uphill, "infantry").estimated_travel_seconds > flat_seconds,
+            "uphill movement should increase estimated travel time"
+        );
+
+        let mut downhill: Value = serde_json::from_str(&flat_json).expect("fixture JSON");
+        downhill["elevation"] = json!(vec![format!("{}{}", "1".repeat(20), "0".repeat(20)); 25]);
+        downhill["sun"] = json!({"azimuthDegrees": 315, "elevationDegrees": 30, "warmth": 50});
+        let downhill = analyze_authored_json(&downhill.to_string()).expect("downhill fixture");
+        assert!(
+            route(&downhill, "infantry").estimated_travel_seconds < flat_seconds,
+            "downhill movement should reduce estimated travel time"
+        );
+    }
 }

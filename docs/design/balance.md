@@ -8,6 +8,10 @@ line-of-sight behavior. The visual open-ground variants retain grass's 1.0x move
 alone applies a 1.5x movement-speed multiplier. Independent authored slow-movement tiles apply a
 0.75x multiplier, while authored damage-reduction tiles reduce incoming damage by 25% after existing damage
 policy; both sample the entity-centre tile and may overlap any base terrain or other overlay.
+Authored elevation grants ordinary units and sight-granting buildings one additional fog-of-war
+sight tile per two absolute levels (`0–1` +0, `2–3` +1, `4–5` +2, `6–7` +3, `8–9` +4). The
+bonus caps at four tiles; zero-sight buildings remain visionless, low elevation never reduces base
+sight, elevation does not occlude sight, and Scout Plane aerial sight remains unchanged.
 `server/crates/rules/src/balance.rs` is the stable public re-export surface for timings, tile size,
 starting resources, supply caps, mining amounts, support-weapon constants, body dimensions, upgrade
 and ability scalars, and stat helpers. Its internal `server/crates/rules/src/balance/*.rs` modules
@@ -347,6 +351,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   NE-SW diagonal marked road tiles share this rule. A moving unit samples the terrain under its
   center at the start of each authoritative movement tick; roads otherwise behave like grass,
   including passability, construction, cover, concealment, and line of sight.
+- Elevation changes movement directionally. A moving unit compares its current elevation with the
+  elevation up to one tile ahead toward its next local waypoint. Any uphill difference uses 0.80x
+  speed and any downhill difference uses 1.30x speed, regardless of the number of elevation levels;
+  level movement remains 1.0x. Elevation does not change passability or create cliffs.
 - `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.75` and
   `DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER = 0.75`. These independent sparse authored overlays sample
   the entity-centre tile. Slow movement multiplies the movement budget after the base-terrain

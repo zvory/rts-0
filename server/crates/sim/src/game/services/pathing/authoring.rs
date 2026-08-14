@@ -189,7 +189,12 @@ fn estimate_segment_ticks(
             let multiplier = terrain::TerrainKind::from_map_code(map.terrain_at(tx, ty))
                 .map(|terrain| f64::from(terrain::movement_speed_multiplier(kind, terrain)))
                 .unwrap_or(1.0)
-                * f64::from(map.slow_movement_multiplier_at(x as f32, y as f32));
+                * f64::from(map.slow_movement_multiplier_at(x as f32, y as f32))
+                * f64::from(map.elevation_movement_multiplier_at(
+                    x as f32,
+                    y as f32,
+                    (to.0 - x as f32, to.1 - y as f32),
+                ));
             sample_distance / (base_speed * multiplier)
         })
         .sum()
@@ -197,4 +202,30 @@ fn estimate_segment_ticks(
 
 fn round_milli(value: f64) -> f64 {
     (value * 1_000.0).round() / 1_000.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn segment_estimate_does_not_sample_elevation_beyond_waypoint() {
+        let mut map = Map::generate(1, 0xE1E0_0002);
+        map.terrain.fill(crate::protocol::terrain::GRASS);
+        map.elevation.fill(0);
+        map.slow_movement_tiles.clear();
+
+        let from = map.tile_center(10, 10);
+        let to = map.tile_center(11, 10);
+        let beyond_waypoint = map.index(12, 10);
+        map.elevation[beyond_waypoint] = 9;
+        let base_speed = 2.0;
+
+        let kind = crate::rules::faction::catalog_for(crate::rules::faction::DEFAULT_FACTION_ID)
+            .and_then(|catalog| catalog.units.first().copied())
+            .expect("default faction should have a unit mobility profile");
+        let ticks = estimate_segment_ticks(&map, kind, from, to, base_speed);
+
+        assert!((ticks - distance(from, to) / base_speed).abs() < f64::EPSILON);
+    }
 }

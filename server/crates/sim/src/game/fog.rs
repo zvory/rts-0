@@ -3,7 +3,8 @@
 //! The server is authoritative about visibility: at 15 Hz we recompute, for every player, a
 //! boolean grid of which tiles that player can see in the latest visibility sample. A tile is
 //! visible if it falls
-//! within the sight area of any of that player's entities (`sight_tiles`) and the line from
+//! within the sight area of any of that player's entities (`sight_tiles` plus the capped absolute
+//! elevation bonus for ordinary units/sight-granting buildings) and the line from
 //! the entity to that tile is not blocked by stone, smoke, or sight-blocking building footprints.
 //! Units stamp a circle from their body center; buildings stamp their full footprint plus
 //! `sight_tiles` around the footprint edge. Scout Planes add a separate team aerial sight pass
@@ -26,6 +27,7 @@ use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
+use crate::rules::terrain::elevation_sight_bonus_tiles;
 use serde::{Deserialize, Serialize};
 
 mod concealment_detection;
@@ -303,7 +305,7 @@ impl Fog {
                 height,
                 source.x,
                 source.y,
-                source.sight_tiles,
+                sight_tiles_at_elevation(map, source.x, source.y, source.sight_tiles),
                 &los,
             );
         }
@@ -341,7 +343,7 @@ impl Fog {
                     height,
                     source.x,
                     source.y,
-                    source.sight_tiles,
+                    sight_tiles_at_elevation(map, source.x, source.y, source.sight_tiles),
                     &los,
                 );
             }
@@ -518,11 +520,21 @@ fn stamp_sight(
     map: &Map,
     los: &LineOfSight<'_>,
 ) {
+    let sight_tiles = sight_tiles_at_elevation(map, e.pos_x, e.pos_y, e.sight_tiles());
     if e.is_building() {
-        stamp_building_sight(grid, width, height, e, map, los);
+        stamp_building_sight(grid, width, height, e, map, sight_tiles, los);
         return;
     }
-    stamp_sight_at(grid, width, height, e.pos_x, e.pos_y, e.sight_tiles(), los);
+    stamp_sight_at(grid, width, height, e.pos_x, e.pos_y, sight_tiles, los);
+}
+
+fn sight_tiles_at_elevation(map: &Map, x: f32, y: f32, base_sight_tiles: u32) -> u32 {
+    if base_sight_tiles == 0 {
+        return 0;
+    }
+    let (tx, ty) = map.tile_of(x, y);
+    let elevation = map.elevation.get(map.index(tx, ty)).copied().unwrap_or(0);
+    base_sight_tiles.saturating_add(elevation_sight_bonus_tiles(elevation))
 }
 
 fn stamp_building_sight(
@@ -531,9 +543,10 @@ fn stamp_building_sight(
     height: u32,
     e: &Entity,
     map: &Map,
+    sight_tiles: u32,
     los: &LineOfSight<'_>,
 ) {
-    let r = e.sight_tiles() as i32;
+    let r = sight_tiles as i32;
     if r <= 0 {
         return;
     }

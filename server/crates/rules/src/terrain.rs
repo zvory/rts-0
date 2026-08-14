@@ -25,6 +25,10 @@ pub const MAP_TERRAIN_FROSTED_GROUND: u8 = 17;
 
 pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
 pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 = 0.75;
+pub const UPHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 0.80;
+pub const DOWNHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.30;
+/// Maximum ordinary fog-of-war sight granted by authored elevation.
+pub const MAX_ELEVATION_SIGHT_BONUS_TILES: u32 = 4;
 /// Body-edge distance at which an ordinary unit detects a concealed hostile unit.
 pub const CONCEALMENT_CLOSE_DETECTION_RANGE_TILES: f32 = 2.0;
 /// Maximum number of concealment tiles an ordinary fog-of-war sight ray may enter.
@@ -92,6 +96,26 @@ pub fn slow_movement_tile_multiplier(active: bool) -> f32 {
     } else {
         1.0
     }
+}
+
+/// Binary multiplier on movement toward a locally sampled elevation.
+/// The size of the elevation difference is intentionally irrelevant.
+pub fn elevation_movement_speed_multiplier(current: u8, ahead: u8) -> f32 {
+    if ahead > current {
+        UPHILL_MOVEMENT_SPEED_MULTIPLIER
+    } else if ahead < current {
+        DOWNHILL_MOVEMENT_SPEED_MULTIPLIER
+    } else {
+        1.0
+    }
+}
+
+/// Extra ordinary sight granted by the observer's absolute authored elevation.
+///
+/// Two elevation levels grant one tile, capped so high plateaus remain a modest positional
+/// advantage. Low ground never reduces the entity's base sight.
+pub fn elevation_sight_bonus_tiles(elevation: u8) -> u32 {
+    (u32::from(elevation) / 2).min(MAX_ELEVATION_SIGHT_BONUS_TILES)
 }
 
 /// Reduce incoming damage by 25% while the target center occupies an authored reduction tile.
@@ -221,5 +245,23 @@ mod tests {
         assert_eq!(damage_after_reduction_tile(1, true), 1);
         assert_eq!(damage_after_reduction_tile(0, true), 0);
         assert_eq!(damage_after_reduction_tile(99, false), 99);
+    }
+
+    #[test]
+    fn elevation_movement_is_directional_and_independent_of_grade_size() {
+        assert_eq!(elevation_movement_speed_multiplier(4, 4), 1.0);
+        assert_eq!(elevation_movement_speed_multiplier(4, 5), 0.80);
+        assert_eq!(elevation_movement_speed_multiplier(0, 9), 0.80);
+        assert_eq!(elevation_movement_speed_multiplier(5, 4), 1.30);
+        assert_eq!(elevation_movement_speed_multiplier(9, 0), 1.30);
+    }
+
+    #[test]
+    fn elevation_sight_bonus_steps_every_two_levels_and_caps_at_four_tiles() {
+        let expected = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4];
+        for (elevation, expected_bonus) in expected.into_iter().enumerate() {
+            assert_eq!(elevation_sight_bonus_tiles(elevation as u8), expected_bonus);
+        }
+        assert_eq!(elevation_sight_bonus_tiles(u8::MAX), 4);
     }
 }

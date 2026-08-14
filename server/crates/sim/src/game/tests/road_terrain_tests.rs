@@ -107,6 +107,60 @@ fn authored_slow_tiles_reduce_movement_by_a_quarter_and_stack_with_roads() {
     );
 }
 
+#[test]
+fn local_elevation_direction_slows_uphill_and_boosts_downhill_movement() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: "kriegsia".to_string(),
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = Game::new_for_replay(&players, 0xE1E0_0001);
+    game.state.map.terrain.fill(terrain::GRASS);
+    game.state.map.elevation.fill(0);
+    for id in game.state.entities.ids() {
+        game.state.entities.remove(id);
+    }
+
+    let level_start = game.state.map.tile_center(20, 16);
+    let uphill_start = game.state.map.tile_center(20, 20);
+    let downhill_start = game.state.map.tile_center(20, 24);
+    for tile_y in [20, 24] {
+        let current_index = game.state.map.index(20, tile_y);
+        let ahead_index = game.state.map.index(21, tile_y);
+        game.state.map.elevation[current_index] = if tile_y == 24 { 1 } else { 0 };
+        game.state.map.elevation[ahead_index] = if tile_y == 20 { 1 } else { 0 };
+    }
+    let level = spawn_moving_rifleman(&mut game, level_start);
+    let uphill = spawn_moving_rifleman(&mut game, uphill_start);
+    let downhill = spawn_moving_rifleman(&mut game, downhill_start);
+
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    game.tick();
+
+    let base_speed = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman stats")
+        .speed;
+    assert_moved_distance(&game, level, level_start, base_speed, "level ground");
+    assert_moved_distance(
+        &game,
+        uphill,
+        uphill_start,
+        base_speed * crate::rules::terrain::UPHILL_MOVEMENT_SPEED_MULTIPLIER,
+        "uphill",
+    );
+    assert_moved_distance(
+        &game,
+        downhill,
+        downhill_start,
+        base_speed * crate::rules::terrain::DOWNHILL_MOVEMENT_SPEED_MULTIPLIER,
+        "downhill",
+    );
+}
+
 fn spawn_moving_rifleman(game: &mut Game, start: (f32, f32)) -> u32 {
     let id = game
         .state
