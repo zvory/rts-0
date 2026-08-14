@@ -4,6 +4,231 @@
   "description": "A rotationally symmetric battlefield divided by an S-curved river, three land crossings, and four defensive edge pools.",
   "width": 126,
   "height": 126,
+  "startLocations": [
+    {
+      "x": 9,
+      "y": 9
+    },
+    {
+      "x": 116,
+      "y": 116
+    }
+  ],
+  "baseSites": [
+    {
+      "x": 9,
+      "y": 9,
+      "steelPatches": 12,
+      "oilPatches": 3
+    },
+    {
+      "x": 116,
+      "y": 116,
+      "steelPatches": 12,
+      "oilPatches": 3
+    },
+    {
+      "x": 18,
+      "y": 34,
+      "steelPatches": 12,
+      "oilPatches": 3
+    },
+    {
+      "x": 107,
+      "y": 91,
+      "steelPatches": 12,
+      "oilPatches": 3
+    },
+    {
+      "x": 63,
+      "y": 110,
+      "steelPatches": 12,
+      "oilPatches": 3
+    },
+    {
+      "x": 62,
+      "y": 15,
+      "steelPatches": 12,
+      "oilPatches": 3
+    }
+  ],
+  "_design": "A six-tile river runs from northeast to southwest with a ten-tile center crossing and paired six-tile side crossings. Mirrored forest clumps frame the center. A broad shallow crescent pair and a narrower forked inlet pair discourage base wraparounds without crowding the starting footprints.",
+  "doodads": [
+    {
+      "typeId": "tree.alder",
+      "x": 1317,
+      "y": 336,
+      "id": 2147484697
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 1360,
+      "y": 369,
+      "id": 2147484825
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 1368,
+      "y": 376,
+      "id": 2147484826
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 1351,
+      "y": 369,
+      "id": 2147484950
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 1406,
+      "y": 396,
+      "id": 2147484953
+    },
+    {
+      "typeId": "tree.spruce",
+      "x": 2210,
+      "y": 1888,
+      "id": 2147490773
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 2179,
+      "y": 1900,
+      "id": 2147490898
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 2203,
+      "y": 1906,
+      "id": 2147490900
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 1827,
+      "y": 2224,
+      "id": 2147492273
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 1854,
+      "y": 2223,
+      "id": 2147492275
+    },
+    {
+      "typeId": "tree.spruce",
+      "x": 1861,
+      "y": 2249,
+      "id": 2147492400
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 2629,
+      "y": 3728,
+      "id": 2147498220
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 2682,
+      "y": 3764,
+      "id": 2147498223
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 2660,
+      "y": 3760,
+      "id": 2147498347
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 2672,
+      "y": 3761,
+      "id": 2147498348
+    },
+    {
+      "typeId": "tree.alder",
+      "x": 2716,
+      "y": 3792,
+      "id": 2147498476
+    }
+  ],
+  "forestSpans": [
+    [
+      8,
+      40,
+      41
+    ],
+    [
+      9,
+      40,
+      43
+    ],
+    [
+      10,
+      41,
+      44
+    ],
+    [
+      11,
+      43,
+      44
+    ],
+    [
+      56,
+      68,
+      68
+    ],
+    [
+      57,
+      67,
+      69
+    ],
+    [
+      58,
+      67,
+      69
+    ],
+    [
+      67,
+      56,
+      58
+    ],
+    [
+      68,
+      56,
+      58
+    ],
+    [
+      69,
+      57,
+      57
+    ],
+    [
+      114,
+      81,
+      82
+    ],
+    [
+      115,
+      81,
+      84
+    ],
+    [
+      116,
+      82,
+      85
+    ],
+    [
+      117,
+      84,
+      85
+    ]
+  ],
+  "concealmentTiles": [],
+  "noVehicleTiles": [],
+  "noBuildingTiles": [],
+  "noEntrenchmentTiles": [],
+  "damageReductionTiles": [],
+  "slowMovementTiles": [],
   "terrain": [
     "........................~~~~~~~~~~~~~~~~..................................................................................~~~~",
     "........................~~~~~~~~~~~~~~~~..................................................................................~~~~",
@@ -131,118 +356,5 @@
     "~~~~...................................................................................~~~~~~~~~~~~~~.........................",
     "~~~~..................................................................................~~~~~~~~~~~~~~~~........................",
     "~~~~..................................................................................~~~~~~~~~~~~~~~~........................"
-  ],
-  "startLocations": [
-    {
-      "x": 9,
-      "y": 9
-    },
-    {
-      "x": 116,
-      "y": 116
-    }
-  ],
-  "baseSites": [
-    {
-      "x": 9,
-      "y": 9,
-      "steelPatches": 12,
-      "oilPatches": 3
-    },
-    {
-      "x": 116,
-      "y": 116,
-      "steelPatches": 12,
-      "oilPatches": 3
-    },
-    {
-      "x": 18,
-      "y": 34,
-      "steelPatches": 12,
-      "oilPatches": 3
-    },
-    {
-      "x": 107,
-      "y": 91,
-      "steelPatches": 12,
-      "oilPatches": 3
-    }
-  ],
-  "_design": "A six-tile river runs from northeast to southwest with a ten-tile center crossing and paired six-tile side crossings. Mirrored forest clumps frame the center. A broad shallow crescent pair and a narrower forked inlet pair discourage base wraparounds without crowding the starting footprints.",
-  "doodads": [
-    {
-      "id": 2147490773,
-      "typeId": "tree.spruce",
-      "x": 2210,
-      "y": 1888
-    },
-    {
-      "id": 2147490898,
-      "typeId": "tree.alder",
-      "x": 2179,
-      "y": 1900
-    },
-    {
-      "id": 2147490900,
-      "typeId": "tree.alder",
-      "x": 2203,
-      "y": 1906
-    },
-    {
-      "id": 2147492273,
-      "typeId": "tree.alder",
-      "x": 1827,
-      "y": 2224
-    },
-    {
-      "id": 2147492275,
-      "typeId": "tree.alder",
-      "x": 1854,
-      "y": 2223
-    },
-    {
-      "id": 2147492400,
-      "typeId": "tree.spruce",
-      "x": 1861,
-      "y": 2249
-    }
-  ],
-  "forestSpans": [
-    [
-      56,
-      68,
-      68
-    ],
-    [
-      57,
-      67,
-      69
-    ],
-    [
-      58,
-      67,
-      69
-    ],
-    [
-      67,
-      56,
-      58
-    ],
-    [
-      68,
-      56,
-      58
-    ],
-    [
-      69,
-      57,
-      57
-    ]
-  ],
-  "concealmentTiles": [],
-  "noVehicleTiles": [],
-  "noBuildingTiles": [],
-  "noEntrenchmentTiles": [],
-  "damageReductionTiles": [],
-  "slowMovementTiles": []
+  ]
 }
