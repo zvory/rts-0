@@ -17,7 +17,7 @@ fn the_river_is_selectable_and_loads_for_a_two_player_match() {
     assert_eq!(map.terrain.len(), 126 * 126);
     assert_eq!(
         map.terrain.iter().filter(|&&tile| tile == terrain::WATER).count(),
-        1_374
+        1_526
     );
     map.starts.sort_unstable();
     assert_eq!(map.starts, [(9, 9), (116, 116)]);
@@ -28,14 +28,14 @@ fn the_river_is_selectable_and_loads_for_a_two_player_match() {
             (116, 116),
             (18, 34),
             (107, 91),
-            (63, 110),
-            (62, 15),
+            (53, 110),
+            (72, 15),
         ]
     );
-    assert_eq!(map.doodads.len(), 16);
-    assert_eq!(map.concealment_tiles.len(), 38);
-    assert_eq!(map.no_vehicle_tiles.len(), 38);
-    assert_eq!(map.no_building_tiles.len(), 38);
+    assert_eq!(map.doodads.len(), 52);
+    assert_eq!(map.concealment_tiles.len(), 134);
+    assert_eq!(map.no_vehicle_tiles.len(), 134);
+    assert_eq!(map.no_building_tiles.len(), 134);
     assert!(
         Map::load("The River", 3, 0x1234_5678).is_err(),
         "The River should not expose a third start location"
