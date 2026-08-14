@@ -50,6 +50,18 @@
       "y": 15,
       "steelPatches": 12,
       "oilPatches": 3
+    },
+    {
+      "x": 32,
+      "y": 86,
+      "steelPatches": 12,
+      "oilPatches": 3
+    },
+    {
+      "x": 93,
+      "y": 39,
+      "steelPatches": 12,
+      "oilPatches": 3
     }
   ],
   "_design": "A six-tile river runs from northeast to southwest with three crossings. Shifted edge expansions sit beside widened double-lobe pools, while narrower mirrored forest walls touch the map boundaries and follow the pool shorelines.",

@@ -30,6 +30,8 @@ fn the_river_is_selectable_and_loads_for_a_two_player_match() {
             (107, 91),
             (57, 110),
             (68, 15),
+            (32, 86),
+            (93, 39),
         ]
     );
     assert_eq!(map.doodads.len(), 38);
