@@ -42,6 +42,7 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/match_history.rs": 180,
   "room_task/observer.rs": 160,
   "room_task/replay.rs": 760,
+  "room_task/replay_artifact.rs": 80,
   "room_task/summary.rs": 120,
   "room_task/types.rs": 220,
 }));

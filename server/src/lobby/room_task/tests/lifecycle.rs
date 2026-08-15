@@ -276,7 +276,7 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
         .msg_tx
         .try_send_snapshot(replay_transition_test_snapshot(100));
 
-    task.end_match(Some(players[0].id), game.scores(), Some(&game));
+    task.end_match(Some(players[0].id), game.scores(), Some(&game), None);
 
     let Phase::ReplayViewer(session) = &task.phase else {
         panic!("match should transition into replay viewer");
@@ -348,6 +348,48 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
             .expect("player B replay room-time state")
             .current_tick,
         0
+    );
+}
+
+#[test]
+fn end_match_omits_a_defeat_conclusion_from_a_draw() {
+    use crate::protocol::{MatchConclusion, MatchConclusionReason};
+
+    let players = replay_test_players(2);
+    let (game, replay_start, _artifact) = replay_test_artifact_with_start(&players, 1);
+    let mut task = RoomTask::new(
+        "draw-conclusion-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let mut writer = add_test_room_player(&mut task, players[0].id, true);
+    task.match_player_count = 2;
+    task.match_human_count = 2;
+    task.replay_start = Some(replay_start);
+
+    task.end_match(
+        None,
+        game.scores(),
+        Some(&game),
+        Some(MatchConclusion {
+            defeated_player_ids: vec![players[0].id],
+            reason: MatchConclusionReason::GaveUp,
+        }),
+    );
+
+    assert!(
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).any(|message| {
+            matches!(
+                message,
+                ServerMessage::GameOver {
+                    winner_id: None,
+                    conclusion: None,
+                    ..
+                }
+            )
+        })
     );
 }
 

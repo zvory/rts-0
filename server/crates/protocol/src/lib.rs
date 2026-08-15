@@ -50,7 +50,9 @@ pub use rts_contract::{
     VisibilityCapabilities, DEFAULT_FACTION_ID, GAME_CHECKPOINT_CURRENT_VERSION,
     MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
-pub use server_message::{LivePauseState, LiveResumeCountdown, ServerMessage};
+pub use server_message::{
+    LivePauseState, LiveResumeCountdown, MatchConclusion, MatchConclusionReason, ServerMessage,
+};
 
 /// A gameplay command. Validated when applied, not when received.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

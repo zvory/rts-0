@@ -60,7 +60,7 @@ import { createRoomCapabilities } from "./room_capabilities.js";
 import { selectInitialCameraView } from "./camera_view_selection.js";
 import { matchLaunchConfig, nextMatchLaunchAction } from "./launch_url.js";
 import { CAMERA } from "./config.js";
-import { formatTeamLabel, replayResultHeadline, scoreRowIsWinner } from "./scoreboard.js";
+import { formatTeamLabel, renderMatchConclusionDetail, replayResultHeadline, scoreRowIsWinner } from "./scoreboard.js";
 import { StatusBadge } from "./status_badge.js";
 import {
   HotkeyProfileService,
@@ -1005,6 +1005,7 @@ export class App {
     else if (verdict === "lost") this.audio.play("defeat", { category: "ui", priority: 5 });
     dom.gameOverText.textContent = text;
     dom.gameOverText.dataset.verdict = verdict; // lets CSS tint win/lose/draw
+    renderMatchConclusionDetail(dom.gameOverConclusion, scores, m?.conclusion);
     this.renderScoreboard(
       scores,
       winnerId,
