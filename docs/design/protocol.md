@@ -455,10 +455,13 @@ first 60 seconds, and averages the remaining actions over the remaining simulate
 `winnerTeamId` is the winning team's id when a winner exists, otherwise `null`. `winnerId` remains
 for FFA compatibility. During singleton-team FFA, `winnerTeamId` matches `winnerId`; during team
 wins, `winnerId` is the first living player on the winning team in stable start/lobby order.
-`MatchConclusion` is `{ defeatedPlayerIds: u32[], reason: "gaveUp" | "lostAllBuildings" }` and
-records the decisive authoritative cause when one is known. The score screen uses the frozen score
-rows to name the defeated players and explain the result below its headline. Draws and abnormal
-server termination omit it.
+`MatchConclusion` is `{ defeatedPlayerIds: u32[], reason: "gaveUp" | "eliminated" |
+"lostAllBuildings" | "lostPrimaryBase" }` and records the decisive authoritative cause when one is
+known. `eliminated` is the accurate common description when an AI in an ordinary mixed match may
+have lost either all units or all survival buildings; all-AI observation matches instead identify
+their starting-primary-base objective explicitly. The score screen uses the frozen score rows to
+name the defeated players and explain the result below its headline. Draws and abnormal server
+termination omit it.
 
 `ReplayBranchSeat`: `{ playerId: u32, teamId: u32, factionId: string, name: string, color: string, claimable: bool }`. Seats are
 listed in original replay player order. `claimable` is false only for unsupported original seats;

@@ -52,6 +52,12 @@ export function matchConclusionDetail(scores, conclusion) {
   if (conclusion.reason === "lostAllBuildings") {
     return `${subject} lost all their buildings.`;
   }
+  if (conclusion.reason === "lostPrimaryBase") {
+    return `${subject} lost ${names.length ? "their primary bases" : "their primary base"}.`;
+  }
+  if (conclusion.reason === "eliminated") {
+    return `${subject} ${names.length ? "were" : "was"} eliminated.`;
+  }
   return "";
 }
 

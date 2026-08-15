@@ -46,6 +46,22 @@ export function runScoreboardContracts() {
       "DV lost all their buildings.",
     "scoreboard explains a base-destruction defeat by name",
   );
+  assert(
+    matchConclusionDetail([
+      { id: 7, name: "Alex" },
+      { id: 8, name: "DV" },
+    ], { defeatedPlayerIds: [8], reason: "lostPrimaryBase" }) ===
+      "DV lost their primary base.",
+    "scoreboard accurately explains the all-AI primary-base objective",
+  );
+  assert(
+    matchConclusionDetail([
+      { id: 7, name: "Alex" },
+      { id: 8, name: "DV" },
+    ], { defeatedPlayerIds: [7, 8], reason: "eliminated" }) ===
+      "Alex and DV were eliminated.",
+    "scoreboard uses neutral accurate copy when the automatic AI defeat condition is ambiguous",
+  );
   const detailElement = { textContent: "stale", hidden: false };
   renderMatchConclusionDetail(detailElement, [], null);
   assert(detailElement.textContent === "" && detailElement.hidden,

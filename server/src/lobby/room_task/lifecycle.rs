@@ -158,8 +158,13 @@ impl RoomTask {
         winner_id: Option<u32>,
         scores: Vec<PlayerScore>,
         game: Option<&Game>,
-        conclusion: Option<MatchConclusion>,
+        mut conclusion: Option<MatchConclusion>,
     ) {
+        // Final draws have no defeated side to attribute, even if the event that happened to
+        // trigger resolution was a surrender or simultaneous elimination.
+        if winner_id.is_none() {
+            conclusion = None;
+        }
         let winner_team_id =
             winner_id.and_then(|id| Self::team_id_for_score_seat(game, &scores, id));
         let ended_at = chrono::Utc::now();

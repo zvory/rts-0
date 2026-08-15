@@ -126,15 +126,18 @@ impl LiveTickDriver<'_> {
             let winner_id = alive_teams
                 .first()
                 .and_then(|team_id| first_alive_player_on_team(&game, &alive, *team_id));
+            let defeated_player_ids: Vec<u32> = alive_before_tick
+                .into_iter()
+                .filter(|id| !alive.contains(id))
+                .collect();
             return LiveTickResult::EndMatch {
                 scores: game.scores(),
-                conclusion: Some(MatchConclusion {
-                    defeated_player_ids: alive_before_tick
-                        .into_iter()
-                        .filter(|id| !alive.contains(id))
-                        .collect(),
-                    reason: MatchConclusionReason::LostAllBuildings,
-                }),
+                conclusion: automatic_match_conclusion(
+                    &game,
+                    winner_id,
+                    defeated_player_ids,
+                    ai_only_match(self.match_player_count, self.ai_player_count),
+                ),
                 game,
                 winner_id,
             };
@@ -473,6 +476,48 @@ impl LiveTickDriver<'_> {
     }
 }
 
+fn automatic_match_conclusion(
+    game: &Game,
+    winner_id: Option<u32>,
+    defeated_player_ids: Vec<u32>,
+    primary_base_objective: bool,
+) -> Option<MatchConclusion> {
+    if winner_id.is_none() || defeated_player_ids.is_empty() {
+        return None;
+    }
+    let defeated_ai = if primary_base_objective {
+        false
+    } else {
+        let players = game.player_inits();
+        defeated_player_ids.iter().any(|defeated_id| {
+            players
+                .iter()
+                .any(|player| player.id == *defeated_id && player.is_ai)
+        })
+    };
+    let reason = automatic_match_conclusion_reason(primary_base_objective, defeated_ai);
+    Some(MatchConclusion {
+        defeated_player_ids,
+        reason,
+    })
+}
+
+fn automatic_match_conclusion_reason(
+    primary_base_objective: bool,
+    defeated_ai: bool,
+) -> MatchConclusionReason {
+    if primary_base_objective {
+        MatchConclusionReason::LostPrimaryBase
+    } else if defeated_ai {
+        // In ordinary mixed matches an AI is defeated by losing either all survival buildings or
+        // all units. Use the truthful common description because the outcome transition alone
+        // does not identify which half of that rule fired.
+        MatchConclusionReason::Eliminated
+    } else {
+        MatchConclusionReason::LostAllBuildings
+    }
+}
+
 fn duration_ms_u32(duration: Duration) -> u32 {
     duration.as_millis().min(u32::MAX as u128) as u32
 }
@@ -517,7 +562,10 @@ fn first_alive_player_on_team(game: &Game, alive: &[u32], team_id: u32) -> Optio
 
 #[cfg(test)]
 mod tests {
-    use super::{ai_observation_tick_limit, match_tick_limit_reached};
+    use super::{
+        ai_observation_tick_limit, automatic_match_conclusion_reason, match_tick_limit_reached,
+    };
+    use crate::protocol::MatchConclusionReason;
 
     #[test]
     fn match_tick_limit_resolves_on_its_exact_tick_only() {
@@ -532,5 +580,21 @@ mod tests {
         assert_eq!(ai_observation_tick_limit(2, 2), Some(25_000));
         assert_eq!(ai_observation_tick_limit(2, 1), None);
         assert_eq!(ai_observation_tick_limit(1, 1), None);
+    }
+
+    #[test]
+    fn automatic_conclusion_reason_matches_the_authoritative_outcome_policy() {
+        assert_eq!(
+            automatic_match_conclusion_reason(false, false),
+            MatchConclusionReason::LostAllBuildings
+        );
+        assert_eq!(
+            automatic_match_conclusion_reason(false, true),
+            MatchConclusionReason::Eliminated
+        );
+        assert_eq!(
+            automatic_match_conclusion_reason(true, true),
+            MatchConclusionReason::LostPrimaryBase
+        );
     }
 }

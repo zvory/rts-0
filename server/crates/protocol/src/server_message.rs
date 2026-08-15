@@ -36,7 +36,9 @@ pub struct MatchConclusion {
 #[serde(rename_all = "camelCase")]
 pub enum MatchConclusionReason {
     GaveUp,
+    Eliminated,
     LostAllBuildings,
+    LostPrimaryBase,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -207,7 +209,26 @@ mod tests {
         };
         let wire = serde_json::to_value(message).unwrap();
         assert_eq!(wire["t"], "gameOver");
-        assert_eq!(wire["conclusion"]["defeatedPlayerIds"], serde_json::json!([2]));
+        assert_eq!(
+            wire["conclusion"]["defeatedPlayerIds"],
+            serde_json::json!([2])
+        );
         assert_eq!(wire["conclusion"]["reason"], "gaveUp");
+    }
+
+    #[test]
+    fn serializes_every_automatic_match_conclusion_reason() {
+        assert_eq!(
+            serde_json::to_value(MatchConclusionReason::Eliminated).unwrap(),
+            "eliminated"
+        );
+        assert_eq!(
+            serde_json::to_value(MatchConclusionReason::LostAllBuildings).unwrap(),
+            "lostAllBuildings"
+        );
+        assert_eq!(
+            serde_json::to_value(MatchConclusionReason::LostPrimaryBase).unwrap(),
+            "lostPrimaryBase"
+        );
     }
 }
