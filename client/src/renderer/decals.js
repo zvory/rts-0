@@ -184,10 +184,23 @@ export class GroundDecalLayer {
 
   _hydrateReplacement(decals, { onError = null, fog = null } = {}) {
     if (!Array.isArray(decals) || decals.length === 0) return 0;
+    // An empty correlated repair may have armed an asset-settlement callback. New durable rows
+    // supersede that empty completion and must finish hydrating before the replacement is exposed.
+    this._emptyReplacementComplete = false;
     if (this._replacementQueue === null) {
       this._replacementQueue = [...decals];
       this._replacementExpectedCount = decals.length;
       this.recordDiagnostic?.("renderer.groundDecals.perspectiveHydrationQueued", decals.length);
+    } else if (decals.length > this._replacementExpectedCount) {
+      // Durable worker batches are cumulative until the renderer acknowledges their revision.
+      // Preserve work already stamped into the hidden surface while extending its remaining tail
+      // when deaths arrive during a multi-frame perspective hydration.
+      this._replacementQueue.push(...decals.slice(this._replacementExpectedCount));
+      this.recordDiagnostic?.(
+        "renderer.groundDecals.perspectiveHydrationQueued",
+        decals.length - this._replacementExpectedCount,
+      );
+      this._replacementExpectedCount = decals.length;
     }
     if (this._replacement.assetStatus === GROUND_DECAL_ATLAS_STATUS.PENDING) return 0;
     const batch = this._replacementQueue.splice(0, PERSPECTIVE_HYDRATION_BATCH_SIZE);
