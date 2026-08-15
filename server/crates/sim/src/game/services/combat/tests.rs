@@ -185,6 +185,17 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     rng_seed: u64,
     smokes: &SmokeCloudStore,
 ) -> HashMap<u32, Vec<Event>> {
+    run_combat_tick_on_map_with_seed_smokes_and_tick(entities, players, map, rng_seed, smokes, 10)
+}
+
+fn run_combat_tick_on_map_with_seed_smokes_and_tick(
+    entities: &mut EntityStore,
+    players: &[PlayerState],
+    map: &Map,
+    rng_seed: u64,
+    smokes: &SmokeCloudStore,
+    tick: u32,
+) -> HashMap<u32, Vec<Event>> {
     let occ = Occupancy::build(map, entities);
     let spatial = SpatialIndex::build(entities, map.width, map.height);
     let mut pathing = PathingService::new(256, 64);
@@ -220,7 +231,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
         &mut rng,
         &mut events,
         &mut firing_reveals,
-        10,
+        tick,
     );
     events
 }
@@ -337,6 +348,33 @@ fn idle_army_units_auto_acquire_targets() {
     );
 
     assert_eq!(target, Some(enemy_id));
+}
+
+#[test]
+fn combat_pairwise_precedence_alternates_by_tick() {
+    fn resolve_lethal_exchange(tick: u32) -> (u32, u32) {
+        let (mut entities, lower_id, higher_id) = rifleman_with_enemy();
+        for id in [lower_id, higher_id] {
+            entities.get_mut(id).expect("rifleman should exist").hp = 5;
+        }
+        let map = open_map(8);
+        let smokes = SmokeCloudStore::new();
+        run_combat_tick_on_map_with_seed_smokes_and_tick(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+            0,
+            &smokes,
+            tick,
+        );
+        (
+            entities.get(lower_id).expect("rifleman should exist").hp,
+            entities.get(higher_id).expect("rifleman should exist").hp,
+        )
+    }
+
+    assert_eq!(resolve_lethal_exchange(10), (5, 0));
+    assert_eq!(resolve_lethal_exchange(11), (0, 5));
 }
 
 #[test]
