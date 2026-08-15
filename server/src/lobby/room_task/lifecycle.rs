@@ -11,7 +11,7 @@ use super::helpers::{match_countdown_duration, server_build_sha, MATCH_COUNTDOWN
 use super::match_history::MatchHistoryRecordInput;
 use super::types::Phase;
 use super::RoomTask;
-use crate::protocol::{PlayerScore, ServerMessage};
+use crate::protocol::{MatchConclusion, PlayerScore, ServerMessage};
 use crate::structured_log::{self, MatchEndedLog};
 use rts_sim::game::replay::ReplayArtifactV1;
 use rts_sim::game::Game;
@@ -158,6 +158,7 @@ impl RoomTask {
         winner_id: Option<u32>,
         scores: Vec<PlayerScore>,
         game: Option<&Game>,
+        conclusion: Option<MatchConclusion>,
     ) {
         let winner_team_id =
             winner_id.and_then(|id| Self::team_id_for_score_seat(game, &scores, id));
@@ -172,7 +173,9 @@ impl RoomTask {
             .unwrap_or(0);
         let replay_artifact = game
             .filter(|_| self.should_capture_post_match_replay())
-            .and_then(|game| self.finalize_replay_artifact(game, winner_id, scores.clone()));
+            .and_then(|game| {
+                self.finalize_replay_artifact(game, winner_id, scores.clone(), conclusion.clone())
+            });
         let winner_name =
             winner_id.and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
         let outcome = crate::db::MatchOutcome::from_winner_name(winner_name.as_deref());
@@ -242,6 +245,7 @@ impl RoomTask {
                 ServerMessage::GameOver {
                     winner_id,
                     winner_team_id,
+                    conclusion: conclusion.clone(),
                     you,
                     scores: scores.clone(),
                 },
@@ -300,7 +304,7 @@ impl RoomTask {
             && match_history_allowed;
         let replay_artifact = (will_record_history
             && self.should_attach_match_history_replay_artifact())
-        .then(|| self.finalize_replay_artifact(&game, None, scores.clone()))
+        .then(|| self.finalize_replay_artifact(&game, None, scores.clone(), None))
         .flatten();
         structured_log::log_match_ended(MatchEndedLog {
             room: &self.room,
@@ -397,6 +401,7 @@ impl RoomTask {
         game: &Game,
         winner_id: Option<u32>,
         scores: Vec<PlayerScore>,
+        conclusion: Option<MatchConclusion>,
     ) -> Option<ReplayArtifactV1> {
         let Some(start) = &self.replay_start else {
             crate::log_warn!(
@@ -406,6 +411,7 @@ impl RoomTask {
             return None;
         };
         let mut artifact = start.finalize(game, winner_id, scores);
+        artifact.conclusion = conclusion;
         artifact.chat_log = self.match_chat_log.clone();
         Some(artifact)
     }

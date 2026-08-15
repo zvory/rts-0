@@ -10,7 +10,8 @@ use super::room_task::{PendingClientCommandAck, RoomPlayer};
 use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
 use super::snapshots::union_events;
 use crate::protocol::{
-    Event, ObserverAnalysisAiDiagnostics, ObserverAnalysisPayload, PlayerScore, ServerMessage,
+    Event, MatchConclusion, MatchConclusionReason, ObserverAnalysisAiDiagnostics,
+    ObserverAnalysisPayload, PlayerScore, ServerMessage,
 };
 use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::replay::ReplayStartComposition;
@@ -26,6 +27,7 @@ pub(super) enum LiveTickResult {
         game: Box<Game>,
         winner_id: Option<u32>,
         scores: Vec<PlayerScore>,
+        conclusion: Option<MatchConclusion>,
     },
     PanicEnd {
         scores: Vec<PlayerScore>,
@@ -87,6 +89,7 @@ impl LiveTickDriver<'_> {
         let scheduler_lag = self.scheduled.elapsed();
         let tick_start = StdInstant::now();
         let mut perf = rts_sim::perf::TickPerf::maybe_new();
+        let alive_before_tick = self.outcome_alive_players(&game);
 
         let tick_result = self.tick_game(&mut game, perf.as_mut());
         let per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
@@ -125,6 +128,13 @@ impl LiveTickDriver<'_> {
                 .and_then(|team_id| first_alive_player_on_team(&game, &alive, *team_id));
             return LiveTickResult::EndMatch {
                 scores: game.scores(),
+                conclusion: Some(MatchConclusion {
+                    defeated_player_ids: alive_before_tick
+                        .into_iter()
+                        .filter(|id| !alive.contains(id))
+                        .collect(),
+                    reason: MatchConclusionReason::LostAllBuildings,
+                }),
                 game,
                 winner_id,
             };
@@ -144,6 +154,7 @@ impl LiveTickDriver<'_> {
             self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
             return LiveTickResult::EndMatch {
                 scores: game.scores(),
+                conclusion: None,
                 game,
                 winner_id: None,
             };
@@ -382,6 +393,7 @@ impl LiveTickDriver<'_> {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
+            let seat_id = self.live_seat_id_for_connection(id).unwrap_or(id);
             send_or_log(
                 self.room,
                 id,
@@ -389,6 +401,10 @@ impl LiveTickDriver<'_> {
                 ServerMessage::GameOver {
                     winner_id: None,
                     winner_team_id: None,
+                    conclusion: Some(MatchConclusion {
+                        defeated_player_ids: vec![seat_id],
+                        reason: MatchConclusionReason::LostAllBuildings,
+                    }),
                     you: "lost".to_string(),
                     scores: scores.clone(),
                 },

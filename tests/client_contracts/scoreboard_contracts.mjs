@@ -1,6 +1,8 @@
 import { assert } from "./assertions.mjs";
 import {
   formatTeamLabel,
+  matchConclusionDetail,
+  renderMatchConclusionDetail,
   replayResultHeadline,
   scoreRowIsWinner,
 } from "../../client/src/scoreboard.js";
@@ -29,4 +31,23 @@ export function runScoreboardContracts() {
   );
   assert(replayResultHeadline([], null, null) === "Draw",
     "replay result keeps Draw when no winner exists");
+  assert(
+    matchConclusionDetail([
+      { id: 7, name: "Alex" },
+      { id: 8, name: "DV" },
+    ], { defeatedPlayerIds: [8], reason: "gaveUp" }) === "DV has given up.",
+    "scoreboard explains a surrender by name",
+  );
+  assert(
+    matchConclusionDetail([
+      { id: 7, name: "Alex" },
+      { id: 8, name: "DV" },
+    ], { defeatedPlayerIds: [8], reason: "lostAllBuildings" }) ===
+      "DV lost all their buildings.",
+    "scoreboard explains a base-destruction defeat by name",
+  );
+  const detailElement = { textContent: "stale", hidden: false };
+  renderMatchConclusionDetail(detailElement, [], null);
+  assert(detailElement.textContent === "" && detailElement.hidden,
+    "scoreboard clears stale conclusion details between matches");
 }

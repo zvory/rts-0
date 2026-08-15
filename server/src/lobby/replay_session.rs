@@ -387,6 +387,7 @@ impl ReplaySession {
         ServerMessage::GameOver {
             winner_id: self.artifact.winner_id,
             winner_team_id: self.artifact.winner_team_id,
+            conclusion: self.artifact.conclusion.clone(),
             you: "draw".to_string(),
             scores: self.artifact.final_scores.clone(),
         }

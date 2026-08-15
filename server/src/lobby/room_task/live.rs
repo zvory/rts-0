@@ -14,7 +14,8 @@ use super::helpers::{late_spectator_notice_name, live_ai_controllers};
 use super::types::{PendingClientCommandAck, Phase, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{
-    Event, LivePauseState, NoticeSeverity, PlayerScore, RoomTimeState, ServerMessage, TeamId,
+    Event, LivePauseState, MatchConclusion, MatchConclusionReason, NoticeSeverity, PlayerScore,
+    RoomTimeState, ServerMessage, TeamId,
 };
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::command::SimCommand;
@@ -381,7 +382,15 @@ impl RoomTask {
             let winner_id = alive_teams
                 .first()
                 .and_then(|team_id| game.first_alive_player_on_team(*team_id));
-            self.end_match(winner_id, scores, Some(&game));
+            self.end_match(
+                winner_id,
+                scores,
+                Some(&game),
+                Some(MatchConclusion {
+                    defeated_player_ids: vec![seat_id],
+                    reason: MatchConclusionReason::GaveUp,
+                }),
+            );
             return;
         }
 
@@ -390,7 +399,15 @@ impl RoomTask {
         }
 
         if self.match_player_count < 2 {
-            self.end_match(None, scores, Some(&game));
+            self.end_match(
+                None,
+                scores,
+                Some(&game),
+                Some(MatchConclusion {
+                    defeated_player_ids: vec![seat_id],
+                    reason: MatchConclusionReason::GaveUp,
+                }),
+            );
         } else {
             self.phase = Phase::InGame(game);
         }
@@ -651,11 +668,12 @@ impl RoomTask {
                 game,
                 winner_id,
                 scores,
+                conclusion,
             } => {
-                self.end_match(winner_id, scores, Some(&game));
+                self.end_match(winner_id, scores, Some(&game), conclusion);
             }
             LiveTickResult::PanicEnd { scores } => {
-                self.end_match(None, scores, None);
+                self.end_match(None, scores, None, None);
             }
         }
     }
@@ -687,6 +705,7 @@ impl RoomTask {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
+            let seat_id = self.live_seat_id_for_connection(id).unwrap_or(id);
             send_or_log(
                 &self.room,
                 id,
@@ -694,6 +713,10 @@ impl RoomTask {
                 ServerMessage::GameOver {
                     winner_id: None,
                     winner_team_id: None,
+                    conclusion: Some(MatchConclusion {
+                        defeated_player_ids: vec![seat_id],
+                        reason: MatchConclusionReason::GaveUp,
+                    }),
                     you: "lost".to_string(),
                     scores: scores.clone(),
                 },

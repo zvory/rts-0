@@ -276,7 +276,7 @@ fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
         .msg_tx
         .try_send_snapshot(replay_transition_test_snapshot(100));
 
-    task.end_match(Some(players[0].id), game.scores(), Some(&game));
+    task.end_match(Some(players[0].id), game.scores(), Some(&game), None);
 
     let Phase::ReplayViewer(session) = &task.phase else {
         panic!("match should transition into replay viewer");

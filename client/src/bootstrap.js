@@ -323,6 +323,7 @@ export const dom = {
   connectionLostClose: document.getElementById("connection-lost-close"),
   gameOver: document.getElementById("game-over"),
   gameOverText: document.getElementById("game-over-text"),
+  gameOverConclusion: document.getElementById("game-over-conclusion"),
   gameOverObservation: document.getElementById("game-over-observation"),
   gameOverScores: document.getElementById("game-over-scores"),
   gameOverButton: document.getElementById("game-over-button"),

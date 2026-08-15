@@ -28,3 +28,36 @@ export function replayResultHeadline(scores, winnerId = null, winnerTeamId = nul
     : `${winnerNames.join(", ")}, and ${lastName}`;
   return `${joinedNames} have won`;
 }
+
+export function matchConclusionDetail(scores, conclusion) {
+  const ids = Array.isArray(conclusion?.defeatedPlayerIds)
+    ? new Set(conclusion.defeatedPlayerIds.map(Number).filter(Number.isFinite))
+    : new Set();
+  const names = (Array.isArray(scores) ? scores : [])
+    .filter((score) => ids.has(Number(score?.id)))
+    .map((score) => {
+      const name = typeof score?.name === "string" ? score.name.trim() : "";
+      return name || `Player ${Number(score.id)}`;
+    });
+  if (!names.length) return "";
+  const lastName = names.pop();
+  const subject = names.length === 0
+    ? lastName
+    : names.length === 1
+      ? `${names[0]} and ${lastName}`
+      : `${names.join(", ")}, and ${lastName}`;
+  if (conclusion.reason === "gaveUp") {
+    return `${subject} ${names.length ? "have" : "has"} given up.`;
+  }
+  if (conclusion.reason === "lostAllBuildings") {
+    return `${subject} lost all their buildings.`;
+  }
+  return "";
+}
+
+export function renderMatchConclusionDetail(element, scores, conclusion) {
+  if (!element) return;
+  const detail = matchConclusionDetail(scores, conclusion);
+  element.textContent = detail;
+  element.hidden = !detail;
+}

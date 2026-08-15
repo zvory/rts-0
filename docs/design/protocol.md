@@ -396,7 +396,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `chat` | `scope: "lobby" or "game"`, `channel: "all" or "team"`, `tick?: u32`, `senderId: u32`, `senderName: string`, `text: string` — reliable server-authored chat delivery. Lobby deliveries omit `tick`; live and replay deliveries carry the authoritative presentation tick. Clients render all fields as text, never HTML. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `observationReady` | `matchRunId: string` — a watched all-AI match has resolved; this id retrieves its saved replay and joins its structured server logs. |
-| `gameOver` | `winnerId: u32 | null`, `winnerTeamId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
+| `gameOver` | `winnerId: u32 | null`, `winnerTeamId: u32 | null`, `conclusion?: MatchConclusion`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `commandReceipt` | `clientSeq: u32`, `serverTick: u32`, `accepted: bool`, `reason?: string` — reliable diagnostics-only room receipt. Does not reconcile prediction. |
 | `error`    | `msg: string` |
@@ -455,6 +455,10 @@ first 60 seconds, and averages the remaining actions over the remaining simulate
 `winnerTeamId` is the winning team's id when a winner exists, otherwise `null`. `winnerId` remains
 for FFA compatibility. During singleton-team FFA, `winnerTeamId` matches `winnerId`; during team
 wins, `winnerId` is the first living player on the winning team in stable start/lobby order.
+`MatchConclusion` is `{ defeatedPlayerIds: u32[], reason: "gaveUp" | "lostAllBuildings" }` and
+records the decisive authoritative cause when one is known. The score screen uses the frozen score
+rows to name the defeated players and explain the result below its headline. Draws and abnormal
+server termination omit it.
 
 `ReplayBranchSeat`: `{ playerId: u32, teamId: u32, factionId: string, name: string, color: string, claimable: bool }`. Seats are
 listed in original replay player order. `claimable` is false only for unsupported original seats;
