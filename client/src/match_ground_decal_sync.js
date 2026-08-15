@@ -89,6 +89,7 @@ export class GroundDecalSync {
     // a lower (including zero) discovery revision.
     this.targetRevision = message.revision;
     this.blockInlineDeltaUntilRepair = false;
+    if (result.queued === 0) this.resetPresentation?.("complete");
     this._ensureRequest();
     return true;
   }

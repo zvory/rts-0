@@ -250,7 +250,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // seam; native display-mode and raw-input ownership remain isolated in the Tauri shell.
   // WASM display progress keeps its runtime alive independently of the pose preference and
   // coordinates authoritative reconcile, pause freezing, and authoritative-only fallback.
-  "match.js": 50441,
+  // Perspective decal swaps add only a narrow empty-repair completion callback; hydration and
+  // surface ownership remain isolated in the renderer and decal sync modules.
+  "match.js": 50486,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.

@@ -136,6 +136,31 @@ class RecordingCanvasContext {
     assert(diagnostics.textureUpdateCount === 2, "texture updates track new-death batches, not historical decal count");
     assert(diagnostics.layerChildCount === 1, "additional batches still use one decal display object");
 
+    const oldSprite = renderer._groundDecals.sprite;
+    const replacementBatch = makeDecalBatch(50000, 49);
+    assert(renderer._groundDecals.beginPerspectiveTransition(map),
+      "perspective reset creates a hidden replacement decal surface");
+    const replacementSprite = renderer._groundDecals._replacement.sprite;
+    assert(oldSprite.visible !== false && replacementSprite.visible === false,
+      "the old perspective remains visible while its replacement hydrates offscreen");
+    assert(renderer._groundDecals.stampBatch(replacementBatch) === 0
+      && renderer._groundDecals._replacementQueue.length === 1,
+      "perspective hydration processes only one bounded record batch per rendered frame");
+    assert(oldSprite.parent === renderer.layers.decals && replacementSprite.visible === false,
+      "a partial replacement does not disturb the visible perspective surface");
+    assert(renderer._groundDecals.stampBatch(replacementBatch) === replacementBatch.length,
+      "the completed replacement acknowledges the original durable batch");
+    assert(oldSprite.parent == null && renderer._groundDecals.sprite === replacementSprite
+      && replacementSprite.visible !== false,
+      "the completed replacement atomically replaces and destroys the old surface");
+
+    const hydratedSprite = renderer._groundDecals.sprite;
+    assert(renderer._groundDecals.beginPerspectiveTransition(map)
+      && renderer._groundDecals.completePerspectiveTransition(),
+      "an empty perspective repair completes without waiting for a decal batch");
+    assert(hydratedSprite.parent == null && renderer._groundDecals.totalStamped === 0,
+      "an empty replacement swaps to a clean surface instead of retaining stale marks forever");
+
     renderer.destroy();
     assert(renderer.layers.decals.children.length === 0, "renderer teardown removes the permanent decal sprite");
     renderer.destroy();

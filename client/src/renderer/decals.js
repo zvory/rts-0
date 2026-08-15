@@ -15,6 +15,7 @@ import { createWorkerSafeCanvas } from "./raster_primitives.js";
 import { TankTreadLayer } from "./tank_tread_layer.js";
 
 export const GROUND_DECAL_TEXTURE_WORLD_SCALE = 4;
+const PERSPECTIVE_HYDRATION_BATCH_SIZE = 48;
 
 const DECAL_CLASS_INFANTRY = "infantry";
 const DECAL_CLASS_SCORCH = "scorch";
@@ -64,10 +65,16 @@ export class GroundDecalLayer {
     this.tankTreads = new TankTreadLayer({ layer, pixi, createCanvas, recordDiagnostic });
     this.totalStamped = 0;
     this.textureUpdateCount = 0;
+    this._map = null;
+    this._replacement = null;
+    this._replacementQueue = null;
+    this._replacementExpectedCount = 0;
+    this._emptyReplacementComplete = false;
   }
 
   resetForMap(map) {
     this.destroy();
+    this._map = map;
     this.totalStamped = 0;
     this.textureUpdateCount = 0;
     if (!this.pixi?.Texture || !this.pixi?.Sprite || !this.layer) return false;
@@ -93,11 +100,74 @@ export class GroundDecalLayer {
     return true;
   }
 
-  stampBatch(decals, { onError = null } = {}) {
+  beginPerspectiveTransition(map = this._map) {
+    if (!map) return false;
+    this._destroyReplacement();
+    const replacement = new GroundDecalLayer({
+      layer: this.layer,
+      pixi: this.pixi,
+      createCanvas: this.createCanvas,
+      downsample: this.downsample,
+      recordDiagnostic: this.recordDiagnostic,
+      loadAtlas: this.loadAtlas,
+    });
+    if (!replacement.resetForMap(map)) {
+      replacement.destroy();
+      return false;
+    }
+    if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.READY && this.atlas) {
+      replacement._assetLoadGeneration += 1;
+      replacement.assetLoadPromise = null;
+      replacement.atlas = this.atlas;
+      replacement.assetStatus = GROUND_DECAL_ATLAS_STATUS.READY;
+      replacement._tintScratch = this._tintScratch;
+      this.atlas = null;
+      this.assetStatus = GROUND_DECAL_ATLAS_STATUS.IDLE;
+      this._tintScratch = null;
+    }
+    replacement.setVisible(false);
+    this._replacement = replacement;
+    this._replacementQueue = null;
+    this._replacementExpectedCount = 0;
+    this._emptyReplacementComplete = false;
+    this.recordDiagnostic?.("renderer.groundDecals.perspectiveTransitionStarted", 1);
+    return true;
+  }
+
+  setVisible(visible) {
+    if (this.sprite) this.sprite.visible = !!visible;
+    this.tankTreads.setVisible(visible);
+  }
+
+  completePerspectiveTransition() {
+    if (!this._replacement || this._replacementQueue?.length) return false;
+    if (this._replacement.assetStatus === GROUND_DECAL_ATLAS_STATUS.PENDING) {
+      this._emptyReplacementComplete = true;
+      const replacement = this._replacement;
+      replacement.assetLoadPromise?.then(() => {
+        if (this._replacement !== replacement || !this._emptyReplacementComplete) return;
+        this._adoptReplacement();
+        this.recordDiagnostic?.("renderer.groundDecals.perspectiveTransitionCompleted", 1);
+      });
+      return false;
+    }
+    this._adoptReplacement();
+    this.recordDiagnostic?.("renderer.groundDecals.perspectiveTransitionCompleted", 1);
+    return true;
+  }
+
+  stampBatch(decals, { onError = null, fog = null } = {}) {
+    if (this._replacement) {
+      return this._hydrateReplacement(decals, { onError, fog });
+    }
+    return this._stampBatchNow(decals, { onError, fog });
+  }
+
+  _stampBatchNow(decals, { onError = null, fog = null } = {}) {
     if (!this.ctx || !Array.isArray(decals) || decals.length === 0) return 0;
     const trails = decals.filter((decal) => decal?.decalClass === "tankTreads");
     const ordinary = decals.filter((decal) => decal?.decalClass !== "tankTreads");
-    const trailStamped = this.tankTreads.stampAuthoritativeTrails(trails);
+    const trailStamped = this.tankTreads.stampAuthoritativeTrails(trails, fog);
     if (ordinary.length === 0) return trailStamped;
     if (this.assetStatus === GROUND_DECAL_ATLAS_STATUS.FAILED) {
       throw this.assetLoadError || new Error("ground decal PNG atlas is unavailable");
@@ -110,6 +180,23 @@ export class GroundDecalLayer {
       ? this._queuedUntilAssets.splice(0).concat(ordinary)
       : ordinary;
     return trailStamped + this._stampDecodedBatch(batch, { onError });
+  }
+
+  _hydrateReplacement(decals, { onError = null, fog = null } = {}) {
+    if (!Array.isArray(decals) || decals.length === 0) return 0;
+    if (this._replacementQueue === null) {
+      this._replacementQueue = [...decals];
+      this._replacementExpectedCount = decals.length;
+      this.recordDiagnostic?.("renderer.groundDecals.perspectiveHydrationQueued", decals.length);
+    }
+    if (this._replacement.assetStatus === GROUND_DECAL_ATLAS_STATUS.PENDING) return 0;
+    const batch = this._replacementQueue.splice(0, PERSPECTIVE_HYDRATION_BATCH_SIZE);
+    const stamped = this._replacement._stampBatchNow(batch, { onError, fog });
+    if (stamped !== batch.length || this._replacementQueue.length > 0) return 0;
+    const completed = this._replacementExpectedCount;
+    this._adoptReplacement();
+    this.recordDiagnostic?.("renderer.groundDecals.perspectiveTransitionCompleted", 1);
+    return completed;
   }
 
   _beginAssetLoad() {
@@ -195,6 +282,7 @@ export class GroundDecalLayer {
   }
 
   diagnostics() {
+    const transition = this._replacement;
     return {
       totalStamped: this.totalStamped,
       pendingDecals: this._queuedUntilAssets.length,
@@ -203,17 +291,30 @@ export class GroundDecalLayer {
       textureHeight: this.canvas?.height || 0,
       downsample: this.downsample,
       layerChildCount: this.displayObjectCount(),
-      assetStatus: this.assetStatus,
+      assetStatus: transition?.assetStatus || this.assetStatus,
+      perspectiveTransition: transition ? {
+        pendingRecords: this._replacementQueue?.length || 0,
+        expectedRecords: this._replacementExpectedCount,
+      } : null,
       tankTreads: this.tankTreads.diagnostics(),
     };
   }
 
   stampLiveTankTreads(entities, fog = null) {
+    if (this._replacement) {
+      return this._replacement.tankTreads.stampVisibleTankPoses(entities);
+    }
     return this.tankTreads.revealAuthoritativeTrails(fog) +
       this.tankTreads.stampVisibleTankPoses(entities);
   }
 
   destroy() {
+    this._destroyReplacement();
+    this._destroySurface();
+    this._map = null;
+  }
+
+  _destroySurface() {
     this.tankTreads.destroy();
     this._assetLoadGeneration += 1;
     this.assetLoadPromise = null;
@@ -248,13 +349,52 @@ export class GroundDecalLayer {
     this.ctx = null;
     this.canvas = null;
   }
+
+  _destroyReplacement() {
+    const replacement = this._replacement;
+    this._replacement = null;
+    this._replacementQueue = null;
+    this._replacementExpectedCount = 0;
+    this._emptyReplacementComplete = false;
+    replacement?.destroy();
+  }
+
+  _adoptReplacement() {
+    const replacement = this._replacement;
+    if (!replacement) return;
+    replacement.setVisible(true);
+    this._replacement = null;
+    this._replacementQueue = null;
+    this._replacementExpectedCount = 0;
+    this._emptyReplacementComplete = false;
+    this._destroySurface();
+    for (const key of [
+      "canvas", "ctx", "texture", "sprite", "atlas", "assetStatus", "assetLoadPromise",
+      "assetLoadError", "_assetLoadGeneration", "_queuedUntilAssets", "_tintScratch",
+      "tankTreads", "totalStamped", "textureUpdateCount", "_map",
+    ]) {
+      this[key] = replacement[key];
+    }
+    replacement.canvas = null;
+    replacement.ctx = null;
+    replacement.texture = null;
+    replacement.sprite = null;
+    replacement.atlas = null;
+    replacement._tintScratch = null;
+    replacement.tankTreads = new TankTreadLayer({
+      layer: replacement.layer,
+      pixi: replacement.pixi,
+      createCanvas: replacement.createCanvas,
+      recordDiagnostic: replacement.recordDiagnostic,
+    });
+  }
 }
 
 export function _initGroundDecalsForMap(map) {
   this._groundDecals?.resetForMap(map);
 }
 
-export function _drawGroundDecals(source) {
+export function _drawGroundDecals(source, { fog = null } = {}) {
   if (!this._groundDecals) return 0;
   if (!this._groundDecals.ctx) return 0;
   const decals = Array.isArray(source)
@@ -264,6 +404,7 @@ export function _drawGroundDecals(source) {
       : [];
   return this._groundDecals.stampBatch(decals, {
     onError: (label, err) => this._recordRenderError?.(label, err),
+    fog,
   });
 }
 

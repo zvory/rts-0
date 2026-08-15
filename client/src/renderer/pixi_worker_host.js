@@ -1,4 +1,5 @@
 import {
+  createCompleteGroundDecalTransitionMessage,
   createCaptureMessage,
   createDestroyMessage,
   createDurableDecalMessage,
@@ -255,6 +256,11 @@ export class PixiWorkerPresentationAdapter {
     this._retainedDecalRevision = 0;
     this._settleDecalWaiters(null);
     this._post(createResetGroundDecalsMessage(this._generation, this._decalEpoch));
+  }
+
+  completeGroundDecalTransition() {
+    if (this._destroyed || this._fatal || this.surface !== "match") return;
+    this._post(createCompleteGroundDecalTransitionMessage(this._generation, this._decalEpoch));
   }
 
   trenchDiagnostics() {

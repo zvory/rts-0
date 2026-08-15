@@ -44,6 +44,12 @@ export class TankTreadLayer {
     this.nextUploadAt = 0;
     this.totalSegments = 0;
     this.textureUpdateCount = 0;
+    this.visible = true;
+  }
+
+  setVisible(visible) {
+    this.visible = !!visible;
+    for (const tile of this.tiles.values()) tile.sprite.visible = this.visible;
   }
 
   resetForMap(map) {
@@ -112,7 +118,7 @@ export class TankTreadLayer {
     return stamped;
   }
 
-  stampAuthoritativeTrails(trails) {
+  stampAuthoritativeTrails(trails, fog = null) {
     if (!Array.isArray(trails) || this.worldWidth <= 0 || this.worldHeight <= 0) return 0;
     let accepted = 0;
     for (const trail of trails) {
@@ -134,7 +140,12 @@ export class TankTreadLayer {
       }
       const segmentsByTile = this._segmentsByMapTile(segments);
       this.authoritativeTrailIds.add(trail.id);
-      if (segmentsByTile.size > 0) this.authoritativeTrails.set(trail.id, segmentsByTile);
+      if (segmentsByTile.size > 0) {
+        this.authoritativeTrails.set(trail.id, segmentsByTile);
+        if (typeof fog?.isVisible === "function") {
+          this._revealTrailTiles(trail.id, segmentsByTile, fog);
+        }
+      }
       this.authoritativeRevealDirty = true;
       accepted += 1;
     }
@@ -350,12 +361,46 @@ export class TankTreadLayer {
     ctx.imageSmoothingEnabled = false;
     const texture = this.pixi.Texture.from(canvas);
     const sprite = new this.pixi.Sprite(texture);
+    sprite.visible = this.visible;
     sprite.position.set(tx * TILE_WORLD_SIZE, ty * TILE_WORLD_SIZE);
     sprite.scale.set(DOWNSAMPLE);
     this.layer.addChild(sprite);
     const tile = { canvas, ctx, texture, sprite };
     this.tiles.set(key, tile);
     return tile;
+  }
+
+  _revealTrailTiles(trailId, segmentsByTile, fog) {
+    const dirty = new Set();
+    let stamped = 0;
+    for (const [tileIndex, segments] of segmentsByTile) {
+      const tx = tileIndex % this.mapWidthTiles;
+      const ty = Math.floor(tileIndex / this.mapWidthTiles);
+      if (this.roadTiles.has(tileIndex)) {
+        segmentsByTile.delete(tileIndex);
+        continue;
+      }
+      if (!fog.isVisible(tx, ty)) continue;
+      const clip = {
+        x: tx * this.mapTileSize,
+        y: ty * this.mapTileSize,
+        width: this.mapTileSize,
+        height: this.mapTileSize,
+      };
+      for (const segment of segments) {
+        if (this._stampSegment(segment, dirty, clip)) stamped += 1;
+      }
+      segmentsByTile.delete(tileIndex);
+    }
+    if (segmentsByTile.size === 0) this.authoritativeTrails.delete(trailId);
+    if (stamped > 0) {
+      for (const tile of dirty) tile.texture?.source?.update?.();
+      this.totalSegments += stamped;
+      this.textureUpdateCount += dirty.size;
+      this.recordDiagnostic?.("renderer.tankTreads.authoritativeSegments", stamped);
+      this.recordDiagnostic?.("renderer.tankTreads.tileUploads", dirty.size);
+    }
+    return stamped;
   }
 }
 

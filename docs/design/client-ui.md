@@ -468,9 +468,12 @@ rows for immediate display but cannot advance the complete cache cursor. In that
 `GroundDecalSync` coalesces the mismatch into one reliable
 `requestGroundDecals { requestId, afterRevision }` repair and retries with bounded backoff. A later
 covering snapshot tail cancels an obsolete outstanding repair. The echoed repair request id rejects
-delayed responses from a prior replay tick or vision perspective. Replay seeks and observer-view
-changes clear both the cache and painted presentation, block possibly pre-reset inline tails until
-a correlated repair establishes the replacement authority, then resynchronize from revision zero.
+delayed responses from a prior replay tick or vision perspective. Replay seeks clear both the cache
+and painted presentation. Observer-view changes clear the authoritative cache but keep the old
+painted surface visible while a hidden replacement resynchronizes from revision zero. Possibly
+pre-reset inline tails remain blocked until a correlated repair establishes replacement authority.
+The worker hydrates the hidden surface in bounded batches across ordinary presentations, then swaps
+it atomically; an empty correlated repair publishes a clean replacement explicitly.
 Transient combat events still drive short-lived
 effects and audio, but are not used to create permanent decals.
 
@@ -479,14 +482,21 @@ effects and audio, but are not used to create permanent decals.
 export const GROUND_DECAL_TEXTURE_WORLD_SCALE
 export class GroundDecalLayer {
   resetForMap(map)
+  beginPerspectiveTransition(map)
+  completePerspectiveTransition()
   stampBatch(decals, options?)
   displayObjectCount()
   diagnostics()
   destroy()
 }
 ```
-`GroundDecalLayer` owns one downsampled OffscreenCanvas-backed Pixi texture and one sprite on the
-`decals` world layer. SVG files remain source art; `scripts/generate-ground-decal-atlas.mjs` creates
+`GroundDecalLayer` normally owns one downsampled OffscreenCanvas-backed Pixi texture and one sprite
+on the `decals` world layer. During an observer-perspective repair it temporarily retains the old
+visible surface and hydrates a hidden replacement in batches of at most 48 durable records per
+presented frame. Completion atomically adopts the replacement and destroys the old surface; a
+newer reset cancels only the unfinished replacement. A ready decal atlas transfers to the hidden
+surface rather than being fetched and decoded again. SVG files remain source art;
+`scripts/generate-ground-decal-atlas.mjs` creates
 the checked-in `ground-decals-v1.png` plus deterministic rect metadata, and runtime loads that one
 PNG through `fetch`/`createImageBitmap`. New visible death and impact decals stamp from those rects;
 an unavailable or failed atlas remains a reported blocking asset error and never silently chooses a
