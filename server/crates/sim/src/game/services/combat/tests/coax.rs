@@ -230,6 +230,48 @@ fn tank_coax_fallback_vehicle_damage_stays_small_arms() {
 }
 
 #[test]
+fn tank_coax_pairwise_precedence_alternates_by_tick() {
+    fn resolve_lethal_exchange(tick: u32) -> (u32, u32) {
+        let map = open_map(16);
+        let mut entities = EntityStore::new();
+        let lower_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let higher_id = entities
+            .spawn_unit(2, EntityKind::Tank, 180.0, 100.0)
+            .expect("tank should spawn");
+        prepare_coax_tank(&mut entities, lower_id);
+        prepare_coax_tank(&mut entities, higher_id);
+        {
+            let lower = entities.get_mut(lower_id).expect("tank should exist");
+            assert!(lower.apply_damage(lower.hp.saturating_sub(1), None));
+        }
+        {
+            let higher = entities.get_mut(higher_id).expect("tank should exist");
+            assert!(higher.apply_damage(higher.hp.saturating_sub(1), None));
+            higher.set_facing(std::f32::consts::PI);
+            higher.set_weapon_facing(std::f32::consts::PI);
+        }
+        let smokes = SmokeCloudStore::new();
+        run_combat_tick_on_map_with_seed_smokes_and_tick(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+            0,
+            &smokes,
+            tick,
+        );
+        (
+            entities.get(lower_id).expect("tank should exist").hp,
+            entities.get(higher_id).expect("tank should exist").hp,
+        )
+    }
+
+    assert_eq!(resolve_lethal_exchange(10), (1, 0));
+    assert_eq!(resolve_lethal_exchange(11), (0, 1));
+}
+
+#[test]
 fn tank_coax_overpenetration_uses_small_arms_profile_without_extra_attack_event() {
     let map = open_map(16);
     let mut entities = EntityStore::new();

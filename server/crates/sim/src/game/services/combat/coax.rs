@@ -52,12 +52,13 @@ pub(super) fn fire_tank_coax_system(
     events: &mut HashMap<u32, Vec<Event>>,
     firing_reveals: &mut Vec<FiringRevealSource>,
     tick: u32,
+    combat_order: &[u32],
 ) {
     let Some(weapon_profile) = combat_rules::weapon_profile(combat_rules::WeaponKind::TankCoax)
     else {
         return;
     };
-    for id in entities.ids() {
+    for id in combat_order.iter().copied() {
         let ready =
             matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
         if !ready {

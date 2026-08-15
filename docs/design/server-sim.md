@@ -1510,6 +1510,9 @@ General rules:
   its movement path and stops to engage; after combat clears before arrival, it resumes the original
   player-issued destination. Moving-fire units keep advancing along that destination while firing.
   Direct `Attack` and idle behavior are stationary as well.
+- Direct combat applies damage immediately, but its complete stable entity-id turn order reverses
+  on alternating ticks. Every entity pair therefore swaps same-tick firing precedence instead of
+  permanently favoring the older, lower-id entity; replay behavior remains deterministic.
 - Normal combat auto-acquisition builds cheap hostile, weapon-fit, and range-qualified candidates
   in `services::combat::acquisition`, orders them through the sim-local
   `services::combat::priority` ranker, then checks fog, smoke, line of sight, blockers, and
