@@ -244,11 +244,11 @@ fn tank_coax_pairwise_precedence_alternates_by_tick() {
         prepare_coax_tank(&mut entities, higher_id);
         {
             let lower = entities.get_mut(lower_id).expect("tank should exist");
-            lower.hp = 1;
+            assert!(lower.apply_damage(lower.hp.saturating_sub(1), None));
         }
         {
             let higher = entities.get_mut(higher_id).expect("tank should exist");
-            higher.hp = 1;
+            assert!(higher.apply_damage(higher.hp.saturating_sub(1), None));
             higher.set_facing(std::f32::consts::PI);
             higher.set_weapon_facing(std::f32::consts::PI);
         }

@@ -355,7 +355,8 @@ fn combat_pairwise_precedence_alternates_by_tick() {
     fn resolve_lethal_exchange(tick: u32) -> (u32, u32) {
         let (mut entities, lower_id, higher_id) = rifleman_with_enemy();
         for id in [lower_id, higher_id] {
-            entities.get_mut(id).expect("rifleman should exist").hp = 5;
+            let rifleman = entities.get_mut(id).expect("rifleman should exist");
+            assert!(rifleman.apply_damage(rifleman.hp.saturating_sub(5), None));
         }
         let map = open_map(8);
         let smokes = SmokeCloudStore::new();
