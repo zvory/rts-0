@@ -1,5 +1,5 @@
 import { runMatchCaptureFrame } from "./frame_recovery.js";
-import { CaptureRenderClock, RenderClock } from "./visual_clock.js";
+import { CaptureRenderClock, RenderClock, syncRenderClockToRoomTime } from "./visual_clock.js";
 
 export function createMatchRenderClock() {
   return { renderClock: new RenderClock(), captureClock: null, captureRafWasRunning: false };
@@ -38,6 +38,7 @@ export function exitFixedCapture(match) {
   if (!match.captureClock) return { resumed: false };
   const resumed = match.captureRafWasRunning && match.running;
   match.renderClock = new RenderClock(match.captureClock.now());
+  syncRenderClockToRoomTime(match.renderClock, match.roomTimeControls?.roomTimeState);
   match.state.setRenderClock(match.renderClock);
   match.renderer.exitFixedCapture(match.renderClock);
   match.captureClock = null;

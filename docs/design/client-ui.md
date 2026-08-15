@@ -137,6 +137,7 @@ src/
   match_startup_inbox.js # semantic buffering while asynchronous Match construction completes
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
   match_notice_presenter.js # Match-owned existing-notice fanout and under-attack incident admission
+  match_room_time.js # authoritative room-time presentation clock and combat-audio synchronization
   match_live_pause.js # live pause state actions and prediction visual suspension
   match_net_reporter.js # Match ping cadence and client net-report upload collaborator
   match_settings_context.js # Match settings action/tab context builder
@@ -2114,8 +2115,10 @@ minimap, and audio together.
 `artilleryFiring` events are forwarded directly to `Minimap.markArtilleryFiring`; the minimap draws
 the artillery rig icon above fog for every recipient without using it as entity visibility.
 
-`Match` composes a render-only clock and injects it into `Renderer`. Normal play reads monotonic
-`performance.now()` with the prior semantics. Interact fixed capture may explicitly suspend
+`Match` composes a render-only clock and injects it into `Renderer`. Fixed-realtime play advances
+it at 1×. Authoritative room-time state changes its continuous rate so paused or ended rooms freeze
+battlefield animation time and positive playback speeds scale it without a visual-time jump.
+Interact fixed capture may explicitly suspend
 the ordinary rAF loop, replace only that render clock with a monotonically advanced capture clock,
 render with interpolation disabled, and then restore the normal clock and rAF ownership. Renderer
 rig sampling, deployed-weapon transitions, frame strips, recoil, command feedback, smoke,
@@ -2577,7 +2580,7 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `prediction_runtime_startup.js`, `match_combat_audio.js`,
-  `match_notice_presenter.js`,
+  `match_notice_presenter.js`, `match_room_time.js`,
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`,
   `match_settings_toggles.js`, `match_auto_spectator.js`, `auto_spectator.js`,
   `client_perf_report.js`, `match_health.js`,
