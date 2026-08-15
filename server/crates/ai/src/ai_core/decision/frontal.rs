@@ -409,7 +409,12 @@ fn issue_expansion_containment_wave(
     }
     let endgame_search_active = memory.enemy_main_destroyed;
     let objective = if endgame_search_active {
-        endgame_search_point(enemy_base, observation.map, memory.endgame_search_waypoint)
+        endgame_search_point(
+            own_base,
+            enemy_base,
+            observation.map,
+            memory.endgame_search_waypoint,
+        )
     } else if memory.enemy_natural_destroyed {
         (enemy_base.x, enemy_base.y)
     } else {
@@ -502,6 +507,7 @@ fn issue_expansion_containment_wave(
                     (memory.endgame_search_waypoint + 1) % ENDGAME_SEARCH_OFFSETS.len();
                 memory.containment_stationary_since = None;
                 let next = endgame_search_point(
+                    own_base,
                     enemy_base,
                     observation.map,
                     memory.endgame_search_waypoint,
@@ -591,16 +597,18 @@ fn update_enemy_main_state(
 }
 
 fn endgame_search_point(
+    own_base: (f32, f32),
     enemy_base: EnemyBaseFact,
     map: AiMapSummary,
     waypoint: usize,
 ) -> (f32, f32) {
     let offset = ENDGAME_SEARCH_OFFSETS[waypoint % ENDGAME_SEARCH_OFFSETS.len()];
+    let orientation = canonical_half_turn_orientation(own_base, (enemy_base.x, enemy_base.y));
     let tile_size = map.tile_size as f32;
     clamp_to_map(
         (
-            enemy_base.x + offset.0 * tile_size,
-            enemy_base.y + offset.1 * tile_size,
+            enemy_base.x + offset.0 * tile_size * orientation,
+            enemy_base.y + offset.1 * tile_size * orientation,
         ),
         map,
     )
@@ -659,14 +667,9 @@ fn containment_points(
     let toward_expansion = normalized_direction(own_base, objective)?;
     let tile_size = map.tile_size as f32;
     let perpendicular = (-toward_expansion.1, toward_expansion.0);
-    let flank_sign = if own_base.0 + own_base.1 <= objective.0 + objective.1 {
-        1.0
-    } else {
-        -1.0
-    };
     let approach_origin = (
-        own_base.0 + perpendicular.0 * policy.flank_tiles * tile_size * flank_sign,
-        own_base.1 + perpendicular.1 * policy.flank_tiles * tile_size * flank_sign,
+        own_base.0 + perpendicular.0 * policy.flank_tiles * tile_size,
+        own_base.1 + perpendicular.1 * policy.flank_tiles * tile_size,
     );
     let toward_expansion = normalized_direction(approach_origin, objective)?;
     let tank_point = clamp_to_map(
@@ -684,6 +687,17 @@ fn containment_points(
         map,
     );
     Some((tank_point, scout_point))
+}
+
+/// Express half-turn-sensitive search offsets in Jeff's local own-base-to-enemy frame. A
+/// rotationally mirrored start flips both axes, so the same local search pattern mirrors instead
+/// of retaining a global top-left bias.
+fn canonical_half_turn_orientation(from: (f32, f32), to: (f32, f32)) -> f32 {
+    if from.0 < to.0 || (from.0 == to.0 && from.1 <= to.1) {
+        1.0
+    } else {
+        -1.0
+    }
 }
 
 fn scout_trailing_point(
@@ -1041,6 +1055,36 @@ mod tests {
     }
 
     #[test]
+    fn containment_flank_rotates_with_the_players() {
+        let map = AiMapSummary {
+            width: 100,
+            height: 100,
+            tile_size: 32,
+        };
+        let policy = JEFFS_AI.expansion_containment.unwrap();
+        let world_size = map.width as f32 * map.tile_size as f32;
+        let own_base = (200.0, 1_000.0);
+        let objective = (2_000.0, 1_000.0);
+        let original = containment_points(own_base, objective, map, policy).unwrap();
+        let rotated = containment_points(
+            (world_size - own_base.0, world_size - own_base.1),
+            (world_size - objective.0, world_size - objective.1),
+            map,
+            policy,
+        )
+        .unwrap();
+
+        for (actual, expected) in [
+            (rotated.0 .0, world_size - original.0 .0),
+            (rotated.0 .1, world_size - original.0 .1),
+            (rotated.1 .0, world_size - original.1 .0),
+            (rotated.1 .1, world_size - original.1 .1),
+        ] {
+            assert!((actual - expected).abs() < 0.001);
+        }
+    }
+
+    #[test]
     fn each_repush_adds_one_tank_to_the_grouped_cohort() {
         let policy = JEFFS_AI.expansion_containment.unwrap();
         assert_eq!(containment_repush_tank_count(policy, 1), 3);
@@ -1164,12 +1208,55 @@ mod tests {
             x: 50.5 * 32.0,
             y: 50.5 * 32.0,
         };
-        assert_eq!(endgame_search_point(enemy_base, map, 0), (1616.0, 1616.0));
-        assert_eq!(endgame_search_point(enemy_base, map, 1), (1872.0, 1616.0));
-        assert_eq!(endgame_search_point(enemy_base, map, 9), (2128.0, 1616.0));
+        let own_base = (9.5 * 32.0, 9.5 * 32.0);
         assert_eq!(
-            endgame_search_point(enemy_base, map, ENDGAME_SEARCH_OFFSETS.len()),
-            endgame_search_point(enemy_base, map, 0)
+            endgame_search_point(own_base, enemy_base, map, 0),
+            (1616.0, 1616.0)
         );
+        assert_eq!(
+            endgame_search_point(own_base, enemy_base, map, 1),
+            (1872.0, 1616.0)
+        );
+        assert_eq!(
+            endgame_search_point(own_base, enemy_base, map, 9),
+            (2128.0, 1616.0)
+        );
+        assert_eq!(
+            endgame_search_point(own_base, enemy_base, map, ENDGAME_SEARCH_OFFSETS.len()),
+            endgame_search_point(own_base, enemy_base, map, 0)
+        );
+    }
+
+    #[test]
+    fn endgame_search_ring_rotates_with_the_players() {
+        let map = AiMapSummary {
+            width: 100,
+            height: 100,
+            tile_size: 32,
+        };
+        let world_size = map.width as f32 * map.tile_size as f32;
+        let own_base = (9.5 * 32.0, 9.5 * 32.0);
+        let enemy_base = EnemyBaseFact {
+            player_id: 2,
+            start_tile: (80, 80),
+            x: 80.5 * 32.0,
+            y: 80.5 * 32.0,
+        };
+        let rotated_enemy_base = EnemyBaseFact {
+            player_id: 2,
+            start_tile: (19, 19),
+            x: world_size - enemy_base.x,
+            y: world_size - enemy_base.y,
+        };
+        for waypoint in 0..ENDGAME_SEARCH_OFFSETS.len() {
+            let original = endgame_search_point(own_base, enemy_base, map, waypoint);
+            let rotated = endgame_search_point(
+                (world_size - own_base.0, world_size - own_base.1),
+                rotated_enemy_base,
+                map,
+                waypoint,
+            );
+            assert_eq!(rotated, (world_size - original.0, world_size - original.1));
+        }
     }
 }
