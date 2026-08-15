@@ -17,6 +17,14 @@ try {
   const resumedClock = new RenderClock(1_000);
   performanceNow = 75;
   assert.equal(resumedClock.now(), 1_025, "normal visual time resumes continuously after a faster-than-real-time capture");
+  resumedClock.setRate(0);
+  performanceNow = 575;
+  assert.equal(resumedClock.now(), 1_025, "zero-rate visual time remains frozen");
+  resumedClock.setRate(2);
+  performanceNow = 600;
+  assert.equal(resumedClock.now(), 1_075, "two-times visual time advances twice as fast without jumping on resume");
+  assert.throws(() => resumedClock.setRate(-1), /non-negative/, "visual time rejects a backwards rate");
+  assert.throws(() => resumedClock.setRate(NaN), /finite/, "visual time rejects a non-finite rate");
 } finally {
   globalThis.performance = savedPerformance;
 }
