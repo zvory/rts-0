@@ -145,7 +145,7 @@ pub(in crate::game) fn combat_system(
     if tick % 2 == 1 {
         combat_order.reverse();
     }
-    for id in combat_order {
+    for id in combat_order.iter().copied() {
         if entities
             .get(id)
             .is_some_and(|entity| entity.kind == EntityKind::MortarTeam)
@@ -559,5 +559,6 @@ pub(in crate::game) fn combat_system(
         events,
         firing_reveals,
         tick,
+        &combat_order,
     );
 }
