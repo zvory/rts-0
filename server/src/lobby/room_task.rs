@@ -32,6 +32,7 @@ mod lobby;
 mod match_history;
 mod observer;
 mod replay;
+mod replay_artifact;
 mod summary;
 mod types;
 

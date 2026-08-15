@@ -14,8 +14,8 @@ use super::helpers::{late_spectator_notice_name, live_ai_controllers};
 use super::types::{PendingClientCommandAck, Phase, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{
-    Event, LivePauseState, MatchConclusion, MatchConclusionReason, NoticeSeverity, PlayerScore,
-    RoomTimeState, ServerMessage, TeamId,
+    Event, LivePauseState, MatchConclusion, NoticeSeverity, PlayerScore, RoomTimeState,
+    ServerMessage, TeamId,
 };
 use crate::structured_log::{self, MatchStartedLog};
 use rts_sim::game::command::SimCommand;
@@ -377,20 +377,13 @@ impl RoomTask {
         let alive = game.alive_players();
         let alive_teams = game.alive_team_ids();
         let scores = game.scores();
+        let conclusion = Some(MatchConclusion::gave_up(seat_id));
 
         if self.match_player_count >= 2 && alive_teams.len() <= 1 {
             let winner_id = alive_teams
                 .first()
                 .and_then(|team_id| game.first_alive_player_on_team(*team_id));
-            self.end_match(
-                winner_id,
-                scores,
-                Some(&game),
-                Some(MatchConclusion {
-                    defeated_player_ids: vec![seat_id],
-                    reason: MatchConclusionReason::GaveUp,
-                }),
-            );
+            self.end_match(winner_id, scores, Some(&game), conclusion);
             return;
         }
 
@@ -399,15 +392,7 @@ impl RoomTask {
         }
 
         if self.match_player_count < 2 {
-            self.end_match(
-                None,
-                scores,
-                Some(&game),
-                Some(MatchConclusion {
-                    defeated_player_ids: vec![seat_id],
-                    reason: MatchConclusionReason::GaveUp,
-                }),
-            );
+            self.end_match(None, scores, Some(&game), conclusion);
         } else {
             self.phase = Phase::InGame(game);
         }
@@ -713,10 +698,7 @@ impl RoomTask {
                 ServerMessage::GameOver {
                     winner_id: None,
                     winner_team_id: None,
-                    conclusion: Some(MatchConclusion {
-                        defeated_player_ids: vec![seat_id],
-                        reason: MatchConclusionReason::GaveUp,
-                    }),
+                    conclusion: Some(MatchConclusion::gave_up(seat_id)),
                     you: "lost".to_string(),
                     scores: scores.clone(),
                 },

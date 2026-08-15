@@ -32,6 +32,15 @@ pub struct MatchConclusion {
     pub reason: MatchConclusionReason,
 }
 
+impl MatchConclusion {
+    pub fn gave_up(player_id: u32) -> Self {
+        Self {
+            defeated_player_ids: vec![player_id],
+            reason: MatchConclusionReason::GaveUp,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum MatchConclusionReason {
