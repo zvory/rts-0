@@ -16,6 +16,7 @@ export const RENDER_WORKER_MESSAGE = Object.freeze({
   CAPTURE: "capture",
   PRESENTATION_PREFERENCES: "presentationPreferences",
   RESET_GROUND_DECALS: "resetGroundDecals",
+  COMPLETE_GROUND_DECAL_TRANSITION: "completeGroundDecalTransition",
   RESET_DIAGNOSTICS: "resetDiagnostics",
   RESET_GENERATION: "resetGeneration",
   DESTROY: "destroy",
@@ -131,6 +132,12 @@ export function createResetGroundDecalsMessage(generation, decalEpoch) {
   });
 }
 
+export function createCompleteGroundDecalTransitionMessage(generation, decalEpoch) {
+  return request(RENDER_WORKER_MESSAGE.COMPLETE_GROUND_DECAL_TRANSITION, generation, {
+    decalEpoch: requireId(decalEpoch, "ground decal epoch"),
+  });
+}
+
 export function createResetDiagnosticsMessage(generation) {
   return request(RENDER_WORKER_MESSAGE.RESET_DIAGNOSTICS, generation, {});
 }
@@ -225,6 +232,7 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
       if (!Array.isArray(payload?.decals)) throw new TypeError("durableDecals requires records");
       break;
     case RENDER_WORKER_MESSAGE.RESET_GROUND_DECALS:
+    case RENDER_WORKER_MESSAGE.COMPLETE_GROUND_DECAL_TRANSITION:
       requireId(payload?.decalEpoch, "ground decal epoch");
       break;
     case RENDER_WORKER_MESSAGE.FRAME:

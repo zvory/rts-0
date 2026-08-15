@@ -267,7 +267,8 @@ export class Match {
     this.state = this._timeInit("match.state", () => new GameState(payload, { renderClock: this.renderClock }));
     this.groundDecalSync = new GroundDecalSync({
       net: this.net, state: this.state, labClient: this.labClient,
-      resetPresentation: () => this.resetGroundDecalPresentation(),
+      resetPresentation: (action) => action === "complete"
+        ? this.renderer?.completeGroundDecalTransition?.() : this.resetGroundDecalPresentation(),
     });
     configureMatchDisplayPreferences(this, options);
     this.controlPolicy = this._timeInit(
