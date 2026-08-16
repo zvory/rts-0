@@ -9,10 +9,10 @@ const UNDER_ATTACK_TARGET_RADIUS_TILES = 2;
 const DEFAULT_PING_INITIAL_RADIUS_PX = 4;
 const UNDER_ATTACK_PING_INITIAL_RADIUS_PX = 8;
 const DEFAULT_PING_STROKE_PX = 2;
-const UNDER_ATTACK_PING_STROKE_PX = 4;
+const UNDER_ATTACK_PING_STROKE_PX = 6;
 const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
-const ALERT_PING_INNER_RIM_INSET_PX = 4;
-const ALERT_PING_INNER_RIM_STROKE_PX = 2;
+const ALERT_PING_INNER_RIM_INSET_PX = 6;
+const ALERT_PING_INNER_RIM_STROKE_PX = 3;
 
 export function resolveUnderAttackTargetId({
   entities,
@@ -68,7 +68,7 @@ export function drawMinimapPings({ ctx, pings, now, worldToCanvas, borderPulseUn
       ping.isUnderAttack ? UNDER_ATTACK_PING_INITIAL_RADIUS_PX : DEFAULT_PING_INITIAL_RADIUS_PX
     ) + 15 * t;
     ctx.save();
-    ctx.globalAlpha = 1 - t;
+    ctx.globalAlpha = ping.isUnderAttack ? 1 - t * t : 1 - t;
     ctx.strokeStyle = ping.severity === "warn" ? "#ffd166" : "#ff4d4d";
     ctx.lineWidth = ping.isUnderAttack ? UNDER_ATTACK_PING_STROKE_PX : DEFAULT_PING_STROKE_PX;
     ctx.beginPath();

@@ -17,7 +17,12 @@ function recordingContext() {
     save() {}, restore() {}, beginPath() {},
     arc(...args) { this.calls.push({ op: "arc", args }); },
     stroke() {
-      this.calls.push({ op: "stroke", strokeStyle: this.strokeStyle, lineWidth: this.lineWidth });
+      this.calls.push({
+        op: "stroke",
+        strokeStyle: this.strokeStyle,
+        lineWidth: this.lineWidth,
+        globalAlpha: this.globalAlpha,
+      });
     },
   };
 }
@@ -49,11 +54,13 @@ export function runMinimapAttackAlertContracts() {
   const strokes = context.calls.filter((call) => call.op === "stroke");
   assert(arcs.length === 2, "attack alert draws both the red ring and its inner rim");
   assertApprox(arcs[0].args[2], 15.5, 0.001, "attack alert advances halfway through 4.4 seconds");
-  assertApprox(arcs[1].args[2], 11.5, 0.001, "attack alert rim stays four pixels inside");
-  assert(strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 4,
-    "attack alert keeps its doubled red outer stroke");
-  assert(strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 2,
-    "attack alert draws a doubled crisp white inner stroke");
+  assertApprox(arcs[1].args[2], 9.5, 0.001, "attack alert rim stays six pixels inside");
+  assert(strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 6,
+    "attack alert keeps its heavier red outer stroke");
+  assert(strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 3,
+    "attack alert draws a heavier crisp white inner stroke");
+  assertApprox(strokes[0].globalAlpha, 0.75, 0.001,
+    "attack alert remains more opaque halfway through its animation");
 
   let flashing = minimap._underAttackFlashEntityIds(entities, 250);
   assert(flashing.has(11) && !flashing.has(13), "attack alert resolves the nearest local entity");
