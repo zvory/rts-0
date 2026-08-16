@@ -37,10 +37,11 @@ mod turtle;
 use self::defense::{
     defensive_machine_gunner_units, defensive_machine_gunner_units_for_build_clearance,
     defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
-    home_defensive_tank_is_positioned, local_defense_target, local_defense_units,
-    machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
-    stage_home_anti_tank_line, stage_home_defensive_tank, stage_home_machine_gunner_screen,
-    stage_home_rifleman_screen, stage_main_steel_defensive_line, DefensivePanicPlan,
+    home_defensive_tank_is_positioned, jeff_breakthrough_response, jeff_surplus_offensive_riflemen,
+    local_defense_target, local_defense_units, machine_gunner_meets_replacement_health,
+    stage_defensive_machine_gunner_perimeter, stage_home_anti_tank_line, stage_home_defensive_tank,
+    stage_home_machine_gunner_screen, stage_jeff_attack_path_defense,
+    stage_jeff_borrowed_defenders_return, stage_main_steel_defensive_line, DefensivePanicPlan,
     DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
 use self::economy_manager::{
@@ -48,7 +49,10 @@ use self::economy_manager::{
     EconomyProposal, OilDemandSignal,
 };
 use self::expansion::{plan_expansion, try_build_expansion_resource_depot, ExpansionBlocker};
-use self::frontal::{issue_frontal_wave, plan_frontal_wave, sync_containment_recovery};
+use self::frontal::{
+    issue_frontal_wave, issue_jeff_anti_tank_gun_reaction, plan_frontal_wave,
+    sync_containment_recovery,
+};
 use self::geometry::{
     clamp_to_map, footprint_top_left_for_center, normalized_direction, tile_center,
 };
@@ -178,6 +182,7 @@ where
 
     let facts = AiFacts::from_observation(observation);
     memory.sync_home_defensive_tank(observation, profile);
+    memory.retain_live_jeff_breakthrough_units(observation);
     memory.sync_turtle_opening(profile, observation);
     let budget = SpendBudget::with_committed_steel(
         observation.economy.steel,
@@ -189,6 +194,7 @@ where
     let start_budget = budget;
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
+    let mut construction_clearance_units = BTreeSet::new();
 
     let local_threat_response = defensive_panic_response(observation);
     let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
@@ -341,6 +347,7 @@ where
                         &defensive_machine_gunners,
                         enemy_base,
                     ) {
+                        construction_clearance_units.extend(units.iter().copied());
                         // Clearing a construction footprint is a tactical move, not a new
                         // staging assignment. The live adapter suppresses repeated staging
                         // commands for units that are already in position.
@@ -420,6 +427,7 @@ where
                     &defensive_machine_gunners,
                     enemy_base,
                 ) {
+                    construction_clearance_units.extend(units.iter().copied());
                     intents.push(AiIntent::Move { units });
                 }
             }
@@ -438,6 +446,7 @@ where
                 enemy_base,
                 &mut placeable,
             ) {
+                construction_clearance_units.extend(units.iter().copied());
                 intents.push(AiIntent::Move { units });
             }
         }
@@ -684,8 +693,9 @@ where
     if let Some(tank_id) = memory.home_defensive_tank {
         frontal_exclusions.insert(tank_id);
     }
+    frontal_exclusions.extend(memory.jeff_breakthrough_units.iter().copied());
     sync_containment_recovery(observation, profile, memory);
-    let frontal_wave = plan_frontal_wave(
+    let mut frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
         memory,
@@ -711,9 +721,13 @@ where
     if !frontal_wave.ready_units.is_empty()
         || !local_ready_units.is_empty()
         || !defensive_machine_gunners.is_empty()
+        || !memory.containment_active_tanks.is_empty()
     {
         let mut handled_local_defense = false;
-        let mut local_defense_assigned = BTreeSet::new();
+        // A construction-clearance move was issued earlier in this same decision. Treat those
+        // units as assigned so attack-path staging cannot overwrite the move before the build
+        // command is applied; on the next decision the submitted footprint is avoided normally.
+        let mut local_defense_assigned = construction_clearance_units.clone();
         if profile.home_anti_tank.is_some() {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 if let Some(units) = stage_home_anti_tank_line(
@@ -735,25 +749,22 @@ where
         local_defenders.sort_unstable();
         local_defenders.dedup();
         if jeff_layered_home_defense {
-            let local_targets: Vec<u32> = defense::local_defense_targets(observation)
-                .into_iter()
-                .collect();
-            let interceptors: Vec<u32> = local_defense_units(observation, &local_defenders)
-                .into_iter()
-                .filter(|id| {
-                    observation.owned.iter().any(|unit| {
-                        unit.id == *id
-                            && matches!(
-                                unit.kind,
-                                EntityKind::Rifleman
-                                    | EntityKind::MachineGunner
-                                    | EntityKind::ScoutCar
-                            )
-                    })
-                })
-                .collect();
-            for (index, unit_id) in interceptors.into_iter().enumerate() {
-                let Some(target) = local_targets.get(index % local_targets.len().max(1)) else {
+            let mut unavailable = memory.containment_active_tanks.clone();
+            if let Some(scout_id) = memory.containment_active_scout {
+                unavailable.insert(scout_id);
+            }
+            let response = jeff_breakthrough_response(
+                observation,
+                map_analysis,
+                &unavailable,
+                memory.home_defensive_tank,
+            );
+            if !response.targets.is_empty() {
+                memory.note_jeff_breakthrough_units(&response.responders, observation.tick);
+            }
+            for (index, unit_id) in response.responders.iter().copied().enumerate() {
+                let Some(target) = response.targets.get(index % response.targets.len().max(1))
+                else {
                     break;
                 };
                 if let Some(units) = actions::attack_units(&mut actions, [unit_id], *target) {
@@ -777,6 +788,25 @@ where
         // one Tank overpenetration lane.
         handled_local_defense |= jeff_layered_home_defense;
 
+        if profile.id == JEFFS_AI_ID
+            && local_target.is_none()
+            && !memory.jeff_breakthrough_units.is_empty()
+        {
+            if memory.jeff_breakthrough_should_release(observation) {
+                memory.clear_jeff_breakthrough_units();
+            } else {
+                if let Some(units) = stage_jeff_borrowed_defenders_return(
+                    &mut actions,
+                    observation,
+                    map_analysis,
+                    &memory.jeff_breakthrough_units,
+                    memory.home_defensive_tank,
+                ) {
+                    intents.push(AiIntent::Stage { units });
+                }
+            }
+        }
+
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
             .copied()
@@ -784,43 +814,28 @@ where
             .collect();
         let turtle_defense_active = profile.turtle_defense.is_some();
 
+        let mut attack_path_defense_staged = false;
         if !handled_local_defense && profile.id == JEFFS_AI_ID && profile.home_anti_tank.is_some() {
             let riflemen: Vec<u32> =
                 actions::select_ready_combat_units(&observation.owned, &[EntityKind::Rifleman])
                     .into_iter()
                     .filter(|id| !local_defense_assigned.contains(id))
                     .collect();
-            let own_base =
-                geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
-            let fallback_armor = observation
-                .owned
-                .iter()
-                .filter(|entity| {
-                    entity.is_complete
-                        && matches!(entity.kind, EntityKind::Tank | EntityKind::ScoutCar)
-                        && !memory.containment_active_tanks.contains(&entity.id)
-                        && memory.containment_active_scout != Some(entity.id)
-                })
-                .min_by(|left, right| {
-                    geometry::dist2(left.x, left.y, own_base.0, own_base.1)
-                        .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
-                })
-                .map(|entity| entity.id);
-            if let (Some(armor_id), Some(enemy_base)) = (
-                memory.home_defensive_tank.or(fallback_armor),
-                facts.nearest_public_enemy_base,
+            if let Some(units) = stage_jeff_attack_path_defense(
+                &mut actions,
+                observation,
+                map_analysis,
+                &defensive_machine_gunners_available,
+                &riflemen,
             ) {
-                if let Some(units) = stage_home_rifleman_screen(
-                    &mut actions,
-                    observation,
-                    &riflemen,
-                    armor_id,
-                    enemy_base,
-                    3.0,
-                    1.75,
-                ) {
-                    intents.push(AiIntent::Stage { units });
-                }
+                attack_path_defense_staged = true;
+                intents.push(AiIntent::Stage { units });
+            }
+            if attack_path_defense_staged {
+                let mut unavailable = local_defense_assigned.clone();
+                unavailable.extend(memory.jeff_breakthrough_units.iter().copied());
+                frontal_wave.jeff_offensive_riflemen =
+                    jeff_surplus_offensive_riflemen(observation, &unavailable);
             }
         }
 
@@ -840,6 +855,7 @@ where
 
         if !handled_local_defense
             && !turtle_defense_active
+            && !attack_path_defense_staged
             && !defensive_machine_gunners_available.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
@@ -899,7 +915,17 @@ where
             }
         }
 
-        if !handled_local_defense && !turtle_defense_active && !frontal_wave.ready_units.is_empty()
+        let anti_tank_gun_reaction =
+            if !handled_local_defense && !turtle_defense_active && profile.id == JEFFS_AI_ID {
+                issue_jeff_anti_tank_gun_reaction(&mut actions, observation, &frontal_wave, memory)
+            } else {
+                None
+            };
+        if let Some(intent) = anti_tank_gun_reaction {
+            intents.push(intent);
+        } else if !handled_local_defense
+            && !turtle_defense_active
+            && !frontal_wave.ready_units.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 if let Some(intent) = issue_frontal_wave(

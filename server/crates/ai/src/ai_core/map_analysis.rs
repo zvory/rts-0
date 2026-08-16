@@ -11,8 +11,10 @@ use rts_protocol::{
 };
 use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
+mod attack_paths;
 mod chokes;
 mod regions;
+pub(crate) use attack_paths::{AiAttackPath, AiAttackPathReport, AiDefendedBase};
 use chokes::build_chokes;
 use regions::{build_regions, nearest_region, region_id_for_tile};
 
@@ -436,6 +438,15 @@ impl AiMapAnalysis {
             .take(limit)
             .map(|(_, _, choke)| choke)
             .collect()
+    }
+
+    pub(crate) fn likely_attack_paths(
+        &self,
+        defender_player_id: u32,
+        base_count: usize,
+        paths_per_base: usize,
+    ) -> AiAttackPathReport {
+        attack_paths::analyze_attack_paths(self, defender_player_id, base_count, paths_per_base)
     }
 
     #[allow(dead_code)]
