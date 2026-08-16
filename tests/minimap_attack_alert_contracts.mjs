@@ -53,8 +53,8 @@ export function runMinimapAttackAlertContracts() {
   const arcs = context.calls.filter((call) => call.op === "arc");
   const strokes = context.calls.filter((call) => call.op === "stroke");
   assert(arcs.length === 2, "attack alert draws both the red ring and its inner rim");
-  assertApprox(arcs[0].args[2], 15.5, 0.001, "attack alert advances halfway through 4.4 seconds");
-  assertApprox(arcs[1].args[2], 9.5, 0.001, "attack alert rim stays six pixels inside");
+  assertApprox(arcs[0].args[2], 19, 0.001, "attack alert contracts halfway from 32 to 6 pixels");
+  assertApprox(arcs[1].args[2], 13, 0.001, "attack alert rim stays six pixels inside");
   assert(strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 6,
     "attack alert keeps its heavier red outer stroke");
   assert(strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 3,
@@ -109,6 +109,18 @@ export function runMinimapAttackAlertContracts() {
   minimap._pings.length = 0;
   minimap.ping(40, 60, "alert", true);
   minimap._pings[0].startedAt = 100;
+  context.calls.length = 0;
+  minimap._drawPings(100);
+  const initialAttackArcs = context.calls.filter((call) => call.op === "arc");
+  assertApprox(initialAttackArcs[0].args[2], 32, 0.001,
+    "attack alert begins at four times its former initial radius");
+  assertApprox(initialAttackArcs[1].args[2], 26, 0.001,
+    "attack alert inner rim begins six pixels inside the outer ring");
+  context.calls.length = 0;
+  minimap._drawPings(4499);
+  const finalAttackArcs = context.calls.filter((call) => call.op === "arc");
+  assertApprox(finalAttackArcs[0].args[2], 6, 0.01,
+    "attack alert contracts to six pixels immediately before disappearing");
   minimap._drawPings(2300);
   assert(minimap._pings.length === 1, "attack alert remains after the former 2.2-second lifetime");
   minimap._drawPings(4500);

@@ -7,7 +7,8 @@ export const MINIMAP_BORDER_PULSE_MS = 700;
 
 const UNDER_ATTACK_TARGET_RADIUS_TILES = 2;
 const DEFAULT_PING_INITIAL_RADIUS_PX = 4;
-const UNDER_ATTACK_PING_INITIAL_RADIUS_PX = 8;
+const UNDER_ATTACK_PING_INITIAL_RADIUS_PX = 32;
+const UNDER_ATTACK_PING_FINAL_RADIUS_PX = 6;
 const DEFAULT_PING_STROKE_PX = 2;
 const UNDER_ATTACK_PING_STROKE_PX = 6;
 const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
@@ -64,9 +65,10 @@ export function drawMinimapPings({ ctx, pings, now, worldToCanvas, borderPulseUn
   for (const ping of activePings) {
     const t = (now - ping.startedAt) / pingDurationMs(ping);
     const p = worldToCanvas(ping.x, ping.y);
-    const radius = (
-      ping.isUnderAttack ? UNDER_ATTACK_PING_INITIAL_RADIUS_PX : DEFAULT_PING_INITIAL_RADIUS_PX
-    ) + 15 * t;
+    const radius = ping.isUnderAttack
+      ? UNDER_ATTACK_PING_INITIAL_RADIUS_PX
+        + (UNDER_ATTACK_PING_FINAL_RADIUS_PX - UNDER_ATTACK_PING_INITIAL_RADIUS_PX) * t
+      : DEFAULT_PING_INITIAL_RADIUS_PX + 15 * t;
     ctx.save();
     ctx.globalAlpha = ping.isUnderAttack ? 1 - t * t : 1 - t;
     ctx.strokeStyle = ping.severity === "warn" ? "#ffd166" : "#ff4d4d";
