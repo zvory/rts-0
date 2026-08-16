@@ -24,12 +24,65 @@ import {
   createObserverAnalysisOverlayPreferences,
   shouldMountObserverAnalysisOverlay,
 } from "../../client/src/observer_analysis_overlay.js";
+import {
+  RESOURCE_ADVANTAGE_MIN_EXTENT,
+  RESOURCE_COLLECTION_WINDOW_SECONDS,
+  ResourceCollectionHistory,
+  collectionAdvantageAreaPoints,
+} from "../../client/src/observer_analysis_resources.js";
 import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
 
 import { textWithin } from "./dom_text.mjs";
 
 // Observer analysis overlay
 // ---------------------------------------------------------------------------
+{
+  const history = new ResourceCollectionHistory();
+  const sample = (tick, firstSteel, secondSteel, firstOil = 0, secondOil = 0) => ({
+    tick,
+    players: [
+      { id: 1, resources: { lifetime: { steel: firstSteel, oil: firstOil } } },
+      { id: 2, resources: { lifetime: { steel: secondSteel, oil: secondOil } } },
+    ],
+  });
+  history.record(sample(0, 10, 20));
+  history.record(sample(12, 99, 0));
+  history.record(sample(240, 40, 10, 2, 8));
+  assert(
+    history.samples.length === 2
+      && history.samples[0].steel === 0
+      && history.samples[1].steel === 40
+      && history.samples[1].oil === -6,
+    "resource collection history samples signed lifetime-income differences over the trailing collection window",
+  );
+  const points = collectionAdvantageAreaPoints(history.samples, "steel", 100, 50);
+  assert(
+    points[0].y === 25 && points[1].y < 25,
+    "resource collection graph plots the smoothed signed income difference around zero",
+  );
+  const baseScaledPoints = collectionAdvantageAreaPoints(
+    [{ steel: 36 }, { steel: -36 }],
+    "steel",
+    100,
+    50,
+    RESOURCE_ADVANTAGE_MIN_EXTENT.steel,
+  );
+  assert(
+    Math.abs(baseScaledPoints[0].y - 25) < 4
+      && RESOURCE_COLLECTION_WINDOW_SECONDS === 8
+      && RESOURCE_ADVANTAGE_MIN_EXTENT.steel === 144
+      && RESOURCE_ADVANTAGE_MIN_EXTENT.oil === 36,
+    "resource collection graph keeps one mine small within a full-base minimum Y extent",
+  );
+  history.record(sample(0, 4, 4));
+  assert(
+    history.samples.length === 1 && history.samples[0].tick === 0,
+    "resource collection history truncates future samples on backward replay seeks",
+  );
+  history.record({ tick: 60, players: [{ id: 1, resources: { last5s: {} } }] });
+  assert(history.samples.length === 0, "resource collection history stays disabled outside 1v1s");
+}
+
 {
   const players = [
     { id: 1, name: "Red", color: "#cc1111" },
@@ -641,13 +694,13 @@ import { textWithin } from "./dom_text.mjs";
     });
     const resourcesText = textWithin(root);
     assert(
-      resourcesText.includes("Mined resources")
+      !resourcesText.includes("Mined resources")
         && resourcesText.includes("Lifetime")
         && resourcesText.includes("Last 5s")
         && resourcesText.includes("Last 1m")
         && resourcesText.includes("620")
         && resourcesText.includes("230"),
-      "resources tab renders lifetime, short-window, and minute mined-resource values",
+      "resources tab omits the redundant heading and renders lifetime, short-window, and minute mined-resource values",
     );
     const resourceGroups = findFakes(root, (el) => el.classList.contains("replay-resources-group"));
     assert(

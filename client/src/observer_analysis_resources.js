@@ -1,5 +1,66 @@
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
-import { resourceValueElement } from "./resource_icons.js";
+import { resourceIconHtml, resourceValueElement } from "./resource_icons.js";
+import { HARVEST_TICKS, OIL_LOAD, TICK_HZ } from "./config.js";
+
+const SAMPLE_INTERVAL_TICKS = 30;
+const MAX_SAMPLES = 60 * 30;
+const SVG_NS = "http://www.w3.org/2000/svg";
+export const RESOURCE_COLLECTION_WINDOW_SECONDS = 8;
+const COLLECTION_WINDOW_TICKS = TICK_HZ * RESOURCE_COLLECTION_WINDOW_SECONDS;
+const STEEL_LOAD = 2;
+const STEEL_PATCHES_PER_BASE = 12;
+const OIL_PATCHES_PER_BASE = 3;
+const HARVESTS_PER_WINDOW = COLLECTION_WINDOW_TICKS / HARVEST_TICKS;
+export const RESOURCE_ADVANTAGE_MIN_EXTENT = Object.freeze({
+  steel: STEEL_PATCHES_PER_BASE * STEEL_LOAD * HARVESTS_PER_WINDOW,
+  oil: OIL_PATCHES_PER_BASE * OIL_LOAD * HARVESTS_PER_WINDOW,
+});
+
+export class ResourceCollectionHistory {
+  constructor() {
+    this.samples = [];
+  }
+
+  record(analysis) {
+    const tick = Math.max(0, Math.trunc(Number(analysis?.tick) || 0));
+    const players = Array.isArray(analysis?.players) ? analysis.players : [];
+    if (players.length !== 2) {
+      this.samples = [];
+      return;
+    }
+
+    const ids = players.map((player) => player.id).sort((a, b) => a - b);
+    const last = this.samples[this.samples.length - 1];
+    if (last && (last.playerIds[0] !== ids[0] || last.playerIds[1] !== ids[1])) {
+      this.samples = [];
+    } else if (last && tick < last.tick) {
+      this.samples = this.samples.filter((sample) => sample.tick <= tick);
+    }
+
+    const current = this.samples[this.samples.length - 1];
+    if (current && tick - current.tick < SAMPLE_INTERVAL_TICKS) return;
+    const byId = new Map(players.map((player) => [player.id, player]));
+    const first = byId.get(ids[0]);
+    const second = byId.get(ids[1]);
+    if (!first || !second) return;
+
+    const cumulativeSteel = (first.resources?.lifetime?.steel || 0) - (second.resources?.lifetime?.steel || 0);
+    const cumulativeOil = (first.resources?.lifetime?.oil || 0) - (second.resources?.lifetime?.oil || 0);
+    const targetTick = tick - COLLECTION_WINDOW_TICKS;
+    const baseline = [...this.samples].reverse().find((sample) => sample.tick <= targetTick);
+    this.samples.push({
+      tick,
+      playerIds: ids,
+      cumulativeSteel,
+      cumulativeOil,
+      steel: baseline ? cumulativeSteel - baseline.cumulativeSteel : 0,
+      oil: baseline ? cumulativeOil - baseline.cumulativeOil : 0,
+    });
+    if (this.samples.length > MAX_SAMPLES) {
+      this.samples.splice(0, this.samples.length - MAX_SAMPLES);
+    }
+  }
+}
 
 export function normalizeResourceWindows(resources) {
   return {
@@ -9,8 +70,9 @@ export function normalizeResourceWindows(resources) {
   };
 }
 
-export function renderResourcesMetric({ analysis, players }) {
-  const wrap = renderAnalysisMetric("replay-resources", "Mined resources");
+export function renderResourcesMetric({ analysis, players, collectionHistory = [] }) {
+  const wrap = document.createElement("div");
+  wrap.className = "replay-analysis-metric replay-resources";
   const rows = playerAnalysisRows({ analysis, players });
   if (!analysis) {
     wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
@@ -21,6 +83,8 @@ export function renderResourcesMetric({ analysis, players }) {
     return wrap;
   }
 
+  wrap.appendChild(renderCollectionAdvantage({ rows, samples: collectionHistory }));
+
   for (const window of RESOURCE_WINDOWS) {
     wrap.appendChild(renderResourceWindowGroup({
       label: window.label,
@@ -29,6 +93,27 @@ export function renderResourcesMetric({ analysis, players }) {
     }));
   }
   return wrap;
+}
+
+export function collectionAdvantageAreaPoints(
+  samples,
+  resource,
+  width = 420,
+  height = 92,
+  minExtent = 0,
+) {
+  if (!Array.isArray(samples) || samples.length === 0) return [];
+  const mid = height / 2;
+  const extent = Math.max(
+    1,
+    Number(minExtent) || 0,
+    ...samples.map((sample) => Math.abs(Number(sample?.[resource]) || 0)),
+  );
+  const lastIndex = Math.max(1, samples.length - 1);
+  return samples.map((sample, index) => ({
+    x: (index / lastIndex) * width,
+    y: mid - ((Number(sample?.[resource]) || 0) / extent) * (mid - 5),
+  }));
 }
 
 export function renderAliveResourcesMetric({ analysis, players }) {
@@ -59,6 +144,121 @@ const RESOURCE_WINDOWS = [
   { label: "Last 1m", resourceKey: "lastMinute" },
   { label: "Lifetime", resourceKey: "lifetime" },
 ];
+
+function renderCollectionAdvantage({ rows, samples }) {
+  const section = document.createElement("section");
+  section.className = "replay-resource-advantage";
+
+  if (rows.length !== 2) {
+    section.appendChild(renderEmptyMetric("Collection graphs are shown for 1v1 replays."));
+    return section;
+  }
+
+  if (!Array.isArray(samples) || samples.length < 2) {
+    section.appendChild(renderEmptyMetric("Play the replay to build its collection timeline."));
+    return section;
+  }
+
+  section.append(
+    renderAdvantageChart({ resource: "steel", label: "Steel", rows, samples, serial: 0 }),
+    renderAdvantageChart({ resource: "oil", label: "Oil", rows, samples, serial: 1 }),
+  );
+  return section;
+}
+
+function renderAdvantageChart({ resource, label, rows, samples, serial }) {
+  const width = 420;
+  const chartHeight = 92;
+  const labelHeight = 18;
+  const plotLeft = 100;
+  const mid = chartHeight / 2;
+  const points = collectionAdvantageAreaPoints(
+    samples,
+    resource,
+    width - plotLeft,
+    chartHeight,
+    RESOURCE_ADVANTAGE_MIN_EXTENT[resource],
+  )
+    .map((point) => ({ ...point, x: point.x + plotLeft }));
+  const curve = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" L ");
+  const area = `M ${plotLeft},${mid} L ${curve} L ${width},${mid} Z`;
+  const clipTopId = `resource-advantage-top-${resource}-${serial}`;
+  const clipBottomId = `resource-advantage-bottom-${resource}-${serial}`;
+
+  const figure = document.createElement("figure");
+  figure.className = "replay-resource-advantage-chart";
+  const caption = document.createElement("figcaption");
+  caption.className = "replay-resource-advantage-chart-heading";
+  caption.innerHTML = `${resourceIconHtml(resource)}<span>${label}</span>`;
+  figure.appendChild(caption);
+
+  const svg = svgElement("svg", {
+    viewBox: `0 0 ${width} ${chartHeight + labelHeight}`,
+    role: "img",
+    "aria-label": `${label} collection advantage over replay time. ${rows[0].name} is above the center line and ${rows[1].name} is below.`,
+  });
+  const defs = svgElement("defs");
+  const topClip = svgElement("clipPath", { id: clipTopId });
+  topClip.appendChild(svgElement("rect", { x: 0, y: 0, width, height: mid }));
+  const bottomClip = svgElement("clipPath", { id: clipBottomId });
+  bottomClip.appendChild(svgElement("rect", { x: 0, y: mid, width, height: mid }));
+  defs.append(topClip, bottomClip);
+  svg.appendChild(defs);
+  svg.appendChild(svgElement("path", {
+    d: area,
+    fill: safeCssColor(rows[0].color),
+    opacity: "0.72",
+    "clip-path": `url(#${clipTopId})`,
+  }));
+  svg.appendChild(svgElement("path", {
+    d: area,
+    fill: safeCssColor(rows[1].color),
+    opacity: "0.72",
+    "clip-path": `url(#${clipBottomId})`,
+  }));
+  svg.appendChild(svgElement("path", {
+    d: `M 0,${mid} H ${width}`,
+    class: "replay-resource-advantage-zero",
+  }));
+  svg.appendChild(svgElement("path", {
+    d: `M ${curve}`,
+    class: "replay-resource-advantage-outline",
+  }));
+  appendPlayerLabel(svg, rows[0], 8, mid - 10);
+  appendPlayerLabel(svg, rows[1], 8, mid + 16);
+  appendTimeLabel(svg, plotLeft, chartHeight + 13, formatReplayTick(samples[0].tick), "start");
+  appendTimeLabel(svg, plotLeft + ((width - plotLeft) / 2), chartHeight + 13, formatReplayTick(samples[Math.floor(samples.length / 2)].tick), "middle");
+  appendTimeLabel(svg, width, chartHeight + 13, formatReplayTick(samples[samples.length - 1].tick), "end");
+  figure.appendChild(svg);
+  return figure;
+}
+
+function appendPlayerLabel(svg, player, x, y) {
+  const label = svgElement("text", {
+    x,
+    y,
+    class: "replay-resource-advantage-player-label",
+  });
+  label.textContent = player.name;
+  svg.appendChild(label);
+}
+
+function svgElement(tag, attributes = {}) {
+  const element = document.createElementNS?.(SVG_NS, tag) || document.createElement(tag);
+  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, String(value));
+  return element;
+}
+
+function appendTimeLabel(svg, x, y, value, anchor) {
+  const label = svgElement("text", { x, y, "text-anchor": anchor });
+  label.textContent = value;
+  svg.appendChild(label);
+}
+
+function formatReplayTick(tick) {
+  const seconds = Math.max(0, Math.floor((Number(tick) || 0) / 30));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
 function normalizeResourceTotals(totals) {
   return {
