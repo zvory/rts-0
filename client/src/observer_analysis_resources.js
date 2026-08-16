@@ -48,13 +48,14 @@ export class ResourceCollectionHistory {
     const cumulativeOil = (first.resources?.lifetime?.oil || 0) - (second.resources?.lifetime?.oil || 0);
     const targetTick = tick - COLLECTION_WINDOW_TICKS;
     const baseline = [...this.samples].reverse().find((sample) => sample.tick <= targetTick);
+    const hasWindowBaseline = baseline && targetTick - baseline.tick <= SAMPLE_INTERVAL_TICKS;
     this.samples.push({
       tick,
       playerIds: ids,
       cumulativeSteel,
       cumulativeOil,
-      steel: baseline ? cumulativeSteel - baseline.cumulativeSteel : 0,
-      oil: baseline ? cumulativeOil - baseline.cumulativeOil : 0,
+      steel: hasWindowBaseline ? cumulativeSteel - baseline.cumulativeSteel : 0,
+      oil: hasWindowBaseline ? cumulativeOil - baseline.cumulativeOil : 0,
     });
     if (this.samples.length > MAX_SAMPLES) {
       this.samples.splice(0, this.samples.length - MAX_SAMPLES);
@@ -109,9 +110,13 @@ export function collectionAdvantageAreaPoints(
     Number(minExtent) || 0,
     ...samples.map((sample) => Math.abs(Number(sample?.[resource]) || 0)),
   );
-  const lastIndex = Math.max(1, samples.length - 1);
-  return samples.map((sample, index) => ({
-    x: (index / lastIndex) * width,
+  const firstTick = Number(samples[0]?.tick) || 0;
+  const lastTick = Number(samples[samples.length - 1]?.tick) || firstTick;
+  const tickSpan = Math.max(1, lastTick - firstTick);
+  return samples.map((sample) => ({
+    x: samples.length === 1
+      ? 0
+      : Math.max(0, Math.min(1, ((Number(sample?.tick) || firstTick) - firstTick) / tickSpan)) * width,
     y: mid - ((Number(sample?.[resource]) || 0) / extent) * (mid - 5),
   }));
 }
@@ -226,9 +231,17 @@ function renderAdvantageChart({ resource, label, rows, samples, serial }) {
   }));
   appendPlayerLabel(svg, rows[0], 8, mid - 10);
   appendPlayerLabel(svg, rows[1], 8, mid + 16);
-  appendTimeLabel(svg, plotLeft, chartHeight + 13, formatReplayTick(samples[0].tick), "start");
-  appendTimeLabel(svg, plotLeft + ((width - plotLeft) / 2), chartHeight + 13, formatReplayTick(samples[Math.floor(samples.length / 2)].tick), "middle");
-  appendTimeLabel(svg, width, chartHeight + 13, formatReplayTick(samples[samples.length - 1].tick), "end");
+  const firstTick = Number(samples[0]?.tick) || 0;
+  const lastTick = Number(samples[samples.length - 1]?.tick) || firstTick;
+  appendTimeLabel(svg, plotLeft, chartHeight + 13, formatReplayTick(firstTick), "start");
+  appendTimeLabel(
+    svg,
+    plotLeft + ((width - plotLeft) / 2),
+    chartHeight + 13,
+    formatReplayTick(firstTick + ((lastTick - firstTick) / 2)),
+    "middle",
+  );
+  appendTimeLabel(svg, width, chartHeight + 13, formatReplayTick(lastTick), "end");
   figure.appendChild(svg);
   return figure;
 }
@@ -256,7 +269,7 @@ function appendTimeLabel(svg, x, y, value, anchor) {
 }
 
 function formatReplayTick(tick) {
-  const seconds = Math.max(0, Math.floor((Number(tick) || 0) / 30));
+  const seconds = Math.max(0, Math.floor((Number(tick) || 0) / TICK_HZ));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 

@@ -55,13 +55,23 @@ import { textWithin } from "./dom_text.mjs";
       && history.samples[1].oil === -6,
     "resource collection history samples signed lifetime-income differences over the trailing collection window",
   );
-  const points = collectionAdvantageAreaPoints(history.samples, "steel", 100, 50);
+  history.record(sample(1200, 140, 10, 20, 8));
   assert(
-    points[0].y === 25 && points[1].y < 25,
-    "resource collection graph plots the smoothed signed income difference around zero",
+    history.samples.at(-1).steel === 0 && history.samples.at(-1).oil === 0,
+    "resource collection history does not turn an arbitrarily old baseline into a false 8-second spike",
+  );
+  const points = collectionAdvantageAreaPoints(
+    [{ tick: 0, steel: 0 }, { tick: 30, steel: 10 }, { tick: 120, steel: 20 }],
+    "steel",
+    100,
+    50,
+  );
+  assert(
+    points[0].y === 25 && points[1].x === 25 && points[1].y < 25 && points[2].x === 100,
+    "resource collection graph plots signed income around zero and spaces points by replay time",
   );
   const baseScaledPoints = collectionAdvantageAreaPoints(
-    [{ steel: 36 }, { steel: -36 }],
+    [{ steel: 12 }, { steel: -12 }],
     "steel",
     100,
     50,
