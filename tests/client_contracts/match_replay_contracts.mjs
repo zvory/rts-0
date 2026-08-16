@@ -1340,7 +1340,6 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   const rateCount = renderClockRates.length;
   livePauseStateMatch.applyRoomTimeState({ currentTick: 600, durationTicks: 0, paused: false });
   assert(renderClockRates.length === rateCount, "incomplete room-time state preserves the prior animation rate");
-
   const manualPointerLockMatch = Object.create(Match.prototype);
   let toggledPointerLock = 0;
   let closedSettings = 0;
