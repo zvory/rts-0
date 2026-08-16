@@ -44,16 +44,16 @@ export function runMinimapAttackAlertContracts() {
 
   minimap.ping(40, 60, "alert", true);
   minimap._pings[0].startedAt = 100;
-  minimap._drawPings(1200);
+  minimap._drawPings(2300);
   const arcs = context.calls.filter((call) => call.op === "arc");
   const strokes = context.calls.filter((call) => call.op === "stroke");
   assert(arcs.length === 2, "attack alert draws both the red ring and its inner rim");
-  assertApprox(arcs[0].args[2], 11.5, 0.001, "attack alert advances halfway through 2.2 seconds");
-  assertApprox(arcs[1].args[2], 9.5, 0.001, "attack alert rim stays two pixels inside");
-  assert(strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 2,
-    "attack alert keeps its strong red outer stroke");
-  assert(strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 1,
-    "attack alert draws a crisp white inner stroke");
+  assertApprox(arcs[0].args[2], 15.5, 0.001, "attack alert advances halfway through 4.4 seconds");
+  assertApprox(arcs[1].args[2], 11.5, 0.001, "attack alert rim stays four pixels inside");
+  assert(strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 4,
+    "attack alert keeps its doubled red outer stroke");
+  assert(strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 2,
+    "attack alert draws a doubled crisp white inner stroke");
 
   let flashing = minimap._underAttackFlashEntityIds(entities, 250);
   assert(flashing.has(11) && !flashing.has(13), "attack alert resolves the nearest local entity");
@@ -96,16 +96,16 @@ export function runMinimapAttackAlertContracts() {
   state.events = [{ e: EVENT.DEATH, id: 99, x: 160, y: 160, kind: KIND.RIFLEMAN }];
   assert(minimap._underAttackFlashEntityIds(entities, 750).has(12),
     "a later snapshot cannot suppress an earlier nonlethal alert target");
-  assert(minimap._underAttackFlashEntityIds(entities, 2300).size === 0,
-    "attack icon strobe ends after 2.2 seconds");
+  assert(minimap._underAttackFlashEntityIds(entities, 4500).size === 0,
+    "attack icon strobe ends after 4.4 seconds");
 
   minimap._pings.length = 0;
   minimap.ping(40, 60, "alert", true);
   minimap._pings[0].startedAt = 100;
-  minimap._drawPings(2200);
-  assert(minimap._pings.length === 1, "attack alert remains after the former 1.1-second lifetime");
   minimap._drawPings(2300);
-  assert(minimap._pings.length === 0, "attack alert expires after 2.2 seconds");
+  assert(minimap._pings.length === 1, "attack alert remains after the former 2.2-second lifetime");
+  minimap._drawPings(4500);
+  assert(minimap._pings.length === 0, "attack alert expires after 4.4 seconds");
 
   minimap.ping(40, 60, "alert");
   minimap._pings[0].startedAt = 100;
