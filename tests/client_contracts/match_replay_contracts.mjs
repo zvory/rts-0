@@ -1332,13 +1332,14 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(worldBedStates.at(-1) === false, "room-time pause fades out the world combat bed");
   livePauseStateMatch.applyRoomTimeState({ currentTick: 120, durationTicks: 600, speed: 2, paused: false });
   assert(renderClockRates.at(-1) === 2, "room-time playback speed scales battlefield animation time");
-  livePauseStateMatch.applyRoomTimeState({ currentTick: 600, durationTicks: 600, speed: 2, paused: false });
-  assert(renderClockRates.at(-1) === 0, "ended replay playback freezes battlefield animation time");
+  livePauseStateMatch.applyRoomTimeState({ currentTick: 601, durationTicks: 600, speed: 2, paused: false, ended: false });
+  assert(renderClockRates.at(-1) === 2, "live Lab playback continues beyond its recorded history horizon");
+  livePauseStateMatch.applyRoomTimeState({ currentTick: 600, durationTicks: 600, speed: 2, paused: false, ended: true });
+  assert(renderClockRates.at(-1) === 0, "authoritatively ended replay playback freezes battlefield animation time");
   assert(worldBedStates.at(-1) === false, "ended replay playback fades out the world combat bed");
   const rateCount = renderClockRates.length;
   livePauseStateMatch.applyRoomTimeState({ currentTick: 600, durationTicks: 0, paused: false });
   assert(renderClockRates.length === rateCount, "incomplete room-time state preserves the prior animation rate");
-
   const manualPointerLockMatch = Object.create(Match.prototype);
   let toggledPointerLock = 0;
   let closedSettings = 0;

@@ -25,8 +25,7 @@ export class RenderClock {
 
 export function syncRenderClockToRoomTime(renderClock, state) {
   const speed = typeof state?.speed === "number" ? state.speed : NaN;
-  const ended = state?.ended === true
-    || (Number(state?.durationTicks) > 0 && Number(state?.currentTick) >= Number(state?.durationTicks));
+  const ended = state?.ended === true;
   if (state?.paused === true || (Number.isFinite(speed) && speed <= 0) || ended) {
     renderClock?.setRate?.(0);
   } else if (Number.isFinite(speed)) {

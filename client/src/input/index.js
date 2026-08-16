@@ -374,7 +374,7 @@ export class Input {
   }
 
   _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
-    const now = performance.now();
+    const now = this.state?.visualNow?.() ?? performance.now();
     if (kind === "mortar" && Number.isFinite(x) && Number.isFinite(y) && Array.isArray(this.state?.pendingMortarTargets)) {
       this.state.pendingMortarTargets.push({ x, y, createdAt: now });
       this.state.pendingMortarTargets = this.state.pendingMortarTargets.filter(

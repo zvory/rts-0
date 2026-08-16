@@ -1020,13 +1020,14 @@ export class Minimap {
   }
 
   _addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
+    const now = this.state?.visualNow?.() ?? performance.now();
     return this._intent()?.addCommandFeedback?.(
       kind,
       x,
       y,
       append,
       radiusTiles,
-      performance.now(),
+      now,
       commandFeedbackOwner(this.state, this.controlPolicy),
     );
   }

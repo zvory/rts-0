@@ -135,8 +135,12 @@ assert(
   "paused room time suppresses the global bed even if a seek snapshot arrives",
 );
 assert(
-  !worldCombatBedAllowed(true, null, { currentTick: 100, durationTicks: 100, speed: 2 }),
-  "ended room time suppresses the global bed",
+  worldCombatBedAllowed(true, null, { currentTick: 101, durationTicks: 100, speed: 2, ended: false }),
+  "live Lab combat audio continues beyond its recorded history horizon",
+);
+assert(
+  !worldCombatBedAllowed(true, null, { currentTick: 100, durationTicks: 100, speed: 2, ended: true }),
+  "authoritatively ended room time suppresses the global bed",
 );
 
 // Audio
