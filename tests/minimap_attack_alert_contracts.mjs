@@ -111,8 +111,14 @@ export function runMinimapAttackAlertContracts() {
   minimap._pings[0].startedAt = 100;
   context.calls.length = 0;
   minimap._drawPings(550);
-  assert(context.calls.filter((call) => call.op === "arc").length === 1,
+  const genericArcs = context.calls.filter((call) => call.op === "arc");
+  const genericStrokes = context.calls.filter((call) => call.op === "stroke");
+  assert(genericArcs.length === 1,
     "generic positional alerts retain their single-ring treatment");
+  assertApprox(genericArcs[0].args[2], 11.5, 0.001,
+    "generic positional alerts retain their original radius progression");
+  assert(genericStrokes[0].lineWidth === 2,
+    "generic positional alerts retain their original stroke width");
   minimap._drawPings(1000);
   assert(minimap._pings.length === 0, "generic alerts retain their 900-millisecond lifetime");
   minimap.destroy();
