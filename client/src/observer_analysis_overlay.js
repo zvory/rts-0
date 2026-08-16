@@ -12,6 +12,7 @@ import {
 import { createImmediateTouchButtonActivation } from "./panel_touch_activation.js";
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
 import {
+  ResourceCollectionHistory,
   normalizeResourceWindows,
   renderAliveResourcesMetric,
   renderResourcesMetric,
@@ -58,6 +59,7 @@ export class ObserverAnalysisOverlay {
     this.showButton = null;
     this.positioner = null;
     this.analysis = null;
+    this.resourceCollectionHistory = new ResourceCollectionHistory();
     this.buttonActivationBindings = [];
     this.onKeyDown = (ev) => this.handleKeyDown(ev);
     this.mount();
@@ -252,6 +254,7 @@ export class ObserverAnalysisOverlay {
     }
 
     const tab = OBSERVER_ANALYSIS_TABS.find((item) => item.id === selectedTab) || OBSERVER_ANALYSIS_TABS[0];
+    this.el.dataset.selectedTab = tab.id;
     this.bodyEl.setAttribute("aria-labelledby", `replay-analysis-tab-${tab.id}`);
     this.renderBody(tab);
   }
@@ -263,6 +266,7 @@ export class ObserverAnalysisOverlay {
 
   applyObserverAnalysis(payload) {
     this.analysis = normalizeObserverAnalysisPayload(payload);
+    this.resourceCollectionHistory.record(this.analysis);
     if (!this.bodyEl || this.bodyEl.hidden) return;
     const selected = isObserverAnalysisTabId(this.preferences.selectedTab)
       ? this.preferences.selectedTab
@@ -441,7 +445,11 @@ export class ObserverAnalysisOverlay {
   }
 
   renderResources(analysis) {
-    return renderResourcesMetric({ analysis, players: this.getPlayers() });
+    return renderResourcesMetric({
+      analysis,
+      players: this.getPlayers(),
+      collectionHistory: this.resourceCollectionHistory.samples,
+    });
   }
 
   renderAliveResources(analysis) {

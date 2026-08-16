@@ -585,7 +585,12 @@ touch release and suppress the synthesized compatibility click. The overlay owns
 and is read-only. The Army Value tab is client-side and viewport-specific, excludes economy workers
 (Engineer and Golem), and counts only combat units. Production, Research, Units, Resources, Alive
 Resources, Losses, and Resources Lost render the latest server-authored `observerAnalysis`
-payload. Alive Resources subtracts destroyed-unit and destroyed-building steel/oil value from
+payload. For exactly two players, Resources also samples each player's server-authored lifetime
+mined totals once per second, derives a trailing 8-second collection difference, and renders
+divergent steel and oil area charts. The first player leads above the
+center line and the second leads below it. Each resource uses a symmetric minimum Y extent equal
+to one fully extracting base over that window (144 Steel or 36 Oil). Backward replay seeks
+truncate future samples before rebuilding the timeline. Alive Resources subtracts destroyed-unit and destroyed-building steel/oil value from
 lifetime mined resources; because starting resources are not lifetime mined income, the derived
 value can be negative.
 Research groups
