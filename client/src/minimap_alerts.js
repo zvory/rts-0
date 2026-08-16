@@ -1,13 +1,19 @@
 import { EVENT, isBuilding, isUnit } from "./protocol.js";
 
 export const DEFAULT_PING_MS = 900;
-export const UNDER_ATTACK_PING_MS = 2200;
+export const UNDER_ATTACK_PING_MS = 4400;
 export const UNDER_ATTACK_STROBE_PHASE_MS = 300;
 export const MINIMAP_BORDER_PULSE_MS = 700;
 
 const UNDER_ATTACK_TARGET_RADIUS_TILES = 2;
+const DEFAULT_PING_INITIAL_RADIUS_PX = 4;
+const UNDER_ATTACK_PING_INITIAL_RADIUS_PX = 32;
+const UNDER_ATTACK_PING_FINAL_RADIUS_PX = 6;
+const DEFAULT_PING_STROKE_PX = 2;
+const UNDER_ATTACK_PING_STROKE_PX = 6;
 const ALERT_PING_INNER_RIM_COLOR = "rgba(255,255,255,0.95)";
-const ALERT_PING_INNER_RIM_INSET_PX = 2;
+const ALERT_PING_INNER_RIM_INSET_PX = 6;
+const ALERT_PING_INNER_RIM_STROKE_PX = 3;
 
 export function resolveUnderAttackTargetId({
   entities,
@@ -59,17 +65,20 @@ export function drawMinimapPings({ ctx, pings, now, worldToCanvas, borderPulseUn
   for (const ping of activePings) {
     const t = (now - ping.startedAt) / pingDurationMs(ping);
     const p = worldToCanvas(ping.x, ping.y);
-    const radius = 4 + 15 * t;
+    const radius = ping.isUnderAttack
+      ? UNDER_ATTACK_PING_INITIAL_RADIUS_PX
+        + (UNDER_ATTACK_PING_FINAL_RADIUS_PX - UNDER_ATTACK_PING_INITIAL_RADIUS_PX) * t
+      : DEFAULT_PING_INITIAL_RADIUS_PX + 15 * t;
     ctx.save();
-    ctx.globalAlpha = 1 - t;
+    ctx.globalAlpha = ping.isUnderAttack ? 1 - t * t : 1 - t;
     ctx.strokeStyle = ping.severity === "warn" ? "#ffd166" : "#ff4d4d";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = ping.isUnderAttack ? UNDER_ATTACK_PING_STROKE_PX : DEFAULT_PING_STROKE_PX;
     ctx.beginPath();
     ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
     ctx.stroke();
     if (ping.isUnderAttack) {
       ctx.strokeStyle = ALERT_PING_INNER_RIM_COLOR;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = ALERT_PING_INNER_RIM_STROKE_PX;
       ctx.beginPath();
       ctx.arc(p.x, p.y, Math.max(1, radius - ALERT_PING_INNER_RIM_INSET_PX), 0, Math.PI * 2);
       ctx.stroke();
