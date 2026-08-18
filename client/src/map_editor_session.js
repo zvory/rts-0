@@ -715,7 +715,11 @@ export function moveSymmetricDraftLocation(draft, {
 }
 
 export function addSymmetricDraftLocations(draft, {
-  kind = "base", tile, symmetry = MAP_EDITOR_SYMMETRY.NONE,
+  kind = "base",
+  tile,
+  symmetry = MAP_EDITOR_SYMMETRY.NONE,
+  steelPatches = MAP_EDITOR_DEFAULT_STEEL_PATCHES,
+  oilPatches = MAP_EDITOR_DEFAULT_OIL_PATCHES,
 } = {}) {
   const radius = locationRadius(kind);
   const target = normalizedDraftTile(draft, tile, radius);
@@ -738,9 +742,9 @@ export function addSymmetricDraftLocations(draft, {
       return draftEditError(`A map supports at most ${MAP_EDITOR_MAX_BASE_SITES} base sites.`);
     }
     for (const location of additions) {
-      if (!draft.baseSites.some((site) => sameLocation(site, location))) {
-        draft.baseSites.push(newBaseSite(location));
-      }
+      const existingBase = draft.baseSites.find((site) => sameLocation(site, location));
+      if (existingBase) setBaseSiteResources(existingBase, { steelPatches, oilPatches });
+      else draft.baseSites.push(newBaseSite(location, { steelPatches, oilPatches }));
       draft.startLocations.push(copyLocation(location));
     }
     return { ok: true, count: additions.length };
@@ -751,7 +755,7 @@ export function addSymmetricDraftLocations(draft, {
   if (locations.some((location) => draft.baseSites.some((site) => sameLocation(site, location)))) {
     return draftEditError("A base already uses that tile.");
   }
-  for (const location of locations) draft.baseSites.push(newBaseSite(location));
+  for (const location of locations) draft.baseSites.push(newBaseSite(location, { steelPatches, oilPatches }));
   return { ok: true, count: locations.length };
 }
 
@@ -762,6 +766,8 @@ export function removeDraftLocation(draft, { kind = "base", locationIndex = 0 } 
   if (!location) return draftEditError("That map location is no longer present.");
   if (kind === "start") {
     draft.startLocations.splice(index, 1);
+    const baseIndex = draft.baseSites.findIndex((site) => sameLocation(site, location));
+    if (baseIndex >= 0) draft.baseSites.splice(baseIndex, 1);
     return { ok: true };
   }
   if (draft.startLocations.some((start) => sameLocation(start, location))) {
@@ -769,6 +775,32 @@ export function removeDraftLocation(draft, { kind = "base", locationIndex = 0 } 
   }
   draft.baseSites.splice(index, 1);
   return { ok: true };
+}
+
+export function updateSymmetricDraftBasePatchCount(draft, {
+  baseIndex = 0,
+  fieldName,
+  value,
+  symmetry = MAP_EDITOR_SYMMETRY.NONE,
+} = {}) {
+  const index = Math.trunc(Number(baseIndex));
+  const source = draft?.baseSites?.[index];
+  const max = fieldName === "oilPatches"
+    ? MAP_EDITOR_MAX_OIL_PATCHES
+    : fieldName === "steelPatches"
+      ? MAP_EDITOR_MAX_STEEL_PATCHES
+      : null;
+  if (!source || max === null) return draftEditError("Choose a valid base resource field.");
+  const count = boundedPatchCount(value, max, 0);
+  const plannedIndices = new Set();
+  for (const transform of symmetryTransforms(draftDimensions(draft), symmetry)) {
+    const location = transformMapTile(source, draftDimensions(draft), transform);
+    const symmetricIndex = transformedLocationIndex(draft.baseSites, location, plannedIndices, symmetry);
+    if (symmetricIndex < 0) continue;
+    plannedIndices.add(symmetricIndex);
+    draft.baseSites[symmetricIndex][fieldName] = count;
+  }
+  return { ok: true, count: plannedIndices.size };
 }
 
 export function paintDraftRect(draft, rect, terrainCode) {
@@ -1182,12 +1214,22 @@ function copyDoodad(record) {
   if (record.color) copy.color = record.color;
   return copy;
 }
-function newBaseSite(location) {
-  return {
-    ...copyLocation(location),
-    steelPatches: MAP_EDITOR_DEFAULT_STEEL_PATCHES,
-    oilPatches: MAP_EDITOR_DEFAULT_OIL_PATCHES,
-  };
+function newBaseSite(location, resources = {}) {
+  return setBaseSiteResources(copyLocation(location), resources);
+}
+
+function setBaseSiteResources(site, resources) {
+  site.steelPatches = boundedPatchCount(
+    resources?.steelPatches,
+    MAP_EDITOR_MAX_STEEL_PATCHES,
+    MAP_EDITOR_DEFAULT_STEEL_PATCHES,
+  );
+  site.oilPatches = boundedPatchCount(
+    resources?.oilPatches,
+    MAP_EDITOR_MAX_OIL_PATCHES,
+    MAP_EDITOR_DEFAULT_OIL_PATCHES,
+  );
+  return site;
 }
 function movedBaseSite(site, location) { return { ...copyBaseSite(site), ...copyLocation(location) }; }
 function boundedPatchCount(value, max, fallback) {
