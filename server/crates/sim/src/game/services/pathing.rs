@@ -3,18 +3,18 @@
 //! Encapsulates terrain mask, dynamic blockers, radius/footprint,
 //! per-request path budget, and an LRU cache of verified tile-path results.
 
-use std::collections::HashMap;
-
+use crate::config;
 use crate::game::entity::{
     movement_body_class, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind,
+    MovementBodyClass,
 };
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
 use crate::rules::terrain::{self, TerrainKind};
-
 use cache::{CacheEntry, CacheKey};
+use std::collections::HashMap;
 
 mod authoring;
 mod route_finalize;
@@ -125,8 +125,8 @@ impl Passability for TerrainPassability<'_> {
         true
     }
 
-    fn movement_cost(&self, tx: i32, ty: i32) -> u32 {
-        tree_detours::movement_cost(self, tx, ty)
+    fn movement_cost(&self, tx: i32, ty: i32, base_step_cost: u32) -> u32 {
+        tree_detours::movement_cost(self, tx, ty, base_step_cost)
     }
 }
 
@@ -265,8 +265,8 @@ fn choose_vehicle_l_elbow<P: Passability>(
 
     match (horizontal_ok, vertical_ok) {
         (true, true) => {
-            let horizontal_cost = pass.movement_cost(horizontal_first.0, horizontal_first.1);
-            let vertical_cost = pass.movement_cost(vertical_first.0, vertical_first.1);
+            let horizontal_cost = pass.movement_cost(horizontal_first.0, horizontal_first.1, 10);
+            let vertical_cost = pass.movement_cost(vertical_first.0, vertical_first.1, 10);
             if horizontal_cost <= vertical_cost {
                 Some(horizontal_first)
             } else {

@@ -358,9 +358,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.75` and
   `DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER = 0.75`. These independent sparse authored overlays sample
   the entity-centre tile. Slow movement multiplies the movement budget after the base-terrain
-  modifier (so a slowed road is 1.125x base speed). Damage reduction applies after weapon armor,
-  facing, falloff, and entrenchment calculations to direct fire, overpenetration, Mortar,
-  Artillery, loaded Panzerfaust, and damaging ability projectiles; fractional non-zero damage rounds up.
+  modifier (so a slowed road is 1.125x base speed). Infantry-like A* routing converts that same
+  0.75x ratio into deterministic cardinal/diagonal tile costs and declines the clear-segment
+  shortcut when its sampled centerline crosses slow terrain. This lets infantry take a faster
+  open-ground detour without treating forests as impassable. Damage reduction applies after weapon
+  armor, facing, falloff, and entrenchment calculations to direct fire, overpenetration, Mortar,
+  Artillery, loaded Panzerfaust, and damaging ability projectiles; fractional non-zero damage rounds
+  up.
 - Gravel A/B/C, Dirt A/B/C, Mud A/B/C, and Frosted Ground are visual Open-terrain variants. They
   use grass-equivalent 1.0x movement, construction, cover, concealment, and line-of-sight rules.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to

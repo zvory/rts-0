@@ -24,7 +24,10 @@ pub const MAP_TERRAIN_MUD_C: u8 = 16;
 pub const MAP_TERRAIN_FROSTED_GROUND: u8 = 17;
 
 pub const ROAD_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.5;
-pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 = 0.75;
+const SLOW_MOVEMENT_TILE_SPEED_NUMERATOR: u32 = 3;
+const SLOW_MOVEMENT_TILE_SPEED_DENOMINATOR: u32 = 4;
+pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 =
+    SLOW_MOVEMENT_TILE_SPEED_NUMERATOR as f32 / SLOW_MOVEMENT_TILE_SPEED_DENOMINATOR as f32;
 pub const UPHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 0.80;
 pub const DOWNHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.30;
 /// Maximum ordinary fog-of-war sight granted by authored elevation.
@@ -96,6 +99,22 @@ pub fn slow_movement_tile_multiplier(active: bool) -> f32 {
     } else {
         1.0
     }
+}
+
+/// Additional integer path cost that makes a slow tile approximate its authoritative travel time.
+///
+/// A* owns the base cardinal/diagonal step cost. Keeping this helper in the terrain rules layer
+/// ensures route selection and tick movement derive from the same speed ratio without a second
+/// forest-specific tuning value.
+pub fn slow_movement_path_cost_surcharge(base_step_cost: u32, active: bool) -> u32 {
+    if !active {
+        return 0;
+    }
+    let travel_cost = base_step_cost
+        .saturating_mul(SLOW_MOVEMENT_TILE_SPEED_DENOMINATOR)
+        .saturating_add(SLOW_MOVEMENT_TILE_SPEED_NUMERATOR - 1)
+        / SLOW_MOVEMENT_TILE_SPEED_NUMERATOR;
+    travel_cost.saturating_sub(base_step_cost)
 }
 
 /// Binary multiplier on movement toward a locally sampled elevation.
@@ -245,6 +264,13 @@ mod tests {
         assert_eq!(damage_after_reduction_tile(1, true), 1);
         assert_eq!(damage_after_reduction_tile(0, true), 0);
         assert_eq!(damage_after_reduction_tile(99, false), 99);
+    }
+
+    #[test]
+    fn slow_movement_path_cost_scales_cardinal_and_diagonal_steps() {
+        assert_eq!(slow_movement_path_cost_surcharge(10, false), 0);
+        assert_eq!(slow_movement_path_cost_surcharge(10, true), 4);
+        assert_eq!(slow_movement_path_cost_surcharge(14, true), 5);
     }
 
     #[test]
