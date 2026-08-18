@@ -630,13 +630,8 @@ mod tests {
         assert!(names.contains(&"1v1"), "got: {names:?}");
         assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
         assert!(names.contains(&"4 Player Map"), "got: {names:?}");
-        // Every entry must have a non-empty description.
+        // Descriptions are optional; an authored empty string intentionally stays empty.
         for entry in &available {
-            assert!(
-                !entry.description.is_empty(),
-                "missing description on {}",
-                entry.name
-            );
             assert!(
                 entry.min_players >= 1 && entry.min_players <= entry.max_players,
                 "bad player bounds on {}: {}..={}",
@@ -645,6 +640,14 @@ mod tests {
                 entry.max_players
             );
         }
+        assert_eq!(
+            available
+                .iter()
+                .find(|entry| entry.name == "Fastest Map Possible")
+                .map(|entry| entry.description.as_str()),
+            Some(""),
+            "the explicitly blank map description must remain blank"
+        );
 
         let map = Map::load("Chokes", 2, 0x1234_5678)
             .expect("default handcrafted map should load from bundled assets");
