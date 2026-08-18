@@ -809,7 +809,13 @@ export class MapEditorViewport {
       : `Moved ${tool.kind === "start" ? "start location" : "base site"}`;
     const changed = this.session.mutate(label, (draft) => {
       result = tool.add
-        ? addSymmetricDraftLocations(draft, { kind: tool.kind, tile, symmetry: tool.symmetry })
+        ? addSymmetricDraftLocations(draft, {
+          kind: tool.kind,
+          tile,
+          symmetry: tool.symmetry,
+          steelPatches: tool.steelPatches,
+          oilPatches: tool.oilPatches,
+        })
         : moveSymmetricDraftLocation(draft, {
           kind: tool.kind,
           locationIndex: tool.locationIndex,
