@@ -640,14 +640,10 @@ mod tests {
                 entry.max_players
             );
         }
-        assert_eq!(
-            available
-                .iter()
-                .find(|entry| entry.name == "Fastest Map Possible")
-                .map(|entry| entry.description.as_str()),
-            Some(""),
-            "the explicitly blank map description must remain blank"
-        );
+        let fastest = available
+            .iter()
+            .find(|entry| entry.name == "Fastest Map Possible");
+        assert_eq!(fastest.map(|entry| entry.description.as_str()), Some(""));
 
         let map = Map::load("Chokes", 2, 0x1234_5678)
             .expect("default handcrafted map should load from bundled assets");
