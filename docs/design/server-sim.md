@@ -18,7 +18,8 @@ crates/
     src/game/
     mod.rs       # Game struct + public API (the seam below)
     command.rs   # SimCommand domain commands + protocol translation helpers
-    map.rs       # Map: authored terrain/doodad loading, passability, base-site/doodad validation
+    map.rs       # Map model: terrain queries, materialized identity, passability
+    map/catalog.rs # Bundled map discovery, loading, metadata, and catalog validation
     entity/      # Entity, EntityKind, Order state machines, grouped state, and EntityStore
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player live visibility grids; snapshots union living teammate grids
