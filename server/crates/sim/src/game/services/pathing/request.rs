@@ -1,5 +1,18 @@
 use super::*;
 
+fn segment_crosses_slow_movement(map: &Map, from: (f32, f32), to: (f32, f32)) -> bool {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let steps = (dx.hypot(dy) / (config::TILE_SIZE as f32 / 4.0))
+        .ceil()
+        .max(1.0) as u32;
+    (0..=steps).any(|index| {
+        let t = index as f32 / steps as f32;
+        let (tx, ty) = map.tile_of(from.0 + dx * t, from.1 + dy * t);
+        map.is_slow_movement_tile(tx, ty)
+    })
+}
+
 impl PathingService {
     /// Request a path. Returns world-pixel waypoints in reverse order (next waypoint = pop).
     #[cfg(test)]
@@ -28,6 +41,8 @@ impl PathingService {
         if let Some((from, to)) = direct_segment {
             if req.start != req.goal
                 && standability::unit_static_segment_standable(map, occupancy, req.kind, from, to)
+                && (movement_body_class(req.kind) != MovementBodyClass::InfantryLike
+                    || !segment_crosses_slow_movement(map, from, to))
             {
                 return PathingRequestOutcome::Resolved {
                     path: vec![to],
