@@ -42,7 +42,10 @@ import {
   MAP_EDITOR_SYMMETRY,
   mapEditorSymmetrySupported,
   removeDraftLocation,
+  symmetryTransforms,
+  transformMapTile,
 } from "./map_editor_session.js";
+import { createMapEditorSymmetryPicker } from "./map_editor_symmetry_picker.js";
 
 const MAP_CATALOG_URL = "/maps/catalog";
 const MAP_EDITOR_MAX_JSON_BYTES = 8 * 1024 * 1024;
@@ -418,37 +421,23 @@ export class MapEditorPanel {
     const detail = document.createElement("span");
     detail.textContent = `${this.activeOperation() || "None"} · ${this.currentContentLabel()}`;
     summary.append(heading, detail);
-    section.append(summary, field("Symmetry", this.renderSymmetrySelect()));
+    section.append(summary, field("Symmetry", this.renderSymmetryControls()));
     for (const warning of this.currentSymmetryWarnings()) {
       section.appendChild(readout(`Symmetry warning: ${warning}`, true));
     }
     return section;
   }
 
-  renderSymmetrySelect() {
-    const symmetry = document.createElement("select");
-    symmetry.setAttribute("aria-label", "Symmetry");
-    symmetry.title = "Symmetry applies to terrain, zones, objects, forests, roads, and locations.";
-    for (const [value, label] of [
-      [MAP_EDITOR_SYMMETRY.NONE, "None"],
-      [MAP_EDITOR_SYMMETRY.HORIZONTAL, "Horizontal"],
-      [MAP_EDITOR_SYMMETRY.VERTICAL, "Vertical"],
-      [MAP_EDITOR_SYMMETRY.HALF_TURN, "Half-turn (180°)"],
-      [MAP_EDITOR_SYMMETRY.THREE_WAY, "3-way rotation (120°, square-grid approximation)"],
-      [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (4-way)"],
-      [MAP_EDITOR_SYMMETRY.QUADRANT_MIRROR, "Quadrant mirror (4-way)"],
-      [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN, "Diagonal ↘ (top-left ↔ bottom-right)"],
-      [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI, "Diagonal ↙ (top-right ↔ bottom-left)"],
-    ]) {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = label;
-      option.disabled = !mapEditorSymmetrySupported(this.session.draft, value);
-      symmetry.appendChild(option);
-    }
-    symmetry.value = this.symmetry;
-    symmetry.addEventListener("change", () => this.setSymmetry(symmetry.value));
-    return symmetry;
+  renderSymmetryControls() {
+    return createMapEditorSymmetryPicker({
+      symmetry: this.symmetry,
+      symmetryValues: MAP_EDITOR_SYMMETRY,
+      dimensions: this.session.draft,
+      isSupported: mapEditorSymmetrySupported,
+      onSelect: (value) => this.setSymmetry(value),
+      transforms: symmetryTransforms,
+      transformPoint: transformMapTile,
+    });
   }
 
   currentContentLabel() {

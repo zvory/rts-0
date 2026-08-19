@@ -6,6 +6,8 @@ export const MAP_AUTHORING_SYMMETRY = Object.freeze({
   THREE_WAY: "threeWay",
   RADIAL: "radial",
   QUADRANT_MIRROR: "quadrantMirror",
+  DIAGONAL_MAIN_FLIP: "diagonalMainFlip",
+  DIAGONAL_ANTI_FLIP: "diagonalAntiFlip",
   DIAGONAL_MAIN: "diagonalMain",
   DIAGONAL_ANTI: "diagonalAnti",
 });
@@ -19,6 +21,8 @@ const TRANSFORMS = Object.freeze({
   [MAP_AUTHORING_SYMMETRY.THREE_WAY]: ["identity", "rotate120", "rotate240"],
   [MAP_AUTHORING_SYMMETRY.RADIAL]: ["identity", "rotate90", "rotate180", "rotate270"],
   [MAP_AUTHORING_SYMMETRY.QUADRANT_MIRROR]: ["identity", "horizontal", "vertical", "rotate180"],
+  [MAP_AUTHORING_SYMMETRY.DIAGONAL_MAIN_FLIP]: ["identity", "rotate180"],
+  [MAP_AUTHORING_SYMMETRY.DIAGONAL_ANTI_FLIP]: ["identity", "rotate180"],
   [MAP_AUTHORING_SYMMETRY.DIAGONAL_MAIN]: ["identity", "diagonalMain"],
   [MAP_AUTHORING_SYMMETRY.DIAGONAL_ANTI]: ["identity", "diagonalAnti"],
 });
@@ -40,6 +44,8 @@ export function symmetrySupported(dimensions, symmetry) {
   return map.width === map.height || ![
     MAP_AUTHORING_SYMMETRY.THREE_WAY,
     MAP_AUTHORING_SYMMETRY.RADIAL,
+    MAP_AUTHORING_SYMMETRY.DIAGONAL_MAIN_FLIP,
+    MAP_AUTHORING_SYMMETRY.DIAGONAL_ANTI_FLIP,
     MAP_AUTHORING_SYMMETRY.DIAGONAL_MAIN,
     MAP_AUTHORING_SYMMETRY.DIAGONAL_ANTI,
   ].includes(normalized);

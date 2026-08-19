@@ -797,9 +797,21 @@ try {
             Math.abs(movedLayersRect.height - layersRect.height) <= 1,
         };
       })(),
-      symmetryTitle: document.querySelector("select[aria-label=Symmetry]")?.title || "",
-      symmetryOptions: [...document.querySelector("select[aria-label=Symmetry]")?.options || []]
-        .map((option) => option.textContent),
+      symmetryTitle: document.querySelector(".map-editor-symmetry-controls")?.title || "",
+      symmetryOptions: [...document.querySelectorAll(".map-editor-symmetry-option")].map((option) => ({
+        value: option.dataset.symmetry,
+        label: option.querySelector(".map-editor-symmetry-option-label")?.textContent || "",
+        previews: option.querySelectorAll(".map-editor-symmetry-preview").length,
+      })),
+      symmetryTrigger: document.querySelector(".map-editor-symmetry-trigger")?.getAttribute("aria-label") || "",
+      symmetryMenuOpen: document.querySelector(".map-editor-symmetry-menu")?.matches(":popover-open"),
+      symmetryPreview: (() => {
+        const preview = document.querySelector(".map-editor-symmetry-preview");
+        return preview && {
+          label: preview.getAttribute("aria-label"),
+          copies: preview.querySelectorAll(".map-editor-symmetry-preview-copy").length,
+        };
+      })(),
       blankMapWidth: (() => {
         const input = document.querySelector("input[aria-label='Map width']");
         return input && {
@@ -995,12 +1007,18 @@ try {
   );
   ok(
     editorUi.symmetryTitle === "Symmetry applies to terrain, zones, objects, forests, roads, and locations." &&
-      editorUi.symmetryOptions.includes("Half-turn (180°)") &&
-      editorUi.symmetryOptions.includes("3-way rotation (120°, square-grid approximation)") &&
-      editorUi.symmetryOptions.includes("Radial (4-way)") &&
-      editorUi.symmetryOptions.includes("Quadrant mirror (4-way)") &&
-      editorUi.symmetryOptions.includes("Diagonal ↘ (top-left ↔ bottom-right)") &&
-      editorUi.symmetryOptions.includes("Diagonal ↙ (top-right ↔ bottom-left)") &&
+      editorUi.symmetryOptions.map(({ label }) => label).includes("Half-turn (180°)") &&
+      editorUi.symmetryOptions.map(({ label }) => label).includes("3-way rotation (120°, square-grid approximation)") &&
+      editorUi.symmetryOptions.map(({ label }) => label).includes("Radial (4-way)") &&
+      editorUi.symmetryOptions.map(({ label }) => label).includes("Quadrant mirror (4-way)") &&
+      editorUi.symmetryOptions.map(({ label }) => label).includes("Diagonal ↘ (top-left ↔ bottom-right)") &&
+      editorUi.symmetryOptions.map(({ label }) => label).includes("Diagonal ↙ (top-right ↔ bottom-left)") &&
+      editorUi.symmetryOptions.map(({ label }) => label).includes("Diagonal ↘ · flipped copy") &&
+      editorUi.symmetryOptions.map(({ label }) => label).includes("Diagonal ↙ · flipped copy") &&
+      editorUi.symmetryOptions.length === 11 && editorUi.symmetryOptions.every(({ previews }) => previews === 1) &&
+      editorUi.symmetryTrigger === "Symmetry: None" && editorUi.symmetryMenuOpen === false &&
+      editorUi.symmetryPreview?.label === "No symmetry preview" &&
+      editorUi.symmetryPreview.copies === 1 &&
       editorUi.blankMapWidth?.type === "number" &&
       editorUi.blankMapWidth.value === "126" &&
       editorUi.blankMapWidth.min === "16" &&
@@ -1014,6 +1032,41 @@ try {
       locationUi.clearanceSection === "Start and base locations" &&
       ["Add", "Move", "Remove"].every((label) => locationUi.enabledOperations.includes(label)),
     "MAP EDITOR: symmetry, independent blank-map dimensions, and grass-clearance controls are presented correctly",
+  );
+  await editorPage.click(".map-editor-symmetry-trigger");
+  await editorPage.waitForFunction(() => document.querySelector(".map-editor-symmetry-menu")?.matches(":popover-open"));
+  const symmetryMenu = await editorPage.evaluate(() => {
+    const menu = document.querySelector(".map-editor-symmetry-menu");
+    const rect = menu.getBoundingClientRect();
+    menu.scrollTop = menu.scrollHeight;
+    return {
+      open: menu.matches(":popover-open"),
+      overflowY: getComputedStyle(menu).overflowY,
+      scrollable: menu.scrollHeight > menu.clientHeight,
+      scrolled: menu.scrollTop > 0,
+      insideViewport: rect.top >= 0 && rect.bottom <= window.innerHeight,
+      topLayerHit: document.elementFromPoint(rect.left + rect.width / 2, rect.top + 8)?.closest(".map-editor-symmetry-menu") === menu,
+    };
+  });
+  ok(
+    symmetryMenu.open && symmetryMenu.overflowY === "auto" && symmetryMenu.scrollable && symmetryMenu.scrolled &&
+      symmetryMenu.insideViewport && symmetryMenu.topLayerHit,
+    `MAP EDITOR: the visual symmetry menu scrolls above overlapping editor chrome (${JSON.stringify(symmetryMenu)})`,
+  );
+  await editorPage.click(".map-editor-symmetry-option[data-symmetry='diagonalMainFlip']");
+  await editorPage.waitForFunction(() => window.__mapEditor?.viewport?.symmetry === "diagonalMainFlip");
+  const composedSymmetry = await editorPage.evaluate(() => ({
+    mode: window.__mapEditor?.viewport?.symmetry,
+    label: document.querySelector(".map-editor-symmetry-trigger .map-editor-symmetry-preview")?.getAttribute("aria-label") || "",
+    copies: document.querySelectorAll(".map-editor-symmetry-trigger .map-editor-symmetry-preview-copy").length,
+    distinctCopies: new Set([...document.querySelectorAll(".map-editor-symmetry-trigger .map-editor-symmetry-preview-copy")]
+      .map((copy) => copy.getAttribute("points"))).size,
+  }));
+  ok(
+    composedSymmetry.mode === "diagonalMainFlip" &&
+      composedSymmetry.label === "Main diagonal with flipped partner preview with two copies" &&
+      composedSymmetry.copies === 2 && composedSymmetry.distinctCopies === 2,
+    `MAP EDITOR: the visual symmetry picker selects a two-copy diagonal with flipped partner (${JSON.stringify(composedSymmetry)})`,
   );
   await editorPage.setViewport({ width: 600, height: 360 });
   const mobileLayers = await editorPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => {

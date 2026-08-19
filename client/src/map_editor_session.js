@@ -1184,7 +1184,7 @@ function validMapTile(tile, dimensions) {
   const x = Math.trunc(Number(tile?.x)); const y = Math.trunc(Number(tile?.y));
   return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < map.width && y < map.height ? { x, y } : null;
 }
-function transformMapTile(tile, dimensions, transform) {
+export function transformMapTile(tile, dimensions, transform) {
   return transformAuthoringPoint(tile, dimensions, transform);
 }
 
@@ -1192,7 +1192,7 @@ export function mapEditorSymmetrySupported(dimensions, symmetry) {
   return symmetrySupported(dimensions, symmetry);
 }
 
-function symmetryTransforms(dimensions, symmetry) {
+export function symmetryTransforms(dimensions, symmetry) {
   return authoringSymmetryTransforms(dimensions, symmetry);
 }
 function transformTerrainCode(code, transform) {
