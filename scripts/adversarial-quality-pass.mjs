@@ -801,6 +801,7 @@ class Runner {
     }
     const report = normalizeReport(fs.readFileSync(reportFile, "utf8"));
     this.formatTouchedRust(repoRoot, options.baseRef);
+    this.ensureProtectedMapAssetsUnchanged(repoRoot, beforeHead);
     const autoCommitted = this.commitDirtyFinalState(repoRoot, report);
     const reviewedHead = this.git(["rev-parse", "HEAD"], repoRoot);
     if (autoCommitted) {
@@ -813,6 +814,7 @@ class Runner {
     // Execute the helper from disk so a review-time fix to its implementation is itself what
     // verifies the final committed head before any external mutation.
     this.runPreflight(repoRoot, options.baseRef);
+    this.ensureProtectedMapAssetsUnchanged(repoRoot, beforeHead);
     const finalHead = this.git(["rev-parse", "HEAD"], repoRoot);
     if (options.markdownReportFile) {
       fs.writeFileSync(options.markdownReportFile, markdownReport(report));
