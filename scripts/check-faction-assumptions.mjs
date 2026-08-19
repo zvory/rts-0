@@ -240,6 +240,8 @@ const approvedCurrentFactionFiles = new Set([
   // regression fixtures name those kinds directly; public faction admission remains catalog-owned.
   "server/crates/ai/src/live.rs",
   "server/crates/rules/src/balance.rs",
+  // Body geometry owns the catalog-aware unit placement radius used by AI placement queries.
+  "server/crates/rules/src/balance/bodies.rs",
   // Balance Phase 4 split: these modules contain constants/helpers moved from balance.rs without
   // changing current-faction ownership.
   "server/crates/rules/src/balance/economy.rs",

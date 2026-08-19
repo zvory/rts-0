@@ -345,6 +345,56 @@ fn unit_training_sets_rally_before_train_when_requested() {
 }
 
 #[test]
+fn unit_training_can_choose_rally_kind_from_selected_unit() {
+    let observation = observation(
+        AiEconomy {
+            steel: 500,
+            oil: 500,
+            supply_used: 0,
+            supply_cap: 20,
+        },
+        vec![production_building(20, EntityKind::Barracks, 0)],
+        Vec::new(),
+    );
+    let facts = AiFacts::from_observation(&observation);
+    let mut ctx = AiActionContext::new(&facts, SpendBudget::new(500, 500, 0, 20));
+
+    let trained = train_units_with_rally_for_unit(
+        &mut ctx,
+        TrainUnitsRequest {
+            buildings: facts.production_buildings(EntityKind::Barracks),
+            unit_priorities: &[EntityKind::Rifleman],
+            completed_building_kinds: facts.complete_building_kinds(),
+            completed_upgrades: facts.completed_upgrades(),
+            max_queue_depth: 1,
+            save_for_tech: false,
+            current_counts: &[(EntityKind::Rifleman, 0)],
+            max_counts: &[(EntityKind::Rifleman, 1)],
+            balance_unit_priorities: false,
+        },
+        |unit| (unit == EntityKind::Rifleman).then_some((96.0, 128.0, RallyKind::Move)),
+    );
+
+    assert_eq!(trained.len(), 1);
+    assert!(matches!(
+        ctx.into_commands().as_slice(),
+        [
+            Command::SetRally {
+                building: 20,
+                x: 96.0,
+                y: 128.0,
+                kind: RallyKind::Move,
+                queued: false,
+            },
+            Command::Train {
+                building: 20,
+                unit: EntityKind::Rifleman,
+            },
+        ]
+    ));
+}
+
+#[test]
 fn support_training_requires_tech_and_can_balance_priorities() {
     let without_tech = observation(
         AiEconomy {

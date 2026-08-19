@@ -17,7 +17,7 @@ Use for tests, CI/hooks, or focused verification.
 - `node tests/lab_mortar_regression.mjs` — mortar event regression; needs a server.
 - `node tests/minimap_input_contracts.mjs` — minimap/router pointer-lock contracts.
 - Interact commands, dependencies, architecture/lane checks, and canary ownership modes are
-  documented in `docs/interact-cli.md`.
+  in `docs/interact-cli.md`.
 - `tests/run-all.sh --only-rust` — architecture policy plus Rust nextest and lint only.
 - `tests/run-all.sh --only-rust-checks` — policy plus lint, without nextest.
 - `RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest` — one CI partition.
@@ -43,9 +43,8 @@ Use for tests, CI/hooks, or focused verification.
 - The required PR gate is `./tests/run-all.sh` in `Main test gate`. Split CI covers server build,
   Rust policy/lint plus complementary nextest partitions, live Node, and complementary browser
   smoke/tri-state shards; docs-only still runs cheap policy checks.
-- `tests/run-all.sh` uses nextest; missing it fails locally with an install hint.
-- Live Node suites need a running server. Use `tests/run-all.sh` to boot a private one, or start
-  `cd server && cargo run` first for individual Node suites.
+- `tests/run-all.sh` requires nextest and gives an install hint.
+- Live Node suites need a server. Use `tests/run-all.sh`, or start `cd server && cargo run` first.
 - Installed hooks run staged whitespace checks, excluding `playtest_notes.md`, plus docs health.
   They do not run `tests/run-all.sh`; GitHub Actions owns the full-suite gate.
 - `agent-pr.sh` skips Codex for pure `.md` diffs and otherwise formats touched Rust.

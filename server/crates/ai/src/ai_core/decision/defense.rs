@@ -16,6 +16,10 @@ pub(super) const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 
 const DEFENSIVE_FIRING_LANE_TILES: f32 = 14.0;
 const DEFENSIVE_FIRING_POSITION_SEARCH_TILES: i32 = 6;
+const HOME_RIFLE_FRONT_TILES: f32 = 4.5;
+const HOME_RIFLE_LATERAL_SPACING_TILES: f32 = 2.75;
+const HOME_RIFLE_RANK_DEPTH_TILES: f32 = 2.25;
+const HOME_RIFLE_MAX_APPROACHES: usize = 3;
 
 pub(super) const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 
@@ -369,238 +373,7 @@ pub(super) fn machine_gunner_meets_replacement_health(hp: u32, threshold: u8) ->
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ai_core::observation::{AiEconomy, AiResourceSummary};
-
-    fn los_test_observation(blocker: EntityKind) -> AiObservation {
-        let tile_size = config::TILE_SIZE;
-        AiObservation {
-            player_id: 1,
-            tick: 0,
-            map: AiMapSummary {
-                width: 32,
-                height: 32,
-                tile_size,
-            },
-            economy: AiEconomy {
-                steel: 0,
-                oil: 0,
-                supply_used: 0,
-                supply_cap: 100,
-            },
-            own_start_tile: (5, 5),
-            players: Vec::new(),
-            owned: vec![AiEntitySummary {
-                id: 10,
-                owner: 1,
-                kind: blocker,
-                x: 10.5 * tile_size as f32,
-                y: 5.5 * tile_size as f32,
-                hp: 100,
-                state: AiEntityState::Idle,
-                is_complete: true,
-                production_queue_len: None,
-                production_kind: None,
-                latched_node: None,
-                target_id: None,
-                free_for_combat: false,
-            }],
-            resources: Vec::new(),
-            visible_allies: Vec::new(),
-            visible_enemies: Vec::new(),
-            pending_builds: Vec::new(),
-            upgrades: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn machine_gunner_below_half_health_requires_replacement() {
-        let max_hp = config::unit_stats(EntityKind::MachineGunner)
-            .expect("machine gunner stats")
-            .hp;
-        let half_or_above = max_hp.div_ceil(2);
-        assert!(machine_gunner_meets_replacement_health(half_or_above, 50));
-        assert!(!machine_gunner_meets_replacement_health(
-            half_or_above - 1,
-            50
-        ));
-    }
-
-    #[test]
-    fn defensive_firing_lane_rejects_opaque_building_but_not_pump_jack() {
-        let ts = config::TILE_SIZE as f32;
-        let origin = (5.5 * ts, 5.5 * ts);
-        assert!(!defensive_firing_lane_is_clear(
-            &los_test_observation(EntityKind::Depot),
-            None,
-            origin,
-            (1.0, 0.0),
-            14.0,
-        ));
-        assert!(defensive_firing_lane_is_clear(
-            &los_test_observation(EntityKind::PumpJack),
-            None,
-            origin,
-            (1.0, 0.0),
-            14.0,
-        ));
-    }
-
-    #[test]
-    fn defensive_firing_sector_rejects_a_building_masking_its_flank() {
-        let mut observation = los_test_observation(EntityKind::Depot);
-        let ts = observation.map.tile_size as f32;
-        let origin = (5.5 * ts, 5.5 * ts);
-        observation.owned[0].y = 7.0 * ts;
-        assert!(defensive_firing_lane_is_clear(
-            &observation,
-            None,
-            origin,
-            (1.0, 0.0),
-            14.0,
-        ));
-        assert!(!defensive_firing_sector_is_clear(
-            &observation,
-            None,
-            origin,
-            (1.0, 0.0),
-            14.0,
-        ));
-    }
-
-    #[test]
-    fn defensive_assignment_shifts_out_from_behind_building() {
-        let observation = los_test_observation(EntityKind::Depot);
-        let ts = observation.map.tile_size as f32;
-        let original = DefensiveLineAssignment {
-            unit_id: 20,
-            x: 5.5 * ts,
-            y: 5.5 * ts,
-        };
-        let adjusted = clear_firing_assignment(
-            &observation,
-            None,
-            original,
-            EnemyBaseFact {
-                player_id: 2,
-                start_tile: (25, 5),
-                x: 25.5 * ts,
-                y: 5.5 * ts,
-            },
-            14.0,
-        )
-        .expect("nearby clear firing position");
-        assert_ne!((adjusted.x, adjusted.y), (original.x, original.y));
-        let direction = normalized_direction((adjusted.x, adjusted.y), (25.5 * ts, 5.5 * ts))
-            .expect("adjusted assignment direction");
-        assert!(defensive_firing_sector_is_clear(
-            &observation,
-            None,
-            (adjusted.x, adjusted.y),
-            direction,
-            14.0,
-        ));
-    }
-
-    #[test]
-    fn machine_gunner_screen_moves_in_front_of_forward_factory() {
-        let observation = los_test_observation(EntityKind::Factory);
-        let ts = observation.map.tile_size as f32;
-        let assignment = DefensiveLineAssignment {
-            unit_id: 20,
-            x: 5.5 * ts,
-            y: 5.5 * ts,
-        };
-        let adjusted = clear_machine_gunner_screen_assignment(
-            &observation,
-            None,
-            assignment,
-            EnemyBaseFact {
-                player_id: 2,
-                start_tile: (25, 5),
-                x: 25.5 * ts,
-                y: 5.5 * ts,
-            },
-        )
-        .expect("clear Machine Gunner position in front of Factory");
-
-        assert!(adjusted.x > observation.owned[0].x);
-        assert_eq!(adjusted.y, assignment.y);
-    }
-
-    #[test]
-    fn infantry_at_home_defends_a_forward_building_under_attack() {
-        let mut observation = los_test_observation(EntityKind::Factory);
-        let ts = observation.map.tile_size as f32;
-        observation.owned[0].x = 24.5 * ts;
-        observation.owned[0].y = 5.5 * ts;
-        for (id, kind) in [(20, EntityKind::Rifleman), (21, EntityKind::MachineGunner)] {
-            observation.owned.push(AiEntitySummary {
-                id,
-                owner: 1,
-                kind,
-                x: 5.5 * ts,
-                y: 5.5 * ts,
-                hp: config::unit_stats(kind).expect("infantry stats").hp,
-                state: AiEntityState::Idle,
-                is_complete: true,
-                production_queue_len: None,
-                production_kind: None,
-                latched_node: None,
-                target_id: None,
-                free_for_combat: true,
-            });
-        }
-        observation.visible_enemies.push(AiEntitySummary {
-            id: 30,
-            owner: 2,
-            kind: EntityKind::Rifleman,
-            x: 27.5 * ts,
-            y: 5.5 * ts,
-            hp: 100,
-            state: AiEntityState::Attack,
-            is_complete: true,
-            production_queue_len: None,
-            production_kind: None,
-            latched_node: None,
-            target_id: Some(10),
-            free_for_combat: true,
-        });
-
-        assert_eq!(local_defense_target(&observation), Some(30));
-        assert_eq!(local_defense_units(&observation, &[20, 21]), vec![20, 21]);
-    }
-
-    #[test]
-    fn first_machine_gunner_reserves_a_flank_slot_in_two_unit_formation() {
-        let mut observation = los_test_observation(EntityKind::Factory);
-        let tile_size = observation.map.tile_size as f32;
-        observation.resources.push(AiResourceSummary {
-            id: 100,
-            kind: EntityKind::Steel,
-            x: 7.5 * tile_size,
-            y: 5.5 * tile_size,
-            remaining: 625,
-        });
-        let enemy_base = EnemyBaseFact {
-            player_id: 2,
-            start_tile: (25, 5),
-            x: 25.5 * observation.map.tile_size as f32,
-            y: 5.5 * observation.map.tile_size as f32,
-        };
-        let centered =
-            main_steel_defensive_line_assignments(&observation, &[20], enemy_base, 6.0, 4.5, 1)
-                .expect("centered assignment")[0];
-        let reserved =
-            main_steel_defensive_line_assignments(&observation, &[20], enemy_base, 6.0, 4.5, 2)
-                .expect("reserved flank assignment")[0];
-        let offset_tiles = dist2(centered.x, centered.y, reserved.x, reserved.y).sqrt()
-            / observation.map.tile_size as f32;
-
-        assert!((offset_tiles - 2.25).abs() < 0.001);
-    }
-}
+mod tests;
 
 pub(super) fn stage_defensive_machine_gunner_perimeter(
     actions: &mut AiActionContext<'_>,
@@ -734,6 +507,167 @@ pub(super) fn stage_home_rifleman_screen(
     staged.sort_unstable();
     staged.dedup();
     (!staged.is_empty()).then_some(staged)
+}
+
+/// Spread Jeff's Riflemen across stable, base-centric approach slots. The primary section faces
+/// the enemy start; larger groups add the nearest analyzed base exits instead of extending one
+/// increasingly long line. Slots stay attached to sorted unit ids until a section is added or a
+/// unit is lost, which avoids routine formation churn.
+pub(super) fn stage_home_rifleman_coverage(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<u32>> {
+    let assignments =
+        home_rifleman_coverage_assignments(observation, map_analysis, ready_units, enemy_base)?;
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|entity| (entity.id, entity))
+        .collect();
+    let tolerance = EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES * observation.map.tile_size as f32;
+    let tolerance2 = squared(tolerance);
+    let mut staged = Vec::new();
+    for assignment in assignments {
+        let Some(unit) = by_id.get(&assignment.unit_id).copied() else {
+            continue;
+        };
+        let command = if dist2(unit.x, unit.y, assignment.x, assignment.y) <= tolerance2 {
+            actions::hold_position_units(actions, [assignment.unit_id])
+        } else {
+            actions::move_units(actions, [assignment.unit_id], assignment.x, assignment.y)
+        };
+        if let Some(units) = command {
+            staged.extend(units);
+        }
+    }
+    staged.sort_unstable();
+    staged.dedup();
+    (!staged.is_empty()).then_some(staged)
+}
+
+fn home_rifleman_coverage_assignments(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<DefensiveLineAssignment>> {
+    if ready_units.is_empty() {
+        return None;
+    }
+    let anchor = main_steel_cluster_center(observation)
+        .unwrap_or_else(|| tile_center(observation.own_start_tile, observation.map.tile_size));
+    let mut approach_targets = vec![(enemy_base.x, enemy_base.y)];
+    if let Some(analysis) = map_analysis {
+        for choke in
+            analysis.base_chokes_for_player(observation.player_id, HOME_RIFLE_MAX_APPROACHES)
+        {
+            let target = choke.enemy_approach_world;
+            let Some(candidate) = normalized_direction(anchor, target) else {
+                continue;
+            };
+            let duplicates_existing = approach_targets.iter().any(|existing| {
+                normalized_direction(anchor, *existing).is_some_and(|direction| {
+                    direction.0 * candidate.0 + direction.1 * candidate.1 > 0.85
+                })
+            });
+            if !duplicates_existing {
+                approach_targets.push(target);
+            }
+        }
+    }
+    let desired_approaches = if ready_units.len() >= 6 {
+        3
+    } else if ready_units.len() >= 4 {
+        2
+    } else {
+        1
+    };
+    approach_targets.truncate(desired_approaches.min(approach_targets.len()));
+    let approach_count = approach_targets.len().max(1);
+    let tile_size = observation.map.tile_size as f32;
+    let mut units = ready_units.to_vec();
+    units.sort_unstable();
+    units.dedup();
+    let primary_slots = (units.len() * 3).div_ceil(5);
+
+    let assignments = units
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, unit_id)| {
+            let approach_index = if index < primary_slots || approach_count == 1 {
+                0
+            } else {
+                1 + (index - primary_slots) % (approach_count - 1)
+            };
+            let local_slot = if approach_index == 0 {
+                index
+            } else {
+                (index - primary_slots) / (approach_count - 1)
+            };
+            let target = approach_targets[approach_index];
+            let direction = normalized_direction(anchor, target)?;
+            let perpendicular = (-direction.1, direction.0);
+            let rank = local_slot % 2;
+            let lateral_slot = local_slot / 2;
+            let column = match lateral_slot {
+                0 => 0.0,
+                slot if slot % 2 == 1 => -(slot.div_ceil(2) as f32),
+                slot => (slot / 2) as f32,
+            };
+            let forward_tiles = HOME_RIFLE_FRONT_TILES - rank as f32 * HOME_RIFLE_RANK_DEPTH_TILES;
+            let desired = clamp_to_map(
+                (
+                    anchor.0
+                        + direction.0 * forward_tiles * tile_size
+                        + perpendicular.0 * column * HOME_RIFLE_LATERAL_SPACING_TILES * tile_size,
+                    anchor.1
+                        + direction.1 * forward_tiles * tile_size
+                        + perpendicular.1 * column * HOME_RIFLE_LATERAL_SPACING_TILES * tile_size,
+                ),
+                observation.map,
+            );
+            clear_mobile_defensive_position(observation, map_analysis, desired)
+                .map(|(x, y)| DefensiveLineAssignment { unit_id, x, y })
+        })
+        .collect::<Vec<_>>();
+    (!assignments.is_empty()).then_some(assignments)
+}
+
+fn clear_mobile_defensive_position(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    desired: (f32, f32),
+) -> Option<(f32, f32)> {
+    let tile_size = observation.map.tile_size as f32;
+    let offsets = [
+        (0.0, 0.0),
+        (1.0, 0.0),
+        (-1.0, 0.0),
+        (0.0, 1.0),
+        (0.0, -1.0),
+        (1.0, 1.0),
+        (1.0, -1.0),
+        (-1.0, 1.0),
+        (-1.0, -1.0),
+        (2.0, 0.0),
+        (-2.0, 0.0),
+        (0.0, 2.0),
+        (0.0, -2.0),
+    ];
+    offsets.into_iter().find_map(|offset| {
+        let candidate = clamp_to_map(
+            (
+                desired.0 + offset.0 * tile_size,
+                desired.1 + offset.1 * tile_size,
+            ),
+            observation.map,
+        );
+        defensive_position_is_open(observation, map_analysis, candidate.0, candidate.1)
+            .then_some(candidate)
+    })
 }
 
 fn stage_machine_gunner_defensive_line(

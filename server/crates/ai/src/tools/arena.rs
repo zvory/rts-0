@@ -32,6 +32,7 @@ struct CliConfig {
     seeds: u32,
     seed_start: u32,
     ticks: u32,
+    map_name: String,
     out_dir: PathBuf,
     verify_replay: bool,
 }
@@ -46,6 +47,7 @@ pub(crate) struct ArenaReport {
     seed_start: u32,
     seeds: u32,
     max_ticks: u32,
+    map_name: String,
     runs: Vec<ArenaRunSummary>,
     aggregate: ArenaAggregate,
 }
@@ -161,6 +163,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
     let mut seeds = DEFAULT_SEEDS;
     let mut seed_start = 0;
     let mut ticks = DEFAULT_TICKS;
+    let mut map_name = "Chokes".to_string();
     let mut out_dir = default_out_dir();
     let mut verify_replay = true;
 
@@ -185,6 +188,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
             }
             "--ticks" => {
                 ticks = parse_u32_flag(&arg, &mut args)?;
+            }
+            "--map" => {
+                map_name = required_value(&arg, &mut args)?;
             }
             "--out-dir" => {
                 out_dir = PathBuf::from(required_value(&arg, &mut args)?);
@@ -212,6 +218,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
         seeds,
         seed_start,
         ticks,
+        map_name,
         out_dir,
         verify_replay,
     }))
@@ -248,7 +255,7 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
             verify_replay: config.verify_replay,
             save_replay_name: Some(replay_name),
             replay_dir: Some(replay_dir.clone()),
-            map_name: None,
+            map_name: Some(config.map_name.clone()),
         })?;
         let artifact_dir = result
             .replay_artifact
@@ -274,6 +281,7 @@ fn run_arena(config: &CliConfig) -> Result<ArenaReport, String> {
         seed_start: config.seed_start,
         seeds: config.seeds,
         max_ticks: config.ticks,
+        map_name: config.map_name.clone(),
         runs,
         aggregate,
     };
@@ -646,6 +654,7 @@ Options:
   --seeds <u32>          Number of seeds to run, side-swapped (default: {DEFAULT_SEEDS})
   --seed-start <u32>     First seed to run (default: 0)
   --ticks <u32>          Tick cap per run (default: {DEFAULT_TICKS})
+  --map <name>           Bundled map name (default: Chokes)
   --out-dir <path>       Artifact directory (default: /tmp/rts-ai-arena-<pid>)
   --no-verify-replay     Skip deterministic command-log replay verification
   -h, --help             Print this help
@@ -693,6 +702,7 @@ mod tests {
         assert_eq!(config.candidate, DEFAULT_CANDIDATE);
         assert_eq!(config.baseline, DEFAULT_BASELINE);
         assert_eq!(config.seeds, DEFAULT_SEEDS);
+        assert_eq!(config.map_name, "Chokes");
     }
 
     #[test]
@@ -705,6 +715,7 @@ mod tests {
             seeds: 1,
             seed_start: 0,
             ticks: 1,
+            map_name: "Chokes".to_string(),
             out_dir: out_dir.clone(),
             verify_replay: false,
         };
@@ -854,6 +865,7 @@ mod tests {
             seeds: 1,
             seed_start: 3,
             ticks: 12,
+            map_name: "Chokes".to_string(),
             out_dir: out_dir.clone(),
             verify_replay: false,
         };
