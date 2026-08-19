@@ -45,13 +45,12 @@ pub(super) fn direct_fire_target_legal(
             attacker,
         )
     } else {
-        !target_entity.is_neutral_obstacle()
-            && crate::game::services::world_query::is_enemy_targetable(
-                target_entity,
-                teams,
-                attacker_owner,
-                attacker,
-            )
+        crate::game::services::world_query::is_automatic_attack_targetable(
+            target_entity,
+            teams,
+            attacker_owner,
+            attacker,
+        )
     };
     if !targetable {
         return false;
@@ -112,15 +111,13 @@ pub(super) fn auto_target_candidate(
     weapon_range_px: f32,
     target: &Entity,
 ) -> Option<AutoTargetLegality> {
-    if target.is_neutral_obstacle()
-        || !crate::game::services::world_query::is_enemy_targetable(
-            target,
-            teams,
-            owner,
-            attacker.id,
-        )
-        || (attacker.kind != EntityKind::MortarTeam
-            && !crate::rules::target::default_weapon_can_target(attacker.kind, target.kind))
+    if !crate::game::services::world_query::is_automatic_attack_targetable(
+        target,
+        teams,
+        owner,
+        attacker.id,
+    ) || (attacker.kind != EntityKind::MortarTeam
+        && !crate::rules::target::default_weapon_can_target(attacker.kind, target.kind))
     {
         return None;
     }
