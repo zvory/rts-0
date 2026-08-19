@@ -156,7 +156,7 @@ const quadrantMirror = buildMapFromRecipe({
 });
 for (const [x, y] of [[2, 3], [17, 3], [2, 14], [17, 14]]) assert.equal(quadrantMirror.terrain[y][x], "~");
 assert(!validateMap(quadrantMirror, { symmetry: "quadrantMirror" }).warnings.some((warning) => warning.includes("symmetry")));
-for (const symmetry of ["horizontal", "vertical", "halfTurn", "threeWay", "radial", "quadrantMirror", "diagonalMain", "diagonalAnti"]) {
+for (const symmetry of ["horizontal", "vertical", "halfTurn", "threeWay", "radial", "quadrantMirror", "diagonalMain", "diagonalAnti", "diagonalMainFlip", "diagonalAntiFlip"]) {
   const generated = buildMapFromRecipe({
     name: `${symmetry} terrain`, width: 32, height: 32, symmetry,
     operations: [{ type: "rect", material: "water", from: [4, 7], to: [6, 9] }],

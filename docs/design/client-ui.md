@@ -1046,14 +1046,17 @@ feature. Import splits the legacy authored `terrain` rows, and export, Lab hando
 and rendering recompose them with features above ground. Existing authored maps and the
 authoritative flat terrain contract therefore remain byte-for-byte compatible while cosmetic paint
 can no longer hide a meaningful feature. Terrain content supports brush
-and inclusive drag-box fills, plus none, horizontal, vertical, half-turn, four-way radial,
-four-way quadrant mirror, or either single-diagonal symmetry. Quadrant mirror reflects a source
-across both centre axes, so adjacent quadrants are single mirrors and the opposite quadrant is
-double-mirrored. Ground Erase applies grass; Feature Erase removes the feature and reveals open
+and inclusive drag-box fills. Symmetry uses one custom visual picker that preserves the established
+flat vocabulary: none, horizontal, vertical, half-turn, approximate three-way rotation, four-way
+radial, four-way quadrant mirror, and either single diagonal. Every choice shows an asymmetric
+directional preview in both the closed picker and its expanded, independently scrollable top-layer
+option list. Each diagonal also has an explicit two-copy `flipped copy` choice: it retains the
+selected diagonal as the authoring boundary but reverses the mirrored partner, so the source and
+partner occupy opposing triangular regions with opposite orientation. Ground Erase applies grass; Feature Erase removes the feature and reveals open
 ground underneath. Until a layered authored-map schema exists, painting a feature canonicalizes
 its hidden ground to Grass and ground painting skips feature tiles, avoiding state that legacy
 export cannot preserve. Rectangular maps retain axis reflection and
-half-turn and quadrant-mirror symmetry, while three-way, radial, and diagonal transforms are
+half-turn and quadrant-mirror symmetry, while three-way, quarter-turn, and diagonal transforms are
 disabled because they would rotate or transpose the map into a different shape. Symmetry expands every terrain tile before it is
 painted, moves existing matching start or base locations together, and adds all symmetric locations.
 The editor viewport also draws non-authoritative Steel and Oil stand-ins for every base using the
@@ -1061,7 +1064,7 @@ same count, centre-facing field geometry, tile snapping, passability search, and
 as match setup and the production resource-node drawing primitives; editing either patch count
 updates those stand-ins immediately. The selected neutral base has a pale map ring. The viewport draws the selected
 centre axis, a centre marker for half-turn symmetry, a cross for radial or quadrant-mirror symmetry,
-or the selected diagonal.
+the selected diagonal for either ordinary or flipped-copy diagonal symmetry.
 Texture Brush operations use a configurable 1–31-tile brush-width number control; Box fills remain independent of brush width.
 Feature Erase is selected as palette content and stays armed while the author switches its Apply shape between Brush and Box.
 The palette presents separate Cosmetic and Features groups. Cosmetic ground is
