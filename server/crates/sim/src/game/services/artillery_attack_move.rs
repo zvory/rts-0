@@ -133,7 +133,7 @@ fn candidates(
     let max_range_px = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     let visible_enemy = |target: &Entity| {
         (target.is_unit() || target.is_building())
-            && world_query::is_enemy_targetable(target, teams, owner, artillery_id)
+            && world_query::is_automatic_attack_targetable(target, teams, owner, artillery_id)
             && crate::rules::projection::team_visible_world(
                 owner,
                 target.pos_x,

@@ -255,9 +255,6 @@ fn target_candidates(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.is_neutral_obstacle() {
-            continue;
-        }
         let retained_target = retained_target_id == Some(id);
         let Some(legality) = auto_target_candidate(
             map,
