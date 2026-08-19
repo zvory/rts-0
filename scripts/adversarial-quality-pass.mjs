@@ -805,7 +805,7 @@ class Runner {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   try {
     const options = parseArgs(process.argv.slice(2));
     new Runner().run(options);
