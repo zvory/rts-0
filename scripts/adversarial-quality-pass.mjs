@@ -612,7 +612,12 @@ class Runner {
   }
 
   formatTouchedRust(repoRoot, baseRef) {
-    this.runInherit(path.join(repoRoot, "scripts", "format-touched-rust.sh"), ["--base", baseRef], { cwd: repoRoot });
+    const formatter = path.join(repoRoot, "scripts", "format-touched-rust.sh");
+    if (process.platform === "win32") {
+      this.runInherit("bash", [formatter, "--base", baseRef], { cwd: repoRoot });
+      return;
+    }
+    this.runInherit(formatter, ["--base", baseRef], { cwd: repoRoot });
   }
 
   runPreflight(repoRoot, baseRef, { dryRun = false } = {}) {
