@@ -25,8 +25,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `platform`: bootstrap, audio, alerts, fog, camera, prediction settings, and reports.
 
 ## Invariants
-- **Pixi worker only.** `pixi_render_worker.js` imports v8.19.0; main-thread code never constructs Pixi.
-- **Client architecture check.** Run `node scripts/check-client-architecture.mjs` for client changes.
+- **Pixi worker only.** `pixi_render_worker.js` imports v8.19.0; main thread never constructs Pixi.
+- **Architecture.** Run `node scripts/check-client-architecture.mjs` after changes.
 - **Cross-area imports are constrained.** `protocol.js` and `config.js` are shared mirrors,
   same-area imports are allowed, and `app-shell` may compose other areas. Non-shell cross-area
   imports should use DI through `Match`/`App`, or be documented in
@@ -42,9 +42,9 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
   `GameState`, or a simulation room. One-use two-minute Lab handoffs carry only map data.
 - **Room affordances are metadata-driven.** `room_capabilities.js` parses `startPayload.capabilities`
   and `startPayload.diagnostics`; shared controls must not be inferred from replay/dev/lab identity.
-- **Client intent is explicit.** `Match` owns `ClientIntent` and injects it into HUD, input,
-  minimap, and renderer feedback. Do not read or write placement, command targeting, command-card
-  mode, active lab tools, Lab ruler, previews, or command feedback through `GameState` shims. Lab setup tools
+- **Client intent is explicit.** `Match` injects `ClientIntent` into HUD, input, minimap, and
+  renderer feedback. Do not route placement, targeting, command-card mode, lab tools, previews, or
+  command feedback through `GameState` shims. Lab setup tools
   are armed through `Match` and consumed by input world clicks, not by panel-owned viewport
   listeners.
 - **Commands and ownership are explicit.** `Match` injects one `CommandInteraction` into Input,
