@@ -335,7 +335,7 @@ impl<'a> WorldQueries<'a> {
             entity.kind.is_unit()
                 && unit_circle_touches_rect(
                     entity.position,
-                    unit_placement_radius(entity.kind),
+                    rts_rules::balance::unit_placement_radius(entity.kind),
                     footprint,
                 )
         }) {
@@ -512,49 +512,6 @@ pub(crate) fn unit_circle_touches_rect(
     let dx = position.0 - nearest_x;
     let dy = position.1 - nearest_y;
     dx * dx + dy * dy <= radius * radius
-}
-
-pub(crate) fn unit_placement_radius(kind: EntityKind) -> f32 {
-    use rts_rules::balance::*;
-
-    let oriented_half_diagonal = match kind {
-        EntityKind::Tank => Some((
-            TANK_BODY_LENGTH_PX,
-            TANK_BODY_WIDTH_PX,
-            TANK_BODY_CLEARANCE_PX,
-        )),
-        EntityKind::ScoutCar => Some((
-            SCOUT_CAR_BODY_LENGTH_PX,
-            SCOUT_CAR_BODY_WIDTH_PX,
-            SCOUT_CAR_BODY_CLEARANCE_PX,
-        )),
-        EntityKind::CommandCar => Some((
-            COMMAND_CAR_BODY_LENGTH_PX,
-            COMMAND_CAR_BODY_WIDTH_PX,
-            COMMAND_CAR_BODY_CLEARANCE_PX,
-        )),
-        EntityKind::AntiTankGun => Some((
-            ANTI_TANK_GUN_BODY_LENGTH_PX,
-            ANTI_TANK_GUN_BODY_WIDTH_PX,
-            ANTI_TANK_GUN_BODY_CLEARANCE_PX,
-        )),
-        EntityKind::Artillery => Some((
-            ARTILLERY_BODY_LENGTH_PX,
-            ARTILLERY_BODY_WIDTH_PX,
-            ARTILLERY_BODY_CLEARANCE_PX,
-        )),
-        _ => None,
-    };
-    oriented_half_diagonal.map_or_else(
-        || {
-            unit_stats(kind)
-                .map(|stats| stats.radius)
-                .unwrap_or_default()
-        },
-        |(length, width, clearance)| {
-            ((length * 0.5).powi(2) + (width * 0.5).powi(2)).sqrt() + clearance
-        },
-    )
 }
 
 #[cfg(test)]
