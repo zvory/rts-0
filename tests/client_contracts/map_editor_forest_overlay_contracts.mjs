@@ -78,3 +78,15 @@ assert.equal(quadrantMirrorTrees.length, 4,
   "rectangular quadrant-mirror forests emit the complete orbit when capacity permits");
 assert.equal(new Set(quadrantMirrorTrees.map(({ typeId }) => typeId)).size, 1,
   "all trees in a rectangular quadrant-mirror orbit use the same tree type");
+
+const radialSpans = [
+  [2, 16, 16],
+  [3, 2, 2],
+  [16, 17, 17],
+  [17, 3, 3],
+];
+assert.deepEqual(
+  generatedForestDoodads(radialSpans, { width: 20, height: 20 }, { max: 3 }),
+  [],
+  "square radial forests do not degrade to a partial half-turn orbit",
+);
