@@ -275,8 +275,8 @@ try {
     };
   });
   ok(
-    own.resourceDepot === 1 && own.workers === 1 && own.completedSteelMines === 6 && own.steelMines >= 6,
-    `client sees own Resource Depot + Engineer + 6 completed Steel Mines plus any automatic scaffold (${JSON.stringify(own)})`,
+    own.resourceDepot === 1 && own.workers === 1 && own.completedSteelMines >= 6 && own.steelMines >= 6,
+    `client sees own Resource Depot + Engineer + at least 6 completed Steel Mines as automatic production advances (${JSON.stringify(own)})`,
   );
 
   await page.waitForFunction(() => {
