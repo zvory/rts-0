@@ -1,7 +1,7 @@
 {
   "version": 10,
   "name": "Wald des Todes",
-  "description": "",
+  "description": "A two-player forest battlefield with ten resource sites and winding routes through dense woodland.",
   "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
   "width": 126,
   "height": 126,
