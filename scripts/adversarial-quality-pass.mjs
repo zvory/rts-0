@@ -14,6 +14,7 @@ const DEFAULT_CODEX_COMMAND = "codex";
 const DEFAULT_GH_BIN = "gh";
 const VERDICTS = new Set(["passed_unchanged", "improved", "improved_with_concerns"]);
 const REVIEW_MODES = new Set(["full", "incremental", "already-reviewed"]);
+const PROTECTED_MAP_ASSET_PATHSPEC = "server/assets/maps";
 export const QUALITY_PASS_ENV = "RTS_ADVERSARIAL_QUALITY_PASS";
 export const MAX_PRIOR_FOCUSED_VERIFICATION_CHARS = 2000;
 export const PRIOR_FOCUSED_VERIFICATION_NOT_SUPPLIED = "not supplied";
@@ -318,6 +319,11 @@ oversized artifacts are deliberately represented only by bounded metadata below.
 decode, cat, git-show, or git-diff their raw contents. Review their generators, source inputs,
 tests, and compact metadata instead.
 
+Bundled map assets under ${PROTECTED_MAP_ASSET_PATHSPEC}/ are immutable review inputs. You may
+inspect and validate them, but never create, modify, delete, rename, format, regenerate, stage, or
+commit files there. If a map has a defect, report it in remaining_concerns and leave every bundled
+map file byte-for-byte unchanged. The outer workflow rejects any map mutation made during this pass.
+
 Review mode: ${reviewMode === "incremental" ? "Incremental" : "Full"}.
 Review base: ${baseRef}.
 ${incrementalInstruction}
@@ -603,6 +609,24 @@ class Runner {
     }
   }
 
+  protectedMapAssetChanges(repoRoot, beforeHead) {
+    const tracked = this.git([
+      "diff", "--name-only", beforeHead, "--", PROTECTED_MAP_ASSET_PATHSPEC,
+    ], repoRoot);
+    const untracked = this.git([
+      "ls-files", "--others", "--exclude-standard", "--", PROTECTED_MAP_ASSET_PATHSPEC,
+    ], repoRoot);
+    return [...new Set([...tracked.split("\n"), ...untracked.split("\n")].filter(Boolean))];
+  }
+
+  ensureProtectedMapAssetsUnchanged(repoRoot, beforeHead) {
+    const changed = this.protectedMapAssetChanges(repoRoot, beforeHead);
+    if (changed.length === 0) return;
+    throw new Error(
+      `quality pass must not edit bundled map assets; restore these paths to the pre-review head:\n${changed.join("\n")}`,
+    );
+  }
+
   commitDirtyFinalState(repoRoot, report) {
     const status = this.git(["status", "--porcelain=v1"], repoRoot);
     if (!status) return false;
@@ -771,6 +795,7 @@ class Runner {
       env: { [QUALITY_PASS_ENV]: "1" },
       input: prompt,
     });
+    this.ensureProtectedMapAssetsUnchanged(repoRoot, beforeHead);
     if (!fs.existsSync(reportFile)) {
       throw new Error(`quality pass did not write report file: ${reportFile}`);
     }
