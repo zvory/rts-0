@@ -742,7 +742,8 @@ done
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/protected-map-reject"], { cwd: workPath });
   fs.writeFileSync(path.join(workPath, "protected-map-candidate.js"), "export const candidate = true;\n");
-  run("git", ["add", "protected-map-candidate.js"], { cwd: workPath });
+  fs.writeFileSync(path.join(workPath, ".gitignore"), "server/assets/maps/*.json\n");
+  run("git", ["add", "protected-map-candidate.js", ".gitignore"], { cwd: workPath });
   run("git", ["commit", "-m", "Branch for protected map rejection"], { cwd: workPath });
   const protectedMapFailure = spawnSync(
     "scripts/agent-pr.sh",
@@ -760,7 +761,7 @@ done
       }),
     },
   );
-  assert.notEqual(protectedMapFailure.status, 0, "quality pass must reject bundled map mutations");
+  assert.notEqual(protectedMapFailure.status, 0, "quality pass must reject ignored bundled map mutations");
   assert.match(
     `${protectedMapFailure.stdout}\n${protectedMapFailure.stderr}`,
     /quality pass must not edit bundled map assets[\s\S]*server\/assets\/maps\/quality-pass-mutation\.json/,
