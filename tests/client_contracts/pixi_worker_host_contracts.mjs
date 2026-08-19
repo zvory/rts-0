@@ -232,6 +232,10 @@ async function decalResetContracts() {
   assert(reset?.payload.decalEpoch === 1
       && !worker.messages.some((message) => message.type === "resetGeneration"),
     "a viewpoint change resets only the decal layer without changing presentation generations");
+  adapter.completeGroundDecalTransition();
+  const complete = worker.messages.find((message) => message.type === "completeGroundDecalTransition");
+  assert(complete?.payload.decalEpoch === 1,
+    "an empty viewpoint repair completes only the current hidden decal replacement");
   worker.emit(response(RENDER_WORKER_RESPONSE.RETAINED, 1, { revision: 5, decalEpoch: 0 }));
   assert(adapter._retainedDecalRevision === 0,
     "a late durable acknowledgment from the old decal epoch cannot revive its retention watermark");

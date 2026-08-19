@@ -906,6 +906,7 @@ fn replay_end_sends_frozen_score_result_once() {
             winner_team_id: Some(winner_team_id),
             you,
             scores,
+            ..
         }] if *winner_id == players[0].id
             && *winner_team_id == players[0].team_id
             && you == "draw"
@@ -958,6 +959,7 @@ fn replay_that_starts_at_its_final_tick_sends_frozen_score_result() {
                 winner_team_id: Some(winner_team_id),
                 you,
                 scores,
+                ..
             } if winner_id == players[0].id
                 && winner_team_id == players[0].team_id
                 && you == "draw"
@@ -1238,7 +1240,7 @@ fn replay_viewer_return_detaches_only_requesting_viewer() {
     task.match_human_count = 2;
     task.replay_start = Some(replay_start);
 
-    task.end_match(Some(players[0].id), game.scores(), Some(&game));
+    task.end_match(Some(players[0].id), game.scores(), Some(&game), None);
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
     let summary = task
         .lobby_summary()
@@ -1278,7 +1280,7 @@ fn replay_viewer_return_resets_room_when_last_viewer_leaves() {
     task.match_human_count = 2;
     task.replay_start = Some(replay_start);
 
-    task.end_match(Some(players[0].id), game.scores(), Some(&game));
+    task.end_match(Some(players[0].id), game.scores(), Some(&game), None);
     assert!(matches!(task.phase, Phase::ReplayViewer(_)));
 
     task.on_return_to_lobby(players[0].id);

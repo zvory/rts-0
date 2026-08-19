@@ -23,7 +23,7 @@ pub trait Passability {
 
     /// Additional deterministic cost for entering this tile. Defaults to zero so callers that
     /// only need pass/fail behavior keep legacy path scoring.
-    fn movement_cost(&self, _tx: i32, _ty: i32) -> u32 {
+    fn movement_cost(&self, _tx: i32, _ty: i32, _base_step_cost: u32) -> u32 {
         0
     }
 }
@@ -251,7 +251,7 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
                 .g
                 .saturating_add(cost)
                 .saturating_add(turn_cost)
-                .saturating_add(pass.movement_cost(nx, ny));
+                .saturating_add(pass.movement_cost(nx, ny, cost));
             let better = match scratch.g_score.get(&next_key) {
                 Some(&existing) => tentative < existing,
                 None => true,

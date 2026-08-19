@@ -991,6 +991,8 @@ labUi.applyRoomTimeState({ currentTick: 300, durationTicks: 600, speed: 0, pause
 assert(labPause.textContent === "Resume", "paused lab room-time control switches to resume");
 labPause._listeners.get("click")({});
 assert(replayNet.speeds.at(-1) === 1, "lab resume restores the last positive room-time speed");
+labUi.applyRoomTimeState({ currentTick: 601, durationTicks: 600, speed: 1, paused: false, ended: false });
+assert(concluded.hidden, "live Lab room time is not concluded when it advances beyond recorded history");
 labUi.destroy();
 
 const readOnlyLabControls = fakeEl("div");

@@ -13,6 +13,7 @@ import {
 } from "../../client/src/protocol.js";
 import { Input } from "../../client/src/input/index.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
+import { Minimap } from "../../client/src/minimap.js";
 
 // ---------------------------------------------------------------------------
 // Client boundary baseline contracts
@@ -49,6 +50,24 @@ import { ClientIntent } from "../../client/src/client_intent.js";
   intent.addCommandFeedback("move", 10, 20, true, null, 100);
   assert(intent.liveCommandFeedback(700).length === 1, "ClientIntent keeps fresh command feedback");
   assert(intent.liveCommandFeedback(751).length === 0, "ClientIntent expires command feedback by TTL");
+  let visualNow = 1_000;
+  const pausedIntent = new ClientIntent();
+  const feedbackInput = Object.create(Input.prototype);
+  feedbackInput.state = { visualNow: () => visualNow };
+  feedbackInput.clientIntent = pausedIntent;
+  feedbackInput.controlPolicy = null;
+  feedbackInput._addCommandFeedback("move", 30, 40);
+  assert(pausedIntent.liveCommandFeedback(visualNow).length === 1, "command feedback remains visible while visual time is paused");
+  visualNow += 651;
+  assert(pausedIntent.liveCommandFeedback(visualNow).length === 0, "paused-created command feedback expires after visual time resumes");
+  visualNow = 5_000;
+  const minimapIntent = new ClientIntent();
+  const feedbackMinimap = Object.create(Minimap.prototype);
+  feedbackMinimap.state = { visualNow: () => visualNow };
+  feedbackMinimap.clientIntent = minimapIntent;
+  feedbackMinimap.controlPolicy = null;
+  feedbackMinimap._addCommandFeedback("move", 50, 60);
+  assert(minimapIntent.commandFeedback[0]?.createdAt === visualNow, "minimap command feedback uses visual time at creation");
   intent.updateResourceMiningPreview({
     resourceId: 200,
     resourceX: 64,

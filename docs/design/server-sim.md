@@ -1368,8 +1368,12 @@ and resets it when the static blocker fingerprint or worker start tile changes, 
 does not depend on rebuildable cache residency. This tick-level scheduling does not lower the
 per-route search allowance. Ordinary
 non-vehicle move formations bypass A* only when the existing body standability check proves the
-exact world-space segment clear; interaction routes and blocked direct segments retain the full
-tile-guided search. Direct results are not stored in the tile-keyed cache. `PathingService` reuses
+exact world-space segment clear and its sampled centerline crosses no authored slow-movement tile;
+interaction routes, blocked direct segments, and slow-terrain crossings retain the full tile-guided
+search. Infantry-like A* routes add a cardinal/diagonal slow-tile surcharge derived from the same
+authoritative 0.75x movement ratio used during ticks, so they may choose a shorter-time open-ground
+detour while still crossing slow terrain when going around costs more. Direct results are not stored
+in the tile-keyed cache. `PathingService` reuses
 cleared A* working containers between sequential room requests; that scratch state remains derived
 and is never serialized. Tree-trunk waypoint refinement is best-effort: if its bounded local detour
 graph cannot refine a successful tile route, the movement coordinator retains the original route
@@ -1510,6 +1514,9 @@ General rules:
   its movement path and stops to engage; after combat clears before arrival, it resumes the original
   player-issued destination. Moving-fire units keep advancing along that destination while firing.
   Direct `Attack` and idle behavior are stationary as well.
+- Direct combat applies damage immediately, but its complete stable entity-id turn order reverses
+  on alternating ticks. Every entity pair therefore swaps same-tick firing precedence instead of
+  permanently favoring the older, lower-id entity; replay behavior remains deterministic.
 - Normal combat auto-acquisition builds cheap hostile, weapon-fit, and range-qualified candidates
   in `services::combat::acquisition`, orders them through the sim-local
   `services::combat::priority` ranker, then checks fog, smoke, line of sight, blockers, and

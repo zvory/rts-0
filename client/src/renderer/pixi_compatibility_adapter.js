@@ -151,9 +151,15 @@ export class PixiPresentationAdapter {
 
   resetGroundDecals() {
     const staticMap = this._sources?.staticMap?.();
-    if (staticMap) this._renderer._initGroundDecalsForMap(materializeStaticMap(staticMap));
+    if (staticMap) {
+      this._renderer._groundDecals?.beginPerspectiveTransition?.(materializeStaticMap(staticMap));
+    }
     this._decalFrameKey = null;
     this._retainedGroundDecalKey = null;
+  }
+
+  completeGroundDecalTransition() {
+    this._renderer._groundDecals?.completePerspectiveTransition?.();
   }
 
   setRenderClock(renderClock) {

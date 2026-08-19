@@ -3,6 +3,7 @@ import { Camera } from "../../client/src/camera.js";
 import { PresentationFrameAssembler } from "../../client/src/presentation/frame.js";
 import {
   createCaptureMessage,
+  createCompleteGroundDecalTransitionMessage,
   createDurableDecalMessage,
   createDestroyMessage,
   createEditorFrameMessage,
@@ -129,6 +130,7 @@ for (const control of [
   createCaptureMessage({ generation: 1, frameId: 1, captureId: 4, readPixels: true }),
   createPresentationPreferencesMessage(1, { projectedUnitShadowsEnabled: true }),
   createResetGroundDecalsMessage(1, 3),
+  createCompleteGroundDecalTransitionMessage(1, 3),
   createResetDiagnosticsMessage(1),
   createResetGenerationMessage(2),
   createDestroyMessage(2),

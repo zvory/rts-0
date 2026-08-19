@@ -48,6 +48,7 @@ import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_b
 
 import { MatchCombatAudio, worldCombatBedAllowed } from "./match_combat_audio.js";
 import { MatchNoticePresenter } from "./match_notice_presenter.js";
+import { applyRoomTimeState as applyRoomTimeStateModel } from "./match_room_time.js";
 import { createMatchStartupInbox } from "./match_startup_inbox.js";
 import { recordPointerLockDiagnostic } from "./match_pointer_lock_diagnostics.js";
 import {
@@ -267,7 +268,8 @@ export class Match {
     this.state = this._timeInit("match.state", () => new GameState(payload, { renderClock: this.renderClock }));
     this.groundDecalSync = new GroundDecalSync({
       net: this.net, state: this.state, labClient: this.labClient,
-      resetPresentation: () => this.resetGroundDecalPresentation(),
+      resetPresentation: (action) => action === "complete"
+        ? this.renderer?.completeGroundDecalTransition?.() : this.resetGroundDecalPresentation(),
     });
     configureMatchDisplayPreferences(this, options);
     this.controlPolicy = this._timeInit(
@@ -1266,13 +1268,7 @@ export class Match {
   }
 
   applyRoomTimeState(state) {
-    this.roomTimeControls?.applyRoomTimeState(state);
-    const speed = Number(state?.speed);
-    const ended = state?.ended === true
-      || (Number(state?.durationTicks) > 0 && Number(state?.currentTick) >= Number(state?.durationTicks));
-    if (state?.paused === true || (Number.isFinite(speed) && speed <= 0) || ended) {
-      this.combatAudio?.updateWorldCombatBed(false);
-    }
+    applyRoomTimeStateModel(this, state);
   }
 
   /** Reset timeline-derived client presentation before a replay seek streams replacement state. */

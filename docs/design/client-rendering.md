@@ -266,7 +266,10 @@ Its payload lifetimes are explicit:
 - durable update: monotonic ground-decal revision plus its detached records;
 - revisioned data: transferred visible/explored copies only when each revision changes;
 - frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
-- control: resize, capture/flush, presentation preferences, generation reset, and destroy. The
+- control: resize, capture/flush, presentation preferences, generation reset, perspective-decal
+  reset/empty-repair completion, and destroy. Perspective-decal reset retains the currently visible
+  surface while a hidden replacement consumes bounded durable batches across normal frames, then
+  swaps atomically. The
   presentation-preference payload currently carries the configurable detailed-unit-shadow boolean so
   disabling it stops worker-side model projection instead of merely hiding the result.
 

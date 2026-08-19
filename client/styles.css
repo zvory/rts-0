@@ -4758,10 +4758,16 @@ input[type="text"]:focus {
   outline: none;
 }
 #game-over-text {
-  margin: 0 0 12px;
+  margin: 0 0 6px;
   font-size: 34px;
   font-weight: 800;
   letter-spacing: 0.06em;
+}
+.game-over-conclusion {
+  margin: 0 0 14px;
+  color: var(--ink-dim);
+  font-size: 15px;
+  line-height: 1.4;
 }
 /* Verdict tint set via data-verdict in main.js (won/lost/draw). */
 #game-over-text[data-verdict="won"] {

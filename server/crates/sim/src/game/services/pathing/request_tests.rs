@@ -22,6 +22,13 @@ fn map_with_rock_wall(size: u32, wall_x: u32, min_y: u32, max_y: u32) -> Map {
     map
 }
 
+fn mark_slow_rect(map: &mut Map, min_x: u32, max_x: u32, min_y: u32, max_y: u32) {
+    map.slow_movement_tiles = (min_y..=max_y)
+        .flat_map(|ty| (min_x..=max_x).map(move |tx| (tx, ty)))
+        .collect();
+    map.slow_movement_tiles.sort_unstable();
+}
+
 fn resolved<T>(outcome: PathingRequestOutcome<T>) -> (T, PathingRequestDiagnostics) {
     match outcome {
         PathingRequestOutcome::Resolved { path, diagnostics } => (path, diagnostics),
@@ -148,6 +155,65 @@ fn exact_direct_segment_bypasses_astar() {
     assert_eq!(diagnostics.cache_status, PathCacheStatus::Bypassed);
     assert_eq!(diagnostics.expanded_nodes, 0);
     assert!(!diagnostics.budget_exhausted);
+}
+
+#[test]
+fn infantry_direct_segment_crossing_slow_tiles_uses_astar_detour() {
+    let mut map = flat_test_map(16);
+    mark_slow_rect(&mut map, 4, 8, 8, 8);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let req = PathRequest {
+        kind: EntityKind::Rifleman,
+        start: (2, 8),
+        goal: (11, 8),
+        radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        route_shape: RouteShape::Normal,
+        budget: None,
+    };
+    let start = map.tile_center(2, 8);
+    let goal = map.tile_center(11, 8);
+
+    let (path, diagnostics) =
+        resolved(service.request_with_diagnostics(&map, &occ, req, Some((start, goal)), true));
+
+    assert_eq!(path.first(), Some(&goal));
+    assert!(diagnostics.expanded_nodes > 0);
+    assert!(path.len() > 1);
+    assert!(path.iter().all(|&(x, y)| {
+        let tile = map.tile_of(x, y);
+        !map.is_slow_movement_tile(tile.0, tile.1)
+    }));
+}
+
+#[test]
+fn infantry_uses_slow_tiles_when_open_detour_is_longer_and_caches_route() {
+    let mut map = flat_test_map(16);
+    mark_slow_rect(&mut map, 4, 8, 2, 14);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let req = PathRequest {
+        kind: EntityKind::Rifleman,
+        start: (2, 8),
+        goal: (11, 8),
+        radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        route_shape: RouteShape::Normal,
+        budget: None,
+    };
+
+    let (first_path, first) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req.clone(), true));
+    let (cached_path, cached) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req, true));
+
+    assert_eq!(first.cache_status, PathCacheStatus::Miss);
+    assert_eq!(cached.cache_status, PathCacheStatus::Hit);
+    assert_eq!(cached_path, first_path);
+    assert!(first_path
+        .iter()
+        .any(|&(tx, ty)| map.is_slow_movement_tile(tx as u32, ty as u32)));
 }
 
 #[test]

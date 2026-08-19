@@ -2,13 +2,34 @@
 
 export class RenderClock {
   constructor(resumeAtMs = null) {
-    this.resumeAtMs = Number.isFinite(resumeAtMs) ? resumeAtMs : null;
-    this.resumePerformanceMs = this.resumeAtMs == null ? null : performance.now();
+    const performanceMs = performance.now();
+    this.anchorVisualMs = Number.isFinite(resumeAtMs) ? resumeAtMs : performanceMs;
+    this.anchorPerformanceMs = performanceMs;
+    this.rate = 1;
   }
 
   now() {
-    const now = performance.now();
-    return this.resumeAtMs == null ? now : this.resumeAtMs + (now - this.resumePerformanceMs);
+    return this.anchorVisualMs + (performance.now() - this.anchorPerformanceMs) * this.rate;
+  }
+
+  setRate(rate) {
+    if (!Number.isFinite(rate) || rate < 0) {
+      throw new RangeError("Render clock rate must be a non-negative finite number.");
+    }
+    const performanceMs = performance.now();
+    this.anchorVisualMs += (performanceMs - this.anchorPerformanceMs) * this.rate;
+    this.anchorPerformanceMs = performanceMs;
+    this.rate = rate;
+  }
+}
+
+export function syncRenderClockToRoomTime(renderClock, state) {
+  const speed = typeof state?.speed === "number" ? state.speed : NaN;
+  const ended = state?.ended === true;
+  if (state?.paused === true || (Number.isFinite(speed) && speed <= 0) || ended) {
+    renderClock?.setRate?.(0);
+  } else if (Number.isFinite(speed)) {
+    renderClock?.setRate?.(speed);
   }
 }
 

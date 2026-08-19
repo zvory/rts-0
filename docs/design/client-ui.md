@@ -137,6 +137,7 @@ src/
   match_startup_inbox.js # semantic buffering while asynchronous Match construction completes
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
   match_notice_presenter.js # Match-owned existing-notice fanout and under-attack incident admission
+  match_room_time.js # authoritative room-time presentation clock and combat-audio synchronization
   match_live_pause.js # live pause state actions and prediction visual suspension
   match_net_reporter.js # Match ping cadence and client net-report upload collaborator
   match_settings_context.js # Match settings action/tab context builder
@@ -468,9 +469,12 @@ rows for immediate display but cannot advance the complete cache cursor. In that
 `GroundDecalSync` coalesces the mismatch into one reliable
 `requestGroundDecals { requestId, afterRevision }` repair and retries with bounded backoff. A later
 covering snapshot tail cancels an obsolete outstanding repair. The echoed repair request id rejects
-delayed responses from a prior replay tick or vision perspective. Replay seeks and observer-view
-changes clear both the cache and painted presentation, block possibly pre-reset inline tails until
-a correlated repair establishes the replacement authority, then resynchronize from revision zero.
+delayed responses from a prior replay tick or vision perspective. Replay seeks clear both the cache
+and painted presentation. Observer-view changes clear the authoritative cache but keep the old
+painted surface visible while a hidden replacement resynchronizes from revision zero. Possibly
+pre-reset inline tails remain blocked until a correlated repair establishes replacement authority.
+The worker hydrates the hidden surface in bounded batches across ordinary presentations, then swaps
+it atomically; an empty correlated repair publishes a clean replacement explicitly.
 Transient combat events still drive short-lived
 effects and audio, but are not used to create permanent decals.
 
@@ -479,14 +483,21 @@ effects and audio, but are not used to create permanent decals.
 export const GROUND_DECAL_TEXTURE_WORLD_SCALE
 export class GroundDecalLayer {
   resetForMap(map)
+  beginPerspectiveTransition(map)
+  completePerspectiveTransition()
   stampBatch(decals, options?)
   displayObjectCount()
   diagnostics()
   destroy()
 }
 ```
-`GroundDecalLayer` owns one downsampled OffscreenCanvas-backed Pixi texture and one sprite on the
-`decals` world layer. SVG files remain source art; `scripts/generate-ground-decal-atlas.mjs` creates
+`GroundDecalLayer` normally owns one downsampled OffscreenCanvas-backed Pixi texture and one sprite
+on the `decals` world layer. During an observer-perspective repair it temporarily retains the old
+visible surface and hydrates a hidden replacement in batches of at most 48 durable records per
+presented frame. Completion atomically adopts the replacement and destroys the old surface; a
+newer reset cancels only the unfinished replacement. A ready decal atlas transfers to the hidden
+surface rather than being fetched and decoded again. SVG files remain source art;
+`scripts/generate-ground-decal-atlas.mjs` creates
 the checked-in `ground-decals-v1.png` plus deterministic rect metadata, and runtime loads that one
 PNG through `fetch`/`createImageBitmap`. New visible death and impact decals stamp from those rects;
 an unavailable or failed atlas remains a reported blocking asset error and never silently chooses a
@@ -574,7 +585,12 @@ touch release and suppress the synthesized compatibility click. The overlay owns
 and is read-only. The Army Value tab is client-side and viewport-specific, excludes economy workers
 (Engineer and Golem), and counts only combat units. Production, Research, Units, Resources, Alive
 Resources, Losses, and Resources Lost render the latest server-authored `observerAnalysis`
-payload. Alive Resources subtracts destroyed-unit and destroyed-building steel/oil value from
+payload. For exactly two players, Resources also samples each player's server-authored lifetime
+mined totals once per second, derives a trailing 8-second collection difference, and renders
+divergent steel and oil area charts. The first player leads above the
+center line and the second leads below it. Each resource uses a symmetric minimum Y extent equal
+to one fully extracting base over that window (144 Steel or 36 Oil). Backward replay seeks
+truncate future samples before rebuilding the timeline. Alive Resources subtracts destroyed-unit and destroyed-building steel/oil value from
 lifetime mined resources; because starting resources are not lifetime mined income, the derived
 value can be negative.
 Research groups
@@ -2089,7 +2105,9 @@ artifact, privacy, API, persistence, and input-limit contract lives in
 `hud.update`, `minimap.render`); on each snapshot it applies state and triggers transient event
 audio exactly once; on `gameOver` show the victory/defeat overlay with the frozen score table. Replay
 spectators instead see a winner headline built from the winning score rows (for example,
-`Alex has won`), while an actual replay draw remains `Draw`. The score table
+`Alex has won`), while an actual replay draw remains `Draw`. When the authoritative result carries
+a decisive conclusion, a smaller line below the headline names who gave up, was eliminated, lost
+all their buildings, or lost their primary base. The score table
 includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
 for singleton FFA compatibility.
 For spectator starts without command-surface permission, `match.js` hides the command card and
@@ -2104,8 +2122,10 @@ minimap, and audio together.
 `artilleryFiring` events are forwarded directly to `Minimap.markArtilleryFiring`; the minimap draws
 the artillery rig icon above fog for every recipient without using it as entity visibility.
 
-`Match` composes a render-only clock and injects it into `Renderer`. Normal play reads monotonic
-`performance.now()` with the prior semantics. Interact fixed capture may explicitly suspend
+`Match` composes a render-only clock and injects it into `Renderer`. Fixed-realtime play advances
+it at 1×. Authoritative room-time state changes its continuous rate so paused or ended rooms freeze
+battlefield animation time and positive playback speeds scale it without a visual-time jump.
+Interact fixed capture may explicitly suspend
 the ordinary rAF loop, replace only that render clock with a monotonically advanced capture clock,
 render with interpolation disabled, and then restore the normal clock and rAF ownership. Renderer
 rig sampling, deployed-weapon transitions, frame strips, recoil, command feedback, smoke,
@@ -2567,7 +2587,7 @@ update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `prediction_runtime_startup.js`, `match_combat_audio.js`,
-  `match_notice_presenter.js`,
+  `match_notice_presenter.js`, `match_room_time.js`,
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`,
   `match_settings_toggles.js`, `match_auto_spectator.js`, `auto_spectator.js`,
   `client_perf_report.js`, `match_health.js`,

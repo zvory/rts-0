@@ -117,7 +117,7 @@ fn live_chat_routes_team_privately_and_is_captured_for_replay() {
         panic!("expected live game");
     };
     let artifact = task
-        .finalize_replay_artifact(game, None, game.scores())
+        .finalize_replay_artifact(game, None, game.scores(), None)
         .expect("replay artifact");
     assert_eq!(artifact.chat_log, task.match_chat_log);
 }

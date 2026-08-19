@@ -17,7 +17,12 @@ function recordingContext() {
     save() {}, restore() {}, beginPath() {},
     arc(...args) { this.calls.push({ op: "arc", args }); },
     stroke() {
-      this.calls.push({ op: "stroke", strokeStyle: this.strokeStyle, lineWidth: this.lineWidth });
+      this.calls.push({
+        op: "stroke",
+        strokeStyle: this.strokeStyle,
+        lineWidth: this.lineWidth,
+        globalAlpha: this.globalAlpha,
+      });
     },
   };
 }
@@ -44,16 +49,18 @@ export function runMinimapAttackAlertContracts() {
 
   minimap.ping(40, 60, "alert", true);
   minimap._pings[0].startedAt = 100;
-  minimap._drawPings(1200);
+  minimap._drawPings(2300);
   const arcs = context.calls.filter((call) => call.op === "arc");
   const strokes = context.calls.filter((call) => call.op === "stroke");
   assert(arcs.length === 2, "attack alert draws both the red ring and its inner rim");
-  assertApprox(arcs[0].args[2], 11.5, 0.001, "attack alert advances halfway through 2.2 seconds");
-  assertApprox(arcs[1].args[2], 9.5, 0.001, "attack alert rim stays two pixels inside");
-  assert(strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 2,
-    "attack alert keeps its strong red outer stroke");
-  assert(strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 1,
-    "attack alert draws a crisp white inner stroke");
+  assertApprox(arcs[0].args[2], 19, 0.001, "attack alert contracts halfway from 32 to 6 pixels");
+  assertApprox(arcs[1].args[2], 13, 0.001, "attack alert rim stays six pixels inside");
+  assert(strokes[0].strokeStyle === "#ff4d4d" && strokes[0].lineWidth === 6,
+    "attack alert keeps its heavier red outer stroke");
+  assert(strokes[1].strokeStyle === "rgba(255,255,255,0.95)" && strokes[1].lineWidth === 3,
+    "attack alert draws a heavier crisp white inner stroke");
+  assertApprox(strokes[0].globalAlpha, 0.75, 0.001,
+    "attack alert remains more opaque halfway through its animation");
 
   let flashing = minimap._underAttackFlashEntityIds(entities, 250);
   assert(flashing.has(11) && !flashing.has(13), "attack alert resolves the nearest local entity");
@@ -96,23 +103,41 @@ export function runMinimapAttackAlertContracts() {
   state.events = [{ e: EVENT.DEATH, id: 99, x: 160, y: 160, kind: KIND.RIFLEMAN }];
   assert(minimap._underAttackFlashEntityIds(entities, 750).has(12),
     "a later snapshot cannot suppress an earlier nonlethal alert target");
-  assert(minimap._underAttackFlashEntityIds(entities, 2300).size === 0,
-    "attack icon strobe ends after 2.2 seconds");
+  assert(minimap._underAttackFlashEntityIds(entities, 4500).size === 0,
+    "attack icon strobe ends after 4.4 seconds");
 
   minimap._pings.length = 0;
   minimap.ping(40, 60, "alert", true);
   minimap._pings[0].startedAt = 100;
-  minimap._drawPings(2200);
-  assert(minimap._pings.length === 1, "attack alert remains after the former 1.1-second lifetime");
+  context.calls.length = 0;
+  minimap._drawPings(100);
+  const initialAttackArcs = context.calls.filter((call) => call.op === "arc");
+  assertApprox(initialAttackArcs[0].args[2], 32, 0.001,
+    "attack alert begins at four times its former initial radius");
+  assertApprox(initialAttackArcs[1].args[2], 26, 0.001,
+    "attack alert inner rim begins six pixels inside the outer ring");
+  context.calls.length = 0;
+  minimap._drawPings(4499);
+  const finalAttackArcs = context.calls.filter((call) => call.op === "arc");
+  assertApprox(finalAttackArcs[0].args[2], 6, 0.01,
+    "attack alert contracts to six pixels immediately before disappearing");
   minimap._drawPings(2300);
-  assert(minimap._pings.length === 0, "attack alert expires after 2.2 seconds");
+  assert(minimap._pings.length === 1, "attack alert remains after the former 2.2-second lifetime");
+  minimap._drawPings(4500);
+  assert(minimap._pings.length === 0, "attack alert expires after 4.4 seconds");
 
   minimap.ping(40, 60, "alert");
   minimap._pings[0].startedAt = 100;
   context.calls.length = 0;
   minimap._drawPings(550);
-  assert(context.calls.filter((call) => call.op === "arc").length === 1,
+  const genericArcs = context.calls.filter((call) => call.op === "arc");
+  const genericStrokes = context.calls.filter((call) => call.op === "stroke");
+  assert(genericArcs.length === 1,
     "generic positional alerts retain their single-ring treatment");
+  assertApprox(genericArcs[0].args[2], 11.5, 0.001,
+    "generic positional alerts retain their original radius progression");
+  assert(genericStrokes[0].lineWidth === 2,
+    "generic positional alerts retain their original stroke width");
   minimap._drawPings(1000);
   assert(minimap._pings.length === 0, "generic alerts retain their 900-millisecond lifetime");
   minimap.destroy();

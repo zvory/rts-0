@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{Game, PlayerInit, PlayerStartingLoadout};
-use crate::protocol::{ChatChannel, Command, PlayerScore};
+use crate::protocol::{ChatChannel, Command, MatchConclusion, PlayerScore};
 
 pub(in crate::game) const REPLAY_ARTIFACT_SCHEMA_VERSION_V3: u32 = 3;
 pub const REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION: u32 = REPLAY_ARTIFACT_SCHEMA_VERSION_V3;
@@ -60,6 +60,8 @@ pub struct ReplayArtifactV1 {
     pub winner_id: Option<u32>,
     #[serde(default)]
     pub winner_team_id: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conclusion: Option<MatchConclusion>,
     pub final_scores: Vec<PlayerScore>,
 }
 
@@ -215,6 +217,7 @@ impl ReplayStartComposition {
             chat_log: Vec::new(),
             winner_id,
             winner_team_id: winner_id.and_then(|id| game.team_of_player(id)),
+            conclusion: None,
             final_scores,
         }
     }

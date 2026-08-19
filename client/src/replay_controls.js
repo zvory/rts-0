@@ -203,13 +203,7 @@ export class RoomTimeControls {
     }
     if (Number.isFinite(state?.speed) && state.speed > 0) this.lastRoomTimeSpeed = state.speed;
     this.syncRoomTimePendingPresentation();
-    const ended =
-      state?.ended === true ||
-      (Number.isFinite(state?.currentTick) &&
-        Number.isFinite(state?.durationTicks) &&
-        state.durationTicks > 0 &&
-        state.currentTick >= state.durationTicks);
-    this.setRoomTimeConcluded(ended);
+    this.setRoomTimeConcluded(state?.ended === true);
     if (Number.isFinite(state?.speed)) this.setRoomTimeSpeedActive(state.speed);
     this.updateRoomTimePauseButton();
     this.updateRoomTimeStatus();
@@ -333,13 +327,7 @@ export class RoomTimeControls {
   roomTimeStepAvailable() {
     const state = this.roomTimeState;
     if (state?.paused !== true) return false;
-    if (state.ended === true) return false;
-    return !(
-      Number.isFinite(state.currentTick) &&
-      Number.isFinite(state.durationTicks) &&
-      state.durationTicks > 0 &&
-      state.currentTick >= state.durationTicks
-    );
+    return state.ended !== true;
   }
 
   noteSnapshotTick(tick) {

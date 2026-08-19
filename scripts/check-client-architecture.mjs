@@ -19,6 +19,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "match_lab_tools.js": "app-shell",
   "match_combat_audio.js": "app-shell",
   "match_notice_presenter.js": "app-shell",
+  "match_room_time.js": "app-shell",
   "match_pointer_lock_diagnostics.js": "app-shell",
   "match_live_pause.js": "app-shell",
   "client_perf_report.js": "app-shell",
@@ -148,6 +149,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "lab_tool_detail.js": "ui",
   "lab_panel_window.js": "ui",
   "map_editor_brush_controls.js": "ui",
+  "map_editor_location_resources.js": "ui",
   "map_editor_panel.js": "ui",
   "map_editor_preview_button.js": "ui",
   "map_editor_panel_workflow.js": "ui",
@@ -250,7 +252,9 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // seam; native display-mode and raw-input ownership remain isolated in the Tauri shell.
   // WASM display progress keeps its runtime alive independently of the pose preference and
   // coordinates authoritative reconcile, pause freezing, and authoritative-only fallback.
-  "match.js": 50441,
+  // Perspective decal swaps add only a narrow empty-repair completion callback; hydration and
+  // surface ownership remain isolated in the renderer and decal sync modules.
+  "match.js": 50486,
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.

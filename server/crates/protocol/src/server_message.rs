@@ -25,6 +25,31 @@ pub struct LivePauseState {
     pub resume_countdown: Option<LiveResumeCountdown>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchConclusion {
+    pub defeated_player_ids: Vec<u32>,
+    pub reason: MatchConclusionReason,
+}
+
+impl MatchConclusion {
+    pub fn gave_up(player_id: u32) -> Self {
+        Self {
+            defeated_player_ids: vec![player_id],
+            reason: MatchConclusionReason::GaveUp,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum MatchConclusionReason {
+    GaveUp,
+    Eliminated,
+    LostAllBuildings,
+    LostPrimaryBase,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "t", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum ServerMessage {
@@ -121,6 +146,8 @@ pub enum ServerMessage {
     GameOver {
         winner_id: Option<u32>,
         winner_team_id: Option<TeamId>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        conclusion: Option<MatchConclusion>,
         /// "won" | "lost" | "draw"
         you: String,
         /// Frozen per-player score snapshot for the score screen.
@@ -175,5 +202,42 @@ mod tests {
         assert_eq!(wire["decals"][0]["decalClass"], "mortarBlast");
         assert_eq!(wire["decals"][0]["radiusTiles"], 1.5);
         assert_eq!(wire["tankTrails"][0]["poses"][1][0], 160);
+    }
+
+    #[test]
+    fn serializes_match_conclusion_for_score_explanation() {
+        let message = ServerMessage::GameOver {
+            winner_id: Some(1),
+            winner_team_id: Some(1),
+            conclusion: Some(MatchConclusion {
+                defeated_player_ids: vec![2],
+                reason: MatchConclusionReason::GaveUp,
+            }),
+            you: "won".to_string(),
+            scores: Vec::new(),
+        };
+        let wire = serde_json::to_value(message).unwrap();
+        assert_eq!(wire["t"], "gameOver");
+        assert_eq!(
+            wire["conclusion"]["defeatedPlayerIds"],
+            serde_json::json!([2])
+        );
+        assert_eq!(wire["conclusion"]["reason"], "gaveUp");
+    }
+
+    #[test]
+    fn serializes_every_automatic_match_conclusion_reason() {
+        assert_eq!(
+            serde_json::to_value(MatchConclusionReason::Eliminated).unwrap(),
+            "eliminated"
+        );
+        assert_eq!(
+            serde_json::to_value(MatchConclusionReason::LostAllBuildings).unwrap(),
+            "lostAllBuildings"
+        );
+        assert_eq!(
+            serde_json::to_value(MatchConclusionReason::LostPrimaryBase).unwrap(),
+            "lostPrimaryBase"
+        );
     }
 }

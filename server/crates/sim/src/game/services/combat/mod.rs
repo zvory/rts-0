@@ -138,7 +138,14 @@ pub(in crate::game) fn combat_system(
         events,
         tick,
     );
-    for id in entities.ids() {
+    // Immediate damage makes turn order observable in lethal same-tick exchanges. Reversing the
+    // complete order each tick flips precedence for every entity pair instead of permanently
+    // favoring older, lower-id entities.
+    let mut combat_order = entities.ids();
+    if tick % 2 == 1 {
+        combat_order.reverse();
+    }
+    for id in combat_order.iter().copied() {
         if entities
             .get(id)
             .is_some_and(|entity| entity.kind == EntityKind::MortarTeam)
@@ -552,5 +559,6 @@ pub(in crate::game) fn combat_system(
         events,
         firing_reveals,
         tick,
+        &combat_order,
     );
 }

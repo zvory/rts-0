@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { CaptureRenderClock, RenderClock } from "../../client/src/visual_clock.js";
+import { CaptureRenderClock, RenderClock, syncRenderClockToRoomTime } from "../../client/src/visual_clock.js";
 import { createMatchRenderClock, enterFixedCapture, exitFixedCapture } from "../../client/src/match_fixed_capture.js";
 import { fixedFrameTick } from "../../scripts/interact/fixed_capture.ts";
 
@@ -17,6 +17,30 @@ try {
   const resumedClock = new RenderClock(1_000);
   performanceNow = 75;
   assert.equal(resumedClock.now(), 1_025, "normal visual time resumes continuously after a faster-than-real-time capture");
+  resumedClock.setRate(0);
+  performanceNow = 575;
+  assert.equal(resumedClock.now(), 1_025, "zero-rate visual time remains frozen");
+  resumedClock.setRate(2);
+  performanceNow = 600;
+  assert.equal(resumedClock.now(), 1_075, "two-times visual time advances twice as fast without jumping on resume");
+  syncRenderClockToRoomTime(resumedClock, {
+    currentTick: 601,
+    durationTicks: 600,
+    speed: 1,
+    paused: false,
+    ended: false,
+  });
+  assert.equal(resumedClock.rate, 1, "a live Lab clock resumes past its recorded history horizon");
+  syncRenderClockToRoomTime(resumedClock, {
+    currentTick: 600,
+    durationTicks: 600,
+    speed: 1,
+    paused: false,
+    ended: true,
+  });
+  assert.equal(resumedClock.rate, 0, "an authoritative replay ending freezes visual time");
+  assert.throws(() => resumedClock.setRate(-1), /non-negative/, "visual time rejects a backwards rate");
+  assert.throws(() => resumedClock.setRate(NaN), /finite/, "visual time rejects a non-finite rate");
 } finally {
   globalThis.performance = savedPerformance;
 }
@@ -36,6 +60,7 @@ globalThis.requestAnimationFrame = () => ++resumed;
 try {
   const match = {
     ...createMatchRenderClock(), running: true, rafId: 7, tickFn() {}, lastFrame: 0,
+    roomTimeControls: { roomTimeState: { speed: 0, paused: true } },
     state: { setRenderClock(clockValue) { this.clock = clockValue; } },
     renderer: {
       enterFixedCapture(clockValue) { this.clock = clockValue; },
@@ -49,6 +74,7 @@ try {
   assert.deepEqual(exitFixedCapture(match), { resumed: true }, "exiting capture reports normal loop restoration");
   assert.equal(resumed, 1, "normal rAF ownership resumes exactly once");
   assert.notEqual(match.renderer.clock, match.captureClock, "renderer returns to an isolated normal clock");
+  assert.equal(match.renderClock.rate, 0, "leaving fixed capture restores the authoritative paused animation rate");
   const stopped = {
     ...createMatchRenderClock(), running: true, rafId: 9, tickFn() {}, lastFrame: 0,
     state: { setRenderClock() {} },

@@ -141,6 +141,7 @@ assert(
   const timers = [];
   const cleared = new Set();
   let resets = 0;
+  let emptyCompletions = 0;
   let labResultHandler = null;
   let labUnsubscribed = 0;
   const buffer = new GroundDecalBuffer();
@@ -166,7 +167,10 @@ assert(
         return () => { labUnsubscribed += 1; };
       },
     },
-    resetPresentation: () => { resets += 1; },
+    resetPresentation: (action) => {
+      if (action === "complete") emptyCompletions += 1;
+      else resets += 1;
+    },
     retryDelaysMs: [10, 20],
     setTimer(fn, ms) { const id = timers.length; timers.push({ fn, ms }); return id; },
     clearTimer(id) { cleared.add(id); },
@@ -228,6 +232,8 @@ assert(
     "the correlated replacement response can settle below a stale old-perspective snapshot");
   assert(buffer.authoritativeRevision === 0 && sync.targetRevision === 0,
     "an empty replacement perspective does not keep chasing the stale snapshot revision");
+  assert(emptyCompletions === 1,
+    "an empty replacement perspective tells the renderer to atomically publish its clean surface");
   const requestCountAfterEmptyReplacement = requests.length;
   sync.observeSnapshot(0);
   assert(requests.length === requestCountAfterEmptyReplacement,

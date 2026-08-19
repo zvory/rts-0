@@ -7,13 +7,12 @@ use super::super::replay_session::ReplaySession;
 use super::super::session_policy::RoomTimeSource;
 use super::super::tick_control::ScheduledTickAction;
 use super::super::{current_unix_ms, DrainNotice, RoomMode, ShutdownFinalizeResult};
-use super::helpers::{match_countdown_duration, server_build_sha, MATCH_COUNTDOWN_WORDS};
+use super::helpers::{match_countdown_duration, MATCH_COUNTDOWN_WORDS};
 use super::match_history::MatchHistoryRecordInput;
 use super::types::Phase;
 use super::RoomTask;
-use crate::protocol::{PlayerScore, ServerMessage};
+use crate::protocol::{MatchConclusion, PlayerScore, ServerMessage};
 use crate::structured_log::{self, MatchEndedLog};
-use rts_sim::game::replay::ReplayArtifactV1;
 use rts_sim::game::Game;
 
 impl RoomTask {
@@ -158,7 +157,9 @@ impl RoomTask {
         winner_id: Option<u32>,
         scores: Vec<PlayerScore>,
         game: Option<&Game>,
+        conclusion: Option<MatchConclusion>,
     ) {
+        let conclusion = winner_id.and(conclusion);
         let winner_team_id =
             winner_id.and_then(|id| Self::team_id_for_score_seat(game, &scores, id));
         let ended_at = chrono::Utc::now();
@@ -172,7 +173,9 @@ impl RoomTask {
             .unwrap_or(0);
         let replay_artifact = game
             .filter(|_| self.should_capture_post_match_replay())
-            .and_then(|game| self.finalize_replay_artifact(game, winner_id, scores.clone()));
+            .and_then(|game| {
+                self.finalize_replay_artifact(game, winner_id, scores.clone(), conclusion.clone())
+            });
         let winner_name =
             winner_id.and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
         let outcome = crate::db::MatchOutcome::from_winner_name(winner_name.as_deref());
@@ -242,6 +245,7 @@ impl RoomTask {
                 ServerMessage::GameOver {
                     winner_id,
                     winner_team_id,
+                    conclusion: conclusion.clone(),
                     you,
                     scores: scores.clone(),
                 },
@@ -300,7 +304,7 @@ impl RoomTask {
             && match_history_allowed;
         let replay_artifact = (will_record_history
             && self.should_attach_match_history_replay_artifact())
-        .then(|| self.finalize_replay_artifact(&game, None, scores.clone()))
+        .then(|| self.finalize_replay_artifact(&game, None, scores.clone(), None))
         .flatten();
         structured_log::log_match_ended(MatchEndedLog {
             room: &self.room,
@@ -376,38 +380,6 @@ impl RoomTask {
         self.replay_start = None;
         self.match_chat_log.clear();
         self.lab_driver = None;
-    }
-
-    pub(super) fn capture_replay_start_for(&mut self, game: &Game) {
-        match rts_sim::game::replay::ReplayStartComposition::capture(game, server_build_sha()) {
-            Ok(start) => self.replay_start = Some(start),
-            Err(err) => {
-                self.replay_start = None;
-                crate::log_warn!(
-                    room = %self.room,
-                    error = %err,
-                    "failed to capture launch-time replay start"
-                );
-            }
-        }
-    }
-
-    pub(super) fn finalize_replay_artifact(
-        &self,
-        game: &Game,
-        winner_id: Option<u32>,
-        scores: Vec<PlayerScore>,
-    ) -> Option<ReplayArtifactV1> {
-        let Some(start) = &self.replay_start else {
-            crate::log_warn!(
-                room = %self.room,
-                "cannot finalize replay artifact without launch-time start checkpoint"
-            );
-            return None;
-        };
-        let mut artifact = start.finalize(game, winner_id, scores);
-        artifact.chat_log = self.match_chat_log.clone();
-        Some(artifact)
     }
 
     pub(super) fn record_live_match_started(

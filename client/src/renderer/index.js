@@ -673,7 +673,10 @@ export class Renderer {
       this._drawSafely(
         "groundDecals",
         () => {
-          const count = this._drawGroundDecals(Array.isArray(reconciledGroundDecals) ? reconciledGroundDecals : state);
+          const count = this._drawGroundDecals(
+            Array.isArray(reconciledGroundDecals) ? reconciledGroundDecals : state,
+            { fog },
+          );
           this._groundDecals?.stampLiveTankTreads?.(entities, fog);
           stagedGroundDecals = Array.isArray(reconciledGroundDecals)
             && reconciledGroundDecals.length > 0

@@ -88,6 +88,9 @@ async function handleMessage(candidate) {
       presentation.resetDecals(message);
       adapter?.resetGroundDecals?.();
       break;
+    case RENDER_WORKER_MESSAGE.COMPLETE_GROUND_DECAL_TRANSITION:
+      adapter?.completeGroundDecalTransition?.();
+      break;
     case RENDER_WORKER_MESSAGE.RESET_DIAGNOSTICS:
       renderer?.resetGpuShadowTiming?.();
       break;
