@@ -237,10 +237,14 @@ where
     }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
+    // Resource Depots own the economy loop: the starting Engineer is supplied by the loadout and
+    // extractors are permanent background production jobs. These counts only keep the historical
+    // fast-Tank timing synchronized with that automatic startup; they are not purchase requests.
     let delay_opening_barracks = profile.fast_tank_timing.is_some_and(|timing| {
         facts.complete_building_count(EntityKind::Barracks) == 0
-            && (facts.worker_count < timing.workers_before_barracks
-                || facts.building_count(EntityKind::PumpJack) < timing.pump_jacks_before_barracks)
+            && (facts.worker_count < timing.builder_engineers_before_barracks
+                || facts.building_count(EntityKind::PumpJack)
+                    < timing.automatic_extractors_before_barracks)
     });
     let preserve_fast_tank_economy = profile
         .fast_tank_timing
@@ -350,6 +354,11 @@ where
                 }
             }
             intents.push(AiIntent::Build { kind: *kind });
+        } else if profile.fast_tank_timing.is_some() {
+            // Jeff's required path is intentionally ordered. In particular, do not skip an
+            // unaffordable Vehicle Works to spend its bank on the later Engineering Complex;
+            // that would silently restore the old build order.
+            break;
         }
     }
 
@@ -578,8 +587,13 @@ where
         production_policy.unit_priorities,
         facts.completed_upgrades(),
     );
-    let effective_unit_priorities =
-        effective_unit_priorities_for_fast_tank_timing(profile, &facts, &effective_unit_priorities);
+    memory.sync_fast_tank_opening_scout(profile, observation);
+    let effective_unit_priorities = effective_unit_priorities_for_fast_tank_timing(
+        profile,
+        memory,
+        &facts,
+        &effective_unit_priorities,
+    );
     let effective_unit_priorities = effective_unit_priorities_for_turtle(
         profile,
         memory,
@@ -685,6 +699,7 @@ where
         );
         for trained in trained_units {
             memory.note_turtle_train(profile, trained.unit);
+            memory.note_fast_tank_train(profile, trained.unit);
             intents.push(AiIntent::Train { kind: trained.unit });
         }
     }
@@ -1179,22 +1194,27 @@ fn effective_unit_priorities_for_upgrades(
 
 fn effective_unit_priorities_for_fast_tank_timing(
     profile: &AiProfile,
+    memory: &AiDecisionMemory,
     facts: &AiFacts,
     unit_priorities: &[EntityKind],
 ) -> Vec<EntityKind> {
     let Some(timing) = profile.fast_tank_timing else {
         return unit_priorities.to_vec();
     };
+    let tank_count = facts.unit_count(EntityKind::Tank);
+    let scout_car_allowed = if memory.fast_tank_opening_scout_committed {
+        tank_count >= timing.tanks_before_scout_car_replacement
+    } else {
+        tank_count >= timing.tanks_before_scout_car
+    };
     let mut priorities: Vec<EntityKind> = unit_priorities
         .iter()
         .copied()
         .filter(|unit| {
-            *unit != EntityKind::ScoutCar
-                || facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
+            *unit != EntityKind::ScoutCar || scout_car_allowed
         })
         .collect();
-    if facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
-        && facts.unit_count(EntityKind::ScoutCar) < timing.scout_car_target
+    if scout_car_allowed && facts.unit_count(EntityKind::ScoutCar) < timing.scout_car_target
     {
         priorities.sort_by_key(|unit| (*unit != EntityKind::ScoutCar) as u8);
     }
