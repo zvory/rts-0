@@ -23,6 +23,23 @@ assert.deepEqual(
   "both four-way modes divide the editor into four authoring regions",
 );
 
+for (const [symmetry, guide] of [
+  [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN_FLIP, { x0: 0, y0: 0, x1: 256, y1: 256 }],
+  [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI_FLIP, { x0: 0, y0: 256, x1: 256, y1: 0 }],
+]) {
+  assert.deepEqual(
+    new Set(symmetricMapTiles(8, [{ x: 1, y: 2 }], symmetry).map(({ x, y }) => `${x},${y}`)),
+    new Set(["1,2", "6,5"]),
+    "diagonal with flipped copy produces one oppositely oriented partner",
+  );
+
+  assert.deepEqual(
+    mapEditorSymmetryGuideLines(8, symmetry),
+    [guide],
+    "diagonal with flipped copy displays its selected diagonal authoring boundary",
+  );
+}
+
 assert.equal(
   mapEditorSymmetrySupported({ width: 12, height: 8 }, MAP_EDITOR_SYMMETRY.QUADRANT_MIRROR),
   true,

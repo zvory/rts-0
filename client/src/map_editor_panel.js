@@ -8,6 +8,7 @@ import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import { createMapEditorPreviewButton } from "./map_editor_preview_button.js";
+import { armMapEditorLocation, mapEditorLocationResourceState, updateMapEditorBasePatchCount, updateMapEditorPendingBasePatchCount } from "./map_editor_location_resources.js";
 import { createMapEditorTerrainPalettes } from "./map_editor_terrain_controls.js";
 import { createMapEditorSunSettings } from "./map_editor_sun_controls.js";
 import {
@@ -30,6 +31,8 @@ import {
 } from "./map_editor_doodads.js";
 import {
   MAP_EDITOR_DEFAULT_SIZE,
+  MAP_EDITOR_DEFAULT_OIL_PATCHES,
+  MAP_EDITOR_DEFAULT_STEEL_PATCHES,
   MAP_EDITOR_MAX_BASE_SITES,
   MAP_EDITOR_MAX_OIL_PATCHES,
   MAP_EDITOR_MAX_STEEL_PATCHES,
@@ -39,7 +42,10 @@ import {
   MAP_EDITOR_SYMMETRY,
   mapEditorSymmetrySupported,
   removeDraftLocation,
+  symmetryTransforms,
+  transformMapTile,
 } from "./map_editor_session.js";
+import { createMapEditorSymmetryPicker } from "./map_editor_symmetry_picker.js";
 
 const MAP_CATALOG_URL = "/maps/catalog";
 const MAP_EDITOR_MAX_JSON_BYTES = 8 * 1024 * 1024;
@@ -83,6 +89,8 @@ export class MapEditorPanel {
     this.selectedMapFile = "";
     this.selectedStartIndex = 0;
     this.selectedBaseIndex = 0;
+    this.pendingBaseSteelPatches = MAP_EDITOR_DEFAULT_STEEL_PATCHES;
+    this.pendingBaseOilPatches = MAP_EDITOR_DEFAULT_OIL_PATCHES;
     this.selectedTerrain = TERRAIN.ROCK;
     this.selectedTerrainLayer = "feature";
     this.selectedElevation = 1;
@@ -413,37 +421,23 @@ export class MapEditorPanel {
     const detail = document.createElement("span");
     detail.textContent = `${this.activeOperation() || "None"} · ${this.currentContentLabel()}`;
     summary.append(heading, detail);
-    section.append(summary, field("Symmetry", this.renderSymmetrySelect()));
+    section.append(summary, field("Symmetry", this.renderSymmetryControls()));
     for (const warning of this.currentSymmetryWarnings()) {
       section.appendChild(readout(`Symmetry warning: ${warning}`, true));
     }
     return section;
   }
 
-  renderSymmetrySelect() {
-    const symmetry = document.createElement("select");
-    symmetry.setAttribute("aria-label", "Symmetry");
-    symmetry.title = "Symmetry applies to terrain, zones, objects, forests, roads, and locations.";
-    for (const [value, label] of [
-      [MAP_EDITOR_SYMMETRY.NONE, "None"],
-      [MAP_EDITOR_SYMMETRY.HORIZONTAL, "Horizontal"],
-      [MAP_EDITOR_SYMMETRY.VERTICAL, "Vertical"],
-      [MAP_EDITOR_SYMMETRY.HALF_TURN, "Half-turn (180°)"],
-      [MAP_EDITOR_SYMMETRY.THREE_WAY, "3-way rotation (120°, square-grid approximation)"],
-      [MAP_EDITOR_SYMMETRY.RADIAL, "Radial (4-way)"],
-      [MAP_EDITOR_SYMMETRY.QUADRANT_MIRROR, "Quadrant mirror (4-way)"],
-      [MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN, "Diagonal ↘ (top-left ↔ bottom-right)"],
-      [MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI, "Diagonal ↙ (top-right ↔ bottom-left)"],
-    ]) {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = label;
-      option.disabled = !mapEditorSymmetrySupported(this.session.draft, value);
-      symmetry.appendChild(option);
-    }
-    symmetry.value = this.symmetry;
-    symmetry.addEventListener("change", () => this.setSymmetry(symmetry.value));
-    return symmetry;
+  renderSymmetryControls() {
+    return createMapEditorSymmetryPicker({
+      symmetry: this.symmetry,
+      symmetryValues: MAP_EDITOR_SYMMETRY,
+      dimensions: this.session.draft,
+      isSupported: mapEditorSymmetrySupported,
+      onSelect: (value) => this.setSymmetry(value),
+      transforms: symmetryTransforms,
+      transformPoint: transformMapTile,
+    });
   }
 
   currentContentLabel() {
@@ -774,6 +768,7 @@ export class MapEditorPanel {
       ? this.session.draft.baseSites.findIndex((site) => site.x === start.x && site.y === start.y)
       : -1;
     const startBase = this.session.draft.baseSites[startBaseIndex];
+    const { adding: addingLocation, resourceBase } = mapEditorLocationResourceState(this, startBase, base);
     this.viewport.setSelectedBase(base?.index ?? null);
     const locationTypes = document.createElement("div");
     locationTypes.className = "map-editor-palette";
@@ -810,23 +805,27 @@ export class MapEditorPanel {
       section.append(
         startPicker,
         readout(start ? `Start ${this.selectedStartIndex + 1}: ${start.x}, ${start.y}` : "No start locations yet. Choose Add, then click the map."),
-        patchCountField("Start-base steel patches", startBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
-          this.updateBasePatchCount(startBaseIndex, "steelPatches", value);
-        }, !startBase),
-        patchCountField("Start-base oil patches", startBase?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
-          this.updateBasePatchCount(startBaseIndex, "oilPatches", value);
-        }, !startBase),
+        patchCountField("Start-base steel patches", resourceBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
+          if (addingLocation) this.updatePendingBasePatchCount("steelPatches", value);
+          else this.updateBasePatchCount(startBaseIndex, "steelPatches", value);
+        }, !addingLocation && !startBase),
+        patchCountField("Start-base oil patches", resourceBase?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
+          if (addingLocation) this.updatePendingBasePatchCount("oilPatches", value);
+          else this.updateBasePatchCount(startBaseIndex, "oilPatches", value);
+        }, !addingLocation && !startBase),
       );
     } else {
       section.append(
         basePicker,
         readout(base ? `Base ${this.selectedBaseIndex + 1}: ${base.x}, ${base.y}` : "No neutral base sites yet."),
-        patchCountField("Base steel patches", base?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
-          this.updateBasePatchCount(base?.index, "steelPatches", value);
-        }, !base),
-        patchCountField("Base oil patches", base?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
-          this.updateBasePatchCount(base?.index, "oilPatches", value);
-        }, !base),
+        patchCountField("Base steel patches", resourceBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
+          if (addingLocation) this.updatePendingBasePatchCount("steelPatches", value);
+          else this.updateBasePatchCount(base?.index, "steelPatches", value);
+        }, !addingLocation && !base),
+        patchCountField("Base oil patches", resourceBase?.oilPatches, MAP_EDITOR_MAX_OIL_PATCHES, (value) => {
+          if (addingLocation) this.updatePendingBasePatchCount("oilPatches", value);
+          else this.updateBasePatchCount(base?.index, "oilPatches", value);
+        }, !addingLocation && !base),
       );
     }
     return section;
@@ -913,8 +912,7 @@ export class MapEditorPanel {
   }
 
   armLocation(kind, locationIndex, add = false) {
-    this.viewport.armTool({ kind, locationIndex, add, symmetry: this.symmetry });
-    this.setStatus(`Click the map to ${add ? "add" : "move"} this ${kind === "start" ? "start location" : "base site"}.`);
+    armMapEditorLocation(this, kind, locationIndex, add);
   }
 
   removeLocation(kind, locationIndex) {
@@ -926,15 +924,9 @@ export class MapEditorPanel {
     this.setStatus(changed ? "Map location removed." : result?.error || "Map location was already absent.", !changed);
   }
 
-  updateBasePatchCount(baseIndex, fieldName, value) {
-    const max = fieldName === "oilPatches" ? MAP_EDITOR_MAX_OIL_PATCHES : MAP_EDITOR_MAX_STEEL_PATCHES;
-    const count = Math.max(0, Math.min(max, Math.trunc(Number(value)) || 0));
-    const changed = this.session.mutate("Updated base resources", (draft) => {
-      const site = draft.baseSites[Math.trunc(Number(baseIndex))];
-      if (site) site[fieldName] = count;
-    });
-    this.setStatus(changed ? "Base resource counts updated." : "Base resource count unchanged.");
-  }
+  updateBasePatchCount(baseIndex, fieldName, value) { updateMapEditorBasePatchCount(this, baseIndex, fieldName, value); }
+
+  updatePendingBasePatchCount(fieldName, value) { updateMapEditorPendingBasePatchCount(this, fieldName, value); }
 
   armTerrain(terrain = this.selectedTerrain, { layer = this.selectedTerrainLayer, eraseFeature = false } = {}) {
     const tool = {

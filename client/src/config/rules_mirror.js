@@ -389,7 +389,7 @@ export const UPGRADES = Object.freeze({
     upgrade: UPGRADE.METHAMPHETAMINES,
     label: "Methamphetamines",
     icon: "METH",
-    cost: Object.freeze({ steel: 100, oil: 25 }),
+    cost: Object.freeze({ steel: 100, oil: 100 }),
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
     description: "Boost Riflemen; speed up Machine Gunner movement and setup",
     researchedAt: KIND.TRAINING_CENTRE,

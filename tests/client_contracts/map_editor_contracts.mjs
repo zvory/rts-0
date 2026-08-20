@@ -538,9 +538,7 @@ assert(
   }), true);
   assert.equal(result.ok, true);
   assert.equal(session.draft.startLocations.length, 0, "an editor draft may temporarily have no start locations");
-  assert.deepEqual(session.draft.baseSites, [{
-    x: 8, y: 8, steelPatches: MAP_EDITOR_DEFAULT_STEEL_PATCHES, oilPatches: MAP_EDITOR_DEFAULT_OIL_PATCHES,
-  }], "removing a start keeps its resource site as a neutral base");
+  assert.deepEqual(session.draft.baseSites, [], "removing a start also removes its backing base site");
   assert.deepEqual(session.materialized().starts, [], "zero-start editor drafts remain materializable");
 
   assert.equal(session.mutate("Rebuilt radial starts", (draft) => {
@@ -553,7 +551,7 @@ assert(
     { x: 8, y: 8 }, { x: 23, y: 8 }, { x: 23, y: 23 }, { x: 8, y: 23 },
   ]);
   assert.deepEqual(baseLocations(session.draft.baseSites), session.draft.startLocations,
-    "symmetric start placement reuses an existing base and creates only the missing resource sites");
+    "symmetric start placement creates the matching resource sites");
 }
 
 {

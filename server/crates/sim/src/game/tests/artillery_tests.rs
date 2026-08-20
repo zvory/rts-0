@@ -117,6 +117,86 @@ fn artillery_attack_move_uses_team_vision_and_preserves_the_route() {
 }
 
 #[test]
+fn artillery_attack_move_ignores_neutral_tank_traps_and_acquires_enemies() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let gun_pos = game.state.map.tile_center(10, 10);
+    let target_pos = game.state.map.tile_center(25, 10);
+    let destination = game.state.map.tile_center(50, 10);
+    let artillery = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, gun_pos.0, gun_pos.1)
+        .expect("artillery should spawn");
+    let trap = game
+        .state
+        .entities
+        .spawn_building(2, EntityKind::TankTrap, target_pos.0, target_pos.1, true)
+        .expect("Tank Trap should spawn");
+    game.state
+        .entities
+        .spawn_unit(
+            1,
+            EntityKind::Worker,
+            target_pos.0,
+            target_pos.1 + config::TILE_SIZE as f32,
+        )
+        .expect("spotter should spawn");
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    let ids: Vec<u32> = game.state.players.iter().map(|player| player.id).collect();
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
+
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![artillery],
+            x: destination.0,
+            y: destination.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    assert_eq!(
+        game.state
+            .entities
+            .get(artillery)
+            .and_then(Entity::target_id),
+        None,
+        "ordinary artillery Attack Move must ignore a visible neutral Tank Trap"
+    );
+    assert_eq!(
+        game.state.entities.get(trap).map(|entity| entity.owner),
+        Some(0),
+        "the completed Tank Trap should be neutral"
+    );
+
+    let enemy = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("enemy should spawn");
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.rebuild_final_spatial();
+    game.state
+        .fog
+        .recompute(&ids, &game.state.entities, &game.state.map);
+    game.tick();
+
+    assert_eq!(
+        game.state
+            .entities
+            .get(artillery)
+            .and_then(Entity::target_id),
+        Some(enemy),
+        "artillery should still acquire a visible enemy under the same Attack Move order"
+    );
+}
+
+#[test]
 fn artillery_attack_move_prioritizes_soft_targets_then_infantry_then_tanks() {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);

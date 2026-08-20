@@ -1369,8 +1369,12 @@ and resets it when the static blocker fingerprint or worker start tile changes, 
 does not depend on rebuildable cache residency. This tick-level scheduling does not lower the
 per-route search allowance. Ordinary
 non-vehicle move formations bypass A* only when the existing body standability check proves the
-exact world-space segment clear; interaction routes and blocked direct segments retain the full
-tile-guided search. Direct results are not stored in the tile-keyed cache. `PathingService` reuses
+exact world-space segment clear and its sampled centerline crosses no authored slow-movement tile;
+interaction routes, blocked direct segments, and slow-terrain crossings retain the full tile-guided
+search. Infantry-like A* routes add a cardinal/diagonal slow-tile surcharge derived from the same
+authoritative 0.75x movement ratio used during ticks, so they may choose a shorter-time open-ground
+detour while still crossing slow terrain when going around costs more. Direct results are not stored
+in the tile-keyed cache. `PathingService` reuses
 cleared A* working containers between sequential room requests; that scratch state remains derived
 and is never serialized. Tree-trunk waypoint refinement is best-effort: if its bounded local detour
 graph cannot refine a successful tile route, the movement coordinator retains the original route

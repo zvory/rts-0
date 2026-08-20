@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +15,7 @@ const DEFAULT_CODEX_COMMAND = "codex";
 const DEFAULT_GH_BIN = "gh";
 const VERDICTS = new Set(["passed_unchanged", "improved", "improved_with_concerns"]);
 const REVIEW_MODES = new Set(["full", "incremental", "already-reviewed"]);
+const PROTECTED_MAP_ASSET_PATHSPEC = "server/assets/maps";
 export const QUALITY_PASS_ENV = "RTS_ADVERSARIAL_QUALITY_PASS";
 export const MAX_PRIOR_FOCUSED_VERIFICATION_CHARS = 2000;
 export const PRIOR_FOCUSED_VERIFICATION_NOT_SUPPLIED = "not supplied";
@@ -318,6 +320,11 @@ oversized artifacts are deliberately represented only by bounded metadata below.
 decode, cat, git-show, or git-diff their raw contents. Review their generators, source inputs,
 tests, and compact metadata instead.
 
+Bundled map assets under ${PROTECTED_MAP_ASSET_PATHSPEC}/ are immutable review inputs. You may
+inspect and validate them, but never create, modify, delete, rename, format, regenerate, stage, or
+commit files there. If a map has a defect, report it in remaining_concerns and leave every bundled
+map file byte-for-byte unchanged. The outer workflow rejects any map mutation made during this pass.
+
 Review mode: ${reviewMode === "incremental" ? "Incremental" : "Full"}.
 Review base: ${baseRef}.
 ${incrementalInstruction}
@@ -603,6 +610,42 @@ class Runner {
     }
   }
 
+  protectedMapAssetSnapshot(repoRoot) {
+    const root = path.join(repoRoot, PROTECTED_MAP_ASSET_PATHSPEC);
+    const snapshot = new Map();
+    const visit = (directory, relativeDirectory = "") => {
+      if (!fs.existsSync(directory)) return;
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const relativePath = path.posix.join(relativeDirectory, entry.name);
+        const absolutePath = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+          snapshot.set(relativePath, "directory");
+          visit(absolutePath, relativePath);
+        } else if (entry.isSymbolicLink()) {
+          snapshot.set(relativePath, `symlink:${fs.readlinkSync(absolutePath)}`);
+        } else if (entry.isFile()) {
+          const digest = crypto.createHash("sha256").update(fs.readFileSync(absolutePath)).digest("hex");
+          snapshot.set(relativePath, `file:${digest}`);
+        } else {
+          snapshot.set(relativePath, "other");
+        }
+      }
+    };
+    visit(root);
+    return snapshot;
+  }
+
+  ensureProtectedMapAssetsUnchanged(repoRoot, beforeSnapshot) {
+    const afterSnapshot = this.protectedMapAssetSnapshot(repoRoot);
+    const changed = [...new Set([...beforeSnapshot.keys(), ...afterSnapshot.keys()])]
+      .filter((assetPath) => beforeSnapshot.get(assetPath) !== afterSnapshot.get(assetPath))
+      .map((assetPath) => path.posix.join(PROTECTED_MAP_ASSET_PATHSPEC, assetPath));
+    if (changed.length === 0) return;
+    throw new Error(
+      `quality pass must not edit bundled map assets; restore these paths to the pre-review head:\n${changed.join("\n")}`,
+    );
+  }
+
   commitDirtyFinalState(repoRoot, report) {
     const status = this.git(["status", "--porcelain=v1"], repoRoot);
     if (!status) return false;
@@ -612,7 +655,12 @@ class Runner {
   }
 
   formatTouchedRust(repoRoot, baseRef) {
-    this.runInherit(path.join(repoRoot, "scripts", "format-touched-rust.sh"), ["--base", baseRef], { cwd: repoRoot });
+    const formatter = path.join(repoRoot, "scripts", "format-touched-rust.sh");
+    if (process.platform === "win32") {
+      this.runInherit("bash", [formatter, "--base", baseRef], { cwd: repoRoot });
+      return;
+    }
+    this.runInherit(formatter, ["--base", baseRef], { cwd: repoRoot });
   }
 
   runPreflight(repoRoot, baseRef, { dryRun = false } = {}) {
@@ -738,6 +786,7 @@ class Runner {
       this.gitInherit(buildFetchArgs({ remote: options.remote, baseRef: options.baseRef }), repoRoot);
     }
     const beforeHead = this.git(["rev-parse", "HEAD"], repoRoot);
+    const protectedMapAssets = this.protectedMapAssetSnapshot(repoRoot);
     const selection = this.chooseReviewMode(options, repoRoot, beforeHead);
     if (!REVIEW_MODES.has(selection.mode)) {
       throw new Error(`quality pass selected unsupported review mode: ${selection.mode}`);
@@ -761,16 +810,24 @@ class Runner {
     const { prompt, codexArgs } = buildReviewInvocation(selection);
 
     this.log(`quality-pass: running Codex final quality pass for ${headBranch}`);
-    this.runInherit(options.codexCommand, codexArgs, {
-      cwd: repoRoot,
-      env: { [QUALITY_PASS_ENV]: "1" },
-      input: prompt,
-    });
+    try {
+      this.runInherit(options.codexCommand, codexArgs, {
+        cwd: repoRoot,
+        env: { [QUALITY_PASS_ENV]: "1" },
+        input: prompt,
+      });
+    } finally {
+      this.ensureProtectedMapAssetsUnchanged(repoRoot, protectedMapAssets);
+    }
     if (!fs.existsSync(reportFile)) {
       throw new Error(`quality pass did not write report file: ${reportFile}`);
     }
     const report = normalizeReport(fs.readFileSync(reportFile, "utf8"));
-    this.formatTouchedRust(repoRoot, options.baseRef);
+    try {
+      this.formatTouchedRust(repoRoot, options.baseRef);
+    } finally {
+      this.ensureProtectedMapAssetsUnchanged(repoRoot, protectedMapAssets);
+    }
     const autoCommitted = this.commitDirtyFinalState(repoRoot, report);
     const reviewedHead = this.git(["rev-parse", "HEAD"], repoRoot);
     if (autoCommitted) {
@@ -782,7 +839,11 @@ class Runner {
     }
     // Execute the helper from disk so a review-time fix to its implementation is itself what
     // verifies the final committed head before any external mutation.
-    this.runPreflight(repoRoot, options.baseRef);
+    try {
+      this.runPreflight(repoRoot, options.baseRef);
+    } finally {
+      this.ensureProtectedMapAssetsUnchanged(repoRoot, protectedMapAssets);
+    }
     const finalHead = this.git(["rev-parse", "HEAD"], repoRoot);
     if (options.markdownReportFile) {
       fs.writeFileSync(options.markdownReportFile, markdownReport(report));
@@ -805,7 +866,7 @@ class Runner {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   try {
     const options = parseArgs(process.argv.slice(2));
     new Runner().run(options);

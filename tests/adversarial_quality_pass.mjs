@@ -93,6 +93,9 @@ assert.match(prompt, /Do not print,\ndecode, cat, git-show, or git-diff their ra
 assert.match(prompt, /fixed-roster-hellhole\.rtsstream \| class=binary/);
 assert.match(prompt, /AI behavior is outside your authority: do not create, alter, or approve it/);
 assert.match(prompt, /Refactor AI code only\nwhen behavior is preserved exactly/);
+assert.match(prompt, /Bundled map assets under server\/assets\/maps\/ are immutable review inputs/);
+assert.match(prompt, /never create, modify, delete, rename, format, regenerate, stage, or\ncommit files there/);
+assert.match(prompt, /leave every bundled\nmap file byte-for-byte unchanged/);
 assert.match(prompt, /Ignore missing documentation updates/);
 assert.match(prompt, /complete, coherent,\nworking state/);
 assert.doesNotMatch(prompt, /fail the gate/i);
@@ -399,6 +402,12 @@ try {
   const rewrittenPreflightCodexCalledMarker = path.join(tempRoot, "rewritten-preflight-codex-called.txt");
   const rewrittenPreflightStatusCapture = path.join(tempRoot, "rewritten-preflight-gh-api.txt");
   const rewrittenPreflightBody = path.join(tempRoot, "rewritten-preflight-pr-body.md");
+  const protectedMapStatusCapture = path.join(tempRoot, "protected-map-gh-api.txt");
+  const protectedMapBody = path.join(tempRoot, "protected-map-pr-body.md");
+  const protectedMapCodexCalledMarker = path.join(tempRoot, "protected-map-codex-called.txt");
+  const lateProtectedMapStatusCapture = path.join(tempRoot, "late-protected-map-gh-api.txt");
+  const lateProtectedMapBody = path.join(tempRoot, "late-protected-map-pr-body.md");
+  const lateProtectedMapCodexCalledMarker = path.join(tempRoot, "late-protected-map-codex-called.txt");
   fs.mkdirSync(binPath, { recursive: true });
   fs.writeFileSync(extraBodyFile, "## Fixture caller notes\n\nKeep this once.\n");
 
@@ -446,6 +455,18 @@ if [ "\${CODEX_REWRITE_PREFLIGHT_TO_REJECT:-}" = "1" ]; then
 console.error("fixture rewritten preflight rejection");
 process.exit(1);
 PREFLIGHT
+fi
+if [ "\${CODEX_REWRITE_PREFLIGHT_TO_MUTATE_MAP:-}" = "1" ]; then
+  cat > scripts/agent-pr-preflight.mjs <<'PREFLIGHT'
+#!/usr/bin/env node
+import fs from "node:fs";
+fs.mkdirSync("server/assets/maps", { recursive: true });
+fs.writeFileSync("server/assets/maps/late-quality-pass-mutation.json", '{"fixture":true}\\n');
+PREFLIGHT
+fi
+if [ "\${CODEX_MUTATE_PROTECTED_MAP:-}" = "1" ]; then
+  mkdir -p server/assets/maps
+  printf '{"fixture":true}\n' > server/assets/maps/quality-pass-mutation.json
 fi
 cat >"$report_file" <<'JSON'
 {
@@ -717,6 +738,79 @@ done
       dryStatus > dryPush &&
       dryPrLifecycle > dryStatus,
   );
+
+  run("git", ["checkout", "main"], { cwd: workPath });
+  run("git", ["checkout", "-b", "zvorygin/protected-map-reject"], { cwd: workPath });
+  fs.writeFileSync(path.join(workPath, "protected-map-candidate.js"), "export const candidate = true;\n");
+  fs.writeFileSync(path.join(workPath, ".gitignore"), "server/assets/maps/*.json\n");
+  run("git", ["add", "protected-map-candidate.js", ".gitignore"], { cwd: workPath });
+  run("git", ["commit", "-m", "Branch for protected map rejection"], { cwd: workPath });
+  const protectedMapFailure = spawnSync(
+    "scripts/agent-pr.sh",
+    ["--owner", "tester", "--verification", "protected map fixture"],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        AGENT_GH_API_CAPTURE: protectedMapStatusCapture,
+        AGENT_PR_BODY_CAPTURE: protectedMapBody,
+        CODEX_CALLED_MARKER: protectedMapCodexCalledMarker,
+        CODEX_MUTATE_PROTECTED_MAP: "1",
+        GH_BIN: path.join(binPath, "gh"),
+        PATH: `${binPath}:${process.env.PATH}`,
+      }),
+    },
+  );
+  assert.notEqual(protectedMapFailure.status, 0, "quality pass must reject ignored bundled map mutations");
+  assert.match(
+    `${protectedMapFailure.stdout}\n${protectedMapFailure.stderr}`,
+    /quality pass must not edit bundled map assets[\s\S]*server\/assets\/maps\/quality-pass-mutation\.json/,
+  );
+  assert.match(fs.readFileSync(protectedMapCodexCalledMarker, "utf8"), /codex called/);
+  assert.equal(fs.existsSync(protectedMapStatusCapture), false, "protected map mutation must not post status");
+  assert.equal(fs.existsSync(protectedMapBody), false, "protected map mutation must not create a PR");
+  assert.equal(
+    run("git", ["log", "-1", "--format=%s"], { cwd: workPath }).stdout.trim(),
+    "Branch for protected map rejection",
+    "protected map mutation must not be committed",
+  );
+  fs.rmSync(path.join(workPath, "server", "assets", "maps", "quality-pass-mutation.json"));
+
+  run("git", ["checkout", "main"], { cwd: workPath });
+  run("git", ["checkout", "-b", "zvorygin/late-protected-map-reject"], { cwd: workPath });
+  fs.writeFileSync(path.join(workPath, "late-protected-map-candidate.js"), "export const candidate = true;\n");
+  run("git", ["add", "late-protected-map-candidate.js"], { cwd: workPath });
+  run("git", ["commit", "-m", "Branch for late protected map rejection"], { cwd: workPath });
+  const lateProtectedMapFailure = spawnSync(
+    "scripts/agent-pr.sh",
+    ["--owner", "tester", "--verification", "late protected map fixture"],
+    {
+      cwd: workPath,
+      encoding: "utf8",
+      env: testEnv({
+        AGENT_GH_API_CAPTURE: lateProtectedMapStatusCapture,
+        AGENT_PR_BODY_CAPTURE: lateProtectedMapBody,
+        CODEX_CALLED_MARKER: lateProtectedMapCodexCalledMarker,
+        CODEX_REWRITE_PREFLIGHT_TO_MUTATE_MAP: "1",
+        GH_BIN: path.join(binPath, "gh"),
+        PATH: `${binPath}:${process.env.PATH}`,
+      }),
+    },
+  );
+  assert.notEqual(lateProtectedMapFailure.status, 0, "late preflight map mutation must fail");
+  assert.match(
+    `${lateProtectedMapFailure.stdout}\n${lateProtectedMapFailure.stderr}`,
+    /quality pass must not edit bundled map assets[\s\S]*server\/assets\/maps\/late-quality-pass-mutation\.json/,
+  );
+  assert.match(fs.readFileSync(lateProtectedMapCodexCalledMarker, "utf8"), /codex called/);
+  assert.equal(fs.existsSync(lateProtectedMapStatusCapture), false, "late map mutation must not post status");
+  assert.equal(fs.existsSync(lateProtectedMapBody), false, "late map mutation must not create a PR");
+  assert.equal(
+    run("git", ["ls-remote", "--heads", "origin", "zvorygin/late-protected-map-reject"], { cwd: workPath }).stdout,
+    "",
+    "late map mutation must not push the branch",
+  );
+  fs.rmSync(path.join(workPath, "server", "assets", "maps", "late-quality-pass-mutation.json"));
 
   run("git", ["checkout", "main"], { cwd: workPath });
   run("git", ["checkout", "-b", "zvorygin/docs-only-quality-skip"], { cwd: workPath });

@@ -181,9 +181,9 @@ pub(crate) fn has_town_hall(entities: &EntityStore, player: u32) -> bool {
 
 // --- Targeting / proximity --------------------------------------------------
 
-/// Whether `candidate` is a legal hostile target for an attacker owned by `attacker_owner`.
-/// Filters out self, friendlies, passive neutrals, dead, and non-targetable kinds. Completed
-/// neutral obstacles are hostile to every player's units.
+/// Whether `candidate` is targetable under hostile-or-neutral-obstacle rules.
+/// This low-level predicate includes completed neutral obstacles for explicit combat objectives;
+/// ordinary acquisition must use `is_automatic_attack_targetable` instead.
 pub(crate) fn is_enemy_targetable(
     candidate: &Entity,
     teams: &TeamRelations,
@@ -198,9 +198,23 @@ pub(crate) fn is_enemy_targetable(
         && candidate.hp > 0
 }
 
+/// Whether `candidate` may be selected by ordinary automatic combat acquisition.
+/// Neutral obstacles require an explicit Attack or ClearObstacleArea objective and must never be
+/// inferred as enemies merely because they are targetable by explicit combat commands.
+pub(crate) fn is_automatic_attack_targetable(
+    candidate: &Entity,
+    teams: &TeamRelations,
+    attacker_owner: u32,
+    attacker_id: u32,
+) -> bool {
+    !candidate.is_neutral_obstacle()
+        && is_enemy_targetable(candidate, teams, attacker_owner, attacker_id)
+}
+
 /// Whether `candidate` is a legal explicit attack target for an attacker owned by
 /// `attacker_owner`. Explicit player commands may target the attacker's own entities, but not
-/// allied teammates; automatic acquisition remains enemy-only through `is_enemy_targetable`.
+/// allied teammates; automatic acquisition remains enemy-only through
+/// `is_automatic_attack_targetable`.
 pub(crate) fn is_explicit_attack_targetable(
     candidate: &Entity,
     teams: &TeamRelations,
@@ -349,7 +363,7 @@ fn explicit_attack_target_inside_fixed_arc(attacker: &Entity, target: &Entity) -
     delta.abs() <= config::ANTI_TANK_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
-/// Nearest hostile entity (`is_enemy_targetable`) to `(px, py)` within `radius_px`.
+/// Nearest automatic enemy target to `(px, py)` within `radius_px`.
 #[allow(dead_code)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn nearest_enemy_in_range(
@@ -421,7 +435,7 @@ fn nearest_matching_enemy_in_range(
         let Some(entity) = entities.get(id) else {
             continue;
         };
-        if !is_enemy_targetable(entity, teams, owner, self_id)
+        if !is_automatic_attack_targetable(entity, teams, owner, self_id)
             || !matches_kind(entity)
             || !target_filter(entity)
         {

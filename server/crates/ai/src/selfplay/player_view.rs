@@ -98,6 +98,7 @@ pub(crate) fn occupied_tiles_from_snapshot(
 pub(crate) fn footprint_placeable_from_snapshot(
     map: &MapInfo,
     snapshot: &Snapshot,
+    player_id: u32,
     building: EntityKind,
     tile_x: u32,
     tile_y: u32,
@@ -134,6 +135,25 @@ pub(crate) fn footprint_placeable_from_snapshot(
         ) {
             return false;
         }
+    }
+    let tile_size = map.tile_size as f32;
+    let left = tile_x as f32 * tile_size;
+    let top = tile_y as f32 * tile_size;
+    let right = tile_x.saturating_add(stats.foot_w) as f32 * tile_size;
+    let bottom = tile_y.saturating_add(stats.foot_h) as f32 * tile_size;
+    if snapshot.entities.iter().any(|entity| {
+        let Some(kind) = kind_of(entity) else {
+            return false;
+        };
+        entity.owner == player_id
+            && kind.is_unit()
+            && crate::sdk::unit_circle_touches_rect(
+                (entity.x, entity.y),
+                crate::sdk::unit_placement_radius(kind),
+                (left, top, right, bottom),
+            )
+    }) {
+        return false;
     }
     for dy in 0..stats.foot_h {
         for dx in 0..stats.foot_w {

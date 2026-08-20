@@ -6,15 +6,31 @@ const MAX_LOCAL_TREES: usize = 8;
 const DETOUR_CLEARANCE_PX: f32 = 1.0;
 const TREE_TILE_AVOIDANCE_COST: u32 = 40;
 
-pub(super) fn movement_cost(pass: &TerrainPassability<'_>, tx: i32, ty: i32) -> u32 {
+pub(super) fn movement_cost(
+    pass: &TerrainPassability<'_>,
+    tx: i32,
+    ty: i32,
+    base_step_cost: u32,
+) -> u32 {
     let tree_cost = pass
         .occupancy
         .tree_path_avoidance_cost(tx, ty)
         .saturating_mul(TREE_TILE_AVOIDANCE_COST);
+    let slow_cost = if movement_body_class(pass.kind) == MovementBodyClass::InfantryLike
+        && pass.map.in_bounds(tx, ty)
+    {
+        terrain::slow_movement_path_cost_surcharge(
+            base_step_cost,
+            pass.map.is_slow_movement_tile(tx as u32, ty as u32),
+        )
+    } else {
+        0
+    };
     if pass.route_shape != RouteShape::VehicleClearance || !uses_oriented_vehicle_body(pass.kind) {
-        return tree_cost;
+        return tree_cost.saturating_add(slow_cost);
     }
     tree_cost
+        .saturating_add(slow_cost)
         .saturating_add(vehicle_clearance_cost(
             pass.occupancy.clearance_at_tile_for_movement_body(
                 tx,

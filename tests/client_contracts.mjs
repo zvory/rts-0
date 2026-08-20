@@ -116,6 +116,7 @@ await import("./client_contracts/map_editor_layer_contracts.mjs");
 await import("./client_contracts/map_editor_sun_contracts.mjs");
 await import("./client_contracts/map_editor_panel_workflow_contracts.mjs");
 await import("./client_contracts/map_editor_contracts.mjs");
+await import("./client_contracts/map_editor_location_resource_contracts.mjs");
 await import("./client_contracts/map_editor_terrain_layer_contracts.mjs");
 await import("./client_contracts/map_editor_symmetry_contracts.mjs");
 await import("./client_contracts/map_editor_resource_patch_contracts.mjs");

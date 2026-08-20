@@ -11,15 +11,16 @@ use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy,
-    ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy, JEFFS_AI_ID,
+    is_jeffs_ai_profile, AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy,
+    ExpansionPolicy, ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
+    JEFFS_AI_ID,
 };
 use crate::ai_shared;
 use crate::config;
 use rts_protocol::ObserverMapAnalysisLayer;
 use rts_rules;
 use rts_sim::game::command::SimCommand as Command;
-use rts_sim::game::entity::EntityKind;
+use rts_sim::game::entity::{EntityKind, RallyKind};
 use rts_sim::game::upgrade::{self, UpgradeKind};
 
 mod defense;
@@ -653,10 +654,13 @@ where
                 current.saturating_add(affordable_above_reserve),
             ));
         }
-        let production_rally = (profile.id == JEFFS_AI_ID)
+        let production_rally = is_jeffs_ai_profile(profile.id)
             .then(|| jeffs_production_rally(observation, &facts))
             .flatten();
-        let trained_units = actions::train_units_with_rally(
+        let rifleman_rally = (profile.id == JEFFS_AI_ID)
+            .then(|| jeffs_rifleman_home_rally(observation, &facts))
+            .flatten();
+        let trained_units = actions::train_units_with_rally_for_unit(
             &mut actions,
             TrainUnitsRequest {
                 buildings,
@@ -669,7 +673,15 @@ where
                 max_counts: &building_max_counts,
                 balance_unit_priorities: production_policy.balance_unit_priorities,
             },
-            production_rally,
+            |unit| {
+                if unit == EntityKind::Rifleman {
+                    rifleman_rally
+                        .map(|(x, y)| (x, y, RallyKind::Move))
+                        .or_else(|| production_rally.map(|(x, y)| (x, y, RallyKind::AttackMove)))
+                } else {
+                    production_rally.map(|(x, y)| (x, y, RallyKind::AttackMove))
+                }
+            },
         );
         for trained in trained_units {
             memory.note_turtle_train(profile, trained.unit);
@@ -728,8 +740,9 @@ where
             }
         }
         let local_target = local_defense_target(observation);
-        let jeff_layered_home_defense =
-            local_target.is_some() && profile.id == JEFFS_AI_ID && profile.home_anti_tank.is_some();
+        let jeff_layered_home_defense = local_target.is_some()
+            && is_jeffs_ai_profile(profile.id)
+            && profile.home_anti_tank.is_some();
         let mut local_defenders = local_ready_units.clone();
         local_defenders.extend(defensive_machine_gunners.iter().copied());
         local_defenders.sort_unstable();
@@ -784,12 +797,28 @@ where
             .collect();
         let turtle_defense_active = profile.turtle_defense.is_some();
 
-        if !handled_local_defense && profile.id == JEFFS_AI_ID && profile.home_anti_tank.is_some() {
-            let riflemen: Vec<u32> =
+        if !handled_local_defense
+            && is_jeffs_ai_profile(profile.id)
+            && profile.home_anti_tank.is_some()
+        {
+            let riflemen: Vec<u32> = if profile.id == JEFFS_AI_ID {
+                observation
+                    .owned
+                    .iter()
+                    .filter(|unit| {
+                        unit.kind == EntityKind::Rifleman
+                            && unit.is_complete
+                            && unit.hp > 0
+                            && !local_defense_assigned.contains(&unit.id)
+                    })
+                    .map(|unit| unit.id)
+                    .collect()
+            } else {
                 actions::select_ready_combat_units(&observation.owned, &[EntityKind::Rifleman])
                     .into_iter()
                     .filter(|id| !local_defense_assigned.contains(id))
-                    .collect();
+                    .collect()
+            };
             let own_base =
                 geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
             let fallback_armor = observation
@@ -806,19 +835,32 @@ where
                         .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
                 })
                 .map(|entity| entity.id);
-            if let (Some(armor_id), Some(enemy_base)) = (
-                memory.home_defensive_tank.or(fallback_armor),
-                facts.nearest_public_enemy_base,
-            ) {
-                if let Some(units) = stage_home_rifleman_screen(
-                    &mut actions,
-                    observation,
-                    &riflemen,
-                    armor_id,
-                    enemy_base,
-                    3.0,
-                    1.75,
-                ) {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                let staged = if profile.id == JEFFS_AI_ID {
+                    defense::stage_home_rifleman_coverage(
+                        &mut actions,
+                        observation,
+                        map_analysis,
+                        &riflemen,
+                        enemy_base,
+                    )
+                } else {
+                    memory
+                        .home_defensive_tank
+                        .or(fallback_armor)
+                        .and_then(|armor_id| {
+                            stage_home_rifleman_screen(
+                                &mut actions,
+                                observation,
+                                &riflemen,
+                                armor_id,
+                                enemy_base,
+                                3.0,
+                                1.75,
+                            )
+                        })
+                };
+                if let Some(units) = staged {
                     intents.push(AiIntent::Stage { units });
                 }
             }
@@ -964,6 +1006,23 @@ fn jeffs_production_rally(observation: &AiObservation, facts: &AiFacts) -> Optio
         (
             own_base.0 + direction.0 * forward_distance,
             own_base.1 + direction.1 * forward_distance,
+        ),
+        observation.map,
+    ))
+}
+
+/// Riflemen are permanent home-screen units. Rally them to the base-centric defensive anchor so
+/// they do not walk through the forward army staging lane before receiving a stable slot.
+fn jeffs_rifleman_home_rally(observation: &AiObservation, facts: &AiFacts) -> Option<(f32, f32)> {
+    let anchor = defense::main_steel_cluster_center(observation)
+        .unwrap_or_else(|| tile_center(observation.own_start_tile, observation.map.tile_size));
+    let enemy_base = facts.nearest_public_enemy_base?;
+    let direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y))?;
+    let distance = observation.map.tile_size as f32 * 3.5;
+    Some(clamp_to_map(
+        (
+            anchor.0 + direction.0 * distance,
+            anchor.1 + direction.1 * distance,
         ),
         observation.map,
     ))
@@ -1289,7 +1348,7 @@ fn queue_profile_upgrades(
     for upgrade in profile.upgrade_priorities {
         if profile.fast_tank_timing.is_some()
             && *upgrade == UpgradeKind::TankUnlock
-            && if profile.id == JEFFS_AI_ID {
+            && if is_jeffs_ai_profile(profile.id) {
                 facts.building_counts(EntityKind::Factory).existing == 0
             } else {
                 facts.building_count(EntityKind::Factory) == 0
@@ -1326,7 +1385,7 @@ fn queue_jeff_infantry_mass_methamphetamines(
     intents: &mut Vec<AiIntent>,
     profile: &AiProfile,
 ) {
-    if profile.id != JEFFS_AI_ID
+    if !is_jeffs_ai_profile(profile.id)
         || facts
             .unit_count(EntityKind::Rifleman)
             .saturating_add(facts.unit_count(EntityKind::MachineGunner))
@@ -1357,7 +1416,7 @@ fn queue_required_unit_unlocks(
         };
         if profile.fast_tank_timing.is_some()
             && upgrade == UpgradeKind::TankUnlock
-            && if profile.id == JEFFS_AI_ID {
+            && if is_jeffs_ai_profile(profile.id) {
                 facts.building_counts(EntityKind::Factory).existing == 0
             } else {
                 facts.building_count(EntityKind::Factory) == 0

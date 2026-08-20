@@ -52,6 +52,12 @@ export function mapEditorSymmetryGuideLines(dimensions, symmetry) {
   if ([MAP_EDITOR_SYMMETRY.RADIAL, MAP_EDITOR_SYMMETRY.QUADRANT_MIRROR].includes(symmetry)) {
     return [horizontal, vertical];
   }
+  if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN_FLIP) {
+    return [{ x0: 0, y0: 0, x1: worldWidth, y1: worldHeight }];
+  }
+  if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_ANTI_FLIP) {
+    return [{ x0: 0, y0: worldHeight, x1: worldWidth, y1: 0 }];
+  }
   if (symmetry === MAP_EDITOR_SYMMETRY.DIAGONAL_MAIN) {
     return [{ x0: 0, y0: 0, x1: worldWidth, y1: worldHeight }];
   }
@@ -809,7 +815,13 @@ export class MapEditorViewport {
       : `Moved ${tool.kind === "start" ? "start location" : "base site"}`;
     const changed = this.session.mutate(label, (draft) => {
       result = tool.add
-        ? addSymmetricDraftLocations(draft, { kind: tool.kind, tile, symmetry: tool.symmetry })
+        ? addSymmetricDraftLocations(draft, {
+          kind: tool.kind,
+          tile,
+          symmetry: tool.symmetry,
+          steelPatches: tool.steelPatches,
+          oilPatches: tool.oilPatches,
+        })
         : moveSymmetricDraftLocation(draft, {
           kind: tool.kind,
           locationIndex: tool.locationIndex,
