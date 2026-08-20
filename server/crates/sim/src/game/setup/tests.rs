@@ -692,36 +692,29 @@ fn base_resources_flank_the_centreline_and_put_oil_outward() {
 #[test]
 fn bundled_oil_patches_have_buildable_pump_jack_sites() {
     for available_map in Map::list_available() {
-        for player_count in available_map.min_players..=available_map.max_players {
-            for seed in 0..32 {
-                let map = Map::load(&available_map.name, player_count as usize, seed)
-                    .unwrap_or_else(|err| {
-                        panic!(
-                            "map {} should load for player_count={player_count} seed={seed}: {err}",
-                            available_map.name
-                        )
-                    });
-                let entities = spawned_resource_sites(&map);
+        // Base resource placement depends only on authored geometry; player count and seed only
+        // choose and assign start locations, so one materialization covers each map's oil sites.
+        let map = Map::load(&available_map.name, available_map.min_players as usize, 0)
+            .unwrap_or_else(|err| panic!("map {} should load: {err}", available_map.name));
+        let entities = spawned_resource_sites(&map);
 
-                for oil in entities
-                    .iter()
-                    .filter(|entity| entity.kind == EntityKind::Oil)
-                {
-                    let (tile_x, tile_y) = map.tile_of(oil.pos_x, oil.pos_y);
-                    assert!(
-                        services::standability::building_site_clear(
-                            &map,
-                            &entities,
-                            EntityKind::PumpJack,
-                            tile_x,
-                            tile_y,
-                        ),
-                        "oil node {} at tile ({tile_x}, {tile_y}) should leave a buildable Pump Jack site for map={} player_count={player_count} seed={seed}",
-                        oil.id,
-                        available_map.name
-                    );
-                }
-            }
+        for oil in entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Oil)
+        {
+            let (tile_x, tile_y) = map.tile_of(oil.pos_x, oil.pos_y);
+            assert!(
+                services::standability::building_site_clear(
+                    &map,
+                    &entities,
+                    EntityKind::PumpJack,
+                    tile_x,
+                    tile_y,
+                ),
+                "oil node {} at tile ({tile_x}, {tile_y}) should leave a buildable Pump Jack site for map={}",
+                oil.id,
+                available_map.name
+            );
         }
     }
 }

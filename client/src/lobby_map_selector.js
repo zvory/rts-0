@@ -33,6 +33,10 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
     author: "oti",
     preview: "/assets/map-previews/doppelganger.jpg",
   }),
+  "Fastest Map Possible": Object.freeze({
+    author: "Alex",
+    preview: "/assets/map-previews/fastest-map-possible.jpg",
+  }),
   "Lighting Test": Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/lighting-test.jpg",

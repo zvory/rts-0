@@ -1,5 +1,5 @@
 {
-  "reason": "movement no longer mutates player economy after vehicle oil burn removal",
+  "reason": "extract bundled map catalog loading from the core map model",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -259,7 +259,7 @@
     },
     {
       "path": "map.rs",
-      "lines": 959
+      "lines": 761
     },
     {
       "path": "map/authored.rs",
@@ -276,6 +276,10 @@
     {
       "path": "map/base_resources.rs",
       "lines": 48
+    },
+    {
+      "path": "map/catalog.rs",
+      "lines": 315
     },
     {
       "path": "map/data.rs",
@@ -2396,11 +2400,15 @@
     },
     {
       "path": "map.rs",
-      "count": 30
+      "count": 27
     },
     {
       "path": "map/base_resources.rs",
       "count": 2
+    },
+    {
+      "path": "map/catalog.rs",
+      "count": 5
     },
     {
       "path": "map/data.rs",
