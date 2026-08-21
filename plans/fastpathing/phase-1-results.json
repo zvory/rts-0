@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "host": {
+    "os": "Darwin 25.5.0 arm64",
+    "cpu": "Apple M5 Pro",
+    "model": "Mac17,8",
+    "logicalCpus": 18
+  },
+  "revisions": {
+    "baseline": "e7ef438051bcdad2449823915a1e30bc99c9ca15",
+    "candidate": "57a91c48f6aff1142559407671df39c69e78ed82"
+  },
+  "corpus": {
+    "version": 1,
+    "fullWorkloadHash": "23c2ab3020408f49",
+    "fullSemanticHash": "e017b84139cd07db",
+    "releaseWorkloadHash": "9393917eb369f14a",
+    "releaseSemanticHash": "d751fe462ad18702",
+    "requestsPerRun": 240,
+    "expansionsPerRun": 2212540,
+    "baselineElapsedNs": [476323209, 475369916, 480682500, 477275667, 476673291, 480280417, 478792750, 479423125, 475950500, 475085292, 477014666],
+    "candidateElapsedNs": [245552750, 245359583, 249104000, 246017334, 245642875, 246240000, 247943416, 245501875, 246843208, 246262417, 246156708],
+    "baselineMedianNs": 477014666,
+    "candidateMedianNs": 246156708,
+    "speedup": 1.9378495507,
+    "pairedMedianRatio": 0.5160359325,
+    "bootstrap90UpperRatio": 0.5178512331
+  },
+  "hellhole": {
+    "ticksPerRun": 900,
+    "baselineElapsedMs": [15777, 16591, 15119, 15204, 15355, 15382, 15187, 15037, 15047, 14983, 14996],
+    "candidateElapsedMs": [15133, 15897, 14698, 14772, 14791, 14797, 14859, 14473, 14517, 14440, 14527],
+    "baselineAverageTickUs": [10875, 11473, 10418, 10474, 10600, 10608, 10461, 10361, 10348, 10318, 10322],
+    "candidateAverageTickUs": [10201, 10732, 9915, 9964, 10002, 9982, 10015, 9755, 9786, 9763, 9801],
+    "baselineP95TickUs": [17685, 18621, 16995, 16889, 17273, 17237, 17108, 16779, 16884, 16800, 16827],
+    "candidateP95TickUs": [16136, 17310, 15804, 15791, 15900, 15910, 15884, 15518, 15706, 15551, 15770],
+    "averageTickPairedMedianRatio": 0.9456899884,
+    "averageTickBootstrap90UpperRatio": 0.9495252858,
+    "p95PairedMedianRatio": 0.9284545242,
+    "improvedPairs": 11,
+    "artifactBytes": 26910978,
+    "artifactSha256": "7054deb3347441de285e252a8275de8e8eb2ca09e84795e25f1d121983e168e2"
+  }
+}

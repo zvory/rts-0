@@ -437,7 +437,7 @@ fn dense_generation_wrap_clears_stamps_without_semantic_drift() {
         query.turn_penalty,
     );
     let mut scratch = SearchScratch::default();
-    scratch.directional.generation = u32::MAX;
+    scratch.force_generation_wrap(true);
     let actual = find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
         &grid,
         query.start,
@@ -447,7 +447,7 @@ fn dense_generation_wrap_clears_stamps_without_semantic_drift() {
         &mut scratch,
     );
     assert_eq!(actual, expected);
-    assert_eq!(scratch.directional.generation, 1);
+    assert_eq!(scratch.generation(true), 1);
 }
 
 #[test]
@@ -474,7 +474,10 @@ fn dense_scratch_memory_is_bounded_for_shipped_map_sizes() {
 #[test]
 #[ignore = "release-only wall-clock evidence; run with --ignored --nocapture"]
 fn phase1_release_path_corpus_benchmark() {
-    assert!(!cfg!(debug_assertions), "benchmark must use --release");
+    assert!(
+        !std::hint::black_box(cfg!(debug_assertions)),
+        "benchmark must use --release"
+    );
     let grids = [Grid::patterned(126, 126, 11), Grid::patterned(196, 196, 23)];
     let query_sets: Vec<_> = grids
         .iter()

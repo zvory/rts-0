@@ -11,7 +11,6 @@
 //! of freezing.
 
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
 
 use crate::config;
 
@@ -98,181 +97,8 @@ const NO_INCOMING_DIR: u8 = u8::MAX;
 
 type SearchKey = (i32, i32, u8);
 
-#[derive(Clone, Default)]
-struct DenseState {
-    g_score: Vec<u32>,
-    parent: Vec<u32>,
-    stamp: Vec<u32>,
-    generation: u32,
-}
-
-impl DenseState {
-    fn begin(&mut self, states: usize) {
-        if self.stamp.len() < states {
-            self.g_score.resize(states, 0);
-            self.parent.resize(states, 0);
-            self.stamp.resize(states, 0);
-        }
-        self.generation = self.generation.wrapping_add(1);
-        if self.generation == 0 {
-            self.stamp.fill(0);
-            self.generation = 1;
-        }
-    }
-
-    #[inline]
-    fn get_g(&self, index: usize) -> Option<u32> {
-        (self.stamp.get(index).copied() == Some(self.generation)).then(|| self.g_score[index])
-    }
-
-    #[inline]
-    fn set(&mut self, index: usize, g: u32, parent: usize) {
-        self.stamp[index] = self.generation;
-        self.g_score[index] = g;
-        self.parent[index] = parent as u32;
-    }
-
-    #[inline]
-    fn parent(&self, index: usize) -> Option<usize> {
-        (self.stamp.get(index).copied() == Some(self.generation) && self.parent[index] != u32::MAX)
-            .then(|| self.parent[index] as usize)
-    }
-
-    #[cfg(test)]
-    fn retained_bytes(&self) -> usize {
-        self.g_score.capacity() * std::mem::size_of::<u32>()
-            + self.parent.capacity() * std::mem::size_of::<u32>()
-            + self.stamp.capacity() * std::mem::size_of::<u32>()
-    }
-}
-
-/// Reusable A* working storage owned by the pathing service.
-///
-/// Searches are strictly sequential inside one room. Clearing these containers between requests
-/// preserves their allocations without making any search result depend on prior requests.
-#[derive(Default)]
-pub(super) struct SearchScratch {
-    open: BinaryHeap<Node>,
-    ordinary: DenseState,
-    directional: DenseState,
-    width: u32,
-    height: u32,
-    start: (i32, i32),
-    direction_sensitive: bool,
-}
-
-impl Clone for SearchScratch {
-    fn clone(&self) -> Self {
-        debug_assert!(self.open.is_empty());
-        Self::default()
-    }
-}
-
-impl SearchScratch {
-    fn begin(&mut self, dimensions: (u32, u32), start: (i32, i32), direction_sensitive: bool) {
-        self.open.clear();
-        self.width = dimensions.0;
-        self.height = dimensions.1;
-        self.start = start;
-        self.direction_sensitive = direction_sensitive;
-        let tiles = (self.width as usize).saturating_mul(self.height as usize);
-        if direction_sensitive {
-            self.directional
-                .begin(tiles.saturating_mul(8).saturating_add(1));
-        } else {
-            self.ordinary.begin(tiles);
-        }
-    }
-
-    fn finish(&mut self) {
-        self.open.clear();
-    }
-
-    #[inline]
-    fn state(&self) -> &DenseState {
-        if self.direction_sensitive {
-            &self.directional
-        } else {
-            &self.ordinary
-        }
-    }
-
-    #[inline]
-    fn state_mut(&mut self) -> &mut DenseState {
-        if self.direction_sensitive {
-            &mut self.directional
-        } else {
-            &mut self.ordinary
-        }
-    }
-
-    #[inline]
-    fn index(&self, key: SearchKey) -> Option<usize> {
-        if self.direction_sensitive && key.2 == NO_INCOMING_DIR {
-            return (key.0 == self.start.0 && key.1 == self.start.1)
-                .then(|| self.width as usize * self.height as usize * 8);
-        }
-        if key.0 < 0 || key.1 < 0 || key.0 as u32 >= self.width || key.1 as u32 >= self.height {
-            return None;
-        }
-        let tile = key.1 as usize * self.width as usize + key.0 as usize;
-        if self.direction_sensitive {
-            (key.2 < 8).then(|| tile * 8 + key.2 as usize)
-        } else {
-            (key.2 == NO_INCOMING_DIR).then_some(tile)
-        }
-    }
-
-    #[inline]
-    fn key(&self, index: usize) -> SearchKey {
-        let tiles = self.width as usize * self.height as usize;
-        if self.direction_sensitive && index == tiles * 8 {
-            return (self.start.0, self.start.1, NO_INCOMING_DIR);
-        }
-        let (tile, dir) = if self.direction_sensitive {
-            (index / 8, (index % 8) as u8)
-        } else {
-            (index, NO_INCOMING_DIR)
-        };
-        (
-            (tile % self.width as usize) as i32,
-            (tile / self.width as usize) as i32,
-            dir,
-        )
-    }
-
-    #[inline]
-    fn get_g(&self, key: SearchKey) -> Option<u32> {
-        self.index(key).and_then(|index| self.state().get_g(index))
-    }
-
-    #[inline]
-    fn set(&mut self, key: SearchKey, g: u32, parent: SearchKey) {
-        if let (Some(index), Some(parent)) = (self.index(key), self.index(parent)) {
-            self.state_mut().set(index, g, parent);
-        }
-    }
-
-    fn reconstruct(&self, goal: SearchKey) -> Vec<(i32, i32)> {
-        let Some(mut current) = self.index(goal) else {
-            return Vec::new();
-        };
-        let mut path = vec![(goal.0, goal.1)];
-        while let Some(previous) = self.state().parent(current) {
-            let key = self.key(previous);
-            path.push((key.0, key.1));
-            current = previous;
-        }
-        path.pop();
-        path.reverse();
-        path
-    }
-
-    #[cfg(test)]
-    pub(super) fn retained_capacity(&self) -> usize {
-        self.ordinary.retained_bytes() + self.directional.retained_bytes()
-    }
-}
+mod scratch;
+pub(super) use scratch::SearchScratch;
 
 /// Find a tile path from `(sx, sy)` to `(gx, gy)` with a configurable expansion cap.
 ///
@@ -338,9 +164,7 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
         dir: NO_INCOMING_DIR,
     });
     if let Some(start_index) = scratch.index(start_key) {
-        scratch.state_mut().set(start_index, 0, start_index);
-        // The start sentinel has no predecessor; its generation stamp is enough to store g=0.
-        scratch.state_mut().parent[start_index] = u32::MAX;
+        scratch.set_start(start_index);
     } else {
         scratch.finish();
         return (Vec::new(), 0, false);
