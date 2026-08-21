@@ -19,8 +19,8 @@ mod authoring;
 mod passability;
 mod route_finalize;
 mod tree_detours;
-use passability::TerrainPassability;
 pub(in crate::game) use authoring::StaticRouteAnalyzer;
+use passability::TerrainPassability;
 #[cfg(test)]
 mod tree_detours_tests;
 pub(in crate::game::services) use route_finalize::finalize_reverse_waypoints_or_raw;
