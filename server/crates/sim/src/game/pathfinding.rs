@@ -331,3 +331,6 @@ fn reconstruct(came_from: &HashMap<SearchKey, SearchKey>, goal: SearchKey) -> Ve
     path.reverse();
     path
 }
+
+#[cfg(test)]
+mod phase1_tests;
