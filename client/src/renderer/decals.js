@@ -35,6 +35,10 @@ const TANK_SCORCH_SCALE_Y = 1.03;
 const TANK_SCORCH_OPACITY_SCALE = 1.28;
 const TANK_ASH_OPACITY_SCALE = 1.45;
 const TANK_PAINT_OPACITY_SCALE = 1.35;
+const CORPSE_SPRITE_SCALE = 0.32;
+const CORPSE_HOLD_MS = 1800;
+const CORPSE_FADE_MS = 2400;
+export const MAX_TRANSIENT_CORPSE_SPRITES = 256;
 
 export class GroundDecalLayer {
   constructor({
@@ -70,6 +74,9 @@ export class GroundDecalLayer {
     this._replacementQueue = null;
     this._replacementExpectedCount = 0;
     this._emptyReplacementComplete = false;
+    this._corpseSprites = [];
+    this._corpseTextures = new Map();
+    this._corpseVisualNowMs = 0;
   }
 
   resetForMap(map) {
@@ -136,7 +143,28 @@ export class GroundDecalLayer {
 
   setVisible(visible) {
     if (this.sprite) this.sprite.visible = !!visible;
+    for (const record of this._corpseSprites) record.sprite.visible = !!visible;
     this.tankTreads.setVisible(visible);
+  }
+
+  updateInfantryCorpseFades(nowMs = performance.now()) {
+    this._corpseVisualNowMs = nowMs;
+    const survivors = [];
+    for (const record of this._corpseSprites) {
+      const age = Math.max(0, nowMs - record.spawnedAtMs);
+      if (age >= CORPSE_HOLD_MS + CORPSE_FADE_MS) {
+        record.sprite.parent?.removeChild?.(record.sprite);
+        record.sprite.destroy?.();
+        continue;
+      }
+      const fade = age <= CORPSE_HOLD_MS
+        ? 1
+        : 1 - (age - CORPSE_HOLD_MS) / CORPSE_FADE_MS;
+      record.sprite.alpha = record.opacity * fade;
+      survivors.push(record);
+    }
+    this._corpseSprites = survivors;
+    return survivors.length;
   }
 
   completePerspectiveTransition() {
@@ -257,27 +285,75 @@ export class GroundDecalLayer {
     if (!this.ctx || !Array.isArray(decals) || decals.length === 0) return 0;
     this.recordDiagnostic?.("renderer.groundDecals.pending", decals.length);
     let stamped = 0;
+    let rasterStamped = 0;
     const tintScratch = this.assetStatus === GROUND_DECAL_ATLAS_STATUS.READY
       ? this._ensureTintScratch()
       : null;
     const atlas = this.assetStatus === GROUND_DECAL_ATLAS_STATUS.READY ? this.atlas : null;
     for (const decal of decals) {
       try {
-        if (stampGroundDecal(this.ctx, decal, this.downsample, { atlas, tintScratch })) stamped += 1;
+        const authoredCorpse = decal?.decalClass === DECAL_CLASS_INFANTRY
+          && isAuthoredInfantryCorpseKind(decal.kind);
+        // Durable repair/rebuild batches include historical deaths. Count those records as
+        // consumed without resurrecting their transient presentation.
+        let didStamp;
+        if (authoredCorpse && decal.animateInfantryDeath === false) {
+          didStamp = true;
+        } else if (authoredCorpse && atlas) {
+          didStamp = this._stampInfantryCorpse(decal, atlas);
+        } else {
+          didStamp = stampGroundDecal(this.ctx, decal, this.downsample, {
+            atlas: authoredCorpse ? atlas : null,
+            tintScratch,
+          });
+          if (didStamp) rasterStamped += 1;
+        }
+        if (didStamp) stamped += 1;
         else this.recordDiagnostic?.("renderer.groundDecals.skipped", 1);
       } catch (err) {
         this.recordDiagnostic?.("renderer.groundDecals.skipped", 1);
         onError?.("groundDecal", err);
       }
     }
-    if (stamped > 0) {
+    if (rasterStamped > 0) {
       updateTexture(this.texture);
-      this.totalStamped += stamped;
       this.textureUpdateCount += 1;
-      this.recordDiagnostic?.("renderer.groundDecals.stamped", stamped);
       this.recordDiagnostic?.("renderer.groundDecals.textureUpdates", 1);
     }
+    this.totalStamped += stamped;
+    if (stamped > 0) this.recordDiagnostic?.("renderer.groundDecals.stamped", stamped);
     return stamped;
+  }
+
+  _stampInfantryCorpse(decal, atlas) {
+    const plan = createGroundDecalStampPlan(decal, { assetCounts: atlasAssetCounts(atlas) });
+    const source = plan && atlas.infantry?.[plan.variantIndex];
+    if (!source || !this.pixi?.Texture || !this.pixi?.Sprite) return false;
+    const textureKey = `${plan.variantIndex}:${plan.color}`;
+    let texture = this._corpseTextures.get(textureKey);
+    if (!texture) {
+      const canvas = createTeamTintedCorpseCanvas(this.createCanvas, source, plan.color);
+      if (!canvas) return false;
+      texture = this.pixi.Texture.from(canvas);
+      this._corpseTextures.set(textureKey, texture);
+    }
+    const sprite = new this.pixi.Sprite(texture);
+    sprite.anchor?.set?.(0.5);
+    sprite.position?.set?.(decal.x + plan.offsetWorldX, decal.y + plan.offsetWorldY);
+    sprite.rotation = plan.rotation;
+    sprite.scale?.set?.(
+      CORPSE_SPRITE_SCALE * plan.scale * plan.flipX,
+      CORPSE_SPRITE_SCALE * plan.scale * plan.flipY,
+    );
+    sprite.alpha = plan.opacity;
+    this.layer.addChild(sprite);
+    if (this._corpseSprites.length >= MAX_TRANSIENT_CORPSE_SPRITES) {
+      const expired = this._corpseSprites.shift();
+      expired?.sprite.parent?.removeChild?.(expired.sprite);
+      expired?.sprite.destroy?.();
+    }
+    this._corpseSprites.push({ sprite, spawnedAtMs: this._corpseVisualNowMs, opacity: plan.opacity });
+    return true;
   }
 
   _ensureTintScratch() {
@@ -334,6 +410,13 @@ export class GroundDecalLayer {
     this.assetLoadError = null;
     this.assetStatus = GROUND_DECAL_ATLAS_STATUS.IDLE;
     this._queuedUntilAssets = [];
+    for (const record of this._corpseSprites) {
+      record.sprite.parent?.removeChild?.(record.sprite);
+      record.sprite.destroy?.();
+    }
+    this._corpseSprites = [];
+    for (const texture of this._corpseTextures.values()) texture.destroy?.(true);
+    this._corpseTextures.clear();
     this.atlas?.destroy?.();
     this.atlas = null;
     if (this._tintScratch?.canvas) {
@@ -384,7 +467,7 @@ export class GroundDecalLayer {
     for (const key of [
       "canvas", "ctx", "texture", "sprite", "atlas", "assetStatus", "assetLoadPromise",
       "assetLoadError", "_assetLoadGeneration", "_queuedUntilAssets", "_tintScratch",
-      "tankTreads", "totalStamped", "textureUpdateCount", "_map",
+      "_corpseSprites", "_corpseTextures", "_corpseVisualNowMs", "tankTreads", "totalStamped", "textureUpdateCount", "_map",
     ]) {
       this[key] = replacement[key];
     }
@@ -394,6 +477,9 @@ export class GroundDecalLayer {
     replacement.sprite = null;
     replacement.atlas = null;
     replacement._tintScratch = null;
+    replacement._corpseSprites = [];
+    replacement._corpseTextures = new Map();
+    replacement._corpseVisualNowMs = 0;
     replacement.tankTreads = new TankTreadLayer({
       layer: replacement.layer,
       pixi: replacement.pixi,
@@ -401,6 +487,54 @@ export class GroundDecalLayer {
       recordDiagnostic: replacement.recordDiagnostic,
     });
   }
+}
+
+function createTeamTintedCorpseCanvas(createCanvas, source, color) {
+  const canvas = createCanvas();
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext("2d", { alpha: true, willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.clearRect(0, 0, source.width, source.height);
+  ctx.drawImage(
+    source.image,
+    source.sourceX,
+    source.sourceY,
+    source.width,
+    source.height,
+    0,
+    0,
+    source.width,
+    source.height,
+  );
+  const pixels = ctx.getImageData(0, 0, source.width, source.height);
+  const targetR = (color >> 16) & 0xff;
+  const targetG = (color >> 8) & 0xff;
+  const targetB = color & 0xff;
+  for (let index = 0; index < pixels.data.length; index += 4) {
+    if (pixels.data[index + 3] === 0) continue;
+    const r = pixels.data[index];
+    const g = pixels.data[index + 1];
+    const b = pixels.data[index + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const luminance = (r + g + b) / 3;
+    // The generated white-painted costume contains mid-grey antialiasing and folds. Tint those
+    // neutral pixels too so downscaling cannot leave peppered grey gaps inside the team color.
+    // Very dark outlines and colored skin/leather/wood remain untouched.
+    if (luminance < 70 || max - min > 56) continue;
+    const shade = 0.32 + 0.68 * (luminance / 255);
+    pixels.data[index] = Math.round(targetR * shade);
+    pixels.data[index + 1] = Math.round(targetG * shade);
+    pixels.data[index + 2] = Math.round(targetB * shade);
+  }
+  ctx.putImageData(pixels, 0, 0);
+  return canvas;
+}
+
+function isAuthoredInfantryCorpseKind(kind) {
+  return kind === KIND.RIFLEMAN || kind === KIND.PANZERFAUST || kind === KIND.MACHINE_GUNNER;
 }
 
 export function _initGroundDecalsForMap(map) {

@@ -73,7 +73,7 @@ async function renderAtlasPng() {
       x: rects[index].x,
       width: asset.width,
       height: asset.height,
-      dataUrl: `data:image/svg+xml;base64,${fs.readFileSync(asset.sourcePath).toString("base64")}`,
+      dataUrl: `data:${path.extname(asset.sourcePath).toLowerCase() === ".png" ? "image/png" : "image/svg+xml"};base64,${fs.readFileSync(asset.sourcePath).toString("base64")}`,
     }));
     const dataUrl = await page.evaluate(async ({ width, height, sources: svgSources }) => {
       const canvas = document.createElement("canvas");

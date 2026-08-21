@@ -2,162 +2,120 @@
 export const GROUND_DECAL_PNG_ATLAS = Object.freeze({
   "version": 1,
   "url": "/assets/decals/ground-decals-v1.png",
-  "width": 1928,
+  "width": 3272,
   "height": 216,
   "groups": {
     "infantry": [
       {
-        "id": "infantry-splash-01",
+        "id": "rifleman-death-01",
         "x": 0,
         "y": 0,
-        "width": 32,
-        "height": 32
+        "width": 224,
+        "height": 160
       },
       {
-        "id": "infantry-splash-02",
-        "x": 32,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      },
-      {
-        "id": "infantry-splash-03",
-        "x": 64,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      },
-      {
-        "id": "infantry-splash-04",
-        "x": 96,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      },
-      {
-        "id": "infantry-splash-05",
-        "x": 128,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      },
-      {
-        "id": "infantry-splash-06",
-        "x": 160,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      },
-      {
-        "id": "infantry-splash-07",
-        "x": 192,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      },
-      {
-        "id": "infantry-splash-08",
+        "id": "rifleman-death-02",
         "x": 224,
         "y": 0,
-        "width": 32,
-        "height": 32
+        "width": 224,
+        "height": 160
       },
       {
-        "id": "infantry-splash-09",
-        "x": 256,
+        "id": "rifleman-death-03",
+        "x": 448,
         "y": 0,
-        "width": 32,
-        "height": 32
+        "width": 224,
+        "height": 160
       },
       {
-        "id": "infantry-splash-10",
-        "x": 288,
+        "id": "rifleman-death-04",
+        "x": 672,
         "y": 0,
-        "width": 32,
-        "height": 32
+        "width": 224,
+        "height": 160
       },
       {
-        "id": "infantry-splash-11",
-        "x": 320,
+        "id": "machine-gunner-death-01",
+        "x": 896,
         "y": 0,
-        "width": 32,
-        "height": 32
+        "width": 224,
+        "height": 160
       },
       {
-        "id": "infantry-splash-12",
-        "x": 352,
+        "id": "machine-gunner-death-02",
+        "x": 1120,
         "y": 0,
-        "width": 32,
-        "height": 32
+        "width": 224,
+        "height": 160
       },
       {
-        "id": "infantry-splash-13",
-        "x": 384,
+        "id": "machine-gunner-death-03",
+        "x": 1344,
         "y": 0,
-        "width": 32,
-        "height": 32
+        "width": 224,
+        "height": 160
       },
       {
-        "id": "infantry-splash-14",
-        "x": 416,
+        "id": "machine-gunner-death-04",
+        "x": 1568,
         "y": 0,
-        "width": 32,
-        "height": 32
+        "width": 224,
+        "height": 160
       }
     ],
     "vehicleScorch": [
       {
         "id": "vehicle-scorch-01",
-        "x": 448,
+        "x": 1792,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-scorch-02",
-        "x": 520,
+        "x": 1864,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-scorch-03",
-        "x": 592,
+        "x": 1936,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-scorch-04",
-        "x": 664,
+        "x": 2008,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-scorch-05",
-        "x": 736,
+        "x": 2080,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-scorch-06",
-        "x": 808,
+        "x": 2152,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-scorch-07",
-        "x": 880,
+        "x": 2224,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-scorch-08",
-        "x": 952,
+        "x": 2296,
         "y": 0,
         "width": 72,
         "height": 48
@@ -166,56 +124,56 @@ export const GROUND_DECAL_PNG_ATLAS = Object.freeze({
     "vehiclePaint": [
       {
         "id": "vehicle-paint-01",
-        "x": 1024,
+        "x": 2368,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-paint-02",
-        "x": 1096,
+        "x": 2440,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-paint-03",
-        "x": 1168,
+        "x": 2512,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-paint-04",
-        "x": 1240,
+        "x": 2584,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-paint-05",
-        "x": 1312,
+        "x": 2656,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-paint-06",
-        "x": 1384,
+        "x": 2728,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-paint-07",
-        "x": 1456,
+        "x": 2800,
         "y": 0,
         "width": 72,
         "height": 48
       },
       {
         "id": "vehicle-paint-08",
-        "x": 1528,
+        "x": 2872,
         "y": 0,
         "width": 72,
         "height": 48
@@ -224,7 +182,7 @@ export const GROUND_DECAL_PNG_ATLAS = Object.freeze({
     "mortarBlast": [
       {
         "id": "mortar-blast-01",
-        "x": 1600,
+        "x": 2944,
         "y": 0,
         "width": 112,
         "height": 112
@@ -233,7 +191,7 @@ export const GROUND_DECAL_PNG_ATLAS = Object.freeze({
     "artilleryBlast": [
       {
         "id": "artillery-blast-01",
-        "x": 1712,
+        "x": 3056,
         "y": 0,
         "width": 216,
         "height": 216

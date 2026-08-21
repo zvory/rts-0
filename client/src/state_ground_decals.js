@@ -31,12 +31,19 @@ export class GroundDecalBuffer {
     }
     if (revision < this.authoritativeRevision) return { accepted: false, queued: 0 };
 
-    const queued = this._queueMarks(decals, tankTrails, context);
+    // Reliable responses can contain the entire durable history after a reconnect or perspective
+    // reset. They repair the permanent surface, but are not evidence that an infantry death just
+    // happened on this presentation timeline.
+    const queued = this._queueMarks(decals, tankTrails, context, { animateInfantryDeath: false });
     this.authoritativeRevision = revision;
     return { accepted: true, queued };
   }
 
-  applySnapshotDelta({ revision, afterRevision, decals, tankTrails } = {}, context = {}) {
+  applySnapshotDelta(
+    { revision, afterRevision, decals, tankTrails } = {},
+    context = {},
+    { animateInfantryDeath = false } = {},
+  ) {
     if (!Number.isInteger(revision) || revision < 0 || revision > 0xffffffff) {
       return { accepted: false, complete: false, queued: 0 };
     }
@@ -47,20 +54,25 @@ export class GroundDecalBuffer {
       return { accepted: false, complete: false, queued: 0 };
     }
 
-    const queued = this._queueMarks(decals, tankTrails, context);
+    // Inline snapshot deltas are the live event path, so newly learned infantry deaths may play
+    // their short-lived authored sprite.
+    const queued = this._queueMarks(decals, tankTrails, context, { animateInfantryDeath });
     const complete = afterRevision <= this.authoritativeRevision;
     if (complete) this.authoritativeRevision = revision;
     return { accepted: true, complete, queued };
   }
 
-  _queueMarks(records, tankTrails, context) {
+  _queueMarks(records, tankTrails, context, { animateInfantryDeath = false } = {}) {
     let queued = 0;
     for (const record of Array.isArray(records) ? records : []) {
       const decal = normalizeAuthoritativeGroundDecal(record, context);
       const key = decal?.id;
       if (!decal || this.authoritativeDecals.has(key)) continue;
       this.authoritativeDecals.set(key, decal);
-      this._pending.push(decal);
+      const animate = typeof animateInfantryDeath === "function"
+        ? animateInfantryDeath(decal)
+        : !!animateInfantryDeath;
+      this._pending.push({ ...decal, animateInfantryDeath: animate });
       queued += 1;
     }
     for (const record of Array.isArray(tankTrails) ? tankTrails : []) {
@@ -124,7 +136,10 @@ export class GroundDecalBuffer {
   }
 
   requeueAuthoritative() {
-    this._pending = [...this.authoritativeDecals.values()];
+    this._pending = [...this.authoritativeDecals.values()].map((decal) => ({
+      ...decal,
+      animateInfantryDeath: false,
+    }));
     this._reconciled = null;
     this._reconciledRevision = 0;
     return this._pending.length;

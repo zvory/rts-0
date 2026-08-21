@@ -38,7 +38,7 @@ export class GroundDecalSync {
     }) || null;
   }
 
-  observeSnapshot(revision, delta = null) {
+  observeSnapshot(revision, delta = null, events = []) {
     if (this.destroyed || !isRevision(revision)) return false;
     if (this.awaitingResetSnapshot) {
       // Inbound snapshots may already be queued from before a seek or perspective reset. Start a
@@ -60,6 +60,7 @@ export class GroundDecalSync {
           players: this.state?.players,
           tileSize: this.state?.map?.tileSize,
         },
+        { animateInfantryDeath: liveInfantryDeathMatcher(events) },
       );
     }
     this.targetRevision = Math.max(this.targetRevision, revision);
@@ -148,4 +149,18 @@ export class GroundDecalSync {
 
 function isRevision(value) {
   return Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
+}
+
+function liveInfantryDeathMatcher(events) {
+  const deaths = new Set();
+  for (const event of Array.isArray(events) ? events : []) {
+    if (
+      event?.e !== "death"
+      || typeof event.kind !== "string"
+      || !Number.isFinite(event.x)
+      || !Number.isFinite(event.y)
+    ) continue;
+    deaths.add(`${event.kind}:${event.x}:${event.y}`);
+  }
+  return (decal) => deaths.has(`${decal?.kind}:${decal?.x}:${decal?.y}`);
 }

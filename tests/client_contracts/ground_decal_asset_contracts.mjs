@@ -1,4 +1,4 @@
-// SVG-authored ground decal asset and deterministic selection contracts.
+// Authored ground decal asset and deterministic selection contracts.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -25,7 +25,7 @@ const allAssets = [
 ];
 
 assert(validateAtlasCoverage(GROUND_DECAL_ASSET_MANIFEST, GROUND_DECAL_PNG_ATLAS),
-  "generated PNG atlas covers every SVG source in deterministic manifest order");
+  "generated PNG atlas covers every authored source in deterministic manifest order");
 const atlasPath = path.join(repoRoot, "client", GROUND_DECAL_PNG_ATLAS.url.slice(1));
 const atlasPng = PNG.sync.read(fs.readFileSync(atlasPath));
 assert(atlasPng.width === GROUND_DECAL_PNG_ATLAS.width && atlasPng.height === GROUND_DECAL_PNG_ATLAS.height,
@@ -61,7 +61,8 @@ assert(atlasPng.width === GROUND_DECAL_PNG_ATLAS.width && atlasPng.height === GR
   assert(closed === 1, "atlas teardown closes its ImageBitmap exactly once");
 }
 
-assert(GROUND_DECAL_ASSET_MANIFEST.infantry.length >= 12, "manifest includes at least twelve infantry decal masks");
+assert(GROUND_DECAL_ASSET_MANIFEST.infantry.length === 8,
+  "manifest includes four rifleman and four machine-gunner death sprites");
 assert(GROUND_DECAL_ASSET_MANIFEST.vehicleScorch.length >= 8, "manifest includes at least eight vehicle scorch masks");
 assert(GROUND_DECAL_ASSET_MANIFEST.vehiclePaint.length >= 8, "manifest includes at least eight vehicle paint masks");
 assert(GROUND_DECAL_ASSET_MANIFEST.mortarBlast.length >= 1, "manifest includes a mortar blast decal mask");
@@ -73,7 +74,16 @@ for (const asset of allAssets) {
   assert(Number.isInteger(asset.height) && asset.height > 0, `decal ${asset.id} declares a positive height`);
 
   const localPath = path.join(repoRoot, "client", asset.url.slice(1));
-  assert(fs.existsSync(localPath), `decal ${asset.id} SVG exists at ${asset.url}`);
+  assert(fs.existsSync(localPath), `decal ${asset.id} exists at ${asset.url}`);
+  if (path.extname(localPath).toLowerCase() === ".png") {
+    const png = PNG.sync.read(fs.readFileSync(localPath));
+    assert(png.width === asset.width && png.height === asset.height,
+      `decal ${asset.id} PNG dimensions match its manifest entry`);
+    const alphaValues = png.data.filter((_value, index) => index % 4 === 3);
+    assert(alphaValues.some((alpha) => alpha === 0) && alphaValues.some((alpha) => alpha > 0),
+      `decal ${asset.id} PNG preserves transparent cutout pixels`);
+    continue;
+  }
   const svg = fs.readFileSync(localPath, "utf8");
   assert(/<svg\b/i.test(svg), `decal ${asset.id} is an SVG file`);
   assert(/\bviewBox="[^"]+"/.test(svg), `decal ${asset.id} has an explicit viewBox`);
@@ -102,12 +112,26 @@ for (const asset of allAssets) {
   assertDeepEqual(plan, repeat, "infantry decal selection is deterministic for a fixed seed");
   assert(plan.color === 0x4878c8, "infantry decal tint uses the recovered owner player color");
   assert(
-    plan.variantIndex === (decal.seed % GROUND_DECAL_ASSET_MANIFEST.infantry.length),
-    "infantry decal variant comes from the deterministic seed",
+    plan.variantIndex === (decal.seed % 4),
+    "rifleman death sprite comes from the first four deterministic variants",
   );
-  assert(plan.scale > 0.8 && plan.scale < 1.17, "infantry decal scale stays within the authored variation range");
-  assert(plan.opacity >= 0.54 && plan.opacity <= 0.7, "infantry decal tint opacity stays intentionally readable");
+  assert(plan.scale === 1, "infantry deaths keep their normalized authored body scale");
+  assert(plan.opacity === 0.94, "infantry death sprites stay readable during their hold interval");
   assert(plan.shadowOpacity >= 0.14 && plan.shadowOpacity <= 0.2, "infantry decal shadow keeps paint grounded");
+}
+
+{
+  const decal = {
+    id: 78,
+    kind: KIND.MACHINE_GUNNER,
+    decalClass: "infantry",
+    color: "#d55e00",
+    seed: 246813579,
+  };
+  const plan = createGroundDecalStampPlan(decal);
+  assert(plan.variantIndex === 4 + (decal.seed % 4),
+    "machine-gunner deaths select only the second four normalized variants");
+  assert(plan.color === 0xd55e00, "machine-gunner death sprites inherit their owner's team color");
 }
 
 {
