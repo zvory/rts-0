@@ -214,9 +214,7 @@ pub(crate) fn launch_world_ability(
                 e.clear_active_order();
                 e.set_path_goal(None);
             }
-            mortar_shells.schedule_rocket_barrage(
-                player, caster, from_x, from_y, x, y, tick,
-            );
+            mortar_shells.schedule_rocket_barrage(player, caster, from_x, from_y, x, y, tick);
             true
         }
         (AbilityEffectHook::DelayedWorld, AbilityKind::Smoke) => {
@@ -650,8 +648,7 @@ fn base_eligible(e: &crate::game::entity::Entity, player: u32, ability: AbilityK
         && e.is_unit()
         && !e.under_construction()
         && ability::carried_by(ability, e.kind)
-        && (ability == AbilityKind::Barrage
-            || e.ability_uses_remaining(ability).unwrap_or(1) > 0)
+        && (ability == AbilityKind::Barrage || e.ability_uses_remaining(ability).unwrap_or(1) > 0)
 }
 
 fn ability_weapon_cycle_ready(e: &crate::game::entity::Entity, ability: AbilityKind) -> bool {
@@ -705,13 +702,17 @@ pub(crate) fn world_ability_current_facing_ready(
     x: f32,
     y: f32,
 ) -> bool {
-    if ability != AbilityKind::MortarFire {
+    if !matches!(ability, AbilityKind::MortarFire | AbilityKind::Barrage) {
         return true;
     }
     let Some(e) = entities.get(caster) else {
         return false;
     };
-    if e.kind != EntityKind::MortarTeam {
+    if !matches!(
+        (ability, e.kind),
+        (AbilityKind::MortarFire, EntityKind::MortarTeam)
+            | (AbilityKind::Barrage, EntityKind::RocketLauncher)
+    ) {
         return false;
     }
     let target_angle = (y - e.pos_y).atan2(x - e.pos_x);

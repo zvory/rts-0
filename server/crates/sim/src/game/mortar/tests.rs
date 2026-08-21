@@ -68,6 +68,54 @@ fn half_turn_completes_in_two_hundred_ms() {
 }
 
 #[test]
+fn rocket_damage_is_reduced_except_for_armor_piercing_direct_hits() {
+    let inner2 = (config::MORTAR_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2);
+    let inner = shell_damage(true, 0.0, inner2, false);
+    let outer = shell_damage(true, inner2 + 1.0, inner2, false);
+    let direct = shell_damage(true, 0.0, inner2, true);
+
+    assert_eq!(inner, 75);
+    assert_eq!(outer, 30);
+    assert_eq!(direct, 100);
+    assert_eq!(
+        shell_effective_damage(EntityKind::Tank, true, inner, false),
+        18
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::Tank, true, outer, false),
+        7
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::Tank, true, direct, true),
+        100
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::Rifleman, true, inner, false),
+        75
+    );
+}
+
+#[test]
+fn rocket_impact_point_uses_the_target_body_for_direct_hits() {
+    let mut entities = EntityStore::new();
+    let tank_id = entities
+        .spawn_unit(2, EntityKind::Tank, 160.0, 160.0)
+        .expect("tank should spawn");
+    let tank = entities.get(tank_id).expect("tank should exist");
+
+    assert!(impact_point_hits_target(
+        160.0 + tank.radius() - 0.1,
+        160.0,
+        tank
+    ));
+    assert!(!impact_point_hits_target(
+        160.0 + tank.radius() + 0.1,
+        160.0,
+        tank
+    ));
+}
+
+#[test]
 fn mortar_under_attack_notice_goes_to_victim_owner_not_teammate() {
     let map = open_map(20);
     let mut entities = EntityStore::new();

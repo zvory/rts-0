@@ -49,5 +49,7 @@ and ability use are deferred. The unit is enabled in ordinary play and Lab autho
 - AI: may perceive, attack, and be damaged by Rocket Trucks, but does not build or command them
   in this prototype.
 
-Deferred tuning: unit economy/body stats, scatter radius, per-rocket damage, flight timing, reload,
-AI usage, final art/animation, audio, and strategic counters.
+Current tuning: 6-tile scatter radius; 30 outer / 75 inner splash per rocket, with 100
+armor-piercing damage when the impact point intersects a target. Deferred tuning: unit
+economy/body stats, flight timing, reload, AI usage, final art/animation, audio, and strategic
+counters.

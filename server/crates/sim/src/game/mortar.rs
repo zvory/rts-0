@@ -306,25 +306,29 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
             continue;
         }
         let d2 = dist2(shell.x, shell.y, target.pos_x, target.pos_y);
-        if d2 <= outer2 {
-            let base = if d2 <= inner2 {
-                config::MORTAR_INNER_DAMAGE
-            } else {
-                config::MORTAR_OUTER_DAMAGE
-            };
-            hits.push((id, base, target.owner, target.pos_x, target.pos_y));
+        let direct_hit = shell.rocket && impact_point_hits_target(shell.x, shell.y, target);
+        if direct_hit || d2 <= outer2 {
+            let base = shell_damage(shell.rocket, d2, inner2, direct_hit);
+            hits.push((
+                id,
+                base,
+                direct_hit,
+                target.owner,
+                target.pos_x,
+                target.pos_y,
+            ));
         }
     }
-    hits.sort_by_key(|(id, _, _, _, _)| *id);
+    hits.sort_by_key(|(id, _, _, _, _, _)| *id);
     let reveal = mortar_reveal_for(entities.get(shell.attacker), shell.owner);
     let mut reveal_recipients = Vec::new();
-    for (id, base, victim_owner, tx, ty) in hits {
+    for (id, base, direct_hit, victim_owner, tx, ty) in hits {
         let effective = entities
             .get(id)
             .map(|target| {
                 let damage = entrenchment_combat::reduce_area_damage(
                     target,
-                    mortar_damage(target.kind, base),
+                    shell_effective_damage(target.kind, shell.rocket, base, direct_hit),
                 );
                 map.damage_after_reduction_tile(target.pos_x, target.pos_y, damage)
             })
@@ -406,6 +410,46 @@ fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
         base,
         Some(TerrainKind::Open),
     )
+}
+
+fn shell_damage(rocket: bool, d2: f32, inner2: f32, direct_hit: bool) -> u32 {
+    if !rocket {
+        return if d2 <= inner2 {
+            config::MORTAR_INNER_DAMAGE
+        } else {
+            config::MORTAR_OUTER_DAMAGE
+        };
+    }
+    if direct_hit {
+        config::ROCKET_BARRAGE_DIRECT_DAMAGE
+    } else if d2 <= inner2 {
+        config::ROCKET_BARRAGE_INNER_DAMAGE
+    } else {
+        config::ROCKET_BARRAGE_OUTER_DAMAGE
+    }
+}
+
+fn shell_effective_damage(
+    victim_kind: EntityKind,
+    rocket: bool,
+    base: u32,
+    direct_hit: bool,
+) -> u32 {
+    if rocket && direct_hit {
+        base
+    } else {
+        mortar_damage(victim_kind, base)
+    }
+}
+
+fn impact_point_hits_target(x: f32, y: f32, target: &Entity) -> bool {
+    if let Some(stats) = config::building_stats(target.kind) {
+        let half_w = stats.foot_w as f32 * config::TILE_SIZE as f32 * 0.5;
+        let half_h = stats.foot_h as f32 * config::TILE_SIZE as f32 * 0.5;
+        return (x - target.pos_x).abs() <= half_w && (y - target.pos_y).abs() <= half_h;
+    }
+    let radius = target.radius();
+    dist2(x, y, target.pos_x, target.pos_y) <= radius * radius
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -277,7 +277,7 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: TICK_HZ * 15,
     charges: 1,
     cost: Object.freeze({ steel: 0, oil: 75 }),
-    radiusTiles: 4,
+    radiusTiles: 6,
     upgradeRequirement: UPGRADE.ROCKETS,
     queued: true,
     queuePolicy: "waitUntilReady",

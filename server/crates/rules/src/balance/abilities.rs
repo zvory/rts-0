@@ -36,7 +36,10 @@ pub const ROCKET_BARRAGE_UNLOAD_TICKS: u32 = TICK_HZ * 2;
 // Cooldown starts when the manual barrage begins and lasts fifteen seconds.
 pub const ROCKET_BARRAGE_RELOAD_TICKS: u16 = (TICK_HZ as u16) * 15;
 pub const ROCKET_BARRAGE_COST_OIL: u32 = 75;
-pub const ROCKET_BARRAGE_SCATTER_RADIUS_TILES: f32 = 4.0;
+pub const ROCKET_BARRAGE_SCATTER_RADIUS_TILES: f32 = 6.0;
+pub const ROCKET_BARRAGE_DIRECT_DAMAGE: u32 = 100;
+pub const ROCKET_BARRAGE_INNER_DAMAGE: u32 = 75;
+pub const ROCKET_BARRAGE_OUTER_DAMAGE: u32 = 30;
 
 pub const EKAT_CONSUME_GOLEM_RANGE_TILES: u32 = 2;
 pub const EKAT_TELEPORT_RANGE_TILES: u32 = 5;
