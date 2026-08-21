@@ -28,6 +28,32 @@ pub trait Passability {
     fn movement_cost(&self, _tx: i32, _ty: i32, _base_step_cost: u32) -> u32 {
         0
     }
+
+    /// Return the extra cost for a directed edge, or `None` when the edge is illegal.
+    ///
+    /// The default deliberately preserves the legacy query order. Pathing graph views override
+    /// this with one contiguous table read while simple test oracles can remain tile-based.
+    fn edge_extra_cost(
+        &self,
+        from_tx: i32,
+        from_ty: i32,
+        dx: i32,
+        dy: i32,
+        base_step_cost: u32,
+    ) -> Option<u32> {
+        let tx = from_tx + dx;
+        let ty = from_ty + dy;
+        if !self.passable(tx, ty) {
+            return None;
+        }
+        if dx != 0
+            && dy != 0
+            && (!self.passable(from_tx + dx, from_ty) || !self.passable(from_tx, from_ty + dy))
+        {
+            return None;
+        }
+        Some(self.movement_cost(tx, ty, base_step_cost))
+    }
 }
 
 /// A* node in the open set, ordered by `f = g + h` (min-heap via `Reverse`-style `Ord`).
@@ -201,16 +227,9 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
         for (dir, &(dx, dy, cost)) in NEIGHBORS.iter().enumerate() {
             let nx = cur.tx + dx;
             let ny = cur.ty + dy;
-            if !pass.passable(nx, ny) {
+            let Some(extra_cost) = pass.edge_extra_cost(cur.tx, cur.ty, dx, dy, cost) else {
                 continue;
-            }
-            // No corner-cutting on diagonals: both orthogonally-adjacent tiles must be open.
-            if dx != 0
-                && dy != 0
-                && (!pass.passable(cur.tx + dx, cur.ty) || !pass.passable(cur.tx, cur.ty + dy))
-            {
-                continue;
-            }
+            };
 
             let dir = dir as u8;
             let turn_cost = if turn_penalty > 0 && cur.dir != NO_INCOMING_DIR && cur.dir != dir {
@@ -228,7 +247,7 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
                 .g
                 .saturating_add(cost)
                 .saturating_add(turn_cost)
-                .saturating_add(pass.movement_cost(nx, ny, cost));
+                .saturating_add(extra_cost);
             let better = match scratch.get_g(next_key) {
                 Some(existing) => tentative < existing,
                 None => true,

@@ -322,7 +322,7 @@ architecture failures.
 | `starting_loadout` | `compatibility metadata` | Serialize until legacy/global-starting-resource compatibility constructors are retired. Checkpoint import should prefer `starting_loadouts` for per-player setup facts. | The field is set by setup constructors and dev scenarios but does not feed the per-tick systems after match creation. |
 | `rng` | `authoritative/serialized` | Serialize the exact current generator state or an equivalent deterministic draw-stream state. Re-seeding from `seed` is not valid after any random draw. | `systems::run_tick` passes `&mut self.state.rng` into combat damage/miss logic; Phase 0.5 probes cloned RNG output as semantic state. |
 | `final_spatial` | `derived/rebuildable` | Do not serialize. Rebuild with `SpatialIndex::build(&entities, map.width, map.height)` after import, after lab mutations that change entity positions/existence, and after any derived-state wipe. | `DerivedState` owns the final post-tick spatial index used by snapshots. `tick_inner` stores the final `systems::run_tick` spatial result, and Phase 0.5/2/4 checkpoint proofs compare snapshots after clearing and rebuilding it. |
-| `pathing` | `derived/rebuildable` | Do not serialize reusable pathing cache/search entries. Recreate `PathingService` with the live default budget, cache capacity, and current tick alignment during import or derived-state rebuild. | `PathingService` cache/search bookkeeping only affects performance. Chosen unit paths, movement phases, waypoints, path goals, and throttling remain serialized on entities. Phase 0.5/2/4 tests prove clearing this cache does not change semantic state or fog-filtered snapshots. |
+| `pathing` | `derived/rebuildable` | Do not serialize reusable pathing cache/search entries or precomputed graph tables. Recreate `PathingService` with the live map content key, default budget, cache capacity, and current tick alignment during import, map replacement, or a full derived-state rebuild. | `PathingService` owns cache/search bookkeeping plus `PathGraph`: immutable authored-map/profile edges, page-COW dynamic edge tables, the exact ordered building topology key `(id, kind, pos_x_bits, pos_y_bits)`, and a monotonic table generation. Chosen unit paths, movement phases, waypoints, path goals, and throttling remain serialized on entities. Entity-only Lab repair retains graph pages but clears route-cache/search residency at the legacy boundary; map replacement clears the graph. Phase 0.5/2/4 tests prove clearing this derived owner does not change semantic state or fog-filtered snapshots. |
 
 The Phase 0.5 and Phase 2 derived-state wipe harnesses confirm the current derived boundary: only
 `final_spatial` and `pathing` are cleared and rebuilt. Every current `GameState` field is treated as
@@ -359,8 +359,10 @@ recorded actions.
 Private checkpoint export/import remains internal test machinery. `GameCheckpointV1` payload helpers
 under `rts-sim::game` are used by the semantic comparator and validation tests; they do not define a
 public route, command, replay artifact format, lab setup format, UI affordance, or lobby/server
-call path by themselves. Lab world mutations reset the full `DerivedState` shell before rebuilding
-spatial state, so pathing cache and search state are cleared at the same rebuildable boundary.
+call path by themselves. Lab entity mutations rebuild final spatial state and clear pathing cache
+and dense-search residency at the existing repair boundary, while retaining the map-keyed graph so
+building changes can patch its dynamic pages locally. Lab map replacement and checkpoint restore
+replace the full `DerivedState` shell, including all graph tables.
 
 Phase 7 release audit for the ownership sequence:
 
@@ -619,7 +621,7 @@ Field map for Phase 2 DTO conversion:
 | `starting_loadout` | `startingLoadout` legacy compatibility object until global-start constructors are retired. Import prefers `startingLoadouts` when both are present and rejects contradictory values. |
 | `rng` | Top-level `rng` draw-stream descriptor with algorithm, seed, and consumed draw count. |
 | `final_spatial` | Omitted. Rebuild with `SpatialIndex::build(&entities, map.width, map.height)` after import and after any import repair. |
-| `pathing` | Omitted. Recreate `PathingService` with the live default budget, cache capacity, and current tick alignment; selected unit paths and goals are serialized on `entities`. |
+| `pathing` | Omitted. Recreate `PathingService` with the live map content key, default budget, cache capacity, and current tick alignment; selected unit paths and goals are serialized on `entities`. |
 
 Snapshots, compact snapshots, fog-filtered events, observer projections, selected debug-path
 projections, pathing caches/search queues, room sockets, connection buffers, replay playback
@@ -1277,12 +1279,34 @@ and building line-of-sight blockers while still using active smoke clouds as blo
 It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
 pathing, and movement; post-movement state for combat and economy queries; pre-collision state
 after production/construction/death mutations; collision-displacement snapshots for entrenchment;
-and final state for snapshot interest filtering. The three phase occupancy snapshots compare an
-exact id/owner/kind/position-bit vector for every building and share immutable blocker/clearance
-data within the tick when that topology is unchanged. A construction placement, building removal,
-owner change, or relocation rebuilds occupancy at the next boundary; spatial indexes continue to
-rebuild at every boundary. This preserves the named phase semantics without repeating the two
-full-map clearance-field builds after unit-only movement.
+and final state for snapshot interest filtering. The three phase occupancy snapshots compare the
+exact ordered `(id, kind, pos_x_bits, pos_y_bits)` vector for every building and share immutable
+blocker/clearance data within the tick when that topology is unchanged. Construction placement,
+building removal, or relocation rebuilds occupancy at the next boundary; owner/completion and unit
+movement do not affect owner-independent topology. Spatial indexes continue to rebuild at every
+boundary. This preserves the named phase semantics without repeating the two full-map
+clearance-field builds after unit-only movement.
+
+`PathGraph` is the longer-lived pathing projection inside `DerivedState.pathing`. Its authored-map
+content key is computed when the room/map owner is created and covers dimensions, row-major
+terrain/roads, elevation, doodads/trees, no-vehicle tiles, slow-movement tiles, and the remaining
+materialized map overlays. Immutable and current directed edges are stored by proven routing
+profile: infantry-like normal, vehicle-body normal, and oriented vehicle-clearance/pinch (with
+radius as a profile parameter). Each tile has one passability byte and eight `u32` extra-cost
+entries in legacy direction order; `u32::MAX` is the illegal-edge sentinel. Base-step and turn
+costs remain outside the table so A* keeps the legacy saturating-add order, heap/tie order,
+heuristic, cap, and fallback behavior.
+
+Dynamic tables use 256-tile copy-on-write pages so transactional Lab clones share unchanged graph
+memory. A movement-body fingerprint first rejects unchanged occupancy in O(1); on change, the graph
+diffs the old/current blocker bitsets and recomputes only edge origins in a square around changed
+tiles. The exact bound is `max(radius + 2, 4 for vehicle-clearance else 2)` tiles: it covers the
+destination radius, diagonal orthogonal guards, oriented pinch corners, tree/current slow costs,
+vehicle corner grazes, and the three-tile preferred-clearance threshold plus the source-to-
+destination edge. Overlapping footprints are resolved from the complete current occupancy, so
+removing one blocker cannot reopen an edge held closed by another. The content-derived occupancy
+fingerprint remains the cache key and the monotonic graph generation decides only table refresh;
+generation never changes cache scheduling, validation, or request-resolution ticks.
 Systems should consume the derived-state object for their phase instead of carrying occupancy or
 spatial indexes across later mutations.
 

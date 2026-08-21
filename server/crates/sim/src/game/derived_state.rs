@@ -22,7 +22,11 @@ impl DerivedState {
     ) -> Self {
         DerivedState {
             final_spatial: SpatialIndex::build(entities, map.width, map.height),
-            pathing: PathingService::new(default_pathing_budget, pathing_cache_capacity),
+            pathing: PathingService::new_for_map(
+                default_pathing_budget,
+                pathing_cache_capacity,
+                map,
+            ),
         }
     }
 
@@ -48,6 +52,17 @@ impl DerivedState {
 
     pub(in crate::game) fn rebuild_final_spatial(&mut self, map: &Map, entities: &EntityStore) {
         self.final_spatial = SpatialIndex::build(entities, map.width, map.height);
+    }
+
+    pub(in crate::game) fn repair_after_lab_entity_mutation(
+        &mut self,
+        map: &Map,
+        entities: &EntityStore,
+    ) {
+        // Preserve graph tables so building changes take the bounded overlay-update path, while
+        // retaining the legacy Lab boundary that clears route-cache and dense-search residency.
+        self.pathing.clear_cache_and_search();
+        self.rebuild_final_spatial(map, entities);
     }
 
     #[allow(dead_code)]

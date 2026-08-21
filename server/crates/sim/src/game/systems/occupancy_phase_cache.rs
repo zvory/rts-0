@@ -1,20 +1,14 @@
-use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 
-/// Exact building facts that determine an [`Occupancy`] snapshot.
-///
-/// Positions use their bit representation so equality cannot produce a false cache hit. Entity
-/// iteration is id-ordered, making the complete vector deterministic without a probabilistic
-/// fingerprint. Include every building, even one whose current blocker class is `None`, so a
-/// future rule change cannot silently make the cache key incomplete.
 #[derive(Debug, PartialEq, Eq)]
 struct OccupancyTopology(Vec<OccupancyTopologyEntry>);
 
 #[derive(Debug, PartialEq, Eq)]
 struct OccupancyTopologyEntry {
     id: u32,
-    kind: EntityKind,
+    kind: crate::game::entity::EntityKind,
     pos_x_bits: u32,
     pos_y_bits: u32,
 }
@@ -88,6 +82,7 @@ impl<'a> OccupancyPhaseCache<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::entity::EntityKind;
     use crate::game::services::occupancy::footprint_center;
     use crate::protocol::terrain;
 
