@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation.
+- [x] Implemented and retained after passing the correctness and performance gates.
 
 ## Objective
 
@@ -104,6 +104,36 @@ Tell Phase 2 how much time remains in rich passability/cost evaluation, and mark
 
 ## Completion Evidence
 
-In the implementation commit, replace this text with the phase revision, verification commands,
-corpus and parity/oracle hashes, paired release measurements, memory result, and the exact Phase 2
-graph seam.
+Implemented manually without the phase runner or a PR. The frozen harness/reference revision is
+`e7ef438051bcdad2449823915a1e30bc99c9ca15`; the dense-search implementation revision is
+`57a91c48f6aff1142559407671df39c69e78ed82`. Raw paired measurements are checked in beside this
+document as `phase-1-results.json`.
+
+- Corpus v1 full workload hash: `23c2ab3020408f49`; all-cap semantic hash:
+  `e017b84139cd07db`. The release cold/search-backed lane hash is `9393917eb369f14a` and its semantic
+  hash is `d751fe462ad18702`. Baseline and candidate match on every path coordinate, world-waypoint
+  bit, expansion count, cap outcome, and benchmark output accumulator.
+- The independent test-only Dijkstra oracle resolves the effective goal first and compares raw
+  tile/state graph cost before waypoint conversion. Uncapped ordinary and direction-sensitive goal
+  paths equal the oracle cost. Twenty-four seeded map families across both profiles and caps
+  `{0, 1, 2, 8, 64, 4096, 32768}` match the retained tuple-`HashMap` implementation exactly.
+- Eleven alternating release pairs on an Apple M5 Pro produced 477.015 ms baseline versus
+  246.157 ms candidate median for 240 full reconstructed/converted cold requests: 1.938x faster,
+  paired median ratio 0.5160, one-sided bootstrap 90% upper ratio 0.5179. Baseline/candidate/ratio
+  MAD were 0.345%/0.245%/0.352%.
+- Eleven alternating 900-tick Hellhole pairs produced a median average tick ratio of 0.9457 with a
+  90% upper ratio of 0.9495; median p95 ratio was 0.9285. All 11 pairs improved. The generated
+  900-frame artifact was byte-identical (26,910,978 bytes, SHA-256
+  `7054deb3347441de285e252a8275de8e8eb2ca09e84795e25f1d121983e168e2`), and action, projectile,
+  death, shuttle, respawn, entity, and serialized-payload counters matched in every pair.
+- Dense retained scratch is 12 bytes/tile for ordinary searches and 96 bytes/tile plus a 12-byte
+  start sentinel for direction-sensitive searches. That is 190,512/1,524,108 bytes at 126x126 and
+  460,992/3,687,948 bytes at 196x196 when each profile is retained independently. Generation wrap
+  clears stamps once and restarts at generation 1; normal requests do not clear the arrays.
+- Phase 2 should keep `Passability::dimensions()` and `SearchScratch` as the seam: replace repeated
+  `Passability::passable`/`movement_cost` neighbor evaluation with profile edge-table lookup while
+  leaving dense state indices, heap entries/order, and reconstruction unchanged.
+
+Verification: the focused corpus/parity/oracle/wrap/memory tests; the full `rts-sim` nextest suite;
+`cargo clippy -p rts-sim --lib -- -D warnings`; sim architecture check; docs health; and
+`git diff --check`.

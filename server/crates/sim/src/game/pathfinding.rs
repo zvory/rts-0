@@ -11,13 +11,15 @@
 //! of freezing.
 
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
 
 use crate::config;
 
 /// A passability oracle the pathfinder queries per tile: terrain AND dynamic building
 /// footprints. Implemented by `systems`/`mod` which own the occupancy grid.
 pub trait Passability {
+    /// Finite tile bounds for dense search storage.
+    fn dimensions(&self) -> (u32, u32);
+
     /// Whether a unit may stand on / traverse this tile.
     fn passable(&self, tx: i32, ty: i32) -> bool;
 
@@ -95,38 +97,8 @@ const NO_INCOMING_DIR: u8 = u8::MAX;
 
 type SearchKey = (i32, i32, u8);
 
-/// Reusable A* working storage owned by the pathing service.
-///
-/// Searches are strictly sequential inside one room. Clearing these containers between requests
-/// preserves their allocations without making any search result depend on prior requests.
-#[derive(Default)]
-pub(super) struct SearchScratch {
-    open: BinaryHeap<Node>,
-    came_from: HashMap<SearchKey, SearchKey>,
-    g_score: HashMap<SearchKey, u32>,
-}
-
-impl Clone for SearchScratch {
-    fn clone(&self) -> Self {
-        debug_assert!(self.open.is_empty());
-        debug_assert!(self.came_from.is_empty());
-        debug_assert!(self.g_score.is_empty());
-        Self::default()
-    }
-}
-
-impl SearchScratch {
-    fn clear(&mut self) {
-        self.open.clear();
-        self.came_from.clear();
-        self.g_score.clear();
-    }
-
-    #[cfg(test)]
-    pub(super) fn retained_capacity(&self) -> usize {
-        self.came_from.capacity() + self.g_score.capacity()
-    }
-}
+mod scratch;
+pub(super) use scratch::SearchScratch;
 
 /// Find a tile path from `(sx, sy)` to `(gx, gy)` with a configurable expansion cap.
 ///
@@ -168,7 +140,7 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
     turn_penalty: u32,
     scratch: &mut SearchScratch,
 ) -> (Vec<(i32, i32)>, usize, bool) {
-    scratch.clear();
+    scratch.begin(pass.dimensions(), start, turn_penalty > 0);
     let (sx, sy) = start;
     let (gx, gy) = goal;
     if sx == gx && sy == gy {
@@ -191,7 +163,12 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
         ty: sy,
         dir: NO_INCOMING_DIR,
     });
-    scratch.g_score.insert(start_key, 0);
+    if let Some(start_index) = scratch.index(start_key) {
+        scratch.set_start(start_index);
+    } else {
+        scratch.finish();
+        return (Vec::new(), 0, false);
+    }
 
     // Track the explored tile closest to the goal for the best-effort fallback.
     let mut best_key = start_key;
@@ -203,13 +180,13 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
     while let Some(cur) = scratch.open.pop() {
         let cur_key = (cur.tx, cur.ty, cur.dir);
         if cur.tx == gx && cur.ty == gy {
-            let path = reconstruct(&scratch.came_from, cur_key);
-            scratch.clear();
+            let path = scratch.reconstruct(cur_key);
+            scratch.finish();
             return (path, expanded, budget_exhausted);
         }
 
         // Skip stale heap entries (a better g was found after this was pushed).
-        if let Some(&best_g) = scratch.g_score.get(&cur_key) {
+        if let Some(best_g) = scratch.get_g(cur_key) {
             if cur.g > best_g {
                 continue;
             }
@@ -252,13 +229,12 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
                 .saturating_add(cost)
                 .saturating_add(turn_cost)
                 .saturating_add(pass.movement_cost(nx, ny, cost));
-            let better = match scratch.g_score.get(&next_key) {
-                Some(&existing) => tentative < existing,
+            let better = match scratch.get_g(next_key) {
+                Some(existing) => tentative < existing,
                 None => true,
             };
             if better {
-                scratch.came_from.insert(next_key, cur_key);
-                scratch.g_score.insert(next_key, tentative);
+                scratch.set(next_key, tentative, cur_key);
                 let h = heuristic(nx, ny, gx, gy);
                 if h < best_h {
                     best_h = h;
@@ -277,11 +253,11 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
 
     // No complete path: head toward whatever we got closest to.
     let path = if (best_key.0, best_key.1) != (sx, sy) {
-        reconstruct(&scratch.came_from, best_key)
+        scratch.reconstruct(best_key)
     } else {
         Vec::new()
     };
-    scratch.clear();
+    scratch.finish();
     (path, expanded, budget_exhausted)
 }
 
@@ -319,15 +295,5 @@ fn nearest_passable<P: Passability>(pass: &P, tx: i32, ty: i32) -> Option<(i32, 
 
 /// Walk the `came_from` chain from `goal` back to the start, returning tiles in forward order
 /// excluding the start tile.
-fn reconstruct(came_from: &HashMap<SearchKey, SearchKey>, goal: SearchKey) -> Vec<(i32, i32)> {
-    let mut path = vec![(goal.0, goal.1)];
-    let mut cur = goal;
-    while let Some(&prev) = came_from.get(&cur) {
-        path.push((prev.0, prev.1));
-        cur = prev;
-    }
-    // path is goal..start; drop the start tile and reverse to start..goal forward order.
-    path.pop(); // remove the start tile
-    path.reverse();
-    path
-}
+#[cfg(test)]
+mod phase1_tests;
