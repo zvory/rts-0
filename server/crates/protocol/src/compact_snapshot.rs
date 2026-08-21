@@ -1171,16 +1171,19 @@ impl Serialize for CompactEvent<'_> {
                 } else {
                     4
                 };
-                let len = base_len + usize::from(*rocket);
+                // Keep the rocket style bit in its own stable trailing slot. Without the null
+                // placeholders, `[code, x, y, radius, true]` is ambiguous with the optional
+                // attacker id and causes the browser to reject the whole snapshot.
+                let len = if *rocket { 7 } else { base_len };
                 let mut seq = serializer.serialize_seq(Some(len))?;
                 seq.serialize_element(&event_code("mortarImpact"))?;
                 seq.serialize_element(x)?;
                 seq.serialize_element(y)?;
                 seq.serialize_element(radius_tiles)?;
-                if base_len > 4 {
+                if *rocket || base_len > 4 {
                     seq.serialize_element(from)?;
                 }
-                if base_len > 5 {
+                if *rocket || base_len > 5 {
                     seq.serialize_element(&reveal.as_ref().map(CompactAttackReveal))?;
                 }
                 if *rocket {
@@ -1402,6 +1405,48 @@ mod tests {
             }
             crate::SnapshotFrame::Binary(_) => panic!("compact JSON baseline codec must stay text"),
         }
+    }
+
+    #[test]
+    fn rocket_mortar_impact_keeps_optional_placeholders_before_style_bit() {
+        let snapshot = Snapshot {
+            tick: 1,
+            ground_decal_revision: 0,
+            ground_decal_delta: None,
+            world_combat_position: None,
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+            auto_build: None,
+            entities: Vec::new(),
+            resource_deltas: Vec::new(),
+            smokes: Vec::new(),
+            ability_objects: Vec::new(),
+            trenches: Vec::new(),
+            visible_tiles: Vec::new(),
+            explored_tiles: Vec::new(),
+            remembered_buildings: Vec::new(),
+            remembered_anti_tank_guns: Vec::new(),
+            events: vec![Event::MortarImpact {
+                from: None,
+                x: 320.0,
+                y: 352.0,
+                radius_tiles: 2.0,
+                reveal: None,
+                rocket: true,
+            }],
+            upgrades: Vec::new(),
+            player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
+        };
+
+        let value = compact_snapshot_value(&snapshot).unwrap();
+        let event = value["ev"][0].as_array().unwrap();
+        assert_eq!(event.len(), 7);
+        assert!(event[4].is_null());
+        assert!(event[5].is_null());
+        assert_eq!(event[6], true);
     }
 
     #[test]

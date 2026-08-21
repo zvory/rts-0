@@ -35,6 +35,14 @@ export const ROCKET_LAUNCHER_PARTS = Object.freeze({
     "part.rocket.6",
     "part.rocket.7",
     "part.rocket.8",
+    "part.rocket.cooldown.1",
+    "part.rocket.cooldown.2",
+    "part.rocket.cooldown.3",
+    "part.rocket.cooldown.4",
+    "part.rocket.cooldown.5",
+    "part.rocket.cooldown.6",
+    "part.rocket.cooldown.7",
+    "part.rocket.cooldown.8",
   ]),
 });
 
@@ -95,14 +103,22 @@ export const ROCKET_LAUNCHER_RIG_SVG = `<svg viewBox="-36 -28 72 56" data-rts-ri
   <rect id="part.cabin" x="8" y="-6" width="11" height="12" rx="2" fill="#ffffff" stroke="#17131a" stroke-width="1.5" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
   <line id="part.windshield" x1="9.5" y1="-4.5" x2="9.5" y2="4.5" stroke="#d8d0b0" stroke-width="1.5" opacity="0.72" data-rts-animation="facing:transform.rotation:1:0" />
   <rect id="part.rack" x="-18" y="-10" width="25" height="20" rx="2" fill="#ffffff" fill-opacity="0.9" stroke="#17131a" stroke-width="1.2" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.1" x1="-17" y1="-8" x2="5" y2="-8" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.2" x1="-17" y1="-5.8" x2="5" y2="-5.8" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.3" x1="-17" y1="-3.5" x2="5" y2="-3.5" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.4" x1="-17" y1="-1.2" x2="5" y2="-1.2" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.5" x1="-17" y1="1.2" x2="5" y2="1.2" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.6" x1="-17" y1="3.5" x2="5" y2="3.5" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.7" x1="-17" y1="5.8" x2="5" y2="5.8" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.8" x1="-17" y1="8" x2="5" y2="8" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.rocket.1" x="-17" y="-8.8" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.2" x="-17" y="-6.6" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.3" x="-17" y="-4.3" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.4" x="-17" y="-2" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.5" x="-17" y="0.4" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.6" x="-17" y="2.7" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.7" x="-17" y="5" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.8" x="-17" y="7.2" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.cooldown.1" x="-17" y="-8.8" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.2" x="-17" y="-6.6" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.3" x="-17" y="-4.3" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.4" x="-17" y="-2" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.5" x="-17" y="0.4" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.6" x="-17" y="2.7" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.7" x="-17" y="5" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.8" x="-17" y="7.2" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
   <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
   <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
   <circle id="anchor.hp" cx="0" cy="-24" r="1" fill="#ffffff" />

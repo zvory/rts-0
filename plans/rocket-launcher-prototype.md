@@ -38,8 +38,8 @@ and ability use are deferred. The unit is enabled in ordinary play and Lab autho
   existing Mortar target modifiers and friendly/allied splash behavior. Rockets use staggered
   flight delays so the barrage reads as many impacts rather than one pulse.
 - Economy/cooldown: the first barrage is free per launcher lifetime. A later barrage spends 75 oil
-  when authoritative execution begins. Reload is 150 ticks (5 seconds) after the last rocket
-  launches. An unaffordable queued barrage waits; a non-queued attempt is rejected with normal
+  when authoritative execution begins. Cooldown is 450 ticks (15 seconds) from activation, and the
+  rack tubes render dark gray until it completes. An unaffordable queued barrage waits; a non-queued attempt is rejected with normal
   resource feedback.
 - Targeting/cancellation: ground positions may be chosen through fog. Invalid coordinates, stale
   units, death, or loss of ownership are safe no-ops. Destroying the launcher does not cancel

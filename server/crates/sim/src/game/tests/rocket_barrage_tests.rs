@@ -57,7 +57,12 @@ fn order_barrage(game: &mut Game, launcher: u32, target: (f32, f32)) {
 
 #[test]
 fn first_barrage_is_free_and_unloads_sixteen_rockets() {
+    assert_eq!(config::ROCKET_BARRAGE_RELOAD_TICKS, config::TICK_HZ as u16 * 15);
     let (mut game, launcher, target) = fixture(0);
+    assert!(
+        !game.state.fog.is_visible_world(1, target.0, target.1),
+        "the regression target must begin outside the Rocket Truck's sight"
+    );
     order_barrage(&mut game, launcher, target);
 
     let mut launches = Vec::new();

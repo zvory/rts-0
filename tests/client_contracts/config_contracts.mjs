@@ -361,6 +361,10 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADES[UPGRADE.ROCKETS].researchTicks === ROCKETS_RESEARCH_TICKS,
     "Rockets research mirrors its server cost and duration",
   );
+  assert(
+    ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 15,
+    "Rocket Truck Barrage mirrors its fifteen-second cooldown",
+  );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
     STATS[KIND.TRAINING_CENTRE].researches.includes(UPGRADE.METHAMPHETAMINES),
