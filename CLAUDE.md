@@ -174,7 +174,13 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   for that artifact. Do not infer the user's device: they may be on a phone or desktop.
   Verify Tailscale state with `tailscale status --json`, start the server with `RTS_ADDR=0.0.0.0:8080 cargo run
   --release` if port 8080 is not already served, then provide an `http://<Tailscale-IP>:8080/...`
-  link rather than requiring a beta deployment. For a live spectator AI matchup, use the existing
+  link rather than requiring a beta deployment. Any user-facing link backed by a live local server
+  must remain available for 12 hours by default unless the user requests another lifetime. Launch
+  the server with a durable host-level background/keepalive mechanism and timed cleanup; do not rely
+  on an agent tool's foreground shell session. Verify the detached server is healthy before sharing
+  the link, and tell the user when it expires. If an existing listener cannot be confirmed durable
+  for the full window, use another free port without killing or replacing it. For a live spectator
+  AI matchup, use the existing
   launch convention with a fresh room name, for example `/?rtsLaunch=match&rtsRoom=mobile-ai-<unique>&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1`.
   This starts an ordinary authoritative AI-vs-AI room. Prefer a Tailscale Serve HTTPS URL only when
   `tailscale serve status` already reports a working endpoint; do not block a preview on the one-time
