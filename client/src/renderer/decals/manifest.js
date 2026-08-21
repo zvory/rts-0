@@ -10,20 +10,14 @@ function asset(id, file, width, height) {
 }
 
 export const INFANTRY_DECAL_ASSETS = Object.freeze([
-  asset("infantry-splash-01", "infantry-splash-01.svg", 32, 32),
-  asset("infantry-splash-02", "infantry-splash-02.svg", 32, 32),
-  asset("infantry-splash-03", "infantry-splash-03.svg", 32, 32),
-  asset("infantry-splash-04", "infantry-splash-04.svg", 32, 32),
-  asset("infantry-splash-05", "infantry-splash-05.svg", 32, 32),
-  asset("infantry-splash-06", "infantry-splash-06.svg", 32, 32),
-  asset("infantry-splash-07", "infantry-splash-07.svg", 32, 32),
-  asset("infantry-splash-08", "infantry-splash-08.svg", 32, 32),
-  asset("infantry-splash-09", "infantry-splash-09.svg", 32, 32),
-  asset("infantry-splash-10", "infantry-splash-10.svg", 32, 32),
-  asset("infantry-splash-11", "infantry-splash-11.svg", 32, 32),
-  asset("infantry-splash-12", "infantry-splash-12.svg", 32, 32),
-  asset("infantry-splash-13", "infantry-splash-13.svg", 32, 32),
-  asset("infantry-splash-14", "infantry-splash-14.svg", 32, 32),
+  asset("rifleman-death-01", "infantry-deaths/rifleman-death-01.png", 224, 160),
+  asset("rifleman-death-02", "infantry-deaths/rifleman-death-02.png", 224, 160),
+  asset("rifleman-death-03", "infantry-deaths/rifleman-death-03.png", 224, 160),
+  asset("rifleman-death-04", "infantry-deaths/rifleman-death-04.png", 224, 160),
+  asset("machine-gunner-death-01", "infantry-deaths/machine-gunner-death-01.png", 224, 160),
+  asset("machine-gunner-death-02", "infantry-deaths/machine-gunner-death-02.png", 224, 160),
+  asset("machine-gunner-death-03", "infantry-deaths/machine-gunner-death-03.png", 224, 160),
+  asset("machine-gunner-death-04", "infantry-deaths/machine-gunner-death-04.png", 224, 160),
 ]);
 
 export const VEHICLE_SCORCH_DECAL_ASSETS = Object.freeze([

@@ -6,7 +6,9 @@ import { KIND } from "../../client/src/protocol.js";
 import { GroundDecalBuffer } from "../../client/src/state_ground_decals.js";
 import {
   GROUND_DECAL_TEXTURE_WORLD_SCALE,
+  MAX_TRANSIENT_CORPSE_SPRITES,
 } from "../../client/src/renderer/decals.js";
+import { GROUND_DECAL_PNG_ATLAS } from "../../client/src/renderer/decals/atlas.generated.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 
 const STRESS_DECAL_COUNT = 1200;
@@ -26,6 +28,10 @@ class RecordingCanvasContext {
   clearRect(x, y, w, h) { this.calls.push(["clearRect", x, y, w, h]); }
   fillRect(x, y, w, h) { this.calls.push(["fillRect", x, y, w, h]); }
   drawImage(...args) { this.calls.push(["drawImage", ...args]); }
+  getImageData(_x, _y, width, height) {
+    return { data: new Uint8ClampedArray(width * height * 4), width, height };
+  }
+  putImageData(imageData, x, y) { this.calls.push(["putImageData", imageData.width, imageData.height, x, y]); }
   beginPath() { this.calls.push(["beginPath"]); }
   moveTo(x, y) { this.calls.push(["moveTo", x, y]); }
   lineTo(x, y) { this.calls.push(["lineTo", x, y]); }
@@ -91,7 +97,11 @@ class RecordingCanvasContext {
     getContext() { return this.context; }
   };
   globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
-  globalThis.createImageBitmap = async () => ({ width: 1928, height: 216, close() {} });
+  globalThis.createImageBitmap = async () => ({
+    width: GROUND_DECAL_PNG_ATLAS.width,
+    height: GROUND_DECAL_PNG_ATLAS.height,
+    close() {},
+  });
 
   try {
     const renderer = await Renderer.create(fakeParent());
@@ -117,7 +127,8 @@ class RecordingCanvasContext {
     assert(diagnostics.textureWidth === EXPECTED_DECAL_TEXTURE_SIZE, "126x126 map decal texture width is downsampled to 1008px");
     assert(diagnostics.textureHeight === EXPECTED_DECAL_TEXTURE_SIZE, "126x126 map decal texture height is downsampled to 1008px");
     assert(diagnostics.downsample === GROUND_DECAL_TEXTURE_WORLD_SCALE, "decal diagnostics expose the texture downsample");
-    assert(diagnostics.layerChildCount === 1, "stress renderer keeps one permanent decal display object");
+    assert(diagnostics.layerChildCount === 1 + MAX_TRANSIENT_CORPSE_SPRITES,
+      "stress renderer caps transient corpse sprites while retaining one permanent decal surface");
 
     const decalCtx = canvasContexts[1];
     const callsAfterStamp = decalCtx.calls.length;
@@ -127,14 +138,16 @@ class RecordingCanvasContext {
     diagnostics = renderer.groundDecalDiagnostics();
     assert(decalCtx.calls.length === callsAfterStamp, "normal render frames do not redraw old decal pixels");
     assert(diagnostics.textureUpdateCount === 1, "normal render frames do not update the decal texture without new deaths");
-    assert(diagnostics.layerChildCount === 1, "normal render frames do not add historical decal display objects");
+    assert(diagnostics.layerChildCount === 1 + MAX_TRANSIENT_CORPSE_SPRITES,
+      "normal render frames do not add historical corpse display objects");
 
     pendingBatches.push(makeDecalBatch(40000, 9));
     renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1);
     diagnostics = renderer.groundDecalDiagnostics();
     assert(diagnostics.totalStamped === STRESS_DECAL_COUNT + 9, "new deaths append to the existing decal texture");
     assert(diagnostics.textureUpdateCount === 2, "texture updates track new-death batches, not historical decal count");
-    assert(diagnostics.layerChildCount === 1, "additional batches still use one decal display object");
+    assert(diagnostics.layerChildCount === 1 + MAX_TRANSIENT_CORPSE_SPRITES,
+      "additional deaths evict the oldest transient corpses at the display-object cap");
 
     const oldSprite = renderer._groundDecals.sprite;
     const replacementBatch = makeDecalBatch(50000, 49);
@@ -234,7 +247,7 @@ function makeDecalBatch(baseId, count) {
     const mortar = decalType === 2;
     out.push({
       id: baseId + i,
-      kind: infantry ? KIND.WORKER : scorch ? KIND.TANK : mortar ? KIND.MORTAR_TEAM : KIND.ARTILLERY,
+      kind: infantry ? KIND.RIFLEMAN : scorch ? KIND.TANK : mortar ? KIND.MORTAR_TEAM : KIND.ARTILLERY,
       decalClass: infantry ? "infantry" : scorch ? "scorch" : mortar ? "mortarBlast" : "artilleryBlast",
       x: 16 + (i % 80) * 50,
       y: 24 + Math.floor(i / 80) * 240,

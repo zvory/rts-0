@@ -669,6 +669,7 @@ export class Renderer {
       }),
     );
     time("renderer.groundDecals", () => {
+      this._groundDecals?.updateInfantryCorpseFades?.(this.visualNow());
       let stagedGroundDecals = false;
       this._drawSafely(
         "groundDecals",

@@ -276,6 +276,57 @@ assert(
     }]);
     assert(decalLayer.texture.sourceUpdateCount === 1 && decalLayer.texture.textureUpdateCount === 0,
       "ground decals upload dynamic canvas pixels through Pixi v8 TextureSource.update");
+
+    const corpseLayer = new GroundDecalLayer({
+      layer: new PIXI.Container(),
+      createCanvas: () => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          clearRect() {},
+          drawImage() {},
+          save() {},
+          restore() {},
+          translate() {},
+          rotate() {},
+          scale() {},
+          beginPath() {},
+          ellipse() {},
+          fill() {},
+          getImageData: (_x, _y, width, height) => ({
+            data: new Uint8ClampedArray(width * height * 4), width, height,
+          }),
+          putImageData() {},
+        }),
+      }),
+    });
+    corpseLayer.resetForMap(map);
+    corpseLayer.atlas = {
+      infantry: Array.from({ length: 8 }, (_unused, index) => ({
+        id: `infantry-${index}`,
+        width: 8,
+        height: 8,
+        sourceX: index * 8,
+        sourceY: 0,
+        image: {},
+      })),
+    };
+    corpseLayer.assetStatus = "ready";
+    corpseLayer.updateInfantryCorpseFades(1000);
+    assert(corpseLayer.stampBatch([
+      { id: 50, decalClass: "infantry", kind: KIND.RIFLEMAN, x: 32, y: 32, color: "#4878c8", seed: 1 },
+      { id: 51, decalClass: "infantry", kind: KIND.MACHINE_GUNNER, x: 64, y: 32, color: "#d55e00", seed: 2 },
+      { id: 52, decalClass: "infantry", kind: KIND.WORKER, x: 96, y: 32, color: "#4878c8", seed: 3 },
+    ]) === 3 && corpseLayer._corpseSprites.length === 2 && corpseLayer.layer.children.length === 3,
+    "authored rifle and machine-gunner deaths use transient sprites while unsupported infantry keep the raster fallback");
+    corpseLayer.updateInfantryCorpseFades(4000);
+    assert(corpseLayer._corpseSprites.every(({ sprite }) => sprite.alpha === 0.47),
+      "authored infantry deaths fade after their 1.8 second hold interval");
+    corpseLayer.updateInfantryCorpseFades(5200);
+    assert(corpseLayer._corpseSprites.length === 0 && corpseLayer.layer.children.length === 1,
+      "authored infantry deaths destroy their sprites and textures after fading");
+    corpseLayer.destroy();
+
     const tank = { id: 40, kind: KIND.TANK, owner: 2, hp: 100, x: 40, y: 80, facing: 0 };
     assert(decalLayer.stampLiveTankTreads([tank]) === 0,
       "the first visible enemy tank pose initializes tread contact without painting");

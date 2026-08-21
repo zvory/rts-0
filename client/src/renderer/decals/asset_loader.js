@@ -57,7 +57,7 @@ export function validateAtlasCoverage(sourceManifest, atlasManifest) {
   for (const [group, assets] of Object.entries(sourceManifest || {})) {
     const rects = atlasManifest.groups?.[group];
     if (!Array.isArray(rects) || rects.length !== assets.length) {
-      throw new Error(`ground decal PNG atlas group ${group} does not cover its SVG sources`);
+      throw new Error(`ground decal PNG atlas group ${group} does not cover its authored sources`);
     }
     for (let index = 0; index < assets.length; index += 1) {
       const source = assets[index];

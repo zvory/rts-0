@@ -30,15 +30,17 @@ export function createGroundDecalStampPlan(decal, {
   const rng = mulberry32(seed);
   const color = normalizeColorNumber(decal.color);
   if (decal.decalClass === DECAL_CLASS_INFANTRY) {
+    const machineGunnerOffset = decal.kind === "machine_gunner" ? 4 : 0;
+    const infantryVariantCount = Math.min(4, Math.max(0, assetCounts.infantry - machineGunnerOffset));
     return {
       decalClass: DECAL_CLASS_INFANTRY,
       color,
-      variantIndex: pickIndex(seed, assetCounts.infantry),
+      variantIndex: machineGunnerOffset + pickIndex(seed, infantryVariantCount),
       rotation: seededAngle(rng),
-      scale: 0.86 + rng() * 0.28,
+      scale: 1,
       flipX: rng() < 0.5 ? -1 : 1,
       flipY: rng() < 0.18 ? -1 : 1,
-      opacity: 0.54 + rng() * 0.16,
+      opacity: 0.94,
       shadowOpacity: 0.14 + rng() * 0.06,
       offsetWorldX: (rng() - 0.5) * 5,
       offsetWorldY: (rng() - 0.5) * 5,

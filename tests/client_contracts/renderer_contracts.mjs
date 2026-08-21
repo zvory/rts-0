@@ -3,6 +3,7 @@ import { FrameProfiler } from "../../client/src/frame_profiler.js";
 import { COLORS } from "../../client/src/config.js";
 import { KIND, STATE, TERRAIN } from "../../client/src/protocol.js";
 import { GROUND_DECAL_TEXTURE_WORLD_SCALE } from "../../client/src/renderer/decals.js";
+import { GROUND_DECAL_PNG_ATLAS } from "../../client/src/renderer/decals/atlas.generated.js";
 import { createRigRenderContext, rigContainerScale } from "../../client/src/renderer/rigs/animation.js";
 import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
 import { inlineSvgImageSources } from "../../client/src/minimap_icon_image.js";
@@ -24,7 +25,6 @@ import {
   _drawResourceMiningPreview,
 } from "../../client/src/renderer/feedback.js";
 import { installFakePixi, RecordingGraphics } from "./pixi_fakes.mjs";
-
 function restoreGlobal(name, value) {
   if (value === undefined) delete globalThis[name];
   else globalThis[name] = value;
@@ -452,7 +452,7 @@ assert(
     },
   };
   globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
-  globalThis.createImageBitmap = async () => ({ width: 1928, height: 216, close() {} });
+  globalThis.createImageBitmap = async () => ({ ...GROUND_DECAL_PNG_ATLAS, close() {} });
   try {
     const parent = {
       clientWidth: 640,
@@ -645,7 +645,7 @@ assert(
     },
   };
   globalThis.fetch = async () => ({ ok: true, blob: async () => ({}) });
-  globalThis.createImageBitmap = async () => ({ width: 1928, height: 216, close() {} });
+  globalThis.createImageBitmap = async () => ({ ...GROUND_DECAL_PNG_ATLAS, close() {} });
   try {
     const parent = {
       clientWidth: 640,
@@ -685,7 +685,7 @@ assert(
       },
     };
     renderer._drawGroundDecals(state);
-    assert(renderer.layers.decals.children.length === 1, "stamping many decals does not create per-death display objects");
+    assert(renderer.layers.decals.children.length === 1, "stamping many fallback decals does not create per-death display objects");
     assert(renderer._groundDecals.totalStamped === 120, "renderer stamps all queued decals into the permanent texture");
     assert(renderer._groundDecals.textureUpdateCount === 1, "renderer updates the decal texture once per consumed batch");
     renderer._drawGroundDecals(state);
