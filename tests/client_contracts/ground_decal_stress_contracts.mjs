@@ -104,7 +104,9 @@ class RecordingCanvasContext {
   });
 
   try {
-    const renderer = await Renderer.create(fakeParent());
+    const renderer = await Renderer.create(fakeParent(), {
+      renderClock: { now: () => 1_000 },
+    });
     muteRenderOverlays(renderer);
     const map = {
       width: CURRENT_MAP_TILES,
