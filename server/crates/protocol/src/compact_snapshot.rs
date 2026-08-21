@@ -1141,14 +1141,19 @@ impl Serialize for CompactEvent<'_> {
                 to_y,
                 radius_tiles,
                 delay_ticks,
+                rocket,
             } => {
-                let mut seq = serializer.serialize_seq(Some(6))?;
+                let len = if *rocket { 7 } else { 6 };
+                let mut seq = serializer.serialize_seq(Some(len))?;
                 seq.serialize_element(&event_code("mortarLaunch"))?;
                 seq.serialize_element(from)?;
                 seq.serialize_element(&[from_x, from_y])?;
                 seq.serialize_element(&[to_x, to_y])?;
                 seq.serialize_element(radius_tiles)?;
                 seq.serialize_element(delay_ticks)?;
+                if *rocket {
+                    seq.serialize_element(rocket)?;
+                }
                 seq.end()
             }
             Event::MortarImpact {
@@ -1157,24 +1162,29 @@ impl Serialize for CompactEvent<'_> {
                 y,
                 radius_tiles,
                 reveal,
+                rocket,
             } => {
-                let len = if reveal.is_some() {
+                let base_len = if reveal.is_some() {
                     6
                 } else if from.is_some() {
                     5
                 } else {
                     4
                 };
+                let len = base_len + usize::from(*rocket);
                 let mut seq = serializer.serialize_seq(Some(len))?;
                 seq.serialize_element(&event_code("mortarImpact"))?;
                 seq.serialize_element(x)?;
                 seq.serialize_element(y)?;
                 seq.serialize_element(radius_tiles)?;
-                if len > 4 {
+                if base_len > 4 {
                     seq.serialize_element(from)?;
                 }
-                if len > 5 {
+                if base_len > 5 {
                     seq.serialize_element(&reveal.as_ref().map(CompactAttackReveal))?;
+                }
+                if *rocket {
+                    seq.serialize_element(rocket)?;
                 }
                 seq.end()
             }

@@ -77,6 +77,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::BlanketFire => 9,
         AbilityKind::DismissScoutPlane => 10,
         AbilityKind::ScoutPlane => 11,
+        AbilityKind::Barrage => 12,
     }
 }
 
@@ -94,6 +95,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         9 => Some(AbilityKind::BlanketFire),
         10 => Some(AbilityKind::DismissScoutPlane),
         11 => Some(AbilityKind::ScoutPlane),
+        12 => Some(AbilityKind::Barrage),
         _ => None,
     }
 }
@@ -101,7 +103,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
 pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
     match kind {
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
-        AbilityKind::Smoke | AbilityKind::MortarFire => AbilityEffectHook::DelayedWorld,
+        AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::Barrage => AbilityEffectHook::DelayedWorld,
         AbilityKind::PointFire | AbilityKind::BlanketFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
         AbilityKind::ScoutPlane => AbilityEffectHook::ScoutPlane,

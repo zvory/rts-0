@@ -24,7 +24,12 @@ struct MortarShell {
     attacker: u32,
     x: f32,
     y: f32,
+    from_x: f32,
+    from_y: f32,
+    launch_tick: u32,
     impact_tick: u32,
+    launched: bool,
+    rocket: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -103,7 +108,12 @@ impl MortarShellStore {
             attacker,
             x,
             y,
+            from_x,
+            from_y,
+            launch_tick: tick,
             impact_tick: tick.saturating_add(delay_ticks),
+            launched: true,
+            rocket: false,
         });
         emit_launch(
             events,
@@ -117,7 +127,55 @@ impl MortarShellStore {
             y,
             false,
             delay_ticks,
+            false,
         );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn schedule_rocket_barrage(
+        &mut self,
+        owner: u32,
+        attacker: u32,
+        from_x: f32,
+        from_y: f32,
+        center_x: f32,
+        center_y: f32,
+        tick: u32,
+    ) {
+        let count = config::ROCKET_BARRAGE_ROCKETS.max(1);
+        for index in 0..count {
+            let launch_offset = if count <= 1 {
+                0
+            } else {
+                index.saturating_mul(config::ROCKET_BARRAGE_UNLOAD_TICKS) / (count - 1)
+            };
+            let mut seed = attacker
+                .wrapping_mul(0x9e37_79b9)
+                .wrapping_add(tick)
+                .wrapping_add(index.wrapping_mul(0x85eb_ca6b));
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            let angle = (seed as f32 / u32::MAX as f32) * std::f32::consts::TAU;
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            let radius = (seed as f32 / u32::MAX as f32).sqrt()
+                * config::ROCKET_BARRAGE_SCATTER_RADIUS_TILES
+                * config::TILE_SIZE as f32;
+            let launch_tick = tick.saturating_add(launch_offset);
+            let flight_ticks = config::TICK_HZ + (index % 5) * 3;
+            self.shells.push(MortarShell {
+                owner,
+                attacker,
+                x: center_x + angle.cos() * radius,
+                y: center_y + angle.sin() * radius,
+                from_x,
+                from_y,
+                launch_tick,
+                impact_tick: launch_tick.saturating_add(flight_ticks),
+                launched: false,
+                rocket: true,
+            });
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -134,8 +192,26 @@ impl MortarShellStore {
     ) {
         let mut pending = Vec::new();
         let due = std::mem::take(&mut self.shells);
-        for shell in due {
-            if shell.impact_tick <= tick {
+        for mut shell in due {
+            if !shell.launched && shell.launch_tick <= tick {
+                let delay_ticks = shell.impact_tick.saturating_sub(tick);
+                emit_launch(
+                    events,
+                    fog,
+                    teams,
+                    shell.owner,
+                    shell.attacker,
+                    shell.from_x,
+                    shell.from_y,
+                    shell.x,
+                    shell.y,
+                    true,
+                    delay_ticks,
+                    shell.rocket,
+                );
+                shell.launched = true;
+            }
+            if shell.launched && shell.impact_tick <= tick {
                 on_impact(shell.x, shell.y);
                 resolve(
                     MortarResolutionContext {
@@ -170,6 +246,7 @@ fn emit_launch(
     to_y: f32,
     reveal_launch_to_enemies: bool,
     delay_ticks: u32,
+    rocket: bool,
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
@@ -188,6 +265,7 @@ fn emit_launch(
             to_y,
             radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
             delay_ticks,
+            rocket,
         });
     }
 }
@@ -301,6 +379,7 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         &reveal_recipients,
         shell.x,
         shell.y,
+        shell.rocket,
     );
 }
 
@@ -340,6 +419,7 @@ fn emit_impact(
     reveal_recipients: &[u32],
     x: f32,
     y: f32,
+    rocket: bool,
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
@@ -356,6 +436,7 @@ fn emit_impact(
             y,
             radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
             reveal: reveal_to_recipient.then(|| reveal.cloned()).flatten(),
+            rocket,
         });
     }
 }

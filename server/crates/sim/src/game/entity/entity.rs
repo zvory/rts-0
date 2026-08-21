@@ -650,6 +650,22 @@ impl Entity {
         )
     }
 
+    pub(crate) fn has_initial_free_barrage(&self) -> bool {
+        self.ability_uses_remaining
+            .get(&AbilityKind::Barrage)
+            .copied()
+            .unwrap_or(1)
+            > 0
+    }
+
+    pub(crate) fn consume_initial_free_barrage(&mut self) -> bool {
+        if !self.has_initial_free_barrage() {
+            return false;
+        }
+        self.ability_uses_remaining.insert(AbilityKind::Barrage, 0);
+        true
+    }
+
     pub fn consume_ability_use(&mut self, ability: AbilityKind) -> bool {
         let definition = crate::game::ability::definition(ability);
         match self.ability_uses_remaining(ability) {

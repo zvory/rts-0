@@ -37,6 +37,11 @@ export const COMMAND_CAR_BODY = Object.freeze({
   width: 18.4,
   clearance: 1.0,
 });
+export const ROCKET_LAUNCHER_BODY = Object.freeze({
+  length: 40.0,
+  width: 22.0,
+  clearance: 1.0,
+});
 
 // Gatherers can mine a resource only when a completed home-base mining anchor is within range.
 export const MINING_ANCHOR_RANGE_TILES = 11.0;
@@ -90,6 +95,7 @@ export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 25;
 export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 15;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const SCOUT_PLANE_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
+export const ROCKETS_RESEARCH_TICKS = TICK_HZ * 25;
 export const SMOKE_PLUS_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 9;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
@@ -144,6 +150,12 @@ export const STATS = Object.freeze({
     cost: { steel: 150, oil: 50 }, supply: 4, buildTicks: TICK_HZ * 20,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
     upgradeRequiresText: "Requires research in Engineering Complex" },
+  [KIND.ROCKET_LAUNCHER]: { label: "Rocket Launcher", icon: "RL", size: 18, sight: 8, body: ROCKET_LAUNCHER_BODY,
+    rangeTiles: 0, minRangeTiles: 10,
+    cost: { steel: 225, oil: 125 }, supply: 6, buildTicks: TICK_HZ * 20,
+    requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ROCKETS,
+    upgradeRequiresText: "Requires Rockets research in Engineering Complex",
+    description: "Mobile rocket artillery. Stop and manually fire a 16-rocket Barrage over a wide area." },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 15, body: SCOUT_CAR_BODY,
     rangeTiles: 7, cost: { steel: 125, oil: 60 }, supply: 3, buildTicks: 480 },
   [KIND.SCOUT_PLANE]: { label: "Scout Plane", icon: "SP", size: 17, sight: 19, body: SCOUT_PLANE_BODY,
@@ -181,6 +193,7 @@ export const STATS = Object.freeze({
       UPGRADE.TANK_UNLOCK,
       UPGRADE.SMOKE_PLUS,
       UPGRADE.SCOUT_PLANE_UNLOCK,
+      UPGRADE.ROCKETS,
     ],
     requires: [KIND.RESOURCE_DEPOT, KIND.TRAINING_CENTRE] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 1,
@@ -189,7 +202,7 @@ export const STATS = Object.freeze({
     requires: [KIND.RESOURCE_DEPOT, KIND.TRAINING_CENTRE] },
   [KIND.STEELWORKS]: { label: "Gun Works", icon: "GW", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 100 }, buildTicks: 599,
-    trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY],
+    trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY, KIND.ROCKET_LAUNCHER],
     requires: [KIND.RESOURCE_DEPOT, KIND.TRAINING_CENTRE] },
   [KIND.TANK_TRAP]: { label: "Tank Trap", icon: "TT", footW: 1, footH: 1, sight: 0,
     cost: { steel: 20, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [],
@@ -246,6 +259,26 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: MORTAR_FIRE_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: MORTAR_OUTER_RADIUS_TILES,
+    queued: true,
+    queuePolicy: "waitUntilReady",
+  }),
+  [ABILITY.BARRAGE]: Object.freeze({
+    ability: ABILITY.BARRAGE,
+    label: "Barrage",
+    icon: "RKT",
+    hotkey: "X",
+    classicHotkey: "F",
+    commandCardPriority: -1,
+    title: "Target a 16-rocket saturation barrage",
+    carriers: Object.freeze([KIND.ROCKET_LAUNCHER]),
+    targetMode: "worldPoint",
+    rangeTiles: 35,
+    minRangeTiles: 10,
+    cooldownTicks: TICK_HZ * 7,
+    charges: 1,
+    cost: Object.freeze({ steel: 0, oil: 75 }),
+    radiusTiles: 4,
+    upgradeRequirement: UPGRADE.ROCKETS,
     queued: true,
     queuePolicy: "waitUntilReady",
   }),
@@ -468,6 +501,15 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 50, oil: 100 }),
     researchTicks: SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
     description: "Unlock the Command Car Scout Plane ability",
+    researchedAt: KIND.ENGINEERING_COMPLEX,
+  }),
+  [UPGRADE.ROCKETS]: Object.freeze({
+    upgrade: UPGRADE.ROCKETS,
+    label: "Rockets",
+    icon: "RKT+",
+    cost: Object.freeze({ steel: 75, oil: 125 }),
+    researchTicks: ROCKETS_RESEARCH_TICKS,
+    description: "Unlock Rocket Launcher training at the Gun Works",
     researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
 });

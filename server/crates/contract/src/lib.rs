@@ -1086,6 +1086,8 @@ pub enum Event {
         to_y: f32,
         radius_tiles: f32,
         delay_ticks: u32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        rocket: bool,
     },
     MortarImpact {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1095,6 +1097,8 @@ pub enum Event {
         radius_tiles: f32,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reveal: Option<AttackReveal>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        rocket: bool,
     },
     ArtilleryTarget {
         from: u32,

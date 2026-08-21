@@ -13,6 +13,7 @@ pub enum EntityKind {
     AntiTankGun,
     MortarTeam,
     Artillery,
+    RocketLauncher,
     ScoutCar,
     ScoutPlane,
     Tank,
@@ -34,7 +35,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 26] = [
+    pub const ALL: [EntityKind; 27] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Rifleman,
@@ -43,6 +44,7 @@ impl EntityKind {
         EntityKind::AntiTankGun,
         EntityKind::MortarTeam,
         EntityKind::Artillery,
+        EntityKind::RocketLauncher,
         EntityKind::ScoutCar,
         EntityKind::ScoutPlane,
         EntityKind::Tank,
@@ -97,6 +99,7 @@ impl EntityKind {
             EntityKind::AntiTankGun => "anti_tank_gun",
             EntityKind::MortarTeam => "mortar_team",
             EntityKind::Artillery => "artillery",
+            EntityKind::RocketLauncher => "rocket_launcher",
             EntityKind::ScoutCar => "scout_car",
             EntityKind::ScoutPlane => "scout_plane",
             EntityKind::Tank => "tank",
@@ -132,6 +135,7 @@ impl FromStr for EntityKind {
             "anti_tank_gun" => Ok(EntityKind::AntiTankGun),
             "mortar_team" => Ok(EntityKind::MortarTeam),
             "artillery" => Ok(EntityKind::Artillery),
+            "rocket_launcher" => Ok(EntityKind::RocketLauncher),
             "scout_car" => Ok(EntityKind::ScoutCar),
             "scout_plane" => Ok(EntityKind::ScoutPlane),
             "tank" => Ok(EntityKind::Tank),
@@ -167,6 +171,7 @@ pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
         EntityKind::AntiTankGun
             | EntityKind::MortarTeam
             | EntityKind::Artillery
+            | EntityKind::RocketLauncher
             | EntityKind::ScoutCar
             | EntityKind::Tank
             | EntityKind::CommandCar
@@ -234,7 +239,7 @@ pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
 }
 
 pub fn uses_car_movement_semantics(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::ScoutCar | EntityKind::CommandCar)
+    matches!(kind, EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher)
 }
 
 pub fn fires_while_moving(kind: EntityKind) -> bool {
@@ -260,6 +265,7 @@ pub fn death_ground_decal_class(kind: EntityKind) -> Option<&'static str> {
         | EntityKind::CommandCar
         | EntityKind::AntiTankGun
         | EntityKind::Artillery => Some("scorch"),
+        EntityKind::RocketLauncher => Some("scorch"),
         kind if kind.is_building() => Some("buildingScorch"),
         _ => None,
     }
@@ -294,6 +300,7 @@ mod tests {
             EntityKind::ScoutCar,
             EntityKind::Tank,
             EntityKind::CommandCar,
+            EntityKind::RocketLauncher,
         ];
         for kind in EntityKind::ALL {
             let expected = if vehicle_body_kinds.contains(&kind) {

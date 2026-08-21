@@ -174,6 +174,9 @@ pub(super) fn planner_facts(
 }
 
 fn has_unreserved_ability_use(entity: &Entity, ability: AbilityKind) -> bool {
+    if ability == AbilityKind::Barrage {
+        return true;
+    }
     match entity.ability_uses_remaining(ability) {
         Some(remaining) => remaining as usize > reserved_ability_uses(entity, ability),
         None => true,
@@ -236,6 +239,7 @@ fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
     matches!(
         ability,
         AbilityKind::MortarFire
+            | AbilityKind::Barrage
             | AbilityKind::EkatTeleport
             | AbilityKind::EkatLineShot
             | AbilityKind::EkatMagicAnchor

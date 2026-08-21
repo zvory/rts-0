@@ -222,7 +222,8 @@ mod tests {
             &[
                 EntityKind::MortarTeam,
                 EntityKind::AntiTankGun,
-                EntityKind::Artillery
+                EntityKind::Artillery,
+                EntityKind::RocketLauncher
             ]
         );
 

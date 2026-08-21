@@ -79,7 +79,7 @@ pub(super) struct CarMotionProfile {
 
 pub(super) fn car_motion_profile(kind: EntityKind) -> Option<CarMotionProfile> {
     match kind {
-        EntityKind::ScoutCar | EntityKind::CommandCar => Some(CarMotionProfile {
+        EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher => Some(CarMotionProfile {
             min_turn_radius_px: SCOUT_CAR_MIN_TURN_RADIUS_PX,
             route_lookahead_px: SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
             sweep_sample_step_px: SCOUT_CAR_SWEEP_SAMPLE_STEP_PX,
