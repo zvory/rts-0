@@ -30,7 +30,6 @@ export class GroundDecalSync {
     this.retryTimer = null;
     this.awaitingResetSnapshot = false;
     this.blockInlineDeltaUntilRepair = false;
-    this.liveTimelineEstablished = false;
     this.destroyed = false;
     this.unsubscribeLabResults = labClient?.subscribeResult?.((result) => {
       if (result?.ok && (result.op === "setVision" || result.op === "importScenario")) {
@@ -39,7 +38,7 @@ export class GroundDecalSync {
     }) || null;
   }
 
-  observeSnapshot(revision, delta = null) {
+  observeSnapshot(revision, delta = null, events = []) {
     if (this.destroyed || !isRevision(revision)) return false;
     if (this.awaitingResetSnapshot) {
       // Inbound snapshots may already be queued from before a seek or perspective reset. Start a
@@ -61,10 +60,9 @@ export class GroundDecalSync {
           players: this.state?.players,
           tileSize: this.state?.map?.tileSize,
         },
-        { animateInfantryDeath: this.liveTimelineEstablished },
+        { animateInfantryDeath: liveInfantryDeathMatcher(events) },
       );
     }
-    this.liveTimelineEstablished = true;
     this.targetRevision = Math.max(this.targetRevision, revision);
     if (this.blockInlineDeltaUntilRepair) return this._ensureRequest();
     const applied = this.state?.groundDecals?.authoritativeRevision || 0;
@@ -92,7 +90,6 @@ export class GroundDecalSync {
     // a lower (including zero) discovery revision.
     this.targetRevision = message.revision;
     this.blockInlineDeltaUntilRepair = false;
-    this.liveTimelineEstablished = true;
     if (result.queued === 0) this.resetPresentation?.("complete");
     this._ensureRequest();
     return true;
@@ -108,7 +105,6 @@ export class GroundDecalSync {
     this.outstandingRequestId = null;
     this.awaitingResetSnapshot = true;
     this.blockInlineDeltaUntilRepair = true;
-    this.liveTimelineEstablished = false;
     this.state?.resetAuthoritativeGroundDecals?.();
     if (resetPresentation) this.resetPresentation?.();
   }
@@ -153,4 +149,18 @@ export class GroundDecalSync {
 
 function isRevision(value) {
   return Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
+}
+
+function liveInfantryDeathMatcher(events) {
+  const deaths = new Set();
+  for (const event of Array.isArray(events) ? events : []) {
+    if (
+      event?.e !== "death"
+      || typeof event.kind !== "string"
+      || !Number.isFinite(event.x)
+      || !Number.isFinite(event.y)
+    ) continue;
+    deaths.add(`${event.kind}:${event.x}:${event.y}`);
+  }
+  return (decal) => deaths.has(`${decal?.kind}:${decal?.x}:${decal?.y}`);
 }

@@ -59,7 +59,7 @@ assert(
   sync.observeSnapshot(3, {
     afterRevision: 1,
     decals: [inlineDecal(20), inlineDecal(21)],
-  });
+  }, [{ e: "death", kind: KIND.RIFLEMAN, x: 53, y: 48 }]);
   assert(buffer.authoritativeRevision === 3 && buffer.pendingCount === 2,
     "an overlapping covered range advances and queues only the newly learned row");
   assert(buffer.peekPending().find((decal) => decal.id === 21)?.animateInfantryDeath === true,
@@ -70,6 +70,8 @@ assert(
     "a forward gap presents entitled recent rows without claiming missing cache coverage");
   assert(requests.length === 1 && requests[0].afterRevision === 3,
     "a forward gap falls back to repair from the last complete cursor");
+  assert(buffer.peekPending().find((decal) => decal.id === 22)?.animateInfantryDeath === false,
+    "newly discovered historical deaths do not replay without a matching transient death event");
   sync.observeSnapshot(70, { afterRevision: 6, decals: [inlineDecal(22)] });
   assert(requests.length === 1 && buffer.pendingCount === 3,
     "repeated gapped deltas coalesce repair and do not duplicate presentation rows");
@@ -324,22 +326,28 @@ assert(
     assert(corpseLayer.stampBatch([
       { id: 50, decalClass: "infantry", kind: KIND.RIFLEMAN, x: 32, y: 32, color: "#4878c8", seed: 1 },
       { id: 51, decalClass: "infantry", kind: KIND.MACHINE_GUNNER, x: 64, y: 32, color: "#d55e00", seed: 2 },
+      { id: 54, decalClass: "infantry", kind: KIND.RIFLEMAN, x: 80, y: 32, color: "#4878c8", seed: 5 },
       { id: 52, decalClass: "infantry", kind: KIND.WORKER, x: 96, y: 32, color: "#4878c8", seed: 3 },
-    ]) === 3 && corpseLayer._corpseSprites.length === 2 && corpseLayer.layer.children.length === 3,
+    ]) === 4 && corpseLayer._corpseSprites.length === 3 && corpseLayer.layer.children.length === 4,
     "authored rifle and machine-gunner deaths use transient sprites while unsupported infantry keep the raster fallback");
+    assert(corpseLayer._corpseTextures.size === 2,
+      "authored deaths share immutable textures for the same asset variant and team color");
+    assert(corpseLayer.texture.sourceUpdateCount === 1,
+      "a mixed batch uploads the permanent surface only for its raster fallback decal");
     assert(corpseLayer.stampBatch([
       {
         id: 53, decalClass: "infantry", kind: KIND.RIFLEMAN, x: 128, y: 32,
         color: "#4878c8", seed: 4, animateInfantryDeath: false,
       },
-    ]) === 1 && corpseLayer._corpseSprites.length === 2,
+    ]) === 1 && corpseLayer._corpseSprites.length === 3
+      && corpseLayer.texture.sourceUpdateCount === 1,
     "historical authored infantry records are consumed without resurrecting corpse sprites");
     corpseLayer.updateInfantryCorpseFades(4000);
     assert(corpseLayer._corpseSprites.every(({ sprite }) => sprite.alpha === 0.47),
       "authored infantry deaths fade after their 1.8 second hold interval");
     corpseLayer.updateInfantryCorpseFades(5200);
     assert(corpseLayer._corpseSprites.length === 0 && corpseLayer.layer.children.length === 1,
-      "authored infantry deaths destroy their sprites and textures after fading");
+      "authored infantry deaths destroy their sprites after fading");
     corpseLayer.destroy();
 
     const tank = { id: 40, kind: KIND.TANK, owner: 2, hp: 100, x: 40, y: 80, facing: 0 };

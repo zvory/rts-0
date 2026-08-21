@@ -419,7 +419,11 @@ export class Match {
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);
-      this.groundDecalSync.observeSnapshot(m?.groundDecalRevision, m?.groundDecalDelta);
+      this.groundDecalSync.observeSnapshot(
+        m?.groundDecalRevision,
+        m?.groundDecalDelta,
+        m?.events,
+      );
     };
     this.onGroundDecals = (m) => this.groundDecalSync.applyResponse(m);
     this.onCommandReceipt = (m) => this.handleCommandReceipt(m);

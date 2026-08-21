@@ -42,7 +42,7 @@ export class GroundDecalBuffer {
   applySnapshotDelta(
     { revision, afterRevision, decals, tankTrails } = {},
     context = {},
-    { animateInfantryDeath = true } = {},
+    { animateInfantryDeath = false } = {},
   ) {
     if (!Number.isInteger(revision) || revision < 0 || revision > 0xffffffff) {
       return { accepted: false, complete: false, queued: 0 };
@@ -69,7 +69,10 @@ export class GroundDecalBuffer {
       const key = decal?.id;
       if (!decal || this.authoritativeDecals.has(key)) continue;
       this.authoritativeDecals.set(key, decal);
-      this._pending.push({ ...decal, animateInfantryDeath });
+      const animate = typeof animateInfantryDeath === "function"
+        ? animateInfantryDeath(decal)
+        : !!animateInfantryDeath;
+      this._pending.push({ ...decal, animateInfantryDeath: animate });
       queued += 1;
     }
     for (const record of Array.isArray(tankTrails) ? tankTrails : []) {

@@ -75,6 +75,7 @@ export class GroundDecalLayer {
     this._replacementExpectedCount = 0;
     this._emptyReplacementComplete = false;
     this._corpseSprites = [];
+    this._corpseTextures = new Map();
     this._corpseVisualNowMs = 0;
   }
 
@@ -153,7 +154,7 @@ export class GroundDecalLayer {
       const age = Math.max(0, nowMs - record.spawnedAtMs);
       if (age >= CORPSE_HOLD_MS + CORPSE_FADE_MS) {
         record.sprite.parent?.removeChild?.(record.sprite);
-        record.sprite.destroy?.({ texture: true, textureSource: true });
+        record.sprite.destroy?.();
         continue;
       }
       const fade = age <= CORPSE_HOLD_MS
@@ -284,6 +285,7 @@ export class GroundDecalLayer {
     if (!this.ctx || !Array.isArray(decals) || decals.length === 0) return 0;
     this.recordDiagnostic?.("renderer.groundDecals.pending", decals.length);
     let stamped = 0;
+    let rasterStamped = 0;
     const tintScratch = this.assetStatus === GROUND_DECAL_ATLAS_STATUS.READY
       ? this._ensureTintScratch()
       : null;
@@ -294,14 +296,18 @@ export class GroundDecalLayer {
           && isAuthoredInfantryCorpseKind(decal.kind);
         // Durable repair/rebuild batches include historical deaths. Count those records as
         // consumed without resurrecting their transient presentation.
-        const didStamp = authoredCorpse && decal.animateInfantryDeath === false
-          ? true
-          : authoredCorpse && atlas
-          ? this._stampInfantryCorpse(decal, atlas)
-          : stampGroundDecal(this.ctx, decal, this.downsample, {
+        let didStamp;
+        if (authoredCorpse && decal.animateInfantryDeath === false) {
+          didStamp = true;
+        } else if (authoredCorpse && atlas) {
+          didStamp = this._stampInfantryCorpse(decal, atlas);
+        } else {
+          didStamp = stampGroundDecal(this.ctx, decal, this.downsample, {
             atlas: authoredCorpse ? atlas : null,
             tintScratch,
           });
+          if (didStamp) rasterStamped += 1;
+        }
         if (didStamp) stamped += 1;
         else this.recordDiagnostic?.("renderer.groundDecals.skipped", 1);
       } catch (err) {
@@ -309,13 +315,13 @@ export class GroundDecalLayer {
         onError?.("groundDecal", err);
       }
     }
-    if (stamped > 0) {
+    if (rasterStamped > 0) {
       updateTexture(this.texture);
-      this.totalStamped += stamped;
       this.textureUpdateCount += 1;
-      this.recordDiagnostic?.("renderer.groundDecals.stamped", stamped);
       this.recordDiagnostic?.("renderer.groundDecals.textureUpdates", 1);
     }
+    this.totalStamped += stamped;
+    if (stamped > 0) this.recordDiagnostic?.("renderer.groundDecals.stamped", stamped);
     return stamped;
   }
 
@@ -323,9 +329,14 @@ export class GroundDecalLayer {
     const plan = createGroundDecalStampPlan(decal, { assetCounts: atlasAssetCounts(atlas) });
     const source = plan && atlas.infantry?.[plan.variantIndex];
     if (!source || !this.pixi?.Texture || !this.pixi?.Sprite) return false;
-    const canvas = createTeamTintedCorpseCanvas(this.createCanvas, source, plan.color);
-    if (!canvas) return false;
-    const texture = this.pixi.Texture.from(canvas);
+    const textureKey = `${plan.variantIndex}:${plan.color}`;
+    let texture = this._corpseTextures.get(textureKey);
+    if (!texture) {
+      const canvas = createTeamTintedCorpseCanvas(this.createCanvas, source, plan.color);
+      if (!canvas) return false;
+      texture = this.pixi.Texture.from(canvas);
+      this._corpseTextures.set(textureKey, texture);
+    }
     const sprite = new this.pixi.Sprite(texture);
     sprite.anchor?.set?.(0.5);
     sprite.position?.set?.(decal.x + plan.offsetWorldX, decal.y + plan.offsetWorldY);
@@ -339,7 +350,7 @@ export class GroundDecalLayer {
     if (this._corpseSprites.length >= MAX_TRANSIENT_CORPSE_SPRITES) {
       const expired = this._corpseSprites.shift();
       expired?.sprite.parent?.removeChild?.(expired.sprite);
-      expired?.sprite.destroy?.({ texture: true, textureSource: true });
+      expired?.sprite.destroy?.();
     }
     this._corpseSprites.push({ sprite, spawnedAtMs: this._corpseVisualNowMs, opacity: plan.opacity });
     return true;
@@ -401,9 +412,11 @@ export class GroundDecalLayer {
     this._queuedUntilAssets = [];
     for (const record of this._corpseSprites) {
       record.sprite.parent?.removeChild?.(record.sprite);
-      record.sprite.destroy?.({ texture: true, textureSource: true });
+      record.sprite.destroy?.();
     }
     this._corpseSprites = [];
+    for (const texture of this._corpseTextures.values()) texture.destroy?.(true);
+    this._corpseTextures.clear();
     this.atlas?.destroy?.();
     this.atlas = null;
     if (this._tintScratch?.canvas) {
@@ -454,7 +467,7 @@ export class GroundDecalLayer {
     for (const key of [
       "canvas", "ctx", "texture", "sprite", "atlas", "assetStatus", "assetLoadPromise",
       "assetLoadError", "_assetLoadGeneration", "_queuedUntilAssets", "_tintScratch",
-      "_corpseSprites", "_corpseVisualNowMs", "tankTreads", "totalStamped", "textureUpdateCount", "_map",
+      "_corpseSprites", "_corpseTextures", "_corpseVisualNowMs", "tankTreads", "totalStamped", "textureUpdateCount", "_map",
     ]) {
       this[key] = replacement[key];
     }
@@ -465,6 +478,7 @@ export class GroundDecalLayer {
     replacement.atlas = null;
     replacement._tintScratch = null;
     replacement._corpseSprites = [];
+    replacement._corpseTextures = new Map();
     replacement._corpseVisualNowMs = 0;
     replacement.tankTreads = new TankTreadLayer({
       layer: replacement.layer,
