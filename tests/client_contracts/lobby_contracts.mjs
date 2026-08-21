@@ -128,10 +128,12 @@ import { textWithin } from "./dom_text.mjs";
 // ---------------------------------------------------------------------------
 {
   const mapNames = Object.keys(LOBBY_MAP_PRESENTATION);
-  const otiMaps = ["Doppelganger", "Schone Tage", "Wald des Todes"];
+  const otiMaps = ["Doppelganger", "Schone Tage"];
   assert(otiMaps
     .every((name) => lobbyMapPresentation(name).author === "oti"),
   "oti-authored maps credit lowercase oti");
+  assert(lobbyMapPresentation("Wald des Todes").author === "Alex",
+    "Wald des Todes credits Alex");
   assert(lobbyMapPresentation("The River").author === "Jeff",
     "The River credits Jeff");
   assert(mapNames.filter((name) => ![...otiMaps, "The River"].includes(name))
