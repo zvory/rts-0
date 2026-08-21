@@ -173,8 +173,10 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   renderer. Never offer the raw `target/interact/lab` path, and do not start a separate game server
   for that artifact. Do not infer the user's device: they may be on a phone or desktop.
   Verify Tailscale state with `tailscale status --json`, start the server with `RTS_ADDR=0.0.0.0:8080 cargo run
-  --release` if port 8080 is not already served, then provide an `http://<Tailscale-IP>:8080/...`
-  link rather than requiring a beta deployment. Any user-facing link backed by a live local server
+  --release` if port 8080 is not already served, then use `Self.DNSName` from the status response,
+  remove its trailing dot, and provide an `http://<machine>.<tailnet>.ts.net:8080/...` MagicDNS link
+  rather than a numeric-IP link or beta deployment. Fall back to the reported Tailscale IPv4 only
+  when `Self.DNSName` is unavailable. Any user-facing link backed by a live local server
   must remain available for 12 hours by default unless the user requests another lifetime. Launch
   the server with a durable host-level background/keepalive mechanism and timed cleanup; do not rely
   on an agent tool's foreground shell session. Verify the detached server is healthy before sharing
