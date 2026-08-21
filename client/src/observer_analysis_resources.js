@@ -3,7 +3,6 @@ import { resourceIconHtml, resourceValueElement } from "./resource_icons.js";
 import { HARVEST_TICKS, OIL_LOAD, TICK_HZ } from "./config.js";
 
 const SAMPLE_INTERVAL_TICKS = 30;
-const MAX_SAMPLES = 60 * 30;
 const SVG_NS = "http://www.w3.org/2000/svg";
 export const RESOURCE_COLLECTION_WINDOW_SECONDS = 8;
 const COLLECTION_WINDOW_TICKS = TICK_HZ * RESOURCE_COLLECTION_WINDOW_SECONDS;
@@ -47,7 +46,13 @@ export class ResourceCollectionHistory {
     const cumulativeSteel = (first.resources?.lifetime?.steel || 0) - (second.resources?.lifetime?.steel || 0);
     const cumulativeOil = (first.resources?.lifetime?.oil || 0) - (second.resources?.lifetime?.oil || 0);
     const targetTick = tick - COLLECTION_WINDOW_TICKS;
-    const baseline = [...this.samples].reverse().find((sample) => sample.tick <= targetTick);
+    let baseline = null;
+    for (let index = this.samples.length - 1; index >= 0; index -= 1) {
+      if (this.samples[index].tick <= targetTick) {
+        baseline = this.samples[index];
+        break;
+      }
+    }
     const hasWindowBaseline = baseline && targetTick - baseline.tick <= SAMPLE_INTERVAL_TICKS;
     this.samples.push({
       tick,
@@ -57,9 +62,6 @@ export class ResourceCollectionHistory {
       steel: hasWindowBaseline ? cumulativeSteel - baseline.cumulativeSteel : 0,
       oil: hasWindowBaseline ? cumulativeOil - baseline.cumulativeOil : 0,
     });
-    if (this.samples.length > MAX_SAMPLES) {
-      this.samples.splice(0, this.samples.length - MAX_SAMPLES);
-    }
   }
 }
 
@@ -84,7 +86,11 @@ export function renderResourcesMetric({ analysis, players, collectionHistory = [
     return wrap;
   }
 
-  wrap.appendChild(renderCollectionAdvantage({ rows, samples: collectionHistory }));
+  wrap.appendChild(renderCollectionAdvantage({
+    rows,
+    samples: collectionHistory,
+    currentTick: analysis.tick,
+  }));
 
   for (const window of RESOURCE_WINDOWS) {
     wrap.appendChild(renderResourceWindowGroup({
@@ -102,6 +108,7 @@ export function collectionAdvantageAreaPoints(
   width = 420,
   height = 92,
   minExtent = 0,
+  currentTick = null,
 ) {
   if (!Array.isArray(samples) || samples.length === 0) return [];
   const mid = height / 2;
@@ -110,13 +117,11 @@ export function collectionAdvantageAreaPoints(
     Number(minExtent) || 0,
     ...samples.map((sample) => Math.abs(Number(sample?.[resource]) || 0)),
   );
-  const firstTick = Number(samples[0]?.tick) || 0;
-  const lastTick = Number(samples[samples.length - 1]?.tick) || firstTick;
-  const tickSpan = Math.max(1, lastTick - firstTick);
+  const lastSampleTick = Math.max(0, Number(samples[samples.length - 1]?.tick) || 0);
+  const lastTick = Math.max(lastSampleTick, Number(currentTick) || 0);
+  const tickSpan = Math.max(1, lastTick);
   return samples.map((sample) => ({
-    x: samples.length === 1
-      ? 0
-      : Math.max(0, Math.min(1, ((Number(sample?.tick) || firstTick) - firstTick) / tickSpan)) * width,
+    x: Math.max(0, Math.min(1, (Number(sample?.tick) || 0) / tickSpan)) * width,
     y: mid - ((Number(sample?.[resource]) || 0) / extent) * (mid - 5),
   }));
 }
@@ -150,7 +155,7 @@ const RESOURCE_WINDOWS = [
   { label: "Lifetime", resourceKey: "lifetime" },
 ];
 
-function renderCollectionAdvantage({ rows, samples }) {
+function renderCollectionAdvantage({ rows, samples, currentTick }) {
   const section = document.createElement("section");
   section.className = "replay-resource-advantage";
 
@@ -165,13 +170,13 @@ function renderCollectionAdvantage({ rows, samples }) {
   }
 
   section.append(
-    renderAdvantageChart({ resource: "steel", label: "Steel", rows, samples, serial: 0 }),
-    renderAdvantageChart({ resource: "oil", label: "Oil", rows, samples, serial: 1 }),
+    renderAdvantageChart({ resource: "steel", label: "Steel", rows, samples, currentTick, serial: 0 }),
+    renderAdvantageChart({ resource: "oil", label: "Oil", rows, samples, currentTick, serial: 1 }),
   );
   return section;
 }
 
-function renderAdvantageChart({ resource, label, rows, samples, serial }) {
+function renderAdvantageChart({ resource, label, rows, samples, currentTick, serial }) {
   const width = 420;
   const chartHeight = 92;
   const labelHeight = 18;
@@ -183,6 +188,7 @@ function renderAdvantageChart({ resource, label, rows, samples, serial }) {
     width - plotLeft,
     chartHeight,
     RESOURCE_ADVANTAGE_MIN_EXTENT[resource],
+    currentTick,
   )
     .map((point) => ({ ...point, x: point.x + plotLeft }));
   const curve = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" L ");
@@ -231,14 +237,14 @@ function renderAdvantageChart({ resource, label, rows, samples, serial }) {
   }));
   appendPlayerLabel(svg, rows[0], 8, mid - 10);
   appendPlayerLabel(svg, rows[1], 8, mid + 16);
-  const firstTick = Number(samples[0]?.tick) || 0;
-  const lastTick = Number(samples[samples.length - 1]?.tick) || firstTick;
-  appendTimeLabel(svg, plotLeft, chartHeight + 13, formatReplayTick(firstTick), "start");
+  const lastSampleTick = Math.max(0, Number(samples[samples.length - 1]?.tick) || 0);
+  const lastTick = Math.max(lastSampleTick, Number(currentTick) || 0);
+  appendTimeLabel(svg, plotLeft, chartHeight + 13, formatReplayTick(0), "start");
   appendTimeLabel(
     svg,
     plotLeft + ((width - plotLeft) / 2),
     chartHeight + 13,
-    formatReplayTick(firstTick + ((lastTick - firstTick) / 2)),
+    formatReplayTick(lastTick / 2),
     "middle",
   );
   appendTimeLabel(svg, width, chartHeight + 13, formatReplayTick(lastTick), "end");
