@@ -70,6 +70,19 @@ import { textWithin } from "./dom_text.mjs";
     points[0].y === 25 && points[1].x === 25 && points[1].y < 25 && points[2].x === 100,
     "resource collection graph plots signed income around zero and spaces points by replay time",
   );
+  const latePoints = collectionAdvantageAreaPoints(
+    [{ tick: 300, steel: 10 }, { tick: 330, steel: 20 }],
+    "steel",
+    100,
+    50,
+    0,
+    360,
+  );
+  assert(
+    Math.abs(latePoints[0].x - (300 / 360) * 100) < 0.001
+      && Math.abs(latePoints[1].x - (330 / 360) * 100) < 0.001,
+    "resource collection graph anchors its x-axis at game start and ends it at the current tick",
+  );
   const baseScaledPoints = collectionAdvantageAreaPoints(
     [{ steel: 12 }, { steel: -12 }],
     "steel",
