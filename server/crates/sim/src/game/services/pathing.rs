@@ -104,6 +104,10 @@ impl TerrainPassability<'_> {
 }
 
 impl Passability for TerrainPassability<'_> {
+    fn dimensions(&self) -> (u32, u32) {
+        (self.map.width, self.map.height)
+    }
+
     fn passable(&self, tx: i32, ty: i32) -> bool {
         let r = self.radius_tiles as i32;
         for dy in -r..=r {

@@ -44,6 +44,10 @@ impl Grid {
 }
 
 impl Passability for Grid {
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width as u32, self.height as u32)
+    }
+
     fn passable(&self, tx: i32, ty: i32) -> bool {
         tx >= 0
             && ty >= 0
@@ -189,16 +193,12 @@ fn dijkstra_cost(grid: &Grid, query: Query) -> Option<u64> {
             if !grid.passable(next.0, next.1)
                 || (dx != 0
                     && dy != 0
-                    && (!grid.passable(cur.tx + dx, cur.ty)
-                        || !grid.passable(cur.tx, cur.ty + dy)))
+                    && (!grid.passable(cur.tx + dx, cur.ty) || !grid.passable(cur.tx, cur.ty + dy)))
             {
                 continue;
             }
             let dir = dir as u8;
-            let turn = if query.turn_penalty > 0
-                && cur.dir != NO_INCOMING_DIR
-                && cur.dir != dir
-            {
+            let turn = if query.turn_penalty > 0 && cur.dir != NO_INCOMING_DIR && cur.dir != dir {
                 query.turn_penalty
             } else {
                 0
@@ -246,6 +246,108 @@ fn path_cost(path: &[(i32, i32)], start: (i32, i32), turn_penalty: u32) -> u64 {
     total
 }
 
+fn legacy_reference(
+    grid: &Grid,
+    start: (i32, i32),
+    goal: (i32, i32),
+    max_expanded: usize,
+    turn_penalty: u32,
+) -> (Vec<(i32, i32)>, usize, bool) {
+    if start == goal {
+        return (Vec::new(), 0, false);
+    }
+    let goal = nearest_passable(grid, goal.0, goal.1).unwrap_or(goal);
+    let start_key = (start.0, start.1, NO_INCOMING_DIR);
+    let mut open = BinaryHeap::from([Node {
+        f: heuristic(start.0, start.1, goal.0, goal.1),
+        g: 0,
+        tx: start.0,
+        ty: start.1,
+        dir: NO_INCOMING_DIR,
+    }]);
+    let mut parents = HashMap::new();
+    let mut scores = HashMap::from([(start_key, 0u32)]);
+    let mut best_key = start_key;
+    let mut best_h = heuristic(start.0, start.1, goal.0, goal.1);
+    let mut expanded = 0usize;
+    let mut exhausted = false;
+
+    while let Some(cur) = open.pop() {
+        let cur_key = (cur.tx, cur.ty, cur.dir);
+        if (cur.tx, cur.ty) == goal {
+            return (legacy_reconstruct(&parents, cur_key), expanded, exhausted);
+        }
+        if scores.get(&cur_key).is_some_and(|best| cur.g > *best) {
+            continue;
+        }
+        expanded += 1;
+        if expanded > max_expanded {
+            exhausted = true;
+            break;
+        }
+        for (dir, &(dx, dy, step)) in NEIGHBORS.iter().enumerate() {
+            let (nx, ny) = (cur.tx + dx, cur.ty + dy);
+            if !grid.passable(nx, ny)
+                || (dx != 0
+                    && dy != 0
+                    && (!grid.passable(cur.tx + dx, cur.ty) || !grid.passable(cur.tx, cur.ty + dy)))
+            {
+                continue;
+            }
+            let dir = dir as u8;
+            let turn = if turn_penalty > 0 && cur.dir != NO_INCOMING_DIR && cur.dir != dir {
+                turn_penalty
+            } else {
+                0
+            };
+            let next_dir = if turn_penalty > 0 {
+                dir
+            } else {
+                NO_INCOMING_DIR
+            };
+            let next_key = (nx, ny, next_dir);
+            let tentative = cur.g.saturating_add(step).saturating_add(turn);
+            if scores.get(&next_key).is_none_or(|old| tentative < *old) {
+                parents.insert(next_key, cur_key);
+                scores.insert(next_key, tentative);
+                let h = heuristic(nx, ny, goal.0, goal.1);
+                if h < best_h {
+                    best_h = h;
+                    best_key = next_key;
+                }
+                open.push(Node {
+                    f: tentative + h,
+                    g: tentative,
+                    tx: nx,
+                    ty: ny,
+                    dir: next_dir,
+                });
+            }
+        }
+    }
+    (
+        if (best_key.0, best_key.1) == start {
+            Vec::new()
+        } else {
+            legacy_reconstruct(&parents, best_key)
+        },
+        expanded,
+        exhausted,
+    )
+}
+
+fn legacy_reconstruct(parents: &HashMap<SearchKey, SearchKey>, goal: SearchKey) -> Vec<(i32, i32)> {
+    let mut path = vec![(goal.0, goal.1)];
+    let mut current = goal;
+    while let Some(previous) = parents.get(&current).copied() {
+        path.push((previous.0, previous.1));
+        current = previous;
+    }
+    path.pop();
+    path.reverse();
+    path
+}
+
 #[test]
 fn phase1_corpus_is_deterministic_and_goal_paths_match_dijkstra() {
     let grids = [Grid::open(19, 17), Grid::patterned(31, 29, 7)];
@@ -283,6 +385,90 @@ fn phase1_corpus_is_deterministic_and_goal_paths_match_dijkstra() {
         "phase1 corpus v{CORPUS_VERSION}: workload={:016x} semantic={first:016x}",
         workload_hash(&grids, &query_sets)
     );
+}
+
+#[test]
+fn dense_search_matches_legacy_for_seeded_maps_profiles_and_caps() {
+    let mut scratch = SearchScratch::default();
+    for seed in 0..24 {
+        let grid = Grid::patterned(13 + seed as i32 % 7, 15 + seed as i32 % 5, seed);
+        for query in corpus_queries(grid.width, grid.height) {
+            let dense = find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+                &grid,
+                query.start,
+                query.goal,
+                query.cap,
+                query.turn_penalty,
+                &mut scratch,
+            );
+            assert_eq!(
+                dense,
+                legacy_reference(
+                    &grid,
+                    query.start,
+                    query.goal,
+                    query.cap,
+                    query.turn_penalty
+                ),
+                "seed={seed} start={:?} goal={:?} cap={} turn={}",
+                query.start,
+                query.goal,
+                query.cap,
+                query.turn_penalty
+            );
+        }
+    }
+}
+
+#[test]
+fn dense_generation_wrap_clears_stamps_without_semantic_drift() {
+    let grid = Grid::patterned(31, 29, 5);
+    let query = Query {
+        start: (1, 1),
+        goal: (29, 27),
+        cap: 32768,
+        turn_penalty: 5,
+    };
+    let expected = legacy_reference(
+        &grid,
+        query.start,
+        query.goal,
+        query.cap,
+        query.turn_penalty,
+    );
+    let mut scratch = SearchScratch::default();
+    scratch.directional.generation = u32::MAX;
+    let actual = find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+        &grid,
+        query.start,
+        query.goal,
+        query.cap,
+        query.turn_penalty,
+        &mut scratch,
+    );
+    assert_eq!(actual, expected);
+    assert_eq!(scratch.directional.generation, 1);
+}
+
+#[test]
+fn dense_scratch_memory_is_bounded_for_shipped_map_sizes() {
+    fn bytes_for(size: u32, directional: bool) -> usize {
+        let grid = Grid::open(size as i32, size as i32);
+        let mut scratch = SearchScratch::default();
+        let _ = find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+            &grid,
+            (1, 1),
+            (size as i32 - 2, size as i32 - 2),
+            32768,
+            u32::from(directional) * 5,
+            &mut scratch,
+        );
+        scratch.retained_capacity()
+    }
+    assert_eq!(bytes_for(126, false), 126 * 126 * 12);
+    assert_eq!(bytes_for(126, true), (126 * 126 * 8 + 1) * 12);
+    assert_eq!(bytes_for(196, false), 196 * 196 * 12);
+    assert_eq!(bytes_for(196, true), (196 * 196 * 8 + 1) * 12);
 }
 
 #[test]

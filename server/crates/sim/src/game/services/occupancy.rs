@@ -315,6 +315,10 @@ fn close_tank_trap_vehicle_gaps(
 }
 
 impl Passability for Occupancy<'_> {
+    fn dimensions(&self) -> (u32, u32) {
+        (self.map.width, self.map.height)
+    }
+
     /// All-ground tile-path blockers. Exact movement should use `passable_for_kind` plus the
     /// authoritative trunk circles so tree tiles retain their physically open space.
     fn passable(&self, tx: i32, ty: i32) -> bool {
