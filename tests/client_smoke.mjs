@@ -195,9 +195,11 @@ try {
   await page.waitForFunction(() => {
     const image = document.querySelector(".lobby-map-preview img");
     return image?.getAttribute("src")?.endsWith("/assets/map-previews/chokes.jpg")
+      && image.complete
       && image.naturalWidth === 512
       && image.naturalHeight === 512;
   }, { timeout: 5000 });
+  ok(true, "selected archived map preview finishes loading before the lobby transition");
 
   await page.click("#lobby-ready");
   await page.waitForFunction(() => { const b = document.querySelector("#lobby-start"); return b && !b.disabled; }, { timeout: 5000 });
