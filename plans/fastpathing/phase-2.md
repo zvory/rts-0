@@ -112,8 +112,8 @@ mark this phase done.
 
 ## Completion Evidence
 
-Implemented manually without the phase runner or a PR. The implementation revision is `696ebdb9b`;
-raw paired measurements are checked in as `phase-2-results.json`.
+Implemented manually without the phase runner. The implementation revision is `696ebdb9b`; raw
+paired measurements are checked in as `phase-2-results.json`.
 
 - The graph has three proven current profiles: infantry-like normal, vehicle-body normal, and
   oriented vehicle-clearance/pinch, with radius retained as a profile parameter. Each 256-tile COW
