@@ -12,7 +12,6 @@ use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
-use crate::rules::terrain::{self, TerrainKind};
 use cache::{CacheEntry, CacheKey};
 use std::collections::HashMap;
 
@@ -20,6 +19,7 @@ mod authoring;
 mod passability;
 mod route_finalize;
 mod tree_detours;
+use passability::TerrainPassability;
 pub(in crate::game) use authoring::StaticRouteAnalyzer;
 #[cfg(test)]
 mod tree_detours_tests;
@@ -30,9 +30,6 @@ const VEHICLE_HARD_CLEARANCE_TILES: u16 = 1;
 const VEHICLE_PREFERRED_CLEARANCE_TILES: u16 = 3;
 const VEHICLE_CLEARANCE_COST_SCALE: u32 = 2;
 const VEHICLE_ROUTE_TURN_PENALTY: u32 = 5;
-const VEHICLE_ADJACENT_BLOCKER_COST: u32 = 2;
-const VEHICLE_CORNER_GRAZE_COST: u32 = 18;
-const VEHICLE_DIAGONAL_BLOCKER_COST: u32 = 3;
 
 /// Parameters for a single path query.
 #[derive(Clone)]
@@ -68,67 +65,6 @@ impl RouteShape {
             RouteShape::PreferFewerTurns => 3,
             RouteShape::VehicleClearance => VEHICLE_ROUTE_TURN_PENALTY,
         }
-    }
-}
-
-/// Passability oracle that layers terrain + occupancy.
-struct TerrainPassability<'a> {
-    map: &'a Map,
-    occupancy: &'a Occupancy<'a>,
-    kind: EntityKind,
-    radius_tiles: u32,
-    route_shape: RouteShape,
-    /// When true, reject tiles pinched between two diagonally-opposite blocked corners.
-    /// Used for oriented vehicle bodies so A* avoids 1-tile gaps that the rotating hull
-    /// cannot legally thread (see docs/design/server-sim.md pathing notes).
-    avoid_diagonal_pinch: bool,
-}
-
-impl TerrainPassability<'_> {
-    fn tile_passable(&self, tx: i32, ty: i32) -> bool {
-        if !self.map.in_bounds(tx, ty) {
-            return false;
-        }
-        let Some(terrain_kind) =
-            TerrainKind::from_map_code(self.map.terrain_at(tx as u32, ty as u32))
-        else {
-            return false;
-        };
-        if !terrain::movement_allowed(self.kind, terrain_kind) {
-            return false;
-        }
-        if !self.occupancy.passable_for_kind(tx, ty, self.kind) {
-            return false;
-        }
-        true
-    }
-}
-
-impl TerrainPassability<'_> {
-    fn vehicle_corner_cost(&self, tx: i32, ty: i32) -> u32 {
-        let n = !self.tile_passable(tx, ty - 1);
-        let e = !self.tile_passable(tx + 1, ty);
-        let s = !self.tile_passable(tx, ty + 1);
-        let w = !self.tile_passable(tx - 1, ty);
-        let nw = !self.tile_passable(tx - 1, ty - 1);
-        let ne = !self.tile_passable(tx + 1, ty - 1);
-        let se = !self.tile_passable(tx + 1, ty + 1);
-        let sw = !self.tile_passable(tx - 1, ty + 1);
-
-        let adjacent_blockers = [n, e, s, w].into_iter().filter(|blocked| *blocked).count() as u32;
-        let diagonal_blockers = [nw, ne, se, sw]
-            .into_iter()
-            .filter(|blocked| *blocked)
-            .count() as u32;
-        let grazes_corner = (w || e) && (s || n);
-
-        adjacent_blockers * VEHICLE_ADJACENT_BLOCKER_COST
-            + diagonal_blockers * VEHICLE_DIAGONAL_BLOCKER_COST
-            + if grazes_corner {
-                VEHICLE_CORNER_GRAZE_COST
-            } else {
-                0
-            }
     }
 }
 

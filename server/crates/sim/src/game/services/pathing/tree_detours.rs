@@ -1,5 +1,6 @@
 use super::*;
 use crate::config;
+use crate::rules::terrain;
 
 const CANDIDATES_PER_TREE: usize = 16;
 const MAX_LOCAL_TREES: usize = 8;
