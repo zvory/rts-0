@@ -46,7 +46,13 @@ export class ResourceCollectionHistory {
     const cumulativeSteel = (first.resources?.lifetime?.steel || 0) - (second.resources?.lifetime?.steel || 0);
     const cumulativeOil = (first.resources?.lifetime?.oil || 0) - (second.resources?.lifetime?.oil || 0);
     const targetTick = tick - COLLECTION_WINDOW_TICKS;
-    const baseline = [...this.samples].reverse().find((sample) => sample.tick <= targetTick);
+    let baseline = null;
+    for (let index = this.samples.length - 1; index >= 0; index -= 1) {
+      if (this.samples[index].tick <= targetTick) {
+        baseline = this.samples[index];
+        break;
+      }
+    }
     const hasWindowBaseline = baseline && targetTick - baseline.tick <= SAMPLE_INTERVAL_TICKS;
     this.samples.push({
       tick,
