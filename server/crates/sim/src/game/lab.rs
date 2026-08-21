@@ -963,7 +963,7 @@ impl Game {
         self.state.entities.clear_stale_miner_slots();
         self.sync_lab_god_mode_flags();
         systems::recompute_supply(&mut self.state.players, &self.state.entities);
-        self.reset_derived_state();
+        self.repair_derived_after_lab_entity_mutation();
         let ids = self.state.player_ids();
         self.recompute_live_fog(&ids);
         self.refresh_fog_memories(&ids);

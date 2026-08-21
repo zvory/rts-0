@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "host": {
+    "os": "Darwin 25.5.0 arm64",
+    "cpu": "Apple M5 Pro"
+  },
+  "revisions": {
+    "phase1MergedBaseline": "209696ba7",
+    "phase1FrozenHarnessOnly": "e7ef438051bcdad2449823915a1e30bc99c9ca15",
+    "implementation": "696ebdb9b"
+  },
+  "richPathCorpus": {
+    "requestsPerRun": 240,
+    "semanticHash": "2d18e58c0dbb5782",
+    "expansionsPerRun": 469321,
+    "referenceElapsedNs": [143534791, 144902875, 142334333, 142137750, 148239500, 154013417, 140258625, 143439666, 144579625, 140531959, 143394042],
+    "candidateElapsedNs": [50276292, 51680542, 51622375, 50472000, 50876750, 53006709, 51698875, 52280542, 52143250, 50598417, 51550792],
+    "referenceMedianNs": 143439666,
+    "candidateMedianNs": 51622375,
+    "speedup": 2.7786336061,
+    "pairedMedianRatio": 0.3595044207,
+    "bootstrap90UpperRatio": 0.3606542070,
+    "referenceMadPercent": 0.9076401502,
+    "candidateMadPercent": 1.2749645866,
+    "ratioMadPercent": 1.2273188082
+  },
+  "graph": {
+    "profiles": 3,
+    "mapTiles": 15876,
+    "baseBytesTotal": 1571724,
+    "dynamicBytesTotal": 1577679,
+    "baseBytesPerProfile": 523908,
+    "dynamicBytesPerProfile": 525893,
+    "initializationMedianNs": 14824376,
+    "localUpdateSamplesPerRun": 202,
+    "localUpdateP50MedianNs": 27875,
+    "localUpdateP95MedianNs": 44959,
+    "localUpdateWorstNs": 218958
+  },
+  "hellhole": {
+    "ticksPerRun": 900,
+    "baselineElapsedMs": [15390, 15023, 15770, 14504, 14705, 15035, 15618, 14992, 14902, 14630, 15454],
+    "candidateElapsedMs": [13882, 13648, 14575, 14053, 14517, 13942, 14564, 14480, 14444, 14427, 13704],
+    "baselineAverageTickUs": [10453, 10245, 10671, 9841, 9984, 10217, 10529, 10153, 10099, 9909, 10538],
+    "candidateAverageTickUs": [9021, 8871, 9478, 9109, 9430, 9051, 9421, 9414, 9380, 9356, 8887],
+    "baselineP95TickUs": [16928, 16374, 17144, 15671, 15728, 16503, 17424, 16110, 16197, 15874, 16956],
+    "candidateP95TickUs": [13656, 13348, 14575, 13795, 14622, 13610, 14640, 14382, 14379, 14552, 13226],
+    "baselineAverageMedianUs": 10217,
+    "candidateAverageMedianUs": 9356,
+    "averageTickPairedMedianRatio": 0.8947668345,
+    "averageTickBootstrap90UpperRatio": 0.9272136314,
+    "p95PairedMedianRatio": 0.8501516566,
+    "elapsedPairedMedianRatio": 0.9325137662,
+    "improvedPairs": 11,
+    "artifactBytes": 26910978,
+    "artifactSha256": "7054deb3347441de285e252a8275de8e8eb2ca09e84795e25f1d121983e168e2",
+    "semanticCounters": {
+      "finalEntities": 468,
+      "snapshotBytes": 27678714,
+      "attackEvents": 17687,
+      "projectileEvents": 120,
+      "deathEvents": 819,
+      "shuttleCommands": 60,
+      "selectedUnits": 2580,
+      "respawnBatches": 528,
+      "respawnedUnits": 819
+    }
+  }
+}

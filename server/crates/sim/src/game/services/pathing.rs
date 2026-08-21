@@ -16,10 +16,12 @@ use cache::{CacheEntry, CacheKey};
 use std::collections::HashMap;
 
 mod authoring;
+mod graph;
 mod passability;
 mod route_finalize;
 mod tree_detours;
 pub(in crate::game) use authoring::StaticRouteAnalyzer;
+use graph::PathGraph;
 use passability::TerrainPassability;
 #[cfg(test)]
 mod tree_detours_tests;
@@ -105,6 +107,7 @@ pub struct PathingService {
     cache: HashMap<CacheKey, CacheEntry>,
     cache_cap: usize,
     search_scratch: pathfinding::SearchScratch,
+    path_graph: PathGraph,
     tick: u32,
 }
 
@@ -116,8 +119,15 @@ impl PathingService {
             cache: HashMap::with_capacity(cache_cap),
             cache_cap,
             search_scratch: pathfinding::SearchScratch::default(),
+            path_graph: PathGraph::default(),
             tick: 0,
         }
+    }
+
+    pub(in crate::game) fn new_for_map(default_budget: usize, cache_cap: usize, map: &Map) -> Self {
+        let mut service = Self::new(default_budget, cache_cap);
+        service.path_graph = PathGraph::for_map(map);
+        service
     }
 
     /// Advance the internal tick counter. Call once per simulation tick.
@@ -127,6 +137,11 @@ impl PathingService {
 
     #[allow(dead_code)]
     pub(in crate::game) fn clear_rebuildable_state(&mut self) {
+        self.clear_cache_and_search();
+        self.path_graph.clear();
+    }
+
+    pub(in crate::game) fn clear_cache_and_search(&mut self) {
         self.cache.clear();
         self.search_scratch = pathfinding::SearchScratch::default();
     }
@@ -1755,5 +1770,30 @@ mod tests {
             tile_path.contains(&(3, 3)),
             "infantry must remain free to thread the diagonal pinch, got {tile_path:?}"
         );
+    }
+
+    #[test]
+    fn lab_style_cache_clear_retains_initialized_graph_tables() {
+        let map = flat_test_map(32);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new_for_map(8_192, 16, &map);
+        let request = PathRequest {
+            kind: EntityKind::Tank,
+            start: (4, 4),
+            goal: (20, 20),
+            radius_tiles: 0,
+            route_shape: RouteShape::VehicleClearance,
+            budget: None,
+        };
+        let first = service.request_tile_path(&map, &occ, request.clone());
+        assert!(!first.is_empty());
+        let generation = service.path_graph.generation();
+
+        service.clear_cache_and_search();
+        let second = service.request_tile_path(&map, &occ, request);
+
+        assert_eq!(second, first);
+        assert_eq!(service.path_graph.generation(), generation);
     }
 }

@@ -262,6 +262,9 @@ const approvedCurrentFactionFiles = new Set([
   // Target facts centralize current-roster target groups until catalog combat roles exist.
   "server/crates/rules/src/target.rs",
   "server/crates/sim/src/game/ability.rs",
+  // The precomputed path graph uses one existing kind as a geometry/cost representative for each
+  // movement-body class. Profile admission remains derived from the request kind and rules APIs.
+  "server/crates/sim/src/game/services/pathing/graph.rs",
   // Entrenchment Phase 3 gates trench creation on the current player's Entrenchment research.
   "server/crates/sim/src/game/services/entrenchment.rs",
   // Inline projectile tests spawn current units directly.
@@ -482,6 +485,7 @@ const approvedSpecialCaseBudgets = new Map([
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
   // Tank Trap deconstruction adds worker-only command validation and trap target admission.
   ["server/crates/sim/src/game/services/commands.rs", 259],
+  ["server/crates/sim/src/game/services/pathing/graph.rs", 2],
   ["server/crates/sim/src/game/invariants.rs", 13],
   ["server/crates/sim/src/game/map_authoring.rs", 2],
   ["server/crates/sim/src/game/services/pathing/route_finalize.rs", 1],

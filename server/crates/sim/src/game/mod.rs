@@ -600,6 +600,11 @@ impl Game {
         self.derived.advance_pathing_tick(self.state.tick);
     }
 
+    pub(in crate::game) fn repair_derived_after_lab_entity_mutation(&mut self) {
+        self.derived
+            .repair_after_lab_entity_mutation(&self.state.map, &self.state.entities);
+    }
+
     #[cfg(test)]
     pub(in crate::game) fn pathing_cache_len_for_test(&self) -> usize {
         self.derived.pathing_cache_len_for_test()

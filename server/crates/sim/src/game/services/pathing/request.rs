@@ -111,14 +111,9 @@ impl PathingService {
         if !allow_pathfinding {
             return PathingRequestOutcome::Deferred;
         }
-        let pass = TerrainPassability {
-            map,
-            occupancy,
-            kind: req.kind,
-            radius_tiles: req.radius_tiles,
-            route_shape: req.route_shape,
-            avoid_diagonal_pinch: uses_oriented_vehicle_body(req.kind),
-        };
+        let pass =
+            self.path_graph
+                .view(map, occupancy, req.kind, req.radius_tiles, req.route_shape);
 
         let search_budget = req.budget.unwrap_or(self.default_budget);
         let static_fingerprint = occupancy.static_fingerprint_for_kind(req.kind);

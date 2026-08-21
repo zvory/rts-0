@@ -12,6 +12,9 @@ use crate::game::pathfinding::Passability;
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
+type PathingTopologyEntry = (u32, EntityKind, u32, u32);
+type OccupancyTopology = Vec<PathingTopologyEntry>;
+
 /// A snapshot of which tiles are blocked by buildings this tick, layered over terrain. Units
 /// never block (soft overlap is allowed), so only static structures appear here.
 #[derive(Clone)]
@@ -21,6 +24,7 @@ pub(crate) struct Occupancy<'a> {
 }
 
 struct OccupancyData {
+    topology: OccupancyTopology,
     all_ground_blocked: Vec<bool>,
     vehicle_body_blocked: Vec<bool>,
     building_blocked: Vec<bool>,
@@ -36,13 +40,28 @@ impl<'a> Occupancy<'a> {
     pub(crate) fn build(map: &'a Map, entities: &EntityStore) -> Self {
         Occupancy {
             map,
-            data: Arc::new(OccupancyData::build(map, entities)),
+            data: Arc::new(OccupancyData::build(
+                map,
+                entities,
+                entities
+                    .iter()
+                    .filter(|entity| entity.is_building())
+                    .map(|entity| {
+                        (
+                            entity.id,
+                            entity.kind,
+                            entity.pos_x.to_bits(),
+                            entity.pos_y.to_bits(),
+                        )
+                    })
+                    .collect(),
+            )),
         }
     }
 }
 
 impl OccupancyData {
-    fn build(map: &Map, entities: &EntityStore) -> Self {
+    fn build(map: &Map, entities: &EntityStore, topology: OccupancyTopology) -> Self {
         let cells = map.width.saturating_mul(map.height) as usize;
         let mut all_ground_blocked = vec![false; cells];
         let mut vehicle_body_blocked = vec![false; cells];
@@ -125,6 +144,7 @@ impl OccupancyData {
         );
 
         OccupancyData {
+            topology,
             all_ground_blocked,
             vehicle_body_blocked,
             building_blocked,
@@ -139,6 +159,26 @@ impl OccupancyData {
 }
 
 impl Occupancy<'_> {
+    pub(crate) fn path_graph_topology(&self) -> &[PathingTopologyEntry] {
+        &self.data.topology
+    }
+
+    pub(crate) fn path_graph_blocked_tiles(
+        &self,
+        movement_body_class: MovementBodyClass,
+    ) -> Vec<bool> {
+        match movement_body_class {
+            MovementBodyClass::InfantryLike => self.data.all_ground_blocked.clone(),
+            MovementBodyClass::VehicleBody => self
+                .data
+                .all_ground_blocked
+                .iter()
+                .zip(&self.data.vehicle_body_blocked)
+                .map(|(all_ground, vehicle)| *all_ground || *vehicle)
+                .collect(),
+        }
+    }
+
     /// Tile clearance from the nearest static blocker, in whole tiles. Blocked and out-of-bounds
     /// tiles report zero. Map edges count as static bounds, so edge-adjacent tiles have low
     /// clearance even on otherwise empty maps.

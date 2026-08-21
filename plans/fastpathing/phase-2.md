@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation.
+- [x] Implemented manually and retained after passing correctness and performance gates.
 
 ## Objective
 
@@ -112,6 +112,43 @@ mark this phase done.
 
 ## Completion Evidence
 
-In the implementation commit, replace this text with the phase revision, verification commands,
-corpus/parity hashes, profile/table encoding, exact topology key and update bound, paired
-measurements, memory, and the Phase 3 cost-policy seam.
+Implemented manually without the phase runner. The implementation revision is `696ebdb9b`; raw
+paired measurements are checked in as `phase-2-results.json`.
+
+- The graph has three proven current profiles: infantry-like normal, vehicle-body normal, and
+  oriented vehicle-clearance/pinch, with radius retained as a profile parameter. Each 256-tile COW
+  page stores one passability byte and eight legacy-direction `u32` extra-cost entries per tile;
+  `u32::MAX` is the illegal-edge sentinel. Base step and turn costs stay outside the table, keeping
+  the legacy saturating-add and heap/tie order. On the 126x126 measurement map, each profile uses
+  523,908 immutable bytes and 525,893 dynamic bytes. Three-profile initialization median was
+  14.824 ms.
+- The authored-map key is the materialized content hash covering dimensions, terrain/roads,
+  elevation, doodads/trees, no-vehicle and slow tiles, and the remaining overlays. The exact ordered
+  dynamic topology key is `(id, kind, pos_x_bits, pos_y_bits)`; owner, completion, and moving units
+  are excluded. Changed blocker tiles recompute edge origins within
+  `max(radius + 2, vehicle-clearance ? 4 : 2)` tiles. Across 202 updates/run, median p50/p95 were
+  0.0279/0.0450 ms and the observed worst case was 0.2190 ms. Exhaustive current-table versus rich
+  reference checks cover initial close, overlap, partial/full reopen, all profiles, and caps
+  `{0,1,2,8,64,4096,32768}`.
+- Eleven alternating rich, prebuilt-occupancy, cold, no-bypass, full-return pairs kept semantic hash
+  `2d18e58c0dbb5782` and 469,321 expansions for all 240 requests. Phase 1 rich evaluation median was
+  143.440 ms versus 51.622 ms candidate: 2.779x faster, paired median ratio 0.3595, bootstrap 90%
+  upper ratio 0.3607. The frozen Phase 1 harness-only revision did not contain a rich
+  `PathingService` lane (its release benchmark used a generic `Grid`), so the immediately preceding
+  Phase 1 rich generator is retained in the candidate binary as the matched reference. The 2.779x
+  incremental gain already exceeds the plan's 2x cumulative threshold without taking credit for
+  Phase 1's separate dense-search gain.
+- Eleven alternating 900-tick Hellhole pairs against merged Phase 1 produced median average-tick
+  ratio 0.8948 with bootstrap 90% upper ratio 0.9272; median p95 ratio was 0.8502 and all 11 pairs
+  improved. Every semantic counter matched. The final 900-frame artifact is byte-identical to Phase
+  1: 26,910,978 bytes, SHA-256
+  `7054deb3347441de285e252a8275de8e8eb2ca09e84795e25f1d121983e168e2`.
+- Verification: exhaustive graph/reference and topology tests; complete `rts-sim` suite (1,316
+  passed, 5 release-only ignored); `cargo clippy -p rts-sim --lib -- -D warnings`; sim architecture
+  check; docs health; and `git diff --check`. Release sampling attributes the remaining Hellhole hot
+  work to vehicle movement/static-clearance checks (`vehicle_route_context`, `static_clearance_px`,
+  and `body_hits_static_blocker`), not path edge evaluation.
+- Phase 3 should change only the infantry profile's base `extra_costs` policy. Keep `PathGraph`
+  ownership, dynamic pages, topology invalidation, dense state indices, and cache fingerprinting
+  unchanged; directional elevation can populate directed infantry base costs without duplicating
+  graph state.
