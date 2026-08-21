@@ -320,7 +320,7 @@ Successful visual responses include this delivery-shaped field (the URL is opaqu
 {
   "preview": {
     "available": true,
-    "url": "http://100.x.y.z:port/interact-preview/<opaque-token>",
+    "url": "http://machine.tailnet.ts.net:port/interact-preview/<opaque-token>",
     "instruction": "Share this Tailnet URL with the user to preview the Interact artifact. Do not share a local file path."
   }
 }
@@ -349,6 +349,8 @@ outside the worktree. That service binds the stable Tailnet port 8091, has no id
 retains each copied artifact for at least 24 hours. The URL therefore survives Lab `close`,
 `shutdown`, idle teardown, and removal of the originating worktree. A later publication restarts
 the service if it is not running while retaining any unexpired copied artifacts.
+Published URLs use the machine's fully qualified MagicDNS name from Tailscale status, with the
+numeric private address retained only as a fallback when that name is unavailable.
 
 Each URL has an unguessable per-artifact id, serves only its registered PNG or MP4 with no directory
 route, and never exposes the private Lab game server or local filesystem paths. If Tailscale is

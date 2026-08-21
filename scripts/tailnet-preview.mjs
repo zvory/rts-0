@@ -133,9 +133,10 @@ export function usage() {
   scripts/tailnet-preview --stop [--port 8091]
 
 Copies one regular file into a private temporary preview directory, serves it over
-the current machine's Tailscale IPv4 address, and prints its URL. The default TTL
-is 24 hours; --keep retains the file until it is removed manually or the OS clears
-its temporary directory.`;
+the current machine's Tailscale IPv4 address, and prints a MagicDNS URL (falling
+back to the IPv4 address when no DNS name is available). The default TTL is 24
+hours; --keep retains the file until it is removed manually or the OS clears its
+temporary directory.`;
 }
 
 function isRegularFile(file) {
@@ -492,7 +493,31 @@ export function tailnetIpv4FromStatus(status) {
   return addresses.find(isTailnetIpv4) || null;
 }
 
-function tailscaleIpv4() {
+export function tailnetDnsNameFromStatus(status) {
+  const dnsName = typeof status?.Self?.DNSName === "string"
+    ? status.Self.DNSName.trim().replace(/\.+$/, "").toLowerCase()
+    : "";
+  if (!dnsName || dnsName.length > 253) return null;
+  const labels = dnsName.split(".");
+  if (labels.length < 2) return null;
+  const validLabel = (label) => (
+    label.length >= 1 &&
+    label.length <= 63 &&
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label)
+  );
+  return labels.every(validLabel) ? dnsName : null;
+}
+
+export function tailnetEndpointFromStatus(status) {
+  const ipv4 = tailnetIpv4FromStatus(status);
+  if (!ipv4) return null;
+  return {
+    bindHost: ipv4,
+    urlHost: tailnetDnsNameFromStatus(status) || ipv4,
+  };
+}
+
+function tailscaleEndpoint() {
   let raw;
   try {
     raw = execFileSync("tailscale", ["status", "--json"], {
@@ -513,9 +538,9 @@ function tailscaleIpv4() {
   if (status.BackendState !== "Running") {
     throw new Error(`Tailscale is not running (state: ${status.BackendState || "unknown"})`);
   }
-  const ipv4 = tailnetIpv4FromStatus(status);
-  if (!ipv4) throw new Error("Tailscale did not report a Tailnet IPv4 address");
-  return ipv4;
+  const endpoint = tailnetEndpointFromStatus(status);
+  if (!endpoint) throw new Error("Tailscale did not report a Tailnet IPv4 address");
+  return endpoint;
 }
 
 function serverScriptPath() {
@@ -688,7 +713,8 @@ export async function publishTailnetPreview({
   if (!keep && ttlMs > Number.MAX_SAFE_INTEGER - Date.now()) {
     throw new Error("preview expiration is out of range");
   }
-  const previewHost = host || tailscaleIpv4();
+  const endpoint = host ? { bindHost: host, urlHost: host } : tailscaleEndpoint();
+  const previewHost = endpoint.bindHost;
   if (!isPreviewHost(previewHost)) {
     throw new Error("preview host must be a Tailscale IPv4 address (or loopback for tests)");
   }
@@ -697,7 +723,7 @@ export async function publishTailnetPreview({
   await ensureServer({ host: previewHost, port, root });
   const preview = stagePreview({ root, source, ttlMs, keep });
   return {
-    url: `http://${urlHost(previewHost)}:${port}${PREVIEW_PATH_PREFIX}${preview.id}/${preview.name}`,
+    url: `http://${urlHost(endpoint.urlHost)}:${port}${PREVIEW_PATH_PREFIX}${preview.id}/${preview.name}`,
     expiresAt: preview.expiresAt,
   };
 }

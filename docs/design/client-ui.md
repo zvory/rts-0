@@ -861,7 +861,10 @@ and sampled time lapses. An explicit media viewport DPR overrides that default, 
 restores the prior session viewport when it settles.
 Visual delivery is deliberately not owned by that per-worktree lifecycle. Before returning a
 Tailnet URL, the daemon validates the artifact and copies it into the machine-level
-`tailnet-preview` service on stable port 8091. The preview server has no idle timeout, and each
+`tailnet-preview` service on stable port 8091. The service binds to the machine's private Tailscale
+IPv4 address but publishes the fully qualified `Self.DNSName` MagicDNS hostname reported by
+`tailscale status --json`; it falls back to the IPv4 address only when that name is unavailable.
+The preview server has no idle timeout, and each
 copied artifact has at least 24 hours of retention, so Lab close/shutdown, idle expiry, and worktree
 removal do not invalidate issued links. A later publisher can restart the service and continue
 serving unexpired copies from its OS-temporary root.

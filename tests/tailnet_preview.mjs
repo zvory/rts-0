@@ -18,6 +18,8 @@ import {
   publishTailnetPreview,
   safeFileName,
   stagePreview,
+  tailnetDnsNameFromStatus,
+  tailnetEndpointFromStatus,
   tailnetIpv4FromStatus,
   writeServerState,
 } from "../scripts/tailnet-preview.mjs";
@@ -72,6 +74,27 @@ try {
     TailscaleIPs: ["fd7a::1"],
     Self: { TailscaleIPs: ["100.119.17.21"] },
   }), "100.119.17.21");
+  assert.equal(tailnetDnsNameFromStatus({
+    Self: { DNSName: "olympus.tail6943f.ts.net." },
+  }), "olympus.tail6943f.ts.net");
+  assert.equal(tailnetDnsNameFromStatus({
+    Self: { DNSName: "not a hostname" },
+  }), null);
+  assert.deepEqual(tailnetEndpointFromStatus({
+    Self: {
+      DNSName: "olympus.tail6943f.ts.net.",
+      TailscaleIPs: ["100.119.17.21"],
+    },
+  }), {
+    bindHost: "100.119.17.21",
+    urlHost: "olympus.tail6943f.ts.net",
+  });
+  assert.deepEqual(tailnetEndpointFromStatus({
+    Self: { TailscaleIPs: ["100.119.17.21"] },
+  }), {
+    bindHost: "100.119.17.21",
+    urlHost: "100.119.17.21",
+  }, "preview URLs fall back to the private address when MagicDNS metadata is absent");
 
   const malformedRequestServer = createPreviewServer({ root: previewRoot });
   const malformedResponse = responseCapture();
