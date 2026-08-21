@@ -35,7 +35,6 @@ export const ROCKET_LAUNCHER_PARTS = Object.freeze({
     "part.rocket.6",
     "part.rocket.7",
     "part.rocket.8",
-    "part.magentaGlow",
   ]),
 });
 
@@ -88,23 +87,22 @@ export const COMMAND_CAR_RIG_SVG = `<svg viewBox="-36 -28 72 56" data-rts-rig-ki
 
 export const ROCKET_LAUNCHER_RIG_SVG = `<svg viewBox="-36 -28 72 56" data-rts-rig-kind="rocket_launcher" data-rts-rig-version="1" data-rts-origin="center" id="rocket-launcher.prototype">
   <ellipse id="part.shadow" cx="-1" cy="5" rx="24" ry="12" fill="#000000" opacity="0.28" data-rts-animation="facing:transform.rotation:1:0" />
-  <rect id="part.hull" x="-21" y="-8" width="42" height="16" rx="3" fill="#5d7896" stroke="#17131a" stroke-width="2" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.hull" x="-21" y="-8" width="42" height="16" rx="3" fill="#ffffff" stroke="#17131a" stroke-width="2" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
   <circle id="part.wheel.top.front" cx="13" cy="-9" r="4" fill="#18151b" stroke="#655a68" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
   <circle id="part.wheel.top.rear" cx="-13" cy="-9" r="4" fill="#18151b" stroke="#655a68" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
   <circle id="part.wheel.bottom.front" cx="13" cy="9" r="4" fill="#18151b" stroke="#655a68" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
   <circle id="part.wheel.bottom.rear" cx="-13" cy="9" r="4" fill="#18151b" stroke="#655a68" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
-  <rect id="part.cabin" x="8" y="-6" width="11" height="12" rx="2" fill="#7895b3" stroke="#17131a" stroke-width="1.5" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.cabin" x="8" y="-6" width="11" height="12" rx="2" fill="#ffffff" stroke="#17131a" stroke-width="1.5" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
   <line id="part.windshield" x1="9.5" y1="-4.5" x2="9.5" y2="4.5" stroke="#d8d0b0" stroke-width="1.5" opacity="0.72" data-rts-animation="facing:transform.rotation:1:0" />
-  <rect id="part.rack" x="-18" y="-10" width="25" height="20" rx="2" fill="#302734" fill-opacity="0.88" stroke="#d48acb" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.1" x1="-17" y1="-8" x2="5" y2="-8" stroke="#ff8bed" stroke-width="2" opacity="0.76" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.2" x1="-17" y1="-5.8" x2="5" y2="-5.8" stroke="#ff8bed" stroke-width="2" opacity="0.76" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.3" x1="-17" y1="-3.5" x2="5" y2="-3.5" stroke="#ff8bed" stroke-width="2" opacity="0.76" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.4" x1="-17" y1="-1.2" x2="5" y2="-1.2" stroke="#ff8bed" stroke-width="2" opacity="0.76" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.5" x1="-17" y1="1.2" x2="5" y2="1.2" stroke="#ff8bed" stroke-width="2" opacity="0.76" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.6" x1="-17" y1="3.5" x2="5" y2="3.5" stroke="#ff8bed" stroke-width="2" opacity="0.76" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.7" x1="-17" y1="5.8" x2="5" y2="5.8" stroke="#ff8bed" stroke-width="2" opacity="0.76" data-rts-animation="facing:transform.rotation:1:0" />
-  <line id="part.rocket.8" x1="-17" y1="8" x2="5" y2="8" stroke="#ff8bed" stroke-width="2" opacity="0.76" data-rts-animation="facing:transform.rotation:1:0" />
-  <ellipse id="part.magentaGlow" cx="-5" cy="0" rx="15" ry="12" fill="#ff25df" opacity="0.12" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.rack" x="-18" y="-10" width="25" height="20" rx="2" fill="#ffffff" fill-opacity="0.9" stroke="#17131a" stroke-width="1.2" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rocket.1" x1="-17" y1="-8" x2="5" y2="-8" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rocket.2" x1="-17" y1="-5.8" x2="5" y2="-5.8" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rocket.3" x1="-17" y1="-3.5" x2="5" y2="-3.5" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rocket.4" x1="-17" y1="-1.2" x2="5" y2="-1.2" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rocket.5" x1="-17" y1="1.2" x2="5" y2="1.2" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rocket.6" x1="-17" y1="3.5" x2="5" y2="3.5" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rocket.7" x1="-17" y1="5.8" x2="5" y2="5.8" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.rocket.8" x1="-17" y1="8" x2="5" y2="8" stroke="#ffffff" stroke-width="2" opacity="0.9" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
   <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
   <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
   <circle id="anchor.hp" cx="0" cy="-24" r="1" fill="#ffffff" />

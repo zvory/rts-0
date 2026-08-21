@@ -72,6 +72,7 @@ import {
 } from "./shared.js";
 import { drawImpassableEdge, isImpassableAt } from "./terrain_palette.js";
 import { drawFormationMovePreview } from "./formation_line_preview.js";
+import { drawPanzerfaustProjectile } from "./panzerfaust_feedback.js";
 
 export { _drawBreakthroughAuras } from "./breakthrough_aura.js";
 
@@ -779,9 +780,7 @@ export function _drawMortarLaunches(state) {
     const flashLen = 22;
     const flashWidth = 8;
     gfxStroke(g, 0, 0x000000, 0);
-    const primary = launch.rocket ? 0xff4ee8 : 0xfff3b0;
-    const secondary = launch.rocket ? 0xa900b8 : 0xff8b23;
-    gfxFill(g, primary, (launch.rocket ? 0.62 : 0.88) * flashFade);
+    gfxFill(g, 0xfff3b0, 0.88 * flashFade);
     gfxPoly(g, [
       launch.x + ux * 2 - uy * 2.8,
       launch.y + uy * 2 + ux * 2.8,
@@ -791,7 +790,7 @@ export function _drawMortarLaunches(state) {
       launch.y + uy * 5 - ux * flashWidth,
     ]);
     gfxNoFill(g);
-    gfxFill(g, secondary, (launch.rocket ? 0.42 : 0.48) * flashFade);
+    gfxFill(g, 0xff8b23, 0.48 * flashFade);
     gfxPoly(g, [
       launch.x - uy * 4.5,
       launch.y + ux * 4.5,
@@ -803,7 +802,7 @@ export function _drawMortarLaunches(state) {
       launch.y - uy * 5,
     ]);
     gfxNoFill(g);
-    gfxFill(g, launch.rocket ? 0x7e3478 : 0x8a806b, 0.24 * fade);
+    gfxFill(g, 0x8a806b, 0.24 * fade);
     gfxPoly(g, [
       launch.x - r * 0.95, launch.y - r * 0.14,
       launch.x - r * 0.5, launch.y - r * 0.58,
@@ -814,7 +813,7 @@ export function _drawMortarLaunches(state) {
       launch.x - r * 0.82, launch.y + r * 0.28,
     ]);
     gfxNoFill(g);
-    gfxFill(g, launch.rocket ? 0xd874cf : 0xc0b092, 0.18 * fade);
+    gfxFill(g, 0xc0b092, 0.18 * fade);
     gfxCircle(g, launch.x - 4, launch.y + 1, 4.5);
     gfxCircle(g, launch.x + 4, launch.y - 2, 3.8);
     gfxNoFill(g);
@@ -859,6 +858,10 @@ export function _drawMortarShells(state) {
   if (!shells.length) return;
 
   for (const shell of shells) {
+    if (shell.rocket) {
+      drawPanzerfaustProjectile(g, shell, now);
+      continue;
+    }
     const duration = Math.max(1, shell.durationMs || 1);
     const t = clamp01((now - shell.createdAt) / duration);
     const dx = shell.toX - shell.fromX;
@@ -874,20 +877,14 @@ export function _drawMortarShells(state) {
     const uy = Math.sin(angle);
     const shadowAlpha = 0.22 * (1 - stretch * 0.55);
 
-    if (shell.rocket) {
-      const trail = 20 + stretch * 18;
-      gfxStrokeLine(g, x - ux * trail, y - uy * trail, x, y, 3.2, 0xff46df, 0.32);
-      gfxStrokeLine(g, x - ux * trail * 0.65, y - uy * trail * 0.65, x, y, 1.2, 0xffc6f5, 0.55);
-    }
-
     gfxStroke(g, 0, 0x000000, 0);
     gfxFill(g, 0x050505, shadowAlpha);
     gfxEllipse(g, x, y, 4.4, 2.2);
     gfxNoFill(g);
-    gfxFill(g, shell.rocket ? 0xff56ec : 0x050505, shell.rocket ? 0.78 : 1);
+    gfxFill(g, 0x050505, 1);
     drawFreeRotatedRect(g, x, y, shellLen, shellWidth, angle);
     gfxNoFill(g);
-    gfxFill(g, shell.rocket ? 0xffb0f4 : 0x2d2d2d, shell.rocket ? 0.62 : 1);
+    gfxFill(g, 0x2d2d2d, 1);
     drawFreeRotatedRect(
       g,
       x - uy * shellWidth * 0.24,
@@ -918,17 +915,17 @@ export function _drawMortarImpacts(state) {
     const dustRadius = outerRadius * 1.35;
     gfxStroke(g, 0, 0x000000, 0);
 
-    gfxFill(g, impact.rocket ? 0xff35dd : 0xffb22e, (impact.rocket ? 0.22 : 0.28) * blastFade);
+    gfxFill(g, 0xffb22e, 0.28 * blastFade);
     drawJaggedBlob(g, impact.x, impact.y, outerRadius * 1.05, 18, impact.seed + 11, 0.7, 1.0);
     gfxNoFill(g);
-    gfxFill(g, impact.rocket ? 0xff9bf0 : 0xffd65a, 0.2 * blastFade);
+    gfxFill(g, 0xffd65a, 0.2 * blastFade);
     drawJaggedBlob(g, impact.x, impact.y, outerRadius * 0.7, 14, impact.seed + 23, 0.74, 1.0);
     gfxNoFill(g);
 
-    gfxFill(g, impact.rocket ? 0x71346c : 0x6f5c45, 0.3 * dustFade);
+    gfxFill(g, 0x6f5c45, 0.3 * dustFade);
     drawJaggedBlob(g, impact.x, impact.y, dustRadius, 26, impact.seed + 31, 0.62, 1.0);
     gfxNoFill(g);
-    gfxFill(g, impact.rocket ? 0xb96cac : 0xa08d70, 0.2 * dustFade);
+    gfxFill(g, 0xa08d70, 0.2 * dustFade);
     drawJaggedBlob(g, impact.x, impact.y, dustRadius * 0.74, 22, impact.seed + 43, 0.68, 1.0);
     gfxNoFill(g);
 

@@ -95,3 +95,39 @@ fn later_barrage_costs_seventy_five_oil() {
     game.tick();
     assert_eq!(game.state.players[0].oil, 0);
 }
+
+#[test]
+fn one_manual_barrage_stops_after_sixteen_rockets_and_leaves_mortar_decals() {
+    let (mut game, launcher, target) = fixture(0);
+    order_barrage(&mut game, launcher, target);
+
+    let mut rocket_launches = 0;
+    let observation_ticks = config::ROCKET_BARRAGE_RELOAD_TICKS as u32 * 2;
+    for _ in 0..observation_ticks {
+        for (player, events) in game.tick() {
+            if player != 1 {
+                continue;
+            }
+            rocket_launches += events
+                .iter()
+                .filter(|event| {
+                    matches!(
+                        event,
+                        Event::MortarLaunch {
+                            from,
+                            rocket: true,
+                            ..
+                        } if *from == launcher
+                    )
+                })
+                .count();
+        }
+    }
+
+    assert_eq!(rocket_launches, config::ROCKET_BARRAGE_ROCKETS as usize);
+    let (_, decals, trails) =
+        game.ground_decals_for_observer(&ObserverView::Omniscient, 0);
+    assert_eq!(decals.len(), config::ROCKET_BARRAGE_ROCKETS as usize);
+    assert!(decals.iter().all(|decal| decal.decal_class == "mortarBlast"));
+    assert!(trails.is_empty());
+}

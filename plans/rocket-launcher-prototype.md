@@ -1,10 +1,10 @@
-# Rocket Launcher Prototype
+# Rocket Truck Prototype
 
 Status: Phase 0/1 approved for immediate implementation by the requester on 2026-08-21.
 
 ## Phase 0: Unit brief
 
-The Rocket Launcher is a manually fired mobile saturation-artillery vehicle for Kriegsia. It is
+The Rocket Truck (`rocket_launcher` protocol kind) is a manually fired mobile saturation-artillery vehicle for Kriegsia. It is
 trained at the Gun Works after completing Rockets research at the Engineering Complex. Its purpose
 is to punish concentrations and static positions at long range while exposing a fragile,
 oil-hungry vehicle that must stop and commit to a visible two-second launch sequence.
@@ -14,13 +14,14 @@ over a wide area. The first barrage is free; later barrages cost 75 oil."
 
 Prototype interactions: vehicle pathing and collision; manual ground targeting through fog;
 friendly/allied splash damage; no automatic weapon or attack-move firing; no sound; placeholder
-Katyusha-like truck presentation with translucent magenta launch and impact effects. AI production
+Katyusha-like truck presentation authored in white and tinted to the owning team. Rockets reuse the
+Panzerfaust projectile visual, while impacts reuse the Mortar explosion and decal. AI production
 and ability use are deferred. The unit is enabled in ordinary play and Lab authoring.
 
 ## Phase 1: Rules and balance
 
 - Research: `rockets`, Engineering Complex, 75 steel / 125 oil, 750 ticks (25 seconds), no
-  prerequisite beyond the completed building; unlocks Rocket Launcher training.
+  prerequisite beyond the completed building; unlocks Rocket Truck training.
 - Production: Gun Works (`steelworks`); provisional 225 steel / 125 oil, 6 supply, 600 ticks
   (20 seconds), build hotkey `R`.
 - Body: 150 HP, small/soft armor class, vehicle body and pathing, 18 px selection radius, 20 px
@@ -43,9 +44,9 @@ and ability use are deferred. The unit is enabled in ordinary play and Lab autho
 - Targeting/cancellation: ground positions may be chosen through fog. Invalid coordinates, stale
   units, death, or loss of ownership are safe no-ops. Destroying the launcher does not cancel
   rockets already launched.
-- Presentation: translucent magenta rockets/trails, four-tile targeting preview, and magenta impact
-  flashes; placeholder truck-mounted rack, team color retained on the vehicle body; no audio.
-- AI: may perceive, attack, and be damaged by Rocket Launchers, but does not build or command them
+- Presentation: Panzerfaust-style rocket projectiles, the ordinary Mortar explosion and persistent
+  Mortar blast decal, and a white-authored placeholder truck/rack tinted to the owning team; no audio.
+- AI: may perceive, attack, and be damaged by Rocket Trucks, but does not build or command them
   in this prototype.
 
 Deferred tuning: unit economy/body stats, scatter radius, per-rocket damage, flight timing, reload,

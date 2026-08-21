@@ -480,6 +480,11 @@ await withFakeDocument(async () => {
     "LabPanel spawn palette includes Kriegsia catalog units",
   );
   assert(
+    labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.ROCKET_LAUNCHER) &&
+      STATS[KIND.ROCKET_LAUNCHER]?.label === "Rocket Truck",
+    "LabPanel spawn palette includes the player-facing Rocket Truck",
+  );
+  assert(
     !labSpawnUnitKindsForFaction(DEFAULT_FACTION_ID).includes(KIND.RESOURCE_DEPOT),
     "LabPanel spawn palette excludes buildings from primary unit options",
   );

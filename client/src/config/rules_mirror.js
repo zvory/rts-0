@@ -150,7 +150,7 @@ export const STATS = Object.freeze({
     cost: { steel: 150, oil: 50 }, supply: 4, buildTicks: TICK_HZ * 20,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
     upgradeRequiresText: "Requires research in Engineering Complex" },
-  [KIND.ROCKET_LAUNCHER]: { label: "Rocket Launcher", icon: "RL", size: 18, sight: 8, body: ROCKET_LAUNCHER_BODY,
+  [KIND.ROCKET_LAUNCHER]: { label: "Rocket Truck", icon: "RT", size: 18, sight: 8, body: ROCKET_LAUNCHER_BODY,
     rangeTiles: 0, minRangeTiles: 10,
     cost: { steel: 225, oil: 125 }, supply: 6, buildTicks: TICK_HZ * 20,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ROCKETS,
@@ -509,7 +509,7 @@ export const UPGRADES = Object.freeze({
     icon: "RKT+",
     cost: Object.freeze({ steel: 75, oil: 125 }),
     researchTicks: ROCKETS_RESEARCH_TICKS,
-    description: "Unlock Rocket Launcher training at the Gun Works",
+    description: "Unlock Rocket Truck training at the Gun Works",
     researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
 });
