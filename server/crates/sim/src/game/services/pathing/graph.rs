@@ -161,7 +161,7 @@ struct ProfileTable {
     #[allow(dead_code)] // Immutable authored-map table is also reported by release diagnostics.
     base: Arc<EdgeTable>,
     dynamic: Arc<EdgeTable>,
-    static_fingerprint: u64,
+    topology: Vec<(u32, EntityKind, u32, u32)>,
     blocked_tiles: Vec<bool>,
 }
 
@@ -170,7 +170,6 @@ struct ProfileTable {
 #[derive(Clone, Default)]
 pub(super) struct PathGraph {
     map_content_key: Option<String>,
-    topology: Option<Vec<(u32, EntityKind, u32, u32)>>,
     generation: u64,
     profiles: Vec<ProfileTable>,
     initialization_ns: u64,
@@ -203,16 +202,19 @@ impl PathGraph {
         }
         let profile = RoutingProfile::for_request(kind, radius_tiles, route_shape);
         let topology = occupancy.path_graph_topology();
-        let fingerprint = occupancy.static_fingerprint_for_movement_body(profile.movement_body);
         let profile_index = self
             .profiles
             .iter()
             .position(|table| table.profile == profile);
         let index = match profile_index {
             Some(index) => {
-                if self.profiles[index].static_fingerprint != fingerprint {
+                if self.profiles[index].topology != topology {
                     let blocked_tiles = occupancy.path_graph_blocked_tiles(profile.movement_body);
-                    self.update_profile(index, map, occupancy, &blocked_tiles);
+                    if self.profiles[index].blocked_tiles != blocked_tiles {
+                        self.update_profile(index, map, occupancy, topology, &blocked_tiles);
+                    } else {
+                        self.profiles[index].topology = topology.to_vec();
+                    }
                 }
                 index
             }
@@ -221,9 +223,6 @@ impl PathGraph {
                 self.initialize_profile(profile, map, occupancy, &blocked_tiles)
             }
         };
-        if self.topology.as_deref() != Some(topology) {
-            self.topology = Some(topology.to_vec());
-        }
         GraphPassability {
             table: Arc::clone(&self.profiles[index].dynamic),
         }
@@ -239,10 +238,12 @@ impl PathGraph {
         let started = Instant::now();
         let empty_entities = EntityStore::new();
         let base_occupancy = Occupancy::build(map, &empty_entities);
+        let base_blocked_tiles = base_occupancy.path_graph_blocked_tiles(profile.movement_body);
         let base_pass = terrain_passability(profile, map, &base_occupancy);
         let base = Arc::new(EdgeTable::build(&base_pass));
-        let dynamic_pass = terrain_passability(profile, map, occupancy);
-        let dynamic = Arc::new(EdgeTable::build(&dynamic_pass));
+        // Start from the authored-map table so unchanged pages remain shared. Building overlays
+        // copy only pages containing an affected edge origin.
+        let dynamic = Arc::new((*base).clone());
         self.initialization_ns = self
             .initialization_ns
             .saturating_add(started.elapsed().as_nanos() as u64);
@@ -251,11 +252,17 @@ impl PathGraph {
             profile,
             base,
             dynamic,
-            static_fingerprint: occupancy
-                .static_fingerprint_for_movement_body(profile.movement_body),
-            blocked_tiles: blocked_tiles.to_vec(),
+            topology: Vec::new(),
+            blocked_tiles: base_blocked_tiles,
         });
-        self.profiles.len() - 1
+        let index = self.profiles.len() - 1;
+        let topology = occupancy.path_graph_topology();
+        if self.profiles[index].blocked_tiles != blocked_tiles {
+            self.update_profile(index, map, occupancy, topology, blocked_tiles);
+        } else {
+            self.profiles[index].topology = topology.to_vec();
+        }
+        index
     }
 
     fn update_profile(
@@ -263,6 +270,7 @@ impl PathGraph {
         index: usize,
         map: &Map,
         occupancy: &Occupancy<'_>,
+        topology: &[(u32, EntityKind, u32, u32)],
         current: &[bool],
     ) {
         let started = Instant::now();
@@ -301,9 +309,8 @@ impl PathGraph {
             table.recompute_tile(&pass, tx, ty);
             updated_origins += 1;
         }
+        self.profiles[index].topology = topology.to_vec();
         self.profiles[index].blocked_tiles = current.to_vec();
-        self.profiles[index].static_fingerprint =
-            occupancy.static_fingerprint_for_movement_body(profile.movement_body);
         self.generation = self.generation.wrapping_add(1).max(1);
         self.local_update_ns
             .push(started.elapsed().as_nanos() as u64);

@@ -172,6 +172,31 @@ fn local_updates_match_close_overlap_partial_and_full_reopen_reference() {
 }
 
 #[test]
+fn base_and_empty_dynamic_tables_share_every_edge_page() {
+    let map = rich_map();
+    let entities = EntityStore::new();
+    let occupancy = Occupancy::build(&map, &entities);
+    let mut graph = PathGraph::default();
+
+    graph.view(
+        &map,
+        &occupancy,
+        EntityKind::Tank,
+        0,
+        RouteShape::VehicleClearance,
+    );
+
+    let profile = &graph.profiles[0];
+    assert_eq!(profile.base.pages.len(), profile.dynamic.pages.len());
+    assert!(profile
+        .base
+        .pages
+        .iter()
+        .zip(&profile.dynamic.pages)
+        .all(|(base, dynamic)| Arc::ptr_eq(base, dynamic)));
+}
+
+#[test]
 fn graph_search_matches_rich_reference_for_profiles_caps_and_fallbacks() {
     let map = rich_map();
     let mut entities = EntityStore::new();
