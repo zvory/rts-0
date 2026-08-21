@@ -359,12 +359,11 @@ canary runs own a private server; the browser shard passes its existing loopback
   `node scripts/check-lobby-architecture.mjs` when changing lobby room-task ownership or mutation
   boundaries. Tank Trap blocker/pathing changes should include the focused gap/pathability
   regression and constructible horizontal, vertical, and diagonal dev scenario coverage.
-- Pathfinding storage changes additionally run
-  `cargo test --release --manifest-path server/Cargo.toml -p rts-sim
-  phase1_release_path_corpus_benchmark -- --ignored --nocapture`. The versioned test corpus reports
-  stable workload and semantic hashes, complete tile-path reconstruction and world-waypoint time,
-  expansions, and output bits. Wall-clock comparisons use separately built baseline and candidate
-  revisions; semantic and Dijkstra-oracle assertions remain ordinary portable sim tests.
+- Pathfinding storage changes additionally use the versioned release corpus documented by the
+  active pathing performance plan. It reports stable workload and semantic hashes, complete
+  tile-path reconstruction and world-waypoint time, expansions, and output bits. Wall-clock
+  comparisons use separately built baseline and candidate revisions; semantic and Dijkstra-oracle
+  assertions remain ordinary portable sim tests.
 - SVG legacy unit renderer oracle: run `node tests/legacy_unit_visual_oracle.mjs` when legacy unit
   rendering behavior or `tests/fixtures/svg/legacy-unit-oracle.baseline.json` changes. The oracle
   uses a deterministic Node fixture, semantic measurements, and bounded pixel-diff thresholds across
