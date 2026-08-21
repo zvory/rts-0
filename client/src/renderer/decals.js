@@ -292,7 +292,11 @@ export class GroundDecalLayer {
       try {
         const authoredCorpse = decal?.decalClass === DECAL_CLASS_INFANTRY
           && isAuthoredInfantryCorpseKind(decal.kind);
-        const didStamp = authoredCorpse && atlas
+        // Durable repair/rebuild batches include historical deaths. Count those records as
+        // consumed without resurrecting their transient presentation.
+        const didStamp = authoredCorpse && decal.animateInfantryDeath === false
+          ? true
+          : authoredCorpse && atlas
           ? this._stampInfantryCorpse(decal, atlas)
           : stampGroundDecal(this.ctx, decal, this.downsample, {
             atlas: authoredCorpse ? atlas : null,

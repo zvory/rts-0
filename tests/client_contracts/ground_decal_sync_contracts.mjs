@@ -51,6 +51,8 @@ assert(
   sync.observeSnapshot(2, { afterRevision: 0, decals: [inlineDecal(20)] });
   assert(buffer.authoritativeRevision === 2 && buffer.pendingCount === 1 && requests.length === 0,
     "a contiguous snapshot decal delta advances immediately without repair");
+  assert(buffer.peekPending()[0].animateInfantryDeath === false,
+    "the initial inline history establishes time without resurrecting old deaths");
   sync.observeSnapshot(2, { afterRevision: 0, decals: [inlineDecal(20)] });
   assert(buffer.pendingCount === 1,
     "a repeated snapshot decal delta is idempotent by stable decal id");
@@ -60,6 +62,8 @@ assert(
   });
   assert(buffer.authoritativeRevision === 3 && buffer.pendingCount === 2,
     "an overlapping covered range advances and queues only the newly learned row");
+  assert(buffer.peekPending().find((decal) => decal.id === 21)?.animateInfantryDeath === true,
+    "new deaths on later inline snapshots retain transient presentation eligibility");
 
   sync.observeSnapshot(70, { afterRevision: 6, decals: [inlineDecal(22)] });
   assert(buffer.authoritativeRevision === 3 && buffer.pendingCount === 3,
@@ -196,6 +200,8 @@ assert(
   }), "a valid authoritative delta advances applied state");
   assert(buffer.authoritativeRevision === 3 && buffer.pendingCount === 1,
     "authoritative application advances only from the response and deduplicates decal ids");
+  assert(buffer.peekPending()[0].animateInfantryDeath === false,
+    "durable repair history cannot resurrect transient infantry death presentation");
   assert(requests.length === 2,
     "a correlated response supersedes the snapshot target that prompted it");
 
@@ -217,6 +223,8 @@ assert(
   buffer.consumePending();
   assert(buffer.requeueAuthoritative() === 2 && buffer.peekPending().length === 2,
     "normalized authoritative records remain available to repaint a replacement renderer generation");
+  assert(buffer.peekPending().every((decal) => decal.animateInfantryDeath === false),
+    "replacement generations rebuild durable marks without replaying transient deaths");
   assert(!sync.applyResponse({ requestId: 2, revision: 2, decals: [] }) && buffer.authoritativeRevision === 3,
     "late responses cannot move the applied revision backward");
 
@@ -319,6 +327,13 @@ assert(
       { id: 52, decalClass: "infantry", kind: KIND.WORKER, x: 96, y: 32, color: "#4878c8", seed: 3 },
     ]) === 3 && corpseLayer._corpseSprites.length === 2 && corpseLayer.layer.children.length === 3,
     "authored rifle and machine-gunner deaths use transient sprites while unsupported infantry keep the raster fallback");
+    assert(corpseLayer.stampBatch([
+      {
+        id: 53, decalClass: "infantry", kind: KIND.RIFLEMAN, x: 128, y: 32,
+        color: "#4878c8", seed: 4, animateInfantryDeath: false,
+      },
+    ]) === 1 && corpseLayer._corpseSprites.length === 2,
+    "historical authored infantry records are consumed without resurrecting corpse sprites");
     corpseLayer.updateInfantryCorpseFades(4000);
     assert(corpseLayer._corpseSprites.every(({ sprite }) => sprite.alpha === 0.47),
       "authored infantry deaths fade after their 1.8 second hold interval");

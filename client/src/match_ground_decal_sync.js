@@ -30,6 +30,7 @@ export class GroundDecalSync {
     this.retryTimer = null;
     this.awaitingResetSnapshot = false;
     this.blockInlineDeltaUntilRepair = false;
+    this.liveTimelineEstablished = false;
     this.destroyed = false;
     this.unsubscribeLabResults = labClient?.subscribeResult?.((result) => {
       if (result?.ok && (result.op === "setVision" || result.op === "importScenario")) {
@@ -60,8 +61,10 @@ export class GroundDecalSync {
           players: this.state?.players,
           tileSize: this.state?.map?.tileSize,
         },
+        { animateInfantryDeath: this.liveTimelineEstablished },
       );
     }
+    this.liveTimelineEstablished = true;
     this.targetRevision = Math.max(this.targetRevision, revision);
     if (this.blockInlineDeltaUntilRepair) return this._ensureRequest();
     const applied = this.state?.groundDecals?.authoritativeRevision || 0;
@@ -89,6 +92,7 @@ export class GroundDecalSync {
     // a lower (including zero) discovery revision.
     this.targetRevision = message.revision;
     this.blockInlineDeltaUntilRepair = false;
+    this.liveTimelineEstablished = true;
     if (result.queued === 0) this.resetPresentation?.("complete");
     this._ensureRequest();
     return true;
@@ -104,6 +108,7 @@ export class GroundDecalSync {
     this.outstandingRequestId = null;
     this.awaitingResetSnapshot = true;
     this.blockInlineDeltaUntilRepair = true;
+    this.liveTimelineEstablished = false;
     this.state?.resetAuthoritativeGroundDecals?.();
     if (resetPresentation) this.resetPresentation?.();
   }
