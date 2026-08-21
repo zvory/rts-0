@@ -56,7 +56,7 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
     preview: "/assets/map-previews/the-river.jpg",
   }),
   "Wald des Todes": Object.freeze({
-    author: "oti",
+    author: "Alex",
     preview: "/assets/map-previews/wald-des-todes.jpg",
   }),
 });
