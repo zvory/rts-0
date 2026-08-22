@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ABILITY, KIND, SETUP, STATE } from "../client/src/protocol.js";
+import { KIND, SETUP, STATE } from "../client/src/protocol.js";
 import { _rigRenderContextFor } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
 import {
@@ -54,11 +54,7 @@ import {
   createBuildingPngRigDefinitions,
 } from "../client/src/renderer/rigs/building_png.js";
 import { liveUnitIconMarkupFor } from "../client/src/renderer/rigs/unit_icon_sources.js";
-import {
-  COMMAND_CAR_RIG_SVG,
-  EKAT_RIG_SVG,
-  ROCKET_LAUNCHER_RIG_SVG,
-} from "../client/src/renderer/rigs/vehicle_svg.js";
+import { COMMAND_CAR_RIG_SVG, EKAT_RIG_SVG } from "../client/src/renderer/rigs/vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 import { createInspectionPixiFactory } from "./helpers/rig_inspection_pixi.mjs";
 import {
@@ -66,6 +62,7 @@ import {
   fakeFrameStripTexture,
   makeRigRenderer,
 } from "./helpers/rig_renderer_harness.mjs";
+import { assertRocketLauncherRackCooldownContract } from "./helpers/rocket_launcher_rig_contract.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 const fixturesDir = path.join(__dirname, "fixtures/svg");
@@ -543,38 +540,7 @@ test("live rig definitions combine raster-native metadata with remaining SVG sou
   assert.equal(definitions.get(KIND.TANK).id, "tank.raster");
 });
 
-test("rocket truck rack swaps team-tinted loaded tubes for dark cooldown tubes", () => {
-  const compiled = compileSvgRig(ROCKET_LAUNCHER_RIG_SVG, { expectedKind: KIND.ROCKET_LAUNCHER });
-  assert.equal(compiled.ok, true);
-  const readyEntity = {
-    id: 270,
-    kind: KIND.ROCKET_LAUNCHER,
-    owner: 1,
-    facing: 0,
-    abilities: [{ ability: ABILITY.BARRAGE, cooldownLeft: 0 }],
-  };
-  const ready = sampleRigAnimation(
-    compiled.definition,
-    readyEntity,
-    createRigRenderContext(readyEntity, { now: fixedNow, colorByOwner: new Map([[1, 0x0072b2]]) }),
-  );
-  assert.equal(ready.parts["part.rocket.1"].visible, true);
-  assert.equal(ready.parts["part.rocket.1"].tintSlot, "team-light-10");
-  assert.equal(ready.parts["part.rocket.cooldown.1"].visible, false);
-
-  const coolingEntity = {
-    ...readyEntity,
-    abilities: [{ ability: ABILITY.BARRAGE, cooldownLeft: 449 }],
-  };
-  const cooling = sampleRigAnimation(
-    compiled.definition,
-    coolingEntity,
-    createRigRenderContext(coolingEntity, { now: fixedNow, colorByOwner: new Map([[1, 0x0072b2]]) }),
-  );
-  assert.equal(cooling.parts["part.rocket.1"].visible, false);
-  assert.equal(cooling.parts["part.rocket.cooldown.1"].visible, true);
-  assert.equal(cooling.parts["part.rocket.cooldown.1"].paint.fill, "#24252a");
-});
+test("rocket truck rack swaps team-tinted loaded tubes for dark cooldown tubes", assertRocketLauncherRackCooldownContract);
 
 test("live rig routes expose kind-specific production part groups", () => {
   const antiTankGunRoutes = liveRigRoutesFor(KIND.ANTI_TANK_GUN);
