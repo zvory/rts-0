@@ -190,6 +190,16 @@ pub(crate) fn promote_ready_orders(
             clear_completed_active_order(entities, id);
         }
 
+        // Launching a barrage above starts a committed unload in the middle of this promotion
+        // pass. Do not promote an already-queued follow-up until that unload has completed.
+        if entities
+            .get(id)
+            .and_then(|entity| entity.movement.as_ref())
+            .is_some_and(|movement| movement.barrage_unload_ticks > 0)
+        {
+            continue;
+        }
+
         let Some(promoted) =
             pop_next_valid_intent(map, entities, players, &teams, fog, smokes, events, id)
         else {
@@ -339,7 +349,12 @@ fn ready_for_next_order(
     smokes: &SmokeCloudStore,
     e: &Entity,
 ) -> bool {
-    if !e.is_unit() || e.kind == EntityKind::ScoutPlane {
+    if !e.is_unit()
+        || e.kind == EntityKind::ScoutPlane
+        || e.movement
+            .as_ref()
+            .is_some_and(|movement| movement.barrage_unload_ticks > 0)
+    {
         return false;
     }
     match e.order() {

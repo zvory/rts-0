@@ -156,6 +156,63 @@ fn barrage_click_waits_for_a_truck_facing_away_then_fires_once() {
 }
 
 #[test]
+fn queued_move_behind_turning_barrage_waits_for_the_unload() {
+    let (mut game, launcher, target) = fixture(0);
+    let start = game
+        .state
+        .entities
+        .get(launcher)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .unwrap();
+    let entity = game.state.entities.get_mut(launcher).unwrap();
+    entity.set_facing(std::f32::consts::PI);
+    entity.set_weapon_facing(std::f32::consts::PI);
+    order_barrage(&mut game, launcher, target);
+    game.tick();
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![launcher],
+            x: start.0 + config::TILE_SIZE as f32 * 8.0,
+            y: start.1,
+            queued: true,
+        },
+    );
+
+    let mut first_launch_tick = None;
+    for elapsed in 0..=HALF_TURN_TICKS + 2 {
+        let events = game.tick();
+        if events.iter().any(|(player, events)| {
+            *player == 1
+                && events
+                    .iter()
+                    .any(|event| matches!(event, Event::MortarLaunch { rocket: true, .. }))
+        }) {
+            first_launch_tick = Some(elapsed);
+            break;
+        }
+    }
+    assert!(
+        first_launch_tick.is_some(),
+        "the turning barrage never launched"
+    );
+
+    for _ in 0..config::ROCKET_BARRAGE_UNLOAD_TICKS {
+        let position = game
+            .state
+            .entities
+            .get(launcher)
+            .map(|entity| (entity.pos_x, entity.pos_y))
+            .unwrap();
+        assert_eq!(
+            position, start,
+            "the pre-queued move interrupted the unload"
+        );
+        game.tick();
+    }
+}
+
+#[test]
 fn barrage_launches_do_not_leak_hidden_impact_points_to_enemies() {
     let (mut game, launcher, target) = fixture(0);
     let launcher_pos = game
@@ -253,6 +310,74 @@ fn destroying_launcher_during_unload_cancels_rockets_not_yet_launched() {
     assert_eq!(
         launches, 1,
         "only the rocket already launched should survive"
+    );
+}
+
+#[test]
+fn barrage_commitment_rejects_movement_until_the_final_rocket_launches() {
+    let (mut game, launcher, target) = fixture(0);
+    let start = game
+        .state
+        .entities
+        .get(launcher)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .unwrap();
+    order_barrage(&mut game, launcher, target);
+    game.tick();
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![launcher],
+            x: start.0 + config::TILE_SIZE as f32 * 8.0,
+            y: start.1,
+            queued: false,
+        },
+    );
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(launcher)
+            .map(|entity| (entity.pos_x, entity.pos_y))
+            .unwrap(),
+        start,
+        "an immediate move interrupted the committed unload"
+    );
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![launcher],
+            x: start.0 + config::TILE_SIZE as f32 * 8.0,
+            y: start.1,
+            queued: true,
+        },
+    );
+    for _ in 1..config::ROCKET_BARRAGE_UNLOAD_TICKS {
+        game.tick();
+        let position = game
+            .state
+            .entities
+            .get(launcher)
+            .map(|entity| (entity.pos_x, entity.pos_y))
+            .unwrap();
+        assert_eq!(
+            position, start,
+            "a queued move interrupted the committed unload"
+        );
+    }
+
+    game.tick();
+    let position = game
+        .state
+        .entities
+        .get(launcher)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .unwrap();
+    assert_ne!(
+        position, start,
+        "the truck remained locked after its unload"
     );
 }
 

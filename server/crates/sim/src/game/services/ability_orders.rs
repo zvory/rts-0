@@ -204,7 +204,7 @@ pub(crate) fn launch_world_ability(
                 return false;
             }
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
-            e.set_attack_cd(config::ROCKET_BARRAGE_UNLOAD_TICKS);
+            e.start_barrage_unload(config::ROCKET_BARRAGE_UNLOAD_TICKS);
             if !preserve_active_order {
                 e.clear_active_order();
                 e.set_path_goal(None);
@@ -670,7 +670,7 @@ fn base_eligible(e: &crate::game::entity::Entity, player: u32, ability: AbilityK
 }
 
 fn ability_weapon_cycle_ready(e: &crate::game::entity::Entity, ability: AbilityKind) -> bool {
-    !matches!(ability, AbilityKind::MortarFire | AbilityKind::Barrage) || e.attack_cd() == 0
+    ability != AbilityKind::MortarFire || e.attack_cd() == 0
 }
 
 fn mortar_fire_weapon_cooldown_ticks() -> u32 {

@@ -10,9 +10,10 @@ pub(super) fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryF
 
 pub(super) fn immediate_unit_can_replace(entities: &EntityStore, player: u32, unit: u32) -> bool {
     unit_can_accept_player_command(entities, player, unit)
-        && !entities.get(unit).is_some_and(|entity| {
-            entity.kind == EntityKind::RocketLauncher && entity.attack_cd() > 0
-        })
+        && !entities
+            .get(unit)
+            .and_then(|entity| entity.movement.as_ref())
+            .is_some_and(|movement| movement.barrage_unload_ticks > 0)
 }
 
 pub(super) fn gather_node_valid(entities: &EntityStore, _player: u32, node: u32) -> bool {
