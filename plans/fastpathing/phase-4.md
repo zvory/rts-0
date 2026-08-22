@@ -37,7 +37,9 @@ reverse recovery.
 - Extend Phase 2 car and pivot profile edge costs with Phase 3's directed terrain metric while
   retaining clearance/corner/turn shaping.
 - Assign and persist `FastestTerrainTime` for eligible vehicle Move and Attack Move paths through the
-  same Phase 3 route-policy seam. Keep Direct Attack and exact interaction routes `LegacyShape`.
+  same Phase 3 route-policy seam. Keep Direct Attack and exact interaction routes `LegacyShape` only
+  for this vehicle-motion phase; Phase 4.5 converts every production ground order after vehicle
+  legality and recovery are proven.
 - Extend raw-graph Dijkstra coverage to the exact direction-state/composite objective.
 - Move eligible vehicle simplification to one-time authored finalization with deterministic terrain
   recost and hull/body legality.
@@ -78,9 +80,9 @@ runs must remain byte-deterministic.
 - Budget exhaustion/deferral increases must be fully attributable to newly search-backed weighted
   vehicle requests; the request allowance and heavy threshold remain unchanged, and a 40-request
   non-heavy batch resolves within five ticks.
-- The complete all-profile corpus meets the final matched search-backed terrain, all-profile search-
-  backed, and warm targets in `plan.md`; former-direct-bypass vehicle requests are reported
-  separately.
+- The complete Move/Attack Move body-profile corpus meets the matched search-backed terrain,
+  all-profile search-backed, and warm targets in `plan.md`; former-direct-bypass vehicle requests
+  are reported separately. Phase 4.5 owns the final all-order corpus.
 - Final Hellhole median tick upper ratio is at most 1.00 against the frozen harness-only SHA, at least
   8 of 11 pairs improve, and p95 remains within the plan's bound.
 
@@ -113,8 +115,9 @@ visible later anchor.
 Report the vehicle composite cost and shaping contract, exact anchor/lookahead/recovery rules, all
 intentional legacy differences, scenario artifacts, oracle/replay evidence, memory/update costs,
 final paired performance ratios, and staged patch-note text. State whether the plan met the 2x
-pathing target; if not, identify the dominant remaining request family for a separately approved
-ALT/corridor/hierarchy plan. Mark this phase done.
+pathing target; if not, identify the dominant remaining request family. Hand Phase 4.5 the proven
+car/pivot policy, finalizer, anchor, lookahead, and recovery seams needed to convert Direct Attack
+and every exact interaction route without weakening vehicle legality. Mark this phase done.
 
 ## Completion Evidence
 

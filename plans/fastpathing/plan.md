@@ -9,6 +9,10 @@ current main, with warm queries and Hellhole tick time no worse. This is a pathi
 promise to double the whole simulation: profiling shows pathing does not own enough of the current
 Hellhole tick for that claim.
 
+The rollout is deliberately staged by movement body and order family, but the end state is not
+limited to plain movement: after Phase 4.5, every production ground route uses the authoritative
+terrain-time objective while retaining its order-specific legal destination and arrival rules.
+
 ## Correctness References
 
 The plan deliberately uses two references:
@@ -154,12 +158,21 @@ recovery. Inspect the named vehicle scenarios and classify every legacy differen
 removing direct-goal or later-waypoint bypasses. Finish only when the complete all-profile corpus
 meets the 2x target and Hellhole remains no slower than the frozen baseline.
 
+### [Phase 4.5 - All-Order Terrain Routes](phase-4.5.md)
+
+Make terrain time the production routing policy for every ground order after infantry and vehicle
+movement are proven. Direct attacks, construction, repair, gathering, deconstruction, abilities,
+rallies, and remaining interaction routes keep their exact legal destinations but use roads, slow
+terrain, and elevation to choose the fastest way there. Audit every caller so no new ground route
+silently falls back to terrain-blind legacy scoring.
+
 ## Phase Index
 
 1. [Phase 1 - Dense Search Headroom](phase-1.md)
 2. [Phase 2 - Precomputed Pathing Edges](phase-2.md)
 3. [Phase 3 - Infantry Terrain Routes](phase-3.md)
 4. [Phase 4 - Vehicle Terrain Routes](phase-4.md)
+5. [Phase 4.5 - All-Order Terrain Routes](phase-4.5.md)
 
 ## Explicitly Deferred
 
