@@ -7,6 +7,7 @@ use crate::game::firing_reveal::{record_mortar_impact_firing_reveals, FiringReve
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
+use crate::game::services::geometry::{unit_body_contains_point, unit_body_for_entity};
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
 use crate::rules::combat;
@@ -455,8 +456,7 @@ fn impact_point_hits_target(x: f32, y: f32, target: &Entity) -> bool {
         let half_h = stats.foot_h as f32 * config::TILE_SIZE as f32 * 0.5;
         return (x - target.pos_x).abs() <= half_w && (y - target.pos_y).abs() <= half_h;
     }
-    let radius = target.radius();
-    dist2(x, y, target.pos_x, target.pos_y) <= radius * radius
+    unit_body_for_entity(target).is_some_and(|body| unit_body_contains_point(body, x, y))
 }
 
 #[allow(clippy::too_many_arguments)]

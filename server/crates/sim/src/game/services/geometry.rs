@@ -150,6 +150,31 @@ pub(crate) fn unit_body_for_entity(e: &Entity) -> Option<UnitBody> {
     unit_body_with_facing(e.kind, e.pos_x, e.pos_y, e.facing())
 }
 
+pub(crate) fn unit_body_contains_point(body: UnitBody, x: f32, y: f32) -> bool {
+    if !x.is_finite() || !y.is_finite() {
+        return false;
+    }
+    match body {
+        UnitBody::Circle(circle) => {
+            let dx = x - circle.x;
+            let dy = y - circle.y;
+            dx * dx + dy * dy <= circle.radius * circle.radius
+        }
+        UnitBody::OrientedCapsule(capsule) => {
+            let (start, end) = capsule.endpoints();
+            point_segment_distance_sq((x, y), start, end) <= capsule.radius * capsule.radius
+        }
+        UnitBody::OrientedBox(rect) => {
+            let dx = x - rect.x;
+            let dy = y - rect.y;
+            let (forward_x, forward_y) = rect.forward_axis();
+            let (side_x, side_y) = rect.side_axis();
+            (dx * forward_x + dy * forward_y).abs() <= rect.half_len
+                && (dx * side_x + dy * side_y).abs() <= rect.half_width
+        }
+    }
+}
+
 pub(crate) fn unit_body_with_facing(
     kind: EntityKind,
     x: f32,

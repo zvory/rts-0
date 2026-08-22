@@ -125,16 +125,12 @@ fn rocket_impact_point_uses_the_target_body_for_direct_hits() {
         .expect("tank should spawn");
     let tank = entities.get(tank_id).expect("tank should exist");
 
-    assert!(impact_point_hits_target(
-        160.0 + tank.radius() - 0.1,
-        160.0,
-        tank
-    ));
-    assert!(!impact_point_hits_target(
-        160.0 + tank.radius() + 0.1,
-        160.0,
-        tank
-    ));
+    // The tank's authoritative body extends farther fore/aft than its legacy circular radius.
+    // A rocket landing on that visible nose must still count as a direct hit.
+    let body_end = 160.0 + config::TANK_BODY_LENGTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX;
+    assert!(body_end - 0.1 > 160.0 + tank.radius());
+    assert!(impact_point_hits_target(body_end - 0.1, 160.0, tank));
+    assert!(!impact_point_hits_target(body_end + 0.1, 160.0, tank));
 }
 
 #[test]
