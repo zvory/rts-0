@@ -855,7 +855,6 @@ function buttonByLabel(card, label) {
       movementBodyClass(KIND.MORTAR_TEAM) === "vehicleBody" &&
       movementBodyClass(KIND.ANTI_TANK_GUN) === "vehicleBody" &&
       movementBodyClass(KIND.ARTILLERY) === "vehicleBody" &&
-      movementBodyClass(KIND.ROCKET_LAUNCHER) === "vehicleBody" &&
       movementBodyClass(KIND.SCOUT_CAR) === "vehicleBody" &&
       movementBodyClass(KIND.TANK) === "vehicleBody" &&
       movementBodyClass(KIND.COMMAND_CAR) === "vehicleBody" &&

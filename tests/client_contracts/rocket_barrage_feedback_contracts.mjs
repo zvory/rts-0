@@ -1,7 +1,14 @@
-import { assertDeepEqual } from "./assertions.mjs";
+import { assert, assertDeepEqual } from "./assertions.mjs";
 import { _drawMortarImpacts, _drawMortarShells } from "../../client/src/renderer/feedback.js";
 import { drawPanzerfaustProjectile } from "../../client/src/renderer/panzerfaust_feedback.js";
+import { movementBodyClass } from "../../client/src/input/placement.js";
+import { KIND } from "../../client/src/protocol.js";
 import { RecordingGraphics } from "./pixi_fakes.mjs";
+
+assert(
+  movementBodyClass(KIND.ROCKET_LAUNCHER) === "vehicleBody",
+  "Rocket Trucks use oriented vehicle selection and placement geometry",
+);
 
 const priorNow = performance.now;
 const fixedNow = 2000;

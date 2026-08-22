@@ -31,36 +31,13 @@ use crate::rules;
 use std::collections::BTreeMap;
 
 use self::attack::{direct_panzerfaust_shot_spent, panzerfaust_attack_cycle_active};
+use self::point_promotion::PointPromotionKey;
 
 mod artillery;
 mod attack;
 mod clear_obstacle_area;
+mod point_promotion;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct PointPromotionKey {
-    owner: u32,
-    attack_move: bool,
-    x_bits: u32,
-    y_bits: u32,
-}
-
-impl PointPromotionKey {
-    fn new(owner: u32, attack_move: bool, x: f32, y: f32) -> Option<Self> {
-        if !x.is_finite() || !y.is_finite() {
-            return None;
-        }
-        Some(PointPromotionKey {
-            owner,
-            attack_move,
-            x_bits: x.to_bits(),
-            y_bits: y.to_bits(),
-        })
-    }
-
-    fn point(self) -> (f32, f32) {
-        (f32::from_bits(self.x_bits), f32::from_bits(self.y_bits))
-    }
-}
 /// Outcome of popping the next queued intent for a unit. Move/AttackMove are batched into a
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
