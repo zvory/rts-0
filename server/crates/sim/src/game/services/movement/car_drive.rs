@@ -548,6 +548,11 @@ fn scout_car_post_motion_waypoint_pops(
     let Some(path) = e.movement.as_ref().map(|m| m.path.as_slice()) else {
         return (candidate.pos, 0);
     };
+    if e.path_policy() == crate::game::entity::RoutePolicy::FastestTerrainTime
+        && route.pre_pop_count > 0
+    {
+        return (candidate.pos, 0);
+    }
     let mut idx = route.next_index;
     let mut pops = 0usize;
     let mut pos = candidate.pos;
@@ -560,6 +565,9 @@ fn scout_car_post_motion_waypoint_pops(
         }
         pops += 1;
         idx -= 1;
+        if e.path_policy() == crate::game::entity::RoutePolicy::FastestTerrainTime {
+            break;
+        }
     }
 
     if idx == 0 {

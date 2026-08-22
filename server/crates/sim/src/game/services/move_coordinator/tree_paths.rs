@@ -31,8 +31,18 @@ impl MoveCoordinator<'_> {
             forward
         });
         let path_ok = path.is_some();
+        let policy = if (movement_body_class(kind) == MovementBodyClass::InfantryLike
+            || uses_oriented_vehicle_body(kind))
+            && matches!(
+                source,
+                PathingRequestSource::Move | PathingRequestSource::AttackMove
+            ) {
+            RoutePolicy::FastestTerrainTime
+        } else {
+            RoutePolicy::LegacyShape
+        };
         if let Some(entity) = entities.get_mut(id) {
-            entity.set_path(path.unwrap_or_default());
+            entity.set_path_with_policy(path.unwrap_or_default(), policy);
             entity.set_last_repath_tick(self.tick);
             entity.set_path_goal(Some(goal));
             entity.mark_move_phase(if path_ok {
@@ -52,24 +62,5 @@ impl MoveCoordinator<'_> {
                 .unwrap_or_default(),
         );
         Some(path_ok)
-    }
-
-    pub(super) fn expand_tree_waypoints(
-        &self,
-        kind: EntityKind,
-        start: (f32, f32),
-        goal: (f32, f32),
-        route_shape: RouteShape,
-        waypoints: Vec<(f32, f32)>,
-    ) -> Vec<(f32, f32)> {
-        finalize_reverse_waypoints_or_raw(
-            self.map,
-            self.occ,
-            kind,
-            start,
-            goal,
-            route_shape,
-            waypoints,
-        )
     }
 }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use super::{Occupancy, RouteShape, TerrainPassability};
+use super::{Occupancy, RoutePolicy, RouteShape, TerrainPassability};
 use crate::game::entity::{
     movement_body_class, uses_oriented_vehicle_body, EntityKind, EntityStore, MovementBodyClass,
 };
@@ -27,16 +27,23 @@ struct RoutingProfile {
     radius_tiles: u32,
     vehicle_clearance: bool,
     diagonal_pinch: bool,
+    policy: RoutePolicy,
 }
 
 impl RoutingProfile {
-    fn for_request(kind: EntityKind, radius_tiles: u32, route_shape: RouteShape) -> Self {
+    fn for_request(
+        kind: EntityKind,
+        radius_tiles: u32,
+        route_shape: RouteShape,
+        policy: RoutePolicy,
+    ) -> Self {
         let oriented = uses_oriented_vehicle_body(kind);
         Self {
             movement_body: movement_body_class(kind),
             radius_tiles,
             vehicle_clearance: oriented && route_shape == RouteShape::VehicleClearance,
             diagonal_pinch: oriented,
+            policy,
         }
     }
 
@@ -68,6 +75,8 @@ struct EdgeTable {
     width: u32,
     height: u32,
     pages: Vec<Arc<EdgePage>>,
+    heuristic_cardinal: u32,
+    heuristic_diagonal: u32,
 }
 
 #[derive(Clone)]
@@ -75,7 +84,7 @@ struct EdgePage {
     passable: Vec<u8>,
     /// Row-major tile, then the legacy eight-direction order. Values are the additional movement
     /// cost only, preserving the A* saturation order; `u32::MAX` denotes an illegal edge.
-    extra_costs: Vec<u32>,
+    edge_costs: Vec<u32>,
 }
 
 impl EdgeTable {
@@ -92,17 +101,45 @@ impl EdgeTable {
                     let page_len = (cells - page_start).min(EDGE_PAGE_TILES);
                     Arc::new(EdgePage {
                         passable: vec![0; page_len],
-                        extra_costs: vec![BLOCKED_EDGE; page_len.saturating_mul(DIRECTIONS.len())],
+                        edge_costs: vec![BLOCKED_EDGE; page_len.saturating_mul(DIRECTIONS.len())],
                     })
                 })
                 .collect(),
+            heuristic_cardinal: u32::MAX,
+            heuristic_diagonal: u32::MAX,
         };
         for ty in 0..height as i32 {
             for tx in 0..width as i32 {
                 table.recompute_tile(pass, tx, ty);
             }
         }
+        table.refresh_heuristic_minima();
         table
+    }
+
+    fn refresh_heuristic_minima(&mut self) {
+        let mut cardinal = u32::MAX;
+        let mut diagonal = u32::MAX;
+        for page in &self.pages {
+            for costs in page.edge_costs.chunks_exact(DIRECTIONS.len()) {
+                for (direction, &cost) in costs.iter().enumerate() {
+                    if cost == BLOCKED_EDGE {
+                        continue;
+                    }
+                    if DIRECTIONS[direction].0 != 0 && DIRECTIONS[direction].1 != 0 {
+                        diagonal = diagonal.min(cost);
+                    } else {
+                        cardinal = cardinal.min(cost);
+                    }
+                }
+            }
+        }
+        self.heuristic_cardinal = if cardinal == u32::MAX { 0 } else { cardinal };
+        self.heuristic_diagonal = if diagonal == u32::MAX {
+            0
+        } else {
+            diagonal.min(self.heuristic_cardinal.saturating_mul(2))
+        };
     }
 
     fn recompute_tile<P: Passability>(&mut self, pass: &P, tx: i32, ty: i32) {
@@ -115,8 +152,8 @@ impl EdgeTable {
         page.passable[page_tile] = u8::from(pass.passable(tx, ty));
         let edge_base = page_tile * DIRECTIONS.len();
         for (direction, &(dx, dy, step_cost)) in DIRECTIONS.iter().enumerate() {
-            page.extra_costs[edge_base + direction] = pass
-                .edge_extra_cost(tx, ty, dx, dy, step_cost)
+            page.edge_costs[edge_base + direction] = pass
+                .edge_cost(tx, ty, dx, dy, step_cost)
                 .unwrap_or(BLOCKED_EDGE);
         }
     }
@@ -139,7 +176,7 @@ impl EdgeTable {
         self.pages
             .iter()
             .map(|page| {
-                page.passable.capacity() + page.extra_costs.capacity() * std::mem::size_of::<u32>()
+                page.passable.capacity() + page.edge_costs.capacity() * std::mem::size_of::<u32>()
             })
             .sum()
     }
@@ -149,9 +186,9 @@ impl EdgeTable {
         page.passable[tile_index % EDGE_PAGE_TILES] != 0
     }
 
-    fn edge_extra_cost(&self, tile_index: usize, direction: usize) -> u32 {
+    fn edge_cost(&self, tile_index: usize, direction: usize) -> u32 {
         let page = &self.pages[tile_index / EDGE_PAGE_TILES];
-        page.extra_costs[(tile_index % EDGE_PAGE_TILES) * DIRECTIONS.len() + direction]
+        page.edge_costs[(tile_index % EDGE_PAGE_TILES) * DIRECTIONS.len() + direction]
     }
 }
 
@@ -196,11 +233,12 @@ impl PathGraph {
         kind: EntityKind,
         radius_tiles: u32,
         route_shape: RouteShape,
+        policy: RoutePolicy,
     ) -> GraphPassability {
         if self.map_content_key.is_none() {
             self.map_content_key = Some(map.materialized_hash());
         }
-        let profile = RoutingProfile::for_request(kind, radius_tiles, route_shape);
+        let profile = RoutingProfile::for_request(kind, radius_tiles, route_shape, policy);
         let topology = occupancy.path_graph_topology();
         let profile_index = self
             .profiles
@@ -225,6 +263,10 @@ impl PathGraph {
         };
         GraphPassability {
             table: Arc::clone(&self.profiles[index].dynamic),
+            cost_fingerprint: terrain_cost_fingerprint(
+                self.map_content_key.as_deref().unwrap_or_default(),
+                policy,
+            ),
         }
     }
 
@@ -363,12 +405,14 @@ fn terrain_passability<'a>(
         kind: profile.representative_kind(),
         radius_tiles: profile.radius_tiles,
         route_shape: profile.route_shape(),
+        policy: profile.policy,
         avoid_diagonal_pinch: profile.diagonal_pinch,
     }
 }
 
 pub(super) struct GraphPassability {
     table: Arc<EdgeTable>,
+    cost_fingerprint: u64,
 }
 
 impl Passability for GraphPassability {
@@ -384,7 +428,7 @@ impl Passability for GraphPassability {
     }
 
     #[inline]
-    fn edge_extra_cost(
+    fn edge_cost(
         &self,
         from_tx: i32,
         from_ty: i32,
@@ -394,9 +438,29 @@ impl Passability for GraphPassability {
     ) -> Option<u32> {
         let tile = self.table.tile_index(from_tx, from_ty)?;
         let direction = EdgeTable::direction(dx, dy)?;
-        let cost = self.table.edge_extra_cost(tile, direction);
+        let cost = self.table.edge_cost(tile, direction);
         (cost != BLOCKED_EDGE).then_some(cost)
     }
+
+    fn heuristic_step_costs(&self) -> (u32, u32) {
+        (self.table.heuristic_cardinal, self.table.heuristic_diagonal)
+    }
+
+    fn cost_fingerprint(&self) -> u64 {
+        self.cost_fingerprint
+    }
+}
+
+fn terrain_cost_fingerprint(map_content_key: &str, policy: RoutePolicy) -> u64 {
+    const TERRAIN_COST_REVISION: u64 = 0x4654_5433_0000_0001;
+    let prefix = map_content_key.get(..16).unwrap_or(map_content_key);
+    let map_bits = u64::from_str_radix(prefix, 16).unwrap_or(0);
+    map_bits
+        ^ TERRAIN_COST_REVISION
+        ^ match policy {
+            RoutePolicy::LegacyShape => 0,
+            RoutePolicy::FastestTerrainTime => 1,
+        }
 }
 
 #[cfg(test)]

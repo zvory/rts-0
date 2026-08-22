@@ -12,14 +12,17 @@ use super::EntityStateGroups;
 use super::{
     supports_manual_emplacement, AttackPhase, BuildPhase, CombatState, ConstructionState,
     DeconstructPhase, EntityKind, GatherPhase, MovePhase, MovementState, Order, OrderIntent,
-    PanzerfaustState, ProductionState, ResourceExtractorState, ResourceNodeState, ScoutPlaneState,
-    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
+    PanzerfaustState, ProductionState, ResourceExtractorState, ResourceNodeState, RoutePolicy,
+    ScoutPlaneState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
+mod helpers;
 mod production;
 mod production_repeat;
 mod rally;
 mod research;
+
+use helpers::construction_hp_for_progress;
 
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
 const BUILDING_START_HP_DENOMINATOR: u32 = 10;
@@ -252,6 +255,7 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.path_goal = None;
             m.last_move_delta = (0.0, 0.0);
             m.scout_car_reverse_waypoint = None;
@@ -419,6 +423,7 @@ impl Entity {
         order.intent.target = next_target;
         order.execution.phase = AttackPhase::Waiting;
         movement.path.clear();
+        movement.path_policy = RoutePolicy::LegacyShape;
         movement.path_goal = None;
         self.set_target_id(Some(next_target));
         true
@@ -537,8 +542,21 @@ impl Entity {
     }
 
     pub fn set_path(&mut self, path: Vec<(f32, f32)>) {
+        self.set_path_with_policy(path, RoutePolicy::LegacyShape);
+    }
+
+    pub(in crate::game) fn set_path_with_policy(
+        &mut self,
+        path: Vec<(f32, f32)>,
+        policy: RoutePolicy,
+    ) {
         if let Some(m) = self.movement.as_mut() {
             m.path = path;
+            m.path_policy = if m.path.is_empty() {
+                RoutePolicy::LegacyShape
+            } else {
+                policy
+            };
             m.scout_car_reverse_waypoint = None;
             if m.path.is_empty() {
                 m.last_move_delta = (0.0, 0.0);
@@ -549,6 +567,7 @@ impl Entity {
     pub fn clear_path(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.scout_car_reverse_waypoint = None;
             m.last_move_delta = (0.0, 0.0);
         }
@@ -558,9 +577,19 @@ impl Entity {
         self.movement.as_ref().and_then(|m| m.path.last().copied())
     }
 
+    pub(in crate::game) fn path_policy(&self) -> RoutePolicy {
+        self.movement
+            .as_ref()
+            .map(|movement| movement.path_policy)
+            .unwrap_or_default()
+    }
+
     pub fn pop_waypoint(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.path.pop();
+            if m.path.is_empty() {
+                m.path_policy = RoutePolicy::LegacyShape;
+            }
             m.scout_car_reverse_waypoint = None;
         }
     }
@@ -1367,6 +1396,7 @@ impl Entity {
             m.order = Order::Idle;
             m.queued_orders.clear();
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
@@ -1381,6 +1411,7 @@ impl Entity {
             m.order = Order::HoldPosition;
             m.queued_orders.clear();
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.path_goal = None;
             m.last_move_delta = (0.0, 0.0);
             m.scout_car_reverse_waypoint = None;
@@ -1399,6 +1430,7 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::Idle;
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
@@ -1425,25 +1457,6 @@ impl Entity {
             combat.panzerfaust = Some(PanzerfaustState::Spent);
         }
     }
-}
-
-fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u32) -> u32 {
-    if max_hp == 0 {
-        return 0;
-    }
-    if total == 0 || progress >= total {
-        return max_hp;
-    }
-    let start_hp = max_hp
-        .saturating_mul(BUILDING_START_HP_NUMERATOR)
-        .div_ceil(BUILDING_START_HP_DENOMINATOR)
-        .clamp(1, max_hp);
-    let remaining_hp = max_hp.saturating_sub(start_hp);
-    let gained_hp = (remaining_hp as u64)
-        .saturating_mul(progress as u64)
-        .checked_div(total as u64)
-        .unwrap_or(remaining_hp as u64) as u32;
-    start_hp.saturating_add(gained_hp).min(max_hp)
 }
 
 fn initial_ability_uses(kind: EntityKind) -> BTreeMap<AbilityKind, u16> {

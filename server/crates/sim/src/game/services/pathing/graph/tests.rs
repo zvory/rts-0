@@ -1,6 +1,9 @@
 use super::*;
+use crate::config;
 use crate::game::services::occupancy::footprint_center;
 use crate::protocol::{terrain, MapDoodad};
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::time::Instant;
 
 fn rich_map() -> Map {
@@ -36,9 +39,16 @@ fn assert_matches_reference(
     kind: EntityKind,
     route_shape: RouteShape,
 ) {
-    let profile = RoutingProfile::for_request(kind, 0, route_shape);
+    let profile = RoutingProfile::for_request(kind, 0, route_shape, RoutePolicy::LegacyShape);
     let reference = terrain_passability(profile, map, occupancy);
-    let table = graph.view(map, occupancy, kind, 0, route_shape);
+    let table = graph.view(
+        map,
+        occupancy,
+        kind,
+        0,
+        route_shape,
+        RoutePolicy::LegacyShape,
+    );
     for ty in -1..=map.height as i32 {
         for tx in -1..=map.width as i32 {
             assert_eq!(
@@ -49,8 +59,8 @@ fn assert_matches_reference(
             if map.in_bounds(tx, ty) {
                 for &(dx, dy, step) in &DIRECTIONS {
                     assert_eq!(
-                        table.edge_extra_cost(tx, ty, dx, dy, step),
-                        reference.edge_extra_cost(tx, ty, dx, dy, step),
+                        table.edge_cost(tx, ty, dx, dy, step),
+                        reference.edge_cost(tx, ty, dx, dy, step),
                         "edge mismatch for {profile:?} at ({tx}, {ty}) -> ({dx}, {dy})"
                     );
                 }
@@ -102,6 +112,52 @@ fn precomputed_edges_match_rich_reference_for_every_live_profile() {
         (3 * 18 * 18 * 33..=3 * 18 * 18 * 34).contains(&dynamic_bytes),
         "unexpected dynamic bytes: {dynamic_bytes}"
     );
+}
+
+#[test]
+fn precomputed_weighted_edges_match_vehicle_reference_profiles() {
+    let map = rich_map();
+    let entities = EntityStore::new();
+    let occupancy = Occupancy::build(&map, &entities);
+    let mut graph = PathGraph::default();
+    for kind in [
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+        EntityKind::AntiTankGun,
+    ] {
+        let radius_tiles = config::unit_radius_tiles(kind);
+        let profile = RoutingProfile::for_request(
+            kind,
+            radius_tiles,
+            RouteShape::VehicleClearance,
+            RoutePolicy::FastestTerrainTime,
+        );
+        let reference = terrain_passability(profile, &map, &occupancy);
+        let table = graph.view(
+            &map,
+            &occupancy,
+            kind,
+            radius_tiles,
+            RouteShape::VehicleClearance,
+            RoutePolicy::FastestTerrainTime,
+        );
+        for ty in 0..map.height as i32 {
+            for tx in 0..map.width as i32 {
+                assert_eq!(
+                    table.passable(tx, ty),
+                    reference.passable(tx, ty),
+                    "{kind:?}"
+                );
+                for &(dx, dy, step) in &DIRECTIONS {
+                    assert_eq!(
+                        table.edge_cost(tx, ty, dx, dy, step),
+                        reference.edge_cost(tx, ty, dx, dy, step),
+                        "{kind:?} at ({tx}, {ty}) -> ({dx}, {dy})"
+                    );
+                }
+            }
+        }
+    }
 }
 
 #[test]
@@ -184,6 +240,7 @@ fn base_and_empty_dynamic_tables_share_every_edge_page() {
         EntityKind::Tank,
         0,
         RouteShape::VehicleClearance,
+        RoutePolicy::LegacyShape,
     );
 
     let profile = &graph.profiles[0];
@@ -221,9 +278,17 @@ fn graph_search_matches_rich_reference_for_profiles_caps_and_fallbacks() {
     ] {
         for &(kind, route_shape) in &profiles {
             for &cap in &caps {
-                let profile = RoutingProfile::for_request(kind, 0, route_shape);
+                let profile =
+                    RoutingProfile::for_request(kind, 0, route_shape, RoutePolicy::LegacyShape);
                 let reference = terrain_passability(profile, &map, &occupancy);
-                let table = graph.view(&map, &occupancy, kind, 0, route_shape);
+                let table = graph.view(
+                    &map,
+                    &occupancy,
+                    kind,
+                    0,
+                    route_shape,
+                    RoutePolicy::LegacyShape,
+                );
                 let mut reference_scratch = crate::game::pathfinding::SearchScratch::default();
                 let mut table_scratch = crate::game::pathfinding::SearchScratch::default();
                 let expected = crate::game::pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
@@ -231,7 +296,7 @@ fn graph_search_matches_rich_reference_for_profiles_caps_and_fallbacks() {
                     start,
                     goal,
                     cap,
-                    route_shape.turn_penalty(),
+                    route_shape.turn_penalty(RoutePolicy::LegacyShape),
                     &mut reference_scratch,
                 );
                 let actual = crate::game::pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
@@ -239,7 +304,7 @@ fn graph_search_matches_rich_reference_for_profiles_caps_and_fallbacks() {
                     start,
                     goal,
                     cap,
-                    route_shape.turn_penalty(),
+                    route_shape.turn_penalty(RoutePolicy::LegacyShape),
                     &mut table_scratch,
                 );
                 assert_eq!(
@@ -249,6 +314,196 @@ fn graph_search_matches_rich_reference_for_profiles_caps_and_fallbacks() {
             }
         }
     }
+}
+
+#[test]
+fn fastest_terrain_raw_graph_cost_equals_dijkstra() {
+    let mut map = rich_map();
+    for tx in 1..17 {
+        let index = map.index(tx, 12);
+        map.terrain[index] = terrain::ROAD_HORIZONTAL;
+    }
+    for ty in 1..17 {
+        let index = map.index(13, ty);
+        map.elevation[index] = if ty < 9 { 4 } else { 1 };
+    }
+    let entities = EntityStore::new();
+    let occupancy = Occupancy::build(&map, &entities);
+    let mut graph = PathGraph::default();
+    for (start, goal) in [((1, 1), (16, 16)), ((16, 16), (1, 1)), ((2, 14), (15, 2))] {
+        let pass = graph.view(
+            &map,
+            &occupancy,
+            EntityKind::Rifleman,
+            config::unit_radius_tiles(EntityKind::Rifleman),
+            RouteShape::Normal,
+            RoutePolicy::FastestTerrainTime,
+        );
+        let path = crate::game::pathfinding::find_path_with_budget_and_turn_cost(
+            &pass,
+            start.0,
+            start.1,
+            goal.0,
+            goal.1,
+            (map.width * map.height) as usize,
+            0,
+        );
+        assert_eq!(path.last().copied(), Some(goal));
+        let mut actual_cost = 0_u64;
+        let mut from = start;
+        for to in path {
+            let dx = to.0 - from.0;
+            let dy = to.1 - from.1;
+            let base = if dx != 0 && dy != 0 { 14 } else { 10 };
+            actual_cost += u64::from(
+                pass.edge_cost(from.0, from.1, dx, dy, base)
+                    .expect("production path edge should be legal"),
+            );
+            from = to;
+        }
+        assert_eq!(Some(actual_cost), dijkstra_cost(&pass, start, goal));
+    }
+}
+
+#[test]
+fn fastest_terrain_vehicle_direction_state_cost_equals_dijkstra() {
+    let mut map = rich_map();
+    for tx in 1..17 {
+        let index = map.index(tx, 12);
+        map.terrain[index] = terrain::ROAD_HORIZONTAL;
+    }
+    for ty in 1..17 {
+        let index = map.index(13, ty);
+        map.elevation[index] = if ty < 9 { 4 } else { 1 };
+    }
+    let entities = EntityStore::new();
+    let occupancy = Occupancy::build(&map, &entities);
+    let mut graph = PathGraph::default();
+    for kind in [
+        EntityKind::ScoutCar,
+        EntityKind::Tank,
+        EntityKind::AntiTankGun,
+    ] {
+        for (start, goal) in [((1, 1), (16, 16)), ((16, 16), (1, 1)), ((2, 14), (15, 2))] {
+            let route_shape = RouteShape::VehicleClearance;
+            let turn_penalty = route_shape.turn_penalty(RoutePolicy::FastestTerrainTime);
+            let pass = graph.view(
+                &map,
+                &occupancy,
+                kind,
+                config::unit_radius_tiles(kind),
+                route_shape,
+                RoutePolicy::FastestTerrainTime,
+            );
+            let path = crate::game::pathfinding::find_path_with_budget_and_turn_cost(
+                &pass,
+                start.0,
+                start.1,
+                goal.0,
+                goal.1,
+                (map.width * map.height * 9) as usize,
+                turn_penalty,
+            );
+            assert_eq!(path.last().copied(), Some(goal), "{kind:?}");
+            let mut actual_cost = 0_u64;
+            let mut from = start;
+            let mut incoming = None;
+            for to in path {
+                let dx = to.0 - from.0;
+                let dy = to.1 - from.1;
+                let direction = EdgeTable::direction(dx, dy).expect("path step direction");
+                let base = if dx != 0 && dy != 0 { 14 } else { 10 };
+                actual_cost += u64::from(
+                    pass.edge_cost(from.0, from.1, dx, dy, base)
+                        .expect("production path edge should be legal"),
+                );
+                if incoming.is_some_and(|previous| previous != direction) {
+                    actual_cost += u64::from(turn_penalty);
+                }
+                incoming = Some(direction);
+                from = to;
+            }
+            assert_eq!(
+                Some(actual_cost),
+                direction_state_dijkstra_cost(&pass, start, goal, turn_penalty),
+                "{kind:?} {start:?}->{goal:?}"
+            );
+        }
+    }
+}
+
+fn direction_state_dijkstra_cost<P: Passability>(
+    pass: &P,
+    start: (i32, i32),
+    goal: (i32, i32),
+    turn_penalty: u32,
+) -> Option<u64> {
+    const START_DIRECTION: usize = DIRECTIONS.len();
+    let (width, height) = pass.dimensions();
+    let states_per_tile = DIRECTIONS.len() + 1;
+    let mut distance = vec![u64::MAX; width.saturating_mul(height) as usize * states_per_tile];
+    let index = |tx: i32, ty: i32, direction: usize| {
+        ((ty as u32 * width + tx as u32) as usize) * states_per_tile + direction
+    };
+    distance[index(start.0, start.1, START_DIRECTION)] = 0;
+    let mut queue = BinaryHeap::from([Reverse((0_u64, start.1, start.0, START_DIRECTION))]);
+    while let Some(Reverse((cost, ty, tx, incoming))) = queue.pop() {
+        if (tx, ty) == goal {
+            return Some(cost);
+        }
+        if cost != distance[index(tx, ty, incoming)] {
+            continue;
+        }
+        for (direction, &(dx, dy, base)) in DIRECTIONS.iter().enumerate() {
+            let Some(edge_cost) = pass.edge_cost(tx, ty, dx, dy, base) else {
+                continue;
+            };
+            let next = (tx + dx, ty + dy);
+            let turn_cost = if incoming != START_DIRECTION && incoming != direction {
+                turn_penalty
+            } else {
+                0
+            };
+            let next_cost = cost
+                .saturating_add(u64::from(edge_cost))
+                .saturating_add(u64::from(turn_cost));
+            let next_index = index(next.0, next.1, direction);
+            if next_cost < distance[next_index] {
+                distance[next_index] = next_cost;
+                queue.push(Reverse((next_cost, next.1, next.0, direction)));
+            }
+        }
+    }
+    None
+}
+
+fn dijkstra_cost<P: Passability>(pass: &P, start: (i32, i32), goal: (i32, i32)) -> Option<u64> {
+    let (width, height) = pass.dimensions();
+    let mut distance = vec![u64::MAX; width.saturating_mul(height) as usize];
+    let index = |tx: i32, ty: i32| (ty as u32 * width + tx as u32) as usize;
+    distance[index(start.0, start.1)] = 0;
+    let mut queue = BinaryHeap::from([Reverse((0_u64, start.1, start.0))]);
+    while let Some(Reverse((cost, ty, tx))) = queue.pop() {
+        if (tx, ty) == goal {
+            return Some(cost);
+        }
+        if cost != distance[index(tx, ty)] {
+            continue;
+        }
+        for &(dx, dy, base) in &DIRECTIONS {
+            let Some(edge_cost) = pass.edge_cost(tx, ty, dx, dy, base) else {
+                continue;
+            };
+            let next = (tx + dx, ty + dy);
+            let next_cost = cost.saturating_add(u64::from(edge_cost));
+            let next_index = index(next.0, next.1);
+            if next_cost < distance[next_index] {
+                distance[next_index] = next_cost;
+                queue.push(Reverse((next_cost, next.1, next.0)));
+            }
+        }
+    }
+    None
 }
 
 fn fold_path(mut hash: u64, path: &[(i32, i32)]) -> u64 {
@@ -301,6 +556,7 @@ fn phase2_release_rich_edge_benchmark() {
                 kind,
                 radius_tiles: 0,
                 route_shape,
+                policy: RoutePolicy::LegacyShape,
                 avoid_diagonal_pinch: uses_oriented_vehicle_body(kind),
             };
             let (path, count, _) = crate::game::pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
@@ -308,7 +564,7 @@ fn phase2_release_rich_edge_benchmark() {
                 start,
                 goal,
                 32_768,
-                route_shape.turn_penalty(),
+                route_shape.turn_penalty(RoutePolicy::LegacyShape),
                 &mut scratch,
             );
             hash = fold_path(hash, &path);
@@ -323,7 +579,14 @@ fn phase2_release_rich_edge_benchmark() {
 
     let mut graph = PathGraph::default();
     for &(kind, route_shape) in &profiles {
-        let _ = graph.view(&map, &occupancy, kind, 0, route_shape);
+        let _ = graph.view(
+            &map,
+            &occupancy,
+            kind,
+            0,
+            route_shape,
+            RoutePolicy::LegacyShape,
+        );
     }
     let (base_bytes, dynamic_bytes) = graph.retained_bytes();
     let initialization_ns = graph.initialization_ns();
@@ -333,13 +596,20 @@ fn phase2_release_rich_edge_benchmark() {
         let mut hash = 0xcbf2_9ce4_8422_2325;
         let mut expanded = 0usize;
         for &(kind, route_shape, start, goal) in &queries {
-            let pass = graph.view(&map, &occupancy, kind, 0, route_shape);
+            let pass = graph.view(
+                &map,
+                &occupancy,
+                kind,
+                0,
+                route_shape,
+                RoutePolicy::LegacyShape,
+            );
             let (path, count, _) = crate::game::pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
                 &pass,
                 start,
                 goal,
                 32_768,
-                route_shape.turn_penalty(),
+                route_shape.turn_penalty(RoutePolicy::LegacyShape),
                 &mut scratch,
             );
             hash = fold_path(hash, &path);
@@ -379,7 +649,14 @@ fn phase2_release_rich_edge_benchmark() {
             .set_position(position.0, position.1);
         let changed = Occupancy::build(&map, &entities);
         for &(kind, route_shape) in &profiles {
-            let _ = graph.view(&map, &changed, kind, 0, route_shape);
+            let _ = graph.view(
+                &map,
+                &changed,
+                kind,
+                0,
+                route_shape,
+                RoutePolicy::LegacyShape,
+            );
         }
     }
     let mut updates = graph.local_update_ns().to_vec();
@@ -399,5 +676,399 @@ fn phase2_release_rich_edge_benchmark() {
         percentile(50),
         percentile(95),
         updates[updates.len() - 1],
+    );
+}
+
+#[test]
+#[ignore = "release-only paired weighted infantry full-path evidence"]
+fn phase3_release_infantry_terrain_benchmark() {
+    assert!(!cfg!(debug_assertions), "benchmark must use --release");
+    let map = Map::generate(4, 0xFA57_0003);
+    let entities = EntityStore::new();
+    let occupancy = Occupancy::build(&map, &entities);
+    let width = map.width as i32;
+    let height = map.height as i32;
+    let queries = (0..240)
+        .map(|index| {
+            let start = (
+                2 + (index * 17 % (width as usize - 4)) as i32,
+                2 + (index * 29 % (height as usize - 4)) as i32,
+            );
+            let goal = (
+                2 + (index * 43 + 31) as i32 % (width - 4),
+                2 + (index * 61 + 47) as i32 % (height - 4),
+            );
+            (start, goal)
+        })
+        .collect::<Vec<_>>();
+
+    let run_reference = || {
+        let started = Instant::now();
+        let mut scratch = crate::game::pathfinding::SearchScratch::default();
+        let mut hash = 0xcbf2_9ce4_8422_2325;
+        let mut expanded = 0usize;
+        for &(start, goal) in &queries {
+            let pass = TerrainPassability {
+                map: &map,
+                occupancy: &occupancy,
+                kind: EntityKind::Rifleman,
+                radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+                route_shape: RouteShape::Normal,
+                policy: RoutePolicy::LegacyShape,
+                avoid_diagonal_pinch: false,
+            };
+            let (path, count, _) = crate::game::pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+                &pass,
+                start,
+                goal,
+                32_768,
+                0,
+                &mut scratch,
+            );
+            let start_world = map.tile_center(start.0 as u32, start.1 as u32);
+            let goal_world = map.tile_center(goal.0 as u32, goal.1 as u32);
+            let waypoints = super::super::route_finalize::finalize_reverse_waypoints_or_raw(
+                &map,
+                &occupancy,
+                EntityKind::Rifleman,
+                start_world,
+                goal_world,
+                super::super::route_finalize::RouteFinalizationMode::new(
+                    RouteShape::Normal,
+                    RoutePolicy::LegacyShape,
+                ),
+                crate::game::pathfinding::to_world_waypoints(&path),
+            );
+            for waypoint in waypoints {
+                hash ^= u64::from(waypoint.0.to_bits()) << 32 | u64::from(waypoint.1.to_bits());
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            expanded += count;
+        }
+        (started.elapsed().as_nanos(), hash, expanded)
+    };
+
+    let mut graph = PathGraph::default();
+    let _ = graph.view(
+        &map,
+        &occupancy,
+        EntityKind::Rifleman,
+        config::unit_radius_tiles(EntityKind::Rifleman),
+        RouteShape::Normal,
+        RoutePolicy::FastestTerrainTime,
+    );
+    let run_candidate = |graph: &mut PathGraph| {
+        let started = Instant::now();
+        let mut finalization_ns = 0_u128;
+        let mut scratch = crate::game::pathfinding::SearchScratch::default();
+        let mut hash = 0xcbf2_9ce4_8422_2325;
+        let mut expanded = 0usize;
+        for &(start, goal) in &queries {
+            let pass = graph.view(
+                &map,
+                &occupancy,
+                EntityKind::Rifleman,
+                config::unit_radius_tiles(EntityKind::Rifleman),
+                RouteShape::Normal,
+                RoutePolicy::FastestTerrainTime,
+            );
+            let (path, count, _) = crate::game::pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+                &pass,
+                start,
+                goal,
+                32_768,
+                0,
+                &mut scratch,
+            );
+            let start_world = map.tile_center(start.0 as u32, start.1 as u32);
+            let goal_world = map.tile_center(goal.0 as u32, goal.1 as u32);
+            let finalization_started = Instant::now();
+            let waypoints = super::super::route_finalize::finalize_reverse_waypoints_or_raw(
+                &map,
+                &occupancy,
+                EntityKind::Rifleman,
+                start_world,
+                goal_world,
+                super::super::route_finalize::RouteFinalizationMode::new(
+                    RouteShape::Normal,
+                    RoutePolicy::FastestTerrainTime,
+                ),
+                crate::game::pathfinding::to_world_waypoints(&path),
+            );
+            finalization_ns =
+                finalization_ns.saturating_add(finalization_started.elapsed().as_nanos());
+            for waypoint in waypoints {
+                hash ^= u64::from(waypoint.0.to_bits()) << 32 | u64::from(waypoint.1.to_bits());
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            expanded += count;
+        }
+        (
+            started.elapsed().as_nanos(),
+            finalization_ns,
+            hash,
+            expanded,
+        )
+    };
+
+    let _ = run_reference();
+    let _ = run_candidate(&mut graph);
+    let candidate_first = std::env::var("RTS_PATHING_BENCH_ORDER").as_deref() == Ok("candidate");
+    let (reference, candidate) = if candidate_first {
+        let candidate = run_candidate(&mut graph);
+        (run_reference(), candidate)
+    } else {
+        let reference = run_reference();
+        (reference, run_candidate(&mut graph))
+    };
+    println!(
+        "PATHING_PHASE3_BENCH_JSON={{\"requests\":{},\"referenceElapsedNs\":{},\"candidateElapsedNs\":{},\"finalizationNs\":{},\"referenceHash\":\"{:016x}\",\"candidateHash\":\"{:016x}\",\"referenceExpanded\":{},\"candidateExpanded\":{}}}",
+        queries.len(),
+        reference.0,
+        candidate.0,
+        candidate.1,
+        reference.1,
+        candidate.2,
+        reference.2,
+        candidate.3,
+    );
+}
+
+#[test]
+#[ignore = "release-only paired all-profile terrain full-path evidence"]
+fn phase4_release_all_profile_terrain_benchmark() {
+    assert!(!cfg!(debug_assertions), "benchmark must use --release");
+    let map = Map::generate(4, 0xFA57_0004);
+    let entities = EntityStore::new();
+    let occupancy = Occupancy::build(&map, &entities);
+    let profiles = [
+        (EntityKind::Rifleman, RouteShape::Normal),
+        (EntityKind::ScoutCar, RouteShape::VehicleClearance),
+        (EntityKind::Tank, RouteShape::VehicleClearance),
+    ];
+    let width = map.width as i32;
+    let height = map.height as i32;
+    let queries = (0..80)
+        .flat_map(|index| {
+            profiles.map(move |profile| {
+                let start = (
+                    2 + (index * 17 % (width as usize - 4)) as i32,
+                    2 + (index * 29 % (height as usize - 4)) as i32,
+                );
+                let goal = (
+                    2 + (index * 43 + 31) as i32 % (width - 4),
+                    2 + (index * 61 + 47) as i32 % (height - 4),
+                );
+                (profile.0, profile.1, start, goal)
+            })
+        })
+        .collect::<Vec<_>>();
+    const REPETITIONS: usize = 4;
+    const WARM_REPETITIONS: usize = 64;
+
+    let run_reference = || {
+        let started = Instant::now();
+        let mut scratch = crate::game::pathfinding::SearchScratch::default();
+        let mut hash = 0xcbf2_9ce4_8422_2325;
+        let mut expanded = 0usize;
+        for &(kind, route_shape, start, goal) in
+            queries.iter().cycle().take(queries.len() * REPETITIONS)
+        {
+            let pass = TerrainPassability {
+                map: &map,
+                occupancy: &occupancy,
+                kind,
+                radius_tiles: config::unit_radius_tiles(kind),
+                route_shape,
+                policy: RoutePolicy::LegacyShape,
+                avoid_diagonal_pinch: uses_oriented_vehicle_body(kind),
+            };
+            let (mut path, count, _) = crate::game::pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+                &pass,
+                start,
+                goal,
+                32_768,
+                route_shape.turn_penalty(RoutePolicy::LegacyShape),
+                &mut scratch,
+            );
+            if crate::game::entity::uses_pivot_vehicle_movement(kind) {
+                path =
+                    super::super::expand_vehicle_diagonal_steps_to_l_waypoints(start, &path, &pass);
+            }
+            let waypoints = super::super::route_finalize::finalize_reverse_waypoints_or_raw(
+                &map,
+                &occupancy,
+                kind,
+                map.tile_center(start.0 as u32, start.1 as u32),
+                map.tile_center(goal.0 as u32, goal.1 as u32),
+                super::super::route_finalize::RouteFinalizationMode::new(
+                    route_shape,
+                    RoutePolicy::LegacyShape,
+                ),
+                crate::game::pathfinding::to_world_waypoints(&path),
+            );
+            for waypoint in waypoints {
+                hash ^= u64::from(waypoint.0.to_bits()) << 32 | u64::from(waypoint.1.to_bits());
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            expanded += count;
+        }
+        (started.elapsed().as_nanos(), hash, expanded)
+    };
+
+    let mut graph = PathGraph::default();
+    for &(kind, route_shape) in &profiles {
+        let _ = graph.view(
+            &map,
+            &occupancy,
+            kind,
+            config::unit_radius_tiles(kind),
+            route_shape,
+            RoutePolicy::FastestTerrainTime,
+        );
+    }
+    let (base_bytes, dynamic_bytes) = graph.retained_bytes();
+    let initialization_ns = graph.initialization_ns();
+    let run_candidate = |graph: &mut PathGraph| {
+        let started = Instant::now();
+        let mut finalization_ns = 0_u128;
+        let mut scratch = crate::game::pathfinding::SearchScratch::default();
+        let mut hash = 0xcbf2_9ce4_8422_2325;
+        let mut expanded = 0usize;
+        for &(kind, route_shape, start, goal) in
+            queries.iter().cycle().take(queries.len() * REPETITIONS)
+        {
+            let pass = graph.view(
+                &map,
+                &occupancy,
+                kind,
+                config::unit_radius_tiles(kind),
+                route_shape,
+                RoutePolicy::FastestTerrainTime,
+            );
+            let (mut path, count, _) = crate::game::pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+                &pass,
+                start,
+                goal,
+                32_768,
+                route_shape.turn_penalty(RoutePolicy::FastestTerrainTime),
+                &mut scratch,
+            );
+            if crate::game::entity::uses_pivot_vehicle_movement(kind) {
+                path =
+                    super::super::expand_vehicle_diagonal_steps_to_l_waypoints(start, &path, &pass);
+            }
+            let finalization_started = Instant::now();
+            let waypoints = super::super::route_finalize::finalize_reverse_waypoints_or_raw(
+                &map,
+                &occupancy,
+                kind,
+                map.tile_center(start.0 as u32, start.1 as u32),
+                map.tile_center(goal.0 as u32, goal.1 as u32),
+                super::super::route_finalize::RouteFinalizationMode::new(
+                    route_shape,
+                    RoutePolicy::FastestTerrainTime,
+                ),
+                crate::game::pathfinding::to_world_waypoints(&path),
+            );
+            finalization_ns =
+                finalization_ns.saturating_add(finalization_started.elapsed().as_nanos());
+            for waypoint in waypoints {
+                hash ^= u64::from(waypoint.0.to_bits()) << 32 | u64::from(waypoint.1.to_bits());
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            expanded += count;
+        }
+        (
+            started.elapsed().as_nanos(),
+            finalization_ns,
+            hash,
+            expanded,
+        )
+    };
+
+    let _ = run_reference();
+    let _ = run_candidate(&mut graph);
+    let candidate_first = std::env::var("RTS_PATHING_BENCH_ORDER").as_deref() == Ok("candidate");
+    let (reference, candidate) = if candidate_first {
+        let candidate = run_candidate(&mut graph);
+        (run_reference(), candidate)
+    } else {
+        let reference = run_reference();
+        (reference, run_candidate(&mut graph))
+    };
+    let run_warm = |policy: RoutePolicy| {
+        let mut service = super::super::PathingService::new(32_768, 512);
+        let mut execute = |measure: bool| {
+            let started = Instant::now();
+            let mut hash = 0xcbf2_9ce4_8422_2325;
+            for &(kind, route_shape, start, goal) in queries
+                .iter()
+                .cycle()
+                .take(queries.len() * WARM_REPETITIONS)
+            {
+                let request = super::super::PathRequest {
+                    kind,
+                    start,
+                    goal,
+                    radius_tiles: config::unit_radius_tiles(kind),
+                    route_shape,
+                    policy,
+                    budget: None,
+                };
+                let start_world = map.tile_center(start.0 as u32, start.1 as u32);
+                let goal_world = map.tile_center(goal.0 as u32, goal.1 as u32);
+                let super::super::PathingRequestOutcome::Resolved {
+                    path: waypoints,
+                    diagnostics,
+                } = service.request_finalized_with_diagnostics(
+                    &map,
+                    &occupancy,
+                    request,
+                    (start_world, goal_world),
+                    None,
+                    true,
+                )
+                else {
+                    panic!("benchmark request unexpectedly deferred");
+                };
+                if measure {
+                    assert_eq!(diagnostics.cache_status, super::super::PathCacheStatus::Hit);
+                }
+                for waypoint in waypoints {
+                    hash ^= u64::from(waypoint.0.to_bits()) << 32 | u64::from(waypoint.1.to_bits());
+                    hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+                }
+            }
+            (started.elapsed().as_nanos(), hash)
+        };
+        let _ = execute(false);
+        execute(true)
+    };
+    let (warm_reference, warm_candidate) = if candidate_first {
+        let candidate = run_warm(RoutePolicy::FastestTerrainTime);
+        (run_warm(RoutePolicy::LegacyShape), candidate)
+    } else {
+        let reference = run_warm(RoutePolicy::LegacyShape);
+        (reference, run_warm(RoutePolicy::FastestTerrainTime))
+    };
+    println!(
+        "PATHING_PHASE4_BENCH_JSON={{\"requests\":{},\"warmRequests\":{},\"referenceElapsedNs\":{},\"candidateElapsedNs\":{},\"finalizationNs\":{},\"referenceHash\":\"{:016x}\",\"candidateHash\":\"{:016x}\",\"referenceExpanded\":{},\"candidateExpanded\":{},\"warmReferenceElapsedNs\":{},\"warmCandidateElapsedNs\":{},\"warmReferenceHash\":\"{:016x}\",\"warmCandidateHash\":\"{:016x}\",\"initializationNs\":{},\"baseBytes\":{},\"dynamicBytes\":{}}}",
+        queries.len() * REPETITIONS,
+        queries.len() * WARM_REPETITIONS,
+        reference.0,
+        candidate.0,
+        candidate.1,
+        reference.1,
+        candidate.2,
+        reference.2,
+        candidate.3,
+        warm_reference.0,
+        warm_candidate.0,
+        warm_reference.1,
+        warm_candidate.1,
+        initialization_ns,
+        base_bytes,
+        dynamic_bytes,
     );
 }

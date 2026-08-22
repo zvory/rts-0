@@ -165,6 +165,7 @@ impl MoveCoordinator<'_> {
             goal: (gx as i32, gy as i32),
             radius_tiles,
             route_shape: RouteShape::Normal,
+            policy: RoutePolicy::LegacyShape,
             budget: None,
         };
         let PathingRequestOutcome::Resolved {

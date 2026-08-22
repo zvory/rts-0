@@ -49,6 +49,7 @@ fn request_tile_path_reports_cache_and_complexity_diagnostics() {
         goal: (8, 8),
         radius_tiles: 0,
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
 
@@ -80,6 +81,7 @@ fn cloning_pathing_service_does_not_copy_ephemeral_search_capacity() {
         goal: (55, 55),
         radius_tiles: 0,
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
 
@@ -107,6 +109,7 @@ fn budget_exhausted_partial_path_is_cached_only_for_the_same_budget() {
         goal: (55, 55),
         radius_tiles: 0,
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: Some(1),
     };
 
@@ -143,6 +146,7 @@ fn exact_direct_segment_bypasses_astar() {
         goal: (25, 19),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
     let start = map.tile_center(3, 4);
@@ -170,6 +174,7 @@ fn infantry_direct_segment_crossing_slow_tiles_uses_astar_detour() {
         goal: (11, 8),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
     let start = map.tile_center(2, 8);
@@ -200,6 +205,7 @@ fn infantry_uses_slow_tiles_when_open_detour_is_longer_and_caches_route() {
         goal: (11, 8),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
 
@@ -228,6 +234,7 @@ fn blocked_direct_segment_falls_back_to_full_astar() {
         goal: (24, 10),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
     let start = map.tile_center(5, 10);
@@ -256,6 +263,7 @@ fn direct_segment_result_is_not_reused_for_unsafe_offsets_in_the_same_tiles() {
         goal: (24, 10),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
     let safe_segment = (map.tile_center(5, 10), map.tile_center(24, 10));
@@ -291,6 +299,7 @@ fn pathing_permission_defers_cache_hits_and_misses() {
         goal: (25, 19),
         radius_tiles: 0,
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
 
@@ -332,6 +341,7 @@ fn completed_no_route_result_is_reused_without_another_search() {
         goal: (25, 19),
         radius_tiles: 0,
         route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
         budget: None,
     };
 
@@ -346,4 +356,121 @@ fn completed_no_route_result_is_reused_without_another_search() {
     assert!(cached_path.is_empty());
     assert_eq!(cached.cache_status, PathCacheStatus::Hit);
     assert_eq!(cached.expanded_nodes, 0);
+}
+
+#[test]
+fn fastest_terrain_policy_uses_offset_road_and_has_distinct_cache_identity() {
+    let mut map = flat_test_map(20);
+    for tx in 2..=16 {
+        let index = map.index(tx, 6);
+        map.terrain[index] = terrain::ROAD_HORIZONTAL;
+    }
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let legacy = PathRequest {
+        kind: EntityKind::Rifleman,
+        start: (2, 9),
+        goal: (16, 9),
+        radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        route_shape: RouteShape::Normal,
+        policy: RoutePolicy::LegacyShape,
+        budget: None,
+    };
+    let (legacy_path, legacy_diagnostics) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, legacy.clone(), true));
+    let weighted = PathRequest {
+        policy: RoutePolicy::FastestTerrainTime,
+        ..legacy
+    };
+    let (weighted_path, weighted_diagnostics) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, weighted.clone(), true));
+    let (cached_path, cached_diagnostics) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, weighted, true));
+
+    assert_eq!(legacy_diagnostics.cache_status, PathCacheStatus::Miss);
+    assert_eq!(weighted_diagnostics.cache_status, PathCacheStatus::Miss);
+    assert_eq!(cached_diagnostics.cache_status, PathCacheStatus::Hit);
+    assert_eq!(cached_path, weighted_path);
+    assert!(legacy_path.iter().all(|&(_, ty)| ty == 9));
+    assert!(weighted_path.iter().any(|&(_, ty)| ty == 6));
+}
+
+#[test]
+fn fastest_terrain_policy_never_uses_legacy_direct_bypass() {
+    let map = flat_test_map(20);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let start = map.tile_center(2, 9);
+    let goal = map.tile_center(16, 9);
+    let request = PathRequest {
+        kind: EntityKind::Rifleman,
+        start: (2, 9),
+        goal: (16, 9),
+        radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        route_shape: RouteShape::Normal,
+        policy: RoutePolicy::FastestTerrainTime,
+        budget: None,
+    };
+
+    let (_, diagnostics) =
+        resolved(service.request_with_diagnostics(&map, &occ, request, Some((start, goal)), true));
+    assert_eq!(diagnostics.cache_status, PathCacheStatus::Miss);
+    assert!(diagnostics.expanded_nodes > 0);
+}
+
+#[test]
+fn fastest_terrain_finalized_cache_preserves_exact_goal_and_clears_with_derived_state() {
+    let map = flat_test_map(24);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let start = map.tile_center(3, 4);
+    let tile_goal = map.tile_center(18, 15);
+    let request = PathRequest {
+        kind: EntityKind::ScoutCar,
+        start: (3, 4),
+        goal: (18, 15),
+        radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+        route_shape: RouteShape::VehicleClearance,
+        policy: RoutePolicy::FastestTerrainTime,
+        budget: None,
+    };
+
+    let (first, first_diagnostics) = resolved(service.request_finalized_with_diagnostics(
+        &map,
+        &occ,
+        request.clone(),
+        (start, tile_goal),
+        None,
+        true,
+    ));
+    let (second, second_diagnostics) = resolved(service.request_finalized_with_diagnostics(
+        &map,
+        &occ,
+        request.clone(),
+        (start, tile_goal),
+        None,
+        true,
+    ));
+    assert_eq!(first, second);
+    assert_eq!(first_diagnostics.cache_status, PathCacheStatus::Miss);
+    assert_eq!(second_diagnostics.cache_status, PathCacheStatus::Hit);
+    assert_eq!(service.finalized_cache.len(), 1);
+
+    let exact_goal = (tile_goal.0 + 4.0, tile_goal.1 - 3.0);
+    let (offset, _) = resolved(service.request_finalized_with_diagnostics(
+        &map,
+        &occ,
+        request,
+        (start, exact_goal),
+        None,
+        true,
+    ));
+    assert_eq!(offset.first().copied(), Some(exact_goal));
+    assert_eq!(service.finalized_cache.len(), 2);
+
+    service.clear_cache_and_search();
+    assert!(service.finalized_cache.is_empty());
 }
