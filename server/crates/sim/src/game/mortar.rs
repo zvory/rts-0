@@ -194,6 +194,15 @@ impl MortarShellStore {
         let due = std::mem::take(&mut self.shells);
         for mut shell in due {
             if !shell.launched && shell.launch_tick <= tick {
+                if shell.rocket
+                    && !entities.get(shell.attacker).is_some_and(|attacker| {
+                        attacker.owner == shell.owner
+                            && attacker.kind == EntityKind::RocketLauncher
+                            && attacker.hp > 0
+                    })
+                {
+                    continue;
+                }
                 let delay_ticks = shell.impact_tick.saturating_sub(tick);
                 emit_launch(
                     events,
@@ -205,7 +214,7 @@ impl MortarShellStore {
                     shell.from_y,
                     shell.x,
                     shell.y,
-                    true,
+                    false,
                     delay_ticks,
                     shell.rocket,
                 );

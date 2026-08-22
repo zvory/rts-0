@@ -152,6 +152,107 @@ fn barrage_click_waits_for_a_truck_facing_away_then_fires_once() {
 }
 
 #[test]
+fn barrage_launches_do_not_leak_hidden_impact_points_to_enemies() {
+    let (mut game, launcher, target) = fixture(0);
+    let launcher_pos = game
+        .state
+        .entities
+        .get(launcher)
+        .map(|entity| (entity.pos_x, entity.pos_y))
+        .unwrap();
+    game.state
+        .entities
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            launcher_pos.0,
+            launcher_pos.1 + config::TILE_SIZE as f32 * 2.0,
+        )
+        .expect("enemy spotter should spawn");
+    game.rebuild_final_spatial();
+    game.state
+        .fog
+        .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    assert!(game
+        .state
+        .fog
+        .is_visible_world(2, launcher_pos.0, launcher_pos.1));
+    assert!(!game.state.fog.is_visible_world(2, target.0, target.1));
+
+    order_barrage(&mut game, launcher, target);
+    for _ in 0..=config::ROCKET_BARRAGE_UNLOAD_TICKS + 2 {
+        let events = game.tick();
+        let enemy_events = events
+            .iter()
+            .find(|(player, _)| *player == 2)
+            .map(|(_, events)| events.as_slice())
+            .unwrap_or_default();
+        assert!(enemy_events
+            .iter()
+            .all(|event| !matches!(event, Event::MortarLaunch { rocket: true, .. })));
+    }
+}
+
+#[test]
+fn destroying_launcher_during_unload_cancels_rockets_not_yet_launched() {
+    let (mut game, launcher, target) = fixture(0);
+    order_barrage(&mut game, launcher, target);
+
+    let mut launches = 0;
+    for _ in 0..config::ROCKET_BARRAGE_UNLOAD_TICKS + 4 {
+        let tick_launches = game
+            .tick()
+            .into_iter()
+            .filter(|(player, _)| *player == 1)
+            .flat_map(|(_, events)| events)
+            .filter(|event| {
+                matches!(
+                    event,
+                    Event::MortarLaunch {
+                        from,
+                        rocket: true,
+                        ..
+                    } if *from == launcher
+                )
+            })
+            .count();
+        launches += tick_launches;
+        if tick_launches > 0 {
+            game.state
+                .entities
+                .get_mut(launcher)
+                .unwrap()
+                .apply_damage(u32::MAX, None);
+            break;
+        }
+    }
+
+    for _ in 0..config::ROCKET_BARRAGE_UNLOAD_TICKS + config::TICK_HZ * 2 {
+        launches += game
+            .tick()
+            .into_iter()
+            .filter(|(player, _)| *player == 1)
+            .flat_map(|(_, events)| events)
+            .filter(|event| {
+                matches!(
+                    event,
+                    Event::MortarLaunch {
+                        from,
+                        rocket: true,
+                        ..
+                    } if *from == launcher
+                )
+            })
+            .count();
+    }
+
+    assert_eq!(
+        launches, 1,
+        "only the rocket already launched should survive"
+    );
+}
+
+#[test]
 fn later_barrage_costs_one_hundred_fifty_oil() {
     let (mut game, launcher, target) = fixture(150);
     order_barrage(&mut game, launcher, target);
