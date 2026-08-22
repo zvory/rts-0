@@ -361,7 +361,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   modifier (so a slowed road is 1.125x base speed). Damage reduction applies after weapon armor,
   facing, falloff, and entrenchment calculations to direct fire, overpenetration, Mortar, Artillery,
   loaded Panzerfaust, and damaging ability projectiles; fractional non-zero damage rounds up.
-- Ordinary infantry Move and Attack Move routes minimize one directed fixed-point terrain-time
+- Ordinary infantry and oriented-ground-vehicle Move and Attack Move routes minimize one directed fixed-point terrain-time
   metric. A cardinal or diagonal edge begins with legacy distance `10` or `14`, scaled by `780`.
   The source tile owns road and slow-overlay sampling; elevation compares source to destination.
   Their exact speed ratios (road `3/2`, slow `3/4`, uphill `4/5`, downhill `13/10`) multiply before
@@ -376,8 +376,11 @@ profiles and explicit activation/autocast policy instead of being folded into de
   distance at 1/1024-pixel precision before applying the same rational composition. It accepts a
   shortcut only when that continuous cost does not increase and a conservative full-body sweep is
   legal; tree-shaping anchors are protected because continuous terrain time does not represent the
-  tree penalty. Direct Attack, gather, build, repair, deconstruct, abilities, and vehicles keep the
-  legacy route objective in this phase.
+  tree penalty. Vehicle-clearance routes retain their existing clearance, corner, and turn shaping
+  scaled by the same `780` factor; their finalizer only collapses exactly collinear authored spans,
+  preserves every bend/diagonal-to-L/recovery anchor, and keeps the Scout Car three-tile segment
+  limit. Direct Attack, gather, build, repair, deconstruct, and abilities keep the legacy route
+  objective until the all-order rollout.
 - Gravel A/B/C, Dirt A/B/C, Mud A/B/C, and Frosted Ground are visual Open-terrain variants. They
   use grass-equivalent 1.0x movement, construction, cover, concealment, and line-of-sight rules.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to

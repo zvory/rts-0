@@ -38,6 +38,7 @@ impl PathingService {
     ) -> PathingRequestOutcome<Vec<(f32, f32)>> {
         let start = req.start;
         let kind = req.kind;
+        let policy = req.policy;
         if let Some((from, to)) = direct_segment {
             if req.policy == RoutePolicy::LegacyShape
                 && req.start != req.goal
@@ -72,7 +73,7 @@ impl PathingService {
                 kind,
                 radius_tiles: 0,
                 route_shape: RouteShape::VehicleClearance,
-                policy: RoutePolicy::LegacyShape,
+                policy,
                 avoid_diagonal_pinch: true,
             };
             let tile_path = expand_vehicle_diagonal_steps_to_l_waypoints(start, &tile_path, &pass);
@@ -151,7 +152,7 @@ impl PathingService {
                 req.start,
                 req.goal,
                 search_budget,
-                req.route_shape.turn_penalty(),
+                req.route_shape.turn_penalty(req.policy),
                 &mut self.search_scratch,
             );
 

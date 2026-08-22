@@ -2,7 +2,7 @@ use super::*;
 use crate::config;
 use crate::game::entity::RoutePolicy;
 
-const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
+pub(super) const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
 #[derive(Clone, Copy)]
 pub(in crate::game::services) struct RouteFinalizationMode {
@@ -33,16 +33,7 @@ pub(in crate::game::services) fn finalize_reverse_waypoints_or_raw(
     if let Some(final_waypoint) = raw.first_mut() {
         *final_waypoint = goal;
     }
-    finalize_reverse_waypoints(
-        map,
-        occupancy,
-        kind,
-        start,
-        goal,
-        mode,
-        waypoints,
-    )
-    .unwrap_or(raw)
+    finalize_reverse_waypoints(map, occupancy, kind, start, goal, mode, waypoints).unwrap_or(raw)
 }
 
 /// Apply the same final tree expansion and Scout Car segment simplification to a resolved path.
@@ -61,12 +52,20 @@ pub(in crate::game::services) fn finalize_reverse_waypoints(
     waypoints[0] = goal;
     if mode.policy == RoutePolicy::FastestTerrainTime {
         waypoints = super::terrain_finalize::simplify_fastest_terrain_route(
-            map, occupancy, kind, start, waypoints,
+            map,
+            occupancy,
+            kind,
+            start,
+            mode.route_shape,
+            waypoints,
         );
     }
     let mut waypoints =
         super::tree_detours::expand_reverse_waypoints(map, occupancy, kind, start, waypoints)?;
-    if mode.route_shape == RouteShape::VehicleClearance && !uses_pivot_vehicle_movement(kind) {
+    if mode.policy == RoutePolicy::LegacyShape
+        && mode.route_shape == RouteShape::VehicleClearance
+        && !uses_pivot_vehicle_movement(kind)
+    {
         waypoints = simplify_reverse_waypoints_with_limit(
             map,
             occupancy,
@@ -78,7 +77,6 @@ pub(in crate::game::services) fn finalize_reverse_waypoints(
     }
     Some(waypoints)
 }
-
 
 #[cfg(test)]
 #[path = "route_finalize_tests.rs"]

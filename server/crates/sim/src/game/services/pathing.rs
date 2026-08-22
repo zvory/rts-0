@@ -12,10 +12,11 @@ use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
-use cache::{CacheEntry, CacheKey};
+use cache::{CacheEntry, CacheKey, FinalizedCacheEntry, FinalizedCacheKey};
 use std::collections::HashMap;
 
 mod authoring;
+mod finalized_request;
 mod graph;
 mod passability;
 mod route_cost;
@@ -27,9 +28,6 @@ use graph::PathGraph;
 use passability::TerrainPassability;
 #[cfg(test)]
 mod tree_detours_tests;
-pub(in crate::game::services) use route_finalize::{
-    finalize_reverse_waypoints_or_raw, RouteFinalizationMode,
-};
 pub(in crate::game::services) use tree_detours::tree_detour_between;
 
 const VEHICLE_HARD_CLEARANCE_TILES: u16 = 1;
@@ -66,12 +64,17 @@ pub enum RouteShape {
 }
 
 impl RouteShape {
-    fn turn_penalty(self) -> u32 {
-        match self {
+    fn turn_penalty(self, policy: RoutePolicy) -> u32 {
+        let legacy = match self {
             RouteShape::Normal => 0,
             #[cfg(test)]
             RouteShape::PreferFewerTurns => 3,
             RouteShape::VehicleClearance => VEHICLE_ROUTE_TURN_PENALTY,
+        };
+        if policy == RoutePolicy::FastestTerrainTime {
+            legacy.saturating_mul(crate::rules::terrain::ROUTE_TIME_SCALE)
+        } else {
+            legacy
         }
     }
 }
@@ -111,6 +114,7 @@ pub(super) enum PathingRequestOutcome<T> {
 pub struct PathingService {
     default_budget: usize,
     cache: HashMap<CacheKey, CacheEntry>,
+    finalized_cache: HashMap<FinalizedCacheKey, FinalizedCacheEntry>,
     cache_cap: usize,
     search_scratch: pathfinding::SearchScratch,
     path_graph: PathGraph,
@@ -123,6 +127,7 @@ impl PathingService {
         PathingService {
             default_budget,
             cache: HashMap::with_capacity(cache_cap),
+            finalized_cache: HashMap::with_capacity(cache_cap),
             cache_cap,
             search_scratch: pathfinding::SearchScratch::default(),
             path_graph: PathGraph::default(),
@@ -149,6 +154,7 @@ impl PathingService {
 
     pub(in crate::game) fn clear_cache_and_search(&mut self) {
         self.cache.clear();
+        self.finalized_cache.clear();
         self.search_scratch = pathfinding::SearchScratch::default();
     }
 
@@ -196,8 +202,16 @@ fn choose_vehicle_l_elbow<P: Passability>(
 
     match (horizontal_ok, vertical_ok) {
         (true, true) => {
-            let horizontal_cost = pass.movement_cost(horizontal_first.0, horizontal_first.1, 10);
-            let vertical_cost = pass.movement_cost(vertical_first.0, vertical_first.1, 10);
+            let elbow_cost = |elbow: (i32, i32)| {
+                pass.edge_cost(prev.0, prev.1, elbow.0 - prev.0, elbow.1 - prev.1, 10)
+                    .and_then(|first| {
+                        pass.edge_cost(elbow.0, elbow.1, next.0 - elbow.0, next.1 - elbow.1, 10)
+                            .map(|second| first.saturating_add(second))
+                    })
+                    .unwrap_or(u32::MAX)
+            };
+            let horizontal_cost = elbow_cost(horizontal_first);
+            let vertical_cost = elbow_cost(vertical_first);
             if horizontal_cost <= vertical_cost {
                 Some(horizontal_first)
             } else {

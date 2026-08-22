@@ -59,11 +59,7 @@ impl<'a> StaticRouteAnalyzer<'a> {
         let start_world = self.map.tile_center(start_tile.0, start_tile.1);
         let goal_world = self.map.tile_center(goal_tile.0, goal_tile.1);
         let vehicle = uses_oriented_vehicle_body(kind);
-        let policy = if vehicle {
-            RoutePolicy::LegacyShape
-        } else {
-            RoutePolicy::FastestTerrainTime
-        };
+        let policy = RoutePolicy::FastestTerrainTime;
         let request = PathRequest {
             kind,
             start,
