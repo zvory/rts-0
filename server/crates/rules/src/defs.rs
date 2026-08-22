@@ -76,6 +76,7 @@ const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
     EntityKind::Artillery,
+    EntityKind::RocketLauncher,
 ];
 const FACTORY_UNITS: &[EntityKind] = &[
     EntityKind::ScoutCar,
@@ -248,6 +249,26 @@ pub const UNITS: &[UnitDef] = &[
             supply: 4,
             build_ticks: 600,
             radius: balance::ARTILLERY_SELECTION_RADIUS_PX,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::None,
+        trained_at: Some(EntityKind::Steelworks),
+        train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
+    },
+    UnitDef {
+        kind: EntityKind::RocketLauncher,
+        stats: balance::UnitStats {
+            hp: 150,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+            speed: 2.0,
+            sight_tiles: 8,
+            cost_steel: 225,
+            cost_oil: 150,
+            supply: 6,
+            build_ticks: balance::TICK_HZ * 20,
+            radius: 18.0,
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::None,
@@ -658,6 +679,7 @@ mod tests {
                 EntityKind::AntiTankGun,
                 EntityKind::MortarTeam,
                 EntityKind::Artillery,
+                EntityKind::RocketLauncher,
                 EntityKind::Tank,
                 EntityKind::ScoutCar,
                 EntityKind::ScoutPlane,
@@ -763,6 +785,15 @@ mod tests {
 
         assert_eq!(stats.supply, 6);
         assert_eq!(stats.cooldown, 108);
+    }
+
+    #[test]
+    fn rocket_launcher_uses_final_production_cost() {
+        let stats = unit_def(EntityKind::RocketLauncher)
+            .expect("rocket launcher def")
+            .stats;
+
+        assert_eq!((stats.cost_steel, stats.cost_oil), (225, 150));
     }
 
     #[test]

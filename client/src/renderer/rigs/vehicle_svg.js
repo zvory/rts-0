@@ -16,6 +16,36 @@ export const COMMAND_CAR_PARTS = Object.freeze({
   ]),
 });
 
+export const ROCKET_LAUNCHER_PARTS = Object.freeze({
+  shadow: Object.freeze(["part.shadow"]),
+  unit: Object.freeze([
+    "part.hull",
+    "part.wheel.top.front",
+    "part.wheel.top.rear",
+    "part.wheel.bottom.front",
+    "part.wheel.bottom.rear",
+    "part.cabin",
+    "part.windshield",
+    "part.rack",
+    "part.rocket.1",
+    "part.rocket.2",
+    "part.rocket.3",
+    "part.rocket.4",
+    "part.rocket.5",
+    "part.rocket.6",
+    "part.rocket.7",
+    "part.rocket.8",
+    "part.rocket.cooldown.1",
+    "part.rocket.cooldown.2",
+    "part.rocket.cooldown.3",
+    "part.rocket.cooldown.4",
+    "part.rocket.cooldown.5",
+    "part.rocket.cooldown.6",
+    "part.rocket.cooldown.7",
+    "part.rocket.cooldown.8",
+  ]),
+});
+
 export const EKAT_PARTS = Object.freeze({
   shadow: Object.freeze(["part.shadow"]),
   unit: Object.freeze([
@@ -61,6 +91,39 @@ export const COMMAND_CAR_RIG_SVG = `<svg viewBox="-36 -28 72 56" data-rts-rig-ki
   <circle id="anchor.hp" cx="0" cy="-22" r="1" fill="#ffffff" />
   <rect id="bounds.selection" x="-21" y="-14" width="42" height="28" fill="none" />
   <rect id="bounds.hp" x="-13" y="-25" width="26" height="6" fill="none" />
+</svg>`;
+
+export const ROCKET_LAUNCHER_RIG_SVG = `<svg viewBox="-36 -28 72 56" data-rts-rig-kind="rocket_launcher" data-rts-rig-version="1" data-rts-origin="center" id="rocket-launcher.prototype">
+  <ellipse id="part.shadow" cx="-1" cy="5" rx="24" ry="12" fill="#000000" opacity="0.28" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.hull" x="-21" y="-8" width="42" height="16" rx="3" fill="#ffffff" stroke="#17131a" stroke-width="2" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <circle id="part.wheel.top.front" cx="13" cy="-9" r="4" fill="#18151b" stroke="#655a68" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
+  <circle id="part.wheel.top.rear" cx="-13" cy="-9" r="4" fill="#18151b" stroke="#655a68" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
+  <circle id="part.wheel.bottom.front" cx="13" cy="9" r="4" fill="#18151b" stroke="#655a68" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
+  <circle id="part.wheel.bottom.rear" cx="-13" cy="9" r="4" fill="#18151b" stroke="#655a68" stroke-width="1.2" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.cabin" x="8" y="-6" width="11" height="12" rx="2" fill="#ffffff" stroke="#17131a" stroke-width="1.5" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0" />
+  <line id="part.windshield" x1="9.5" y1="-4.5" x2="9.5" y2="4.5" stroke="#d8d0b0" stroke-width="1.5" opacity="0.72" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.rack" x="-18" y="-10" width="25" height="20" rx="2" fill="#ffffff" fill-opacity="0.9" stroke="#17131a" stroke-width="1.2" data-rts-tint="team" data-rts-animation="facing:transform.rotation:1:0" />
+  <rect id="part.rocket.1" x="-17" y="-8.8" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.2" x="-17" y="-6.6" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.3" x="-17" y="-4.3" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.4" x="-17" y="-2" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.5" x="-17" y="0.4" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.6" x="-17" y="2.7" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.7" x="-17" y="5" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.8" x="-17" y="7.2" width="22" height="1.6" rx="0.8" fill="#ffffff" opacity="0.94" data-rts-tint="team-light-10" data-rts-animation="facing:transform.rotation:1:0;rocketRackReady:visible:1:0" />
+  <rect id="part.rocket.cooldown.1" x="-17" y="-8.8" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.2" x="-17" y="-6.6" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.3" x="-17" y="-4.3" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.4" x="-17" y="-2" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.5" x="-17" y="0.4" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.6" x="-17" y="2.7" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.7" x="-17" y="5" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <rect id="part.rocket.cooldown.8" x="-17" y="7.2" width="22" height="1.6" rx="0.8" fill="#24252a" opacity="0.98" data-rts-animation="facing:transform.rotation:1:0;rocketRackCooling:visible:1:0" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#ffffff" />
+  <circle id="anchor.hp" cx="0" cy="-24" r="1" fill="#ffffff" />
+  <rect id="bounds.selection" x="-25" y="-15" width="50" height="30" fill="none" />
+  <rect id="bounds.hp" x="-15" y="-27" width="30" height="6" fill="none" />
 </svg>`;
 
 export const EKAT_RIG_SVG = `<svg viewBox="-24 -24 48 48" data-rts-rig-kind="ekat" data-rts-rig-version="1" data-rts-origin="center" id="ekat.authored">

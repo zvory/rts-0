@@ -26,9 +26,9 @@ import { decodeCompactEvent } from "./protocol_snapshot_events.js";
 import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
-  // Version 53 appends unitsKilled to entity records. Versions 51 and 52 use the same shorter
-  // entity layout and remain safe to decode for fixture and replay compatibility.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 52 && raw.v !== 51) {
+  // Version 54 appends the optional rocket style bit to mortar launch/impact events. Versions
+  // 51-53 remain safe to decode because their event and entity records are strict prefixes.
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 

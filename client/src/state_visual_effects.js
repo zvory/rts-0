@@ -129,6 +129,7 @@ export class VisualEffectBuffers {
       toY: ev.toY,
       seed,
       createdAt: now,
+      rocket: ev.rocket === true,
     });
     this.mortarShells.push({
       fromX: ev.fromX,
@@ -139,6 +140,7 @@ export class VisualEffectBuffers {
       durationMs,
       seed,
       createdAt: now,
+      rocket: ev.rocket === true,
     });
     this.mortarTargets.push({
       fromX: ev.fromX,
@@ -149,6 +151,7 @@ export class VisualEffectBuffers {
       durationMs,
       seed,
       createdAt: now,
+      rocket: ev.rocket === true,
     });
   }
 
@@ -166,6 +169,7 @@ export class VisualEffectBuffers {
       radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : MORTAR_OUTER_RADIUS_TILES,
       seed: Math.floor(ev.x * 13 + ev.y * 7 + now) >>> 0,
       createdAt: now,
+      rocket: ev.rocket === true,
     });
   }
 

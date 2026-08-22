@@ -97,7 +97,14 @@ pub(super) fn unit_can_accept_stop_command(entities: &EntityStore, player: u32, 
             if entity.owner == player
                 && entity.is_unit()
                 && entity.kind != EntityKind::ScoutPlane
-    )
+    ) && !unit_has_committed_barrage(entities, unit)
+}
+
+pub(super) fn unit_has_committed_barrage(entities: &EntityStore, unit: u32) -> bool {
+    entities
+        .get(unit)
+        .and_then(|entity| entity.movement.as_ref())
+        .is_some_and(|movement| movement.barrage_unload_ticks > 0)
 }
 
 /// True if this unit is a worker that has already begun laying concrete. Ordinary replacement

@@ -1243,6 +1243,7 @@ mod tests {
                     to_y: 352.0,
                     radius_tiles: 1.5,
                     delay_ticks: 68,
+                    rocket: false,
                 },
                 Event::ArtilleryTarget {
                     from: 10,

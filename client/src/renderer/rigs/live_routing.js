@@ -9,6 +9,8 @@ import {
 import {
   COMMAND_CAR_PARTS,
   COMMAND_CAR_RIG_SVG,
+  ROCKET_LAUNCHER_PARTS,
+  ROCKET_LAUNCHER_RIG_SVG,
   EKAT_PARTS,
   EKAT_RIG_SVG,
 } from "./vehicle_svg.js";
@@ -69,6 +71,7 @@ const ROUTE_PLAN_CACHE = new Map([
 
 const LIVE_RIG_SOURCES = Object.freeze([
   [KIND.COMMAND_CAR, COMMAND_CAR_RIG_SVG],
+  [KIND.ROCKET_LAUNCHER, ROCKET_LAUNCHER_RIG_SVG],
   [KIND.EKAT, EKAT_RIG_SVG],
   [KIND.GOLEM, GOLEM_RIG_SVG],
   [KIND.WORKER, WORKER_RIG_SVG],
@@ -96,6 +99,7 @@ const WORKER_UNIT_PARTS = Object.freeze([
 const LIVE_RIG_PARTS = Object.freeze({
   ...RASTER_RIG_PARTS,
   [KIND.COMMAND_CAR]: COMMAND_CAR_PARTS,
+  [KIND.ROCKET_LAUNCHER]: ROCKET_LAUNCHER_PARTS,
   [KIND.EKAT]: EKAT_PARTS,
   [KIND.GOLEM]: Object.freeze({
     shadow: Object.freeze(["part.shadow"]),

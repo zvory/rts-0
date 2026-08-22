@@ -1,3 +1,4 @@
+use super::guards::unit_has_committed_barrage;
 use super::*;
 
 pub(super) fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryFireMode> {
@@ -10,6 +11,7 @@ pub(super) fn artillery_fire_mode_for(ability: AbilityKind) -> Option<ArtilleryF
 
 pub(super) fn immediate_unit_can_replace(entities: &EntityStore, player: u32, unit: u32) -> bool {
     unit_can_accept_player_command(entities, player, unit)
+        && !unit_has_committed_barrage(entities, unit)
 }
 
 pub(super) fn gather_node_valid(entities: &EntityStore, _player: u32, node: u32) -> bool {

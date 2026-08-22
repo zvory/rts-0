@@ -1,5 +1,5 @@
 import { HARVEST_TICKS, STATS, TICK_HZ } from "../../config.js";
-import { KIND, SETUP, STATE } from "../../protocol.js";
+import { ABILITY, KIND, SETUP, STATE } from "../../protocol.js";
 import { angleLerp, clamp01, hexToInt, polar, recoilVector, smoothstep01, tankBodyVisual, weaponRecoilOffset } from "../shared.js";
 import { normalizedPartSet } from "./part_selection.js";
 
@@ -61,6 +61,10 @@ export function createRigRenderContext(entity, {
   const weaponRecoil = recoilPx > 0 ? polar(weaponVisualFacing + Math.PI, recoilPx) : { x: 0, y: 0 };
   const scoutGunner = scoutGunnerOffsets(entity, facing, weaponFacing, recoilPx);
   const extractor = extractorAnimation(entity, now);
+  const barrageCooldownLeft = entity.abilities?.find?.(
+    (entry) => entry?.ability === ABILITY.BARRAGE,
+  )?.cooldownLeft ?? 0;
+  const rocketRackCooling = barrageCooldownLeft > 0;
   const recoilKickFactor = entity.kind === KIND.TANK
     ? 0.85
     : entity.kind === KIND.ARTILLERY
@@ -114,6 +118,8 @@ export function createRigRenderContext(entity, {
     busy: isBusy(entity),
     breakthroughTicks: finite(entity.breakthroughTicks, 0),
     panzerfaustLoaded: entity.panzerfaustLoaded !== false,
+    rocketRackReady: !rocketRackCooling,
+    rocketRackCooling,
     extractorSteelToolOffsetX: extractor.steelToolOffsetX,
     extractorSteelToolOffsetY: extractor.steelToolOffsetY,
     extractorPumpRotation: extractor.pumpRotation,

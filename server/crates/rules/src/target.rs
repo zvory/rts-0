@@ -217,6 +217,20 @@ mod tests {
                 },
             ),
             (
+                EntityKind::RocketLauncher,
+                ExpectedTargetFacts {
+                    is_unit: true,
+                    is_building: false,
+                    is_resource_node: false,
+                    armor_class: Some(ArmorClass::Small),
+                    weapon_class: WeaponClass::None,
+                    threat_role: TargetThreatRole::SupportWeapon,
+                    is_vehicle_body: true,
+                    is_economy_unit: false,
+                    is_coax_infantry_priority: false,
+                },
+            ),
+            (
                 EntityKind::ScoutCar,
                 ExpectedTargetFacts {
                     is_unit: true,

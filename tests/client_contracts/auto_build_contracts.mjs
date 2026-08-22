@@ -25,11 +25,11 @@ const state = {
 const gridEntries = productionGridEntries(state, {
   getActiveProfile: () => ({ mode: "grid" }),
 });
-assert(gridEntries.length === 9, "global Auto-Build grid exposes all nine Barracks, Gunworks, and Vehicle Works units");
+assert(gridEntries.length === 10, "global Auto-Build grid exposes all ten Barracks, Gunworks, and Vehicle Works units");
 assertDeepEqual(
   gridEntries.map((entry) => entry.hotkey),
-  ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"],
-  "global Auto-Build grid uses the complete command-card keyboard grid",
+  ["Q", "W", "E", "A", "S", "D", "Z", "X", "C", ""],
+  "global Auto-Build grid uses the complete command-card keyboard grid and leaves overflow clickable",
 );
 const rifleman = gridEntries.find((entry) => entry.unit === KIND.RIFLEMAN);
 assertDeepEqual(rifleman.producerIds, [10, 11], "global Auto-Build includes every owned compatible producer, including unfinished buildings");
@@ -51,7 +51,7 @@ const conflictingClassicEntries = productionGridEntries(state, {
 });
 assertDeepEqual(
   conflictingClassicEntries.map((entry) => entry.hotkey),
-  ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"],
+  ["Q", "W", "E", "A", "S", "D", "Z", "X", "C", ""],
   "conflicting classic bindings fall back to the deterministic grid",
 );
 

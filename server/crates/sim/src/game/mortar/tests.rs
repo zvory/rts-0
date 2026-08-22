@@ -68,6 +68,72 @@ fn half_turn_completes_in_two_hundred_ms() {
 }
 
 #[test]
+fn legacy_mortar_shell_checkpoint_defaults_to_already_launched() {
+    let store: MortarShellStore = serde_json::from_value(serde_json::json!({
+        "shells": [{
+            "owner": 1,
+            "attacker": 7,
+            "x": 320.0,
+            "y": 352.0,
+            "impact_tick": 99
+        }]
+    }))
+    .expect("legacy mortar-shell checkpoint should remain readable");
+
+    let shell = store.shells.first().expect("restored shell");
+    assert!(shell.launched);
+    assert!(!shell.rocket);
+    assert_eq!(
+        (shell.from_x, shell.from_y, shell.launch_tick),
+        (0.0, 0.0, 0)
+    );
+}
+
+#[test]
+fn rocket_damage_is_reduced_except_for_armor_piercing_direct_hits() {
+    let inner2 = (config::MORTAR_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2);
+    let inner = shell_damage(true, 0.0, inner2, false);
+    let outer = shell_damage(true, inner2 + 1.0, inner2, false);
+    let direct = shell_damage(true, 0.0, inner2, true);
+
+    assert_eq!(inner, 75);
+    assert_eq!(outer, 30);
+    assert_eq!(direct, 100);
+    assert_eq!(
+        shell_effective_damage(EntityKind::Tank, true, inner, false),
+        18
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::Tank, true, outer, false),
+        7
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::Tank, true, direct, true),
+        100
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::Rifleman, true, inner, false),
+        75
+    );
+}
+
+#[test]
+fn rocket_impact_point_uses_the_target_body_for_direct_hits() {
+    let mut entities = EntityStore::new();
+    let tank_id = entities
+        .spawn_unit(2, EntityKind::Tank, 160.0, 160.0)
+        .expect("tank should spawn");
+    let tank = entities.get(tank_id).expect("tank should exist");
+
+    // The tank's authoritative body extends farther fore/aft than its legacy circular radius.
+    // A rocket landing on that visible nose must still count as a direct hit.
+    let body_end = 160.0 + config::TANK_BODY_LENGTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX;
+    assert!(body_end - 0.1 > 160.0 + tank.radius());
+    assert!(impact_point_hits_target(body_end - 0.1, 160.0, tank));
+    assert!(!impact_point_hits_target(body_end + 0.1, 160.0, tank));
+}
+
+#[test]
 fn mortar_under_attack_notice_goes_to_victim_owner_not_teammate() {
     let map = open_map(20);
     let mut entities = EntityStore::new();

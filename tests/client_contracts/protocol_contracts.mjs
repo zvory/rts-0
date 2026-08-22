@@ -276,11 +276,14 @@ assert(
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
       [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
       [EVENT_CODE[EVENT.MORTAR_LAUNCH], 9, [256, 272], [320, 352], 1.5, 68],
+      [EVENT_CODE[EVENT.MORTAR_LAUNCH], 10, [256, 300], [448, 480], 2, 36, true],
       [EVENT_CODE[EVENT.ARTILLERY_TARGET], 10, [320, 352], 3, ARTILLERY_SHELL_DELAY_TICKS],
       [EVENT_CODE[EVENT.ARTILLERY_FIRING], 1, 288, 304, 0.25],
       [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
       [EVENT_CODE[EVENT.PANZERFAUST_LAUNCH], 11, [360, 384], [416, 384], 15],
       [EVENT_CODE[EVENT.PANZERFAUST_IMPACT], 416, 384],
+      [EVENT_CODE[EVENT.MORTAR_IMPACT], 448, 480, 2, true],
+      [EVENT_CODE[EVENT.MORTAR_IMPACT], 512, 544, 2, null, null, true],
     ],
   });
 
@@ -498,37 +501,56 @@ assert(
     "mortar launch event decodes",
   );
   assert(
-    decoded.events[8].e === EVENT.ARTILLERY_TARGET &&
+    decoded.events[8].e === EVENT.MORTAR_LAUNCH &&
       decoded.events[8].from === 10 &&
-      decoded.events[8].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
-      decoded.events[8].radiusTiles === 3,
+      decoded.events[8].rocket === true &&
+      decoded.events[8].delayTicks === 36,
+    "seven-slot rocket launch events decode without rejecting the snapshot",
+  );
+  assert(
+    decoded.events[9].e === EVENT.ARTILLERY_TARGET &&
+      decoded.events[9].from === 10 &&
+      decoded.events[9].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
+      decoded.events[9].radiusTiles === 3,
     "artillery target event decodes",
   );
   assert(
-    decoded.events[9].e === EVENT.ARTILLERY_FIRING &&
-      decoded.events[9].owner === 1 &&
-      decoded.events[9].x === 288 &&
-      decoded.events[9].facing === 0.25,
+    decoded.events[10].e === EVENT.ARTILLERY_FIRING &&
+      decoded.events[10].owner === 1 &&
+      decoded.events[10].x === 288 &&
+      decoded.events[10].facing === 0.25,
     "artillery firing minimap event decodes",
   );
   assert(
-    decoded.events[10].e === EVENT.ARTILLERY_IMPACT &&
-      decoded.events[10].x === 336 &&
-      decoded.events[10].y === 368,
+    decoded.events[14].e === EVENT.MORTAR_IMPACT &&
+      decoded.events[14].rocket === true &&
+      decoded.events[14].from === undefined,
+    "placeholder-free version-54 rocket impacts do not decode the style bit as an attacker id",
+  );
+  assert(
+    decoded.events[15].e === EVENT.MORTAR_IMPACT &&
+      decoded.events[15].rocket === true &&
+      decoded.events[15].from === undefined,
+    "canonical rocket impacts decode through explicit attacker and reveal placeholders",
+  );
+  assert(
+    decoded.events[11].e === EVENT.ARTILLERY_IMPACT &&
+      decoded.events[11].x === 336 &&
+      decoded.events[11].y === 368,
     "artillery impact event decodes",
   );
   assert(
-    decoded.events[11].e === EVENT.PANZERFAUST_LAUNCH &&
-      decoded.events[11].from === 11 &&
-      decoded.events[11].fromX === 360 &&
-      decoded.events[11].toX === 416 &&
-      decoded.events[11].delayTicks === 15,
+    decoded.events[12].e === EVENT.PANZERFAUST_LAUNCH &&
+      decoded.events[12].from === 11 &&
+      decoded.events[12].fromX === 360 &&
+      decoded.events[12].toX === 416 &&
+      decoded.events[12].delayTicks === 15,
     "panzerfaust launch event decodes without target id",
   );
   assert(
-    decoded.events[12].e === EVENT.PANZERFAUST_IMPACT &&
-      decoded.events[12].x === 416 &&
-      decoded.events[12].y === 384,
+    decoded.events[13].e === EVENT.PANZERFAUST_IMPACT &&
+      decoded.events[13].x === 416 &&
+      decoded.events[13].y === 384,
     "panzerfaust impact event decodes",
   );
   const abilityCommand = cmd.useAbility(ABILITY.SMOKE, [7, 8], 320, 384, true);

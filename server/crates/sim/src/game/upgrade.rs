@@ -95,6 +95,14 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::SCOUT_PLANE_UNLOCK_COST_OIL,
             research_ticks: crate::config::SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
         },
+        UpgradeKind::Rockets => UpgradeDefinition {
+            kind,
+            researched_at: catalog.researched_at,
+            requires_upgrade: None,
+            cost_steel: crate::config::ROCKETS_COST_STEEL,
+            cost_oil: crate::config::ROCKETS_COST_OIL,
+            research_ticks: crate::config::ROCKETS_RESEARCH_TICKS,
+        },
     }
 }
 
@@ -103,6 +111,7 @@ pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
         EntityKind::Panzerfaust => Some(UpgradeKind::Panzerfausts),
         EntityKind::AntiTankGun => Some(UpgradeKind::AntiTankGunUnlock),
         EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
+        EntityKind::RocketLauncher => Some(UpgradeKind::Rockets),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
         _ => None,
     }
@@ -131,6 +140,7 @@ mod tests {
                 UpgradeKind::TankUnlock,
                 UpgradeKind::SmokePlus,
                 UpgradeKind::ScoutPlaneUnlock,
+                UpgradeKind::Rockets,
             ]
         );
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));

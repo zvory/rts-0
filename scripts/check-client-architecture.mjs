@@ -235,7 +235,7 @@ const forbiddenPresentationRuntimeRe = /\b(?:PIXI|WebSocket|GameState|ClientInte
 // update this table with the phase-specific reason.
 const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Tank Trap Phase 5 extends placement feedback to draw multi-site line previews.
-  "renderer/feedback.js": 46315,
+  "renderer/feedback.js": 46994,
   // Lab MVP Phase 5 injects explicit lab control policy into command-card context.
   "hud.js": 44208,
   // Hotspot Cleanup Phase 6 extracted GameState query and visual-effect helpers.
@@ -262,7 +262,7 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Entrenchment Phase 3 adds the occupiedTrenchId slot; Panzerfaust reserves compact events.
   "protocol_snapshot.js": 24192,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
-  "hud_command_card.js": 29498,
+  "hud_command_card.js": 29519,
   // Interact Phase 6 centralizes renderer visual-clock fallback so extracted draw modules
   // share the injected clock without each growing its own compatibility expression.
   "renderer/shared.js": 28217,

@@ -39,14 +39,14 @@ export function abilityActiveObjectId(entity, ability) {
 
 export function abilityUnitReady(entity, definition) {
   return abilityCooldownLeft(entity, definition.ability) === 0 &&
-    abilityRemainingUses(entity, definition.ability) !== 0 &&
+    (definition.ability === "barrage" || abilityRemainingUses(entity, definition.ability) !== 0) &&
     !abilityLockoutActive(entity, definition.ability);
 }
 
 export function abilityUnitQueueAdmissible(entity, definition) {
   if (definition.queuePolicy === "notQueueable") return false;
   if (definition.queuePolicy !== "waitUntilReady") return abilityUnitReady(entity, definition);
-  return abilityRemainingUses(entity, definition.ability) !== 0 &&
+  return (definition.ability === "barrage" || abilityRemainingUses(entity, definition.ability) !== 0) &&
     !abilityLockoutActive(entity, definition.ability);
 }
 
