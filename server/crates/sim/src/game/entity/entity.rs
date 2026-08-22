@@ -16,10 +16,13 @@ use super::{
     ScoutPlaneState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
+mod helpers;
 mod production;
 mod production_repeat;
 mod rally;
 mod research;
+
+use helpers::construction_hp_for_progress;
 
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
 const BUILDING_START_HP_DENOMINATOR: u32 = 10;
@@ -542,7 +545,11 @@ impl Entity {
         self.set_path_with_policy(path, RoutePolicy::LegacyShape);
     }
 
-    pub fn set_path_with_policy(&mut self, path: Vec<(f32, f32)>, policy: RoutePolicy) {
+    pub(in crate::game) fn set_path_with_policy(
+        &mut self,
+        path: Vec<(f32, f32)>,
+        policy: RoutePolicy,
+    ) {
         if let Some(m) = self.movement.as_mut() {
             m.path = path;
             m.path_policy = if m.path.is_empty() {
@@ -570,7 +577,7 @@ impl Entity {
         self.movement.as_ref().and_then(|m| m.path.last().copied())
     }
 
-    pub fn path_policy(&self) -> RoutePolicy {
+    pub(in crate::game) fn path_policy(&self) -> RoutePolicy {
         self.movement
             .as_ref()
             .map(|movement| movement.path_policy)
@@ -1450,25 +1457,6 @@ impl Entity {
             combat.panzerfaust = Some(PanzerfaustState::Spent);
         }
     }
-}
-
-fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u32) -> u32 {
-    if max_hp == 0 {
-        return 0;
-    }
-    if total == 0 || progress >= total {
-        return max_hp;
-    }
-    let start_hp = max_hp
-        .saturating_mul(BUILDING_START_HP_NUMERATOR)
-        .div_ceil(BUILDING_START_HP_DENOMINATOR)
-        .clamp(1, max_hp);
-    let remaining_hp = max_hp.saturating_sub(start_hp);
-    let gained_hp = (remaining_hp as u64)
-        .saturating_mul(progress as u64)
-        .checked_div(total as u64)
-        .unwrap_or(remaining_hp as u64) as u32;
-    start_hp.saturating_add(gained_hp).min(max_hp)
 }
 
 fn initial_ability_uses(kind: EntityKind) -> BTreeMap<AbilityKind, u16> {
