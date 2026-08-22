@@ -150,7 +150,7 @@ pub(crate) fn promote_ready_orders(
             if !world_ability_facing_ready(entities, id, ability, x, y) {
                 continue;
             }
-            if waits_for_readiness(entities, owner, id, ability) {
+            if waits_for_readiness(entities, players, owner, id, ability) {
                 continue;
             }
             let faction_id = players
@@ -163,7 +163,6 @@ pub(crate) fn promote_ready_orders(
                 map,
                 entities,
                 players,
-                fog,
                 &teams,
                 smokes,
                 ability_runtime,
@@ -259,7 +258,6 @@ pub(crate) fn promote_ready_orders(
                     map,
                     entities,
                     players,
-                    fog,
                     &teams,
                     coordinator,
                     smokes,
@@ -365,10 +363,30 @@ fn ready_for_next_order(
     }
 }
 
-fn waits_for_readiness(entities: &EntityStore, owner: u32, id: u32, ability: AbilityKind) -> bool {
-    ability::definition(ability).queue_policy == AbilityQueuePolicy::QueueWaitUntilReady
-        && caster_can_accept_waiting_order(entities, owner, id, ability)
-        && !caster_can_attempt(entities, owner, id, ability)
+fn waits_for_readiness(
+    entities: &EntityStore,
+    players: &[PlayerState],
+    owner: u32,
+    id: u32,
+    ability: AbilityKind,
+) -> bool {
+    let definition = ability::definition(ability);
+    if definition.queue_policy != AbilityQueuePolicy::QueueWaitUntilReady
+        || !caster_can_accept_waiting_order(entities, owner, id, ability)
+    {
+        return false;
+    }
+    if !caster_can_attempt(entities, owner, id, ability) {
+        return true;
+    }
+    let activation_is_free = ability == AbilityKind::Barrage
+        && entities
+            .get(id)
+            .is_some_and(|entity| entity.has_initial_free_barrage());
+    let Some(player) = players.iter().find(|player| player.id == owner) else {
+        return false;
+    };
+    !activation_is_free && !player.can_afford(definition.cost.steel, definition.cost.oil)
 }
 
 fn clear_completed_active_order(entities: &mut EntityStore, id: u32) {
@@ -551,6 +569,9 @@ fn world_ability_intent_valid(
         return false;
     }
     let definition = crate::game::ability::definition(ability);
+    if definition.queue_policy == AbilityQueuePolicy::QueueWaitUntilReady {
+        return true;
+    }
     let Some(ps) = players.iter().find(|p| p.id == owner) else {
         return false;
     };

@@ -92,7 +92,6 @@ impl MortarShellStore {
     pub(crate) fn schedule_manual(
         &mut self,
         events: &mut HashMap<u32, Vec<Event>>,
-        fog: &Fog,
         teams: &TeamRelations,
         owner: u32,
         attacker: u32,
@@ -117,7 +116,6 @@ impl MortarShellStore {
         });
         emit_launch(
             events,
-            fog,
             teams,
             owner,
             attacker,
@@ -125,7 +123,6 @@ impl MortarShellStore {
             from_y,
             x,
             y,
-            false,
             delay_ticks,
             false,
         );
@@ -206,7 +203,6 @@ impl MortarShellStore {
                 let delay_ticks = shell.impact_tick.saturating_sub(tick);
                 emit_launch(
                     events,
-                    fog,
                     teams,
                     shell.owner,
                     shell.attacker,
@@ -214,7 +210,6 @@ impl MortarShellStore {
                     shell.from_y,
                     shell.x,
                     shell.y,
-                    false,
                     delay_ticks,
                     shell.rocket,
                 );
@@ -245,7 +240,6 @@ impl MortarShellStore {
 #[allow(clippy::too_many_arguments)]
 fn emit_launch(
     events: &mut HashMap<u32, Vec<Event>>,
-    fog: &Fog,
     teams: &TeamRelations,
     owner: u32,
     attacker: u32,
@@ -253,17 +247,12 @@ fn emit_launch(
     from_y: f32,
     to_x: f32,
     to_y: f32,
-    reveal_launch_to_enemies: bool,
     delay_ticks: u32,
     rocket: bool,
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        let allied = teams.same_team_or_same_owner(pid, owner);
-        if !allied
-            && (!reveal_launch_to_enemies
-                || !projection::team_visible_world(pid, from_x, from_y, fog, teams))
-        {
+        if !teams.same_team_or_same_owner(pid, owner) {
             continue;
         }
         events.entry(pid).or_default().push(Event::MortarLaunch {

@@ -291,7 +291,6 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
     let mut launch_events = event_map_for(&baseline);
     baseline.state.mortar_shells.schedule_manual(
         &mut launch_events,
-        &baseline.state.fog,
         &baseline.team_relations(),
         1,
         mortar,

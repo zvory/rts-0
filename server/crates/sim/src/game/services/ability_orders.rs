@@ -8,7 +8,6 @@ use crate::game::ability_runtime::{
     AbilityObjectPayload, AbilityRuntime, AbilityWorldObjectKind, AbilityWorldObjectSpec,
 };
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, OrderIntent};
-use crate::game::fog::Fog;
 use crate::game::hero_abilities;
 use crate::game::map::Map;
 use crate::game::mortar::{mortar_current_facing_ready, rotate_mortar_for_fire, MortarShellStore};
@@ -35,7 +34,6 @@ pub(crate) fn order_or_launch_world_ability(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    fog: &Fog,
     teams: &TeamRelations,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
@@ -84,7 +82,6 @@ pub(crate) fn order_or_launch_world_ability(
             map,
             entities,
             players,
-            fog,
             teams,
             smokes,
             ability_runtime,
@@ -117,7 +114,6 @@ pub(crate) fn launch_world_ability(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    fog: &Fog,
     teams: &TeamRelations,
     smokes: &mut SmokeCloudStore,
     ability_runtime: &mut AbilityRuntime,
@@ -189,9 +185,8 @@ pub(crate) fn launch_world_ability(
                 e.set_path_goal(None);
             }
             e.set_attack_cd(mortar_fire_weapon_cooldown_ticks());
-            mortar_shells.schedule_manual(
-                events, fog, teams, player, caster, from_x, from_y, x, y, tick,
-            );
+            mortar_shells
+                .schedule_manual(events, teams, player, caster, from_x, from_y, x, y, tick);
             true
         }
         (AbilityEffectHook::DelayedWorld, AbilityKind::Barrage) => {

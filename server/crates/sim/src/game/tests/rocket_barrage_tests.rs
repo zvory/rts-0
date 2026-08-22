@@ -57,6 +57,10 @@ fn fixture(oil: u32) -> (Game, u32, (f32, f32)) {
 }
 
 fn order_barrage(game: &mut Game, launcher: u32, target: (f32, f32)) {
+    order_barrage_with_queue(game, launcher, target, false);
+}
+
+fn order_barrage_with_queue(game: &mut Game, launcher: u32, target: (f32, f32), queued: bool) {
     game.enqueue(
         1,
         Command::UseAbility {
@@ -64,7 +68,7 @@ fn order_barrage(game: &mut Game, launcher: u32, target: (f32, f32)) {
             units: vec![launcher],
             x: Some(target.0),
             y: Some(target.1),
-            queued: false,
+            queued,
         },
     );
 }
@@ -264,6 +268,65 @@ fn later_barrage_costs_one_hundred_fifty_oil() {
     }
     order_barrage(&mut game, launcher, target);
     game.tick();
+    assert_eq!(game.state.players[0].oil, 0);
+}
+
+#[test]
+fn unaffordable_queued_barrage_waits_until_oil_is_available() {
+    let (mut game, launcher, target) = fixture(0);
+    order_barrage(&mut game, launcher, target);
+    let mut launches = game
+        .tick()
+        .into_iter()
+        .filter(|(player, _)| *player == 1)
+        .flat_map(|(_, events)| events)
+        .filter(|event| matches!(event, Event::MortarLaunch { rocket: true, .. }))
+        .count();
+    order_barrage_with_queue(&mut game, launcher, target, true);
+    launches += game
+        .tick()
+        .into_iter()
+        .filter(|(player, _)| *player == 1)
+        .flat_map(|(_, events)| events)
+        .filter(|event| matches!(event, Event::MortarLaunch { rocket: true, .. }))
+        .count();
+    let queued_entity = game.state.entities.get(launcher).unwrap();
+    assert!(
+        matches!(queued_entity.order(), Order::Ability(_))
+            || !queued_entity.queued_orders().is_empty(),
+        "queued barrage should be admitted during cooldown; order={:?}, queued={:?}",
+        queued_entity.order(),
+        queued_entity.queued_orders(),
+    );
+    for _ in 0..config::ROCKET_BARRAGE_RELOAD_TICKS as u32 + 4 {
+        launches += game
+            .tick()
+            .into_iter()
+            .filter(|(player, _)| *player == 1)
+            .flat_map(|(_, events)| events)
+            .filter(|event| matches!(event, Event::MortarLaunch { rocket: true, .. }))
+            .count();
+    }
+    assert_eq!(launches, config::ROCKET_BARRAGE_ROCKETS as usize);
+    let launcher_entity = game.state.entities.get(launcher).unwrap();
+    assert!(
+        matches!(launcher_entity.order(), Order::Ability(_)),
+        "queued barrage should remain active while unaffordable; order={:?}, queued={:?}",
+        launcher_entity.order(),
+        launcher_entity.queued_orders(),
+    );
+
+    game.state.players[0].set_resources(0, config::ROCKET_BARRAGE_COST_OIL);
+    for _ in 0..=config::ROCKET_BARRAGE_UNLOAD_TICKS + config::TICK_HZ {
+        launches += game
+            .tick()
+            .into_iter()
+            .filter(|(player, _)| *player == 1)
+            .flat_map(|(_, events)| events)
+            .filter(|event| matches!(event, Event::MortarLaunch { rocket: true, .. }))
+            .count();
+    }
+    assert_eq!(launches, (config::ROCKET_BARRAGE_ROCKETS * 2) as usize);
     assert_eq!(game.state.players[0].oil, 0);
 }
 
