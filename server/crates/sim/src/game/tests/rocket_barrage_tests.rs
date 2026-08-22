@@ -152,11 +152,11 @@ fn barrage_click_waits_for_a_truck_facing_away_then_fires_once() {
 }
 
 #[test]
-fn later_barrage_costs_one_hundred_oil() {
-    let (mut game, launcher, target) = fixture(100);
+fn later_barrage_costs_one_hundred_fifty_oil() {
+    let (mut game, launcher, target) = fixture(150);
     order_barrage(&mut game, launcher, target);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 100, "first barrage remains free");
+    assert_eq!(game.state.players[0].oil, 150, "first barrage remains free");
 
     for _ in 0..config::ROCKET_BARRAGE_RELOAD_TICKS as u32 + 2 {
         game.tick();

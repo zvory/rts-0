@@ -352,8 +352,10 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   );
   assert(
     STATS[KIND.ROCKET_LAUNCHER].label === "Rocket Truck" &&
+      STATS[KIND.ROCKET_LAUNCHER].cost.steel === 225 &&
+      STATS[KIND.ROCKET_LAUNCHER].cost.oil === 150 &&
       STATS[KIND.STEELWORKS].trains.includes(KIND.ROCKET_LAUNCHER),
-    "Gun Works exposes the player-facing Rocket Truck",
+    "Gun Works exposes the player-facing Rocket Truck with mirrored production cost",
   );
   assert(
     UPGRADES[UPGRADE.ROCKETS].cost.steel === 75 &&
@@ -363,7 +365,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   );
   assert(
     ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 30 &&
-      ABILITIES[ABILITY.BARRAGE].cost.oil === 100,
+      ABILITIES[ABILITY.BARRAGE].cost.oil === 150,
     "Rocket Truck Barrage mirrors its thirty-second cooldown and repeat cost",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");

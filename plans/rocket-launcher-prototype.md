@@ -10,7 +10,7 @@ is to punish concentrations and static positions at long range while exposing a 
 oil-hungry vehicle that must stop and commit to a visible two-second launch sequence.
 
 Player-facing description: "Mobile rocket artillery. Stop and manually fire a 16-rocket Barrage
-over a wide area. The first barrage is free; later barrages cost 100 oil."
+over a wide area. The first barrage is free; later barrages cost 150 oil."
 
 Prototype interactions: vehicle pathing and collision; manual ground targeting through fog;
 friendly/allied splash damage; no automatic weapon or attack-move firing; no sound; placeholder
@@ -22,7 +22,7 @@ and ability use are deferred. The unit is enabled in ordinary play and Lab autho
 
 - Research: `rockets`, Engineering Complex, 75 steel / 125 oil, 750 ticks (25 seconds), no
   prerequisite beyond the completed building; unlocks Rocket Truck training.
-- Production: Gun Works (`steelworks`); provisional 225 steel / 125 oil, 6 supply, 600 ticks
+- Production: Gun Works (`steelworks`); 225 steel / 150 oil, 6 supply, 600 ticks
   (20 seconds), build hotkey `R`.
 - Body: 150 HP, small/soft armor class, vehicle body and pathing, 18 px selection radius, 20 px
   collision half-length, 11 px half-width; 2.0 px/tick speed; 8-tile sight.
@@ -38,7 +38,7 @@ and ability use are deferred. The unit is enabled in ordinary play and Lab autho
   impact point instead takes 100 armor-piercing damage. Rockets retain existing Mortar target
   modifiers and friendly/allied splash behavior, with staggered flight delays so the barrage reads
   as many impacts rather than one pulse.
-- Economy/cooldown: the first barrage is free per launcher lifetime. A later barrage spends 100 oil
+- Economy/cooldown: the first barrage is free per launcher lifetime. A later barrage spends 150 oil
   when authoritative execution begins. Cooldown is 900 ticks (30 seconds) from activation, and the
   rack tubes render dark gray until it completes. An unaffordable queued barrage waits; a non-queued attempt is rejected with normal
   resource feedback.

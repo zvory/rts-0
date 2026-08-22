@@ -265,7 +265,7 @@ pub const UNITS: &[UnitDef] = &[
             speed: 2.0,
             sight_tiles: 8,
             cost_steel: 225,
-            cost_oil: 125,
+            cost_oil: 150,
             supply: 6,
             build_ticks: balance::TICK_HZ * 20,
             radius: 18.0,
@@ -785,6 +785,15 @@ mod tests {
 
         assert_eq!(stats.supply, 6);
         assert_eq!(stats.cooldown, 108);
+    }
+
+    #[test]
+    fn rocket_launcher_uses_final_production_cost() {
+        let stats = unit_def(EntityKind::RocketLauncher)
+            .expect("rocket launcher def")
+            .stats;
+
+        assert_eq!((stats.cost_steel, stats.cost_oil), (225, 150));
     }
 
     #[test]
