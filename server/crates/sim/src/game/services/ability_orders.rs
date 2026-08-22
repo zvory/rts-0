@@ -602,6 +602,29 @@ pub(crate) fn caster_can_accept_waiting_order(
         Some(e) if base_eligible(e, player, ability) && ability_order_ready(e.kind, ability))
 }
 
+pub(crate) fn waiting_ability_needs_readiness(
+    entities: &EntityStore,
+    owner: u32,
+    caster: u32,
+    ability: AbilityKind,
+    can_afford: bool,
+) -> bool {
+    let definition = ability::definition(ability);
+    if definition.queue_policy != AbilityQueuePolicy::QueueWaitUntilReady
+        || !caster_can_accept_waiting_order(entities, owner, caster, ability)
+    {
+        return false;
+    }
+    if !caster_can_attempt(entities, owner, caster, ability) {
+        return true;
+    }
+    let activation_is_free = ability == AbilityKind::Barrage
+        && entities
+            .get(caster)
+            .is_some_and(|entity| entity.has_initial_free_barrage());
+    !activation_is_free && !can_afford
+}
+
 fn policy_accepts(store: &EntityStore, player: u32, caster: u32, ability: AbilityKind) -> bool {
     match ability::definition(ability).queue_policy {
         AbilityQueuePolicy::QueueWaitUntilReady => {

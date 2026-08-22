@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
+use crate::game::ability::{AbilityKind, AbilityQueuePolicy};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     supports_manual_emplacement, BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order,
@@ -9,9 +9,9 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services::ability_orders::{
-    active_ability_order_ready, caster_can_accept_waiting_order, caster_can_attempt,
-    caster_can_promote_queued_world_ability, launch_self_ability, launch_world_ability,
-    order_or_launch_world_ability, world_ability_facing_ready,
+    active_ability_order_ready, caster_can_promote_queued_world_ability, launch_self_ability,
+    launch_world_ability, order_or_launch_world_ability, waiting_ability_needs_readiness,
+    world_ability_facing_ready,
 };
 use crate::game::services::construction::unattended_site_for_build_intent;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -150,7 +150,12 @@ pub(crate) fn promote_ready_orders(
             if !world_ability_facing_ready(entities, id, ability, x, y) {
                 continue;
             }
-            if waits_for_readiness(entities, players, owner, id, ability) {
+            let cost = crate::game::ability::definition(ability).cost;
+            let can_afford = players
+                .iter()
+                .find(|player| player.id == owner)
+                .is_none_or(|player| player.can_afford(cost.steel, cost.oil));
+            if waiting_ability_needs_readiness(entities, owner, id, ability, can_afford) {
                 continue;
             }
             let faction_id = players
@@ -361,32 +366,6 @@ fn ready_for_next_order(
             Some(MovePhase::Arrived | MovePhase::PathFailed)
         ),
     }
-}
-
-fn waits_for_readiness(
-    entities: &EntityStore,
-    players: &[PlayerState],
-    owner: u32,
-    id: u32,
-    ability: AbilityKind,
-) -> bool {
-    let definition = ability::definition(ability);
-    if definition.queue_policy != AbilityQueuePolicy::QueueWaitUntilReady
-        || !caster_can_accept_waiting_order(entities, owner, id, ability)
-    {
-        return false;
-    }
-    if !caster_can_attempt(entities, owner, id, ability) {
-        return true;
-    }
-    let activation_is_free = ability == AbilityKind::Barrage
-        && entities
-            .get(id)
-            .is_some_and(|entity| entity.has_initial_free_barrage());
-    let Some(player) = players.iter().find(|player| player.id == owner) else {
-        return false;
-    };
-    !activation_is_free && !player.can_afford(definition.cost.steel, definition.cost.oil)
 }
 
 fn clear_completed_active_order(entities: &mut EntityStore, id: u32) {
