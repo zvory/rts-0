@@ -69,6 +69,7 @@ pub mod kinds {
     pub const ANTI_TANK_GUN: &str = "anti_tank_gun";
     pub const MORTAR_TEAM: &str = "mortar_team";
     pub const ARTILLERY: &str = "artillery";
+    pub const ROCKET_LAUNCHER: &str = "rocket_launcher";
     pub const SCOUT_CAR: &str = "scout_car";
     pub const SCOUT_PLANE: &str = "scout_plane";
     pub const TANK: &str = "tank";
@@ -115,6 +116,7 @@ pub mod abilities {
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
     pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
     pub const EKAT_CONSUME_GOLEM: &str = "ekatConsumeGolem";
+    pub const BARRAGE: &str = "barrage";
     pub const ALL: &[&str] = &[
         CHARGE,
         SMOKE,
@@ -128,6 +130,7 @@ pub mod abilities {
         EKAT_LINE_SHOT,
         EKAT_MAGIC_ANCHOR,
         EKAT_CONSUME_GOLEM,
+        BARRAGE,
     ];
 }
 
@@ -155,6 +158,7 @@ pub mod upgrades {
     pub const BALLISTIC_TABLES: &str = "ballistic_tables";
     pub const SMOKE_PLUS: &str = "smoke_plus";
     pub const SCOUT_PLANE_UNLOCK: &str = "scout_plane_unlock";
+    pub const ROCKETS: &str = "rockets";
     pub const ALL: &[&str] = &[
         METHAMPHETAMINES,
         PANZERFAUSTS,
@@ -165,6 +169,7 @@ pub mod upgrades {
         TANK_UNLOCK,
         SMOKE_PLUS,
         SCOUT_PLANE_UNLOCK,
+        ROCKETS,
     ];
 }
 
@@ -194,7 +199,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 53;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 54;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -368,6 +373,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::ANTI_TANK_GUN, 4),
     (kinds::MORTAR_TEAM, 15),
     (kinds::ARTILLERY, 16),
+    (kinds::ROCKET_LAUNCHER, 27),
     (kinds::TANK, 5),
     (kinds::SCOUT_CAR, 14),
     (kinds::SCOUT_PLANE, 25),
@@ -444,6 +450,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::DISMISS_SCOUT_PLANE, 18),
     (abilities::SCOUT_PLANE, 19),
     ("holdPosition", 20),
+    (abilities::BARRAGE, 21),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -459,6 +466,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::BLANKET_FIRE, 10),
     (abilities::DISMISS_SCOUT_PLANE, 11),
     (abilities::SCOUT_PLANE, 12),
+    (abilities::BARRAGE, 13),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -477,6 +485,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::ENTRENCHMENT, 8),
     (upgrades::SMOKE_PLUS, 9),
     (upgrades::SCOUT_PLANE_UNLOCK, 11),
+    (upgrades::ROCKETS, 12),
 ];
 
 const WEAPON_KIND_CODES: &[(&str, u8)] = &[
@@ -684,6 +693,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("ANTI_TANK_GUN", kinds::ANTI_TANK_GUN),
         ("MORTAR_TEAM", kinds::MORTAR_TEAM),
         ("ARTILLERY", kinds::ARTILLERY),
+        ("ROCKET_LAUNCHER", kinds::ROCKET_LAUNCHER),
         ("SCOUT_CAR", kinds::SCOUT_CAR),
         ("SCOUT_PLANE", kinds::SCOUT_PLANE),
         ("TANK", kinds::TANK),
@@ -747,6 +757,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
         ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
+        ("BARRAGE", abilities::BARRAGE),
     ])
 }
 
@@ -776,6 +787,7 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("BALLISTIC_TABLES", upgrades::BALLISTIC_TABLES),
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
         ("SCOUT_PLANE_UNLOCK", upgrades::SCOUT_PLANE_UNLOCK),
+        ("ROCKETS", upgrades::ROCKETS),
     ])
 }
 
@@ -827,6 +839,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
         ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
+        ("BARRAGE", abilities::BARRAGE),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
 }

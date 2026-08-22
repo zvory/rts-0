@@ -47,6 +47,7 @@ await import("./client_contracts/ground_decal_asset_contracts.mjs");
 await import("./client_contracts/ground_decal_stress_contracts.mjs");
 await import("./client_contracts/client_boundary_contracts.mjs");
 await import("./client_contracts/renderer_feedback_contracts.mjs");
+await import("./client_contracts/rocket_barrage_feedback_contracts.mjs");
 await import("./client_contracts/selection_ring_contracts.mjs");
 await import("./client_contracts/spectator_at_cone_contracts.mjs");
 await import("./client_contracts/input_contracts.mjs");

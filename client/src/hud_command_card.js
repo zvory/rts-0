@@ -376,7 +376,8 @@ export function buildUnitCard(ctx, selection) {
       ? affordance.recastReadyIds
       : intentAbilityIds(definition, affordance);
     const showReadyCount = readyCount < affordance.carrierIds.length;
-    const showChargeCount = definition.charges != null && affordance.remainingUsesTotal != null;
+    const showChargeCount = definition.ability !== ABILITY.BARRAGE &&
+      definition.charges != null && affordance.remainingUsesTotal != null;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
     if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
     // Ability collisions stay in place: later, higher-priority abilities replace lower-priority
@@ -566,7 +567,10 @@ export function selectedAbilityAffordances(ctx, selection) {
       const carriers = ownUnits.filter((e) => definition.carriers.includes(e.kind));
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
-      const canAfford = affordable(definition.cost, resources);
+      const hasFreeBarrage = definition.ability === ABILITY.BARRAGE && carriers.some(
+        (e) => (abilityRemainingUses(e, definition.ability) ?? 0) > 0,
+      );
+      const canAfford = hasFreeBarrage || affordable(definition.cost, resources);
       const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
       const queueAdmissibleUnits = carriers.filter((e) =>
         abilityUnitQueueAdmissible(e, definition));
@@ -577,9 +581,9 @@ export function selectedAbilityAffordances(ctx, selection) {
       const chargeRecharges = carriers.map((e) =>
         abilityChargeRechargeLeft(e, definition.ability),
       );
-      const depletedCount = carriers.filter(
-        (e) => abilityRemainingUses(e, definition.ability) === 0,
-      ).length;
+      const depletedCount = definition.ability === ABILITY.BARRAGE
+        ? 0
+        : carriers.filter((e) => abilityRemainingUses(e, definition.ability) === 0).length;
       const projectedUses = carriers.map((e) => abilityRemainingUses(e, definition.ability));
       const remainingUsesTotal = definition.charges != null &&
         projectedUses.every((uses) => typeof uses === "number")

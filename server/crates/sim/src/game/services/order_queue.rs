@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::ability::{self, AbilityKind, AbilityQueuePolicy};
+use crate::game::ability::{AbilityKind, AbilityQueuePolicy};
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     supports_manual_emplacement, BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order,
@@ -9,9 +9,9 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services::ability_orders::{
-    active_ability_order_ready, caster_can_accept_waiting_order, caster_can_attempt,
-    caster_can_promote_queued_world_ability, launch_self_ability, launch_world_ability,
-    order_or_launch_world_ability, world_ability_facing_ready,
+    active_ability_order_ready, caster_can_promote_queued_world_ability, launch_self_ability,
+    launch_world_ability, order_or_launch_world_ability, waiting_ability_needs_readiness,
+    world_ability_facing_ready,
 };
 use crate::game::services::construction::unattended_site_for_build_intent;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -31,36 +31,13 @@ use crate::rules;
 use std::collections::BTreeMap;
 
 use self::attack::{direct_panzerfaust_shot_spent, panzerfaust_attack_cycle_active};
+use self::point_promotion::PointPromotionKey;
 
 mod artillery;
 mod attack;
 mod clear_obstacle_area;
+mod point_promotion;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct PointPromotionKey {
-    owner: u32,
-    attack_move: bool,
-    x_bits: u32,
-    y_bits: u32,
-}
-
-impl PointPromotionKey {
-    fn new(owner: u32, attack_move: bool, x: f32, y: f32) -> Option<Self> {
-        if !x.is_finite() || !y.is_finite() {
-            return None;
-        }
-        Some(PointPromotionKey {
-            owner,
-            attack_move,
-            x_bits: x.to_bits(),
-            y_bits: y.to_bits(),
-        })
-    }
-
-    fn point(self) -> (f32, f32) {
-        (f32::from_bits(self.x_bits), f32::from_bits(self.y_bits))
-    }
-}
 /// Outcome of popping the next queued intent for a unit. Move/AttackMove are batched into a
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
@@ -150,7 +127,12 @@ pub(crate) fn promote_ready_orders(
             if !world_ability_facing_ready(entities, id, ability, x, y) {
                 continue;
             }
-            if waits_for_readiness(entities, owner, id, ability) {
+            let cost = crate::game::ability::definition(ability).cost;
+            let can_afford = players
+                .iter()
+                .find(|player| player.id == owner)
+                .is_none_or(|player| player.can_afford(cost.steel, cost.oil));
+            if waiting_ability_needs_readiness(entities, owner, id, ability, can_afford) {
                 continue;
             }
             let faction_id = players
@@ -163,7 +145,6 @@ pub(crate) fn promote_ready_orders(
                 map,
                 entities,
                 players,
-                fog,
                 &teams,
                 smokes,
                 ability_runtime,
@@ -184,6 +165,16 @@ pub(crate) fn promote_ready_orders(
             }
         } else {
             clear_completed_active_order(entities, id);
+        }
+
+        // Launching a barrage above starts a committed unload in the middle of this promotion
+        // pass. Do not promote an already-queued follow-up until that unload has completed.
+        if entities
+            .get(id)
+            .and_then(|entity| entity.movement.as_ref())
+            .is_some_and(|movement| movement.barrage_unload_ticks > 0)
+        {
+            continue;
         }
 
         let Some(promoted) =
@@ -259,7 +250,6 @@ pub(crate) fn promote_ready_orders(
                     map,
                     entities,
                     players,
-                    fog,
                     &teams,
                     coordinator,
                     smokes,
@@ -336,7 +326,12 @@ fn ready_for_next_order(
     smokes: &SmokeCloudStore,
     e: &Entity,
 ) -> bool {
-    if !e.is_unit() || e.kind == EntityKind::ScoutPlane {
+    if !e.is_unit()
+        || e.kind == EntityKind::ScoutPlane
+        || e.movement
+            .as_ref()
+            .is_some_and(|movement| movement.barrage_unload_ticks > 0)
+    {
         return false;
     }
     match e.order() {
@@ -363,12 +358,6 @@ fn ready_for_next_order(
             Some(MovePhase::Arrived | MovePhase::PathFailed)
         ),
     }
-}
-
-fn waits_for_readiness(entities: &EntityStore, owner: u32, id: u32, ability: AbilityKind) -> bool {
-    ability::definition(ability).queue_policy == AbilityQueuePolicy::QueueWaitUntilReady
-        && caster_can_accept_waiting_order(entities, owner, id, ability)
-        && !caster_can_attempt(entities, owner, id, ability)
 }
 
 fn clear_completed_active_order(entities: &mut EntityStore, id: u32) {
@@ -551,6 +540,9 @@ fn world_ability_intent_valid(
         return false;
     }
     let definition = crate::game::ability::definition(ability);
+    if definition.queue_policy == AbilityQueuePolicy::QueueWaitUntilReady {
+        return true;
+    }
     let Some(ps) = players.iter().find(|p| p.id == owner) else {
         return false;
     };

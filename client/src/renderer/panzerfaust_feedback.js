@@ -15,18 +15,13 @@ export function _drawPanzerfaustShots(state) {
   if (!shots.length) return;
 
   for (const shot of shots) {
-    const duration = Math.max(1, shot.durationMs || 1);
     const age = now - shot.createdAt;
-    const t = clamp01(age / duration);
     const dx = shot.toX - shot.fromX;
     const dy = shot.toY - shot.fromY;
     const len = Math.hypot(dx, dy);
     const angle = len > 0.001 ? Math.atan2(dy, dx) : 0;
     const ux = Math.cos(angle);
     const uy = Math.sin(angle);
-    const x = shot.fromX + dx * t;
-    const y = shot.fromY + dy * t;
-    const travelFade = 1 - smoothstep01(Math.max(0, t - 0.78) / 0.22);
     const launchFade = 1 - clamp01(age / 180);
 
     if (launchFade > 0) {
@@ -46,21 +41,38 @@ export function _drawPanzerfaustShots(state) {
       gfxNoFill(g);
     }
 
-    if (age <= duration + 80) {
-      const tail = Math.min(34, Math.max(14, len * 0.22));
-      gfxStrokeLine(g, x - ux * tail, y - uy * tail, x, y,
-        3.2, 0x1d1812, 0.56 * travelFade);
-      gfxStrokeLine(g, x - ux * tail * 0.72, y - uy * tail * 0.72, x, y,
-        1.7, 0xffd65a, 0.86 * travelFade);
-      gfxStroke(g, 0, 0x000000, 0);
-      gfxFill(g, 0x19130d, 0.98 * travelFade);
-      drawFreeRotatedRect(g, x, y, 9.5, 3.2, angle);
-      gfxNoFill(g);
-      gfxFill(g, 0xd8d0b0, 0.72 * travelFade);
-      drawFreeRotatedRect(g, x + ux * 3.2, y + uy * 3.2, 3.2, 2.2, angle);
-      gfxNoFill(g);
-    }
+    drawPanzerfaustProjectile(g, shot, now);
   }
+}
+
+// Shared projectile primitive for Panzerfaust shots and Rocket Truck rockets. Keeping the
+// projectile in one place guarantees both weapons use the same rocket body and exhaust sprite.
+export function drawPanzerfaustProjectile(g, shot, now) {
+  const duration = Math.max(1, shot.durationMs || 1);
+  const age = now - shot.createdAt;
+  if (age > duration + 80) return;
+  const t = clamp01(age / duration);
+  const dx = shot.toX - shot.fromX;
+  const dy = shot.toY - shot.fromY;
+  const len = Math.hypot(dx, dy);
+  const angle = len > 0.001 ? Math.atan2(dy, dx) : 0;
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const x = shot.fromX + dx * t;
+  const y = shot.fromY + dy * t;
+  const travelFade = 1 - smoothstep01(Math.max(0, t - 0.78) / 0.22);
+  const tail = Math.min(34, Math.max(14, len * 0.22));
+  gfxStrokeLine(g, x - ux * tail, y - uy * tail, x, y,
+    3.2, 0x1d1812, 0.56 * travelFade);
+  gfxStrokeLine(g, x - ux * tail * 0.72, y - uy * tail * 0.72, x, y,
+    1.7, 0xffd65a, 0.86 * travelFade);
+  gfxStroke(g, 0, 0x000000, 0);
+  gfxFill(g, 0x19130d, 0.98 * travelFade);
+  drawFreeRotatedRect(g, x, y, 9.5, 3.2, angle);
+  gfxNoFill(g);
+  gfxFill(g, 0xd8d0b0, 0.72 * travelFade);
+  drawFreeRotatedRect(g, x + ux * 3.2, y + uy * 3.2, 3.2, 2.2, angle);
+  gfxNoFill(g);
 }
 
 export function _drawPanzerfaustImpacts(state) {

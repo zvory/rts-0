@@ -172,6 +172,7 @@ export const KIND = Object.freeze({
   ANTI_TANK_GUN: "anti_tank_gun",
   MORTAR_TEAM: "mortar_team",
   ARTILLERY: "artillery",
+  ROCKET_LAUNCHER: "rocket_launcher",
   SCOUT_CAR: "scout_car",
   SCOUT_PLANE: "scout_plane",
   TANK: "tank",
@@ -200,6 +201,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.ANTI_TANK_GUN,
   KIND.MORTAR_TEAM,
   KIND.ARTILLERY,
+  KIND.ROCKET_LAUNCHER,
   KIND.SCOUT_CAR,
   KIND.SCOUT_PLANE,
   KIND.TANK,
@@ -291,6 +293,7 @@ export const ABILITY = Object.freeze({
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
   DISMISS_SCOUT_PLANE: "dismissScoutPlane",
+  BARRAGE: "barrage",
 });
 
 export const WEAPON_KIND = Object.freeze({
@@ -328,7 +331,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 53;
+export const COMPACT_SNAPSHOT_VERSION = 54;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -349,6 +352,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.ANTI_TANK_GUN]: 4,
   [KIND.MORTAR_TEAM]: 15,
   [KIND.ARTILLERY]: 16,
+  [KIND.ROCKET_LAUNCHER]: 27,
   [KIND.TANK]: 5,
   [KIND.SCOUT_CAR]: 14,
   [KIND.SCOUT_PLANE]: 25,
@@ -397,6 +401,7 @@ export const UPGRADE = Object.freeze({
   BALLISTIC_TABLES: "ballistic_tables",
   SMOKE_PLUS: "smoke_plus",
   SCOUT_PLANE_UNLOCK: "scout_plane_unlock",
+  ROCKETS: "rockets",
 });
 
 export const UPGRADE_CODE = Object.freeze({
@@ -409,6 +414,7 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.ENTRENCHMENT]: 8,
   [UPGRADE.SMOKE_PLUS]: 9,
   [UPGRADE.SCOUT_PLANE_UNLOCK]: 11,
+  [UPGRADE.ROCKETS]: 12,
 });
 
 export const WEAPON_KIND_CODE = Object.freeze({
@@ -462,6 +468,7 @@ export const ORDER_STAGE = Object.freeze({
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
   DISMISS_SCOUT_PLANE: "dismissScoutPlane",
+  BARRAGE: "barrage",
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
 
@@ -486,6 +493,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.DISMISS_SCOUT_PLANE]: 18,
   [ORDER_STAGE.SCOUT_PLANE]: 19,
   [ORDER_STAGE.HOLD_POSITION]: 20,
+  [ORDER_STAGE.BARRAGE]: 21,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -501,6 +509,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.BLANKET_FIRE]: 10,
   [ABILITY.DISMISS_SCOUT_PLANE]: 11,
   [ABILITY.SCOUT_PLANE]: 12,
+  [ABILITY.BARRAGE]: 13,
 });
 
 export const ABILITY_OBJECT_KIND_CODE = Object.freeze({

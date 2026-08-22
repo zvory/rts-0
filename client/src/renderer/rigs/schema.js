@@ -52,6 +52,8 @@ export const ANIMATION_INPUTS = Object.freeze([
   "busy",
   "breakthroughTicks",
   "panzerfaustLoaded",
+  "rocketRackReady",
+  "rocketRackCooling",
   "extractorSteelToolOffsetX",
   "extractorSteelToolOffsetY",
   "extractorPumpRotation",

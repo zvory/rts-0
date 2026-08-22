@@ -40,6 +40,7 @@ import {
   WORKER_BUILDABLE,
   WORKER_BUILD_CARD_SLOTS,
   SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
+  ROCKETS_RESEARCH_TICKS,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   SMOKE_PLUS_RESEARCH_TICKS,
   commandCardAbilitiesForFaction,
@@ -345,8 +346,27 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADE.TANK_UNLOCK,
       UPGRADE.SMOKE_PLUS,
       UPGRADE.SCOUT_PLANE_UNLOCK,
+      UPGRADE.ROCKETS,
     ],
     "Engineering Complex should expose the AT Guns, Artillery, and Fire Control chain before its independent research",
+  );
+  assert(
+    STATS[KIND.ROCKET_LAUNCHER].label === "Rocket Truck" &&
+      STATS[KIND.ROCKET_LAUNCHER].cost.steel === 225 &&
+      STATS[KIND.ROCKET_LAUNCHER].cost.oil === 150 &&
+      STATS[KIND.STEELWORKS].trains.includes(KIND.ROCKET_LAUNCHER),
+    "Gun Works exposes the player-facing Rocket Truck with mirrored production cost",
+  );
+  assert(
+    UPGRADES[UPGRADE.ROCKETS].cost.steel === 75 &&
+      UPGRADES[UPGRADE.ROCKETS].cost.oil === 125 &&
+      UPGRADES[UPGRADE.ROCKETS].researchTicks === ROCKETS_RESEARCH_TICKS,
+    "Rockets research mirrors its server cost and duration",
+  );
+  assert(
+    ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 30 &&
+      ABILITIES[ABILITY.BARRAGE].cost.oil === 150,
+    "Rocket Truck Barrage mirrors its thirty-second cooldown and repeat cost",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(

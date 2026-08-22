@@ -26,6 +26,7 @@ pub enum UpgradeKind {
     TankUnlock,
     SmokePlus,
     ScoutPlaneUnlock,
+    Rockets,
 }
 
 impl UpgradeKind {
@@ -39,6 +40,7 @@ impl UpgradeKind {
         Self::TankUnlock,
         Self::SmokePlus,
         Self::ScoutPlaneUnlock,
+        Self::Rockets,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -52,6 +54,7 @@ impl UpgradeKind {
             Self::TankUnlock => "tank_unlock",
             Self::SmokePlus => "smoke_plus",
             Self::ScoutPlaneUnlock => "scout_plane_unlock",
+            Self::Rockets => "rockets",
         }
     }
 
@@ -86,6 +89,7 @@ pub enum AbilityKind {
     EkatLineShot,
     EkatMagicAnchor,
     EkatConsumeGolem,
+    Barrage,
 }
 
 impl AbilityKind {
@@ -102,6 +106,7 @@ impl AbilityKind {
         Self::EkatLineShot,
         Self::EkatMagicAnchor,
         Self::EkatConsumeGolem,
+        Self::Barrage,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -118,6 +123,7 @@ impl AbilityKind {
             Self::EkatLineShot => "ekatLineShot",
             Self::EkatMagicAnchor => "ekatMagicAnchor",
             Self::EkatConsumeGolem => "ekatConsumeGolem",
+            Self::Barrage => "barrage",
         }
     }
 
@@ -147,6 +153,7 @@ pub const BALLISTIC_TABLES_UPGRADE: &str = UpgradeKind::BallisticTables.stable_i
 pub const TANK_UNLOCK_UPGRADE: &str = UpgradeKind::TankUnlock.stable_id();
 pub const SMOKE_PLUS_UPGRADE: &str = UpgradeKind::SmokePlus.stable_id();
 pub const SCOUT_PLANE_UNLOCK_UPGRADE: &str = UpgradeKind::ScoutPlaneUnlock.stable_id();
+pub const ROCKETS_UPGRADE: &str = UpgradeKind::Rockets.stable_id();
 
 pub const SMOKE_ABILITY: &str = AbilityKind::Smoke.stable_id();
 pub const MORTAR_FIRE_ABILITY: &str = AbilityKind::MortarFire.stable_id();
@@ -160,6 +167,7 @@ pub const EKAT_TELEPORT_ABILITY: &str = AbilityKind::EkatTeleport.stable_id();
 pub const EKAT_LINE_SHOT_ABILITY: &str = AbilityKind::EkatLineShot.stable_id();
 pub const EKAT_MAGIC_ANCHOR_ABILITY: &str = AbilityKind::EkatMagicAnchor.stable_id();
 pub const EKAT_CONSUME_GOLEM_ABILITY: &str = AbilityKind::EkatConsumeGolem.stable_id();
+pub const BARRAGE_ABILITY: &str = AbilityKind::Barrage.stable_id();
 
 const CURRENT_STANDARD_START_ENTITIES: &[StartingEntityGroup] = &[
     StartingEntityGroup {
@@ -265,6 +273,7 @@ const DEFAULT_UNITS: &[EntityKind] = &[
     EntityKind::AntiTankGun,
     EntityKind::MortarTeam,
     EntityKind::Artillery,
+    EntityKind::RocketLauncher,
     EntityKind::Tank,
     EntityKind::ScoutCar,
     EntityKind::ScoutPlane,
@@ -296,8 +305,9 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 ];
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
+const ROCKET_LAUNCHER_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::RocketLauncher];
 
-const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
+const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::Methamphetamines,
         researched_at: EntityKind::TrainingCentre,
@@ -334,9 +344,13 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
         kind: UpgradeKind::ScoutPlaneUnlock,
         researched_at: EntityKind::EngineeringComplex,
     },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::Rockets,
+        researched_at: EntityKind::EngineeringComplex,
+    },
 ];
 
-const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
+const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
     AbilityCatalogEntry {
         kind: AbilityKind::Charge,
         label: "Charge",
@@ -518,6 +532,28 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 8] = [
         command_card: false,
         protocol_code: 11,
         order_stage_code: 18,
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::Barrage,
+        label: "Barrage",
+        icon: "RKT",
+        hotkey: Some("X"),
+        title: "Target a 16-rocket saturation barrage",
+        carriers: ROCKET_LAUNCHER_ABILITY_CARRIERS,
+        target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: Some(35),
+        min_range_tiles: Some(10),
+        cooldown_ticks: balance::ROCKET_BARRAGE_RELOAD_TICKS,
+        charges: Some(1),
+        charge_recharge_ticks: None,
+        cost: ResourceCost::new(0, balance::ROCKET_BARRAGE_COST_OIL),
+        tech_requirement: None,
+        upgrade_requirement: Some(UpgradeKind::Rockets),
+        queue_policy: AbilityQueuePolicy::QueueWaitUntilReady,
+        autocast: false,
+        command_card: true,
+        protocol_code: 13,
+        order_stage_code: 21,
     },
 ];
 
@@ -878,7 +914,7 @@ pub fn catalog_loadout_for(faction_id: &str, loadout_id: &str) -> Option<Faction
 }
 
 pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
-    let [charge, smoke, mortar_fire, point_fire, blanket_fire, breakthrough, scout_plane, dismiss_scout_plane] =
+    let [charge, smoke, mortar_fire, point_fire, blanket_fire, breakthrough, scout_plane, dismiss_scout_plane, barrage] =
         DEFAULT_ABILITIES;
     let [ekat_teleport, ekat_line_shot, ekat_magic_anchor, ekat_consume_golem] = EKAT_ABILITIES;
     match kind {
@@ -894,11 +930,12 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::EkatLineShot => ekat_line_shot,
         AbilityKind::EkatMagicAnchor => ekat_magic_anchor,
         AbilityKind::EkatConsumeGolem => ekat_consume_golem,
+        AbilityKind::Barrage => barrage,
     }
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
-    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock] =
+    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock, rockets] =
         DEFAULT_UPGRADES;
     match kind {
         UpgradeKind::Methamphetamines => methamphetamines,
@@ -910,6 +947,7 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::SmokePlus => smoke_plus,
         UpgradeKind::ArtilleryUnlock => artillery_unlock,
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
+        UpgradeKind::Rockets => rockets,
     }
 }
 
@@ -962,7 +1000,8 @@ mod tests {
             vec![
                 EntityKind::MortarTeam,
                 EntityKind::AntiTankGun,
-                EntityKind::Artillery
+                EntityKind::Artillery,
+                EntityKind::RocketLauncher
             ]
         );
         assert!(catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
@@ -972,6 +1011,7 @@ mod tests {
         assert!(catalog.allows_research(UpgradeKind::ArtilleryUnlock, engineering_complex));
         assert!(catalog.allows_research(UpgradeKind::TankUnlock, engineering_complex));
         assert!(catalog.allows_research(UpgradeKind::SmokePlus, engineering_complex));
+        assert!(catalog.allows_research(UpgradeKind::Rockets, engineering_complex));
         assert!(!catalog.allows_research(UpgradeKind::TankUnlock, EntityKind::TrainingCentre));
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));

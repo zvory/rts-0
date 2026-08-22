@@ -50,7 +50,12 @@ fn mortar_outer_area_damage_is_reduced_against_entrenched_infantry() {
         attacker,
         x: 160.0,
         y: 160.0,
+        from_x: 100.0,
+        from_y: 100.0,
+        launch_tick: 0,
         impact_tick: 0,
+        launched: true,
+        rocket: false,
     };
 
     resolve(

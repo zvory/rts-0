@@ -259,11 +259,18 @@ fn print_client_config(indent: &str) {
         json_f32(balance::SCOUT_PLANE_BODY_CLEARANCE_PX),
     );
     println!(
-        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}}",
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}},",
         EntityKind::CommandCar.stable_id(),
         json_f32(balance::COMMAND_CAR_BODY_LENGTH_PX),
         json_f32(balance::COMMAND_CAR_BODY_WIDTH_PX),
         json_f32(balance::COMMAND_CAR_BODY_CLEARANCE_PX),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}}",
+        EntityKind::RocketLauncher.stable_id(),
+        json_f32(balance::ROCKET_LAUNCHER_BODY_LENGTH_PX),
+        json_f32(balance::ROCKET_LAUNCHER_BODY_WIDTH_PX),
+        json_f32(balance::ROCKET_LAUNCHER_BODY_CLEARANCE_PX),
     );
     println!("{indent}  }},");
     print_upgrades(indent);
@@ -591,6 +598,15 @@ fn print_upgrades(indent: &str) {
         balance::SCOUT_PLANE_UNLOCK_COST_OIL,
         balance::SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
         None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::ROCKETS_UPGRADE,
+        balance::ROCKETS_COST_STEEL,
+        balance::ROCKETS_COST_OIL,
+        balance::ROCKETS_RESEARCH_TICKS,
+        None,
         false,
     );
     println!("{indent}  }},");
@@ -660,9 +676,14 @@ fn print_ability_effects(indent: &str) {
         json_f32(balance::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER),
     );
     println!(
-        "{indent}    \"{}\": {{\"radiusTiles\":{}}}",
+        "{indent}    \"{}\": {{\"radiusTiles\":{}}},",
         faction::EKAT_CONSUME_GOLEM_ABILITY,
         json_f32(balance::EKAT_CONSUME_GOLEM_RANGE_TILES as f32),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{}}}",
+        faction::BARRAGE_ABILITY,
+        json_f32(balance::ROCKET_BARRAGE_SCATTER_RADIUS_TILES),
     );
 }
 

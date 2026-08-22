@@ -626,7 +626,17 @@ impl Entity {
             m.breakthrough_ticks = m.breakthrough_ticks.saturating_sub(1);
             m.breakthrough_aura_ticks = m.breakthrough_aura_ticks.saturating_sub(1);
             m.recent_smoke_ticks = m.recent_smoke_ticks.saturating_sub(1);
+            m.barrage_unload_ticks = m.barrage_unload_ticks.saturating_sub(1);
         }
+    }
+
+    pub(crate) fn start_barrage_unload(&mut self, ticks: u32) {
+        let Some(movement) = self.movement.as_mut() else {
+            return;
+        };
+        // Status timers tick later in the activation tick. Retain the lock through the movement
+        // phase of the tick on which the final scheduled rocket launches.
+        movement.barrage_unload_ticks = ticks.saturating_add(1).min(u16::MAX as u32) as u16;
     }
 
     pub fn ability_cooldown_ticks(&self, ability: AbilityKind) -> u16 {
@@ -648,6 +658,22 @@ impl Entity {
                 .copied()
                 .unwrap_or(max_charges),
         )
+    }
+
+    pub(crate) fn has_initial_free_barrage(&self) -> bool {
+        self.ability_uses_remaining
+            .get(&AbilityKind::Barrage)
+            .copied()
+            .unwrap_or(1)
+            > 0
+    }
+
+    pub(crate) fn consume_initial_free_barrage(&mut self) -> bool {
+        if !self.has_initial_free_barrage() {
+            return false;
+        }
+        self.ability_uses_remaining.insert(AbilityKind::Barrage, 0);
+        true
     }
 
     pub fn consume_ability_use(&mut self, ability: AbilityKind) -> bool {

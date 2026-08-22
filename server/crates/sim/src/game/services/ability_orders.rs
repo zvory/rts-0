@@ -8,7 +8,6 @@ use crate::game::ability_runtime::{
     AbilityObjectPayload, AbilityRuntime, AbilityWorldObjectKind, AbilityWorldObjectSpec,
 };
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, OrderIntent};
-use crate::game::fog::Fog;
 use crate::game::hero_abilities;
 use crate::game::map::Map;
 use crate::game::mortar::{mortar_current_facing_ready, rotate_mortar_for_fire, MortarShellStore};
@@ -35,7 +34,6 @@ pub(crate) fn order_or_launch_world_ability(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    fog: &Fog,
     teams: &TeamRelations,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
@@ -84,7 +82,6 @@ pub(crate) fn order_or_launch_world_ability(
             map,
             entities,
             players,
-            fog,
             teams,
             smokes,
             ability_runtime,
@@ -117,7 +114,6 @@ pub(crate) fn launch_world_ability(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    fog: &Fog,
     teams: &TeamRelations,
     smokes: &mut SmokeCloudStore,
     ability_runtime: &mut AbilityRuntime,
@@ -153,7 +149,11 @@ pub(crate) fn launch_world_ability(
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return false;
     };
-    if !ps.can_afford(definition.cost.steel, definition.cost.oil) {
+    let initial_barrage_free = ability == AbilityKind::Barrage
+        && entities
+            .get(caster)
+            .is_some_and(|entity| entity.has_initial_free_barrage());
+    if !initial_barrage_free && !ps.can_afford(definition.cost.steel, definition.cost.oil) {
         if emit_resource_notice {
             notice(
                 events,
@@ -185,9 +185,31 @@ pub(crate) fn launch_world_ability(
                 e.set_path_goal(None);
             }
             e.set_attack_cd(mortar_fire_weapon_cooldown_ticks());
-            mortar_shells.schedule_manual(
-                events, fog, teams, player, caster, from_x, from_y, x, y, tick,
-            );
+            mortar_shells
+                .schedule_manual(events, teams, player, caster, from_x, from_y, x, y, tick);
+            true
+        }
+        (AbilityEffectHook::DelayedWorld, AbilityKind::Barrage) => {
+            let Some((from_x, from_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+                return false;
+            };
+            let Some(e) = entities.get_mut(caster) else {
+                return false;
+            };
+            if initial_barrage_free {
+                if !e.consume_initial_free_barrage() {
+                    return false;
+                }
+            } else if !ps.spend_cost(definition.cost) {
+                return false;
+            }
+            e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            e.start_barrage_unload(config::ROCKET_BARRAGE_UNLOAD_TICKS);
+            if !preserve_active_order {
+                e.clear_active_order();
+                e.set_path_goal(None);
+            }
+            mortar_shells.schedule_rocket_barrage(player, caster, from_x, from_y, x, y, tick);
             true
         }
         (AbilityEffectHook::DelayedWorld, AbilityKind::Smoke) => {
@@ -580,6 +602,29 @@ pub(crate) fn caster_can_accept_waiting_order(
         Some(e) if base_eligible(e, player, ability) && ability_order_ready(e.kind, ability))
 }
 
+pub(crate) fn waiting_ability_needs_readiness(
+    entities: &EntityStore,
+    owner: u32,
+    caster: u32,
+    ability: AbilityKind,
+    can_afford: bool,
+) -> bool {
+    let definition = ability::definition(ability);
+    if definition.queue_policy != AbilityQueuePolicy::QueueWaitUntilReady
+        || !caster_can_accept_waiting_order(entities, owner, caster, ability)
+    {
+        return false;
+    }
+    if !caster_can_attempt(entities, owner, caster, ability) {
+        return true;
+    }
+    let activation_is_free = ability == AbilityKind::Barrage
+        && entities
+            .get(caster)
+            .is_some_and(|entity| entity.has_initial_free_barrage());
+    !activation_is_free && !can_afford
+}
+
 fn policy_accepts(store: &EntityStore, player: u32, caster: u32, ability: AbilityKind) -> bool {
     match ability::definition(ability).queue_policy {
         AbilityQueuePolicy::QueueWaitUntilReady => {
@@ -621,7 +666,7 @@ fn base_eligible(e: &crate::game::entity::Entity, player: u32, ability: AbilityK
         && e.is_unit()
         && !e.under_construction()
         && ability::carried_by(ability, e.kind)
-        && e.ability_uses_remaining(ability).unwrap_or(1) > 0
+        && (ability == AbilityKind::Barrage || e.ability_uses_remaining(ability).unwrap_or(1) > 0)
 }
 
 fn ability_weapon_cycle_ready(e: &crate::game::entity::Entity, ability: AbilityKind) -> bool {
@@ -633,11 +678,15 @@ fn mortar_fire_weapon_cooldown_ticks() -> u32 {
 }
 
 fn ability_order_ready(kind: EntityKind, ability: AbilityKind) -> bool {
-    ability != AbilityKind::MortarFire || kind == EntityKind::MortarTeam
+    match ability {
+        AbilityKind::MortarFire => kind == EntityKind::MortarTeam,
+        AbilityKind::Barrage => kind == EntityKind::RocketLauncher,
+        _ => true,
+    }
 }
 
 fn ability_launch_ready(kind: EntityKind, ability: AbilityKind) -> bool {
-    ability != AbilityKind::MortarFire || kind == EntityKind::MortarTeam
+    ability_order_ready(kind, ability)
 }
 
 pub(crate) fn world_ability_facing_ready(
@@ -647,13 +696,17 @@ pub(crate) fn world_ability_facing_ready(
     x: f32,
     y: f32,
 ) -> bool {
-    if ability != AbilityKind::MortarFire {
+    if !matches!(ability, AbilityKind::MortarFire | AbilityKind::Barrage) {
         return true;
     }
     let Some(e) = entities.get_mut(caster) else {
         return false;
     };
-    if e.kind != EntityKind::MortarTeam {
+    if !matches!(
+        (ability, e.kind),
+        (AbilityKind::MortarFire, EntityKind::MortarTeam)
+            | (AbilityKind::Barrage, EntityKind::RocketLauncher)
+    ) {
         return false;
     }
     let target_angle = (y - e.pos_y).atan2(x - e.pos_x);
@@ -667,13 +720,17 @@ pub(crate) fn world_ability_current_facing_ready(
     x: f32,
     y: f32,
 ) -> bool {
-    if ability != AbilityKind::MortarFire {
+    if !matches!(ability, AbilityKind::MortarFire | AbilityKind::Barrage) {
         return true;
     }
     let Some(e) = entities.get(caster) else {
         return false;
     };
-    if e.kind != EntityKind::MortarTeam {
+    if !matches!(
+        (ability, e.kind),
+        (AbilityKind::MortarFire, EntityKind::MortarTeam)
+            | (AbilityKind::Barrage, EntityKind::RocketLauncher)
+    ) {
         return false;
     }
     let target_angle = (y - e.pos_y).atan2(x - e.pos_x);

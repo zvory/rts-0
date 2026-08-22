@@ -54,10 +54,7 @@ import {
   createBuildingPngRigDefinitions,
 } from "../client/src/renderer/rigs/building_png.js";
 import { liveUnitIconMarkupFor } from "../client/src/renderer/rigs/unit_icon_sources.js";
-import {
-  COMMAND_CAR_RIG_SVG,
-  EKAT_RIG_SVG,
-} from "../client/src/renderer/rigs/vehicle_svg.js";
+import { COMMAND_CAR_RIG_SVG, EKAT_RIG_SVG } from "../client/src/renderer/rigs/vehicle_svg.js";
 import { GOLEM_RIG_SVG, WORKER_RIG_SVG } from "../client/src/renderer/rigs/worker_svg.js";
 import { createInspectionPixiFactory } from "./helpers/rig_inspection_pixi.mjs";
 import {
@@ -65,6 +62,7 @@ import {
   fakeFrameStripTexture,
   makeRigRenderer,
 } from "./helpers/rig_renderer_harness.mjs";
+import { assertRocketLauncherRackCooldownContract } from "./helpers/rocket_launcher_rig_contract.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 const fixturesDir = path.join(__dirname, "fixtures/svg");
@@ -541,6 +539,8 @@ test("live rig definitions combine raster-native metadata with remaining SVG sou
   assert.equal(definitions.get(KIND.EKAT).id, "ekat.authored");
   assert.equal(definitions.get(KIND.TANK).id, "tank.raster");
 });
+
+test("rocket truck rack swaps team-tinted loaded tubes for dark cooldown tubes", assertRocketLauncherRackCooldownContract);
 
 test("live rig routes expose kind-specific production part groups", () => {
   const antiTankGunRoutes = liveRigRoutesFor(KIND.ANTI_TANK_GUN);

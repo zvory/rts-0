@@ -301,6 +301,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         EntityKind::AntiTankGun => Some(WeaponKind::AntiTankGun),
         EntityKind::MortarTeam => Some(WeaponKind::MortarTeamMortar),
         EntityKind::Artillery => Some(WeaponKind::ArtilleryGun),
+        EntityKind::RocketLauncher => None,
         EntityKind::ScoutCar => Some(WeaponKind::ScoutCarMg),
         EntityKind::Tank => Some(WeaponKind::TankCannon),
         EntityKind::ScoutPlane
@@ -391,7 +392,10 @@ pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
         TargetThreatRole::AntiArmorThreat
     } else if kind == EntityKind::TankTrap {
         TargetThreatRole::FieldObstacle
-    } else if matches!(kind, EntityKind::MortarTeam | EntityKind::Artillery) {
+    } else if matches!(
+        kind,
+        EntityKind::MortarTeam | EntityKind::Artillery | EntityKind::RocketLauncher
+    ) {
         TargetThreatRole::SupportWeapon
     } else {
         TargetThreatRole::Ordinary
@@ -403,7 +407,10 @@ pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
 pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::ScoutCar | EntityKind::Tank | EntityKind::CommandCar
+        EntityKind::ScoutCar
+            | EntityKind::Tank
+            | EntityKind::CommandCar
+            | EntityKind::RocketLauncher
     )
 }
 
@@ -797,6 +804,7 @@ mod tests {
             (EntityKind::AntiTankGun, Some(WeaponKind::AntiTankGun)),
             (EntityKind::MortarTeam, Some(WeaponKind::MortarTeamMortar)),
             (EntityKind::Artillery, Some(WeaponKind::ArtilleryGun)),
+            (EntityKind::RocketLauncher, None),
             (EntityKind::ScoutCar, Some(WeaponKind::ScoutCarMg)),
             (EntityKind::ScoutPlane, None),
             (EntityKind::Tank, Some(WeaponKind::TankCannon)),
@@ -1095,7 +1103,10 @@ mod tests {
                 is_panzerfaust_loaded_shot_target(kind),
                 matches!(
                     kind,
-                    EntityKind::ScoutCar | EntityKind::Tank | EntityKind::CommandCar
+                    EntityKind::ScoutCar
+                        | EntityKind::Tank
+                        | EntityKind::CommandCar
+                        | EntityKind::RocketLauncher
                 ),
                 "{kind:?}"
             );

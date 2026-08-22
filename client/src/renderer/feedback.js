@@ -72,6 +72,7 @@ import {
 } from "./shared.js";
 import { drawImpassableEdge, isImpassableAt } from "./terrain_palette.js";
 import { drawFormationMovePreview } from "./formation_line_preview.js";
+import { drawPanzerfaustProjectile } from "./panzerfaust_feedback.js";
 
 export { _drawBreakthroughAuras } from "./breakthrough_aura.js";
 
@@ -857,6 +858,10 @@ export function _drawMortarShells(state) {
   if (!shells.length) return;
 
   for (const shell of shells) {
+    if (shell.rocket) {
+      drawPanzerfaustProjectile(g, shell, now);
+      continue;
+    }
     const duration = Math.max(1, shell.durationMs || 1);
     const t = clamp01((now - shell.createdAt) / duration);
     const dx = shell.toX - shell.fromX;

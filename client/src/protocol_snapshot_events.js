@@ -9,7 +9,7 @@ import {
 } from "./protocol_constants.js";
 
 export function decodeCompactEvent(record, index) {
-  const fields = readArray(record, `event ${index}`, 6);
+  const fields = readArray(record, `event ${index}`, 7);
   if (fields.length < 1) throw new Error(`event ${index} is too short`);
   const eventKind = readCode(fields[0], EVENT_BY_CODE, "event.kind");
   switch (eventKind) {
@@ -83,10 +83,12 @@ export function decodeCompactEvent(record, index) {
       };
     }
     case EVENT.MORTAR_LAUNCH: {
-      requireLength(fields, 6, `mortar launch event ${index}`);
+      if (fields.length !== 6 && fields.length !== 7) {
+        throw new Error(`mortar launch event ${index} field count mismatch`);
+      }
       const fromPoint = decodeCompactPoint(fields[2], "event.mortarLaunch.from");
       const to = decodeCompactPoint(fields[3], "event.mortarLaunch.to");
-      return {
+      const ev = {
         e: EVENT.MORTAR_LAUNCH,
         from: readU32(fields[1], "event.mortarLaunch.from"),
         fromX: fromPoint[0],
@@ -96,24 +98,31 @@ export function decodeCompactEvent(record, index) {
         radiusTiles: readNumber(fields[4], "event.mortarLaunch.radiusTiles"),
         delayTicks: readU32(fields[5], "event.mortarLaunch.delayTicks"),
       };
+      if (fields[6] === true) ev.rocket = true;
+      return ev;
     }
     case EVENT.MORTAR_IMPACT:
-      if (fields.length !== 4 && fields.length !== 5 && fields.length !== 6) {
+      if (fields.length < 4 || fields.length > 7) {
         throw new Error(`mortar impact event ${index} field count mismatch`);
       }
       {
+        const rocket = fields.at(-1) === true;
         const ev = {
           e: EVENT.MORTAR_IMPACT,
           x: readNumber(fields[1], "event.mortarImpact.x"),
           y: readNumber(fields[2], "event.mortarImpact.y"),
           radiusTiles: readNumber(fields[3], "event.mortarImpact.radiusTiles"),
         };
-        if (fields.length > 4 && fields[4] != null) {
+        // Version-54 servers briefly emitted the rocket bit directly after radius when both
+        // optional fields were absent. Accept that legacy shape without interpreting `true` as
+        // an attacker id; current servers retain null placeholders and put it in slot 6.
+        if (fields.length > 4 && fields[4] != null && fields[4] !== true) {
           ev.from = readU32(fields[4], "event.mortarImpact.from");
         }
-        if (fields.length > 5 && fields[5] != null) {
+        if (fields.length > 5 && fields[5] != null && fields[5] !== true) {
           ev.reveal = decodeCompactAttackReveal(fields[5], index);
         }
+        if (rocket) ev.rocket = true;
         return ev;
       }
     case EVENT.ARTILLERY_TARGET: {

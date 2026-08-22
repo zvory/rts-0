@@ -10,6 +10,7 @@ use crate::rules;
 
 use super::guards::{
     dedupe_cap_units, unit_can_accept_ground_command, unit_can_accept_player_command,
+    unit_has_committed_barrage,
 };
 pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
     planner::PlannerConfig {
@@ -96,7 +97,9 @@ pub(super) fn planner_facts(
             }
             let mut facts = planner::UnitFacts::new(id);
             facts.pos = planner::Point::new(e.pos_x, e.pos_y);
-            facts.can_replace_active = unit_can_accept_player_command(entities, player, id);
+            let committed_barrage = unit_has_committed_barrage(entities, id);
+            facts.can_replace_active =
+                unit_can_accept_player_command(entities, player, id) && !committed_barrage;
             facts.queue_len = e.queued_orders().len();
             facts.queue_terminal = matches!(
                 e.order(),
@@ -119,7 +122,8 @@ pub(super) fn planner_facts(
             };
             facts.can_attack_move = e.kind != EntityKind::ScoutPlane;
             facts.can_attack = e.can_attack();
-            facts.can_hold_position = unit_can_accept_ground_command(entities, player, id);
+            facts.can_hold_position =
+                unit_can_accept_ground_command(entities, player, id) && !committed_barrage;
             facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
             facts.can_build = rules::faction::catalog_for(faction_id)
                 .is_some_and(|catalog| catalog.builders.contains(&e.kind));
@@ -174,6 +178,9 @@ pub(super) fn planner_facts(
 }
 
 fn has_unreserved_ability_use(entity: &Entity, ability: AbilityKind) -> bool {
+    if ability == AbilityKind::Barrage {
+        return true;
+    }
     match entity.ability_uses_remaining(ability) {
         Some(remaining) => remaining as usize > reserved_ability_uses(entity, ability),
         None => true,
@@ -236,6 +243,7 @@ fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
     matches!(
         ability,
         AbilityKind::MortarFire
+            | AbilityKind::Barrage
             | AbilityKind::EkatTeleport
             | AbilityKind::EkatLineShot
             | AbilityKind::EkatMagicAnchor

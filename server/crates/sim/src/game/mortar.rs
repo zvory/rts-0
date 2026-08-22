@@ -7,6 +7,7 @@ use crate::game::firing_reveal::{record_mortar_impact_firing_reveals, FiringReve
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
+use crate::game::services::geometry::{unit_body_contains_point, unit_body_for_entity};
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
 use crate::rules::combat;
@@ -24,7 +25,21 @@ struct MortarShell {
     attacker: u32,
     x: f32,
     y: f32,
+    #[serde(default)]
+    from_x: f32,
+    #[serde(default)]
+    from_y: f32,
+    #[serde(default)]
+    launch_tick: u32,
     impact_tick: u32,
+    #[serde(default = "legacy_shell_was_launched")]
+    launched: bool,
+    #[serde(default)]
+    rocket: bool,
+}
+
+fn legacy_shell_was_launched() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -87,7 +102,6 @@ impl MortarShellStore {
     pub(crate) fn schedule_manual(
         &mut self,
         events: &mut HashMap<u32, Vec<Event>>,
-        fog: &Fog,
         teams: &TeamRelations,
         owner: u32,
         attacker: u32,
@@ -103,11 +117,15 @@ impl MortarShellStore {
             attacker,
             x,
             y,
+            from_x,
+            from_y,
+            launch_tick: tick,
             impact_tick: tick.saturating_add(delay_ticks),
+            launched: true,
+            rocket: false,
         });
         emit_launch(
             events,
-            fog,
             teams,
             owner,
             attacker,
@@ -115,9 +133,56 @@ impl MortarShellStore {
             from_y,
             x,
             y,
-            false,
             delay_ticks,
+            false,
         );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn schedule_rocket_barrage(
+        &mut self,
+        owner: u32,
+        attacker: u32,
+        from_x: f32,
+        from_y: f32,
+        center_x: f32,
+        center_y: f32,
+        tick: u32,
+    ) {
+        let count = config::ROCKET_BARRAGE_ROCKETS.max(1);
+        for index in 0..count {
+            let launch_offset = if count <= 1 {
+                0
+            } else {
+                index.saturating_mul(config::ROCKET_BARRAGE_UNLOAD_TICKS) / (count - 1)
+            };
+            let mut seed = attacker
+                .wrapping_mul(0x9e37_79b9)
+                .wrapping_add(tick)
+                .wrapping_add(index.wrapping_mul(0x85eb_ca6b));
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            let angle = (seed as f32 / u32::MAX as f32) * std::f32::consts::TAU;
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            let radius = (seed as f32 / u32::MAX as f32).sqrt()
+                * config::ROCKET_BARRAGE_SCATTER_RADIUS_TILES
+                * config::TILE_SIZE as f32;
+            let launch_tick = tick.saturating_add(launch_offset);
+            let flight_ticks = config::TICK_HZ + (index % 5) * 3;
+            self.shells.push(MortarShell {
+                owner,
+                attacker,
+                x: center_x + angle.cos() * radius,
+                y: center_y + angle.sin() * radius,
+                from_x,
+                from_y,
+                launch_tick,
+                impact_tick: launch_tick.saturating_add(flight_ticks),
+                launched: false,
+                rocket: true,
+            });
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -134,8 +199,33 @@ impl MortarShellStore {
     ) {
         let mut pending = Vec::new();
         let due = std::mem::take(&mut self.shells);
-        for shell in due {
-            if shell.impact_tick <= tick {
+        for mut shell in due {
+            if !shell.launched && shell.launch_tick <= tick {
+                if shell.rocket
+                    && !entities.get(shell.attacker).is_some_and(|attacker| {
+                        attacker.owner == shell.owner
+                            && attacker.kind == EntityKind::RocketLauncher
+                            && attacker.hp > 0
+                    })
+                {
+                    continue;
+                }
+                let delay_ticks = shell.impact_tick.saturating_sub(tick);
+                emit_launch(
+                    events,
+                    teams,
+                    shell.owner,
+                    shell.attacker,
+                    shell.from_x,
+                    shell.from_y,
+                    shell.x,
+                    shell.y,
+                    delay_ticks,
+                    shell.rocket,
+                );
+                shell.launched = true;
+            }
+            if shell.launched && shell.impact_tick <= tick {
                 on_impact(shell.x, shell.y);
                 resolve(
                     MortarResolutionContext {
@@ -160,7 +250,6 @@ impl MortarShellStore {
 #[allow(clippy::too_many_arguments)]
 fn emit_launch(
     events: &mut HashMap<u32, Vec<Event>>,
-    fog: &Fog,
     teams: &TeamRelations,
     owner: u32,
     attacker: u32,
@@ -168,16 +257,12 @@ fn emit_launch(
     from_y: f32,
     to_x: f32,
     to_y: f32,
-    reveal_launch_to_enemies: bool,
     delay_ticks: u32,
+    rocket: bool,
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        let allied = teams.same_team_or_same_owner(pid, owner);
-        if !allied
-            && (!reveal_launch_to_enemies
-                || !projection::team_visible_world(pid, from_x, from_y, fog, teams))
-        {
+        if !teams.same_team_or_same_owner(pid, owner) {
             continue;
         }
         events.entry(pid).or_default().push(Event::MortarLaunch {
@@ -188,6 +273,7 @@ fn emit_launch(
             to_y,
             radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
             delay_ticks,
+            rocket,
         });
     }
 }
@@ -228,25 +314,29 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
             continue;
         }
         let d2 = dist2(shell.x, shell.y, target.pos_x, target.pos_y);
-        if d2 <= outer2 {
-            let base = if d2 <= inner2 {
-                config::MORTAR_INNER_DAMAGE
-            } else {
-                config::MORTAR_OUTER_DAMAGE
-            };
-            hits.push((id, base, target.owner, target.pos_x, target.pos_y));
+        let direct_hit = shell.rocket && impact_point_hits_target(shell.x, shell.y, target);
+        if direct_hit || d2 <= outer2 {
+            let base = shell_damage(shell.rocket, d2, inner2, direct_hit);
+            hits.push((
+                id,
+                base,
+                direct_hit,
+                target.owner,
+                target.pos_x,
+                target.pos_y,
+            ));
         }
     }
-    hits.sort_by_key(|(id, _, _, _, _)| *id);
+    hits.sort_by_key(|(id, _, _, _, _, _)| *id);
     let reveal = mortar_reveal_for(entities.get(shell.attacker), shell.owner);
     let mut reveal_recipients = Vec::new();
-    for (id, base, victim_owner, tx, ty) in hits {
+    for (id, base, direct_hit, victim_owner, tx, ty) in hits {
         let effective = entities
             .get(id)
             .map(|target| {
                 let damage = entrenchment_combat::reduce_area_damage(
                     target,
-                    mortar_damage(target.kind, base),
+                    shell_effective_damage(target.kind, shell.rocket, base, direct_hit),
                 );
                 map.damage_after_reduction_tile(target.pos_x, target.pos_y, damage)
             })
@@ -301,6 +391,7 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         &reveal_recipients,
         shell.x,
         shell.y,
+        shell.rocket,
     );
 }
 
@@ -329,6 +420,45 @@ fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
     )
 }
 
+fn shell_damage(rocket: bool, d2: f32, inner2: f32, direct_hit: bool) -> u32 {
+    if !rocket {
+        return if d2 <= inner2 {
+            config::MORTAR_INNER_DAMAGE
+        } else {
+            config::MORTAR_OUTER_DAMAGE
+        };
+    }
+    if direct_hit {
+        config::ROCKET_BARRAGE_DIRECT_DAMAGE
+    } else if d2 <= inner2 {
+        config::ROCKET_BARRAGE_INNER_DAMAGE
+    } else {
+        config::ROCKET_BARRAGE_OUTER_DAMAGE
+    }
+}
+
+fn shell_effective_damage(
+    victim_kind: EntityKind,
+    rocket: bool,
+    base: u32,
+    direct_hit: bool,
+) -> u32 {
+    if rocket && direct_hit {
+        base
+    } else {
+        mortar_damage(victim_kind, base)
+    }
+}
+
+fn impact_point_hits_target(x: f32, y: f32, target: &Entity) -> bool {
+    if let Some(stats) = config::building_stats(target.kind) {
+        let half_w = stats.foot_w as f32 * config::TILE_SIZE as f32 * 0.5;
+        let half_h = stats.foot_h as f32 * config::TILE_SIZE as f32 * 0.5;
+        return (x - target.pos_x).abs() <= half_w && (y - target.pos_y).abs() <= half_h;
+    }
+    unit_body_for_entity(target).is_some_and(|body| unit_body_contains_point(body, x, y))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn emit_impact(
     events: &mut HashMap<u32, Vec<Event>>,
@@ -340,6 +470,7 @@ fn emit_impact(
     reveal_recipients: &[u32],
     x: f32,
     y: f32,
+    rocket: bool,
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
@@ -356,6 +487,7 @@ fn emit_impact(
             y,
             radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
             reveal: reveal_to_recipient.then(|| reveal.cloned()).flatten(),
+            rocket,
         });
     }
 }
