@@ -59,8 +59,10 @@ pub(super) fn plan_scout_car_motion(
     current: (f32, f32),
     budget: f32,
 ) -> Option<ScoutCarMotionPlan> {
-    if !matches!(e.kind, EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher)
-        || !budget.is_finite()
+    if !matches!(
+        e.kind,
+        EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher
+    ) || !budget.is_finite()
         || budget <= 0.0
     {
         return None;

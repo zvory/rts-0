@@ -151,7 +151,10 @@ fn forward_traffic_heading(entity: &Entity, facing: f32) -> Option<(f32, f32)> {
         return None;
     }
     let forward = (facing.cos(), facing.sin());
-    if matches!(entity.kind, EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher) {
+    if matches!(
+        entity.kind,
+        EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher
+    ) {
         let reversing = entity
             .movement
             .as_ref()

@@ -79,14 +79,16 @@ pub(super) struct CarMotionProfile {
 
 pub(super) fn car_motion_profile(kind: EntityKind) -> Option<CarMotionProfile> {
     match kind {
-        EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher => Some(CarMotionProfile {
-            min_turn_radius_px: SCOUT_CAR_MIN_TURN_RADIUS_PX,
-            route_lookahead_px: SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
-            sweep_sample_step_px: SCOUT_CAR_SWEEP_SAMPLE_STEP_PX,
-            clearance_score_max_px: SCOUT_CAR_CLEARANCE_SCORE_MAX_PX,
-            score_eps: SCOUT_CAR_SCORE_EPS,
-            reverse_min_behind_angle_rad: VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD,
-        }),
+        EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher => {
+            Some(CarMotionProfile {
+                min_turn_radius_px: SCOUT_CAR_MIN_TURN_RADIUS_PX,
+                route_lookahead_px: SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
+                sweep_sample_step_px: SCOUT_CAR_SWEEP_SAMPLE_STEP_PX,
+                clearance_score_max_px: SCOUT_CAR_CLEARANCE_SCORE_MAX_PX,
+                score_eps: SCOUT_CAR_SCORE_EPS,
+                reverse_min_behind_angle_rad: VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD,
+            })
+        }
         _ => None,
     }
 }

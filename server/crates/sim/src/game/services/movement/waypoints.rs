@@ -664,7 +664,10 @@ fn breakthrough_speed_multiplier(
 }
 
 fn inject_scout_car_reverse_recovery(e: &mut Entity, map: &Map, occ: &Occupancy) {
-    if !matches!(e.kind, EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher) {
+    if !matches!(
+        e.kind,
+        EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher
+    ) {
         return;
     }
     let Some(movement) = e.movement.as_ref() else {

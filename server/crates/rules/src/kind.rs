@@ -239,7 +239,10 @@ pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
 }
 
 pub fn uses_car_movement_semantics(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher)
+    matches!(
+        kind,
+        EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher
+    )
 }
 
 pub fn fires_while_moving(kind: EntityKind) -> bool {

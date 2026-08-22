@@ -170,7 +170,10 @@ pub(crate) fn unit_body_with_facing(
         }));
     }
 
-    if matches!(kind, EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher) {
+    if matches!(
+        kind,
+        EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher
+    ) {
         let (length, width, clearance) = vehicle_body_dimensions(kind);
         let radius = width * 0.5 + clearance;
         let half_segment = (length * 0.5 - width * 0.5).max(0.0);

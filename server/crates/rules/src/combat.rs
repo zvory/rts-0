@@ -392,7 +392,10 @@ pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
         TargetThreatRole::AntiArmorThreat
     } else if kind == EntityKind::TankTrap {
         TargetThreatRole::FieldObstacle
-    } else if matches!(kind, EntityKind::MortarTeam | EntityKind::Artillery | EntityKind::RocketLauncher) {
+    } else if matches!(
+        kind,
+        EntityKind::MortarTeam | EntityKind::Artillery | EntityKind::RocketLauncher
+    ) {
         TargetThreatRole::SupportWeapon
     } else {
         TargetThreatRole::Ordinary
@@ -404,7 +407,10 @@ pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
 pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::ScoutCar | EntityKind::Tank | EntityKind::CommandCar | EntityKind::RocketLauncher
+        EntityKind::ScoutCar
+            | EntityKind::Tank
+            | EntityKind::CommandCar
+            | EntityKind::RocketLauncher
     )
 }
 
@@ -1097,7 +1103,10 @@ mod tests {
                 is_panzerfaust_loaded_shot_target(kind),
                 matches!(
                     kind,
-                    EntityKind::ScoutCar | EntityKind::Tank | EntityKind::CommandCar | EntityKind::RocketLauncher
+                    EntityKind::ScoutCar
+                        | EntityKind::Tank
+                        | EntityKind::CommandCar
+                        | EntityKind::RocketLauncher
                 ),
                 "{kind:?}"
             );

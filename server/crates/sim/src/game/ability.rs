@@ -103,7 +103,9 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
 pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
     match kind {
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
-        AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::Barrage => AbilityEffectHook::DelayedWorld,
+        AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::Barrage => {
+            AbilityEffectHook::DelayedWorld
+        }
         AbilityKind::PointFire | AbilityKind::BlanketFire => AbilityEffectHook::ArtilleryPointFire,
         AbilityKind::Breakthrough => AbilityEffectHook::OwnedAreaStatus,
         AbilityKind::ScoutPlane => AbilityEffectHook::ScoutPlane,
