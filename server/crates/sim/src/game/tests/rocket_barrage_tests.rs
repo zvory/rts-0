@@ -73,7 +73,7 @@ fn order_barrage(game: &mut Game, launcher: u32, target: (f32, f32)) {
 fn first_barrage_is_free_and_unloads_sixteen_rockets() {
     assert_eq!(
         config::ROCKET_BARRAGE_RELOAD_TICKS,
-        config::TICK_HZ as u16 * 15
+        config::TICK_HZ as u16 * 30
     );
     let (mut game, launcher, target) = fixture(0);
     assert!(
@@ -152,11 +152,11 @@ fn barrage_click_waits_for_a_truck_facing_away_then_fires_once() {
 }
 
 #[test]
-fn later_barrage_costs_seventy_five_oil() {
-    let (mut game, launcher, target) = fixture(75);
+fn later_barrage_costs_one_hundred_oil() {
+    let (mut game, launcher, target) = fixture(100);
     order_barrage(&mut game, launcher, target);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 75, "first barrage remains free");
+    assert_eq!(game.state.players[0].oil, 100, "first barrage remains free");
 
     for _ in 0..config::ROCKET_BARRAGE_RELOAD_TICKS as u32 + 2 {
         game.tick();

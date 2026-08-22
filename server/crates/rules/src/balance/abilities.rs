@@ -33,9 +33,9 @@ pub const ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES: f32 = 1.0;
 
 pub const ROCKET_BARRAGE_ROCKETS: u32 = 16;
 pub const ROCKET_BARRAGE_UNLOAD_TICKS: u32 = TICK_HZ * 2;
-// Cooldown starts when the manual barrage begins and lasts fifteen seconds.
-pub const ROCKET_BARRAGE_RELOAD_TICKS: u16 = (TICK_HZ as u16) * 15;
-pub const ROCKET_BARRAGE_COST_OIL: u32 = 75;
+// Cooldown starts when the manual barrage begins and lasts thirty seconds.
+pub const ROCKET_BARRAGE_RELOAD_TICKS: u16 = (TICK_HZ as u16) * 30;
+pub const ROCKET_BARRAGE_COST_OIL: u32 = 100;
 pub const ROCKET_BARRAGE_SCATTER_RADIUS_TILES: f32 = 6.0;
 pub const ROCKET_BARRAGE_DIRECT_DAMAGE: u32 = 100;
 pub const ROCKET_BARRAGE_INNER_DAMAGE: u32 = 75;

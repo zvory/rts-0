@@ -362,8 +362,9 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Rockets research mirrors its server cost and duration",
   );
   assert(
-    ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 15,
-    "Rocket Truck Barrage mirrors its fifteen-second cooldown",
+    ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 30 &&
+      ABILITIES[ABILITY.BARRAGE].cost.oil === 100,
+    "Rocket Truck Barrage mirrors its thirty-second cooldown and repeat cost",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(

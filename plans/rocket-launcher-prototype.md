@@ -10,7 +10,7 @@ is to punish concentrations and static positions at long range while exposing a 
 oil-hungry vehicle that must stop and commit to a visible two-second launch sequence.
 
 Player-facing description: "Mobile rocket artillery. Stop and manually fire a 16-rocket Barrage
-over a wide area. The first barrage is free; later barrages cost 75 oil."
+over a wide area. The first barrage is free; later barrages cost 100 oil."
 
 Prototype interactions: vehicle pathing and collision; manual ground targeting through fog;
 friendly/allied splash damage; no automatic weapon or attack-move firing; no sound; placeholder
@@ -33,12 +33,13 @@ and ability use are deferred. The unit is enabled in ordinary play and Lab autho
 - Execution: the launcher must reach a legal firing position, stop, and then commits to the
   barrage. Sixteen rockets launch evenly across 60 ticks (2 seconds). Moving or stopping before
   launch cancels the pending order; after the first rocket launches the sequence is not refundable.
-- Area: each rocket samples independently and uniformly inside a provisional 4-tile target circle.
-  Each impact copies Mortar splash: 100 damage within 0.5 tiles and 40 damage out to 2 tiles, with
-  existing Mortar target modifiers and friendly/allied splash behavior. Rockets use staggered
-  flight delays so the barrage reads as many impacts rather than one pulse.
-- Economy/cooldown: the first barrage is free per launcher lifetime. A later barrage spends 75 oil
-  when authoritative execution begins. Cooldown is 450 ticks (15 seconds) from activation, and the
+- Area: each rocket samples independently and uniformly inside a 6-tile target circle. Each impact
+  deals 75 damage within 0.5 tiles and 30 damage out to 2 tiles; a target intersected by the exact
+  impact point instead takes 100 armor-piercing damage. Rockets retain existing Mortar target
+  modifiers and friendly/allied splash behavior, with staggered flight delays so the barrage reads
+  as many impacts rather than one pulse.
+- Economy/cooldown: the first barrage is free per launcher lifetime. A later barrage spends 100 oil
+  when authoritative execution begins. Cooldown is 900 ticks (30 seconds) from activation, and the
   rack tubes render dark gray until it completes. An unaffordable queued barrage waits; a non-queued attempt is rejected with normal
   resource feedback.
 - Targeting/cancellation: ground positions may be chosen through fog. Invalid coordinates, stale
