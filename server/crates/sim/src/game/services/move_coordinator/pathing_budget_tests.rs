@@ -204,3 +204,86 @@ fn path_failed_is_set_on_unreachable_imported_goal() {
     assert_eq!(unit.move_phase(), Some(MovePhase::PathFailed));
     assert!(unit.path_is_empty());
 }
+
+#[test]
+fn forty_non_heavy_infantry_routes_resolve_within_five_ticks() {
+    let map = flat_test_map(80);
+    let mut entities = EntityStore::new();
+    let mut ids = Vec::new();
+    for index in 0..40 {
+        let start = map.tile_center(4 + index % 8, 4 + index / 8);
+        ids.push(
+            entities
+                .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+                .expect("rifleman should spawn"),
+        );
+    }
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(32_768, 256);
+    for tick in 1..=5 {
+        pathing.advance_tick(tick);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+        if tick == 1 {
+            coordinator.order_group_move(&mut entities, 1, &ids, map.tile_center(55, 55), false);
+        }
+        coordinator.process_awaiting_paths(&mut entities);
+    }
+
+    let failures = ids
+        .iter()
+        .filter_map(|&id| {
+            let entity = entities.get(id)?;
+            (entity.move_phase() == Some(MovePhase::AwaitingPath)
+                || entity.path_policy() != RoutePolicy::FastestTerrainTime)
+                .then_some((id, entity.move_phase(), entity.path_policy()))
+        })
+        .collect::<Vec<_>>();
+    assert!(failures.is_empty(), "unresolved routes: {failures:?}");
+}
+
+#[test]
+fn forty_non_heavy_vehicle_routes_resolve_within_five_ticks() {
+    for kind in [EntityKind::ScoutCar, EntityKind::Tank] {
+        let map = flat_test_map(80);
+        let mut entities = EntityStore::new();
+        let mut ids = Vec::new();
+        for index in 0..40 {
+            let start = map.tile_center(4 + index % 8 * 2, 4 + index / 8 * 2);
+            ids.push(
+                entities
+                    .spawn_unit(1, kind, start.0, start.1)
+                    .expect("vehicle should spawn"),
+            );
+        }
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(32_768, 256);
+        for tick in 1..=5 {
+            pathing.advance_tick(tick);
+            let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+            if tick == 1 {
+                coordinator.order_group_move(
+                    &mut entities,
+                    1,
+                    &ids,
+                    map.tile_center(45, 45),
+                    false,
+                );
+            }
+            coordinator.process_awaiting_paths(&mut entities);
+        }
+
+        let failures = ids
+            .iter()
+            .filter_map(|&id| {
+                let entity = entities.get(id)?;
+                (entity.move_phase() == Some(MovePhase::AwaitingPath)
+                    || entity.path_policy() != RoutePolicy::FastestTerrainTime)
+                    .then_some((id, entity.move_phase(), entity.path_is_empty()))
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            failures.is_empty(),
+            "{kind:?} unresolved routes: {failures:?}"
+        );
+    }
+}
