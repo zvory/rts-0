@@ -6,7 +6,9 @@ pub(super) type CacheKey = (
     (i32, i32),
     u32,
     RouteShape,
+    RoutePolicy,
     usize,
+    u64,
     u64,
 );
 
@@ -23,6 +25,7 @@ impl PathingService {
         req: &PathRequest,
         pass: &P,
         static_fingerprint: u64,
+        cost_fingerprint: u64,
         search_budget: usize,
     ) -> Option<(Vec<(i32, i32)>, usize)> {
         let key: CacheKey = (
@@ -31,8 +34,10 @@ impl PathingService {
             req.goal,
             req.radius_tiles,
             req.route_shape,
+            req.policy,
             search_budget,
             static_fingerprint,
+            cost_fingerprint,
         );
         let entry = self.cache.get_mut(&key)?;
         for &(tx, ty) in &entry.tile_path {
@@ -48,6 +53,7 @@ impl PathingService {
         &mut self,
         req: &PathRequest,
         static_fingerprint: u64,
+        cost_fingerprint: u64,
         search_budget: usize,
         tile_path: Vec<(i32, i32)>,
         diagnostics: PathingRequestDiagnostics,
@@ -69,8 +75,10 @@ impl PathingService {
                 req.goal,
                 req.radius_tiles,
                 req.route_shape,
+                req.policy,
                 search_budget,
                 static_fingerprint,
+                cost_fingerprint,
             ),
             CacheEntry {
                 tile_path,

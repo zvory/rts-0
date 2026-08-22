@@ -39,7 +39,8 @@ impl PathingService {
         let start = req.start;
         let kind = req.kind;
         if let Some((from, to)) = direct_segment {
-            if req.start != req.goal
+            if req.policy == RoutePolicy::LegacyShape
+                && req.start != req.goal
                 && standability::unit_static_segment_standable(map, occupancy, req.kind, from, to)
                 && (movement_body_class(req.kind) != MovementBodyClass::InfantryLike
                     || !segment_crosses_slow_movement(map, from, to))
@@ -71,6 +72,7 @@ impl PathingService {
                 kind,
                 radius_tiles: 0,
                 route_shape: RouteShape::VehicleClearance,
+                policy: RoutePolicy::LegacyShape,
                 avoid_diagonal_pinch: true,
             };
             let tile_path = expand_vehicle_diagonal_steps_to_l_waypoints(start, &tile_path, &pass);
@@ -111,15 +113,25 @@ impl PathingService {
         if !allow_pathfinding {
             return PathingRequestOutcome::Deferred;
         }
-        let pass =
-            self.path_graph
-                .view(map, occupancy, req.kind, req.radius_tiles, req.route_shape);
+        let pass = self.path_graph.view(
+            map,
+            occupancy,
+            req.kind,
+            req.radius_tiles,
+            req.route_shape,
+            req.policy,
+        );
 
         let search_budget = req.budget.unwrap_or(self.default_budget);
         let static_fingerprint = occupancy.static_fingerprint_for_kind(req.kind);
-        if let Some((tile_path, search_expanded_nodes)) =
-            self.cache_lookup(&req, &pass, static_fingerprint, search_budget)
-        {
+        let cost_fingerprint = pass.cost_fingerprint();
+        if let Some((tile_path, search_expanded_nodes)) = self.cache_lookup(
+            &req,
+            &pass,
+            static_fingerprint,
+            cost_fingerprint,
+            search_budget,
+        ) {
             let diagnostics = PathingRequestDiagnostics {
                 cache_status: PathCacheStatus::Hit,
                 expanded_nodes: 0,
@@ -155,6 +167,7 @@ impl PathingService {
         self.cache_insert(
             &req,
             static_fingerprint,
+            cost_fingerprint,
             search_budget,
             tile_path.clone(),
             diagnostics,

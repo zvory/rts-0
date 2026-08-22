@@ -9,7 +9,7 @@ use super::pivot_drive::{
 use super::*;
 use crate::config;
 use crate::game::entity::{
-    BuildPhase, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
+    BuildPhase, EntityKind, EntityStore, GatherPhase, MovePhase, Order, RoutePolicy, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
@@ -2739,6 +2739,38 @@ fn infantry_skips_lateral_waypoint_when_next_segment_reachable() {
         e.pos_x > start.0,
         "rifleman should move along the reachable route after consuming the waypoint"
     );
+}
+
+#[test]
+fn fastest_terrain_infantry_keeps_authored_lateral_anchor() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let start = (
+        sx,
+        sy + config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX + 10.0,
+    );
+    let intermediate = (sx + config::TILE_SIZE as f32, sy);
+    let goal = (sx + config::TILE_SIZE as f32 * 4.0, sy);
+    let rifleman = entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    if let Some(e) = entities.get_mut(rifleman) {
+        e.set_order(Order::move_to(goal.0, goal.1));
+        e.set_path_with_policy(vec![goal, intermediate], RoutePolicy::FastestTerrainTime);
+        e.set_path_goal(Some(goal));
+        e.mark_move_phase(MovePhase::Moving);
+    }
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(e.movement.as_ref().map(|m| m.path.len()), Some(2));
+    assert_eq!(e.next_waypoint(), Some(intermediate));
+    assert_eq!(e.path_policy(), RoutePolicy::FastestTerrainTime);
+    assert!(e.pos_x > start.0 && e.pos_y < start.1);
 }
 
 #[test]

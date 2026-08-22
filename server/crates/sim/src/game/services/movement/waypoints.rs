@@ -2,7 +2,8 @@ use crate::config;
 use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
-    AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order, PanzerfaustState, WeaponSetup,
+    AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order, PanzerfaustState, RoutePolicy,
+    WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -235,6 +236,10 @@ pub(super) fn advance_moving_units(
                     let accepts_waypoint = entities.get(id).is_some_and(|e| {
                         if uses_vehicle_movement {
                             route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
+                        } else if e.path_policy() == RoutePolicy::FastestTerrainTime {
+                            next_next.is_some_and(|next| {
+                                crossed_authored_waypoint((x, y), (wx, wy), next)
+                            })
                         } else {
                             next_next.is_some_and(|next| {
                                 unit_static_segment_standable(map, occ, e.kind, (x, y), next)
@@ -546,6 +551,7 @@ pub(super) fn advance_moving_units(
                 if stuck_ticks >= recovery_threshold
                     && static_blocked_ticks == 0
                     && !uses_oriented_vehicle_body(kind)
+                    && e.path_policy() == RoutePolicy::LegacyShape
                     && skippable_next_waypoint.is_some_and(|following_waypoint| {
                         unit_static_segment_standable(map, occ, e.kind, (x, y), following_waypoint)
                     })
@@ -613,6 +619,41 @@ pub(super) fn advance_moving_units(
                 }
             }
         }
+    }
+}
+
+/// A weighted route may consume its current anchor after collision/local steering has carried the
+/// body across the plane through that anchor perpendicular to the authored outgoing segment. This
+/// is the ordinary crossed-current-waypoint rule: it cannot preselect a later clear target while
+/// the unit is still on the incoming side of the anchor.
+fn crossed_authored_waypoint(
+    current: (f32, f32),
+    waypoint: (f32, f32),
+    next: (f32, f32),
+) -> bool {
+    let outgoing = (next.0 - waypoint.0, next.1 - waypoint.1);
+    let displaced = (current.0 - waypoint.0, current.1 - waypoint.1);
+    let outgoing_length = outgoing.0.hypot(outgoing.1);
+    if !outgoing_length.is_finite() || outgoing_length <= f32::EPSILON {
+        return false;
+    }
+    let along = outgoing.0 * displaced.0 + outgoing.1 * displaced.1;
+    let lateral = (outgoing.0 * displaced.1 - outgoing.1 * displaced.0).abs() / outgoing_length;
+    along > 0.0 && lateral <= config::ARRIVE_RADIUS_INTERMEDIATE_PX
+}
+
+#[cfg(test)]
+mod authored_waypoint_tests {
+    use super::crossed_authored_waypoint;
+
+    #[test]
+    fn crossing_uses_the_outgoing_anchor_plane() {
+        let waypoint = (32.0, 32.0);
+        let next = (64.0, 32.0);
+        assert!(!crossed_authored_waypoint((31.0, 48.0), waypoint, next));
+        assert!(!crossed_authored_waypoint((32.0, 48.0), waypoint, next));
+        assert!(crossed_authored_waypoint((33.0, 48.0), waypoint, next));
+        assert!(!crossed_authored_waypoint((33.0, 49.0), waypoint, next));
     }
 }
 

@@ -19,8 +19,9 @@ use std::time::{Duration, Instant};
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
-    active_trench_occupation, uses_oriented_vehicle_body, AttackPhase, BuildPhase,
-    DeconstructPhase, Entity, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
+    active_trench_occupation, movement_body_class, uses_oriented_vehicle_body, AttackPhase,
+    BuildPhase, DeconstructPhase, Entity, EntityKind, EntityStore, FootprintRouting, MovePhase,
+    MovementBodyClass, Order, RoutePolicy,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -35,7 +36,8 @@ use crate::game::services::occupancy::{
 };
 use crate::game::services::pathing::{
     finalize_reverse_waypoints_or_raw, tree_detour_between, PathCacheStatus, PathRequest,
-    PathingRequestDiagnostics, PathingRequestOutcome, PathingService, RouteShape,
+    PathingRequestDiagnostics, PathingRequestOutcome, PathingService, RouteFinalizationMode,
+    RouteShape,
 };
 use crate::game::services::standability;
 use crate::game::smoke::SmokeCloudStore;
@@ -1031,7 +1033,17 @@ impl<'a> MoveCoordinator<'a> {
         } else {
             RouteShape::Normal
         };
+        let policy = if movement_body_class(kind) == MovementBodyClass::InfantryLike
+            && matches!(
+                source,
+                PathingRequestSource::Move | PathingRequestSource::AttackMove
+            ) {
+            RoutePolicy::FastestTerrainTime
+        } else {
+            RoutePolicy::LegacyShape
+        };
         let direct_segment = (smooth_static_segments
+            && policy == RoutePolicy::LegacyShape
             && !uses_oriented_vehicle_body(kind)
             && matches!(
                 source,
@@ -1046,6 +1058,7 @@ impl<'a> MoveCoordinator<'a> {
             goal: (gx as i32, gy as i32),
             radius_tiles,
             route_shape,
+            policy,
             budget: None,
         };
         let PathingRequestOutcome::Resolved {
@@ -1062,11 +1075,12 @@ impl<'a> MoveCoordinator<'a> {
             return false;
         };
 
-        waypoints = self.expand_tree_waypoints(kind, start_pos, goal, route_shape, waypoints);
+        waypoints =
+            self.expand_tree_waypoints(kind, start_pos, goal, route_shape, policy, waypoints);
 
         let path_ok = !waypoints.is_empty();
         if let Some(e) = entities.get_mut(id) {
-            e.set_path(waypoints);
+            e.set_path_with_policy(waypoints, policy);
             e.set_last_repath_tick(self.tick);
             e.set_path_goal(Some(goal));
             match e.order() {
@@ -1660,6 +1674,59 @@ mod tests {
     }
 
     #[test]
+    fn forty_non_heavy_infantry_routes_resolve_within_five_ticks() {
+        let map = flat_map(80);
+        let mut entities = EntityStore::new();
+        let mut ids = Vec::new();
+        for index in 0..40 {
+            let start = map.tile_center(4 + index % 8, 4 + index / 8);
+            ids.push(
+                entities
+                    .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+                    .expect("rifleman should spawn"),
+            );
+        }
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(32_768, 256);
+        for tick in 1..=5 {
+            pathing.advance_tick(tick);
+            let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+            if tick == 1 {
+                coordinator.order_group_move(
+                    &mut entities,
+                    1,
+                    &ids,
+                    map.tile_center(55, 55),
+                    false,
+                );
+            }
+            coordinator.process_awaiting_paths(&mut entities);
+        }
+
+        let failures = ids
+            .iter()
+            .filter_map(|&id| {
+                let entity = entities.get(id)?;
+                (entity.move_phase() == Some(MovePhase::AwaitingPath)
+                    || entity.path_policy() != RoutePolicy::FastestTerrainTime)
+                    .then_some((
+                        id,
+                        entity.move_phase(),
+                        entity.path_policy(),
+                        entity.path_is_empty(),
+                    ))
+            })
+            .collect::<Vec<_>>();
+        assert!(failures.is_empty(), "unresolved routes: {failures:?}");
+        assert!(ids.iter().all(|&id| {
+            entities.get(id).is_some_and(|entity| {
+                entity.move_phase() != Some(MovePhase::AwaitingPath)
+                    && entity.path_policy() == RoutePolicy::FastestTerrainTime
+            })
+        }));
+    }
+
+    #[test]
     fn heavy_completed_search_consumes_remaining_request_allowance() {
         let map = Map::generate(1, 0x1234_5678);
         let entities = EntityStore::new();
@@ -1710,6 +1777,7 @@ mod tests {
         assert!(matches!(attacker.order(), Order::Attack(_)));
         assert!(!attacker.path_is_empty());
         assert!(attacker.path_goal().is_some());
+        assert_eq!(attacker.path_policy(), RoutePolicy::LegacyShape);
     }
 
     #[test]
@@ -1741,6 +1809,7 @@ mod tests {
         assert!(matches!(routed.order(), Order::Build(_)));
         assert!(!routed.path_is_empty());
         assert!(routed.path_goal().is_some());
+        assert_eq!(routed.path_policy(), RoutePolicy::LegacyShape);
     }
 
     #[test]
@@ -1781,6 +1850,7 @@ mod tests {
             "paths are reverse-ordered, so index 0 must remain the exact requested final goal"
         );
         assert_eq!(unit.path_goal(), Some(exact_goal));
+        assert_eq!(unit.path_policy(), RoutePolicy::FastestTerrainTime);
     }
 
     #[test]
@@ -1832,6 +1902,10 @@ mod tests {
                 ),
                 "{kind:?} movement path should use the clearance-aware vehicle route shape"
             );
+            assert_eq!(
+                entities.get(unit).map(Entity::path_policy),
+                Some(RoutePolicy::LegacyShape)
+            );
         }
     }
 
@@ -1870,14 +1944,12 @@ mod tests {
             .as_ref()
             .expect("unit should have movement")
             .path;
-        assert!(
-            path.len() > 1,
-            "resumed movement paths should keep intermediate tile waypoints"
-        );
+        assert!(!path.is_empty());
         assert_eq!(
             path.first().copied(),
             Some(goal),
             "resumed movement still snaps the final reverse waypoint to the order goal"
         );
+        assert_eq!(unit.path_policy(), RoutePolicy::FastestTerrainTime);
     }
 }

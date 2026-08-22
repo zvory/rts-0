@@ -2,7 +2,9 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation.
+- [x] Implementation complete.
+- [ ] Performance acceptance complete: the Hellhole and finalization gates pass, but the matched
+  infantry terrain full-path ratio misses the phase's 0.50 median / 0.55 upper target.
 
 ## Objective
 
@@ -160,6 +162,55 @@ versus infantry-specific, and mark this phase done.
 
 ## Completion Evidence
 
-In the implementation commit, replace this text with the phase revision, verification commands,
-metric/policy contract, corpus/oracle hashes, intentional differences, paired measurements,
-assignment-latency result, patch-note staging, and the exact Phase 4 vehicle seam.
+Implemented manually without the phase runner or a PR, based on Phase 2 revision
+`e6afd1e6b0ccd57d93ae2caffa8946ad169603b7`. Raw paired measurements are checked in as
+`phase-3-results.json`.
+
+- The shared directed metric scales cardinal/diagonal distance `10/14` by `780`. Source-tile road
+  and slow ratios and source-to-destination elevation multiply as exact rationals before one ceiling
+  division. Level-open/road/slow/road-plus-slow/uphill/downhill cardinal costs are respectively
+  `7800/5200/10400/6934/9750/6000`. Continuous recost walks exact half-open tile boundaries at
+  1/1024-pixel distance precision and uses the same ratios. Non-time tree shaping stays separately
+  protected.
+- `FastestTerrainTime` applies only to ordinary-infantry Move and Attack Move. All interactions and
+  vehicles keep `LegacyShape`. Policy is part of graph/cache identity and serialized movement state,
+  defaults to legacy for old state, changes atomically with path assignment, survives deferred
+  repaths/recovery insertion, and resets when the final waypoint is consumed or the path is cleared.
+- Raw weighted A* matches Dijkstra exactly on directed road/slow/elevation fixtures. One-time
+  finalization independently recosts retained and direct spans, conservatively body-checks each
+  removal, bounds its candidate scan, and protects tree anchors. Weighted movement consumes only the
+  current authored anchor; it does not use the old direct bypass or the 30 Hz next-next skip. A
+  collision-displaced unit may consume the current anchor only after crossing its outgoing plane
+  within the half-tile route corridor. Existing blocked debounce/repath remains the displacement
+  recovery rule. The completed snaking-corridor regression clears four Machine Gunners in 2,919
+  ticks versus its 2,927-tick baseline.
+- The 240-request paired terrain lane returned stable reference/candidate hashes
+  `5d5ae97dd3787ed5` / `0bf4a0514afe44a7` and 230,320 / 229,556 expansions. Eleven alternating runs
+  measured 31.263 ms reference versus 21.433 ms candidate: 1.459x faster, paired median ratio
+  0.6796, bootstrap 90% upper ratio 0.6848. This misses the required 0.50/0.55 gate. The frozen
+  Phase 1 harness-only revision lacks an equivalent rich `PathingService` lane, so the same-binary
+  retained rich reference is the only exact matched comparison. Finalization was 9.43% of candidate
+  request time, passing its 10% gate.
+- Eleven alternating 900-tick Hellhole pairs against Phase 2 measured a 1.0103 median tick ratio and
+  1.0127 bootstrap 90% upper ratio, passing the 1.03 phase gate; median p95 ratio was 1.0102 and its
+  upper ratio 1.0138, below 1.05. Wall time ratio was 0.9958 with 10/11 pairs faster, while tick CPU
+  improved in 1/11 pairs. Candidate runs were internally byte-deterministic: both 900-frame streams
+  were 26,981,493 bytes with SHA-256
+  `1c97f9e35142c1c46ab7d4138515c75c4c54db94e99c16bb4dc3e21074ea734c`.
+- Phase 2 and Phase 3 Hellhole streams intentionally differ because terrain-bearing infantry routes,
+  trajectories, and combat timing are allowed to change. The Phase 2 stream remains 26,910,978
+  bytes with SHA-256 `7054deb3347441de285e252a8275de8e8eb2ca09e84795e25f1d121983e168e2`;
+  candidate totals were 17,824 attacks, 118 projectiles, 807 deaths, and 807 respawns, identically in
+  every candidate run.
+- Forty distinct non-heavy infantry requests resolve inside the unchanged allowance of eight
+  searches per tick: all 40 are assigned within exactly five ticks. Verification covers the full
+  `rts-sim` suite, `rts-rules`, Clippy with warnings denied, simulation architecture, docs health,
+  and diff whitespace checks.
+- The staged player note says: “Infantry Move and Attack Move orders now choose faster routes using
+  roads, slow terrain, and elevation, and follow the authored route without skipping strategic
+  anchors.” It has not been delivered.
+- Phase 4 should reuse the metric, policy-indexed graph/cache planes, continuous finalizer, serialized
+  policy, and authored-anchor runtime rule. It must opt car and pivot-vehicle request seams into
+  `FastestTerrainTime` only after preserving oriented clearance, turn costs, hull legality,
+  lookahead, and reverse recovery; recovery waypoint insertion already preserves the assigned
+  policy.

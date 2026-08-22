@@ -358,13 +358,26 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - `SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER = 0.75` and
   `DAMAGE_REDUCTION_TILE_DAMAGE_MULTIPLIER = 0.75`. These independent sparse authored overlays sample
   the entity-centre tile. Slow movement multiplies the movement budget after the base-terrain
-  modifier (so a slowed road is 1.125x base speed). Infantry-like A* routing converts that same
-  0.75x ratio into deterministic cardinal/diagonal tile costs and declines the clear-segment
-  shortcut when its sampled centerline crosses slow terrain. This lets infantry take a faster
-  open-ground detour without treating forests as impassable. Damage reduction applies after weapon
-  armor, facing, falloff, and entrenchment calculations to direct fire, overpenetration, Mortar,
-  Artillery, loaded Panzerfaust, and damaging ability projectiles; fractional non-zero damage rounds
-  up.
+  modifier (so a slowed road is 1.125x base speed). Damage reduction applies after weapon armor,
+  facing, falloff, and entrenchment calculations to direct fire, overpenetration, Mortar, Artillery,
+  loaded Panzerfaust, and damaging ability projectiles; fractional non-zero damage rounds up.
+- Ordinary infantry Move and Attack Move routes minimize one directed fixed-point terrain-time
+  metric. A cardinal or diagonal edge begins with legacy distance `10` or `14`, scaled by `780`.
+  The source tile owns road and slow-overlay sampling; elevation compares source to destination.
+  Their exact speed ratios (road `3/2`, slow `3/4`, uphill `4/5`, downhill `13/10`) multiply before
+  one ceiling division. Thus level open cardinal costs `7800`, road `5200`, slow open `10400`,
+  road-plus-slow `6934`, uphill open `9750`, and downhill open `6000`; reversing an elevation edge
+  may change its cost. Unit base speed factors out and temporary abilities/statuses do not affect
+  static route selection. The existing nonnegative tree-avoidance penalty remains separate in the
+  graph objective.
+- One-time route finalization compares both the retained world polyline and each candidate shortcut
+  through the same `RouteCostModel`. It walks exact half-open tile boundaries, owns each interval by
+  the tile containing its midpoint, samples elevation one tile ahead along the segment, and measures
+  distance at 1/1024-pixel precision before applying the same rational composition. It accepts a
+  shortcut only when that continuous cost does not increase and a conservative full-body sweep is
+  legal; tree-shaping anchors are protected because continuous terrain time does not represent the
+  tree penalty. Direct Attack, gather, build, repair, deconstruct, abilities, and vehicles keep the
+  legacy route objective in this phase.
 - Gravel A/B/C, Dirt A/B/C, Mud A/B/C, and Frosted Ground are visual Open-terrain variants. They
   use grass-equivalent 1.0x movement, construction, cover, concealment, and line-of-sight rules.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to

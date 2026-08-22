@@ -4,12 +4,11 @@
 //! vehicle-body, clearance, and route-shaping behavior as live movement without exposing those
 //! implementation types through the public `Game` API.
 
-use crate::game::entity::{uses_oriented_vehicle_body, EntityKind, EntityStore};
-use crate::{config, rules::terrain};
+use crate::config;
+use crate::game::entity::{uses_oriented_vehicle_body, EntityKind, EntityStore, RoutePolicy};
 
 use super::{Map, Occupancy, PathRequest, PathingRequestOutcome, PathingService, RouteShape};
 
-const ROUTE_SAMPLE_STEP_PX: f32 = 8.0;
 const MAX_SEARCH_EXPANSIONS_PER_ROUTE: usize = 65_536;
 
 #[derive(Clone, Copy, Debug)]
@@ -60,6 +59,11 @@ impl<'a> StaticRouteAnalyzer<'a> {
         let start_world = self.map.tile_center(start_tile.0, start_tile.1);
         let goal_world = self.map.tile_center(goal_tile.0, goal_tile.1);
         let vehicle = uses_oriented_vehicle_body(kind);
+        let policy = if vehicle {
+            RoutePolicy::LegacyShape
+        } else {
+            RoutePolicy::FastestTerrainTime
+        };
         let request = PathRequest {
             kind,
             start,
@@ -70,12 +74,13 @@ impl<'a> StaticRouteAnalyzer<'a> {
             } else {
                 RouteShape::Normal
             },
+            policy,
             budget: Some(
                 self.remaining_search_expansions
                     .min(MAX_SEARCH_EXPANSIONS_PER_ROUTE),
             ),
         };
-        let direct_segment = (!vehicle).then_some((start_world, goal_world));
+        let direct_segment = None;
         let PathingRequestOutcome::Resolved {
             path: reverse_waypoints,
             diagnostics,
@@ -112,7 +117,7 @@ impl<'a> StaticRouteAnalyzer<'a> {
             kind,
             start_world,
             goal_world,
-            route_shape,
+            super::route_finalize::RouteFinalizationMode::new(route_shape, policy),
             reverse_waypoints,
         ) else {
             return unreachable("tree_detour_unavailable");
@@ -169,35 +174,17 @@ fn distance(from: (f32, f32), to: (f32, f32)) -> f64 {
 
 fn estimate_segment_ticks(
     map: &Map,
-    kind: EntityKind,
+    _kind: EntityKind,
     from: (f32, f32),
     to: (f32, f32),
     base_speed: f64,
 ) -> f64 {
-    let distance = distance(from, to);
-    if distance == 0.0 {
-        return 0.0;
-    }
-    let samples = (distance / f64::from(ROUTE_SAMPLE_STEP_PX)).ceil().max(1.0) as u32;
-    let sample_distance = distance / f64::from(samples);
-    (0..samples)
-        .map(|sample| {
-            let t = (f64::from(sample) + 0.5) / f64::from(samples);
-            let x = f64::from(from.0) + f64::from(to.0 - from.0) * t;
-            let y = f64::from(from.1) + f64::from(to.1 - from.1) * t;
-            let (tx, ty) = map.tile_of(x as f32, y as f32);
-            let multiplier = terrain::TerrainKind::from_map_code(map.terrain_at(tx, ty))
-                .map(|terrain| f64::from(terrain::movement_speed_multiplier(kind, terrain)))
-                .unwrap_or(1.0)
-                * f64::from(map.slow_movement_multiplier_at(x as f32, y as f32))
-                * f64::from(map.elevation_movement_multiplier_at(
-                    x as f32,
-                    y as f32,
-                    (to.0 - x as f32, to.1 - y as f32),
-                ));
-            sample_distance / (base_speed * multiplier)
-        })
-        .sum()
+    let Some(cost) = super::route_cost::RouteCostModel::new(map).segment_cost(from, to) else {
+        return f64::INFINITY;
+    };
+    // segment_cost carries an additional 1/1024-pixel precision factor.
+    f64::from(config::TILE_SIZE) * cost as f64
+        / (10.0 * f64::from(crate::rules::terrain::ROUTE_TIME_SCALE) * 1024.0 * base_speed)
 }
 
 fn round_milli(value: f64) -> f64 {

@@ -12,8 +12,8 @@ use super::EntityStateGroups;
 use super::{
     supports_manual_emplacement, AttackPhase, BuildPhase, CombatState, ConstructionState,
     DeconstructPhase, EntityKind, GatherPhase, MovePhase, MovementState, Order, OrderIntent,
-    PanzerfaustState, ProductionState, ResourceExtractorState, ResourceNodeState, ScoutPlaneState,
-    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
+    PanzerfaustState, ProductionState, ResourceExtractorState, ResourceNodeState, RoutePolicy,
+    ScoutPlaneState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
 mod production;
@@ -252,6 +252,7 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.path_goal = None;
             m.last_move_delta = (0.0, 0.0);
             m.scout_car_reverse_waypoint = None;
@@ -419,6 +420,7 @@ impl Entity {
         order.intent.target = next_target;
         order.execution.phase = AttackPhase::Waiting;
         movement.path.clear();
+        movement.path_policy = RoutePolicy::LegacyShape;
         movement.path_goal = None;
         self.set_target_id(Some(next_target));
         true
@@ -537,8 +539,17 @@ impl Entity {
     }
 
     pub fn set_path(&mut self, path: Vec<(f32, f32)>) {
+        self.set_path_with_policy(path, RoutePolicy::LegacyShape);
+    }
+
+    pub fn set_path_with_policy(&mut self, path: Vec<(f32, f32)>, policy: RoutePolicy) {
         if let Some(m) = self.movement.as_mut() {
             m.path = path;
+            m.path_policy = if m.path.is_empty() {
+                RoutePolicy::LegacyShape
+            } else {
+                policy
+            };
             m.scout_car_reverse_waypoint = None;
             if m.path.is_empty() {
                 m.last_move_delta = (0.0, 0.0);
@@ -549,6 +560,7 @@ impl Entity {
     pub fn clear_path(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.scout_car_reverse_waypoint = None;
             m.last_move_delta = (0.0, 0.0);
         }
@@ -558,9 +570,19 @@ impl Entity {
         self.movement.as_ref().and_then(|m| m.path.last().copied())
     }
 
+    pub fn path_policy(&self) -> RoutePolicy {
+        self.movement
+            .as_ref()
+            .map(|movement| movement.path_policy)
+            .unwrap_or_default()
+    }
+
     pub fn pop_waypoint(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.path.pop();
+            if m.path.is_empty() {
+                m.path_policy = RoutePolicy::LegacyShape;
+            }
             m.scout_car_reverse_waypoint = None;
         }
     }
@@ -1341,6 +1363,7 @@ impl Entity {
             m.order = Order::Idle;
             m.queued_orders.clear();
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
@@ -1355,6 +1378,7 @@ impl Entity {
             m.order = Order::HoldPosition;
             m.queued_orders.clear();
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.path_goal = None;
             m.last_move_delta = (0.0, 0.0);
             m.scout_car_reverse_waypoint = None;
@@ -1373,6 +1397,7 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::Idle;
             m.path.clear();
+            m.path_policy = RoutePolicy::LegacyShape;
             m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
