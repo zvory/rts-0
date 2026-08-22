@@ -382,6 +382,76 @@ fn barrage_commitment_rejects_movement_until_the_final_rocket_launches() {
 }
 
 #[test]
+fn barrage_commitment_rejects_immediate_stop_and_hold_position() {
+    let (mut game, launcher, target) = fixture(0);
+    order_barrage(&mut game, launcher, target);
+    game.tick();
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![launcher],
+            x: target.0,
+            y: target.1,
+            queued: true,
+        },
+    );
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(launcher)
+            .expect("launcher should survive")
+            .queued_orders()
+            .len(),
+        1,
+        "the follow-up move should queue behind the committed unload"
+    );
+
+    game.enqueue(
+        1,
+        Command::Stop {
+            units: vec![launcher],
+        },
+    );
+    game.tick();
+    let entity = game
+        .state
+        .entities
+        .get(launcher)
+        .expect("launcher should survive");
+    assert_eq!(
+        entity.queued_orders().len(),
+        1,
+        "a rejected stop command cleared the queued follow-up"
+    );
+
+    game.enqueue(
+        1,
+        Command::HoldPosition {
+            units: vec![launcher],
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let entity = game
+        .state
+        .entities
+        .get(launcher)
+        .expect("launcher should survive");
+    assert!(
+        !matches!(entity.order(), Order::HoldPosition),
+        "immediate hold position bypassed the committed-unload lock"
+    );
+    assert_eq!(
+        entity.queued_orders().len(),
+        1,
+        "a rejected hold-position command cleared the queued follow-up"
+    );
+}
+
+#[test]
 fn later_barrage_costs_one_hundred_fifty_oil() {
     let (mut game, launcher, target) = fixture(150);
     order_barrage(&mut game, launcher, target);

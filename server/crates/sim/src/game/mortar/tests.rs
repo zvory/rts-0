@@ -68,6 +68,28 @@ fn half_turn_completes_in_two_hundred_ms() {
 }
 
 #[test]
+fn legacy_mortar_shell_checkpoint_defaults_to_already_launched() {
+    let store: MortarShellStore = serde_json::from_value(serde_json::json!({
+        "shells": [{
+            "owner": 1,
+            "attacker": 7,
+            "x": 320.0,
+            "y": 352.0,
+            "impact_tick": 99
+        }]
+    }))
+    .expect("legacy mortar-shell checkpoint should remain readable");
+
+    let shell = store.shells.first().expect("restored shell");
+    assert!(shell.launched);
+    assert!(!shell.rocket);
+    assert_eq!(
+        (shell.from_x, shell.from_y, shell.launch_tick),
+        (0.0, 0.0, 0)
+    );
+}
+
+#[test]
 fn rocket_damage_is_reduced_except_for_armor_piercing_direct_hits() {
     let inner2 = (config::MORTAR_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2);
     let inner = shell_damage(true, 0.0, inner2, false);

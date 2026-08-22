@@ -59,8 +59,8 @@ use self::command_helpers::{
 };
 use self::guards::{
     command_admission_for, dedupe_cap_units, dedupe_units, is_constructing, player_is_ai,
-    rally_intent_for_map, unit_can_accept_ground_command, unit_can_accept_player_command,
-    unit_can_accept_stop_command, CommandAdmissionPolicy,
+    rally_intent_for_map, unit_can_accept_player_command, unit_can_accept_stop_command,
+    CommandAdmissionPolicy,
 };
 use self::planner_facts::{
     ability_from_planner, ability_to_planner, build_kind_code, build_kind_from_code,
@@ -886,7 +886,7 @@ mod planned_actions {
                         }
                     }
                     planner::OrderIntent::HoldPosition => {
-                        if unit_can_accept_ground_command(entities, player, unit) {
+                        if immediate_unit_can_replace(entities, player, unit) {
                             entities.release_miner(unit);
                             if let Some(e) = entities.get_mut(unit) {
                                 e.hold_position();

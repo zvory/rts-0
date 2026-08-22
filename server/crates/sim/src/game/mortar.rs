@@ -24,12 +24,21 @@ struct MortarShell {
     attacker: u32,
     x: f32,
     y: f32,
+    #[serde(default)]
     from_x: f32,
+    #[serde(default)]
     from_y: f32,
+    #[serde(default)]
     launch_tick: u32,
     impact_tick: u32,
+    #[serde(default = "legacy_shell_was_launched")]
     launched: bool,
+    #[serde(default)]
     rocket: bool,
+}
+
+fn legacy_shell_was_launched() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
