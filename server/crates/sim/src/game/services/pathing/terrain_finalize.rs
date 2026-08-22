@@ -152,10 +152,12 @@ fn simplify_fastest_vehicle_corridor(
             }) {
                 continue;
             }
-            if kind == EntityKind::ScoutCar
-                && (forward[candidate].0 - from.0).hypot(forward[candidate].1 - from.1)
-                    > super::route_finalize::SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX
-            {
+            if super::route_finalize::vehicle_finalization_max_segment_px(kind).is_some_and(
+                |max_segment_px| {
+                    (forward[candidate].0 - from.0).hypot(forward[candidate].1 - from.1)
+                        > max_segment_px
+                },
+            ) {
                 continue;
             }
             // An exactly collinear span traverses the same directed terrain intervals and carries

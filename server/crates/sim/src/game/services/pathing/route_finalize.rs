@@ -4,6 +4,10 @@ use crate::game::entity::RoutePolicy;
 
 pub(super) const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
+pub(super) fn vehicle_finalization_max_segment_px(kind: EntityKind) -> Option<f32> {
+    (kind == EntityKind::ScoutCar).then_some(SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX)
+}
+
 #[derive(Clone, Copy)]
 pub(in crate::game::services) struct RouteFinalizationMode {
     route_shape: RouteShape,
