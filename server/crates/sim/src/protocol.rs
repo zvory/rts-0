@@ -16,7 +16,7 @@ mod tests {
     use super::*;
     use rts_rules::faction::{AbilityKind, UpgradeKind};
 
-    const PROTOCOL_KIND_IDS: [&str; 26] = [
+    const PROTOCOL_KIND_IDS: [&str; 27] = [
         kinds::WORKER,
         kinds::GOLEM,
         kinds::RIFLEMAN,
@@ -25,6 +25,7 @@ mod tests {
         kinds::ANTI_TANK_GUN,
         kinds::MORTAR_TEAM,
         kinds::ARTILLERY,
+        kinds::ROCKET_LAUNCHER,
         kinds::SCOUT_CAR,
         kinds::SCOUT_PLANE,
         kinds::TANK,
