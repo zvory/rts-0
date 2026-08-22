@@ -298,7 +298,7 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
                 }
                 let h = production_heuristic(nx, ny);
                 scratch.open.push(Node {
-                    f: tentative + h,
+                    f: tentative.saturating_add(h),
                     g: tentative,
                     tx: nx,
                     ty: ny,

@@ -349,7 +349,7 @@ mod tests {
             "authored vehicle route should preserve the same target-acquisition episode: {acquired_at:?}"
         );
         assert!(
-            rear_slowed_at.is_some_and(|tick| tick >= REPLAY_PRE_COMMAND_TICK + 1),
+            rear_slowed_at.is_some_and(|tick| tick > REPLAY_PRE_COMMAND_TICK),
             "rear Tank should still exhibit the recorded slowdown episode: {rear_slowed_at:?}"
         );
         assert!(
