@@ -215,6 +215,20 @@ Tank core exists. The profile uses the shared decision and action layers, receiv
 fog-filtered observations, and issues ordinary validated player commands for spending, placement,
 production, and combat.
 
+Its local-defense envelope covers every owned building footprint, including incomplete structures,
+plus reserved sites for submitted build intents. The standing Rifleman formation is anchored only
+to completed core buildings, not extractors or pending construction, and keeps three fifths of the
+line on the primary approach. When visible enemy material enters the wider envelope, mobile
+defenders focus the highest-value visible target at the threatened footprint. Tanks and
+Panzerfausts answer armored contacts first, fully entrenched Riflemen remain in place, and an
+understrength Rifle-only group does not make a sacrificial intercept. Lost contact creates only a
+bounded two-second search incident; reaching the last contact point without reacquiring the enemy
+or reaching the timeout returns the units to normal defensive staging. Each Tank containment push
+also assigns half of the ready Riflemen as a stable escort cohort and orders them to screen two
+tiles ahead of the Tank front; the remaining Riflemen stay available for home defense. The internal
+`jeffs_ai_pre_defense_envelope` profile freezes the preceding Jeff policy for arena regression
+comparisons and is not exposed in the lobby selector.
+
 ### Self-play and arena tools
 
 Matchup, arena, balance, `LiveSelfPlay`, real-AI tests, and live-AI performance hosts all use that
@@ -249,6 +263,19 @@ fingerprints, rather than a requested/resolved identity pair.
 
     cd server
     cargo run --bin ai-arena -- --candidate ai_2_1 --baseline ai_turtle --seeds 3 --ticks 9000
+
+The repository term **120 game test** means `scripts/120-game-test.mjs`. It requires profile IDs for
+the current AI 2.1, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
+runs all three pairings on The River, Schone Tage, 1v1, and Crossroads with five side-swapped seeds,
+caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
+Markdown, JSON, and CSV summaries.
+
+    node scripts/120-game-test.mjs ai_2_1 jeffs_ai_pre_defense_envelope jeffs_ai
+
+Per-seed console progress is off by default. For unattended runs, `--background` starts the test in
+a hidden detached process and returns immediately; `--status <output-directory>` reads compact
+progress from `run-config.json` without attaching to the simulation. Use `--progress` only when
+per-seed terminal updates are wanted. Background output is retained in `120-game-test.log`.
 
 Scorecards report diagnostic economy, army, building, command, attack, damage, death, and milestone
 data. Material values do not break ties. Replay artifacts remain the source of player intent;

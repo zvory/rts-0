@@ -197,6 +197,10 @@ const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|Golem
 const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/actions.rs",
   "server/crates/ai/src/ai_core/decision/defense.rs",
+  // Jeff's Kriegsia-only defense policy is split into focused geometry and incident-response
+  // modules; roster ownership and faction admission remain in the profile/catalog layers.
+  "server/crates/ai/src/ai_core/decision/defense/envelope.rs",
+  "server/crates/ai/src/ai_core/decision/defense/incident.rs",
   "server/crates/ai/src/ai_core/decision/expansion.rs",
   "server/crates/ai/src/ai_core/decision/frontal.rs",
   "server/crates/ai/src/ai_core/decision/harassment.rs",

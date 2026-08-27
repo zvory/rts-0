@@ -3,7 +3,7 @@
 Use when changing rendering, input, HUD, lobby UI, or any module under `client/src/`.
 
 ## Read first
-- [docs/design/architecture.md](../design/architecture.md) — just the client paragraph
+- [docs/design/architecture.md](../design/architecture.md) — client paragraph
 - [docs/design/client-ui.md](../design/client-ui.md) — module contracts in §4.1 and current Pixi
   behavior in §4.2
 - [client-rendering.md](../design/client-rendering.md) — renderer-neutral contracts and parity ledger

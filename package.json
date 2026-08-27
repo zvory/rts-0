@@ -7,7 +7,8 @@
     "node": ">=22.18.0"
   },
   "scripts": {
-    "check:interact-types": "tsc --project scripts/interact/tsconfig.json"
+    "check:interact-types": "tsc --project scripts/interact/tsconfig.json",
+    "test:120-games": "node scripts/120-game-test.mjs"
   },
   "devDependencies": {
     "@types/node": "^22",

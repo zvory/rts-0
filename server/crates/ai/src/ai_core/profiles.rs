@@ -7,7 +7,9 @@ mod jeffs_ai_chat_start;
 mod turtle;
 
 pub(crate) use self::jeffs_ai::{
-    JEFFS_AI, JEFFS_AI_ID, JEFFS_AI_PRE_RIFLE_COVERAGE, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    JEFFS_AI, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE,
+    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE,
+    JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 pub(crate) use self::jeffs_ai_chat_start::{JEFFS_AI_CHAT_START, JEFFS_AI_CHAT_START_ID};
 pub(crate) use self::turtle::AI_TURTLE;
@@ -404,6 +406,9 @@ pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
+    if id == JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID {
+        return Some(&JEFFS_AI_PRE_DEFENSE_ENVELOPE);
+    }
     if id == JEFFS_AI_PRE_RIFLE_COVERAGE_ID {
         return Some(&JEFFS_AI_PRE_RIFLE_COVERAGE);
     }
@@ -416,7 +421,10 @@ pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
 }
 
 pub(crate) fn is_jeffs_ai_profile(id: &str) -> bool {
-    matches!(id, JEFFS_AI_ID | JEFFS_AI_PRE_RIFLE_COVERAGE_ID)
+    matches!(
+        id,
+        JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID | JEFFS_AI_PRE_RIFLE_COVERAGE_ID
+    )
 }
 
 #[cfg(test)]
@@ -436,10 +444,17 @@ mod tests {
             JEFFS_AI_CHAT_START_ID
         );
         assert_eq!(
+            profile_by_id(JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID)
+                .unwrap()
+                .id,
+            JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
+        );
+        assert_eq!(
             profile_by_id(JEFFS_AI_PRE_RIFLE_COVERAGE_ID).unwrap().id,
             JEFFS_AI_PRE_RIFLE_COVERAGE_ID
         );
         assert!(is_jeffs_ai_profile(JEFFS_AI_ID));
+        assert!(is_jeffs_ai_profile(JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID));
         assert!(is_jeffs_ai_profile(JEFFS_AI_PRE_RIFLE_COVERAGE_ID));
     }
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::ai_core::observation::{AiEconomy, AiResourceSummary};
+use crate::ai_core::observation::{AiBuildIntent, AiEconomy, AiResourceSummary};
 
 fn los_test_observation(blocker: EntityKind) -> AiObservation {
     let tile_size = config::TILE_SIZE;
@@ -277,4 +277,187 @@ fn home_rifle_coverage_uses_wide_fixed_columns_and_deeper_second_rank() {
             .abs()
             < 0.001
     );
+}
+
+#[test]
+fn planned_factory_is_part_of_the_local_defense_envelope() {
+    let mut observation = los_test_observation(EntityKind::Depot);
+    let ts = observation.map.tile_size as f32;
+    observation
+        .pending_builds
+        .push(AiBuildIntent::to_site(99, EntityKind::Factory, 18, 4));
+    let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
+    let right_edge = (18 + stats.foot_w) as f32 * ts;
+    observation.visible_enemies.push(AiEntitySummary {
+        id: 30,
+        owner: 2,
+        kind: EntityKind::Rifleman,
+        x: right_edge + 2.0 * ts,
+        y: 6.5 * ts,
+        hp: 100,
+        state: AiEntityState::Attack,
+        is_complete: true,
+        production_queue_len: None,
+        production_kind: None,
+        latched_node: None,
+        target_id: None,
+        free_for_combat: true,
+    });
+
+    assert_eq!(
+        local_defense_contact(&observation)
+            .expect("planned site contact")
+            .target_ids,
+        vec![30]
+    );
+    assert_eq!(
+        local_defense_target(&observation),
+        None,
+        "legacy profiles must not inherit Jeff's planned-site geometry"
+    );
+}
+
+#[test]
+fn incomplete_factory_is_part_of_the_local_defense_envelope() {
+    let mut observation = los_test_observation(EntityKind::Depot);
+    let ts = observation.map.tile_size as f32;
+    let (factory_x, factory_y) =
+        building_center((18, 4), EntityKind::Factory, observation.map.tile_size)
+            .expect("Factory footprint");
+    observation.owned.push(AiEntitySummary {
+        id: 20,
+        owner: 1,
+        kind: EntityKind::Factory,
+        x: factory_x,
+        y: factory_y,
+        hp: 50,
+        state: AiEntityState::Build,
+        is_complete: false,
+        production_queue_len: None,
+        production_kind: None,
+        latched_node: None,
+        target_id: None,
+        free_for_combat: false,
+    });
+    let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
+    observation.visible_enemies.push(AiEntitySummary {
+        id: 30,
+        owner: 2,
+        kind: EntityKind::Rifleman,
+        x: (18 + stats.foot_w) as f32 * ts + 2.0 * ts,
+        y: factory_y,
+        hp: 100,
+        state: AiEntityState::Attack,
+        is_complete: true,
+        production_queue_len: None,
+        production_kind: None,
+        latched_node: None,
+        target_id: None,
+        free_for_combat: true,
+    });
+
+    assert_eq!(
+        local_defense_contact(&observation)
+            .expect("incomplete building contact")
+            .target_ids,
+        vec![30]
+    );
+}
+
+#[test]
+fn planned_factory_does_not_move_the_standing_rifle_formation() {
+    let mut observation = los_test_observation(EntityKind::Depot);
+    observation.owned.clear();
+    observation
+        .pending_builds
+        .push(AiBuildIntent::to_site(99, EntityKind::Factory, 16, 4));
+    assert!(defensive_formation_sites(&observation).is_empty());
+    assert_eq!(defended_building_sites(&observation, true).len(), 1);
+}
+
+#[test]
+fn standing_rifle_formation_ignores_extractors() {
+    let mut observation = los_test_observation(EntityKind::Depot);
+    observation.owned.push(AiEntitySummary {
+        id: 21,
+        owner: 1,
+        kind: EntityKind::PumpJack,
+        x: 20.5 * observation.map.tile_size as f32,
+        y: 20.5 * observation.map.tile_size as f32,
+        hp: 100,
+        state: AiEntityState::Idle,
+        is_complete: true,
+        production_queue_len: None,
+        production_kind: None,
+        latched_node: None,
+        target_id: None,
+        free_for_combat: false,
+    });
+
+    assert_eq!(defensive_formation_sites(&observation).len(), 1);
+    assert_eq!(defended_building_sites(&observation, false).len(), 2);
+}
+
+#[test]
+fn standing_rifle_line_keeps_three_fifths_on_the_primary_approach() {
+    let assignments = (0..10)
+        .map(|index| primary_weighted_approach_slot(index, 10, 3).0)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        assignments
+            .iter()
+            .filter(|approach| **approach == 0)
+            .count(),
+        6
+    );
+    assert_eq!(
+        assignments
+            .iter()
+            .filter(|approach| **approach == 1)
+            .count(),
+        2
+    );
+    assert_eq!(
+        assignments
+            .iter()
+            .filter(|approach| **approach == 2)
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn strongest_local_sector_wins_over_a_lone_flanker() {
+    let mut observation = los_test_observation(EntityKind::Depot);
+    let ts = observation.map.tile_size as f32;
+    for (id, x, y) in [
+        (30, 11.5 * ts, 5.5 * ts),
+        (31, 12.5 * ts, 5.5 * ts),
+        (32, 5.5 * ts, 11.5 * ts),
+    ] {
+        observation.visible_enemies.push(AiEntitySummary {
+            id,
+            owner: 2,
+            kind: EntityKind::Rifleman,
+            x,
+            y,
+            hp: 100,
+            state: AiEntityState::Attack,
+            is_complete: true,
+            production_queue_len: None,
+            production_kind: None,
+            latched_node: None,
+            target_id: None,
+            free_for_combat: true,
+        });
+    }
+
+    let contact = local_defense_contact(&observation).expect("local contact");
+    assert_eq!(contact.target_ids, vec![30, 31]);
+    assert!(
+        contact.intercept.0 <= contact.centroid.0,
+        "contact: {contact:?}"
+    );
+    assert!((contact.intercept.1 - contact.centroid.1).abs() < f32::EPSILON);
 }

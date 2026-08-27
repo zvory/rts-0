@@ -1,6 +1,20 @@
-use super::geometry::{clamp_to_map, dist2, normalized_direction, squared, tile_center};
+use super::geometry::{
+    building_center, clamp_to_map, dist2, normalized_direction, squared, tile_center,
+};
 use super::resources::forward_steel_cluster_center;
 use super::*;
+
+mod envelope;
+mod incident;
+
+pub(super) use self::envelope::local_defense_contact;
+use self::envelope::{
+    defended_building_sites, defended_envelope_center, defended_envelope_support,
+    defensive_formation_sites, DefendedBuildingSite,
+};
+pub(super) use self::incident::respond_to_local_incident;
+#[cfg(test)]
+pub(super) use self::incident::select_defensive_interceptors;
 
 pub(super) const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
 
@@ -149,8 +163,10 @@ pub(super) fn defensive_panic_rifle_plan() -> DefensivePanicPlan {
 
 pub(super) fn defensive_panic_response(
     observation: &AiObservation,
+    include_planned_buildings: bool,
 ) -> Option<DefensivePanicResponse> {
-    let geometry = LocalDefenseGeometry::from_observation(observation);
+    let geometry =
+        LocalDefenseGeometry::from_observation_with_plans(observation, include_planned_buildings);
     let enemy_value = local_enemy_unit_value(observation, &geometry);
     if enemy_value == 0 {
         return None;
@@ -520,8 +536,38 @@ pub(super) fn stage_home_rifleman_coverage(
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
 ) -> Option<Vec<u32>> {
-    let assignments =
-        home_rifleman_coverage_assignments(observation, map_analysis, ready_units, enemy_base)?;
+    let assignments = home_rifleman_coverage_assignments_with_policy(
+        observation,
+        map_analysis,
+        ready_units,
+        enemy_base,
+        false,
+    )?;
+    stage_home_rifleman_assignments(actions, observation, assignments)
+}
+
+pub(super) fn stage_home_rifleman_envelope_coverage(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<u32>> {
+    let assignments = home_rifleman_coverage_assignments_with_policy(
+        observation,
+        map_analysis,
+        ready_units,
+        enemy_base,
+        true,
+    )?;
+    stage_home_rifleman_assignments(actions, observation, assignments)
+}
+
+fn stage_home_rifleman_assignments(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    assignments: Vec<DefensiveLineAssignment>,
+) -> Option<Vec<u32>> {
     let by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
         .iter()
@@ -554,11 +600,52 @@ fn home_rifleman_coverage_assignments(
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
 ) -> Option<Vec<DefensiveLineAssignment>> {
+    home_rifleman_coverage_assignments_with_policy(
+        observation,
+        map_analysis,
+        ready_units,
+        enemy_base,
+        false,
+    )
+}
+
+fn home_rifleman_envelope_coverage_assignments(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<DefensiveLineAssignment>> {
+    home_rifleman_coverage_assignments_with_policy(
+        observation,
+        map_analysis,
+        ready_units,
+        enemy_base,
+        true,
+    )
+}
+
+fn home_rifleman_coverage_assignments_with_policy(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+    use_building_envelope: bool,
+) -> Option<Vec<DefensiveLineAssignment>> {
     if ready_units.is_empty() {
         return None;
     }
-    let anchor = main_steel_cluster_center(observation)
-        .unwrap_or_else(|| tile_center(observation.own_start_tile, observation.map.tile_size));
+    let defended_sites = if use_building_envelope {
+        defensive_formation_sites(observation)
+    } else {
+        Vec::new()
+    };
+    let anchor = if use_building_envelope {
+        defended_envelope_center(&defended_sites)
+    } else {
+        None
+    }
+    .or_else(|| main_steel_cluster_center(observation))
+    .unwrap_or_else(|| tile_center(observation.own_start_tile, observation.map.tile_size));
     let mut approach_targets = vec![(enemy_base.x, enemy_base.y)];
     if let Some(analysis) = map_analysis {
         for choke in
@@ -591,25 +678,22 @@ fn home_rifleman_coverage_assignments(
     let mut units = ready_units.to_vec();
     units.sort_unstable();
     units.dedup();
-    let primary_slots = (units.len() * 3).div_ceil(5);
+    let unit_count = units.len();
 
     let assignments = units
         .into_iter()
         .enumerate()
         .filter_map(|(index, unit_id)| {
-            let approach_index = if index < primary_slots || approach_count == 1 {
-                0
-            } else {
-                1 + (index - primary_slots) % (approach_count - 1)
-            };
-            let local_slot = if approach_index == 0 {
-                index
-            } else {
-                (index - primary_slots) / (approach_count - 1)
-            };
+            let (approach_index, local_slot) =
+                primary_weighted_approach_slot(index, unit_count, approach_count);
             let target = approach_targets[approach_index];
             let direction = normalized_direction(anchor, target)?;
             let perpendicular = (-direction.1, direction.0);
+            let section_anchor = if use_building_envelope {
+                defended_envelope_support(&defended_sites, anchor, direction)
+            } else {
+                anchor
+            };
             let rank = local_slot % 2;
             let lateral_slot = local_slot / 2;
             let column = match lateral_slot {
@@ -620,10 +704,10 @@ fn home_rifleman_coverage_assignments(
             let forward_tiles = HOME_RIFLE_FRONT_TILES - rank as f32 * HOME_RIFLE_RANK_DEPTH_TILES;
             let desired = clamp_to_map(
                 (
-                    anchor.0
+                    section_anchor.0
                         + direction.0 * forward_tiles * tile_size
                         + perpendicular.0 * column * HOME_RIFLE_LATERAL_SPACING_TILES * tile_size,
-                    anchor.1
+                    section_anchor.1
                         + direction.1 * forward_tiles * tile_size
                         + perpendicular.1 * column * HOME_RIFLE_LATERAL_SPACING_TILES * tile_size,
                 ),
@@ -634,6 +718,28 @@ fn home_rifleman_coverage_assignments(
         })
         .collect::<Vec<_>>();
     (!assignments.is_empty()).then_some(assignments)
+}
+
+fn primary_weighted_approach_slot(
+    index: usize,
+    unit_count: usize,
+    approach_count: usize,
+) -> (usize, usize) {
+    // Keep three fifths of the line on the known enemy approach. The remaining two fifths cover
+    // secondary chokes without weakening the mirrored Tank lane.
+    let approach_count = approach_count.max(1);
+    let primary_slots = (unit_count * 3).div_ceil(5);
+    let approach_index = if index < primary_slots || approach_count == 1 {
+        0
+    } else {
+        1 + (index - primary_slots) % (approach_count - 1)
+    };
+    let local_slot = if approach_index == 0 {
+        index
+    } else {
+        (index - primary_slots) / (approach_count - 1)
+    };
+    (approach_index, local_slot)
 }
 
 fn clear_mobile_defensive_position(
@@ -1225,6 +1331,21 @@ pub(super) fn local_defense_targets(observation: &AiObservation) -> BTreeSet<u32
         .collect()
 }
 
+pub(super) fn local_defense_units_with_plans(
+    observation: &AiObservation,
+    ready_units: &[u32],
+) -> Vec<u32> {
+    let geometry = LocalDefenseGeometry::from_observation_with_plans(observation, true);
+    let ready: BTreeSet<u32> = ready_units.iter().copied().collect();
+    observation
+        .owned
+        .iter()
+        .filter(|entity| ready.contains(&entity.id))
+        .filter(|entity| geometry.contains(entity))
+        .map(|entity| entity.id)
+        .collect()
+}
+
 pub(super) struct LocalDefenseGeometry {
     own_base: (f32, f32),
     base_radius2: f32,
@@ -1233,11 +1354,19 @@ pub(super) struct LocalDefenseGeometry {
     building_radius2: f32,
     home_resources: Vec<(f32, f32)>,
     workers: Vec<(f32, f32)>,
-    buildings: Vec<(f32, f32)>,
+    buildings: Vec<DefendedBuildingSite>,
+    use_building_footprints: bool,
 }
 
 impl LocalDefenseGeometry {
     fn from_observation(observation: &AiObservation) -> Self {
+        Self::from_observation_with_plans(observation, false)
+    }
+
+    fn from_observation_with_plans(
+        observation: &AiObservation,
+        include_planned_buildings: bool,
+    ) -> Self {
         let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
         let tile_size = observation.map.tile_size as f32;
         let base_radius2 = squared(LOCAL_DEFENSE_RADIUS_TILES * tile_size);
@@ -1262,12 +1391,7 @@ impl LocalDefenseGeometry {
             .filter(|entity| entity.kind == EntityKind::Worker)
             .map(|worker| (worker.x, worker.y))
             .collect();
-        let buildings = observation
-            .owned
-            .iter()
-            .filter(|entity| entity.kind.is_building() && entity.hp > 0)
-            .map(|building| (building.x, building.y))
-            .collect();
+        let buildings = defended_building_sites(observation, include_planned_buildings);
 
         Self {
             own_base,
@@ -1278,6 +1402,7 @@ impl LocalDefenseGeometry {
             home_resources,
             workers,
             buildings,
+            use_building_footprints: include_planned_buildings,
         }
     }
 
@@ -1291,13 +1416,21 @@ impl LocalDefenseGeometry {
                 .workers
                 .iter()
                 .any(|(x, y)| dist2(entity.x, entity.y, *x, *y) <= self.worker_radius2)
-            || self
-                .buildings
-                .iter()
-                .any(|(x, y)| dist2(entity.x, entity.y, *x, *y) <= self.building_radius2)
+            || self.buildings.iter().any(|building| {
+                let distance2 = if self.use_building_footprints {
+                    building.distance2_to_footprint((entity.x, entity.y))
+                } else {
+                    dist2(entity.x, entity.y, building.x, building.y)
+                };
+                distance2 <= self.building_radius2
+            })
     }
 
     fn base_dist2(&self, entity: &AiEntitySummary) -> f32 {
         dist2(entity.x, entity.y, self.own_base.0, self.own_base.1)
+    }
+
+    fn envelope_center(&self) -> (f32, f32) {
+        defended_envelope_center(&self.buildings).unwrap_or(self.own_base)
     }
 }
