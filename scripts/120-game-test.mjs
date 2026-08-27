@@ -34,6 +34,14 @@ if (options.help) {
   console.log(usage());
   process.exit(0);
 }
+if (options.statusDir) {
+  process.exitCode = printStatus(options.statusDir);
+  process.exit();
+}
+if (options.background) {
+  launchBackground(options);
+  process.exit(0);
+}
 const MATCHUPS = createMatchups(options.profiles);
 
 const jobs = createJobs(options);
@@ -48,6 +56,7 @@ if (options.dryRun) {
 
 const activeChildren = new Set();
 let interrupted = false;
+let completedJobs = 0;
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     if (interrupted) return;
@@ -61,7 +70,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 try {
   fs.mkdirSync(options.outDir, { recursive: true });
   const gitSha = commandOutput("git", ["rev-parse", "HEAD"]) || "unknown";
-  writeRunConfig(options, gitSha, "running");
+  writeRunConfig(options, gitSha, "running", "", completedJobs);
 
   console.log("120 game test");
   console.log(`  games:       ${GAME_COUNT}`);
@@ -96,14 +105,20 @@ try {
   }
 
   const { pending, resumed } = partitionJobs(jobs, options);
+  completedJobs = resumed;
+  writeRunConfig(options, gitSha, "running", "", completedJobs);
   if (resumed > 0) {
     console.log(`\nResuming ${resumed * 2}/${GAME_COUNT} completed games from existing summaries.`);
   }
-  await runPool(pending, options, arenaBinary, resumed);
+  await runPool(pending, options, arenaBinary, resumed, (completeJobs, job) => {
+    completedJobs = completeJobs;
+    writeRunConfig(options, gitSha, "running", "", completedJobs);
+    if (options.progress) printJobProgress(completeJobs, job);
+  });
 
   const report = aggregateResults(jobs, options, gitSha);
   writeReports(report, options);
-  writeRunConfig(options, gitSha, "complete");
+  writeRunConfig(options, gitSha, "complete", "", jobs.length);
 
   console.log("\n120 game test complete.");
   console.log(`  Markdown: ${path.join(options.outDir, "analysis.md")}`);
@@ -113,7 +128,13 @@ try {
   for (const child of activeChildren) child.kill();
   try {
     const gitSha = commandOutput("git", ["rev-parse", "HEAD"]) || "unknown";
-    writeRunConfig(options, gitSha, "failed", error instanceof Error ? error.message : String(error));
+    writeRunConfig(
+      options,
+      gitSha,
+      "failed",
+      error instanceof Error ? error.message : String(error),
+      completedJobs,
+    );
   } catch {
     // Preserve the original failure if the status file cannot be updated.
   }
@@ -141,6 +162,9 @@ Options:
   --ticks N           Per-game tick cap (default: ${DEFAULT_TICKS}).
   --skip-build        Use the existing release ai-arena binary.
   --verify-replay     Verify every replay (slower; default skips replay verification).
+  --background        Start the test detached and return immediately.
+  --progress          Print each completed seed pair (default is start/end only).
+  --status DIR        Print compact status for an output directory; no profiles required.
   --dry-run           Print the fixed test plan without building or running games.
   -h, --help          Show this help.
 
@@ -157,6 +181,9 @@ function parseArgs(argv) {
     outDir: "",
     skipBuild: false,
     verifyReplay: false,
+    background: false,
+    progress: false,
+    statusDir: "",
     dryRun: false,
     help: false,
   };
@@ -176,9 +203,21 @@ function parseArgs(argv) {
     else if (arg === "--ticks") parsed.ticks = positiveInteger(value(), arg);
     else if (arg === "--skip-build") parsed.skipBuild = true;
     else if (arg === "--verify-replay") parsed.verifyReplay = true;
+    else if (arg === "--background") parsed.background = true;
+    else if (arg === "--progress") parsed.progress = true;
+    else if (arg === "--status") parsed.statusDir = path.resolve(value());
     else if (arg === "--dry-run") parsed.dryRun = true;
     else if (!arg.startsWith("-")) positionals.push(arg);
     else throw new Error(`unknown argument: ${arg}\n\n${usage()}`);
+  }
+  if (parsed.statusDir) {
+    if (positionals.length !== 0) {
+      throw new Error("--status does not accept profile inputs");
+    }
+    return parsed;
+  }
+  if (parsed.background && parsed.dryRun) {
+    throw new Error("--background and --dry-run cannot be used together");
   }
   if (!parsed.help) {
     if (positionals.length !== 3) {
@@ -229,6 +268,84 @@ function positiveInteger(raw, flag) {
 
 function utcStamp() {
   return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function launchBackground(runOptions) {
+  fs.mkdirSync(runOptions.outDir, { recursive: true });
+  const gitSha = commandOutput("git", ["rev-parse", "HEAD"]) || "unknown";
+  writeRunConfig(runOptions, gitSha, "starting", "", 0, createMatchups(runOptions.profiles));
+  const logPath = path.join(runOptions.outDir, "120-game-test.log");
+  const log = fs.openSync(logPath, "a");
+  const args = [
+    fileURLToPath(import.meta.url),
+    runOptions.profiles.ai21,
+    runOptions.profiles.preChangeJeff,
+    runOptions.profiles.postChangeJeff,
+    "--out-dir",
+    runOptions.outDir,
+    "--concurrency",
+    String(runOptions.concurrency),
+    "--ticks",
+    String(runOptions.ticks),
+  ];
+  if (runOptions.skipBuild) args.push("--skip-build");
+  if (runOptions.verifyReplay) args.push("--verify-replay");
+  if (runOptions.progress) args.push("--progress");
+
+  let child;
+  try {
+    child = spawn(process.execPath, args, {
+      cwd: repoRoot,
+      detached: true,
+      windowsHide: true,
+      stdio: ["ignore", log, log],
+      shell: false,
+    });
+  } finally {
+    fs.closeSync(log);
+  }
+  if (!child.pid) throw new Error("failed to start the background 120 game test");
+  child.unref();
+
+  console.log("120 game test started in background.");
+  console.log(`  pid:         ${child.pid}`);
+  console.log(`  output:      ${runOptions.outDir}`);
+  console.log(`  log:         ${logPath}`);
+  console.log(`  status:      node scripts/120-game-test.mjs --status "${runOptions.outDir}"`);
+}
+
+function printStatus(outDir) {
+  const configPath = path.join(outDir, "run-config.json");
+  if (!fs.existsSync(configPath)) {
+    console.error(`120 game test status is unavailable: ${configPath}`);
+    return 1;
+  }
+  let config;
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  } catch (error) {
+    console.error(
+      `120 game test status is unreadable: ${error instanceof Error ? error.message : error}`,
+    );
+    return 1;
+  }
+  const completedGames = Number.isSafeInteger(config.completedGames)
+    ? config.completedGames
+    : config.status === "complete"
+      ? config.games || GAME_COUNT
+      : 0;
+  console.log("120 game test status");
+  console.log(`  status:      ${config.status || "unknown"}`);
+  console.log(`  games:       ${completedGames}/${config.games || GAME_COUNT}`);
+  console.log(`  updated:     ${config.updatedAt || "unknown"}`);
+  console.log(`  output:      ${outDir}`);
+  if (config.error) console.log(`  error:       ${config.error}`);
+  if (config.status === "complete") {
+    console.log(`  analysis:    ${path.join(outDir, "analysis.md")}`);
+  } else {
+    console.log(`  log:         ${path.join(outDir, "120-game-test.log")}`);
+  }
+  return config.status === "failed" ? 1 : 0;
 }
 
 function createJobs(runOptions) {
@@ -295,7 +412,7 @@ function partitionJobs(plannedJobs, runOptions) {
   return { pending, resumed };
 }
 
-async function runPool(pendingJobs, runOptions, arenaBinary, resumedJobs) {
+async function runPool(pendingJobs, runOptions, arenaBinary, resumedJobs, onProgress) {
   if (pendingJobs.length === 0) return;
   let nextIndex = 0;
   let completeJobs = resumedJobs;
@@ -311,10 +428,7 @@ async function runPool(pendingJobs, runOptions, arenaBinary, resumedJobs) {
       try {
         await runArenaJob(job, runOptions, arenaBinary);
         completeJobs += 1;
-        console.log(
-          `[${String(completeJobs).padStart(2)}/${jobs.length} jobs | ${String(completeJobs * 2).padStart(3)}/${GAME_COUNT} games] ` +
-            `${job.matchup.id} / ${job.map.name} / seed ${job.seed}`,
-        );
+        onProgress(completeJobs, job);
       } catch (error) {
         aborted = true;
         throw error;
@@ -323,6 +437,13 @@ async function runPool(pendingJobs, runOptions, arenaBinary, resumedJobs) {
   };
 
   await Promise.all(Array.from({ length: workerCount }, worker));
+}
+
+function printJobProgress(completeJobs, job) {
+  console.log(
+    `[${String(completeJobs).padStart(2)}/${jobs.length} jobs | ${String(completeJobs * 2).padStart(3)}/${GAME_COUNT} games] ` +
+      `${job.matchup.id} / ${job.map.name} / seed ${job.seed}`,
+  );
 }
 
 function runArenaJob(job, runOptions, arenaBinary) {
@@ -549,7 +670,14 @@ function number(value) {
   return value.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 
-function writeRunConfig(runOptions, gitSha, status, error = "") {
+function writeRunConfig(
+  runOptions,
+  gitSha,
+  status,
+  error = "",
+  completeJobs = 0,
+  matchups = MATCHUPS,
+) {
   fs.mkdirSync(runOptions.outDir, { recursive: true });
   fs.writeFileSync(
     path.join(runOptions.outDir, "run-config.json"),
@@ -560,12 +688,14 @@ function writeRunConfig(runOptions, gitSha, status, error = "") {
         updatedAt: new Date().toISOString(),
         gitSha,
         games: GAME_COUNT,
+        completedJobs: completeJobs,
+        completedGames: completeJobs * 2,
         seedsPerMap: SEEDS_PER_MAP,
         sideSwapped: true,
         ticks: runOptions.ticks,
         concurrency: runOptions.concurrency,
         verifyReplay: runOptions.verifyReplay,
-        matchups: MATCHUPS,
+        matchups,
         maps: MAPS,
         ...(error ? { error } : {}),
       },

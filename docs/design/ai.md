@@ -269,6 +269,11 @@ Markdown, JSON, and CSV summaries.
 
     node scripts/120-game-test.mjs ai_2_1 jeffs_ai_pre_defense_envelope jeffs_ai
 
+Per-seed console progress is off by default. For unattended runs, `--background` starts the test in
+a hidden detached process and returns immediately; `--status <output-directory>` reads compact
+progress from `run-config.json` without attaching to the simulation. Use `--progress` only when
+per-seed terminal updates are wanted. Background output is retained in `120-game-test.log`.
+
 Scorecards report diagnostic economy, army, building, command, attack, damage, death, and milestone
 data. Material values do not break ties. Replay artifacts remain the source of player intent;
 decision traces are diagnostic output only.
