@@ -13,7 +13,7 @@ use crate::ai_core::observation::{
 use crate::ai_core::profiles::{
     is_jeffs_ai_profile, AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy,
     ExpansionPolicy, ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
-    JEFFS_AI_ID,
+    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -41,9 +41,12 @@ use self::defense::{
     home_defensive_tank_is_positioned, local_defense_target, local_defense_units,
     machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
     stage_home_anti_tank_line, stage_home_defensive_tank, stage_home_machine_gunner_screen,
-    stage_home_rifleman_screen, stage_main_steel_defensive_line, DefensivePanicPlan,
-    DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
+    stage_home_rifleman_envelope_coverage, stage_home_rifleman_screen,
+    stage_main_steel_defensive_line, DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS,
+    DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
+#[cfg(test)]
+use self::defense::select_defensive_interceptors;
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
     EconomyProposal, OilDemandSignal,
@@ -172,6 +175,7 @@ where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
     memory.ensure_profile(profile);
+    memory.sync_defender_posture(observation);
     memory.sync_incomplete_resource_depots(observation);
     memory
         .pending_upgrades
@@ -191,7 +195,7 @@ where
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
 
-    let local_threat_response = defensive_panic_response(observation);
+    let local_threat_response = defensive_panic_response(observation, profile.id == JEFFS_AI_ID);
     let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
     let panic_plan = defensive_panic
         .active
@@ -657,7 +661,7 @@ where
         let production_rally = is_jeffs_ai_profile(profile.id)
             .then(|| jeffs_production_rally(observation, &facts))
             .flatten();
-        let rifleman_rally = (profile.id == JEFFS_AI_ID)
+        let rifleman_rally = uses_home_rifle_coverage(profile.id)
             .then(|| jeffs_rifleman_home_rally(observation, &facts))
             .flatten();
         let trained_units = actions::train_units_with_rally_for_unit(
@@ -740,14 +744,43 @@ where
             }
         }
         let local_target = local_defense_target(observation);
-        let jeff_layered_home_defense = local_target.is_some()
+        let new_jeff_defense = profile.id == JEFFS_AI_ID;
+        let mut jeff_layered_home_defense = local_target.is_some()
             && is_jeffs_ai_profile(profile.id)
             && profile.home_anti_tank.is_some();
         let mut local_defenders = local_ready_units.clone();
         local_defenders.extend(defensive_machine_gunners.iter().copied());
+        if new_jeff_defense {
+            local_defenders.extend(
+                observation
+                    .owned
+                    .iter()
+                    .filter(|unit| unit.is_complete && unit.hp > 0)
+                    .filter(|unit| {
+                        matches!(
+                            unit.kind,
+                            EntityKind::Rifleman
+                                | EntityKind::MachineGunner
+                                | EntityKind::ScoutCar
+                        )
+                    })
+                    .map(|unit| unit.id),
+            );
+        }
         local_defenders.sort_unstable();
         local_defenders.dedup();
-        if jeff_layered_home_defense {
+        if new_jeff_defense {
+            if let Some(units) = defense::respond_to_local_incident(
+                &mut actions,
+                observation,
+                memory,
+                &local_defenders,
+            ) {
+                local_defense_assigned.extend(units.iter().copied());
+                intents.push(AiIntent::Attack { units });
+                jeff_layered_home_defense = true;
+            }
+        } else if jeff_layered_home_defense {
             let local_targets: Vec<u32> = defense::local_defense_targets(observation)
                 .into_iter()
                 .collect();
@@ -801,7 +834,7 @@ where
             && is_jeffs_ai_profile(profile.id)
             && profile.home_anti_tank.is_some()
         {
-            let riflemen: Vec<u32> = if profile.id == JEFFS_AI_ID {
+            let riflemen: Vec<u32> = if uses_home_rifle_coverage(profile.id) {
                 observation
                     .owned
                     .iter()
@@ -837,6 +870,14 @@ where
                 .map(|entity| entity.id);
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 let staged = if profile.id == JEFFS_AI_ID {
+                    stage_home_rifleman_envelope_coverage(
+                        &mut actions,
+                        observation,
+                        map_analysis,
+                        &riflemen,
+                        enemy_base,
+                    )
+                } else if profile.id == JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID {
                     defense::stage_home_rifleman_coverage(
                         &mut actions,
                         observation,
@@ -844,7 +885,7 @@ where
                         &riflemen,
                         enemy_base,
                     )
-                } else {
+                } else if profile.id == JEFFS_AI_PRE_RIFLE_COVERAGE_ID {
                     memory
                         .home_defensive_tank
                         .or(fallback_armor)
@@ -859,6 +900,8 @@ where
                                 1.75,
                             )
                         })
+                } else {
+                    None
                 };
                 if let Some(units) = staged {
                     intents.push(AiIntent::Stage { units });
@@ -992,6 +1035,13 @@ where
         commands: actions.into_commands(),
         trace,
     }
+}
+
+fn uses_home_rifle_coverage(profile_id: &str) -> bool {
+    matches!(
+        profile_id,
+        JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
+    )
 }
 
 /// Jeff's producers send fresh combat units to a safe forward staging point immediately.

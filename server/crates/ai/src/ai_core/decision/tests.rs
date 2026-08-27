@@ -232,6 +232,67 @@ fn decide(
 }
 
 #[test]
+fn defensive_incident_search_expires_at_its_bounded_end_condition() {
+    const SEARCH_TICKS: u32 = config::TICK_HZ * 2;
+    let mut memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
+    memory.note_defensive_contact(100, (320.4, 640.6), 100);
+
+    let active = memory
+        .defensive_incident(100 + SEARCH_TICKS, SEARCH_TICKS)
+        .expect("incident remains active through the search window");
+    assert_eq!(active.position, (320.0, 641.0));
+    assert!(memory
+        .defensive_incident(
+            101 + SEARCH_TICKS,
+            SEARCH_TICKS
+        )
+        .is_none());
+}
+
+#[test]
+fn defensive_interceptors_move_unentrenched_reserves_first() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 3,
+            supply_cap: 10,
+        },
+        vec![
+            combat_at(10, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts),
+            combat_at(20, EntityKind::Rifleman, 11.5 * ts, 10.5 * ts),
+            combat_at(30, EntityKind::Rifleman, 12.5 * ts, 10.5 * ts),
+        ],
+    );
+    observation.upgrades.push(UpgradeKind::Entrenchment);
+    observation.tick = 0;
+    let mut memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
+    memory.sync_defender_posture(&observation);
+    observation.tick = rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS;
+    memory.sync_defender_posture(&observation);
+
+    observation.tick += 9;
+    observation.owned[0].x += ts;
+    observation.owned[0].state = AiEntityState::Move;
+    memory.sync_defender_posture(&observation);
+    let selected = select_defensive_interceptors(
+        &observation,
+        &memory,
+        vec![20, 30, 10],
+        (20.5 * ts, 10.5 * ts),
+        50,
+    );
+
+    assert_eq!(selected.len(), 3);
+    assert_eq!(selected[0], 10);
+    assert_eq!(
+        memory.estimated_entrenchment_ticks(&observation, 20),
+        rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS
+    );
+}
+
+#[test]
 fn canonical_profiles_never_schedule_disabled_supply_depots() {
     let observation = observation(
         AiEconomy {

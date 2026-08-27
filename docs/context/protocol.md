@@ -3,7 +3,7 @@
 Use when adding, removing, or changing any field on a client↔server message, snapshot, or event.
 
 ## Read first
-- [docs/design/protocol.md](../design/protocol.md) — full wire protocol
+- [docs/design/protocol.md](../design/protocol.md) — wire protocol
   - §2.0 Boundary authority and guardrails
   - §2.1 `ClientMessage`
   - §2.2 `ServerMessage`

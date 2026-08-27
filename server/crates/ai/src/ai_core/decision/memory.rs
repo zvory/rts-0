@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::ai_core::observation::AiObservation;
+use crate::ai_core::observation::{AiEntityState, AiObservation};
 use crate::ai_core::profiles::{AiProfile, AttackPolicy};
 use crate::config;
 use rts_sim::game::entity::EntityKind;
@@ -13,6 +13,28 @@ use super::defense::{
 use super::geometry;
 
 const RESOURCE_DEPOT_RESUME_SAFE_TICKS: u32 = config::TICK_HZ * 3;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DefensiveIncidentMemory {
+    last_contact_tick: u32,
+    x: i32,
+    y: i32,
+    threat_value: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct DefensiveIncident {
+    pub(super) last_contact_tick: u32,
+    pub(super) position: (f32, f32),
+    pub(super) threat_value: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DefenderPostureMemory {
+    x: i32,
+    y: i32,
+    stationary_since: u32,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct IncompleteResourceDepotMemory {
@@ -29,6 +51,9 @@ pub(crate) struct AiDecisionMemory {
     defensive_panic_started_tick: Option<u32>,
     defensive_panic_last_tick: Option<u32>,
     defensive_panic_response: DefensivePanicResponse,
+    defensive_incident: Option<DefensiveIncidentMemory>,
+    defender_posture: BTreeMap<u32, DefenderPostureMemory>,
+    entrenchment_available_since: Option<u32>,
     pub(super) pending_upgrades: BTreeSet<UpgradeKind>,
     launched_frontal_units: BTreeMap<u32, u32>,
     pub(super) containment_stationary_since: Option<u32>,
@@ -59,6 +84,9 @@ impl AiDecisionMemory {
             defensive_panic_started_tick: None,
             defensive_panic_last_tick: None,
             defensive_panic_response: DefensivePanicResponse::Riflemen,
+            defensive_incident: None,
+            defender_posture: BTreeMap::new(),
+            entrenchment_available_since: None,
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
             containment_stationary_since: None,
@@ -141,6 +169,9 @@ impl AiDecisionMemory {
         self.defensive_panic_started_tick = None;
         self.defensive_panic_last_tick = None;
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
+        self.defensive_incident = None;
+        self.defender_posture.clear();
+        self.entrenchment_available_since = None;
         self.pending_upgrades.clear();
         self.launched_frontal_units.clear();
         self.containment_stationary_since = None;
@@ -223,6 +254,103 @@ impl AiDecisionMemory {
             sustained,
             response: self.defensive_panic_response,
         }
+    }
+
+    pub(super) fn note_defensive_contact(
+        &mut self,
+        tick: u32,
+        position: (f32, f32),
+        threat_value: u32,
+    ) {
+        self.defensive_incident = Some(DefensiveIncidentMemory {
+            last_contact_tick: tick,
+            x: position.0.round() as i32,
+            y: position.1.round() as i32,
+            threat_value,
+        });
+    }
+
+    pub(super) fn defensive_incident(
+        &mut self,
+        tick: u32,
+        search_ticks: u32,
+    ) -> Option<DefensiveIncident> {
+        let incident = self.defensive_incident?;
+        if tick.saturating_sub(incident.last_contact_tick) > search_ticks {
+            self.defensive_incident = None;
+            return None;
+        }
+        Some(DefensiveIncident {
+            last_contact_tick: incident.last_contact_tick,
+            position: (incident.x as f32, incident.y as f32),
+            threat_value: incident.threat_value,
+        })
+    }
+
+    pub(super) fn clear_defensive_incident(&mut self) {
+        self.defensive_incident = None;
+    }
+
+    pub(super) fn sync_defender_posture(&mut self, observation: &AiObservation) {
+        if observation.upgrades.contains(&UpgradeKind::Entrenchment) {
+            self.entrenchment_available_since
+                .get_or_insert(observation.tick);
+        } else {
+            self.entrenchment_available_since = None;
+        }
+        let active: BTreeSet<u32> = observation
+            .owned
+            .iter()
+            .filter(|entity| {
+                entity.is_complete
+                    && entity.hp > 0
+                    && rts_rules::balance::is_entrenchment_eligible_infantry(entity.kind)
+            })
+            .map(|entity| entity.id)
+            .collect();
+        self.defender_posture
+            .retain(|unit_id, _| active.contains(unit_id));
+        for unit in observation
+            .owned
+            .iter()
+            .filter(|entity| active.contains(&entity.id))
+        {
+            let x = unit.x.round() as i32;
+            let y = unit.y.round() as i32;
+            self.defender_posture
+                .entry(unit.id)
+                .and_modify(|posture| {
+                    let moved = posture.x != x
+                        || posture.y != y
+                        || unit.state == AiEntityState::Move;
+                    if moved {
+                        posture.stationary_since = observation.tick;
+                    }
+                    posture.x = x;
+                    posture.y = y;
+                })
+                .or_insert(DefenderPostureMemory {
+                    x,
+                    y,
+                    stationary_since: observation.tick,
+                });
+        }
+    }
+
+    pub(super) fn estimated_entrenchment_ticks(
+        &self,
+        observation: &AiObservation,
+        unit_id: u32,
+    ) -> u32 {
+        let Some(available_since) = self.entrenchment_available_since else {
+            return 0;
+        };
+        self.defender_posture.get(&unit_id).map_or(0, |posture| {
+            observation
+                .tick
+                .saturating_sub(posture.stationary_since.max(available_since))
+                .min(rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS)
+        })
     }
 
     pub(super) fn sync_turtle_opening(&mut self, profile: &AiProfile, observation: &AiObservation) {

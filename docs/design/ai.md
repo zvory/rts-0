@@ -215,6 +215,17 @@ Tank core exists. The profile uses the shared decision and action layers, receiv
 fog-filtered observations, and issues ordinary validated player commands for spending, placement,
 production, and combat.
 
+Its local-defense envelope covers every owned building footprint, including incomplete structures,
+plus reserved sites for submitted build intents. Home Riflemen stage outside the exposed edges of
+that combined envelope instead of remaining centered on the starting Steel line. When visible enemy
+material enters the envelope, the profile reinforces a blocking point outside the nearest
+threatened footprint with the least entrenched available defenders first, preserving dug-in units
+when equivalent mobile reserves can respond. Lost contact creates only a bounded two-second search
+incident; reaching the last contact
+point without reacquiring the enemy or reaching the timeout returns the units to normal defensive
+staging. The internal `jeffs_ai_pre_defense_envelope` profile freezes the preceding Jeff policy for
+arena regression comparisons and is not exposed in the lobby selector.
+
 ### Self-play and arena tools
 
 Matchup, arena, balance, `LiveSelfPlay`, real-AI tests, and live-AI performance hosts all use that
