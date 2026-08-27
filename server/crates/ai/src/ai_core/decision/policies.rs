@@ -1,19 +1,5 @@
 use super::*;
 
-pub(super) fn profile_upgrade_prerequisites_met(
-    facts: &AiFacts,
-    profile: &AiProfile,
-    upgrade: UpgradeKind,
-) -> bool {
-    upgrade != UpgradeKind::Methamphetamines
-        || !profile
-            .upgrade_priorities
-            .contains(&UpgradeKind::Entrenchment)
-        || facts
-            .completed_upgrades()
-            .contains(&UpgradeKind::Entrenchment)
-}
-
 pub(super) fn active_tech_transition(
     observation: &AiObservation,
     profile: &AiProfile,

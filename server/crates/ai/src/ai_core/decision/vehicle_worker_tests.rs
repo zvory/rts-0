@@ -3,7 +3,7 @@ use super::*;
 use crate::ai_core::observation::{
     AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary, AiResourceSummary,
 };
-use crate::ai_core::profiles::{AiProfile, AI_2_1, JEFFS_AI, JEFFS_AI_PRE_EARLY_METH};
+use crate::ai_core::profiles::{AiProfile, AI_2_1, JEFFS_AI};
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
@@ -325,64 +325,6 @@ fn jeff_starts_vehicle_works_before_tank_production_research() {
             }
         )
     }));
-}
-
-#[test]
-fn jeff_researches_meth_immediately_after_entrenchment_without_waiting_for_tanks() {
-    let mut before_entrenchment =
-        jeff_armored_tech_observation(Some(building(5, EntityKind::Factory, Some(0))));
-    before_entrenchment
-        .owned
-        .iter_mut()
-        .find(|building| building.kind == EntityKind::TrainingCentre)
-        .expect("Training Centre")
-        .production_queue_len = Some(0);
-    before_entrenchment.upgrades.push(UpgradeKind::TankUnlock);
-
-    let decision = decide_with_profile(&before_entrenchment, &JEFFS_AI);
-    assert!(decision.commands.iter().any(|command| matches!(
-        command,
-        Command::Research {
-            upgrade: UpgradeKind::Entrenchment,
-            ..
-        }
-    )));
-    assert!(!decision.commands.iter().any(|command| matches!(
-        command,
-        Command::Research {
-            upgrade: UpgradeKind::Methamphetamines,
-            ..
-        }
-    )));
-
-    let mut after_entrenchment = before_entrenchment;
-    after_entrenchment.upgrades.push(UpgradeKind::Entrenchment);
-    let decision = decide_with_profile(&after_entrenchment, &JEFFS_AI);
-    assert!(decision.commands.iter().any(|command| matches!(
-        command,
-        Command::Research {
-            upgrade: UpgradeKind::Methamphetamines,
-            ..
-        }
-    )));
-    assert_eq!(
-        after_entrenchment
-            .owned
-            .iter()
-            .filter(|unit| unit.kind == EntityKind::Tank)
-            .count(),
-        0,
-        "the early Meth order must not rely on the old three-Tank gate"
-    );
-
-    let frozen = decide_with_profile(&after_entrenchment, &JEFFS_AI_PRE_EARLY_METH);
-    assert!(!frozen.commands.iter().any(|command| matches!(
-        command,
-        Command::Research {
-            upgrade: UpgradeKind::Methamphetamines,
-            ..
-        }
-    )));
 }
 
 #[test]

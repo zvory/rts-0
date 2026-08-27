@@ -283,9 +283,12 @@ fn home_rifle_coverage_uses_wide_fixed_columns_and_deeper_second_rank() {
 fn planned_factory_is_part_of_the_local_defense_envelope() {
     let mut observation = los_test_observation(EntityKind::Depot);
     let ts = observation.map.tile_size as f32;
-    observation
-        .pending_builds
-        .push(AiBuildIntent::to_site(99, EntityKind::Factory, 18, 4));
+    observation.pending_builds.push(AiBuildIntent::to_site(
+        99,
+        EntityKind::Factory,
+        18,
+        4,
+    ));
     let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
     let right_edge = (18 + stats.foot_w) as f32 * ts;
     observation.visible_enemies.push(AiEntitySummary {
@@ -321,9 +324,12 @@ fn planned_factory_is_part_of_the_local_defense_envelope() {
 fn incomplete_factory_is_part_of_the_local_defense_envelope() {
     let mut observation = los_test_observation(EntityKind::Depot);
     let ts = observation.map.tile_size as f32;
-    let (factory_x, factory_y) =
-        building_center((18, 4), EntityKind::Factory, observation.map.tile_size)
-            .expect("Factory footprint");
+    let (factory_x, factory_y) = building_center(
+        (18, 4),
+        EntityKind::Factory,
+        observation.map.tile_size,
+    )
+    .expect("Factory footprint");
     observation.owned.push(AiEntitySummary {
         id: 20,
         owner: 1,
@@ -368,9 +374,12 @@ fn incomplete_factory_is_part_of_the_local_defense_envelope() {
 fn home_rifle_envelope_forms_beyond_a_planned_factory_footprint() {
     let mut observation = los_test_observation(EntityKind::Depot);
     observation.owned.clear();
-    observation
-        .pending_builds
-        .push(AiBuildIntent::to_site(99, EntityKind::Factory, 16, 4));
+    observation.pending_builds.push(AiBuildIntent::to_site(
+        99,
+        EntityKind::Factory,
+        16,
+        4,
+    ));
     let ts = observation.map.tile_size as f32;
     let enemy_base = EnemyBaseFact {
         player_id: 2,
@@ -388,9 +397,7 @@ fn home_rifle_envelope_forms_beyond_a_planned_factory_footprint() {
     let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
     let right_edge = (16 + stats.foot_w) as f32 * ts;
 
-    assert!(assignments
-        .iter()
-        .all(|assignment| assignment.x > right_edge));
+    assert!(assignments.iter().all(|assignment| assignment.x > right_edge));
 }
 
 #[test]

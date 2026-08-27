@@ -320,8 +320,9 @@ impl AiDecisionMemory {
             self.defender_posture
                 .entry(unit.id)
                 .and_modify(|posture| {
-                    let moved =
-                        posture.x != x || posture.y != y || unit.state == AiEntityState::Move;
+                    let moved = posture.x != x
+                        || posture.y != y
+                        || unit.state == AiEntityState::Move;
                     if moved {
                         posture.stationary_since = observation.tick;
                     }

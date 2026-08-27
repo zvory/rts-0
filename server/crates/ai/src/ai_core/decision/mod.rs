@@ -13,8 +13,7 @@ use crate::ai_core::observation::{
 use crate::ai_core::profiles::{
     is_jeffs_ai_profile, AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy,
     ExpansionPolicy, ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
-    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_EARLY_METH_ID,
-    JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -36,8 +35,6 @@ mod resources;
 mod trace;
 mod turtle;
 
-#[cfg(test)]
-use self::defense::select_defensive_interceptors;
 use self::defense::{
     defensive_machine_gunner_units, defensive_machine_gunner_units_for_build_clearance,
     defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
@@ -48,6 +45,8 @@ use self::defense::{
     stage_main_steel_defensive_line, DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS,
     DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
+#[cfg(test)]
+use self::defense::select_defensive_interceptors;
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
     EconomyProposal, OilDemandSignal,
@@ -60,7 +59,7 @@ use self::geometry::{
 pub(crate) use self::memory::AiDecisionMemory;
 use self::policies::{
     active_attack_policy, active_barracks_curve, active_production_policy,
-    active_required_tech_path, active_tech_transition, profile_upgrade_prerequisites_met,
+    active_required_tech_path, active_tech_transition,
 };
 use self::production::{
     producer_for_unit, production_building_order, production_uses_building,
@@ -196,8 +195,7 @@ where
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
 
-    let local_threat_response =
-        defensive_panic_response(observation, uses_defended_building_envelope(profile.id));
+    let local_threat_response = defensive_panic_response(observation, profile.id == JEFFS_AI_ID);
     let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
     let panic_plan = defensive_panic
         .active
@@ -746,7 +744,7 @@ where
             }
         }
         let local_target = local_defense_target(observation);
-        let new_jeff_defense = uses_defended_building_envelope(profile.id);
+        let new_jeff_defense = profile.id == JEFFS_AI_ID;
         let mut jeff_layered_home_defense = local_target.is_some()
             && is_jeffs_ai_profile(profile.id)
             && profile.home_anti_tank.is_some();
@@ -761,7 +759,9 @@ where
                     .filter(|unit| {
                         matches!(
                             unit.kind,
-                            EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::ScoutCar
+                            EntityKind::Rifleman
+                                | EntityKind::MachineGunner
+                                | EntityKind::ScoutCar
                         )
                     })
                     .map(|unit| unit.id),
@@ -869,7 +869,7 @@ where
                 })
                 .map(|entity| entity.id);
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                let staged = if uses_defended_building_envelope(profile.id) {
+                let staged = if profile.id == JEFFS_AI_ID {
                     stage_home_rifleman_envelope_coverage(
                         &mut actions,
                         observation,
@@ -1040,12 +1040,8 @@ where
 fn uses_home_rifle_coverage(profile_id: &str) -> bool {
     matches!(
         profile_id,
-        JEFFS_AI_ID | JEFFS_AI_PRE_EARLY_METH_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
+        JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
     )
-}
-
-fn uses_defended_building_envelope(profile_id: &str) -> bool {
-    matches!(profile_id, JEFFS_AI_ID | JEFFS_AI_PRE_EARLY_METH_ID)
 }
 
 /// Jeff's producers send fresh combat units to a safe forward staging point immediately.
@@ -1400,9 +1396,6 @@ fn queue_profile_upgrades(
     profile: &AiProfile,
 ) {
     for upgrade in profile.upgrade_priorities {
-        if !profile_upgrade_prerequisites_met(facts, profile, *upgrade) {
-            continue;
-        }
         if profile.fast_tank_timing.is_some()
             && *upgrade == UpgradeKind::TankUnlock
             && if is_jeffs_ai_profile(profile.id) {
@@ -1443,9 +1436,6 @@ fn queue_jeff_infantry_mass_methamphetamines(
     profile: &AiProfile,
 ) {
     if !is_jeffs_ai_profile(profile.id)
-        || profile
-            .upgrade_priorities
-            .contains(&UpgradeKind::Methamphetamines)
         || facts
             .unit_count(EntityKind::Rifleman)
             .saturating_add(facts.unit_count(EntityKind::MachineGunner))

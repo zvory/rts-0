@@ -9,8 +9,8 @@ use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 
 pub(crate) const JEFFS_AI_ID: &str = "jeffs_ai";
-pub(crate) const JEFFS_AI_PRE_EARLY_METH_ID: &str = "jeffs_ai_pre_early_meth";
-pub(crate) const JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID: &str = "jeffs_ai_pre_defense_envelope";
+pub(crate) const JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID: &str =
+    "jeffs_ai_pre_defense_envelope";
 pub(crate) const JEFFS_AI_PRE_RIFLE_COVERAGE_ID: &str = "jeffs_ai_pre_rifle_coverage";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
@@ -22,23 +22,7 @@ const ARMORED_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Factory,
 ];
 const UPGRADES: [UpgradeKind; 2] = [UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
-const EARLY_METH_UPGRADES: [UpgradeKind; 3] = [
-    UpgradeKind::TankUnlock,
-    UpgradeKind::Entrenchment,
-    UpgradeKind::Methamphetamines,
-];
-const NO_OPTIONAL_UPGRADES: [UpgradeKind; 0] = [];
 const OPTIONAL_UPGRADES: [UpgradeKind; 1] = [UpgradeKind::Methamphetamines];
-
-const EARLY_METH_FAST_TANK_TIMING: FastTankTimingPolicy = FastTankTimingPolicy {
-    workers_before_barracks: 1,
-    pump_jacks_before_barracks: 2,
-    tanks_before_scout_car: 2,
-    scout_car_target: 1,
-    tanks_before_optional_upgrades: 3,
-    optional_upgrades: &NO_OPTIONAL_UPGRADES,
-    preserve_during_defensive_panic: true,
-};
 
 /// Server-authoritative port of the champion V3 policy developed in the standalone
 /// `Jeff's AI` workspace. The live controller still emits ordinary fog-constrained
@@ -182,18 +166,7 @@ const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) static JEFFS_AI: AiProfile = AiProfile {
-    upgrade_priorities: &EARLY_METH_UPGRADES,
-    fast_tank_timing: Some(EARLY_METH_FAST_TANK_TIMING),
-    ..JEFFS_AI_TEMPLATE
-};
-
-/// Frozen immediately before Methamphetamines moved directly behind Entrenchment. This profile
-/// retains the defended-building envelope and bounded incident response for isolated arena tests.
-pub(crate) static JEFFS_AI_PRE_EARLY_METH: AiProfile = AiProfile {
-    id: JEFFS_AI_PRE_EARLY_METH_ID,
-    ..JEFFS_AI_TEMPLATE
-};
+pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_TEMPLATE;
 
 /// Frozen immediately before defended-building envelope placement and bounded incident response.
 /// This remains internal and exists so arena runs can compare the active profile against the exact
@@ -258,16 +231,7 @@ mod tests {
         assert_eq!(timing.pump_jacks_before_barracks, 2);
         assert_eq!(timing.tanks_before_scout_car, 2);
         assert_eq!(timing.scout_car_target, 1);
-        assert_eq!(JEFFS_AI.upgrade_priorities, &EARLY_METH_UPGRADES);
-        assert_eq!(timing.optional_upgrades, &NO_OPTIONAL_UPGRADES);
-        assert_eq!(JEFFS_AI_PRE_EARLY_METH.upgrade_priorities, &UPGRADES);
-        assert_eq!(
-            JEFFS_AI_PRE_EARLY_METH
-                .fast_tank_timing
-                .expect("frozen fast tank timing")
-                .optional_upgrades,
-            &OPTIONAL_UPGRADES
-        );
+        assert_eq!(timing.optional_upgrades, &OPTIONAL_UPGRADES);
         assert_eq!(JEFFS_AI.surplus_steel_production.unwrap().reserve, 600);
         assert_eq!(JEFFS_AI.extra_factories.unwrap().minimum_units, 3);
     }

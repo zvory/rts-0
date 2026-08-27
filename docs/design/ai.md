@@ -210,15 +210,10 @@ below 50% health no longer counts toward that healthy screen and triggers a repl
 Tank tech path starts immediately, Tanks do not wait for Methamphetamines, and defensive panic
 does not replace the active armored production plan with infantry. After two Tanks, one Scout Car
 takes temporary Factory priority and joins those Tanks as a single vision-supported attack wave.
-Expansion, a second Factory, and other optional spending wait until the initial Tank core exists.
-The profile uses the shared decision and action layers, receives only
+Expansion, a second Factory, Methamphetamines, and other optional spending wait until the initial
+Tank core exists. The profile uses the shared decision and action layers, receives only
 fog-filtered observations, and issues ordinary validated player commands for spending, placement,
 production, and combat.
-
-Canonical Jeff now queues Methamphetamines directly after Entrenchment completes, independent of
-Tank count; the fast-Tank policy's optional-upgrade gate cannot delay it. The internal
-`jeffs_ai_pre_early_meth` profile freezes the immediately preceding defended-building policy with
-the prior three-Tank Methamphetamines gate for isolated 120 game test comparisons.
 
 Its local-defense envelope covers every owned building footprint, including incomplete structures,
 plus reserved sites for submitted build intents. Home Riflemen stage outside the exposed edges of
@@ -272,7 +267,7 @@ runs all three pairings on The River, Schone Tage, 1v1, and Crossroads with five
 caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
 Markdown, JSON, and CSV summaries.
 
-    node scripts/120-game-test.mjs ai_2_1 jeffs_ai_pre_early_meth jeffs_ai
+    node scripts/120-game-test.mjs ai_2_1 jeffs_ai_pre_defense_envelope jeffs_ai
 
 Scorecards report diagnostic economy, army, building, command, attack, damage, death, and milestone
 data. Material values do not break ties. Replay artifacts remain the source of player intent;
