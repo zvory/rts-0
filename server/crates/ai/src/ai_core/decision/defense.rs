@@ -7,11 +7,11 @@ use super::*;
 mod envelope;
 mod incident;
 
-use self::envelope::{
-    balanced_approach_slot, defended_building_sites, defended_envelope_center,
-    defended_envelope_support, DefendedBuildingSite,
-};
 pub(super) use self::envelope::local_defense_contact;
+use self::envelope::{
+    defended_building_sites, defended_envelope_center, defended_envelope_support,
+    defensive_formation_sites, DefendedBuildingSite,
+};
 pub(super) use self::incident::respond_to_local_incident;
 #[cfg(test)]
 pub(super) use self::incident::select_defensive_interceptors;
@@ -635,7 +635,7 @@ fn home_rifleman_coverage_assignments_with_policy(
         return None;
     }
     let defended_sites = if use_building_envelope {
-        defended_building_sites(observation, true)
+        defensive_formation_sites(observation)
     } else {
         Vec::new()
     };
@@ -684,22 +684,8 @@ fn home_rifleman_coverage_assignments_with_policy(
         .into_iter()
         .enumerate()
         .filter_map(|(index, unit_id)| {
-            let (approach_index, local_slot) = if use_building_envelope {
-                balanced_approach_slot(index, unit_count, approach_count)
-            } else {
-                let primary_slots = (unit_count * 3).div_ceil(5);
-                let approach_index = if index < primary_slots || approach_count == 1 {
-                    0
-                } else {
-                    1 + (index - primary_slots) % (approach_count - 1)
-                };
-                let local_slot = if approach_index == 0 {
-                    index
-                } else {
-                    (index - primary_slots) / (approach_count - 1)
-                };
-                (approach_index, local_slot)
-            };
+            let (approach_index, local_slot) =
+                primary_weighted_approach_slot(index, unit_count, approach_count);
             let target = approach_targets[approach_index];
             let direction = normalized_direction(anchor, target)?;
             let perpendicular = (-direction.1, direction.0);
@@ -732,6 +718,28 @@ fn home_rifleman_coverage_assignments_with_policy(
         })
         .collect::<Vec<_>>();
     (!assignments.is_empty()).then_some(assignments)
+}
+
+fn primary_weighted_approach_slot(
+    index: usize,
+    unit_count: usize,
+    approach_count: usize,
+) -> (usize, usize) {
+    // Keep three fifths of the line on the known enemy approach. The remaining two fifths cover
+    // secondary chokes without weakening the mirrored Tank lane.
+    let approach_count = approach_count.max(1);
+    let primary_slots = (unit_count * 3).div_ceil(5);
+    let approach_index = if index < primary_slots || approach_count == 1 {
+        0
+    } else {
+        1 + (index - primary_slots) % (approach_count - 1)
+    };
+    let local_slot = if approach_index == 0 {
+        index
+    } else {
+        (index - primary_slots) / (approach_count - 1)
+    };
+    (approach_index, local_slot)
 }
 
 fn clear_mobile_defensive_position(
@@ -1408,17 +1416,14 @@ impl LocalDefenseGeometry {
                 .workers
                 .iter()
                 .any(|(x, y)| dist2(entity.x, entity.y, *x, *y) <= self.worker_radius2)
-            || self
-                .buildings
-                .iter()
-                .any(|building| {
-                    let distance2 = if self.use_building_footprints {
-                        building.distance2_to_footprint((entity.x, entity.y))
-                    } else {
-                        dist2(entity.x, entity.y, building.x, building.y)
-                    };
-                    distance2 <= self.building_radius2
-                })
+            || self.buildings.iter().any(|building| {
+                let distance2 = if self.use_building_footprints {
+                    building.distance2_to_footprint((entity.x, entity.y))
+                } else {
+                    dist2(entity.x, entity.y, building.x, building.y)
+                };
+                distance2 <= self.building_radius2
+            })
     }
 
     fn base_dist2(&self, entity: &AiEntitySummary) -> f32 {

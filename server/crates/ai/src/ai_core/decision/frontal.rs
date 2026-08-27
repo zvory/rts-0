@@ -22,6 +22,8 @@ const ENDGAME_SEARCH_OFFSETS: [(f32, f32); 17] = [
 ];
 
 pub(super) const OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES: f32 = 14.0;
+const RIFLE_SCREEN_FORWARD_TILES: f32 = 2.0;
+const RIFLE_SCREEN_SPACING_TILES: f32 = 1.25;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum FrontalWaveBlocker {
@@ -186,6 +188,7 @@ pub(super) fn sync_containment_recovery(
         memory.containment_recovery_active = false;
         memory.containment_active_tanks.clear();
         memory.containment_active_scout = None;
+        memory.containment_active_riflemen.clear();
         return;
     };
     if !memory.containment_wave_launched || memory.enemy_main_destroyed {
@@ -209,6 +212,7 @@ pub(super) fn sync_containment_recovery(
     memory.containment_recovery_active = true;
     memory.containment_active_tanks.clear();
     memory.containment_active_scout = None;
+    memory.containment_active_riflemen.clear();
     memory.containment_stationary_since = None;
 }
 
@@ -277,6 +281,83 @@ fn unit_position(observation: &AiObservation, unit_id: u32) -> Option<(f32, f32)
         .map(|unit| (unit.x, unit.y))
 }
 
+fn select_rifle_escorts(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    anchor: (f32, f32),
+) -> Vec<u32> {
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|unit| (unit.id, unit))
+        .collect();
+    let mut riflemen =
+        actions::select_ready_combat_units(&observation.owned, &[EntityKind::Rifleman]);
+    let escort_count = riflemen.len().div_ceil(2);
+    riflemen.sort_by(|left, right| {
+        memory
+            .estimated_entrenchment_ticks(observation, *left)
+            .cmp(&memory.estimated_entrenchment_ticks(observation, *right))
+            .then_with(|| {
+                let left_distance = by_id.get(left).map_or(f32::INFINITY, |unit| {
+                    dist2(unit.x, unit.y, anchor.0, anchor.1)
+                });
+                let right_distance = by_id.get(right).map_or(f32::INFINITY, |unit| {
+                    dist2(unit.x, unit.y, anchor.0, anchor.1)
+                });
+                left_distance.total_cmp(&right_distance)
+            })
+            .then_with(|| left.cmp(right))
+    });
+    riflemen.truncate(escort_count);
+    riflemen
+}
+
+fn rifle_screen_point(
+    tank_anchor: (f32, f32),
+    objective: (f32, f32),
+    map: AiMapSummary,
+) -> Option<(f32, f32)> {
+    let direction = normalized_direction(tank_anchor, objective)?;
+    let forward = RIFLE_SCREEN_FORWARD_TILES * map.tile_size as f32;
+    Some(clamp_to_map(
+        (
+            tank_anchor.0 + direction.0 * forward,
+            tank_anchor.1 + direction.1 * forward,
+        ),
+        map,
+    ))
+}
+
+fn rifle_screen_points(
+    tank_anchor: (f32, f32),
+    objective: (f32, f32),
+    map: AiMapSummary,
+    count: usize,
+) -> Vec<(f32, f32)> {
+    let Some(center) = rifle_screen_point(tank_anchor, objective, map) else {
+        return Vec::new();
+    };
+    let Some(direction) = normalized_direction(tank_anchor, objective) else {
+        return Vec::new();
+    };
+    let perpendicular = (-direction.1, direction.0);
+    let spacing = RIFLE_SCREEN_SPACING_TILES * map.tile_size as f32;
+    let center_index = (count.saturating_sub(1)) as f32 / 2.0;
+    (0..count)
+        .map(|index| {
+            let offset = (index as f32 - center_index) * spacing;
+            clamp_to_map(
+                (
+                    center.0 + perpendicular.0 * offset,
+                    center.1 + perpendicular.1 * offset,
+                ),
+                map,
+            )
+        })
+        .collect()
+}
+
 fn compact_group_near(
     observation: &AiObservation,
     unit_ids: &[u32],
@@ -326,6 +407,10 @@ fn issue_expansion_containment_wave(
     }
     tanks.sort_unstable();
     scouts.sort_unstable();
+    let owned: BTreeSet<u32> = observation.owned.iter().map(|unit| unit.id).collect();
+    memory
+        .containment_active_riflemen
+        .retain(|rifleman| owned.contains(rifleman));
     if !memory.containment_wave_launched {
         if tanks.len() < policy.minimum_tanks_to_continue {
             return None;
@@ -335,6 +420,11 @@ fn issue_expansion_containment_wave(
         memory.containment_opening_tanks = tanks.iter().copied().collect();
         memory.containment_active_tanks = tanks.iter().copied().collect();
         memory.containment_active_scout = scouts.first().copied();
+        let escort_anchor = group_center(observation, &tanks).unwrap_or(own_base);
+        memory.containment_active_riflemen =
+            select_rifle_escorts(observation, memory, escort_anchor)
+                .into_iter()
+                .collect();
         memory.containment_wave_launched = true;
     } else if memory.containment_recovery_active {
         let required = containment_repush_tank_count(policy, memory.containment_repush_count);
@@ -394,6 +484,10 @@ fn issue_expansion_containment_wave(
         }
         memory.containment_active_tanks = tanks.iter().copied().collect();
         memory.containment_active_scout = scouts.first().copied();
+        memory.containment_active_riflemen =
+            select_rifle_escorts(observation, memory, regroup_point)
+                .into_iter()
+                .collect();
         memory.containment_recovery_active = false;
         memory.containment_stationary_since = None;
     } else {
@@ -552,7 +646,17 @@ fn issue_expansion_containment_wave(
         scout_point.1,
     );
 
+    let riflemen: Vec<u32> = memory.containment_active_riflemen.iter().copied().collect();
+    if !riflemen.is_empty() {
+        let screen_points =
+            rifle_screen_points(tank_anchor, objective, observation.map, riflemen.len());
+        for (rifleman, screen_point) in riflemen.iter().zip(screen_points) {
+            actions::attack_move_units(actions, [*rifleman], screen_point.0, screen_point.1);
+        }
+    }
+
     tanks.extend(scouts);
+    tanks.extend(riflemen);
     tanks.sort_unstable();
     tanks.dedup();
     Some(AiIntent::Attack { units: tanks })
@@ -1019,6 +1123,51 @@ mod tests {
             pending_builds: Vec::new(),
             upgrades: Vec::new(),
         }
+    }
+
+    #[test]
+    fn tank_push_selects_half_of_available_riflemen() {
+        let riflemen = (1..=5)
+            .map(|id| {
+                let mut unit =
+                    target_test_entity(id, EntityKind::Rifleman, id as f32 * 32.0, 320.0);
+                unit.owner = 1;
+                unit
+            })
+            .collect::<Vec<_>>();
+        let observation = regroup_test_observation(riflemen);
+        let memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+
+        let selected = select_rifle_escorts(&observation, &memory, (0.0, 320.0));
+
+        assert_eq!(selected, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn rifle_screen_stays_two_tiles_ahead_of_the_tank_front() {
+        let map = AiMapSummary {
+            width: 100,
+            height: 100,
+            tile_size: 32,
+        };
+
+        let point =
+            rifle_screen_point((320.0, 640.0), (960.0, 640.0), map).expect("forward screen point");
+
+        assert_eq!(point, (384.0, 640.0));
+    }
+
+    #[test]
+    fn rifle_screen_spreads_escorts_across_the_tank_front() {
+        let map = AiMapSummary {
+            width: 100,
+            height: 100,
+            tile_size: 32,
+        };
+
+        let points = rifle_screen_points((320.0, 640.0), (960.0, 640.0), map, 3);
+
+        assert_eq!(points, vec![(384.0, 600.0), (384.0, 640.0), (384.0, 680.0)]);
     }
 
     #[test]

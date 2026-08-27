@@ -734,6 +734,7 @@ fn jeff_enters_larger_repush_recovery_after_an_active_tank_is_lost() {
     memory.containment_opening_tanks = BTreeSet::from([101, 102]);
     memory.containment_active_tanks = BTreeSet::from([101, 102]);
     memory.containment_active_scout = Some(203);
+    memory.containment_active_riflemen = BTreeSet::from([301, 302]);
     memory.home_defensive_tank = Some(200);
     let observation = observation(
         AiEconomy {
@@ -752,6 +753,7 @@ fn jeff_enters_larger_repush_recovery_after_an_active_tank_is_lost() {
     assert!(memory.containment_recovery_active);
     assert_eq!(memory.containment_repush_count, 1);
     assert!(memory.containment_active_tanks.is_empty());
+    assert!(memory.containment_active_riflemen.is_empty());
     assert_eq!(
         JEFFS_AI
             .expansion_containment

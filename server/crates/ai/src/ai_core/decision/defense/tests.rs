@@ -283,12 +283,9 @@ fn home_rifle_coverage_uses_wide_fixed_columns_and_deeper_second_rank() {
 fn planned_factory_is_part_of_the_local_defense_envelope() {
     let mut observation = los_test_observation(EntityKind::Depot);
     let ts = observation.map.tile_size as f32;
-    observation.pending_builds.push(AiBuildIntent::to_site(
-        99,
-        EntityKind::Factory,
-        18,
-        4,
-    ));
+    observation
+        .pending_builds
+        .push(AiBuildIntent::to_site(99, EntityKind::Factory, 18, 4));
     let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
     let right_edge = (18 + stats.foot_w) as f32 * ts;
     observation.visible_enemies.push(AiEntitySummary {
@@ -324,12 +321,9 @@ fn planned_factory_is_part_of_the_local_defense_envelope() {
 fn incomplete_factory_is_part_of_the_local_defense_envelope() {
     let mut observation = los_test_observation(EntityKind::Depot);
     let ts = observation.map.tile_size as f32;
-    let (factory_x, factory_y) = building_center(
-        (18, 4),
-        EntityKind::Factory,
-        observation.map.tile_size,
-    )
-    .expect("Factory footprint");
+    let (factory_x, factory_y) =
+        building_center((18, 4), EntityKind::Factory, observation.map.tile_size)
+            .expect("Factory footprint");
     observation.owned.push(AiEntitySummary {
         id: 20,
         owner: 1,
@@ -371,33 +365,66 @@ fn incomplete_factory_is_part_of_the_local_defense_envelope() {
 }
 
 #[test]
-fn home_rifle_envelope_forms_beyond_a_planned_factory_footprint() {
+fn planned_factory_does_not_move_the_standing_rifle_formation() {
     let mut observation = los_test_observation(EntityKind::Depot);
     observation.owned.clear();
-    observation.pending_builds.push(AiBuildIntent::to_site(
-        99,
-        EntityKind::Factory,
-        16,
-        4,
-    ));
-    let ts = observation.map.tile_size as f32;
-    let enemy_base = EnemyBaseFact {
-        player_id: 2,
-        start_tile: (30, 6),
-        x: 30.5 * ts,
-        y: 6.5 * ts,
-    };
-    let assignments = home_rifleman_envelope_coverage_assignments(
-        &observation,
-        None,
-        &[10, 20, 30, 40],
-        enemy_base,
-    )
-    .expect("envelope assignments");
-    let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
-    let right_edge = (16 + stats.foot_w) as f32 * ts;
+    observation
+        .pending_builds
+        .push(AiBuildIntent::to_site(99, EntityKind::Factory, 16, 4));
+    assert!(defensive_formation_sites(&observation).is_empty());
+    assert_eq!(defended_building_sites(&observation, true).len(), 1);
+}
 
-    assert!(assignments.iter().all(|assignment| assignment.x > right_edge));
+#[test]
+fn standing_rifle_formation_ignores_extractors() {
+    let mut observation = los_test_observation(EntityKind::Depot);
+    observation.owned.push(AiEntitySummary {
+        id: 21,
+        owner: 1,
+        kind: EntityKind::PumpJack,
+        x: 20.5 * observation.map.tile_size as f32,
+        y: 20.5 * observation.map.tile_size as f32,
+        hp: 100,
+        state: AiEntityState::Idle,
+        is_complete: true,
+        production_queue_len: None,
+        production_kind: None,
+        latched_node: None,
+        target_id: None,
+        free_for_combat: false,
+    });
+
+    assert_eq!(defensive_formation_sites(&observation).len(), 1);
+    assert_eq!(defended_building_sites(&observation, false).len(), 2);
+}
+
+#[test]
+fn standing_rifle_line_keeps_three_fifths_on_the_primary_approach() {
+    let assignments = (0..10)
+        .map(|index| primary_weighted_approach_slot(index, 10, 3).0)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        assignments
+            .iter()
+            .filter(|approach| **approach == 0)
+            .count(),
+        6
+    );
+    assert_eq!(
+        assignments
+            .iter()
+            .filter(|approach| **approach == 1)
+            .count(),
+        2
+    );
+    assert_eq!(
+        assignments
+            .iter()
+            .filter(|approach| **approach == 2)
+            .count(),
+        2
+    );
 }
 
 #[test]

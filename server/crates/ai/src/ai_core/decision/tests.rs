@@ -235,17 +235,14 @@ fn decide(
 fn defensive_incident_search_expires_at_its_bounded_end_condition() {
     const SEARCH_TICKS: u32 = config::TICK_HZ * 2;
     let mut memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
-    memory.note_defensive_contact(100, (320.4, 640.6), 100);
+    memory.note_defensive_contact(100, (320.4, 640.6), 100, false);
 
     let active = memory
         .defensive_incident(100 + SEARCH_TICKS, SEARCH_TICKS)
         .expect("incident remains active through the search window");
     assert_eq!(active.position, (320.0, 641.0));
     assert!(memory
-        .defensive_incident(
-            101 + SEARCH_TICKS,
-            SEARCH_TICKS
-        )
+        .defensive_incident(101 + SEARCH_TICKS, SEARCH_TICKS)
         .is_none());
 }
 
@@ -281,15 +278,54 @@ fn defensive_interceptors_move_unentrenched_reserves_first() {
         &memory,
         vec![20, 30, 10],
         (20.5 * ts, 10.5 * ts),
-        50,
+        10,
+        false,
     );
 
-    assert_eq!(selected.len(), 3);
-    assert_eq!(selected[0], 10);
+    assert_eq!(selected, vec![10]);
     assert_eq!(
         memory.estimated_entrenchment_ticks(&observation, 20),
         rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS
     );
+}
+
+#[test]
+fn defensive_interceptors_prioritize_anti_armor_and_refuse_rifle_only_sacrifices() {
+    let ts = config::TILE_SIZE as f32;
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 4,
+            supply_cap: 10,
+        },
+        vec![
+            combat_at(10, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts),
+            combat_at(20, EntityKind::Rifleman, 11.5 * ts, 10.5 * ts),
+            combat_at(30, EntityKind::Tank, 12.5 * ts, 10.5 * ts),
+        ],
+    );
+    let memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
+
+    let with_tank = select_defensive_interceptors(
+        &observation,
+        &memory,
+        vec![10, 20, 30],
+        (20.5 * ts, 10.5 * ts),
+        600,
+        true,
+    );
+    let rifles_only = select_defensive_interceptors(
+        &observation,
+        &memory,
+        vec![10, 20],
+        (20.5 * ts, 10.5 * ts),
+        600,
+        true,
+    );
+
+    assert_eq!(with_tank.first(), Some(&30));
+    assert!(rifles_only.is_empty());
 }
 
 #[test]

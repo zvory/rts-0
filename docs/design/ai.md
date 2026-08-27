@@ -216,15 +216,18 @@ fog-filtered observations, and issues ordinary validated player commands for spe
 production, and combat.
 
 Its local-defense envelope covers every owned building footprint, including incomplete structures,
-plus reserved sites for submitted build intents. Home Riflemen stage outside the exposed edges of
-that combined envelope instead of remaining centered on the starting Steel line. When visible enemy
-material enters the envelope, the profile reinforces a blocking point outside the nearest
-threatened footprint with the least entrenched available defenders first, preserving dug-in units
-when equivalent mobile reserves can respond. Lost contact creates only a bounded two-second search
-incident; reaching the last contact
-point without reacquiring the enemy or reaching the timeout returns the units to normal defensive
-staging. The internal `jeffs_ai_pre_defense_envelope` profile freezes the preceding Jeff policy for
-arena regression comparisons and is not exposed in the lobby selector.
+plus reserved sites for submitted build intents. The standing Rifleman formation is anchored only
+to completed core buildings, not extractors or pending construction, and keeps three fifths of the
+line on the primary approach. When visible enemy material enters the wider envelope, mobile
+defenders focus the highest-value visible target at the threatened footprint. Tanks and
+Panzerfausts answer armored contacts first, fully entrenched Riflemen remain in place, and an
+understrength Rifle-only group does not make a sacrificial intercept. Lost contact creates only a
+bounded two-second search incident; reaching the last contact point without reacquiring the enemy
+or reaching the timeout returns the units to normal defensive staging. Each Tank containment push
+also assigns half of the ready Riflemen as a stable escort cohort and orders them to screen two
+tiles ahead of the Tank front; the remaining Riflemen stay available for home defense. The internal
+`jeffs_ai_pre_defense_envelope` profile freezes the preceding Jeff policy for arena regression
+comparisons and is not exposed in the lobby selector.
 
 ### Self-play and arena tools
 

@@ -20,6 +20,7 @@ struct DefensiveIncidentMemory {
     x: i32,
     y: i32,
     threat_value: u32,
+    armored_threat: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -27,6 +28,7 @@ pub(super) struct DefensiveIncident {
     pub(super) last_contact_tick: u32,
     pub(super) position: (f32, f32),
     pub(super) threat_value: u32,
+    pub(super) armored_threat: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,6 +64,7 @@ pub(crate) struct AiDecisionMemory {
     pub(super) containment_recovery_active: bool,
     pub(super) containment_active_tanks: BTreeSet<u32>,
     pub(super) containment_active_scout: Option<u32>,
+    pub(super) containment_active_riflemen: BTreeSet<u32>,
     pub(super) containment_repush_count: usize,
     pub(super) home_defensive_tank: Option<u32>,
     pub(super) home_defensive_tank_assigned_once: bool,
@@ -95,6 +98,7 @@ impl AiDecisionMemory {
             containment_recovery_active: false,
             containment_active_tanks: BTreeSet::new(),
             containment_active_scout: None,
+            containment_active_riflemen: BTreeSet::new(),
             containment_repush_count: 0,
             home_defensive_tank: None,
             home_defensive_tank_assigned_once: false,
@@ -180,6 +184,7 @@ impl AiDecisionMemory {
         self.containment_recovery_active = false;
         self.containment_active_tanks.clear();
         self.containment_active_scout = None;
+        self.containment_active_riflemen.clear();
         self.containment_repush_count = 0;
         self.home_defensive_tank = None;
         self.home_defensive_tank_assigned_once = false;
@@ -261,12 +266,14 @@ impl AiDecisionMemory {
         tick: u32,
         position: (f32, f32),
         threat_value: u32,
+        armored_threat: bool,
     ) {
         self.defensive_incident = Some(DefensiveIncidentMemory {
             last_contact_tick: tick,
             x: position.0.round() as i32,
             y: position.1.round() as i32,
             threat_value,
+            armored_threat,
         });
     }
 
@@ -284,6 +291,7 @@ impl AiDecisionMemory {
             last_contact_tick: incident.last_contact_tick,
             position: (incident.x as f32, incident.y as f32),
             threat_value: incident.threat_value,
+            armored_threat: incident.armored_threat,
         })
     }
 
@@ -320,9 +328,8 @@ impl AiDecisionMemory {
             self.defender_posture
                 .entry(unit.id)
                 .and_modify(|posture| {
-                    let moved = posture.x != x
-                        || posture.y != y
-                        || unit.state == AiEntityState::Move;
+                    let moved =
+                        posture.x != x || posture.y != y || unit.state == AiEntityState::Move;
                     if moved {
                         posture.stationary_since = observation.tick;
                     }

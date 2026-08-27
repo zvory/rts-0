@@ -35,6 +35,8 @@ mod resources;
 mod trace;
 mod turtle;
 
+#[cfg(test)]
+use self::defense::select_defensive_interceptors;
 use self::defense::{
     defensive_machine_gunner_units, defensive_machine_gunner_units_for_build_clearance,
     defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
@@ -45,8 +47,6 @@ use self::defense::{
     stage_main_steel_defensive_line, DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS,
     DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
-#[cfg(test)]
-use self::defense::select_defensive_interceptors;
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
     EconomyProposal, OilDemandSignal,
@@ -762,6 +762,8 @@ where
                             EntityKind::Rifleman
                                 | EntityKind::MachineGunner
                                 | EntityKind::ScoutCar
+                                | EntityKind::Panzerfaust
+                                | EntityKind::Tank
                         )
                     })
                     .map(|unit| unit.id),
@@ -843,6 +845,7 @@ where
                             && unit.is_complete
                             && unit.hp > 0
                             && !local_defense_assigned.contains(&unit.id)
+                            && !memory.containment_active_riflemen.contains(&unit.id)
                     })
                     .map(|unit| unit.id)
                     .collect()
@@ -1038,10 +1041,7 @@ where
 }
 
 fn uses_home_rifle_coverage(profile_id: &str) -> bool {
-    matches!(
-        profile_id,
-        JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
-    )
+    matches!(profile_id, JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID)
 }
 
 /// Jeff's producers send fresh combat units to a safe forward staging point immediately.

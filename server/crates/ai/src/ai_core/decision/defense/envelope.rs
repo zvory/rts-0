@@ -1,24 +1,5 @@
 use super::*;
 
-pub(super) fn balanced_approach_slot(
-    index: usize,
-    unit_count: usize,
-    approach_count: usize,
-) -> (usize, usize) {
-    let approach_count = approach_count.max(1);
-    let base = unit_count / approach_count;
-    let remainder = unit_count % approach_count;
-    let mut start = 0;
-    for approach in 0..approach_count {
-        let count = base + usize::from(approach < remainder);
-        if index < start + count {
-            return (approach, index - start);
-        }
-        start += count;
-    }
-    (approach_count - 1, 0)
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct DefendedBuildingSite {
     pub(super) x: f32,
@@ -99,9 +80,26 @@ pub(super) fn defended_building_sites(
     sites
 }
 
-pub(super) fn defended_envelope_center(
-    sites: &[DefendedBuildingSite],
-) -> Option<(f32, f32)> {
+/// Core structures define the standing Rifleman line. Extractors and speculative build intents
+/// remain protected by local incident detection, but cannot drag the permanent line away from the
+/// main base and production belt.
+pub(super) fn defensive_formation_sites(observation: &AiObservation) -> Vec<DefendedBuildingSite> {
+    let tile_size = observation.map.tile_size as f32;
+    observation
+        .owned
+        .iter()
+        .filter(|entity| {
+            entity.kind.is_building()
+                && !matches!(entity.kind, EntityKind::SteelMine | EntityKind::PumpJack)
+                && entity.hp > 0
+        })
+        .filter_map(|entity| {
+            DefendedBuildingSite::from_center(entity.kind, entity.x, entity.y, tile_size)
+        })
+        .collect()
+}
+
+pub(super) fn defended_envelope_center(sites: &[DefendedBuildingSite]) -> Option<(f32, f32)> {
     (!sites.is_empty()).then(|| {
         let sum = sites
             .iter()
@@ -131,6 +129,7 @@ pub(in crate::ai_core::decision) struct LocalDefenseContact {
     pub(in crate::ai_core::decision) centroid: (f32, f32),
     pub(in crate::ai_core::decision) intercept: (f32, f32),
     pub(in crate::ai_core::decision) threat_value: u32,
+    pub(in crate::ai_core::decision) armored_threat: bool,
 }
 
 /// Select the strongest currently visible local sector. Concentrating the response on one sector
@@ -152,15 +151,21 @@ pub(in crate::ai_core::decision) fn local_defense_contact(
             .or_default()
             .push(enemy);
     }
-    let (_, enemies) = sectors.into_iter().max_by(|(left_sector, left), (right_sector, right)| {
-        sector_threat_value(left)
-            .cmp(&sector_threat_value(right))
-            .then_with(|| right_sector.cmp(left_sector))
-    })?;
+    let (_, enemies) =
+        sectors
+            .into_iter()
+            .max_by(|(left_sector, left), (right_sector, right)| {
+                sector_threat_value(left)
+                    .cmp(&sector_threat_value(right))
+                    .then_with(|| right_sector.cmp(left_sector))
+            })?;
     let threat_value = sector_threat_value(&enemies);
-    let centroid = enemies.iter().fold((0.0, 0.0), |sum, enemy| {
-        (sum.0 + enemy.x, sum.1 + enemy.y)
-    });
+    let armored_threat = enemies
+        .iter()
+        .any(|enemy| matches!(enemy.kind, EntityKind::Tank | EntityKind::ScoutCar));
+    let centroid = enemies
+        .iter()
+        .fold((0.0, 0.0), |sum, enemy| (sum.0 + enemy.x, sum.1 + enemy.y));
     let centroid = (
         centroid.0 / enemies.len() as f32,
         centroid.1 / enemies.len() as f32,
@@ -173,6 +178,7 @@ pub(in crate::ai_core::decision) fn local_defense_contact(
         centroid,
         intercept,
         threat_value,
+        armored_threat,
     })
 }
 
@@ -197,8 +203,7 @@ fn defensive_intercept_point(
         return clamp_to_map(contact, observation.map);
     }
     let contact_distance = dist2(support.0, support.1, contact.0, contact.1).sqrt();
-    let forward_distance =
-        (1.5 * observation.map.tile_size as f32).min(contact_distance * 0.5);
+    let forward_distance = (1.5 * observation.map.tile_size as f32).min(contact_distance * 0.5);
     clamp_to_map(
         (
             support.0 + direction.0 * forward_distance,
@@ -210,8 +215,8 @@ fn defensive_intercept_point(
 
 fn defense_sector(center: (f32, f32), point: (f32, f32)) -> u8 {
     let angle = (point.1 - center.1).atan2(point.0 - center.0);
-    (((angle + std::f32::consts::PI) * 8.0 / std::f32::consts::TAU).floor() as i32)
-        .rem_euclid(8) as u8
+    (((angle + std::f32::consts::PI) * 8.0 / std::f32::consts::TAU).floor() as i32).rem_euclid(8)
+        as u8
 }
 
 fn sector_threat_value(enemies: &[&AiEntitySummary]) -> u32 {
