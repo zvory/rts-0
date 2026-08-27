@@ -261,6 +261,14 @@ fingerprints, rather than a requested/resolved identity pair.
     cd server
     cargo run --bin ai-arena -- --candidate ai_2_1 --baseline ai_turtle --seeds 3 --ticks 9000
 
+The repository term **120 game test** means `scripts/120-game-test.mjs`. It requires profile IDs for
+the current AI 2.1, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
+runs all three pairings on The River, Schone Tage, 1v1, and Crossroads with five side-swapped seeds,
+caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
+Markdown, JSON, and CSV summaries.
+
+    node scripts/120-game-test.mjs ai_2_1 jeffs_ai_pre_defense_envelope jeffs_ai
+
 Scorecards report diagnostic economy, army, building, command, attack, damage, death, and milestone
 data. Material values do not break ties. Replay artifacts remain the source of player intent;
 decision traces are diagnostic output only.
