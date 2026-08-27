@@ -10,11 +10,7 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
     local_defenders: &[u32],
 ) -> Option<Vec<u32>> {
     if let Some(contact) = local_defense_contact(observation) {
-        memory.note_defensive_contact(
-            observation.tick,
-            contact.intercept,
-            contact.threat_value,
-        );
+        memory.note_defensive_contact(observation.tick, contact.intercept, contact.threat_value);
         let interceptors = select_defensive_interceptors(
             observation,
             memory,
@@ -36,12 +32,7 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
     let reached_last_contact = candidates.iter().any(|id| {
         observation.owned.iter().any(|unit| {
             unit.id == *id
-                && dist2(
-                    unit.x,
-                    unit.y,
-                    incident.position.0,
-                    incident.position.1,
-                ) <= reacquire2
+                && dist2(unit.x, unit.y, incident.position.0, incident.position.1) <= reacquire2
         })
     });
     if reached_last_contact {
@@ -63,10 +54,7 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
     )
 }
 
-fn eligible_local_defenders(
-    observation: &AiObservation,
-    local_defenders: &[u32],
-) -> Vec<u32> {
+fn eligible_local_defenders(observation: &AiObservation, local_defenders: &[u32]) -> Vec<u32> {
     local_defense_units_with_plans(observation, local_defenders)
         .into_iter()
         .filter(|id| {

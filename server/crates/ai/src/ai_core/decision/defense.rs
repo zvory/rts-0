@@ -7,11 +7,11 @@ use super::*;
 mod envelope;
 mod incident;
 
+pub(super) use self::envelope::local_defense_contact;
 use self::envelope::{
     balanced_approach_slot, defended_building_sites, defended_envelope_center,
     defended_envelope_support, DefendedBuildingSite,
 };
-pub(super) use self::envelope::local_defense_contact;
 pub(super) use self::incident::respond_to_local_incident;
 #[cfg(test)]
 pub(super) use self::incident::select_defensive_interceptors;
@@ -1408,17 +1408,14 @@ impl LocalDefenseGeometry {
                 .workers
                 .iter()
                 .any(|(x, y)| dist2(entity.x, entity.y, *x, *y) <= self.worker_radius2)
-            || self
-                .buildings
-                .iter()
-                .any(|building| {
-                    let distance2 = if self.use_building_footprints {
-                        building.distance2_to_footprint((entity.x, entity.y))
-                    } else {
-                        dist2(entity.x, entity.y, building.x, building.y)
-                    };
-                    distance2 <= self.building_radius2
-                })
+            || self.buildings.iter().any(|building| {
+                let distance2 = if self.use_building_footprints {
+                    building.distance2_to_footprint((entity.x, entity.y))
+                } else {
+                    dist2(entity.x, entity.y, building.x, building.y)
+                };
+                distance2 <= self.building_radius2
+            })
     }
 
     fn base_dist2(&self, entity: &AiEntitySummary) -> f32 {

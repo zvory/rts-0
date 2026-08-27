@@ -99,9 +99,7 @@ pub(super) fn defended_building_sites(
     sites
 }
 
-pub(super) fn defended_envelope_center(
-    sites: &[DefendedBuildingSite],
-) -> Option<(f32, f32)> {
+pub(super) fn defended_envelope_center(sites: &[DefendedBuildingSite]) -> Option<(f32, f32)> {
     (!sites.is_empty()).then(|| {
         let sum = sites
             .iter()
@@ -152,15 +150,18 @@ pub(in crate::ai_core::decision) fn local_defense_contact(
             .or_default()
             .push(enemy);
     }
-    let (_, enemies) = sectors.into_iter().max_by(|(left_sector, left), (right_sector, right)| {
-        sector_threat_value(left)
-            .cmp(&sector_threat_value(right))
-            .then_with(|| right_sector.cmp(left_sector))
-    })?;
+    let (_, enemies) =
+        sectors
+            .into_iter()
+            .max_by(|(left_sector, left), (right_sector, right)| {
+                sector_threat_value(left)
+                    .cmp(&sector_threat_value(right))
+                    .then_with(|| right_sector.cmp(left_sector))
+            })?;
     let threat_value = sector_threat_value(&enemies);
-    let centroid = enemies.iter().fold((0.0, 0.0), |sum, enemy| {
-        (sum.0 + enemy.x, sum.1 + enemy.y)
-    });
+    let centroid = enemies
+        .iter()
+        .fold((0.0, 0.0), |sum, enemy| (sum.0 + enemy.x, sum.1 + enemy.y));
     let centroid = (
         centroid.0 / enemies.len() as f32,
         centroid.1 / enemies.len() as f32,
@@ -197,8 +198,7 @@ fn defensive_intercept_point(
         return clamp_to_map(contact, observation.map);
     }
     let contact_distance = dist2(support.0, support.1, contact.0, contact.1).sqrt();
-    let forward_distance =
-        (1.5 * observation.map.tile_size as f32).min(contact_distance * 0.5);
+    let forward_distance = (1.5 * observation.map.tile_size as f32).min(contact_distance * 0.5);
     clamp_to_map(
         (
             support.0 + direction.0 * forward_distance,
@@ -210,8 +210,8 @@ fn defensive_intercept_point(
 
 fn defense_sector(center: (f32, f32), point: (f32, f32)) -> u8 {
     let angle = (point.1 - center.1).atan2(point.0 - center.0);
-    (((angle + std::f32::consts::PI) * 8.0 / std::f32::consts::TAU).floor() as i32)
-        .rem_euclid(8) as u8
+    (((angle + std::f32::consts::PI) * 8.0 / std::f32::consts::TAU).floor() as i32).rem_euclid(8)
+        as u8
 }
 
 fn sector_threat_value(enemies: &[&AiEntitySummary]) -> u32 {

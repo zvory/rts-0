@@ -242,10 +242,7 @@ fn defensive_incident_search_expires_at_its_bounded_end_condition() {
         .expect("incident remains active through the search window");
     assert_eq!(active.position, (320.0, 641.0));
     assert!(memory
-        .defensive_incident(
-            101 + SEARCH_TICKS,
-            SEARCH_TICKS
-        )
+        .defensive_incident(101 + SEARCH_TICKS, SEARCH_TICKS)
         .is_none());
 }
 
