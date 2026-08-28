@@ -253,6 +253,8 @@ pub(super) fn next_tank_resource_goal(
         EntityKind::EngineeringComplex
     } else if facts.complete_building_count(EntityKind::Factory) == 0 {
         EntityKind::Factory
+    // `Some(0)` is the explicit opt-out used by live Jeff. Profiles without a
+    // home-defense gun policy retain their established resource-goal ordering.
     } else if !profile
         .home_anti_tank
         .is_some_and(|policy| policy.target_guns == 0)
