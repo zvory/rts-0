@@ -76,6 +76,18 @@ where
     }
     let build_search = build_search_for_kind(build_search, profile, kind);
     let empty = BTreeSet::new();
+    if uses_jeff_opposite_spawn_layout(observation, profile) {
+        let (tile_x, tile_y) = ai_shared::find_build_spot_mirrored_from_opposite_spawn_with(
+            observation.map.width,
+            observation.map.height,
+            observation.own_start_tile,
+            kind,
+            build_search,
+            &empty,
+            |tx, ty| placeable(kind, tx, ty),
+        )?;
+        return actions::try_build_at(actions, builder_pools, kind, tile_x, tile_y);
+    }
     actions::try_build(
         actions,
         builder_pools,
@@ -116,29 +128,42 @@ where
         .filter(|entity| machine_gunners.contains(&entity.id))
         .map(|entity| (entity.id, entity))
         .collect();
-    let blocked_site = ai_shared::find_build_spot_near_start_with(
-        observation.map.width,
-        observation.map.height,
-        observation.own_start_tile,
-        EntityKind::Factory,
-        search,
-        &empty,
-        |tile_x, tile_y| {
-            if placeable(EntityKind::Factory, tile_x, tile_y) {
-                return false;
-            }
-            units_by_id.values().any(|unit| {
-                let unit_tile = (
-                    (unit.x / observation.map.tile_size as f32).floor() as u32,
-                    (unit.y / observation.map.tile_size as f32).floor() as u32,
-                );
-                unit_tile.0 >= tile_x
-                    && unit_tile.0 < tile_x.saturating_add(stats.foot_w)
-                    && unit_tile.1 >= tile_y
-                    && unit_tile.1 < tile_y.saturating_add(stats.foot_h)
-            })
-        },
-    )?;
+    let mut blocked_by_machine_gunner = |tile_x, tile_y| {
+        if placeable(EntityKind::Factory, tile_x, tile_y) {
+            return false;
+        }
+        units_by_id.values().any(|unit| {
+            let unit_tile = (
+                (unit.x / observation.map.tile_size as f32).floor() as u32,
+                (unit.y / observation.map.tile_size as f32).floor() as u32,
+            );
+            unit_tile.0 >= tile_x
+                && unit_tile.0 < tile_x.saturating_add(stats.foot_w)
+                && unit_tile.1 >= tile_y
+                && unit_tile.1 < tile_y.saturating_add(stats.foot_h)
+        })
+    };
+    let blocked_site = if uses_jeff_opposite_spawn_layout(observation, profile) {
+        ai_shared::find_build_spot_mirrored_from_opposite_spawn_with(
+            observation.map.width,
+            observation.map.height,
+            observation.own_start_tile,
+            EntityKind::Factory,
+            search,
+            &empty,
+            &mut blocked_by_machine_gunner,
+        )
+    } else {
+        ai_shared::find_build_spot_near_start_with(
+            observation.map.width,
+            observation.map.height,
+            observation.own_start_tile,
+            EntityKind::Factory,
+            search,
+            &empty,
+            &mut blocked_by_machine_gunner,
+        )
+    }?;
     let blockers: Vec<u32> = units_by_id
         .values()
         .filter_map(|unit| {
@@ -160,6 +185,15 @@ where
         &blockers,
         enemy_base,
     )
+}
+
+fn uses_jeff_opposite_spawn_layout(observation: &AiObservation, profile: &AiProfile) -> bool {
+    profile.id == JEFFS_AI_ID
+        && is_upper_left_diagonal_start(observation.map, observation.own_start_tile)
+}
+
+fn is_upper_left_diagonal_start(map: AiMapSummary, start: (u32, u32)) -> bool {
+    start.0 == start.1 && start.0 < map.width / 2 && start.1 < map.height / 2
 }
 
 pub(super) fn relocate_machine_gunners_from_factory_site(
@@ -444,5 +478,18 @@ mod tests {
         assert_eq!(search.max_radius, 6);
         assert!(search.prefer_away_from_center);
         assert!(!search.prefer_toward_center);
+    }
+
+    #[test]
+    fn mirrored_layout_scope_excludes_off_diagonal_crossroads_start() {
+        let map = AiMapSummary {
+            width: 126,
+            height: 126,
+            tile_size: 32,
+        };
+
+        assert!(is_upper_left_diagonal_start(map, (9, 9)));
+        assert!(!is_upper_left_diagonal_start(map, (47, 8)));
+        assert!(!is_upper_left_diagonal_start(map, (116, 116)));
     }
 }
