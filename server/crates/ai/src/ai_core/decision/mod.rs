@@ -490,7 +490,7 @@ where
                 map_analysis,
             )
         });
-    if profile.home_anti_tank.is_some()
+    if home_anti_tank_guns_enabled(profile)
         && home_defensive_tank_ready
         && facts.building_count(EntityKind::Steelworks)
             + planned_in_intents(&intents, EntityKind::Steelworks)
@@ -568,7 +568,7 @@ where
                 entity.kind == EntityKind::Factory
                     && entity.production_kind == Some(EntityKind::Tank)
             }));
-    if profile.home_anti_tank.is_some() && defensive_tank_started {
+    if home_anti_tank_guns_enabled(profile) && defensive_tank_started {
         queue_upgrade_if_available(
             &mut actions,
             &facts,
@@ -606,7 +606,7 @@ where
             effective_unit_priorities.push(policy.unit);
         }
     }
-    if profile.home_anti_tank.is_some()
+    if home_anti_tank_guns_enabled(profile)
         && memory.containment_wave_launched
         && !effective_unit_priorities.contains(&EntityKind::AntiTankGun)
     {
@@ -1042,6 +1042,12 @@ where
 
 fn uses_home_rifle_coverage(profile_id: &str) -> bool {
     matches!(profile_id, JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID)
+}
+
+fn home_anti_tank_guns_enabled(profile: &AiProfile) -> bool {
+    profile
+        .home_anti_tank
+        .is_some_and(|policy| policy.target_guns > 0)
 }
 
 /// Jeff's producers send fresh combat units to a safe forward staging point immediately.

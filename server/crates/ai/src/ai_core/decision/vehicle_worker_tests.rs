@@ -3,7 +3,7 @@ use super::*;
 use crate::ai_core::observation::{
     AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary, AiResourceSummary,
 };
-use crate::ai_core::profiles::{AiProfile, AI_2_1, JEFFS_AI};
+use crate::ai_core::profiles::{AiProfile, AI_2_1, JEFFS_AI, JEFFS_AI_PRE_DEFENSE_ENVELOPE};
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
@@ -464,7 +464,7 @@ fn jeff_interrupts_busy_machine_gunner_to_clear_vehicle_works_site() {
 }
 
 #[test]
-fn jeff_starts_defensive_tank_before_anti_tank_research() {
+fn live_jeff_skips_anti_tank_research_after_the_defensive_tank_starts() {
     let mut factory = building(5, EntityKind::Factory, Some(0));
     let mut observation = jeff_armored_tech_observation(Some(factory.clone()));
     observation.upgrades = vec![UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
@@ -513,7 +513,7 @@ fn jeff_starts_defensive_tank_before_anti_tank_research() {
         },
         |_, tx, ty| tx < width && ty < height,
     );
-    assert!(decision.commands.iter().any(|command| {
+    assert!(!decision.commands.iter().any(|command| {
         matches!(
             command,
             Command::Research {
@@ -522,6 +522,196 @@ fn jeff_starts_defensive_tank_before_anti_tank_research() {
             }
         )
     }));
+
+    let mut historical_memory = AiDecisionMemory::for_profile(&JEFFS_AI_PRE_DEFENSE_ENVELOPE);
+    historical_memory.containment_wave_launched = true;
+    let historical_decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI_PRE_DEFENSE_ENVELOPE,
+        &mut historical_memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+    assert!(historical_decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Research {
+                upgrade: UpgradeKind::AntiTankGunUnlock,
+                ..
+            }
+        )
+    }));
+}
+
+#[test]
+fn live_jeff_skips_anti_tank_gun_production_even_when_the_old_path_is_available() {
+    let factory = building(5, EntityKind::Factory, Some(0));
+    let mut observation = jeff_armored_tech_observation(Some(factory));
+    observation
+        .owned
+        .push(building(6, EntityKind::Steelworks, Some(0)));
+    observation.upgrades = vec![
+        UpgradeKind::TankUnlock,
+        UpgradeKind::Entrenchment,
+        UpgradeKind::AntiTankGunUnlock,
+    ];
+
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment_wave_launched = true;
+    let width = observation.map.width;
+    let height = observation.map.height;
+    let decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+    assert!(!decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Train {
+                unit: EntityKind::AntiTankGun,
+                ..
+            }
+        )
+    }));
+
+    let mut historical_memory = AiDecisionMemory::for_profile(&JEFFS_AI_PRE_DEFENSE_ENVELOPE);
+    historical_memory.containment_wave_launched = true;
+    let historical_decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI_PRE_DEFENSE_ENVELOPE,
+        &mut historical_memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+    assert!(historical_decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Train {
+                unit: EntityKind::AntiTankGun,
+                ..
+            }
+        )
+    }));
+}
+
+#[test]
+fn live_jeff_skips_gun_works_after_the_home_tank_is_positioned() {
+    let factory = building(5, EntityKind::Factory, Some(0));
+    let mut observation = jeff_armored_tech_observation(Some(factory));
+    observation
+        .owned
+        .push(building(6, EntityKind::ResourceDepot, Some(0)));
+    observation
+        .owned
+        .push(building(7, EntityKind::Barracks, Some(0)));
+    observation.owned.push(combat_unit(30, EntityKind::Tank));
+    observation
+        .owned
+        .push(combat_unit(31, EntityKind::Rifleman));
+    observation.upgrades = vec![UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
+    let width = observation.map.width;
+    let height = observation.map.height;
+
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment_wave_launched = true;
+    memory.home_defensive_tank = Some(30);
+    let staging_decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+    let (x, y) = staging_decision
+        .commands
+        .iter()
+        .find_map(|command| match command {
+            Command::Move { units, x, y, .. } if units == &[30] => Some((*x, *y)),
+            _ => None,
+        })
+        .expect("home Tank staging destination");
+    let tank = observation
+        .owned
+        .iter_mut()
+        .find(|entity| entity.id == 30)
+        .expect("home Tank");
+    tank.x = x;
+    tank.y = y;
+
+    let decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+    assert!(!decision.commands.iter().any(|command| {
+        matches!(
+            command,
+            Command::Build {
+                building: EntityKind::Steelworks,
+                ..
+            }
+        )
+    }));
+
+    let mut historical_memory = AiDecisionMemory::for_profile(&JEFFS_AI_PRE_DEFENSE_ENVELOPE);
+    historical_memory.containment_wave_launched = true;
+    historical_memory.home_defensive_tank = Some(30);
+    let historical_decision = decide_profile_without_static_map_for_tests(
+        &observation,
+        &JEFFS_AI_PRE_DEFENSE_ENVELOPE,
+        &mut historical_memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, tx, ty| tx < width && ty < height,
+    );
+    assert!(
+        historical_decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Build {
+                    building: EntityKind::Steelworks,
+                    ..
+                }
+            )
+        }),
+        "historical commands: {:#?}; intents: {:#?}",
+        historical_decision.commands,
+        historical_decision.intents
+    );
 }
 
 #[test]

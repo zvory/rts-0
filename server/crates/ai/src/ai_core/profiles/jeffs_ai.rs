@@ -166,7 +166,15 @@ const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
     }),
 };
 
-pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_TEMPLATE;
+pub(crate) static JEFFS_AI: AiProfile = AiProfile {
+    // Keep the home Tank/Machine Gunner/Rifleman defense policy active while
+    // disabling only its optional Anti-Tank Gun production target.
+    home_anti_tank: Some(HomeAntiTankPolicy {
+        target_guns: 0,
+        ..JEFFS_AI_TEMPLATE.home_anti_tank.unwrap()
+    }),
+    ..JEFFS_AI_TEMPLATE
+};
 
 /// Frozen immediately before defended-building envelope placement and bounded incident response.
 /// This remains internal and exists so arena runs can compare the active profile against the exact
@@ -219,9 +227,23 @@ mod tests {
         assert_eq!(containment.contact_stop_tiles, 18.0);
         let home_anti_tank = JEFFS_AI.home_anti_tank.unwrap();
         assert_eq!(home_anti_tank.defensive_tanks, 1);
-        assert_eq!(home_anti_tank.target_guns, 2);
+        assert_eq!(home_anti_tank.target_guns, 0);
         assert_eq!(home_anti_tank.anti_tank_position_tiles, 3.0);
         assert_eq!(home_anti_tank.machine_gunner_screen_tiles, 1.0);
+        assert_eq!(
+            JEFFS_AI_PRE_DEFENSE_ENVELOPE
+                .home_anti_tank
+                .unwrap()
+                .target_guns,
+            2
+        );
+        assert_eq!(
+            JEFFS_AI_PRE_RIFLE_COVERAGE
+                .home_anti_tank
+                .unwrap()
+                .target_guns,
+            2
+        );
         assert_eq!(
             transition.resource_float,
             ResourceFloatThreshold { steel: 0, oil: 0 }

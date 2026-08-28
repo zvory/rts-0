@@ -213,7 +213,10 @@ takes temporary Factory priority and joins those Tanks as a single vision-suppor
 Expansion, a second Factory, Methamphetamines, and other optional spending wait until the initial
 Tank core exists. The profile uses the shared decision and action layers, receives only
 fog-filtered observations, and issues ordinary validated player commands for spending, placement,
-production, and combat.
+production, and combat. Its home Tank, Machine Gunner, and Rifleman defense remains active, but the
+live profile has no Anti-Tank Gun target: it does not research the Anti-Tank Gun unlock, build a Gun
+Works for that path, or train Anti-Tank Guns. The internal frozen Jeff profiles retain the historical
+two-gun path so regression comparisons still represent their original behavior.
 
 Its local-defense envelope covers every owned building footprint, including incomplete structures,
 plus reserved sites for submitted build intents. The standing Rifleman formation is anchored only

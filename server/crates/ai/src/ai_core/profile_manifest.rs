@@ -122,7 +122,40 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "anti_tank_emplacements",
             ],
         ),
-        JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID | JEFFS_AI_PRE_RIFLE_COVERAGE_ID => (
+        JEFFS_AI_ID => (
+            "Jeff's AI",
+            "Fast-Tank containment profile with a two-Tank opening wave, a reserved home Tank and spread Machine Gunner screen, no Anti-Tank Gun tech path, and a post-natural advance on the enemy main.",
+            vec![
+                "economy_manager",
+                "single_engineer_two_pump_opening",
+                "two_machine_gunner_opening",
+                "half_health_machine_gunner_replacement",
+                "immediate_tank_tech",
+                "vehicle_works_before_tank_production_research",
+                "two_tanks_before_scout",
+                "tank_scout_vision_wave",
+                "stationary_tank_expansion_containment",
+                "armored_contact_range_hold",
+                "minimum_two_tank_reform",
+                "three_tank_failed_push_recovery",
+                "failed_push_home_regroup",
+                "shallow_flank_approach",
+                "threat_first_targeting",
+                "third_tank_home_anchor",
+                "stationary_home_tank_range_anchor",
+                "line_of_sight_checked_home_armor_positions",
+                "machine_gunner_forward_shield",
+                "layered_home_defense",
+                "post_natural_main_advance",
+                "endgame_search_and_destroy_sweep",
+                "two_base_full_saturation",
+                "post_timing_expansion",
+                "earlier_second_vehicle_works",
+                "surplus_steel_riflemen",
+                "surplus_second_barracks",
+            ],
+        ),
+        JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID | JEFFS_AI_PRE_RIFLE_COVERAGE_ID => (
             "Jeff's AI",
             "Fast-Tank containment profile with a two-Tank opening wave, a reserved home Tank and spread Machine Gunner screen, deployed Anti-Tank Guns, and a post-natural advance on the enemy main.",
             vec![
@@ -238,6 +271,6 @@ mod tests {
     fn jeff_profile_fingerprint_uses_stable_canonical_data() {
         let identity = profile_identity_by_id(JEFFS_AI_ID).expect("Jeff profile identity");
 
-        assert_eq!(identity.fingerprint, "fnv1a64:9d124af44604cdd3");
+        assert_eq!(identity.fingerprint, "fnv1a64:eadb156ea03e2667");
     }
 }

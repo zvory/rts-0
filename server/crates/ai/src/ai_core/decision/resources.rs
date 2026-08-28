@@ -253,7 +253,11 @@ pub(super) fn next_tank_resource_goal(
         EntityKind::EngineeringComplex
     } else if facts.complete_building_count(EntityKind::Factory) == 0 {
         EntityKind::Factory
-    } else if facts.complete_building_count(EntityKind::Steelworks) == 0 {
+    } else if !profile
+        .home_anti_tank
+        .is_some_and(|policy| policy.target_guns == 0)
+        && facts.complete_building_count(EntityKind::Steelworks) == 0
+    {
         EntityKind::Steelworks
     } else {
         EntityKind::Tank
@@ -296,7 +300,7 @@ mod tests {
         AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiPlayerSummary,
         AiResourceSummary,
     };
-    use crate::ai_core::profiles::AI_2_1;
+    use crate::ai_core::profiles::{AI_2_1, JEFFS_AI, JEFFS_AI_PRE_DEFENSE_ENVELOPE};
 
     fn entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         AiEntitySummary {
@@ -430,5 +434,37 @@ mod tests {
             "completed Pump Jacks on depleted oil must not satisfy current oil demand"
         );
         assert_eq!(plan.mineable_oil_nodes, BTreeSet::from([201]));
+    }
+
+    #[test]
+    fn live_jeff_saves_for_tanks_instead_of_the_removed_gun_works_path() {
+        let observation = observation(
+            vec![
+                entity(10, EntityKind::ResourceDepot, 0.0, 0.0),
+                entity(11, EntityKind::Barracks, 0.0, 0.0),
+                entity(12, EntityKind::TrainingCentre, 0.0, 0.0),
+                entity(13, EntityKind::EngineeringComplex, 0.0, 0.0),
+                entity(14, EntityKind::Factory, 0.0, 0.0),
+            ],
+            Vec::new(),
+        );
+        let facts = AiFacts::from_observation(&observation);
+        let (tank_steel, tank_oil) = rts_rules::economy::cost(EntityKind::Tank);
+        let (gun_works_steel, gun_works_oil) = rts_rules::economy::cost(EntityKind::Steelworks);
+
+        assert_eq!(
+            next_tank_resource_goal(&facts, &JEFFS_AI),
+            Some(ResourceGoal {
+                steel: tank_steel,
+                oil: tank_oil,
+            })
+        );
+        assert_eq!(
+            next_tank_resource_goal(&facts, &JEFFS_AI_PRE_DEFENSE_ENVELOPE),
+            Some(ResourceGoal {
+                steel: gun_works_steel,
+                oil: gun_works_oil,
+            })
+        );
     }
 }
