@@ -264,6 +264,57 @@ pub(crate) fn find_build_spot_near_start_with(
     fallback
 }
 
+/// Run the placement search in the 180-degree opposite-spawn frame, then rotate the selected
+/// building footprint back into this spawn. This is intentionally footprint-aware: mirroring a
+/// top-left tile requires subtracting the building width/height, not merely flipping the tile.
+pub(crate) fn find_build_spot_mirrored_from_opposite_spawn_with(
+    map_width: u32,
+    map_height: u32,
+    start: (u32, u32),
+    building: EntityKind,
+    search: BuildSearch,
+    skip: &BTreeSet<(u32, u32)>,
+    mut placeable: impl FnMut(u32, u32) -> bool,
+) -> Option<(u32, u32)> {
+    let stats = config::building_stats(building)?;
+    let opposite_start = (
+        map_width.saturating_sub(1).saturating_sub(start.0),
+        map_height.saturating_sub(1).saturating_sub(start.1),
+    );
+    let canonical_skip = BTreeSet::new();
+    let canonical = find_build_spot_near_start_with(
+        map_width,
+        map_height,
+        opposite_start,
+        building,
+        search,
+        &canonical_skip,
+        |canonical_x, canonical_y| {
+            let Some(tile_x) = map_width
+                .checked_sub(canonical_x)
+                .and_then(|value| value.checked_sub(stats.foot_w))
+            else {
+                return false;
+            };
+            let Some(tile_y) = map_height
+                .checked_sub(canonical_y)
+                .and_then(|value| value.checked_sub(stats.foot_h))
+            else {
+                return false;
+            };
+            !skip.contains(&(tile_x, tile_y)) && placeable(tile_x, tile_y)
+        },
+    )?;
+    Some((
+        map_width
+            .checked_sub(canonical.0)?
+            .checked_sub(stats.foot_w)?,
+        map_height
+            .checked_sub(canonical.1)?
+            .checked_sub(stats.foot_h)?,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,6 +348,21 @@ mod tests {
         );
 
         assert_eq!(spot, Some((1, 4)));
+    }
+
+    #[test]
+    fn opposite_spawn_mirror_accounts_for_building_footprint() {
+        let spot = find_build_spot_mirrored_from_opposite_spawn_with(
+            126,
+            126,
+            (9, 9),
+            EntityKind::Barracks,
+            BuildSearch::default(),
+            &BTreeSet::new(),
+            |tx, ty| (tx, ty) == (4, 7),
+        );
+
+        assert_eq!(spot, Some((4, 7)));
     }
 
     #[test]

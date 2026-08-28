@@ -335,8 +335,8 @@ fn jeff_moves_machine_gunner_off_blocked_vehicle_works_footprint() {
     machine_gunner.hp = config::unit_stats(EntityKind::MachineGunner)
         .expect("Machine Gunner stats")
         .hp;
-    machine_gunner.x = 2.5 * ts;
-    machine_gunner.y = 2.5 * ts;
+    machine_gunner.x = 0.5 * ts;
+    machine_gunner.y = 0.5 * ts;
     observation.owned.push(machine_gunner);
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
 
@@ -378,8 +378,8 @@ fn jeff_clears_machine_gunner_when_issuing_vehicle_works_build() {
     machine_gunner.hp = config::unit_stats(EntityKind::MachineGunner)
         .expect("Machine Gunner stats")
         .hp;
-    machine_gunner.x = 2.5 * ts;
-    machine_gunner.y = 2.5 * ts;
+    machine_gunner.x = 0.5 * ts;
+    machine_gunner.y = 0.5 * ts;
     observation.owned.push(machine_gunner);
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
 
@@ -393,15 +393,15 @@ fn jeff_clears_machine_gunner_when_issuing_vehicle_works_build() {
             prefer_away_from_center: false,
             prefer_toward_center: false,
         },
-        |kind, tx, ty| kind == EntityKind::Factory && (tx, ty) == (2, 2),
+        |kind, tx, ty| kind == EntityKind::Factory && (tx, ty) == (0, 0),
     );
 
     assert!(decision.commands.iter().any(|command| matches!(
         command,
         Command::Build {
             building: EntityKind::Factory,
-            tile_x: 2,
-            tile_y: 2,
+            tile_x: 0,
+            tile_y: 0,
             ..
         }
     )));
@@ -411,7 +411,7 @@ fn jeff_clears_machine_gunner_when_issuing_vehicle_works_build() {
     });
     let destination = destination.expect("Machine Gunner move alongside Factory build");
     let moved_tiles =
-        ((destination.0 - 2.5 * ts).powi(2) + (destination.1 - 2.5 * ts).powi(2)).sqrt() / ts;
+        ((destination.0 - 0.5 * ts).powi(2) + (destination.1 - 0.5 * ts).powi(2)).sqrt() / ts;
     assert!((moved_tiles - 4.0).abs() < 0.001);
 }
 
@@ -423,8 +423,8 @@ fn jeff_interrupts_busy_machine_gunner_to_clear_vehicle_works_site() {
     machine_gunner.hp = config::unit_stats(EntityKind::MachineGunner)
         .expect("Machine Gunner stats")
         .hp;
-    machine_gunner.x = 2.5 * ts;
-    machine_gunner.y = 2.5 * ts;
+    machine_gunner.x = 0.5 * ts;
+    machine_gunner.y = 0.5 * ts;
     machine_gunner.state = AiEntityState::Attack;
     machine_gunner.target_id = Some(99);
     machine_gunner.free_for_combat = false;
@@ -441,15 +441,15 @@ fn jeff_interrupts_busy_machine_gunner_to_clear_vehicle_works_site() {
             prefer_away_from_center: false,
             prefer_toward_center: false,
         },
-        |kind, tx, ty| kind == EntityKind::Factory && (tx, ty) == (2, 2),
+        |kind, tx, ty| kind == EntityKind::Factory && (tx, ty) == (0, 0),
     );
 
     assert!(decision.commands.iter().any(|command| matches!(
         command,
         Command::Build {
             building: EntityKind::Factory,
-            tile_x: 2,
-            tile_y: 2,
+            tile_x: 0,
+            tile_y: 0,
             ..
         }
     )));
