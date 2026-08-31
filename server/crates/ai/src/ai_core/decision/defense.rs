@@ -6,6 +6,7 @@ use super::*;
 
 mod envelope;
 mod incident;
+mod pocket;
 
 pub(super) use self::envelope::local_defense_contact;
 use self::envelope::{
@@ -15,6 +16,14 @@ use self::envelope::{
 pub(super) use self::incident::respond_to_local_incident;
 #[cfg(test)]
 pub(super) use self::incident::select_defensive_interceptors;
+#[cfg(test)]
+use self::pocket::{
+    defensive_pocket_basis, defensive_pocket_machine_gunner_assignments,
+    home_defensive_pocket_rifle_assignments,
+};
+pub(super) use self::pocket::{
+    stage_defensive_pocket_machine_gunners, stage_home_defensive_pocket_riflemen,
+};
 
 pub(super) const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
 
@@ -34,11 +43,6 @@ const HOME_RIFLE_FRONT_TILES: f32 = 4.5;
 const HOME_RIFLE_LATERAL_SPACING_TILES: f32 = 2.75;
 const HOME_RIFLE_RANK_DEPTH_TILES: f32 = 2.25;
 const HOME_RIFLE_MAX_APPROACHES: usize = 3;
-// (forward, lateral) offsets from the starting Resource Depot centre. These reproduce the
-// approved River pocket, then rotate as one shape toward each base's central approach.
-const DEFENSIVE_POCKET_RIFLE_SLOTS: [(f32, f32); 4] =
-    [(4.25, 2.83), (4.25, -2.83), (8.15, -0.78), (8.15, 0.78)];
-const DEFENSIVE_POCKET_MACHINE_GUNNER_SLOTS: [(f32, f32); 2] = [(7.5, -2.25), (7.5, 2.25)];
 
 pub(super) const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 
@@ -568,22 +572,6 @@ pub(super) fn stage_home_rifleman_envelope_coverage(
     stage_home_rifleman_assignments(actions, observation, assignments)
 }
 
-pub(super) fn stage_home_defensive_pocket_riflemen(
-    actions: &mut AiActionContext<'_>,
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    ready_units: &[u32],
-    enemy_base: EnemyBaseFact,
-) -> Option<Vec<u32>> {
-    let assignments = home_defensive_pocket_rifle_assignments(
-        observation,
-        map_analysis,
-        ready_units,
-        enemy_base,
-    )?;
-    stage_home_rifleman_assignments(actions, observation, assignments)
-}
-
 fn stage_home_rifleman_assignments(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
@@ -642,84 +630,6 @@ fn home_rifleman_envelope_coverage_assignments(
         ready_units,
         enemy_base,
         true,
-    )
-}
-
-fn home_defensive_pocket_rifle_assignments(
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    ready_units: &[u32],
-    enemy_base: EnemyBaseFact,
-) -> Option<Vec<DefensiveLineAssignment>> {
-    let mut units = ready_units.to_vec();
-    units.sort_unstable();
-    units.dedup();
-    if units.is_empty() {
-        return None;
-    }
-
-    let (anchor, direction) = defensive_pocket_basis(observation, map_analysis, enemy_base)?;
-    let mut assignments = units
-        .iter()
-        .take(DEFENSIVE_POCKET_RIFLE_SLOTS.len())
-        .copied()
-        .zip(DEFENSIVE_POCKET_RIFLE_SLOTS)
-        .filter_map(|(unit_id, slot)| {
-            let desired = defensive_pocket_slot_target(observation, anchor, direction, slot);
-            clear_mobile_defensive_position(observation, map_analysis, desired)
-                .map(|(x, y)| DefensiveLineAssignment { unit_id, x, y })
-        })
-        .collect::<Vec<_>>();
-
-    // The four oldest home Riflemen own the pocket. Later surplus Riflemen retain the broader
-    // envelope coverage so a large late-game group does not collapse into the six opening slots.
-    if units.len() > DEFENSIVE_POCKET_RIFLE_SLOTS.len() {
-        if let Some(mut supplemental) = home_rifleman_envelope_coverage_assignments(
-            observation,
-            map_analysis,
-            &units[DEFENSIVE_POCKET_RIFLE_SLOTS.len()..],
-            enemy_base,
-        ) {
-            assignments.append(&mut supplemental);
-        }
-    }
-
-    (!assignments.is_empty()).then_some(assignments)
-}
-
-fn defensive_pocket_basis(
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    enemy_base: EnemyBaseFact,
-) -> Option<((f32, f32), (f32, f32))> {
-    let anchor = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let tile_size = observation.map.tile_size as f32;
-    let map_center = (
-        observation.map.width as f32 * tile_size * 0.5,
-        observation.map.height as f32 * tile_size * 0.5,
-    );
-    let target = map_analysis
-        .and_then(|analysis| analysis.central_base_approach_for_player(observation.player_id))
-        .unwrap_or(map_center);
-    let direction = normalized_direction(anchor, target)
-        .or_else(|| normalized_direction(anchor, (enemy_base.x, enemy_base.y)))?;
-    Some((anchor, direction))
-}
-
-fn defensive_pocket_slot_target(
-    observation: &AiObservation,
-    anchor: (f32, f32),
-    direction: (f32, f32),
-    slot: (f32, f32),
-) -> (f32, f32) {
-    let tile_size = observation.map.tile_size as f32;
-    let perpendicular = (-direction.1, direction.0);
-    clamp_to_map(
-        (
-            anchor.0 + direction.0 * slot.0 * tile_size + perpendicular.0 * slot.1 * tile_size,
-            anchor.1 + direction.1 * slot.0 * tile_size + perpendicular.1 * slot.1 * tile_size,
-        ),
-        observation.map,
     )
 }
 
@@ -918,117 +828,6 @@ fn stage_machine_gunner_defensive_line(
         }
     }
     (!staged.is_empty()).then_some(staged)
-}
-
-pub(super) fn stage_defensive_pocket_machine_gunners(
-    actions: &mut AiActionContext<'_>,
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    ready_units: &[u32],
-    enemy_base: EnemyBaseFact,
-) -> Option<Vec<u32>> {
-    let assignments = defensive_pocket_machine_gunner_assignments(
-        observation,
-        map_analysis,
-        ready_units,
-        enemy_base,
-    )?;
-    let units_by_id: BTreeMap<u32, &AiEntitySummary> = observation
-        .owned
-        .iter()
-        .map(|entity| (entity.id, entity))
-        .collect();
-    let close_enough =
-        EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES * observation.map.tile_size as f32;
-    let close_enough2 = squared(close_enough);
-    let mut staged = Vec::new();
-    for assignment in assignments {
-        let Some(unit) = units_by_id.get(&assignment.unit_id).copied() else {
-            continue;
-        };
-        if dist2(unit.x, unit.y, assignment.x, assignment.y) <= close_enough2 {
-            continue;
-        }
-        if let Some(units) =
-            actions::attack_move_units(actions, [assignment.unit_id], assignment.x, assignment.y)
-        {
-            staged.extend(units);
-        }
-    }
-    (!staged.is_empty()).then_some(staged)
-}
-
-fn defensive_pocket_machine_gunner_assignments(
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    ready_units: &[u32],
-    enemy_base: EnemyBaseFact,
-) -> Option<Vec<DefensiveLineAssignment>> {
-    let (anchor, direction) = defensive_pocket_basis(observation, map_analysis, enemy_base)?;
-    let mut units = ready_units.to_vec();
-    units.sort_unstable();
-    units.dedup();
-    let assignments = units
-        .into_iter()
-        .take(DEFENSIVE_POCKET_MACHINE_GUNNER_SLOTS.len())
-        .zip(DEFENSIVE_POCKET_MACHINE_GUNNER_SLOTS)
-        .filter_map(|(unit_id, slot)| {
-            let desired = defensive_pocket_slot_target(observation, anchor, direction, slot);
-            clear_defensive_pocket_machine_gunner_position(
-                observation,
-                map_analysis,
-                desired,
-                direction,
-            )
-            .map(|(x, y)| DefensiveLineAssignment { unit_id, x, y })
-        })
-        .collect::<Vec<_>>();
-    (!assignments.is_empty()).then_some(assignments)
-}
-
-fn clear_defensive_pocket_machine_gunner_position(
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    desired: (f32, f32),
-    direction: (f32, f32),
-) -> Option<(f32, f32)> {
-    let perpendicular = (-direction.1, direction.0);
-    let tile_size = observation.map.tile_size as f32;
-    let mut offsets = vec![(0.0, 0.0)];
-    for radius in 1..=DEFENSIVE_FIRING_POSITION_SEARCH_TILES {
-        let radius = radius as f32;
-        offsets.extend([
-            (perpendicular.0 * radius, perpendicular.1 * radius),
-            (-perpendicular.0 * radius, -perpendicular.1 * radius),
-            (-direction.0 * radius, -direction.1 * radius),
-            (
-                (perpendicular.0 - direction.0) * radius,
-                (perpendicular.1 - direction.1) * radius,
-            ),
-            (
-                (-perpendicular.0 - direction.0) * radius,
-                (-perpendicular.1 - direction.1) * radius,
-            ),
-        ]);
-    }
-    offsets.into_iter().find_map(|offset| {
-        let candidate = clamp_to_map(
-            (
-                desired.0 + offset.0 * tile_size,
-                desired.1 + offset.1 * tile_size,
-            ),
-            observation.map,
-        );
-        (defensive_position_is_open(observation, map_analysis, candidate.0, candidate.1)
-            && defensive_firing_sector_is_clear(
-                observation,
-                map_analysis,
-                candidate,
-                direction,
-                DEFENSIVE_FIRING_LANE_TILES,
-            ))
-        .then_some(candidate)
-    })
 }
 
 fn clear_machine_gunner_screen_assignment(

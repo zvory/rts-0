@@ -28,7 +28,6 @@ const CHOKE_CONTACT_RADIUS_TILES: u16 = 8;
 const CHOKE_PAIR_PATH_SLACK_TILES: u32 = 2;
 const CHOKE_MIN_BAND_TILES: u32 = 4;
 const CHOKE_MAX_BAND_TILES: u32 = 1_024;
-const CENTRAL_BASE_APPROACH_MIN_ALIGNMENT: f32 = 0.9;
 const MAP_ANALYSIS_CHOKE_COLOR: &str = "#ff6b35";
 const MAP_ANALYSIS_APPROACH_COLOR: &str = "#f7d774";
 const MAP_ANALYSIS_COMPONENT_COLORS: [&str; 8] = [
@@ -437,47 +436,6 @@ impl AiMapAnalysis {
             .take(limit)
             .map(|(_, _, choke)| choke)
             .collect()
-    }
-
-    /// Return the analyzed base exit that most directly carries traffic toward the map centre.
-    ///
-    /// This deliberately returns `None` for open or side-lane starts such as Crossroads. Callers
-    /// can still use their own map-specific fallback while keeping central-path maps on a stable,
-    /// terrain-derived orientation.
-    pub(crate) fn central_base_approach_for_player(&self, player_id: u32) -> Option<(f32, f32)> {
-        let start = self
-            .starts
-            .iter()
-            .find(|start| start.player_id == player_id)?;
-        let start_world = tile_center_world(start.start_tile, self.tile_size);
-        let tile_size = self.tile_size as f32;
-        let map_center = (
-            self.width as f32 * tile_size * 0.5,
-            self.height as f32 * tile_size * 0.5,
-        );
-        let center_direction = normalized_world_delta(start_world, map_center)?;
-
-        self.base_chokes_for_player(player_id, self.chokes.len())
-            .into_iter()
-            .filter_map(|choke| {
-                let approach_direction =
-                    normalized_world_delta(start_world, choke.enemy_approach_world)?;
-                let alignment = center_direction.0 * approach_direction.0
-                    + center_direction.1 * approach_direction.1;
-                (alignment >= CENTRAL_BASE_APPROACH_MIN_ALIGNMENT).then_some((
-                    choke.enemy_approach_world,
-                    alignment,
-                    world_distance2(choke.enemy_approach_world, map_center),
-                    choke.id,
-                ))
-            })
-            .min_by(|left, right| {
-                left.2
-                    .total_cmp(&right.2)
-                    .then_with(|| right.1.total_cmp(&left.1))
-                    .then_with(|| left.3.cmp(&right.3))
-            })
-            .map(|(target, _, _, _)| target)
     }
 
     #[allow(dead_code)]
@@ -1332,19 +1290,6 @@ fn tile_center_world(tile: AiTile, tile_size: u32) -> (f32, f32) {
         tile.x as f32 * tile_size + tile_size * 0.5,
         tile.y as f32 * tile_size + tile_size * 0.5,
     )
-}
-
-fn normalized_world_delta(from: (f32, f32), to: (f32, f32)) -> Option<(f32, f32)> {
-    let dx = to.0 - from.0;
-    let dy = to.1 - from.1;
-    let len = (dx * dx + dy * dy).sqrt();
-    (len.is_finite() && len > f32::EPSILON).then_some((dx / len, dy / len))
-}
-
-fn world_distance2(left: (f32, f32), right: (f32, f32)) -> f32 {
-    let dx = left.0 - right.0;
-    let dy = left.1 - right.1;
-    dx * dx + dy * dy
 }
 
 fn choke_line_world_endpoints(
