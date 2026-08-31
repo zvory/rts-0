@@ -9,6 +9,7 @@
 /target/agent-lab
 /target/lab-interact
 /target/interact
+/target/play-the-bot
 **/*.rs.bk
 Cargo.lock.orig
 
