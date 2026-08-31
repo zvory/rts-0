@@ -38,6 +38,10 @@ fn player_inits(count: u32) -> Vec<PlayerInit> {
 }
 
 fn fixture_analysis(map_name: &str) -> AiMapAnalysisDebugSnapshot {
+    fixture_map_analysis(map_name).debug_snapshot()
+}
+
+fn fixture_map_analysis(map_name: &str) -> AiMapAnalysis {
     let players = player_inits(2);
     let player_slots: Vec<_> = players
         .iter()
@@ -52,7 +56,7 @@ fn fixture_analysis(map_name: &str) -> AiMapAnalysisDebugSnapshot {
     });
     let game =
         Game::new_with_random_ai_profiles_and_map_metadata(&players, FIXTURE_SEED, map, metadata);
-    AiMapAnalysis::analyze(&game.start_payload()).debug_snapshot()
+    AiMapAnalysis::analyze(&game.start_payload())
 }
 
 fn resource_at(id: u32, kind: &str, tile_x: u32, tile_y: u32) -> ResourceNode {
@@ -177,6 +181,17 @@ fn one_v_one_no_terrain_fixture_is_one_clear_component() {
         start.component_id == Some(0) && start.clearance_tiles == MAX_CLEARANCE_TILES
     }));
     assert!(debug.starts.iter().all(|start| start.region_id == Some(0)));
+}
+
+#[test]
+fn central_base_approach_classifies_the_river_but_not_crossroads() {
+    let river = fixture_map_analysis("The River");
+    assert!(river.central_base_approach_for_player(1).is_some());
+    assert!(river.central_base_approach_for_player(2).is_some());
+
+    let crossroads = fixture_map_analysis("Crossroads");
+    assert_eq!(crossroads.central_base_approach_for_player(1), None);
+    assert_eq!(crossroads.central_base_approach_for_player(2), None);
 }
 
 #[test]

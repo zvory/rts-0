@@ -280,6 +280,114 @@ fn home_rifle_coverage_uses_wide_fixed_columns_and_deeper_second_rank() {
 }
 
 #[test]
+fn river_defensive_pocket_matches_the_approved_six_unit_shape() {
+    let mut observation = los_test_observation(EntityKind::Factory);
+    observation.map.width = 126;
+    observation.map.height = 126;
+    observation.own_start_tile = (9, 9);
+    observation.owned.clear();
+    let tile_size = observation.map.tile_size as f32;
+    let enemy_base = EnemyBaseFact {
+        player_id: 2,
+        start_tile: (116, 116),
+        x: 116.5 * tile_size,
+        y: 116.5 * tile_size,
+    };
+
+    let rifles =
+        home_defensive_pocket_rifle_assignments(&observation, None, &[40, 10, 30, 20], enemy_base)
+            .expect("Rifle pocket assignments");
+    let machine_gunners =
+        defensive_pocket_machine_gunner_assignments(&observation, None, &[60, 50], enemy_base)
+            .expect("Machine Gunner pocket assignments");
+
+    assert_eq!(
+        rifles.iter().map(|slot| slot.unit_id).collect::<Vec<_>>(),
+        vec![10, 20, 30, 40]
+    );
+    for (assignment, expected) in
+        rifles
+            .iter()
+            .zip([(10.5, 14.5), (14.5, 10.5), (15.8, 14.7), (14.7, 15.8)])
+    {
+        assert!((assignment.x / tile_size - expected.0).abs() < 0.03);
+        assert!((assignment.y / tile_size - expected.1).abs() < 0.03);
+    }
+    for (assignment, expected) in machine_gunners.iter().zip([(16.39, 13.21), (13.21, 16.39)]) {
+        assert!((assignment.x / tile_size - expected.0).abs() < 0.03);
+        assert!((assignment.y / tile_size - expected.1).abs() < 0.03);
+    }
+
+    let anchor = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y)).unwrap();
+    let forward = |assignment: &DefensiveLineAssignment| {
+        ((assignment.x - anchor.0) * direction.0 + (assignment.y - anchor.1) * direction.1)
+            / tile_size
+    };
+    assert!(forward(&machine_gunners[0]) < forward(&rifles[2]));
+    assert!(forward(&machine_gunners[1]) < forward(&rifles[3]));
+}
+
+#[test]
+fn first_machine_gunner_keeps_its_side_when_the_mirrored_partner_arrives() {
+    let mut observation = los_test_observation(EntityKind::Factory);
+    observation.map.width = 126;
+    observation.map.height = 126;
+    observation.own_start_tile = (9, 9);
+    observation.owned.clear();
+    let tile_size = observation.map.tile_size as f32;
+    let enemy_base = EnemyBaseFact {
+        player_id: 2,
+        start_tile: (116, 116),
+        x: 116.5 * tile_size,
+        y: 116.5 * tile_size,
+    };
+
+    let first =
+        defensive_pocket_machine_gunner_assignments(&observation, None, &[50], enemy_base).unwrap();
+    let pair =
+        defensive_pocket_machine_gunner_assignments(&observation, None, &[60, 50], enemy_base)
+            .unwrap();
+
+    assert_eq!(first[0].unit_id, pair[0].unit_id);
+    assert_eq!((first[0].x, first[0].y), (pair[0].x, pair[0].y));
+    let anchor = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y)).unwrap();
+    let perpendicular = (-direction.1, direction.0);
+    let projection = |assignment: &DefensiveLineAssignment, axis: (f32, f32)| {
+        (assignment.x - anchor.0) * axis.0 + (assignment.y - anchor.1) * axis.1
+    };
+    assert!((projection(&pair[0], direction) - projection(&pair[1], direction)).abs() < 0.001);
+    assert!(
+        (projection(&pair[0], perpendicular) + projection(&pair[1], perpendicular)).abs() < 0.001
+    );
+}
+
+#[test]
+fn noncentral_crossroads_start_rotates_the_pocket_toward_map_center() {
+    let mut observation = los_test_observation(EntityKind::Factory);
+    observation.map.width = 126;
+    observation.map.height = 126;
+    observation.own_start_tile = (47, 8);
+    observation.owned.clear();
+    let tile_size = observation.map.tile_size as f32;
+    let enemy_base = EnemyBaseFact {
+        player_id: 1,
+        start_tile: (117, 78),
+        x: 117.5 * tile_size,
+        y: 78.5 * tile_size,
+    };
+    let (anchor, direction) =
+        defensive_pocket_basis(&observation, None, enemy_base).expect("fallback orientation");
+    let map_center = (63.0 * tile_size, 63.0 * tile_size);
+    let center_direction = normalized_direction(anchor, map_center).unwrap();
+    let enemy_direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y)).unwrap();
+
+    assert!(direction.0 * center_direction.0 + direction.1 * center_direction.1 > 0.999);
+    assert!(direction.0 * enemy_direction.0 + direction.1 * enemy_direction.1 < 0.9);
+}
+
+#[test]
 fn planned_factory_is_part_of_the_local_defense_envelope() {
     let mut observation = los_test_observation(EntityKind::Depot);
     let ts = observation.map.tile_size as f32;
