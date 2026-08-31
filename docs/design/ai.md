@@ -208,8 +208,10 @@ Jeff's AI is the fast-Tank timing profile developed from the standalone local bo
 four oldest home Riflemen and two opening Machine Gunners form a six-slot defensive pocket around
 the starting Resource Depot: the two outside Riflemen remain on the close flanks, the middle pair
 stands forward, and the Machine Gunners occupy mirrored slots slightly behind that middle pair.
-The whole pocket rotates toward a terrain-analyzed central base approach when one exists. Open or
-side-lane starts such as Crossroads retain the same shape but rotate toward the map centre instead.
+The whole pocket rotates toward a terrain-analyzed central base approach when one exists. Crossroads
+uses a map-specific wall-aware rotation for both starts: its pocket faces the southwest approach
+corridor around the water barriers rather than the blocked direct diagonal or the map centre. Other
+open or side-lane starts retain the same shape and rotate toward the map centre.
 Later surplus Riflemen keep the broader building-envelope coverage instead of crowding the opening
 pocket. A Machine Gunner below 50% health no longer counts toward the healthy pair and triggers a
 replacement. The full Tank tech path starts immediately, Tanks do not wait for Methamphetamines,
