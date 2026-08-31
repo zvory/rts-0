@@ -1,5 +1,5 @@
 use super::*;
-use crate::ai_core::observation::{AiBuildIntent, AiEconomy, AiResourceSummary};
+use crate::ai_core::observation::{AiBuildIntent, AiEconomy, AiPlayerSummary, AiResourceSummary};
 
 fn los_test_observation(blocker: EntityKind) -> AiObservation {
     let tile_size = config::TILE_SIZE;
@@ -364,11 +364,27 @@ fn first_machine_gunner_keeps_its_side_when_the_mirrored_partner_arrives() {
 }
 
 #[test]
-fn noncentral_crossroads_start_rotates_the_pocket_toward_map_center() {
+fn crossroads_starts_use_the_approved_wall_aware_pocket_rotation() {
     let mut observation = los_test_observation(EntityKind::Factory);
     observation.map.width = 126;
     observation.map.height = 126;
     observation.own_start_tile = (47, 8);
+    observation.players = vec![
+        AiPlayerSummary {
+            id: 1,
+            team_id: 1,
+            start_tile: (47, 8),
+            is_ai: true,
+            is_alive: true,
+        },
+        AiPlayerSummary {
+            id: 2,
+            team_id: 2,
+            start_tile: (117, 78),
+            is_ai: true,
+            is_alive: true,
+        },
+    ];
     observation.owned.clear();
     let tile_size = observation.map.tile_size as f32;
     let enemy_base = EnemyBaseFact {
@@ -377,14 +393,66 @@ fn noncentral_crossroads_start_rotates_the_pocket_toward_map_center() {
         x: 117.5 * tile_size,
         y: 78.5 * tile_size,
     };
-    let (anchor, direction) =
-        defensive_pocket_basis(&observation, None, enemy_base).expect("fallback orientation");
-    let map_center = (63.0 * tile_size, 63.0 * tile_size);
-    let center_direction = normalized_direction(anchor, map_center).unwrap();
-    let enemy_direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y)).unwrap();
+    let (_, direction) =
+        defensive_pocket_basis(&observation, None, enemy_base).expect("P1 wall-aware orientation");
+    let expected = normalized_direction((0.0, 0.0), (-2.0, 1.0)).unwrap();
+    assert!((direction.0 - expected.0).abs() < 0.0001);
+    assert!((direction.1 - expected.1).abs() < 0.0001);
+    let rifles =
+        home_defensive_pocket_rifle_assignments(&observation, None, &[40, 10, 30, 20], enemy_base)
+            .expect("P1 Rifle pocket assignments");
+    let machine_gunners =
+        defensive_pocket_machine_gunner_assignments(&observation, None, &[60, 50], enemy_base)
+            .expect("P1 Machine Gunner pocket assignments");
+    for (assignment, expected) in rifles.iter().zip([
+        (42.43, 7.87),
+        (44.96, 12.93),
+        (40.56, 12.84),
+        (39.86, 11.45),
+    ]) {
+        assert!((assignment.x / tile_size - expected.0).abs() < 0.03);
+        assert!((assignment.y / tile_size - expected.1).abs() < 0.03);
+    }
+    for (assignment, expected) in machine_gunners.iter().zip([(41.80, 13.87), (39.79, 9.84)]) {
+        assert!((assignment.x / tile_size - expected.0).abs() < 0.03);
+        assert!((assignment.y / tile_size - expected.1).abs() < 0.03);
+    }
 
-    assert!(direction.0 * center_direction.0 + direction.1 * center_direction.1 > 0.999);
-    assert!(direction.0 * enemy_direction.0 + direction.1 * enemy_direction.1 < 0.9);
+    observation.player_id = 2;
+    observation.own_start_tile = (117, 78);
+    let enemy_base = EnemyBaseFact {
+        player_id: 1,
+        start_tile: (47, 8),
+        x: 47.5 * tile_size,
+        y: 8.5 * tile_size,
+    };
+    let (_, direction) =
+        defensive_pocket_basis(&observation, None, enemy_base).expect("P2 wall-aware orientation");
+    let expected = normalized_direction((0.0, 0.0), (-5.0, 7.0)).unwrap();
+    assert!((direction.0 - expected.0).abs() < 0.0001);
+    assert!((direction.1 - expected.1).abs() < 0.0001);
+    let rifles =
+        home_defensive_pocket_rifle_assignments(&observation, None, &[40, 10, 30, 20], enemy_base)
+            .expect("P2 Rifle pocket assignments");
+    let machine_gunners =
+        defensive_pocket_machine_gunner_assignments(&observation, None, &[60, 50], enemy_base)
+            .expect("P2 Machine Gunner pocket assignments");
+    for (assignment, expected) in rifles.iter().zip([
+        (112.73, 80.31),
+        (117.33, 83.60),
+        (113.40, 85.59),
+        (112.13, 84.68),
+    ]) {
+        assert!((assignment.x / tile_size - expected.0).abs() < 0.03);
+        assert!((assignment.y / tile_size - expected.1).abs() < 0.03);
+    }
+    for (assignment, expected) in machine_gunners
+        .iter()
+        .zip([(114.97, 85.91), (111.31, 83.30)])
+    {
+        assert!((assignment.x / tile_size - expected.0).abs() < 0.03);
+        assert!((assignment.y / tile_size - expected.1).abs() < 0.03);
+    }
 }
 
 #[test]

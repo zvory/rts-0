@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use super::*;
 
 const CENTRAL_BASE_APPROACH_MIN_ALIGNMENT: f32 = 0.9;
+const CROSSROADS_MAP_TILES: (u32, u32) = (126, 126);
+const CROSSROADS_STARTS: [(u32, u32); 2] = [(47, 8), (117, 78)];
 // (forward, lateral) offsets from the starting Resource Depot centre. These reproduce the
 // approved River pocket, then rotate as one shape toward each base's central approach.
 const RIFLE_SLOTS: [(f32, f32); 4] = [(4.25, 2.83), (4.25, -2.83), (8.15, -0.78), (8.15, 0.78)];
@@ -138,6 +140,13 @@ pub(super) fn defensive_pocket_basis(
         observation.map.width as f32 * tile_size * 0.5,
         observation.map.height as f32 * tile_size * 0.5,
     );
+    if let Some(direction) = crossroads_wall_aware_direction(
+        (observation.map.width, observation.map.height),
+        observation.own_start_tile,
+        observation.players.iter().map(|player| player.start_tile),
+    ) {
+        return Some((anchor, direction));
+    }
     let target = map_analysis
         .and_then(|analysis| {
             central_base_approach(observation.player_id, analysis, anchor, map_center)
@@ -146,6 +155,42 @@ pub(super) fn defensive_pocket_basis(
     let direction = normalized_direction(anchor, target)
         .or_else(|| normalized_direction(anchor, (enemy_base.x, enemy_base.y)))?;
     Some((anchor, direction))
+}
+
+fn crossroads_wall_aware_direction(
+    map_tiles: (u32, u32),
+    own_start_tile: (u32, u32),
+    player_starts: impl IntoIterator<Item = (u32, u32)>,
+) -> Option<(f32, f32)> {
+    if map_tiles != CROSSROADS_MAP_TILES {
+        return None;
+    }
+    let mut seen = [false; CROSSROADS_STARTS.len()];
+    let mut start_count = 0_usize;
+    for start in player_starts {
+        let index = CROSSROADS_STARTS
+            .iter()
+            .position(|expected| *expected == start)?;
+        if seen[index] {
+            return None;
+        }
+        seen[index] = true;
+        start_count += 1;
+    }
+    if start_count != CROSSROADS_STARTS.len() || seen.iter().any(|present| !present) {
+        return None;
+    }
+
+    // Crossroads' two water walls block the direct spawn-to-spawn diagonal. These vectors retain
+    // the approved six-slot shape while facing the southwest road-and-ground corridor from which
+    // an attack can actually enter each base. They are the reviewed route-facing proposal plus
+    // the requested additional 45-degree turn in the same direction at each spawn.
+    let target = match own_start_tile {
+        (47, 8) => (-2.0, 1.0),
+        (117, 78) => (-5.0, 7.0),
+        _ => return None,
+    };
+    normalized_direction((0.0, 0.0), target)
 }
 
 fn central_base_approach(
@@ -313,5 +358,33 @@ mod tests {
         assert!(fixture_approaches("Crossroads")
             .into_iter()
             .all(|approach| approach.is_none()));
+    }
+
+    #[test]
+    fn crossroads_wall_aware_directions_match_the_approved_extra_rotation() {
+        let (_, start) = fixture("Crossroads");
+        let player_starts = start
+            .players
+            .iter()
+            .map(|player| (player.start_tile_x, player.start_tile_y))
+            .collect::<Vec<_>>();
+        let p1 = normalized_direction((0.0, 0.0), (-2.0, 1.0)).unwrap();
+        let p2 = normalized_direction((0.0, 0.0), (-5.0, 7.0)).unwrap();
+        for player in &start.players {
+            let start_tile = (player.start_tile_x, player.start_tile_y);
+            let direction = crossroads_wall_aware_direction(
+                (start.map.width, start.map.height),
+                start_tile,
+                player_starts.iter().copied(),
+            )
+            .expect("Crossroads should have a wall-aware pocket direction");
+            let expected = match start_tile {
+                (47, 8) => p1,
+                (117, 78) => p2,
+                _ => panic!("unexpected Crossroads start {start_tile:?}"),
+            };
+            assert!((direction.0 - expected.0).abs() < 0.0001);
+            assert!((direction.1 - expected.1).abs() < 0.0001);
+        }
     }
 }
