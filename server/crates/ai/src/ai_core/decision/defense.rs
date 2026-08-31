@@ -6,6 +6,7 @@ use super::*;
 
 mod envelope;
 mod incident;
+mod pocket;
 
 pub(super) use self::envelope::local_defense_contact;
 use self::envelope::{
@@ -15,6 +16,14 @@ use self::envelope::{
 pub(super) use self::incident::respond_to_local_incident;
 #[cfg(test)]
 pub(super) use self::incident::select_defensive_interceptors;
+#[cfg(test)]
+use self::pocket::{
+    defensive_pocket_basis, defensive_pocket_machine_gunner_assignments,
+    home_defensive_pocket_rifle_assignments,
+};
+pub(super) use self::pocket::{
+    stage_defensive_pocket_machine_gunners, stage_home_defensive_pocket_riflemen,
+};
 
 pub(super) const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
 

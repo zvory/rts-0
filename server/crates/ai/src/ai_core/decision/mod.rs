@@ -42,10 +42,10 @@ use self::defense::{
     defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
     home_defensive_tank_is_positioned, local_defense_target, local_defense_units,
     machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
-    stage_home_anti_tank_line, stage_home_defensive_tank, stage_home_machine_gunner_screen,
-    stage_home_rifleman_envelope_coverage, stage_home_rifleman_screen,
-    stage_main_steel_defensive_line, DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS,
-    DEFENSIVE_PANIC_RIFLE_TECH_PATH,
+    stage_defensive_pocket_machine_gunners, stage_home_anti_tank_line,
+    stage_home_defensive_pocket_riflemen, stage_home_defensive_tank,
+    stage_home_machine_gunner_screen, stage_home_rifleman_screen, stage_main_steel_defensive_line,
+    DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
 use self::economy_manager::{
     propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
@@ -873,7 +873,7 @@ where
                 .map(|entity| entity.id);
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 let staged = if profile.id == JEFFS_AI_ID {
-                    stage_home_rifleman_envelope_coverage(
+                    stage_home_defensive_pocket_riflemen(
                         &mut actions,
                         observation,
                         map_analysis,
@@ -931,7 +931,15 @@ where
             && !defensive_machine_gunners_available.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                let staged = if memory.home_defensive_tank.is_some() {
+                let staged = if profile.id == JEFFS_AI_ID {
+                    stage_defensive_pocket_machine_gunners(
+                        &mut actions,
+                        observation,
+                        map_analysis,
+                        &defensive_machine_gunners_available,
+                        enemy_base,
+                    )
+                } else if memory.home_defensive_tank.is_some() {
                     let distance = profile
                         .defensive_machine_gunners
                         .map(|policy| policy.perimeter_distance_tiles)

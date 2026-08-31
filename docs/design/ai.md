@@ -204,30 +204,35 @@ All three profiles are self-contained policy records in the same registry. Each 
 whether to use the proposal economy manager; AI 2.1, Jeff's AI, and AI Turtle enable it. None
 inherits behavior from a retired version or resolves through a second profile name.
 
-Jeff's AI is the fast-Tank timing profile developed from the standalone local bot workspace. It
-opens with exactly two entrenched Machine Gunners held close to the main steel line; a defender
-below 50% health no longer counts toward that healthy screen and triggers a replacement. The full
-Tank tech path starts immediately, Tanks do not wait for Methamphetamines, and defensive panic
-does not replace the active armored production plan with infantry. After two Tanks, one Scout Car
-takes temporary Factory priority and joins those Tanks as a single vision-supported attack wave.
-Expansion, a second Factory, Methamphetamines, and other optional spending wait until the initial
-Tank core exists. The profile uses the shared decision and action layers, receives only
-fog-filtered observations, and issues ordinary validated player commands for spending, placement,
-production, and combat.
+Jeff's AI is the fast-Tank timing profile developed from the standalone local bot workspace. Its
+four oldest home Riflemen and two opening Machine Gunners form a six-slot defensive pocket around
+the starting Resource Depot: the two outside Riflemen remain on the close flanks, the middle pair
+stands forward, and the Machine Gunners occupy mirrored slots slightly behind that middle pair.
+The whole pocket rotates toward a terrain-analyzed central base approach when one exists. Open or
+side-lane starts such as Crossroads retain the same shape but rotate toward the map centre instead.
+Later surplus Riflemen keep the broader building-envelope coverage instead of crowding the opening
+pocket. A Machine Gunner below 50% health no longer counts toward the healthy pair and triggers a
+replacement. The full Tank tech path starts immediately, Tanks do not wait for Methamphetamines,
+and defensive panic does not replace the active armored production plan with infantry. After two
+Tanks, one Scout Car takes temporary Factory priority and joins those Tanks as a single
+vision-supported attack wave. Expansion, a second Factory, Methamphetamines, and other optional
+spending wait until the initial Tank core exists. The profile uses the shared decision and action
+layers, receives only fog-filtered observations, and issues ordinary validated player commands for
+spending, placement, production, and combat.
 
 Its local-defense envelope covers every owned building footprint, including incomplete structures,
-plus reserved sites for submitted build intents. The standing Rifleman formation is anchored only
-to completed core buildings, not extractors or pending construction, and keeps three fifths of the
-line on the primary approach. When visible enemy material enters the wider envelope, mobile
-defenders focus the highest-value visible target at the threatened footprint. Tanks and
-Panzerfausts answer armored contacts first, fully entrenched Riflemen remain in place, and an
-understrength Rifle-only group does not make a sacrificial intercept. Lost contact creates only a
-bounded two-second search incident; reaching the last contact point without reacquiring the enemy
-or reaching the timeout returns the units to normal defensive staging. Each Tank containment push
-also assigns half of the ready Riflemen as a stable escort cohort and orders them to screen two
-tiles ahead of the Tank front; the remaining Riflemen stay available for home defense. The internal
-`jeffs_ai_pre_defense_envelope` profile freezes the preceding Jeff policy for arena regression
-comparisons and is not exposed in the lobby selector.
+plus reserved sites for submitted build intents. The four-unit defensive pocket remains anchored to
+the starting Resource Depot so later construction cannot drag it out of shape; only surplus
+Riflemen use completed core buildings for their standing coverage. When visible enemy material
+enters the wider envelope, mobile defenders focus the highest-value visible target at the
+threatened footprint. Tanks and Panzerfausts answer armored contacts first, fully entrenched
+Riflemen remain in place, and an understrength Rifle-only group does not make a sacrificial
+intercept. Lost contact creates only a bounded two-second search incident; reaching the last
+contact point without reacquiring the enemy or reaching the timeout returns the units to normal
+defensive staging. Each Tank containment push also assigns half of the ready Riflemen as a stable
+escort cohort and orders them to screen two tiles ahead of the Tank front; the remaining Riflemen
+stay available for home defense. The internal `jeffs_ai_pre_defense_envelope` profile freezes the
+preceding Jeff policy for arena regression comparisons and is not exposed in the lobby selector.
 
 ### Self-play and arena tools
 
