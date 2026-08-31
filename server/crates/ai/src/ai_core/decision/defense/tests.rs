@@ -388,7 +388,7 @@ fn crossroads_starts_use_the_approved_wall_aware_pocket_rotation() {
     observation.owned.clear();
     let tile_size = observation.map.tile_size as f32;
     let enemy_base = EnemyBaseFact {
-        player_id: 1,
+        player_id: 2,
         start_tile: (117, 78),
         x: 117.5 * tile_size,
         y: 78.5 * tile_size,
