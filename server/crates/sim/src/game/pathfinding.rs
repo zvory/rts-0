@@ -54,30 +54,6 @@ pub trait Passability {
         }
         Some(self.movement_cost(tx, ty, base_step_cost))
     }
-
-    /// Total directed edge cost. Weighted profiles override this because discounts can make an
-    /// edge cheaper than the legacy base step and therefore cannot be represented as a surcharge.
-    fn edge_cost(
-        &self,
-        from_tx: i32,
-        from_ty: i32,
-        dx: i32,
-        dy: i32,
-        base_step_cost: u32,
-    ) -> Option<u32> {
-        self.edge_extra_cost(from_tx, from_ty, dx, dy, base_step_cost)
-            .map(|extra| base_step_cost.saturating_add(extra))
-    }
-
-    /// Minimum attainable cardinal/diagonal costs for an admissible geometric heuristic.
-    fn heuristic_step_costs(&self) -> (u32, u32) {
-        (10, 14)
-    }
-
-    /// Deterministic identity of cost-bearing static inputs. Legality-only callers use zero.
-    fn cost_fingerprint(&self) -> u64 {
-        0
-    }
 }
 
 /// A* node in the open set, ordered by `f = g + h` (min-heap via `Reverse`-style `Ord`).
@@ -123,26 +99,12 @@ impl PartialOrd for Node {
 
 /// Octile heuristic, scaled by 10 to keep integer math (cardinal = 10, diagonal = 14).
 #[inline]
-fn heuristic_with_costs(
-    ax: i32,
-    ay: i32,
-    bx: i32,
-    by: i32,
-    cardinal_cost: u32,
-    diagonal_cost: u32,
-) -> u32 {
+fn heuristic(ax: i32, ay: i32, bx: i32, by: i32) -> u32 {
     let dx = (ax - bx).unsigned_abs();
     let dy = (ay - by).unsigned_abs();
     let (lo, hi) = if dx < dy { (dx, dy) } else { (dy, dx) };
     // hi - lo straight moves at 10, lo diagonal moves at 14.
-    diagonal_cost
-        .saturating_mul(lo)
-        .saturating_add(cardinal_cost.saturating_mul(hi - lo))
-}
-
-#[inline]
-fn heuristic(ax: i32, ay: i32, bx: i32, by: i32) -> u32 {
-    heuristic_with_costs(ax, ay, bx, by, 10, 14)
+    14 * lo + 10 * (hi - lo)
 }
 
 /// The 8 neighbor offsets paired with their step cost (×10 scaling).
@@ -220,11 +182,8 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
     // best known g per search state.
     let start_key = (sx, sy, NO_INCOMING_DIR);
 
-    let (heuristic_cardinal, heuristic_diagonal) = pass.heuristic_step_costs();
-    let production_heuristic =
-        |tx, ty| heuristic_with_costs(tx, ty, gx, gy, heuristic_cardinal, heuristic_diagonal);
     scratch.open.push(Node {
-        f: production_heuristic(sx, sy),
+        f: heuristic(sx, sy, gx, gy),
         g: 0,
         tx: sx,
         ty: sy,
@@ -268,7 +227,7 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
         for (dir, &(dx, dy, cost)) in NEIGHBORS.iter().enumerate() {
             let nx = cur.tx + dx;
             let ny = cur.ty + dy;
-            let Some(edge_cost) = pass.edge_cost(cur.tx, cur.ty, dx, dy, cost) else {
+            let Some(extra_cost) = pass.edge_extra_cost(cur.tx, cur.ty, dx, dy, cost) else {
                 continue;
             };
 
@@ -284,19 +243,22 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
                 NO_INCOMING_DIR
             };
             let next_key = (nx, ny, next_dir);
-            let tentative = cur.g.saturating_add(edge_cost).saturating_add(turn_cost);
+            let tentative = cur
+                .g
+                .saturating_add(cost)
+                .saturating_add(turn_cost)
+                .saturating_add(extra_cost);
             let better = match scratch.get_g(next_key) {
                 Some(existing) => tentative < existing,
                 None => true,
             };
             if better {
                 scratch.set(next_key, tentative, cur_key);
-                let fallback_h = heuristic(nx, ny, gx, gy);
-                if fallback_h < best_h {
-                    best_h = fallback_h;
+                let h = heuristic(nx, ny, gx, gy);
+                if h < best_h {
+                    best_h = h;
                     best_key = next_key;
                 }
-                let h = production_heuristic(nx, ny);
                 scratch.open.push(Node {
                     f: tentative + h,
                     g: tentative,

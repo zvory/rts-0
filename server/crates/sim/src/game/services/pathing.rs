@@ -6,7 +6,7 @@
 use crate::config;
 use crate::game::entity::{
     movement_body_class, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind,
-    MovementBodyClass, RoutePolicy,
+    MovementBodyClass,
 };
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
@@ -18,18 +18,14 @@ use std::collections::HashMap;
 mod authoring;
 mod graph;
 mod passability;
-mod route_cost;
 mod route_finalize;
-mod terrain_finalize;
 mod tree_detours;
 pub(in crate::game) use authoring::StaticRouteAnalyzer;
 use graph::PathGraph;
 use passability::TerrainPassability;
 #[cfg(test)]
 mod tree_detours_tests;
-pub(in crate::game::services) use route_finalize::{
-    finalize_reverse_waypoints_or_raw, RouteFinalizationMode,
-};
+pub(in crate::game::services) use route_finalize::finalize_reverse_waypoints_or_raw;
 pub(in crate::game::services) use tree_detours::tree_detour_between;
 
 const VEHICLE_HARD_CLEARANCE_TILES: u16 = 1;
@@ -51,8 +47,6 @@ pub(crate) struct PathRequest {
     /// Optional route-shaping cost model. Keep normal for interaction paths where exact tile
     /// progression matters more than visual smoothness.
     pub route_shape: RouteShape,
-    /// Static route objective. Every caller must choose explicitly.
-    pub policy: RoutePolicy,
     /// Max A* nodes to expand. `None` uses the service default.
     pub budget: Option<usize>,
 }
@@ -384,7 +378,6 @@ mod tests {
             goal,
             radius_tiles,
             route_shape: RouteShape::Normal,
-            policy: RoutePolicy::LegacyShape,
             budget: None,
         };
         let tile_path = service.request_tile_path(map, &occ, req.clone());
@@ -412,7 +405,6 @@ mod tests {
                 goal,
                 radius_tiles,
                 route_shape,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         )
@@ -579,7 +571,6 @@ mod tests {
                 goal: *goal,
                 radius_tiles: 0,
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             };
             a.request(&map, &occ, req.clone());
@@ -595,7 +586,6 @@ mod tests {
             goal: (5, 5),
             radius_tiles: 0,
             route_shape: RouteShape::Normal,
-            policy: RoutePolicy::LegacyShape,
             budget: None,
         };
         a.request(&map, &occ, req4.clone());
@@ -645,7 +635,6 @@ mod tests {
                 goal,
                 radius_tiles: 0,
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: Some(0),
             },
         );
@@ -661,7 +650,6 @@ mod tests {
                 goal,
                 radius_tiles: 0,
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -842,7 +830,6 @@ mod tests {
                     goal,
                     radius_tiles: 0,
                     route_shape,
-                    policy: RoutePolicy::LegacyShape,
                     budget: None,
                 },
             );
@@ -887,7 +874,6 @@ mod tests {
                     goal,
                     radius_tiles,
                     route_shape,
-                    policy: RoutePolicy::LegacyShape,
                     budget: None,
                 },
             );
@@ -925,7 +911,6 @@ mod tests {
             goal,
             radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
             route_shape: RouteShape::Normal,
-            policy: RoutePolicy::LegacyShape,
             budget: None,
         };
 
@@ -976,7 +961,6 @@ mod tests {
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -995,7 +979,6 @@ mod tests {
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1029,7 +1012,6 @@ mod tests {
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1054,7 +1036,6 @@ mod tests {
             goal,
             radius_tiles: config::unit_radius_tiles(EntityKind::Worker),
             route_shape: RouteShape::Normal,
-            policy: RoutePolicy::LegacyShape,
             budget: None,
         };
         let vehicle_req = PathRequest {
@@ -1063,7 +1044,6 @@ mod tests {
             goal,
             radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
             route_shape: RouteShape::Normal,
-            policy: RoutePolicy::LegacyShape,
             budget: None,
         };
 
@@ -1140,7 +1120,6 @@ mod tests {
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1186,7 +1165,6 @@ mod tests {
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1205,7 +1183,6 @@ mod tests {
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
                     route_shape: RouteShape::Normal,
-                    policy: RoutePolicy::LegacyShape,
                     budget: None,
                 },
             );
@@ -1247,7 +1224,6 @@ mod tests {
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
                     route_shape: RouteShape::Normal,
-                    policy: RoutePolicy::LegacyShape,
                     budget: None,
                 },
             );
@@ -1277,7 +1253,6 @@ mod tests {
                 goal,
                 radius_tiles: 0,
                 route_shape: RouteShape::PreferFewerTurns,
-                policy: RoutePolicy::LegacyShape,
                 budget: Some(0),
             },
         );
@@ -1293,7 +1268,6 @@ mod tests {
                 goal,
                 radius_tiles: 0,
                 route_shape: RouteShape::PreferFewerTurns,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1584,7 +1558,6 @@ mod tests {
                 goal,
                 radius_tiles,
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1625,7 +1598,6 @@ mod tests {
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
                     route_shape: RouteShape::Normal,
-                    policy: RoutePolicy::LegacyShape,
                     budget: None,
                 },
             );
@@ -1638,7 +1610,6 @@ mod tests {
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
                     route_shape: RouteShape::VehicleClearance,
-                    policy: RoutePolicy::LegacyShape,
                     budget: None,
                 },
             );
@@ -1674,7 +1645,6 @@ mod tests {
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
                 route_shape: RouteShape::VehicleClearance,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1700,7 +1670,6 @@ mod tests {
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
                 route_shape: RouteShape::VehicleClearance,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1754,7 +1723,6 @@ mod tests {
                 goal,
                 radius_tiles,
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1793,7 +1761,6 @@ mod tests {
                 goal,
                 radius_tiles,
                 route_shape: RouteShape::Normal,
-                policy: RoutePolicy::LegacyShape,
                 budget: None,
             },
         );
@@ -1817,7 +1784,6 @@ mod tests {
             goal: (20, 20),
             radius_tiles: 0,
             route_shape: RouteShape::VehicleClearance,
-            policy: RoutePolicy::LegacyShape,
             budget: None,
         };
         let first = service.request_tile_path(&map, &occ, request.clone());

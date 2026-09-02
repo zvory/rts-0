@@ -8,17 +8,6 @@ use serde::{Deserialize, Serialize};
 use super::reveal_reaction::FiringRevealReactionGate;
 use super::{EntityKind, Order, OrderIntent, RallyIntent};
 
-/// Static route objective used to author the currently serialized movement path.
-#[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-#[serde(rename_all = "camelCase")]
-pub enum RoutePolicy {
-    #[default]
-    LegacyShape,
-    FastestTerrainTime,
-}
-
 /// Maximum number of explicit unit or research entries stored on one production building.
 /// Unpaid manual entries need an authority-side cap because resources no longer bound queue size.
 pub(crate) const MAX_PRODUCTION_QUEUE: usize = 8;
@@ -132,9 +121,6 @@ pub struct MovementState {
     /// Tile-center waypoints remaining to walk through (world pixels), in reverse order so
     /// the next waypoint is the last element (cheap `pop`). Empty when not moving.
     pub path: Vec<(f32, f32)>,
-    /// Policy under which `path` was authored. Old checkpoints default to legacy behavior.
-    #[serde(default)]
-    pub path_policy: RoutePolicy,
     /// Tick when this unit was last assigned a path. Used for repath throttling.
     pub last_repath_tick: u32,
     /// The goal world point of the most recently assigned path, for throttle-bypass checks.
@@ -185,7 +171,6 @@ impl Default for MovementState {
             order: Order::Idle,
             queued_orders: Vec::new(),
             path: Vec::new(),
-            path_policy: RoutePolicy::LegacyShape,
             last_repath_tick: 0,
             path_goal: None,
             stuck_ticks: 0,

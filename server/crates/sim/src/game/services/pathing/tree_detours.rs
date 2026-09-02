@@ -7,12 +7,6 @@ const MAX_LOCAL_TREES: usize = 8;
 const DETOUR_CLEARANCE_PX: f32 = 1.0;
 const TREE_TILE_AVOIDANCE_COST: u32 = 40;
 
-pub(super) fn weighted_tree_avoidance_cost(tree_count: u32) -> u32 {
-    tree_count
-        .saturating_mul(TREE_TILE_AVOIDANCE_COST)
-        .saturating_mul(terrain::ROUTE_TIME_SCALE)
-}
-
 pub(super) fn movement_cost(
     pass: &TerrainPassability<'_>,
     tx: i32,

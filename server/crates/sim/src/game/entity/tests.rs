@@ -508,31 +508,6 @@ fn entity_store_iteration_and_checkpoint_restore_stay_ordered() {
 }
 
 #[test]
-fn movement_path_policy_round_trips_and_old_state_defaults_to_legacy() {
-    let mut entity = Entity::new_unit(1, EntityKind::Rifleman, 64.0, 64.0)
-        .expect("rifleman should be constructible");
-    entity.set_path_with_policy(vec![(128.0, 64.0)], RoutePolicy::FastestTerrainTime);
-    let encoded = serde_json::to_value(&entity).expect("entity should serialize");
-    let restored: Entity =
-        serde_json::from_value(encoded.clone()).expect("entity should deserialize");
-    assert_eq!(restored.path_policy(), RoutePolicy::FastestTerrainTime);
-
-    let mut legacy_encoded = encoded;
-    legacy_encoded
-        .get_mut("movement")
-        .and_then(serde_json::Value::as_object_mut)
-        .expect("movement state should be an object")
-        .remove("path_policy");
-    let legacy: Entity =
-        serde_json::from_value(legacy_encoded).expect("old movement state should deserialize");
-    assert_eq!(legacy.path_policy(), RoutePolicy::LegacyShape);
-
-    entity.pop_waypoint();
-    assert!(entity.path_is_empty());
-    assert_eq!(entity.path_policy(), RoutePolicy::LegacyShape);
-}
-
-#[test]
 fn entity_store_serde_round_trip_and_default_semantics_stay_unchanged() {
     let mut store = EntityStore::new();
     store
