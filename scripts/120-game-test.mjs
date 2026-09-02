@@ -16,6 +16,7 @@ const DEFAULT_EXPECTED_FULL_GAME_SECONDS = 90;
 const MAX_EFFECTIVE_ESTIMATE_CONCURRENCY = 8;
 const EXPECTED_RELEASE_BUILD_SECONDS = 120;
 const AGENT_WAIT_MARGIN_PERCENT = 10;
+const REPLAY_VERIFICATION_SIMULATION_PASSES = 2;
 const DEFAULT_CONCURRENCY = Math.min(
   32,
   Math.max(1, os.availableParallelism?.() ?? os.cpus().length),
@@ -175,7 +176,7 @@ Options:
   --background        Start the test detached and return immediately.
   --progress          Print each completed seed pair (default is start/end only).
   --expected-game-seconds N
-                      Expected wall time for one 25,000-tick game (default: ${DEFAULT_EXPECTED_FULL_GAME_SECONDS}).
+                      Expected wall time for one live 25,000-tick game (default: ${DEFAULT_EXPECTED_FULL_GAME_SECONDS}).
                       Used only for the quiet agent wait estimate.
   --status DIR        Print compact status for an output directory; no profiles required.
   --dry-run           Print the fixed test plan without building or running games.
@@ -409,8 +410,11 @@ function createAgentWaitPlan(runOptions, completedGames = 0, includeBuild = true
     Math.min(runOptions.concurrency, MAX_EFFECTIVE_ESTIMATE_CONCURRENCY, activeJobs || 1),
   );
   const simulationWaves = Math.ceil(activeJobs / effectiveConcurrency);
+  const simulationPasses = runOptions.verifyReplay
+    ? REPLAY_VERIFICATION_SIMULATION_PASSES
+    : 1;
   const simulationSeconds =
-    (simulationWaves * 2 * runOptions.expectedGameSeconds * runOptions.ticks) /
+    (simulationWaves * 2 * simulationPasses * runOptions.expectedGameSeconds * runOptions.ticks) /
     TICKS_PER_FULL_GAME_ESTIMATE;
   const buildSeconds = includeBuild && !runOptions.skipBuild ? EXPECTED_RELEASE_BUILD_SECONDS : 0;
   const baseExpectedSeconds = Math.ceil(buildSeconds + simulationSeconds);
@@ -435,6 +439,7 @@ function createAgentWaitPlan(runOptions, completedGames = 0, includeBuild = true
       expectedSecondsPer25000TickGame: runOptions.expectedGameSeconds,
       requestedConcurrency: runOptions.concurrency,
       effectiveEstimateConcurrency: effectiveConcurrency,
+      simulationPassesPerGame: simulationPasses,
       releaseBuildSeconds: buildSeconds,
     },
     resume: {
@@ -472,6 +477,8 @@ function resolveAgentWaitPlan(outDir, proposedPlan) {
           proposedPlan.assumptions.expectedSecondsPer25000TickGame &&
         existing.assumptions?.requestedConcurrency ===
           proposedPlan.assumptions.requestedConcurrency &&
+        existing.assumptions?.simulationPassesPerGame ===
+          proposedPlan.assumptions.simulationPassesPerGame &&
         existing.assumptions?.completedGames === proposedPlan.assumptions.completedGames
       ) {
         return existing;
@@ -517,8 +524,11 @@ function printPlan(runOptions, plannedJobs) {
   console.log(`  output:      ${runOptions.outDir}`);
   console.log(`  replay:      ${runOptions.verifyReplay ? "verify" : "skip verification"}`);
   const agentWait = createAgentWaitPlan(runOptions);
+  const estimateScope = runOptions.verifyReplay
+    ? "live games and replay verification at cap"
+    : "all games at cap";
   console.log(
-    `  quiet wait:  ${formatDuration(agentWait.waitSeconds)} (all games at cap plus ${agentWait.safetyMarginPercent}%)`,
+    `  quiet wait:  ${formatDuration(agentWait.waitSeconds)} (${estimateScope} plus ${agentWait.safetyMarginPercent}%)`,
   );
   for (const matchup of MATCHUPS) {
     console.log(`  matchup:     ${matchup.label}`);
