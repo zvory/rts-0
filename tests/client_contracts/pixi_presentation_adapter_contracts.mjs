@@ -80,7 +80,7 @@ const frameInputs = {
         x: 48,
         y: 24,
         setupState: "deployed",
-        weaponFacing: Math.PI,
+        facing: Math.PI,
         threatMemory: true,
       },
       {
@@ -90,7 +90,7 @@ const frameInputs = {
         x: 72,
         y: 24,
         setupState: "deployed",
-        weaponFacing: 0,
+        setupFacing: 0,
         threatMemory: false,
       },
     ],

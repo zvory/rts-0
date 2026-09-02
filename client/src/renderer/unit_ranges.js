@@ -91,7 +91,11 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
   if (!weapon) return;
 
   for (const entity of state.enemyAntiTankGunThreats()) {
-    const facing = firstFinite(entity?.setupFacing, entity?.weaponFacing, entity?.facing);
+    // A live warning is anchored to the immutable emplacement direction. Remembered warnings
+    // already carry that same direction in their compact `facing` field. Never fall back to the
+    // gun's body/weapon facing: deployed AT guns visually track targets inside their fixed field,
+    // and using either dynamic angle makes the warning cone follow the target too.
+    const facing = entity?.threatMemory === true ? entity?.facing : entity?.setupFacing;
     if (!finiteNumber(entity?.x) || !finiteNumber(entity?.y) || !finiteNumber(facing)) continue;
     const paths = hatchedWedgePaths(
       entity.x,
@@ -264,6 +268,10 @@ function polygonSignedArea(points) {
 
 function selectedUnitRangeProfile(e, tileSize) {
   if (e?.kind === KIND.WORKER) return null;
+  // The AT-gun range is a fixed emplacement field, even when a backend supplies optional dynamic
+  // range metadata for other units. Route it directly to the static profile so weapon-facing
+  // telemetry can never rotate the displayed cone.
+  if (e?.kind === KIND.ANTI_TANK_GUN) return staticUnitRangeProfile(e, tileSize);
   const dynamic = dynamicUnitRangeProfile(e, tileSize);
   if (dynamic !== undefined) return dynamic;
   return staticUnitRangeProfile(e, tileSize);
@@ -334,7 +342,7 @@ function staticUnitRangeProfile(e, tileSize) {
     if (e.setupState !== SETUP.DEPLOYED) return null;
     const weapon = fieldOfFireProfile(e.kind, tileSize);
     if (!weapon) return null;
-    const facing = firstFinite(e.setupFacing, e.weaponFacing, e.facing);
+    const facing = e.setupFacing;
     if (!finiteNumber(facing) && weapon.arc < Math.PI * 2) return null;
     return {
       kind: "fieldOfFire",

@@ -109,7 +109,7 @@ const feedback = {
       x: 48,
       y: 32,
       setupState: "deployed",
-      weaponFacing: Math.PI,
+      facing: Math.PI,
       threatMemory: true,
     },
     {
@@ -119,7 +119,7 @@ const feedback = {
       x: 80,
       y: 32,
       setupState: "deployed",
-      weaponFacing: 0,
+      setupFacing: 0,
       threatMemory: false,
     },
   ],

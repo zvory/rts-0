@@ -17,6 +17,7 @@ const visibleEntities = [
     x: 320,
     y: 256,
     facing: 0,
+    setupFacing: 0,
     setupState: SETUP.DEPLOYED,
   },
   {
@@ -35,6 +36,7 @@ const visibleEntities = [
     x: 448,
     y: 256,
     facing: 0,
+    setupFacing: 0,
     setupState: SETUP.DEPLOYED,
   },
   {
@@ -44,6 +46,7 @@ const visibleEntities = [
     x: 512,
     y: 256,
     facing: 0,
+    setupFacing: 0,
     setupState: SETUP.DEPLOYED,
   },
 ];
@@ -212,7 +215,7 @@ const spectatorMemoryView = buildRendererFeedbackView({
     kind: KIND.ANTI_TANK_GUN,
     x: 320,
     y: 256,
-    weaponFacing: 0,
+    facing: 0,
     setupState: SETUP.DEPLOYED,
   }],
 });

@@ -331,7 +331,15 @@ pub fn project_entity(
     if entity.kind == EntityKind::MachineGunner || supports_manual_emplacement(entity.kind) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
-    if supports_manual_emplacement(entity.kind) && owner_or_ally {
+    // A deployed enemy AT gun's setup direction is already exposed by its visible warning cone.
+    // Project that fixed direction with the live entity so clients never need to infer the cone
+    // from the dynamically tracking body or weapon facing. Other setup-capable units retain the
+    // owner/allied-detail boundary.
+    let public_deployed_anti_tank_facing = entity.kind == EntityKind::AntiTankGun
+        && entity.weapon_setup() == crate::game::entity::WeaponSetup::Deployed;
+    if supports_manual_emplacement(entity.kind)
+        && (owner_or_ally || public_deployed_anti_tank_facing)
+    {
         view.setup_facing = entity.emplacement_facing();
     }
 
