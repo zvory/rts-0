@@ -284,6 +284,15 @@ a hidden detached process and returns immediately; `--status <output-directory>`
 progress from `run-config.json` without attaching to the simulation. Use `--progress` only when
 per-seed terminal updates are wanted. Background output is retained in `120-game-test.log`.
 
+Every full run also emits an agent handoff after the release build. Background launch emits it
+immediately. The handoff tells an attached coding agent to stop processing, avoid status/log polls,
+and resume once at a conservative all-games-hit-the-tick-cap estimate plus ten percent. It is also
+persisted as `agent-handoff.json` beside the reports so a resumed task has the exact wake time,
+status command, and analysis path. The estimate assumes 90 seconds for one 25,000-tick game and
+caps effective parallel speedup at eight to account for arena contention; use
+`--expected-game-seconds` to calibrate a materially faster or slower host. When replay verification
+is enabled, the estimate conservatively budgets a second full simulation pass for every game.
+
 Scorecards report diagnostic economy, army, building, command, attack, damage, death, and milestone
 data. Material values do not break ties. Replay artifacts remain the source of player intent;
 decision traces are diagnostic output only.
