@@ -1,13 +1,19 @@
-# Fast Terrain-Aware Pathing Plan
+# Fast Pathing Plan
+
+## Outcome
+
+Phases 1 and 2 are retained: they improve search/storage and precompute the existing route graph
+with exact legacy behavior parity. Phases 3 and 4 were implemented, playtested, rejected, and
+reverted because terrain-weighted route selection made unit movement worse in practice. The later
+Phase 4.5 expansion was reverted with them. The Phase 3 and 4 documents remain only as a record of
+the rejected approach and are not ready implementation work.
 
 ## Purpose
 
-Make pathfinding materially faster, then use that headroom to activate road, slow-terrain, and
-elevation-aware routes without making the canonical server workload slower. The final target is at
-least 2x full-path throughput on a matched cold, search-backed terrain lane relative to frozen
-current main, with warm queries and Hellhole tick time no worse. This is a pathing target, not a
-promise to double the whole simulation: profiling shows pathing does not own enough of the current
-Hellhole tick for that claim.
+Make pathfinding materially faster without changing route selection or movement behavior. The
+retained result is the behavior-preserving dense search and precomputed-edge work from Phases 1 and
+2. The terrain-aware goals below describe the rejected follow-on experiment, not current behavior
+or planned implementation.
 
 ## Correctness References
 

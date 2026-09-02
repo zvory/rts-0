@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation.
+- [x] Rejected and reverted after playtesting. Retained for historical context only.
 
 ## Objective
 

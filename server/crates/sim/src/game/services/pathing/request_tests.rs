@@ -347,3 +347,29 @@ fn completed_no_route_result_is_reused_without_another_search() {
     assert_eq!(cached.cache_status, PathCacheStatus::Hit);
     assert_eq!(cached.expanded_nodes, 0);
 }
+
+#[test]
+fn legacy_routes_do_not_detour_to_offset_roads() {
+    let mut map = flat_test_map(20);
+    for tx in 2..=16 {
+        let index = map.index(tx, 6);
+        map.terrain[index] = terrain::ROAD_HORIZONTAL;
+    }
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8_192, 256);
+    let request = PathRequest {
+        kind: EntityKind::Rifleman,
+        start: (2, 9),
+        goal: (16, 9),
+        radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        route_shape: RouteShape::Normal,
+        budget: None,
+    };
+
+    let (path, diagnostics) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, request, true));
+
+    assert_eq!(diagnostics.cache_status, PathCacheStatus::Miss);
+    assert!(path.iter().all(|&(_, ty)| ty == 9), "route was {path:?}");
+}
