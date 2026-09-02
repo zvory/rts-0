@@ -397,11 +397,8 @@ function createJobsForMatchups(runOptions, matchups) {
 }
 
 function countExistingGames(runOptions, matchups) {
-  return (
-    createJobsForMatchups(runOptions, matchups).filter((job) =>
-      fs.existsSync(path.join(job.outDir, "arena-summary.json")),
-    ).length * 2
-  );
+  const { resumed } = partitionJobs(createJobsForMatchups(runOptions, matchups), runOptions);
+  return resumed * 2;
 }
 
 function createAgentWaitPlan(runOptions, completedGames = 0, includeBuild = true) {
@@ -411,10 +408,10 @@ function createAgentWaitPlan(runOptions, completedGames = 0, includeBuild = true
     1,
     Math.min(runOptions.concurrency, MAX_EFFECTIVE_ESTIMATE_CONCURRENCY, activeJobs || 1),
   );
+  const simulationWaves = Math.ceil(activeJobs / effectiveConcurrency);
   const simulationSeconds =
-    (remainingGames * runOptions.expectedGameSeconds * runOptions.ticks) /
-    TICKS_PER_FULL_GAME_ESTIMATE /
-    effectiveConcurrency;
+    (simulationWaves * 2 * runOptions.expectedGameSeconds * runOptions.ticks) /
+    TICKS_PER_FULL_GAME_ESTIMATE;
   const buildSeconds = includeBuild && !runOptions.skipBuild ? EXPECTED_RELEASE_BUILD_SECONDS : 0;
   const baseExpectedSeconds = Math.ceil(buildSeconds + simulationSeconds);
   const waitSeconds = Math.ceil(
