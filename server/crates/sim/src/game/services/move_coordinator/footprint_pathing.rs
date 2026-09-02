@@ -18,7 +18,7 @@ impl MoveCoordinator<'_> {
         }
         let footprint_set: BTreeSet<(u32, u32)> = footprint.into_iter().collect();
         if let Some(goal) = current_staging_goal(self.map, entities, id, kind, &footprint_set) {
-            set_entity_path(entities, id, Vec::new(), goal, self.tick);
+            set_entity_path(entities, id, Vec::new(), goal, self.tick, source);
             return PathAttempt::Ready(());
         }
 
@@ -121,7 +121,7 @@ impl MoveCoordinator<'_> {
             return PathAttempt::Failed;
         };
         let waypoints = pathfinding::to_world_waypoints(trimmed);
-        set_entity_path(entities, id, waypoints, goal, self.tick);
+        set_entity_path(entities, id, waypoints, goal, self.tick, source);
         PathAttempt::Ready(())
     }
 
@@ -138,7 +138,7 @@ impl MoveCoordinator<'_> {
             PathAttempt::Deferred => return PathAttempt::Deferred,
         };
         let waypoints = pathfinding::to_world_waypoints(&tile_path);
-        set_entity_path(entities, id, waypoints, goal, self.tick);
+        set_entity_path(entities, id, waypoints, goal, self.tick, source);
         PathAttempt::Ready(())
     }
 
@@ -165,7 +165,7 @@ impl MoveCoordinator<'_> {
             goal: (gx as i32, gy as i32),
             radius_tiles,
             route_shape: RouteShape::Normal,
-            policy: RoutePolicy::LegacyShape,
+            policy: route_policy_for_source(source),
             budget: None,
         };
         let PathingRequestOutcome::Resolved {
@@ -227,9 +227,10 @@ fn set_entity_path(
     path: Vec<(f32, f32)>,
     goal: (f32, f32),
     tick: u32,
+    source: PathingRequestSource,
 ) {
     if let Some(entity) = entities.get_mut(id) {
-        entity.set_path(path);
+        entity.set_path_with_policy(path, route_policy_for_source(source));
         entity.set_last_repath_tick(tick);
         entity.set_path_goal(Some(goal));
     }

@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Ready for implementation after Phase 4.
+- [x] Done.
 
 ## Objective
 
@@ -125,7 +125,48 @@ new production ground route remains terrain-blind, or name the exact justified e
 
 ## Completion Evidence
 
-In the implementation commit, replace this text with the implementation revision, verification
-commands, exhaustive source/caller table, interaction legality proofs, corpus/oracle hashes,
-intentional differences, paired source and Hellhole measurements, determinism artifact, and any
-explicit remaining exception.
+- The implementation commit on `zvorygin/fastpathing-phase-4.5` makes the production policy match
+  exhaustive and maps all sources to `FastestTerrainTime`: `Move` (commands, rally, queued
+  resumption), `AttackMove` (commands, rally, combat/artillery resumption), `DirectAttack` (combat
+  pursuit and Panzerfaust), `Gather` (node approach, blocked-slot repath, and depot return), `Build`
+  and `Deconstruct` (footprint approach plus fallback staging candidates), `Ability` (legal cast
+  staging), and `Other` (the exhaustively enumerated Idle, Hold Position, Artillery Point Fire, and
+  Artillery Blanket Fire variants). Those `Other` orders do not currently originate a live ground
+  route; their explicit mapping prevents a future caller from treating the bucket as an exemption.
+  The current order model has no separate repair route; any future source variant must be
+  classified before the exhaustive match compiles.
+- General requests, exact footprint requests, same-tile tree detours, and nonempty same-tile nudges
+  persist the selected policy atomically with the path. Production requests never pass a legacy
+  direct segment. Same-tile completion/current legal footprint staging remains arrival logic and
+  may hold no path. Oriented vehicles use `VehicleClearance` for interactions as well as movement,
+  retaining Phase 4 hull, turn, anchor, lookahead, and recovery rules.
+- Direct Attack still derives the same closest target point and min/max range-band staging goal;
+  Build and Deconstruct retain the same outside-footprint ring and full body checks; Gather retains
+  node/slot ownership and mining state; Ability retains its exact legal launch point; rally retains
+  body-safe spawn selection. The primary footprint approach now follows the globally weighted path
+  toward the footprint and trims it at the last legal outside tile; deterministic bounded fallback
+  candidates use the same weighted exact-path seam. No destination or arrival predicate changed.
+- The exhaustive policy and offset-road tests cover all eight sources and prove each retains a
+  faster offset-road anchor. Existing Phase 4 graph/oracle and finalizer evidence remains applicable
+  because this phase changes only production source selection: reference/candidate semantic hashes
+  are `9a5b92a0d69cc0e5` / `a91153a2991dae45`, cold median/upper ratios are
+  `0.29156` / `0.29287`, warm ratios are `0.23206` / `0.23599`, and finalization is `3.28%`.
+- Eleven warmed alternating 900-tick Hellhole pairs against Phase 4 produced a median average-tick
+  ratio of `1.00180` with one-sided bootstrap 90% upper `1.00336`; median p95 ratio was `1.00221`
+  and wall ratio `1.00325`. Baseline/candidate MAD was `0.16%` / `0.17%`. Against the frozen
+  pre-Phase-1 median the candidate ratio is `0.71997`, with all 11 samples improving. Raw rows are
+  checked in as `phase-4.5-results.json`.
+- Two independently generated 900-frame streams were byte-identical at 24,899,122 bytes, SHA-256
+  `396417a116a3c0b98b858d4782b56acf59f30e58fff9e5366892f400e05f2af4`. Hellhole remained
+  semantically identical to Phase 4 at 26,833,202 serialized snapshot bytes, 14,899 attack events,
+  92 projectile events, and 937 death events. Intentional differences are limited to route geometry
+  and resulting arrival timing when a newly converted interaction encounters terrain with a faster
+  non-geometric route; there is no production ground-route exception.
+- Focused verification: `cargo test --manifest-path server/Cargo.toml -p rts-sim --lib
+  move_coordinator::tests`; `cargo test --manifest-path server/Cargo.toml -p rts-sim --lib
+  every_production_source_takes_a_faster_offset_road`; two release snapshot-stream generations;
+  eleven paired release Hellhole runs; Clippy, simulation architecture, docs health, and
+  `git diff --check`.
+- Patch-note text staged locally and not delivered: “All ground orders now choose routes by travel
+  time, so attacks, worker interactions, abilities, and rally movement can use faster roads and
+  avoid slow or unfavorable terrain without changing their legal destination.”

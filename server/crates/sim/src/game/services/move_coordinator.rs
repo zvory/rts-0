@@ -19,9 +19,9 @@ use std::time::{Duration, Instant};
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
-    active_trench_occupation, movement_body_class, uses_oriented_vehicle_body, AttackPhase,
-    BuildPhase, DeconstructPhase, Entity, EntityKind, EntityStore, FootprintRouting, MovePhase,
-    MovementBodyClass, Order, RoutePolicy,
+    active_trench_occupation, uses_oriented_vehicle_body, AttackPhase, BuildPhase,
+    DeconstructPhase, Entity, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
+    RoutePolicy,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -545,7 +545,7 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        self.request_path(entities, id, (nx, ny), false, PathingRequestSource::Gather);
+        self.request_path(entities, id, (nx, ny), PathingRequestSource::Gather);
     }
 
     /// Issue a world-targeted ability order and walk the caster to the launch staging point.
@@ -568,7 +568,7 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        self.request_path(entities, id, staging, true, PathingRequestSource::Ability);
+        self.request_path(entities, id, staging, PathingRequestSource::Ability);
     }
 
     /// Issue a build order: record the placement intent on the worker and walk it to an outside
@@ -712,7 +712,7 @@ impl<'a> MoveCoordinator<'a> {
                         continue;
                     };
                     let source = pathing_source_from_order(&order);
-                    self.request_path(entities, id, goal, true, source);
+                    self.request_path(entities, id, goal, source);
                 }
                 None => {}
             }
@@ -734,7 +734,7 @@ impl<'a> MoveCoordinator<'a> {
         if !self.can_repath(entities, id, goal) {
             return false;
         }
-        self.request_path(entities, id, goal, false, PathingRequestSource::AttackMove)
+        self.request_path(entities, id, goal, PathingRequestSource::AttackMove)
     }
 
     /// Repath an explicit attack toward its target-relative firing position without changing the
@@ -776,13 +776,7 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (entity.pos_x, entity.pos_y);
             entity.reset_stuck(px, py);
         }
-        self.request_path(
-            entities,
-            id,
-            goal,
-            false,
-            PathingRequestSource::DirectAttack,
-        )
+        self.request_path(entities, id, goal, PathingRequestSource::DirectAttack)
     }
 
     /// Request a path for a gatherer, respecting throttle and budget.
@@ -796,7 +790,7 @@ impl<'a> MoveCoordinator<'a> {
         if !self.can_repath(entities, id, node_pos) {
             return false;
         }
-        self.request_path(entities, id, node_pos, false, PathingRequestSource::Gather)
+        self.request_path(entities, id, node_pos, PathingRequestSource::Gather)
     }
 
     // -------------------------------------------------------------------
@@ -948,7 +942,6 @@ impl<'a> MoveCoordinator<'a> {
         entities: &mut EntityStore,
         id: u32,
         goal: (f32, f32),
-        smooth_static_segments: bool,
         source: PathingRequestSource,
     ) -> bool {
         let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
@@ -977,7 +970,10 @@ impl<'a> MoveCoordinator<'a> {
                     } else {
                         None
                     };
-                e.set_path(same_tile_path.into_iter().collect());
+                e.set_path_with_policy(
+                    same_tile_path.into_iter().collect(),
+                    route_policy_for_source(source),
+                );
                 e.set_last_repath_tick(self.tick);
                 e.set_path_goal(Some(goal));
                 match e.order() {
@@ -1009,7 +1005,7 @@ impl<'a> MoveCoordinator<'a> {
         }
         if sx == gx && sy == gy {
             if let Some(e) = entities.get_mut(id) {
-                e.set_path(vec![goal]);
+                e.set_path_with_policy(vec![goal], route_policy_for_source(source));
                 e.set_last_repath_tick(self.tick);
                 e.set_path_goal(Some(goal));
                 e.mark_attack_phase(AttackPhase::Pursuing);
@@ -1027,31 +1023,15 @@ impl<'a> MoveCoordinator<'a> {
             return true;
         }
         let radius_tiles = config::unit_radius_tiles(kind);
-        let route_shape = if smooth_static_segments && uses_oriented_vehicle_body(kind) {
+        let route_shape = if uses_oriented_vehicle_body(kind) {
             RouteShape::VehicleClearance
         } else {
             RouteShape::Normal
         };
-        let policy = if (movement_body_class(kind) == MovementBodyClass::InfantryLike
-            || uses_oriented_vehicle_body(kind))
-            && matches!(
-                source,
-                PathingRequestSource::Move | PathingRequestSource::AttackMove
-            ) {
-            RoutePolicy::FastestTerrainTime
-        } else {
-            RoutePolicy::LegacyShape
-        };
-        let direct_segment = (smooth_static_segments
-            && policy == RoutePolicy::LegacyShape
-            && !uses_oriented_vehicle_body(kind)
-            && matches!(
-                source,
-                PathingRequestSource::Move
-                    | PathingRequestSource::AttackMove
-                    | PathingRequestSource::DirectAttack
-            ))
-        .then_some((start_pos, goal));
+        let policy = route_policy_for_source(source);
+        // All production ground routes use terrain time, so none may take the legacy
+        // clear-line bypass. Same-tile completion above remains order arrival logic.
+        let direct_segment = None;
         let req = PathRequest {
             kind,
             start: (sx as i32, sy as i32),
@@ -1195,6 +1175,21 @@ fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
         | Order::HoldPosition
         | Order::ArtilleryPointFire(_)
         | Order::ArtilleryBlanketFire { .. } => PathingRequestSource::Other,
+    }
+}
+
+/// Exhaustive production policy boundary. Adding an order source cannot silently inherit legacy
+/// geometric scoring: the new variant must be classified here before the crate compiles.
+fn route_policy_for_source(source: PathingRequestSource) -> RoutePolicy {
+    match source {
+        PathingRequestSource::Move
+        | PathingRequestSource::AttackMove
+        | PathingRequestSource::DirectAttack
+        | PathingRequestSource::Gather
+        | PathingRequestSource::Build
+        | PathingRequestSource::Deconstruct
+        | PathingRequestSource::Ability
+        | PathingRequestSource::Other => RoutePolicy::FastestTerrainTime,
     }
 }
 
@@ -1722,7 +1717,7 @@ mod tests {
         assert!(matches!(attacker.order(), Order::Attack(_)));
         assert!(!attacker.path_is_empty());
         assert!(attacker.path_goal().is_some());
-        assert_eq!(attacker.path_policy(), RoutePolicy::LegacyShape);
+        assert_eq!(attacker.path_policy(), RoutePolicy::FastestTerrainTime);
     }
 
     #[test]
@@ -1754,7 +1749,68 @@ mod tests {
         assert!(matches!(routed.order(), Order::Build(_)));
         assert!(!routed.path_is_empty());
         assert!(routed.path_goal().is_some());
-        assert_eq!(routed.path_policy(), RoutePolicy::LegacyShape);
+        assert_eq!(routed.path_policy(), RoutePolicy::FastestTerrainTime);
+    }
+
+    #[test]
+    fn every_production_pathing_source_uses_terrain_time() {
+        for source in [
+            PathingRequestSource::Move,
+            PathingRequestSource::AttackMove,
+            PathingRequestSource::DirectAttack,
+            PathingRequestSource::Gather,
+            PathingRequestSource::Build,
+            PathingRequestSource::Deconstruct,
+            PathingRequestSource::Ability,
+            PathingRequestSource::Other,
+        ] {
+            assert_eq!(
+                route_policy_for_source(source),
+                RoutePolicy::FastestTerrainTime,
+                "production source {source:?} must not fall back to legacy scoring"
+            );
+        }
+    }
+
+    #[test]
+    fn every_production_source_takes_a_faster_offset_road() {
+        let mut map = flat_map(20);
+        for tx in 2..=16 {
+            let index = map.index(tx, 6);
+            map.terrain[index] = terrain::ROAD_HORIZONTAL;
+        }
+        for source in [
+            PathingRequestSource::Move,
+            PathingRequestSource::AttackMove,
+            PathingRequestSource::DirectAttack,
+            PathingRequestSource::Gather,
+            PathingRequestSource::Build,
+            PathingRequestSource::Deconstruct,
+            PathingRequestSource::Ability,
+            PathingRequestSource::Other,
+        ] {
+            let mut entities = EntityStore::new();
+            let start = map.tile_center(2, 9);
+            let goal = map.tile_center(16, 9);
+            let unit = entities
+                .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+                .expect("unit should spawn");
+            let occ = Occupancy::build(&map, &entities);
+            let mut pathing = PathingService::new(8_192, 256);
+            pathing.advance_tick(1);
+            let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+            assert!(coordinator.request_path(&mut entities, unit, goal, source));
+            let routed = entities.get(unit).expect("unit should remain");
+            assert_eq!(routed.path_policy(), RoutePolicy::FastestTerrainTime);
+            assert!(
+                routed.movement.as_ref().is_some_and(|movement| movement
+                    .path
+                    .iter()
+                    .any(|waypoint| { map.tile_of(waypoint.0, waypoint.1).1 == 6 })),
+                "production source {source:?} should retain the faster road anchor"
+            );
+        }
     }
 
     #[test]
@@ -1774,13 +1830,7 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
         assert!(
-            coordinator.request_path(
-                &mut entities,
-                unit,
-                exact_goal,
-                true,
-                PathingRequestSource::Move,
-            ),
+            coordinator.request_path(&mut entities, unit, exact_goal, PathingRequestSource::Move,),
             "fixture path should be found"
         );
         let unit = entities.get(unit).expect("unit should still exist");
@@ -1826,13 +1876,8 @@ mod tests {
             {
                 let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
                 assert!(
-                    coordinator.request_path(
-                        &mut entities,
-                        unit,
-                        goal,
-                        true,
-                        PathingRequestSource::Move,
-                    ),
+                    coordinator
+                        .request_path(&mut entities, unit, goal, PathingRequestSource::Move,),
                     "fixture path should be found for {kind:?}"
                 );
             }

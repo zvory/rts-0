@@ -31,16 +31,7 @@ impl MoveCoordinator<'_> {
             forward
         });
         let path_ok = path.is_some();
-        let policy = if (movement_body_class(kind) == MovementBodyClass::InfantryLike
-            || uses_oriented_vehicle_body(kind))
-            && matches!(
-                source,
-                PathingRequestSource::Move | PathingRequestSource::AttackMove
-            ) {
-            RoutePolicy::FastestTerrainTime
-        } else {
-            RoutePolicy::LegacyShape
-        };
+        let policy = route_policy_for_source(source);
         if let Some(entity) = entities.get_mut(id) {
             entity.set_path_with_policy(path.unwrap_or_default(), policy);
             entity.set_last_repath_tick(self.tick);
