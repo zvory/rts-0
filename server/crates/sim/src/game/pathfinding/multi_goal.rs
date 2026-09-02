@@ -46,9 +46,8 @@ pub(in crate::game) fn find_path_to_any_with_budget_and_turn_cost_with_diagnosti
         let nearest_y = ty.clamp(min_y, max_y);
         heuristic_with_costs(tx, ty, nearest_x, nearest_y, cardinal, diagonal)
     };
-    let production_heuristic = |tx, ty| {
-        distance_to_goal_bounds(tx, ty, heuristic_cardinal, heuristic_diagonal)
-    };
+    let production_heuristic =
+        |tx, ty| distance_to_goal_bounds(tx, ty, heuristic_cardinal, heuristic_diagonal);
     scratch.open.push(Node {
         f: production_heuristic(sx, sy),
         g: 0,
@@ -106,7 +105,10 @@ pub(in crate::game) fn find_path_to_any_with_budget_and_turn_cost_with_diagnosti
             };
             let next_key = (nx, ny, next_dir);
             let tentative = cur.g.saturating_add(edge_cost).saturating_add(turn_cost);
-            if scratch.get_g(next_key).is_none_or(|existing| tentative < existing) {
+            if scratch
+                .get_g(next_key)
+                .is_none_or(|existing| tentative < existing)
+            {
                 scratch.set(next_key, tentative, cur_key);
                 let fallback_h = distance_to_goal_bounds(nx, ny, 10, 14);
                 if fallback_h < best_h {

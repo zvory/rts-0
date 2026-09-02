@@ -27,7 +27,8 @@ impl PathingService {
             req,
             &goal_tiles,
             allow_pathfinding,
-        ) else {
+        )
+        else {
             return PathingRequestOutcome::Deferred;
         };
         let raw = if uses_pivot_vehicle_movement(kind) {

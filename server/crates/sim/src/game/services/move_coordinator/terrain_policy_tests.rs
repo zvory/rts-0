@@ -143,13 +143,7 @@ fn build_live_caller_ranks_staging_endpoints_by_route_cost() {
     pathing.advance_tick(1);
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-    assert!(coordinator.order_build(
-        &mut entities,
-        worker,
-        EntityKind::Depot,
-        18,
-        9,
-    ));
+    assert!(coordinator.order_build(&mut entities, worker, EntityKind::Depot, 18, 9,));
 
     let worker = entities.get(worker).expect("worker should remain");
     assert_route_uses_offset_road(&map, worker);
@@ -170,13 +164,7 @@ fn deconstruct_live_caller_ranks_staging_endpoints_by_route_cost() {
         .spawn_unit(1, EntityKind::Worker, start.0, start.1)
         .expect("worker should spawn");
     let target = entities
-        .spawn_building(
-            1,
-            EntityKind::TankTrap,
-            target_pos.0,
-            target_pos.1,
-            true,
-        )
+        .spawn_building(1, EntityKind::TankTrap, target_pos.0, target_pos.1, true)
         .expect("tank trap should spawn");
     let occ = Occupancy::build(&map, &entities);
     let mut pathing = PathingService::new(8_192, 256);
@@ -187,7 +175,9 @@ fn deconstruct_live_caller_ranks_staging_endpoints_by_route_cost() {
 
     let worker = entities.get(worker).expect("worker should remain");
     assert_route_uses_offset_road(&map, worker);
-    let goal = worker.path_goal().expect("deconstruct should select a goal");
+    let goal = worker
+        .path_goal()
+        .expect("deconstruct should select a goal");
     assert!(
         map.tile_of(goal.0, goal.1).1 < 9,
         "terrain-time endpoint selection should stage north of the footprint, got {goal:?}"

@@ -74,7 +74,8 @@ impl MoveCoordinator<'_> {
             start_world,
             &candidates,
             self.budget > 0,
-        ) else {
+        )
+        else {
             return PathAttempt::Deferred;
         };
         self.consume_request_budget(Some(diagnostics));
@@ -84,13 +85,14 @@ impl MoveCoordinator<'_> {
                 false,
                 false,
                 Some(diagnostics),
-                request_start.map(|start| start.elapsed()).unwrap_or_default(),
+                request_start
+                    .map(|start| start.elapsed())
+                    .unwrap_or_default(),
             );
             return PathAttempt::Failed;
         };
         if waypoints.is_empty()
-            && (goal.0 - start_world.0).hypot(goal.1 - start_world.1)
-                > EXACT_GOAL_ARRIVAL_EPS_PX
+            && (goal.0 - start_world.0).hypot(goal.1 - start_world.1) > EXACT_GOAL_ARRIVAL_EPS_PX
         {
             waypoints.push(goal);
         }
@@ -107,7 +109,9 @@ impl MoveCoordinator<'_> {
             true,
             false,
             Some(diagnostics),
-            request_start.map(|start| start.elapsed()).unwrap_or_default(),
+            request_start
+                .map(|start| start.elapsed())
+                .unwrap_or_default(),
         );
         PathAttempt::Ready(())
     }

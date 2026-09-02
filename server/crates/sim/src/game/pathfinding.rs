@@ -161,8 +161,8 @@ const NO_INCOMING_DIR: u8 = u8::MAX;
 
 type SearchKey = (i32, i32, u8);
 
-mod scratch;
 mod multi_goal;
+mod scratch;
 pub(super) use multi_goal::find_path_to_any_with_budget_and_turn_cost_with_diagnostics_and_scratch;
 pub(super) use scratch::SearchScratch;
 
