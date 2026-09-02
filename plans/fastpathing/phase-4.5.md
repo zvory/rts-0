@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Policy rollout complete; interaction endpoint ranking remains incomplete.
+- [x] Done.
 
 ## Objective
 
@@ -143,23 +143,24 @@ new production ground route remains terrain-blind, or name the exact justified e
 - Direct Attack still derives the same closest target point and min/max range-band staging goal;
   Build and Deconstruct retain the same outside-footprint ring and full body checks; Gather retains
   node/slot ownership and mining state; Ability retains its exact legal launch point; rally retains
-  body-safe spawn selection. The primary footprint approach follows a weighted path toward the
-  footprint and trims it at the last legal outside tile; deterministic bounded fallback candidates
-  each use the same weighted exact-path seam. No destination or arrival predicate changed. However,
-  fallback footprint candidates are still attempted in geometric order, and Direct Attack still
-  derives one geometric range-band endpoint before routing. The implementation therefore does not
-  yet compare all semantically equivalent endpoints by complete route cost as required above.
-- The exhaustive policy test covers all eight source variants. The offset-road test exercises those
-  variants through the shared generic request seam and proves that seam retains a faster road
-  anchor; it does not independently exercise every live order caller or interaction endpoint
-  selector. Existing Phase 4 graph/oracle and finalizer evidence remains applicable because this
-  phase changes only production source selection: reference/candidate semantic hashes
+  body-safe spawn selection. Direct Attack generates at most 256 deterministically ordered legal
+  range-band endpoints; Build and Deconstruct reuse the existing six-ring legal candidate set. One
+  multi-goal A* request ranks the entire set by complete authoritative graph cost, with candidate
+  order used only for equal-cost ties. It shares one expansion cap and one of the eight coordinator
+  request allowances, rejects goals through the active infantry/vehicle legality profile, finalizes
+  the selected route once, and preserves the serialized eight-candidate footprint retry cadence.
+  No destination or arrival predicate changed.
+- The exhaustive policy test covers all eight source variants. The generic offset-road test proves
+  the shared seam retains a faster road anchor for every label, while focused fixtures exercise the
+  real `request_direct_attack_path`, `order_build`, and `order_deconstruct` callers and prove their
+  selected endpoint moves to the road-facing side. Existing Phase 4 single-goal graph/oracle and
+  finalizer evidence remains applicable: reference/candidate semantic hashes
   are `9a5b92a0d69cc0e5` / `a91153a2991dae45`, cold median/upper ratios are
   `0.29156` / `0.29287`, warm ratios are `0.23206` / `0.23599`, and finalization is `3.28%`.
-- Eleven warmed alternating 900-tick Hellhole pairs against Phase 4 produced a median average-tick
-  ratio of `1.00180` with one-sided bootstrap 90% upper `1.00336`; median p95 ratio was `1.00221`
-  and wall ratio `1.00325`. Baseline/candidate MAD was `0.16%` / `0.17%`. Against the frozen
-  pre-Phase-1 median the candidate ratio is `0.71997`, with all 11 samples improving. Raw rows are
+- Eleven refreshed warmed alternating 900-tick Hellhole pairs against Phase 4 produced a median
+  average-tick ratio of `1.00409` with one-sided bootstrap 90% upper `1.00473`; median p95 ratio was
+  `1.00039` and wall ratio `1.00274`. Baseline/candidate MAD was `0.17%` / `0.28%`. Against the frozen
+  pre-Phase-1 median the candidate ratio is `0.74995`, with all 11 samples improving. Raw rows are
   checked in as `phase-4.5-results.json`.
 - Two independently generated 900-frame streams were byte-identical at 24,899,122 bytes, SHA-256
   `396417a116a3c0b98b858d4782b56acf59f30e58fff9e5366892f400e05f2af4`. Hellhole remained
@@ -167,11 +168,11 @@ new production ground route remains terrain-blind, or name the exact justified e
   92 projectile events, and 937 death events. Intentional differences are limited to route geometry
   and resulting arrival timing when a newly converted interaction encounters terrain with a faster
   non-geometric route; there is no production ground-route exception.
-- Focused verification: `cargo test --manifest-path server/Cargo.toml -p rts-sim --lib
-  move_coordinator::tests`; `cargo test --manifest-path server/Cargo.toml -p rts-sim --lib
-  generic_request_path_uses_a_faster_offset_road_for_every_source`; two release snapshot-stream
-  generations;
-  eleven paired release Hellhole runs; Clippy, simulation architecture, docs health, and
+- Focused verification: the full `rts-sim` library suite (1,353 passed, 7 ignored), including the
+  generic source-label road test, three real live-caller endpoint road tests, footprint retry/cache
+  scheduling, Panzerfaust pursuit, checkpoint, replay, vehicle, and dynamic-blocker coverage; two
+  release snapshot-stream generations; eleven refreshed paired release Hellhole runs; Clippy,
+  source-size and simulation-architecture checks, docs health, JSON validation, and
   `git diff --check`.
 - Patch-note text staged locally and not delivered: “All ground orders now choose routes by travel
   time, so attacks, worker interactions, abilities, and rally movement can use faster roads and

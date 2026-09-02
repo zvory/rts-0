@@ -1324,6 +1324,17 @@ bounded, and periodic anchors cap work on unusually long infantry paths. Exact r
 requests may reuse the bounded derived finalization cache; assignment still installs an ordinary
 serialized path and policy on the entity.
 
+Direct Attack range bands and Build/Deconstruct outside-footprint rings use the same bounded
+multi-goal search rather than selecting one endpoint geometrically before routing. The search
+shares one normal expansion cap and one coordinator request allowance across the complete ordered
+candidate set, rejects body-illegal goal tiles through the active routing profile, minimizes the
+authoritative directed graph cost, and uses candidate order only to break equal-cost arrivals.
+Direct Attack keeps the prior closest-target-point calculation, geometric fallback, and min/max
+range predicates; its candidate generation is capped at 256 deterministic endpoints. Build and Deconstruct keep the
+existing six-ring candidate bound and full footprint/body checks. A failed footprint search retains
+the serialized retry counter on the same eight-candidate cadence before declaring failure, so cache
+residency, checkpoint restore, and request scheduling cannot change order lifetime.
+
 Every waypoint left on a fastest-time path is authoritative. The 30 Hz movement pass may consume
 the current waypoint through its normal arrival rule. Collision or local steering may also consume
 it after the unit has crossed the anchor's outgoing perpendicular plane while remaining within the

@@ -20,8 +20,7 @@ use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     active_trench_occupation, uses_oriented_vehicle_body, AttackPhase, BuildPhase,
-    DeconstructPhase, Entity, EntityKind, EntityStore, FootprintRouting, MovePhase, Order,
-    RoutePolicy,
+    DeconstructPhase, Entity, EntityKind, EntityStore, MovePhase, Order, RoutePolicy,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -48,6 +47,7 @@ use crate::rules::projection;
 mod clear_obstacle_area;
 mod footprint_pathing;
 mod formation;
+mod interaction_pathing;
 #[cfg(test)]
 mod pathing_budget_tests;
 mod rally;
@@ -56,6 +56,8 @@ mod spawn_tests;
 #[cfg(test)]
 mod terrain_policy_tests;
 mod tree_paths;
+
+use interaction_pathing::{direct_attack_staging_goal, direct_attack_staging_goals};
 
 #[cfg(test)]
 use footprint_pathing::{build_staging_goal, build_staging_goal_in_range};
@@ -757,7 +759,7 @@ impl<'a> MoveCoordinator<'a> {
             return false;
         };
         let target_point = closest_combat_target_point(self.map, attacker_pos, target);
-        let Some(goal) = direct_attack_staging_goal(
+        let Some(geometric_goal) = direct_attack_staging_goal(
             self.map,
             attacker_pos,
             target_point,
@@ -766,10 +768,18 @@ impl<'a> MoveCoordinator<'a> {
         ) else {
             return false;
         };
+        let goals = direct_attack_staging_goals(
+            self.map,
+            attacker_pos,
+            target,
+            min_range_px,
+            max_range_px,
+            geometric_goal,
+        );
         let needs_initial_path = entities
             .get(id)
             .is_some_and(|entity| entity.path_goal().is_none());
-        if !needs_initial_path && !self.can_repath(entities, id, goal) {
+        if !needs_initial_path && !self.can_repath_to_any(entities, id, &goals) {
             return false;
         }
         if let Some(entity) = entities.get_mut(id) {
@@ -778,7 +788,15 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (entity.pos_x, entity.pos_y);
             entity.reset_stuck(px, py);
         }
-        self.request_path(entities, id, goal, PathingRequestSource::DirectAttack)
+        matches!(
+            self.request_best_interaction_path(
+                entities,
+                id,
+                &goals,
+                PathingRequestSource::DirectAttack,
+            ),
+            PathAttempt::Ready(())
+        )
     }
 
     /// Request a path for a gatherer, respecting throttle and budget.
@@ -1193,49 +1211,6 @@ fn route_policy_for_source(source: PathingRequestSource) -> RoutePolicy {
         | PathingRequestSource::Ability
         | PathingRequestSource::Other => RoutePolicy::FastestTerrainTime,
     }
-}
-
-fn direct_attack_staging_goal(
-    map: &Map,
-    attacker: (f32, f32),
-    target: (f32, f32),
-    min_range_px: f32,
-    max_range_px: f32,
-) -> Option<(f32, f32)> {
-    if !attacker.0.is_finite()
-        || !attacker.1.is_finite()
-        || !target.0.is_finite()
-        || !target.1.is_finite()
-        || !min_range_px.is_finite()
-        || !max_range_px.is_finite()
-        || min_range_px < 0.0
-        || max_range_px < min_range_px
-    {
-        return None;
-    }
-    let dx = attacker.0 - target.0;
-    let dy = attacker.1 - target.1;
-    let distance = dx.hypot(dy);
-    if distance >= min_range_px && distance <= max_range_px {
-        return None;
-    }
-    let margin = 4.0;
-    let desired_distance = if distance > max_range_px {
-        (max_range_px - margin).max(min_range_px)
-    } else {
-        (min_range_px + margin).min(max_range_px)
-    };
-    let (dir_x, dir_y) = if distance > f32::EPSILON {
-        (dx / distance, dy / distance)
-    } else {
-        (1.0, 0.0)
-    };
-    let world_max_x = map.world_width_px() - 0.01;
-    let world_max_y = map.world_height_px() - 0.01;
-    Some((
-        (target.0 + dir_x * desired_distance).clamp(0.0, world_max_x),
-        (target.1 + dir_y * desired_distance).clamp(0.0, world_max_y),
-    ))
 }
 
 fn spawn_gap_from_building(

@@ -1,7 +1,5 @@
 use super::*;
-use crate::game::entity::Entity;
-use crate::game::pathfinding;
-
+use crate::game::entity::{Entity, FootprintRouting};
 impl MoveCoordinator<'_> {
     pub(super) fn plan_footprint_interaction_path(
         &mut self,
@@ -18,185 +16,67 @@ impl MoveCoordinator<'_> {
         }
         let footprint_set: BTreeSet<(u32, u32)> = footprint.into_iter().collect();
         if let Some(goal) = current_staging_goal(self.map, entities, id, kind, &footprint_set) {
-            set_entity_path(entities, id, Vec::new(), goal, self.tick, source);
+            if let Some(entity) = entities.get_mut(id) {
+                entity.set_path_with_policy(Vec::new(), route_policy_for_source(source));
+                entity.set_last_repath_tick(self.tick);
+                entity.set_path_goal(Some(goal));
+            }
             return PathAttempt::Ready(());
         }
 
-        let Some(mut routing) = self.prepare_footprint_routing(entities, id) else {
+        let goals = build_staging_goals(self.map, self.occ, entities, id, kind, tile_x, tile_y);
+        let Some(routing) = prepare_footprint_routing(self, entities, id) else {
             return PathAttempt::Failed;
         };
-        if routing.attempt == 0 {
-            match self.request_footprint_approach_path(
-                entities,
-                id,
-                kind,
-                (tile_x, tile_y),
-                &footprint_set,
-                source,
-            ) {
-                PathAttempt::Ready(()) => return PathAttempt::Ready(()),
-                PathAttempt::Deferred => return PathAttempt::Deferred,
-                PathAttempt::Failed => {
-                    routing.attempt = 1;
-                    set_footprint_routing(entities, id, routing);
+        match self.request_best_interaction_path(entities, id, &goals, source) {
+            PathAttempt::Failed => {
+                let next_attempt = routing
+                    .attempt
+                    .saturating_add(u32::try_from(MAX_REQUESTS_PER_TICK).unwrap_or(u32::MAX));
+                let legacy_endpoint_count = goals.len().saturating_add(1);
+                if usize::try_from(next_attempt)
+                    .is_ok_and(|attempt| attempt < legacy_endpoint_count)
+                {
+                    set_footprint_routing(
+                        entities,
+                        id,
+                        FootprintRouting {
+                            attempt: next_attempt,
+                            ..routing
+                        },
+                    );
+                    PathAttempt::Deferred
+                } else {
+                    PathAttempt::Failed
                 }
             }
-        }
-
-        for (index, goal) in
-            build_staging_goals(self.map, self.occ, entities, id, kind, tile_x, tile_y)
-                .into_iter()
-                .enumerate()
-        {
-            let candidate_attempt = u32::try_from(index).unwrap_or(u32::MAX).saturating_add(1);
-            if candidate_attempt < routing.attempt {
-                continue;
-            }
-            match self.request_exact_path_to_build_goal(entities, id, goal, source) {
-                PathAttempt::Ready(()) => return PathAttempt::Ready(()),
-                PathAttempt::Deferred => return PathAttempt::Deferred,
-                PathAttempt::Failed => {
-                    routing.attempt = candidate_attempt.saturating_add(1);
-                    set_footprint_routing(entities, id, routing);
-                }
-            }
-        }
-        PathAttempt::Failed
-    }
-
-    fn prepare_footprint_routing(
-        &self,
-        entities: &mut EntityStore,
-        id: u32,
-    ) -> Option<FootprintRouting> {
-        let entity = entities.get(id)?;
-        let start_tile = self.map.tile_of(entity.pos_x, entity.pos_y);
-        let static_fingerprint = self.occ.static_fingerprint_for_kind(entity.kind);
-        let current = footprint_routing(entity)?;
-        let routing = if current.static_fingerprint == Some(static_fingerprint)
-            && current.start_tile == Some(start_tile)
-        {
-            current
-        } else {
-            FootprintRouting {
-                attempt: 0,
-                static_fingerprint: Some(static_fingerprint),
-                start_tile: Some(start_tile),
-            }
-        };
-        set_footprint_routing(entities, id, routing);
-        Some(routing)
-    }
-
-    fn request_footprint_approach_path(
-        &mut self,
-        entities: &mut EntityStore,
-        id: u32,
-        kind: EntityKind,
-        target_tile: (u32, u32),
-        footprint_set: &BTreeSet<(u32, u32)>,
-        source: PathingRequestSource,
-    ) -> PathAttempt {
-        let approach_goal = self.map.tile_center(target_tile.0, target_tile.1);
-        let tile_path = match self.request_exact_tile_path(entities, id, approach_goal, source) {
-            PathAttempt::Ready(path) => path,
-            PathAttempt::Failed => return PathAttempt::Failed,
-            PathAttempt::Deferred => return PathAttempt::Deferred,
-        };
-        let Some(staging_index) = tile_path.iter().rposition(|(tx, ty)| {
-            *tx >= 0 && *ty >= 0 && !footprint_set.contains(&(*tx as u32, *ty as u32))
-        }) else {
-            return PathAttempt::Failed;
-        };
-        let Some(&staging_tile) = tile_path.get(staging_index) else {
-            return PathAttempt::Failed;
-        };
-        let goal = self
-            .map
-            .tile_center(staging_tile.0 as u32, staging_tile.1 as u32);
-        if !build_staging_goal_in_range(self.map, kind, target_tile.0, target_tile.1, goal) {
-            return PathAttempt::Failed;
-        }
-        let Some(trimmed) = tile_path.get(..=staging_index) else {
-            return PathAttempt::Failed;
-        };
-        let waypoints = pathfinding::to_world_waypoints(trimmed);
-        set_entity_path(entities, id, waypoints, goal, self.tick, source);
-        PathAttempt::Ready(())
-    }
-
-    fn request_exact_path_to_build_goal(
-        &mut self,
-        entities: &mut EntityStore,
-        id: u32,
-        goal: (f32, f32),
-        source: PathingRequestSource,
-    ) -> PathAttempt {
-        let tile_path = match self.request_exact_tile_path(entities, id, goal, source) {
-            PathAttempt::Ready(path) => path,
-            PathAttempt::Failed => return PathAttempt::Failed,
-            PathAttempt::Deferred => return PathAttempt::Deferred,
-        };
-        let waypoints = pathfinding::to_world_waypoints(&tile_path);
-        set_entity_path(entities, id, waypoints, goal, self.tick, source);
-        PathAttempt::Ready(())
-    }
-
-    fn request_exact_tile_path(
-        &mut self,
-        entities: &EntityStore,
-        id: u32,
-        goal: (f32, f32),
-        source: PathingRequestSource,
-    ) -> PathAttempt<Vec<(i32, i32)>> {
-        let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
-        let (unit_kind, sx, sy) = match entities.get(id) {
-            Some(e) if e.is_unit() => {
-                let (sx, sy) = self.map.tile_of(e.pos_x, e.pos_y);
-                (e.kind, sx, sy)
-            }
-            _ => return PathAttempt::Failed,
-        };
-        let (gx, gy) = self.map.tile_of(goal.0, goal.1);
-        let radius_tiles = config::unit_radius_tiles(unit_kind);
-        let req = PathRequest {
-            kind: unit_kind,
-            start: (sx as i32, sy as i32),
-            goal: (gx as i32, gy as i32),
-            radius_tiles,
-            route_shape: RouteShape::Normal,
-            policy: route_policy_for_source(source),
-            budget: None,
-        };
-        let PathingRequestOutcome::Resolved {
-            path: tile_path,
-            diagnostics: request_diagnostics,
-        } = self.pathing.request_tile_path_with_diagnostics(
-            self.map,
-            self.occ,
-            req,
-            self.budget > 0,
-        )
-        else {
-            return PathAttempt::Deferred;
-        };
-        self.consume_request_budget(Some(request_diagnostics));
-        let path_ok = tile_path.last().copied() == Some((gx as i32, gy as i32));
-        self.record_path_request(
-            source,
-            path_ok,
-            false,
-            Some(request_diagnostics),
-            request_start
-                .map(|start| start.elapsed())
-                .unwrap_or_default(),
-        );
-        if path_ok {
-            PathAttempt::Ready(tile_path)
-        } else {
-            PathAttempt::Failed
+            attempt => attempt,
         }
     }
+}
+
+fn prepare_footprint_routing(
+    coordinator: &MoveCoordinator<'_>,
+    entities: &mut EntityStore,
+    id: u32,
+) -> Option<FootprintRouting> {
+    let entity = entities.get(id)?;
+    let start_tile = coordinator.map.tile_of(entity.pos_x, entity.pos_y);
+    let static_fingerprint = coordinator.occ.static_fingerprint_for_kind(entity.kind);
+    let current = footprint_routing(entity)?;
+    let routing = if current.static_fingerprint == Some(static_fingerprint)
+        && current.start_tile == Some(start_tile)
+    {
+        current
+    } else {
+        FootprintRouting {
+            attempt: 0,
+            static_fingerprint: Some(static_fingerprint),
+            start_tile: Some(start_tile),
+        }
+    };
+    set_footprint_routing(entities, id, routing);
+    Some(routing)
 }
 
 fn set_footprint_routing(entities: &mut EntityStore, id: u32, routing: FootprintRouting) {
@@ -218,21 +98,6 @@ fn footprint_routing(entity: &Entity) -> Option<FootprintRouting> {
         Order::Build(order) => Some(order.execution.routing),
         Order::Deconstruct(order) => Some(order.execution.routing),
         _ => None,
-    }
-}
-
-fn set_entity_path(
-    entities: &mut EntityStore,
-    id: u32,
-    path: Vec<(f32, f32)>,
-    goal: (f32, f32),
-    tick: u32,
-    source: PathingRequestSource,
-) {
-    if let Some(entity) = entities.get_mut(id) {
-        entity.set_path_with_policy(path, route_policy_for_source(source));
-        entity.set_last_repath_tick(tick);
-        entity.set_path_goal(Some(goal));
     }
 }
 
