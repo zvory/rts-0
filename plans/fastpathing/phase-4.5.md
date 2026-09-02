@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Done.
+- [ ] Policy rollout complete; interaction endpoint ranking remains incomplete.
 
 ## Objective
 
@@ -123,7 +123,7 @@ rule, every intentional route/output difference, per-source oracle and determini
 scheduling results, paired performance, Hellhole result, and staged patch-note text. Confirm that no
 new production ground route remains terrain-blind, or name the exact justified exception.
 
-## Completion Evidence
+## Implementation Evidence
 
 - The implementation commit on `zvorygin/fastpathing-phase-4.5` makes the production policy match
   exhaustive and maps all sources to `FastestTerrainTime`: `Move` (commands, rally, queued
@@ -143,12 +143,17 @@ new production ground route remains terrain-blind, or name the exact justified e
 - Direct Attack still derives the same closest target point and min/max range-band staging goal;
   Build and Deconstruct retain the same outside-footprint ring and full body checks; Gather retains
   node/slot ownership and mining state; Ability retains its exact legal launch point; rally retains
-  body-safe spawn selection. The primary footprint approach now follows the globally weighted path
-  toward the footprint and trims it at the last legal outside tile; deterministic bounded fallback
-  candidates use the same weighted exact-path seam. No destination or arrival predicate changed.
-- The exhaustive policy and offset-road tests cover all eight sources and prove each retains a
-  faster offset-road anchor. Existing Phase 4 graph/oracle and finalizer evidence remains applicable
-  because this phase changes only production source selection: reference/candidate semantic hashes
+  body-safe spawn selection. The primary footprint approach follows a weighted path toward the
+  footprint and trims it at the last legal outside tile; deterministic bounded fallback candidates
+  each use the same weighted exact-path seam. No destination or arrival predicate changed. However,
+  fallback footprint candidates are still attempted in geometric order, and Direct Attack still
+  derives one geometric range-band endpoint before routing. The implementation therefore does not
+  yet compare all semantically equivalent endpoints by complete route cost as required above.
+- The exhaustive policy test covers all eight source variants. The offset-road test exercises those
+  variants through the shared generic request seam and proves that seam retains a faster road
+  anchor; it does not independently exercise every live order caller or interaction endpoint
+  selector. Existing Phase 4 graph/oracle and finalizer evidence remains applicable because this
+  phase changes only production source selection: reference/candidate semantic hashes
   are `9a5b92a0d69cc0e5` / `a91153a2991dae45`, cold median/upper ratios are
   `0.29156` / `0.29287`, warm ratios are `0.23206` / `0.23599`, and finalization is `3.28%`.
 - Eleven warmed alternating 900-tick Hellhole pairs against Phase 4 produced a median average-tick
@@ -164,7 +169,8 @@ new production ground route remains terrain-blind, or name the exact justified e
   non-geometric route; there is no production ground-route exception.
 - Focused verification: `cargo test --manifest-path server/Cargo.toml -p rts-sim --lib
   move_coordinator::tests`; `cargo test --manifest-path server/Cargo.toml -p rts-sim --lib
-  every_production_source_takes_a_faster_offset_road`; two release snapshot-stream generations;
+  generic_request_path_uses_a_faster_offset_road_for_every_source`; two release snapshot-stream
+  generations;
   eleven paired release Hellhole runs; Clippy, simulation architecture, docs health, and
   `git diff --check`.
 - Patch-note text staged locally and not delivered: “All ground orders now choose routes by travel

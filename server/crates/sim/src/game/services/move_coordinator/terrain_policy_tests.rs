@@ -34,7 +34,7 @@ fn every_production_pathing_source_uses_terrain_time() {
 }
 
 #[test]
-fn every_production_source_takes_a_faster_offset_road() {
+fn generic_request_path_uses_a_faster_offset_road_for_every_source() {
     let mut map = flat_map(20);
     for tx in 2..=16 {
         let index = map.index(tx, 6);

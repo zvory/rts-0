@@ -1,5 +1,6 @@
 {
   "phase": 4.5,
+  "scopeStatus": "policy-rollout-complete-endpoint-ranking-incomplete",
   "baselineRevision": "967078d8ce95b16be8baafe683be4442ca5a9cf1",
   "policy": {
     "sources": [
@@ -14,7 +15,7 @@
     ],
     "productionPolicy": "FastestTerrainTime",
     "legacyDirectBypassEnabled": false,
-    "offsetRoadSourcesPassed": 8
+    "genericRequestSourceLabelsPassed": 8
   },
   "pathing": {
     "graphAndFinalizerUnchangedFromPhase4": true,
