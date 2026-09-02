@@ -12,16 +12,6 @@ pub(super) type CacheKey = (
     u64,
 );
 
-pub(super) type FinalizedCacheKey = (
-    EntityKind,
-    RouteShape,
-    RoutePolicy,
-    (u32, u32),
-    (u32, u32),
-    u64,
-    Vec<(u32, u32)>,
-);
-
 #[derive(Clone)]
 pub(super) struct CacheEntry {
     tile_path: Vec<(i32, i32)>,
@@ -29,46 +19,7 @@ pub(super) struct CacheEntry {
     last_used: u32,
 }
 
-#[derive(Clone)]
-pub(super) struct FinalizedCacheEntry {
-    waypoints: Vec<(f32, f32)>,
-    last_used: u32,
-}
-
 impl PathingService {
-    pub(super) fn finalized_cache_lookup(
-        &mut self,
-        key: &FinalizedCacheKey,
-    ) -> Option<Vec<(f32, f32)>> {
-        let entry = self.finalized_cache.get_mut(key)?;
-        entry.last_used = self.tick;
-        Some(entry.waypoints.clone())
-    }
-
-    pub(super) fn finalized_cache_insert(
-        &mut self,
-        key: FinalizedCacheKey,
-        waypoints: Vec<(f32, f32)>,
-    ) {
-        if self.finalized_cache.len() >= self.cache_cap {
-            if let Some(oldest_key) = self
-                .finalized_cache
-                .iter()
-                .min_by_key(|(key, entry)| (entry.last_used, *key))
-                .map(|(key, _)| key.clone())
-            {
-                self.finalized_cache.remove(&oldest_key);
-            }
-        }
-        self.finalized_cache.insert(
-            key,
-            FinalizedCacheEntry {
-                waypoints,
-                last_used: self.tick,
-            },
-        );
-    }
-
     pub(super) fn cache_lookup<P: Passability>(
         &mut self,
         req: &PathRequest,

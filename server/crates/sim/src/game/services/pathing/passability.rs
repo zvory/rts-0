@@ -119,31 +119,13 @@ impl Passability for TerrainPassability<'_> {
                 base_step_cost,
             )));
         }
-        let mut cost = super::route_cost::RouteCostModel::new(self.map)
-            .edge_cost((from_tx, from_ty), (to_tx, to_ty), base_step_cost)?
-            .saturating_add(tree_detours::weighted_tree_avoidance_cost(
-                self.occupancy.tree_path_avoidance_cost(to_tx, to_ty),
-            ));
-        if self.route_shape == RouteShape::VehicleClearance
-            && crate::game::entity::uses_oriented_vehicle_body(self.kind)
-        {
-            let clearance =
-                super::vehicle_clearance_cost(self.occupancy.clearance_at_tile_for_movement_body(
-                    to_tx,
-                    to_ty,
-                    crate::game::entity::movement_body_class(self.kind),
-                ));
-            let shaping = if clearance >= u32::MAX / 4 {
-                clearance
-            } else {
-                clearance
-                    .saturating_add(self.vehicle_corner_cost(to_tx, to_ty))
-                    .saturating_mul(crate::rules::terrain::ROUTE_TIME_SCALE)
-            };
-            // `u32::MAX` is reserved by the precomputed table as the illegal-edge sentinel.
-            cost = cost.saturating_add(shaping).min(u32::MAX - 1);
-        }
-        Some(cost)
+        Some(
+            super::route_cost::RouteCostModel::new(self.map)
+                .edge_cost((from_tx, from_ty), (to_tx, to_ty), base_step_cost)?
+                .saturating_add(tree_detours::weighted_tree_avoidance_cost(
+                    self.occupancy.tree_path_avoidance_cost(to_tx, to_ty),
+                )),
+        )
     }
 
     fn heuristic_step_costs(&self) -> (u32, u32) {

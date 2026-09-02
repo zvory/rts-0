@@ -1,5 +1,5 @@
-use super::route_cost::RouteCostModel;
 use super::*;
+use super::route_cost::RouteCostModel;
 use crate::config;
 
 const MAX_TERRAIN_SHORTCUT_CANDIDATES: usize = 64;
@@ -10,7 +10,6 @@ pub(super) fn simplify_fastest_terrain_route(
     occupancy: &Occupancy<'_>,
     kind: EntityKind,
     start: (f32, f32),
-    route_shape: RouteShape,
     reverse_waypoints: Vec<(f32, f32)>,
 ) -> Vec<(f32, f32)> {
     if reverse_waypoints.len() <= 1 {
@@ -20,11 +19,6 @@ pub(super) fn simplify_fastest_terrain_route(
     let mut positions = Vec::with_capacity(forward.len() + 1);
     positions.push(start);
     positions.extend(forward.iter().copied());
-    let vehicle_authored_corridor =
-        route_shape == RouteShape::VehicleClearance && uses_oriented_vehicle_body(kind);
-    if vehicle_authored_corridor {
-        return simplify_fastest_vehicle_corridor(map, occupancy, kind, start, &forward);
-    }
     let model = RouteCostModel::new(map);
     let mut prefix_cost = vec![0_u64; positions.len()];
     for index in 1..positions.len() {
@@ -47,7 +41,7 @@ pub(super) fn simplify_fastest_terrain_route(
     let mut anchor_indices = Vec::new();
     for index in 0..forward.len() {
         let position = index + 1;
-        let tree_protected = protected_prefix[index + 1] > protected_prefix[index];
+        let protected = protected_prefix[index + 1] > protected_prefix[index];
         let direction_changes = position + 1 < positions.len()
             && segment_direction(positions[position - 1], positions[position])
                 != segment_direction(positions[position], positions[position + 1]);
@@ -60,7 +54,7 @@ pub(super) fn simplify_fastest_terrain_route(
                 prefix_cost[position + 1].saturating_sub(prefix_cost[position]),
             );
         if index + 1 == forward.len()
-            || tree_protected
+            || protected
             || direction_changes
             || cost_rate_changes
             || (index + 1) % MAX_RAW_WAYPOINTS_PER_ANCHOR == 0
@@ -103,16 +97,8 @@ pub(super) fn simplify_fastest_terrain_route(
             break;
         }
         let Some(chosen_cursor) = chosen_cursor else {
-            if position_index >= forward.len() {
-                break;
-            }
             selected.push(forward[position_index]);
             position_index += 1;
-            while anchor_cursor < anchor_indices.len()
-                && anchor_indices[anchor_cursor] < position_index
-            {
-                anchor_cursor += 1;
-            }
             continue;
         };
         let chosen = anchor_indices[chosen_cursor];
@@ -124,77 +110,11 @@ pub(super) fn simplify_fastest_terrain_route(
     selected
 }
 
-fn simplify_fastest_vehicle_corridor(
-    map: &Map,
-    occupancy: &Occupancy<'_>,
-    kind: EntityKind,
-    start: (f32, f32),
-    forward: &[(f32, f32)],
-) -> Vec<(f32, f32)> {
-    let mut selected = Vec::with_capacity(forward.len());
-    let mut next_index = 0_usize;
-    let mut from = start;
-    while next_index < forward.len() {
-        let last_candidate = (next_index + MAX_TERRAIN_SHORTCUT_CANDIDATES).min(forward.len() - 1);
-        let mut run_end = next_index;
-        while run_end < last_candidate {
-            let candidate = run_end + 1;
-            if !same_forward_line(from, forward[next_index], forward[candidate]) {
-                break;
-            }
-            run_end = candidate;
-        }
-        let mut chosen = next_index;
-        for candidate in (next_index..=run_end).rev() {
-            if (next_index..=candidate).any(|index| {
-                let (tx, ty) = map.tile_of(forward[index].0, forward[index].1);
-                occupancy.tree_path_avoidance_cost(tx as i32, ty as i32) > 0
-            }) {
-                continue;
-            }
-            if super::route_finalize::vehicle_finalization_max_segment_px(kind).is_some_and(
-                |max_segment_px| {
-                    (forward[candidate].0 - from.0).hypot(forward[candidate].1 - from.1)
-                        > max_segment_px
-                },
-            ) {
-                continue;
-            }
-            // An exactly collinear span traverses the same directed terrain intervals and carries
-            // no omitted turn/clearance/corner event, so its composite cost is identical.
-            if !body_sweep_legal(map, occupancy, kind, from, forward[candidate]) {
-                continue;
-            }
-            chosen = candidate;
-            break;
-        }
-        selected.push(forward[chosen]);
-        from = forward[chosen];
-        next_index = chosen + 1;
-    }
-    selected.reverse();
-    selected
-}
-
-fn same_forward_line(from: (f32, f32), first: (f32, f32), candidate: (f32, f32)) -> bool {
-    let first_delta = (first.0 - from.0, first.1 - from.1);
-    let candidate_delta = (candidate.0 - from.0, candidate.1 - from.1);
-    let cross = first_delta.0 * candidate_delta.1 - first_delta.1 * candidate_delta.0;
-    let dot = first_delta.0 * candidate_delta.0 + first_delta.1 * candidate_delta.1;
-    cross.abs() <= 0.001 && dot > 0.0
-}
-
 fn segment_direction(from: (f32, f32), to: (f32, f32)) -> (i8, i8) {
-    let axis = |delta: f32| {
-        if delta > 0.0 {
-            1
-        } else if delta < 0.0 {
-            -1
-        } else {
-            0
-        }
-    };
-    (axis(to.0 - from.0), axis(to.1 - from.1))
+    (
+        (to.0 - from.0).signum() as i8,
+        (to.1 - from.1).signum() as i8,
+    )
 }
 
 fn segment_cost_rate_changed(

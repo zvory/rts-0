@@ -161,9 +161,7 @@ const NO_INCOMING_DIR: u8 = u8::MAX;
 
 type SearchKey = (i32, i32, u8);
 
-mod multi_goal;
 mod scratch;
-pub(super) use multi_goal::find_path_to_any_with_budget_and_turn_cost_with_diagnostics_and_scratch;
 pub(super) use scratch::SearchScratch;
 
 /// Find a tile path from `(sx, sy)` to `(gx, gy)` with a configurable expansion cap.
@@ -212,8 +210,16 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
     if sx == gx && sy == gy {
         return (Vec::new(), 0, false);
     }
+
+    // If the goal tile itself is blocked, retarget to the nearest passable tile around it so
+    // we still walk up adjacent (e.g. building a structure, mining a node on a rock edge).
     let (gx, gy) = nearest_passable(pass, gx, gy).unwrap_or((gx, gy));
+
+    // came_from[state] = predecessor state. State includes incoming direction when turn costs
+    // are enabled, so paths to the same tile with different headings do not overwrite each other.
+    // best known g per search state.
     let start_key = (sx, sy, NO_INCOMING_DIR);
+
     let (heuristic_cardinal, heuristic_diagonal) = pass.heuristic_step_costs();
     let production_heuristic =
         |tx, ty| heuristic_with_costs(tx, ty, gx, gy, heuristic_cardinal, heuristic_diagonal);
@@ -230,10 +236,14 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
         scratch.finish();
         return (Vec::new(), 0, false);
     }
+
+    // Track the explored tile closest to the goal for the best-effort fallback.
     let mut best_key = start_key;
     let mut best_h = heuristic(sx, sy, gx, gy);
+
     let mut expanded = 0usize;
     let mut budget_exhausted = false;
+
     while let Some(cur) = scratch.open.pop() {
         let cur_key = (cur.tx, cur.ty, cur.dir);
         if cur.tx == gx && cur.ty == gy {
@@ -241,22 +251,27 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
             scratch.finish();
             return (path, expanded, budget_exhausted);
         }
+
+        // Skip stale heap entries (a better g was found after this was pushed).
         if let Some(best_g) = scratch.get_g(cur_key) {
             if cur.g > best_g {
                 continue;
             }
         }
+
         expanded += 1;
         if expanded > max_expanded {
             budget_exhausted = true;
             break;
         }
+
         for (dir, &(dx, dy, cost)) in NEIGHBORS.iter().enumerate() {
             let nx = cur.tx + dx;
             let ny = cur.ty + dy;
             let Some(edge_cost) = pass.edge_cost(cur.tx, cur.ty, dx, dy, cost) else {
                 continue;
             };
+
             let dir = dir as u8;
             let turn_cost = if turn_penalty > 0 && cur.dir != NO_INCOMING_DIR && cur.dir != dir {
                 turn_penalty
@@ -283,7 +298,7 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
                 }
                 let h = production_heuristic(nx, ny);
                 scratch.open.push(Node {
-                    f: tentative.saturating_add(h),
+                    f: tentative + h,
                     g: tentative,
                     tx: nx,
                     ty: ny,
@@ -292,6 +307,8 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
             }
         }
     }
+
+    // No complete path: head toward whatever we got closest to.
     let path = if (best_key.0, best_key.1) != (sx, sy) {
         scratch.reconstruct(best_key)
     } else {

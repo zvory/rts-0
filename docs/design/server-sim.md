@@ -322,7 +322,7 @@ architecture failures.
 | `starting_loadout` | `compatibility metadata` | Serialize until legacy/global-starting-resource compatibility constructors are retired. Checkpoint import should prefer `starting_loadouts` for per-player setup facts. | The field is set by setup constructors and dev scenarios but does not feed the per-tick systems after match creation. |
 | `rng` | `authoritative/serialized` | Serialize the exact current generator state or an equivalent deterministic draw-stream state. Re-seeding from `seed` is not valid after any random draw. | `systems::run_tick` passes `&mut self.state.rng` into combat damage/miss logic; Phase 0.5 probes cloned RNG output as semantic state. |
 | `final_spatial` | `derived/rebuildable` | Do not serialize. Rebuild with `SpatialIndex::build(&entities, map.width, map.height)` after import, after lab mutations that change entity positions/existence, and after any derived-state wipe. | `DerivedState` owns the final post-tick spatial index used by snapshots. `tick_inner` stores the final `systems::run_tick` spatial result, and Phase 0.5/2/4 checkpoint proofs compare snapshots after clearing and rebuilding it. |
-| `pathing` | `derived/rebuildable` | Do not serialize reusable raw/finalized path caches, search entries, or precomputed graph tables. Recreate `PathingService` with the live map content key, default budget, cache capacity, and current tick alignment during import, map replacement, or a full derived-state rebuild. | `PathingService` owns cache/search bookkeeping plus `PathGraph`: immutable authored-map/profile/policy edges, page-COW dynamic edge tables, the exact ordered building topology key `(id, kind, pos_x_bits, pos_y_bits)`, and a monotonic table generation. Raw cache identity includes route policy and the deterministic terrain-cost fingerprint as well as the separate blocker fingerprint; graph generation is never a cache key. The bounded fastest-terrain finalization cache additionally keys exact world endpoints, body/profile/policy, the blocker fingerprint, and the complete raw waypoint-bit sequence, so an exact-goal or topology change cannot reuse the wrong authored corridor. Chosen unit paths, policies, movement phases, waypoints, path goals, and throttling remain serialized on entities. Entity-only Lab repair retains graph pages but clears raw/finalized route-cache and search residency at the legacy boundary; map replacement clears the graph. Phase 0.5/2/4 tests prove clearing this derived owner does not change semantic state or fog-filtered snapshots. |
+| `pathing` | `derived/rebuildable` | Do not serialize reusable pathing cache/search entries or precomputed graph tables. Recreate `PathingService` with the live map content key, default budget, cache capacity, and current tick alignment during import, map replacement, or a full derived-state rebuild. | `PathingService` owns cache/search bookkeeping plus `PathGraph`: immutable authored-map/profile/policy edges, page-COW dynamic edge tables, the exact ordered building topology key `(id, kind, pos_x_bits, pos_y_bits)`, and a monotonic table generation. Cache identity includes route policy and the deterministic terrain-cost fingerprint as well as the separate blocker fingerprint; graph generation is never a cache key. Chosen unit paths, policies, movement phases, waypoints, path goals, and throttling remain serialized on entities. Entity-only Lab repair retains graph pages but clears route-cache/search residency at the legacy boundary; map replacement clears the graph. Phase 0.5/2/4 tests prove clearing this derived owner does not change semantic state or fog-filtered snapshots. |
 
 The Phase 0.5 and Phase 2 derived-state wipe harnesses confirm the current derived boundary: only
 `final_spatial` and `pathing` are cleared and rebuilt. Every current `GameState` field is treated as
@@ -1301,53 +1301,24 @@ octile heuristic from the minimum legal cardinal and diagonal table costs (with 
 clamped to two cardinals); capped fallback progress remains the legacy 10/14 geometric metric and
 retains its existing tie and count rules.
 
-Every production ground-path source selects `FastestTerrainTime`: Move, Attack Move, direct Attack,
-Gather (including depot returns and blocked-slot repaths), Build, Deconstruct, Ability staging, and
-the exhaustively classified `Other` source reserved for non-routing Order variants. Rally movement
-enters through Move or Attack Move after body-safe spawning. No current live caller produces an
-`Other` route, but its explicit policy prevents it from becoming a legacy exemption. The
-source-to-policy match is
-exhaustive, so a newly added source cannot silently inherit `LegacyShape`; legacy policy remains
-only for old checkpoint compatibility and explicit tests or diagnostics. Weighted requests always
-search instead of using the legacy clear-line bypass. Same-tile completion and already-in-range
-interaction checks remain arrival logic and do not choose a terrain-blind route. Raw
+Ordinary infantry Move and Attack Move requests select `FastestTerrainTime`; direct Attack and all
+interaction, footprint, gather, build, repair, deconstruct, ability, and vehicle requests retain
+`LegacyShape`. Weighted requests always search instead of using the legacy clear-line bypass. Raw
 A* produces the graph-optimal tile path. Finalization then runs once: `RouteCostModel` traverses
 exact tile boundaries to recost both a proposed world-space shortcut and the retained polyline, and
 a shortcut is accepted only when it is no slower and an independent conservative swept-body check
 proves it legal. Anchors created by tree shaping remain protected because that shaping cost is not
-part of continuous terrain-time recosting. For vehicle-clearance profiles, the graph adds the
-existing clearance, corner, and direction-change penalties scaled by the same `780` route-time
-factor. Vehicle finalization may collapse only an exactly collinear span of the same authored
-corridor; every bend, diagonal-to-L elbow, clearance/corner event, tree detour, and recovery point
-remains protected, and Scout Car segments remain capped at three tiles. Candidate anchors are
-bounded, and periodic anchors cap work on unusually long infantry paths. Exact repeated weighted
-requests may reuse the bounded derived finalization cache; assignment still installs an ordinary
-serialized path and policy on the entity.
-
-Direct Attack range bands and Build/Deconstruct outside-footprint rings use the same bounded
-multi-goal search rather than selecting one endpoint geometrically before routing. The search
-shares one normal expansion cap and one coordinator request allowance across the complete ordered
-candidate set, rejects body-illegal goal tiles through the active routing profile, minimizes the
-authoritative directed graph cost, and uses candidate order only to break equal-cost arrivals.
-Direct Attack keeps the prior closest-target-point calculation, geometric fallback, and min/max
-range predicates; its candidate generation is capped at 256 deterministic endpoints. Build and Deconstruct keep the
-existing six-ring candidate bound and full footprint/body checks. A failed footprint search retains
-the serialized retry counter on the same eight-candidate cadence before declaring failure, so cache
-residency, checkpoint restore, and request scheduling cannot change order lifetime.
+part of continuous terrain-time recosting. Candidate anchors are bounded, and periodic anchors cap
+work on unusually long paths.
 
 Every waypoint left on a fastest-time path is authoritative. The 30 Hz movement pass may consume
 the current waypoint through its normal arrival rule. Collision or local steering may also consume
 it after the unit has crossed the anchor's outgoing perpendicular plane while remaining within the
 half-tile route corridor; crossing the plane far to the side cannot accept a corner through a wall.
-The pass cannot greedily target or pop a later waypoint merely because it is clear. This applies to
-movement and interaction routes alike, including vehicle pursuit paths, which retain the oriented
-vehicle-clearance profile. If displacement makes the current anchor fail through existing recovery,
-the normal blocked debounce requests a fresh path. A fastest-time vehicle consumes at most its
-current anchor in one route evaluation, only when the immediate next join is legal from its current
-hull; steering lookahead stays on that adjacent segment, clear-final-goal targeting is disabled,
-and bounded reverse recovery resumes the same stored path/policy. Old deserialized legacy paths
-retain their compatibility behavior until replaced or consumed; every new production assignment
-uses the authored-anchor contract above.
+The pass cannot greedily target or pop a later waypoint merely because it is clear. If displacement
+makes the current anchor fail through existing recovery, the normal blocked debounce requests a
+fresh path. Legacy paths keep their existing runtime lookahead behavior; Phase 4 can opt vehicles
+into the same authored-anchor contract without changing the metric or finalizer.
 
 Dynamic tables use 256-tile copy-on-write pages so transactional Lab clones share unchanged graph
 memory. A movement-body fingerprint first rejects unchanged occupancy in O(1); on change, the graph

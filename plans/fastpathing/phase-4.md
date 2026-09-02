@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [x] Complete on `zvorygin/fastpathing-phase4` (based on Phase 3 revision `cfbe6ddea`).
+- [ ] Ready for implementation.
 
 ## Objective
 
@@ -121,37 +121,6 @@ and every exact interaction route without weakening vehicle legality. Mark this 
 
 ## Completion Evidence
 
-- Vehicle Move and Attack Move now persist `FastestTerrainTime`; Direct Attack and exact interaction
-  routes remain `LegacyShape` for Phase 4.5. Vehicle edges combine the Phase 3 directed terrain-time
-  metric with scaled clearance, corner, and incoming-direction turn shaping. Diagonal-to-L elbows
-  use that same directed composite cost.
-- Finalization is one-time and cached by exact endpoints, route/profile policy, blocker fingerprint,
-  and raw route. It removes only provably equal-cost collinear spans, retains bends and authored
-  clearance/turn/recovery anchors, applies the Scout Car three-tile limit, and requires hull-legal
-  joins. Motion consumes at most one adjacent authored anchor per evaluation; it cannot bypass to a
-  visible final goal or later waypoint. Bounded recovery resumes the same path or repaths.
-- Oracle and regression coverage includes exact direction-state Dijkstra equality for Scout Car,
-  Tank, and Anti-Tank Gun profiles, precomputed/direct terrain-cost equality, finalizer legality,
-  anchor/lookahead limits, 40-request scheduling, the vehicle movement suite, and deterministic
-  replay 281/303 cases. `cargo test --manifest-path server/Cargo.toml -p rts-sim --lib` passed
-  1,334 tests (7 ignored); clippy with `-D warnings` and `rts-archcheck` passed.
-- Eleven all-profile release samples (960 cold and 15,360 warm requests per sample) produced stable
-  reference/candidate hashes `9a5b92a0d69cc0e5` / `a91153a2991dae45`. Cold median ratio was
-  0.29156 (90% bootstrap upper 0.29287, 11/11 improved); warm median ratio was 0.23206 (upper
-  0.23599). Candidate MAD was 0.43% cold and 2.46% warm. Finalization was 3.28% of candidate cold
-  time. Graph initialization median was 7.55 ms; base/dynamic graph storage was 1,047,816 / 1,051,786
-  bytes. This clears the 2x pathing target.
-- Eleven Hellhole pairs against Phase 3 improved average tick CPU in 11/11 runs: medians 9,351 us to
-  8,673 us, ratio 0.92490 (90% upper 0.92551). p95 ratio was 0.97716 and p99 ratio 0.96219. Harness
-  wall-time ratio was 1.02312 because the new vehicle trajectories intentionally changed battle and
-  snapshot work. Eleven additional pairs against frozen pre-Phase-1 revision `e7ef438051` improved
-  average tick CPU from 10,774 us to 8,647 us: ratio 0.80072 (90% upper 0.80210), with 11/11
-  improving. Frozen-baseline p95/p99/wall ratios were 0.78608/0.71417/0.92860. Two candidate
-  900-tick snapshot streams were byte-identical at 24,899,122 bytes,
-  SHA-256 `81d4b7488f7011e6a34c79b1a45332919ef58abcf58e617e7bb5e371cdc78d95`.
-- Phase 3 and Phase 4 outputs intentionally differ on terrain-bearing vehicle routes: Hellhole
-  snapshot bytes changed from 27,723,460 to 26,833,202 and event totals changed with combat timing.
-  Repeated Phase 4 runs retained identical snapshot and event totals. Full measurement rows are in
-  `phase-4-results.json`.
-- Interact review covered the open-ground L completion and an active lake reverse-L route without
-  order loss or recovery. Patch-note copy was staged locally and not delivered.
+In the implementation commit, replace this text with the phase revision, verification commands,
+vehicle policy/composite-cost contract, corpus/oracle hashes, intentional differences, scenario
+artifacts, paired measurements, memory/update results, patch-note staging, and final target status.

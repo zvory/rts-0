@@ -1,6 +1,6 @@
 use crate::config;
 use crate::game::entity::{
-    uses_oriented_vehicle_body, uses_pivot_vehicle_movement, Entity, EntityKind, RoutePolicy,
+    uses_oriented_vehicle_body, uses_pivot_vehicle_movement, Entity, EntityKind,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -36,10 +36,7 @@ pub(super) fn route_accepts_waypoint(
     next_waypoint: Option<(f32, f32)>,
 ) -> bool {
     if distance_between(current, waypoint) <= config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX {
-        if uses_pivot_vehicle_movement(e.kind)
-            || (uses_oriented_vehicle_body(e.kind)
-                && e.path_policy() == RoutePolicy::FastestTerrainTime)
-        {
+        if uses_pivot_vehicle_movement(e.kind) {
             return next_waypoint.is_some_and(|next_waypoint| {
                 route_segment_standable_from_current_hull(map, occ, e, current, next_waypoint)
             });
@@ -70,10 +67,6 @@ pub(super) fn route_accepts_waypoint(
         return route_segment_standable_for_route_skip(map, occ, e, current, next_waypoint);
     }
 
-    if e.path_policy() == RoutePolicy::FastestTerrainTime {
-        return false;
-    }
-
     route_segment_standable_for_route_skip(map, occ, e, current, next_waypoint)
 }
 
@@ -84,10 +77,7 @@ fn route_segment_standable_for_route_skip(
     current: (f32, f32),
     next_waypoint: (f32, f32),
 ) -> bool {
-    if uses_pivot_vehicle_movement(e.kind)
-        || (uses_oriented_vehicle_body(e.kind)
-            && e.path_policy() == RoutePolicy::FastestTerrainTime)
-    {
+    if uses_pivot_vehicle_movement(e.kind) {
         return route_segment_standable_from_current_hull(map, occ, e, current, next_waypoint);
     }
 
@@ -143,9 +133,6 @@ pub(super) fn vehicle_route_context(
             break;
         }
         next_index -= 1;
-        if e.path_policy() == RoutePolicy::FastestTerrainTime {
-            break;
-        }
     }
 
     let pre_pop_count = path.len() - 1 - next_index;
@@ -154,10 +141,9 @@ pub(super) fn vehicle_route_context(
         .path_goal()
         .or_else(|| path.first().copied())
         .unwrap_or(target);
-    let direct_goal_is_clear = e.path_policy() == RoutePolicy::LegacyShape
-        && car_motion_profile(e.kind).is_some_and(|profile| {
-            clear_car_direct_goal_route(profile, map, occ, e.kind, current, final_goal)
-        });
+    let direct_goal_is_clear = car_motion_profile(e.kind).is_some_and(|profile| {
+        clear_car_direct_goal_route(profile, map, occ, e.kind, current, final_goal)
+    });
     let route_focus = if direct_goal_is_clear {
         final_goal
     } else {

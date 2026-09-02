@@ -247,16 +247,9 @@ pub(super) fn advance_moving_units(
                         }
                     });
                     if accepts_waypoint {
-                        let authored_vehicle_anchor = entities.get(id).is_some_and(|e| {
-                            uses_vehicle_movement
-                                && e.path_policy() == RoutePolicy::FastestTerrainTime
-                        });
                         if let Some(e) = entities.get_mut(id) {
                             e.pop_waypoint();
                             e.mark_move_phase(MovePhase::Moving);
-                        }
-                        if authored_vehicle_anchor {
-                            break;
                         }
                         // No position snap — steer toward the new next waypoint from current position.
                         continue;
@@ -633,7 +626,11 @@ pub(super) fn advance_moving_units(
 /// body across the plane through that anchor perpendicular to the authored outgoing segment. This
 /// is the ordinary crossed-current-waypoint rule: it cannot preselect a later clear target while
 /// the unit is still on the incoming side of the anchor.
-fn crossed_authored_waypoint(current: (f32, f32), waypoint: (f32, f32), next: (f32, f32)) -> bool {
+fn crossed_authored_waypoint(
+    current: (f32, f32),
+    waypoint: (f32, f32),
+    next: (f32, f32),
+) -> bool {
     let outgoing = (next.0 - waypoint.0, next.1 - waypoint.1);
     let displaced = (current.0 - waypoint.0, current.1 - waypoint.1);
     let outgoing_length = outgoing.0.hypot(outgoing.1);
