@@ -19,7 +19,7 @@ pub use frame::{
     AiResource, AiResourceAmount, AiSmokeCloud, AiTerrain,
 };
 pub(crate) use rts_rules::balance::unit_placement_radius;
-pub use rts_rules::faction::UpgradeKind;
+pub use rts_rules::faction::{AbilityKind, UpgradeKind};
 pub use rts_rules::EntityKind;
 pub use rulebook::{AiCost, AiEntityRule, AiFootprint, AiPrerequisites, AiRulebook};
 pub use strategy::AiStrategy;

@@ -1,6 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use rts_ai::sdk::{AiActions, AiFrame, AiRulebook, AiStrategy, EntityKind, WorldQueries};
+use rts_ai::sdk::{
+    AbilityKind, AiActions, AiFrame, AiRulebook, AiStrategy, EntityKind, WorldQueries,
+};
 use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::replay::{replay_commands, CommandLogEntry};
 use rts_sim::game::{Game, PlayerInit};
@@ -13,6 +15,11 @@ use reference_strategy::ReferenceStrategy;
 
 const SEED: u32 = 0xA15D_0004;
 const TICKS: u32 = 36;
+
+#[test]
+fn sdk_reexports_ability_kinds() {
+    assert_eq!(AbilityKind::Smoke.stable_id(), "smoke");
+}
 
 #[derive(Default)]
 struct LifecycleLog {
