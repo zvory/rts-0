@@ -1,5 +1,7 @@
 use super::*;
 
+type SelectedTilePath = (Vec<(i32, i32)>, Option<usize>);
+
 fn segment_crosses_slow_movement(map: &Map, from: (f32, f32), to: (f32, f32)) -> bool {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
@@ -176,6 +178,47 @@ impl PathingService {
         PathingRequestOutcome::Resolved {
             path: tile_path,
             diagnostics,
+        }
+    }
+
+    pub(in crate::game::services) fn request_tile_path_to_any_with_diagnostics(
+        &mut self,
+        map: &Map,
+        occupancy: &Occupancy,
+        req: PathRequest,
+        goals: &[(i32, i32)],
+        allow_pathfinding: bool,
+    ) -> PathingRequestOutcome<SelectedTilePath> {
+        if !allow_pathfinding {
+            return PathingRequestOutcome::Deferred;
+        }
+        let pass = self.path_graph.view(
+            map,
+            occupancy,
+            req.kind,
+            req.radius_tiles,
+            req.route_shape,
+            req.policy,
+        );
+        let search_budget = req.budget.unwrap_or(self.default_budget);
+        let (tile_path, expanded_nodes, budget_exhausted, goal_index) =
+            pathfinding::find_path_to_any_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+                &pass,
+                req.start,
+                goals,
+                search_budget,
+                req.route_shape.turn_penalty(req.policy),
+                &mut self.search_scratch,
+            );
+        PathingRequestOutcome::Resolved {
+            diagnostics: PathingRequestDiagnostics {
+                cache_status: PathCacheStatus::Miss,
+                expanded_nodes,
+                scheduling_expanded_nodes: expanded_nodes,
+                budget_exhausted,
+                tile_path_len: tile_path.len(),
+            },
+            path: (tile_path, goal_index),
         }
     }
 }

@@ -1301,10 +1301,16 @@ octile heuristic from the minimum legal cardinal and diagonal table costs (with 
 clamped to two cardinals); capped fallback progress remains the legacy 10/14 geometric metric and
 retains its existing tie and count rules.
 
-Ordinary infantry and oriented-ground-vehicle Move and Attack Move requests select
-`FastestTerrainTime`; direct Attack and all interaction, footprint, gather, build, repair,
-deconstruct, and ability requests retain `LegacyShape` until the all-order rollout. Weighted
-requests always search instead of using the legacy clear-line bypass. Raw
+Every production ground-path source selects `FastestTerrainTime`: Move, Attack Move, direct Attack,
+Gather (including depot returns and blocked-slot repaths), Build, Deconstruct, Ability staging, and
+the exhaustively classified `Other` source reserved for non-routing Order variants. Rally movement
+enters through Move or Attack Move after body-safe spawning. No current live caller produces an
+`Other` route, but its explicit policy prevents it from becoming a legacy exemption. The
+source-to-policy match is
+exhaustive, so a newly added source cannot silently inherit `LegacyShape`; legacy policy remains
+only for old checkpoint compatibility and explicit tests or diagnostics. Weighted requests always
+search instead of using the legacy clear-line bypass. Same-tile completion and already-in-range
+interaction checks remain arrival logic and do not choose a terrain-blind route. Raw
 A* produces the graph-optimal tile path. Finalization then runs once: `RouteCostModel` traverses
 exact tile boundaries to recost both a proposed world-space shortcut and the retained polyline, and
 a shortcut is accepted only when it is no slower and an independent conservative swept-body check
@@ -1318,16 +1324,30 @@ bounded, and periodic anchors cap work on unusually long infantry paths. Exact r
 requests may reuse the bounded derived finalization cache; assignment still installs an ordinary
 serialized path and policy on the entity.
 
+Direct Attack range bands and Build/Deconstruct outside-footprint rings use the same bounded
+multi-goal search rather than selecting one endpoint geometrically before routing. The search
+shares one normal expansion cap and one coordinator request allowance across the complete ordered
+candidate set, rejects body-illegal goal tiles through the active routing profile, minimizes the
+authoritative directed graph cost, and uses candidate order only to break equal-cost arrivals.
+Direct Attack keeps the prior closest-target-point calculation, geometric fallback, and min/max
+range predicates; its candidate generation is capped at 256 deterministic endpoints. Build and Deconstruct keep the
+existing six-ring candidate bound and full footprint/body checks. A failed footprint search retains
+the serialized retry counter on the same eight-candidate cadence before declaring failure, so cache
+residency, checkpoint restore, and request scheduling cannot change order lifetime.
+
 Every waypoint left on a fastest-time path is authoritative. The 30 Hz movement pass may consume
 the current waypoint through its normal arrival rule. Collision or local steering may also consume
 it after the unit has crossed the anchor's outgoing perpendicular plane while remaining within the
 half-tile route corridor; crossing the plane far to the side cannot accept a corner through a wall.
-The pass cannot greedily target or pop a later waypoint merely because it is clear. If displacement
-makes the current anchor fail through existing recovery, the normal blocked debounce requests a
-fresh path. A fastest-time vehicle consumes at most its current anchor in one route evaluation, only
-when the immediate next join is legal from its current hull; steering lookahead stays on that
-adjacent segment, clear-final-goal targeting is disabled, and bounded reverse recovery resumes the
-same stored path/policy. Legacy interaction paths keep their existing runtime lookahead behavior.
+The pass cannot greedily target or pop a later waypoint merely because it is clear. This applies to
+movement and interaction routes alike, including vehicle pursuit paths, which retain the oriented
+vehicle-clearance profile. If displacement makes the current anchor fail through existing recovery,
+the normal blocked debounce requests a fresh path. A fastest-time vehicle consumes at most its
+current anchor in one route evaluation, only when the immediate next join is legal from its current
+hull; steering lookahead stays on that adjacent segment, clear-final-goal targeting is disabled,
+and bounded reverse recovery resumes the same stored path/policy. Old deserialized legacy paths
+retain their compatibility behavior until replaced or consumed; every new production assignment
+uses the authored-anchor contract above.
 
 Dynamic tables use 256-tile copy-on-write pages so transactional Lab clones share unchanged graph
 memory. A movement-body fingerprint first rejects unchanged occupancy in O(1); on change, the graph
