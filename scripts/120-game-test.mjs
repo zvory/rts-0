@@ -11,6 +11,11 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const GAME_COUNT = 120;
 const SEEDS_PER_MAP = 5;
 const DEFAULT_TICKS = 25_000;
+const TICKS_PER_FULL_GAME_ESTIMATE = 25_000;
+const DEFAULT_EXPECTED_FULL_GAME_SECONDS = 90;
+const MAX_EFFECTIVE_ESTIMATE_CONCURRENCY = 8;
+const EXPECTED_RELEASE_BUILD_SECONDS = 120;
+const AGENT_WAIT_MARGIN_PERCENT = 10;
 const DEFAULT_CONCURRENCY = Math.min(
   32,
   Math.max(1, os.availableParallelism?.() ?? os.cpus().length),
@@ -110,6 +115,11 @@ try {
   if (resumed > 0) {
     console.log(`\nResuming ${resumed * 2}/${GAME_COUNT} completed games from existing summaries.`);
   }
+  const agentWait = resolveAgentWaitPlan(
+    options.outDir,
+    createAgentWaitPlan(options, resumed * 2, false),
+  );
+  printAgentWaitInstructions(agentWait);
   await runPool(pending, options, arenaBinary, resumed, (completeJobs, job) => {
     completedJobs = completeJobs;
     writeRunConfig(options, gitSha, "running", "", completedJobs);
@@ -164,6 +174,9 @@ Options:
   --verify-replay     Verify every replay (slower; default skips replay verification).
   --background        Start the test detached and return immediately.
   --progress          Print each completed seed pair (default is start/end only).
+  --expected-game-seconds N
+                      Expected wall time for one 25,000-tick game (default: ${DEFAULT_EXPECTED_FULL_GAME_SECONDS}).
+                      Used only for the quiet agent wait estimate.
   --status DIR        Print compact status for an output directory; no profiles required.
   --dry-run           Print the fixed test plan without building or running games.
   -h, --help          Show this help.
@@ -183,6 +196,7 @@ function parseArgs(argv) {
     verifyReplay: false,
     background: false,
     progress: false,
+    expectedGameSeconds: DEFAULT_EXPECTED_FULL_GAME_SECONDS,
     statusDir: "",
     dryRun: false,
     help: false,
@@ -205,6 +219,9 @@ function parseArgs(argv) {
     else if (arg === "--verify-replay") parsed.verifyReplay = true;
     else if (arg === "--background") parsed.background = true;
     else if (arg === "--progress") parsed.progress = true;
+    else if (arg === "--expected-game-seconds") {
+      parsed.expectedGameSeconds = positiveNumber(value(), arg);
+    }
     else if (arg === "--status") parsed.statusDir = path.resolve(value());
     else if (arg === "--dry-run") parsed.dryRun = true;
     else if (!arg.startsWith("-")) positionals.push(arg);
@@ -266,6 +283,14 @@ function positiveInteger(raw, flag) {
   return number;
 }
 
+function positiveNumber(raw, flag) {
+  const number = Number(raw);
+  if (!Number.isFinite(number) || number <= 0) {
+    throw new Error(`${flag} must be a positive number`);
+  }
+  return number;
+}
+
 function utcStamp() {
   return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }
@@ -273,7 +298,11 @@ function utcStamp() {
 function launchBackground(runOptions) {
   fs.mkdirSync(runOptions.outDir, { recursive: true });
   const gitSha = commandOutput("git", ["rev-parse", "HEAD"]) || "unknown";
-  writeRunConfig(runOptions, gitSha, "starting", "", 0, createMatchups(runOptions.profiles));
+  const matchups = createMatchups(runOptions.profiles);
+  const completedGames = countExistingGames(runOptions, matchups);
+  const agentWait = createAgentWaitPlan(runOptions, completedGames);
+  writeRunConfig(runOptions, gitSha, "starting", "", completedGames / 2, matchups);
+  writeAgentHandoff(runOptions.outDir, agentWait);
   const logPath = path.join(runOptions.outDir, "120-game-test.log");
   const log = fs.openSync(logPath, "a");
   const args = [
@@ -291,6 +320,7 @@ function launchBackground(runOptions) {
   if (runOptions.skipBuild) args.push("--skip-build");
   if (runOptions.verifyReplay) args.push("--verify-replay");
   if (runOptions.progress) args.push("--progress");
+  args.push("--expected-game-seconds", String(runOptions.expectedGameSeconds));
 
   let child;
   try {
@@ -312,6 +342,7 @@ function launchBackground(runOptions) {
   console.log(`  output:      ${runOptions.outDir}`);
   console.log(`  log:         ${logPath}`);
   console.log(`  status:      node scripts/120-game-test.mjs --status "${runOptions.outDir}"`);
+  printAgentWaitInstructions(agentWait);
 }
 
 function printStatus(outDir) {
@@ -349,8 +380,12 @@ function printStatus(outDir) {
 }
 
 function createJobs(runOptions) {
+  return createJobsForMatchups(runOptions, MATCHUPS);
+}
+
+function createJobsForMatchups(runOptions, matchups) {
   const planned = [];
-  for (const matchup of MATCHUPS) {
+  for (const matchup of matchups) {
     for (const map of MAPS) {
       for (let seed = 0; seed < SEEDS_PER_MAP; seed += 1) {
         const outDir = path.join(runOptions.outDir, matchup.id, map.id, `seed-${seed}`);
@@ -361,6 +396,121 @@ function createJobs(runOptions) {
   return planned;
 }
 
+function countExistingGames(runOptions, matchups) {
+  return (
+    createJobsForMatchups(runOptions, matchups).filter((job) =>
+      fs.existsSync(path.join(job.outDir, "arena-summary.json")),
+    ).length * 2
+  );
+}
+
+function createAgentWaitPlan(runOptions, completedGames = 0, includeBuild = true) {
+  const remainingGames = Math.max(0, GAME_COUNT - completedGames);
+  const activeJobs = Math.ceil(remainingGames / 2);
+  const effectiveConcurrency = Math.max(
+    1,
+    Math.min(runOptions.concurrency, MAX_EFFECTIVE_ESTIMATE_CONCURRENCY, activeJobs || 1),
+  );
+  const simulationSeconds =
+    (remainingGames * runOptions.expectedGameSeconds * runOptions.ticks) /
+    TICKS_PER_FULL_GAME_ESTIMATE /
+    effectiveConcurrency;
+  const buildSeconds = includeBuild && !runOptions.skipBuild ? EXPECTED_RELEASE_BUILD_SECONDS : 0;
+  const baseExpectedSeconds = Math.ceil(buildSeconds + simulationSeconds);
+  const waitSeconds = Math.ceil(
+    (baseExpectedSeconds * (100 + AGENT_WAIT_MARGIN_PERCENT)) / 100,
+  );
+  const createdAt = new Date();
+  const waitUntil = new Date(createdAt.getTime() + waitSeconds * 1_000);
+  return {
+    schema: "rts-120-game-agent-handoff-v1",
+    action: "stop_processing_and_wait",
+    createdAt: createdAt.toISOString(),
+    waitUntil: waitUntil.toISOString(),
+    waitSeconds,
+    baseExpectedSeconds,
+    safetyMarginPercent: AGENT_WAIT_MARGIN_PERCENT,
+    assumptions: {
+      games: GAME_COUNT,
+      completedGames,
+      remainingGames,
+      tickCap: runOptions.ticks,
+      expectedSecondsPer25000TickGame: runOptions.expectedGameSeconds,
+      requestedConcurrency: runOptions.concurrency,
+      effectiveEstimateConcurrency: effectiveConcurrency,
+      releaseBuildSeconds: buildSeconds,
+    },
+    resume: {
+      statusCommand: [process.execPath, fileURLToPath(import.meta.url), "--status", runOptions.outDir],
+      analysisPath: path.join(runOptions.outDir, "analysis.md"),
+      instructions: [
+        "Do not poll run-config.json, the process, or the log before waitUntil.",
+        "At or after waitUntil, check status once.",
+        "When status is complete, read analysisPath and prepare the user report.",
+        "If status is still running, wait for the remaining runner process instead of repeatedly polling.",
+      ],
+    },
+  };
+}
+
+function writeAgentHandoff(outDir, agentWait) {
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(outDir, "agent-handoff.json"),
+    `${JSON.stringify(agentWait, null, 2)}\n`,
+  );
+}
+
+function resolveAgentWaitPlan(outDir, proposedPlan) {
+  const handoffPath = path.join(outDir, "agent-handoff.json");
+  if (fs.existsSync(handoffPath)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(handoffPath, "utf8"));
+      if (
+        existing.schema === proposedPlan.schema &&
+        Date.parse(existing.waitUntil) > Date.now() &&
+        existing.resume?.analysisPath === proposedPlan.resume.analysisPath &&
+        existing.assumptions?.tickCap === proposedPlan.assumptions.tickCap &&
+        existing.assumptions?.expectedSecondsPer25000TickGame ===
+          proposedPlan.assumptions.expectedSecondsPer25000TickGame &&
+        existing.assumptions?.requestedConcurrency ===
+          proposedPlan.assumptions.requestedConcurrency &&
+        existing.assumptions?.completedGames === proposedPlan.assumptions.completedGames
+      ) {
+        return existing;
+      }
+    } catch {
+      // Replace a stale or unreadable handoff with the current run's plan.
+    }
+  }
+  writeAgentHandoff(outDir, proposedPlan);
+  return proposedPlan;
+}
+
+function printAgentWaitInstructions(agentWait) {
+  console.log("\nAgent handoff (quiet wait)");
+  console.log("  STOP PROCESSING AND DO NOT POLL THIS RUN.");
+  console.log(
+    `  Wait until:  ${agentWait.waitUntil} (${formatDuration(agentWait.waitSeconds)}; includes ${agentWait.safetyMarginPercent}% padding)`,
+  );
+  console.log(`  Then check:  ${agentWait.resume.statusCommand.map(quoteArgument).join(" ")}`);
+  console.log(`  Then report: ${agentWait.resume.analysisPath}`);
+}
+
+function quoteArgument(value) {
+  const text = String(value);
+  return /\s|"/.test(text) ? `"${text.replaceAll('"', '\\"')}"` : text;
+}
+
+function formatDuration(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours ? `${hours}h` : "", minutes ? `${minutes}m` : "", `${seconds}s`]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function printPlan(runOptions, plannedJobs) {
   console.log("120 game test dry run");
   console.log(`  games:       ${plannedJobs.length * 2}`);
@@ -369,6 +519,10 @@ function printPlan(runOptions, plannedJobs) {
   console.log(`  tick cap:    ${runOptions.ticks}`);
   console.log(`  output:      ${runOptions.outDir}`);
   console.log(`  replay:      ${runOptions.verifyReplay ? "verify" : "skip verification"}`);
+  const agentWait = createAgentWaitPlan(runOptions);
+  console.log(
+    `  quiet wait:  ${formatDuration(agentWait.waitSeconds)} (all games at cap plus ${agentWait.safetyMarginPercent}%)`,
+  );
   for (const matchup of MATCHUPS) {
     console.log(`  matchup:     ${matchup.label}`);
   }
@@ -695,6 +849,7 @@ function writeRunConfig(
         ticks: runOptions.ticks,
         concurrency: runOptions.concurrency,
         verifyReplay: runOptions.verifyReplay,
+        expectedGameSeconds: runOptions.expectedGameSeconds,
         matchups,
         maps: MAPS,
         ...(error ? { error } : {}),
