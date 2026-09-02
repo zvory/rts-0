@@ -24,7 +24,7 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
             contact.threat_value,
             contact.armored_threat,
         );
-        let smoke = crate::ai_core::decision::frontal::maybe_issue_local_defense_smoke(
+        let smoke = crate::ai_core::decision::frontal::smoke::maybe_issue_local_defense_smoke(
             actions,
             observation,
             &interceptors,
@@ -35,14 +35,14 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
         let mut attack_targets = contact.target_ids.clone();
         if let Some(smoke) = smoke {
             let scout = match smoke {
-                crate::ai_core::decision::frontal::LocalDefenseSmokeDirective::Obscure {
+                crate::ai_core::decision::frontal::smoke::LocalDefenseSmokeDirective::Obscure {
                     target,
                     scout,
                 } => {
                     attack_targets.retain(|candidate| *candidate != target);
                     scout
                 }
-                crate::ai_core::decision::frontal::LocalDefenseSmokeDirective::Reposition {
+                crate::ai_core::decision::frontal::smoke::LocalDefenseSmokeDirective::Reposition {
                     scout,
                 } => scout,
             };
