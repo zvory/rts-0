@@ -13,6 +13,7 @@ use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload}
 
 mod chokes;
 mod regions;
+mod routes;
 use chokes::build_chokes;
 use regions::{build_regions, nearest_region, region_id_for_tile};
 

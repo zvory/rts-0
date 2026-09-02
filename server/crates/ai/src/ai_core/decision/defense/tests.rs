@@ -37,6 +37,8 @@ fn los_test_observation(blocker: EntityKind) -> AiObservation {
         resources: Vec::new(),
         visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
+        ability_states: Vec::new(),
+        smokes: Vec::new(),
         pending_builds: Vec::new(),
         upgrades: Vec::new(),
     }

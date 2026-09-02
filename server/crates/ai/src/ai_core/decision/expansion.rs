@@ -195,7 +195,19 @@ where
     if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
         return None;
     }
-    let (tile_x, tile_y) = expansion_resource_depot_site(observation, expansion, kind, placeable)?;
+    let (tile_x, tile_y) =
+        expansion_resource_depot_site(observation, expansion, kind, profile.id, placeable)?;
+    if profile.id == JEFFS_AI_ID && observation.own_start_tile == (9, 9) {
+        let approach = tile_center((15, 27), observation.map.tile_size);
+        return actions::try_move_then_build_at(
+            actions,
+            builder_pools,
+            kind,
+            tile_x,
+            tile_y,
+            approach,
+        );
+    }
     actions::try_build_at(actions, builder_pools, kind, tile_x, tile_y)
 }
 
@@ -203,6 +215,7 @@ pub(super) fn expansion_resource_depot_site<F>(
     observation: &AiObservation,
     expansion: ExpansionPolicy,
     kind: EntityKind,
+    profile_id: &str,
     placeable: &mut F,
 ) -> Option<(u32, u32)>
 where
@@ -212,6 +225,15 @@ where
     let resources = expansion_candidate_resources(observation);
     if resources.is_empty() {
         return None;
+    }
+    if profile_id == JEFFS_AI_ID {
+        if let Some(instruction) = instructed_river_expansion_site(observation, kind, &resources) {
+            // The River's natural has one known good footprint per side. Do not
+            // fall back to the surrounding search when that exact footprint is
+            // temporarily blocked; retry the same instruction on the next pass.
+            let tile = instruction.tile;
+            return placeable(kind, tile.0, tile.1).then_some(tile);
+        }
     }
     let mut best = None;
     for anchor in expansion_anchor_tiles(observation, &resources) {
@@ -273,6 +295,68 @@ where
     }
 
     best.map(|candidate: ExpansionSiteCandidate| candidate.tile)
+}
+
+fn instructed_river_expansion_site(
+    observation: &AiObservation,
+    kind: EntityKind,
+    resources: &[&AiResourceSummary],
+) -> Option<RiverExpansionInstruction> {
+    let instruction = river_expansion_instruction(observation.map, observation.own_start_tile)?;
+    let tile = instruction.tile;
+    let candidate = expansion_site_candidate(observation, kind, tile.0, tile.1, resources)?;
+    let required_steel = config::STEEL_PATCHES_PER_BASE as usize;
+    let required_oil = config::OIL_PATCHES_PER_BASE as usize;
+    (candidate.steel_in_range >= required_steel && candidate.oil_in_range >= required_oil)
+        .then_some(instruction)
+}
+
+pub(super) fn uses_jeff_river_layout(observation: &AiObservation) -> bool {
+    let resources = expansion_candidate_resources(observation);
+    instructed_river_expansion_site(observation, EntityKind::ResourceDepot, &resources).is_some()
+}
+
+pub(super) fn has_jeff_river_expansion_site(observation: &AiObservation) -> bool {
+    let Some(instruction) =
+        river_expansion_instruction(observation.map, observation.own_start_tile)
+    else {
+        return false;
+    };
+    let Some(stats) = config::building_stats(EntityKind::ResourceDepot) else {
+        return false;
+    };
+    let tile_size = observation.map.tile_size as f32;
+    let expected_center = (
+        (instruction.tile.0 as f32 + stats.foot_w as f32 * 0.5) * tile_size,
+        (instruction.tile.1 as f32 + stats.foot_h as f32 * 0.5) * tile_size,
+    );
+    observation.pending_builds.iter().any(|intent| {
+        intent.kind == EntityKind::ResourceDepot
+            && (intent.tile_x, intent.tile_y) == instruction.tile
+    }) || observation.owned.iter().any(|entity| {
+        entity.kind == EntityKind::ResourceDepot
+            && dist2(entity.x, entity.y, expected_center.0, expected_center.1)
+                <= (0.5 * tile_size).powi(2)
+    }) || uses_jeff_river_layout(observation)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct RiverExpansionInstruction {
+    tile: (u32, u32),
+}
+
+fn river_expansion_instruction(
+    map: AiMapSummary,
+    own_start_tile: (u32, u32),
+) -> Option<RiverExpansionInstruction> {
+    if map.width != 126 || map.height != 126 {
+        return None;
+    }
+    match own_start_tile {
+        (9, 9) => Some(RiverExpansionInstruction { tile: (15, 30) }),
+        (116, 116) => Some(RiverExpansionInstruction { tile: (108, 93) }),
+        _ => None,
+    }
 }
 
 pub(super) fn expansion_candidate_resources(
@@ -513,6 +597,25 @@ pub(super) fn resource_is_near_player_start(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn river_expansion_instruction_mirrors_the_verified_footprint() {
+        let map = AiMapSummary {
+            width: 126,
+            height: 126,
+            tile_size: 32,
+        };
+
+        assert_eq!(
+            river_expansion_instruction(map, (9, 9)),
+            Some(RiverExpansionInstruction { tile: (15, 30) })
+        );
+        assert_eq!(
+            river_expansion_instruction(map, (116, 116)),
+            Some(RiverExpansionInstruction { tile: (108, 93) })
+        );
+        assert_eq!(river_expansion_instruction(map, (47, 8)), None);
+    }
 
     fn site_candidate(
         tile: (u32, u32),

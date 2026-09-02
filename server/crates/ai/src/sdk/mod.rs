@@ -14,9 +14,9 @@ pub use actions::{
     ReservationNamespace, UnitGroup, MAX_ACTIONS_PER_STEP,
 };
 pub use frame::{
-    AiBuildObservation, AiBuildObservationPhase, AiCompletion, AiEconomy, AiEntity, AiEntityState,
-    AiFrame, AiHealth, AiMap, AiPlayer, AiProduction, AiRememberedContact, AiResource,
-    AiResourceAmount, AiTerrain,
+    AiAbilityState, AiBuildObservation, AiBuildObservationPhase, AiCompletion, AiEconomy, AiEntity,
+    AiEntityState, AiFrame, AiHealth, AiMap, AiPlayer, AiProduction, AiRememberedContact,
+    AiResource, AiResourceAmount, AiSmokeCloud, AiTerrain,
 };
 pub(crate) use rts_rules::balance::unit_placement_radius;
 pub use rts_rules::faction::UpgradeKind;

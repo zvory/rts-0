@@ -9,8 +9,8 @@ use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 
 pub(crate) const JEFFS_AI_ID: &str = "jeffs_ai";
-pub(crate) const JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID: &str =
-    "jeffs_ai_pre_defense_envelope";
+pub(crate) const JEFFS_AI_BETA_ID: &str = "jeffs_ai_beta_967078d";
+pub(crate) const JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID: &str = "jeffs_ai_pre_defense_envelope";
 pub(crate) const JEFFS_AI_PRE_RIFLE_COVERAGE_ID: &str = "jeffs_ai_pre_rifle_coverage";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
@@ -167,6 +167,13 @@ const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
 };
 
 pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_TEMPLATE;
+
+/// Comparison-only snapshot of the Jeff profile deployed on beta at build 967078d8ce95.
+/// Decision code routes this identity through the matching pre-formation frontal controller.
+pub(crate) static JEFFS_AI_BETA: AiProfile = AiProfile {
+    id: JEFFS_AI_BETA_ID,
+    ..JEFFS_AI_TEMPLATE
+};
 
 /// Frozen immediately before defended-building envelope placement and bounded incident response.
 /// This remains internal and exists so arena runs can compare the active profile against the exact

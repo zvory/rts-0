@@ -222,6 +222,15 @@ spending wait until the initial Tank core exists. The profile uses the shared de
 layers, receives only fog-filtered observations, and issues ordinary validated player commands for
 spending, placement, production, and combat.
 
+On The River, Jeff's first expansion uses the upper-right verified Resource Depot footprint at tile
+`(108, 93)` and its footprint-aware rotation `(15, 30)` from the lower-left start. The map spawns
+both Workers east of their starting depot rather than rotating the Worker position, so the
+lower-left instruction first moves its builder to the rotated upper-right approach tile and queues
+the build. Both sides retry only the verified footprint instead of scanning adjacent blocked tiles.
+The override is identified by the map dimensions, start tile, and complete twelve-Steel/three-Oil
+natural cluster, so the 1v1 map's matching dimensions and start tiles continue to use ordinary
+expansion search.
+
 Its local-defense envelope covers every owned building footprint, including incomplete structures,
 plus reserved sites for submitted build intents. The four-unit defensive pocket remains anchored to
 the starting Resource Depot so later construction cannot drag it out of shape; only surplus
@@ -231,10 +240,63 @@ threatened footprint. Tanks and Panzerfausts answer armored contacts first, full
 Riflemen remain in place, and an understrength Rifle-only group does not make a sacrificial
 intercept. Lost contact creates only a bounded two-second search incident; reaching the last
 contact point without reacquiring the enemy or reaching the timeout returns the units to normal
-defensive staging. Each Tank containment push also assigns half of the ready Riflemen as a stable
-escort cohort and orders them to screen two tiles ahead of the Tank front; the remaining Riflemen
-stay available for home defense. The internal `jeffs_ai_pre_defense_envelope` profile freezes the
-preceding Jeff policy for arena regression comparisons and is not exposed in the lobby selector.
+defensive staging. A containment push may start once its two-Tank, one-Scout-Car core and two nearby
+Riflemen are available even if the generic frontal-wave size is not yet filled. The four oldest
+Riflemen remain reserved for the home pocket. Escort selection uses only other completed,
+free-for-combat Riflemen within twelve tiles of the group, takes at least two
+when available and up to half of those candidates, capped at six, and reselects nearby escorts when
+assembly times out rather than waiting on a distant reservation. The screen stands two tiles ahead
+of the Tanks with two-tile lateral spacing; groups larger than four use a staggered second rank so
+the screen covers the Tank frontage without putting all six Riflemen into one line.
+
+Before departure, both Tanks and the Scout Car assemble around the Tanks' center. Exact formation
+slots can launch immediately; after eight seconds the compact vehicle core plus two nearby
+Riflemen is sufficient, and after twelve seconds the compact vehicle core is a hard upper bound on
+assembly even if no usable screen exists. On The River, the opening group then guards its mirrored
+rally for thirty seconds and requires five clear seconds after nearby contact before beginning the
+crossing, giving forward pressure a chance to meet the grouped force while Smoke is available.
+At the more exposed lower-left natural, any defensive incident that commits a Tank also commits its
+available Tank partner and two available Riflemen; upper-right keeps its established response.
+The group follows cached passability and clearance-aware
+six-tile route bounds instead of straight-line hops. A four-second waypoint timeout drops distant
+Rifleman laggards and advances only after the Tanks are compact and the Scout Car is close. Formation
+commands refresh at most every two seconds while a waypoint is unchanged. On contact, the Tanks
+stop as a shared firing core, the Riflemen occupy their spread screen, and the Scout Car remains
+behind; a two-second contact memory prevents rapid movement/hold oscillation. A material home-defense
+panic recalls every surviving member of the active cohort to the visible local threat and cancels
+its outbound route. This active-cohort control bypasses the ordinary new-wave exclusion window so
+the launched force remains under formation control without admitting newly produced units. The internal
+`jeffs_ai_beta_967078d` profile preserves the beta build's prior frontal controller for local arena
+comparisons. `jeffs_ai_pre_defense_envelope` freezes the preceding Jeff defense policy; neither is
+exposed in the lobby selector.
+
+After the three-second stationary-range ramp, Jeff issues explicit Tank attacks only against a
+visible target that every Tank can reach from its current position. An out-of-range retained target
+is cancelled with Hold Position before it can pull one Tank out of the firing core. Anti-Tank Guns,
+Tanks, and Panzerfausts lead the target order; killable and lower-HP targets break equal-priority
+ties, and each 60-damage Tank shot is allocated only while the target still needs another shot.
+Rifle escorts independently cover bounded lateral sectors around their assigned screen slots,
+prioritize Panzerfausts and Machine Gunners, never explicitly chase Tanks, and return to their slot
+when no soft threat is inside the four-tile leash.
+
+The Scout Car may use Smoke after the Engineering Complex prerequisite and an actual smoke charge
+are available and both the cast range and resulting sight lines are safe. The outbound formation
+also requires a stable Tank focus; a local-defense incident may react immediately so incoming Tank
+pressure does not bypass Smoke. Defensive Smoke is limited to a selected one- or two-Tank
+interceptor core; larger defensive Tank groups retain ordinary target acquisition rather than
+having their whole volley rewritten around a cloud. Candidate Tanks are restricted to the local
+engagement instead of sorting every globally visible Tank. The normal candidate is the healthy rear Tank while the
+forward Tank remains exposed. If Jeff's Tanks are already firing on the rear Tank, the forward Tank
+becomes the smoke candidate instead. Stale or split pre-command target orders do not veto the cast,
+because the same decision replaces them with a coordinated volley. Immediately before the cast,
+the controller rejects smoke that overlaps the exposed focus, an existing cloud, or any Tank's line
+to the exposed target. Once launched, the smoked Tank is excluded from volley and local-defense
+allocation and the Scout is excluded from the subsequent attack order. If only one local enemy Tank
+is available, Jeff switches fire to another shared-range target when possible; otherwise it briefly
+holds the grouped Tanks while Smoke gives the rifle screen a protected five-second advance window.
+If the Scout is just outside range, it may temporarily move to a computed launch point capped at 3.5
+tiles ahead of the Tank center and 4.5 tiles laterally. It never follows an unrestricted
+out-of-range ability order or leaves that bounded envelope to force a cast.
 
 ### Self-play and arena tools
 

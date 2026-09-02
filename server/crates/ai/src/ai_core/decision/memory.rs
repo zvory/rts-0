@@ -65,7 +65,21 @@ pub(crate) struct AiDecisionMemory {
     pub(super) containment_active_tanks: BTreeSet<u32>,
     pub(super) containment_active_scout: Option<u32>,
     pub(super) containment_active_riflemen: BTreeSet<u32>,
+    pub(super) containment_march_waypoint: Option<(i32, i32)>,
+    pub(super) containment_route: Vec<(i32, i32)>,
+    pub(super) containment_route_index: usize,
+    pub(super) containment_route_objective: Option<(i32, i32)>,
+    pub(super) containment_last_formation_command_tick: Option<u32>,
+    pub(super) containment_assembly_started_tick: Option<u32>,
+    pub(super) containment_waypoint_started_tick: Option<u32>,
     pub(super) containment_repush_count: usize,
+    pub(super) containment_recall_active: bool,
+    pub(super) containment_contact_last_tick: Option<u32>,
+    pub(super) containment_focus_target: Option<u32>,
+    pub(super) containment_focus_stable_since: Option<u32>,
+    pub(super) containment_smoke_target: Option<u32>,
+    pub(super) containment_smoke_focus_target: Option<u32>,
+    pub(super) containment_smoke_expires_tick: Option<u32>,
     pub(super) home_defensive_tank: Option<u32>,
     pub(super) home_defensive_tank_assigned_once: bool,
     pub(super) enemy_natural_resource_depot: Option<u32>,
@@ -99,7 +113,21 @@ impl AiDecisionMemory {
             containment_active_tanks: BTreeSet::new(),
             containment_active_scout: None,
             containment_active_riflemen: BTreeSet::new(),
+            containment_march_waypoint: None,
+            containment_route: Vec::new(),
+            containment_route_index: 0,
+            containment_route_objective: None,
+            containment_last_formation_command_tick: None,
+            containment_assembly_started_tick: None,
+            containment_waypoint_started_tick: None,
             containment_repush_count: 0,
+            containment_recall_active: false,
+            containment_contact_last_tick: None,
+            containment_focus_target: None,
+            containment_focus_stable_since: None,
+            containment_smoke_target: None,
+            containment_smoke_focus_target: None,
+            containment_smoke_expires_tick: None,
             home_defensive_tank: None,
             home_defensive_tank_assigned_once: false,
             enemy_natural_resource_depot: None,
@@ -185,7 +213,21 @@ impl AiDecisionMemory {
         self.containment_active_tanks.clear();
         self.containment_active_scout = None;
         self.containment_active_riflemen.clear();
+        self.containment_march_waypoint = None;
+        self.containment_route.clear();
+        self.containment_route_index = 0;
+        self.containment_route_objective = None;
+        self.containment_last_formation_command_tick = None;
+        self.containment_assembly_started_tick = None;
+        self.containment_waypoint_started_tick = None;
         self.containment_repush_count = 0;
+        self.containment_recall_active = false;
+        self.containment_contact_last_tick = None;
+        self.containment_focus_target = None;
+        self.containment_focus_stable_since = None;
+        self.containment_smoke_target = None;
+        self.containment_smoke_focus_target = None;
+        self.containment_smoke_expires_tick = None;
         self.home_defensive_tank = None;
         self.home_defensive_tank_assigned_once = false;
         self.enemy_natural_resource_depot = None;
