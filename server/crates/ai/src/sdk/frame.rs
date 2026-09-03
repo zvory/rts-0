@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rts_rules::faction::UpgradeKind;
+use rts_rules::faction::{AbilityKind, UpgradeKind};
 use rts_rules::terrain::*;
 use rts_rules::EntityKind;
 use rts_sim::game::entity::NEUTRAL;
@@ -123,6 +123,24 @@ pub struct AiProduction {
     pub waiting_for_resources: Option<bool>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AiAbilityState {
+    pub kind: AbilityKind,
+    pub cooldown_left: u16,
+    pub remaining_uses: Option<u16>,
+    pub available_tick: Option<u32>,
+    pub lockout_until_tick: Option<u32>,
+    pub charge_recharge_left: Option<u16>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AiSmokeCloud {
+    pub id: u32,
+    pub position: (f32, f32),
+    pub radius_tiles: f32,
+    pub expires_in: u16,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct AiEntity {
     pub id: u32,
@@ -135,6 +153,8 @@ pub struct AiEntity {
     pub production: Option<AiProduction>,
     pub latched_resource: Option<u32>,
     pub target: Option<u32>,
+    /// Owner-only ability availability. Enemy entities intentionally expose no private state.
+    pub abilities: Vec<AiAbilityState>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -198,6 +218,7 @@ pub struct AiFrame {
     resources: Vec<AiResource>,
     submitted_builds: Vec<AiBuildObservation>,
     completed_upgrades: Vec<UpgradeKind>,
+    smokes: Vec<AiSmokeCloud>,
 }
 
 impl AiFrame {
@@ -242,6 +263,9 @@ impl AiFrame {
     }
     pub fn completed_upgrades(&self) -> &[UpgradeKind] {
         &self.completed_upgrades
+    }
+    pub fn smokes(&self) -> &[AiSmokeCloud] {
+        &self.smokes
     }
 
     pub(crate) fn from_host(
@@ -387,6 +411,17 @@ impl AiFrame {
             .collect::<Vec<_>>();
         completed_upgrades.sort_unstable();
         completed_upgrades.dedup();
+        let mut smokes = snapshot
+            .smokes
+            .iter()
+            .map(|cloud| AiSmokeCloud {
+                id: cloud.id,
+                position: (cloud.x, cloud.y),
+                radius_tiles: cloud.radius_tiles,
+                expires_in: cloud.expires_in,
+            })
+            .collect::<Vec<_>>();
+        smokes.sort_by_key(|cloud| cloud.id);
 
         Some(Self {
             player_id,
@@ -425,6 +460,7 @@ impl AiFrame {
             resources: resources.into_values().collect(),
             submitted_builds,
             completed_upgrades,
+            smokes,
         })
     }
 }
@@ -475,6 +511,20 @@ fn normalize_entity(
         }),
         latched_resource: view.latched_node,
         target: view.target_id,
+        abilities: view
+            .abilities
+            .iter()
+            .filter_map(|ability| {
+                Some(AiAbilityState {
+                    kind: ability.ability.parse().ok()?,
+                    cooldown_left: ability.cooldown_left,
+                    remaining_uses: ability.remaining_uses,
+                    available_tick: ability.available_tick,
+                    lockout_until_tick: ability.lockout_until_tick,
+                    charge_recharge_left: ability.charge_recharge_left,
+                })
+            })
+            .collect(),
     })
 }
 

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 
 #[cfg(test)]
 use rts_rules;
+use rts_rules::faction::AbilityKind;
 use rts_sim::game::entity::EntityKind;
 #[cfg(test)]
 use rts_sim::game::entity::NEUTRAL;
@@ -138,6 +139,26 @@ pub(crate) struct AiResourceSummary {
     pub(crate) remaining: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct AiAbilitySummary {
+    pub(crate) entity_id: u32,
+    pub(crate) kind: AbilityKind,
+    pub(crate) cooldown_left: u16,
+    pub(crate) remaining_uses: Option<u16>,
+    pub(crate) available_tick: Option<u32>,
+    pub(crate) lockout_until_tick: Option<u32>,
+    pub(crate) charge_recharge_left: Option<u16>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct AiSmokeSummary {
+    pub(crate) id: u32,
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) radius_tiles: f32,
+    pub(crate) expires_in: u16,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiObservation {
     pub(crate) player_id: u32,
@@ -150,6 +171,8 @@ pub(crate) struct AiObservation {
     pub(crate) resources: Vec<AiResourceSummary>,
     pub(crate) visible_allies: Vec<AiEntitySummary>,
     pub(crate) visible_enemies: Vec<AiEntitySummary>,
+    pub(crate) ability_states: Vec<AiAbilitySummary>,
+    pub(crate) smokes: Vec<AiSmokeSummary>,
     pub(crate) pending_builds: Vec<AiBuildIntent>,
     pub(crate) upgrades: Vec<UpgradeKind>,
 }
@@ -176,6 +199,35 @@ impl AiObservation {
         let owned = frame.owned().iter().map(project_entity).collect();
         let visible_allies = frame.visible_allies().iter().map(project_entity).collect();
         let visible_enemies = frame.visible_enemies().iter().map(project_entity).collect();
+        let ability_states = frame
+            .owned()
+            .iter()
+            .flat_map(|entity| {
+                entity
+                    .abilities
+                    .iter()
+                    .map(move |ability| AiAbilitySummary {
+                        entity_id: entity.id,
+                        kind: ability.kind,
+                        cooldown_left: ability.cooldown_left,
+                        remaining_uses: ability.remaining_uses,
+                        available_tick: ability.available_tick,
+                        lockout_until_tick: ability.lockout_until_tick,
+                        charge_recharge_left: ability.charge_recharge_left,
+                    })
+            })
+            .collect();
+        let smokes = frame
+            .smokes()
+            .iter()
+            .map(|cloud| AiSmokeSummary {
+                id: cloud.id,
+                x: cloud.position.0,
+                y: cloud.position.1,
+                radius_tiles: cloud.radius_tiles,
+                expires_in: cloud.expires_in,
+            })
+            .collect();
         let resources = frame
             .resources()
             .iter()
@@ -225,6 +277,8 @@ impl AiObservation {
             resources,
             visible_allies,
             visible_enemies,
+            ability_states,
+            smokes,
             pending_builds,
             upgrades: frame.completed_upgrades().to_vec(),
         })
@@ -385,6 +439,37 @@ impl AiObservation {
             .collect();
         upgrades.sort_unstable();
         upgrades.dedup();
+        let mut ability_states = snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.owner == player_id)
+            .flat_map(|entity| {
+                entity.abilities.iter().filter_map(move |ability| {
+                    Some(AiAbilitySummary {
+                        entity_id: entity.id,
+                        kind: ability.ability.parse().ok()?,
+                        cooldown_left: ability.cooldown_left,
+                        remaining_uses: ability.remaining_uses,
+                        available_tick: ability.available_tick,
+                        lockout_until_tick: ability.lockout_until_tick,
+                        charge_recharge_left: ability.charge_recharge_left,
+                    })
+                })
+            })
+            .collect::<Vec<_>>();
+        ability_states.sort_by_key(|ability| (ability.entity_id, ability.kind));
+        let mut smokes = snapshot
+            .smokes
+            .iter()
+            .map(|cloud| AiSmokeSummary {
+                id: cloud.id,
+                x: cloud.x,
+                y: cloud.y,
+                radius_tiles: cloud.radius_tiles,
+                expires_in: cloud.expires_in,
+            })
+            .collect::<Vec<_>>();
+        smokes.sort_by_key(|cloud| cloud.id);
 
         Some(Self {
             player_id,
@@ -397,6 +482,8 @@ impl AiObservation {
             resources,
             visible_allies,
             visible_enemies,
+            ability_states,
+            smokes,
             pending_builds,
             upgrades,
         })

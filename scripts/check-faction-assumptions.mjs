@@ -203,6 +203,11 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/defense/incident.rs",
   "server/crates/ai/src/ai_core/decision/expansion.rs",
   "server/crates/ai/src/ai_core/decision/frontal.rs",
+  // Jeff's current-roster formation, legacy comparison, and smoke policies were extracted
+  // from the approved frontal controller; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/frontal/formation.rs",
+  "server/crates/ai/src/ai_core/decision/frontal/legacy_beta.rs",
+  "server/crates/ai/src/ai_core/decision/frontal/smoke.rs",
   "server/crates/ai/src/ai_core/decision/harassment.rs",
   // Decision memory retains existing current-roster unit checks moved verbatim from the approved
   // decision orchestrator; faction admission and roster ownership remain elsewhere.

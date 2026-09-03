@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use rts_rules::faction::AbilityKind;
 use rts_rules::faction::UpgradeKind;
 use rts_rules::EntityKind;
 use rts_sim::game::entity::RallyKind;
@@ -751,6 +752,13 @@ pub(crate) enum AiActionRequest {
         units: Vec<u32>,
         x: f32,
         y: f32,
+        queued: bool,
+    },
+    UseAbility {
+        units: Vec<u32>,
+        ability: AbilityKind,
+        x: Option<f32>,
+        y: Option<f32>,
         queued: bool,
     },
 }

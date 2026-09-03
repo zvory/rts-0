@@ -16,7 +16,7 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
             contact.threat_value,
             contact.armored_threat,
         );
-        let interceptors = select_defensive_interceptors(
+        let mut interceptors = select_defensive_interceptors(
             observation,
             memory,
             eligible_local_defenders(observation, local_defenders),
@@ -24,8 +24,35 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
             contact.threat_value,
             contact.armored_threat,
         );
-        let target = primary_defense_target(observation, &contact.target_ids)?;
-        return actions::attack_units(actions, interceptors, target);
+        let smoke = crate::ai_core::decision::frontal::smoke::maybe_issue_local_defense_smoke(
+            actions,
+            observation,
+            &interceptors,
+            local_defenders,
+            &contact.target_ids,
+            memory,
+        );
+        let mut attack_targets = contact.target_ids.clone();
+        if let Some(smoke) = smoke {
+            let scout = match smoke {
+                crate::ai_core::decision::frontal::smoke::LocalDefenseSmokeDirective::Obscure {
+                    target,
+                    scout,
+                } => {
+                    attack_targets.retain(|candidate| *candidate != target);
+                    scout
+                }
+                crate::ai_core::decision::frontal::smoke::LocalDefenseSmokeDirective::Reposition {
+                    scout,
+                } => scout,
+            };
+            interceptors.retain(|unit| *unit != scout);
+        }
+        return if let Some(target) = primary_defense_target(observation, &attack_targets) {
+            actions::attack_units(actions, interceptors, target)
+        } else {
+            actions::hold_position_units(actions, interceptors)
+        };
     }
 
     let incident = memory.defensive_incident(observation.tick, SEARCH_TICKS)?;
@@ -127,6 +154,7 @@ pub(in crate::ai_core::decision) fn select_defensive_interceptors(
     let mut selected = Vec::new();
     let mut selected_value: u32 = 0;
     let mut has_anti_armor = false;
+    let eligible_candidates = candidates.clone();
     for unit_id in candidates {
         let Some(unit) = by_id.get(&unit_id) else {
             continue;
@@ -137,6 +165,35 @@ pub(in crate::ai_core::decision) fn select_defensive_interceptors(
         selected_value = selected_value.saturating_add(steel.saturating_add(oil).max(1));
         if selected_value >= required_value {
             break;
+        }
+    }
+    let selected_has_tank = selected.iter().any(|unit_id| {
+        by_id
+            .get(unit_id)
+            .is_some_and(|unit| unit.kind == EntityKind::Tank)
+    });
+    let lower_river_natural = observation.own_start_tile == (9, 9)
+        && crate::ai_core::decision::expansion::has_jeff_river_expansion_site(observation);
+    if selected_has_tank && lower_river_natural {
+        for kind in [EntityKind::Tank, EntityKind::Rifleman] {
+            for unit_id in eligible_candidates
+                .iter()
+                .copied()
+                .filter(|unit_id| by_id.get(unit_id).is_some_and(|unit| unit.kind == kind))
+            {
+                if !selected.contains(&unit_id) {
+                    selected.push(unit_id);
+                }
+                let selected_of_kind = selected
+                    .iter()
+                    .filter(|selected_id| {
+                        by_id.get(selected_id).is_some_and(|unit| unit.kind == kind)
+                    })
+                    .count();
+                if selected_of_kind >= 2 {
+                    break;
+                }
+            }
         }
     }
     if selected_value < required_value && !has_anti_armor {

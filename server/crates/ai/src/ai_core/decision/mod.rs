@@ -13,7 +13,8 @@ use crate::ai_core::observation::{
 use crate::ai_core::profiles::{
     is_jeffs_ai_profile, AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy,
     ExpansionPolicy, ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
-    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    JEFFS_AI_BETA_ID, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID,
+    JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -28,6 +29,7 @@ mod economy_manager;
 mod expansion;
 mod frontal;
 mod geometry;
+mod jeff;
 mod memory;
 mod policies;
 mod production;
@@ -55,6 +57,10 @@ use self::expansion::{plan_expansion, try_build_expansion_resource_depot, Expans
 use self::frontal::{issue_frontal_wave, plan_frontal_wave, sync_containment_recovery};
 use self::geometry::{
     clamp_to_map, footprint_top_left_for_center, normalized_direction, tile_center,
+};
+use self::jeff::{
+    production_rally as jeffs_production_rally, rifleman_home_rally as jeffs_rifleman_home_rally,
+    uses_current_jeff_defense, uses_home_rifle_coverage,
 };
 pub(crate) use self::memory::AiDecisionMemory;
 use self::policies::{
@@ -195,7 +201,8 @@ where
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
 
-    let local_threat_response = defensive_panic_response(observation, profile.id == JEFFS_AI_ID);
+    let local_threat_response =
+        defensive_panic_response(observation, uses_current_jeff_defense(profile.id));
     let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
     let panic_plan = defensive_panic
         .active
@@ -744,7 +751,7 @@ where
             }
         }
         let local_target = local_defense_target(observation);
-        let new_jeff_defense = profile.id == JEFFS_AI_ID;
+        let new_jeff_defense = uses_current_jeff_defense(profile.id);
         let mut jeff_layered_home_defense = local_target.is_some()
             && is_jeffs_ai_profile(profile.id)
             && profile.home_anti_tank.is_some();
@@ -872,7 +879,7 @@ where
                 })
                 .map(|entity| entity.id);
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                let staged = if profile.id == JEFFS_AI_ID {
+                let staged = if uses_current_jeff_defense(profile.id) {
                     stage_home_defensive_pocket_riflemen(
                         &mut actions,
                         observation,
@@ -931,7 +938,7 @@ where
             && !defensive_machine_gunners_available.is_empty()
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                let staged = if profile.id == JEFFS_AI_ID {
+                let staged = if uses_current_jeff_defense(profile.id) {
                     stage_defensive_pocket_machine_gunners(
                         &mut actions,
                         observation,
@@ -995,9 +1002,20 @@ where
             }
         }
 
-        if !handled_local_defense && !turtle_defense_active && !frontal_wave.ready_units.is_empty()
+        let containment_needs_control = profile.id != JEFFS_AI_BETA_ID
+            && profile.expansion_containment.is_some()
+            && frontal::containment_wave_needs_control(memory);
+        let containment_recall_target = if defensive_panic.active && containment_needs_control {
+            local_target
+        } else {
+            None
+        };
+        if (!handled_local_defense || containment_recall_target.is_some())
+            && !turtle_defense_active
+            && (!frontal_wave.ready_units.is_empty() || containment_needs_control)
         {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                let containment_was_launched = memory.containment_wave_launched;
                 if let Some(intent) = issue_frontal_wave(
                     &mut actions,
                     observation,
@@ -1005,10 +1023,17 @@ where
                     attack_policy,
                     &frontal_wave,
                     enemy_base,
+                    map_analysis,
+                    containment_recall_target,
                     memory,
                 ) {
                     if let AiIntent::Attack { units } = &intent {
-                        memory.note_attack_for(profile, attack_policy, observation.tick, units);
+                        if profile.id == JEFFS_AI_BETA_ID
+                            || profile.expansion_containment.is_none()
+                            || !containment_was_launched
+                        {
+                            memory.note_attack_for(profile, attack_policy, observation.tick, units);
+                        }
                     }
                     intents.push(intent);
                 }
@@ -1046,44 +1071,6 @@ where
         commands: actions.into_commands(),
         trace,
     }
-}
-
-fn uses_home_rifle_coverage(profile_id: &str) -> bool {
-    matches!(profile_id, JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID)
-}
-
-/// Jeff's producers send fresh combat units to a safe forward staging point immediately.
-/// The normal frontal and defense planners remain authoritative and can redirect them on
-/// the next think; this route only removes the idle interval at the production building.
-fn jeffs_production_rally(observation: &AiObservation, facts: &AiFacts) -> Option<(f32, f32)> {
-    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let enemy_base = facts.nearest_public_enemy_base?;
-    let direction = normalized_direction(own_base, (enemy_base.x, enemy_base.y))?;
-    let forward_distance = observation.map.tile_size as f32 * 8.0;
-    Some(clamp_to_map(
-        (
-            own_base.0 + direction.0 * forward_distance,
-            own_base.1 + direction.1 * forward_distance,
-        ),
-        observation.map,
-    ))
-}
-
-/// Riflemen are permanent home-screen units. Rally them to the base-centric defensive anchor so
-/// they do not walk through the forward army staging lane before receiving a stable slot.
-fn jeffs_rifleman_home_rally(observation: &AiObservation, facts: &AiFacts) -> Option<(f32, f32)> {
-    let anchor = defense::main_steel_cluster_center(observation)
-        .unwrap_or_else(|| tile_center(observation.own_start_tile, observation.map.tile_size));
-    let enemy_base = facts.nearest_public_enemy_base?;
-    let direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y))?;
-    let distance = observation.map.tile_size as f32 * 3.5;
-    Some(clamp_to_map(
-        (
-            anchor.0 + direction.0 * distance,
-            anchor.1 + direction.1 * distance,
-        ),
-        observation.map,
-    ))
 }
 
 fn planned_in_intents(intents: &[AiIntent], kind: EntityKind) -> usize {

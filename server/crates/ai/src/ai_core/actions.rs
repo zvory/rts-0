@@ -5,6 +5,7 @@ use crate::ai_core::observation::{AiEntityState, AiEntitySummary, AiResourceSumm
 use crate::ai_shared;
 use crate::sdk::actions::{ActionBudget, ActionReservations, AiActionRequest};
 use rts_rules;
+use rts_rules::faction::AbilityKind;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::{EntityKind, RallyKind};
 use rts_sim::game::upgrade::{self, UpgradeKind};
@@ -789,6 +790,58 @@ pub(crate) fn attack_units(
         queued: false,
     });
     Some(units)
+}
+
+pub(crate) fn try_move_then_build_at(
+    ctx: &mut AiActionContext<'_>,
+    worker_pools: &[&[u32]],
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    approach: (f32, f32),
+) -> Option<BuildAction> {
+    if !ctx.budget.can_afford_building(building) {
+        return None;
+    }
+    let worker = ctx.reserve_worker_from_pools(worker_pools)?;
+    if !ctx.budget.reserve_building(building) {
+        return None;
+    }
+    ctx.emit_action(AiActionRequest::Move {
+        units: vec![worker],
+        x: approach.0,
+        y: approach.1,
+        queued: false,
+    });
+    ctx.emit_action(AiActionRequest::Build {
+        units: vec![worker],
+        building,
+        tile_x,
+        tile_y,
+        queued: true,
+    });
+    Some(BuildAction {
+        worker,
+        building,
+        tile_x,
+        tile_y,
+    })
+}
+
+pub(crate) fn use_world_ability(
+    ctx: &mut AiActionContext<'_>,
+    unit: u32,
+    ability: AbilityKind,
+    x: f32,
+    y: f32,
+) {
+    ctx.emit_action(AiActionRequest::UseAbility {
+        units: vec![unit],
+        ability,
+        x: Some(x),
+        y: Some(y),
+        queued: false,
+    });
 }
 
 pub(crate) fn select_ready_combat_units(

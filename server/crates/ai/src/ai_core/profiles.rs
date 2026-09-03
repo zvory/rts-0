@@ -7,9 +7,8 @@ mod jeffs_ai_chat_start;
 mod turtle;
 
 pub(crate) use self::jeffs_ai::{
-    JEFFS_AI, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE,
-    JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    JEFFS_AI, JEFFS_AI_BETA, JEFFS_AI_BETA_ID, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE,
+    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 pub(crate) use self::jeffs_ai_chat_start::{JEFFS_AI_CHAT_START, JEFFS_AI_CHAT_START_ID};
 pub(crate) use self::turtle::AI_TURTLE;
@@ -406,6 +405,9 @@ pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
+    if id == JEFFS_AI_BETA_ID {
+        return Some(&JEFFS_AI_BETA);
+    }
     if id == JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID {
         return Some(&JEFFS_AI_PRE_DEFENSE_ENVELOPE);
     }
@@ -423,7 +425,10 @@ pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
 pub(crate) fn is_jeffs_ai_profile(id: &str) -> bool {
     matches!(
         id,
-        JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID | JEFFS_AI_PRE_RIFLE_COVERAGE_ID
+        JEFFS_AI_ID
+            | JEFFS_AI_BETA_ID
+            | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
+            | JEFFS_AI_PRE_RIFLE_COVERAGE_ID
     )
 }
 
@@ -440,13 +445,15 @@ mod tests {
         assert_eq!(profile_by_id(AI_2_1_ID).unwrap().id, AI_2_1_ID);
         assert_eq!(profile_by_id(AI_TURTLE_ID).unwrap().id, AI_TURTLE_ID);
         assert_eq!(
+            profile_by_id(JEFFS_AI_BETA_ID).unwrap().id,
+            JEFFS_AI_BETA_ID
+        );
+        assert_eq!(
             profile_by_id(JEFFS_AI_CHAT_START_ID).unwrap().id,
             JEFFS_AI_CHAT_START_ID
         );
         assert_eq!(
-            profile_by_id(JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID)
-                .unwrap()
-                .id,
+            profile_by_id(JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID).unwrap().id,
             JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
         );
         assert_eq!(
@@ -454,6 +461,7 @@ mod tests {
             JEFFS_AI_PRE_RIFLE_COVERAGE_ID
         );
         assert!(is_jeffs_ai_profile(JEFFS_AI_ID));
+        assert!(is_jeffs_ai_profile(JEFFS_AI_BETA_ID));
         assert!(is_jeffs_ai_profile(JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID));
         assert!(is_jeffs_ai_profile(JEFFS_AI_PRE_RIFLE_COVERAGE_ID));
     }

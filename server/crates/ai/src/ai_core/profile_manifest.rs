@@ -5,7 +5,7 @@ use serde::Serialize;
 #[cfg(test)]
 use super::profiles::required_profiles;
 use super::profiles::{
-    profile_by_id, AiProfile, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
+    profile_by_id, AiProfile, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
     JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 
@@ -122,7 +122,10 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "anti_tank_emplacements",
             ],
         ),
-        JEFFS_AI_ID | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID | JEFFS_AI_PRE_RIFLE_COVERAGE_ID => (
+        JEFFS_AI_ID
+        | JEFFS_AI_BETA_ID
+        | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
+        | JEFFS_AI_PRE_RIFLE_COVERAGE_ID => (
             "Jeff's AI",
             "Fast-Tank containment profile with a two-Tank opening wave, a reserved home Tank and spread Machine Gunner screen, deployed Anti-Tank Guns, and a post-natural advance on the enemy main.",
             vec![
