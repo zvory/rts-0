@@ -588,6 +588,7 @@ fn issue_expansion_containment_wave(
 
     if should_stop {
         let mut smoke_reposition = None;
+        let mut smoke_issued = false;
         if tanks_in_position && !contact_active {
             reset_containment_route(memory);
         }
@@ -628,6 +629,7 @@ fn issue_expansion_containment_wave(
                         .find(|enemy| enemy.id == target)
                         .is_some_and(|enemy| enemy.kind.is_unit());
                     if target_is_unit {
+                        let smoke_expiry_before = memory.containment_smoke_expires_tick;
                         smoke_reposition = maybe_issue_isolation_smoke(
                             actions,
                             observation,
@@ -637,6 +639,8 @@ fn issue_expansion_containment_wave(
                             memory,
                             true,
                         );
+                        smoke_issued = smoke_expiry_before.is_none()
+                            && memory.containment_smoke_expires_tick.is_some();
                         issue_hp_aware_tank_volley(
                             actions,
                             observation,
@@ -692,12 +696,14 @@ fn issue_expansion_containment_wave(
             } else {
                 trailing_point
             };
-            actions::move_units(
-                actions,
-                scouts.iter().copied(),
-                scout_point.0,
-                scout_point.1,
-            );
+            if !smoke_issued {
+                actions::move_units(
+                    actions,
+                    scouts.iter().copied(),
+                    scout_point.0,
+                    scout_point.1,
+                );
+            }
             let screen_points =
                 rifle_screen_points(tank_anchor, objective, observation.map, riflemen.len());
             for (rifleman, screen_point) in riflemen.iter().zip(screen_points) {

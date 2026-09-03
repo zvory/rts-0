@@ -264,10 +264,15 @@ pub(super) fn maybe_issue_isolation_smoke(
     );
     memory.containment_smoke_target = Some(candidate.id);
     memory.containment_smoke_focus_target = (!singleton_suppression).then_some(*focus_target);
+    let smoke_duration = if observation.upgrades.contains(&UpgradeKind::SmokePlus) {
+        CONTAINMENT_SMOKE_DURATION_TICKS * 2
+    } else {
+        CONTAINMENT_SMOKE_DURATION_TICKS
+    };
     memory.containment_smoke_expires_tick = Some(
         observation
             .tick
-            .saturating_add(CONTAINMENT_SMOKE_DURATION_TICKS + config::TICK_HZ),
+            .saturating_add(smoke_duration + config::TICK_HZ),
     );
     None
 }
