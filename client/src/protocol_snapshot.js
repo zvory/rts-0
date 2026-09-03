@@ -26,9 +26,9 @@ import { decodeCompactEvent } from "./protocol_snapshot_events.js";
 import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
-  // Version 54 appends the optional rocket style bit to mortar launch/impact events. Versions
-  // 51-53 remain safe to decode because their event and entity records are strict prefixes.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
+  // Version 55 adds the artilleryIncoming event code. Versions 51-54 remain safe to decode
+  // because their existing event and entity record layouts are unchanged.
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 

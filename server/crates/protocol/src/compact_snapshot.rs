@@ -1206,6 +1206,14 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(delay_ticks)?;
                 seq.end()
             }
+            Event::ArtilleryIncoming { x, y, delay_ticks } => {
+                let mut seq = serializer.serialize_seq(Some(4))?;
+                seq.serialize_element(&event_code("artilleryIncoming"))?;
+                seq.serialize_element(x)?;
+                seq.serialize_element(y)?;
+                seq.serialize_element(delay_ticks)?;
+                seq.end()
+            }
             Event::ArtilleryFiring {
                 owner,
                 x,

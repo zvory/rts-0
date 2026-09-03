@@ -1108,6 +1108,11 @@ pub enum Event {
         radius_tiles: f32,
         delay_ticks: u32,
     },
+    ArtilleryIncoming {
+        x: f32,
+        y: f32,
+        delay_ticks: u32,
+    },
     ArtilleryFiring {
         owner: u32,
         x: f32,

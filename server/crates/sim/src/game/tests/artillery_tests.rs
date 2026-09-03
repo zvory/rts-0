@@ -785,6 +785,7 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
 
     let mut owner_saw_target = false;
     let mut enemy_saw_target = false;
+    let mut enemy_saw_incoming = false;
     let mut enemy_saw_artillery_reveal = false;
     let mut owner_saw_impact = false;
     let mut enemy_saw_impact = false;
@@ -794,6 +795,11 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
                 match event {
                     Event::ArtilleryTarget { .. } if pid == 1 => owner_saw_target = true,
                     Event::ArtilleryTarget { .. } if pid == 2 => enemy_saw_target = true,
+                    Event::ArtilleryIncoming { x, y, delay_ticks } if pid == 2 => {
+                        enemy_saw_incoming = x.is_finite()
+                            && y.is_finite()
+                            && delay_ticks == config::ARTILLERY_SHELL_DELAY_TICKS
+                    }
                     Event::Attack {
                         from,
                         reveal: Some(reveal),
@@ -816,6 +822,10 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     assert!(
         !enemy_saw_target,
         "enemy should never receive pre-impact artillery target marker"
+    );
+    assert!(
+        enemy_saw_incoming,
+        "enemy with current target-point vision should receive sanitized incoming audio timing"
     );
     assert!(enemy_saw_artillery_reveal);
     assert!(owner_saw_impact, "owner should see delayed impact");
