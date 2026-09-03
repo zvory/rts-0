@@ -30,6 +30,7 @@ import {
   renderDescriptorCardDom,
   syncCooldownClockElement,
 } from "./hud_command_dom.js";
+import { isCancellableProductionBuilding } from "./hud_train_card_helpers.js";
 import {
   renderAllPlayersResources,
   renderSinglePlayerResources,
@@ -770,17 +771,11 @@ export class HUD {
     );
   }
 
-  /** Selected own completed producers of `kind` that currently have production to cancel. */
-  _selectedProducingBuildingsForKind(kind) {
+  /** Selected own completed producers of `kind` with a queue or auto-build to cancel. */
+  _selectedCancellableProducers(kind) {
     const sel = this.state.selectedEntities() || [];
-    return sel.filter(
-      (e) =>
-        this._isOwn(e) &&
-        e.kind === kind &&
-        isBuilding(e.kind) &&
-        e.buildProgress == null &&
-        ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN),
-    );
+    return sel.filter((entity) =>
+      this._isOwn(entity) && isCancellableProductionBuilding(entity, kind));
   }
 
   /** Pick the next selected compatible producer for `unit` and advance its cursor. */
@@ -796,7 +791,7 @@ export class HUD {
 
   /** Pick the next producing building in reverse selection order and advance its cursor. */
   _previousProducingBuildingForKind(kind) {
-    const producers = this._selectedProducingBuildingsForKind(kind);
+    const producers = this._selectedCancellableProducers(kind);
     if (producers.length === 0) return null;
 
     const key = producers.map((e) => e.id).join(".");
