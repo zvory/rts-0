@@ -336,7 +336,8 @@ pub fn project_entity(
     // from the dynamically tracking body or weapon facing. Other setup-capable units retain the
     // owner/allied-detail boundary.
     let public_deployed_anti_tank_facing = entity.kind == EntityKind::AntiTankGun
-        && entity.weapon_setup() == crate::game::entity::WeaponSetup::Deployed;
+        && entity.weapon_setup() == crate::game::entity::WeaponSetup::Deployed
+        && !vision_only;
     if supports_manual_emplacement(entity.kind)
         && (owner_or_ally || public_deployed_anti_tank_facing)
     {

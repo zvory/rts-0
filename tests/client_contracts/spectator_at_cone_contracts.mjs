@@ -2,6 +2,7 @@
 // Spectator-perspective anti-tank cone projection contracts.
 
 import { assert } from "./assertions.mjs";
+import { ANTI_TANK_GUN_FIELD_OF_FIRE_RAD } from "../../client/src/config.js";
 import { KIND, LAB_ROLE, SETUP } from "../../client/src/protocol.js";
 import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { createControlPolicyProjection } from "../../client/src/control_policy_projection.js";
@@ -216,6 +217,7 @@ const spectatorMemoryView = buildRendererFeedbackView({
     x: 320,
     y: 256,
     facing: 0,
+    weaponFacing: Math.PI / 2,
     setupState: SETUP.DEPLOYED,
   }],
 });
@@ -233,4 +235,47 @@ assert(
   spectatorMemoryGfx.calls.some((call) =>
     call[0] === "lineStyle" && call[1] === 1.25 && call[2] === 0xfff1f5 && call[3] === 0.58),
   "spectator stale-intel cones retain the remembered question-mark cue",
+);
+assert(
+  spectatorMemoryGfx.calls.some((call) => call[0] === "arc" &&
+    Math.abs(call[4] + ANTI_TANK_GUN_FIELD_OF_FIRE_RAD / 2) <= 0.001),
+  "spectator stale-intel cones stay on frozen memory facing instead of weapon facing",
+);
+
+const renderOnlyView = buildRendererFeedbackView(state, {
+  entities: [{
+    id: 307, owner: 2, kind: KIND.ANTI_TANK_GUN,
+    x: 320, y: 256, setupFacing: 0, setupState: SETUP.DEPLOYED,
+    visionOnly: true,
+  }],
+});
+assert(
+  renderOnlyView.enemyAntiTankGunThreats().length === 0,
+  "render-only enemy intel never expands into an actionable threat cone",
+);
+
+const dynamicFriendlyGfx = new RecordingGraphics();
+_drawSelectedUnitRanges.call(
+  { _feedbackGfx: dynamicFriendlyGfx, _map: { tileSize: 32 } },
+  {
+    playerId: 1,
+    showUnitRangesEnabled: true,
+    enemyAntiTankGunThreats: () => [],
+    selectedEntities: () => [{
+      id: 308, owner: 1, kind: KIND.ANTI_TANK_GUN,
+      x: 320, y: 256, setupFacing: 0, weaponFacing: Math.PI / 2,
+      setupState: SETUP.DEPLOYED,
+      weaponRangeProfile: {
+        maxPx: 240,
+        arcRad: ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
+        facing: Math.PI / 2,
+      },
+    }],
+  },
+);
+assert(
+  dynamicFriendlyGfx.calls.some((call) => call[0] === "arc" &&
+    Math.abs(call[3] - 240) <= 0.001 &&
+    Math.abs(call[4] + ANTI_TANK_GUN_FIELD_OF_FIRE_RAD / 2) <= 0.001),
+  "dynamic range metadata refines AT radius without rotating its fixed setup field",
 );

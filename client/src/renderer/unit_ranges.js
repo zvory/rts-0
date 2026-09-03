@@ -268,10 +268,6 @@ function polygonSignedArea(points) {
 
 function selectedUnitRangeProfile(e, tileSize) {
   if (e?.kind === KIND.WORKER) return null;
-  // The AT-gun range is a fixed emplacement field, even when a backend supplies optional dynamic
-  // range metadata for other units. Route it directly to the static profile so weapon-facing
-  // telemetry can never rotate the displayed cone.
-  if (e?.kind === KIND.ANTI_TANK_GUN) return staticUnitRangeProfile(e, tileSize);
   const dynamic = dynamicUnitRangeProfile(e, tileSize);
   if (dynamic !== undefined) return dynamic;
   return staticUnitRangeProfile(e, tileSize);
@@ -316,7 +312,11 @@ function dynamicUnitRangeProfile(e, tileSize) {
     e?.attackMinRangeTiles,
   ), tileSize) ?? 0);
   const arc = firstFinite(source?.arcRad, source?.arc, e?.weaponArcRad, e?.firingArcRad, e?.attackArcRad);
-  const facing = firstFinite(source?.facing, e?.setupFacing, e?.weaponFacing, e?.facing);
+  // Dynamic range metadata may refine availability or radii, but an AT gun's arc remains fixed to
+  // its emplacement. Never let a backend-provided tracking angle rotate that field of fire.
+  const facing = e?.kind === KIND.ANTI_TANK_GUN
+    ? e?.setupFacing
+    : firstFinite(source?.facing, e?.setupFacing, e?.weaponFacing, e?.facing);
   if (arc > 0 && arc < Math.PI * 2 && finiteNumber(facing)) {
     return {
       kind: "fieldOfFire",

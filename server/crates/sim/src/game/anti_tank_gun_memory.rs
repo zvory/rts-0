@@ -192,9 +192,7 @@ fn memory_entry_for_visible_enemy(
     {
         return None;
     }
-    let facing = entity
-        .emplacement_facing()
-        .or_else(|| entity.weapon_facing())?;
+    let facing = entity.emplacement_facing()?;
     facing.is_finite().then_some(AntiTankGunMemoryEntry {
         id: entity.id,
         owner: entity.owner,

@@ -933,6 +933,7 @@ pub struct EntityView {
     pub target_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub setup_state: Option<String>,
+    /// Owner/allies, plus actionable visible deployed enemy Anti-Tank Guns.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub setup_facing: Option<f32>,
 
