@@ -2,6 +2,37 @@
     use crate::ai_core::observation::{AiAbilitySummary, AiEconomy};
     use crate::ai_core::profiles::JEFFS_AI;
 
+    #[test]
+    fn current_jeff_uses_cohesive_containment_only_on_validated_river_layout() {
+        let mut observation = regroup_test_observation(Vec::new());
+        observation.map.width = 126;
+        observation.map.height = 126;
+        observation.own_start_tile = (9, 9);
+
+        assert!(!uses_cohesive_containment(&observation, JEFFS_AI_ID));
+        assert!(!uses_cohesive_containment(
+            &observation,
+            JEFFS_AI_BETA_ID
+        ));
+
+        let natural_center = tile_center((18, 33), observation.map.tile_size);
+        observation.resources = (0..15)
+            .map(|index| AiResourceSummary {
+                id: 900 + index,
+                kind: if index < 12 {
+                    EntityKind::Steel
+                } else {
+                    EntityKind::Oil
+                },
+                x: natural_center.0,
+                y: natural_center.1,
+                remaining: 1_000,
+            })
+            .collect();
+
+        assert!(uses_cohesive_containment(&observation, JEFFS_AI_ID));
+    }
+
     fn target_test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         AiEntitySummary {
             id,

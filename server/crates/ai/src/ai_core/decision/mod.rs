@@ -1002,7 +1002,8 @@ where
             }
         }
 
-        let containment_needs_control = profile.id != JEFFS_AI_BETA_ID
+        let cohesive_containment = frontal::uses_cohesive_containment(observation, profile.id);
+        let containment_needs_control = cohesive_containment
             && profile.expansion_containment.is_some()
             && frontal::containment_wave_needs_control(memory);
         let containment_recall_target = if defensive_panic.active && containment_needs_control {
@@ -1028,7 +1029,7 @@ where
                     memory,
                 ) {
                     if let AiIntent::Attack { units } = &intent {
-                        if profile.id == JEFFS_AI_BETA_ID
+                        if !cohesive_containment
                             || profile.expansion_containment.is_none()
                             || !containment_was_launched
                         {

@@ -175,11 +175,12 @@ pub(super) fn issue_frontal_wave(
     recall_target: Option<u32>,
     memory: &mut AiDecisionMemory,
 ) -> Option<AiIntent> {
+    let cohesive_containment = uses_cohesive_containment(observation, profile.id);
     let containment_active = memory.containment_wave_launched
         || memory.containment_recovery_active
         || !memory.containment_active_tanks.is_empty();
     if let Some(containment) = profile.expansion_containment {
-        if profile.id != JEFFS_AI_BETA_ID {
+        if cohesive_containment {
             if let Some(target) = recall_target {
                 if let Some(intent) = issue_containment_recall(actions, observation, memory, target)
                 {
@@ -196,7 +197,7 @@ pub(super) fn issue_frontal_wave(
             && plan.required_unit_ready
             && plan.methamphetamines_ready
             && plan.ready_units.len() >= containment.minimum_tanks_to_continue + 3;
-        if profile.id == JEFFS_AI_BETA_ID && plan.should_attack() {
+        if !cohesive_containment && plan.should_attack() {
             if let Some(intent) = legacy_beta::issue_expansion_containment_wave(
                 actions,
                 observation,
@@ -208,7 +209,7 @@ pub(super) fn issue_frontal_wave(
             ) {
                 return Some(intent);
             }
-        } else if profile.id != JEFFS_AI_BETA_ID
+        } else if cohesive_containment
             && (plan.should_attack() || relaxed_start || containment_active)
         {
             if let Some(intent) = issue_expansion_containment_wave(
@@ -265,6 +266,13 @@ pub(super) fn issue_frontal_wave(
         )
     };
     staged.map(|units| AiIntent::Stage { units })
+}
+
+pub(super) fn uses_cohesive_containment(observation: &AiObservation, profile_id: &str) -> bool {
+    if profile_id == JEFFS_AI_ID {
+        return expansion::uses_jeff_river_layout(observation);
+    }
+    profile_id != JEFFS_AI_BETA_ID
 }
 
 pub(super) fn containment_wave_needs_control(memory: &AiDecisionMemory) -> bool {
