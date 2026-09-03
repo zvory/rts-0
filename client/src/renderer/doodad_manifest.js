@@ -3,10 +3,10 @@ import { DOODAD_TYPE, TREE_DOODAD_GEOMETRY } from "../config.js";
 export const MAX_DOODADS = 4096;
 
 const TREE_PRESENTATION = Object.freeze({
-  [DOODAD_TYPE.TREE_OAK]: Object.freeze({ windAmplitude: 0.025, windRate: 0.00115, shadowX: 34, shadowY: 9 }),
-  [DOODAD_TYPE.TREE_PINE]: Object.freeze({ windAmplitude: 0.018, windRate: 0.001, shadowX: 34, shadowY: 8 }),
-  [DOODAD_TYPE.TREE_SPRUCE]: Object.freeze({ windAmplitude: 0.016, windRate: 0.00095, shadowX: 30, shadowY: 8 }),
-  [DOODAD_TYPE.TREE_ALDER]: Object.freeze({ windAmplitude: 0.027, windRate: 0.0012, shadowX: 27, shadowY: 8 }),
+  [DOODAD_TYPE.TREE_OAK]: Object.freeze({ shadowX: 34, shadowY: 9 }),
+  [DOODAD_TYPE.TREE_PINE]: Object.freeze({ shadowX: 34, shadowY: 8 }),
+  [DOODAD_TYPE.TREE_SPRUCE]: Object.freeze({ shadowX: 30, shadowY: 8 }),
+  [DOODAD_TYPE.TREE_ALDER]: Object.freeze({ shadowX: 27, shadowY: 8 }),
 });
 
 const entries = {};
@@ -28,8 +28,6 @@ entries[DOODAD_TYPE.WILDFLOWER_SINGLE] = Object.freeze({
   heightPx: 22,
   anchorY: 0.95,
   tintable: true,
-  windAmplitude: 0.065,
-  windRate: 0.0018,
 });
 entries[DOODAD_TYPE.WILDFLOWER_CLUSTER] = Object.freeze({
   typeId: DOODAD_TYPE.WILDFLOWER_CLUSTER,
@@ -39,8 +37,6 @@ entries[DOODAD_TYPE.WILDFLOWER_CLUSTER] = Object.freeze({
   heightPx: 25,
   anchorY: 0.92,
   tintable: true,
-  windAmplitude: 0.045,
-  windRate: 0.00155,
 });
 
 export const DOODAD_MANIFEST = Object.freeze(entries);
@@ -58,8 +54,6 @@ function treeEntry({
   widthPx,
   heightPx,
   anchorY,
-  windAmplitude,
-  windRate,
   shadowX,
   shadowY,
   shadowOffsetY = 1,
@@ -71,8 +65,6 @@ function treeEntry({
     widthPx,
     heightPx,
     anchorY,
-    windAmplitude,
-    windRate,
     shadow: Object.freeze({ radiusX: shadowX, radiusY: shadowY, offsetY: shadowOffsetY }),
   });
 }

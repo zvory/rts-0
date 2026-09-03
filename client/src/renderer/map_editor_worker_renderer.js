@@ -40,7 +40,7 @@ export class MapEditorWorkerRenderer {
     this._applyOverlay(record.overlay);
     this.renderer.world.position.set(-record.camera.x * record.camera.zoom, -record.camera.y * record.camera.zoom);
     this.renderer.world.scale.set(record.camera.zoom);
-    this.renderer.updateStaticDoodadWind(record.visualTimeMs, record.camera);
+    this.renderer.updateStaticDoodadVisibility(record.camera);
     const workerUpdateMs = performance.now() - updateStartedAt;
     const presentStartedAt = performance.now();
     this.renderer.present();

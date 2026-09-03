@@ -624,7 +624,7 @@ export class Renderer {
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
-    time("renderer.doodads", () => this._doodads?.update(this.visualNow(), camera));
+    time("renderer.doodads", () => this._doodads?.updateVisibility(camera));
 
     // Begin a fresh reconciliation pass.
     for (const key of Object.keys(this._seen)) this._seen[key].clear();
@@ -1388,15 +1388,15 @@ function patchStaticDoodads(update) {
   return this._doodads?.patch(update) || 0;
 }
 
-function updateStaticDoodadWind(visualTimeMs, camera) {
-  return this._doodads?.update(visualTimeMs, camera) || 0;
+function updateStaticDoodadVisibility(camera) {
+  return this._doodads?.updateVisibility(camera) || 0;
 }
 
 Object.assign(Renderer.prototype, {
   buildStaticMap: buildStaticMapWithDoodads,
   replaceStaticDoodads,
   patchStaticDoodads,
-  updateStaticDoodadWind,
+  updateStaticDoodadVisibility,
   previewStaticTerrain,
   updateStaticTerrainTiles,
   _initGroundDecalsForMap,
