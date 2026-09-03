@@ -478,7 +478,8 @@ impl Game {
         })
     }
 
-    /// Remove every entity owned by `player` (e.g. on disconnect) so the match can resolve.
+    /// Remove every entity owned by `player` (e.g. on give-up or disconnect) so the match can
+    /// resolve. Administrative cleanup is not a simulated death and must not change loss scores.
     pub fn eliminate(&mut self, player: u32) {
         let doomed: Vec<u32> = services::world_query::owned_units(&self.state.entities, player)
             .chain(services::world_query::owned_buildings(
@@ -488,11 +489,7 @@ impl Game {
             .map(|e| e.id)
             .collect();
         for id in doomed {
-            if let Some(entity) = self.state.entities.remove(id) {
-                if let Some(p) = self.state.players.iter_mut().find(|p| p.id == entity.owner) {
-                    p.record_entity_lost(entity.kind);
-                }
-            }
+            let _ = self.state.entities.remove(id);
         }
         if let Some(p) = self.state.players.iter_mut().find(|p| p.id == player) {
             p.reset_supply();

@@ -111,6 +111,31 @@ fn scores_record_kills_and_losses_on_death() {
 }
 
 #[test]
+fn eliminate_removes_survivors_without_recording_deaths() {
+    let players = human_vs_ai_players();
+    let mut game = Game::new(&players, 0xE11A_1A7E);
+
+    let before = game
+        .scores()
+        .into_iter()
+        .find(|score| score.id == 1)
+        .expect("eliminated player score should exist");
+    assert_eq!(before.units_lost, 0);
+    assert_eq!(before.buildings_lost, 0);
+
+    game.eliminate(1);
+
+    assert!(!game.state.entities.iter().any(|entity| entity.owner == 1));
+    let after = game
+        .scores()
+        .into_iter()
+        .find(|score| score.id == 1)
+        .expect("eliminated player score should remain");
+    assert_eq!(after.units_lost, 0);
+    assert_eq!(after.buildings_lost, 0);
+}
+
+#[test]
 fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
     let players = human_vs_ai_players();
     let mut game =
