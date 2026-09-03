@@ -46,14 +46,18 @@ export function selectedRepeatProducerBuildingsForUnit(ctx, unit, isOwn, faction
   );
 }
 
+export function isCancellableProductionBuilding(entity, kind) {
+  return entity.kind === kind &&
+    isBuilding(entity.kind) &&
+    entity.buildProgress == null &&
+    ((entity.prodQueue ?? 0) > 0 ||
+      entity.state === STATE.TRAIN ||
+      (entity.prodRepeatKinds?.length ?? 0) > 0);
+}
+
 export function selectedCancellableProducers(ctx, kind, isOwn) {
   return (ctx.selection || []).filter(
-    (e) =>
-      isOwn(ctx, e) &&
-      e.kind === kind &&
-      isBuilding(e.kind) &&
-      e.buildProgress == null &&
-      ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN || (e.prodRepeatKinds?.length ?? 0) > 0),
+    (entity) => isOwn(ctx, entity) && isCancellableProductionBuilding(entity, kind),
   );
 }
 
