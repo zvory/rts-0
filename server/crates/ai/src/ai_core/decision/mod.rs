@@ -111,6 +111,10 @@ pub(crate) enum AiIntent {
     Stage {
         units: Vec<u32>,
     },
+    /// Cohort repositioning owns its cadence and must supersede cached staging orders.
+    Assemble {
+        units: Vec<u32>,
+    },
     Attack {
         units: Vec<u32>,
     },

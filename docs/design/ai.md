@@ -249,7 +249,12 @@ assembly times out rather than waiting on a distant reservation. The screen stan
 of the Tanks with two-tile lateral spacing; groups larger than four use a staggered second rank so
 the screen covers the Tank frontage without putting all six Riflemen into one line.
 
-Before departure, both Tanks and the Scout Car assemble around the Tanks' center. Exact formation
+Before departure, both Tanks and the Scout Car assemble around the Tanks' center. Assembly uses an
+explicit `Assemble` intent: its repositioning and hold commands supersede cached staging and recent
+attack suppression in the live controller. The formation planner still owns the two-second retry
+cadence; ordinary defensive staging remains deduplicated. Assembly does not count as launching an
+attack and leaves no staging-cache entry that could block defensive retasking when assembly ends.
+Spectator decision traces label this phase `assemble`. Exact formation
 slots can launch immediately; after eight seconds the compact vehicle core plus two nearby
 Riflemen is sufficient, and after twelve seconds the compact vehicle core is a hard upper bound on
 assembly even if no usable screen exists. On The River, the opening group then guards its mirrored

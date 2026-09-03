@@ -145,7 +145,7 @@ fn containment_waits_for_tanks_scout_and_rifle_screen_to_assemble() {
 
     let (intent, assembly_commands) = issue_test_containment(&observation, &mut memory);
 
-    assert!(matches!(intent, Some(AiIntent::Stage { .. })));
+    assert!(matches!(intent, Some(AiIntent::Assemble { .. })));
     assert!(!memory.containment_wave_launched);
     assert_eq!(memory.containment_active_tanks.len(), 2);
     assert_eq!(memory.containment_active_riflemen.len(), 2);
@@ -181,7 +181,7 @@ fn containment_launches_after_assembly_timeout_when_core_is_grouped() {
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
 
     let (intent, _) = issue_test_containment(&observation, &mut memory);
-    assert!(matches!(intent, Some(AiIntent::Stage { .. })));
+    assert!(matches!(intent, Some(AiIntent::Assemble { .. })));
 
     observation.tick += CONTAINMENT_ASSEMBLY_TIMEOUT_TICKS;
     let (intent, commands) = issue_test_containment(&observation, &mut memory);
@@ -210,7 +210,7 @@ fn containment_timeout_does_not_launch_split_tanks() {
 
     let (intent, _) = issue_test_containment(&observation, &mut memory);
 
-    assert!(matches!(intent, Some(AiIntent::Stage { .. })));
+    assert!(matches!(intent, Some(AiIntent::Assemble { .. })));
     assert!(!memory.containment_wave_launched);
 }
 

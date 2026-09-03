@@ -454,7 +454,7 @@ fn issue_expansion_containment_wave(
                 }
                 note_formation_command(memory, observation.tick);
             }
-            return Some(AiIntent::Stage {
+            return Some(AiIntent::Assemble {
                 units: formation.unit_ids(),
             });
         }
