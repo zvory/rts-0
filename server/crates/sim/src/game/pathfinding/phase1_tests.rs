@@ -57,36 +57,6 @@ impl Passability for Grid {
     }
 }
 
-#[test]
-fn near_sentinel_edge_cost_does_not_overflow_heap_priority() {
-    struct NearSentinelGrid;
-
-    impl Passability for NearSentinelGrid {
-        fn dimensions(&self) -> (u32, u32) {
-            (4, 1)
-        }
-
-        fn passable(&self, tx: i32, ty: i32) -> bool {
-            (0..4).contains(&tx) && ty == 0
-        }
-
-        fn edge_cost(
-            &self,
-            from_tx: i32,
-            from_ty: i32,
-            dx: i32,
-            dy: i32,
-            _base_step_cost: u32,
-        ) -> Option<u32> {
-            self.passable(from_tx + dx, from_ty + dy)
-                .then_some(u32::MAX - 1)
-        }
-    }
-
-    let path = find_path_with_budget_and_turn_cost(&NearSentinelGrid, 0, 0, 3, 0, 16, 0);
-    assert_eq!(path, vec![(1, 0), (2, 0), (3, 0)]);
-}
-
 #[derive(Clone, Copy)]
 struct Query {
     start: (i32, i32),

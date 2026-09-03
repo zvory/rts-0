@@ -1,17 +1,19 @@
-# Fast Terrain-Aware Pathing Plan
+# Fast Pathing Plan
+
+## Outcome
+
+Phases 1 and 2 are retained: they improve search/storage and precompute the existing route graph
+with exact legacy behavior parity. Phases 3 and 4 were implemented, playtested, rejected, and
+reverted because terrain-weighted route selection made unit movement worse in practice. The later
+Phase 4.5 expansion was reverted with them. The Phase 3 and 4 documents remain only as a record of
+the rejected approach and are not ready implementation work.
 
 ## Purpose
 
-Make pathfinding materially faster, then use that headroom to activate road, slow-terrain, and
-elevation-aware routes without making the canonical server workload slower. The final target is at
-least 2x full-path throughput on a matched cold, search-backed terrain lane relative to frozen
-current main, with warm queries and Hellhole tick time no worse. This is a pathing target, not a
-promise to double the whole simulation: profiling shows pathing does not own enough of the current
-Hellhole tick for that claim.
-
-The rollout is deliberately staged by movement body and order family, but the end state is not
-limited to plain movement: after Phase 4.5, every production ground route uses the authoritative
-terrain-time objective while retaining its order-specific legal destination and arrival rules.
+Make pathfinding materially faster without changing route selection or movement behavior. The
+retained result is the behavior-preserving dense search and precomputed-edge work from Phases 1 and
+2. The terrain-aware goals below describe the rejected follow-on experiment, not current behavior
+or planned implementation.
 
 ## Correctness References
 
@@ -158,21 +160,12 @@ recovery. Inspect the named vehicle scenarios and classify every legacy differen
 removing direct-goal or later-waypoint bypasses. Finish only when the complete all-profile corpus
 meets the 2x target and Hellhole remains no slower than the frozen baseline.
 
-### [Phase 4.5 - All-Order Terrain Routes](phase-4.5.md)
-
-Make terrain time the production routing policy for every ground order after infantry and vehicle
-movement are proven. Direct attacks, construction, repair, gathering, deconstruction, abilities,
-rallies, and remaining interaction routes keep their exact legal destinations but use roads, slow
-terrain, and elevation to choose the fastest way there. Audit every caller so no new ground route
-silently falls back to terrain-blind legacy scoring.
-
 ## Phase Index
 
 1. [Phase 1 - Dense Search Headroom](phase-1.md)
 2. [Phase 2 - Precomputed Pathing Edges](phase-2.md)
 3. [Phase 3 - Infantry Terrain Routes](phase-3.md)
 4. [Phase 4 - Vehicle Terrain Routes](phase-4.md)
-5. [Phase 4.5 - All-Order Terrain Routes](phase-4.5.md)
 
 ## Explicitly Deferred
 

@@ -30,12 +30,6 @@ pub const SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER: f32 =
     SLOW_MOVEMENT_TILE_SPEED_NUMERATOR as f32 / SLOW_MOVEMENT_TILE_SPEED_DENOMINATOR as f32;
 pub const UPHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 0.80;
 pub const DOWNHILL_MOVEMENT_SPEED_MULTIPLIER: f32 = 1.30;
-/// Fixed-point scale applied to the legacy 10/14 grid distances for terrain-time routing.
-/// 780 is the least common multiple needed to represent the individual road (3/2), slow (3/4),
-/// uphill (4/5), and downhill (13/10) ratios without losing their exact rational definitions.
-pub const ROUTE_TIME_SCALE: u32 = 780;
-pub const MIN_TERRAIN_CARDINAL_ROUTE_COST: u32 = 4_000;
-pub const MIN_TERRAIN_DIAGONAL_ROUTE_COST: u32 = 5_600;
 /// Maximum ordinary fog-of-war sight granted by authored elevation.
 pub const MAX_ELEVATION_SIGHT_BONUS_TILES: u32 = 4;
 /// Body-edge distance at which an ordinary unit detects a concealed hostile unit.
@@ -133,71 +127,6 @@ pub fn elevation_movement_speed_multiplier(current: u8, ahead: u8) -> f32 {
     } else {
         1.0
     }
-}
-
-/// Directed static travel-time cost for one cardinal/diagonal edge.
-///
-/// Terrain and the slow overlay belong to the edge's source tile, matching the movement tick's
-/// center sample. Elevation compares source to destination. Speed multipliers compose before one
-/// ceiling division, so road plus slow is exactly the runtime's multiplicative 1.125x behavior.
-pub fn terrain_route_edge_cost(
-    base_step_cost: u32,
-    terrain: TerrainKind,
-    slow: bool,
-    source_elevation: u8,
-    destination_elevation: u8,
-) -> u32 {
-    let scaled_distance = u64::from(base_step_cost).saturating_mul(u64::from(ROUTE_TIME_SCALE));
-    terrain_route_cost_from_scaled_distance(
-        scaled_distance,
-        terrain,
-        slow,
-        source_elevation,
-        destination_elevation,
-    )
-    .min(u64::from(u32::MAX)) as u32
-}
-
-pub fn terrain_route_speed_ratio(
-    terrain: TerrainKind,
-    slow: bool,
-    source_elevation: u8,
-    destination_elevation: u8,
-) -> (u64, u64) {
-    let (mut speed_numerator, mut speed_denominator) = match terrain {
-        TerrainKind::Open => (1_u64, 1_u64),
-        TerrainKind::Road => (3, 2),
-    };
-    if slow {
-        speed_numerator = speed_numerator.saturating_mul(3);
-        speed_denominator = speed_denominator.saturating_mul(4);
-    }
-    let (elevation_numerator, elevation_denominator) = if destination_elevation > source_elevation {
-        (4_u64, 5_u64)
-    } else if destination_elevation < source_elevation {
-        (13, 10)
-    } else {
-        (1, 1)
-    };
-    speed_numerator = speed_numerator.saturating_mul(elevation_numerator);
-    speed_denominator = speed_denominator.saturating_mul(elevation_denominator);
-    (speed_numerator, speed_denominator)
-}
-
-pub fn terrain_route_cost_from_scaled_distance(
-    scaled_distance: u64,
-    terrain: TerrainKind,
-    slow: bool,
-    source_elevation: u8,
-    destination_elevation: u8,
-) -> u64 {
-    let (speed_numerator, speed_denominator) =
-        terrain_route_speed_ratio(terrain, slow, source_elevation, destination_elevation);
-    scaled_distance
-        .saturating_mul(speed_denominator)
-        .saturating_add(speed_numerator.saturating_sub(1))
-        .checked_div(speed_numerator)
-        .unwrap_or(u64::MAX)
 }
 
 /// Extra ordinary sight granted by the observer's absolute authored elevation.
@@ -351,42 +280,6 @@ mod tests {
         assert_eq!(elevation_movement_speed_multiplier(0, 9), 0.80);
         assert_eq!(elevation_movement_speed_multiplier(5, 4), 1.30);
         assert_eq!(elevation_movement_speed_multiplier(9, 0), 1.30);
-    }
-
-    #[test]
-    fn terrain_route_cost_composes_ratios_once_and_is_directional() {
-        assert_eq!(
-            terrain_route_edge_cost(10, TerrainKind::Open, false, 4, 4),
-            7_800
-        );
-        assert_eq!(
-            terrain_route_edge_cost(10, TerrainKind::Road, false, 4, 4),
-            5_200
-        );
-        assert_eq!(
-            terrain_route_edge_cost(10, TerrainKind::Open, true, 4, 4),
-            10_400
-        );
-        assert_eq!(
-            terrain_route_edge_cost(10, TerrainKind::Road, true, 4, 4),
-            6_934
-        );
-        assert_eq!(
-            terrain_route_edge_cost(10, TerrainKind::Open, false, 4, 5),
-            9_750
-        );
-        assert_eq!(
-            terrain_route_edge_cost(10, TerrainKind::Open, false, 5, 4),
-            6_000
-        );
-        assert_eq!(
-            terrain_route_edge_cost(10, TerrainKind::Road, false, 5, 4),
-            4_000
-        );
-        assert_eq!(
-            terrain_route_edge_cost(14, TerrainKind::Road, false, 5, 4),
-            5_600
-        );
     }
 
     #[test]

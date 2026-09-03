@@ -1,4 +1,4 @@
-use super::{tree_detours, Occupancy, RoutePolicy, RouteShape};
+use super::{tree_detours, Occupancy, RouteShape};
 use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
@@ -15,7 +15,6 @@ pub(super) struct TerrainPassability<'a> {
     pub(super) kind: EntityKind,
     pub(super) radius_tiles: u32,
     pub(super) route_shape: RouteShape,
-    pub(super) policy: RoutePolicy,
     /// When true, reject tiles pinched between two diagonally-opposite blocked corners.
     /// Used for oriented vehicle bodies so A* avoids 1-tile gaps that the rotating hull
     /// cannot legally thread (see docs/design/server-sim.md pathing notes).
@@ -93,67 +92,5 @@ impl Passability for TerrainPassability<'_> {
 
     fn movement_cost(&self, tx: i32, ty: i32, base_step_cost: u32) -> u32 {
         tree_detours::movement_cost(self, tx, ty, base_step_cost)
-    }
-
-    fn edge_cost(
-        &self,
-        from_tx: i32,
-        from_ty: i32,
-        dx: i32,
-        dy: i32,
-        base_step_cost: u32,
-    ) -> Option<u32> {
-        let to_tx = from_tx + dx;
-        let to_ty = from_ty + dy;
-        if !self.passable(to_tx, to_ty)
-            || (dx != 0
-                && dy != 0
-                && (!self.passable(from_tx + dx, from_ty) || !self.passable(from_tx, from_ty + dy)))
-        {
-            return None;
-        }
-        if self.policy != RoutePolicy::FastestTerrainTime {
-            return Some(base_step_cost.saturating_add(self.movement_cost(
-                to_tx,
-                to_ty,
-                base_step_cost,
-            )));
-        }
-        let mut cost = super::route_cost::RouteCostModel::new(self.map)
-            .edge_cost((from_tx, from_ty), (to_tx, to_ty), base_step_cost)?
-            .saturating_add(tree_detours::weighted_tree_avoidance_cost(
-                self.occupancy.tree_path_avoidance_cost(to_tx, to_ty),
-            ));
-        if self.route_shape == RouteShape::VehicleClearance
-            && crate::game::entity::uses_oriented_vehicle_body(self.kind)
-        {
-            let clearance =
-                super::vehicle_clearance_cost(self.occupancy.clearance_at_tile_for_movement_body(
-                    to_tx,
-                    to_ty,
-                    crate::game::entity::movement_body_class(self.kind),
-                ));
-            let shaping = if clearance >= u32::MAX / 4 {
-                clearance
-            } else {
-                clearance
-                    .saturating_add(self.vehicle_corner_cost(to_tx, to_ty))
-                    .saturating_mul(crate::rules::terrain::ROUTE_TIME_SCALE)
-            };
-            // `u32::MAX` is reserved by the precomputed table as the illegal-edge sentinel.
-            cost = cost.saturating_add(shaping).min(u32::MAX - 1);
-        }
-        Some(cost)
-    }
-
-    fn heuristic_step_costs(&self) -> (u32, u32) {
-        if self.policy == RoutePolicy::FastestTerrainTime {
-            (
-                terrain::MIN_TERRAIN_CARDINAL_ROUTE_COST,
-                terrain::MIN_TERRAIN_DIAGONAL_ROUTE_COST,
-            )
-        } else {
-            (10, 14)
-        }
     }
 }

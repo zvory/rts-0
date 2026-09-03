@@ -6,11 +6,10 @@ use super::pivot_drive::{
     pivot_drive_desired_path_point, ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK,
     PIVOT_VEHICLE_LOOKAHEAD_PX, VEHICLE_REVERSE_GOAL_DISTANCE_PX,
 };
-use super::vehicle_route::vehicle_route_context;
 use super::*;
 use crate::config;
 use crate::game::entity::{
-    BuildPhase, EntityKind, EntityStore, GatherPhase, MovePhase, Order, RoutePolicy, WeaponSetup,
+    BuildPhase, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
@@ -150,11 +149,6 @@ impl ScoutCarMovementBaseline {
         assert!(
             !self.accepted_static_illegal_pose,
             "{name}: movement accepted a statically illegal scout-car pose: {:?}",
-            self
-        );
-        assert!(
-            self.collision_displacement_px.is_finite() && self.collision_displacement_px >= 0.0,
-            "{name}: collision displacement must stay finite and nonnegative: {:?}",
             self
         );
         assert!(
@@ -2308,11 +2302,10 @@ fn scout_car_phase0_factory_corner_graze_cardinal_approaches() {
             measure_scout_car_fixture(name, &map, &mut entities, scout, goal, 1_200, true);
 
         baseline.assert_reference_envelope(name);
-        // Fastest-terrain vehicle routes retain the graph's clearance shaping and authored bend,
-        // so they may deliberately avoid the former two-pixel corner graze entirely.
         assert!(
-            baseline.min_static_clearance_px >= 0.0,
-            "{name}: {baseline:?}"
+            baseline.min_static_clearance_px <= 2.0,
+            "{name}: corner graze fixture should exercise tight static clearance: {:?}",
+            baseline
         );
         assert!(
             baseline.static_blocked_step_attempts <= 45,
@@ -2457,8 +2450,8 @@ fn scout_car_phase0_blocked_nose_recovery_is_measurable() {
         baseline
     );
     assert!(
-        baseline.reverse_recovery_activations <= 1,
-        "authored-anchor recovery must stay bounded in the former blocked-nose fixture: {:?}",
+        baseline.reverse_recovery_activations == 0,
+        "capsule geometry should not need reverse recovery in the former blocked-nose fixture: {:?}",
         baseline
     );
 }
@@ -2522,8 +2515,11 @@ fn scout_car_phase0_traffic_compression_near_factory() {
         "capsule geometry should avoid reverse recovery churn in this traffic fixture: {:?}",
         baseline
     );
-    // The authored vehicle corridor may now route outside the traffic cluster rather than using
-    // the legacy clear-goal bypass. Completion and bounded recovery are the stable contract.
+    assert!(
+        baseline.collision_displacement_px > config::TILE_SIZE as f32,
+        "traffic compression should record collision pressure from nearby units: {:?}",
+        baseline
+    );
     assert!(
         baseline.repath_count <= 4,
         "traffic fixture should distinguish clean progress from repeated repaths: {:?}",
@@ -2746,38 +2742,6 @@ fn infantry_skips_lateral_waypoint_when_next_segment_reachable() {
 }
 
 #[test]
-fn fastest_terrain_infantry_keeps_authored_lateral_anchor() {
-    let map = flat_map(1);
-    let mut entities = EntityStore::new();
-    let (sx, sy) = map.tile_center(20, 20);
-    let start = (
-        sx,
-        sy + config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX + 10.0,
-    );
-    let intermediate = (sx + config::TILE_SIZE as f32, sy);
-    let goal = (sx + config::TILE_SIZE as f32 * 4.0, sy);
-    let rifleman = entities
-        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
-        .expect("rifleman should spawn");
-    if let Some(e) = entities.get_mut(rifleman) {
-        e.set_order(Order::move_to(goal.0, goal.1));
-        e.set_path_with_policy(vec![goal, intermediate], RoutePolicy::FastestTerrainTime);
-        e.set_path_goal(Some(goal));
-        e.mark_move_phase(MovePhase::Moving);
-    }
-
-    let occ = Occupancy::build(&map, &entities);
-    let spatial = SpatialIndex::build(&entities, map.width, map.height);
-    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-
-    let e = entities.get(rifleman).expect("rifleman should exist");
-    assert_eq!(e.movement.as_ref().map(|m| m.path.len()), Some(2));
-    assert_eq!(e.next_waypoint(), Some(intermediate));
-    assert_eq!(e.path_policy(), RoutePolicy::FastestTerrainTime);
-    assert!(e.pos_x > start.0 && e.pos_y < start.1);
-}
-
-#[test]
 fn worker_skips_lateral_waypoint_when_next_segment_reachable() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
@@ -2930,55 +2894,6 @@ fn scout_car_route_lookahead_stops_before_blocked_corner() {
         "scout car intent should advance along the current segment only, got {:?}",
         desired
     );
-}
-
-#[test]
-fn fastest_terrain_vehicle_lookahead_stays_on_adjacent_authored_segment() {
-    let map = flat_map(1);
-    let mut entities = EntityStore::new();
-    let start = map.tile_center(8, 8);
-    let anchor = map.tile_center(8, 12);
-    let goal = map.tile_center(16, 12);
-    let scout = entities
-        .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
-        .expect("scout car spawn");
-    if let Some(entity) = entities.get_mut(scout) {
-        entity.set_facing(std::f32::consts::FRAC_PI_2);
-        entity.set_path_with_policy(vec![goal, anchor], RoutePolicy::FastestTerrainTime);
-        entity.set_path_goal(Some(goal));
-    }
-    let occ = Occupancy::build(&map, &entities);
-    let entity = entities.get(scout).expect("scout car should remain");
-    let route = vehicle_route_context(&map, &occ, entity, start).expect("route context");
-
-    assert!(!route.direct_goal_is_clear);
-    assert_eq!(route.target, anchor);
-    assert!((route.lookahead.0 - start.0).abs() <= 0.001);
-    assert!(route.lookahead.1 > start.1 && route.lookahead.1 <= anchor.1);
-}
-
-#[test]
-fn fastest_terrain_vehicle_consumes_at_most_one_authored_anchor_per_route_evaluation() {
-    let map = flat_map(1);
-    let mut entities = EntityStore::new();
-    let start = map.tile_center(8, 8);
-    let first = (start.0 + 1.0, start.1);
-    let second = (start.0 + 2.0, start.1);
-    let goal = map.tile_center(14, 8);
-    let scout = entities
-        .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
-        .expect("scout car spawn");
-    if let Some(entity) = entities.get_mut(scout) {
-        entity.set_facing(0.0);
-        entity.set_path_with_policy(vec![goal, second, first], RoutePolicy::FastestTerrainTime);
-        entity.set_path_goal(Some(goal));
-    }
-    let occ = Occupancy::build(&map, &entities);
-    let entity = entities.get(scout).expect("scout car should remain");
-    let route = vehicle_route_context(&map, &occ, entity, start).expect("route context");
-
-    assert_eq!(route.pre_pop_count, 1);
-    assert_eq!(route.target, second);
 }
 
 /// Set a path directly on a unit. Path is stored reversed (last element = next waypoint).
