@@ -72,13 +72,16 @@ try {
       return x < 300 && y < 300;
     },
   };
-  const visible = layer.update(1000, nearCamera);
-  const firstRotation = layer.instances.get(1).display.rotation;
-  layer.update(1000, nearCamera);
-  assert.equal(layer.instances.get(1).display.rotation, firstRotation, "sway is deterministic for stable id and visual time");
+  layer.instances.get(1).display.rotation = 0.37;
+  const visible = layer.updateVisibility(nearCamera);
+  assert.equal(
+    layer.instances.get(1).display.rotation,
+    0.37,
+    "static vegetation visibility updates do not write sprite rotations",
+  );
   assert.equal(visible, 3, "viewport culling retains nearby doodads");
   let tallTreeMargin = 0;
-  layer.update(1000, {
+  layer.updateVisibility({
     projectedExtent: (_point, width, height) => ({ width: width * 2, height: height * 2 }),
     containsProjected: (_point, margin) => {
       tallTreeMargin = Math.max(tallTreeMargin, margin);
@@ -96,9 +99,9 @@ try {
   });
   assert.equal(layer.instances.size, 1, "patch removes and upserts without a full static reconciliation");
   assert.equal(
-    layer.update(1500, nearCamera),
+    layer.updateVisibility(nearCamera),
     0,
-    "off-viewport doodads skip per-frame transform work",
+    "off-viewport doodads are excluded from the visible count",
   );
   assert.equal(layer.instances.get(2).display.visible, false, "culled doodad sprites are hidden");
   assert.equal(MAX_DOODADS, 4096, "renderer enforces the shared authored doodad bound");
@@ -143,7 +146,7 @@ try {
     },
     replaceStaticDoodads: (doodads) => editorCalls.push(["replace", doodads]),
     patchStaticDoodads: (update) => editorCalls.push(["patch", update]),
-    updateStaticDoodadWind: (time) => editorCalls.push(["wind", time]),
+    updateStaticDoodadVisibility: (camera) => editorCalls.push(["visibility", camera]),
     present: () => editorCalls.push(["present"]),
     destroy: () => editorCalls.push(["destroy"]),
   };
@@ -234,7 +237,7 @@ try {
     [10],
     "entity-backed upserts remove any stale static doodad that reused the same authored id",
   );
-  assert(editorCalls.some(([kind, time]) => kind === "wind" && time === 2400), "editor sway uses its detached visual clock");
+  assert(editorCalls.some(([kind]) => kind === "visibility"), "editor refreshes static doodad visibility");
   editor.destroy();
   editor.destroy();
   assert.equal(editorCalls.filter(([kind]) => kind === "destroy").length, 1, "editor renderer teardown remains idempotent");
@@ -250,4 +253,4 @@ function latestDrawRectWidths(graphics) {
     .filter((width) => width === 28 || width === 14 || width === 9);
 }
 
-console.log("✅ doodad_renderer_contracts.mjs: static assets, layering, wind, editor updates, and teardown passed");
+console.log("✅ doodad_renderer_contracts.mjs: static assets, layering, visibility, editor updates, and teardown passed");

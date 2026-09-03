@@ -105,9 +105,8 @@ export class DoodadLayer {
     return this.records.size;
   }
 
-  update(visualTimeMs, camera = null) {
+  updateVisibility(camera = null) {
     if (this.destroyed) return 0;
-    const now = Number.isFinite(visualTimeMs) && visualTimeMs >= 0 ? visualTimeMs : 0;
     const projectedExtent = camera?.projectedExtent?.(
       { x: 0, y: 0, heightPx: 0 },
       MAX_DOODAD_WIDTH_PX,
@@ -130,9 +129,6 @@ export class DoodadLayer {
       if (instance.shadow) instance.shadow.visible = inView;
       if (!inView) continue;
       visible += 1;
-      const sway = Math.sin(now * instance.manifest.windRate + instance.windPhase)
-        * instance.manifest.windAmplitude;
-      instance.display.rotation = sway;
     }
     return visible;
   }
@@ -198,7 +194,6 @@ export class DoodadLayer {
       manifest,
       display,
       shadow,
-      windPhase: stableNoise(record.id, 17) * Math.PI * 2,
     };
     positionInstance(instance);
     this.instances.set(record.id, instance);
@@ -306,13 +301,6 @@ function bucketKey(x, y) {
 
 function colorNumber(color) {
   return Number.parseInt(color.slice(1), 16);
-}
-
-function stableNoise(id, salt) {
-  let value = (Math.imul(id | 0, 0x45d9f3b) ^ salt) >>> 0;
-  value = Math.imul(value ^ (value >>> 16), 0x45d9f3b) >>> 0;
-  value ^= value >>> 16;
-  return value / 0xffffffff;
 }
 
 function finiteNonNegative(value) {
