@@ -17,6 +17,7 @@ import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./pro
 import { admitControlGroupIds } from "./state_control_groups.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
 import { autoBuild as ab } from "./state_auto_build.js";
+import { pruneSelection } from "./state_selection.js";
 import {
   isAllyOwner as queryIsAllyOwner,
   isEnemyOwner as queryIsEnemyOwner,
@@ -338,7 +339,7 @@ export class GameState extends VisualEffectBackedState {
       ? msg.exploredTiles
       : [];
     this.events = events;
-    this._pruneSelection();
+    this._pruneSelection({ controlPolicy, enforceCommandBudget: true });
     this._pruneControlGroups({ controlPolicy });
 
     this.visualEffects.applySnapshotEvents(this.events, visualNow, (id) => this.entityById(id));
@@ -700,20 +701,10 @@ export class GameState extends VisualEffectBackedState {
     this.selectionBudgetOverflow = null;
   }
 
-  /** Drop selected ids that are no longer present in the latest snapshot. */
-  _pruneSelection() {
-    if (!this.selection || this.selection.size === 0) return;
-    let changed = false;
-    const live = new Set();
-    for (const id of this.selection) {
-      const entity = this._curById.get(id);
-      if (entity && !entity.shotReveal && !entity.visionOnly) {
-        live.add(id);
-      } else {
-        changed = true;
-      }
-    }
-    if (changed) this.selection = live;
+  /** Drop missing ids and optionally restore a legal command budget. */
+  _pruneSelection(options = {}) {
+    const trimmed = pruneSelection(this, options);
+    if (trimmed) this._recordSelectionBudgetOverflow(trimmed);
   }
 
   _recordSelectionBudgetOverflow(admitted) {
