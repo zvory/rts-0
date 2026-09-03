@@ -197,7 +197,10 @@ where
     }
     let (tile_x, tile_y) =
         expansion_resource_depot_site(observation, expansion, kind, profile.id, placeable)?;
-    if profile.id == JEFFS_AI_ID && observation.own_start_tile == (9, 9) {
+    if profile.id == JEFFS_AI_ID
+        && observation.own_start_tile == (9, 9)
+        && uses_jeff_river_layout(observation)
+    {
         let approach = tile_center((15, 27), observation.map.tile_size);
         return actions::try_move_then_build_at(
             actions,
@@ -597,6 +600,7 @@ pub(super) fn resource_is_near_player_start(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai_core::observation::AiEconomy;
 
     #[test]
     fn river_expansion_instruction_mirrors_the_verified_footprint() {
@@ -615,6 +619,37 @@ mod tests {
             Some(RiverExpansionInstruction { tile: (108, 93) })
         );
         assert_eq!(river_expansion_instruction(map, (47, 8)), None);
+    }
+
+    #[test]
+    fn lower_left_start_without_river_natural_does_not_use_river_layout() {
+        let observation = AiObservation {
+            player_id: 1,
+            tick: 0,
+            map: AiMapSummary {
+                width: 126,
+                height: 126,
+                tile_size: 32,
+            },
+            economy: AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 100,
+            },
+            own_start_tile: (9, 9),
+            players: Vec::new(),
+            owned: Vec::new(),
+            resources: Vec::new(),
+            visible_allies: Vec::new(),
+            visible_enemies: Vec::new(),
+            ability_states: Vec::new(),
+            smokes: Vec::new(),
+            pending_builds: Vec::new(),
+            upgrades: Vec::new(),
+        };
+
+        assert!(!uses_jeff_river_layout(&observation));
     }
 
     fn site_candidate(
