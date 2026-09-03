@@ -208,7 +208,8 @@ impl Game {
     /// Authoritative observer analysis state for configured spectator-only or all-recipient audiences.
     pub fn observer_analysis(&self) -> ObserverAnalysisPayload;
 
-    /// Remove all of a player's entities (e.g. on disconnect) so the match can resolve.
+    /// Remove all of a player's entities (e.g. on give-up or disconnect) so the match can resolve,
+    /// without treating administrative cleanup as simulated deaths in score totals.
     pub fn eliminate(&mut self, player: u32);
 
     pub fn tick_count(&self) -> u32;

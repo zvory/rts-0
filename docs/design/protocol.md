@@ -451,6 +451,8 @@ frozen server snapshot taken when that recipient gets `gameOver`; it is not live
 unit/building entity created for that player, including starting entities. `apm` counts one action
 per authoritative gameplay command regardless of the number of units in that command, excludes the
 first 60 seconds, and averages the remaining actions over the remaining simulated match time.
+`unitsLost` and `buildingsLost` count only entities that died in the simulation. Surviving entities
+removed as administrative cleanup after give-up or disconnect do not increment either loss total.
 
 `winnerTeamId` is the winning team's id when a winner exists, otherwise `null`. `winnerId` remains
 for FFA compatibility. During singleton-team FFA, `winnerTeamId` matches `winnerId`; during team

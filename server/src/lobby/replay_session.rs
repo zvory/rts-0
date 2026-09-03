@@ -1244,7 +1244,7 @@ mod tests {
     }
 
     #[test]
-    fn observer_analysis_restores_from_keyframe_without_accumulating_extra_losses() {
+    fn observer_analysis_restores_from_keyframe_after_divergent_cleanup() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 1);
         let mut replay = ReplaySession::new(artifact).unwrap();

@@ -181,7 +181,8 @@ const { ok } = assertions;
   const aScore = over.scores?.find((s) => s.id === A.playerId);
   const bScore = over.scores?.find((s) => s.id === B.playerId);
   ok(aScore && aScore.unitScore >= 50 && aScore.structureScore >= 500, `SCORE: A has unit/structure value (${aScore?.unitScore}/${aScore?.structureScore})`);
-  ok(bScore && bScore.unitsLost >= 1 && bScore.buildingsLost >= 7, `SCORE: surrendered B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
+  ok(bScore && bScore.unitsLost === 0 && bScore.buildingsLost === 0,
+     `SCORE: surrender cleanup does not fabricate losses (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
 
   const replayStartA = await A.waitFor((m) => m.t === "start" && m.replay, 4000, "A replay start");
   const replayStartB = await B.waitFor((m) => m.t === "start" && m.replay, 4000, "B replay start");
