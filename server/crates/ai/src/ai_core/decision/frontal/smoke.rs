@@ -1,6 +1,9 @@
 use super::*;
 
-pub(super) fn active_smoke_focus(observation: &AiObservation, memory: &mut AiDecisionMemory) -> Option<u32> {
+pub(super) fn active_smoke_focus(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+) -> Option<u32> {
     let active = memory
         .containment_smoke_expires_tick
         .is_some_and(|expires| observation.tick < expires);
