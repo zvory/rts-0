@@ -33,7 +33,7 @@ import {
   researchSlotForUpgrade,
   selectedResearchBuilding,
   selectedRepeatProducerBuildingsForUnit,
-  selectedProducingBuildingsForKind,
+  selectedCancellableProductionBuildingsForKind,
   trainAvailability,
   trainDisabledReason,
   trainLimitSignature,
@@ -445,9 +445,9 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
   const factionId = commandFactionId(ctx);
   const trains = factionTrainsOf(ctx, building.kind);
   const researches = underConstruction ? [] : availableResearchesOf(ctx, building.kind);
-  const producingBuildings = underConstruction
+  const cancellableProductionBuildings = underConstruction
     ? []
-    : selectedProducingBuildingsForKind(ctx, building.kind, isOwn);
+    : selectedCancellableProductionBuildingsForKind(ctx, building.kind, isOwn);
   const cancelSlot = 8;
   const signature =
     `${underConstruction ? "construction" : "train"}|${building.id}|` +
@@ -465,7 +465,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       const target = selectedResearchBuilding(ctx, upgrade, isOwn);
       return `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}:${target?.id ?? ""}`;
     }).join(",") +
-    `|cancel:${producingBuildings.map((e) => e.id).join(".")}`;
+    `|cancel:${cancellableProductionBuildings.map((e) => e.id).join(".")}`;
 
   const slots = new Array(9).fill(null);
   for (const unit of trains) {
@@ -540,7 +540,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
 
   if (underConstruction) {
     slots[cancelSlot] = constructionCancelDescriptor(building);
-  } else if (producingBuildings.length > 0) {
+  } else if (cancellableProductionBuildings.length > 0) {
     slots[cancelSlot] = {
       id: `cancel:${building.kind}`,
       commandId: `production.cancel.${building.kind}`,
@@ -551,7 +551,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       label: "Cancel",
       enabled: true,
       cls: "cancel",
-      title: "Cancel latest queued production",
+      title: "Cancel auto-build and latest queued production",
       repeatable: true,
     };
   }

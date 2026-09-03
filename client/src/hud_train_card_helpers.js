@@ -46,14 +46,14 @@ export function selectedRepeatProducerBuildingsForUnit(ctx, unit, isOwn, faction
   );
 }
 
-export function selectedProducingBuildingsForKind(ctx, kind, isOwn) {
+export function selectedCancellableProductionBuildingsForKind(ctx, kind, isOwn) {
   return (ctx.selection || []).filter(
     (e) =>
       isOwn(ctx, e) &&
       e.kind === kind &&
       isBuilding(e.kind) &&
       e.buildProgress == null &&
-      ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN),
+      ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN || (e.prodRepeatKinds?.length ?? 0) > 0),
   );
 }
 

@@ -1032,6 +1032,31 @@ withFakeHudDocument(({ FakeElement }) => {
       repeatingTrainCard.slots[0].autobuildIndicatorCount === 1,
     "authoritative repeat production should show one swirl and its partial allocation count",
   );
+  producingBarracks.state = STATE.IDLE;
+  producingBarracks.prodQueue = 0;
+  const waitingRepeatTrainCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [producingBarracks],
+    entities: [resourceDepot, producingBarracks],
+    resources: { steel: 0, oil: 0 },
+  }));
+  assert(
+    waitingRepeatTrainCard.slots[8]?.intent.type === "cancelProduction",
+    "resource-starved idle auto-build should keep production cancellation available",
+  );
+  const issued = [];
+  const waitingRepeatHud = Object.assign(Object.create(HUD.prototype), {
+    state: {
+      selectedEntities: () => [producingBarracks],
+    },
+    commandInteraction: { issueCommand: (command) => issued.push(command) },
+    _cancelRoundRobin: new Map(),
+    _isOwn: (entity) => entity.owner === 1,
+  });
+  waitingRepeatHud._issueCancelProduction(KIND.BARRACKS);
+  assert(
+    issued[0]?.c === "cancel" && issued[0]?.building === producingBarracks.id,
+    "production cancellation targets an idle selected producer with auto-build enabled",
+  );
   delete producingBarracks.prodRepeatKinds;
 
   const supplyReservedTrainCard = buildCommandCardDescriptors(commandCardCtx({
