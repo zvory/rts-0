@@ -218,10 +218,12 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
                     .iter()
                     .any(|intent| matches!(intent, AiIntent::Attack { .. }))
         }
-        StrategicGoal::FrontalAttack => input
-            .intents
-            .iter()
-            .any(|intent| matches!(intent, AiIntent::Attack { .. } | AiIntent::Stage { .. })),
+        StrategicGoal::FrontalAttack => input.intents.iter().any(|intent| {
+            matches!(
+                intent,
+                AiIntent::Attack { .. } | AiIntent::Stage { .. } | AiIntent::Assemble { .. }
+            )
+        }),
     };
     let mut blockers = blockers_for_goal(goal, input, selected);
     blockers.sort();
@@ -248,7 +250,7 @@ fn blockers_for_goal(
             && input
                 .intents
                 .iter()
-                .any(|intent| matches!(intent, AiIntent::Stage { .. }))
+                .any(|intent| matches!(intent, AiIntent::Stage { .. } | AiIntent::Assemble { .. }))
         {
             let mut blockers: Vec<GoalBlocker> = input
                 .frontal_wave_blockers
@@ -394,9 +396,13 @@ fn intent_matches_goal(goal: StrategicGoal, intent: &AiIntent) -> bool {
         StrategicGoal::Production => {
             matches!(intent, AiIntent::Train { .. } | AiIntent::Research { .. })
         }
-        StrategicGoal::LocalDefense | StrategicGoal::FrontalAttack => {
+        StrategicGoal::LocalDefense => {
             matches!(intent, AiIntent::Attack { .. } | AiIntent::Stage { .. })
         }
+        StrategicGoal::FrontalAttack => matches!(
+            intent,
+            AiIntent::Attack { .. } | AiIntent::Stage { .. } | AiIntent::Assemble { .. }
+        ),
     }
 }
 
@@ -412,6 +418,7 @@ fn format_intent(intent: &AiIntent) -> String {
             assignments,
         } => format!("gather:{resource:?}:{assignments}"),
         AiIntent::Stage { units } => format!("stage:{}", units.len()),
+        AiIntent::Assemble { units } => format!("assemble:{}", units.len()),
         AiIntent::Attack { units } => format!("attack:{}", units.len()),
     }
 }

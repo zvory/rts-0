@@ -462,6 +462,7 @@ impl AiController {
     ) -> Vec<SimCommand> {
         let mut attacking = BTreeSet::new();
         let mut staging = BTreeSet::new();
+        let mut assembling = BTreeSet::new();
         for intent in intents {
             match intent {
                 crate::ai_core::decision::AiIntent::Attack { units } => {
@@ -469,6 +470,9 @@ impl AiController {
                 }
                 crate::ai_core::decision::AiIntent::Stage { units } => {
                     staging.extend(units.iter().copied())
+                }
+                crate::ai_core::decision::AiIntent::Assemble { units } => {
+                    assembling.extend(units.iter().copied())
                 }
                 crate::ai_core::decision::AiIntent::Move { .. }
                 | crate::ai_core::decision::AiIntent::Build { .. }
@@ -482,6 +486,14 @@ impl AiController {
             self.staged_units.remove(id);
             self.held_stage_units.remove(id);
             self.active_attack_units.insert(*id, tick);
+        }
+        // Assembly supplies bounded repositioning/hold commands, including changed destinations.
+        // Clear stale stage and attack suppression before filtering, and do not cache assembly as
+        // an ordinary stage: defense must still be able to retask the cohort when assembly ends.
+        for id in &assembling {
+            self.staged_units.remove(id);
+            self.held_stage_units.remove(id);
+            self.active_attack_units.remove(id);
         }
         if staging.is_empty() {
             return commands;
@@ -500,7 +512,7 @@ impl AiController {
                 } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
-                        .filter(|id| !self.staged_units.contains(id))
+                        .filter(|id| assembling.contains(id) || !self.staged_units.contains(id))
                         .filter(|id| !self.active_attack_units.contains_key(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
@@ -525,7 +537,7 @@ impl AiController {
                 } if command_stages_units(&units) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
-                        .filter(|id| !self.staged_units.contains(id))
+                        .filter(|id| assembling.contains(id) || !self.staged_units.contains(id))
                         .filter(|id| !self.active_attack_units.contains_key(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
@@ -546,7 +558,7 @@ impl AiController {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.active_attack_units.contains_key(id))
-                        .filter(|id| !self.held_stage_units.contains(id))
+                        .filter(|id| assembling.contains(id) || !self.held_stage_units.contains(id))
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
                     self.held_stage_units.extend(fresh.iter().copied());
@@ -580,6 +592,10 @@ impl AiController {
                 }
                 other => filtered.push(other),
             }
+        }
+        for id in &assembling {
+            self.staged_units.remove(id);
+            self.held_stage_units.remove(id);
         }
         filtered
     }
@@ -979,6 +995,107 @@ mod tests {
             ai.filter_repeated_stage_commands(19, &clearance_intent, vec![clearance.clone()]),
             vec![clearance]
         );
+    }
+
+    #[test]
+    fn assembly_supersedes_staging_and_recent_attack_suppression() {
+        use crate::ai_core::decision::AiIntent;
+        let mut ai = AiController::with_profile_id(1, JEFFS_AI_ID);
+        let stage = [AiIntent::Stage {
+            units: vec![42, 43, 99],
+        }];
+        let initial = SimCommand::Move {
+            units: vec![42, 43, 99],
+            x: 100.0,
+            y: 100.0,
+            queued: false,
+        };
+        assert_eq!(
+            ai.filter_repeated_stage_commands(10, &stage, vec![initial.clone()]),
+            vec![initial.clone()]
+        );
+        // Ordinary staging still suppresses repeats, even with a changed destination.
+        let regroup = SimCommand::Move {
+            units: vec![42, 43],
+            x: 228.0,
+            y: 196.0,
+            queued: false,
+        };
+        assert!(ai
+            .filter_repeated_stage_commands(19, &stage, vec![regroup.clone()])
+            .is_empty());
+        ai.filter_repeated_stage_commands(20, &[AiIntent::Attack { units: vec![43] }], vec![]);
+        let assembly = [
+            AiIntent::Assemble {
+                units: vec![42, 43],
+            },
+            AiIntent::Stage {
+                units: vec![42, 43, 99],
+            },
+        ];
+        let hold = SimCommand::HoldPosition {
+            units: vec![42, 43],
+            queued: false,
+        };
+        let earlier_stage = SimCommand::Move {
+            units: vec![42, 43],
+            x: 100.0,
+            y: 100.0,
+            queued: false,
+        };
+        // Home staging may precede cohort selection on the first assembly decision. It must not
+        // swallow the later assembly destination; the unrelated staged defender remains filtered.
+        assert_eq!(
+            ai.filter_repeated_stage_commands(
+                28,
+                &assembly,
+                vec![initial, regroup.clone(), hold.clone()]
+            ),
+            vec![earlier_stage, regroup.clone(), hold.clone()],
+        );
+        // A bounded planner retry must still pass if units failed to reach the slot.
+        assert_eq!(
+            ai.filter_repeated_stage_commands(88, &assembly, vec![regroup.clone(), hold.clone()]),
+            vec![regroup.clone(), hold]
+        );
+        // Leaving assembly must allow an ordinary defensive stage to retask the cohort.
+        assert_eq!(
+            ai.filter_repeated_stage_commands(97, &stage, vec![regroup.clone()]),
+            vec![regroup]
+        );
+    }
+
+    #[test]
+    fn assembly_without_other_staging_preserves_moves_and_escort_attack_moves() {
+        use crate::ai_core::decision::AiIntent;
+        let mut ai = AiController::with_profile_id(1, JEFFS_AI_ID);
+        ai.staged_units.extend([42, 43]);
+        ai.held_stage_units.insert(42);
+        ai.active_attack_units.insert(43, 10);
+        let intents = [AiIntent::Assemble {
+            units: vec![42, 43],
+        }];
+        let commands = vec![
+            SimCommand::Move {
+                units: vec![42],
+                x: 228.0,
+                y: 196.0,
+                queued: false,
+            },
+            SimCommand::AttackMove {
+                units: vec![43],
+                x: 260.0,
+                y: 196.0,
+                queued: false,
+            },
+        ];
+        assert_eq!(
+            ai.filter_repeated_stage_commands(19, &intents, commands.clone()),
+            commands
+        );
+        assert!(!ai.staged_units.contains(&42));
+        assert!(!ai.held_stage_units.contains(&42));
+        assert!(!ai.active_attack_units.contains_key(&43));
     }
 
     #[test]
