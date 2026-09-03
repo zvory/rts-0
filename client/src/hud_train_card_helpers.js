@@ -46,7 +46,7 @@ export function selectedRepeatProducerBuildingsForUnit(ctx, unit, isOwn, faction
   );
 }
 
-export function selectedCancellableProductionBuildingsForKind(ctx, kind, isOwn) {
+export function selectedCancellableProducers(ctx, kind, isOwn) {
   return (ctx.selection || []).filter(
     (e) =>
       isOwn(ctx, e) &&

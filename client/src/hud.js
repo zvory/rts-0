@@ -771,7 +771,7 @@ export class HUD {
   }
 
   /** Selected own completed producers of `kind` with a queue or auto-build to cancel. */
-  _selectedCancellableProductionBuildingsForKind(kind) {
+  _selectedCancellableProducers(kind) {
     const sel = this.state.selectedEntities() || [];
     return sel.filter(
       (e) =>
@@ -796,7 +796,7 @@ export class HUD {
 
   /** Pick the next producing building in reverse selection order and advance its cursor. */
   _previousProducingBuildingForKind(kind) {
-    const producers = this._selectedCancellableProductionBuildingsForKind(kind);
+    const producers = this._selectedCancellableProducers(kind);
     if (producers.length === 0) return null;
 
     const key = producers.map((e) => e.id).join(".");
