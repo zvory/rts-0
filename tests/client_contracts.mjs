@@ -89,6 +89,7 @@ await import("./client_contracts/lab_input_ownership_contracts.mjs");
 await import("./client_contracts/lab_tool_input_contracts.mjs");
 await import("./client_contracts/lab_map_editor_contracts.mjs");
 await import("./client_contracts/command_budget_contracts.mjs");
+await import("./client_contracts/selection_reconciliation_contracts.mjs");
 await import("./client_contracts/prediction_controller_contracts.mjs");
 await import("./client_contracts/replay_branch_contracts.mjs");
 await import("./client_contracts/config_surface_contracts.mjs");
