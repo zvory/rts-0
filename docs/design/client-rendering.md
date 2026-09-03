@@ -170,7 +170,10 @@ tile-footprint descriptor. Freehand formation feedback crosses `tacticalFeedback
 deployed enemy Anti-Tank Gun warnings cross the same boundary as detached
 `enemyAntiTankGunThreat` records, including an explicit stale-memory presentation flag, so a backend
 can render current amber-orange hatching and thinner very-pale-pink frozen hatching without consulting
-mutable gameplay state. Friendly selected field-of-fire wedges remain unhatched. These are
+mutable gameplay state. Live warnings take their immutable direction only from the entity's
+`setupFacing`; stale warnings use the remembered record's frozen `facing`. Body and weapon facing
+are never fallback cone directions because they may track targets inside the emplacement field.
+Friendly selected field-of-fire wedges likewise use only `setupFacing` and remain unhatched. These are
 presentation hints only: `SelectionSceneV1` remains the sole entity/ground interaction authority.
 The detached feedback context also carries the observer-only all-unit-range preference. When it is
 enabled, Pixi draws the existing range profile for every currently visible, non-reveal unit record,

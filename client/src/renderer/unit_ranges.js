@@ -91,7 +91,11 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
   if (!weapon) return;
 
   for (const entity of state.enemyAntiTankGunThreats()) {
-    const facing = firstFinite(entity?.setupFacing, entity?.weaponFacing, entity?.facing);
+    // A live warning is anchored to the immutable emplacement direction. Remembered warnings
+    // already carry that same direction in their compact `facing` field. Never fall back to the
+    // gun's body/weapon facing: deployed AT guns visually track targets inside their fixed field,
+    // and using either dynamic angle makes the warning cone follow the target too.
+    const facing = entity?.threatMemory === true ? entity?.facing : entity?.setupFacing;
     if (!finiteNumber(entity?.x) || !finiteNumber(entity?.y) || !finiteNumber(facing)) continue;
     const paths = hatchedWedgePaths(
       entity.x,
@@ -308,7 +312,11 @@ function dynamicUnitRangeProfile(e, tileSize) {
     e?.attackMinRangeTiles,
   ), tileSize) ?? 0);
   const arc = firstFinite(source?.arcRad, source?.arc, e?.weaponArcRad, e?.firingArcRad, e?.attackArcRad);
-  const facing = firstFinite(source?.facing, e?.setupFacing, e?.weaponFacing, e?.facing);
+  // Dynamic range metadata may refine availability or radii, but an AT gun's arc remains fixed to
+  // its emplacement. Never let a backend-provided tracking angle rotate that field of fire.
+  const facing = e?.kind === KIND.ANTI_TANK_GUN
+    ? e?.setupFacing
+    : firstFinite(source?.facing, e?.setupFacing, e?.weaponFacing, e?.facing);
   if (arc > 0 && arc < Math.PI * 2 && finiteNumber(facing)) {
     return {
       kind: "fieldOfFire",
@@ -334,7 +342,7 @@ function staticUnitRangeProfile(e, tileSize) {
     if (e.setupState !== SETUP.DEPLOYED) return null;
     const weapon = fieldOfFireProfile(e.kind, tileSize);
     if (!weapon) return null;
-    const facing = firstFinite(e.setupFacing, e.weaponFacing, e.facing);
+    const facing = e.setupFacing;
     if (!finiteNumber(facing) && weapon.arc < Math.PI * 2) return null;
     return {
       kind: "fieldOfFire",

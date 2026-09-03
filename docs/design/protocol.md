@@ -783,6 +783,10 @@ Combat `targetId` and `weaponFacing` for allied units are sent whenever an attac
 a visible acquired target, including autonomous acquisition while its explicit order state remains
 idle. They are omitted when the target is not visible in the recipient's team-current actionable
 fog, so allied units attacking hidden enemies do not reveal hidden target ids or target directions.
+`setupFacing` remains owner/allied setup detail except for an actionable visible deployed enemy
+Anti-Tank Gun: that gun projects its fixed emplacement direction because the same direction is
+already disclosed by its live threat cone. Clients must orient that cone only from `setupFacing`,
+never from the dynamically tracking body or `weaponFacing` values.
 `steel`, `oil`, supply, `autoBuild`, `upgrades`, rallies, order plans,
 construction activity hints, ability controls/autocast toggles, debug paths, and command authority
 remain exact-owner-only in normal active-player and selected-player/team observer projections.

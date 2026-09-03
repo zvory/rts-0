@@ -601,6 +601,49 @@ fn observer_switches_restore_each_players_authoritative_anti_tank_gun_memory() {
 }
 
 #[test]
+fn anti_tank_gun_memory_never_uses_tracked_weapon_facing() {
+    let mut game = empty_flat_game();
+    let scout_pos = game.state.map.tile_center(20, 20);
+    let gun_pos = game.state.map.tile_center(22, 20);
+    let scout = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
+        .expect("Bravo scout should spawn");
+    let gun = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::AntiTankGun, gun_pos.0, gun_pos.1)
+        .expect("Alpha anti-tank gun should spawn");
+    let gun_entity = game
+        .state
+        .entities
+        .get_mut(gun)
+        .expect("anti-tank gun should exist");
+    gun_entity.set_weapon_setup(WeaponSetup::Deployed);
+    gun_entity.set_weapon_facing(0.75);
+    advance_to_next_fog_refresh(&mut game);
+    let visible = game.snapshot_for_observer(&ObserverView::Players(vec![2]));
+    let projected = visible
+        .entities
+        .iter()
+        .find(|entity| entity.id == gun)
+        .expect("Bravo should see the gun before the scout leaves");
+    assert_eq!(projected.setup_facing, None);
+
+    game.state.entities.remove(scout);
+    advance_to_next_fog_refresh(&mut game);
+
+    assert!(
+        game.snapshot_for_observer(&ObserverView::Players(vec![2]))
+            .remembered_anti_tank_guns
+            .iter()
+            .all(|memory| memory.id != gun),
+        "tracked weapon facing must not synthesize a remembered emplacement cone"
+    );
+}
+
+#[test]
 fn smoke_obscuration_does_not_clear_remembered_anti_tank_gun_intel() {
     let mut game = empty_flat_game();
     let scout_pos = game.state.map.tile_center(20, 20);

@@ -2,7 +2,7 @@
 // Domain contract assertions imported by ../client_contracts.mjs.
 
 import { assert, assertApprox, assertDeepEqual } from "./assertions.mjs";
-import { COLORS } from "../../client/src/config.js";
+import { ANTI_TANK_GUN_FIELD_OF_FIRE_RAD, COLORS } from "../../client/src/config.js";
 import {
   ABILITY,
   ABILITY_OBJECT_KIND,
@@ -145,7 +145,9 @@ function nearPoint(call, point, epsilon = 0.001) {
       kind: KIND.ANTI_TANK_GUN,
       x: 320,
       y: 256,
-      facing: 0,
+      facing: Math.PI / 2,
+      weaponFacing: Math.PI / 2,
+      setupFacing: 0,
       setupState: SETUP.DEPLOYED,
     },
     {
@@ -225,17 +227,18 @@ function nearPoint(call, point, epsilon = 0.001) {
     !threatGfx.calls.some((call) => call[0] === "beginFill"),
     "enemy anti-tank threat cone never blankets the terrain with a tint",
   );
+  assert(
+    threatGfx.calls.some((call) => call[0] === "arc" &&
+      Math.abs(call[4] + ANTI_TANK_GUN_FIELD_OF_FIRE_RAD / 2) <= 0.001),
+    "live enemy anti-tank threat cone stays on setup facing instead of tracked body/weapon facing",
+  );
 
   const staleFeedbackView = buildRendererFeedbackView(state, {
     entities: [],
     rememberedEnemyAntiTankGunThreats: [{
-      id: 306,
-      owner: 2,
-      kind: KIND.ANTI_TANK_GUN,
-      x: 320,
-      y: 256,
-      weaponFacing: 0,
-      setupState: SETUP.DEPLOYED,
+      id: 306, owner: 2,
+      x: 320, y: 256,
+      facing: 0, weaponFacing: Math.PI / 2,
     }],
   });
   const staleGfx = new RecordingGraphics();

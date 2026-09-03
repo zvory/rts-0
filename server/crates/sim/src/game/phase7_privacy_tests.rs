@@ -75,6 +75,46 @@ fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) 
 }
 
 #[test]
+fn visible_enemy_deployed_anti_tank_gun_projects_fixed_setup_facing() {
+    let mut game = empty_flat_game(&phase7_players());
+    let observer_pos = game.state.map.tile_center(20, 20);
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, observer_pos.0, observer_pos.1)
+        .expect("observer rifleman should spawn");
+    let gun_pos = game.state.map.tile_center(22, 20);
+    let gun_id = game
+        .state
+        .entities
+        .spawn_unit(3, EntityKind::AntiTankGun, gun_pos.0, gun_pos.1)
+        .expect("enemy anti-tank gun should spawn");
+    let setup_facing = 0.25;
+    {
+        let gun = game
+            .state
+            .entities
+            .get_mut(gun_id)
+            .expect("enemy anti-tank gun should exist");
+        gun.set_weapon_setup(WeaponSetup::Deployed);
+        gun.set_emplacement_facing(Some(setup_facing));
+        gun.set_facing(1.0);
+        gun.set_weapon_facing(1.0);
+    }
+
+    refresh_world(&mut game);
+
+    let projected = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|entity| entity.id == gun_id)
+        .expect("visible enemy anti-tank gun should project");
+    assert_eq!(projected.setup_facing, Some(setup_facing));
+    assert_eq!(projected.facing, Some(1.0));
+    assert_eq!(projected.weapon_facing, None);
+}
+
+#[test]
 fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
     let mut game = empty_flat_game(&phase7_players());
     game.state
