@@ -136,6 +136,17 @@ pub(in crate::game) fn try_fire_artillery(
                     radius_tiles: config::ARTILLERY_OUTER_RADIUS_TILES,
                     delay_ticks: config::ARTILLERY_SHELL_DELAY_TICKS,
                 });
+        } else if crate::rules::projection::team_visible_world(
+            player_id, target_x, target_y, fog, teams,
+        ) {
+            events
+                .entry(player_id)
+                .or_default()
+                .push(Event::ArtilleryIncoming {
+                    x: target_x,
+                    y: target_y,
+                    delay_ticks: config::ARTILLERY_SHELL_DELAY_TICKS,
+                });
         }
     }
     if let Some(reveal) = reveal {

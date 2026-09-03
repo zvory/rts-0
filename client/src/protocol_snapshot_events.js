@@ -137,6 +137,14 @@ export function decodeCompactEvent(record, index) {
         delayTicks: readU32(fields[4], "event.artilleryTarget.delayTicks"),
       };
     }
+    case EVENT.ARTILLERY_INCOMING:
+      requireLength(fields, 4, `artillery incoming event ${index}`);
+      return {
+        e: EVENT.ARTILLERY_INCOMING,
+        x: readNumber(fields[1], "event.artilleryIncoming.x"),
+        y: readNumber(fields[2], "event.artilleryIncoming.y"),
+        delayTicks: readU32(fields[3], "event.artilleryIncoming.delayTicks"),
+      };
     case EVENT.ARTILLERY_FIRING:
       requireLength(fields, 5, `artillery firing event ${index}`);
       return {

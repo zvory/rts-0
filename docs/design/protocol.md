@@ -856,10 +856,11 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 54. The client also accepts compact
-snapshot versions 51 through 53: version 52 only appends a kind code, version 53 appends the
-optional `unitsKilled` entity slot, and version 54 appends an optional `rocket` style bit to mortar
-launch/impact event records, so the older record layouts remain safe to decode.
+`messagepack-compact`, codec version 1, compact snapshot version 55. The client also accepts compact
+snapshot versions 51 through 54: version 52 only appends a kind code, version 53 appends the
+optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
+launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
+record layouts remain safe to decode.
 `client/src/net.js` calls
 `parseServerFrame`; the binary frame parser in `client/src/protocol_frame.js` returns the raw
 compact snapshot object, then `decodeCompactSnapshot` expands it back into the semantic object above
@@ -886,7 +887,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 54,
+  "v": 55,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -1187,6 +1188,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "mortarImpact", from?: u32, x: f32, y: f32, radiusTiles: f32,
   reveal?: { owner: u32, kind: string, x: f32, y: f32, facing?: f32, weaponFacing?: f32, setupState?: string }, rocket?: bool }
 { e: "artilleryTarget", from: u32, x: f32, y: f32, radiusTiles: f32, delayTicks: u32 }
+{ e: "artilleryIncoming", x: f32, y: f32, delayTicks: u32 }
 { e: "artilleryFiring", owner: u32, x: f32, y: f32, facing: f32 }
 { e: "artilleryImpact", x: f32, y: f32, radiusTiles: f32 }
 { e: "panzerfaustLaunch", from: u32, fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
@@ -1251,11 +1253,15 @@ indirect fire lands. Allied or owned entities can still take mortar splash damag
 is unattributed and does not reveal the firing mortar as hostile. Enemy players do not receive
 hidden mortar launch data or hidden mortar impact markers unless their entities were hit or their
 team sees the relevant point.
-Artillery target events are sent to the firing team so enemies never receive pre-impact markers,
-even if they have vision of the gun. Fire reports the final deterministic shell target after the
-uniform selected-area sample, not the raw clicked center. The
+Artillery target events are sent to the firing team so enemies never receive the firing-side
+pre-impact marker or shooter id, even if they have vision of the gun. Fire reports the final
+deterministic shell target after the uniform selected-area sample, not the raw clicked center. The
 `from` id lets allied clients recoil the specific gun and draw launch
-dust. Every player receives a visual-only `artilleryFiring` event with the firing owner, shooter
+dust. Enemy players whose team currently sees the final target point instead receive an
+`artilleryIncoming` event containing only that point and the remaining delay. It exists solely to
+schedule the spatial incoming-whistle-and-impact cue; it does not create a target marker, identify
+the gun, reveal terrain, or update exploration. Every player receives a visual-only
+`artilleryFiring` event with the firing owner, shooter
 position, and facing so the minimap can show a small global artillery firing marker; it does not
 carry the shooter entity id, target point, terrain, or exploration. Separately, the server grants
 every enemy player actionable temporary live fog on the firing gun, subject to normal smoke

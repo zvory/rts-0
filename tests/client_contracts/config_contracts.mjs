@@ -200,6 +200,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assert(EVENT_CODE[EVENT.ARTILLERY_FIRING] === 11, "Artillery firing compact event code should be reserved");
   assert(EVENT_CODE[EVENT.PANZERFAUST_LAUNCH] === 12, "Panzerfaust launch compact event code should be reserved");
   assert(EVENT_CODE[EVENT.PANZERFAUST_IMPACT] === 13, "Panzerfaust impact compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.ARTILLERY_INCOMING] === 14, "Artillery incoming compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MISS] === 15, "Miss compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.BALLISTIC_TABLES] === 7, "Artillery Fire Control should retain compact upgrade code 7");
   assert(UPGRADE_CODE[UPGRADE.ENTRENCHMENT] === 8, "Entrenchment compact upgrade code should be reserved");

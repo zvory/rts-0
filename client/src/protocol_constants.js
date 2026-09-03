@@ -256,6 +256,7 @@ export const EVENT = Object.freeze({
   MORTAR_LAUNCH: "mortarLaunch",
   MORTAR_IMPACT: "mortarImpact",
   ARTILLERY_TARGET: "artilleryTarget",
+  ARTILLERY_INCOMING: "artilleryIncoming",
   ARTILLERY_IMPACT: "artilleryImpact",
   ARTILLERY_FIRING: "artilleryFiring",
   PANZERFAUST_LAUNCH: "panzerfaustLaunch",
@@ -331,7 +332,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 54;
+export const COMPACT_SNAPSHOT_VERSION = 55;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -445,6 +446,7 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.ARTILLERY_FIRING]: 11,
   [EVENT.PANZERFAUST_LAUNCH]: 12,
   [EVENT.PANZERFAUST_IMPACT]: 13,
+  [EVENT.ARTILLERY_INCOMING]: 14,
   [EVENT.MISS]: 15,
 });
 

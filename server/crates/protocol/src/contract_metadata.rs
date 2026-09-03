@@ -199,7 +199,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 54;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 55;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -426,6 +426,7 @@ const EVENT_CODES: &[(&str, u8)] = &[
     ("artilleryFiring", 11),
     ("panzerfaustLaunch", 12),
     ("panzerfaustImpact", 13),
+    ("artilleryIncoming", 14),
     ("miss", 15),
 ];
 
@@ -734,6 +735,7 @@ fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("MORTAR_LAUNCH", "mortarLaunch"),
         ("MORTAR_IMPACT", "mortarImpact"),
         ("ARTILLERY_TARGET", "artilleryTarget"),
+        ("ARTILLERY_INCOMING", "artilleryIncoming"),
         ("ARTILLERY_IMPACT", "artilleryImpact"),
         ("OVERPENETRATION", "overpenetration"),
         ("ARTILLERY_FIRING", "artilleryFiring"),
@@ -1089,6 +1091,15 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
                 field(1, "x"),
                 field(2, "y"),
                 field(3, "radiusTiles"),
+            ],
+        ),
+        (
+            "artilleryIncoming",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "x"),
+                field(2, "y"),
+                field(3, "delayTicks"),
             ],
         ),
         (

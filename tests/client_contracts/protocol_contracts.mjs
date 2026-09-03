@@ -278,6 +278,7 @@ assert(
       [EVENT_CODE[EVENT.MORTAR_LAUNCH], 9, [256, 272], [320, 352], 1.5, 68],
       [EVENT_CODE[EVENT.MORTAR_LAUNCH], 10, [256, 300], [448, 480], 2, 36, true],
       [EVENT_CODE[EVENT.ARTILLERY_TARGET], 10, [320, 352], 3, ARTILLERY_SHELL_DELAY_TICKS],
+      [EVENT_CODE[EVENT.ARTILLERY_INCOMING], 324, 356, ARTILLERY_SHELL_DELAY_TICKS],
       [EVENT_CODE[EVENT.ARTILLERY_FIRING], 1, 288, 304, 0.25],
       [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
       [EVENT_CODE[EVENT.PANZERFAUST_LAUNCH], 11, [360, 384], [416, 384], 15],
@@ -515,42 +516,49 @@ assert(
     "artillery target event decodes",
   );
   assert(
-    decoded.events[10].e === EVENT.ARTILLERY_FIRING &&
-      decoded.events[10].owner === 1 &&
-      decoded.events[10].x === 288 &&
-      decoded.events[10].facing === 0.25,
-    "artillery firing minimap event decodes",
+    decoded.events[10].e === EVENT.ARTILLERY_INCOMING &&
+      decoded.events[10].x === 324 &&
+      decoded.events[10].y === 356 &&
+      decoded.events[10].delayTicks === ARTILLERY_SHELL_DELAY_TICKS,
+    "sanitized artillery incoming event decodes",
   );
   assert(
-    decoded.events[14].e === EVENT.MORTAR_IMPACT &&
-      decoded.events[14].rocket === true &&
-      decoded.events[14].from === undefined,
-    "placeholder-free version-54 rocket impacts do not decode the style bit as an attacker id",
+    decoded.events[11].e === EVENT.ARTILLERY_FIRING &&
+      decoded.events[11].owner === 1 &&
+      decoded.events[11].x === 288 &&
+      decoded.events[11].facing === 0.25,
+    "artillery firing minimap event decodes",
   );
   assert(
     decoded.events[15].e === EVENT.MORTAR_IMPACT &&
       decoded.events[15].rocket === true &&
       decoded.events[15].from === undefined,
+    "placeholder-free version-54 rocket impacts do not decode the style bit as an attacker id",
+  );
+  assert(
+    decoded.events[16].e === EVENT.MORTAR_IMPACT &&
+      decoded.events[16].rocket === true &&
+      decoded.events[16].from === undefined,
     "canonical rocket impacts decode through explicit attacker and reveal placeholders",
   );
   assert(
-    decoded.events[11].e === EVENT.ARTILLERY_IMPACT &&
-      decoded.events[11].x === 336 &&
-      decoded.events[11].y === 368,
+    decoded.events[12].e === EVENT.ARTILLERY_IMPACT &&
+      decoded.events[12].x === 336 &&
+      decoded.events[12].y === 368,
     "artillery impact event decodes",
   );
   assert(
-    decoded.events[12].e === EVENT.PANZERFAUST_LAUNCH &&
-      decoded.events[12].from === 11 &&
-      decoded.events[12].fromX === 360 &&
-      decoded.events[12].toX === 416 &&
-      decoded.events[12].delayTicks === 15,
+    decoded.events[13].e === EVENT.PANZERFAUST_LAUNCH &&
+      decoded.events[13].from === 11 &&
+      decoded.events[13].fromX === 360 &&
+      decoded.events[13].toX === 416 &&
+      decoded.events[13].delayTicks === 15,
     "panzerfaust launch event decodes without target id",
   );
   assert(
-    decoded.events[13].e === EVENT.PANZERFAUST_IMPACT &&
-      decoded.events[13].x === 416 &&
-      decoded.events[13].y === 384,
+    decoded.events[14].e === EVENT.PANZERFAUST_IMPACT &&
+      decoded.events[14].x === 416 &&
+      decoded.events[14].y === 384,
     "panzerfaust impact event decodes",
   );
   const abilityCommand = cmd.useAbility(ABILITY.SMOKE, [7, 8], 320, 384, true);

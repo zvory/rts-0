@@ -474,9 +474,10 @@ fn artillery_target_marker_is_visible_to_allies_not_hidden_enemies() {
     assert!(ally_events
         .iter()
         .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery)));
-    assert!(enemy_events
-        .iter()
-        .all(|event| !matches!(event, Event::ArtilleryTarget { .. } | Event::Attack { .. })));
+    assert!(enemy_events.iter().all(|event| !matches!(
+        event,
+        Event::ArtilleryTarget { .. } | Event::ArtilleryIncoming { .. } | Event::Attack { .. }
+    )));
 }
 
 #[test]

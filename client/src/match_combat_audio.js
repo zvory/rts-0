@@ -199,7 +199,9 @@ export class MatchCombatAudio {
 
   playPointFireSound(ev) {
     if (!this.audio) return;
-    if (ev?.e === EVENT.ARTILLERY_TARGET) this._scheduleArtilleryLanding(ev);
+    if (ev?.e === EVENT.ARTILLERY_TARGET || ev?.e === EVENT.ARTILLERY_INCOMING) {
+      this._scheduleArtilleryLanding(ev);
+    }
     const spec = POSITIONAL_EVENT_SOUNDS[ev.e];
     if (!spec) return;
     const pos = positionalEventSoundPosition(ev, this.state);
@@ -243,7 +245,7 @@ export class MatchCombatAudio {
   }
 
   hasPointFireSound(eventKind) {
-    return !!POSITIONAL_EVENT_SOUNDS[eventKind];
+    return eventKind === EVENT.ARTILLERY_INCOMING || !!POSITIONAL_EVENT_SOUNDS[eventKind];
   }
 
   stopInactiveMachineGunSounds() {

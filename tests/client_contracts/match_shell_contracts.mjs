@@ -484,6 +484,20 @@ import {
   assert(plays.at(-1).opts.x === 512 && plays.at(-1).opts.y === 640, "landing cue is spatialized at the impact point");
   assert(plays.at(-1).opts.category === "combat_self", "own artillery landing uses the self combat bus");
   assertApprox(plays.at(-1).opts.gain, 0.7, 0.0001, "artillery landings use the quieter combat mix");
+  const playsBeforeIncoming = plays.length;
+  assert(combatAudio.hasPointFireSound(EVENT.ARTILLERY_INCOMING), "match routes incoming artillery into combat audio");
+  combatAudio.playPointFireSound({
+    e: EVENT.ARTILLERY_INCOMING,
+    x: 608,
+    y: 736,
+    delayTicks: 150,
+  });
+  assert(plays.length === playsBeforeIncoming, "incoming artillery does not play a separate firing cue");
+  assert(timers.length === 2, "incoming artillery schedules the intact landing cue");
+  timers[1].handler();
+  assert(plays.at(-1).id === "combat_artillery_landing_01", "incoming artillery reuses the intact landing recording");
+  assert(plays.at(-1).opts.x === 608 && plays.at(-1).opts.y === 736, "incoming artillery audio uses its fog-safe landing point");
+  assert(plays.at(-1).opts.category === "combat_other", "incoming enemy artillery uses the other-combat bus");
   combatAudio.playPointFireSound({
     e: EVENT.ARTILLERY_TARGET,
     from: 8,
@@ -492,7 +506,7 @@ import {
     delayTicks: 150,
   });
   combatAudio.destroy();
-  assert(cleared.length === 1 && cleared[0] === timers[1], "teardown cancels a pending artillery landing");
+  assert(cleared.length === 1 && cleared[0] === timers[2], "teardown cancels a pending artillery landing");
 }
 
 // Match settings context collaborator
