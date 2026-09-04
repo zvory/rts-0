@@ -40,6 +40,16 @@ pub const ROCKET_BARRAGE_SCATTER_RADIUS_TILES: f32 = 6.0;
 pub const ROCKET_BARRAGE_DIRECT_DAMAGE: u32 = 100;
 pub const ROCKET_BARRAGE_INNER_DAMAGE: u32 = 75;
 pub const ROCKET_BARRAGE_OUTER_DAMAGE: u32 = 30;
+/// Rocket barrages are anti-unit saturation weapons, not efficient demolition weapons.
+/// Apply this after the existing armor policy whenever a rocket damages a building.
+pub const ROCKET_BARRAGE_BUILDING_DAMAGE_NUMERATOR: u32 = 1;
+pub const ROCKET_BARRAGE_BUILDING_DAMAGE_DENOMINATOR: u32 = 4;
+
+pub fn rocket_barrage_building_damage(damage: u32) -> u32 {
+    damage
+        .saturating_mul(ROCKET_BARRAGE_BUILDING_DAMAGE_NUMERATOR)
+        .div_ceil(ROCKET_BARRAGE_BUILDING_DAMAGE_DENOMINATOR)
+}
 
 pub const EKAT_CONSUME_GOLEM_RANGE_TILES: u32 = 2;
 pub const EKAT_TELEPORT_RANGE_TILES: u32 = 5;

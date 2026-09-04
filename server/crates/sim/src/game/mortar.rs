@@ -443,10 +443,15 @@ fn shell_effective_damage(
     base: u32,
     direct_hit: bool,
 ) -> u32 {
-    if rocket && direct_hit {
+    let damage = if rocket && direct_hit {
         base
     } else {
         mortar_damage(victim_kind, base)
+    };
+    if rocket && config::building_stats(victim_kind).is_some() {
+        config::rocket_barrage_building_damage(damage)
+    } else {
+        damage
     }
 }
 
