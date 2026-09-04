@@ -172,12 +172,24 @@ fn decide(observation: &AiObservation) -> AiDecision {
 }
 
 fn decide_with_profile(observation: &AiObservation, profile: &'static AiProfile) -> AiDecision {
+    decide_with_memory(
+        observation,
+        profile,
+        &mut AiDecisionMemory::for_profile(profile),
+    )
+}
+
+fn decide_with_memory(
+    observation: &AiObservation,
+    profile: &'static AiProfile,
+    memory: &mut AiDecisionMemory,
+) -> AiDecision {
     let width = observation.map.width;
     let height = observation.map.height;
     decide_profile_without_static_map_for_tests(
         observation,
         profile,
-        &mut AiDecisionMemory::for_profile(profile),
+        memory,
         ai_shared::BuildSearch {
             min_radius: 0,
             max_radius: 0,
@@ -290,6 +302,137 @@ fn jeff_armored_tech_observation(factory: Option<AiEntitySummary>) -> AiObservat
         },
         owned,
     )
+}
+
+#[test]
+fn jeff_starts_vehicle_works_before_engineering_complex() {
+    let observation = observation(
+        AiEconomy {
+            steel: 2_000,
+            oil: 2_000,
+            supply_used: 20,
+            supply_cap: 100,
+        },
+        vec![
+            building(1, EntityKind::ResourceDepot, Some(0)),
+            building(2, EntityKind::Barracks, Some(0)),
+            building(3, EntityKind::TrainingCentre, None),
+            worker(20, AiEntityState::Idle),
+        ],
+    );
+
+    let decision = decide_with_profile(&observation, &JEFFS_AI);
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory,
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::EngineeringComplex,
+    }));
+}
+
+#[test]
+fn jeff_saves_for_vehicle_works_instead_of_skipping_to_engineering_complex() {
+    let observation = observation(
+        AiEconomy {
+            steel: 150,
+            oil: 100,
+            supply_used: 20,
+            supply_cap: 100,
+        },
+        vec![
+            building(1, EntityKind::ResourceDepot, Some(0)),
+            building(2, EntityKind::Barracks, Some(0)),
+            building(3, EntityKind::TrainingCentre, None),
+            worker(20, AiEntityState::Idle),
+        ],
+    );
+
+    let decision = decide_with_profile(&observation, &JEFFS_AI);
+
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory,
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::EngineeringComplex,
+    }));
+}
+
+#[test]
+fn jeff_queues_opening_scout_while_engineering_complex_is_built() {
+    let observation = observation(
+        AiEconomy {
+            steel: 2_000,
+            oil: 2_000,
+            supply_used: 20,
+            supply_cap: 100,
+        },
+        vec![
+            building(1, EntityKind::ResourceDepot, Some(0)),
+            building(2, EntityKind::Barracks, Some(0)),
+            building(3, EntityKind::TrainingCentre, None),
+            building(4, EntityKind::Factory, Some(0)),
+            worker(20, AiEntityState::Idle),
+        ],
+    );
+
+    let decision = decide_with_profile(&observation, &JEFFS_AI);
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::EngineeringComplex,
+    }));
+    assert!(decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar,
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Tank,
+    }));
+}
+
+#[test]
+fn jeff_does_not_replace_lost_opening_scout_until_two_tanks_are_complete() {
+    let armored_base = || {
+        observation(
+            AiEconomy {
+                steel: 2_000,
+                oil: 2_000,
+                supply_used: 20,
+                supply_cap: 100,
+            },
+            vec![
+                building(1, EntityKind::ResourceDepot, Some(0)),
+                building(2, EntityKind::Barracks, Some(0)),
+                building(3, EntityKind::TrainingCentre, None),
+                building(4, EntityKind::Factory, Some(0)),
+                worker(20, AiEntityState::Idle),
+            ],
+        )
+    };
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+
+    let opening = decide_with_memory(&armored_base(), &JEFFS_AI, &mut memory);
+    assert!(opening.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar,
+    }));
+
+    let lost_before_tanks = decide_with_memory(&armored_base(), &JEFFS_AI, &mut memory);
+    assert!(!lost_before_tanks.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar,
+    }));
+
+    let mut one_tank = armored_base();
+    one_tank.owned.push(combat_unit(30, EntityKind::Tank));
+    let after_one_tank = decide_with_memory(&one_tank, &JEFFS_AI, &mut memory);
+    assert!(!after_one_tank.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar,
+    }));
+
+    let mut two_tanks = one_tank;
+    two_tanks.owned.push(combat_unit(31, EntityKind::Tank));
+    let after_two_tanks = decide_with_memory(&two_tanks, &JEFFS_AI, &mut memory);
+    assert!(after_two_tanks.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar,
+    }));
 }
 
 #[test]

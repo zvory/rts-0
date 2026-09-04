@@ -50,10 +50,15 @@ pub(crate) struct AiProfile {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct FastTankTimingPolicy {
-    pub(crate) workers_before_barracks: usize,
-    pub(crate) pump_jacks_before_barracks: usize,
+    /// Construction Engineers that must already exist before the opening Barracks.
+    /// This is a readiness check, not a worker-production target.
+    pub(crate) builder_engineers_before_barracks: usize,
+    /// Depot-owned automatic extractors that must be online before the opening Barracks.
+    /// The AI observes these jobs; it never purchases or manually builds them.
+    pub(crate) automatic_extractors_before_barracks: usize,
     pub(crate) tanks_before_scout_car: usize,
     pub(crate) scout_car_target: usize,
+    pub(crate) tanks_before_scout_car_replacement: usize,
     pub(crate) tanks_before_optional_upgrades: usize,
     pub(crate) optional_upgrades: &'static [UpgradeKind],
     pub(crate) preserve_during_defensive_panic: bool,

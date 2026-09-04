@@ -88,6 +88,7 @@ pub(crate) struct AiDecisionMemory {
     pub(super) enemy_main_destroyed: bool,
     pub(super) endgame_search_waypoint: usize,
     pub(super) turtle_opening_riflemen_ordered: usize,
+    pub(super) fast_tank_opening_scout_committed: bool,
     incomplete_resource_depots: BTreeMap<u32, IncompleteResourceDepotMemory>,
 }
 
@@ -136,6 +137,7 @@ impl AiDecisionMemory {
             enemy_main_destroyed: false,
             endgame_search_waypoint: 0,
             turtle_opening_riflemen_ordered: 0,
+            fast_tank_opening_scout_committed: false,
             incomplete_resource_depots: BTreeMap::new(),
         }
     }
@@ -236,6 +238,7 @@ impl AiDecisionMemory {
         self.enemy_main_destroyed = false;
         self.endgame_search_waypoint = 0;
         self.turtle_opening_riflemen_ordered = 0;
+        self.fast_tank_opening_scout_committed = false;
         self.incomplete_resource_depots.clear();
     }
 
@@ -493,6 +496,25 @@ impl AiDecisionMemory {
                 .turtle_opening_riflemen_ordered
                 .saturating_add(1)
                 .min(policy.opening_riflemen);
+        }
+    }
+
+    pub(super) fn sync_fast_tank_opening_scout(
+        &mut self,
+        profile: &AiProfile,
+        observation: &AiObservation,
+    ) {
+        if profile.fast_tank_timing.is_none() {
+            self.fast_tank_opening_scout_committed = false;
+            return;
+        }
+        self.fast_tank_opening_scout_committed |=
+            unit_and_queue_count(observation, EntityKind::ScoutCar) > 0;
+    }
+
+    pub(super) fn note_fast_tank_train(&mut self, profile: &AiProfile, unit: EntityKind) {
+        if profile.fast_tank_timing.is_some() && unit == EntityKind::ScoutCar {
+            self.fast_tank_opening_scout_committed = true;
         }
     }
 }
