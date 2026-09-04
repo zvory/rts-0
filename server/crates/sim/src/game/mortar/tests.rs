@@ -90,7 +90,7 @@ fn legacy_mortar_shell_checkpoint_defaults_to_already_launched() {
 }
 
 #[test]
-fn rocket_damage_is_reduced_except_for_armor_piercing_direct_hits() {
+fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
     let inner2 = (config::MORTAR_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2);
     let inner = shell_damage(true, 0.0, inner2, false);
     let outer = shell_damage(true, inner2 + 1.0, inner2, false);
@@ -114,6 +114,26 @@ fn rocket_damage_is_reduced_except_for_armor_piercing_direct_hits() {
     assert_eq!(
         shell_effective_damage(EntityKind::Rifleman, true, inner, false),
         75
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::SteelMine, true, direct, true),
+        25,
+        "a direct rocket must no longer one-shot a mine"
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::PumpJack, true, inner, false),
+        19,
+        "soft buildings take one quarter damage, rounded up"
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::ResourceDepot, true, direct, true),
+        25,
+        "direct-hit armor penetration is preserved before the building penalty"
+    );
+    assert_eq!(
+        shell_effective_damage(EntityKind::ResourceDepot, true, inner, false),
+        5,
+        "ordinary splash applies armor before the building penalty"
     );
 }
 
