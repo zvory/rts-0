@@ -212,13 +212,30 @@ The whole pocket rotates toward a terrain-analyzed central base approach when on
 uses a map-specific wall-aware rotation for both starts: its pocket faces the southwest approach
 corridor around the water barriers rather than the blocked direct diagonal or the map centre. Other
 open or side-lane starts retain the same shape and rotate toward the map centre.
-Later surplus Riflemen keep the broader building-envelope coverage instead of crowding the opening
-pocket. A Machine Gunner below 50% health no longer counts toward the healthy pair and triggers a
+Later surplus Riflemen fill three lateral columns before adding deeper ranks. Their destinations
+reserve at least 2.75 tiles of separation from other home Rifle slots and reject disconnected
+terrain and blocked firing lanes. A Machine Gunner below 50% health no longer counts toward the healthy pair and triggers a
 replacement. The full Tank tech path starts immediately, Tanks do not wait for Methamphetamines,
 and defensive panic does not replace the active armored production plan with infantry. After two
 Tanks, one Scout Car takes temporary Factory priority and joins those Tanks as a single
-vision-supported attack wave. Expansion, a second Factory, Methamphetamines, and other optional
-spending wait until the initial Tank core exists. The profile uses the shared decision and action
+vision-supported attack wave. For active `jeffs_ai`, once the first Tank exists or is paid in the
+Factory queue, the second Resource Depot becomes the next protected oil purchase. Before any
+Depot build intent or affordability requirement, two Riflemen beyond the home four advance to
+separate posts at the selected natural. The Barracks can fill this six-Rifle minimum without the
+usual surplus-steel reserve. Tank replenishment waits for the Depot order. Construction requires
+both guards at their posts and three seconds without visible enemy contact within eleven tiles;
+contact or a missing guard resets that interval. The builder uses that same secured footprint.
+Once the Depot is complete, the first surplus Tank outside the containment wave and home reserve
+forms behind the guards and in front of the Depot. The containment wave keeps its original rally,
+the reserved Tank stays at the starting base, and guards may leave their posts to answer contact
+near the expansion before returning when the area clears.
+On Crossroads, the expansion guards and staged Tank face the same verified route around the water
+walls as the starting-base pocket instead of the blocked direct line between player starts.
+On either mirrored River start, an armored incident at the mapped natural reinforces to at least
+two Tanks and two Riflemen; other maps keep the ordinary value-sized incident response.
+The pair stays as the expansion garrison, is replaced after losses, and is excluded from attack
+escorts and home incident reassignment. A second Factory, Methamphetamines, and other optional
+spending retain their opening gates. The profile uses the shared decision and action
 layers, receives only fog-filtered observations, and issues ordinary validated player commands for
 spending, placement, production, and combat.
 

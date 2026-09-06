@@ -7,6 +7,8 @@ use super::*;
 mod envelope;
 mod incident;
 mod pocket;
+mod spacing;
+pub(super) use spacing::{separated_rifle_position, separated_rifle_position_where};
 
 pub(super) use self::envelope::local_defense_contact;
 use self::envelope::{
@@ -24,6 +26,12 @@ use self::pocket::{
 pub(super) use self::pocket::{
     stage_defensive_pocket_machine_gunners, stage_home_defensive_pocket_riflemen,
 };
+
+pub(super) fn crossroads_wall_aware_approach_direction(
+    observation: &AiObservation,
+) -> Option<(f32, f32)> {
+    pocket::crossroads_wall_aware_direction_for_observation(observation)
+}
 
 pub(super) const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
 
@@ -703,8 +711,16 @@ fn home_rifleman_coverage_assignments_with_policy(
             } else {
                 anchor
             };
-            let rank = local_slot % 2;
-            let lateral_slot = local_slot / 2;
+            let rank = if use_building_envelope {
+                local_slot / 3
+            } else {
+                local_slot % 2
+            };
+            let lateral_slot = if use_building_envelope {
+                local_slot % 3
+            } else {
+                local_slot / 2
+            };
             let column = match lateral_slot {
                 0 => 0.0,
                 slot if slot % 2 == 1 => -(slot.div_ceil(2) as f32),
@@ -1004,6 +1020,31 @@ pub(super) fn home_defensive_tank_is_positioned(
     };
     let tolerance = observation.map.tile_size as f32;
     dist2(tank.x, tank.y, assignment.x, assignment.y) <= tolerance * tolerance
+}
+
+pub(super) fn defensive_tank_is_positioned_at(
+    observation: &AiObservation,
+    tank_id: u32,
+    position: (f32, f32),
+) -> bool {
+    let Some(tank) = observation.owned.iter().find(|entity| entity.id == tank_id) else {
+        return false;
+    };
+    let tolerance = observation.map.tile_size as f32;
+    dist2(tank.x, tank.y, position.0, position.1) <= squared(tolerance)
+}
+
+pub(super) fn stage_defensive_tank_at(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    tank_id: u32,
+    position: (f32, f32),
+) -> Option<Vec<u32>> {
+    if defensive_tank_is_positioned_at(observation, tank_id, position) {
+        actions::hold_position_units(actions, [tank_id])
+    } else {
+        actions::move_units(actions, [tank_id], position.0, position.1)
+    }
 }
 
 pub(super) fn stage_home_defensive_tank(

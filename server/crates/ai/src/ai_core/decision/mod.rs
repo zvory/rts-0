@@ -27,6 +27,7 @@ use rts_sim::game::upgrade::{self, UpgradeKind};
 mod defense;
 mod economy_manager;
 mod expansion;
+mod expansion_security;
 mod frontal;
 mod geometry;
 mod jeff;
@@ -36,6 +37,8 @@ mod production;
 mod resources;
 mod trace;
 mod turtle;
+mod upgrades;
+use self::upgrades::*;
 
 #[cfg(test)]
 use self::defense::select_defensive_interceptors;
@@ -44,7 +47,7 @@ use self::defense::{
     defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
     home_defensive_tank_is_positioned, local_defense_target, local_defense_units,
     machine_gunner_meets_replacement_health, stage_defensive_machine_gunner_perimeter,
-    stage_defensive_pocket_machine_gunners, stage_home_anti_tank_line,
+    stage_defensive_pocket_machine_gunners, stage_defensive_tank_at, stage_home_anti_tank_line,
     stage_home_defensive_pocket_riflemen, stage_home_defensive_tank,
     stage_home_machine_gunner_screen, stage_home_rifleman_screen, stage_main_steel_defensive_line,
     DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
@@ -263,8 +266,19 @@ where
         .unwrap_or(false);
     let defer_economy_for_panic = defensive_panic.active && !preserve_fast_tank_economy;
     let mut expansion_plan = plan_expansion(observation, &facts, profile, defer_economy_for_panic);
+    expansion_security::prepare(observation, &facts, profile, memory, &mut placeable);
+    let expansion_secured =
+        expansion_security::update_and_stage(observation, map_analysis, memory, &mut actions);
+    let reserve_expansion = profile.id == JEFFS_AI_ID
+        && memory.expansion_security.site.is_some()
+        && facts.building_count(EntityKind::ResourceDepot) < 2;
     let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
     let save_for_expansion = expansion_plan.should_save;
+    if reserve_expansion && !expansion_secured {
+        expansion_plan
+            .blockers
+            .push(ExpansionBlocker::SiteNotSecured);
+    }
     let economy_manager_output = propose_economy(EconomyManagerInput {
         observation,
         facts: &facts,
@@ -276,13 +290,16 @@ where
         },
     });
 
-    if should_build_expansion_from_economy_manager(&economy_manager_output) {
+    if should_build_expansion_from_economy_manager(&economy_manager_output)
+        && (profile.id != JEFFS_AI_ID || expansion_secured)
+    {
         if try_build_expansion_resource_depot(
             observation,
             &facts,
             &mut actions,
             &builder_pools,
             profile,
+            memory.expansion_security.site,
             &mut placeable,
         )
         .is_some()
@@ -294,8 +311,8 @@ where
             expansion_plan.blockers.push(ExpansionBlocker::NoValidSite);
         }
     }
-    let save_for_unplanned_expansion =
-        save_for_expansion && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0;
+    let save_for_unplanned_expansion = (save_for_expansion || reserve_expansion)
+        && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0;
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
@@ -609,6 +626,18 @@ where
         &effective_unit_priorities,
     );
     let mut effective_unit_priorities = effective_unit_priorities;
+    if profile.id == JEFFS_AI_ID
+        && memory.expansion_security.site.is_some()
+        && facts.unit_count(EntityKind::Rifleman) < 6
+    {
+        effective_unit_priorities.insert(0, EntityKind::Rifleman);
+    }
+    if reserve_expansion && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0 {
+        effective_unit_priorities.retain(|kind| {
+            rts_rules::economy::cost(*kind).1 == 0
+                || (*kind == EntityKind::Tank && facts.unit_count(EntityKind::Tank) == 0)
+        });
+    }
     if let Some(policy) = profile.surplus_steel_production {
         let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
         if actions.budget().steel() >= policy.reserve.saturating_add(unit_steel)
@@ -642,9 +671,15 @@ where
         let key_tech_unit = production_policy
             .save_for_first_tech_unit
             .unwrap_or(EntityKind::Worker);
-        let save_for_tech = (save_for_unplanned_expansion
-            || (save_for_first_tech_unit && !planned_train_in_intents(&intents, key_tech_unit))
-            || save_for_required_tech_building)
+        let security_recruits = profile.id == JEFFS_AI_ID
+            && memory.expansion_security.site.is_some()
+            && facts.unit_count(EntityKind::Rifleman) < 6
+            && building_kind == EntityKind::Barracks;
+        let save_for_tech = !security_recruits
+            && (save_for_unplanned_expansion
+                || (save_for_first_tech_unit
+                    && !planned_train_in_intents(&intents, key_tech_unit))
+                || save_for_required_tech_building)
             && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit)
             && !can_train_pre_tank_defensive_machine_gunner(profile, &facts, building_kind);
         let mut building_max_counts = production_max_counts.clone();
@@ -666,7 +701,9 @@ where
             building_max_counts.retain(|(kind, _)| *kind != policy.unit);
             building_max_counts.push((
                 policy.unit,
-                current.saturating_add(affordable_above_reserve),
+                current
+                    .saturating_add(affordable_above_reserve)
+                    .max(if security_recruits { 6 } else { 0 }),
             ));
         }
         let production_rally = is_jeffs_ai_profile(profile.id)
@@ -712,6 +749,15 @@ where
         frontal_exclusions.insert(tank_id);
     }
     sync_containment_recovery(observation, profile, memory);
+    let forward_tank_position = (profile.id == JEFFS_AI_ID)
+        .then(|| expansion_security::tank_staging_center(observation, map_analysis))
+        .flatten();
+    let forward_defensive_tank = forward_tank_position
+        .and_then(|_| expansion_security::surplus_tank_for_forward_base(observation, memory));
+    if let Some(tank_id) = forward_defensive_tank {
+        frontal_exclusions.insert(tank_id);
+    }
+    frontal_exclusions.extend(memory.expansion_security.riflemen.iter().copied());
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
@@ -857,6 +903,7 @@ where
                             && unit.hp > 0
                             && !local_defense_assigned.contains(&unit.id)
                             && !memory.containment_active_riflemen.contains(&unit.id)
+                            && !memory.expansion_security.riflemen.contains(&unit.id)
                     })
                     .map(|unit| unit.id)
                     .collect()
@@ -993,16 +1040,25 @@ where
                     .defensive_machine_gunners
                     .map(|policy| policy.perimeter_distance_tiles)
                     .unwrap_or(6.0);
-                if let Some(units) = stage_home_defensive_tank(
+                let staged = stage_home_defensive_tank(
                     &mut actions,
                     observation,
                     tank_id,
                     enemy_base,
                     distance,
                     map_analysis,
-                ) {
+                );
+                if let Some(units) = staged {
                     intents.push(AiIntent::Stage { units });
                 }
+            }
+        }
+
+        if let Some((tank_id, position)) = forward_defensive_tank.zip(forward_tank_position) {
+            if let Some(units) =
+                stage_defensive_tank_at(&mut actions, observation, tank_id, position)
+            {
+                intents.push(AiIntent::Stage { units });
             }
         }
 
@@ -1359,122 +1415,6 @@ fn can_train_pre_tank_defensive_machine_gunner(
             .completed_upgrades()
             .contains(&UpgradeKind::Methamphetamines);
     !tank_production_available
-}
-
-fn queue_upgrade_if_available(
-    actions: &mut AiActionContext<'_>,
-    facts: &AiFacts,
-    memory: &mut AiDecisionMemory,
-    intents: &mut Vec<AiIntent>,
-    upgrade: UpgradeKind,
-) {
-    if facts.completed_upgrades().contains(&upgrade) || memory.pending_upgrades.contains(&upgrade) {
-        return;
-    }
-    let definition = upgrade::definition(upgrade);
-    if facts.complete_building_count(definition.researched_at) == 0 {
-        return;
-    }
-    if let Some(researched) = actions::try_research_upgrade(
-        actions,
-        facts.production_buildings(definition.researched_at),
-        upgrade,
-    ) {
-        memory.pending_upgrades.insert(researched.upgrade);
-        intents.push(AiIntent::Research {
-            upgrade: researched.upgrade,
-        });
-    }
-}
-
-fn queue_profile_upgrades(
-    actions: &mut AiActionContext<'_>,
-    facts: &AiFacts,
-    memory: &mut AiDecisionMemory,
-    intents: &mut Vec<AiIntent>,
-    profile: &AiProfile,
-) {
-    for upgrade in profile.upgrade_priorities {
-        if profile.fast_tank_timing.is_some()
-            && *upgrade == UpgradeKind::TankUnlock
-            && if is_jeffs_ai_profile(profile.id) {
-                facts.building_counts(EntityKind::Factory).existing == 0
-            } else {
-                facts.building_count(EntityKind::Factory) == 0
-            }
-        {
-            continue;
-        }
-        queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
-    }
-}
-
-fn queue_fast_tank_optional_upgrades(
-    actions: &mut AiActionContext<'_>,
-    facts: &AiFacts,
-    memory: &mut AiDecisionMemory,
-    intents: &mut Vec<AiIntent>,
-    profile: &AiProfile,
-) {
-    let Some(timing) = profile.fast_tank_timing else {
-        return;
-    };
-    if facts.unit_count(EntityKind::Tank) < timing.tanks_before_optional_upgrades {
-        return;
-    }
-    for upgrade in timing.optional_upgrades {
-        queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
-    }
-}
-
-fn queue_jeff_infantry_mass_methamphetamines(
-    actions: &mut AiActionContext<'_>,
-    facts: &AiFacts,
-    memory: &mut AiDecisionMemory,
-    intents: &mut Vec<AiIntent>,
-    profile: &AiProfile,
-) {
-    if !is_jeffs_ai_profile(profile.id)
-        || facts
-            .unit_count(EntityKind::Rifleman)
-            .saturating_add(facts.unit_count(EntityKind::MachineGunner))
-            <= 15
-    {
-        return;
-    }
-    queue_upgrade_if_available(
-        actions,
-        facts,
-        memory,
-        intents,
-        UpgradeKind::Methamphetamines,
-    );
-}
-
-fn queue_required_unit_unlocks(
-    actions: &mut AiActionContext<'_>,
-    facts: &AiFacts,
-    unit_priorities: &[EntityKind],
-    memory: &mut AiDecisionMemory,
-    intents: &mut Vec<AiIntent>,
-    profile: &AiProfile,
-) {
-    for unit in unit_priorities {
-        let Some(upgrade) = upgrade::required_for_unit(*unit) else {
-            continue;
-        };
-        if profile.fast_tank_timing.is_some()
-            && upgrade == UpgradeKind::TankUnlock
-            && if is_jeffs_ai_profile(profile.id) {
-                facts.building_counts(EntityKind::Factory).existing == 0
-            } else {
-                facts.building_count(EntityKind::Factory) == 0
-            }
-        {
-            continue;
-        }
-        queue_upgrade_if_available(actions, facts, memory, intents, upgrade);
-    }
 }
 
 #[cfg(test)]

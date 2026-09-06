@@ -46,6 +46,7 @@ struct IncompleteResourceDepotMemory {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct AiDecisionMemory {
+    pub(super) expansion_security: super::expansion_security::ExpansionSecurity,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -94,6 +95,7 @@ pub(crate) struct AiDecisionMemory {
 impl AiDecisionMemory {
     pub(crate) fn for_profile(profile: &AiProfile) -> Self {
         Self {
+            expansion_security: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
@@ -195,6 +197,7 @@ impl AiDecisionMemory {
             return;
         }
         self.profile_id = Some(profile.id);
+        self.expansion_security = Default::default();
         self.attack_first_size = Some(profile.attack.first_attack_size);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;

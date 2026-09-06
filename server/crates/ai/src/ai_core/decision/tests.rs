@@ -3,13 +3,14 @@ use super::geometry::{building_center, normalized_direction, tile_center};
 use super::*;
 
 use crate::ai_core::observation::{
-    AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiPlayerSummary,
-    AiResourceSummary,
+    AiBuildIntent, AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiObservation,
+    AiPlayerSummary, AiResourceSummary,
 };
 use crate::ai_core::profiles::AiProfile;
 use rts_sim::game::command::SimCommand as Command;
 
 mod economy_manager_tests;
+mod expansion_security_tests;
 mod steel_line_tests;
 mod turtle_tests;
 
@@ -328,6 +329,92 @@ fn defensive_interceptors_prioritize_anti_armor_and_refuse_rifle_only_sacrifices
 
     assert_eq!(with_tank.first(), Some(&30));
     assert!(rifles_only.is_empty());
+}
+
+#[test]
+fn river_natural_reinforcement_is_symmetric_and_map_bounded() {
+    let ts = config::TILE_SIZE as f32;
+    let candidates = vec![10, 20, 30, 40];
+    for (start, site) in [((9, 9), (15, 30)), ((116, 116), (108, 93))] {
+        let mut observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 4,
+                supply_cap: 10,
+            },
+            vec![
+                combat_at(10, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts),
+                combat_at(20, EntityKind::Rifleman, 11.5 * ts, 10.5 * ts),
+                combat_at(30, EntityKind::Tank, 12.5 * ts, 10.5 * ts),
+                combat_at(40, EntityKind::Tank, 13.5 * ts, 10.5 * ts),
+            ],
+        );
+        observation.map = AiMapSummary {
+            width: 126,
+            height: 126,
+            tile_size: config::TILE_SIZE,
+        };
+        observation.own_start_tile = start;
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            99,
+            EntityKind::ResourceDepot,
+            site.0,
+            site.1,
+        ));
+        let memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
+
+        let selected = select_defensive_interceptors(
+            &observation,
+            &memory,
+            candidates.clone(),
+            (20.5 * ts, 10.5 * ts),
+            1,
+            true,
+        );
+        let selected_kind_count = |kind| {
+            selected
+                .iter()
+                .filter(|id| {
+                    observation
+                        .owned
+                        .iter()
+                        .any(|unit| unit.id == **id && unit.kind == kind)
+                })
+                .count()
+        };
+        assert_eq!(selected_kind_count(EntityKind::Tank), 2, "start {start:?}");
+        assert_eq!(
+            selected_kind_count(EntityKind::Rifleman),
+            2,
+            "start {start:?}"
+        );
+    }
+
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 4,
+            supply_cap: 10,
+        },
+        vec![
+            combat_at(10, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts),
+            combat_at(20, EntityKind::Rifleman, 11.5 * ts, 10.5 * ts),
+            combat_at(30, EntityKind::Tank, 12.5 * ts, 10.5 * ts),
+            combat_at(40, EntityKind::Tank, 13.5 * ts, 10.5 * ts),
+        ],
+    );
+    let memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
+    let selected = select_defensive_interceptors(
+        &observation,
+        &memory,
+        candidates,
+        (20.5 * ts, 10.5 * ts),
+        1,
+        true,
+    );
+    assert_eq!(selected.len(), 1);
 }
 
 #[test]
