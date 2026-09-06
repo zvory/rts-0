@@ -179,6 +179,20 @@ fn expansion_security_retains_party_and_replaces_casualties_without_taking_home_
 }
 
 #[test]
+fn expansion_security_waits_safely_when_only_one_guard_is_available() {
+    let mut obs = security_observation();
+    obs.owned.retain(|unit| unit.id != 15);
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+
+    let decision = decide(&obs, &JEFFS_AI, &mut memory);
+
+    assert_eq!(memory.expansion_security.riflemen, vec![14]);
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::ResourceDepot
+    }));
+}
+
+#[test]
 fn expansion_security_does_not_start_before_first_tank_commitment() {
     let mut obs = security_observation();
     obs.owned

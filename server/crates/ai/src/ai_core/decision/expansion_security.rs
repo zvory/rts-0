@@ -381,7 +381,8 @@ pub(super) fn update_and_stage(
         assignments.push((*id, *point, close, footprint_clear, unit.state));
         arrived &= close && footprint_clear && unit.state != AiEntityState::Attack;
     }
-    arrived &= party_positions.len() == PARTY_SIZE
+    arrived = arrived
+        && party_positions.len() == PARTY_SIZE
         && dist2(
             party_positions[0].0,
             party_positions[0].1,
