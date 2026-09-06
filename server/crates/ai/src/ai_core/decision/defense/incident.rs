@@ -172,9 +172,9 @@ pub(in crate::ai_core::decision) fn select_defensive_interceptors(
             .get(unit_id)
             .is_some_and(|unit| unit.kind == EntityKind::Tank)
     });
-    let lower_river_natural = observation.own_start_tile == (9, 9)
-        && crate::ai_core::decision::expansion::has_jeff_river_expansion_site(observation);
-    if selected_has_tank && lower_river_natural {
+    let river_natural =
+        crate::ai_core::decision::expansion::has_jeff_river_expansion_site(observation);
+    if selected_has_tank && river_natural {
         for kind in [EntityKind::Tank, EntityKind::Rifleman] {
             for unit_id in eligible_candidates
                 .iter()

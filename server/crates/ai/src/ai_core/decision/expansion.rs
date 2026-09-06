@@ -17,6 +17,7 @@ pub(super) enum ExpansionBlocker {
     MaxPending,
     NoCandidateResources,
     NoValidSite,
+    SiteNotSecured,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -143,6 +144,10 @@ fn armored_production_reserve_met(
     facts: &AiFacts,
     profile: &AiProfile,
 ) -> bool {
+    if super::expansion_security::expansion_is_next(observation, facts, profile) {
+        let (steel, oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
+        return observation.economy.steel >= steel && observation.economy.oil >= oil;
+    }
     let Some(timing) = profile.fast_tank_timing else {
         return true;
     };
@@ -177,6 +182,7 @@ pub(super) fn try_build_expansion_resource_depot<F>(
     actions: &mut AiActionContext<'_>,
     builder_pools: &[&[u32]],
     profile: &AiProfile,
+    secured_site: Option<(u32, u32)>,
     placeable: &mut F,
 ) -> Option<actions::BuildAction>
 where
@@ -195,8 +201,15 @@ where
     if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
         return None;
     }
-    let (tile_x, tile_y) =
-        expansion_resource_depot_site(observation, expansion, kind, profile.id, placeable)?;
+    let (tile_x, tile_y) = if profile.id == JEFFS_AI_ID {
+        let site = secured_site?;
+        if !placeable(kind, site.0, site.1) {
+            return None;
+        }
+        site
+    } else {
+        expansion_resource_depot_site(observation, expansion, kind, profile.id, placeable)?
+    };
     if profile.id == JEFFS_AI_ID
         && observation.own_start_tile == (9, 9)
         && uses_jeff_river_layout(observation)

@@ -343,6 +343,9 @@ fn expansion_blocker_trace(blocker: &ExpansionBlocker) -> GoalBlocker {
             GoalBlocker::MissingPrerequisite("no_expansion_resources")
         }
         ExpansionBlocker::NoValidSite => GoalBlocker::MissingPrerequisite("no_expansion_site"),
+        ExpansionBlocker::SiteNotSecured => {
+            GoalBlocker::MissingPrerequisite("expansion_site_not_secured")
+        }
     }
 }
 

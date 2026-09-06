@@ -253,6 +253,11 @@ impl LegacyProfileStrategy {
 }
 
 impl AiController {
+    #[cfg(all(test, not(debug_assertions)))]
+    pub(crate) fn decision_memory(&self) -> &AiDecisionMemory {
+        &self.memory
+    }
+
     pub fn new(player: u32) -> Self {
         Self::with_profile_id(player, DEFAULT_LIVE_PROFILE_ID)
     }

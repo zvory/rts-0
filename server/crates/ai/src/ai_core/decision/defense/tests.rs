@@ -1,4 +1,34 @@
 use super::*;
+
+#[test]
+fn supplemental_rifles_reserve_distinct_spaced_posts_outside_the_opening_pocket() {
+    let mut observation = los_test_observation(EntityKind::Factory);
+    observation.owned.clear();
+    let ts = observation.map.tile_size as f32;
+    let enemy = EnemyBaseFact {
+        player_id: 2,
+        start_tile: (25, 5),
+        x: 25.5 * ts,
+        y: 5.5 * ts,
+    };
+    let units: Vec<_> = (1..=14).collect();
+    let assignments =
+        home_defensive_pocket_rifle_assignments(&observation, None, &units, enemy).unwrap();
+    assert_eq!(assignments.len(), units.len());
+    for slot in assignments.iter().skip(4) {
+        for other in assignments
+            .iter()
+            .filter(|other| other.unit_id != slot.unit_id)
+        {
+            assert!(
+                dist2(slot.x, slot.y, other.x, other.y) >= squared(2.75 * ts),
+                "{} crowds {}",
+                slot.unit_id,
+                other.unit_id
+            );
+        }
+    }
+}
 use crate::ai_core::observation::{AiBuildIntent, AiEconomy, AiPlayerSummary, AiResourceSummary};
 
 fn los_test_observation(blocker: EntityKind) -> AiObservation {

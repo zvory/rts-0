@@ -202,6 +202,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/defense/envelope.rs",
   "server/crates/ai/src/ai_core/decision/defense/incident.rs",
   "server/crates/ai/src/ai_core/decision/expansion.rs",
+  // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the
+  // approved decision controller; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/expansion_security.rs",
   "server/crates/ai/src/ai_core/decision/frontal.rs",
   // Jeff's current-roster formation, legacy comparison, and smoke policies were extracted
   // from the approved frontal controller; profile/catalog layers still own faction admission.
@@ -218,6 +221,7 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/raids.rs",
   "server/crates/ai/src/ai_core/decision/resources.rs",
   "server/crates/ai/src/ai_core/decision/trace.rs",
+  "server/crates/ai/src/ai_core/decision/upgrades.rs",
   // Player-facing and Turtle AI profiles are Kriegsia-only current-roster policies until AI
   // faction catalog routing exists.
   "server/crates/ai/src/ai_core/decision/turtle.rs",

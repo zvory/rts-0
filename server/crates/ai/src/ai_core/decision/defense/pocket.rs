@@ -55,13 +55,27 @@ pub(super) fn home_defensive_pocket_rifle_assignments(
     // The four oldest home Riflemen own the pocket. Later surplus Riflemen retain the broader
     // envelope coverage so a large late-game group does not collapse into the six opening slots.
     if units.len() > RIFLE_SLOTS.len() {
-        if let Some(mut supplemental) = home_rifleman_envelope_coverage_assignments(
+        if let Some(supplemental) = home_rifleman_envelope_coverage_assignments(
             observation,
             map_analysis,
             &units[RIFLE_SLOTS.len()..],
             enemy_base,
         ) {
-            assignments.append(&mut supplemental);
+            let mut reserved: Vec<_> = assignments.iter().map(|slot| (slot.x, slot.y)).collect();
+            for mut slot in supplemental {
+                if let Some(point) = separated_rifle_position(
+                    observation,
+                    map_analysis,
+                    (slot.x, slot.y),
+                    direction,
+                    &reserved,
+                ) {
+                    slot.x = point.0;
+                    slot.y = point.1;
+                    reserved.push(point);
+                    assignments.push(slot);
+                }
+            }
         }
     }
 
@@ -140,11 +154,7 @@ pub(super) fn defensive_pocket_basis(
         observation.map.width as f32 * tile_size * 0.5,
         observation.map.height as f32 * tile_size * 0.5,
     );
-    if let Some(direction) = crossroads_wall_aware_direction(
-        (observation.map.width, observation.map.height),
-        observation.own_start_tile,
-        observation.players.iter().map(|player| player.start_tile),
-    ) {
+    if let Some(direction) = crossroads_wall_aware_direction_for_observation(observation) {
         return Some((anchor, direction));
     }
     let target = map_analysis
@@ -155,6 +165,16 @@ pub(super) fn defensive_pocket_basis(
     let direction = normalized_direction(anchor, target)
         .or_else(|| normalized_direction(anchor, (enemy_base.x, enemy_base.y)))?;
     Some((anchor, direction))
+}
+
+pub(super) fn crossroads_wall_aware_direction_for_observation(
+    observation: &AiObservation,
+) -> Option<(f32, f32)> {
+    crossroads_wall_aware_direction(
+        (observation.map.width, observation.map.height),
+        observation.own_start_tile,
+        observation.players.iter().map(|player| player.start_tile),
+    )
 }
 
 fn crossroads_wall_aware_direction(
