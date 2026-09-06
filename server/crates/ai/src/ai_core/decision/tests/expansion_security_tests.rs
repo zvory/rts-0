@@ -74,6 +74,28 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
         expansion_security::update_and_stage(obs, None, memory, &mut actions)
     };
     assert!(!step(&obs, &mut memory));
+    for (index, id) in memory.expansion_security.riflemen.iter().enumerate() {
+        let unit = obs.owned.iter_mut().find(|unit| unit.id == *id).unwrap();
+        unit.x = (16.0 + index as f32 * 3.0) * config::TILE_SIZE as f32;
+        unit.y = 16.0 * config::TILE_SIZE as f32;
+    }
+    assert!(memory.expansion_security.riflemen.iter().all(|id| {
+        let unit = obs.owned.iter().find(|unit| unit.id == *id).unwrap();
+        let site = memory.expansion_security.site.unwrap();
+        let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+        geometry::dist2(unit.x, unit.y, center.0, center.1).sqrt()
+            < geometry::dist2(
+                config::TILE_SIZE as f32 * 8.5,
+                config::TILE_SIZE as f32 * 8.5,
+                center.0,
+                center.1,
+            )
+    }));
+    obs.tick += config::TICK_HZ * 3;
+    assert!(
+        !step(&obs, &mut memory),
+        "guards merely partway to the expansion must not start the secure dwell"
+    );
     for (id, point) in memory.expansion_security.riflemen.iter().zip(&points) {
         let unit = obs.owned.iter_mut().find(|unit| unit.id == *id).unwrap();
         unit.x = point.0;

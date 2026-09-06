@@ -349,8 +349,6 @@ pub(super) fn update_and_stage(
             && (enemy.kind.is_unit() || enemy.kind.is_building())
             && dist2(enemy.x, enemy.y, center.0, center.1) < squared(11.0 * ts)
     });
-    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let staging_radius = dist2(home.0, home.1, center.0, center.1).sqrt() * 0.8;
     let Some(depot) = config::building_stats(EntityKind::ResourceDepot) else {
         return false;
     };
@@ -381,9 +379,7 @@ pub(super) fn update_and_stage(
             depot_rect,
         );
         assignments.push((*id, *point, close, footprint_clear, unit.state));
-        arrived &= dist2(unit.x, unit.y, center.0, center.1) <= squared(staging_radius)
-            && footprint_clear
-            && unit.state != AiEntityState::Attack;
+        arrived &= close && footprint_clear && unit.state != AiEntityState::Attack;
     }
     arrived &= party_positions.len() == PARTY_SIZE
         && dist2(
