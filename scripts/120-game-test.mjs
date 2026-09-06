@@ -18,7 +18,7 @@ const EXPECTED_RELEASE_BUILD_SECONDS = 120;
 const AGENT_WAIT_MARGIN_PERCENT = 10;
 const REPLAY_VERIFICATION_SIMULATION_PASSES = 2;
 const DEFAULT_CONCURRENCY = Math.min(
-  32,
+  8,
   Math.max(1, os.availableParallelism?.() ?? os.cpus().length),
 );
 
