@@ -100,13 +100,14 @@ fn issue_local_interception(
     target: u32,
     intercept: (f32, f32),
 ) -> Option<Vec<u32>> {
-    let (bounded_riflemen, direct): (Vec<_>, Vec<_>) = interceptors.into_iter().partition(|unit_id| {
-        observation.tick < EARLY_ENTRENCHED_RESPONSE_TICKS
-            && observation
-                .owned
-                .iter()
-                .any(|unit| unit.id == *unit_id && unit.kind == EntityKind::Rifleman)
-    });
+    let (bounded_riflemen, direct): (Vec<_>, Vec<_>) =
+        interceptors.into_iter().partition(|unit_id| {
+            observation.tick < EARLY_ENTRENCHED_RESPONSE_TICKS
+                && observation
+                    .owned
+                    .iter()
+                    .any(|unit| unit.id == *unit_id && unit.kind == EntityKind::Rifleman)
+        });
     let mut issued = Vec::new();
     if let Some(units) = actions::attack_units(actions, direct, target) {
         issued.extend(units);

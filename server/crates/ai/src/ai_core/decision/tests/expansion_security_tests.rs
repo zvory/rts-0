@@ -147,11 +147,15 @@ fn contested_expansion_guards_are_available_to_local_defense() {
     obs.visible_enemies.push(enemy);
 
     let decision = decide(&obs, &JEFFS_AI, &mut memory);
-    assert!(decision.commands.iter().any(|command| matches!(
-        command,
-        Command::AttackMove { units, .. }
-            if units.iter().any(|id| memory.expansion_security.riflemen.contains(id))
-    )), "{:?}", decision.commands);
+    assert!(
+        decision.commands.iter().any(|command| matches!(
+            command,
+            Command::AttackMove { units, .. }
+                if units.iter().any(|id| memory.expansion_security.riflemen.contains(id))
+        )),
+        "{:?}",
+        decision.commands
+    );
 }
 
 #[test]
