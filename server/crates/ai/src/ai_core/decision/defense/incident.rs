@@ -2,6 +2,9 @@ use super::*;
 
 pub(super) const SEARCH_TICKS: u32 = config::TICK_HZ * 2;
 const REACQUIRE_TILES: f32 = 1.5;
+const EARLY_ENTRENCHED_RESPONSE_TICKS: u32 = config::TICK_HZ * 60 * 4;
+const MIN_ENTRENCHED_HOME_GUARDS: usize = 2;
+const MAX_ENTRENCHED_INTERCEPTORS: usize = 2;
 
 pub(in crate::ai_core::decision) fn respond_to_local_incident(
     actions: &mut AiActionContext<'_>,
@@ -49,7 +52,13 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
             interceptors.retain(|unit| *unit != scout);
         }
         return if let Some(target) = primary_defense_target(observation, &attack_targets) {
-            actions::attack_units(actions, interceptors, target)
+            issue_local_interception(
+                actions,
+                observation,
+                interceptors,
+                target,
+                contact.intercept,
+            )
         } else {
             actions::hold_position_units(actions, interceptors)
         };
@@ -82,6 +91,37 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
         incident.position.0,
         incident.position.1,
     )
+}
+
+fn issue_local_interception(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    interceptors: Vec<u32>,
+    target: u32,
+    intercept: (f32, f32),
+) -> Option<Vec<u32>> {
+    let (bounded_riflemen, direct): (Vec<_>, Vec<_>) = interceptors.into_iter().partition(|unit_id| {
+        observation.tick < EARLY_ENTRENCHED_RESPONSE_TICKS
+            && observation
+                .owned
+                .iter()
+                .any(|unit| unit.id == *unit_id && unit.kind == EntityKind::Rifleman)
+    });
+    let mut issued = Vec::new();
+    if let Some(units) = actions::attack_units(actions, direct, target) {
+        issued.extend(units);
+    }
+    // Early Riflemen move only to the footprint-side intercept. This remains true after released
+    // trench guards start moving and no longer qualify as entrenched, so later decisions cannot
+    // turn the bounded response into a chase across an open map or around Crossroads walls.
+    if let Some(units) =
+        actions::attack_move_units(actions, bounded_riflemen, intercept.0, intercept.1)
+    {
+        issued.extend(units);
+    }
+    issued.sort_unstable();
+    issued.dedup();
+    (!issued.is_empty()).then_some(issued)
 }
 
 fn eligible_local_defenders(observation: &AiObservation, local_defenders: &[u32]) -> Vec<u32> {
@@ -140,16 +180,28 @@ pub(in crate::ai_core::decision) fn select_defensive_interceptors(
             .then_with(|| left.cmp(right))
     });
     candidates.dedup();
+    let entrenched: Vec<u32> = candidates
+        .iter()
+        .copied()
+        .filter(|unit_id| entrenched_rifleman(observation, memory, *unit_id))
+        .collect();
+    let released_entrenched = if observation.tick < EARLY_ENTRENCHED_RESPONSE_TICKS {
+        entrenched
+            .len()
+            .saturating_sub(MIN_ENTRENCHED_HOME_GUARDS)
+            .min(MAX_ENTRENCHED_INTERCEPTORS)
+    } else {
+        0
+    };
+    let released_entrenched: BTreeSet<u32> =
+        entrenched.into_iter().take(released_entrenched).collect();
     candidates.retain(|unit_id| {
-        by_id.get(unit_id).is_some_and(|unit| {
-            unit.kind != EntityKind::Rifleman
-                || memory.estimated_entrenchment_ticks(observation, *unit_id)
-                    < rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS
-        })
+        !entrenched_rifleman(observation, memory, *unit_id) || released_entrenched.contains(unit_id)
     });
-
     // A two-to-one observed-value response clears a small penetration without uprooting every
-    // entrenched edge guard. Larger forces naturally exhaust the available home reserve.
+    // entrenched edge guard. Unentrenched units sort first, but entrenched Riflemen remain valid
+    // interceptors when the mobile reserve is insufficient. The deterministic home-pocket planner
+    // sends them back to their original slots as soon as the incident clears.
     let required_value = threat_value.saturating_mul(2).max(1);
     let mut selected = Vec::new();
     let mut selected_value: u32 = 0;
@@ -196,11 +248,27 @@ pub(in crate::ai_core::decision) fn select_defensive_interceptors(
             }
         }
     }
-    if selected_value < required_value && !has_anti_armor {
+    if selected_value < required_value
+        && !has_anti_armor
+        && (armored_threat || observation.tick >= EARLY_ENTRENCHED_RESPONSE_TICKS)
+    {
         Vec::new()
     } else {
         selected
     }
+}
+
+fn entrenched_rifleman(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    unit_id: u32,
+) -> bool {
+    observation.owned.iter().any(|unit| {
+        unit.id == unit_id
+            && unit.kind == EntityKind::Rifleman
+            && memory.estimated_entrenchment_ticks(observation, unit_id)
+                >= rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS
+    })
 }
 
 fn defensive_counter_rank(kind: EntityKind, armored_threat: bool) -> u8 {

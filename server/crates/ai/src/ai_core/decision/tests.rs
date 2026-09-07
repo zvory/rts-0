@@ -293,6 +293,115 @@ fn defensive_interceptors_move_unentrenched_reserves_first() {
 }
 
 #[test]
+fn defensive_interceptors_release_entrenched_riflemen_when_reserves_are_insufficient() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 3,
+            supply_cap: 10,
+        },
+        (1..=5)
+            .map(|id| {
+                combat_at(
+                    id * 10,
+                    EntityKind::Rifleman,
+                    (9.5 + id as f32) * ts,
+                    10.5 * ts,
+                )
+            })
+            .collect(),
+    );
+    observation.upgrades.push(UpgradeKind::Entrenchment);
+    observation.tick = 0;
+    let mut memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
+    memory.sync_defender_posture(&observation);
+    observation.tick = rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS;
+    memory.sync_defender_posture(&observation);
+
+    let selected = select_defensive_interceptors(
+        &observation,
+        &memory,
+        vec![10, 20, 30, 40, 50],
+        (20.5 * ts, 10.5 * ts),
+        50,
+        false,
+    );
+
+    assert_eq!(selected, vec![50, 40]);
+}
+
+#[test]
+fn defensive_interceptors_commit_available_riflemen_to_overwhelming_infantry() {
+    let ts = config::TILE_SIZE as f32;
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 2,
+            supply_cap: 10,
+        },
+        vec![
+            combat_at(10, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts),
+            combat_at(20, EntityKind::Rifleman, 11.5 * ts, 10.5 * ts),
+        ],
+    );
+    let memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
+
+    let selected = select_defensive_interceptors(
+        &observation,
+        &memory,
+        vec![10, 20],
+        (20.5 * ts, 10.5 * ts),
+        600,
+        false,
+    );
+
+    assert_eq!(selected, vec![20, 10]);
+}
+
+#[test]
+fn defensive_interceptors_keep_entrenched_riflemen_home_after_four_minutes() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 5,
+            supply_cap: 10,
+        },
+        (1..=5)
+            .map(|id| {
+                combat_at(
+                    id * 10,
+                    EntityKind::Rifleman,
+                    (9.5 + id as f32) * ts,
+                    10.5 * ts,
+                )
+            })
+            .collect(),
+    );
+    observation.upgrades.push(UpgradeKind::Entrenchment);
+    observation.tick = 0;
+    let mut memory = AiDecisionMemory::for_profile(&crate::ai_core::profiles::JEFFS_AI);
+    memory.sync_defender_posture(&observation);
+    observation.tick = config::TICK_HZ * 60 * 4;
+    memory.sync_defender_posture(&observation);
+
+    let selected = select_defensive_interceptors(
+        &observation,
+        &memory,
+        vec![10, 20, 30, 40, 50],
+        (20.5 * ts, 10.5 * ts),
+        50,
+        false,
+    );
+
+    assert!(selected.is_empty());
+}
+
+#[test]
 fn defensive_interceptors_prioritize_anti_armor_and_refuse_rifle_only_sacrifices() {
     let ts = config::TILE_SIZE as f32;
     let observation = observation(

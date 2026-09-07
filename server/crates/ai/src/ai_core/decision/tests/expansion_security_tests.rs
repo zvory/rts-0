@@ -149,8 +149,8 @@ fn contested_expansion_guards_are_available_to_local_defense() {
     let decision = decide(&obs, &JEFFS_AI, &mut memory);
     assert!(decision.commands.iter().any(|command| matches!(
         command,
-        Command::Attack { units, target, .. }
-            if *target == 900 && units.iter().any(|id| memory.expansion_security.riflemen.contains(id))
+        Command::AttackMove { units, .. }
+            if units.iter().any(|id| memory.expansion_security.riflemen.contains(id))
     )), "{:?}", decision.commands);
 }
 

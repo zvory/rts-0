@@ -253,11 +253,16 @@ plus reserved sites for submitted build intents. The four-unit defensive pocket 
 the starting Resource Depot so later construction cannot drag it out of shape; only surplus
 Riflemen use completed core buildings for their standing coverage. When visible enemy material
 enters the wider envelope, mobile defenders focus the highest-value visible target at the
-threatened footprint. Tanks and Panzerfausts answer armored contacts first, fully entrenched
-Riflemen remain in place, and an understrength Rifle-only group does not make a sacrificial
-intercept. Lost contact creates only a bounded two-second search incident; reaching the last
-contact point without reacquiring the enemy or reaching the timeout returns the units to normal
-defensive staging. A containment push may start once its two-Tank, one-Scout-Car core and two nearby
+threatened footprint. Tanks and Panzerfausts answer armored contacts first. During the first four
+minutes, at most two entrenched home Riflemen may reinforce an infantry breach when mobile reserves
+are insufficient, and at least two entrenched Riflemen remain at the home pocket. Released trench
+guards attack-move only to the bounded footprint-side intercept instead of chasing a selected unit.
+After four minutes, fully entrenched Riflemen remain in place. Riflemen always refuse a sacrificial
+intercept against armor when no anti-armor unit is available. Lost contact creates only a bounded
+two-second search incident; reaching the
+last contact point without reacquiring the enemy or reaching the timeout returns the units to their
+deterministic home slots and normal defensive staging. A containment push may start once its
+two-Tank, one-Scout-Car core and two nearby
 Riflemen are available even if the generic frontal-wave size is not yet filled. The four oldest
 Riflemen remain reserved for the home pocket. Escort selection uses only other completed,
 free-for-combat Riflemen within twelve tiles of the group, takes at least two
