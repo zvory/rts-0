@@ -55,6 +55,7 @@ pub(crate) struct AiDecisionMemory {
     defensive_panic_last_tick: Option<u32>,
     defensive_panic_response: DefensivePanicResponse,
     defensive_incident: Option<DefensiveIncidentMemory>,
+    defensive_incident_riflemen: BTreeSet<u32>,
     defender_posture: BTreeMap<u32, DefenderPostureMemory>,
     entrenchment_available_since: Option<u32>,
     pub(super) pending_upgrades: BTreeSet<UpgradeKind>,
@@ -104,6 +105,7 @@ impl AiDecisionMemory {
             defensive_panic_last_tick: None,
             defensive_panic_response: DefensivePanicResponse::Riflemen,
             defensive_incident: None,
+            defensive_incident_riflemen: BTreeSet::new(),
             defender_posture: BTreeMap::new(),
             entrenchment_available_since: None,
             pending_upgrades: BTreeSet::new(),
@@ -330,6 +332,7 @@ impl AiDecisionMemory {
         let incident = self.defensive_incident?;
         if tick.saturating_sub(incident.last_contact_tick) > search_ticks {
             self.defensive_incident = None;
+            self.defensive_incident_riflemen.clear();
             return None;
         }
         Some(DefensiveIncident {
@@ -342,6 +345,18 @@ impl AiDecisionMemory {
 
     pub(super) fn clear_defensive_incident(&mut self) {
         self.defensive_incident = None;
+        self.defensive_incident_riflemen.clear();
+    }
+
+    pub(super) fn defensive_incident_riflemen(&self) -> &BTreeSet<u32> {
+        &self.defensive_incident_riflemen
+    }
+
+    pub(super) fn note_defensive_incident_riflemen(
+        &mut self,
+        unit_ids: impl IntoIterator<Item = u32>,
+    ) {
+        self.defensive_incident_riflemen.extend(unit_ids);
     }
 
     pub(super) fn sync_defender_posture(&mut self, observation: &AiObservation) {
@@ -361,6 +376,8 @@ impl AiDecisionMemory {
             })
             .map(|entity| entity.id)
             .collect();
+        self.defensive_incident_riflemen
+            .retain(|unit_id| active.contains(unit_id));
         self.defender_posture
             .retain(|unit_id, _| active.contains(unit_id));
         for unit in observation

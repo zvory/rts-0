@@ -27,6 +27,12 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
             contact.threat_value,
             contact.armored_threat,
         );
+        let released_riflemen: Vec<u32> = interceptors
+            .iter()
+            .copied()
+            .filter(|unit_id| entrenched_rifleman(observation, memory, *unit_id))
+            .collect();
+        memory.note_defensive_incident_riflemen(released_riflemen);
         let smoke = crate::ai_core::decision::frontal::smoke::maybe_issue_local_defense_smoke(
             actions,
             observation,
@@ -190,7 +196,10 @@ pub(in crate::ai_core::decision) fn select_defensive_interceptors(
         entrenched
             .len()
             .saturating_sub(MIN_ENTRENCHED_HOME_GUARDS)
-            .min(MAX_ENTRENCHED_INTERCEPTORS)
+            .min(
+                MAX_ENTRENCHED_INTERCEPTORS
+                    .saturating_sub(memory.defensive_incident_riflemen().len()),
+            )
     } else {
         0
     };

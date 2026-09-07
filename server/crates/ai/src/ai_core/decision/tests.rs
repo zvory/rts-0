@@ -325,11 +325,35 @@ fn defensive_interceptors_release_entrenched_riflemen_when_reserves_are_insuffic
         &memory,
         vec![10, 20, 30, 40, 50],
         (20.5 * ts, 10.5 * ts),
-        50,
+        100,
         false,
     );
 
     assert_eq!(selected, vec![50, 40]);
+
+    memory.note_defensive_incident_riflemen(selected.iter().copied());
+    observation.tick += 9;
+    for unit_id in &selected {
+        let unit = observation
+            .owned
+            .iter_mut()
+            .find(|unit| unit.id == *unit_id)
+            .unwrap();
+        unit.x += ts;
+        unit.state = AiEntityState::Move;
+    }
+    memory.sync_defender_posture(&observation);
+
+    let selected_again = select_defensive_interceptors(
+        &observation,
+        &memory,
+        vec![10, 20, 30, 40, 50],
+        (20.5 * ts, 10.5 * ts),
+        100,
+        false,
+    );
+
+    assert_eq!(selected_again, vec![50, 40]);
 }
 
 #[test]
