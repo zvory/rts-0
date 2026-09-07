@@ -126,6 +126,20 @@ fn committed_steel_is_reserved_from_budget() {
 }
 
 #[test]
+fn resource_holdback_preserves_only_the_requested_amount() {
+    let mut budget = SpendBudget::new(900, 300, 0, 20);
+    budget.holdback_resources(450, 100);
+
+    assert_eq!(budget.steel(), 450);
+    assert_eq!(budget.oil(), 200);
+    assert!(budget.can_afford_unit(EntityKind::Tank));
+
+    budget.holdback_resources(900, 300);
+    assert_eq!(budget.steel(), 0);
+    assert_eq!(budget.oil(), 0);
+}
+
+#[test]
 fn compatibility_context_does_not_apply_the_public_strategy_cap() {
     let observation = observation(
         AiEconomy {

@@ -222,7 +222,9 @@ vision-supported attack wave. For active `jeffs_ai`, once the first Tank exists 
 Factory queue, the second Resource Depot becomes the next protected oil purchase. Before any
 Depot build intent or affordability requirement, two Riflemen beyond the home four advance to
 separate posts at the selected natural. The Barracks can fill this six-Rifle minimum without the
-usual surplus-steel reserve. Tank replenishment waits for the Depot order. Construction requires
+usual surplus-steel reserve. While the site is being secured, only the exact Resource Depot cost
+is held back; resources above that reserve remain available for Tank and other production.
+Construction requires
 both guards at their posts and three seconds without visible enemy contact within eleven tiles;
 contact or a missing guard resets that interval. The builder uses that same secured footprint.
 Once the Depot is complete, the first surplus Tank outside the containment wave and home reserve

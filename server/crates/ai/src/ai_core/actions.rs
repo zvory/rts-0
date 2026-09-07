@@ -36,6 +36,10 @@ impl<'a> AiActionContext<'a> {
         &self.budget
     }
 
+    pub(crate) fn holdback_resources(&mut self, steel: u32, oil: u32) {
+        self.budget.holdback_resources(steel, oil);
+    }
+
     pub(crate) fn reservations(&self) -> &AiReservations {
         &self.reservations
     }
