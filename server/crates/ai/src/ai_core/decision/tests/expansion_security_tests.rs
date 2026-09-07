@@ -231,21 +231,25 @@ fn expansion_security_allows_a_replacement_when_the_first_tank_is_lost() {
 }
 
 #[test]
-fn expansion_security_builds_only_the_secured_site_and_keeps_its_garrison() {
+fn expansion_security_spends_only_resources_above_the_depot_reserve() {
     let mut obs = security_observation();
     obs.economy.steel = 2000;
     obs.economy.oil = 2000;
     obs.owned.push(combat(20, EntityKind::Tank));
+    let factory = obs
+        .owned
+        .iter_mut()
+        .find(|unit| unit.kind == EntityKind::Factory)
+        .unwrap();
+    factory.production_kind = None;
+    factory.production_queue_len = Some(0);
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     let first = decide(&obs, &JEFFS_AI, &mut memory);
     assert!(
-        !first.intents.iter().any(|intent| match intent {
-            AiIntent::Train { kind } | AiIntent::Build { kind } =>
-                rts_rules::economy::cost(*kind).1 > 0,
-            AiIntent::Research { upgrade: kind } => upgrade::definition(*kind).cost_oil > 0,
-            _ => false,
+        first.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Tank
         }),
-        "gas was spent before securing the expansion: {:?}",
+        "surplus resources should remain available for Tanks: {:?}",
         first.intents
     );
     assert!(!first.intents.contains(&AiIntent::Build {

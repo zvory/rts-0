@@ -129,6 +129,11 @@ impl ActionBudget {
         self.oil
     }
 
+    pub(crate) fn holdback_resources(&mut self, steel: u32, oil: u32) {
+        self.steel = self.steel.saturating_sub(steel);
+        self.oil = self.oil.saturating_sub(oil);
+    }
+
     pub(crate) fn can_afford_unit(&self, kind: EntityKind) -> bool {
         kind.is_unit() && self.can_afford(cost_for_unit(kind))
     }

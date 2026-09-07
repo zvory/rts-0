@@ -313,6 +313,10 @@ where
     }
     let save_for_unplanned_expansion = (save_for_expansion || reserve_expansion)
         && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0;
+    if reserve_expansion && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0 {
+        let (steel, oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
+        actions.holdback_resources(steel, oil);
+    }
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
@@ -631,12 +635,6 @@ where
         && facts.unit_count(EntityKind::Rifleman) < 6
     {
         effective_unit_priorities.insert(0, EntityKind::Rifleman);
-    }
-    if reserve_expansion && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0 {
-        effective_unit_priorities.retain(|kind| {
-            rts_rules::economy::cost(*kind).1 == 0
-                || (*kind == EntityKind::Tank && facts.unit_count(EntityKind::Tank) == 0)
-        });
     }
     if let Some(policy) = profile.surplus_steel_production {
         let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
