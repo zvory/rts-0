@@ -1,5 +1,6 @@
 use super::super::pending_build::{
-    PendingBuildTracker, BUILD_SITE_CLEARANCE_GRACE_TICKS, PENDING_BUILD_STALE_TICKS,
+    PendingBuildTracker, BUILD_SITE_CLEARANCE_GRACE_TICKS, PENDING_BUILD_MAX_AGE_TICKS,
+    PENDING_BUILD_STALE_TICKS,
 };
 use super::super::player_view::PlayerView;
 use crate::config;
@@ -128,6 +129,34 @@ fn pending_build_tracker_keeps_moving_worker_past_stale_window() {
             "moving expansion builder should remain reserved at tick {tick}"
         );
     }
+}
+
+#[test]
+fn pending_build_tracker_expires_a_worker_that_moves_without_arriving() {
+    let start = pending_tracker_start_payload();
+    let mut tracker = PendingBuildTracker::default();
+    tracker.record_commands(
+        10,
+        &[Command::Build {
+            units: vec![2],
+            building: EntityKind::ResourceDepot,
+            tile_x: 48,
+            tile_y: 70,
+            queued: false,
+        }],
+    );
+
+    for tick in (70..10 + PENDING_BUILD_MAX_AGE_TICKS).step_by(60) {
+        let snapshot = pending_tracker_snapshot(tick, 100.0 + tick as f32, 200.0);
+        tracker.observe(pending_tracker_view(tick, &start, &snapshot));
+        assert_eq!(tracker.intents().len(), 1, "tick {tick}");
+    }
+    let expiry_tick = 10 + PENDING_BUILD_MAX_AGE_TICKS;
+    let snapshot = pending_tracker_snapshot(expiry_tick, 100.0 + expiry_tick as f32, 200.0);
+    tracker.observe(pending_tracker_view(expiry_tick, &start, &snapshot));
+
+    assert!(tracker.intents().is_empty());
+    assert!(tracker.failed(EntityKind::ResourceDepot, 48, 70));
 }
 
 #[test]

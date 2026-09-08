@@ -12,7 +12,7 @@ fn security_observation() -> AiObservation {
         building(6, EntityKind::Factory, Some(1)),
     ];
     units.last_mut().unwrap().production_kind = Some(EntityKind::Tank);
-    units.extend((10..16).map(|id| combat_at(id, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts)));
+    units.extend((10..18).map(|id| combat_at(id, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts)));
     let mut obs = observation(
         AiEconomy {
             steel: 40,
@@ -36,7 +36,7 @@ fn expansion_security_dispatches_before_affordability_or_build_intent() {
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     let decision = decide(&obs, &JEFFS_AI, &mut memory);
     assert!(memory.expansion_security.site.is_some());
-    assert_eq!(memory.expansion_security.riflemen, vec![14, 15]);
+    assert_eq!(memory.expansion_security.riflemen, vec![14, 15, 16, 17]);
     assert!(obs.pending_builds.is_empty());
     assert!(!decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::ResourceDepot
@@ -104,6 +104,88 @@ fn predicted_expansion_footprint_evicts_friendly_combat_units() {
 }
 
 #[test]
+fn selected_expansion_footprint_evicts_friendly_combat_units_on_other_maps() {
+    let mut obs = security_observation();
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    let center = building_center(
+        memory.expansion_security.site.unwrap(),
+        EntityKind::ResourceDepot,
+        obs.map.tile_size,
+    )
+    .unwrap();
+    obs.owned
+        .push(combat_at(99, EntityKind::Rifleman, center.0, center.1));
+    let facts = AiFacts::from_observation(&obs);
+    let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+
+    let blockers = expansion_security::clear_reserved_footprint(&obs, &memory, &mut actions);
+
+    assert_eq!(blockers, vec![99]);
+    assert!(actions
+        .into_commands()
+        .iter()
+        .any(|command| matches!(command, Command::Move { units, .. } if units == &[99])));
+}
+
+#[test]
+fn expansion_waits_for_its_footprint_to_clear_before_ordering_the_engineer() {
+    let mut obs = security_observation();
+    obs.economy.steel = 2000;
+    obs.economy.oil = 2000;
+    obs.owned.push(combat(20, EntityKind::Tank));
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    decide(&obs, &JEFFS_AI, &mut memory);
+    let site = memory.expansion_security.site.unwrap();
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    for (id, point) in memory
+        .expansion_security
+        .riflemen
+        .iter()
+        .zip(&points)
+        .take(2)
+    {
+        let unit = obs.owned.iter_mut().find(|unit| unit.id == *id).unwrap();
+        unit.x = point.0;
+        unit.y = point.1;
+    }
+    let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    obs.owned
+        .push(combat_at(99, EntityKind::Rifleman, center.0, center.1));
+    decide(&obs, &JEFFS_AI, &mut memory);
+    obs.tick += config::TICK_HZ * 3;
+
+    let blocked = decide(&obs, &JEFFS_AI, &mut memory);
+
+    assert!(!blocked.intents.contains(&AiIntent::Build {
+        kind: EntityKind::ResourceDepot
+    }));
+    assert!(blocked
+        .commands
+        .iter()
+        .any(|command| matches!(command, Command::Move { units, .. } if units.contains(&99))));
+
+    let blocker = obs.owned.iter_mut().find(|unit| unit.id == 99).unwrap();
+    blocker.x = 2.0 * obs.map.tile_size as f32;
+    blocker.y = 2.0 * obs.map.tile_size as f32;
+    obs.tick += 9;
+    let clear = decide(&obs, &JEFFS_AI, &mut memory);
+    assert!(clear.commands.iter().any(|command| matches!(
+        command,
+        Command::Build {
+            building: EntityKind::ResourceDepot,
+            ..
+        }
+    )));
+}
+
+#[test]
 fn successful_expansion_attempt_does_not_time_out_after_later_depot_loss() {
     let mut obs = security_observation();
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
@@ -158,11 +240,7 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
         &mut |_, _, _| true,
     );
     let points = expansion_security::positions(&obs, None, &memory.expansion_security);
-    assert_eq!(points.len(), 2);
-    assert!(
-        geometry::dist2(points[0].0, points[0].1, points[1].0, points[1].1).sqrt()
-            >= 2.75 * config::TILE_SIZE as f32
-    );
+    assert_eq!(points.len(), 4);
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
@@ -191,7 +269,13 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
         !step(&obs, &mut memory),
         "guards merely partway to the expansion must not start the secure dwell"
     );
-    for (id, point) in memory.expansion_security.riflemen.iter().zip(&points) {
+    for (id, point) in memory
+        .expansion_security
+        .riflemen
+        .iter()
+        .zip(&points)
+        .take(2)
+    {
         let unit = obs.owned.iter_mut().find(|unit| unit.id == *id).unwrap();
         unit.x = point.0;
         unit.y = point.1;
@@ -264,19 +348,120 @@ fn expansion_security_retains_party_and_replaces_casualties_without_taking_home_
     };
     prepare(&obs, &mut memory);
     let site = memory.expansion_security.site;
-    obs.owned.push(combat(16, EntityKind::Rifleman));
+    let site_center = building_center(
+        memory.expansion_security.site.unwrap(),
+        EntityKind::ResourceDepot,
+        obs.map.tile_size,
+    )
+    .unwrap();
+    obs.owned.push(combat_at(
+        18,
+        EntityKind::Rifleman,
+        site_center.0,
+        site_center.1,
+    ));
     prepare(&obs, &mut memory);
-    assert_eq!(memory.expansion_security.riflemen, vec![14, 15]);
+    assert_eq!(memory.expansion_security.riflemen, vec![14, 15, 16, 17]);
     obs.owned.retain(|unit| unit.id != 14);
     prepare(&obs, &mut memory);
-    assert_eq!(memory.expansion_security.riflemen, vec![15, 16]);
+    assert_eq!(memory.expansion_security.riflemen, vec![15, 16, 17, 18]);
     assert_eq!(memory.expansion_security.site, site);
+}
+
+#[test]
+fn expansion_security_replaces_an_escort_that_stops_making_progress() {
+    let mut obs = security_observation();
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    let arrived = obs.owned.iter_mut().find(|unit| unit.id == 15).unwrap();
+    arrived.x = points[1].0;
+    arrived.y = points[1].1;
+    for id in [16, 17] {
+        obs.owned
+            .iter_mut()
+            .find(|unit| unit.id == id)
+            .unwrap()
+            .state = AiEntityState::Attack;
+    }
+    let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
+        let facts = AiFacts::from_observation(obs);
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(obs, None, memory, &mut actions)
+    };
+    assert!(!step(&obs, &mut memory));
+    obs.tick += config::TICK_HZ * 10;
+    assert!(!step(&obs, &mut memory));
+    assert_eq!(memory.expansion_security.riflemen, vec![15]);
+
+    for id in 18..=20 {
+        obs.owned
+            .push(combat_at(id, EntityKind::Rifleman, 14.0, 14.0));
+    }
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    assert_eq!(memory.expansion_security.riflemen, vec![15, 18, 19, 20]);
+}
+
+#[test]
+fn replacing_a_surplus_escort_does_not_reset_two_ready_guards() {
+    let mut obs = security_observation();
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    for (id, point) in memory
+        .expansion_security
+        .riflemen
+        .iter()
+        .zip(&points)
+        .take(2)
+    {
+        let unit = obs.owned.iter_mut().find(|unit| unit.id == *id).unwrap();
+        unit.x = point.0;
+        unit.y = point.1;
+    }
+    let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
+        let facts = AiFacts::from_observation(obs);
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(obs, None, memory, &mut actions)
+    };
+    assert!(!step(&obs, &mut memory));
+
+    obs.owned.retain(|unit| unit.id != 17);
+    obs.owned.push(combat(18, EntityKind::Rifleman));
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    assert!(memory.expansion_security.riflemen.contains(&18));
+    obs.tick += config::TICK_HZ * 3;
+    assert!(step(&obs, &mut memory));
 }
 
 #[test]
 fn expansion_security_waits_safely_when_only_one_guard_is_available() {
     let mut obs = security_observation();
-    obs.owned.retain(|unit| unit.id != 15);
+    obs.owned.retain(|unit| !matches!(unit.id, 15 | 16 | 17));
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
 
     let decision = decide(&obs, &JEFFS_AI, &mut memory);
@@ -379,7 +564,7 @@ fn expansion_security_spends_only_resources_above_the_depot_reserve() {
         center.1,
     ));
     decide(&obs, &JEFFS_AI, &mut memory);
-    assert_eq!(memory.expansion_security.riflemen, vec![14, 15]);
+    assert_eq!(memory.expansion_security.riflemen.len(), 2);
 }
 
 #[test]
@@ -426,7 +611,7 @@ fn expansion_security_has_spaced_reachable_posts_on_river_and_crossroads() {
             let mut security = expansion_security::ExpansionSecurity::default();
             security.site = Some(site);
             let points = expansion_security::positions(&obs, Some(&analysis), &security);
-            assert_eq!(points.len(), 2, "{name} player {player} site {site:?}");
+            assert_eq!(points.len(), 4, "{name} player {player} site {site:?}");
             let center =
                 building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
             let enemy = obs
@@ -459,10 +644,12 @@ fn expansion_security_has_spaced_reachable_posts_on_river_and_crossroads() {
                     "guard faces away from the approach on {name} player {player}: {point:?}"
                 );
             }
-            assert!(
-                geometry::dist2(points[0].0, points[0].1, points[1].0, points[1].1).sqrt()
-                    >= 2.75 * obs.map.tile_size as f32
-            );
+            for pair in points.windows(2) {
+                assert!(
+                    geometry::dist2(pair[0].0, pair[0].1, pair[1].0, pair[1].1).sqrt()
+                        >= 2.75 * obs.map.tile_size as f32
+                );
+            }
         }
     }
 }
@@ -526,7 +713,7 @@ fn crossroads_expansion_tank_uses_the_same_wall_aware_approach_as_its_rifles() {
             (point.0 - center.0) * direction.0 + (point.1 - center.1) * direction.1
         };
 
-        assert_eq!(rifles.len(), 2, "player {player} site {site:?}");
+        assert_eq!(rifles.len(), 4, "player {player} site {site:?}");
         assert!(projection(tank) > 0.0, "player {player} tank {tank:?}");
         assert!(
             rifles
@@ -568,7 +755,7 @@ fn completed_expansion_stages_tanks_between_the_depot_and_rifle_screen() {
     security.site = Some(site);
     let rifles = expansion_security::positions(&obs, None, &security);
 
-    assert_eq!(rifles.len(), 2);
+    assert_eq!(rifles.len(), 4);
     assert!(projection(tank) > 0.0);
     assert!(rifles
         .iter()

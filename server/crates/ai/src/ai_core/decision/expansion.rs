@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
 
 use super::geometry::{
-    building_center, dist2, footprint_top_left_for_center, squared, tile_center,
+    building_center, dist2, footprint_top_left_for_center, normalized_direction, squared,
+    tile_center,
 };
 use super::policies::active_expansion_policy;
 use super::*;
@@ -218,6 +219,25 @@ where
         && uses_jeff_river_layout(observation)
     {
         let approach = tile_center((15, 27), observation.map.tile_size);
+        return actions::try_move_then_build_at(
+            actions,
+            builder_pools,
+            kind,
+            tile_x,
+            tile_y,
+            approach,
+        );
+    }
+    if profile.id == JEFFS_AI_ID {
+        let center = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
+        let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+        let direction = normalized_direction(center, home)?;
+        let stats = config::building_stats(kind)?;
+        let clearance_tiles = stats.foot_w.max(stats.foot_h) as f32 * 0.5 + 1.0;
+        let approach = (
+            center.0 + direction.0 * clearance_tiles * observation.map.tile_size as f32,
+            center.1 + direction.1 * clearance_tiles * observation.map.tile_size as f32,
+        );
         return actions::try_move_then_build_at(
             actions,
             builder_pools,

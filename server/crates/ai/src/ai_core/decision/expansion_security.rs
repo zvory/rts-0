@@ -2,17 +2,31 @@ use super::geometry::{building_center, dist2, normalized_direction, squared, til
 use super::*;
 
 const HOME_RIFLES: usize = 4;
-const PARTY_SIZE: usize = 2;
+pub(super) const ESCORT_PARTY_SIZE: usize = 4;
+pub(super) const SECURITY_RIFLE_TARGET: usize = HOME_RIFLES + ESCORT_PARTY_SIZE;
+const REQUIRED_GUARDS: usize = 2;
 const SECURE_TICKS: u32 = config::TICK_HZ * 3;
+const GUARD_COVERAGE_TILES: f32 = 8.0;
 const MIN_PARTY_SEPARATION_TILES: f32 = 2.75;
 const TANK_FRONT_OFFSET_TILES: f32 = 2.75;
 const BUILD_START_TIMEOUT_TICKS: u32 = config::TICK_HZ * 3;
+const ESCORT_STALL_TICKS: u32 = config::TICK_HZ * 10;
+const ESCORT_RETRY_TICKS: u32 = config::TICK_HZ * 10;
+const ESCORT_PROGRESS_EPS_TILES: f32 = 0.25;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct EscortProgress {
+    best_distance_milli_tiles: u32,
+    last_progress_tick: u32,
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct ExpansionSecurity {
     pub(super) site: Option<(u32, u32)>,
     pub(super) riflemen: Vec<u32>,
     slots: BTreeMap<u32, usize>,
+    progress: BTreeMap<u32, EscortProgress>,
+    retry_after: BTreeMap<u32, u32>,
     secure_since: Option<u32>,
     build_attempt_tick: Option<u32>,
     build_attempt_worker: Option<u32>,
@@ -83,6 +97,26 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         memory.expansion_security.build_attempt_tick = None;
         memory.expansion_security.build_attempt_worker = None;
         memory.expansion_security.retry_builder = None;
+        if memory.expansion_security.riflemen.len() > REQUIRED_GUARDS {
+            let Some(center) = memory.expansion_security.site.and_then(|site| {
+                building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+            }) else {
+                return;
+            };
+            memory.expansion_security.riflemen.sort_by(|left, right| {
+                let distance = |id: &u32| {
+                    observation
+                        .owned
+                        .iter()
+                        .find(|unit| unit.id == *id)
+                        .map_or(f32::MAX, |unit| dist2(unit.x, unit.y, center.0, center.1))
+                };
+                distance(left)
+                    .total_cmp(&distance(right))
+                    .then_with(|| left.cmp(right))
+            });
+            memory.expansion_security.riflemen.truncate(REQUIRED_GUARDS);
+        }
     }
     let timed_out_site = memory
         .expansion_security
@@ -144,6 +178,10 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     if !expansion_is_next(observation, facts, profile) {
         return;
     }
+    memory
+        .expansion_security
+        .retry_after
+        .retain(|_, retry_tick| observation.tick < *retry_tick);
     let mut rifles: Vec<_> = observation
         .owned
         .iter()
@@ -151,7 +189,23 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         .map(|unit| unit.id)
         .collect();
     rifles.sort_unstable();
-    let mut candidates = rifles.get(HOME_RIFLES..).unwrap_or(&[]).to_vec();
+    memory
+        .expansion_security
+        .riflemen
+        .retain(|id| rifles.contains(id));
+    let home_reserve = rifles
+        .iter()
+        .copied()
+        .filter(|id| !memory.expansion_security.riflemen.contains(id))
+        .take(HOME_RIFLES)
+        .collect::<BTreeSet<_>>();
+    let mut candidates = rifles
+        .iter()
+        .copied()
+        .filter(|id| !home_reserve.contains(id))
+        .filter(|id| !memory.expansion_security.riflemen.contains(id))
+        .filter(|id| !memory.expansion_security.retry_after.contains_key(id))
+        .collect::<Vec<_>>();
     if let Some(center) = building_center(
         memory.expansion_security.site.unwrap(),
         EntityKind::ResourceDepot,
@@ -170,14 +224,9 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
                 .then_with(|| left.cmp(right))
         });
     }
-    candidates.truncate(PARTY_SIZE);
-    let previous = memory.expansion_security.riflemen.clone();
-    memory
-        .expansion_security
-        .riflemen
-        .retain(|id| candidates.contains(id));
+    candidates.truncate(ESCORT_PARTY_SIZE.saturating_sub(memory.expansion_security.riflemen.len()));
     for id in &candidates {
-        if memory.expansion_security.riflemen.len() >= PARTY_SIZE {
+        if memory.expansion_security.riflemen.len() >= ESCORT_PARTY_SIZE {
             break;
         }
         if !memory.expansion_security.riflemen.contains(id) {
@@ -185,16 +234,16 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         }
     }
     let security = &mut memory.expansion_security;
-    if security.riflemen != previous {
-        security.secure_since = None;
-    }
     security
         .slots
         .retain(|id, _| security.riflemen.contains(id));
+    security
+        .progress
+        .retain(|id, _| security.riflemen.contains(id));
     for id in &security.riflemen {
         if !security.slots.contains_key(id) {
-            if let Some(slot) =
-                (0..PARTY_SIZE).find(|slot| !security.slots.values().any(|used| used == slot))
+            if let Some(slot) = (0..ESCORT_PARTY_SIZE)
+                .find(|slot| !security.slots.values().any(|used| used == slot))
             {
                 security.slots.insert(*id, slot);
             }
@@ -352,7 +401,7 @@ pub(super) fn positions(
         site.1.saturating_add(depot.foot_h) as f32 * ts,
     );
     let mut points = Vec::new();
-    for lateral in [-2.0, 2.0] {
+    for lateral in [-4.5, -1.5, 1.5, 4.5] {
         let desired = (
             center.0 + (direction.0 * forward_tiles - direction.1 * lateral) * ts,
             center.1 + (direction.1 * forward_tiles + direction.0 * lateral) * ts,
@@ -499,19 +548,14 @@ pub(super) fn update_and_stage(
         site.0.saturating_add(depot.foot_w) as f32 * ts,
         site.1.saturating_add(depot.foot_h) as f32 * ts,
     );
-    let mut party_positions = Vec::new();
     let mut assignments = Vec::new();
-    let mut arrived = security.riflemen.len() == PARTY_SIZE && points.len() == PARTY_SIZE;
     for id in &security.riflemen {
         let Some(point) = security.slots.get(id).and_then(|slot| points.get(*slot)) else {
-            arrived = false;
             continue;
         };
         let Some(unit) = observation.owned.iter().find(|unit| unit.id == *id) else {
-            arrived = false;
             continue;
         };
-        party_positions.push((unit.x, unit.y));
         let close = dist2(unit.x, unit.y, point.0, point.1)
             <= squared(defense::EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES * ts);
         let footprint_clear = !crate::sdk::unit_circle_touches_rect(
@@ -520,32 +564,77 @@ pub(super) fn update_and_stage(
             depot_rect,
         );
         assignments.push((*id, *point, close, footprint_clear, unit.state));
-        arrived &= close && footprint_clear && unit.state != AiEntityState::Attack;
     }
-    arrived = arrived
-        && party_positions.len() == PARTY_SIZE
-        && dist2(
-            party_positions[0].0,
-            party_positions[0].1,
-            party_positions[1].0,
-            party_positions[1].1,
-        ) >= squared(MIN_PARTY_SEPARATION_TILES * ts);
+    let qualified = assignments
+        .iter()
+        .filter_map(|(id, _, _, footprint_clear, _)| {
+            let unit = observation.owned.iter().find(|unit| unit.id == *id)?;
+            (*footprint_clear
+                && dist2(unit.x, unit.y, center.0, center.1) <= squared(GUARD_COVERAGE_TILES * ts))
+            .then_some((*id, (unit.x, unit.y)))
+        })
+        .collect::<Vec<_>>();
+    let arrived = qualified.iter().enumerate().any(|(index, (_, left))| {
+        qualified.iter().skip(index + 1).any(|(_, right)| {
+            dist2(left.0, left.1, right.0, right.1) >= squared(MIN_PARTY_SEPARATION_TILES * ts)
+        })
+    });
+
+    let progress_epsilon = (ESCORT_PROGRESS_EPS_TILES * 1000.0) as u32;
+    let mut stalled = Vec::new();
+    for (id, point, _, footprint_clear, _) in &assignments {
+        let Some(unit) = observation.owned.iter().find(|unit| unit.id == *id) else {
+            continue;
+        };
+        let covering_site = *footprint_clear
+            && dist2(unit.x, unit.y, center.0, center.1) <= squared(GUARD_COVERAGE_TILES * ts);
+        if covering_site {
+            security.progress.remove(id);
+            continue;
+        }
+        let distance_milli_tiles =
+            (dist2(unit.x, unit.y, point.0, point.1).sqrt() / ts * 1000.0) as u32;
+        let progress = security.progress.entry(*id).or_insert(EscortProgress {
+            best_distance_milli_tiles: distance_milli_tiles,
+            last_progress_tick: observation.tick,
+        });
+        if distance_milli_tiles.saturating_add(progress_epsilon)
+            < progress.best_distance_milli_tiles
+        {
+            progress.best_distance_milli_tiles = distance_milli_tiles;
+            progress.last_progress_tick = observation.tick;
+        } else if observation.tick.saturating_sub(progress.last_progress_tick) >= ESCORT_STALL_TICKS
+        {
+            stalled.push(*id);
+        }
+    }
     // On contact, leave the guards unclaimed so local incident handling can use them. Once the
     // area clears, their normal staging orders bring them back to their assigned posts.
     if !contested {
-        for (id, point, close, footprint_clear, state) in assignments {
-            if arrived || (close && footprint_clear) {
+        for (id, point, close, footprint_clear, _) in assignments {
+            if close && footprint_clear {
                 actions::hold_position_units(actions, [id]);
-            } else if state != AiEntityState::Attack {
+            } else {
                 actions::attack_move_units(actions, [id], point.0, point.1);
             }
         }
     }
     if arrived && !contested {
         let since = *security.secure_since.get_or_insert(observation.tick);
-        observation.tick.saturating_sub(since) >= SECURE_TICKS
+        let secured = observation.tick.saturating_sub(since) >= SECURE_TICKS;
+        if secured {
+            return true;
+        }
     } else {
         security.secure_since = None;
-        false
     }
+    for id in stalled {
+        security.riflemen.retain(|candidate| *candidate != id);
+        security.slots.remove(&id);
+        security.progress.remove(&id);
+        security
+            .retry_after
+            .insert(id, observation.tick.saturating_add(ESCORT_RETRY_TICKS));
+    }
+    false
 }

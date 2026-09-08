@@ -12,6 +12,10 @@ const FAILED_SPOTS_CAP: usize = 16;
 /// Force a pending build to be treated as failed after this many ticks without worker movement so
 /// stale commands do not suppress future build attempts forever if a worker gets stuck.
 pub(super) const PENDING_BUILD_STALE_TICKS: u32 = 300;
+/// Even a worker that is moving can circle or oscillate without ever reaching an unreachable
+/// footprint. Bound the total travel/build reservation so the AI can reject that footprint and
+/// choose another one instead of reserving its resources forever.
+pub(super) const PENDING_BUILD_MAX_AGE_TICKS: u32 = config::TICK_HZ * 60;
 /// Allow a unit ordered off a construction footprint time to move clear before the builder
 /// abandons the selected site. The simulation runs at 30 Hz, so this is six seconds.
 pub(super) const BUILD_SITE_CLEARANCE_GRACE_TICKS: u32 = 180;
@@ -25,6 +29,7 @@ struct PendingBuild {
     last_x: Option<f32>,
     last_y: Option<f32>,
     last_progress_tick: u32,
+    created_tick: u32,
     clearance_grace_until: Option<u32>,
 }
 
@@ -48,6 +53,10 @@ impl PendingBuild {
 
     fn stale_at(self, tick: u32) -> bool {
         tick.saturating_sub(self.last_progress_tick) >= PENDING_BUILD_STALE_TICKS
+    }
+
+    fn expired_at(self, tick: u32) -> bool {
+        tick.saturating_sub(self.created_tick) >= PENDING_BUILD_MAX_AGE_TICKS
     }
 }
 
@@ -79,7 +88,7 @@ impl PendingBuildTracker {
             let keep = worker
                 .map(|worker| {
                     pending.observe_worker(worker, view.tick);
-                    !pending.stale_at(view.tick)
+                    !pending.stale_at(view.tick) && !pending.expired_at(view.tick)
                 })
                 .unwrap_or_else(|| {
                     pending
@@ -154,6 +163,7 @@ impl PendingBuildTracker {
                     last_x: None,
                     last_y: None,
                     last_progress_tick: tick,
+                    created_tick: tick,
                     clearance_grace_until: (factory_clearance_ordered
                         && *building == EntityKind::Factory)
                         .then_some(tick.saturating_add(BUILD_SITE_CLEARANCE_GRACE_TICKS)),

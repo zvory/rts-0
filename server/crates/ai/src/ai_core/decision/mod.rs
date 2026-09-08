@@ -267,9 +267,7 @@ where
     let defer_economy_for_panic = defensive_panic.active && !preserve_fast_tank_economy;
     let mut expansion_plan = plan_expansion(observation, &facts, profile, defer_economy_for_panic);
     expansion_security::prepare(observation, &facts, profile, memory, &mut placeable);
-    let expansion_footprint_blockers = if profile.id == JEFFS_AI_ID
-        && expansion_security::predicts_natural_from_opening(observation)
-    {
+    let expansion_footprint_blockers = if profile.id == JEFFS_AI_ID {
         expansion_security::clear_reserved_footprint(observation, memory, &mut actions)
     } else {
         Vec::new()
@@ -310,6 +308,7 @@ where
     if (should_build_expansion_from_economy_manager(&economy_manager_output)
         || !retry_builder.is_empty())
         && (profile.id != JEFFS_AI_ID || expansion_secured)
+        && (profile.id != JEFFS_AI_ID || expansion_footprint_blockers.is_empty())
     {
         if let Some(build_action) = try_build_expansion_resource_depot(
             observation,
@@ -656,7 +655,7 @@ where
     let mut effective_unit_priorities = effective_unit_priorities;
     if profile.id == JEFFS_AI_ID
         && memory.expansion_security.site.is_some()
-        && facts.unit_count(EntityKind::Rifleman) < 6
+        && facts.unit_count(EntityKind::Rifleman) < expansion_security::SECURITY_RIFLE_TARGET
     {
         effective_unit_priorities.insert(0, EntityKind::Rifleman);
     }
@@ -695,7 +694,7 @@ where
             .unwrap_or(EntityKind::Worker);
         let security_recruits = profile.id == JEFFS_AI_ID
             && memory.expansion_security.site.is_some()
-            && facts.unit_count(EntityKind::Rifleman) < 6
+            && facts.unit_count(EntityKind::Rifleman) < expansion_security::SECURITY_RIFLE_TARGET
             && building_kind == EntityKind::Barracks;
         let save_for_tech = !security_recruits
             && (save_for_unplanned_expansion
@@ -725,7 +724,11 @@ where
                 policy.unit,
                 current
                     .saturating_add(affordable_above_reserve)
-                    .max(if security_recruits { 6 } else { 0 }),
+                    .max(if security_recruits {
+                        expansion_security::SECURITY_RIFLE_TARGET
+                    } else {
+                        0
+                    }),
             ));
         }
         let production_rally = is_jeffs_ai_profile(profile.id)
