@@ -310,7 +310,9 @@ function attackTargetAtScreen(input, point, eligibleOwner) {
   const tileSize = input.state?.map?.tileSize || DEFAULT_TILE_SIZE;
   const reach = tileSize / 2 + tileSize / 6;
   return input._selectionEntities()
-    .filter((target) => target.kind === KIND.PUMP_JACK && eligible(target))
+    .filter((target) => (
+      (target.kind === KIND.STEEL_MINE || target.kind === KIND.PUMP_JACK) && eligible(target)
+    ))
     .filter((target) => Math.abs(world.x - target.x) <= reach && Math.abs(world.y - target.y) <= reach)
     .sort((a, b) => Math.hypot(world.x - a.x, world.y - a.y) - Math.hypot(world.x - b.x, world.y - b.y))[0] || null;
 }

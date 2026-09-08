@@ -74,6 +74,27 @@ assert(
   "enemy Pump Jack accepts a contextual attack within one-sixth tile beyond its footprint",
 );
 
+const steel = { id: 62, owner: 0, kind: KIND.STEEL, x: 176, y: 176, remaining: 1000 };
+const enemySteelMine = { id: 63, owner: 3, kind: KIND.STEEL_MINE, x: steel.x, y: steel.y, hp: 100, maxHp: 100 };
+input.selectionScene = buildSelectionScene({
+  entities: [attackingTank, steel, enemySteelMine],
+  tileSize: map.tileSize,
+  projection,
+});
+commands.length = 0;
+input._onRightClick({ x: steel.x, y: steel.y });
+assert(
+  commands.length === 1 && commands[0].c === "attack" && commands[0].target === enemySteelMine.id,
+  "enemy Steel Mine wins contextual attack targeting over its underlying steel patch",
+);
+
+commands.length = 0;
+input._onRightClick({ x: steel.x + map.tileSize / 2 + map.tileSize / 6 - 0.1, y: steel.y });
+assert(
+  commands.length === 1 && commands[0].c === "attack" && commands[0].target === enemySteelMine.id,
+  "enemy Steel Mine accepts a contextual attack within one-sixth tile beyond its footprint",
+);
+
 const steelMineScaffold = {
   id: 4,
   owner: 1,
