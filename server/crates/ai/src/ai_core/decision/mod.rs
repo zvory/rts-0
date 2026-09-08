@@ -267,11 +267,17 @@ where
     let defer_economy_for_panic = defensive_panic.active && !preserve_fast_tank_economy;
     let mut expansion_plan = plan_expansion(observation, &facts, profile, defer_economy_for_panic);
     expansion_security::prepare(observation, &facts, profile, memory, &mut placeable);
+    let expansion_footprint_blockers = if profile.id == JEFFS_AI_ID
+        && expansion_security::predicts_natural_from_opening(observation)
+    {
+        expansion_security::clear_reserved_footprint(observation, memory, &mut actions)
+    } else {
+        Vec::new()
+    };
     let expansion_secured =
         expansion_security::update_and_stage(observation, map_analysis, memory, &mut actions);
-    let reserve_expansion = profile.id == JEFFS_AI_ID
-        && memory.expansion_security.site.is_some()
-        && facts.building_count(EntityKind::ResourceDepot) < 2;
+    let reserve_expansion = expansion_security::expansion_is_next(observation, &facts, profile)
+        && memory.expansion_security.site.is_some();
     let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
     let save_for_expansion = expansion_plan.should_save;
     if reserve_expansion && !expansion_secured {
@@ -290,20 +296,38 @@ where
         },
     });
 
-    if should_build_expansion_from_economy_manager(&economy_manager_output)
+    let retry_builder = memory
+        .expansion_security
+        .retry_builder()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let expansion_builder_pools = [
+        retry_builder.as_slice(),
+        idle_builders.as_slice(),
+        gathering_builders.as_slice(),
+    ];
+
+    if (should_build_expansion_from_economy_manager(&economy_manager_output)
+        || !retry_builder.is_empty())
         && (profile.id != JEFFS_AI_ID || expansion_secured)
     {
-        if try_build_expansion_resource_depot(
+        if let Some(build_action) = try_build_expansion_resource_depot(
             observation,
             &facts,
             &mut actions,
-            &builder_pools,
+            &expansion_builder_pools,
             profile,
             memory.expansion_security.site,
+            !retry_builder.is_empty(),
             &mut placeable,
-        )
-        .is_some()
-        {
+        ) {
+            if profile.id == JEFFS_AI_ID
+                && expansion_security::predicts_natural_from_opening(observation)
+            {
+                memory
+                    .expansion_security
+                    .note_build_attempt(observation.tick, build_action.worker);
+            }
             intents.push(AiIntent::Build {
                 kind: EntityKind::ResourceDepot,
             });
@@ -756,6 +780,7 @@ where
         frontal_exclusions.insert(tank_id);
     }
     frontal_exclusions.extend(memory.expansion_security.riflemen.iter().copied());
+    frontal_exclusions.extend(expansion_footprint_blockers.iter().copied());
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
@@ -768,6 +793,7 @@ where
     let attack_due = frontal_wave.attack_due;
     let mut local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
+    local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     if profile.home_anti_tank.is_some() {
         local_ready_units.retain(|id| {
             Some(*id) != memory.home_defensive_tank

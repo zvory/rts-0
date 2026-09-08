@@ -11,7 +11,8 @@ pub(super) fn queue_upgrade_if_available(
         return;
     }
     let definition = upgrade::definition(upgrade);
-    if memory.expansion_security.site.is_some()
+    if facts.complete_building_count(EntityKind::Factory) > 0
+        && memory.expansion_security.site.is_some()
         && facts.building_count(EntityKind::ResourceDepot) < 2
         && planned_in_intents(intents, EntityKind::ResourceDepot) == 0
         && definition.cost_oil > 0

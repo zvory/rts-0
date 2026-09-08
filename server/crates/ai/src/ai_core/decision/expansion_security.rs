@@ -6,6 +6,7 @@ const PARTY_SIZE: usize = 2;
 const SECURE_TICKS: u32 = config::TICK_HZ * 3;
 const MIN_PARTY_SEPARATION_TILES: f32 = 2.75;
 const TANK_FRONT_OFFSET_TILES: f32 = 2.75;
+const BUILD_START_TIMEOUT_TICKS: u32 = config::TICK_HZ * 3;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct ExpansionSecurity {
@@ -13,6 +14,22 @@ pub(super) struct ExpansionSecurity {
     pub(super) riflemen: Vec<u32>,
     slots: BTreeMap<u32, usize>,
     secure_since: Option<u32>,
+    build_attempt_tick: Option<u32>,
+    build_attempt_worker: Option<u32>,
+    retry_builder: Option<u32>,
+    rejected_sites: BTreeSet<(u32, u32)>,
+}
+
+impl ExpansionSecurity {
+    pub(super) fn note_build_attempt(&mut self, tick: u32, worker: u32) {
+        self.build_attempt_tick = Some(tick);
+        self.build_attempt_worker = Some(worker);
+        self.retry_builder = None;
+    }
+
+    pub(super) fn retry_builder(&self) -> Option<u32> {
+        self.retry_builder
+    }
 }
 
 /// The first Tank is paid before the natural; subsequent gas is reserved for the Depot.
@@ -23,7 +40,12 @@ pub(super) fn expansion_is_next(
     profile: &AiProfile,
 ) -> bool {
     profile.id == JEFFS_AI_ID
-        && facts.building_count(EntityKind::ResourceDepot) < 2
+        && observation
+            .owned
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.hp > 0)
+            .count()
+            < 2
         && facts.complete_building_count(EntityKind::Factory) > 0
         && (facts.unit_count(EntityKind::Tank) > 0
             || observation.owned.iter().any(|unit| {
@@ -31,6 +53,12 @@ pub(super) fn expansion_is_next(
                     && unit.production_kind == Some(EntityKind::Tank)
                     && unit.production_queue_len.unwrap_or(0) > 0
             }))
+}
+
+pub(super) fn predicts_natural_from_opening(observation: &AiObservation) -> bool {
+    observation.map.width == 166
+        && observation.map.height == 166
+        && matches!(observation.own_start_tile, (157, 47) | (8, 47))
 }
 
 pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
@@ -43,6 +71,30 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     if profile.id != JEFFS_AI_ID {
         return;
     }
+    let timed_out_site = memory
+        .expansion_security
+        .build_attempt_tick
+        .is_some_and(|tick| {
+            observation
+                .owned
+                .iter()
+                .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.hp > 0)
+                .count()
+                < 2
+                && observation.tick.saturating_sub(tick) >= BUILD_START_TIMEOUT_TICKS
+        });
+    if timed_out_site {
+        if let Some(site) = memory.expansion_security.site {
+            memory.expansion_security.rejected_sites.insert(site);
+        }
+        memory.expansion_security.site = None;
+        memory.expansion_security.riflemen.clear();
+        memory.expansion_security.slots.clear();
+        memory.expansion_security.secure_since = None;
+        memory.expansion_security.build_attempt_tick = None;
+        memory.expansion_security.retry_builder =
+            memory.expansion_security.build_attempt_worker.take();
+    }
     let security_wait_complete = memory
         .expansion_security
         .secure_since
@@ -54,20 +106,34 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
                     && !placeable(EntityKind::ResourceDepot, site.0, site.1)))
     });
     if site_became_blocked {
-        memory.expansion_security = ExpansionSecurity::default();
+        let rejected_sites = std::mem::take(&mut memory.expansion_security.rejected_sites);
+        memory.expansion_security = ExpansionSecurity {
+            rejected_sites,
+            ..ExpansionSecurity::default()
+        };
     }
-    if memory.expansion_security.site.is_none() && expansion_is_next(observation, facts, profile) {
+    if memory.expansion_security.site.is_none()
+        && ((profile.id == JEFFS_AI_ID && predicts_natural_from_opening(observation))
+            || expansion_is_next(observation, facts, profile))
+        && facts.building_count(EntityKind::ResourceDepot) < 2
+    {
         if let Some(policy) = profile.expansion {
+            let rejected_sites = &memory.expansion_security.rejected_sites;
             memory.expansion_security.site = expansion::expansion_resource_depot_site(
                 observation,
                 policy,
                 EntityKind::ResourceDepot,
                 profile.id,
-                placeable,
+                &mut |kind, x, y| !rejected_sites.contains(&(x, y)) && placeable(kind, x, y),
             );
         }
     }
     if memory.expansion_security.site.is_none() {
+        return;
+    }
+    // Predict and reserve the footprint from the opening, but do not pull the security party
+    // off the opening army until the expansion is actually the next strategic milestone.
+    if !expansion_is_next(observation, facts, profile) {
         return;
     }
     let mut rifles: Vec<_> = observation
@@ -129,6 +195,73 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     memory
         .containment_active_riflemen
         .retain(|id| !memory.expansion_security.riflemen.contains(id));
+}
+
+/// Move friendly combat units out of the predicted Depot footprint before they can settle there.
+/// Workers are excluded because the eventual builder must be allowed to enter the reserved area.
+pub(super) fn clear_reserved_footprint(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    actions: &mut AiActionContext<'_>,
+) -> Vec<u32> {
+    let Some(site) = memory.expansion_security.site else {
+        return Vec::new();
+    };
+    if observation
+        .owned
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.hp > 0)
+        .count()
+        >= 2
+    {
+        return Vec::new();
+    }
+    let Some(stats) = config::building_stats(EntityKind::ResourceDepot) else {
+        return Vec::new();
+    };
+    let ts = observation.map.tile_size as f32;
+    let rect = (
+        site.0 as f32 * ts,
+        site.1 as f32 * ts,
+        site.0.saturating_add(stats.foot_w) as f32 * ts,
+        site.1.saturating_add(stats.foot_h) as f32 * ts,
+    );
+    let Some(center) = building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+    else {
+        return Vec::new();
+    };
+    let blockers = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind.is_unit() && unit.kind != EntityKind::Worker && unit.hp > 0)
+        .filter(|unit| {
+            crate::sdk::unit_circle_touches_rect(
+                (unit.x, unit.y),
+                rts_rules::balance::unit_placement_radius(unit.kind) + 0.25 * ts,
+                rect,
+            )
+        })
+        .map(|unit| unit.id)
+        .collect::<Vec<_>>();
+    for id in &blockers {
+        let Some(unit) = observation.owned.iter().find(|unit| unit.id == *id) else {
+            continue;
+        };
+        // Use a short radial exit. A destination toward home can lie across Schone Tage's cliff
+        // and leave the blocker parked inside the footprint indefinitely.
+        let direction = normalized_direction(center, (unit.x, unit.y)).unwrap_or((0.0, 1.0));
+        let half_diagonal =
+            ((stats.foot_w * stats.foot_w + stats.foot_h * stats.foot_h) as f32).sqrt() * 0.5;
+        let clearance =
+            half_diagonal * ts + rts_rules::balance::unit_placement_radius(unit.kind) + 0.5 * ts;
+        actions::move_units(
+            actions,
+            [*id],
+            center.0 + direction.0 * clearance,
+            center.1 + direction.1 * clearance,
+        );
+    }
+    blockers
 }
 
 fn site_blocked_by_owned_building(observation: &AiObservation, site: (u32, u32)) -> bool {
