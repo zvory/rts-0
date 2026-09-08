@@ -52,6 +52,101 @@ fn expansion_security_dispatches_before_affordability_or_build_intent() {
 }
 
 #[test]
+fn expansion_footprint_is_predicted_before_the_expansion_opening() {
+    let mut obs = security_observation();
+    obs.map.width = 166;
+    obs.map.height = 166;
+    obs.own_start_tile = (157, 47);
+    obs.owned
+        .retain(|entity| entity.kind != EntityKind::Factory);
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    assert!(memory.expansion_security.site.is_some());
+    assert!(memory.expansion_security.riflemen.is_empty());
+}
+
+#[test]
+fn predicted_expansion_footprint_evicts_friendly_combat_units() {
+    let mut obs = security_observation();
+    obs.map.width = 166;
+    obs.map.height = 166;
+    obs.own_start_tile = (157, 47);
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    let center = building_center(
+        memory.expansion_security.site.unwrap(),
+        EntityKind::ResourceDepot,
+        obs.map.tile_size,
+    )
+    .unwrap();
+    obs.owned
+        .push(combat_at(99, EntityKind::Rifleman, center.0, center.1));
+    let facts = AiFacts::from_observation(&obs);
+    let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+    let blockers = expansion_security::clear_reserved_footprint(&obs, &memory, &mut actions);
+    assert_eq!(blockers, vec![99]);
+    assert!(actions
+        .into_commands()
+        .iter()
+        .any(|command| matches!(command, Command::Move { units, .. } if units == &[99])));
+}
+
+#[test]
+fn successful_expansion_attempt_does_not_time_out_after_later_depot_loss() {
+    let mut obs = security_observation();
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    memory.expansion_security.note_build_attempt(obs.tick, 1);
+    let site = memory.expansion_security.site.unwrap();
+    let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    obs.owned.push(building_at(
+        99,
+        EntityKind::ResourceDepot,
+        Some(0),
+        center.0,
+        center.1,
+    ));
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+
+    obs.owned.retain(|entity| entity.id != 99);
+    obs.tick += config::TICK_HZ * 3;
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+
+    assert_eq!(memory.expansion_security.site, Some(site));
+    assert_eq!(memory.expansion_security.retry_builder(), None);
+}
+
+#[test]
 fn expansion_security_requires_arrival_and_uncontested_dwell() {
     let mut obs = security_observation();
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);

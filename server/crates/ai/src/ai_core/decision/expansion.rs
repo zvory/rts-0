@@ -183,6 +183,7 @@ pub(super) fn try_build_expansion_resource_depot<F>(
     builder_pools: &[&[u32]],
     profile: &AiProfile,
     secured_site: Option<(u32, u32)>,
+    retrying_stalled_order: bool,
     placeable: &mut F,
 ) -> Option<actions::BuildAction>
 where
@@ -198,7 +199,9 @@ where
         return None;
     }
     let counts = facts.building_counts(kind);
-    if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
+    if !retrying_stalled_order
+        && counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind
+    {
         return None;
     }
     let (tile_x, tile_y) = if profile.id == JEFFS_AI_ID {
@@ -248,6 +251,11 @@ where
             // fall back to the surrounding search when that exact footprint is
             // temporarily blocked; retry the same instruction on the next pass.
             let tile = instruction.tile;
+            return placeable(kind, tile.0, tile.1).then_some(tile);
+        }
+    }
+    if profile_id == JEFFS_AI_ID {
+        if let Some(tile) = instructed_schone_tage_expansion_site(observation, kind, &resources) {
             return placeable(kind, tile.0, tile.1).then_some(tile);
         }
     }
@@ -311,6 +319,26 @@ where
     }
 
     best.map(|candidate: ExpansionSiteCandidate| candidate.tile)
+}
+
+fn instructed_schone_tage_expansion_site(
+    observation: &AiObservation,
+    kind: EntityKind,
+    resources: &[&AiResourceSummary],
+) -> Option<(u32, u32)> {
+    if observation.map.width != 166 || observation.map.height != 166 {
+        return None;
+    }
+    let tile = match observation.own_start_tile {
+        (157, 47) => (144, 24),
+        (8, 47) => (19, 24),
+        _ => return None,
+    };
+    let candidate = expansion_site_candidate(observation, kind, tile.0, tile.1, resources)?;
+    let required_steel = config::STEEL_PATCHES_PER_BASE as usize;
+    let required_oil = config::OIL_PATCHES_PER_BASE as usize;
+    (candidate.steel_in_range >= required_steel && candidate.oil_in_range >= required_oil)
+        .then_some(tile)
 }
 
 fn instructed_river_expansion_site(
