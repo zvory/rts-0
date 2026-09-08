@@ -339,6 +339,7 @@ export const dom = {
   giveUpConfirmButton: document.getElementById("give-up-confirm-button"),
   selectionArea: document.getElementById("selection-area"),
   commandCard: document.getElementById("command-card"),
+  betaBadge: document.getElementById("beta-badge"),
   devBanner: document.getElementById("dev-banner"),
   devLinks: document.getElementById("dev-links"),
   roomTimeControls: document.getElementById("room-time-controls"),

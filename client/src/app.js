@@ -1,5 +1,4 @@
 // Bootstrap & wiring. See docs/design/client-ui.md §4.1 (module contracts) and §4.
-//
 // This is the only place that knows about *all* the modules. It owns:
 //   - the WebSocket lifecycle (via Net),
 //   - the lobby <-> game screen transition,
@@ -89,6 +88,7 @@ import {
 } from "./renderer/preparation_slot.js";
 import { formatReplaySeekNotice } from "./replay_seek_notice.js";
 import { ReplaySeekOverlay } from "./replay_seek_overlay.js";
+import { applyBetaBadge } from "./beta_badge.js";
 import { StressTestRunner } from "./stress_test.js";
 import { FloatingPanelPositioner } from "./floating_panel_positioner.js";
 import { ChatOverlay } from "./chat_overlay.js";
@@ -96,7 +96,6 @@ import {
   installMapPreviewStartupStatus,
   MapPreviewBridge,
 } from "./map_preview_bridge.js";
-
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
  * so we ping well inside that window to keep a healthy connection alive.
@@ -104,7 +103,6 @@ import {
 const HEARTBEAT_MS = 15000;
 const PLAYER_ACTIVITY_REPORT_INTERVAL_MS = 30000;
 const PLAYER_ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel"];
-
 export function isLivePlayerMatch(match) {
   return !!match &&
     !!match.state &&
@@ -347,7 +345,6 @@ export class App {
         force: true,
       });
     }
-
     void this.loadVersion();
     if (this.labCatalogLaunch) {
       this.showLabCatalog();
@@ -357,6 +354,7 @@ export class App {
       this._mountMatchHistory();
     }
     this.applyDevBanner();
+    applyBetaBadge(this);
     if (!this.requiresConnectionOnStart()) return;
     try {
       await this.ensureConnected();
@@ -821,6 +819,7 @@ export class App {
     this.branchStaging.hide();
     if (dom.devLinks) dom.devLinks.hidden = true;
     dom.gameScreen.hidden = false;
+    applyBetaBadge(this);
     if (!preserveScorePanel) {
       dom.gameOver.hidden = true;
       this.clearScoreboard();
@@ -1154,6 +1153,7 @@ export class App {
     if (dom.branchScreen) this.branchStaging.hide();
     dom.lobbyScreen.hidden = false;
     if (dom.devLinks) dom.devLinks.hidden = false;
+    applyBetaBadge(this);
     this.lobby.resetToBrowser();
     this.lobby.show();
     this.disconnectIdleConnection();
