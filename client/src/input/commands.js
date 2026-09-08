@@ -61,7 +61,7 @@ export function _issueTargetedCommand(p, ev = {}) {
   const landUnits = selectedOwnLandUnitIds(this, ownUnits);
   const producers = ownUnits.length === 0 ? this._selectedProducerBuildingIds() : [];
   const pickedTarget = commandTarget === "attack"
-    ? this._entityAtScreen(p, /*ownPreferred=*/ false) ||
+    ? attackCommandTargetAtScreen(this, p) ||
       this._rememberedEntityAtScreen?.(p, isNeutralObstacle)
     : null;
   const resource = this._resourceAtScreen(p);
@@ -223,14 +223,6 @@ function normalRightClickAction(input, p) {
   const gatherers = input._selectedGathererIds();
   const workers = input._selectedWorkerIds();
   const contextualResource = resource;
-  if (contextualResource && contextualResource.remaining !== 0) {
-    const action = resourceRightClickAction(
-      contextualResource,
-      world || contextualResource,
-      gatherers,
-    );
-    if (action) return action;
-  }
 
   if (target && ownOwner(input.state, target.owner, input.controlPolicy) && _isOwnIncompleteBuilding(target)) {
     const resume = _resumeConstructionIntent(target, input.state.map);
@@ -252,6 +244,23 @@ function normalRightClickAction(input, p) {
       target,
       feedback: rightClickFeedback("move", target.x, target.y),
     };
+  }
+  const attackTarget = contextualAttackTargetAtScreen(input, p);
+  if (attackTarget) {
+    return {
+      kind: "attack",
+      units: landUnits,
+      target: attackTarget,
+      feedback: rightClickFeedback("attack", attackTarget.x, attackTarget.y),
+    };
+  }
+  if (contextualResource && contextualResource.remaining !== 0) {
+    const action = resourceRightClickAction(
+      contextualResource,
+      world || contextualResource,
+      gatherers,
+    );
+    if (action) return action;
   }
   if (
     target &&
@@ -278,6 +287,32 @@ function normalRightClickAction(input, p) {
     y: world.y,
     feedback: rightClickFeedback("move", world.x, world.y),
   };
+}
+
+function contextualAttackTargetAtScreen(input, point) {
+  return attackTargetAtScreen(input, point, (target) => (
+    Number(target.owner) !== 0 && enemyOwner(input.state, target.owner, input.controlPolicy)
+  ));
+}
+
+function attackCommandTargetAtScreen(input, point) {
+  return attackTargetAtScreen(input, point, (target) => (
+    explicitAttackCommandTarget(input.state, target, input.controlPolicy)
+  ));
+}
+
+function attackTargetAtScreen(input, point, eligibleOwner) {
+  const eligible = (target) => isAttackableEntityTarget(target) && eligibleOwner(target);
+  const exact = input._entityAtScreen(point, false, eligible);
+  if (exact && eligible(exact)) return exact;
+  const world = input._groundAtScreen(point.x, point.y);
+  if (!world) return null;
+  const tileSize = input.state?.map?.tileSize || DEFAULT_TILE_SIZE;
+  const reach = tileSize / 2 + tileSize / 6;
+  return input._selectionEntities()
+    .filter((target) => target.kind === KIND.PUMP_JACK && eligible(target))
+    .filter((target) => Math.abs(world.x - target.x) <= reach && Math.abs(world.y - target.y) <= reach)
+    .sort((a, b) => Math.hypot(world.x - a.x, world.y - a.y) - Math.hypot(world.x - b.x, world.y - b.y))[0] || null;
 }
 
 function resourceRightClickAction(resource, world, gatherers) {
@@ -801,7 +836,7 @@ export function _refreshAttackTargetPreview() {
   }
 
   if (intent.commandTarget === "attack") {
-    const target = this._entityAtScreen(this.mouse, /*ownPreferred=*/ false) ||
+    const target = attackCommandTargetAtScreen(this, this.mouse) ||
       this._rememberedEntityAtScreen?.(this.mouse, isNeutralObstacle);
     intent.updateAttackTargetPreview(
       explicitAttackCommandTarget(this.state, target, this.controlPolicy)
