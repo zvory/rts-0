@@ -483,8 +483,8 @@ assert(
     const occupantLipsIndex = renderer.world.children.indexOf(renderer.layers.trenchOccupantLips);
     const selectionIndex = renderer.world.children.indexOf(renderer.layers.selectionRings);
     const resourcesIndex = renderer.world.children.indexOf(renderer.layers.resources);
-    assert(terrainIndex < decalsIndex && decalsIndex < trenchesIndex && trenchesIndex < resourcesIndex,
-      "renderer mounts trench ground above decals and below resources/units");
+    assert(terrainIndex < decalsIndex && decalsIndex < trenchesIndex && trenchesIndex < renderer.world.children.indexOf(renderer.layers.corpses) && renderer.world.children.indexOf(renderer.layers.corpses) < resourcesIndex,
+      "renderer mounts transient corpses above trench ground and below resources/units");
     assert(
       unitShadowsIndex < occupantShadowsIndex &&
         occupantShadowsIndex < occupantLipsIndex &&
