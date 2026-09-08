@@ -129,8 +129,9 @@ class RecordingCanvasContext {
     assert(diagnostics.textureWidth === EXPECTED_DECAL_TEXTURE_SIZE, "126x126 map decal texture width is downsampled to 1008px");
     assert(diagnostics.textureHeight === EXPECTED_DECAL_TEXTURE_SIZE, "126x126 map decal texture height is downsampled to 1008px");
     assert(diagnostics.downsample === GROUND_DECAL_TEXTURE_WORLD_SCALE, "decal diagnostics expose the texture downsample");
-    assert(diagnostics.layerChildCount === 1 + MAX_TRANSIENT_CORPSE_SPRITES,
-      "stress renderer caps transient corpse sprites while retaining one permanent decal surface");
+    assert(diagnostics.layerChildCount === 1 &&
+      renderer.layers.corpses.children.length === MAX_TRANSIENT_CORPSE_SPRITES,
+    "stress renderer caps transient corpses on their dedicated layer while retaining one permanent decal surface");
 
     const decalCtx = canvasContexts[1];
     const callsAfterStamp = decalCtx.calls.length;
@@ -140,7 +141,8 @@ class RecordingCanvasContext {
     diagnostics = renderer.groundDecalDiagnostics();
     assert(decalCtx.calls.length === callsAfterStamp, "normal render frames do not redraw old decal pixels");
     assert(diagnostics.textureUpdateCount === 1, "normal render frames do not update the decal texture without new deaths");
-    assert(diagnostics.layerChildCount === 1 + MAX_TRANSIENT_CORPSE_SPRITES,
+    assert(diagnostics.layerChildCount === 1 &&
+      renderer.layers.corpses.children.length === MAX_TRANSIENT_CORPSE_SPRITES,
       "normal render frames do not add historical corpse display objects");
 
     pendingBatches.push(makeDecalBatch(40000, 9));
@@ -148,7 +150,8 @@ class RecordingCanvasContext {
     diagnostics = renderer.groundDecalDiagnostics();
     assert(diagnostics.totalStamped === STRESS_DECAL_COUNT + 9, "new deaths append to the existing decal texture");
     assert(diagnostics.textureUpdateCount === 2, "texture updates track new-death batches, not historical decal count");
-    assert(diagnostics.layerChildCount === 1 + MAX_TRANSIENT_CORPSE_SPRITES,
+    assert(diagnostics.layerChildCount === 1 &&
+      renderer.layers.corpses.children.length === MAX_TRANSIENT_CORPSE_SPRITES,
       "additional deaths evict the oldest transient corpses at the display-object cap");
 
     const oldSprite = renderer._groundDecals.sprite;
@@ -213,7 +216,8 @@ class RecordingCanvasContext {
     "the queued durable row hydrates before the replacement becomes visible");
 
     renderer.destroy();
-    assert(renderer.layers.decals.children.length === 0, "renderer teardown removes the permanent decal sprite");
+    assert(renderer.layers.decals.children.length === 0 && renderer.layers.corpses.children.length === 0,
+      "renderer teardown removes permanent decals and transient corpse sprites");
     renderer.destroy();
   } finally {
     if (priorDocument === undefined) delete globalThis.document;

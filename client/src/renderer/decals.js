@@ -43,6 +43,7 @@ export const MAX_TRANSIENT_CORPSE_SPRITES = 256;
 export class GroundDecalLayer {
   constructor({
     layer,
+    corpseLayer = layer,
     pixi = globalThis.PIXI,
     createCanvas = createWorkerSafeCanvas,
     downsample = GROUND_DECAL_TEXTURE_WORLD_SCALE,
@@ -50,6 +51,7 @@ export class GroundDecalLayer {
     loadAtlas = loadGroundDecalAtlas,
   } = {}) {
     this.layer = layer;
+    this.corpseLayer = corpseLayer;
     this.pixi = pixi;
     this.createCanvas = createCanvas;
     this.downsample = downsample;
@@ -112,6 +114,7 @@ export class GroundDecalLayer {
     this._destroyReplacement();
     const replacement = new GroundDecalLayer({
       layer: this.layer,
+      corpseLayer: this.corpseLayer,
       pixi: this.pixi,
       createCanvas: this.createCanvas,
       downsample: this.downsample,
@@ -346,7 +349,7 @@ export class GroundDecalLayer {
       CORPSE_SPRITE_SCALE * plan.scale * plan.flipY,
     );
     sprite.alpha = plan.opacity;
-    this.layer.addChild(sprite);
+    this.corpseLayer.addChild(sprite);
     if (this._corpseSprites.length >= MAX_TRANSIENT_CORPSE_SPRITES) {
       const expired = this._corpseSprites.shift();
       expired?.sprite.parent?.removeChild?.(expired.sprite);

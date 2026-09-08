@@ -287,8 +287,10 @@ assert(
     assert(decalLayer.texture.sourceUpdateCount === 1 && decalLayer.texture.textureUpdateCount === 0,
       "ground decals upload dynamic canvas pixels through Pixi v8 TextureSource.update");
 
+    const corpseContainer = new PIXI.Container();
     const corpseLayer = new GroundDecalLayer({
       layer: new PIXI.Container(),
+      corpseLayer: corpseContainer,
       createCanvas: () => ({
         width: 0,
         height: 0,
@@ -328,8 +330,13 @@ assert(
       { id: 51, decalClass: "infantry", kind: KIND.MACHINE_GUNNER, x: 64, y: 32, color: "#d55e00", seed: 2 },
       { id: 54, decalClass: "infantry", kind: KIND.RIFLEMAN, x: 80, y: 32, color: "#4878c8", seed: 5 },
       { id: 52, decalClass: "infantry", kind: KIND.WORKER, x: 96, y: 32, color: "#4878c8", seed: 3 },
-    ]) === 4 && corpseLayer._corpseSprites.length === 3 && corpseLayer.layer.children.length === 4,
+    ]) === 4 && corpseLayer._corpseSprites.length === 3 && corpseLayer.layer.children.length === 1,
     "authored rifle and machine-gunner deaths use transient sprites while unsupported infantry keep the raster fallback");
+    assert(
+      corpseLayer._corpseSprites.every(({ sprite }) => sprite.parent === corpseContainer) &&
+        corpseContainer.children.length === 3,
+      "authored infantry corpses mount on the dedicated layer above trench terrain",
+    );
     assert(corpseLayer._corpseTextures.size === 2,
       "authored deaths share immutable textures for the same asset variant and team color");
     assert(corpseLayer.texture.sourceUpdateCount === 1,
@@ -346,7 +353,8 @@ assert(
     assert(corpseLayer._corpseSprites.every(({ sprite }) => sprite.alpha === 0.47),
       "authored infantry deaths fade after their 1.8 second hold interval");
     corpseLayer.updateInfantryCorpseFades(5200);
-    assert(corpseLayer._corpseSprites.length === 0 && corpseLayer.layer.children.length === 1,
+    assert(corpseLayer._corpseSprites.length === 0 && corpseLayer.layer.children.length === 1 &&
+      corpseContainer.children.length === 0,
       "authored infantry deaths destroy their sprites after fading");
     corpseLayer.destroy();
 

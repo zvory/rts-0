@@ -2227,8 +2227,8 @@ overlay container as smoke clouds, below selection rings and HP bars):
 - Ability objects are never routed through entity selection, minimap blips, HUD command-card state,
   or local prediction. They disappear when absent from the next authoritative snapshot.
 
-Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; layer `decals` between
-terrain and resources):
+Ground decal rendering (`state_ground_decals.js`, `renderer/decals.js`; durable layer `decals`
+between terrain and trenches, transient corpse layer `corpses` immediately above trenches):
 - Decals are checkpointed server state. Snapshots expose a fog-safe, perspective-scoped revision
   plus a bounded repeated tail for immediate ordinary discovery. Reliable range requests repair
   late joins, reconnects, replay seeks, perspective changes, missed revisions, and cache recovery
@@ -2307,7 +2307,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Minimap roads reuse the world's deterministic dark-charcoal surface variants so revealed terrain stays visually coherent. Authored marked-road tiles draw small yellow centerline dots above fog, keeping the route network legible in unexplored territory; the dotted overlay is a cached static layer, while bare road tiles widen the charcoal surface without adding markings.
 - Authored tree doodads draw compact, dark cartographic pine symbols centered on their foliage bounds rather than their grounded trunk anchors. The cached forest layer renders beneath minimap fog, so trees are clear in current vision, dim when explored without vision, and nearly hidden when unexplored; roads, resources, and foreground player markers remain above it for tactical readability.
 - Minimap player-owned unit and building blips render above resource blips with a merged one-pixel white outline mask for clustered-icon readability. Their 1.6× maximum size scales linearly from 50% to 100% using supply for units (Rifleman/Worker through Tank) and total Steel + Oil cost for buildings (Tank Trap through Resource Depot), clamped at both ends; resource blips retain their original size. Legacy vision-only intel uses the same kind-specific scale but renders below the fog overlay and does not use the foreground outline/resource-overlap pass. Positional under-attack alerts use a 2.2-second red pulse with a crisp white inner rim. The nearest local owned unit or building at the alert position strobes its icon interior between white and its team color in 300-millisecond phases for the same duration; the resolved entity keeps flashing if it moves.
-- Layers (back→front): terrain → ground decals → trench terrain → local visual samples → resource nodes → building shadows → buildings →
+- Layers (back→front): terrain → ground decals → trench terrain → transient infantry corpses → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
   health bars → fog overlay → local visual-sample labels → shot-revealed units → damaged actionable-reveal health bars → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost and Lab ruler →
   selection drag-box → (HUD is DOM, not Pixi). Occupied-trench shadows and lips render only when the

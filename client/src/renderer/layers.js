@@ -5,6 +5,7 @@ export const LAYERS = [
   "terrain",
   "decals",
   "trenches",
+  "corpses",
   "visualSamples",
   "doodadUnderstory",
   "resources",

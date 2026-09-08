@@ -5,7 +5,7 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 // positioned/scaled from the Camera each frame, plus a screen-space overlay layer
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
-//   terrain → decals → trenches → visual-samples → doodad-understory → resources → building-shadows → buildings
+//   terrain → decals → trenches → corpses → visual-samples → doodad-understory → resources → building-shadows → buildings
 //   → building-overlays → unit-shadows → trench-occupant-shadows → trench-occupant-lips
 //   → selection-rings → world-Y-sorted units/tree-canopies
 //   → forest-unit-outlines → smokes → hp-bars → fog → concealment-unit-outlines → visual-sample-labels
@@ -219,6 +219,7 @@ export class Renderer {
     });
     this._groundDecals = new GroundDecalLayer({
       layer: this.layers.decals,
+      corpseLayer: this.layers.corpses,
       pixi: PIXI,
       recordDiagnostic: (label, amount) => this._recordRenderDiagnostic(label, amount),
     });
