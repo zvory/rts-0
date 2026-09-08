@@ -16,6 +16,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
 
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/beta_badge.css" />
     <link rel="stylesheet" href="/branch_staging.css" />
     <link rel="stylesheet" href="/lobby_map_selector.css" />
     <link rel="stylesheet" href="/map_preview.css" />
@@ -57,19 +58,22 @@
     -->
     <div id="app">
       <div id="status-badge" aria-label="game diagnostics"></div>
-      <details id="dev-links">
-        <summary>Dev links</summary>
-        <ul>
-          <li class="dev-links-section">Tools</li>
-          <li><a href="/lab" target="_blank">Lab</a></li>
-          <li><a href="/dev/scenarios" target="_blank">Scenarios</a></li>
-          <li><a href="/wiki" target="_blank">Wiki</a></li>
-          <li><a href="/map-editor" target="_blank">Map editor</a></li>
-          <li><a href="/stress-test" target="_blank">Stress Test</a></li>
-          <li class="dev-links-section">Environments</li>
-          <li><a href="https://rts-0-zvorygin-beta.fly.dev/" target="_blank" rel="noreferrer">Beta Version</a></li>
-        </ul>
-      </details>
+      <div id="dev-corner">
+        <details id="dev-links">
+          <summary>Dev links</summary>
+          <ul>
+            <li class="dev-links-section">Tools</li>
+            <li><a href="/lab" target="_blank">Lab</a></li>
+            <li><a href="/dev/scenarios" target="_blank">Scenarios</a></li>
+            <li><a href="/wiki" target="_blank">Wiki</a></li>
+            <li><a href="/map-editor" target="_blank">Map editor</a></li>
+            <li><a href="/stress-test" target="_blank">Stress Test</a></li>
+            <li class="dev-links-section">Environments</li>
+            <li><a href="https://rts-0-zvorygin-beta.fly.dev/" target="_blank" rel="noreferrer">Beta Version</a></li>
+          </ul>
+        </details>
+        <div id="beta-badge" aria-label="Beta environment" hidden>Beta</div>
+      </div>
       <div id="dev-banner" hidden></div>
 
       <a
