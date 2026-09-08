@@ -312,7 +312,7 @@ fn stationary_tank_range_linearly_ramps_to_fourteen_tiles() {
     let tank_id = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
         .expect("tank should spawn");
-    let base_range = combat_rules::attack_profile(EntityKind::Tank).range_tiles as f32;
+    let base_range = combat_rules::attack_profile(EntityKind::Tank).range_tiles;
 
     assert_range_near(tank_range_tiles(&entities, tank_id), base_range);
 
@@ -354,7 +354,7 @@ fn tank_path_translation_resets_stationary_range_to_base() {
 
     assert_range_near(
         tank_range_tiles(&entities, tank_id),
-        combat_rules::attack_profile(EntityKind::Tank).range_tiles as f32,
+        combat_rules::attack_profile(EntityKind::Tank).range_tiles,
     );
 }
 
@@ -384,7 +384,7 @@ fn tank_path_pivot_without_translation_resets_stationary_range_to_base() {
     );
     assert_range_near(
         tank_range_tiles(&entities, tank_id),
-        combat_rules::attack_profile(EntityKind::Tank).range_tiles as f32,
+        combat_rules::attack_profile(EntityKind::Tank).range_tiles,
     );
 }
 

@@ -159,7 +159,7 @@ fn tank_coax_snapshot(
     }
     let weapon_facing = tank.weapon_facing().filter(|facing| facing.is_finite())?;
     let range_px =
-        weapon_profile.range_tiles as f32 * config::TILE_SIZE as f32 + tank.radius() + RANGE_SLACK;
+        weapon_profile.range_tiles * config::TILE_SIZE as f32 + tank.radius() + RANGE_SLACK;
     if !range_px.is_finite() {
         return None;
     }

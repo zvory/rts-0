@@ -12,7 +12,7 @@ pub const TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES: f32 = 4.0;
 pub struct UnitStats {
     pub hp: u32,
     pub dmg: u32,
-    pub range_tiles: u32,
+    pub range_tiles: f32,
     pub cooldown: u32,
     pub speed: f32,
     pub sight_tiles: u32,
@@ -56,7 +56,7 @@ pub struct BuildingStats {
     pub foot_h: u32,
     pub build_ticks: u32,
     pub dmg: u32,
-    pub range_tiles: u32,
+    pub range_tiles: f32,
     pub cooldown: u32,
 }
 

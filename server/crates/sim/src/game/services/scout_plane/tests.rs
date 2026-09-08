@@ -44,7 +44,7 @@ fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
     assert_eq!(combat::default_weapon_kind(EntityKind::ScoutPlane), None);
     assert_eq!(def.stats.hp, 40);
     assert_eq!(def.stats.dmg, 0);
-    assert_eq!(def.stats.range_tiles, 0);
+    assert_eq!(def.stats.range_tiles, 0.0);
     assert_eq!(def.stats.cooldown, 0);
     assert_eq!(def.stats.speed, 2.6);
     assert_eq!(def.stats.sight_tiles, 19);

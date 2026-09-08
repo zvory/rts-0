@@ -265,8 +265,7 @@ pub fn project_entity(
     }
     if entity.kind == EntityKind::Tank && owner_or_ally {
         if let Some(stats) = config::unit_stats(entity.kind) {
-            view.weapon_range_tiles =
-                Some(tank_weapon_range_tiles(entity, stats.range_tiles as f32));
+            view.weapon_range_tiles = Some(tank_weapon_range_tiles(entity, stats.range_tiles));
         }
     }
     project_panzerfaust_state(entity, &mut view);

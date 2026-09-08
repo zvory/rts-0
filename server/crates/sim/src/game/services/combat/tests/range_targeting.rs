@@ -14,9 +14,8 @@ fn worker_barracks_edge_fixture() -> (Map, EntityStore, u32, u32) {
         )
         .expect("barracks should spawn");
     let worker_stats = config::unit_stats(EntityKind::Worker).expect("worker stats should exist");
-    let range_px = worker_stats.range_tiles as f32 * config::TILE_SIZE as f32
-        + worker_stats.radius
-        + RANGE_SLACK;
+    let range_px =
+        worker_stats.range_tiles * config::TILE_SIZE as f32 + worker_stats.radius + RANGE_SLACK;
     let worker = entities
         .spawn_unit(
             1,

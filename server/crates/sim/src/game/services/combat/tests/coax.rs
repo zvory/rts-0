@@ -32,7 +32,7 @@ fn attack_weapon_kinds(
 fn tank_coax_profile_is_live_without_replacing_tank_cannon() {
     let coax = combat_rules::weapon_profile(combat_rules::WeaponKind::TankCoax)
         .expect("Tank coax profile should be live");
-    assert_eq!(coax.range_tiles, 6);
+    assert_eq!(coax.range_tiles, 6.0);
     assert_eq!(coax.dmg, 4);
     assert_eq!(coax.cooldown, 6);
     assert_eq!(

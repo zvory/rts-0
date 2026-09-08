@@ -515,8 +515,7 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_out_of_range() {
             .expect("attacker should spawn");
         let stats = config::unit_stats(kind).expect("moving-fire unit should have stats");
         let profile = combat_rules::attack_profile(kind);
-        let range_px =
-            profile.range_tiles as f32 * config::TILE_SIZE as f32 + stats.radius + RANGE_SLACK;
+        let range_px = profile.range_tiles * config::TILE_SIZE as f32 + stats.radius + RANGE_SLACK;
         let retained_distance =
             (range_px + 4.0).min(stats.sight_tiles as f32 * config::TILE_SIZE as f32 - 1.0);
         assert!(
