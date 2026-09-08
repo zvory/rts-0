@@ -18,16 +18,16 @@ pub const TANK_ARMOR_REACTION_LOCK_TICKS: u32 = crate::balance::TICK_HZ * 3;
 pub const TANK_ARMOR_REACTION_MAX_PIVOT_RAD: f32 = std::f32::consts::PI * 4.0 / 9.0;
 
 /// Attack profile for a combat-capable unit or building.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AttackProfile {
-    pub range_tiles: u32,
+    pub range_tiles: f32,
     pub dmg: u32,
     pub cooldown: u32,
 }
 
 impl AttackProfile {
     pub const NONE: AttackProfile = AttackProfile {
-        range_tiles: 0,
+        range_tiles: 0.0,
         dmg: 0,
         cooldown: 0,
     };
@@ -102,7 +102,7 @@ pub enum OverpenetrationPolicy {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WeaponProfile {
     pub id: WeaponKind,
-    pub range_tiles: u32,
+    pub range_tiles: f32,
     pub dmg: u32,
     pub cooldown: u32,
     pub weapon_class: WeaponClass,
@@ -125,7 +125,7 @@ impl WeaponProfile {
 pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     WeaponProfile {
         id: WeaponKind::WorkerTools,
-        range_tiles: 1,
+        range_tiles: 1.0,
         dmg: 4,
         cooldown: 24,
         weapon_class: WeaponClass::SmallArms,
@@ -136,7 +136,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::GolemFists,
-        range_tiles: 1,
+        range_tiles: 1.0,
         dmg: 16,
         cooldown: 24,
         weapon_class: WeaponClass::SmallArms,
@@ -147,7 +147,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::RiflemanRifle,
-        range_tiles: 5,
+        range_tiles: 5.0,
         dmg: 5,
         cooldown: 16,
         weapon_class: WeaponClass::SmallArms,
@@ -158,7 +158,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::MachineGunnerMg,
-        range_tiles: 6,
+        range_tiles: 6.1,
         dmg: 4,
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
@@ -169,7 +169,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::ScoutCarMg,
-        range_tiles: 7,
+        range_tiles: 7.0,
         dmg: 6,
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
@@ -180,7 +180,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::AntiTankGun,
-        range_tiles: 5,
+        range_tiles: 5.0,
         dmg: 100,
         cooldown: 108,
         weapon_class: WeaponClass::AntiTank,
@@ -191,7 +191,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::PanzerfaustLoadedShot,
-        range_tiles: crate::balance::PANZERFAUST_RANGE_TILES,
+        range_tiles: crate::balance::PANZERFAUST_RANGE_TILES as f32,
         dmg: crate::balance::PANZERFAUST_DAMAGE,
         cooldown: 0,
         weapon_class: WeaponClass::AntiTank,
@@ -202,7 +202,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::MortarTeamMortar,
-        range_tiles: crate::balance::MORTAR_RANGE_TILES,
+        range_tiles: crate::balance::MORTAR_RANGE_TILES as f32,
         dmg: crate::balance::MORTAR_OUTER_DAMAGE,
         cooldown: 60,
         weapon_class: WeaponClass::SmallArms,
@@ -213,7 +213,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::ArtilleryGun,
-        range_tiles: crate::balance::ARTILLERY_MAX_RANGE_TILES,
+        range_tiles: crate::balance::ARTILLERY_MAX_RANGE_TILES as f32,
         dmg: 0,
         cooldown: crate::balance::ARTILLERY_RELOAD_TICKS,
         weapon_class: WeaponClass::None,
@@ -224,7 +224,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::TankCannon,
-        range_tiles: 5,
+        range_tiles: 5.0,
         dmg: 60,
         cooldown: 72,
         weapon_class: WeaponClass::AntiTank,
@@ -235,7 +235,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::TankCoax,
-        range_tiles: 6,
+        range_tiles: 6.0,
         dmg: 4,
         cooldown: 6,
         weapon_class: WeaponClass::SmallArms,
@@ -909,20 +909,20 @@ mod tests {
         let machine_gunner = weapon_profile(WeaponKind::MachineGunnerMg).expect("MG profile");
         assert_eq!(machine_gunner.weapon_class, WeaponClass::SmallArms);
         assert_eq!(machine_gunner.armor_penetration, NO_ARMOR_PENETRATION);
-        assert_eq!(machine_gunner.range_tiles, 6);
+        assert_eq!(machine_gunner.range_tiles, 6.1);
         assert_eq!(machine_gunner.dmg, 4);
         assert_eq!(machine_gunner.cooldown, 6);
 
         let scout_car = weapon_profile(WeaponKind::ScoutCarMg).expect("Scout Car MG profile");
         assert_eq!(scout_car.weapon_class, WeaponClass::SmallArms);
-        assert_eq!(scout_car.range_tiles, 7);
+        assert_eq!(scout_car.range_tiles, 7.0);
         assert_eq!(scout_car.dmg, 6);
         assert_eq!(scout_car.cooldown, 6);
 
         let tank_coax = weapon_profile(WeaponKind::TankCoax).expect("Tank coax profile");
         assert_eq!(tank_coax.weapon_class, WeaponClass::SmallArms);
         assert_eq!(tank_coax.armor_penetration, NO_ARMOR_PENETRATION);
-        assert_eq!(tank_coax.range_tiles, 6);
+        assert_eq!(tank_coax.range_tiles, 6.0);
         assert_eq!(tank_coax.dmg, 4);
         assert_eq!(tank_coax.cooldown, 6);
         assert_eq!(tank_coax.miss_policy, MissPolicy::None);

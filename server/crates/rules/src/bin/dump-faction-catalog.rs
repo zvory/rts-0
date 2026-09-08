@@ -738,9 +738,9 @@ fn ticks_to_ceil_ms(ticks: u32) -> u32 {
     (ticks * 1000_u32).div_ceil(balance::TICK_HZ)
 }
 
-fn client_visible_range_tiles(kind: EntityKind, default_range_tiles: u32) -> u32 {
+fn client_visible_range_tiles(kind: EntityKind, default_range_tiles: f32) -> f32 {
     match kind {
-        EntityKind::AntiTankGun => balance::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
+        EntityKind::AntiTankGun => balance::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32,
         _ => default_range_tiles,
     }
 }

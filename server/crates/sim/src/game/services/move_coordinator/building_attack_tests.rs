@@ -28,7 +28,7 @@ fn worker_direct_attack_stages_outside_barracks_footprint() {
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occupancy, 1);
     coordinator.order_attack(&mut entities, worker, barracks);
     let worker_stats = config::unit_stats(EntityKind::Worker).expect("worker stats should exist");
-    let range_px = worker_stats.range_tiles as f32 * config::TILE_SIZE as f32
+    let range_px = worker_stats.range_tiles * config::TILE_SIZE as f32
         + worker_stats.radius
         + crate::game::services::combat::RANGE_SLACK;
 

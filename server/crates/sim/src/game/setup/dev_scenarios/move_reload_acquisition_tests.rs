@@ -44,7 +44,7 @@ fn reloading_plain_move_acquires_and_tracks_an_in_range_gun_without_stopping() {
         .get(target_id)
         .expect("scenario Anti-Tank Gun should survive");
     let distance = (target.pos_x - attacker.pos_x).hypot(target.pos_y - attacker.pos_y);
-    let moving_range = cannon.range_tiles as f32 * config::TILE_SIZE as f32 + attacker.radius();
+    let moving_range = cannon.range_tiles * config::TILE_SIZE as f32 + attacker.radius();
     assert!(
         distance < moving_range,
         "gun should already be inside cannon range"

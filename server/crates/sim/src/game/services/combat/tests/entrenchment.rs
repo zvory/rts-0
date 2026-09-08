@@ -128,13 +128,68 @@ fn apply_test_damage_with_seed_and_teams(
 }
 
 #[test]
+fn attack_move_machine_gunner_clears_entrenched_rifleman_without_return_fire() {
+    // Replay 359: rifle #222 at (368, 2736), approaching MG #228 at
+    // (400.311, 2939.943) just before both acquired at tick 5025 with the old range.
+    // Start one tile earlier and sweep arrival offsets at both movement speeds.
+    for speed in [1.28_f32, 1.6] {
+        for offset in 0..16 {
+            let map = open_map(110);
+            let mut entities = EntityStore::new();
+            let rifle = entities
+                .spawn_unit(1, EntityKind::Rifleman, 368.0, 2736.0)
+                .expect("rifleman");
+            mark_entrenched(&mut entities, rifle);
+            let mg = entities
+                .spawn_unit(
+                    2,
+                    EntityKind::MachineGunner,
+                    400.311,
+                    2971.943 + speed * offset as f32 / 16.0,
+                )
+                .expect("machine gunner");
+            let unit = entities.get_mut(mg).expect("MG");
+            unit.set_order(Order::attack_move_to(400.0, 2704.0));
+            unit.set_path(vec![(400.0, 2704.0)]);
+            unit.set_path_goal(Some((400.0, 2704.0)));
+            let initial_hp = unit.hp;
+            let mut players = [player_state(1, false), player_state(2, false)];
+            if speed == 1.6 {
+                for player in &mut players {
+                    player.upgrades.insert(UpgradeKind::Methamphetamines);
+                }
+            }
+            for tick in 0..300 {
+                let occ = Occupancy::build(&map, &entities);
+                let spatial = SpatialIndex::build(&entities, map.width, map.height);
+                movement_system(&map, &mut entities, &players, &occ, &spatial, tick);
+                run_combat_tick_on_map(&mut entities, &players, &map);
+                assert_eq!(
+                    entities.get(mg).expect("MG").hp,
+                    initial_hp,
+                    "return fire at speed {speed}, offset {offset}"
+                );
+                if entities.get(rifle).expect("rifleman").hp == 0 {
+                    break;
+                }
+            }
+            assert_eq!(
+                entities.get(rifle).expect("rifleman").hp,
+                0,
+                "MG must clear the trench at speed {speed}, offset {offset}"
+            );
+        }
+    }
+}
+
+#[test]
 fn entrenched_eligible_infantry_gain_one_tile_of_weapon_range() {
     for kind in [EntityKind::Rifleman, EntityKind::MachineGunner] {
         let mut entities = EntityStore::new();
         let id = entities
             .spawn_unit(1, kind, 100.0, 100.0)
             .expect("eligible infantry should spawn");
-        let base_range = combat_rules::attack_profile(kind).range_tiles as f32;
+        let base_range = combat_rules::attack_profile(kind).range_tiles;
 
         assert_eq!(
             effective_attack_profile(entities.get(id).expect("unit should exist")).range_tiles,
@@ -184,7 +239,7 @@ fn entrenched_idle_rifleman_fires_at_bonus_range_without_chasing() {
         .expect("rifleman should spawn");
     mark_entrenched(&mut entities, rifleman);
     let rifleman_entity = entities.get(rifleman).expect("rifleman should exist");
-    let base_range_px = combat_rules::attack_profile(rifleman_entity.kind).range_tiles as f32
+    let base_range_px = combat_rules::attack_profile(rifleman_entity.kind).range_tiles
         * config::TILE_SIZE as f32
         + rifleman_entity.radius()
         + RANGE_SLACK;

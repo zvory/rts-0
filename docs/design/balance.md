@@ -20,6 +20,9 @@ helpers read the defs table.
 Default attack range, damage, cooldown, weapon class, and weapon-policy metadata are exposed through
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
+Base weapon ranges use fractional tiles (`f32`) throughout stat records and attack profiles.
+The Machine Gunner has 6.1 tiles of base range (7.1 while entrenched), giving an approaching
+attack-moving MG a small standoff margin against a stationary entrenched Rifleman's 6 tiles.
 Direct-fire damage, miss policy, tank-facing modifiers, and over-penetration policy consume the
 selected weapon profile instead of inferring those behaviors only from the firing entity kind.
 The Panzerfausts Training Centre upgrade unlocks a separate Barracks-trained Panzerfaust unit. It
@@ -633,7 +636,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
-| machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
+| machine_gunner  | 55  | 4   | 6.1   | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 108 | 1.52 | 9    | 150 | 40  | 6   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in Engineering Complex |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |

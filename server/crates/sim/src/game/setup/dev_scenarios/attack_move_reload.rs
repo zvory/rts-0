@@ -39,7 +39,7 @@ impl Game {
             .radius();
         // Stay inside the current moving-range boundary without relying on a duplicated balance
         // value. Half the attacker's range allowance leaves a visible gap and a stable margin.
-        let target_distance = cannon.range_tiles as f32 * tile_size + attacker_radius * 0.5;
+        let target_distance = cannon.range_tiles * tile_size + attacker_radius * 0.5;
         let target_pos = (attacker_pos.0 + target_distance, attacker_pos.1);
         let target = entities
             .spawn_unit(2, EntityKind::Tank, target_pos.0, target_pos.1)

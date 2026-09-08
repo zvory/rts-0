@@ -135,7 +135,7 @@ export const STATS = Object.freeze({
     upgradeRequires: UPGRADE.PANZERFAUSTS,
     description: `Rifle infantry carrying one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot. After launching it, the unit keeps fighting as ordinary rifle infantry.` },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
-    rangeTiles: 6, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
+    rangeTiles: 6.1, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 150, oil: 40 }, supply: 6, buildTicks: 440,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,

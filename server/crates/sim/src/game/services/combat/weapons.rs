@@ -245,7 +245,7 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         },
         range_tiles: entrenchment_combat::attack_range_tiles(
             e,
-            tank_effective_range_tiles(e, base.range_tiles as f32),
+            tank_effective_range_tiles(e, base.range_tiles),
         ),
         dmg: base.dmg,
         cooldown: base.cooldown,
