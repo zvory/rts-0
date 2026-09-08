@@ -104,8 +104,7 @@ const HEARTBEAT_MS = 15000;
 const PLAYER_ACTIVITY_REPORT_INTERVAL_MS = 30000;
 const PLAYER_ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel"];
 export function isLivePlayerMatch(match) {
-  return !!match &&
-    !!match.state &&
+  return !!match?.state &&
     match.running !== false &&
     !match.state.spectator &&
     !match.replayViewer &&
@@ -354,7 +353,7 @@ export class App {
       this._mountMatchHistory();
     }
     this.applyDevBanner();
-    applyBetaBadge(this);
+    applyBetaBadge(this, dom);
     if (!this.requiresConnectionOnStart()) return;
     try {
       await this.ensureConnected();
@@ -819,7 +818,7 @@ export class App {
     this.branchStaging.hide();
     if (dom.devLinks) dom.devLinks.hidden = true;
     dom.gameScreen.hidden = false;
-    applyBetaBadge(this);
+    applyBetaBadge(this, dom);
     if (!preserveScorePanel) {
       dom.gameOver.hidden = true;
       this.clearScoreboard();
@@ -1153,7 +1152,7 @@ export class App {
     if (dom.branchScreen) this.branchStaging.hide();
     dom.lobbyScreen.hidden = false;
     if (dom.devLinks) dom.devLinks.hidden = false;
-    applyBetaBadge(this);
+    applyBetaBadge(this, dom);
     this.lobby.resetToBrowser();
     this.lobby.show();
     this.disconnectIdleConnection();
@@ -1408,6 +1407,7 @@ export class App {
     }
     dom.lobbyScreen.hidden = false;
     this.lobby.show();
+    applyBetaBadge(this, dom);
     return await this.lobby.joinReplayLobby(room);
   }
 
