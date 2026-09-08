@@ -104,6 +104,49 @@ fn predicted_expansion_footprint_evicts_friendly_combat_units() {
 }
 
 #[test]
+fn successful_expansion_attempt_does_not_time_out_after_later_depot_loss() {
+    let mut obs = security_observation();
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+    memory.expansion_security.note_build_attempt(obs.tick, 1);
+    let site = memory.expansion_security.site.unwrap();
+    let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    obs.owned.push(building_at(
+        99,
+        EntityKind::ResourceDepot,
+        Some(0),
+        center.0,
+        center.1,
+    ));
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+
+    obs.owned.retain(|entity| entity.id != 99);
+    obs.tick += config::TICK_HZ * 3;
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        &mut |_, _, _| true,
+    );
+
+    assert_eq!(memory.expansion_security.site, Some(site));
+    assert_eq!(memory.expansion_security.retry_builder(), None);
+}
+
+#[test]
 fn expansion_security_requires_arrival_and_uncontested_dwell() {
     let mut obs = security_observation();
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);

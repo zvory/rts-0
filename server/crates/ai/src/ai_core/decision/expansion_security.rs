@@ -71,16 +71,24 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     if profile.id != JEFFS_AI_ID {
         return;
     }
+    let active_depot_count = observation
+        .owned
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.hp > 0)
+        .count();
+    // Once the attempted Depot appears in the authoritative observation, the build order
+    // succeeded. Do not retain its timeout: if that Depot is destroyed later, stale attempt
+    // state must not reject the proven site or retry the old builder immediately.
+    if active_depot_count >= 2 {
+        memory.expansion_security.build_attempt_tick = None;
+        memory.expansion_security.build_attempt_worker = None;
+        memory.expansion_security.retry_builder = None;
+    }
     let timed_out_site = memory
         .expansion_security
         .build_attempt_tick
         .is_some_and(|tick| {
-            observation
-                .owned
-                .iter()
-                .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.hp > 0)
-                .count()
-                < 2
+            active_depot_count < 2
                 && observation.tick.saturating_sub(tick) >= BUILD_START_TIMEOUT_TICKS
         });
     if timed_out_site {
