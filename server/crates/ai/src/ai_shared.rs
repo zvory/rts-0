@@ -315,6 +315,62 @@ pub(crate) fn find_build_spot_mirrored_from_opposite_spawn_with(
     ))
 }
 
+/// Run the placement search in the frame reflected across the top-right-to-bottom-left map
+/// centerline, then reflect the selected square footprint back into this spawn.
+pub(crate) fn find_build_spot_reflected_across_anti_diagonal_with(
+    map_width: u32,
+    map_height: u32,
+    start: (u32, u32),
+    building: EntityKind,
+    search: BuildSearch,
+    skip: &BTreeSet<(u32, u32)>,
+    mut placeable: impl FnMut(u32, u32) -> bool,
+) -> Option<(u32, u32)> {
+    if map_width != map_height {
+        return None;
+    }
+    let stats = config::building_stats(building)?;
+    if stats.foot_w != stats.foot_h {
+        return None;
+    }
+    let canonical_start = (
+        map_width.saturating_sub(1).saturating_sub(start.1),
+        map_height.saturating_sub(1).saturating_sub(start.0),
+    );
+    let canonical_skip = BTreeSet::new();
+    let canonical = find_build_spot_near_start_with(
+        map_width,
+        map_height,
+        canonical_start,
+        building,
+        search,
+        &canonical_skip,
+        |canonical_x, canonical_y| {
+            let Some(tile_x) = map_width
+                .checked_sub(canonical_y)
+                .and_then(|value| value.checked_sub(stats.foot_h))
+            else {
+                return false;
+            };
+            let Some(tile_y) = map_height
+                .checked_sub(canonical_x)
+                .and_then(|value| value.checked_sub(stats.foot_w))
+            else {
+                return false;
+            };
+            !skip.contains(&(tile_x, tile_y)) && placeable(tile_x, tile_y)
+        },
+    )?;
+    Some((
+        map_width
+            .checked_sub(canonical.1)?
+            .checked_sub(stats.foot_h)?,
+        map_height
+            .checked_sub(canonical.0)?
+            .checked_sub(stats.foot_w)?,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,6 +419,21 @@ mod tests {
         );
 
         assert_eq!(spot, Some((4, 7)));
+    }
+
+    #[test]
+    fn anti_diagonal_reflection_accounts_for_square_building_footprint() {
+        let spot = find_build_spot_reflected_across_anti_diagonal_with(
+            126,
+            126,
+            (117, 78),
+            EntityKind::Factory,
+            BuildSearch::default(),
+            &BTreeSet::new(),
+            |x, y| (x, y) == (122, 70),
+        );
+
+        assert_eq!(spot, Some((122, 70)));
     }
 
     #[test]

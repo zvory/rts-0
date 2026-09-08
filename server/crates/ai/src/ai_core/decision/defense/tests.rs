@@ -396,7 +396,7 @@ fn first_machine_gunner_keeps_its_side_when_the_mirrored_partner_arrives() {
 }
 
 #[test]
-fn crossroads_starts_use_the_approved_wall_aware_pocket_rotation() {
+fn crossroads_starts_reflect_the_wall_aware_pocket_across_the_anti_diagonal() {
     let mut observation = los_test_observation(EntityKind::Factory);
     observation.map.width = 126;
     observation.map.height = 126;
@@ -460,7 +460,7 @@ fn crossroads_starts_use_the_approved_wall_aware_pocket_rotation() {
     };
     let (_, direction) =
         defensive_pocket_basis(&observation, None, enemy_base).expect("P2 wall-aware orientation");
-    let expected = normalized_direction((0.0, 0.0), (-5.0, 7.0)).unwrap();
+    let expected = normalized_direction((0.0, 0.0), (-1.0, 2.0)).unwrap();
     assert!((direction.0 - expected.0).abs() < 0.0001);
     assert!((direction.1 - expected.1).abs() < 0.0001);
     let rifles =
@@ -470,19 +470,29 @@ fn crossroads_starts_use_the_approved_wall_aware_pocket_rotation() {
         defensive_pocket_machine_gunner_assignments(&observation, None, &[60, 50], enemy_base)
             .expect("P2 Machine Gunner pocket assignments");
     for (assignment, expected) in rifles.iter().zip([
-        (112.73, 80.31),
-        (117.33, 83.60),
-        (113.40, 85.59),
-        (112.13, 84.68),
+        (113.07, 81.04),
+        (118.13, 83.57),
+        (114.55, 86.14),
+        (113.16, 85.44),
     ]) {
-        assert!((assignment.x / tile_size - expected.0).abs() < 0.03);
+        assert!(
+            (assignment.x / tile_size - expected.0).abs() < 0.03,
+            "rifle x={} y={} expected={expected:?}",
+            assignment.x / tile_size,
+            assignment.y / tile_size
+        );
         assert!((assignment.y / tile_size - expected.1).abs() < 0.03);
     }
     for (assignment, expected) in machine_gunners
         .iter()
-        .zip([(114.97, 85.91), (111.31, 83.30)])
+        .zip([(116.16, 86.21), (112.13, 84.20)])
     {
-        assert!((assignment.x / tile_size - expected.0).abs() < 0.03);
+        assert!(
+            (assignment.x / tile_size - expected.0).abs() < 0.03,
+            "machine gunner x={} y={} expected={expected:?}",
+            assignment.x / tile_size,
+            assignment.y / tile_size
+        );
         assert!((assignment.y / tile_size - expected.1).abs() < 0.03);
     }
 }

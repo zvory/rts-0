@@ -5,6 +5,7 @@ use super::*;
 const CENTRAL_BASE_APPROACH_MIN_ALIGNMENT: f32 = 0.9;
 const CROSSROADS_MAP_TILES: (u32, u32) = (126, 126);
 const CROSSROADS_STARTS: [(u32, u32); 2] = [(47, 8), (117, 78)];
+const CROSSROADS_PRIMARY_APPROACH: (f32, f32) = (-2.0, 1.0);
 // (forward, lateral) offsets from the starting Resource Depot centre. These reproduce the
 // approved River pocket, then rotate as one shape toward each base's central approach.
 const RIFLE_SLOTS: [(f32, f32); 4] = [(4.25, 2.83), (4.25, -2.83), (8.15, -0.78), (8.15, 0.78)];
@@ -201,16 +202,19 @@ fn crossroads_wall_aware_direction(
         return None;
     }
 
-    // Crossroads' two water walls block the direct spawn-to-spawn diagonal. These vectors retain
-    // the approved six-slot shape while facing the southwest road-and-ground corridor from which
-    // an attack can actually enter each base. They are the reviewed route-facing proposal plus
-    // the requested additional 45-degree turn in the same direction at each spawn.
+    // Crossroads' two water walls block the direct spawn-to-spawn diagonal. Keep the reviewed
+    // route-facing input for the primary start and reflect that same input across the map's
+    // anti-diagonal for the opposing start so both formations receive symmetric inputs.
     let target = match own_start_tile {
-        (47, 8) => (-2.0, 1.0),
-        (117, 78) => (-5.0, 7.0),
+        (47, 8) => CROSSROADS_PRIMARY_APPROACH,
+        (117, 78) => reflect_across_anti_diagonal(CROSSROADS_PRIMARY_APPROACH),
         _ => return None,
     };
     normalized_direction((0.0, 0.0), target)
+}
+
+const fn reflect_across_anti_diagonal(vector: (f32, f32)) -> (f32, f32) {
+    (-vector.1, -vector.0)
 }
 
 fn central_base_approach(
@@ -381,15 +385,19 @@ mod tests {
     }
 
     #[test]
-    fn crossroads_wall_aware_directions_match_the_approved_extra_rotation() {
+    fn crossroads_wall_aware_directions_reflect_across_the_anti_diagonal() {
         let (_, start) = fixture("Crossroads");
         let player_starts = start
             .players
             .iter()
             .map(|player| (player.start_tile_x, player.start_tile_y))
             .collect::<Vec<_>>();
-        let p1 = normalized_direction((0.0, 0.0), (-2.0, 1.0)).unwrap();
-        let p2 = normalized_direction((0.0, 0.0), (-5.0, 7.0)).unwrap();
+        let p1 = normalized_direction((0.0, 0.0), CROSSROADS_PRIMARY_APPROACH).unwrap();
+        let p2 = normalized_direction(
+            (0.0, 0.0),
+            reflect_across_anti_diagonal(CROSSROADS_PRIMARY_APPROACH),
+        )
+        .unwrap();
         for player in &start.players {
             let start_tile = (player.start_tile_x, player.start_tile_y);
             let direction = crossroads_wall_aware_direction(

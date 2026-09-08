@@ -76,6 +76,18 @@ where
     }
     let build_search = build_search_for_kind(build_search, profile, kind);
     let empty = BTreeSet::new();
+    if uses_jeff_crossroads_reflected_layout(observation, profile, kind) {
+        let (tile_x, tile_y) = ai_shared::find_build_spot_reflected_across_anti_diagonal_with(
+            observation.map.width,
+            observation.map.height,
+            observation.own_start_tile,
+            kind,
+            build_search,
+            &empty,
+            |tx, ty| placeable(kind, tx, ty),
+        )?;
+        return actions::try_build_at(actions, builder_pools, kind, tile_x, tile_y);
+    }
     if uses_jeff_opposite_spawn_layout(observation, profile) {
         let (tile_x, tile_y) = ai_shared::find_build_spot_mirrored_from_opposite_spawn_with(
             observation.map.width,
@@ -143,27 +155,38 @@ where
                 && unit_tile.1 < tile_y.saturating_add(stats.foot_h)
         })
     };
-    let blocked_site = if uses_jeff_opposite_spawn_layout(observation, profile) {
-        ai_shared::find_build_spot_mirrored_from_opposite_spawn_with(
-            observation.map.width,
-            observation.map.height,
-            observation.own_start_tile,
-            EntityKind::Factory,
-            search,
-            &empty,
-            &mut blocked_by_machine_gunner,
-        )
-    } else {
-        ai_shared::find_build_spot_near_start_with(
-            observation.map.width,
-            observation.map.height,
-            observation.own_start_tile,
-            EntityKind::Factory,
-            search,
-            &empty,
-            &mut blocked_by_machine_gunner,
-        )
-    }?;
+    let blocked_site =
+        if uses_jeff_crossroads_reflected_layout(observation, profile, EntityKind::Factory) {
+            ai_shared::find_build_spot_reflected_across_anti_diagonal_with(
+                observation.map.width,
+                observation.map.height,
+                observation.own_start_tile,
+                EntityKind::Factory,
+                search,
+                &empty,
+                &mut blocked_by_machine_gunner,
+            )
+        } else if uses_jeff_opposite_spawn_layout(observation, profile) {
+            ai_shared::find_build_spot_mirrored_from_opposite_spawn_with(
+                observation.map.width,
+                observation.map.height,
+                observation.own_start_tile,
+                EntityKind::Factory,
+                search,
+                &empty,
+                &mut blocked_by_machine_gunner,
+            )
+        } else {
+            ai_shared::find_build_spot_near_start_with(
+                observation.map.width,
+                observation.map.height,
+                observation.own_start_tile,
+                EntityKind::Factory,
+                search,
+                &empty,
+                &mut blocked_by_machine_gunner,
+            )
+        }?;
     let blockers: Vec<u32> = units_by_id
         .values()
         .filter_map(|unit| {
@@ -185,6 +208,25 @@ where
         &blockers,
         enemy_base,
     )
+}
+
+fn uses_jeff_crossroads_reflected_layout(
+    observation: &AiObservation,
+    profile: &AiProfile,
+    kind: EntityKind,
+) -> bool {
+    const CROSSROADS_STARTS: [(u32, u32); 2] = [(47, 8), (117, 78)];
+    profile.id == JEFFS_AI_ID
+        && (observation.map.width, observation.map.height) == (126, 126)
+        && observation.own_start_tile == CROSSROADS_STARTS[1]
+        && observation.players.len() == CROSSROADS_STARTS.len()
+        && CROSSROADS_STARTS.iter().all(|expected| {
+            observation
+                .players
+                .iter()
+                .any(|player| player.start_tile == *expected)
+        })
+        && config::building_stats(kind).is_some_and(|stats| stats.foot_w == stats.foot_h)
 }
 
 fn uses_jeff_opposite_spawn_layout(observation: &AiObservation, profile: &AiProfile) -> bool {

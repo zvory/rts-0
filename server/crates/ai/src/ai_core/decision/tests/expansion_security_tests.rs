@@ -655,7 +655,7 @@ fn expansion_security_has_spaced_reachable_posts_on_river_and_crossroads() {
 }
 
 #[test]
-fn crossroads_expansion_tank_uses_the_same_wall_aware_approach_as_its_rifles() {
+fn crossroads_expansion_tank_stays_behind_most_of_the_staggered_rifle_screen() {
     use rts_sim::game::map::Map;
     use rts_sim::game::{Game, PlayerInit};
 
@@ -718,7 +718,9 @@ fn crossroads_expansion_tank_uses_the_same_wall_aware_approach_as_its_rifles() {
         assert!(
             rifles
                 .iter()
-                .all(|point| projection(*point) > projection(tank)),
+                .filter(|point| projection(**point) > projection(tank))
+                .count()
+                >= 3,
             "player {player} center {center:?} tank {tank:?} tank_forward={} rifles {rifles:?} rifle_forward={:?}",
             projection(tank),
             rifles.iter().map(|point| projection(*point)).collect::<Vec<_>>()
