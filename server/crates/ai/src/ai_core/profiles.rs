@@ -7,8 +7,9 @@ mod jeffs_ai_chat_start;
 mod turtle;
 
 pub(crate) use self::jeffs_ai::{
-    JEFFS_AI, JEFFS_AI_BETA, JEFFS_AI_BETA_ID, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    JEFFS_AI, JEFFS_AI_BETA, JEFFS_AI_BETA_CURRENT, JEFFS_AI_BETA_CURRENT_ID, JEFFS_AI_BETA_ID,
+    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID,
+    JEFFS_AI_PRE_RIFLE_COVERAGE, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 pub(crate) use self::jeffs_ai_chat_start::{JEFFS_AI_CHAT_START, JEFFS_AI_CHAT_START_ID};
 pub(crate) use self::turtle::AI_TURTLE;
@@ -405,6 +406,9 @@ pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
+    if id == JEFFS_AI_BETA_CURRENT_ID {
+        return Some(&JEFFS_AI_BETA_CURRENT);
+    }
     if id == JEFFS_AI_BETA_ID {
         return Some(&JEFFS_AI_BETA);
     }
@@ -426,6 +430,7 @@ pub(crate) fn is_jeffs_ai_profile(id: &str) -> bool {
     matches!(
         id,
         JEFFS_AI_ID
+            | JEFFS_AI_BETA_CURRENT_ID
             | JEFFS_AI_BETA_ID
             | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
             | JEFFS_AI_PRE_RIFLE_COVERAGE_ID

@@ -13,7 +13,7 @@ use crate::ai_core::observation::{
 use crate::ai_core::profiles::{
     is_jeffs_ai_profile, AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy,
     ExpansionPolicy, ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
-    JEFFS_AI_BETA_ID, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID,
+    JEFFS_AI_BETA_CURRENT_ID, JEFFS_AI_BETA_ID, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID,
     JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 use crate::ai_shared;
@@ -28,6 +28,7 @@ mod defense;
 mod economy_manager;
 mod expansion;
 mod expansion_security;
+mod expansion_security_beta_current;
 mod frontal;
 mod geometry;
 mod jeff;
@@ -266,16 +267,44 @@ where
         .unwrap_or(false);
     let defer_economy_for_panic = defensive_panic.active && !preserve_fast_tank_economy;
     let mut expansion_plan = plan_expansion(observation, &facts, profile, defer_economy_for_panic);
-    expansion_security::prepare(observation, &facts, profile, memory, &mut placeable);
+    let beta_current = profile.id == JEFFS_AI_BETA_CURRENT_ID;
+    if beta_current {
+        expansion_security_beta_current::prepare(
+            observation,
+            &facts,
+            profile,
+            memory,
+            &mut placeable,
+        );
+    } else {
+        expansion_security::prepare(observation, &facts, profile, memory, &mut placeable);
+    }
     let expansion_footprint_blockers = if profile.id == JEFFS_AI_ID {
         expansion_security::clear_reserved_footprint(observation, memory, &mut actions)
+    } else if beta_current
+        && expansion_security_beta_current::predicts_natural_from_opening(observation)
+    {
+        expansion_security_beta_current::clear_reserved_footprint(observation, memory, &mut actions)
     } else {
         Vec::new()
     };
-    let expansion_secured =
-        expansion_security::update_and_stage(observation, map_analysis, memory, &mut actions);
-    let reserve_expansion = expansion_security::expansion_is_next(observation, &facts, profile)
-        && memory.expansion_security.site.is_some();
+    let expansion_secured = if beta_current {
+        expansion_security_beta_current::update_and_stage(
+            observation,
+            map_analysis,
+            memory,
+            &mut actions,
+        )
+    } else {
+        expansion_security::update_and_stage(observation, map_analysis, memory, &mut actions)
+    };
+    let reserve_expansion = if beta_current {
+        expansion_security_beta_current::expansion_is_next(observation, &facts, profile)
+            && memory.beta_expansion_security.site.is_some()
+    } else {
+        expansion_security::expansion_is_next(observation, &facts, profile)
+            && memory.expansion_security.site.is_some()
+    };
     let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
     let save_for_expansion = expansion_plan.should_save;
     if reserve_expansion && !expansion_secured {
@@ -294,11 +323,13 @@ where
         },
     });
 
-    let retry_builder = memory
-        .expansion_security
-        .retry_builder()
-        .into_iter()
-        .collect::<Vec<_>>();
+    let retry_builder = if beta_current {
+        memory.beta_expansion_security.retry_builder()
+    } else {
+        memory.expansion_security.retry_builder()
+    }
+    .into_iter()
+    .collect::<Vec<_>>();
     let expansion_builder_pools = [
         retry_builder.as_slice(),
         idle_builders.as_slice(),
@@ -307,7 +338,7 @@ where
 
     if (should_build_expansion_from_economy_manager(&economy_manager_output)
         || !retry_builder.is_empty())
-        && (profile.id != JEFFS_AI_ID || expansion_secured)
+        && (!matches!(profile.id, JEFFS_AI_ID | JEFFS_AI_BETA_CURRENT_ID) || expansion_secured)
         && (profile.id != JEFFS_AI_ID || expansion_footprint_blockers.is_empty())
     {
         if let Some(build_action) = try_build_expansion_resource_depot(
@@ -316,7 +347,11 @@ where
             &mut actions,
             &expansion_builder_pools,
             profile,
-            memory.expansion_security.site,
+            if beta_current {
+                memory.beta_expansion_security.site
+            } else {
+                memory.expansion_security.site
+            },
             !retry_builder.is_empty(),
             &mut placeable,
         ) {
@@ -325,6 +360,12 @@ where
             {
                 memory
                     .expansion_security
+                    .note_build_attempt(observation.tick, build_action.worker);
+            } else if beta_current
+                && expansion_security_beta_current::predicts_natural_from_opening(observation)
+            {
+                memory
+                    .beta_expansion_security
                     .note_build_attempt(observation.tick, build_action.worker);
             }
             intents.push(AiIntent::Build {
@@ -653,9 +694,19 @@ where
         &effective_unit_priorities,
     );
     let mut effective_unit_priorities = effective_unit_priorities;
-    if profile.id == JEFFS_AI_ID
-        && memory.expansion_security.site.is_some()
-        && facts.unit_count(EntityKind::Rifleman) < expansion_security::SECURITY_RIFLE_TARGET
+    let security_site_selected = if beta_current {
+        memory.beta_expansion_security.site.is_some()
+    } else {
+        memory.expansion_security.site.is_some()
+    };
+    let security_rifle_target = if beta_current {
+        6
+    } else {
+        expansion_security::SECURITY_RIFLE_TARGET
+    };
+    if matches!(profile.id, JEFFS_AI_ID | JEFFS_AI_BETA_CURRENT_ID)
+        && security_site_selected
+        && facts.unit_count(EntityKind::Rifleman) < security_rifle_target
     {
         effective_unit_priorities.insert(0, EntityKind::Rifleman);
     }
@@ -692,9 +743,9 @@ where
         let key_tech_unit = production_policy
             .save_for_first_tech_unit
             .unwrap_or(EntityKind::Worker);
-        let security_recruits = profile.id == JEFFS_AI_ID
-            && memory.expansion_security.site.is_some()
-            && facts.unit_count(EntityKind::Rifleman) < expansion_security::SECURITY_RIFLE_TARGET
+        let security_recruits = matches!(profile.id, JEFFS_AI_ID | JEFFS_AI_BETA_CURRENT_ID)
+            && security_site_selected
+            && facts.unit_count(EntityKind::Rifleman) < security_rifle_target
             && building_kind == EntityKind::Barracks;
         let save_for_tech = !security_recruits
             && (save_for_unplanned_expansion
@@ -725,7 +776,7 @@ where
                 current
                     .saturating_add(affordable_above_reserve)
                     .max(if security_recruits {
-                        expansion_security::SECURITY_RIFLE_TARGET
+                        security_rifle_target
                     } else {
                         0
                     }),
@@ -774,15 +825,28 @@ where
         frontal_exclusions.insert(tank_id);
     }
     sync_containment_recovery(observation, profile, memory);
-    let forward_tank_position = (profile.id == JEFFS_AI_ID)
-        .then(|| expansion_security::tank_staging_center(observation, map_analysis))
-        .flatten();
-    let forward_defensive_tank = forward_tank_position
-        .and_then(|_| expansion_security::surplus_tank_for_forward_base(observation, memory));
+    let forward_tank_position = if beta_current {
+        expansion_security_beta_current::tank_staging_center(observation, map_analysis)
+    } else {
+        (profile.id == JEFFS_AI_ID)
+            .then(|| expansion_security::tank_staging_center(observation, map_analysis))
+            .flatten()
+    };
+    let forward_defensive_tank = forward_tank_position.and_then(|_| {
+        if beta_current {
+            expansion_security_beta_current::surplus_tank_for_forward_base(observation, memory)
+        } else {
+            expansion_security::surplus_tank_for_forward_base(observation, memory)
+        }
+    });
     if let Some(tank_id) = forward_defensive_tank {
         frontal_exclusions.insert(tank_id);
     }
-    frontal_exclusions.extend(memory.expansion_security.riflemen.iter().copied());
+    if beta_current {
+        frontal_exclusions.extend(memory.beta_expansion_security.riflemen.iter().copied());
+    } else {
+        frontal_exclusions.extend(memory.expansion_security.riflemen.iter().copied());
+    }
     frontal_exclusions.extend(expansion_footprint_blockers.iter().copied());
     let frontal_wave = plan_frontal_wave(
         observation,

@@ -64,9 +64,17 @@ impl PendingBuild {
 pub(crate) struct PendingBuildTracker {
     pending: BTreeMap<u32, PendingBuild>,
     failed_spots: HashMap<EntityKind, BTreeSet<(u32, u32)>>,
+    max_age_enabled: bool,
 }
 
 impl PendingBuildTracker {
+    pub(crate) fn with_max_age_enabled(max_age_enabled: bool) -> Self {
+        Self {
+            max_age_enabled,
+            ..Self::default()
+        }
+    }
+
     pub(crate) fn observe(&mut self, view: PlayerView<'_>) {
         let own: Vec<&EntityView> = view
             .snapshot
@@ -88,7 +96,8 @@ impl PendingBuildTracker {
             let keep = worker
                 .map(|worker| {
                     pending.observe_worker(worker, view.tick);
-                    !pending.stale_at(view.tick) && !pending.expired_at(view.tick)
+                    !pending.stale_at(view.tick)
+                        && (!self.max_age_enabled || !pending.expired_at(view.tick))
                 })
                 .unwrap_or_else(|| {
                     pending

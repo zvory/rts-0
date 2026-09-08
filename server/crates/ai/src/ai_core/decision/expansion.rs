@@ -145,7 +145,9 @@ fn armored_production_reserve_met(
     facts: &AiFacts,
     profile: &AiProfile,
 ) -> bool {
-    if super::expansion_security::expansion_is_next(observation, facts, profile) {
+    if super::expansion_security::expansion_is_next(observation, facts, profile)
+        || super::expansion_security_beta_current::expansion_is_next(observation, facts, profile)
+    {
         let (steel, oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
         return observation.economy.steel >= steel && observation.economy.oil >= oil;
     }
@@ -205,7 +207,7 @@ where
     {
         return None;
     }
-    let (tile_x, tile_y) = if profile.id == JEFFS_AI_ID {
+    let (tile_x, tile_y) = if matches!(profile.id, JEFFS_AI_ID | JEFFS_AI_BETA_CURRENT_ID) {
         let site = secured_site?;
         if !placeable(kind, site.0, site.1) {
             return None;
@@ -214,7 +216,7 @@ where
     } else {
         expansion_resource_depot_site(observation, expansion, kind, profile.id, placeable)?
     };
-    if profile.id == JEFFS_AI_ID
+    if matches!(profile.id, JEFFS_AI_ID | JEFFS_AI_BETA_CURRENT_ID)
         && observation.own_start_tile == (9, 9)
         && uses_jeff_river_layout(observation)
     {
@@ -265,7 +267,7 @@ where
     if resources.is_empty() {
         return None;
     }
-    if profile_id == JEFFS_AI_ID {
+    if matches!(profile_id, JEFFS_AI_ID | JEFFS_AI_BETA_CURRENT_ID) {
         if let Some(instruction) = instructed_river_expansion_site(observation, kind, &resources) {
             // The River's natural has one known good footprint per side. Do not
             // fall back to the surrounding search when that exact footprint is
@@ -274,7 +276,7 @@ where
             return placeable(kind, tile.0, tile.1).then_some(tile);
         }
     }
-    if profile_id == JEFFS_AI_ID {
+    if matches!(profile_id, JEFFS_AI_ID | JEFFS_AI_BETA_CURRENT_ID) {
         if let Some(tile) = instructed_schone_tage_expansion_site(observation, kind, &resources) {
             return placeable(kind, tile.0, tile.1).then_some(tile);
         }

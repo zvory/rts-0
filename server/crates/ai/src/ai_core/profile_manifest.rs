@@ -5,8 +5,8 @@ use serde::Serialize;
 #[cfg(test)]
 use super::profiles::required_profiles;
 use super::profiles::{
-    profile_by_id, AiProfile, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    profile_by_id, AiProfile, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_BETA_CURRENT_ID, JEFFS_AI_BETA_ID,
+    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -123,6 +123,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
             ],
         ),
         JEFFS_AI_ID
+        | JEFFS_AI_BETA_CURRENT_ID
         | JEFFS_AI_BETA_ID
         | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
         | JEFFS_AI_PRE_RIFLE_COVERAGE_ID => (

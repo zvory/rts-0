@@ -269,7 +269,7 @@ impl AiController {
             profile_id: profile.id,
             memory: AiDecisionMemory::for_profile(profile),
             static_map_context: AiStaticMapContextCache::default(),
-            pending_builds: PendingBuildTracker::default(),
+            pending_builds: PendingBuildTracker::with_max_age_enabled(profile.id == JEFFS_AI_ID),
             staged_units: BTreeSet::new(),
             held_stage_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),

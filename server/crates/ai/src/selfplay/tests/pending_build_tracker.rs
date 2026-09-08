@@ -134,7 +134,7 @@ fn pending_build_tracker_keeps_moving_worker_past_stale_window() {
 #[test]
 fn pending_build_tracker_expires_a_worker_that_moves_without_arriving() {
     let start = pending_tracker_start_payload();
-    let mut tracker = PendingBuildTracker::default();
+    let mut tracker = PendingBuildTracker::with_max_age_enabled(true);
     tracker.record_commands(
         10,
         &[Command::Build {
