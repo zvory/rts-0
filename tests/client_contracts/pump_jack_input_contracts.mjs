@@ -51,6 +51,29 @@ assert(
   "Engineer right-click over oil remains a move now that depots produce Pump Jacks",
 );
 
+const attackingTank = { id: 60, owner: 1, kind: KIND.TANK, x: 64, y: 64, facing: 0 };
+const enemyPumpJack = { id: 61, owner: 3, kind: KIND.PUMP_JACK, x: oil.x, y: oil.y, hp: 100, maxHp: 100 };
+input.state.selectedEntities = () => [attackingTank];
+input.state.isEnemyOwner = (owner) => owner === 3;
+input.selectionScene = buildSelectionScene({
+  entities: [attackingTank, oil, enemyPumpJack],
+  tileSize: map.tileSize,
+  projection,
+});
+commands.length = 0;
+input._onRightClick({ x: oil.x, y: oil.y });
+assert(
+  commands.length === 1 && commands[0].c === "attack" && commands[0].target === enemyPumpJack.id,
+  "enemy Pump Jack wins contextual attack targeting over its underlying oil patch",
+);
+
+commands.length = 0;
+input._onRightClick({ x: oil.x + map.tileSize / 2 + map.tileSize / 6 - 0.1, y: oil.y });
+assert(
+  commands.length === 1 && commands[0].c === "attack" && commands[0].target === enemyPumpJack.id,
+  "enemy Pump Jack accepts a contextual attack within one-sixth tile beyond its footprint",
+);
+
 const steelMineScaffold = {
   id: 4,
   owner: 1,
