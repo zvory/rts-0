@@ -131,8 +131,8 @@ try {
   ok(!teamUi.hasSidebarAddAi, "lobby keeps Add AI contextual to the team roster");
   ok(!teamUi.hasTeamMarks && teamUi.seatDisplay === "grid",
     `lobby teams have no color marks and player rows align with grid (${teamUi.seatDisplay})`);
-  ok(!teamUi.hasFactionControl && !teamUi.hasSeatMeta && !teamUi.hasTeamCount,
-    "dense roster omits faction controls, seat metadata, and team count badges");
+  ok(teamUi.hasFactionControl && !teamUi.hasSeatMeta && !teamUi.hasTeamCount,
+    "dense local roster includes the faction control while omitting seat metadata and team count badges");
   ok(teamUi.lobbyChatVisible && teamUi.chatDocked && teamUi.shellColumns.split(" ").length === 3,
     `joined desktop lobby uses roster, setup, and chat columns (${teamUi.shellColumns})`);
   ok(teamUi.mapPreviewBeforeDropdown,
