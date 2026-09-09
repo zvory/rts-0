@@ -34,9 +34,6 @@ pub(super) fn direct_fire_target_legal(
     let Some(target_entity) = entities.get(target) else {
         return false;
     };
-    if !crate::rules::target::default_weapon_can_target(attacker_entity.kind, target_entity.kind) {
-        return false;
-    }
     let targetable = if legality == DirectFireLegality::IntendedTarget {
         crate::game::services::world_query::is_explicit_attack_targetable(
             target_entity,
@@ -116,9 +113,7 @@ pub(super) fn auto_target_candidate(
         teams,
         owner,
         attacker.id,
-    ) || (attacker.kind != EntityKind::MortarTeam
-        && !crate::rules::target::default_weapon_can_target(attacker.kind, target.kind))
-    {
+    ) {
         return None;
     }
     let concealment = terrain::concealment_modifier(target.kind, TerrainKind::Open).max(0.0);

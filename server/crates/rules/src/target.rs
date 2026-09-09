@@ -78,11 +78,6 @@ pub fn is_anti_tank_gun_infantry_target(kind: EntityKind) -> bool {
     )
 }
 
-/// Whether an attacker's default weapon is allowed to choose this kind as its primary target.
-pub fn default_weapon_can_target(_attacker_kind: EntityKind, _target_kind: EntityKind) -> bool {
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -544,7 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn anti_tank_gun_primary_target_policy_allows_infantry() {
+    fn anti_tank_gun_infantry_damage_classification_covers_only_uncrewed_infantry() {
         let infantry = [
             EntityKind::Worker,
             EntityKind::Golem,
@@ -558,14 +553,6 @@ mod tests {
                 is_anti_tank_gun_infantry_target(kind),
                 infantry.contains(&kind),
                 "{kind} infantry classification"
-            );
-            assert!(
-                default_weapon_can_target(EntityKind::AntiTankGun, kind),
-                "anti-tank gun primary-target policy for {kind}"
-            );
-            assert!(
-                default_weapon_can_target(EntityKind::Tank, kind),
-                "other default weapons should remain legal against every target kind"
             );
         }
     }
