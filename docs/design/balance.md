@@ -372,8 +372,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   use grass-equivalent 1.0x movement, construction, cover, concealment, and line-of-sight rules.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
-- Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 113` (~3.77s) and
-  `ANTI_TANK_GUN_TEARDOWN_TICKS = 45` (~1.5s).
+- Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 85` (~2.83s) and
+  `ANTI_TANK_GUN_TEARDOWN_TICKS = 57` (~1.9s).
 - Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_MANUAL_SHELL_DELAY_TICKS = 34` (~1.13s manual travel),
@@ -397,8 +397,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   cannot fire. A deployed gun's setup cone remains fixed while its body and barrel turn together at
   `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.035` to track targets inside that cone;
   targets outside the cone are ignored until teardown and redeployment. While packed and mobile, an
-  Anti-Tank Gun moves at 1.52 px/tick and turns its body at
-  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 50`; sharp heading changes still reduce throttle
+  Anti-Tank Gun moves at 1.672 px/tick and turns its body at
+  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 55`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
@@ -418,8 +418,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 10`, `ARTILLERY_MAX_RANGE_TILES = 35`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 30 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 180` (~6s setup or teardown), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
-  `ARTILLERY_AMMO_COST_STEEL = 5`. It moves at 1.6 px/tick, slightly faster than the
-  Anti-Tank Gun's 1.52 px/tick speed.
+  `ARTILLERY_AMMO_COST_STEEL = 5`. It moves at 1.6 px/tick, slightly slower than the
+  Anti-Tank Gun's 1.672 px/tick speed.
   Unified Fire uses a player-selected radius clamped between
   `ARTILLERY_MIN_FIRE_RADIUS_TILES = 4` and `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored
   locked center. Every shell lands at a point sampled uniformly by area inside that circle. There
