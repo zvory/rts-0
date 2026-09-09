@@ -75,10 +75,7 @@ fn order_barrage_with_queue(game: &mut Game, launcher: u32, target: (f32, f32), 
 
 #[test]
 fn first_barrage_is_free_and_unloads_sixteen_rockets() {
-    assert_eq!(
-        config::ROCKET_BARRAGE_UNLOAD_TICKS,
-        config::TICK_HZ * 4
-    );
+    assert_eq!(config::ROCKET_BARRAGE_UNLOAD_TICKS, config::TICK_HZ * 4);
     assert_eq!(
         config::ROCKET_BARRAGE_RELOAD_TICKS,
         config::TICK_HZ as u16 * 30
