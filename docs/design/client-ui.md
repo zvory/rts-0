@@ -1955,9 +1955,11 @@ faction catalog use the local player's faction id as the command-id prefix.
 descriptors with the Rust catalog dump for every client-exposed faction. Unknown valid faction ids
 fail closed in command-card data, so future factions do not inherit Kriegsia build, train, research,
 or ability buttons before their catalog is intentionally exposed. The client mirror is a checked
-projection, not lifecycle admission: the lobby currently exposes no faction selector,
-fixture-only ids remain test harness data, public AI controls do not expose a faction selector, and
-local prediction remains disabled for unsupported local faction ids such as the current Ekat slice.
+projection, not lifecycle admission: beta and local normal lobbies expose a faction selector for
+human seats even while its only product option is Kriegsia; Ekat and the reserved Cultivators shell
+are omitted. Mainline and replay lobbies hide the selector, fixture-only ids remain test harness
+data, public AI controls do not expose a faction selector, and local prediction remains disabled
+for unsupported local faction ids such as the current Ekat slice.
 Generation is not required as long as the parity check remains a required gate comparing every
 client-exposed descriptor against the Rust dump.
 

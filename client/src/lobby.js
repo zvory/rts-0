@@ -76,6 +76,21 @@ export function countdownSoundId(word, index = -1, total = 0) {
   return null;
 }
 
+export function betaFactionSelectEnabledForLocation(locationLike) {
+  const host = String(locationLike?.hostname || "").toLowerCase();
+  const path = String(locationLike?.pathname || "");
+  return (
+    host.includes("beta") ||
+    path.startsWith("/beta") ||
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0" ||
+    host === "::1" ||
+    host.endsWith(".localhost") ||
+    host === ""
+  );
+}
+
 export function lobbyBrowserAutoRefreshEligible({
   enabled = true,
   joined = false,
@@ -619,12 +634,18 @@ export class Lobby {
       spectatorOnly: this._isReplayLobby(),
       playerCount: this._playerCount,
       maxPlayers: this._selectedMapMaxPlayers(),
+      betaFactionSelect: this._betaFactionSelectEnabled(),
       onAddAi: (teamId) => this.net.addAi(teamId, DEFAULT_AI_PROFILE_ID),
       onRemoveAi: (id) => this.net.removeAi(id),
       onSetAiProfile: (id, aiProfileId) => this.net.setAiProfile(id, aiProfileId),
       onSetTeam: (id, teamId) => this.net.setTeam(id, teamId),
       onSetSpectator: (id, spectator) => this.net.setSpectator(spectator, id),
+      onSetFaction: (factionId) => this.net.setFaction(factionId),
     });
+  }
+
+  _betaFactionSelectEnabled() {
+    return typeof window !== "undefined" && betaFactionSelectEnabledForLocation(window.location);
   }
 
   _selectedMapMaxPlayers() {

@@ -1,5 +1,6 @@
 use rts_rules::faction::{
-    catalog_for, DEFAULT_FACTION_ID, EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID,
+    catalog_for, CULTIVATORS_FACTION_ID, DEFAULT_FACTION_ID, EKAT_FACTION_ID,
+    EMPTY_FIXTURE_FACTION_ID,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,6 +180,8 @@ fn lifecycle_status_for(faction_id: &str) -> FactionLifecycleStatus {
         FactionLifecycleStatus::Playable
     } else if faction_id == EMPTY_FIXTURE_FACTION_ID {
         FactionLifecycleStatus::TestFixtureOnly
+    } else if faction_id == CULTIVATORS_FACTION_ID {
+        FactionLifecycleStatus::UnsupportedCatalog
     } else {
         FactionLifecycleStatus::UnsupportedCatalog
     }
@@ -319,5 +322,20 @@ mod tests {
                 reason: FactionRejectReason::FixtureNotAllowed,
             }
         );
+    }
+
+    #[test]
+    fn cultivators_catalog_is_reserved_in_every_lifecycle_context() {
+        assert!(catalog_for(CULTIVATORS_FACTION_ID).is_some());
+        for context in ALL_CONTEXTS {
+            assert_eq!(
+                validate_faction_request(*context, Some(CULTIVATORS_FACTION_ID)),
+                FactionValidation::Rejected {
+                    requested: Some(CULTIVATORS_FACTION_ID.to_string()),
+                    reason: FactionRejectReason::FactionNotAllowedInContext,
+                },
+                "Cultivators should remain unavailable in {context:?}",
+            );
+        }
     }
 }

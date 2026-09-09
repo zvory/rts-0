@@ -538,3 +538,4 @@ export const WORKER_BUILDABLE = Object.freeze([
 
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";
 export const EKAT_FACTION_ID = "ekat";
+export const CULTIVATORS_FACTION_ID = "cultivators";

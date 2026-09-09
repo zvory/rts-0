@@ -184,6 +184,10 @@ playable catalogs, explicit fixture catalogs, and future catalog data, but
 branch, self-play, dev, match-history, and post-match paths. Fixture-only and
 reserved/future ids must not inherit Kriegsia economy behavior or appear in product selectors just
 because their catalog rows are dumpable.
+The reserved `cultivators` catalog is intentionally an empty shell with the non-playable
+`cultivators.unavailable` loadout: zero starting resources, no starting entities, and no roster,
+production, research, or ability entries. It must remain rejected by every lifecycle path until a
+reviewed faction specification replaces that shell and explicitly promotes its admission status.
 
 Approved direct Steel/Oil/Supply modules for this plan are:
 
