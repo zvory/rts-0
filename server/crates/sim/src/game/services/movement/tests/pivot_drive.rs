@@ -27,8 +27,8 @@ fn anti_tank_gun_body_uses_pivot_drive_turning_along_path() {
         .expect("anti-tank gun should exist");
     let actual_degrees_per_second = e.facing().to_degrees() * config::TICK_HZ as f32;
     assert!(
-        (actual_degrees_per_second - 50.0).abs() <= 0.001,
-        "anti-tank gun body should turn at 50 degrees per second, got {actual_degrees_per_second:.4}"
+        (actual_degrees_per_second - 55.0).abs() <= 0.001,
+        "anti-tank gun body should turn at 55 degrees per second, got {actual_degrees_per_second:.4}"
     );
     assert!((e.facing() - ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK).abs() <= 0.0001);
     assert!(

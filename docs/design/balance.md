@@ -372,8 +372,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   use grass-equivalent 1.0x movement, construction, cover, concealment, and line-of-sight rules.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
-- Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 113` (~3.77s) and
-  `ANTI_TANK_GUN_TEARDOWN_TICKS = 45` (~1.5s).
+- Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 85` (~2.83s) and
+  `ANTI_TANK_GUN_TEARDOWN_TICKS = 57` (~1.9s).
 - Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_MANUAL_SHELL_DELAY_TICKS = 34` (~1.13s manual travel),
@@ -397,8 +397,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   cannot fire. A deployed gun's setup cone remains fixed while its body and barrel turn together at
   `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.035` to track targets inside that cone;
   targets outside the cone are ignored until teardown and redeployment. While packed and mobile, an
-  Anti-Tank Gun moves at 1.52 px/tick and turns its body at
-  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 50`; sharp heading changes still reduce throttle
+  Anti-Tank Gun moves at 1.672 px/tick and turns its body at
+  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 55`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
@@ -418,8 +418,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 10`, `ARTILLERY_MAX_RANGE_TILES = 35`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 30 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SETUP_TICKS = 180` (~6s setup or teardown), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
-  `ARTILLERY_AMMO_COST_STEEL = 5`. It moves at 1.6 px/tick, slightly faster than the
-  Anti-Tank Gun's 1.52 px/tick speed.
+  `ARTILLERY_AMMO_COST_STEEL = 5`. It moves at 1.6 px/tick, slightly slower than the
+  Anti-Tank Gun's 1.672 px/tick speed.
   Unified Fire uses a player-selected radius clamped between
   `ARTILLERY_MIN_FIRE_RADIUS_TILES = 4` and `ARTILLERY_BLANKET_RADIUS_TILES = 15` around the stored
   locked center. Every shell lands at a point sampled uniformly by area inside that circle. There
@@ -638,7 +638,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 108 | 1.52 | 9    | 150 | 40  | 6   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in Engineering Complex |
+| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 108 | 1.672 | 9    | 150 | 40  | 6   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in Engineering Complex |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
 | rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 30 outer / 75 inner AOE; a rocket whose impact point intersects a target deals 100 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-35 Barrage | 900-tick (~30s) cooldown from activation | 2.0 | 8 | 225 | 150 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind) and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 60 ticks (~2s) into a 6-tile scatter radius and then stops; the rack tubes darken during the cooldown; Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
