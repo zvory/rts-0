@@ -1,6 +1,5 @@
 use rts_rules::faction::{
-    catalog_for, CULTIVATORS_FACTION_ID, DEFAULT_FACTION_ID, EKAT_FACTION_ID,
-    EMPTY_FIXTURE_FACTION_ID,
+    catalog_for, DEFAULT_FACTION_ID, EKAT_FACTION_ID, EMPTY_FIXTURE_FACTION_ID,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,8 +179,6 @@ fn lifecycle_status_for(faction_id: &str) -> FactionLifecycleStatus {
         FactionLifecycleStatus::Playable
     } else if faction_id == EMPTY_FIXTURE_FACTION_ID {
         FactionLifecycleStatus::TestFixtureOnly
-    } else if faction_id == CULTIVATORS_FACTION_ID {
-        FactionLifecycleStatus::UnsupportedCatalog
     } else {
         FactionLifecycleStatus::UnsupportedCatalog
     }
@@ -190,6 +187,7 @@ fn lifecycle_status_for(faction_id: &str) -> FactionLifecycleStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rts_rules::faction::CULTIVATORS_FACTION_ID;
 
     const ALL_CONTEXTS: &[FactionRequestContext] = &[
         FactionRequestContext::NormalLobby,
