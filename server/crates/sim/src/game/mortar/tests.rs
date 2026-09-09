@@ -96,43 +96,43 @@ fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
     let outer = shell_damage(true, inner2 + 1.0, inner2, false);
     let direct = shell_damage(true, 0.0, inner2, true);
 
-    assert_eq!(inner, 75);
-    assert_eq!(outer, 30);
-    assert_eq!(direct, 100);
+    assert_eq!(inner, 53);
+    assert_eq!(outer, 21);
+    assert_eq!(direct, 70);
     assert_eq!(
         shell_effective_damage(EntityKind::Tank, true, inner, false),
-        18
+        13
     );
     assert_eq!(
         shell_effective_damage(EntityKind::Tank, true, outer, false),
-        7
+        5
     );
     assert_eq!(
         shell_effective_damage(EntityKind::Tank, true, direct, true),
-        100
+        70
     );
     assert_eq!(
         shell_effective_damage(EntityKind::Rifleman, true, inner, false),
-        75
+        53
     );
     assert_eq!(
         shell_effective_damage(EntityKind::SteelMine, true, direct, true),
-        25,
+        18,
         "a direct rocket must no longer one-shot a mine"
     );
     assert_eq!(
         shell_effective_damage(EntityKind::PumpJack, true, inner, false),
-        19,
+        14,
         "soft buildings take one quarter damage, rounded up"
     );
     assert_eq!(
         shell_effective_damage(EntityKind::ResourceDepot, true, direct, true),
-        25,
+        18,
         "direct-hit armor penetration is preserved before the building penalty"
     );
     assert_eq!(
         shell_effective_damage(EntityKind::ResourceDepot, true, inner, false),
-        5,
+        4,
         "ordinary splash applies armor before the building penalty"
     );
 }
