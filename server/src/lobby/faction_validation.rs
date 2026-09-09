@@ -42,7 +42,7 @@ pub(super) enum FactionValidation {
 enum FactionLifecycleStatus {
     Playable,
     TestFixtureOnly,
-    UnsupportedCatalog,
+    ReservedFuture,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -157,7 +157,7 @@ pub(super) fn validate_faction_request(
             requested: Some(faction_id.to_string()),
             reason: FactionRejectReason::FixtureNotAllowed,
         },
-        FactionLifecycleStatus::Playable | FactionLifecycleStatus::UnsupportedCatalog => {
+        FactionLifecycleStatus::Playable | FactionLifecycleStatus::ReservedFuture => {
             FactionValidation::Rejected {
                 requested: Some(faction_id.to_string()),
                 reason: FactionRejectReason::FactionNotAllowedInContext,
@@ -180,13 +180,16 @@ fn lifecycle_status_for(faction_id: &str) -> FactionLifecycleStatus {
     } else if faction_id == EMPTY_FIXTURE_FACTION_ID {
         FactionLifecycleStatus::TestFixtureOnly
     } else {
-        FactionLifecycleStatus::UnsupportedCatalog
+        // Catalog existence was checked before classification, so every remaining id is a
+        // fail-closed reserved catalog rather than an unknown protocol value.
+        FactionLifecycleStatus::ReservedFuture
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rts_rules::faction::CULTIVATORS_FACTION_ID;
 
     const ALL_CONTEXTS: &[FactionRequestContext] = &[
         FactionRequestContext::NormalLobby,
@@ -319,5 +322,20 @@ mod tests {
                 reason: FactionRejectReason::FixtureNotAllowed,
             }
         );
+    }
+
+    #[test]
+    fn cultivators_catalog_is_reserved_in_every_lifecycle_context() {
+        assert!(catalog_for(CULTIVATORS_FACTION_ID).is_some());
+        for context in ALL_CONTEXTS {
+            assert_eq!(
+                validate_faction_request(*context, Some(CULTIVATORS_FACTION_ID)),
+                FactionValidation::Rejected {
+                    requested: Some(CULTIVATORS_FACTION_ID.to_string()),
+                    reason: FactionRejectReason::FactionNotAllowedInContext,
+                },
+                "Cultivators should remain unavailable in {context:?}",
+            );
+        }
     }
 }

@@ -16,6 +16,7 @@ import {
   LOBBY_BROWSER_REFRESH_INTERVAL_MS,
   MAX_LOBBY_TEAMS,
   Lobby,
+  betaFactionSelectEnabledForLocation,
   countdownSoundId,
   lobbyBrowserAutoRefreshEligible,
   shouldAcceptSpectatorDrop,
@@ -33,7 +34,11 @@ import {
   suggestLobbyName,
   validateLobbyName,
 } from "../../client/src/lobby_browser_view.js";
-import { AI_PROFILES, LobbyRosterView, PLAYABLE_FACTIONS } from "../../client/src/lobby_view.js";
+import {
+  AI_PROFILES,
+  LOBBY_SELECTABLE_FACTIONS,
+  LobbyRosterView,
+} from "../../client/src/lobby_view.js";
 import {
   BirthdayBanner,
   isSoupmanBirthday,
@@ -254,9 +259,18 @@ import { textWithin } from "./dom_text.mjs";
   assert(countdownSoundId("2", 1, 3) === "countdown_zwei", "countdown maps numeric labels to voice cues");
   assert(countdownSoundId("Ready", 0, 3) === "countdown_drei", "three-word countdowns fall back to display order");
   assert(countdownSoundId("Go", 0, 1) === null, "non-countdown words stay silent");
+  assertDeepEqual(
+    LOBBY_SELECTABLE_FACTIONS,
+    [{ id: "kriegsia", label: "Kriegsia" }],
+    "beta lobby faction selector exposes only playable Kriegsia",
+  );
   assert(
-    PLAYABLE_FACTIONS.find((entry) => entry.id === "ekat")?.label === "Ekat",
-    "lobby faction selector labels the ekat faction as Ekat",
+    betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }) &&
+      betaFactionSelectEnabledForLocation({ hostname: "localhost", pathname: "/" }) &&
+      betaFactionSelectEnabledForLocation({ hostname: "[::1]", pathname: "/" }) &&
+      !betaFactionSelectEnabledForLocation({ hostname: "alphabetagames.example", pathname: "/" }) &&
+      !betaFactionSelectEnabledForLocation({ hostname: "rts.example", pathname: "/beta-preview" }),
+    "faction selector is enabled only on the beta deployment and local hosts",
   );
   assertDeepEqual(
     AI_PROFILES,
@@ -410,7 +424,7 @@ import { textWithin } from "./dom_text.mjs";
     assert(textWithin(root).includes("AI 2.1"), "host lobby labels AI seats as AI 2.1");
     assert(profileSelectors[0].children.length === 2, "host lobby exposes both player-facing AI profiles");
     assert(!findFakes(root, (el) => String(el.className).includes("player-faction")).length,
-      "lobby seats do not render faction controls");
+      "non-beta lobby seats do not render faction controls");
     assert(!findFakes(root, (el) => String(el.className).includes("lobby-seat-meta")).length,
       "lobby seats omit redundant human and AI profile metadata");
     assert(!findFakes(root, (el) => String(el.className).includes("team-row-count")).length,
@@ -420,6 +434,73 @@ import { textWithin } from "./dom_text.mjs";
         profileSelectors[0].children[1].textContent === "Jeff's AI",
       "host lobby exposes the locally developed Jeff's AI profile",
     );
+
+    const betaRoot = document.createElement("div");
+    const betaView = new LobbyRosterView(betaRoot);
+    betaView.render({
+      players: [
+        { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1, factionId: "kriegsia" },
+        { id: 2, name: "Guest", color: "#d55e00", ready: false, teamId: 2, factionId: "ekat" },
+      ],
+      myId: 1,
+      hostId: 1,
+      isHost: true,
+      countdownActive: false,
+      betaFactionSelect: true,
+      playerCount: 2,
+      maxPlayers: 4,
+    });
+    const factionSelectors = findFakes(
+      betaRoot,
+      (el) => el.tagName === "SELECT" && String(el.className).includes("player-faction-select"),
+    );
+    assert(
+      factionSelectors.length === 1 &&
+        factionSelectors[0].children.length === 1 &&
+        factionSelectors[0].children[0].value === "kriegsia" &&
+        factionSelectors[0].children[0].textContent === "Kriegsia",
+      "beta lobby restores a one-option Kriegsia faction dropdown and hides Ekat and Cultivators",
+    );
+    assert(
+      !factionSelectors[0].disabled &&
+        findFakes(
+          betaRoot,
+          (el) => String(el.className).includes("player-faction-label") && el.textContent === "Ekat",
+        ).length === 1,
+      "the local human can operate their selector while a hidden Ekat seat remains accurately labeled",
+    );
+
+    const selectedFactions = [];
+    const recoveryRoot = document.createElement("div");
+    const recoveryView = new LobbyRosterView(recoveryRoot);
+    recoveryView.render({
+      players: [
+        { id: 2, name: "Guest", color: "#d55e00", ready: false, teamId: 2, factionId: "ekat" },
+      ],
+      myId: 2,
+      hostId: 1,
+      isHost: false,
+      countdownActive: false,
+      betaFactionSelect: true,
+      playerCount: 1,
+      maxPlayers: 4,
+      onSetFaction: (factionId) => selectedFactions.push(factionId),
+    });
+    const hiddenFactionSelector = findFakes(
+      recoveryRoot,
+      (el) => el.tagName === "SELECT" && String(el.className).includes("player-faction-select"),
+    )[0];
+    assert(
+      hiddenFactionSelector.value === "ekat" &&
+        hiddenFactionSelector.children.length === 2 &&
+        hiddenFactionSelector.children[0].value === "ekat" &&
+        hiddenFactionSelector.children[0].disabled &&
+        hiddenFactionSelector.children[1].value === "kriegsia",
+      "a local hidden-faction seat shows its current value but offers only Kriegsia as a destination",
+    );
+    hiddenFactionSelector.value = "kriegsia";
+    hiddenFactionSelector.listeners.change();
+    assertDeepEqual(selectedFactions, ["kriegsia"], "a local Ekat seat can return to Kriegsia");
 
     const turtleRoot = document.createElement("div");
     const turtleView = new LobbyRosterView(turtleRoot);

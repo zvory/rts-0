@@ -13,6 +13,7 @@ use crate::{balance, defs, economy::ResourceCost, EntityKind};
 
 pub const DEFAULT_FACTION_ID: &str = "kriegsia";
 pub const EKAT_FACTION_ID: &str = "ekat";
+pub const CULTIVATORS_FACTION_ID: &str = "cultivators";
 pub const EMPTY_FIXTURE_FACTION_ID: &str = "phase2_empty_fixture";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -262,6 +263,16 @@ pub const EKAT_LOADOUT: FactionLoadout = FactionLoadout {
     initial_steel: 0,
     initial_oil: 0,
     starting_entities: EKAT_START_ENTITIES,
+    opening_upgrades: &[],
+};
+
+/// Reserved faction shell. Lifecycle validation intentionally rejects it until its starting
+/// loadout and roster are designed and explicitly promoted to a playable status.
+pub const CULTIVATORS_LOADOUT: FactionLoadout = FactionLoadout {
+    id: "cultivators.unavailable",
+    initial_steel: 0,
+    initial_oil: 0,
+    starting_entities: &[],
     opening_upgrades: &[],
 };
 
@@ -695,7 +706,25 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
     production_anchors: &[EntityKind::Zamok],
 };
 
-pub const CATALOGS: &[FactionCatalog] = &[CURRENT_CATALOG, EKAT_CATALOG, EMPTY_FIXTURE_CATALOG];
+pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
+    id: CULTIVATORS_FACTION_ID,
+    loadout: CULTIVATORS_LOADOUT,
+    units: &[],
+    buildings: &[],
+    buildables: &[],
+    upgrades: &[],
+    abilities: &[],
+    builders: &[],
+    gatherers: &[],
+    production_anchors: &[],
+};
+
+pub const CATALOGS: &[FactionCatalog] = &[
+    CURRENT_CATALOG,
+    EKAT_CATALOG,
+    CULTIVATORS_CATALOG,
+    EMPTY_FIXTURE_CATALOG,
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpgradeCatalogEntry {
@@ -1196,6 +1225,21 @@ mod tests {
     }
 
     #[test]
+    fn cultivators_catalog_is_an_empty_reserved_shell() {
+        let catalog = catalog_for(CULTIVATORS_FACTION_ID).expect("Cultivators catalog exists");
+
+        assert_eq!(catalog, CULTIVATORS_CATALOG);
+        assert_eq!(catalog.loadout.id, "cultivators.unavailable");
+        assert_eq!(catalog.loadout.initial_steel, 0);
+        assert_eq!(catalog.loadout.initial_oil, 0);
+        assert!(catalog.loadout.starting_entities.is_empty());
+        assert!(catalog.units.is_empty());
+        assert!(catalog.buildings.is_empty());
+        assert!(catalog.upgrades.is_empty());
+        assert!(catalog.abilities.is_empty());
+    }
+
+    #[test]
     fn unknown_non_empty_catalog_ids_fail_closed() {
         assert!(catalog_for("unknown_faction").is_none());
         assert!(catalog_for_or_default_empty("unknown_faction").is_none());
@@ -1207,6 +1251,7 @@ mod tests {
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "missing.loadout").is_none());
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "kriegsia.standard").is_some());
         assert!(catalog_loadout_for(EKAT_FACTION_ID, "ekat.standard").is_some());
+        assert!(catalog_loadout_for(CULTIVATORS_FACTION_ID, "cultivators.unavailable").is_some());
     }
 
     #[test]

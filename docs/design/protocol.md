@@ -620,12 +620,15 @@ truncated; there is no branch, redo, or undo protocol in this slice.
 For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
-The canonical default faction id is `kriegsia`; `ekat` is also a playable catalog id. Start payloads emit `factionId` for every active
+The canonical default faction id is `kriegsia`; `ekat` remains an internally supported playable
+catalog id but is hidden from the normal lobby selector. The reserved `cultivators` catalog id exists as an
+empty future-faction shell and is rejected by every lifecycle context. Start payloads emit `factionId` for every active
 start player, lobby seat, and replay branch seat, and replay artifacts store `faction_id` for every
 player. Missing faction requests default to `kriegsia` in normal lobby, AI, self-play, and
 dev-start contexts, while explicit `kriegsia` and `ekat` requests are accepted by the current
 playable faction policy. Other ids are rejected unless a lifecycle path explicitly accepts recorded
-replay data or the `phase2_empty_fixture` test fixture.
+replay data or the `phase2_empty_fixture` test fixture. Catalog existence alone does not admit
+`cultivators` through `setFaction` or any match-start path.
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
 field does not make a faction playable. Fixture-only, reserved/future, and historical-only ids must
 not become valid `setFaction`, AI-seat, replay-branch, or post-match replay ids without updating

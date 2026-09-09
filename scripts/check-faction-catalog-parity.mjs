@@ -95,7 +95,7 @@ import {
   trainableUnitsForFaction,
   workerBuildablesForFaction,
 } from "../client/src/config.js";
-import { PLAYABLE_FACTIONS } from "../client/src/lobby_view.js";
+import { LOBBY_SELECTABLE_FACTIONS } from "../client/src/lobby_view.js";
 import {
   ABILITY,
   ABILITY_CODE,
@@ -147,11 +147,11 @@ const abilityByStableId = new Map(Object.entries(ABILITY).map(([, value]) => [va
 const EXPECTED_CLIENT_CATALOG_IDS = Object.freeze([
   DEFAULT_FACTION_ID,
   "ekat",
+  "cultivators",
   "phase2_empty_fixture",
 ]);
-const EXPECTED_PLAYABLE_FACTION_IDS = Object.freeze([
+const EXPECTED_LOBBY_FACTION_IDS = Object.freeze([
   DEFAULT_FACTION_ID,
-  "ekat",
 ]);
 const EXPECTED_CLIENT_CONFIG_SECTIONS = Object.freeze([
   "abilityEffects",
@@ -390,14 +390,19 @@ assert.deepEqual(
   "client FACTION_CATALOGS must not add or omit catalog ids silently",
 );
 assert.deepEqual(
-  PLAYABLE_FACTIONS.map((entry) => entry.id),
-  EXPECTED_PLAYABLE_FACTION_IDS,
-  "client playable faction selector must only expose product-playable ids",
+  LOBBY_SELECTABLE_FACTIONS.map((entry) => entry.id),
+  EXPECTED_LOBBY_FACTION_IDS,
+  "client lobby faction selector must only expose currently selectable ids",
 );
 assert.equal(
-  PLAYABLE_FACTIONS.some((entry) => entry.id === "phase2_empty_fixture"),
+  LOBBY_SELECTABLE_FACTIONS.some((entry) => entry.id === "phase2_empty_fixture"),
   false,
   "fixture-only faction id must not appear as a playable client option",
+);
+assert.equal(
+  LOBBY_SELECTABLE_FACTIONS.some((entry) => entry.id === "cultivators" || entry.id === "ekat"),
+  false,
+  "reserved Cultivators and hidden Ekat must not appear as playable client options",
 );
 assert.deepEqual(
   WORKER_BUILDABLE,

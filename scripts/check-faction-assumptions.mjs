@@ -79,11 +79,12 @@ for (const anchor of [
 for (const requiredText of [
   "Lifecycle status is explicit and separate from catalog existence",
   "`playable-human-only`: allowed for human selection but not for AI, prediction, or replay-capable",
-  "`reserved/future`: named for future work but not admitted",
+  "`reserved/future`: named for future work and optionally represented by an empty catalog shell",
   "`plans/archive/faction/*` files are historical-only evidence",
   "they must not read archived phase files as the source",
   "| `kriegsia` | playable |",
   "| `ekat` | playable |",
+  "| `cultivators` | reserved/future |",
   "| `phase2_empty_fixture` | test-fixture-only |",
   "| `plans/archive/faction/*` | historical-only |",
   "The Rust faction catalog in",

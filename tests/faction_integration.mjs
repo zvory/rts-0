@@ -44,6 +44,12 @@ const { ok } = assertions;
   ok(afterInvalid.players.find((p) => p.id === A.playerId)?.factionId === DEFAULT_FACTION_ID,
     "fixture faction request is ignored for normal lobby players");
 
+  A.send({ t: "setFaction", factionId: "cultivators" });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const afterCultivators = A.msgs.filter((m) => m.t === "lobby").at(-1);
+  ok(afterCultivators.players.find((p) => p.id === A.playerId)?.factionId === DEFAULT_FACTION_ID,
+    "reserved Cultivators faction request is ignored for normal lobby players");
+
   await readyPlayers([A, B]);
   const { countdowns, starts } = await startMatch(A, [A, B]);
   assertCountdownProtocol(ok, countdowns[0]);

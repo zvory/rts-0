@@ -1,6 +1,7 @@
 import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "../protocol.js";
 import {
   ABILITIES,
+  CULTIVATORS_FACTION_ID,
   EKAT_FACTION_ID,
   FIXTURE_FACTION_ID,
   WORKER_BUILDABLE,
@@ -115,6 +116,16 @@ export const FACTION_CATALOGS = Object.freeze({
       ABILITY.EKAT_MAGIC_ANCHOR,
       ABILITY.EKAT_CONSUME_GOLEM,
     ],
+  }),
+  [CULTIVATORS_FACTION_ID]: freezeCatalog({
+    id: CULTIVATORS_FACTION_ID,
+    loadoutId: "cultivators.unavailable",
+    units: [],
+    buildings: [],
+    buildables: [],
+    trainables: {},
+    research: {},
+    abilities: [],
   }),
 });
 
