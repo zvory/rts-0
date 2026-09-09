@@ -96,6 +96,8 @@ export const BALLISTIC_TABLES_RESEARCH_TICKS = TICK_HZ * 15;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const SCOUT_PLANE_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const ROCKETS_RESEARCH_TICKS = TICK_HZ * 25;
+export const ROCKET_BARRAGE_MIN_RANGE_TILES = 10;
+export const ROCKET_BARRAGE_MAX_RANGE_TILES = 44;
 export const SMOKE_PLUS_RESEARCH_TICKS = TICK_HZ * 20;
 export const BREAKTHROUGH_RADIUS_TILES = 9;
 export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
@@ -152,7 +154,7 @@ export const STATS = Object.freeze({
     upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.ROCKET_LAUNCHER]: { label: "Rocket Truck", icon: "RT", size: 18, sight: 8, body: ROCKET_LAUNCHER_BODY,
     rangeTiles: 0, minRangeTiles: 10,
-    cost: { steel: 225, oil: 150 }, supply: 6, buildTicks: TICK_HZ * 20,
+    cost: { steel: 225, oil: 100 }, supply: 6, buildTicks: TICK_HZ * 20,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ROCKETS,
     upgradeRequiresText: "Requires Rockets research in Engineering Complex",
     description: "Mobile rocket artillery. Stop and manually fire a 16-rocket Barrage over a wide area." },
@@ -272,8 +274,8 @@ export const ABILITIES = Object.freeze({
     title: "Target a 16-rocket saturation barrage",
     carriers: Object.freeze([KIND.ROCKET_LAUNCHER]),
     targetMode: "worldPoint",
-    rangeTiles: 35,
-    minRangeTiles: 10,
+    rangeTiles: ROCKET_BARRAGE_MAX_RANGE_TILES,
+    minRangeTiles: ROCKET_BARRAGE_MIN_RANGE_TILES,
     cooldownTicks: TICK_HZ * 30,
     charges: 1,
     cost: Object.freeze({ steel: 0, oil: 150 }),

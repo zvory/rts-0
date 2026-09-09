@@ -354,7 +354,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assert(
     STATS[KIND.ROCKET_LAUNCHER].label === "Rocket Truck" &&
       STATS[KIND.ROCKET_LAUNCHER].cost.steel === 225 &&
-      STATS[KIND.ROCKET_LAUNCHER].cost.oil === 150 &&
+      STATS[KIND.ROCKET_LAUNCHER].cost.oil === 100 &&
       STATS[KIND.STEELWORKS].trains.includes(KIND.ROCKET_LAUNCHER),
     "Gun Works exposes the player-facing Rocket Truck with mirrored production cost",
   );
@@ -365,9 +365,11 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Rockets research mirrors its server cost and duration",
   );
   assert(
-    ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 30 &&
+    ABILITIES[ABILITY.BARRAGE].rangeTiles === 44 &&
+      ABILITIES[ABILITY.BARRAGE].minRangeTiles === 10 &&
+      ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 30 &&
       ABILITIES[ABILITY.BARRAGE].cost.oil === 150,
-    "Rocket Truck Barrage mirrors its thirty-second cooldown and repeat cost",
+    "Rocket Truck Barrage mirrors its range band, thirty-second cooldown, and repeat cost",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
