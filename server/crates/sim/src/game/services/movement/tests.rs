@@ -25,6 +25,7 @@ use crate::game::services::standability;
 use crate::game::{PlayerState, ScoreState};
 use rayon::prelude::*;
 mod pivot_drive;
+mod side_push;
 mod static_repath;
 mod steering_proximity;
 mod tree_trunks;

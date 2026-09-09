@@ -371,7 +371,11 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   ring that has any (so units exit the rally-facing side), and the new unit is immediately given
   the first rally stage as its active move/attack-move order plus later stages as queued orders;
   with no rally plan the legacy first-found candidate is used and the unit spawns idle.
-- **Unit collision**: `services::movement::resolve_collisions` runs after production each tick and
+- **Unit collision**: Moving units of every kind add the same small, terrain-legal sideways nudge
+  to an overlapping stationary blocker ahead of them. The nudge is half the overlap clamped to
+  4–16 world pixels (a 2–8 pixel nudge); moving blockers and ghost workers are exempt. Existing
+  footing weights still govern ordinary separation.
+  `services::movement::resolve_collisions` runs after production each tick and
   pair-wise pushes overlapping mobile units apart using `services::geometry::unit_body_overlap`.
   Infantry resolve as circles while tanks resolve from their oriented hulls, so a tank front/back or
   side contact separates on the actual hull axis instead of the center-to-center circle direction.

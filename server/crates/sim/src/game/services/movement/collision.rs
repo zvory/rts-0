@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{uses_oriented_vehicle_body, EntityKind, EntityStore};
+use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::geometry::{unit_body_for_entity, unit_body_overlap, UnitBody};
 use crate::game::services::occupancy::Occupancy;
@@ -25,7 +25,7 @@ const COLLISION_PASSES: usize = 8;
 pub(super) const COLLISION_EPS_PX: f32 = 0.001;
 
 /// Scale applied to the extra lateral nudge that moves stationary blockers away from a moving
-/// vehicle's centerline. The normal overlap-resolution push is unchanged.
+/// unit's centerline. The normal overlap-resolution push is unchanged.
 const CENTERLINE_LATERAL_PUSH_SCALE: f32 = 0.5;
 
 /// Resolve unit-unit overlaps with iterative pair-wise pushes so units do not stack on top of
@@ -292,8 +292,7 @@ fn lateral_offset_one_way(
     blocker: CollisionSide,
     overlap: f32,
 ) -> Option<(f32, f32)> {
-    if !uses_oriented_vehicle_body(pusher.kind)
-        || pusher.path_empty
+    if pusher.path_empty
         || !blocker.path_empty
         || !pusher.facing.is_finite()
         || !overlap.is_finite()
