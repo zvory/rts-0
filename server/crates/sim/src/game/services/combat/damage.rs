@@ -103,9 +103,11 @@ pub(super) fn apply_damage(
     // Resolve weapon-specific accuracy before computing damage. Entrenchment is deterministic
     // damage reduction, not another miss source. A miss still leaves the shell path live so each
     // overpenetration candidate can make its own independent accuracy roll.
-    let primary_missed = if let Some(v) = entities.get(shot_victim) {
-        let mc = combat_rules::miss_chance_for_weapon(weapon_profile, v.kind)
-            .max(extra_miss_chance.clamp(0.0, 1.0));
+    let primary_missed = if entities.get(shot_victim).is_some() {
+        // Intended targets have no intrinsic weapon miss roll. Movement penalties remain able to
+        // make a primary shot miss; weapon-specific infantry dodge applies only to incidental
+        // overpenetration candidates below.
+        let mc = extra_miss_chance.clamp(0.0, 1.0);
         if mc > 0.0 && rng.gen::<f32>() < mc {
             emit_miss_event(events, &attack_recipients, shot_victim);
             true
@@ -177,13 +179,10 @@ pub(super) fn apply_damage(
             shot_victim,
             weapon_profile,
             damaged && victim_entrenched,
-            if primary_missed {
-                unentrenched_dmg
-            } else {
-                // Tile cover protects this victim without draining the projectile's downstream
-                // overpenetration energy; each later candidate samples its own tile separately.
-                entrenched_dmg
-            },
+            // Target-type and tile modifiers protect this victim without draining the
+            // projectile's downstream overpenetration energy; each later candidate applies its
+            // own modifiers independently. A direct hit on entrenched infantry stops the shell.
+            dmg,
             attacker_owner,
             ax,
             ay,

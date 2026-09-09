@@ -2290,7 +2290,7 @@ fn allied_damage_does_not_update_last_damage_signal() {
 }
 
 #[test]
-fn missed_primary_shot_still_emits_attack_event() {
+fn intended_anti_tank_gun_infantry_hit_emits_attack_feedback() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
@@ -2319,8 +2319,8 @@ fn missed_primary_shot_still_emits_attack_event() {
 
     assert_eq!(
         entities.get(victim).expect("victim should exist").hp,
-        victim_hp,
-        "seeded anti-tank shot should miss the infantry target"
+        victim_hp.saturating_sub(14),
+        "the intended infantry target should reliably take 30% of the 48-damage test shot"
     );
     assert!(
             events
@@ -2328,18 +2328,8 @@ fn missed_primary_shot_still_emits_attack_event() {
                 .expect("attacker owner events should exist")
                 .iter()
                 .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == victim)),
-            "missed shots should still emit attack feedback for gun audio"
+            "intended infantry hits should emit attack feedback for gun audio"
         );
-    assert!(
-        events
-            .get(&2)
-            .expect("victim owner events should exist")
-            .iter()
-            .all(
-                |event| !matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")
-            ),
-        "misses should not emit under-attack damage alerts"
-    );
 }
 
 #[test]

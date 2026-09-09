@@ -295,7 +295,8 @@ movement, and 25% faster rifle attacks plus the Panzerfaust windup boost. Machin
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
 mobile combat units still hold position once a target is in weapon range. Scout cars also fire while
 moving using an independent rear machine-gun facing. They are unarmored light vehicles and do not
-receive armored damage reduction, but anti-tank guns do not roll their infantry miss chance against them.
+receive armored damage reduction; Anti-Tank Guns deal their full damage to them and do not roll an
+incidental infantry miss chance against them.
 Plain `Move` tanks, scout cars, and Methamphetamines-upgraded Riflemen and Panzerfausts only fire at enemies already in
 weapon range. Their active `AttackMove` orders use the same moving-fire policy while they are still
 following the player-issued path: auto-acquisition can aim and fire only at targets that are
@@ -322,10 +323,11 @@ creates a four-tile clear-area objective: units retain normal Attack Move engage
 on the approach, but currently actionable traps inside that objective preempt ordinary targets.
 Hidden traps remain ineligible until revealed, while vehicle pathfinding continues routing around
 the obstacles. Anti-armor default weapons
-prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns cannot
-auto-acquire or accept direct Attack orders against infantry-sized targets: Workers, Golems,
-Riflemen, Panzerfausts, and Machine Gunners. Crewed support weapons and other non-infantry targets
-remain legal. Tanks keep a narrower
+prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns can
+auto-acquire and accept direct Attack orders against infantry-sized targets: Workers, Golems,
+Riflemen, Panzerfausts, and Machine Gunners. Those intended hits are reliable but deal only 30% of
+normal damage; infantry remain fallback targets behind anti-armor threats and armored units. Crewed
+support weapons and other non-infantry targets remain legal and take full damage. Tanks keep a narrower
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
@@ -484,9 +486,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   reduces incoming area damage by 25% after existing falloff/armor rules, and suppresses
   over-penetration through or into the entrenched unit. Entrenchment does not add a direct-shot
   miss chance. Tank cannon direct shots have no intrinsic infantry dodge chance. Anti-Tank Guns
-  cannot choose infantry-sized units as primary targets; their existing 90% infantry miss roll
-  still applies to incidental overpenetration candidates. Each Anti-Tank Gun roll happens before
-  the entrenched direct-damage reduction, and every overpenetration candidate rolls separately.
+  can deliberately target infantry-sized units, dealing 30 damage from their 100-damage shell with
+  no intrinsic miss roll. Their existing 90% infantry miss roll still applies independently to each
+  incidental overpenetration candidate, and an incidental hit applies the same 30% infantry damage
+  modifier after the shell's normal half-damage follow-through.
   The trench radius is 0.375 tile.
   The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
@@ -638,7 +641,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed / 75 packed | 20 deployed / 5 packed | 108 | 1.672 | 9    | 150 | 40  | 6   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in Engineering Complex |
+| anti_tank_gun         | 45  | 100 deployed; 30 vs infantry-sized targets | 20 deployed | 108 | 1.672 | 9    | 150 | 40  | 6   | 440 (~15s); cannot fire while packed or transitioning; requires Gun Works (`steelworks` kind) and AT Guns (`anti_tank_gun_unlock`) researched in Engineering Complex |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
 | rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 900-tick (~30s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind) and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; the rack tubes darken during the cooldown; Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
