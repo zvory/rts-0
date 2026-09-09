@@ -78,10 +78,8 @@ export function countdownSoundId(word, index = -1, total = 0) {
 
 export function betaFactionSelectEnabledForLocation(locationLike) {
   const host = String(locationLike?.hostname || "").toLowerCase();
-  const path = String(locationLike?.pathname || "");
   return (
-    host.includes("beta") ||
-    path.startsWith("/beta") ||
+    host === "rts-0-zvorygin-beta.fly.dev" ||
     host === "localhost" ||
     host === "127.0.0.1" ||
     host === "0.0.0.0" ||

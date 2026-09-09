@@ -326,7 +326,7 @@ export class LobbyRosterView {
   }
 
   _buildFactionControl({ player, myId, countdownActive, onSetFaction }) {
-    if (player.isAi) {
+    if (player.isAi || !isLobbySelectableFaction(player.factionId)) {
       const label = document.createElement("span");
       label.className = "player-faction-label player-ai-profile-select";
       label.textContent = factionLabel(player.factionId);
@@ -497,11 +497,15 @@ export const LOBBY_SELECTABLE_FACTIONS = Object.freeze([
   { id: "kriegsia", label: "Kriegsia" },
 ]);
 
+function isLobbySelectableFaction(factionId) {
+  return LOBBY_SELECTABLE_FACTIONS.some((entry) => entry.id === factionId);
+}
+
 function playableFactionId(factionId) {
-  return LOBBY_SELECTABLE_FACTIONS.some((entry) => entry.id === factionId) ? factionId : "kriegsia";
+  return isLobbySelectableFaction(factionId) ? factionId : "kriegsia";
 }
 
 function factionLabel(factionId) {
-  const entry = LOBBY_SELECTABLE_FACTIONS.find((item) => item.id === factionId);
+  const entry = PLAYABLE_FACTIONS.find((item) => item.id === factionId);
   return entry ? entry.label : "Kriegsia";
 }

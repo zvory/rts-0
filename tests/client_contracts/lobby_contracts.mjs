@@ -265,10 +265,11 @@ import { textWithin } from "./dom_text.mjs";
     "beta lobby faction selector exposes only playable Kriegsia",
   );
   assert(
-    betaFactionSelectEnabledForLocation({ hostname: "rts-beta.example", pathname: "/" }) &&
+    betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }) &&
       betaFactionSelectEnabledForLocation({ hostname: "localhost", pathname: "/" }) &&
-      !betaFactionSelectEnabledForLocation({ hostname: "rts.example", pathname: "/" }),
-    "faction selector is enabled on beta and local hosts but hidden on mainline",
+      !betaFactionSelectEnabledForLocation({ hostname: "alphabetagames.example", pathname: "/" }) &&
+      !betaFactionSelectEnabledForLocation({ hostname: "rts.example", pathname: "/beta-preview" }),
+    "faction selector is enabled only on the beta deployment and local hosts",
   );
   assertDeepEqual(
     AI_PROFILES,
@@ -453,15 +454,19 @@ import { textWithin } from "./dom_text.mjs";
       (el) => el.tagName === "SELECT" && String(el.className).includes("player-faction-select"),
     );
     assert(
-      factionSelectors.length === 2 &&
+      factionSelectors.length === 1 &&
         factionSelectors[0].children.length === 1 &&
         factionSelectors[0].children[0].value === "kriegsia" &&
         factionSelectors[0].children[0].textContent === "Kriegsia",
       "beta lobby restores a one-option Kriegsia faction dropdown and hides Ekat and Cultivators",
     );
     assert(
-      !factionSelectors[0].disabled && factionSelectors[1].disabled,
-      "only the local human can operate their faction dropdown",
+      !factionSelectors[0].disabled &&
+        findFakes(
+          betaRoot,
+          (el) => String(el.className).includes("player-faction-label") && el.textContent === "Ekat",
+        ).length === 1,
+      "the local human can operate their selector while a hidden Ekat seat remains accurately labeled",
     );
 
     const turtleRoot = document.createElement("div");
