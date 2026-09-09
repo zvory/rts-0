@@ -84,7 +84,7 @@ impl WeaponKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MissPolicy {
     None,
-    AntiTankGunVsInfantrySized,
+    AntiTankGunOverpenetrationVsInfantrySized,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -185,7 +185,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         cooldown: 108,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
-        miss_policy: MissPolicy::AntiTankGunVsInfantrySized,
+        miss_policy: MissPolicy::AntiTankGunOverpenetrationVsInfantrySized,
         facing_damage_policy: FacingDamagePolicy::TankArmorFacing,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.50 },
     },
@@ -441,9 +441,9 @@ pub fn default_weapon_target_fit(
     }
 }
 
-/// Miss probability [0.0, 1.0) for an attack. Incidental Anti-Tank Gun shell intersections have a
-/// 90% miss rate against infantry-sized targets. A miss flies straight through without finding
-/// anyone; hits that connect deal full damage.
+/// Miss probability [0.0, 1.0) for an incidental shell intersection. Anti-Tank Gun shells have a
+/// 90% miss rate against infantry-sized targets behind the intended target. A miss flies straight
+/// through without finding anyone.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
     default_weapon_profile(attacker_kind)
         .map(|profile| miss_chance_for_weapon(profile, victim_kind))
@@ -452,13 +452,29 @@ pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
 
 pub fn miss_chance_for_weapon(profile: &WeaponProfile, victim_kind: EntityKind) -> f32 {
     match profile.miss_policy {
-        MissPolicy::AntiTankGunVsInfantrySized
+        MissPolicy::AntiTankGunOverpenetrationVsInfantrySized
             if crate::target::is_anti_tank_gun_infantry_target(victim_kind) =>
         {
             0.90
         }
         _ => 0.0,
     }
+}
+
+/// Applies weapon-specific target-type damage modifiers after armor and terrain calculations.
+pub fn damage_after_target_type_modifier(
+    profile: &WeaponProfile,
+    victim_kind: EntityKind,
+    damage: u32,
+) -> u32 {
+    if profile.id == WeaponKind::AntiTankGun
+        && crate::target::is_anti_tank_gun_infantry_target(victim_kind)
+    {
+        return ((damage as f32) * crate::balance::ANTI_TANK_GUN_INFANTRY_DAMAGE_MULTIPLIER)
+            .round()
+            .max(0.0) as u32;
+    }
+    damage
 }
 
 /// Applies the shared direct-damage reduction for actively entrenched eligible infantry.
@@ -532,12 +548,13 @@ pub fn effective_damage_for_weapon(
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
-    effective_damage_for_armor_penetration(
+    let damage = effective_damage_for_armor_penetration(
         profile.armor_penetration,
         victim_kind,
         base_dmg,
         victim_terrain,
-    )
+    );
+    damage_after_target_type_modifier(profile, victim_kind, damage)
 }
 
 fn effective_damage_for_weapon_class(
@@ -883,7 +900,7 @@ mod tests {
         assert_eq!(anti_tank_gun.armor_penetration, FULL_ARMOR_PENETRATION);
         assert_eq!(
             anti_tank_gun.miss_policy,
-            MissPolicy::AntiTankGunVsInfantrySized
+            MissPolicy::AntiTankGunOverpenetrationVsInfantrySized
         );
         assert_eq!(
             anti_tank_gun.facing_damage_policy,
@@ -1016,10 +1033,10 @@ mod tests {
     }
 
     #[test]
-    fn ap_vs_small_full_damage_on_hit() {
+    fn anti_tank_gun_damage_is_reduced_against_infantry() {
         assert_eq!(
             effective_damage(EntityKind::AntiTankGun, EntityKind::Rifleman, 20, None),
-            20
+            6
         );
     }
 
@@ -1313,7 +1330,7 @@ mod tests {
     }
 
     #[test]
-    fn anti_tank_gun_misses_infantry_sized_targets_nine_times_out_of_ten() {
+    fn anti_tank_gun_incidental_hits_miss_infantry_sized_targets_nine_times_out_of_ten() {
         for victim in [
             EntityKind::Worker,
             EntityKind::Golem,

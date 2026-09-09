@@ -40,12 +40,13 @@ fn packed_anti_tank_gun_cannot_fire() {
 }
 
 #[test]
-fn anti_tank_gun_auto_acquisition_skips_all_infantry() {
+fn anti_tank_gun_auto_acquisition_can_select_infantry() {
     let map = open_map(16);
     let mut entities = EntityStore::new();
     let anti_tank_gun = entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
         .expect("anti-tank gun should spawn");
+    let mut infantry_ids = Vec::new();
     for (index, kind) in [
         EntityKind::Worker,
         EntityKind::Golem,
@@ -56,9 +57,10 @@ fn anti_tank_gun_auto_acquisition_skips_all_infantry() {
     .into_iter()
     .enumerate()
     {
-        entities
+        let id = entities
             .spawn_unit(2, kind, 132.0 + index as f32 * 20.0, 100.0)
             .expect("infantry target should spawn");
+        infantry_ids.push(id);
     }
 
     assert_eq!(
@@ -69,8 +71,8 @@ fn anti_tank_gun_auto_acquisition_skips_all_infantry() {
             anti_tank_gun,
             256.0,
         ),
-        None,
-        "anti-tank guns must not auto-acquire any infantry target"
+        Some(infantry_ids[2]),
+        "anti-tank guns should auto-acquire the nearest non-economy infantry target"
     );
 
     let mortar = entities
@@ -84,8 +86,83 @@ fn anti_tank_gun_auto_acquisition_skips_all_infantry() {
             anti_tank_gun,
             256.0,
         ),
-        Some(mortar),
-        "crewed support weapons should remain legal anti-tank gun targets"
+        Some(infantry_ids[2]),
+        "a farther equal-fit support weapon should not displace the nearer infantry target"
+    );
+    assert_ne!(mortar, infantry_ids[2]);
+}
+
+#[test]
+fn deployed_anti_tank_gun_fires_reduced_damage_at_infantry() {
+    let map = open_map(16);
+    let mut entities = EntityStore::new();
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    let rifleman = entities
+        .spawn_unit(2, EntityKind::Rifleman, 180.0, 100.0)
+        .expect("rifleman should spawn");
+    if let Some(at) = entities.get_mut(anti_tank_gun) {
+        at.set_weapon_setup(WeaponSetup::Deployed);
+        at.set_emplacement_facing(Some(0.0));
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+    }
+
+    let before_hp = entities.get(rifleman).expect("rifleman should exist").hp;
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert_eq!(
+        entities.get(rifleman).expect("rifleman should exist").hp,
+        before_hp.saturating_sub(30),
+        "a deployed anti-tank gun should reliably deal 30 damage to its intended infantry target"
+    );
+    assert!(events.values().flatten().any(|event| {
+        matches!(
+            event,
+            Event::Attack { from, to, .. } if *from == anti_tank_gun && *to == rifleman
+        )
+    }));
+}
+
+#[test]
+fn deployed_anti_tank_gun_survives_a_head_on_rifleman_duel() {
+    let map = open_map(16);
+    let players = [player_state(1, false), player_state(2, false)];
+    let mut entities = EntityStore::new();
+    let anti_tank_gun = entities
+        .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+        .expect("anti-tank gun should spawn");
+    let rifleman = entities
+        .spawn_unit(2, EntityKind::Rifleman, 180.0, 100.0)
+        .expect("rifleman should spawn");
+    if let Some(at) = entities.get_mut(anti_tank_gun) {
+        at.set_weapon_setup(WeaponSetup::Deployed);
+        at.set_emplacement_facing(Some(0.0));
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+    }
+
+    for _ in 0..=108 {
+        run_combat_tick_on_map(&mut entities, &players, &map);
+    }
+
+    assert_eq!(
+        entities.get(rifleman).expect("rifleman should exist").hp,
+        0,
+        "two reduced anti-tank-gun hits should kill one full-health rifleman"
+    );
+    assert!(
+        entities
+            .get(anti_tank_gun)
+            .expect("anti-tank gun should exist")
+            .hp
+            > 0,
+        "a ready, deployed anti-tank gun should survive one head-on rifleman"
     );
 }
 

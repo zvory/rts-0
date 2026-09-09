@@ -1,13 +1,13 @@
 use super::*;
 use rand::Rng;
 
-fn seed_with_primary_miss_and_secondary_hit(miss_chance: f32) -> u64 {
+fn seed_with_first_roll_at_least(miss_chance: f32) -> u64 {
     (0..10_000)
         .find(|seed| {
             let mut rng = SmallRng::seed_from_u64(*seed);
-            rng.gen::<f32>() < miss_chance && rng.gen::<f32>() >= miss_chance
+            rng.gen::<f32>() >= miss_chance
         })
-        .expect("test should find a seed that exercises independent miss rolls")
+        .expect("test should find a seed whose first roll hits")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -116,7 +116,7 @@ fn tank_cannon_seeded_shot_hits_infantry_and_scout_cars() {
 }
 
 #[test]
-fn at_gun_primary_dodge_does_not_cancel_secondary_overpenetration_roll() {
+fn at_gun_primary_hits_infantry_for_reduced_damage_and_secondary_keeps_its_own_roll() {
     let mut entities = EntityStore::new();
     let attacker = entities
         .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
@@ -131,7 +131,7 @@ fn at_gun_primary_dodge_does_not_cancel_secondary_overpenetration_roll() {
     let secondary_hp = entities.get(secondary).expect("secondary should exist").hp;
     let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
     let miss_chance = combat_rules::miss_chance(EntityKind::AntiTankGun, EntityKind::Rifleman);
-    let rng_seed = seed_with_primary_miss_and_secondary_hit(miss_chance);
+    let rng_seed = seed_with_first_roll_at_least(miss_chance);
 
     apply_test_damage_with_seed(
         &mut entities,
@@ -150,12 +150,13 @@ fn at_gun_primary_dodge_does_not_cancel_secondary_overpenetration_roll() {
 
     assert_eq!(
         entities.get(primary).expect("primary should exist").hp,
-        primary_hp,
-        "the selected seed should make the primary infantry target dodge the anti-tank gun"
+        primary_hp.saturating_sub(30),
+        "the intended infantry target should take 30% anti-tank-gun damage without a dodge roll"
     );
-    assert!(
-        entities.get(secondary).expect("secondary should exist").hp < secondary_hp,
-        "the primary dodge must not cancel the anti-tank gun's independent secondary roll"
+    assert_eq!(
+        entities.get(secondary).expect("secondary should exist").hp,
+        secondary_hp.saturating_sub(15),
+        "an incidental infantry hit should take 30% of the shell's half-damage follow-through"
     );
     assert!(
         events

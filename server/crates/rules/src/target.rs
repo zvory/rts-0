@@ -64,10 +64,9 @@ pub fn is_coax_infantry_priority(kind: EntityKind) -> bool {
     )
 }
 
-/// Infantry-sized units that anti-tank guns cannot choose as primary targets.
+/// Infantry-sized units that take reduced damage from anti-tank guns.
 ///
 /// This includes both factions' current economy bodies as well as Kriegsia's combat infantry.
-/// Crewed support weapons, vehicles, Ekat, buildings, and other non-infantry entities stay legal.
 pub fn is_anti_tank_gun_infantry_target(kind: EntityKind) -> bool {
     matches!(
         kind,
@@ -80,8 +79,8 @@ pub fn is_anti_tank_gun_infantry_target(kind: EntityKind) -> bool {
 }
 
 /// Whether an attacker's default weapon is allowed to choose this kind as its primary target.
-pub fn default_weapon_can_target(attacker_kind: EntityKind, target_kind: EntityKind) -> bool {
-    attacker_kind != EntityKind::AntiTankGun || !is_anti_tank_gun_infantry_target(target_kind)
+pub fn default_weapon_can_target(_attacker_kind: EntityKind, _target_kind: EntityKind) -> bool {
+    true
 }
 
 #[cfg(test)]
@@ -545,7 +544,7 @@ mod tests {
     }
 
     #[test]
-    fn anti_tank_gun_primary_target_policy_excludes_only_infantry() {
+    fn anti_tank_gun_primary_target_policy_allows_infantry() {
         let infantry = [
             EntityKind::Worker,
             EntityKind::Golem,
@@ -560,14 +559,13 @@ mod tests {
                 infantry.contains(&kind),
                 "{kind} infantry classification"
             );
-            assert_eq!(
+            assert!(
                 default_weapon_can_target(EntityKind::AntiTankGun, kind),
-                !infantry.contains(&kind),
                 "anti-tank gun primary-target policy for {kind}"
             );
             assert!(
                 default_weapon_can_target(EntityKind::Tank, kind),
-                "the infantry exclusion must be specific to anti-tank guns"
+                "other default weapons should remain legal against every target kind"
             );
         }
     }

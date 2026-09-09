@@ -173,7 +173,7 @@ fn direct_fire_legality_rejects_resource_nodes() {
 }
 
 #[test]
-fn direct_fire_legality_rejects_anti_tank_gun_shots_at_infantry() {
+fn direct_fire_legality_allows_anti_tank_gun_shots_at_infantry() {
     let map = open_map(12);
     let smokes = SmokeCloudStore::new();
 
@@ -198,12 +198,12 @@ fn direct_fire_legality_rejects_anti_tank_gun_shots_at_infantry() {
             DirectFireLegality::IntendedTarget,
         ] {
             assert!(
-                !direct_fire_legal(&map, &entities, &smokes, attacker, target, legality),
-                "{legality:?} should reject anti-tank gun fire at {target_kind}"
+                direct_fire_legal(&map, &entities, &smokes, attacker, target, legality),
+                "{legality:?} should allow anti-tank gun fire at {target_kind}"
             );
         }
         assert!(
-            !crate::game::services::world_query::unit_explicit_attack_target_valid(
+            crate::game::services::world_query::unit_explicit_attack_target_valid(
                 crate::game::services::world_query::ExplicitAttackQuery {
                     map: &map,
                     entities: &entities,
@@ -215,7 +215,7 @@ fn direct_fire_legality_rejects_anti_tank_gun_shots_at_infantry() {
                 attacker,
                 target,
             ),
-            "direct Attack commands should reject {target_kind}"
+            "direct Attack commands should allow {target_kind}"
         );
     }
 }
