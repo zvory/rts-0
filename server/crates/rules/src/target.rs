@@ -7,6 +7,15 @@ use crate::combat::{self, TargetThreatRole};
 use crate::defs::{ArmorClass, WeaponClass};
 use crate::{movement_body_class, EntityKind, MovementBodyClass};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InfantryTargetPolicy {
+    None,
+    AntiTankGun {
+        damage_multiplier: f32,
+        incidental_miss_chance: f32,
+    },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TargetFacts {
     pub kind: EntityKind,
@@ -76,6 +85,42 @@ pub fn is_anti_tank_gun_infantry_target(kind: EntityKind) -> bool {
             | EntityKind::Panzerfaust
             | EntityKind::MachineGunner
     )
+}
+
+/// Miss probability for an incidental shell intersection. Intended targets do not use this roll.
+pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
+    combat::default_weapon_profile(attacker_kind)
+        .map(|profile| miss_chance_for_weapon(profile, victim_kind))
+        .unwrap_or(0.0)
+}
+
+pub fn miss_chance_for_weapon(profile: &combat::WeaponProfile, victim_kind: EntityKind) -> f32 {
+    match profile.infantry_target_policy {
+        InfantryTargetPolicy::AntiTankGun {
+            incidental_miss_chance,
+            ..
+        } if is_anti_tank_gun_infantry_target(victim_kind) => {
+            incidental_miss_chance.clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    }
+}
+
+/// Applies weapon-specific target-type damage modifiers after armor and terrain calculations.
+pub fn damage_after_target_type_modifier(
+    profile: &combat::WeaponProfile,
+    victim_kind: EntityKind,
+    damage: u32,
+) -> u32 {
+    match profile.infantry_target_policy {
+        InfantryTargetPolicy::AntiTankGun {
+            damage_multiplier, ..
+        } if is_anti_tank_gun_infantry_target(victim_kind) => ((damage as f32)
+            * damage_multiplier.clamp(0.0, 1.0))
+        .round()
+        .max(0.0) as u32,
+        _ => damage,
+    }
 }
 
 #[cfg(test)]
