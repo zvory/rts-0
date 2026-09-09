@@ -326,7 +326,8 @@ export class LobbyRosterView {
   }
 
   _buildFactionControl({ player, myId, countdownActive, onSetFaction }) {
-    if (player.isAi || !isLobbySelectableFaction(player.factionId)) {
+    const isLocalPlayer = player.id === myId;
+    if (player.isAi || (!isLocalPlayer && !isLobbySelectableFaction(player.factionId))) {
       const label = document.createElement("span");
       label.className = "player-faction-label player-ai-profile-select";
       label.textContent = factionLabel(player.factionId);
@@ -336,14 +337,21 @@ export class LobbyRosterView {
     const select = document.createElement("select");
     select.className = "player-faction-select player-ai-profile-select";
     select.setAttribute("aria-label", `${player.name || "Player"} faction`);
+    if (!isLobbySelectableFaction(player.factionId)) {
+      const current = document.createElement("option");
+      current.value = player.factionId;
+      current.textContent = factionLabel(player.factionId);
+      current.disabled = true;
+      select.appendChild(current);
+    }
     for (const entry of LOBBY_SELECTABLE_FACTIONS) {
       const option = document.createElement("option");
       option.value = entry.id;
       option.textContent = entry.label;
       select.appendChild(option);
     }
-    select.value = playableFactionId(player.factionId);
-    select.disabled = countdownActive || player.id !== myId || player.isSpectator;
+    select.value = player.factionId;
+    select.disabled = countdownActive || !isLocalPlayer || player.isSpectator;
     select.addEventListener("change", () => {
       if (!select.disabled) onSetFaction?.(select.value);
     });
@@ -499,10 +507,6 @@ export const LOBBY_SELECTABLE_FACTIONS = Object.freeze([
 
 function isLobbySelectableFaction(factionId) {
   return LOBBY_SELECTABLE_FACTIONS.some((entry) => entry.id === factionId);
-}
-
-function playableFactionId(factionId) {
-  return isLobbySelectableFaction(factionId) ? factionId : "kriegsia";
 }
 
 function factionLabel(factionId) {
