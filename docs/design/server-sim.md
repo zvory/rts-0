@@ -1181,10 +1181,12 @@ not request enemy-directed paths or tear down the weapon to pursue. A fresh Move
 direct Attack order clears active occupation before later combat decisions use it; direct Attack
 then follows its normal target-pursuit rule and may tear down a Machine Gunner to close range.
 
-Incoming direct-fire accuracy is weapon-specific: Anti-Tank Gun shots give each incidental infantry
-body they intersect an independent 90% chance to dodge, while Tank cannon shots have no intrinsic
-miss chance and entrenchment adds no miss chance. A clump therefore gives one Anti-Tank Gun shot
-multiple independent opportunities to connect on its way to a legal non-infantry primary target.
+Incoming direct-fire accuracy is weapon-specific: Anti-Tank Guns may deliberately target
+infantry-sized units, and those intended hits have no intrinsic miss roll but deal only 30% damage.
+Each incidental infantry body intersected behind the intended target retains an independent 90%
+chance to dodge and takes the same 30% target-type modifier after normal half-damage
+overpenetration. Tank cannon shots have no intrinsic miss chance and entrenchment adds no miss
+chance.
 After a direct hit's normal
 weapon, armor, and facing calculations, `entrenchment_combat::reduce_direct_damage` reduces damage
 by 50% for actively entrenched eligible infantry. Area effects call
