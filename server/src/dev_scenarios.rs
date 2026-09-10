@@ -10,6 +10,7 @@ mod replay_303_scout_car_forest_lock;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_retreat;
+mod warrior_portal_duel;
 use move_reload_acquisition::MOVE_RELOAD_ACQUISITION_SPEC;
 use scout_car_lake_reverse_l_path::SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC;
 use scout_car_open_ground_l_path::SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC;
@@ -766,15 +767,6 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     blocker: None,
     case: None,
 }];
-
-const WARRIOR_PORTAL_DUEL_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
-    id: "warrior_portal_duel",
-    unit: EntityKind::Warrior,
-    count: 1,
-    blocker: None,
-    case: None,
-}];
-
 const DEV_SCENARIOS: [DevScenarioSpec; 30] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
@@ -881,12 +873,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 30] = [
     TANK_UNDER_FIRE_RETREAT_SPEC,
     TANK_REVERSE_TRAFFIC_SPEC,
     TANK_DAMAGE_PURSUIT_PIVOT_SPEC,
-    DevScenarioSpec {
-        id: "warrior_portal_duel",
-        title: "Warrior Portal Duel",
-        description: "A Cultivator Portal completes a full Warrior production cycle, rallies the new swordsman into open ground, and lets ordinary combat resolve against one held Rifleman.",
-        launches: &WARRIOR_PORTAL_DUEL_LAUNCHES,
-    },
+    warrior_portal_duel::SPEC,
 ];
 
 pub fn all_dev_scenarios() -> &'static [DevScenarioSpec] {

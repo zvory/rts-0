@@ -51,3 +51,26 @@ fn warrior_sword_two_shots_rifleman_without_overpenetration() {
         .iter()
         .all(|event| !matches!(event, Event::Overpenetration { .. })));
 }
+
+#[test]
+fn warrior_sword_applies_fifty_percent_armor_penetration() {
+    let mut entities = EntityStore::new();
+    let warrior = entities
+        .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+        .expect("Warrior should spawn");
+    let tank = entities
+        .spawn_unit(2, EntityKind::Tank, 125.0, 100.0)
+        .expect("Tank should spawn");
+    entities
+        .get_mut(warrior)
+        .expect("Warrior should exist")
+        .set_order(Order::attack(tank));
+    entities
+        .get_mut(tank)
+        .expect("Tank should exist")
+        .set_order(Order::HoldPosition);
+
+    run_combat_tick(&mut entities);
+
+    assert_eq!(entities.get(tank).map(|unit| unit.hp), Some(278));
+}

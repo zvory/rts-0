@@ -1168,28 +1168,6 @@ mod tests {
     }
 
     #[test]
-    fn warrior_sword_has_partial_armor_penetration_without_overpenetration() {
-        let profile = default_weapon_profile(EntityKind::Warrior)
-            .expect("Warrior should have a default sword weapon");
-        assert_eq!(profile.id, WeaponKind::WarriorSword);
-        assert_eq!(profile.range_tiles, 0.5);
-        assert_eq!(profile.dmg, 23);
-        assert_eq!(profile.cooldown, 32);
-        assert_eq!(profile.weapon_class, WeaponClass::SmallArms);
-        assert_eq!(profile.armor_penetration, 0.5);
-        assert_eq!(profile.overpenetration, OverpenetrationPolicy::None);
-        assert_eq!(
-            effective_damage_for_weapon(profile, EntityKind::Tank, profile.dmg, None),
-            14,
-            "50% armor penetration should preserve 62.5% damage against armor"
-        );
-        assert_eq!(
-            effective_damage_for_weapon(profile, EntityKind::Rifleman, profile.dmg, None),
-            23
-        );
-    }
-
-    #[test]
     fn open_terrain_keeps_current_damage_values() {
         assert_eq!(
             effective_damage(
