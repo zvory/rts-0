@@ -760,7 +760,7 @@ withFakeHudDocument(({ FakeElement }) => {
     playerResources: [
       { id: 1, steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 50 },
       { id: 2, steel: 24, oil: 0, supplyUsed: 4, supplyCap: 50,
-        upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] },
+        upgrades: [] },
     ],
     upgrades: [],
     players: [
@@ -784,13 +784,13 @@ withFakeHudDocument(({ FakeElement }) => {
   );
   p2Selection = [p2Steelworks];
   p2LabHudState.playerResources[1] = { id: 2, steel: 1000, oil: 1000, supplyUsed: 4,
-    supplyCap: 50, upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] };
+    supplyCap: 50, upgrades: [] };
   const p2SteelworksCard = buildCommandCardDescriptors(
     p2Hud._commandDescriptorContext({ selectedEntities: p2Selection, currentEntities: p2Entities }),
   );
   assert(
     buttonByLabel(p2SteelworksCard, "Anti-Tank Gun").enabled,
-    "lab command card tech checks use selected-owner upgrades when per-owner upgrade data is present",
+    "lab command card exposes Anti-Tank Guns without selected-owner research",
   );
 
   const p1CommandCar = { id: 705, owner: 1, kind: KIND.COMMAND_CAR };
@@ -1301,8 +1301,7 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 125, oil: 125 },
   }));
   const antiTankGun = buttonByLabel(upgradeCard, "Anti-Tank Gun");
-  assert(antiTankGun && !antiTankGun.enabled, "upgrade-gated unit should be disabled before research");
-  assert(antiTankGun.title.startsWith("Requires research in Engineering Complex"), "upgrade-gated unit tooltip should name Engineering Complex research");
+  assert(antiTankGun && antiTankGun.enabled, "Anti-Tank Gun should be available as soon as Gun Works is complete");
   assert(!buttonByLabel(upgradeCard, "AT Guns"), "Gun Works should not expose Engineering Complex research");
   const artilleryResearchId = defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK);
   assert(!commandButtons(upgradeCard).some((button) => button.commandId === artilleryResearchId), "Gun Works should not expose Artillery research");
@@ -1317,13 +1316,10 @@ withFakeHudDocument(({ FakeElement }) => {
     ],
     resources: { steel: 200, oil: 200 },
   }));
-  const atGuns = buttonByLabel(researchCard, "AT Guns");
-  assert(atGuns && atGuns.enabled, "available affordable upgrade should be enabled");
-  assert(atGuns.commandId === defaultFactionCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK), "research button should expose stable research identity");
-  assert(atGuns.intent.type === "research", "upgrade button should carry research intent");
+  assert(!buttonByLabel(researchCard, "AT Guns"), "retired AT Guns research should stay out of the command card");
   const lockedArtillery = buttonByLabel(researchCard, "Artillery");
-  assert(lockedArtillery && !lockedArtillery.enabled, "Engineering Complex should keep Artillery visible but locked before AT Guns");
-  assert(lockedArtillery.slotIndex !== atGuns.slotIndex, "Artillery should keep a slot separate from AT Guns");
+  assert(lockedArtillery && lockedArtillery.enabled, "Engineering Complex should expose Artillery independently");
+  assert(lockedArtillery.slotIndex === 1, "Artillery should keep W while the former Q slot stays empty");
   assert(!buttonByLabel(researchCard, "Unlock Artillery"), "Engineering Complex should not expose a separate Artillery unlock");
   const artilleryResearchCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [engineeringComplex],
@@ -1333,10 +1329,10 @@ withFakeHudDocument(({ FakeElement }) => {
       engineeringComplex,
     ],
     resources: { steel: 500, oil: 500 },
-    upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+    upgrades: [],
   }));
   const artilleryResearch = buttonByLabel(artilleryResearchCard, "Artillery");
-  assert(artilleryResearch && artilleryResearch.enabled, "Artillery should enable after AT Guns is researched");
+  assert(artilleryResearch && artilleryResearch.enabled, "Artillery should remain enabled without AT Guns research");
   assert(artilleryResearch.slotIndex === lockedArtillery.slotIndex, "Artillery should retain its permanent button slot");
   assert(artilleryResearch.commandId === defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK), "Artillery should use the artillery unlock identity");
   const catalog = buildCommandCardContextCatalog();

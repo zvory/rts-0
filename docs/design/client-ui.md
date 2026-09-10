@@ -1916,8 +1916,8 @@ enqueue. A repeated unit already inserted in the FIFO stays ahead of later manua
 Cancel clears the affected producer's repeat state. Standing repeat controls never create unpaid
 queue entries; their swirl remains a policy indicator until a fully funded item is admitted.
 Research buttons that unlock production appear directly
-below the production button they unlock and disappear once complete. AT Guns and Artillery
-have separate stable Engineering Complex slots. A dependent button unlocks for queueing when
+below the production button they unlock and disappear once complete. The retired AT Guns research
+leaves the Engineering Complex `Q` slot empty, while Artillery retains its stable `W` slot. A dependent button unlocks for queueing when
 its prerequisite is complete or already present earlier in the selected building's authoritative
 `prodUpgradeQueue`. Cancel walks selected producing
 buildings in reverse round-robin order for the displayed producer type. Selecting an owned building

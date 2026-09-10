@@ -120,14 +120,14 @@ completed Resource Depot and Training Centre; Tank Trap requires a completed Tra
 Depot trains Workers. Barracks trains Riflemen immediately and Machine
 Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately,
 Command Cars once an Engineering Complex is complete, and Tanks after Tank Production research. Gun Works
-trains Mortar Teams immediately, Anti-Tank Guns after AT Guns research, and Artillery after
+trains Mortar Teams and Anti-Tank Guns immediately, and Artillery after
 Artillery research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
 `client/src/config.js`. Training Centre researches Methamphetamines. Engineering Complex researches
-AT Guns, Artillery, Tank Production, and Smoke Plus; Artillery requires
-AT Guns.
-Each dependency may already be complete or earlier in the same Engineering Complex queue when its dependent is
+Artillery, Tank Production, and Smoke Plus. The retired AT Guns research leaves its former command-card
+slot empty so the remaining research hotkeys do not move.
+Each remaining dependency may already be complete or earlier in the same Engineering Complex queue when its dependent is
 ordered, while completion still gates the actual unlock. Tank Production unlocks Tanks; Command
 Cars require the Engineering Complex itself but no completed research. The current Ekat tech tree starts
 with Zamok training Golems;

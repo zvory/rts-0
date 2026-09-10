@@ -346,7 +346,12 @@ const SCOUT_PLANE_CARRIER_COSTS: &[(EntityKind, ResourceCost)] = &[
     ),
 ];
 
-const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
+const LEGACY_ANTI_TANK_GUN_UNLOCK: UpgradeCatalogEntry = UpgradeCatalogEntry {
+    kind: UpgradeKind::AntiTankGunUnlock,
+    researched_at: EntityKind::EngineeringComplex,
+};
+
+const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::Methamphetamines,
         researched_at: EntityKind::TrainingCentre,
@@ -358,10 +363,6 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::Entrenchment,
         researched_at: EntityKind::TrainingCentre,
-    },
-    UpgradeCatalogEntry {
-        kind: UpgradeKind::AntiTankGunUnlock,
-        researched_at: EntityKind::EngineeringComplex,
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::ArtilleryUnlock,
@@ -1009,13 +1010,13 @@ pub fn ability_cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Resou
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
-    let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock, rockets] =
+    let [methamphetamines, panzerfausts, entrenchment, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock, rockets] =
         DEFAULT_UPGRADES;
     match kind {
         UpgradeKind::Methamphetamines => methamphetamines,
         UpgradeKind::Panzerfausts => panzerfausts,
         UpgradeKind::Entrenchment => entrenchment,
-        UpgradeKind::AntiTankGunUnlock => anti_tank_gun_unlock,
+        UpgradeKind::AntiTankGunUnlock => LEGACY_ANTI_TANK_GUN_UNLOCK,
         UpgradeKind::BallisticTables => ballistic_tables,
         UpgradeKind::TankUnlock => tank_unlock,
         UpgradeKind::SmokePlus => smoke_plus,
@@ -1080,7 +1081,7 @@ mod tests {
         );
         assert!(catalog.allows_research(UpgradeKind::Methamphetamines, EntityKind::TrainingCentre));
         assert!(catalog.allows_research(UpgradeKind::Entrenchment, EntityKind::TrainingCentre));
-        assert!(catalog.allows_research(UpgradeKind::AntiTankGunUnlock, engineering_complex));
+        assert!(!catalog.allows_research(UpgradeKind::AntiTankGunUnlock, engineering_complex));
         assert!(catalog.allows_research(UpgradeKind::BallisticTables, engineering_complex));
         assert!(catalog.allows_research(UpgradeKind::ArtilleryUnlock, engineering_complex));
         assert!(catalog.allows_research(UpgradeKind::TankUnlock, engineering_complex));

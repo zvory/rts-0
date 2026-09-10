@@ -397,7 +397,7 @@ await withFakeDocument(async () => {
         oil: 50,
         supplyUsed: 7,
         supplyCap: 12,
-        upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+        upgrades: [UPGRADE.TANK_UNLOCK],
       },
     ],
     players: [
@@ -420,7 +420,7 @@ await withFakeDocument(async () => {
   assert(policy.commandFactionId(state) === "ekat", "lab command faction resolves from the selected owner");
   assertDeepEqual(
     policy.commandUpgrades(state),
-    [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+    [UPGRADE.TANK_UNLOCK],
     "lab command upgrades resolve from per-owner upgrade rows when available",
   );
   assert(policy.isCommandOwner(2, state), "lab command owner matching is exact-owner based");
@@ -640,7 +640,7 @@ await withFakeDocument(async () => {
         { id: 1, steel: 500, oil: 200 },
         { id: 2, steel: 700, oil: 100 },
       ],
-      upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+      upgrades: [UPGRADE.TANK_UNLOCK],
       playerUpgrades: [
         { id: 2, upgrades: [] },
       ],
@@ -926,23 +926,17 @@ await withFakeDocument(async () => {
     "LabPanel does not expose advanced spawn or completion toggles",
   );
   assert(
-    buttonByText("AT Guns")?.dataset.researched === "true" &&
-      buttonByText("AT Guns")?.dataset.available === "true" &&
-      buttonByText("AT Guns")?.["aria-pressed"] === "true",
+    buttonByText("Tank Production")?.dataset.researched === "true" &&
+      buttonByText("Tank Production")?.dataset.available === "true" &&
+      buttonByText("Tank Production")?.["aria-pressed"] === "true",
     "LabPanel renders completed research as a depressed available button",
   );
   assert(
-    buttonByUpgrade(UPGRADE.ARTILLERY_UNLOCK)?.textContent === "Artillery" &&
-      buttonByUpgrade(UPGRADE.ARTILLERY_UNLOCK)?.dataset.researched === "false" &&
-      buttonByUpgrade(UPGRADE.ARTILLERY_UNLOCK)?.dataset.available === "false" &&
-      buttonByUpgrade(UPGRADE.ARTILLERY_UNLOCK)?.["aria-pressed"] === "false",
-    "LabPanel renders incomplete Artillery as an up unavailable button",
-  );
-  assert(
-    buttonByText("Tank Production")?.dataset.researched === "false" &&
-      buttonByText("Tank Production")?.dataset.available === "false" &&
-      buttonByText("Tank Production")?.["aria-pressed"] === "false",
-    "LabPanel renders incomplete research as an up unavailable button",
+    buttonByUpgrade(UPGRADE.BALLISTIC_TABLES)?.textContent === "Artillery Fire Control" &&
+      buttonByUpgrade(UPGRADE.BALLISTIC_TABLES)?.dataset.researched === "false" &&
+      buttonByUpgrade(UPGRADE.BALLISTIC_TABLES)?.dataset.available === "false" &&
+      buttonByUpgrade(UPGRADE.BALLISTIC_TABLES)?.["aria-pressed"] === "false",
+    "LabPanel renders incomplete prerequisite-gated research as an up unavailable button",
   );
   assert(!buttonByText("Apply teams"), "LabPanel omits the arbitrary team-union controls");
   assert(
@@ -964,8 +958,8 @@ await withFakeDocument(async () => {
     "LabPanel refreshes resource fields from the newly selected player",
   );
   assert(
-    buttonByText("AT Guns")?.dataset.researched === "false" &&
-      buttonByText("AT Guns")?.["aria-pressed"] === "false",
+    buttonByText("Tank Production")?.dataset.researched === "false" &&
+      buttonByText("Tank Production")?.["aria-pressed"] === "false",
     "LabPanel refreshes completed research for the newly selected player",
   );
   assert(
@@ -976,7 +970,7 @@ await withFakeDocument(async () => {
   assert(
     panel.fields.get("resource-steel").value === "500" &&
       panel.fields.get("resource-oil").value === "200" &&
-      buttonByText("AT Guns")?.dataset.researched === "true" &&
+      buttonByText("Tank Production")?.dataset.researched === "true" &&
       panel.fields.get("player-god-mode").checked === true,
     "LabPanel restores every player-specific control when switching back",
   );
