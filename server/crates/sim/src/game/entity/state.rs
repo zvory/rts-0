@@ -73,16 +73,8 @@ impl ScoutPlaneState {
         x: f32,
         y: f32,
     ) -> Self {
-        Self::launched_from_source(Some(source_command_car), x, y)
-    }
-
-    pub(in crate::game) fn launched_from_source(
-        source_command_car: Option<u32>,
-        x: f32,
-        y: f32,
-    ) -> Self {
         Self {
-            source_command_car,
+            source_command_car: Some(source_command_car),
             ..Self::launched_at(x, y)
         }
     }

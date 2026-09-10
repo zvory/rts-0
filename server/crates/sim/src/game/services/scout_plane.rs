@@ -1,4 +1,5 @@
 use crate::config;
+use crate::game::ability::{self, AbilityKind};
 use crate::game::entity::{EntityKind, EntityStore, ScoutPlaneState};
 use crate::game::map::Map;
 
@@ -25,10 +26,7 @@ pub(crate) fn launch_ability(
         .get(source)
         .filter(|source| {
             source.owner == owner
-                && matches!(
-                    source.kind,
-                    EntityKind::ResourceDepot | EntityKind::CommandCar
-                )
+                && ability::carried_by(AbilityKind::ScoutPlane, source.kind)
                 && source.hp > 0
                 && !source.under_construction()
         })
@@ -47,7 +45,7 @@ pub(crate) fn launch_ability(
             *state = if source_kind == EntityKind::CommandCar {
                 ScoutPlaneState::launched_from_command_car(source, target_x, target_y)
             } else {
-                ScoutPlaneState::launched_from_source(None, target_x, target_y)
+                ScoutPlaneState::launched_at(target_x, target_y)
             };
         }
     }
