@@ -304,6 +304,21 @@ function buttonSlots(card) {
     groupCooldownClocks: () => [],
   });
   const scoutPlaneCommandId = kriegsiaCommandId("train", KIND.SCOUT_PLANE);
+  for (const steel of [0, 120]) {
+    const card = buildCommandCardDescriptors({
+      playerId: 1,
+      selection: [resourceDepot],
+      resources: { steel, oil: 0, supplyUsed: 0, supplyCap: 20 },
+      upgrades: [],
+      playerHasCompleteKind: () => true,
+      groupCooldownClocks: () => [],
+    });
+    const pumpJack = card.slots.find((slot) => slot?.id === `train:${KIND.PUMP_JACK}`);
+    assert.equal(pumpJack.cost, null, "free depot Pump Jacks have no manual construction cost badge");
+    assert.equal(pumpJack.unaffordable, false, "free depot Pump Jacks never require a Steel balance");
+    assert.equal(pumpJack.enabled, false, "automatic production remains informational");
+    assert.equal(pumpJack.intent, null);
+  }
   assert.deepEqual(
     commandCardActivationCandidates(resourceDepotCard, scoutPlaneCommandId),
     [],

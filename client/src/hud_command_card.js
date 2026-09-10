@@ -381,8 +381,7 @@ export function buildUnitCard(ctx, selection) {
       definition.charges != null && affordance.remainingUsesTotal != null;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
     if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
-    // Ability collisions stay in place: later, higher-priority abilities replace lower-priority
-    // occupants instead of moving the losing command to an unrelated grid hotkey.
+    // Later, higher-priority abilities replace collisions without moving the losing command.
     slots[preferred] = {
       id: `ability:${definition.ability}`,
       commandId: factionCommandId(factionId, "ability", definition.ability),
@@ -497,9 +496,9 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       icon: st.icon,
       unitIconKind: unit,
       label: st.label,
-      cost: st.cost,
+      cost: automatic ? null : st.cost,
       enabled: !automatic && !underConstruction && availability !== "locked",
-      unaffordable: !underConstruction && availability === "unaffordable",
+      unaffordable: !automatic && !underConstruction && availability === "unaffordable",
       title: automatic
         ? disabledReason
         : (disabledReason ? `${disabledReason}. ${repeatHelp}` : repeatHelp),
