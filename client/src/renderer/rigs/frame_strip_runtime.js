@@ -131,6 +131,10 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null, render
     if (Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing - setupForwardAngle;
     if (Number.isFinite(entity?.facing)) return entity.facing - setupForwardAngle;
   }
+  const firingFrames = validFrameList(strip, strip?.firingFrames);
+  if (firingFrames.includes(resolvedFrame) && Number.isFinite(entity?.weaponFacing)) {
+    return entity.weaponFacing + facingOffset;
+  }
   if (frameStripUsesMovementFrames(strip, entity, renderContext) && Number.isFinite(entity?.facing)) {
     return entity.facing + finite(strip?.movementFacingOffset, facingOffset);
   }
@@ -139,9 +143,10 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null, render
 }
 
 function frameStripFacingOffset(strip, frameIndex) {
+  const baseOffset = finite(strip?.facingOffset, 0);
   const firingFrames = validFrameList(strip, strip?.firingFrames);
-  if (firingFrames.includes(frameIndex)) return finite(strip?.firingFacingOffset, 0);
-  return finite(strip?.facingOffset, 0);
+  if (firingFrames.includes(frameIndex)) return finite(strip?.firingFacingOffset, baseOffset);
+  return baseOffset;
 }
 
 export function frameStripWorldScale(strip, entity, renderContext = null) {
