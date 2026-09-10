@@ -294,8 +294,7 @@ fn nearest_public_enemy_base(observation: &AiObservation) -> Option<EnemyBaseFac
 
 fn is_combat_unit(kind: EntityKind) -> bool {
     match kind {
-        EntityKind::Warrior
-        | EntityKind::Rifleman
+        EntityKind::Rifleman
         | EntityKind::Panzerfaust
         | EntityKind::MachineGunner
         | EntityKind::AntiTankGun
@@ -304,6 +303,7 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::Tank
         | EntityKind::Ekat => true,
         EntityKind::Worker
+        | EntityKind::Warrior
         | EntityKind::ScoutPlane
         | EntityKind::Golem
         | EntityKind::ResourceDepot
@@ -636,6 +636,7 @@ mod tests {
         observation.owned = vec![
             owned_entity(3, EntityKind::Worker, AiEntityState::Idle),
             owned_entity(4, EntityKind::ScoutPlane, AiEntityState::Idle),
+            owned_entity(5, EntityKind::Warrior, AiEntityState::Idle),
             owned_entity(2, EntityKind::Rifleman, AiEntityState::Move),
             owned_entity(1, EntityKind::Rifleman, AiEntityState::Idle),
         ];
@@ -645,9 +646,11 @@ mod tests {
         assert_eq!(facts.worker_count, 1);
         assert_eq!(facts.unit_count(EntityKind::Worker), 1);
         assert_eq!(facts.unit_count(EntityKind::ScoutPlane), 1);
+        assert_eq!(facts.unit_count(EntityKind::Warrior), 1);
         assert_eq!(facts.unit_count(EntityKind::Rifleman), 2);
         assert_eq!(facts.free_combat_units(EntityKind::Rifleman), &[1]);
         assert!(facts.free_combat_units(EntityKind::Worker).is_empty());
+        assert!(facts.free_combat_units(EntityKind::Warrior).is_empty());
         assert!(facts.free_combat_units(EntityKind::ScoutPlane).is_empty());
     }
 }

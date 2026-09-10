@@ -1330,6 +1330,7 @@ mod tests {
         for victim in [
             EntityKind::Worker,
             EntityKind::Golem,
+            EntityKind::Warrior,
             EntityKind::Rifleman,
             EntityKind::Panzerfaust,
             EntityKind::MachineGunner,
