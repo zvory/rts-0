@@ -717,3 +717,28 @@ function buttonSlots(card) {
     duplicateSlotIndex: 2,
   }]);
 }
+
+{
+  const card = buildCommandCardDescriptors({
+    playerId: 1, factionId: "cultivators",
+    selection: [{ id: 1, owner: 1, kind: KIND.WORKER }],
+    resources: { steel: 1000, oil: 1000 }, commandCardMode: "workerBuild",
+  });
+  const builds = card.slots.filter((slot) => slot?.action === "build");
+  assert.deepEqual(builds.map((slot) => slot.intent.building), [KIND.RESOURCE_DEPOT]);
+  assert.equal(builds[0].label, "Nexus");
+  assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
+}
+
+{
+  const { statsForFaction } = await import("../client/src/config.js");
+  const { selectionBudgetGridModel } = await import("../client/src/hud_selection_panel.js");
+  assert.equal(statsForFaction(KIND.RESOURCE_DEPOT, "cultivators").label, "Nexus");
+  assert.equal(statsForFaction(KIND.RESOURCE_DEPOT, "kriegsia").label, "Resource Depot");
+  const model = selectionBudgetGridModel([
+    { id: 10, owner: 1, kind: KIND.RESOURCE_DEPOT },
+    { id: 11, owner: 2, kind: KIND.RESOURCE_DEPOT },
+  ], null, [{ id: 1, factionId: "cultivators" }, { id: 2, factionId: "kriegsia" }]);
+  assert.deepEqual(model.pages.flatMap((page) => page.blocks).map((block) => block.label),
+    ["Nexus", "Resource Depot"]);
+}

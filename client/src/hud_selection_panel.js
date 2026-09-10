@@ -6,6 +6,7 @@ import {
   ENTRENCHMENT_DIRECT_DAMAGE_REDUCTION,
   ENTRENCHMENT_RANGE_BONUS_TILES,
   STATS,
+  statsForFaction,
   TICK_HZ,
   UPGRADES,
 } from "./config.js";
@@ -31,13 +32,13 @@ export function selectionBudgetBlockShape(weight) {
   };
 }
 
-export function selectionBudgetGridModel(entities, overflow = null) {
+export function selectionBudgetGridModel(entities, overflow = null, players = []) {
   const budget = selectionBudgetForHudEntities(entities);
   const cols = SELECTION_BUDGET_COLS;
   const blocks = (entities || []).map((entity, sourceIndex) => {
     const weight = commandWeight(entity?.kind);
     const shape = selectionBudgetBlockShape(weight);
-    const st = STATS[entity?.kind] || {};
+    const st = statsForFaction(entity?.kind, players.find?.((p) => p.id === entity?.owner)?.factionId) || {};
     return {
       id: entity?.id,
       kind: entity?.kind,
@@ -181,7 +182,7 @@ export class HudSelectionPanel {
     }
     this._recordSelectionDiagnostic("hud.dirty.selectionPanel.miss");
     this._renderSig = sig;
-    const model = selectionBudgetGridModel(sel, overflow);
+    const model = selectionBudgetGridModel(sel, overflow, this.state.players);
 
     const frag = document.createDocumentFragment();
     const header = document.createElement("div");
@@ -360,7 +361,7 @@ export class HudSelectionPanel {
 
   /** Build the detail node for a single selected entity. */
   _singleSelectionNode(e) {
-    const st = STATS[e.kind] || {};
+    const st = statsForFaction(e.kind, this.state.players?.find?.((p) => p.id === e.owner)?.factionId) || {};
     const node = document.createElement("div");
     node.className = "sel-single";
 
@@ -426,7 +427,7 @@ export class HudSelectionPanel {
     node.setAttribute("data-selection-kind", String(entity.kind || ""));
     node.setAttribute(
       "aria-label",
-      `Selected ${entity.label || STATS[entity.kind]?.label || entity.kind || "entity"}`,
+      `Selected ${entity.label || statsForFaction(entity.kind, this.state.players?.find?.((p) => p.id === entity.owner)?.factionId)?.label || entity.kind || "entity"}`,
     );
     return node;
   }

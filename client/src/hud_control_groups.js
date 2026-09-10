@@ -1,4 +1,4 @@
-import { STATS } from "./config.js";
+import { statsForFaction } from "./config.js";
 
 export function buildControlGroupSummaries(state, selected = [], controlPolicy = null) {
   const selectedIds = new Set((selected || []).map((entity) => entity.id));
@@ -15,7 +15,8 @@ export function buildControlGroupSummaries(state, selected = [], controlPolicy =
     }
 
     const dominant = dominantControlGroupKind(entities);
-    const st = STATS[dominant.kind] || {};
+    const owner = entities[dominant.first]?.owner;
+    const st = statsForFaction(dominant.kind, state.players?.find?.((p) => p.id === owner)?.factionId) || {};
     out.push({
       key: slot === 9 ? "0" : String(slot + 1),
       count: entities.length,
@@ -29,7 +30,7 @@ export function buildControlGroupSummaries(state, selected = [], controlPolicy =
 
 export function controlGroupTabsSignature(groups) {
   return (groups || []).map((group) =>
-    group ? `${group.key}:${group.count}:${group.icon}:${group.selected ? 1 : 0}` : "-",
+    group ? `${group.key}:${group.count}:${group.icon}:${group.label}:${group.selected ? 1 : 0}` : "-",
   ).join("|");
 }
 

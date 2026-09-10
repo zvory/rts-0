@@ -152,6 +152,7 @@ const EXPECTED_CLIENT_CATALOG_IDS = Object.freeze([
 ]);
 const EXPECTED_LOBBY_FACTION_IDS = Object.freeze([
   DEFAULT_FACTION_ID,
+  "cultivators",
 ]);
 const EXPECTED_CLIENT_CONFIG_SECTIONS = Object.freeze([
   "abilityEffects",
@@ -400,9 +401,9 @@ assert.equal(
   "fixture-only faction id must not appear as a playable client option",
 );
 assert.equal(
-  LOBBY_SELECTABLE_FACTIONS.some((entry) => entry.id === "cultivators" || entry.id === "ekat"),
+  LOBBY_SELECTABLE_FACTIONS.some((entry) => entry.id === "ekat"),
   false,
-  "reserved Cultivators and hidden Ekat must not appear as playable client options",
+  "hidden Ekat must not appear as playable client options",
 );
 assert.deepEqual(
   WORKER_BUILDABLE,
@@ -471,7 +472,7 @@ for (const rustFaction of allRustCatalogs.catalogs) {
   );
   assert.deepEqual(
     rustFaction.builders.map((kind) => kindByStableId.get(kind)),
-    rustFaction.id === DEFAULT_FACTION_ID ? [KIND.WORKER] : [],
+    [DEFAULT_FACTION_ID, "cultivators"].includes(rustFaction.id) ? [KIND.WORKER] : [],
     `${rustFaction.id} builder set remains explicit`,
   );
   assert.deepEqual(

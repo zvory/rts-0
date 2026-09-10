@@ -45,10 +45,11 @@ const { ok } = assertions;
     "fixture faction request is ignored for normal lobby players");
 
   A.send({ t: "setFaction", factionId: "cultivators" });
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  const afterCultivators = A.msgs.filter((m) => m.t === "lobby").at(-1);
-  ok(afterCultivators.players.find((p) => p.id === A.playerId)?.factionId === DEFAULT_FACTION_ID,
-    "reserved Cultivators faction request is ignored for normal lobby players");
+  const afterCultivators = await A.waitFor(
+    (m) => m.t === "lobby" && m.players.find((p) => p.id === A.playerId)?.factionId === "cultivators",
+    3000, "Cultivators selection");
+  ok(afterCultivators.players.find((p) => p.id === A.playerId)?.factionId === "cultivators",
+    "Cultivators faction is selectable in normal lobbies");
 
   await readyPlayers([A, B]);
   const { countdowns, starts } = await startMatch(A, [A, B]);
@@ -56,8 +57,8 @@ const { ok } = assertions;
   assertCountdownProtocol(ok, countdowns[1]);
   assertStartProtocol(ok, starts[0], { playerId: A.playerId, expectedPlayers: 2, spectator: false });
   assertStartProtocol(ok, starts[1], { playerId: B.playerId, expectedPlayers: 2, spectator: false });
-  ok(starts[0].players.find((p) => p.id === A.playerId)?.factionId === DEFAULT_FACTION_ID,
-    `start carries A ${DEFAULT_FACTION_ID}`);
+  ok(starts[0].players.find((p) => p.id === A.playerId)?.factionId === "cultivators",
+    "start carries A cultivators");
   ok(starts[0].players.find((p) => p.id === B.playerId)?.factionId === "ekat",
     "start carries B ekat");
 

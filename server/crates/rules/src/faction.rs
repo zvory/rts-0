@@ -266,13 +266,18 @@ pub const EKAT_LOADOUT: FactionLoadout = FactionLoadout {
     opening_upgrades: &[],
 };
 
-/// Reserved faction shell. Lifecycle validation intentionally rejects it until its starting
-/// loadout and roster are designed and explicitly promoted to a playable status.
+// Reuse the standard economy without the starting combat units.
+const CULTIVATORS_START_ENTITIES: &[StartingEntityGroup] = &[
+    CURRENT_STANDARD_START_ENTITIES[0],
+    CURRENT_STANDARD_START_ENTITIES[1],
+    CURRENT_STANDARD_START_ENTITIES[3],
+    CURRENT_STANDARD_START_ENTITIES[4],
+];
 pub const CULTIVATORS_LOADOUT: FactionLoadout = FactionLoadout {
-    id: "cultivators.unavailable",
-    initial_steel: 0,
-    initial_oil: 0,
-    starting_entities: &[],
+    id: "cultivators.standard",
+    initial_steel: balance::STARTING_STEEL,
+    initial_oil: balance::STARTING_OIL,
+    starting_entities: CULTIVATORS_START_ENTITIES,
     opening_upgrades: &[],
 };
 
@@ -709,14 +714,18 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
 pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     id: CULTIVATORS_FACTION_ID,
     loadout: CULTIVATORS_LOADOUT,
-    units: &[],
-    buildings: &[],
-    buildables: &[],
+    units: &[EntityKind::Worker],
+    buildings: &[
+        EntityKind::ResourceDepot,
+        EntityKind::SteelMine,
+        EntityKind::PumpJack,
+    ],
+    buildables: &[EntityKind::ResourceDepot],
     upgrades: &[],
     abilities: &[],
-    builders: &[],
+    builders: &[EntityKind::Worker],
     gatherers: &[],
-    production_anchors: &[],
+    production_anchors: &[EntityKind::ResourceDepot],
 };
 
 pub const CATALOGS: &[FactionCatalog] = &[
@@ -1225,16 +1234,27 @@ mod tests {
     }
 
     #[test]
-    fn cultivators_catalog_is_an_empty_reserved_shell() {
-        let catalog = catalog_for(CULTIVATORS_FACTION_ID).expect("Cultivators catalog exists");
-
-        assert_eq!(catalog, CULTIVATORS_CATALOG);
-        assert_eq!(catalog.loadout.id, "cultivators.unavailable");
-        assert_eq!(catalog.loadout.initial_steel, 0);
-        assert_eq!(catalog.loadout.initial_oil, 0);
-        assert!(catalog.loadout.starting_entities.is_empty());
-        assert!(catalog.units.is_empty());
-        assert!(catalog.buildings.is_empty());
+    fn cultivators_catalog_reuses_only_the_depot_economy() {
+        let catalog = catalog_for(CULTIVATORS_FACTION_ID).unwrap();
+        assert_eq!(catalog.loadout.id, "cultivators.standard");
+        assert_eq!(catalog.loadout.initial_steel, balance::STARTING_STEEL);
+        assert_eq!(catalog.loadout.initial_oil, balance::STARTING_OIL);
+        assert_eq!(catalog.units, &[EntityKind::Worker]);
+        assert_eq!(catalog.buildables, &[EntityKind::ResourceDepot]);
+        assert_eq!(
+            catalog.trainable_units(EntityKind::ResourceDepot),
+            vec![
+                EntityKind::Worker,
+                EntityKind::SteelMine,
+                EntityKind::PumpJack
+            ]
+        );
+        assert!(catalog.trainable_units(EntityKind::Barracks).is_empty());
+        assert!(catalog
+            .loadout
+            .starting_entities
+            .iter()
+            .all(|group| group.kind == EntityKind::Worker || catalog.allows_building(group.kind)));
         assert!(catalog.upgrades.is_empty());
         assert!(catalog.abilities.is_empty());
     }
@@ -1251,7 +1271,7 @@ mod tests {
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "missing.loadout").is_none());
         assert!(catalog_loadout_for(DEFAULT_FACTION_ID, "kriegsia.standard").is_some());
         assert!(catalog_loadout_for(EKAT_FACTION_ID, "ekat.standard").is_some());
-        assert!(catalog_loadout_for(CULTIVATORS_FACTION_ID, "cultivators.unavailable").is_some());
+        assert!(catalog_loadout_for(CULTIVATORS_FACTION_ID, "cultivators.standard").is_some());
     }
 
     #[test]

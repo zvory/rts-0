@@ -13,6 +13,7 @@ import { ABILITY, KIND, STATE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
   STATS,
+  statsForFaction,
   TICK_HZ,
   UPGRADES,
 } from "./config.js";
@@ -885,7 +886,7 @@ export class HUD {
 
   /** Detailed command-card hover for any buildable or trainable kind. */
   _kindTooltipHtml(kind) {
-    const st = STATS[kind];
+    const st = statsForFaction(kind, this._commandFactionId());
     if (!st) return "";
     const cost = st.cost || {};
     const requirements = this._requirementsOf(st);
@@ -974,7 +975,7 @@ export class HUD {
     if (typeof policy?.commandFactionId === "function") {
       return policy.commandFactionId(this.state, owner);
     }
-    return this.state.localFactionId;
+    return this.state?.localFactionId;
   }
 
   _commandUpgrades(owner = this._commandOwnerForSelection()) {

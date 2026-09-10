@@ -718,3 +718,72 @@ fn bundled_oil_patches_have_buildable_pump_jack_sites() {
         }
     }
 }
+
+#[test]
+fn cultivators_start_train_and_mine_with_only_nexus_construction() {
+    let players = [PlayerInit {
+        id: 1,
+        team_id: 1,
+        faction_id: crate::rules::faction::CULTIVATORS_FACTION_ID.to_string(),
+        name: "Cultivators".to_string(),
+        color: "#cc1111".to_string(),
+        is_ai: false,
+    }];
+    let mut game = Game::new(&players, 9);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::ResourceDepot), 1);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Worker), 1);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Rifleman), 0);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::SteelMine), 6);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::PumpJack), 1);
+    let worker = game
+        .state
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
+        .unwrap()
+        .id;
+    let nexus = game
+        .state
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == EntityKind::ResourceDepot)
+        .unwrap()
+        .id;
+    game.state.players[0].set_resources(2000, 2000);
+    game.enqueue(
+        1,
+        SimCommand::Build {
+            units: vec![worker],
+            building: EntityKind::Barracks,
+            tile_x: 8,
+            tile_y: 8,
+            queued: false,
+        },
+    );
+    game.tick();
+    assert!(!matches!(
+        game.state.entities.get(worker).unwrap().order(),
+        Order::Build(_)
+    ));
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Barracks), 0);
+    game.enqueue(
+        1,
+        SimCommand::Train {
+            building: nexus,
+            unit: EntityKind::Worker,
+        },
+    );
+    for _ in 0..config::TICK_HZ * 60 {
+        game.tick();
+    }
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Worker), 2);
+    assert!(
+        game.state.players[0].steel > 2000,
+        "shared Steel Mine income runs"
+    );
+    assert!(
+        game.state.players[0].oil > 2000,
+        "shared Oil Pumpjack income runs"
+    );
+    game.assert_invariants();
+}

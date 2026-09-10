@@ -1,5 +1,5 @@
 import { DEFAULT_FACTION_ID, LAB_ROLE } from "./protocol.js";
-import { PLAYER_PALETTE, STATS, UPGRADES } from "./config.js";
+import { PLAYER_PALETTE, STATS, UPGRADES, statsForFaction } from "./config.js";
 import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import {
   labBuildingSpawnFactionOptions,
@@ -708,7 +708,7 @@ export class LabPanel {
     const grid = document.createElement("div");
     grid.className = "lab-spawn-palette";
     for (const kind of buildingKinds) {
-      const stats = STATS[kind] || {};
+      const stats = statsForFaction(kind, this.buildingSpawnPalette.factionId) || {};
       const button = this.button(stats.label || kind, () => this.armBuildingSpawnPaletteTool(kind), {
         className: "lab-btn lab-spawn-option",
         title: `Spawn ${stats.label || kind}`,

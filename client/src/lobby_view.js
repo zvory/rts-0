@@ -498,11 +498,13 @@ export function playableAiProfileId(id) {
 
 export const PLAYABLE_FACTIONS = Object.freeze([
   { id: "kriegsia", label: "Kriegsia" },
+  { id: "cultivators", label: "Cultivators" },
   { id: "ekat", label: "Ekat" },
 ]);
 
 export const LOBBY_SELECTABLE_FACTIONS = Object.freeze([
   { id: "kriegsia", label: "Kriegsia" },
+  { id: "cultivators", label: "Cultivators" },
 ]);
 
 function isLobbySelectableFaction(factionId) {
