@@ -485,7 +485,7 @@ fn support_training_requires_tech_and_can_balance_priorities() {
         vec![EntityKind::MachineGunner, EntityKind::MachineGunner]
     );
 
-    let mut with_steelworks = observation(
+    let with_steelworks = observation(
         AiEconomy {
             steel: 500,
             oil: 200,
@@ -501,9 +501,6 @@ fn support_training_requires_tech_and_can_balance_priorities() {
         ],
         Vec::new(),
     );
-    with_steelworks
-        .upgrades
-        .push(UpgradeKind::AntiTankGunUnlock);
     let facts = AiFacts::from_observation(&with_steelworks);
     let mut ctx = AiActionContext::new(&facts, budget_from_observation(&with_steelworks));
 

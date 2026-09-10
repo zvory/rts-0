@@ -161,7 +161,7 @@ fn turtle_spends_large_float_on_second_gun_works_not_a_second_barracks() {
         },
         owned,
     );
-    observation.upgrades = vec![UpgradeKind::Entrenchment, UpgradeKind::AntiTankGunUnlock];
+    observation.upgrades = vec![UpgradeKind::Entrenchment];
 
     let decision = decide(
         &observation,

@@ -466,7 +466,7 @@ fn jeff_interrupts_busy_machine_gunner_to_clear_vehicle_works_site() {
 }
 
 #[test]
-fn jeff_starts_defensive_tank_before_anti_tank_research() {
+fn jeff_does_not_research_retired_anti_tank_unlock() {
     let mut factory = building(5, EntityKind::Factory, Some(0));
     let mut observation = jeff_armored_tech_observation(Some(factory.clone()));
     observation.upgrades = vec![UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
@@ -474,28 +474,6 @@ fn jeff_starts_defensive_tank_before_anti_tank_research() {
     memory.containment_wave_launched = true;
     let width = observation.map.width;
     let height = observation.map.height;
-    let decision = decide_profile_without_static_map_for_tests(
-        &observation,
-        &JEFFS_AI,
-        &mut memory,
-        ai_shared::BuildSearch {
-            min_radius: 0,
-            max_radius: 0,
-            prefer_away_from_center: false,
-            prefer_toward_center: false,
-        },
-        |_, tx, ty| tx < width && ty < height,
-    );
-    assert!(!decision.commands.iter().any(|command| {
-        matches!(
-            command,
-            Command::Research {
-                upgrade: UpgradeKind::AntiTankGunUnlock,
-                ..
-            }
-        )
-    }));
-
     factory.state = AiEntityState::Train;
     factory.production_queue_len = Some(1);
     factory.production_kind = Some(EntityKind::Tank);
@@ -515,7 +493,7 @@ fn jeff_starts_defensive_tank_before_anti_tank_research() {
         },
         |_, tx, ty| tx < width && ty < height,
     );
-    assert!(decision.commands.iter().any(|command| {
+    assert!(!decision.commands.iter().any(|command| {
         matches!(
             command,
             Command::Research {

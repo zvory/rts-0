@@ -11,8 +11,7 @@ const TURTLE_UNITS: [EntityKind; 3] = [
     EntityKind::Rifleman,
 ];
 const TURTLE_ANTI_TANK: [EntityKind; 1] = [EntityKind::AntiTankGun];
-const TURTLE_UPGRADES: [UpgradeKind; 2] =
-    [UpgradeKind::Entrenchment, UpgradeKind::AntiTankGunUnlock];
+const TURTLE_UPGRADES: [UpgradeKind; 1] = [UpgradeKind::Entrenchment];
 const TURTLE_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,

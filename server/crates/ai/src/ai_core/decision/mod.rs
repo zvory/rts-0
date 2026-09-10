@@ -618,21 +618,6 @@ where
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
     queue_fast_tank_optional_upgrades(&mut actions, &facts, memory, &mut intents, profile);
-    let defensive_tank_started = memory.home_defensive_tank.is_some()
-        || (memory.containment_wave_launched
-            && observation.owned.iter().any(|entity| {
-                entity.kind == EntityKind::Factory
-                    && entity.production_kind == Some(EntityKind::Tank)
-            }));
-    if profile.home_anti_tank.is_some() && defensive_tank_started {
-        queue_upgrade_if_available(
-            &mut actions,
-            &facts,
-            memory,
-            &mut intents,
-            UpgradeKind::AntiTankGunUnlock,
-        );
-    }
     let effective_unit_priorities = effective_unit_priorities_for_upgrades(
         profile,
         production_policy.unit_priorities,
