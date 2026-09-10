@@ -25,7 +25,6 @@ pub struct DevScenarioLaunch {
     pub blocker: Option<EntityKind>,
     pub case: Option<&'static str>,
 }
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DevScenarioSpec {
     pub id: &'static str,
@@ -33,11 +32,9 @@ pub struct DevScenarioSpec {
     pub description: &'static str,
     pub launches: &'static [DevScenarioLaunch],
 }
-
 pub const DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_HEAD_ON: &str = "head_on";
 pub const DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_SLIGHT_ANGLE: &str = "slight_angle";
 pub const DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_MAJOR_ANGLE: &str = "major_angle";
-
 const DYNAMIC_CONSTRUCTION_PATH_BLOCK_LAUNCHES: [DevScenarioLaunch; 3] = [
     DevScenarioLaunch {
         id: "dynamic_construction_path_block",
@@ -987,6 +984,7 @@ pub fn parse_dev_scenario_case(id: &str, case: Option<&str>) -> Option<Option<&'
         }
         ("tank_trap_pathing_matrix", _) => None,
         ("replay_281_tank_gap", case) => replay_281_tank_gap::parse_case(case),
+        ("warrior_portal_duel", case) => warrior_portal_duel::parse_case(case),
         (_, None) => Some(None),
         (_, Some(_)) => None,
     }
@@ -1001,7 +999,9 @@ pub fn dev_scenario_case_label(case: &str) -> &'static str {
         TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE => "enemy vehicle reroute",
         TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH => "infantry pass-through",
         TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK => "explicit infantry attack",
-        _ => replay_281_tank_gap::case_label(case).unwrap_or("case"),
+        _ => replay_281_tank_gap::case_label(case)
+            .or_else(|| warrior_portal_duel::case_label(case))
+            .unwrap_or("case"),
     }
 }
 

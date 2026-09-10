@@ -233,6 +233,10 @@ Current scenario ids:
   authoritative; the source uses the Rifleman presentation because an initial Panzerfaust entity
   prevents the dev watcher from becoming ready. The regression requires the hit not to make the
   moving Tank choose a reverse heading that needs more than an 80-degree hull pivot.
+- `warrior_portal_duel` — the default case completes a full Cultivator Portal production cycle and
+  rallies the Warrior into one held Rifleman. The `entrenched_riflemen` case lets two held
+  Riflemen finish digging in, then issues a real Warrior attack-move from beyond their enhanced
+  firing range through their position.
 
 The watcher shows movement debug path overlays by default. Replay speed controls are reused for
 dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one
