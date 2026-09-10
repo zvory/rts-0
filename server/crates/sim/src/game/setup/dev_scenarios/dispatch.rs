@@ -98,7 +98,9 @@ impl Game {
             "tank_damage_pursuit_pivot" => {
                 Self::new_tank_damage_pursuit_pivot_scenario(unit, unit_count, seed)
             }
-            "warrior_portal_duel" => Self::new_warrior_portal_duel_scenario(unit, unit_count, seed),
+            "warrior_portal_duel" => {
+                Self::new_warrior_portal_duel_scenario(scenario_case, unit, unit_count, seed)
+            }
             _ => Err(format!("unknown dev scenario: {scenario_id}")),
         }
     }
