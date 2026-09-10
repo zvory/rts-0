@@ -958,8 +958,8 @@ await withFakeDocument(async () => {
     "LabPanel refreshes resource fields from the newly selected player",
   );
   assert(
-    buttonByText("AT Guns")?.dataset.researched === "false" &&
-      buttonByText("AT Guns")?.["aria-pressed"] === "false",
+    buttonByText("Tank Production")?.dataset.researched === "false" &&
+      buttonByText("Tank Production")?.["aria-pressed"] === "false",
     "LabPanel refreshes completed research for the newly selected player",
   );
   assert(
@@ -970,7 +970,7 @@ await withFakeDocument(async () => {
   assert(
     panel.fields.get("resource-steel").value === "500" &&
       panel.fields.get("resource-oil").value === "200" &&
-      buttonByText("AT Guns")?.dataset.researched === "true" &&
+      buttonByText("Tank Production")?.dataset.researched === "true" &&
       panel.fields.get("player-god-mode").checked === true,
     "LabPanel restores every player-specific control when switching back",
   );
