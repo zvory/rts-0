@@ -30,6 +30,32 @@ assert(
   "Warrior swipe art fails closed for non-sword attack feedback",
 );
 
+const warriorFacing = 0.75;
+assert(
+  frameStripVisualFacing(
+    WARRIOR_PNG_FRAME_STRIP,
+    { id: 6, kind: KIND.WARRIOR, state: STATE.MOVE, facing: warriorFacing },
+    { now: 0, frameStripMoving: true },
+  ) === warriorFacing - Math.PI / 2,
+  "Warrior locomotion rotates the authored sideways pose counterclockwise into travel direction",
+);
+assert(
+  frameStripVisualFacing(
+    WARRIOR_PNG_FRAME_STRIP,
+    { id: 6, kind: KIND.WARRIOR, state: STATE.IDLE, facing: warriorFacing, weaponFacing: 1.25 },
+    { recoilProgress: 0 },
+  ) === 1.25 - Math.PI / 2,
+  "Warrior idle art keeps the same corrected body orientation as locomotion",
+);
+assert(
+  frameStripVisualFacing(
+    WARRIOR_PNG_FRAME_STRIP,
+    { id: 6, kind: KIND.WARRIOR, state: STATE.ATTACK, facing: warriorFacing, weaponFacing: 1.25 },
+    { recoilProgress: 1, recoilPhase: 0.2, recoilWeaponKind: WEAPON_KIND.WARRIOR_SWORD },
+  ) === 1.25,
+  "Warrior sword swipe keeps its accepted attack-facing orientation",
+);
+
 const deployedMachineGunner = {
   id: 7,
   kind: KIND.MACHINE_GUNNER,

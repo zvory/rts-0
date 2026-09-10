@@ -407,7 +407,9 @@ Raster rig workflow:
 - PNG-backed units are defined by `renderer/rigs/raster_rig_definitions.js`, frame-strip metadata,
   or `renderer/rigs/*_png_atlas.js`, then routed through `png_routing.js`, `png_runtime.js`, and the
   shared rig animation sampler. Raster-native metadata owns anchors, animation bindings, semantic
-  part ids, recoil, facing, shadows, effects, and route splits; no SVG source or vector-art fallback
+  part ids, recoil, facing, shadows, effects, and route splits; frame strips may declare a base
+  facing offset plus a firing-frame override when authored locomotion and attack poses use different
+  forward axes. No SVG source or vector-art fallback
   exists for those units. Command-card and selection-panel portraits use an atlas's
   assembled reference when available; setup-capable component-only atlases declare an explicit
   deployed composition so the UI shows the complete set-up silhouette, including support legs,

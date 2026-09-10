@@ -1,0 +1,18 @@
+{
+  "source": "client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-source.png",
+  "runtimeStrip": "client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png",
+  "runtimeVersion": "placeholder-2",
+  "frameSize": 160,
+  "frameCount": 6,
+  "transparentGutterPx": 5,
+  "pipeline": "node scripts/art/warrior-placeholder-pipeline.mjs",
+  "processing": [
+    "detect six complete figures in the high-resolution source before slicing",
+    "group nearby detached details with their figure",
+    "repair enclosed transparent holes from the nearest opaque artwork",
+    "replace magenta-contaminated visible pixels from the nearest clean artwork",
+    "preserve exterior antialiasing",
+    "fit every complete figure within a consistent 84px height and 150px width envelope",
+    "center every result in a 160px cell with at least a five-pixel transparent gutter"
+  ]
+}
