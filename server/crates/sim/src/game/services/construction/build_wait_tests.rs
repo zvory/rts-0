@@ -94,7 +94,7 @@ fn waiting_build_starts_when_resources_become_available() {
 }
 
 #[test]
-fn arrived_pump_jack_waits_for_120_steel_then_completes_in_10_seconds() {
+fn arrived_pump_jack_waits_for_150_steel_then_completes_in_10_seconds() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
     let (sx, sy) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
@@ -116,15 +116,15 @@ fn arrived_pump_jack_waits_for_120_steel_then_completes_in_10_seconds() {
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("friendly blocker should exist");
     let mut players = vec![player_state(1)];
-    players[0].set_resources(119, 0);
+    players[0].set_resources(149, 0);
     let mut events = HashMap::new();
 
     run_construction_tick!(&map, &mut entities, &mut players, &mut events);
     assert!(entities
         .iter()
         .all(|entity| entity.kind != EntityKind::PumpJack));
-    assert_eq!(players[0].steel, 119);
-    players[0].set_resources(120, 0);
+    assert_eq!(players[0].steel, 149);
+    players[0].set_resources(150, 0);
     run_construction_tick!(&map, &mut entities, &mut players, &mut events);
 
     assert_eq!(
@@ -141,7 +141,7 @@ fn arrived_pump_jack_waits_for_120_steel_then_completes_in_10_seconds() {
         })
     );
     let cost = rules::economy::resource_cost(EntityKind::PumpJack);
-    assert_eq!((cost.steel, cost.oil), (120, 0));
+    assert_eq!((cost.steel, cost.oil), (150, 0));
     assert_eq!(players[0].steel, 0);
     assert_eq!(players[0].oil, 0);
     assert_ne!(
