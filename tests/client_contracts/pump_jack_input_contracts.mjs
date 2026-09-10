@@ -48,8 +48,14 @@ assert(
   commands.length === 1 &&
     commands[0].c === "move" &&
     commands[0].units.join(",") === String(worker.id),
-  "Engineer right-click over oil remains a move now that depots produce Pump Jacks",
+  "Engineer right-click outside the oil patch remains a move",
 );
+
+commands.length = 0;
+input._onRightClick({ x: oil.x, y: oil.y });
+assert(commands.length === 1 && commands[0].c === "build" &&
+  commands[0].building === KIND.PUMP_JACK && commands[0].tileX === 3 && commands[0].tileY === 3,
+  "Engineer right-click on live oil builds a centered Pump Jack");
 
 const attackingTank = { id: 60, owner: 1, kind: KIND.TANK, x: 64, y: 64, facing: 0 };
 const enemyPumpJack = { id: 61, owner: 3, kind: KIND.PUMP_JACK, x: oil.x, y: oil.y, hp: 100, maxHp: 100 };

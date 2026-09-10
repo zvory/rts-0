@@ -380,7 +380,7 @@ pub struct ProductionState {
 pub struct ConstructionState {
     /// Ticks of construction accumulated so far.
     pub progress: u32,
-    /// Total ticks of construction required (`building_stats.build_ticks`).
+    /// Total ticks of construction required (manual building stats or depot job duration).
     pub total: u32,
     /// Whether the owner paid the building cost when this site was created. Authored/Lab
     /// scaffolds are intentionally unpaid and must not mint resources when cancelled.

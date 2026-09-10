@@ -216,9 +216,10 @@ export const STATS = Object.freeze({
       "Resource Depots automatically build this for free on nearby Steel patches. " +
       `Extracts 2 Steel every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s.` },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
-    cost: { steel: 0, oil: 0 }, buildTicks: TICK_HZ * 36, trains: [],
+    cost: { steel: 120, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
     description:
-      "Resource Depots automatically build this for free on nearby Oil patches. " +
+      "Engineers can build this on Oil patches for 120 Steel in 10s. " +
+      "Resource Depots automatically build this for free in 36s on nearby Oil patches. " +
       `Extracts ${OIL_LOAD} Oil every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s while within ` +
       `${MINING_ANCHOR_RANGE_TILES} tiles of a completed friendly Resource Depot or Zamok.` },
 
@@ -528,6 +529,7 @@ export const RESOURCE_AMOUNTS = Object.freeze({
 // What a worker can build (command card when a worker is selected).
 export const WORKER_BUILDABLE = Object.freeze([
   KIND.RESOURCE_DEPOT,
+  KIND.PUMP_JACK,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.ENGINEERING_COMPLEX,

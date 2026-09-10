@@ -433,6 +433,7 @@ pub(crate) fn unattended_site_for_build_intent(
         (entity.owner == owner
             && entity.kind == kind
             && entity.under_construction()
+            && entity.construction_producer_id().is_none()
             && active_builder_for_site(entities, entity.id).is_none()
             && (entity.pos_x - cx).abs() <= 0.01
             && (entity.pos_y - cy).abs() <= 0.01)

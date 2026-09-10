@@ -573,11 +573,11 @@ pub const BUILDINGS: &[BuildingDef] = &[
         stats: balance::BuildingStats {
             hp: 75,
             sight_tiles: 1,
-            cost_steel: 0,
+            cost_steel: 120,
             cost_oil: 0,
             foot_w: 1,
             foot_h: 1,
-            build_ticks: balance::TICK_HZ * 36,
+            build_ticks: balance::TICK_HZ * 10,
             dmg: 0,
             range_tiles: 0.0,
             cooldown: 0,
@@ -846,14 +846,14 @@ mod tests {
     }
 
     #[test]
-    fn pump_jack_uses_free_automatic_extractor_stats() {
+    fn pump_jack_uses_manual_construction_stats() {
         let def = building_def(EntityKind::PumpJack).expect("pump jack def");
 
         assert_eq!(def.stats.hp, 75);
         assert_eq!(def.stats.sight_tiles, 1);
-        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (0, 0));
+        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (120, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
-        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 36);
+        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 10);
         assert_eq!(def.armor_class, ArmorClass::Small);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());

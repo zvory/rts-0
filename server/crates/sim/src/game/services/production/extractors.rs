@@ -60,6 +60,9 @@ pub(super) fn advance_automatic(
                     return false;
                 };
                 construction.producer_id = Some(producer_id);
+                if kind == EntityKind::PumpJack {
+                    construction.total = config::AUTOMATIC_PUMP_JACK_BUILD_TICKS;
+                }
                 let Some(extractor) = entity.resource_extractor.as_mut() else {
                     return false;
                 };

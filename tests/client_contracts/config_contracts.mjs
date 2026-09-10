@@ -474,11 +474,11 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   );
   assert(
     !WORKER_BUILDABLE.includes(KIND.DEPOT) &&
-      !WORKER_BUILDABLE.includes(KIND.PUMP_JACK) &&
-      WORKER_BUILD_CARD_SLOTS[1] === null &&
+      WORKER_BUILDABLE.includes(KIND.PUMP_JACK) &&
+      WORKER_BUILD_CARD_SLOTS[1] === KIND.PUMP_JACK &&
       WORKER_BUILD_CARD_SLOTS[2] === KIND.BARRACKS &&
       WORKER_BUILD_CARD_SLOTS.filter(Boolean).join(",") === WORKER_BUILDABLE.join(","),
-    "Supply Depot and depot-built extractors stay out of the Engineer build card without compacting the retired W slot",
+    "Pump Jack returns to the Engineer W slot while Supply Depot stays unavailable",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
