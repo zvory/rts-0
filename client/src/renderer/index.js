@@ -299,6 +299,7 @@ export class Renderer {
       resources: new Map(),
       buildingShadows: new Map(),
       buildings: new Map(),
+      buildingEffects: new Map(),
       buildingOverlays: new Map(),
       unitShadows: new Map(),
       trenchOccupantShadows: new Map(),

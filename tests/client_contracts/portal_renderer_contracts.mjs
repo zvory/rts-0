@@ -27,7 +27,7 @@ try {
   const state = { playerId: 1, players: [{ id: 1, color: "#4878c8" }] };
 
   renderer._drawBuilding(portal, ownerColors, state);
-  const portalCalls = renderer._pools.buildingOverlays.get(portal.id)?.calls || [];
+  const portalCalls = renderer._pools.buildingEffects.get(portal.id)?.calls || [];
   assert(
     portalCalls.filter((call) => call[0] === "drawCircle").length >= 40,
     "completed Portal renders a dense animated vortex particle field",
@@ -37,11 +37,24 @@ try {
     "completed Portal renders rotating vortex arcs and energy spokes",
   );
 
+  const producingPortal = { ...portal, id: 508, prodProgress: 0.5 };
+  renderer._drawBuilding(producingPortal, ownerColors, state);
+  assert(
+    renderer._pools.buildingEffects.get(producingPortal.id)?.calls.length > 0 &&
+      renderer._pools.buildingOverlays.get(producingPortal.id)?.calls.length > 0,
+    "Portal effects coexist with production and status overlays",
+  );
+
   const portalScaffold = { ...portal, id: 507, buildProgress: 0.5 };
   renderer._drawBuilding(portalScaffold, ownerColors, state);
   assert(
-    !renderer._pools.buildingOverlays.has(portalScaffold.id),
+    !renderer._pools.buildingEffects.has(portalScaffold.id),
     "Portal vortex remains dormant during construction",
+  );
+  assert(
+    renderer.world.children.indexOf(renderer.layers.buildingEffects) <
+      renderer.world.children.indexOf(renderer.layers.buildingOverlays),
+    "Portal effects render below production and status overlays",
   );
 
   renderer.destroy();

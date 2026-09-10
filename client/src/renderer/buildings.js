@@ -263,7 +263,7 @@ function drawPortalFrame(g, cx, cy, width, height, tint, alpha) {
 }
 
 function drawPortalVortex(e, width, height) {
-  const g = this._slot("buildingOverlays", e.id);
+  const g = this._slot("buildingEffects", e.id);
   g.position.set(0, 0);
   const time = rendererVisualNow(this) / 1000;
   const radius = Math.min(width, height) * 0.39;
