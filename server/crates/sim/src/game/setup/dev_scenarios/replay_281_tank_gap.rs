@@ -335,9 +335,9 @@ mod tests {
                 rear_slowed_at = Some(tick);
             }
         }
-        assert_eq!(acquired_at, Some(13_543));
-        assert_eq!(rear_slowed_at, Some(13_579));
-        assert_eq!(target_removed_at, Some(13_599));
+        assert_eq!(acquired_at, Some(13_544));
+        assert_eq!(rear_slowed_at, Some(13_580));
+        assert_eq!(target_removed_at, Some(13_612));
         assert!(setup.game.state.entities.contains(COMMAND_CAR));
         assert!(!setup.game.state.entities.contains(219));
         assert!(!setup.game.state.entities.contains(250));

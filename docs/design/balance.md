@@ -576,14 +576,14 @@ profiles and explicit activation/autocast policy instead of being folded into de
   missing charge regenerates, the ability's existing clock animation shows progress toward the
   next charge; recharge does not disable a stored charge that is still available.
 - **Command Car aura and Breakthrough!** (hotkey `E`): Each completed Command Car continuously gives
-  owned units within 9 tiles a 1.4x speed multiplier. This passive aura has no smoke interaction,
+  owned units within 9 tiles a 1.2x speed multiplier. This passive aura has no smoke interaction,
   and overlapping Command Cars do not stack. Breakthrough is the self-targeted instant active
-  version: it applies the full 1.8x speed status to owned units currently within that same radius
+  version: it applies the full 1.4x speed status to owned units currently within that same radius
   for 180 ticks (~6s), with a 750-tick (~25s) per-caster cooldown, no resource cost, queueability,
   and movement during casting. While an affected unit is actually moving, Breakthrough lets it
   fire without stopping and halves the cooldown of each weapon fired on that tick. Stationary
   attacks retain their normal cooldown, and setup weapons still obey their setup requirements. The
-  active status uses the 2.2x multiplier while the affected unit is inside smoke or during the
+  active status uses the 1.6x multiplier while the affected unit is inside smoke or during the
   60-tick (~2s) recent-smoke grace window after leaving it; it overrides the passive aura. Multiple
   active Breakthrough effects do not stack; a shorter refresh cannot reduce an active buff. Enemies
   see the active status only when the affected unit is
