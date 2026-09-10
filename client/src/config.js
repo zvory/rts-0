@@ -128,6 +128,7 @@ export {
   factionCatalog,
   researchableUpgradesForFaction,
   trainableUnitsForFaction,
+  workerBuildCardSlotsForFaction,
   workerBuildablesForFaction,
 } from "./config/factions.js";
 

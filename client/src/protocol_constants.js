@@ -179,6 +179,7 @@ export const KIND = Object.freeze({
   COMMAND_CAR: "command_car",
   EKAT: "ekat",
   RESOURCE_DEPOT: "resource_depot",
+  PORTAL: "portal",
   ZAMOK: "zamok",
   DEPOT: "depot",
   BARRACKS: "barracks",
@@ -210,6 +211,7 @@ export const UNIT_KINDS = Object.freeze([
 ]);
 export const BUILDING_KINDS = Object.freeze([
   KIND.RESOURCE_DEPOT,
+  KIND.PORTAL,
   KIND.ZAMOK,
   KIND.DEPOT,
   KIND.BARRACKS,
@@ -358,6 +360,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.SCOUT_CAR]: 14,
   [KIND.SCOUT_PLANE]: 25,
   [KIND.RESOURCE_DEPOT]: 6,
+  [KIND.PORTAL]: 28,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,
   [KIND.TRAINING_CENTRE]: 9,

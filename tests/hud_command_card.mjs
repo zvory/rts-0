@@ -742,9 +742,14 @@ function buttonSlots(card) {
     resources: { steel: 1000, oil: 1000 }, commandCardMode: "workerBuild",
   });
   const builds = card.slots.filter((slot) => slot?.action === "build");
-  assert.deepEqual(builds.map((slot) => slot.intent.building), [KIND.RESOURCE_DEPOT]);
+  assert.deepEqual(
+    builds.map((slot) => slot.intent.building),
+    [KIND.RESOURCE_DEPOT, KIND.PORTAL],
+  );
   assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
+  assert.equal(builds[1].label, "Portal");
+  assert.equal(builds[1].commandId, "cultivators.build." + KIND.PORTAL);
 }
 
 {

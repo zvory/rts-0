@@ -309,6 +309,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         | EntityKind::CommandCar
         | EntityKind::Ekat
         | EntityKind::ResourceDepot
+        | EntityKind::Portal
         | EntityKind::Zamok
         | EntityKind::Depot
         | EntityKind::Barracks
@@ -793,6 +794,7 @@ mod tests {
             (EntityKind::CommandCar, None),
             (EntityKind::Ekat, None),
             (EntityKind::ResourceDepot, None),
+            (EntityKind::Portal, None),
             (EntityKind::Zamok, None),
             (EntityKind::Depot, None),
             (EntityKind::Barracks, None),

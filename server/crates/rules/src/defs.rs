@@ -398,6 +398,25 @@ pub const BUILDINGS: &[BuildingDef] = &[
         build_requires: &[],
     },
     BuildingDef {
+        kind: EntityKind::Portal,
+        stats: balance::BuildingStats {
+            hp: 165,
+            sight_tiles: 1,
+            cost_steel: 150,
+            cost_oil: 0,
+            foot_w: 3,
+            foot_h: 3,
+            build_ticks: balance::TICK_HZ * 5,
+            dmg: 0,
+            range_tiles: 0.0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: &[],
+    },
+    BuildingDef {
         kind: EntityKind::Zamok,
         stats: balance::BuildingStats {
             hp: 600,
@@ -693,6 +712,7 @@ mod tests {
             buildings,
             vec![
                 EntityKind::ResourceDepot,
+                EntityKind::Portal,
                 EntityKind::Zamok,
                 EntityKind::Depot,
                 EntityKind::Barracks,

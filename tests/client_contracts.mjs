@@ -38,6 +38,7 @@ await import("./client_contracts/renderer_contracts.mjs");
 await import("./client_contracts/projected_unit_shadow_contracts.mjs");
 await import("./client_contracts/projected_unit_shadow_model_candidate_contracts.mjs");
 await import("./client_contracts/building_png_renderer_contracts.mjs");
+await import("./client_contracts/portal_renderer_contracts.mjs");
 await import("./client_contracts/fog_presentation_contracts.mjs");
 await import("./client_contracts/terrain_variant_contracts.mjs");
 await import("./client_contracts/terrain_blend_contracts.mjs");

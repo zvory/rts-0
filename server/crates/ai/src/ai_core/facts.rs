@@ -306,6 +306,7 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::ScoutPlane
         | EntityKind::Golem
         | EntityKind::ResourceDepot
+        | EntityKind::Portal
         | EntityKind::Zamok
         | EntityKind::Depot
         | EntityKind::Barracks
