@@ -6,6 +6,8 @@ pub const STARTING_WORKERS: u32 = 1;
 pub const STARTING_RIFLEMEN: u32 = 4;
 pub const STARTING_STEEL_MINES: u32 = 6;
 pub const STARTING_PUMP_JACKS: u32 = 1;
+/// Free depot construction remains independent of paid Engineer construction.
+pub const AUTOMATIC_PUMP_JACK_BUILD_TICKS: u32 = super::TICK_HZ * 36;
 
 pub const STEEL_LOAD: u32 = 2;
 pub const OIL_LOAD: u32 = 2;

@@ -26,6 +26,7 @@ import {
 } from "./artillery_targeting.js";
 import {
   commandHotkeyCodeFromEvent,
+  pumpJackBuildIntentForResource,
 } from "./placement.js";
 import { armPostQuickCastSelectionGuard } from "./quick_cast_selection_guard.js";
 import {
@@ -259,6 +260,8 @@ function normalRightClickAction(input, p) {
       contextualResource,
       world || contextualResource,
       gatherers,
+      workers,
+      input.state.map,
     );
     if (action) return action;
   }
@@ -275,7 +278,7 @@ function normalRightClickAction(input, p) {
     };
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
-    const action = resourceRightClickAction(target, world || target, gatherers);
+    const action = resourceRightClickAction(target, world || target, gatherers, workers, input.state.map);
     if (action) return action;
     // Selection has no gatherers: fall through to a move onto the node's position.
   }
@@ -317,7 +320,16 @@ function attackTargetAtScreen(input, point, eligibleOwner) {
     .sort((a, b) => Math.hypot(world.x - a.x, world.y - a.y) - Math.hypot(world.x - b.x, world.y - b.y))[0] || null;
 }
 
-function resourceRightClickAction(resource, world, gatherers) {
+function resourceRightClickAction(resource, world, gatherers, workers, map) {
+  const build = workers.length > 0 ? pumpJackBuildIntentForResource(resource, map) : null;
+  if (build) {
+    return {
+      kind: "build",
+      units: workers,
+      ...build,
+      feedback: rightClickFeedback("move", resource.x, resource.y),
+    };
+  }
   if (gatherers.length > 0 && resource.kind !== KIND.OIL) {
     return {
       kind: "gather",
@@ -518,7 +530,6 @@ function _isOwnIncompleteBuilding(target) {
   return (
     isBuilding(target.kind) &&
     target.kind !== KIND.STEEL_MINE &&
-    target.kind !== KIND.PUMP_JACK &&
     typeof target.buildProgress === "number" &&
     target.buildProgress < 1
   );

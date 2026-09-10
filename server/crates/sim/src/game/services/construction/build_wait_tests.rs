@@ -94,7 +94,7 @@ fn waiting_build_starts_when_resources_become_available() {
 }
 
 #[test]
-fn arrived_pump_jack_starts_for_free() {
+fn arrived_pump_jack_waits_for_120_steel_then_completes_in_10_seconds() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
     let (sx, sy) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
@@ -116,10 +116,15 @@ fn arrived_pump_jack_starts_for_free() {
         .map(|entity| (entity.pos_x, entity.pos_y))
         .expect("friendly blocker should exist");
     let mut players = vec![player_state(1)];
-    players[0].set_resources(99, 0);
+    players[0].set_resources(119, 0);
     let mut events = HashMap::new();
 
     run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+    assert!(entities.iter().all(|entity| entity.kind != EntityKind::PumpJack));
+    assert_eq!(players[0].steel, 119);
+    players[0].set_resources(120, 0);
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+
 
     assert_eq!(
         entities
@@ -130,13 +135,13 @@ fn arrived_pump_jack_starts_for_free() {
             site: entities
                 .iter()
                 .find(|entity| entity.kind == EntityKind::PumpJack && entity.under_construction())
-                .expect("free Pump Jack should start immediately")
+                .expect("paid Pump Jack should start")
                 .id,
         })
     );
     let cost = rules::economy::resource_cost(EntityKind::PumpJack);
-    assert_eq!((cost.steel, cost.oil), (0, 0));
-    assert_eq!(players[0].steel, 99);
+    assert_eq!((cost.steel, cost.oil), (120, 0));
+    assert_eq!(players[0].steel, 0);
     assert_eq!(players[0].oil, 0);
     assert_ne!(
         entities
@@ -145,6 +150,16 @@ fn arrived_pump_jack_starts_for_free() {
         Some(blocker_before),
         "the friendly blocker should move once construction can actually start"
     );
+    let site = entities.iter().find(|entity| entity.kind == EntityKind::PumpJack).unwrap().id;
+    assert_eq!(entities.get(site).unwrap().construction.as_ref().unwrap().total, config::TICK_HZ * 10);
+    for _ in 1..config::TICK_HZ * 10 - 1 {
+        run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+    }
+    assert!(entities.get(site).unwrap().under_construction());
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+    assert!(!entities.get(site).unwrap().under_construction());
+    assert_eq!(players[0].steel, 0);
+
 }
 
 #[test]

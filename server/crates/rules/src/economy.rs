@@ -380,7 +380,7 @@ mod tests {
             can_build_for_faction(DEFAULT_FACTION_ID, EntityKind::Worker, EntityKind::TankTrap),
             "default workers can build Tank Traps"
         );
-        assert!(!can_build_for_faction(
+        assert!(can_build_for_faction(
             DEFAULT_FACTION_ID,
             EntityKind::Worker,
             EntityKind::PumpJack

@@ -199,7 +199,8 @@ function buttonSlots(card) {
   assert.equal(buildCard.slots[0].commandId, kriegsiaCommandId("build", KIND.RESOURCE_DEPOT));
   assert.equal(buildCard.slots[0].slotIndex, 0);
   assert.equal(buildCard.slots[0].hotkey, "Q");
-  assert.equal(buildCard.slots[1], null);
+  assert.equal(buildCard.slots[1].commandId, kriegsiaCommandId("build", KIND.PUMP_JACK));
+  assert.equal(buildCard.slots[1].hotkey, "W");
   assert.equal(buildCard.slots[2].commandId, kriegsiaCommandId("build", KIND.BARRACKS));
   assert.equal(buildCard.slots[2].hotkey, "E");
   assert.equal(buildCard.slots[7].commandId, kriegsiaCommandId("build", KIND.TANK_TRAP));
@@ -207,8 +208,8 @@ function buttonSlots(card) {
   assert.equal(buildCard.slots[7].hotkey, "X");
   assert.equal(
     buildCard.slots.some((slot) => slot?.commandId === kriegsiaCommandId("build", KIND.PUMP_JACK)),
-    false,
-    "Engineers no longer place Pump Jacks",
+    true,
+    "Engineers can place Pump Jacks",
   );
   assert.equal(buildCard.slots[8].commandId, "worker.return");
   assert.equal(buildCard.slots[8].hotkey, "C");
@@ -689,6 +690,7 @@ function buttonSlots(card) {
   );
   assert.deepEqual(WORKER_BUILDABLE, [
     KIND.RESOURCE_DEPOT,
+    KIND.PUMP_JACK,
     KIND.BARRACKS,
     KIND.TRAINING_CENTRE,
     KIND.ENGINEERING_COMPLEX,

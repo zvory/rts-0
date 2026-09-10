@@ -845,7 +845,8 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(buildCard.slots[0].hotkey === "Q", "worker build hotkey Q should be preserved");
   assert(buildCard.slots[0].unaffordable, "unaffordable build buttons stay clickable for feedback");
   assert(buildCard.slots[0].enabled, "unaffordable build buttons enter placement and wait at the site");
-  assert(buildCard.slots[1] === null, "Engineer build menu keeps the retired top-middle W slot empty");
+  assert(buildCard.slots[1].label === "Pump Jack" && buildCard.slots[1].hotkey === "W" &&
+    buildCard.slots[1].cost.steel === 120, "Engineer build menu restores the 120-Steel Pump Jack in the W slot");
   assert(buildCard.slots[2].label === "Barracks", "Engineer build menu keeps Barracks in the top-right E slot");
   assert(buildCard.slots[2].hotkey === "E", "Barracks build hotkey should be E");
   assert(buildCard.slots[2].cost.steel === 150, "Barracks build button should expose its regular cost");
@@ -853,7 +854,7 @@ withFakeHudDocument(({ FakeElement }) => {
   tooltipHud._resourceIcon = (kind) => kind;
   const pumpJackTooltip = tooltipHud._kindTooltipHtml(KIND.PUMP_JACK);
   assert(
-    pumpJackTooltip.includes("36s") &&
+    pumpJackTooltip.includes("36s") && pumpJackTooltip.includes("10s") && pumpJackTooltip.includes("120 Steel") &&
       pumpJackTooltip.includes("automatically build this for free") &&
       pumpJackTooltip.includes("Oil patches") &&
       pumpJackTooltip.includes("Extracts 2 Oil every 1.3s"),

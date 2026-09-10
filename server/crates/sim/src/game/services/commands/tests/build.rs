@@ -514,7 +514,7 @@ fn build_order_rejects_disabled_supply_depot() {
 }
 
 #[test]
-fn build_order_rejects_worker_pump_jack_even_on_oil() {
+fn build_order_accepts_worker_pump_jack_on_oil() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
     let (site_x, site_y) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
@@ -543,14 +543,8 @@ fn build_order_rejects_worker_pump_jack_even_on_oil() {
     );
 
     let worker = entities.get(worker).expect("worker should remain alive");
-    assert_eq!(worker.order().build_intent_tile(), None);
-    assert!(
-        entities
-            .iter()
-            .all(|entity| entity.kind != EntityKind::PumpJack),
-        "workers must not spawn Pump Jack scaffolds"
-    );
-    assert_notice(&events, 1, "Building unavailable");
+    assert_eq!(worker.order().build_intent_tile(), Some((EntityKind::PumpJack, 4, 4)));
+    assert!(events.get(&1).is_none_or(Vec::is_empty));
 }
 
 #[test]
@@ -588,7 +582,7 @@ fn build_order_rejects_pump_jack_off_oil() {
         ),
         "Pump Jack build orders must be rejected away from live oil patches"
     );
-    assert_notice(&events, 1, "Building unavailable");
+    assert_notice(&events, 1, "Cannot build there");
 }
 
 #[test]

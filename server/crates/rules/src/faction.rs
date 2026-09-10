@@ -312,6 +312,7 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
 
 const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::ResourceDepot,
+    EntityKind::PumpJack,
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
     EntityKind::EngineeringComplex,
@@ -1054,7 +1055,7 @@ mod tests {
         assert!(catalog.allows_building(EntityKind::TankTrap));
         assert!(catalog.can_build(EntityKind::Worker, EntityKind::TankTrap));
         assert!(catalog.allows_building(EntityKind::PumpJack));
-        assert!(!catalog.can_build(EntityKind::Worker, EntityKind::PumpJack));
+        assert!(catalog.can_build(EntityKind::Worker, EntityKind::PumpJack));
         assert!(!catalog.can_build(EntityKind::Worker, EntityKind::SteelMine));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::TankTrap));
         assert!(!catalog.can_act_as_production_anchor(EntityKind::PumpJack));

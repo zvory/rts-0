@@ -1461,15 +1461,13 @@ minimap targeting feedback uses the mirrored cloud radius and duration effect fi
 replaces the stale authoritative plan when composing subsequent queued previews, and asynchronous
 Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
-command. The worker build submenu leaves the retired top-middle `W` slot empty so removing depot-built
-extractors does not compact the remaining Engineer build hotkeys. Contextual Pump Jack placement
+command. The worker build submenu restores Pump Jack to the top-middle `W` slot and preserves
+the remaining Engineer build hotkeys. Manual construction costs 120 Steel and takes 10 seconds. Contextual Pump Jack placement
 snaps to the closest live oil patch within one map tile of the cursor before applying the normal
 footprint validation. Pump Jack construction remains legal outside the completed
 friendly Resource Depot/Zamok mining radius, while the normal resource-mining preview warns that the
 distant extractor will be inactive. Completed owned or allied Pump Jacks with inactive extraction show a red prohibited-sign
-badge above the building until a completed friendly mining anchor comes into range. If an owned or
-allied unit covers the patch, right-clicking that unit's body still resolves
-to the live oil beneath its Pump Jack footprint. Advisory building placement ignores unit types whose client configuration marks them as
+badge above the building until a completed friendly mining anchor comes into range. Right-clicking the oil patch also works when an owned or allied unit overlaps it. Advisory building placement ignores unit types whose client configuration marks them as
 non-ground placement blockers. The Scout Plane stays out of the shared ground vehicle-body
 classifier, so its body does not block build previews. Normal gameplay selection and control-group
 commands exclude it, while Lab and spectator inspection paths allow selecting and grouping it. Its generated Fw 189-style top-down PNG frame-strip rig is scaled to the mirrored aircraft body so
