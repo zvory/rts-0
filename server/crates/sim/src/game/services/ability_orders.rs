@@ -663,7 +663,6 @@ fn caster_base_ready(e: &crate::game::entity::Entity, player: u32, ability: Abil
 fn base_eligible(e: &crate::game::entity::Entity, player: u32, ability: AbilityKind) -> bool {
     e.owner == player
         && e.hp > 0
-        && e.is_unit()
         && !e.under_construction()
         && ability::carried_by(ability, e.kind)
         && (ability == AbilityKind::Barrage || e.ability_uses_remaining(ability).unwrap_or(1) > 0)

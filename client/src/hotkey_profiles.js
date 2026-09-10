@@ -29,6 +29,7 @@ const CLASSIC_DIRECT_BINDINGS = Object.freeze({
   [factionCommandId(DEFAULT_FACTION_ID, "build", KIND.TANK_TRAP)]: "KeyK",
   [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SMOKE)]: "KeyD",
   [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SCOUT_PLANE)]: "KeyP",
+  [factionCommandId(DEFAULT_FACTION_ID, "train", KIND.PUMP_JACK)]: "KeyJ",
   [factionCommandId(DEFAULT_FACTION_ID, "train", KIND.ARTILLERY)]: "KeyR",
 });
 

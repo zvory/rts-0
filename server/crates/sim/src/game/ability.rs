@@ -63,6 +63,10 @@ pub fn carried_by(kind: AbilityKind, entity_kind: EntityKind) -> bool {
     definition(kind).carriers.contains(&entity_kind)
 }
 
+pub fn cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> ResourceCost {
+    rules::faction::ability_cost_for_carrier(kind, carrier)
+}
+
 pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
     match kind {
         AbilityKind::Charge => 0,

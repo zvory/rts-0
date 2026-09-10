@@ -25,6 +25,7 @@ import {
   setupSupportWeaponDescriptor,
   stopDescriptor,
 } from "./hud_unit_commands.js";
+import { abilityButtonDescriptor } from "./hud_ability_descriptor.js";
 import {
   constructionCancelDescriptor,
   firstOpenCommandSlot,
@@ -363,68 +364,7 @@ export function buildUnitCard(ctx, selection) {
     slots[4] = stopDescriptor(unitIds);
   }
 
-  const slotOrderedAbilityAffordances = [...abilityAffordances].sort((left, right) =>
-    abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
-  for (const affordance of slotOrderedAbilityAffordances) {
-    const definition = affordance.definition;
-    const disabledReason = abilityDisabledReason(ctx, affordance);
-    const recastActive = affordance.recastTargetObjectId != null;
-    const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
-    const commandableCount = recastActive
-      ? affordance.recastReadyIds.length
-      : affordance.queueAdmissibleIds.length;
-    const abilityReadyIds = recastActive
-      ? affordance.recastReadyIds
-      : intentAbilityIds(definition, affordance);
-    const showReadyCount = readyCount < affordance.carrierIds.length;
-    const showChargeCount = definition.ability !== ABILITY.BARRAGE &&
-      definition.charges != null && affordance.remainingUsesTotal != null;
-    const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
-    if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
-    // Later, higher-priority abilities replace collisions without moving the losing command.
-    slots[preferred] = {
-      id: `ability:${definition.ability}`,
-      commandId: factionCommandId(factionId, "ability", definition.ability),
-      kind: "button",
-      action: "ability",
-      intent: {
-        type: "ability",
-        ability: definition.ability,
-        targetMode: recastActive ? "recast" : definition.targetMode,
-        readyIds: abilityReadyIds,
-        targetObjectId: recastActive ? affordance.recastTargetObjectId : null,
-      },
-      icon: definition.icon,
-      label: definition.label,
-      title: disabledReason,
-      tooltipHtml: !affordance.unlocked
-        ? `<span class="cmd-tooltip-title">${definition.label}</span>` +
-          `<span class="cmd-tooltip-desc">${disabledReason}</span>`
-        : "",
-      ability: definition.ability,
-      enabled: affordance.unlocked && commandableCount > 0 && affordance.affordable,
-      unaffordable: affordance.unlocked && commandableCount > 0 && !affordance.affordable,
-      countBadge: showChargeCount
-        ? `${affordance.remainingUsesTotal}`
-        : (showReadyCount ? `${readyCount}` : ""),
-      cooldownClocks: affordance.cooldownClocks,
-      cost: definition.cost,
-      cls: [
-        abilityTargetActive(ctx.commandTarget, definition.ability) ? "active" : "",
-        affordance.autocastEnabledIds.length > 0 ? "autocast-enabled" : "",
-      ].filter(Boolean).join(" "),
-      onUnavailableIntent: { type: "playNotEnough", cost: definition.cost },
-      contextIntent: definition.autocast
-        ? {
-            type: "setAutocast",
-            ability: definition.ability,
-            unitIds: affordance.carrierIds,
-            enabled: affordance.autocastEnabledIds.length === 0,
-          }
-        : null,
-      contextHotkeyModifiers: definition.autocast ? ["alt"] : [],
-    };
-  }
+  placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId);
 
   if (setupGunIds.length > 0) {
     const setupSlot = GRID_HOTKEYS.indexOf("Z");
@@ -440,6 +380,36 @@ function abilitySlotPriority(definition) {
   return definition?.commandCardPriority ?? 0;
 }
 
+function abilityCostForCarriers(definition, carriers) {
+  const carrierKind = carriers[0]?.kind;
+  return definition.carrierCosts?.[carrierKind] || definition.cost;
+}
+
+function placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId) {
+  const ordered = [...abilityAffordances].sort((left, right) =>
+    abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
+  for (const affordance of ordered) {
+    const definition = affordance.definition;
+    const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
+    if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
+    // Later, higher-priority abilities replace collisions without moving the losing command.
+    slots[preferred] = abilityDescriptor(ctx, factionId, affordance);
+  }
+}
+
+function abilityDescriptor(ctx, factionId, affordance) {
+  const definition = affordance.definition;
+  const disabledReason = abilityDisabledReason(ctx, affordance);
+  const recastActive = affordance.recastTargetObjectId != null;
+  return abilityButtonDescriptor({
+    affordance,
+    commandId: factionCommandId(factionId, "ability", definition.ability),
+    disabledReason,
+    readyIds: recastActive ? affordance.recastReadyIds : intentAbilityIds(definition, affordance),
+    active: abilityTargetActive(ctx.commandTarget, definition.ability),
+  });
+}
+
 export function buildTrainCard(ctx, building, { underConstruction = false } = {}) {
   const resources = trainResourcesOf(ctx);
   const factionId = commandFactionId(ctx);
@@ -448,6 +418,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
   const cancellableProducers = underConstruction
     ? []
     : selectedCancellableProducers(ctx, building.kind, isOwn);
+  const abilityAffordances = underConstruction ? [] : selectedAbilityAffordances(ctx, [building]);
   const cancelSlot = 8;
   const signature =
     `${underConstruction ? "construction" : "train"}|${building.id}|` +
@@ -465,6 +436,10 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       const target = selectedResearchBuilding(ctx, upgrade, isOwn);
       return `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}:${target?.id ?? ""}`;
     }).join(",") +
+    `|abilities:${abilityAffordances.map((affordance) =>
+      `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:` +
+      `${affordance.affordable ? 1 : 0}:${affordance.readyIds.join(".")}`,
+    ).join("|")}` +
     `|cancel:${cancellableProducers.map((e) => e.id).join(".")}`;
 
   const slots = new Array(9).fill(null);
@@ -538,10 +513,13 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
     };
   }
 
+  placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId);
+
   if (underConstruction) {
     slots[cancelSlot] = constructionCancelDescriptor(building);
   } else if (cancellableProducers.length > 0) {
-    slots[cancelSlot] = {
+    const resolvedCancelSlot = firstOpenCommandSlot(slots, cancelSlot);
+    if (resolvedCancelSlot >= 0) slots[resolvedCancelSlot] = {
       id: `cancel:${building.kind}`,
       commandId: `production.cancel.${building.kind}`,
       kind: "button",
@@ -560,17 +538,18 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
 }
 
 export function selectedAbilityAffordances(ctx, selection) {
-  const ownUnits = selectedOwnUnits(ctx, selection);
   const resources = resourcesOf(ctx);
   return commandCardAbilitiesForFaction(commandFactionId(ctx))
     .map((definition) => {
-      const carriers = ownUnits.filter((e) => definition.carriers.includes(e.kind));
+      const carriers = (selection || []).filter((e) =>
+        isOwn(ctx, e) && e.kind !== KIND.SCOUT_PLANE && definition.carriers.includes(e.kind));
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
+      const cost = abilityCostForCarriers(definition, carriers);
       const hasFreeBarrage = definition.ability === ABILITY.BARRAGE && carriers.some(
         (e) => (abilityRemainingUses(e, definition.ability) ?? 0) > 0,
       );
-      const canAfford = hasFreeBarrage || affordable(definition.cost, resources);
+      const canAfford = hasFreeBarrage || affordable(cost, resources);
       const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
       const queueAdmissibleUnits = carriers.filter((e) =>
         abilityUnitQueueAdmissible(e, definition));
@@ -594,6 +573,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         .map((e) => e.id);
       return {
         definition,
+        cost,
         unlocked,
         affordable: canAfford,
         depletedCount,

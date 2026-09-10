@@ -45,29 +45,33 @@ pub(super) fn use_ability(
             }
             true
         });
-    let Some(source_command_car) = caster else {
+    let Some(source) = caster else {
         return;
     };
+    let Some(source_kind) = entities.get(source).map(|entity| entity.kind) else {
+        return;
+    };
+    let cost = ability::cost_for_carrier(ability, source_kind);
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return;
     };
-    if !ps.spend_cost(definition.cost) {
+    if !ps.spend_cost(cost) {
         notice(
             events,
             player,
-            rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, definition.cost),
+            rules::economy::resource_shortage_notice_for_cost(ps.steel, ps.oil, cost),
         );
         return;
     }
-    match scout_plane::launch_ability(map, entities, player, source_command_car, x, y) {
+    match scout_plane::launch_ability(map, entities, player, source, x, y) {
         Ok(_) => {
-            if let Some(caster) = entities.get_mut(source_command_car) {
+            if let Some(caster) = entities.get_mut(source) {
                 caster.start_ability_cooldown(ability, definition.cooldown_ticks);
             }
             notice_positioned(events, player, "Scout Plane", NoticeSeverity::Info, x, y);
         }
         Err(ScoutPlaneLaunchError::InvalidLaunch) => {
-            ps.refund_cost(definition.cost);
+            ps.refund_cost(cost);
             notice(events, player, "Unable to launch Scout Plane");
         }
     }

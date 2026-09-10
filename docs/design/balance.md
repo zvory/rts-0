@@ -225,9 +225,10 @@ support readable gameplay, clear unit roles, and strong terrain identity without
 or regime-specific iconography.
 
 MVP scope:
-- No combat air forces. `scout_plane` is non-combat reconnaissance launched by the Command Car
-  Scout Plane ability. Each sortie has a 30-second total lifetime from launch, flies to a targeted
-  orbit, provides vision throughout transit and any remaining orbit time, and then disappears.
+- No combat air forces. `scout_plane` is non-combat reconnaissance launched by the Resource Depot
+  or Command Car Scout Plane ability. Each sortie has a 30-second total lifetime from launch, flies
+  to a targeted orbit, provides vision throughout transit and any remaining orbit time, and then
+  disappears.
 - Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
   early delayed-area fire tool.
 - No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
@@ -453,16 +454,19 @@ profiles and explicit activation/autocast policy instead of being folded into de
   non-armor-piercing falloff down to 20 damage at 2 tiles, including friendly fire.
 - Tanks, Scout Cars, and Command Cars do not consume oil while moving. Zero oil does not pause
   their path movement or prevent a stationary Tank from turning its hull toward an anti-armor hit.
-- Scout Plane constants for the Command Car Scout Plane ability:
-  `SCOUT_PLANE_COST_STEEL = 50`, `SCOUT_PLANE_COST_OIL = 75`,
+- Scout Plane constants retain the 50 Steel / 75 Oil reference value on the spawned unit definition.
+  Actual sortie prices are rounded to the nearest whole resource after applying the launcher
+  modifier: Resource Depot sorties cost 38 Steel / 56 Oil (25% less), while Command Car sorties
+  cost 63 Steel / 94 Oil (25% more).
+  The remaining Scout Plane constants are
   `SCOUT_PLANE_HP = 40`, `SCOUT_PLANE_SIGHT_TILES = 19`,
   `SCOUT_PLANE_SPEED_PX_PER_TICK = 2.6`, `SCOUT_PLANE_SUPPLY = 0`,
   `SCOUT_PLANE_ORBIT_RADIUS_TILES = 2`, `SCOUT_PLANE_LIFETIME_TICKS = 900`,
   and `SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = 900`. It has no default weapon and a zero-radius
   authoritative movement/collision body, so it neither reserves nor blocks ground pathing. The
-  client mirror uses a 48x34 px body and 17 px render size. Command Cars keep Breakthrough and add
-  Scout Plane on the `C` grid slot; after Scout Plane research completes, the ability launches
-  instantly from the selected Command Car without a Resource Depot requirement. Each Command Car
+  client mirror uses a 48x34 px body and 17 px render size. Command Cars keep Breakthrough, while
+  both Command Cars and Resource Depots expose Scout Plane on the `C` grid slot after Scout Plane
+  research completes. The ability launches instantly from the selected carrier. Each carrier
   tracks its own 30-second cooldown; active
   sorties are otherwise independent and every plane contributes aerial sight.
 - Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
@@ -524,11 +528,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
   takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
   cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
 - **Scout Plane** (Engineering Complex research, protocol id `scout_plane_unlock`): costs 50 steel /
-  100 oil and takes 600 ticks (~20s). Once complete, Command Cars owned by that player can use
-  their Scout Plane ability.
+  100 oil and takes 600 ticks (~20s). Once complete, Resource Depots and Command Cars owned by that
+  player can use their C-slot Scout Plane ability at their carrier-specific sortie price.
 - Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
-  catalog records carriers, target mode, ranges, cooldowns, charges, Steel/Oil cost, building and
-  upgrade requirements, queueability, autocast support, and command-card affordances;
+  catalog records carriers, target mode, ranges, cooldowns, charges, base and carrier-specific
+  Steel/Oil costs, building and upgrade requirements, queueability, autocast support, and
+  command-card affordances;
   `client/src/config.js` is mechanically checked
   against that registry for client-visible ability descriptors. Server execution maps those
   registry rows to a small set of sim-local effect hooks: legacy no-op, owned area status, delayed
@@ -656,7 +661,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
 | rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 900-tick (~30s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind) and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; the rack tubes darken during the cooldown; Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
 | scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
-| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 50  | 75  | 0   | 0; launched instantly from a selected ready Command Car without a Resource Depot requirement; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second caster-local cooldown, no ground collision reservation, and 48x34 px client render body |
+| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 50  | 75  | 0   | 0; spawned-unit reference value is 50/75, while instant sorties cost 38 Steel / 56 Oil from a Resource Depot or 63 Steel / 94 Oil from a Command Car; both use the C slot after research; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second carrier-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 175 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 85  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |

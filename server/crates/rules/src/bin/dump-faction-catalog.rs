@@ -108,6 +108,8 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
             ability.title,
         );
         print_kind_array_inline(ability.carriers);
+        print!(",\"carrierCosts\":");
+        print_carrier_costs(*ability);
         print!(
             ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"chargeRechargeTicks\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"upgradeRequirement\":{},\"mayQueue\":{},\"queuePolicy\":\"{}\",\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
             ability.target_mode.stable_id(),
@@ -164,6 +166,31 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
     print_client_config(&child_indent);
     println!();
     print!("{indent}}}");
+}
+
+fn print_carrier_costs(ability: faction::AbilityCatalogEntry) {
+    let overrides: Vec<_> = ability
+        .carriers
+        .iter()
+        .copied()
+        .filter_map(|carrier| {
+            let cost = faction::ability_cost_for_carrier(ability.kind, carrier);
+            (cost != ability.cost).then_some((carrier, cost))
+        })
+        .collect();
+    print!("{{");
+    for (index, (carrier, cost)) in overrides.iter().enumerate() {
+        if index > 0 {
+            print!(",");
+        }
+        print!(
+            "\"{}\":{{\"steel\":{},\"oil\":{}}}",
+            carrier.stable_id(),
+            cost.steel,
+            cost.oil
+        );
+    }
+    print!("}}");
 }
 
 fn print_client_config(indent: &str) {
