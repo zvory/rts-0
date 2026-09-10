@@ -472,7 +472,7 @@ await withFakeDocument(async () => {
 {
   assertDeepEqual(
     labSpawnFactionOptions().map((entry) => entry.id),
-    ["kriegsia", "ekat"],
+    ["kriegsia", "cultivators", "ekat"],
     "LabPanel spawn palette exposes product-playable faction catalogs",
   );
   assert(
@@ -504,7 +504,7 @@ await withFakeDocument(async () => {
   );
   assertDeepEqual(
     labBuildingSpawnFactionOptions().map((entry) => entry.id),
-    ["kriegsia", "ekat"],
+    ["kriegsia", "cultivators", "ekat"],
     "LabPanel building spawn palette exposes product-playable faction catalogs",
   );
   assert(

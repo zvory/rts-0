@@ -1,6 +1,7 @@
 import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "../protocol.js";
 import {
   ABILITIES,
+  STATS,
   CULTIVATORS_FACTION_ID,
   EKAT_FACTION_ID,
   FIXTURE_FACTION_ID,
@@ -119,11 +120,13 @@ export const FACTION_CATALOGS = Object.freeze({
   }),
   [CULTIVATORS_FACTION_ID]: freezeCatalog({
     id: CULTIVATORS_FACTION_ID,
-    loadoutId: "cultivators.unavailable",
-    units: [],
-    buildings: [],
-    buildables: [],
-    trainables: {},
+    loadoutId: "cultivators.standard",
+    units: [KIND.WORKER],
+    buildings: [KIND.RESOURCE_DEPOT, KIND.STEEL_MINE, KIND.PUMP_JACK],
+    buildables: [KIND.RESOURCE_DEPOT],
+    trainables: {
+      [KIND.RESOURCE_DEPOT]: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK],
+    },
     research: {},
     abilities: [],
   }),
@@ -161,4 +164,11 @@ export function commandCardAbilitiesForFaction(factionId) {
     .abilities
     .map((ability) => ABILITIES[ability])
     .filter((entry) => entry && entry.commandCard !== false);
+}
+
+// Presentation aliases preserve the shared simulation and renderer identity.
+const NEXUS_STATS = Object.freeze({ ...STATS[KIND.RESOURCE_DEPOT], label: "Nexus" });
+export function statsForFaction(kind, factionId) {
+  return factionId === CULTIVATORS_FACTION_ID && kind === KIND.RESOURCE_DEPOT
+    ? NEXUS_STATS : STATS[kind];
 }

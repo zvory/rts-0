@@ -1,6 +1,7 @@
 import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
   STATS,
+  statsForFaction,
   UPGRADES,
   WORKER_BUILD_CARD_SLOTS,
   commandCardAbilitiesForFaction,
@@ -268,7 +269,7 @@ export function buildWorkerBuildCard(ctx) {
       slots.push(null);
       continue;
     }
-    const st = STATS[kind];
+    const st = statsForFaction(kind, factionId);
     if (!st) continue;
     const availability = buildAvailability(ctx, kind, resources);
     sigParts.push(`${kind}:${availability}`);

@@ -114,6 +114,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "factionCatalog",
   "isProducerBuilding",
   "researchableUpgradesForFaction",
+  "statsForFaction",
   "trainableUnitsForFaction",
   "workerBuildablesForFaction",
 ]);

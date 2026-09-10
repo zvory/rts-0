@@ -261,8 +261,8 @@ import { textWithin } from "./dom_text.mjs";
   assert(countdownSoundId("Go", 0, 1) === null, "non-countdown words stay silent");
   assertDeepEqual(
     LOBBY_SELECTABLE_FACTIONS,
-    [{ id: "kriegsia", label: "Kriegsia" }],
-    "beta lobby faction selector exposes only playable Kriegsia",
+    [{ id: "kriegsia", label: "Kriegsia" }, { id: "cultivators", label: "Cultivators" }],
+    "beta lobby faction selector exposes Kriegsia and Cultivators",
   );
   assert(
     betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }) &&
@@ -456,10 +456,11 @@ import { textWithin } from "./dom_text.mjs";
     );
     assert(
       factionSelectors.length === 1 &&
-        factionSelectors[0].children.length === 1 &&
+        factionSelectors[0].children.length === 2 &&
         factionSelectors[0].children[0].value === "kriegsia" &&
-        factionSelectors[0].children[0].textContent === "Kriegsia",
-      "beta lobby restores a one-option Kriegsia faction dropdown and hides Ekat and Cultivators",
+        factionSelectors[0].children[0].textContent === "Kriegsia" &&
+        factionSelectors[0].children[1].value === "cultivators",
+      "beta lobby offers Kriegsia and Cultivators and hides Ekat",
     );
     assert(
       !factionSelectors[0].disabled &&
@@ -492,11 +493,11 @@ import { textWithin } from "./dom_text.mjs";
     )[0];
     assert(
       hiddenFactionSelector.value === "ekat" &&
-        hiddenFactionSelector.children.length === 2 &&
+        hiddenFactionSelector.children.length === 3 &&
         hiddenFactionSelector.children[0].value === "ekat" &&
         hiddenFactionSelector.children[0].disabled &&
         hiddenFactionSelector.children[1].value === "kriegsia",
-      "a local hidden-faction seat shows its current value but offers only Kriegsia as a destination",
+      "a local hidden-faction seat shows its current value but offers Kriegsia and Cultivators as destinations",
     );
     hiddenFactionSelector.value = "kriegsia";
     hiddenFactionSelector.listeners.change();

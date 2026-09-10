@@ -130,3 +130,5 @@ export {
   trainableUnitsForFaction,
   workerBuildablesForFaction,
 } from "./config/factions.js";
+
+export { statsForFaction } from "./config/factions.js";

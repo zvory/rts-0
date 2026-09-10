@@ -43,7 +43,7 @@ Lifecycle status is explicit and separate from catalog existence:
 | --- | --- | --- |
 | `kriegsia` | playable | Default faction for missing non-replay requests. Supported by normal human lobby, AI seats, dev starts, self-play defaults, replay/branch records, match-history replay, post-match replay, spectator metadata, and local prediction when version/build metadata is compatible. |
 | `ekat` | playable | Hidden from the normal lobby faction selector while its existing catalog, Lab palette, and internal wire selection remain available. Explicit playable validation accepts it for start/replay-capable contexts, and schema 3 replay records plus replay-branch metadata may carry it. Public AI seat creation has no faction selector and still defaults to `kriegsia`; current local prediction is disabled when the local player is `ekat`. |
-| `cultivators` | reserved/future | Empty authoritative and mirrored catalog shells exist with the `cultivators.unavailable` loadout, but the id is absent from product selectors and rejected by normal lobby, AI, replay, branch, dev scenario, self-play, match-history, post-match replay, prediction, and fixture admission. |
+| `cultivators` | playable | Economy-only catalog: Nexus (shared ResourceDepot), Engineer, Steel Mine and Oil Pumpjack. Standard economy loadout without Riflemen; human beta/local selector enabled, normal playable lifecycle policy applies. No new AI profile; prediction remains unsupported. |
 | `phase2_empty_fixture` | test-fixture-only | Catalog and loadout exist for explicit Rust/test fixture coverage. It is rejected by normal lobby, AI, replay, branch, dev scenario, self-play, match-history, and post-match paths unless the caller uses the `TestFixture` validation context or a direct lower-level sim test helper that deliberately owns the fixture. |
 | `plans/archive/faction/*` | historical-only | Archived phase plans, handoffs, and lifecycle matrices are not active faction policy and are not checker lifecycle inputs. |
 
@@ -101,7 +101,7 @@ Zamok and one Ekat hero, with no starting Steel/Oil or Supply requirement. Zamok
 the current Ekat economy and recovery slice. The
 `phase2_empty_fixture.scout_depot` loadout starts one Depot and one Scout Car for explicit
 fixture tests only; catalog existence does not make that id product-playable.
-The reserved `cultivators.unavailable` loadout contains zero starting resources and no entities.
+The `cultivators.standard` loadout reuses Kriegsia starting resources and economy entities, without Riflemen.
 It is structural catalog paperwork only and cannot reach simulation setup through a validated
 lifecycle path.
 
@@ -152,10 +152,10 @@ keeps the ability visible but disabled with the missing-tech reason until that b
 
 The command-card renderer is local JS in `client/src/hud_command_card.js`; faction-sensitive
 build, train, research, and ability descriptors are driven by the checked catalog mirror in
-`client/src/config.js`. Kriegsia and Ekat command ids are namespaced by faction, unknown valid ids
-fail closed to an empty catalog, and fixture plus reserved Cultivators catalogs expose no command
-surface. The beta/local human-seat selector currently lists only Kriegsia; Ekat and Cultivators are
-hidden. `node tests/hud_command_card.mjs`
+`client/src/config.js`. Kriegsia, Ekat and Cultivators command ids are namespaced by faction, unknown valid ids
+fail closed to an empty catalog, and fixture catalogs expose no command
+surface. Cultivators exposes Nexus construction and Engineer production with automatic extractors.
+The beta/local human-seat selector lists Kriegsia and Cultivators; Ekat is hidden. `node tests/hud_command_card.mjs`
 is the focused command-card guard, and `node scripts/check-faction-catalog-parity.mjs` compares
 client-exposed descriptor data against the Rust catalog dump.
 
@@ -184,9 +184,9 @@ Later phases must update this section whenever they touch one of those lifecycle
 
 | Path | Faction source | Allowed factions | AI behavior | Prediction behavior | Replay/branch behavior | Tests or checks |
 | --- | --- | --- | --- | --- | --- | --- |
-| Normal lobby start | `LobbyPlayer.factionId` and `PlayerInit.faction_id`, defaulted by `lobby::faction_validation` | Product selector exposes only `kriegsia`; internal explicit `ekat` remains accepted; Cultivators, fixture, and unknown ids reject | No AI assignment by `setFaction`; AI seats are separate | Enabled only for local Kriegsia when build/version metadata is compatible | Schema 2 records player faction id plus per-player loadout record | `tests/faction_integration.mjs`, `tests/prediction_controller.mjs`, `server/src/lobby/faction_validation.rs` tests |
+| Normal lobby start | `LobbyPlayer.factionId` and `PlayerInit.faction_id`, defaulted by `lobby::faction_validation` | Product selector exposes `kriegsia` and `cultivators`; internal explicit `ekat` remains accepted; fixture and unknown ids reject | No AI assignment by `setFaction`; AI seats are separate | Enabled only for local Kriegsia when build/version metadata is compatible | Schema 2 records player faction id plus per-player loadout record | `tests/faction_integration.mjs`, `tests/prediction_controller.mjs`, `server/src/lobby/faction_validation.rs` tests |
 | AI add/remove/start | AI `PlayerInit.faction_id`, created by public `addAi` | Public AI seats default to `kriegsia`; no public Ekat selector | Kriegsia-only through public lobby controls | Not applicable | Schema 2 records AI faction and per-player loadout if match starts | `tests/ai_integration.mjs`, `tests/server_integration.mjs` |
-| Fixture/dev faction start | Explicit Rust test/dev harness only | `phase2_empty_fixture` only in `TestFixture` validation or direct lower-level tests; Cultivators rejects even in fixture context | Rejected unless a later phase explicitly adds fixture AI | Disabled when local fixture player is unsupported | Fixture ids stay in explicit test artifacts only | `server/crates/sim/src/game/setup/tests.rs`, `tests/prediction_controller.mjs`, `scripts/check-faction-assumptions.mjs` |
+| Fixture/dev faction start | Explicit Rust test/dev harness only | `phase2_empty_fixture` only in `TestFixture` validation or direct lower-level tests; playable catalogs reject in fixture-only context | Rejected unless a later phase explicitly adds fixture AI | Disabled when local fixture player is unsupported | Fixture ids stay in explicit test artifacts only | `server/crates/sim/src/game/setup/tests.rs`, `tests/prediction_controller.mjs`, `scripts/check-faction-assumptions.mjs` |
 | Replay playback | `ReplayArtifactV1.players[].faction_id` and `playerLoadouts[]` in artifact schema 3 | Recorded playable ids `kriegsia` or `ekat`; missing, unknown, and fixture ids reject | From artifact only | Disabled for replay viewers | Schema 3 restores a checkpoint-backed start state; schema 2 and older artifacts reject; never lobby state | `server/crates/sim/src/game/replay.rs` tests, `server/src/lobby/room_task.rs` replay tests |
 | Replay branch staging/launch | Branch seed seats copy recorded `factionId` from replay players | Recorded playable ids `kriegsia` or `ekat`; unsupported seat faction ids reject before live launch | From recorded branch seed only | Disabled unless supported by branch schema/WASM | Reconstruct from branch seed and cloned keyframe | `server/src/lobby/room_task.rs` tests, `tests/protocol_parity.mjs` |
 | Dev scenarios | Scenario definition plus validation/defaulting | Current bundled scenarios default to Kriegsia; explicit playable ids may be accepted by an owning scenario | Not applicable unless scenario declares AI | Enabled only for local Kriegsia | Not replayed unless scenario recording exists | `server/crates/sim/src/game/setup/dev_scenarios/tests.rs`, `docs/context/testing.md` |

@@ -2,74 +2,80 @@ use super::*;
 
 #[test]
 fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
-    let map = flat_map(16);
-    let mut entities = EntityStore::new();
-    let (wx, wy) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
-    let worker = entities
-        .spawn_unit(1, EntityKind::Worker, wx, wy)
-        .expect("worker should spawn");
-    let spatial = SpatialIndex::build(&entities, map.width, map.height);
-    let occ = Occupancy::build(&map, &entities);
-    let mut pathing = PathingService::new(1024, 32);
-    pathing.advance_tick(1);
-    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-    let mut players = vec![player_state(1)];
-    let mut fog = Fog::new(map.width, map.height);
-    fog.recompute(&[1], &entities, &map);
-    let mut smokes = SmokeCloudStore::new();
-    let mut ability_runtime = AbilityRuntime::new();
-    let mut mortar_shells = MortarShellStore::default();
-    let mut artillery_shells = ArtilleryShellStore::default();
-    let mut firing_reveals = Vec::new();
-    let mut events: HashMap<u32, Vec<Event>> = players
-        .iter()
-        .map(|player| (player.id, Vec::new()))
-        .collect();
+    for faction_id in [
+        crate::rules::faction::DEFAULT_FACTION_ID,
+        crate::rules::faction::CULTIVATORS_FACTION_ID,
+    ] {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, wx, wy)
+            .expect("worker should spawn");
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(1024, 32);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let mut players = vec![player_state(1)];
+        players[0].faction_id = faction_id.to_string();
+        let mut fog = Fog::new(map.width, map.height);
+        fog.recompute(&[1], &entities, &map);
+        let mut smokes = SmokeCloudStore::new();
+        let mut ability_runtime = AbilityRuntime::new();
+        let mut mortar_shells = MortarShellStore::default();
+        let mut artillery_shells = ArtilleryShellStore::default();
+        let mut firing_reveals = Vec::new();
+        let mut events: HashMap<u32, Vec<Event>> = players
+            .iter()
+            .map(|player| (player.id, Vec::new()))
+            .collect();
 
-    apply_commands(
-        &map,
-        &mut entities,
-        &mut players,
-        &spatial,
-        &mut coordinator,
-        &fog,
-        &BuildingMemory::default(),
-        &mut smokes,
-        &mut ability_runtime,
-        &mut mortar_shells,
-        &mut artillery_shells,
-        &mut firing_reveals,
-        normal_pending(vec![(
+        apply_commands(
+            &map,
+            &mut entities,
+            &mut players,
+            &spatial,
+            &mut coordinator,
+            &fog,
+            &BuildingMemory::default(),
+            &mut smokes,
+            &mut ability_runtime,
+            &mut mortar_shells,
+            &mut artillery_shells,
+            &mut firing_reveals,
+            normal_pending(vec![(
+                1,
+                SimCommand::Build {
+                    units: vec![worker],
+                    building: EntityKind::ResourceDepot,
+                    tile_x: 4,
+                    tile_y: 4,
+                    queued: false,
+                },
+            )]),
+            &mut events,
             1,
-            SimCommand::Build {
-                units: vec![worker],
-                building: EntityKind::ResourceDepot,
-                tile_x: 4,
-                tile_y: 4,
-                queued: false,
-            },
-        )]),
-        &mut events,
-        1,
-    );
+        );
 
-    let worker = entities.get(worker).expect("worker should remain alive");
-    assert!(
-        matches!(worker.order(), Order::Build(_)),
-        "worker should keep the accepted build order"
-    );
-    let goal = worker
-        .path_goal()
-        .expect("build order should set a staging goal");
-    let goal_tile = map.tile_of(goal.0, goal.1);
-    assert!(
-        !footprint_tiles(EntityKind::ResourceDepot, 4, 4).contains(&goal_tile),
-        "build-over-self order should stage outside the requested footprint"
-    );
-    assert!(
-        events.get(&1).is_none_or(Vec::is_empty),
-        "valid build-over-self intent should not emit a failure notice"
-    );
+        let worker = entities.get(worker).expect("worker should remain alive");
+        assert!(
+            matches!(worker.order(), Order::Build(_)),
+            "worker should keep the accepted build order"
+        );
+        let goal = worker
+            .path_goal()
+            .expect("build order should set a staging goal");
+        let goal_tile = map.tile_of(goal.0, goal.1);
+        assert!(
+            !footprint_tiles(EntityKind::ResourceDepot, 4, 4).contains(&goal_tile),
+            "build-over-self order should stage outside the requested footprint"
+        );
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "valid build-over-self intent should not emit a failure notice"
+        );
+    }
 }
 
 #[test]
