@@ -119,10 +119,7 @@ fn destroyed_depot_does_not_refund_linked_extractor_construction() {
     );
     game.tick();
 
-    assert_eq!(
-        game.state.players[0].steel,
-        starting_steel
-    );
+    assert_eq!(game.state.players[0].steel, starting_steel);
     let scaffold = game
         .state
         .entities
@@ -144,8 +141,7 @@ fn destroyed_depot_does_not_refund_linked_extractor_construction() {
     assert!(game.state.entities.get(resource_depot).is_none());
     assert!(game.state.entities.get(scaffold).is_none());
     assert_eq!(
-        game.state.players[0].steel,
-        starting_steel,
+        game.state.players[0].steel, starting_steel,
         "extractor construction destroyed with its producer must not be refunded"
     );
 }

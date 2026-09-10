@@ -279,8 +279,8 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         .buildings_lost
         .iter()
         .any(|row| row.kind == "depot" && row.count == 1 && row.steel_value > 0));
-    let expected_steel =
-        economy_rules::cost(EntityKind::Worker).0 + economy_rules::cost(EntityKind::Depot).0
+    let expected_steel = economy_rules::cost(EntityKind::Worker).0
+        + economy_rules::cost(EntityKind::Depot).0
         + economy_rules::cost(EntityKind::PumpJack).0;
     let expected_oil =
         economy_rules::cost(EntityKind::Worker).1 + economy_rules::cost(EntityKind::Depot).1;
