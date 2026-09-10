@@ -201,12 +201,10 @@ fn dev_scenario_case_matrix_html(
     let mut cases = Vec::new();
     let mut unit_options = String::new();
     for launch in launches {
-        let Some(case) = launch.case else {
-            continue;
-        };
-        if !cases.contains(&case) {
-            cases.push(case);
+        if !cases.contains(&launch.case) {
+            cases.push(launch.case);
         }
+        let case = launch.case.unwrap_or("");
         unit_options.push_str(&format!(
             "<option value=\"{}\" data-case=\"{}\">{}</option>",
             launch.unit,
@@ -217,11 +215,9 @@ fn dev_scenario_case_matrix_html(
 
     let mut case_options = String::new();
     for case in cases {
-        case_options.push_str(&format!(
-            "<option value=\"{}\">{}</option>",
-            case,
-            dev_scenario_case_label(case)
-        ));
+        let value = case.unwrap_or("");
+        let label = case.map(dev_scenario_case_label).unwrap_or("default");
+        case_options.push_str(&format!("<option value=\"{}\">{}</option>", value, label));
     }
 
     let default_case = first.case.unwrap_or("");
@@ -349,5 +345,12 @@ mod tests {
         assert!(html.contains("/dev/scenarios?id=tank_coax_inspection&unit=tank&count=1"));
         assert!(html.contains("Attack-Move Reload Acquisition"));
         assert!(html.contains("/dev/scenarios?id=attack_move_reload_acquisition&unit=tank&count=1"));
+        assert!(html.contains("Warrior Combat Scenarios"));
+        assert!(html.contains("<option value=\"\">default</option>"));
+        assert!(html.contains("<option value=\"entrenched_riflemen\">entrenched Riflemen</option>"));
+        assert!(html.contains("<option value=\"warrior\" data-case=\"\">warrior</option>"));
+        assert!(html.contains(
+            "<option value=\"warrior\" data-case=\"entrenched_riflemen\">warrior</option>"
+        ));
     }
 }

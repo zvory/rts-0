@@ -999,9 +999,8 @@ pub fn dev_scenario_case_label(case: &str) -> &'static str {
         TANK_TRAP_PATHING_CASE_ENEMY_VEHICLE_REROUTE => "enemy vehicle reroute",
         TANK_TRAP_PATHING_CASE_INFANTRY_PASS_THROUGH => "infantry pass-through",
         TANK_TRAP_PATHING_CASE_EXPLICIT_INFANTRY_ATTACK => "explicit infantry attack",
-        _ => replay_281_tank_gap::case_label(case)
-            .or_else(|| warrior_portal_duel::case_label(case))
-            .unwrap_or("case"),
+        warrior_portal_duel::CASE_ENTRENCHED_RIFLEMEN => "entrenched Riflemen",
+        _ => replay_281_tank_gap::case_label(case).unwrap_or("case"),
     }
 }
 
@@ -1016,6 +1015,7 @@ pub fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
         EntityKind::ScoutCar => "scout car",
         EntityKind::Tank => "tank",
         EntityKind::CommandCar => "command car",
+        EntityKind::Warrior => "warrior",
         _ => "unit",
     }
 }

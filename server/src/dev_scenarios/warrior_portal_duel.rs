@@ -35,6 +35,33 @@ pub(super) fn parse_case(case: Option<&str>) -> Option<Option<&'static str>> {
     }
 }
 
-pub(super) fn case_label(case: &str) -> Option<&'static str> {
-    (case == CASE_ENTRENCHED_RIFLEMEN).then_some("entrenched Riflemen")
+#[cfg(test)]
+mod tests {
+    use super::super::{parse_dev_scenario_launch_with_case, parse_dev_scenario_room};
+    use super::*;
+
+    #[test]
+    fn warrior_combat_cases_parse_only_supported_launches() {
+        let default =
+            parse_dev_scenario_launch_with_case("warrior_portal_duel", "warrior", "1", None, None)
+                .expect("default Warrior Portal duel");
+        assert_eq!(default.case, None);
+
+        let entrenched = parse_dev_scenario_room(
+            "warrior_portal_duel:unit=warrior:count=1:case=entrenched_riflemen",
+        )
+        .expect("entrenched Riflemen case");
+        assert_eq!(entrenched.case, Some(CASE_ENTRENCHED_RIFLEMEN));
+
+        assert_eq!(
+            parse_dev_scenario_launch_with_case(
+                "warrior_portal_duel",
+                "warrior",
+                "1",
+                None,
+                Some("unsupported"),
+            ),
+            None
+        );
+    }
 }
