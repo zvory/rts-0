@@ -1271,11 +1271,11 @@ adapter exception. New command/order service edges therefore need both an exact 
 entry and a role-matrix justification.
 
 `services::scout_plane` is a mutation helper for the Scout Plane aerial unit. Command admission
-calls it from the Command Car `scoutPlane` ability after validating a selected owned Command Car,
-player resources, and that Command Car's cooldown. The helper records the
-source Command Car, spawns the plane there, flies it to the clicked point, starts a 20-second total
-lifetime at launch, and despawns it when that timer expires whether or not it reached the orbit. Scout Plane sorties have no Resource
-Depot dependency or return leg. Live fog recompute stamps Scout Plane sight as team aerial vision that ignores terrain
+calls it from the `scoutPlane` ability after validating a selected owned Resource Depot or Command
+Car, that carrier's sortie price, and that carrier's cooldown. The helper spawns the plane at the
+carrier, records Command Car provenance when applicable, flies it to the clicked point, starts a
+30-second total lifetime at launch, and despawns it when that timer expires whether or not it
+reached the orbit. Scout Plane sorties have no return leg. Live fog recompute stamps Scout Plane sight as team aerial vision that ignores terrain
 and building line-of-sight blockers while still using active smoke clouds as blockers.
 
 `game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.
@@ -1324,7 +1324,7 @@ before the gun can engage them.
 
 Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Range to buildings is measured from the attacker's center to the closest point on the authoritative building footprint; range to non-building entities remains center-to-center. Building acquisition broadphase queries include the maximum building half-extent so a footprint inside range is discoverable even when its indexed center is not. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, using the closest footprint-boundary point for buildings, stops to fire, and repaths if the same target moves out of range; it never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward.
 
-After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the Engineering Complex, Command Cars activate Scout Plane on the C grid slot for 50 Steel and 75 Oil. Activation launches immediately from a selected ready Command Car without a Resource Depot requirement and starts a 30-second cooldown on that Command Car. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear the selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
+After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the Engineering Complex, Resource Depots and Command Cars activate Scout Plane on the C grid slot. A Resource Depot sortie costs 38 Steel / 56 Oil; a Command Car sortie costs 63 Steel / 94 Oil. Activation launches immediately from a selected ready carrier and starts that carrier's 30-second cooldown. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear a selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
 Group move formation assignment chooses one bounded, locally connected landing patch before issuing
 per-unit goals, avoiding command-time A* probes outside the move coordinator pathing budget. The

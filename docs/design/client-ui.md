@@ -1925,16 +1925,16 @@ under construction shows a dedicated construction card with Cancel in the bottom
 An unfinished production building also shows its production buttons with primary training disabled,
 while Alt/Ctrl/Shift production hotkeys can assign standing repeat production for after completion;
 click selection prefers the scaffold over an overlapping builder, and cancellation returns the full
-construction cost. The Scout Plane affordance
-is a Command Car world-point ability on the `C` grid slot, beside Breakthrough. It unlocks after
-the Scout Plane Engineering Complex research completes, costs 50 steel and 75 oil, has no Resource Depot requirement,
-disables while that Command Car has an active Scout
-Plane or its 30-second cooldown is running, and issues immediately rather than entering a
-building production queue. Scout Planes are hit-testable for hover/readout purposes but normal
+construction cost. The Scout Plane affordance is a Resource Depot and Command Car world-point
+ability on the `C` grid slot (beside Breakthrough on the Command Car). It unlocks after the Scout
+Plane Engineering Complex research completes, costs 38 steel / 56 oil from a Resource Depot or 63
+steel / 94 oil from a Command Car, disables while that carrier has an active Scout Plane cooldown,
+and issues immediately rather than entering a building production queue. Scout Planes are
+hit-testable for hover/readout purposes but normal
 selection, box selection, control groups, right-click commands, and command-card descriptors filter
 them out, so they are unselectable and uncontrollable in live play. While the Scout Plane ability is
-armed, the ground overlay draws an advisory line from the launching Command Car to the cursor and a
-dotted ring around the car for the plane's maximum 20-second travel distance; targets outside that
+armed, the ground overlay draws an advisory line from the launching carrier to the cursor and a
+dotted ring around the carrier for the plane's maximum 30-second travel distance; targets outside that
 ring remain valid and produce sorties that expire before arrival.
 Unit abilities remain on their declared grid slots in mixed selections rather than spilling into an
 unrelated empty hotkey. When abilities collide, Artillery Fire has the lowest command-card
@@ -2205,7 +2205,7 @@ Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
   each eligible carrier. Scout Plane instead derives its advisory ring from plane speed multiplied
   by its total lifetime; the ring does not clamp or reject farther targets.
 - `rangeOrigins` keeps normal range rings tied to carrier units, while `pathOrigins` adds the
-  Command Car-to-cursor Scout Plane route and can add server-projected origins such as Magic Anchors
+  carrier-to-cursor Scout Plane route and can add server-projected origins such as Magic Anchors
   for multi-origin line-shot previews.
 - `returnMarkers` can draw owner-visible dash-return markers while the dash ability is armed.
 - Artillery Fire draws the current artillery cone when the clicked center is in range and inside a
