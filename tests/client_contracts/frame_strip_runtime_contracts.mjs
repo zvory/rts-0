@@ -10,6 +10,25 @@ import { _frameStripMovementVisual } from "../../client/src/renderer/units.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/machine_gunner_png_strip.js";
 import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_png_strip.js";
+import { WARRIOR_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/warrior_png_strip.js";
+
+assert(WARRIOR_PNG_FRAME_STRIP.frameCount === 6, "Warrior placeholder exposes six consistent atlas cells");
+assert(
+  frameStripFrameIndex(
+    WARRIOR_PNG_FRAME_STRIP,
+    { id: 6, kind: KIND.WARRIOR, state: STATE.ATTACK },
+    { recoilProgress: 1, recoilPhase: 0.2, recoilWeaponKind: WEAPON_KIND.WARRIOR_SWORD },
+  ) === 5,
+  "Warrior sword attack selects the authored swipe frame",
+);
+assert(
+  frameStripFrameIndex(
+    WARRIOR_PNG_FRAME_STRIP,
+    { id: 6, kind: KIND.WARRIOR, state: STATE.ATTACK },
+    { recoilProgress: 1, recoilPhase: 0.2, recoilWeaponKind: WEAPON_KIND.RIFLEMAN_RIFLE },
+  ) === 0,
+  "Warrior swipe art fails closed for non-sword attack feedback",
+);
 
 const deployedMachineGunner = {
   id: 7,

@@ -294,7 +294,8 @@ fn nearest_public_enemy_base(observation: &AiObservation) -> Option<EnemyBaseFac
 
 fn is_combat_unit(kind: EntityKind) -> bool {
     match kind {
-        EntityKind::Rifleman
+        EntityKind::Warrior
+        | EntityKind::Rifleman
         | EntityKind::Panzerfaust
         | EntityKind::MachineGunner
         | EntityKind::AntiTankGun

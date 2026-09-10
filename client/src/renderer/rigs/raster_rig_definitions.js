@@ -153,6 +153,15 @@ const MACHINE_GUNNER_DEFINITION = definition({
   animations: [],
 });
 
+const WARRIOR_DEFINITION = definition({
+  id: "warrior.raster",
+  kind: KIND.WARRIOR,
+  parts: [ellipseShadow("part.shadow", 0, 4.2, 13.5, 8.1)],
+  anchors: { origin: { x: 0, y: 0 }, selection: { x: 0, y: 0 }, hp: { x: 0, y: -23 } },
+  bounds: { selection: { x: -19, y: -19, width: 38, height: 38 }, hp: { x: -14, y: -25, width: 28, height: 6 } },
+  animations: [],
+});
+
 const SCOUT_PLANE_DEFINITION = definition({
   id: "scout-plane.raster",
   kind: KIND.SCOUT_PLANE,
@@ -366,6 +375,7 @@ const RASTER_DEFINITION_ENTRIES = Object.freeze([
   [KIND.ANTI_TANK_GUN, ANTI_TANK_GUN_DEFINITION],
   [KIND.ARTILLERY, ARTILLERY_DEFINITION],
   [KIND.MACHINE_GUNNER, MACHINE_GUNNER_DEFINITION],
+  [KIND.WARRIOR, WARRIOR_DEFINITION],
   [KIND.MORTAR_TEAM, MORTAR_TEAM_DEFINITION],
   [LOADED_RIFLEMAN_RIG_KEY, PANZERFAUST_DEFINITION],
   [KIND.RIFLEMAN, RIFLEMAN_DEFINITION],
@@ -379,6 +389,7 @@ const RASTER_PART_ENTRIES = Object.freeze([
   [KIND.ANTI_TANK_GUN, { shadow: ["part.shadow"], unit: atlasSourceParts(ANTI_TANK_GUN_PNG_RIG_ATLAS) }],
   [KIND.ARTILLERY, { shadow: ["part.shadow"], unit: [...atlasSourceParts(ARTILLERY_PNG_RIG_ATLAS), ...ARTILLERY_FLASH_IDS] }],
   [KIND.MACHINE_GUNNER, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
+  [KIND.WARRIOR, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
   [KIND.MORTAR_TEAM, { shadow: ["part.shadow"], unit: atlasSourceParts(MORTAR_TEAM_PNG_RIG_ATLAS) }],
   [LOADED_RIFLEMAN_RIG_KEY, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
   [KIND.RIFLEMAN, { shadow: ["part.shadow"], unit: ["raster.frame"] }],

@@ -586,6 +586,15 @@ assert(
     "generic Panzerfaust attack events stay silent instead of reusing rifle or tank sounds",
   );
   assert(
+    defaultWeaponKindForAttackerKind(KIND.WARRIOR) === WEAPON_KIND.WARRIOR_SWORD &&
+      attackFeedbackKind(KIND.WARRIOR, WEAPON_KIND.WARRIOR_SWORD) === KIND.WARRIOR,
+    "Warrior attack feedback resolves to its sword instead of a ranged weapon",
+  );
+  assert(
+    !attackKindHasCombatSound(KIND.WARRIOR, WEAPON_KIND.WARRIOR_SWORD),
+    "placeholder Warrior sword attacks stay silent instead of reusing rifle audio",
+  );
+  assert(
     panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_LAUNCH) === PANZERFAUST_LAUNCH_SOUND_ID,
     "Panzerfaust launch events map to a dedicated launch cue",
   );

@@ -21,7 +21,7 @@ Status: Phase 0 and Phase 1 complete; implementation authorized by the originati
   Rifleman-only research or entrenchment behavior.
 - **Availability:** Normal Cultivator unit trained at a completed Portal with no prerequisite.
   Lab/Interact spawning is supported. Existing AI profiles do not train it in the first pass.
-- **Visual direction:** A clearly placeholder, matte-white/off-white armored swordsman sprite that
+- **Visual direction:** A clearly placeholder, matte-white/off-white unarmored Chinese swordsman sprite that
   can receive runtime team tint, rendered 50% larger in radius than a Rifleman. The attack pose
   reads as a sword swipe; projectile, muzzle-flash, and tracer presentation are prohibited.
 - **Patch-note draft:** Cultivator Portals can now train Warriors: 100 Steel, 2 Supply, 135 HP, and a
@@ -39,7 +39,7 @@ Known unknowns: final art, audio, AI composition, and post-playtest balance tuni
 | Build hotkey | Portal grid slot 1 (`Q`) |
 | Build time | 300 ticks (~10 seconds), matching Rifleman |
 | Prerequisite | None beyond owning a completed Portal |
-| HP / armor | 135 HP (3x Rifleman's 45); Small armor classification |
+| HP / armor | 135 HP (3x Rifleman's 45); Small armor classification, with an unarmored visual |
 | Sight | 11 tiles, matching Rifleman |
 | Collision / selection / render radius | 13.5 px (1.5x Rifleman's 9 px) |
 | Movement | 1.6 px/tick ordinary ground movement and pathing, matching Rifleman |
@@ -61,7 +61,7 @@ existing mirrored protocol vocabularies; no new command, snapshot field, or even
 
 ## Deferred checklist
 
-- Final multi-frame Warrior art and bespoke audio.
+- Final non-placeholder Warrior art and bespoke audio.
 - Cultivator AI production/composition and matchup tuning.
 - Post-playtest cost, durability, reach, cadence, and armor-penetration tuning.
 - Archer brief and implementation; it is explicitly outside this unit pass.

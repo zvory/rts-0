@@ -629,6 +629,8 @@ AI, self-play and dev contexts. Explicit `kriegsia`, `ekat` and `cultivators` re
 playable lifecycle policy; the `phase2_empty_fixture` test fixture and unknown ids remain restricted. Cultivators uses the
 `cultivators.standard` loadout; Nexus is a faction-specific presentation name for
 `resource_depot`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
+Cultivator Warriors use the dedicated `warrior` entity kind (compact kind code 29); their generic
+attack events carry the `warrior_sword` weapon hint (compact weapon-kind code 12).
 
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
 field does not make a faction playable. Fixture-only, reserved/future, and historical-only ids must
@@ -932,14 +934,14 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage` |
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets` |
-| `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax` |
+| `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[10, to]` overpenetration damage, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[15, to]` missed direct shot (14 removed with conversion) |
 
@@ -1182,7 +1184,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "attack", from: u32, to: u32,
   reveal?: { owner: u32, kind: string, x: f32, y: f32, facing?: f32, weaponFacing?: f32, setupState?: string },
   toPos?: [f32, f32],
-  weaponKind?: "worker_tools"|"golem_fists"|"rifleman_rifle"|"machine_gunner_mg"|"scout_car_mg"|"anti_tank_gun"|"panzerfaust_loaded_shot"|"mortar_team_mortar"|"artillery_gun"|"tank_cannon"|"tank_coax" } // feedback hint; unknown/missing hints fall back to attacker kind
+  weaponKind?: "worker_tools"|"golem_fists"|"warrior_sword"|"rifleman_rifle"|"machine_gunner_mg"|"scout_car_mg"|"anti_tank_gun"|"panzerfaust_loaded_shot"|"mortar_team_mortar"|"artillery_gun"|"tank_cannon"|"tank_coax" } // feedback hint; unknown/missing hints fall back to attacker kind
 { e: "overpenetration", to: u32 }               // secondary penetration damage; no tracer/audio
 { e: "miss", to: u32 }                          // direct shot missed the target; no position
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs

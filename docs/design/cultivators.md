@@ -61,8 +61,9 @@ second. The sword uses general-purpose SmallArms target preference but has no pr
 muzzle flash, area damage, or overpenetration. It holds position while attacking and otherwise uses
 the ordinary attack, attack-move, hold, rally, fog, blocker, damage, and death rules.
 
-The first implementation uses clearly placeholder matte-white/off-white swordsman art with runtime
-team tint and a sword-swipe attack pose. It supports Lab/Interact spawning, but existing AI profiles
+The first implementation uses clearly placeholder matte-white/off-white unarmored Chinese
+swordsman art with a plain robe, minimal topknot, runtime team tint, and a sword-swipe attack pose.
+It supports Lab/Interact spawning, but existing AI profiles
 do not train it. Final art, bespoke audio, AI composition, and post-playtest tuning are deferred.
 
 The completed building is a black-and-blue spinning ground portal: a dark framed 3x3 platform

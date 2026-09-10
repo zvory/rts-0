@@ -26,6 +26,7 @@ mod support_weapon_attack_move;
 mod tank_traps;
 mod target_legality;
 mod target_priority;
+mod warrior;
 mod weapon_cooldowns;
 mod weapon_profiles;
 fn rifleman_with_enemy() -> (EntityStore, u32, u32) {

@@ -5,6 +5,7 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
     let cases = [
         (EntityKind::Worker, 140.0),
         (EntityKind::Golem, 140.0),
+        (EntityKind::Warrior, 160.0),
         (EntityKind::Rifleman, 180.0),
         (EntityKind::MachineGunner, 220.0),
         (EntityKind::ScoutCar, 180.0),

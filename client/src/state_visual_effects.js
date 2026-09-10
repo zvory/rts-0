@@ -66,7 +66,7 @@ export class VisualEffectBuffers {
     for (const ev of events) {
       if (ev && ev.e === EVENT.ATTACK && typeof ev.from === "number" && typeof ev.to === "number") {
         const targetPos = eventTargetPos(ev);
-        if (ev.from !== ev.to) {
+        if (ev.from !== ev.to && ev.weaponKind !== WEAPON_KIND.WARRIOR_SWORD) {
           this.muzzleFlashes.push({
             from: ev.from,
             to: ev.to,

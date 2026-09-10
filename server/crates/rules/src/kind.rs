@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub enum EntityKind {
     Worker,
     Golem,
+    Warrior,
     Rifleman,
     Panzerfaust,
     MachineGunner,
@@ -36,9 +37,10 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 28] = [
+    pub const ALL: [EntityKind; 29] = [
         EntityKind::Worker,
         EntityKind::Golem,
+        EntityKind::Warrior,
         EntityKind::Rifleman,
         EntityKind::Panzerfaust,
         EntityKind::MachineGunner,
@@ -95,6 +97,7 @@ impl EntityKind {
         match self {
             EntityKind::Worker => "worker",
             EntityKind::Golem => "golem",
+            EntityKind::Warrior => "warrior",
             EntityKind::Rifleman => "rifleman",
             EntityKind::Panzerfaust => "panzerfaust",
             EntityKind::MachineGunner => "machine_gunner",
@@ -132,6 +135,7 @@ impl FromStr for EntityKind {
         match s {
             "worker" => Ok(EntityKind::Worker),
             "golem" => Ok(EntityKind::Golem),
+            "warrior" => Ok(EntityKind::Warrior),
             "rifleman" => Ok(EntityKind::Rifleman),
             "panzerfaust" => Ok(EntityKind::Panzerfaust),
             "machine_gunner" => Ok(EntityKind::MachineGunner),
@@ -262,6 +266,7 @@ pub fn leaves_tank_treads(kind: EntityKind) -> bool {
 pub fn death_ground_decal_class(kind: EntityKind) -> Option<&'static str> {
     match kind {
         EntityKind::Worker
+        | EntityKind::Warrior
         | EntityKind::Rifleman
         | EntityKind::Panzerfaust
         | EntityKind::MachineGunner

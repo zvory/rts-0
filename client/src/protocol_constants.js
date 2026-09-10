@@ -168,6 +168,7 @@ export const KIND = Object.freeze({
   GOLEM: "golem",
   RIFLEMAN: "rifleman",
   PANZERFAUST: "panzerfaust",
+  WARRIOR: "warrior",
   MACHINE_GUNNER: "machine_gunner",
   ANTI_TANK_GUN: "anti_tank_gun",
   MORTAR_TEAM: "mortar_team",
@@ -198,6 +199,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.GOLEM,
   KIND.RIFLEMAN,
   KIND.PANZERFAUST,
+  KIND.WARRIOR,
   KIND.MACHINE_GUNNER,
   KIND.ANTI_TANK_GUN,
   KIND.MORTAR_TEAM,
@@ -311,6 +313,7 @@ export const WEAPON_KIND = Object.freeze({
   ARTILLERY_GUN: "artillery_gun",
   TANK_CANNON: "tank_cannon",
   TANK_COAX: "tank_coax",
+  WARRIOR_SWORD: "warrior_sword",
 });
 
 export const VISION_SELECTION = Object.freeze({
@@ -361,6 +364,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.SCOUT_PLANE]: 25,
   [KIND.RESOURCE_DEPOT]: 6,
   [KIND.PORTAL]: 28,
+  [KIND.WARRIOR]: 29,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,
   [KIND.TRAINING_CENTRE]: 9,
@@ -433,6 +437,7 @@ export const WEAPON_KIND_CODE = Object.freeze({
   [WEAPON_KIND.ARTILLERY_GUN]: 9,
   [WEAPON_KIND.TANK_CANNON]: 10,
   [WEAPON_KIND.TANK_COAX]: 11,
+  [WEAPON_KIND.WARRIOR_SWORD]: 12,
 });
 
 export const EVENT_CODE = Object.freeze({

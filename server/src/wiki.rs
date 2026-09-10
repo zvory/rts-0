@@ -476,6 +476,7 @@ fn kind_label(kind: EntityKind) -> String {
         EntityKind::Worker => "Engineer",
         EntityKind::Golem => "Golem",
         EntityKind::Rifleman => "Rifleman",
+        EntityKind::Warrior => "Warrior",
         EntityKind::Panzerfaust => "Panzerfaust",
         EntityKind::MachineGunner => "Machine Gunner",
         EntityKind::AntiTankGun => "Anti-Tank Gun",

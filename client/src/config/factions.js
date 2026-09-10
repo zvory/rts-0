@@ -126,11 +126,12 @@ export const FACTION_CATALOGS = Object.freeze({
   [CULTIVATORS_FACTION_ID]: freezeCatalog({
     id: CULTIVATORS_FACTION_ID,
     loadoutId: "cultivators.standard",
-    units: [KIND.WORKER],
+    units: [KIND.WORKER, KIND.WARRIOR],
     buildings: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.STEEL_MINE, KIND.PUMP_JACK],
     buildables: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
     trainables: {
       [KIND.RESOURCE_DEPOT]: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK],
+      [KIND.PORTAL]: [KIND.WARRIOR],
     },
     research: {},
     abilities: [],
