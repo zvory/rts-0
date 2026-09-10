@@ -230,16 +230,39 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     spawn_node(&mut game, EntityKind::Oil, oil_patch);
     game.state.players[0].set_resources(0, 0);
     game.tick();
-    let (pump_id, pump_x, pump_y) = game.state.entities.iter()
+    let (pump_id, pump_x, pump_y) = game
+        .state
+        .entities
+        .iter()
         .find(|entity| entity.kind == EntityKind::PumpJack)
-        .map(|entity| (entity.id, entity.pos_x, entity.pos_y)).unwrap();
-    let worker = game.state.entities.spawn_unit(1, EntityKind::Worker, pump_x, pump_y).unwrap();
-    game.enqueue(1, Command::Build {
-        units: vec![worker], building: EntityKind::PumpJack,
-        tile_x: 16, tile_y: 10, queued: false,
-    });
-    assert_eq!(game.state.entities.get(pump_id).unwrap().construction.as_ref().unwrap().total,
-        config::AUTOMATIC_PUMP_JACK_BUILD_TICKS);
+        .map(|entity| (entity.id, entity.pos_x, entity.pos_y))
+        .unwrap();
+    let worker = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, pump_x, pump_y)
+        .unwrap();
+    game.enqueue(
+        1,
+        Command::Build {
+            units: vec![worker],
+            building: EntityKind::PumpJack,
+            tile_x: 16,
+            tile_y: 10,
+            queued: false,
+        },
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .get(pump_id)
+            .unwrap()
+            .construction
+            .as_ref()
+            .unwrap()
+            .total,
+        config::AUTOMATIC_PUMP_JACK_BUILD_TICKS
+    );
     let progress = |game: &Game, kind| {
         game.state
             .entities
@@ -267,8 +290,16 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     for _ in 1..steel_ticks {
         game.tick();
     }
-    assert!(game.state.entities.get(worker).unwrap().order().build_intent_tile().is_none(),
-        "Engineer cannot assist the automatic scaffold");
+    assert!(
+        game.state
+            .entities
+            .get(worker)
+            .unwrap()
+            .order()
+            .build_intent_tile()
+            .is_none(),
+        "Engineer cannot assist the automatic scaffold"
+    );
     assert!(completed(&game, EntityKind::SteelMine));
     assert!(!completed(&game, EntityKind::PumpJack));
     assert_eq!(

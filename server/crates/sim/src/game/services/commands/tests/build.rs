@@ -543,7 +543,10 @@ fn build_order_accepts_worker_pump_jack_on_oil() {
     );
 
     let worker = entities.get(worker).expect("worker should remain alive");
-    assert_eq!(worker.order().build_intent_tile(), Some((EntityKind::PumpJack, 4, 4)));
+    assert_eq!(
+        worker.order().build_intent_tile(),
+        Some((EntityKind::PumpJack, 4, 4))
+    );
     assert!(events.get(&1).is_none_or(Vec::is_empty));
 }
 

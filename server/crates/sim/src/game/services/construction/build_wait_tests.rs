@@ -120,11 +120,12 @@ fn arrived_pump_jack_waits_for_120_steel_then_completes_in_10_seconds() {
     let mut events = HashMap::new();
 
     run_construction_tick!(&map, &mut entities, &mut players, &mut events);
-    assert!(entities.iter().all(|entity| entity.kind != EntityKind::PumpJack));
+    assert!(entities
+        .iter()
+        .all(|entity| entity.kind != EntityKind::PumpJack));
     assert_eq!(players[0].steel, 119);
     players[0].set_resources(120, 0);
     run_construction_tick!(&map, &mut entities, &mut players, &mut events);
-
 
     assert_eq!(
         entities
@@ -150,8 +151,21 @@ fn arrived_pump_jack_waits_for_120_steel_then_completes_in_10_seconds() {
         Some(blocker_before),
         "the friendly blocker should move once construction can actually start"
     );
-    let site = entities.iter().find(|entity| entity.kind == EntityKind::PumpJack).unwrap().id;
-    assert_eq!(entities.get(site).unwrap().construction.as_ref().unwrap().total, config::TICK_HZ * 10);
+    let site = entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::PumpJack)
+        .unwrap()
+        .id;
+    assert_eq!(
+        entities
+            .get(site)
+            .unwrap()
+            .construction
+            .as_ref()
+            .unwrap()
+            .total,
+        config::TICK_HZ * 10
+    );
     for _ in 1..config::TICK_HZ * 10 - 1 {
         run_construction_tick!(&map, &mut entities, &mut players, &mut events);
     }
@@ -159,7 +173,6 @@ fn arrived_pump_jack_waits_for_120_steel_then_completes_in_10_seconds() {
     run_construction_tick!(&map, &mut entities, &mut players, &mut events);
     assert!(!entities.get(site).unwrap().under_construction());
     assert_eq!(players[0].steel, 0);
-
 }
 
 #[test]
