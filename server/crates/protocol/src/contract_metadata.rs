@@ -76,6 +76,7 @@ pub mod kinds {
     pub const COMMAND_CAR: &str = "command_car";
     pub const EKAT: &str = "ekat";
     pub const RESOURCE_DEPOT: &str = "resource_depot";
+    pub const PORTAL: &str = "portal";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -378,6 +379,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::SCOUT_CAR, 14),
     (kinds::SCOUT_PLANE, 25),
     (kinds::RESOURCE_DEPOT, 6),
+    (kinds::PORTAL, 28),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
     (kinds::TRAINING_CENTRE, 9),
@@ -701,6 +703,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("COMMAND_CAR", kinds::COMMAND_CAR),
         ("EKAT", kinds::EKAT),
         ("RESOURCE_DEPOT", kinds::RESOURCE_DEPOT),
+        ("PORTAL", kinds::PORTAL),
         ("ZAMOK", kinds::ZAMOK),
         ("DEPOT", kinds::DEPOT),
         ("BARRACKS", kinds::BARRACKS),

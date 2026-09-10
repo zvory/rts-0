@@ -11,6 +11,7 @@ export const LAYERS = [
   "resources",
   "buildingShadows",
   "buildings",
+  "buildingEffects",
   "buildingOverlays",
   "unitShadows",
   "trenchOccupantShadows",

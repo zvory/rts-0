@@ -190,7 +190,10 @@ because their catalog rows are dumpable.
 The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), Engineer,
 Steel Mine and Oil Pumpjack, with only Nexus available for Engineer construction. Its
 `cultivators.standard` loadout matches Kriegsia's starting economy and omits Riflemen.
-All shared entity stats remain identical; see [Cultivators specification](cultivators.md).
+Cultivator Engineers can also construct the faction-specific Portal for 150 Steel: it has a 3x3
+footprint, 165 HP, one tile of sight, a five-second construction time, no prerequisite, and no
+current production output. Shared entity stats remain identical; see
+[Cultivators specification](cultivators.md).
 
 
 Approved direct Steel/Oil/Supply modules for this plan are:

@@ -7,6 +7,11 @@ import {
   FIXTURE_FACTION_ID,
   WORKER_BUILDABLE,
 } from "./rules_mirror.js";
+import { WORKER_BUILD_CARD_SLOTS } from "./presentation.js";
+
+const CULTIVATORS_WORKER_BUILD_CARD_SLOTS = Object.freeze([
+  KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, null, null, null, null, null,
+]);
 
 function freezeCatalog(catalog) {
   const trainables = {};
@@ -122,8 +127,8 @@ export const FACTION_CATALOGS = Object.freeze({
     id: CULTIVATORS_FACTION_ID,
     loadoutId: "cultivators.standard",
     units: [KIND.WORKER],
-    buildings: [KIND.RESOURCE_DEPOT, KIND.STEEL_MINE, KIND.PUMP_JACK],
-    buildables: [KIND.RESOURCE_DEPOT],
+    buildings: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.STEEL_MINE, KIND.PUMP_JACK],
+    buildables: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
     trainables: {
       [KIND.RESOURCE_DEPOT]: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK],
     },
@@ -149,6 +154,12 @@ export function factionCatalog(factionId = DEFAULT_FACTION_ID) {
 
 export function workerBuildablesForFaction(factionId) {
   return factionCatalog(factionId).buildables;
+}
+
+export function workerBuildCardSlotsForFaction(factionId) {
+  return factionId === CULTIVATORS_FACTION_ID
+    ? CULTIVATORS_WORKER_BUILD_CARD_SLOTS
+    : WORKER_BUILD_CARD_SLOTS;
 }
 
 export function trainableUnitsForFaction(factionId, buildingKind) {

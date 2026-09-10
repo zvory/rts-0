@@ -2,13 +2,19 @@ use super::*;
 
 #[test]
 fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
-    for faction_id in [
-        crate::rules::faction::DEFAULT_FACTION_ID,
-        crate::rules::faction::CULTIVATORS_FACTION_ID,
+    for (faction_id, building) in [
+        (
+            crate::rules::faction::DEFAULT_FACTION_ID,
+            EntityKind::ResourceDepot,
+        ),
+        (
+            crate::rules::faction::CULTIVATORS_FACTION_ID,
+            EntityKind::Portal,
+        ),
     ] {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
-        let (wx, wy) = footprint_center(&map, EntityKind::ResourceDepot, 4, 4);
+        let (wx, wy) = footprint_center(&map, building, 4, 4);
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, wx, wy)
             .expect("worker should spawn");
@@ -48,7 +54,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
                 1,
                 SimCommand::Build {
                     units: vec![worker],
-                    building: EntityKind::ResourceDepot,
+                    building,
                     tile_x: 4,
                     tile_y: 4,
                     queued: false,
@@ -68,7 +74,7 @@ fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
             .expect("build order should set a staging goal");
         let goal_tile = map.tile_of(goal.0, goal.1);
         assert!(
-            !footprint_tiles(EntityKind::ResourceDepot, 4, 4).contains(&goal_tile),
+            !footprint_tiles(building, 4, 4).contains(&goal_tile),
             "build-over-self order should stage outside the requested footprint"
         );
         assert!(

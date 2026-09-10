@@ -3,10 +3,10 @@ import {
   STATS,
   statsForFaction,
   UPGRADES,
-  WORKER_BUILD_CARD_SLOTS,
   commandCardAbilitiesForFaction,
   researchableUpgradesForFaction,
   trainableUnitsForFaction,
+  workerBuildCardSlotsForFaction,
   workerBuildablesForFaction,
 } from "./config.js";
 import {
@@ -264,7 +264,7 @@ export function buildWorkerBuildCard(ctx) {
   const slots = [];
   const sigParts = [];
   const buildables = new Set(workerBuildablesForFaction(factionId));
-  for (const kind of WORKER_BUILD_CARD_SLOTS) {
+  for (const kind of workerBuildCardSlotsForFaction(factionId)) {
     if (!kind || !buildables.has(kind)) {
       slots.push(null);
       continue;

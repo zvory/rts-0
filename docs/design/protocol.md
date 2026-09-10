@@ -621,14 +621,14 @@ For compatibility with hand-built fixtures and older replay artifacts, missing `
 simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
 The canonical default faction id is `kriegsia`; `ekat` remains an internally supported playable
-catalog id but is hidden from the normal lobby selector. `cultivators` is a playable economy-only
+catalog id but is hidden from the normal lobby selector. `cultivators` is a playable economy-first
 catalog, selectable alongside Kriegsia in beta/local human lobbies. Start payloads emit `factionId`
 for every active start player, lobby seat and replay branch seat, and replay artifacts store
 `faction_id` for every player. Missing faction requests default to `kriegsia` in normal lobby,
 AI, self-play and dev contexts. Explicit `kriegsia`, `ekat` and `cultivators` requests follow
 playable lifecycle policy; the `phase2_empty_fixture` test fixture and unknown ids remain restricted. Cultivators uses the
-`cultivators.standard` loadout and existing entity tags; Nexus is a faction-specific presentation
-name for `resource_depot`, not a new wire kind.
+`cultivators.standard` loadout; Nexus is a faction-specific presentation name for
+`resource_depot`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
 
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
 field does not make a faction playable. Fixture-only, reserved/future, and historical-only ids must
@@ -932,7 +932,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage` |
@@ -1113,7 +1113,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources/completed Tank Traps), else player id
-  kind: string,                  // EntityKind: "worker","golem","rifleman","panzerfaust","machine_gunner","anti_tank_gun","mortar_team","artillery","rocket_launcher","scout_car","scout_plane","tank","command_car","ekat","resource_depot","zamok","depot","barracks","training_centre","engineering_complex","factory","steelworks","tank_trap","steel_mine","pump_jack"
+  kind: string,                  // EntityKind: "worker","golem","rifleman","panzerfaust","machine_gunner","anti_tank_gun","mortar_team","artillery","rocket_launcher","scout_car","scout_plane","tank","command_car","ekat","resource_depot","portal","zamok","depot","barracks","training_centre","engineering_complex","factory","steelworks","tank_trap","steel_mine","pump_jack"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
