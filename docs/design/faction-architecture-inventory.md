@@ -43,20 +43,20 @@ Lifecycle status is explicit and separate from catalog existence:
 | --- | --- | --- |
 | `kriegsia` | playable | Default faction for missing non-replay requests. Supported by normal human lobby, AI seats, dev starts, self-play defaults, replay/branch records, match-history replay, post-match replay, spectator metadata, and local prediction when version/build metadata is compatible. |
 | `ekat` | playable | Hidden from the normal lobby faction selector while its existing catalog, Lab palette, and internal wire selection remain available. Explicit playable validation accepts it for start/replay-capable contexts, and schema 3 replay records plus replay-branch metadata may carry it. Public AI seat creation has no faction selector and still defaults to `kriegsia`; current local prediction is disabled when the local player is `ekat`. |
-| `cultivators` | playable | Economy-first catalog: Nexus (shared ResourceDepot), Portal, Engineer, Steel Mine and Oil Pumpjack. Portal is a dedicated inert 3x3 production-building kind for the current slice. Standard economy loadout without Riflemen; human beta/local selector enabled, normal playable lifecycle policy applies. No new AI profile; prediction remains unsupported. |
+| `cultivators` | playable | Economy-first catalog: Nexus (shared ResourceDepot), Portal, Engineer, Warrior, Steel Mine and Oil Pumpjack. Portal is a dedicated 3x3 building that produces Warriors. Standard economy loadout without Riflemen; human beta/local selector enabled, normal playable lifecycle policy applies. No new AI profile; prediction remains unsupported. |
 | `phase2_empty_fixture` | test-fixture-only | Catalog and loadout exist for explicit Rust/test fixture coverage. It is rejected by normal lobby, AI, replay, branch, dev scenario, self-play, match-history, and post-match paths unless the caller uses the `TestFixture` validation context or a direct lower-level sim test helper that deliberately owns the fixture. |
 | `plans/archive/faction/*` | historical-only | Archived phase plans, handoffs, and lifecycle matrices are not active faction policy and are not checker lifecycle inputs. |
 
 ## Current Entity Identity
 
-Runtime identity is still global `EntityKind`. The current roster has 28 global kinds: 14 units,
+Runtime identity is still global `EntityKind`. The current roster has 29 global kinds: 15 units,
 12 buildings, and 2 resource nodes. Server rules own the stable ids in
 `server/crates/rules/src/kind.rs`; protocol mirrors expose the same string ids in
 `server/crates/protocol/src/lib.rs` and `client/src/protocol.js`.
 
 The current production catalog is in `server/crates/rules/src/defs.rs`:
 
-- Units: Worker, Golem, Rifleman, Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team,
+- Units: Worker, Golem, Warrior, Rifleman, Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team,
   Artillery, Rocket Truck, Scout Car, Scout Plane, Tank, Command Car, and Ekat.
 - Buildings: Resource Depot, Zamok, Depot, Barracks, Training Centre, Engineering Complex, Factory, Gun
   Works, Tank Trap, Steel Mine, and Pump Jack. Tank Trap construction is server-authoritative after
