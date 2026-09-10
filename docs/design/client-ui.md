@@ -1462,7 +1462,7 @@ replaces the stale authoritative plan when composing subsequent queued previews,
 Lab command results are not recorded as durable local plans. Contextual oil
 right-clicks compose a Pump Jack build intent on the clicked oil patch rather than a gather
 command. The worker build submenu restores Pump Jack to the top-middle `W` slot and preserves
-the remaining Engineer build hotkeys. Manual construction costs 120 Steel and takes 10 seconds. Contextual Pump Jack placement
+the remaining Engineer build hotkeys. Manual construction costs 150 Steel and takes 10 seconds. Contextual Pump Jack placement
 snaps to the closest live oil patch within one map tile of the cursor before applying the normal
 footprint validation. Pump Jack construction remains legal outside the completed
 friendly Resource Depot/Zamok mining radius, while the normal resource-mining preview warns that the

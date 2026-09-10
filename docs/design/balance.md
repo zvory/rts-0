@@ -142,7 +142,7 @@ their `*_BODY_*` length, width, and clearance values instead.
 The Kriegsia economy replaces transferable Engineer mining with base-local extractor growth.
 Engineers remain 50-Steel, 1-Supply construction units trained by
 the Resource Depot, but they cannot gather resources. Engineers can manually place Pump Jacks on live Oil patches
-for 120 Steel, taking 10 seconds (half the former 20-second manual build time). The standard
+for 150 Steel, taking 10 seconds (half the former 20-second manual build time). The standard
 start contains one completed Engineer and six completed Steel Mines attached to six of the home
 base's live Steel patches, plus one completed Pump Jack attached to one home-base Oil patch.
 
@@ -155,7 +155,7 @@ depleted. It is free and takes 24 seconds to produce.
 
 Pump Jack keeps its existing 1x1 footprint, 75 HP, Small/unarmored classification, 1-tile sight,
 and `OIL_LOAD = 2` payout every 40 ticks. Depot production remains free and takes 36 seconds,
-independently of the 120-Steel, 10-second manual construction stats. Engineers cannot assist
+independently of the 150-Steel, 10-second manual construction stats. Engineers cannot assist
 depot-owned scaffolds; manual scaffolds reserve their patch against automatic production.
 Every completed Resource Depot permanently runs one Steel Mine job and one Pump Jack job in the
 background. The two jobs progress concurrently with each other and independently of the Depot's
@@ -674,7 +674,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after AT Guns, Artillery after Artillery research, and Rocket Trucks after Rockets research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | steel_mine                 | Steel Mine         | 50  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
-| pump_jack                  | Pump Jack          | 75  | 1     | 120 steel | 1x1  | 300      | manual Engineer construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
+| pump_jack                  | Pump Jack          | 75  | 1     | 150 steel | 1x1  | 300      | manual Engineer construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

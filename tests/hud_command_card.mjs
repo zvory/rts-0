@@ -304,7 +304,7 @@ function buttonSlots(card) {
     groupCooldownClocks: () => [],
   });
   const scoutPlaneCommandId = kriegsiaCommandId("train", KIND.SCOUT_PLANE);
-  for (const steel of [0, 120]) {
+  for (const steel of [0, 150]) {
     const card = buildCommandCardDescriptors({
       playerId: 1,
       selection: [resourceDepot],
