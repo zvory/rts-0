@@ -29,7 +29,6 @@ import {
   ENTRENCHMENT_RANGE_BONUS_TILES,
   ENTRENCHMENT_RESEARCH_TICKS,
   ENTRENCHMENT_TRENCH_RADIUS_TILES,
-  ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
   ARTILLERY_UNLOCK_RESEARCH_TICKS,
   BALLISTIC_TABLES_RESEARCH_TICKS,
   ABILITIES,
@@ -346,7 +345,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assertDeepEqual(
     STATS[KIND.ENGINEERING_COMPLEX].researches,
     [
-      UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      null,
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
@@ -354,7 +353,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADE.SCOUT_PLANE_UNLOCK,
       UPGRADE.ROCKETS,
     ],
-    "Engineering Complex should expose the AT Guns, Artillery, and Fire Control chain before its independent research",
+    "Engineering Complex should preserve an empty former AT Guns slot before Artillery and Fire Control",
   );
   assert(
     STATS[KIND.ROCKET_LAUNCHER].label === "Rocket Truck" &&
@@ -423,14 +422,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       SMOKE_PLUS_CLOUD_DURATION_TICKS === SMOKE_CLOUD_DURATION_TICKS * 2,
     "Smoke Plus ability effect values mirror the base Smoke cloud upgrade",
   );
-  assert(
-    UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK].label === "AT Guns" &&
-      UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK].cost.steel === 100 &&
-      UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK].cost.oil === 50 &&
-      UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK].researchTicks === ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS &&
-      ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS === TICK_HZ * 10,
-    "AT Guns research cost and time mirror server",
-  );
+  assert(!UPGRADES[UPGRADE.ANTI_TANK_GUN_UNLOCK], "retired AT Guns research should have no live client definition");
   assert(
     UPGRADES[UPGRADE.ARTILLERY_UNLOCK].label === "Artillery" &&
       UPGRADES[UPGRADE.ARTILLERY_UNLOCK].cost.steel === 200 &&
@@ -439,12 +431,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       ARTILLERY_UNLOCK_RESEARCH_TICKS === TICK_HZ * 25,
     "Artillery research cost and time mirror server",
   );
-  assert(
-    UPGRADES[UPGRADE.ARTILLERY_UNLOCK].requiresUpgrade === UPGRADE.ANTI_TANK_GUN_UNLOCK &&
-      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].requiresText === "Requires AT Guns" &&
-      UPGRADES[UPGRADE.ARTILLERY_UNLOCK].replacesUpgrade == null,
-    "Artillery research keeps a permanent slot and its prerequisite explicit",
-  );
+  assert(!UPGRADES[UPGRADE.ARTILLERY_UNLOCK].requiresUpgrade, "Artillery research is independently available");
   assert(
     UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.steel === 50 &&
       UPGRADES[UPGRADE.BALLISTIC_TABLES].cost.oil === 100 &&
@@ -454,10 +441,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADES[UPGRADE.BALLISTIC_TABLES].description.includes("1 tile"),
     "Artillery Fire Control exposes its 50/100 cost, 15-second duration, Artillery prerequisite, and radius effect",
   );
-  assert(
-    STATS[KIND.ANTI_TANK_GUN].upgradeRequiresText === "Requires research in Engineering Complex",
-    "Anti-Tank Gun training should explain the Engineering Complex research requirement",
-  );
+  assert(!STATS[KIND.ANTI_TANK_GUN].upgradeRequires, "Anti-Tank Gun training should need no research");
   assert(
     STATS[KIND.TANK].upgradeRequiresText === "Requires research in Engineering Complex",
     "Tank training should explain the Engineering Complex research requirement",
@@ -1109,9 +1093,9 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     const engineeringTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     const engineeringSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
     const engineeringScoutPlaneButton = renderedButtons.find((button) => button.innerHTML.includes("SP+"));
-    assert(engineeringAtGunsResearchButton?.dataset.hotkey === "Q", "AT Guns research should appear in Engineering Complex");
-    assert(engineeringArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot before AT Guns");
-    assert(engineeringArtilleryResearchButton?.disabled, "Artillery should be disabled before AT Guns is complete or queued");
+    assert(!engineeringAtGunsResearchButton, "AT Guns research should no longer appear in Engineering Complex");
+    assert(engineeringArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot");
+    assert(!engineeringArtilleryResearchButton?.disabled, "Artillery should be independently available");
     assert(engineeringArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in Engineering Complex");
     assert(engineeringArtilleryFireControlButton?.disabled, "Artillery Fire Control should require Artillery");
     assert(engineeringArtilleryFireControlButton?.title === "Requires Artillery", "Artillery Fire Control should name its prerequisite");
@@ -1122,18 +1106,17 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     assert(!engineeringSeparateArtilleryResearchButton, "Engineering Complex should not expose separate Artillery research");
 
     renderedButtons.length = 0;
-    selectedEngineeringComplex.prodUpgradeQueue = [UPGRADE.ANTI_TANK_GUN_UNLOCK];
+    selectedEngineeringComplex.prodUpgradeQueue = [];
     engineeringHud._cardSig = null;
     renderCommandCard(engineeringHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
     const atGunsUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
     assert(unlockedArtilleryResearchButton?.dataset.hotkey === "W", "Artillery should retain the W slot");
-    assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery should enable when AT Guns is queued");
-    assert(atGunsUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Artillery after AT Guns is queued");
+    assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery should remain independently available");
+    assert(atGunsUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Artillery");
 
     renderedButtons.length = 0;
     selectedEngineeringComplex.prodUpgradeQueue = [
-      UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
     ];
     engineeringHud._cardSig = null;

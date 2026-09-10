@@ -1,19 +1,13 @@
 use super::*;
 
 #[test]
-fn support_weapon_and_vehicle_training_require_finished_unlock_upgrades() {
+fn locked_units_require_finished_unlock_upgrades() {
     let map = flat_map(24);
     for (producer, unit, upgrade, setup_extra) in [
         (
             EntityKind::Barracks,
             EntityKind::Panzerfaust,
             UpgradeKind::Panzerfausts,
-            None,
-        ),
-        (
-            EntityKind::Steelworks,
-            EntityKind::AntiTankGun,
-            UpgradeKind::AntiTankGunUnlock,
             None,
         ),
         (
@@ -70,10 +64,38 @@ fn support_weapon_and_vehicle_training_require_finished_unlock_upgrades() {
 }
 
 #[test]
+fn anti_tank_guns_are_immediately_trainable_from_gun_works() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::Steelworks, 6, 6);
+    let gun_works = entities
+        .spawn_building(1, EntityKind::Steelworks, x, y, true)
+        .expect("gun works should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Train {
+                building: gun_works,
+                unit: EntityKind::AntiTankGun,
+            },
+        )],
+    );
+
+    assert!(events.get(&1).is_none_or(Vec::is_empty));
+    let queue = entities.get(gun_works).expect("gun works").prod_queue();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0].unit, EntityKind::AntiTankGun);
+}
+
+#[test]
 fn advanced_unlocks_research_only_at_engineering_complex() {
     let map = flat_map(24);
     for (wrong_building_kind, upgrade) in [
-        (EntityKind::Steelworks, UpgradeKind::AntiTankGunUnlock),
         (EntityKind::Steelworks, UpgradeKind::ArtilleryUnlock),
         (EntityKind::Factory, UpgradeKind::TankUnlock),
         (EntityKind::Steelworks, UpgradeKind::SmokePlus),
@@ -89,9 +111,6 @@ fn advanced_unlocks_research_only_at_engineering_complex() {
             .spawn_building(1, EntityKind::EngineeringComplex, rd_x, rd_y, true)
             .expect("engineering complex should spawn");
         let mut players = vec![player_state(1), player_state(2)];
-        if upgrade == UpgradeKind::ArtilleryUnlock {
-            players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
-        }
         let events = apply_with_players(
             &map,
             &mut entities,
@@ -299,7 +318,7 @@ fn fixture_faction_rejects_global_build_train_and_research_commands() {
 }
 
 #[test]
-fn artillery_research_requires_at_guns() {
+fn artillery_research_is_available_without_at_guns() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (rd_x, rd_y) = footprint_center(&map, EntityKind::EngineeringComplex, 6, 6);
@@ -316,20 +335,9 @@ fn artillery_research_requires_at_guns() {
         &map,
         &mut entities,
         &mut players,
-        vec![(1, command.clone())],
+        vec![(1, command)],
     );
-    assert!(entities
-        .get(engineering_complex)
-        .expect("engineering complex")
-        .research_queue()
-        .is_empty());
-    assert!(matches!(
-        events.get(&1).and_then(|events| events.first()),
-        Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
-    ));
-
-    players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
-    apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
+    assert!(events.get(&1).is_none_or(Vec::is_empty));
     let queue = entities
         .get(engineering_complex)
         .expect("engineering complex")
@@ -363,18 +371,6 @@ fn artillery_fire_control_requires_artillery_research() {
         .expect("engineering complex")
         .research_queue()
         .is_empty());
-    players[0].upgrades.insert(UpgradeKind::AntiTankGunUnlock);
-    apply_with_players(
-        &map,
-        &mut entities,
-        &mut players,
-        vec![(1, command.clone())],
-    );
-    assert!(entities
-        .get(engineering_complex)
-        .expect("engineering complex")
-        .research_queue()
-        .is_empty());
     players[0].upgrades.insert(UpgradeKind::ArtilleryUnlock);
     apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
     let queue = entities
@@ -386,7 +382,7 @@ fn artillery_fire_control_requires_artillery_research() {
 }
 
 #[test]
-fn artillery_unlock_can_queue_behind_its_prerequisite() {
+fn legacy_at_gun_research_is_not_available() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let (rd_x, rd_y) = footprint_center(&map, EntityKind::EngineeringComplex, 6, 6);
@@ -395,39 +391,28 @@ fn artillery_unlock_can_queue_behind_its_prerequisite() {
         .expect("engineering complex should spawn");
     let mut players = vec![player_state(1), player_state(2)];
 
-    apply_with_players(
+    let events = apply_with_players(
         &map,
         &mut entities,
         &mut players,
-        vec![
-            (
-                1,
-                SimCommand::Research {
-                    building: engineering_complex,
-                    upgrade: UpgradeKind::AntiTankGunUnlock,
-                },
-            ),
-            (
-                1,
-                SimCommand::Research {
-                    building: engineering_complex,
-                    upgrade: UpgradeKind::ArtilleryUnlock,
-                },
-            ),
-        ],
+        vec![(
+            1,
+            SimCommand::Research {
+                building: engineering_complex,
+                upgrade: UpgradeKind::AntiTankGunUnlock,
+            },
+        )],
     );
 
-    let queued: Vec<_> = entities
+    assert!(entities
         .get(engineering_complex)
         .expect("engineering complex")
         .research_queue()
-        .iter()
-        .map(|item| item.upgrade)
-        .collect();
-    assert_eq!(
-        queued,
-        vec![UpgradeKind::AntiTankGunUnlock, UpgradeKind::ArtilleryUnlock,]
-    );
+        .is_empty());
+    assert!(matches!(
+        events.get(&1).and_then(|events| events.first()),
+        Some(Event::Notice { msg, .. }) if msg == "Cannot research that here"
+    ));
 }
 
 #[test]

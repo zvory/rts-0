@@ -148,10 +148,10 @@ function ekatCard() {
   );
   assert(
     catalog.contexts.some((context) =>
-      context.id === "engineering-complex-at-guns" &&
-        context.label === "Engineering Complex (AT Guns researched)"
+      context.id === "engineering-complex-artillery" &&
+        context.label === "Engineering Complex (Artillery researched)"
     ),
-    "hotkey command catalog names the researched AT Guns context explicitly",
+    "hotkey command catalog names the researched Artillery context explicitly",
   );
   assert(
     catalog.commands.some((command) =>

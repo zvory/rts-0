@@ -179,7 +179,6 @@ export function buildCommandCardContextCatalog() {
     resources: { steel: 1000, oil: 1000 },
     upgrades: [
       UPGRADE.METHAMPHETAMINES,
-      UPGRADE.ANTI_TANK_GUN_UNLOCK,
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.SCOUT_PLANE_UNLOCK,
@@ -206,10 +205,10 @@ export function buildCommandCardContextCatalog() {
     { id: "training-centre", card: buildCommandCardDescriptors(ctx([baseEntities[2]], { upgrades: [] })) },
     { id: "engineering-complex", card: buildCommandCardDescriptors(ctx([baseEntities[3]], { upgrades: [] })) },
     {
-      id: "engineering-complex-at-guns",
-      label: "Engineering Complex (AT Guns researched)",
+      id: "engineering-complex-artillery",
+      label: "Engineering Complex (Artillery researched)",
       card: buildCommandCardDescriptors(ctx([baseEntities[3]], {
-        upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
+        upgrades: [UPGRADE.ARTILLERY_UNLOCK],
       })),
     },
     ...buildEkatCommandCardContextSamples(buildCommandCardDescriptors),

@@ -143,8 +143,7 @@ export const STATS = Object.freeze({
     rangeTiles: 6.1, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.ANTI_TANK_GUN]: { label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 150, oil: 40 }, supply: 6, buildTicks: 440,
-    requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    upgradeRequiresText: "Requires research in Engineering Complex" },
+    requires: KIND.STEELWORKS },
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 10,
     rangeTiles: MORTAR_RANGE_TILES, minRangeTiles: MORTAR_MIN_RANGE_TILES,
     cost: { steel: 100, oil: 40 }, supply: 3, buildTicks: 460,
@@ -195,7 +194,7 @@ export const STATS = Object.freeze({
   [KIND.ENGINEERING_COMPLEX]: { label: "Engineering Complex", icon: "EC", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 15, trains: [],
     researches: [
-      UPGRADE.ANTI_TANK_GUN_UNLOCK,
+      null,
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.BALLISTIC_TABLES,
       UPGRADE.TANK_UNLOCK,
@@ -458,15 +457,6 @@ export const UPGRADES = Object.freeze({
     description: "Let eligible infantry create and use persistent trenches",
     researchedAt: KIND.TRAINING_CENTRE,
   }),
-  [UPGRADE.ANTI_TANK_GUN_UNLOCK]: Object.freeze({
-    upgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    label: "AT Guns",
-    icon: "ATG",
-    cost: Object.freeze({ steel: 100, oil: 50 }),
-    researchTicks: ANTI_TANK_GUN_UNLOCK_RESEARCH_TICKS,
-    description: "Unlock Anti-Tank Gun training",
-    researchedAt: KIND.ENGINEERING_COMPLEX,
-  }),
   [UPGRADE.ARTILLERY_UNLOCK]: Object.freeze({
     upgrade: UPGRADE.ARTILLERY_UNLOCK,
     label: "Artillery",
@@ -475,8 +465,6 @@ export const UPGRADES = Object.freeze({
     researchTicks: ARTILLERY_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Artillery training",
     researchedAt: KIND.ENGINEERING_COMPLEX,
-    requiresUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    requiresText: "Requires AT Guns",
   }),
   [UPGRADE.BALLISTIC_TABLES]: Object.freeze({
     upgrade: UPGRADE.BALLISTIC_TABLES,

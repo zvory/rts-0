@@ -58,7 +58,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
         UpgradeKind::ArtilleryUnlock => UpgradeDefinition {
             kind,
             researched_at: catalog.researched_at,
-            requires_upgrade: Some(UpgradeKind::AntiTankGunUnlock),
+            requires_upgrade: None,
             cost_steel: crate::config::ARTILLERY_UNLOCK_COST_STEEL,
             cost_oil: crate::config::ARTILLERY_UNLOCK_COST_OIL,
             research_ticks: crate::config::ARTILLERY_UNLOCK_RESEARCH_TICKS,
@@ -109,7 +109,6 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
 pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
     match unit {
         EntityKind::Panzerfaust => Some(UpgradeKind::Panzerfausts),
-        EntityKind::AntiTankGun => Some(UpgradeKind::AntiTankGunUnlock),
         EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
         EntityKind::RocketLauncher => Some(UpgradeKind::Rockets),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
@@ -134,7 +133,6 @@ mod tests {
         assert_eq!(
             researchable_upgrades(EntityKind::EngineeringComplex),
             vec![
-                UpgradeKind::AntiTankGunUnlock,
                 UpgradeKind::ArtilleryUnlock,
                 UpgradeKind::BallisticTables,
                 UpgradeKind::TankUnlock,

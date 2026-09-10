@@ -67,22 +67,21 @@ function buttonSlots(card) {
 
 {
   const ids = slotIds(engineeringComplexCard());
-  assert.equal(ids[0], `research:${UPGRADE.ANTI_TANK_GUN_UNLOCK}`);
+  assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
   assert.equal(ids[3], `research:${UPGRADE.TANK_UNLOCK}`);
   assert.equal(ids[4], `research:${UPGRADE.SMOKE_PLUS}`);
   assert.equal(ids[5], `research:${UPGRADE.SCOUT_PLANE_UNLOCK}`);
   assert.deepEqual(slotCommandIds(engineeringComplexCard()).slice(0, 6), [
-    kriegsiaCommandId("research", UPGRADE.ANTI_TANK_GUN_UNLOCK),
+    null,
     kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES),
     kriegsiaCommandId("research", UPGRADE.TANK_UNLOCK),
     kriegsiaCommandId("research", UPGRADE.SMOKE_PLUS),
     kriegsiaCommandId("research", UPGRADE.SCOUT_PLANE_UNLOCK),
   ]);
-  assert.equal(engineeringComplexCard().slots[1].enabled, false);
-  assert.equal(engineeringComplexCard().slots[1].title, "Requires AT Guns");
+  assert.equal(engineeringComplexCard().slots[1].enabled, true);
   assert.equal(engineeringComplexCard().slots[1].label, "Artillery");
   assert.equal(engineeringComplexCard().slots[2].title, "Requires Artillery");
   assert.equal(engineeringComplexCard().slots[2].label, "Artillery Fire Control");
@@ -90,67 +89,14 @@ function buttonSlots(card) {
 }
 
 {
-  const card = engineeringComplexCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK]);
-  const ids = slotIds(card);
-  assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
-  assert.equal(card.slots[1].label, "Artillery");
-  assert.equal(card.slots[1].enabled, true);
-  assert.equal(card.slots[2].enabled, false);
-  assert.equal(card.slots[2].title, "Requires Artillery");
-}
-
-{
-  const emptyEngineeringComplex = { ...engineeringComplex, id: 11, prodUpgradeQueue: [] };
-  const queuedEngineeringComplex = {
-    ...engineeringComplex,
-    id: 12,
-    prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
-  };
-  const card = buildCommandCardDescriptors({
-    playerId: 1,
-    selection: [emptyEngineeringComplex, queuedEngineeringComplex],
-    resources: { steel: 1000, oil: 1000 },
-    upgrades: [],
-    playerHasCompleteKind: () => true,
-    groupCooldownClocks: () => [],
-  });
-  assert.equal(
-    card.slots[1].intent.buildingId,
-    queuedEngineeringComplex.id,
-    "dependent research should target the selected building that owns its queued prerequisite",
-  );
-}
-
-{
-  const selectedEngineeringComplex = { ...engineeringComplex, id: 11, prodUpgradeQueue: [] };
-  const otherEngineeringComplex = {
-    ...engineeringComplex,
-    id: 12,
-    prodUpgrade: UPGRADE.ANTI_TANK_GUN_UNLOCK,
-    prodUpgradeQueue: [UPGRADE.ANTI_TANK_GUN_UNLOCK],
-  };
-  const card = buildCommandCardDescriptors({
-    playerId: 1,
-    selection: [selectedEngineeringComplex],
-    currentEntities: [selectedEngineeringComplex, otherEngineeringComplex],
-    resources: { steel: 1000, oil: 1000 },
-    upgrades: [],
-    playerHasCompleteKind: () => true,
-    groupCooldownClocks: () => [],
-  });
-  assert.equal(card.slots[0].enabled, false);
-  assert.equal(card.slots[0].title, "Researching");
-}
-
-{
-  const card = engineeringComplexCard([], [UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
+  const card = engineeringComplexCard([], [UPGRADE.ARTILLERY_UNLOCK]);
   assert.equal(card.slots[1].enabled, false);
   assert.equal(card.slots[1].title, "Queued");
   assert.equal(card.slots[2].enabled, true);
 }
 
 {
-  const ids = slotIds(engineeringComplexCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.TANK_UNLOCK]));
+  const ids = slotIds(engineeringComplexCard([UPGRADE.TANK_UNLOCK]));
   assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.BALLISTIC_TABLES}`);
@@ -160,7 +106,7 @@ function buttonSlots(card) {
 }
 
 {
-  const card = engineeringComplexCard([UPGRADE.ANTI_TANK_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK]);
+  const card = engineeringComplexCard([UPGRADE.ARTILLERY_UNLOCK]);
   const ids = slotIds(card);
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
@@ -703,18 +649,18 @@ function buttonSlots(card) {
     "gun-works-train",
     "training-centre",
     "engineering-complex",
-    "engineering-complex-at-guns",
+    "engineering-complex-artillery",
     "ekat-unit",
     "ekat-zamok-train",
   ]);
   assert(
     catalog.some((entry) =>
-      entry.id === "engineering-complex-at-guns" &&
+      entry.id === "engineering-complex-artillery" &&
         entry.card.slots.some((slot) =>
-          slot?.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK)
+          slot?.commandId === kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES)
         )
     ),
-    "command-card context catalog samples the queued research-chain state",
+    "command-card context catalog samples the researched Artillery state",
   );
   assert(
     catalog.some((entry) =>
