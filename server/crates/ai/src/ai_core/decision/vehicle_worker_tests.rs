@@ -468,17 +468,13 @@ fn jeff_interrupts_busy_machine_gunner_to_clear_vehicle_works_site() {
 #[test]
 fn jeff_does_not_research_retired_anti_tank_unlock() {
     let mut factory = building(5, EntityKind::Factory, Some(0));
-    let mut observation = jeff_armored_tech_observation(Some(factory.clone()));
-    observation.upgrades = vec![UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    memory.containment_wave_launched = true;
-    let width = observation.map.width;
-    let height = observation.map.height;
     factory.state = AiEntityState::Train;
     factory.production_queue_len = Some(1);
     factory.production_kind = Some(EntityKind::Tank);
-    observation = jeff_armored_tech_observation(Some(factory));
+    let mut observation = jeff_armored_tech_observation(Some(factory));
     observation.upgrades = vec![UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
+    let width = observation.map.width;
+    let height = observation.map.height;
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     memory.containment_wave_launched = true;
     let decision = decide_profile_without_static_map_for_tests(
