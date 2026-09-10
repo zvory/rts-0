@@ -331,12 +331,7 @@ fn artillery_research_is_available_without_at_guns() {
         upgrade: UpgradeKind::ArtilleryUnlock,
     };
 
-    let events = apply_with_players(
-        &map,
-        &mut entities,
-        &mut players,
-        vec![(1, command)],
-    );
+    let events = apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
     assert!(events.get(&1).is_none_or(Vec::is_empty));
     let queue = entities
         .get(engineering_complex)
