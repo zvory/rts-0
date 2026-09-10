@@ -323,6 +323,18 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 const ROCKET_LAUNCHER_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::RocketLauncher];
+const SCOUT_PLANE_ABILITY_CARRIERS: &[EntityKind] =
+    &[EntityKind::ResourceDepot, EntityKind::CommandCar];
+const SCOUT_PLANE_CARRIER_COSTS: &[ResourceCost] = &[
+    ResourceCost::new(
+        balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_STEEL,
+        balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_OIL,
+    ),
+    ResourceCost::new(
+        balance::SCOUT_PLANE_COMMAND_CAR_COST_STEEL,
+        balance::SCOUT_PLANE_COMMAND_CAR_COST_OIL,
+    ),
+];
 
 const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
     UpgradeCatalogEntry {
@@ -509,7 +521,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         icon: "SP",
         hotkey: Some("C"),
         title: "Launch a scout plane sortie",
-        carriers: &[EntityKind::ResourceDepot, EntityKind::CommandCar],
+        carriers: SCOUT_PLANE_ABILITY_CARRIERS,
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: None,
         min_range_tiles: None,
@@ -974,17 +986,17 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
 }
 
 pub fn ability_cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> ResourceCost {
-    match (kind, carrier) {
-        (AbilityKind::ScoutPlane, EntityKind::ResourceDepot) => ResourceCost::new(
-            balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_STEEL,
-            balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_OIL,
-        ),
-        (AbilityKind::ScoutPlane, EntityKind::CommandCar) => ResourceCost::new(
-            balance::SCOUT_PLANE_COMMAND_CAR_COST_STEEL,
-            balance::SCOUT_PLANE_COMMAND_CAR_COST_OIL,
-        ),
-        _ => ability_definition(kind).cost,
+    let definition = ability_definition(kind);
+    if kind == AbilityKind::ScoutPlane {
+        return definition
+            .carriers
+            .iter()
+            .position(|candidate| *candidate == carrier)
+            .and_then(|index| SCOUT_PLANE_CARRIER_COSTS.get(index))
+            .copied()
+            .unwrap_or(definition.cost);
     }
+    definition.cost
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
@@ -1077,8 +1089,9 @@ mod tests {
         assert!(catalog.allows_ability(AbilityKind::Smoke, EntityKind::ScoutCar));
         assert!(catalog.allows_ability(AbilityKind::PointFire, ARTILLERY_ABILITY_CARRIERS[0]));
         assert!(catalog.allows_ability(AbilityKind::BlanketFire, ARTILLERY_ABILITY_CARRIERS[0]));
-        assert!(catalog.allows_ability(AbilityKind::ScoutPlane, EntityKind::CommandCar));
-        assert!(catalog.allows_ability(AbilityKind::ScoutPlane, EntityKind::ResourceDepot));
+        for carrier in SCOUT_PLANE_ABILITY_CARRIERS {
+            assert!(catalog.allows_ability(AbilityKind::ScoutPlane, *carrier));
+        }
         assert!(!catalog.allows_ability(AbilityKind::Charge, EntityKind::Rifleman));
         assert!(!catalog.allows_ability(AbilityKind::DismissScoutPlane, EntityKind::ScoutPlane));
         assert!(!catalog.allows_ability(AbilityKind::Smoke, EntityKind::Worker));
@@ -1133,21 +1146,18 @@ mod tests {
         assert!(smoke.command_card);
 
         let scout_plane = CURRENT_CATALOG.ability(AbilityKind::ScoutPlane).unwrap();
-        assert_eq!(
-            scout_plane.carriers,
-            &[EntityKind::ResourceDepot, EntityKind::CommandCar]
-        );
+        assert_eq!(scout_plane.carriers, SCOUT_PLANE_ABILITY_CARRIERS);
         assert_eq!(
             scout_plane.upgrade_requirement,
             Some(UpgradeKind::ScoutPlaneUnlock),
             "Scout Plane should require its Engineering Complex upgrade"
         );
         assert_eq!(
-            ability_cost_for_carrier(AbilityKind::ScoutPlane, EntityKind::ResourceDepot),
+            ability_cost_for_carrier(AbilityKind::ScoutPlane, SCOUT_PLANE_ABILITY_CARRIERS[0]),
             ResourceCost::new(38, 56)
         );
         assert_eq!(
-            ability_cost_for_carrier(AbilityKind::ScoutPlane, EntityKind::CommandCar),
+            ability_cost_for_carrier(AbilityKind::ScoutPlane, SCOUT_PLANE_ABILITY_CARRIERS[1]),
             ResourceCost::new(63, 94)
         );
 
