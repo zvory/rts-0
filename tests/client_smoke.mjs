@@ -406,8 +406,8 @@ try {
       .map((button) => button.dataset.commandId),
   }));
   ok(
-    engineerBuildCard.hasDepotButton && !engineerBuildCard.hasPumpJackButton,
-    `BUILD: Engineer constructs bases but not extractors (${JSON.stringify(engineerBuildCard)})`,
+    engineerBuildCard.hasDepotButton && engineerBuildCard.hasPumpJackButton,
+    `BUILD: Engineer constructs bases and manual Pump Jacks (${JSON.stringify(engineerBuildCard)})`,
   );
 
   const extractorSlots = await page.evaluate(() => {
