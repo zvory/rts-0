@@ -303,7 +303,7 @@ function buttonSlots(card) {
     playerHasCompleteKind: (kind) => kind === KIND.STEELWORKS,
     groupCooldownClocks: () => [],
   });
-  const scoutPlaneCommandId = kriegsiaCommandId("train", KIND.SCOUT_PLANE);
+  const scoutPlaneTrainCommandId = kriegsiaCommandId("train", KIND.SCOUT_PLANE);
   for (const steel of [0, 150]) {
     const card = buildCommandCardDescriptors({
       playerId: 1,
@@ -320,9 +320,31 @@ function buttonSlots(card) {
     assert.equal(pumpJack.intent, null);
   }
   assert.deepEqual(
-    commandCardActivationCandidates(resourceDepotCard, scoutPlaneCommandId),
+    commandCardActivationCandidates(resourceDepotCard, scoutPlaneTrainCommandId),
     [],
     "Resource Depot no longer exposes Scout Plane production",
+  );
+  const researchedDepotCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [resourceDepot],
+    resources: { steel: 38, oil: 56, supplyUsed: 0, supplyCap: 20 },
+    upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.deepEqual(
+    commandCardActivationCandidates(
+      researchedDepotCard,
+      kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE),
+    ),
+    [{
+      commandId: kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE),
+      slotIndex: 8,
+      hotkey: "C",
+      label: "Scout Plane",
+      enabled: true,
+    }],
+    "researched Resource Depot exposes its discounted Scout Plane ability on C",
   );
   assert.deepEqual(
     resourceDepotCard.slots.slice(0, 3).map((slot) => slot?.commandId),
@@ -476,8 +498,8 @@ function buttonSlots(card) {
     { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
     { commandId: kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE), slotIndex: 8, hotkey: "C" },
   ]);
-  assert.equal(commandCarCard.slots[8].cost.steel, 50);
-  assert.equal(commandCarCard.slots[8].cost.oil, 75);
+  assert.equal(commandCarCard.slots[8].cost.steel, 63);
+  assert.equal(commandCarCard.slots[8].cost.oil, 94);
 }
 
 {

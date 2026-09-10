@@ -351,6 +351,14 @@ function assertAbilityDescriptor(entry, factionId) {
     asClientKinds(entry.carriers),
     `${factionId} ${entry.id} carriers mirror Rust catalog`,
   );
+  assert.deepEqual(
+    descriptor.carrierCosts || {},
+    Object.fromEntries(Object.entries(entry.carrierCosts || {}).map(([kind, cost]) => [
+      kindByStableId.get(kind),
+      cost,
+    ])),
+    `${factionId} ${entry.id} carrier costs mirror Rust catalog`,
+  );
   assert.equal(descriptor.targetMode, entry.targetMode, `${factionId} ${entry.id} target mode mirrors Rust registry`);
   assert.equal(descriptor.rangeTiles ?? null, entry.rangeTiles, `${factionId} ${entry.id} range mirrors Rust registry`);
   assert.equal(descriptor.minRangeTiles ?? null, entry.minRangeTiles, `${factionId} ${entry.id} min range mirrors Rust registry`);

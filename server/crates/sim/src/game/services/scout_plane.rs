@@ -14,19 +14,25 @@ pub(crate) fn launch_ability(
     map: &Map,
     entities: &mut EntityStore,
     owner: u32,
-    source_command_car: u32,
+    source: u32,
     x: f32,
     y: f32,
 ) -> Result<u32, ScoutPlaneLaunchError> {
     let Some((target_x, target_y)) = clamp_world_point(map, x, y) else {
         return Err(ScoutPlaneLaunchError::InvalidLaunch);
     };
-    let Some((launch_x, launch_y)) = entities
-        .get(source_command_car)
+    let Some((launch_x, launch_y, source_kind)) = entities
+        .get(source)
         .filter(|source| {
-            source.owner == owner && source.kind == EntityKind::CommandCar && source.hp > 0
+            source.owner == owner
+                && matches!(
+                    source.kind,
+                    EntityKind::ResourceDepot | EntityKind::CommandCar
+                )
+                && source.hp > 0
+                && !source.under_construction()
         })
-        .map(|source| (source.pos_x, source.pos_y))
+        .map(|source| (source.pos_x, source.pos_y, source.kind))
     else {
         return Err(ScoutPlaneLaunchError::InvalidLaunch);
     };
@@ -38,8 +44,11 @@ pub(crate) fn launch_ability(
         .ok_or(ScoutPlaneLaunchError::InvalidLaunch)?;
     if let Some(plane) = entities.get_mut(spawned) {
         if let Some(state) = plane.scout_plane_state_mut() {
-            *state =
-                ScoutPlaneState::launched_from_command_car(source_command_car, target_x, target_y);
+            *state = if source_kind == EntityKind::CommandCar {
+                ScoutPlaneState::launched_from_command_car(source, target_x, target_y)
+            } else {
+                ScoutPlaneState::launched_from_source(None, target_x, target_y)
+            };
         }
     }
     Ok(spawned)

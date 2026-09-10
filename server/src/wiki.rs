@@ -396,8 +396,8 @@ fn ability_table() -> StatsTable {
                         optional_u32(ability.min_range_tiles),
                         ability.cooldown_ticks.to_string(),
                         optional_u16(ability.charges),
-                        ability.cost.steel.to_string(),
-                        ability.cost.oil.to_string(),
+                        ability_cost_column(*ability, |cost| cost.steel),
+                        ability_cost_column(*ability, |cost| cost.oil),
                         optional_kind(ability.tech_requirement),
                         ability
                             .upgrade_requirement
@@ -411,6 +411,31 @@ fn ability_table() -> StatsTable {
             })
             .collect(),
     }
+}
+
+fn ability_cost_column(
+    ability: faction::AbilityCatalogEntry,
+    resource: impl Fn(rts_rules::economy::ResourceCost) -> u32,
+) -> String {
+    let carrier_costs: Vec<_> = ability
+        .carriers
+        .iter()
+        .copied()
+        .map(|carrier| {
+            (
+                carrier,
+                faction::ability_cost_for_carrier(ability.kind, carrier),
+            )
+        })
+        .collect();
+    if carrier_costs.iter().all(|(_, cost)| *cost == ability.cost) {
+        return resource(ability.cost).to_string();
+    }
+    carrier_costs
+        .into_iter()
+        .map(|(carrier, cost)| format!("{}: {}", kind_label(carrier), resource(cost)))
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 fn render_stats_tables(tables: &[StatsTable]) -> String {
@@ -1010,8 +1035,8 @@ mod tests {
                     optional_u32(ability.min_range_tiles),
                     ability.cooldown_ticks.to_string(),
                     optional_u16(ability.charges),
-                    ability.cost.steel.to_string(),
-                    ability.cost.oil.to_string(),
+                    ability_cost_column(*ability, |cost| cost.steel),
+                    ability_cost_column(*ability, |cost| cost.oil),
                     optional_kind(ability.tech_requirement),
                     ability
                         .upgrade_requirement

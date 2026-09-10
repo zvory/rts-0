@@ -508,8 +508,8 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         label: "Scout Plane",
         icon: "SP",
         hotkey: Some("C"),
-        title: "Launch this Command Car's scout plane",
-        carriers: &[EntityKind::CommandCar],
+        title: "Launch a scout plane sortie",
+        carriers: &[EntityKind::ResourceDepot, EntityKind::CommandCar],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: None,
         min_range_tiles: None,
@@ -973,6 +973,20 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
     }
 }
 
+pub fn ability_cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> ResourceCost {
+    match (kind, carrier) {
+        (AbilityKind::ScoutPlane, EntityKind::ResourceDepot) => ResourceCost::new(
+            balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_STEEL,
+            balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_OIL,
+        ),
+        (AbilityKind::ScoutPlane, EntityKind::CommandCar) => ResourceCost::new(
+            balance::SCOUT_PLANE_COMMAND_CAR_COST_STEEL,
+            balance::SCOUT_PLANE_COMMAND_CAR_COST_OIL,
+        ),
+        _ => ability_definition(kind).cost,
+    }
+}
+
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
     let [methamphetamines, panzerfausts, entrenchment, anti_tank_gun_unlock, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock, rockets] =
         DEFAULT_UPGRADES;
@@ -1064,6 +1078,7 @@ mod tests {
         assert!(catalog.allows_ability(AbilityKind::PointFire, ARTILLERY_ABILITY_CARRIERS[0]));
         assert!(catalog.allows_ability(AbilityKind::BlanketFire, ARTILLERY_ABILITY_CARRIERS[0]));
         assert!(catalog.allows_ability(AbilityKind::ScoutPlane, EntityKind::CommandCar));
+        assert!(catalog.allows_ability(AbilityKind::ScoutPlane, EntityKind::ResourceDepot));
         assert!(!catalog.allows_ability(AbilityKind::Charge, EntityKind::Rifleman));
         assert!(!catalog.allows_ability(AbilityKind::DismissScoutPlane, EntityKind::ScoutPlane));
         assert!(!catalog.allows_ability(AbilityKind::Smoke, EntityKind::Worker));
@@ -1119,9 +1134,21 @@ mod tests {
 
         let scout_plane = CURRENT_CATALOG.ability(AbilityKind::ScoutPlane).unwrap();
         assert_eq!(
+            scout_plane.carriers,
+            &[EntityKind::ResourceDepot, EntityKind::CommandCar]
+        );
+        assert_eq!(
             scout_plane.upgrade_requirement,
             Some(UpgradeKind::ScoutPlaneUnlock),
             "Scout Plane should require its Engineering Complex upgrade"
+        );
+        assert_eq!(
+            ability_cost_for_carrier(AbilityKind::ScoutPlane, EntityKind::ResourceDepot),
+            ResourceCost::new(38, 56)
+        );
+        assert_eq!(
+            ability_cost_for_carrier(AbilityKind::ScoutPlane, EntityKind::CommandCar),
+            ResourceCost::new(63, 94)
         );
 
         let point_fire = CURRENT_CATALOG.ability(AbilityKind::PointFire).unwrap();

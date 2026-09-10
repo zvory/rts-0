@@ -58,6 +58,43 @@ fn scout_plane_is_no_longer_trained_at_resource_depots() {
 }
 
 #[test]
+fn researched_resource_depot_launches_a_discounted_scout_plane_ability() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let (depot_x, depot_y) = footprint_center(&map, EntityKind::ResourceDepot, 6, 6);
+    let resource_depot = entities
+        .spawn_building(1, EntityKind::ResourceDepot, depot_x, depot_y, true)
+        .expect("resource depot should spawn");
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].upgrades.insert(UpgradeKind::ScoutPlaneUnlock);
+
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(1, scout_plane_command(vec![resource_depot], 592.0, 592.0))],
+    );
+
+    assert_eq!((players[0].steel, players[0].oil), (962, 944));
+    assert_eq!(
+        entities
+            .get(resource_depot)
+            .expect("resource depot")
+            .ability_cooldown_ticks(AbilityKind::ScoutPlane),
+        config::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS
+    );
+    let plane = entities
+        .iter()
+        .find(|entity| entity.kind == EntityKind::ScoutPlane)
+        .expect("Scout Plane should spawn");
+    assert_eq!((plane.pos_x, plane.pos_y), (depot_x, depot_y));
+    let state = plane.scout_plane_state().expect("plane state");
+    assert_eq!(state.source_command_car, None);
+    assert_eq!(state.orbit_center, (592.0, 592.0));
+    assert_notice(&events, 1, "Scout Plane");
+}
+
+#[test]
 fn command_car_scout_plane_ability_launches_from_caster_without_a_resource_depot() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
@@ -74,8 +111,8 @@ fn command_car_scout_plane_ability_launches_from_caster_without_a_resource_depot
         vec![(1, scout_plane_command(vec![command_car], 592.0, 592.0))],
     );
 
-    assert_eq!(players[0].steel, 950);
-    assert_eq!(players[0].oil, 925);
+    assert_eq!(players[0].steel, 937);
+    assert_eq!(players[0].oil, 906);
     assert_eq!(
         entities
             .get(command_car)
@@ -152,7 +189,7 @@ fn each_command_car_can_launch_its_own_scout_plane() {
         ],
     );
 
-    assert_eq!((players[0].steel, players[0].oil), (900, 850));
+    assert_eq!((players[0].steel, players[0].oil), (874, 812));
     let mut source_cars = entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::ScoutPlane && entity.owner == 1)
@@ -237,7 +274,7 @@ fn command_car_can_launch_again_when_ready_while_an_earlier_plane_is_active() {
         vec![(1, scout_plane_command(vec![command_car], 512.0, 512.0))],
     );
 
-    assert_eq!((players[0].steel, players[0].oil), (900, 850));
+    assert_eq!((players[0].steel, players[0].oil), (874, 812));
     assert_eq!(
         entities
             .iter()
@@ -276,7 +313,7 @@ fn scout_plane_command_uses_the_first_ready_selected_command_car() {
         )],
     );
 
-    assert_eq!((players[0].steel, players[0].oil), (900, 850));
+    assert_eq!((players[0].steel, players[0].oil), (874, 812));
     let mut source_cars = entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::ScoutPlane && entity.owner == 1)
