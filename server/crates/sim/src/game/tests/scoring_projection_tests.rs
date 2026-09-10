@@ -20,6 +20,7 @@ fn scores_count_starting_entities() {
         human.structure_score,
         entity_score_value(EntityKind::ResourceDepot)
             + config::STARTING_STEEL_MINES * entity_score_value(EntityKind::SteelMine)
+            + config::STARTING_PUMP_JACKS * entity_score_value(EntityKind::PumpJack)
     );
     assert_eq!(human.units_killed, 0);
     assert_eq!(human.units_lost, 0);
@@ -279,7 +280,8 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
         .iter()
         .any(|row| row.kind == "depot" && row.count == 1 && row.steel_value > 0));
     let expected_steel =
-        economy_rules::cost(EntityKind::Worker).0 + economy_rules::cost(EntityKind::Depot).0;
+        economy_rules::cost(EntityKind::Worker).0 + economy_rules::cost(EntityKind::Depot).0
+        + economy_rules::cost(EntityKind::PumpJack).0;
     let expected_oil =
         economy_rules::cost(EntityKind::Worker).1 + economy_rules::cost(EntityKind::Depot).1;
     assert_eq!(player_two.resources_lost.steel, expected_steel);

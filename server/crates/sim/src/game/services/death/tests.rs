@@ -119,10 +119,9 @@ fn destroyed_depot_does_not_refund_linked_extractor_construction() {
     );
     game.tick();
 
-    let pump_jack_cost = economy::resource_cost(EntityKind::PumpJack);
     assert_eq!(
         game.state.players[0].steel,
-        starting_steel - pump_jack_cost.steel
+        starting_steel
     );
     let scaffold = game
         .state
@@ -146,7 +145,7 @@ fn destroyed_depot_does_not_refund_linked_extractor_construction() {
     assert!(game.state.entities.get(scaffold).is_none());
     assert_eq!(
         game.state.players[0].steel,
-        starting_steel - pump_jack_cost.steel,
+        starting_steel,
         "extractor construction destroyed with its producer must not be refunded"
     );
 }
@@ -265,10 +264,7 @@ fn killed_completed_automatic_extractor_cooldown_survives_checkpoint_restore() {
         .map(|entity| entity.id)
         .collect::<Vec<_>>();
 
-    for _ in 0..config::building_stats(EntityKind::PumpJack)
-        .expect("pump jack stats")
-        .build_ticks
-    {
+    for _ in 0..config::AUTOMATIC_PUMP_JACK_BUILD_TICKS {
         game.tick();
     }
 
