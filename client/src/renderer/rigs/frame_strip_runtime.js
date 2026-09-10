@@ -116,9 +116,11 @@ function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback 
   return validFrame(strip, firingFrames[index], fallback);
 }
 
-export function frameStripVisualFacing(stripOrEntity, maybeEntity = null, renderContext = null) {
+export function frameStripVisualFacing(stripOrEntity, maybeEntity = null, renderContext = null, frameIndex = null) {
   const strip = maybeEntity ? stripOrEntity : null;
   const entity = maybeEntity ?? stripOrEntity;
+  const resolvedFrame = frameIndex ?? frameStripFrameIndex(strip, entity, renderContext ?? {});
+  const facingOffset = frameStripFacingOffset(strip, resolvedFrame);
   const moving = frameStripEntityIsMoving(entity, renderContext);
   const setupState = entity?.setupState || SETUP.PACKED;
   if (strip?.packedFacing === "body" && setupState === SETUP.PACKED && !moving && Number.isFinite(entity?.facing)) {
@@ -129,11 +131,22 @@ export function frameStripVisualFacing(stripOrEntity, maybeEntity = null, render
     if (Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing - setupForwardAngle;
     if (Number.isFinite(entity?.facing)) return entity.facing - setupForwardAngle;
   }
-  if (frameStripUsesMovementFrames(strip, entity, renderContext) && Number.isFinite(entity?.facing)) {
-    return entity.facing + finite(strip?.movementFacingOffset, 0);
+  const firingFrames = validFrameList(strip, strip?.firingFrames);
+  if (firingFrames.includes(resolvedFrame) && Number.isFinite(entity?.weaponFacing)) {
+    return entity.weaponFacing + facingOffset;
   }
-  if (!moving && Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing;
-  return finite(entity?.facing, 0);
+  if (frameStripUsesMovementFrames(strip, entity, renderContext) && Number.isFinite(entity?.facing)) {
+    return entity.facing + finite(strip?.movementFacingOffset, facingOffset);
+  }
+  if (!moving && Number.isFinite(entity?.weaponFacing)) return entity.weaponFacing + facingOffset;
+  return finite(entity?.facing, 0) + facingOffset;
+}
+
+function frameStripFacingOffset(strip, frameIndex) {
+  const baseOffset = finite(strip?.facingOffset, 0);
+  const firingFrames = validFrameList(strip, strip?.firingFrames);
+  if (firingFrames.includes(frameIndex)) return finite(strip?.firingFacingOffset, baseOffset);
+  return baseOffset;
 }
 
 export function frameStripWorldScale(strip, entity, renderContext = null) {
@@ -203,9 +216,8 @@ class FrameStripUnitInstance {
     applyWorldYDepth(this.container, entity);
     const scale = rigContainerScale(renderContext);
     setPoint(this.container.scale, scale, scale);
-    this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext);
-
     const frameIndex = frameStripFrameIndex(this.strip, entity, renderContext);
+    this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext, frameIndex);
     if (frameIndex !== this._frameIndex) {
       this.sprite.texture = this.frameTextures[frameIndex] ?? this.frameTextures[0];
       this._frameIndex = frameIndex;
