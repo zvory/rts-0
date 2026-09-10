@@ -325,14 +325,20 @@ const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 const ROCKET_LAUNCHER_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::RocketLauncher];
 const SCOUT_PLANE_ABILITY_CARRIERS: &[EntityKind] =
     &[EntityKind::ResourceDepot, EntityKind::CommandCar];
-const SCOUT_PLANE_CARRIER_COSTS: &[ResourceCost] = &[
-    ResourceCost::new(
-        balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_STEEL,
-        balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_OIL,
+const SCOUT_PLANE_CARRIER_COSTS: &[(EntityKind, ResourceCost)] = &[
+    (
+        EntityKind::ResourceDepot,
+        ResourceCost::new(
+            balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_STEEL,
+            balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_OIL,
+        ),
     ),
-    ResourceCost::new(
-        balance::SCOUT_PLANE_COMMAND_CAR_COST_STEEL,
-        balance::SCOUT_PLANE_COMMAND_CAR_COST_OIL,
+    (
+        EntityKind::CommandCar,
+        ResourceCost::new(
+            balance::SCOUT_PLANE_COMMAND_CAR_COST_STEEL,
+            balance::SCOUT_PLANE_COMMAND_CAR_COST_OIL,
+        ),
     ),
 ];
 
@@ -987,16 +993,14 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
 
 pub fn ability_cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> ResourceCost {
     let definition = ability_definition(kind);
-    if kind == AbilityKind::ScoutPlane {
-        return definition
-            .carriers
-            .iter()
-            .position(|candidate| *candidate == carrier)
-            .and_then(|index| SCOUT_PLANE_CARRIER_COSTS.get(index))
-            .copied()
-            .unwrap_or(definition.cost);
-    }
-    definition.cost
+    let carrier_costs = match kind {
+        AbilityKind::ScoutPlane => SCOUT_PLANE_CARRIER_COSTS,
+        _ => &[],
+    };
+    carrier_costs
+        .iter()
+        .find_map(|(candidate, cost)| (*candidate == carrier).then_some(*cost))
+        .unwrap_or(definition.cost)
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
@@ -1153,11 +1157,11 @@ mod tests {
             "Scout Plane should require its Engineering Complex upgrade"
         );
         assert_eq!(
-            ability_cost_for_carrier(AbilityKind::ScoutPlane, SCOUT_PLANE_ABILITY_CARRIERS[0]),
+            ability_cost_for_carrier(AbilityKind::ScoutPlane, EntityKind::ResourceDepot),
             ResourceCost::new(38, 56)
         );
         assert_eq!(
-            ability_cost_for_carrier(AbilityKind::ScoutPlane, SCOUT_PLANE_ABILITY_CARRIERS[1]),
+            ability_cost_for_carrier(AbilityKind::ScoutPlane, EntityKind::CommandCar),
             ResourceCost::new(63, 94)
         );
 
