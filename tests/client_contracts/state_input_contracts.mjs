@@ -1182,8 +1182,7 @@ function buttonByLabel(card, label) {
   input._onRightClick({ x: 112, y: 112 }, { shiftKey: true });
   assert(
     rightClickCommands.length === 1 &&
-      rightClickCommands[0].c === "build" &&
-      rightClickCommands[0].building === KIND.PUMP_JACK &&
+      rightClickCommands[0].c === "build" && rightClickCommands[0].building === KIND.PUMP_JACK &&
       rightClickCommands[0].queued === true,
     "Engineer shift-right-click on Oil queues Pump Jack construction",
   );
