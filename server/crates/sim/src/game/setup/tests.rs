@@ -749,8 +749,7 @@ fn cultivators_start_train_and_mine_with_only_nexus_construction() {
         .find(|e| e.owner == 1 && e.kind == EntityKind::ResourceDepot)
         .unwrap()
         .id;
-    game.state.players[0].steel = 2000;
-    game.state.players[0].oil = 2000;
+    game.state.players[0].set_resources(2000, 2000);
     game.enqueue(
         1,
         SimCommand::Build {
