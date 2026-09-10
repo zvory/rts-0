@@ -323,18 +323,22 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 const ROCKET_LAUNCHER_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::RocketLauncher];
-const SCOUT_PLANE_ABILITY_CARRIERS: &[EntityKind] =
-    &[EntityKind::ResourceDepot, EntityKind::CommandCar];
+const SCOUT_PLANE_RESOURCE_DEPOT_CARRIER: EntityKind = EntityKind::ResourceDepot;
+const SCOUT_PLANE_COMMAND_CAR_CARRIER: EntityKind = EntityKind::CommandCar;
+const SCOUT_PLANE_ABILITY_CARRIERS: &[EntityKind] = &[
+    SCOUT_PLANE_RESOURCE_DEPOT_CARRIER,
+    SCOUT_PLANE_COMMAND_CAR_CARRIER,
+];
 const SCOUT_PLANE_CARRIER_COSTS: &[(EntityKind, ResourceCost)] = &[
     (
-        EntityKind::ResourceDepot,
+        SCOUT_PLANE_RESOURCE_DEPOT_CARRIER,
         ResourceCost::new(
             balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_STEEL,
             balance::SCOUT_PLANE_RESOURCE_DEPOT_COST_OIL,
         ),
     ),
     (
-        EntityKind::CommandCar,
+        SCOUT_PLANE_COMMAND_CAR_CARRIER,
         ResourceCost::new(
             balance::SCOUT_PLANE_COMMAND_CAR_COST_STEEL,
             balance::SCOUT_PLANE_COMMAND_CAR_COST_OIL,
@@ -1157,11 +1161,11 @@ mod tests {
             "Scout Plane should require its Engineering Complex upgrade"
         );
         assert_eq!(
-            ability_cost_for_carrier(AbilityKind::ScoutPlane, EntityKind::ResourceDepot),
+            ability_cost_for_carrier(AbilityKind::ScoutPlane, SCOUT_PLANE_RESOURCE_DEPOT_CARRIER),
             ResourceCost::new(38, 56)
         );
         assert_eq!(
-            ability_cost_for_carrier(AbilityKind::ScoutPlane, EntityKind::CommandCar),
+            ability_cost_for_carrier(AbilityKind::ScoutPlane, SCOUT_PLANE_COMMAND_CAR_CARRIER),
             ResourceCost::new(63, 94)
         );
 
