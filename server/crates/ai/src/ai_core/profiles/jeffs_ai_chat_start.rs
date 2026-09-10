@@ -15,8 +15,8 @@ const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
 const ARMORED_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
-    EntityKind::EngineeringComplex,
     EntityKind::Factory,
+    EntityKind::EngineeringComplex,
 ];
 const UPGRADES: [UpgradeKind; 2] = [UpgradeKind::TankUnlock, UpgradeKind::Entrenchment];
 const OPTIONAL_UPGRADES: [UpgradeKind; 1] = [UpgradeKind::Methamphetamines];
@@ -153,10 +153,11 @@ pub(crate) static JEFFS_AI_CHAT_START: AiProfile = AiProfile {
         },
     }),
     fast_tank_timing: Some(FastTankTimingPolicy {
-        workers_before_barracks: 2,
-        pump_jacks_before_barracks: 2,
-        tanks_before_scout_car: 2,
+        builder_engineers_before_barracks: 2,
+        automatic_extractors_before_barracks: 2,
+        tanks_before_scout_car: 0,
         scout_car_target: 1,
+        tanks_before_scout_car_replacement: 2,
         tanks_before_optional_upgrades: 3,
         optional_upgrades: &OPTIONAL_UPGRADES,
         preserve_during_defensive_panic: true,
@@ -185,6 +186,15 @@ mod tests {
             2
         );
         assert_eq!(transition.production.unit_priorities, &ARMORED_UNITS);
+        assert_eq!(
+            transition.required_tech_path,
+            &[
+                EntityKind::Barracks,
+                EntityKind::TrainingCentre,
+                EntityKind::Factory,
+                EntityKind::EngineeringComplex,
+            ]
+        );
         assert_eq!(JEFFS_AI_CHAT_START.production.queue_depth, 1);
         assert_eq!(transition.production.queue_depth, 1);
         assert_eq!(transition.attack.first_attack_size, 3);
@@ -216,10 +226,11 @@ mod tests {
         let timing = JEFFS_AI_CHAT_START
             .fast_tank_timing
             .expect("fast tank timing");
-        assert_eq!(timing.workers_before_barracks, 2);
-        assert_eq!(timing.pump_jacks_before_barracks, 2);
-        assert_eq!(timing.tanks_before_scout_car, 2);
+        assert_eq!(timing.builder_engineers_before_barracks, 2);
+        assert_eq!(timing.automatic_extractors_before_barracks, 2);
+        assert_eq!(timing.tanks_before_scout_car, 0);
         assert_eq!(timing.scout_car_target, 1);
+        assert_eq!(timing.tanks_before_scout_car_replacement, 2);
         assert_eq!(timing.optional_upgrades, &OPTIONAL_UPGRADES);
         assert_eq!(
             JEFFS_AI_CHAT_START
