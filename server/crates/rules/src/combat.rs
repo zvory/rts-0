@@ -41,6 +41,7 @@ impl AttackProfile {
 pub enum WeaponKind {
     WorkerTools,
     GolemFists,
+    WarriorSword,
     RiflemanRifle,
     MachineGunnerMg,
     ScoutCarMg,
@@ -54,9 +55,10 @@ pub enum WeaponKind {
 }
 
 impl WeaponKind {
-    pub const ALL: [WeaponKind; 11] = [
+    pub const ALL: [WeaponKind; 12] = [
         WeaponKind::WorkerTools,
         WeaponKind::GolemFists,
+        WeaponKind::WarriorSword,
         WeaponKind::RiflemanRifle,
         WeaponKind::MachineGunnerMg,
         WeaponKind::ScoutCarMg,
@@ -72,6 +74,7 @@ impl WeaponKind {
         match self {
             WeaponKind::WorkerTools => "worker_tools",
             WeaponKind::GolemFists => "golem_fists",
+            WeaponKind::WarriorSword => "warrior_sword",
             WeaponKind::RiflemanRifle => "rifleman_rifle",
             WeaponKind::MachineGunnerMg => "machine_gunner_mg",
             WeaponKind::ScoutCarMg => "scout_car_mg",
@@ -142,6 +145,17 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         infantry_target_policy: InfantryTargetPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
         overpenetration: OverpenetrationPolicy::DirectFire { range_factor: 0.25 },
+    },
+    WeaponProfile {
+        id: WeaponKind::WarriorSword,
+        range_tiles: 0.5,
+        dmg: 23,
+        cooldown: 32,
+        weapon_class: WeaponClass::SmallArms,
+        armor_penetration: 0.5,
+        infantry_target_policy: InfantryTargetPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+        overpenetration: OverpenetrationPolicy::None,
     },
     WeaponProfile {
         id: WeaponKind::RiflemanRifle,
@@ -297,6 +311,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
     match kind {
         EntityKind::Worker => Some(WeaponKind::WorkerTools),
         EntityKind::Golem => Some(WeaponKind::GolemFists),
+        EntityKind::Warrior => Some(WeaponKind::WarriorSword),
         EntityKind::Rifleman | EntityKind::Panzerfaust => Some(WeaponKind::RiflemanRifle),
         EntityKind::MachineGunner => Some(WeaponKind::MachineGunnerMg),
         EntityKind::AntiTankGun => Some(WeaponKind::AntiTankGun),
@@ -749,6 +764,7 @@ mod tests {
         let expected = [
             (WeaponKind::WorkerTools, "worker_tools"),
             (WeaponKind::GolemFists, "golem_fists"),
+            (WeaponKind::WarriorSword, "warrior_sword"),
             (WeaponKind::RiflemanRifle, "rifleman_rifle"),
             (WeaponKind::MachineGunnerMg, "machine_gunner_mg"),
             (WeaponKind::ScoutCarMg, "scout_car_mg"),
@@ -781,6 +797,7 @@ mod tests {
         let expected = [
             (EntityKind::Worker, Some(WeaponKind::WorkerTools)),
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
+            (EntityKind::Warrior, Some(WeaponKind::WarriorSword)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::Panzerfaust, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::MachineGunner, Some(WeaponKind::MachineGunnerMg)),
@@ -1178,6 +1195,12 @@ mod tests {
             (EntityKind::Worker, false, false, TargetThreatRole::Ordinary),
             (EntityKind::Golem, false, false, TargetThreatRole::Ordinary),
             (
+                EntityKind::Warrior,
+                false,
+                true,
+                TargetThreatRole::AntiArmorThreat,
+            ),
+            (
                 EntityKind::Rifleman,
                 false,
                 false,
@@ -1307,6 +1330,7 @@ mod tests {
         for victim in [
             EntityKind::Worker,
             EntityKind::Golem,
+            EntityKind::Warrior,
             EntityKind::Rifleman,
             EntityKind::Panzerfaust,
             EntityKind::MachineGunner,

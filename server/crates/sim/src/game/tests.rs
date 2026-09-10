@@ -41,3 +41,4 @@ mod smoke_charge_tests;
 mod smoke_mortar_tests;
 mod smoke_mortar_visibility_tests;
 mod tank_trap_tests;
+mod warrior_tests;

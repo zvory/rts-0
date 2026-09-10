@@ -503,6 +503,11 @@ await withFakeDocument(async () => {
     "LabPanel spawn palette filters Ekat to Ekat catalog units",
   );
   assertDeepEqual(
+    labSpawnUnitKindsForFaction("cultivators"),
+    [KIND.WORKER, KIND.WARRIOR],
+    "LabPanel and Interact expose the Cultivator Warrior spawn kind",
+  );
+  assertDeepEqual(
     labBuildingSpawnFactionOptions().map((entry) => entry.id),
     ["kriegsia", "cultivators", "ekat"],
     "LabPanel building spawn palette exposes product-playable faction catalogs",

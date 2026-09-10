@@ -423,6 +423,9 @@ const approvedCurrentFactionFiles = new Set([
   // Tank retreat inspection deliberately seeds a fixed Kriegsia armor matchup; public faction
   // admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/tank_retreat.rs",
+  // Warrior Portal duel deliberately seeds the Cultivator faction and its paid production queue;
+  // public faction admission remains routed through the catalog-aware dev scenario launcher.
+  "server/crates/sim/src/game/setup/dev_scenarios/warrior_portal_duel.rs",
   "server/crates/sim/src/game/setup/dev_scenarios/layouts.rs",
   "server/crates/sim/src/game/setup/dev_scenarios/layouts/tank_traps.rs",
   "server/crates/sim/src/game/systems.rs",

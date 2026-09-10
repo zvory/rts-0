@@ -28,12 +28,11 @@ buildings are deferred to future user-directed work.
 
 ### Approved brief and rules (Phases 0 and 1)
 
-The **Portal** is the Cultivators' first dedicated production building and its name is final. Its
-command-card description is: "A dormant production gateway. Unit production is not yet
-available." The Portal establishes the faction's supernatural production language now while
-leaving its roster for a later unit brief. Its immediate player tradeoff is 150 Steel invested in
-a vulnerable structure with no current economic or military output. Opponents counter it through
-ordinary scouting and building destruction; losing it has no additional effect in this slice.
+The **Portal** is the Cultivators' first dedicated production building and its name is final. It
+trains the faction's Warrior from grid slot 1 (`Q`). Its immediate player tradeoff is 150 Steel
+invested in a vulnerable structure before it can produce a front-line military unit. Opponents
+counter it through ordinary scouting and building destruction; losing it cancels access to new
+Warrior production but has no additional special effect.
 
 Cultivator Engineers build the Portal through the normal Build command. It costs 150 Steel and
 zero Oil, occupies a 3x3 footprint, and takes five seconds to construct, matching the Cultivator
@@ -42,8 +41,30 @@ Nexus; it is intentionally isolated here for easy tuning. The Portal has the Bar
 165 HP, armored building status, one tile of sight, normal building collision and terrain
 placement, ordinary construction cancellation/refund, repair, fog memory, minimap, damage, and
 death behavior. It provides and consumes no supply, has no weapon, has no prerequisite beyond a
-Cultivator Engineer, and has no build limit. It exposes no train, research, rally, aura, storage,
-or other production/economy action yet. Cultivator AI support remains deferred.
+Cultivator Engineer, and has no build limit. It supports ordinary Warrior production and rally
+orders, but exposes no research, aura, storage, or other economy action. Cultivator AI support
+remains deferred.
+
+### Warrior brief and rules (Phases 0 and 1)
+
+The **Warrior** is a tanky Cultivator melee bruiser trained from a completed Portal. Its command-card
+description is: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow
+attacks deal heavy damage." It costs 100 Steel and zero Oil, consumes 2 Supply, and takes 300 ticks
+(about 10 seconds) to train with no prerequisite. It has 135 HP, Small armor classification,
+11-tile sight, a 13.5 px collision/selection/render radius, and ordinary ground movement at 1.6
+px/tick. These values give it three times Rifleman HP, the same speed, and 1.5 times the radius.
+
+Its sword has 0.5-tile reach beyond collision radii, deals 23 base damage, attacks every 32 ticks,
+and applies 50% armor penetration. The 23 damage makes two successful hits lethal to a 45-HP
+Rifleman; the 32-tick cooldown interprets "half Rifleman attack speed" as half as many attacks per
+second. The sword uses general-purpose SmallArms target preference but has no projectile, tracer,
+muzzle flash, area damage, or overpenetration. It holds position while attacking and otherwise uses
+the ordinary attack, attack-move, hold, rally, fog, blocker, damage, and death rules.
+
+The first implementation uses clearly placeholder matte-white/off-white unarmored Chinese
+swordsman art with a plain robe, minimal topknot, runtime team tint, and a sword-swipe attack pose.
+It supports Lab/Interact spawning, but existing AI profiles
+do not train it. Final art, bespoke audio, AI composition, and post-playtest tuning are deferred.
 
 The completed building is a black-and-blue spinning ground portal: a dark framed 3x3 platform
 surrounds a layered vortex with counter-rotating rings, a pulsing black core, blue energy arcs,

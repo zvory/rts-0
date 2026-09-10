@@ -18,6 +18,7 @@ mod scout_car_open_ground_l_path;
 mod tank_coax;
 mod tank_damage_pursuit;
 mod tank_retreat;
+mod warrior_portal_duel;
 use dev_scenario_setup::{DevScenarioOrder, DevScenarioSetup};
 use layouts::*;
 

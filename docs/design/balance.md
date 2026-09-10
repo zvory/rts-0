@@ -192,7 +192,10 @@ Steel Mine and Oil Pumpjack, with only Nexus available for Engineer construction
 `cultivators.standard` loadout matches Kriegsia's starting economy and omits Riflemen.
 Cultivator Engineers can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 165 HP, one tile of sight, a five-second construction time, no prerequisite, and no
-current production output. Shared entity stats remain identical; see
+research. A completed Portal trains the Cultivator Warrior for 100 Steel and 2 Supply in 300 ticks.
+The Warrior is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
+23-damage sword has 0.5-tile reach, a 32-tick cooldown, 50% armor penetration, and no
+overpenetration. See
 [Cultivators specification](cultivators.md).
 
 
@@ -653,6 +656,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
 | golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
+| warrior         | 135 | 23  | 0.5   | 32 | 1.6   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile, tracer, or overpenetration |
 | rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |

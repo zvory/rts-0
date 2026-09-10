@@ -10,6 +10,7 @@ mod replay_303_scout_car_forest_lock;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_retreat;
+mod warrior_portal_duel;
 use move_reload_acquisition::MOVE_RELOAD_ACQUISITION_SPEC;
 use scout_car_lake_reverse_l_path::SCOUT_CAR_LAKE_REVERSE_L_PATH_SPEC;
 use scout_car_open_ground_l_path::SCOUT_CAR_OPEN_GROUND_L_PATH_SPEC;
@@ -766,8 +767,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     blocker: None,
     case: None,
 }];
-
-const DEV_SCENARIOS: [DevScenarioSpec; 29] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 30] = [
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -873,6 +873,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 29] = [
     TANK_UNDER_FIRE_RETREAT_SPEC,
     TANK_REVERSE_TRAFFIC_SPEC,
     TANK_DAMAGE_PURSUIT_PIVOT_SPEC,
+    warrior_portal_duel::SPEC,
 ];
 
 pub fn all_dev_scenarios() -> &'static [DevScenarioSpec] {

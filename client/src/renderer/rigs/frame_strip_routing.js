@@ -7,12 +7,14 @@ import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "./machine_gunner_png_strip.js";
 import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "./rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "./rifleman_png_strip.js";
 import { SCOUT_PLANE_PNG_FRAME_STRIP } from "./scout_plane_png_strip.js";
+import { WARRIOR_PNG_FRAME_STRIP } from "./warrior_png_strip.js";
 
 const LIVE_FRAME_STRIPS = Object.freeze([
   [KIND.MACHINE_GUNNER, MACHINE_GUNNER_PNG_FRAME_STRIP],
   [LOADED_RIFLEMAN_RIG_KEY, RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP],
   [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP],
   [KIND.SCOUT_PLANE, SCOUT_PLANE_PNG_FRAME_STRIP],
+  [KIND.WARRIOR, WARRIOR_PNG_FRAME_STRIP],
 ]);
 
 export function createLiveFrameStrips() {

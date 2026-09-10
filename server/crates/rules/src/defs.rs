@@ -67,6 +67,7 @@ const RESOURCE_DEPOT_UNITS: &[EntityKind] = &[
     EntityKind::PumpJack,
 ];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
+const WARRIOR_ONLY: &[EntityKind] = &[EntityKind::Warrior];
 const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::Rifleman,
     EntityKind::MachineGunner,
@@ -133,6 +134,26 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         trained_at: Some(EntityKind::Zamok),
+        train_requirement: TechRequirement::All(&[]),
+    },
+    UnitDef {
+        kind: EntityKind::Warrior,
+        stats: balance::UnitStats {
+            hp: 135,
+            dmg: 23,
+            range_tiles: 0.5,
+            cooldown: 32,
+            speed: 1.6,
+            sight_tiles: 11,
+            cost_steel: 100,
+            cost_oil: 0,
+            supply: 2,
+            build_ticks: 300,
+            radius: 13.5,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        trained_at: Some(EntityKind::Portal),
         train_requirement: TechRequirement::All(&[]),
     },
     UnitDef {
@@ -413,7 +434,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
-        trains: &[],
+        trains: WARRIOR_ONLY,
         build_requires: &[],
     },
     BuildingDef {
@@ -692,6 +713,7 @@ mod tests {
             vec![
                 EntityKind::Worker,
                 EntityKind::Golem,
+                EntityKind::Warrior,
                 EntityKind::Rifleman,
                 EntityKind::Panzerfaust,
                 EntityKind::MachineGunner,

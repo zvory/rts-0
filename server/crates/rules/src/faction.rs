@@ -737,7 +737,7 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
 pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     id: CULTIVATORS_FACTION_ID,
     loadout: CULTIVATORS_LOADOUT,
-    units: &[EntityKind::Worker],
+    units: &[EntityKind::Worker, EntityKind::Warrior],
     buildings: &[
         EntityKind::ResourceDepot,
         EntityKind::Portal,
@@ -749,7 +749,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     abilities: &[],
     builders: &[EntityKind::Worker],
     gatherers: &[],
-    production_anchors: &[EntityKind::ResourceDepot],
+    production_anchors: &[EntityKind::ResourceDepot, EntityKind::Portal],
 };
 
 pub const CATALOGS: &[FactionCatalog] = &[
@@ -1281,12 +1281,12 @@ mod tests {
     }
 
     #[test]
-    fn cultivators_catalog_adds_an_inert_portal_to_the_depot_economy() {
+    fn cultivators_catalog_trains_warriors_from_portals() {
         let catalog = catalog_for(CULTIVATORS_FACTION_ID).unwrap();
         assert_eq!(catalog.loadout.id, "cultivators.standard");
         assert_eq!(catalog.loadout.initial_steel, balance::STARTING_STEEL);
         assert_eq!(catalog.loadout.initial_oil, balance::STARTING_OIL);
-        assert_eq!(catalog.units, &[EntityKind::Worker]);
+        assert_eq!(catalog.units, &[EntityKind::Worker, EntityKind::Warrior]);
         assert_eq!(
             catalog.buildables,
             &[EntityKind::ResourceDepot, EntityKind::Portal]
@@ -1300,7 +1300,10 @@ mod tests {
             ]
         );
         assert!(catalog.trainable_units(EntityKind::Barracks).is_empty());
-        assert!(catalog.trainable_units(EntityKind::Portal).is_empty());
+        assert_eq!(
+            catalog.trainable_units(EntityKind::Portal),
+            vec![EntityKind::Warrior]
+        );
         assert!(catalog
             .loadout
             .starting_entities

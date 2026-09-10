@@ -63,6 +63,7 @@ pub mod terrain {
 pub mod kinds {
     pub const WORKER: &str = "worker";
     pub const GOLEM: &str = "golem";
+    pub const WARRIOR: &str = "warrior";
     pub const RIFLEMAN: &str = "rifleman";
     pub const PANZERFAUST: &str = "panzerfaust";
     pub const MACHINE_GUNNER: &str = "machine_gunner";
@@ -178,6 +179,7 @@ pub mod upgrades {
 pub mod weapons {
     pub const WORKER_TOOLS: &str = "worker_tools";
     pub const GOLEM_FISTS: &str = "golem_fists";
+    pub const WARRIOR_SWORD: &str = "warrior_sword";
     pub const RIFLEMAN_RIFLE: &str = "rifleman_rifle";
     pub const MACHINE_GUNNER_MG: &str = "machine_gunner_mg";
     pub const SCOUT_CAR_MG: &str = "scout_car_mg";
@@ -368,6 +370,7 @@ fn code_map(entries: &[(&'static str, u8)]) -> BTreeMap<&'static str, u8> {
 const KIND_CODES: &[(&str, u8)] = &[
     (kinds::WORKER, 1),
     (kinds::GOLEM, 22),
+    (kinds::WARRIOR, 29),
     (kinds::RIFLEMAN, 2),
     (kinds::PANZERFAUST, 24),
     (kinds::MACHINE_GUNNER, 3),
@@ -494,6 +497,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
 const WEAPON_KIND_CODES: &[(&str, u8)] = &[
     (weapons::WORKER_TOOLS, 1),
     (weapons::GOLEM_FISTS, 2),
+    (weapons::WARRIOR_SWORD, 12),
     (weapons::RIFLEMAN_RIFLE, 3),
     (weapons::MACHINE_GUNNER_MG, 4),
     (weapons::SCOUT_CAR_MG, 5),
@@ -690,6 +694,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[
         ("WORKER", kinds::WORKER),
         ("GOLEM", kinds::GOLEM),
+        ("WARRIOR", kinds::WARRIOR),
         ("RIFLEMAN", kinds::RIFLEMAN),
         ("PANZERFAUST", kinds::PANZERFAUST),
         ("MACHINE_GUNNER", kinds::MACHINE_GUNNER),
@@ -800,6 +805,7 @@ fn weapon_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[
         ("WORKER_TOOLS", weapons::WORKER_TOOLS),
         ("GOLEM_FISTS", weapons::GOLEM_FISTS),
+        ("WARRIOR_SWORD", weapons::WARRIOR_SWORD),
         ("RIFLEMAN_RIFLE", weapons::RIFLEMAN_RIFLE),
         ("MACHINE_GUNNER_MG", weapons::MACHINE_GUNNER_MG),
         ("SCOUT_CAR_MG", weapons::SCOUT_CAR_MG),

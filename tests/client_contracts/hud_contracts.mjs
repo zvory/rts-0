@@ -1021,6 +1021,11 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(trainCard.slots[2].label === "Panzerfaust" && trainCard.slots[2].hotkey === "E", "Barracks third train slot should be Panzerfaust on hotkey E");
   assert(!trainCard.slots[2].enabled && trainCard.slots[2].title.startsWith("Requires Panzerfausts"), "Panzerfaust should be research-locked");
 
+  const portal = { id: 22, owner: 1, kind: KIND.PORTAL, buildProgress: null, state: STATE.IDLE, prodQueue: 0 };
+  const portalCard = buildCommandCardDescriptors(commandCardCtx({ selection: [portal], entities: [portal], factionId: "cultivators", resources: { steel: 100, oil: 0 } }));
+  assert(portalCard.slots[0].label === "Warrior" && portalCard.slots[0].hotkey === "Q" && portalCard.slots[0].enabled, "Cultivator Portal trains an affordable Warrior from hotkey Q");
+  assert(portalCard.slots[0].cost.steel === 100 && STATS[KIND.WARRIOR].supply === 2, "Warrior train descriptor exposes its 100-Steel and 2-Supply cost");
+
   producingBarracks.prodRepeatKinds = [KIND.RIFLEMAN, KIND.MACHINE_GUNNER];
   const repeatingTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks, producingBarracks],

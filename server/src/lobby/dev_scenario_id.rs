@@ -29,6 +29,7 @@ pub(in crate::lobby) enum DevScenarioId {
     TankUnderFireRetreat,
     TankReverseTraffic,
     TankDamagePursuitPivot,
+    WarriorPortalDuel,
 }
 
 impl DevScenarioId {
@@ -65,6 +66,7 @@ impl DevScenarioId {
             "tank_under_fire_retreat" => Some(Self::TankUnderFireRetreat),
             "tank_reverse_traffic" => Some(Self::TankReverseTraffic),
             "tank_damage_pursuit_pivot" => Some(Self::TankDamagePursuitPivot),
+            "warrior_portal_duel" => Some(Self::WarriorPortalDuel),
             _ => None,
         }
     }
@@ -102,6 +104,7 @@ impl DevScenarioId {
             Self::TankUnderFireRetreat => "tank_under_fire_retreat",
             Self::TankReverseTraffic => "tank_reverse_traffic",
             Self::TankDamagePursuitPivot => "tank_damage_pursuit_pivot",
+            Self::WarriorPortalDuel => "warrior_portal_duel",
         }
     }
 }
@@ -122,5 +125,12 @@ mod tests {
         let id = DevScenarioId::from_room_id("replay_303_scout_car_forest_lock")
             .expect("replay-303 scenario id");
         assert_eq!(id.room_id(), "replay_303_scout_car_forest_lock");
+    }
+
+    #[test]
+    fn warrior_portal_duel_id_round_trips() {
+        let id = DevScenarioId::from_room_id("warrior_portal_duel")
+            .expect("Warrior Portal duel scenario id");
+        assert_eq!(id.room_id(), "warrior_portal_duel");
     }
 }

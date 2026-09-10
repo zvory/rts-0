@@ -69,7 +69,10 @@ pub fn is_economy_unit(kind: EntityKind) -> bool {
 pub fn is_coax_infantry_priority(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Rifleman | EntityKind::Panzerfaust | EntityKind::MachineGunner
+        EntityKind::Warrior
+            | EntityKind::Rifleman
+            | EntityKind::Panzerfaust
+            | EntityKind::MachineGunner
     )
 }
 
@@ -81,6 +84,7 @@ pub fn is_anti_tank_gun_infantry_target(kind: EntityKind) -> bool {
         kind,
         EntityKind::Worker
             | EntityKind::Golem
+            | EntityKind::Warrior
             | EntityKind::Rifleman
             | EntityKind::Panzerfaust
             | EntityKind::MachineGunner
@@ -169,6 +173,20 @@ mod tests {
                     is_vehicle_body: false,
                     is_economy_unit: true,
                     is_coax_infantry_priority: false,
+                },
+            ),
+            (
+                EntityKind::Warrior,
+                ExpectedTargetFacts {
+                    is_unit: true,
+                    is_building: false,
+                    is_resource_node: false,
+                    armor_class: Some(ArmorClass::Small),
+                    weapon_class: WeaponClass::SmallArms,
+                    threat_role: TargetThreatRole::AntiArmorThreat,
+                    is_vehicle_body: false,
+                    is_economy_unit: false,
+                    is_coax_infantry_priority: true,
                 },
             ),
             (
@@ -602,6 +620,7 @@ mod tests {
         let infantry = [
             EntityKind::Worker,
             EntityKind::Golem,
+            EntityKind::Warrior,
             EntityKind::Rifleman,
             EntityKind::Panzerfaust,
             EntityKind::MachineGunner,
