@@ -150,8 +150,12 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
             }
         }
     }
-    if e.owner == viewer {
-        for kind in [ability::AbilityKind::Charge, ability::AbilityKind::Smoke] {
+    if e.owner == viewer || !fogged {
+        for kind in [
+            ability::AbilityKind::Charge,
+            ability::AbilityKind::Smoke,
+            ability::AbilityKind::ScoutPlane,
+        ] {
             if ability::carried_by(kind, e.kind) {
                 v.abilities.push(AbilityCooldownView {
                     ability: kind.to_protocol_str().to_string(),
