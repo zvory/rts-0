@@ -222,7 +222,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 45,
             dmg: 100,
             range_tiles: 5.0,
-            cooldown: 108,
+            cooldown: 72,
             speed: 1.672,
             sight_tiles: 9,
             cost_steel: 150,
@@ -820,13 +820,13 @@ mod tests {
     }
 
     #[test]
-    fn anti_tank_gun_uses_increased_supply_and_cooldown() {
+    fn anti_tank_gun_uses_six_supply_and_restored_cooldown() {
         let stats = unit_def(EntityKind::AntiTankGun)
             .expect("anti-tank gun def")
             .stats;
 
         assert_eq!(stats.supply, 6);
-        assert_eq!(stats.cooldown, 108);
+        assert_eq!(stats.cooldown, 72);
     }
 
     #[test]
