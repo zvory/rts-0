@@ -477,7 +477,6 @@ pub(in crate::game) fn combat_system(
                             id,
                             (px, py),
                             tick,
-                            cd_reset,
                         );
                     }
                 }

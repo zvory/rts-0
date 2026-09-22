@@ -110,7 +110,6 @@ pub(in crate::game) fn try_fire_artillery(
             player,
             unit,
             tick,
-            config::ARTILLERY_RELOAD_TICKS,
         );
         for player_id in player_ids {
             events

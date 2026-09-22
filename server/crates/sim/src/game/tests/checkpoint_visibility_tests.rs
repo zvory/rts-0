@@ -162,7 +162,6 @@ fn visibility_combat_checkpoint_preserves_fog_memory_trenches_and_reveals() {
         hidden_attacker,
         hidden_attacker_pos,
         reveal_tick,
-        config::TICK_HZ,
     );
     repair_after_authoritative_test_spawn(&mut baseline);
     assert!(

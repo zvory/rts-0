@@ -27,7 +27,6 @@ fn game_with_active_reveal_gate() -> (Game, u32, u32) {
         2,
         shooter,
         0,
-        config::TICK_HZ,
     );
     refresh_visibility_for_test(&mut game);
     assert!(!game.state.firing_reveals.is_empty());

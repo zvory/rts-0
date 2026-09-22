@@ -139,7 +139,6 @@ pub(super) fn fire_tank_coax_system(
                 id,
                 (snapshot.pos_x, snapshot.pos_y),
                 tick,
-                cooldown,
             );
         }
         if let Some(e) = entities.get_mut(id) {

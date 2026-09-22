@@ -563,14 +563,11 @@ fn counterfire_against_firing_revealed_target_waits_half_second() {
 }
 
 #[test]
-fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
+fn anti_tank_gun_firing_reveal_lasts_three_seconds() {
     let (mut game, enemy_at, tank) = hidden_enemy_at_gun_fixture();
     game.tick();
     let fired_at_tick = game.tick_count();
-    let reveal_ticks = config::unit_stats(EntityKind::AntiTankGun)
-        .expect("anti-tank gun stats should exist")
-        .cooldown
-        + config::TICK_HZ / 2;
+    let reveal_ticks = config::TICK_HZ * 3;
 
     game.state
         .entities
@@ -596,7 +593,7 @@ fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
             .entities
             .iter()
             .any(|entity| entity.id == enemy_at),
-        "AT gun should remain visible through the full firing-cycle-plus-half-second window"
+        "AT gun should remain visible through the full three-second reveal window"
     );
 
     game.tick();
@@ -605,6 +602,9 @@ fn anti_tank_gun_firing_reveal_lasts_for_firing_cycle_plus_half_second() {
         fired_at_tick + reveal_ticks,
         "test should advance to the first expired reveal tick"
     );
+    assert!(game.state.firing_reveals.is_empty());
+    // Fog is sampled every second tick, so the snapshot can retain the prior sample here.
+    game.tick();
     let hidden = game.snapshot_for(1);
     assert!(
         !hidden.entities.iter().any(|entity| entity.id == enemy_at),
