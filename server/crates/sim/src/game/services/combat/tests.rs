@@ -20,6 +20,7 @@ mod coax;
 mod entrenchment;
 mod fog_visibility;
 mod moving_fire_policy;
+mod overpenetration;
 mod range_targeting;
 mod retention;
 mod support_weapon_attack_move;

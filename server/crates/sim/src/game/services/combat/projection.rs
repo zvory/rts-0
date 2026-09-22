@@ -3,7 +3,7 @@ use crate::game::entity::{blocks_line_of_sight, Entity, EntityKind, EntityStore}
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, segment_intersects_rect, segment_intersects_unit_body,
-    unit_body_for_entity,
+    unit_body_for_entity, UnitBody,
 };
 use crate::game::teams::TeamRelations;
 
@@ -11,6 +11,8 @@ use super::shot_blocker_index::{ShotBlockerBounds, ShotBlockerIndex};
 
 const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
 const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
+// Carry-through requires a substantial crossing rather than a collision-edge graze.
+const OVERPENETRATION_BODY_FACTOR: f32 = 0.7;
 
 /// Squared combat distance from an attacker's center to the target's attackable surface.
 /// Buildings use their authoritative footprint edge; other entities preserve center targeting.
@@ -243,4 +245,32 @@ pub(super) fn shot_blocker_intersection(
             .and_then(|rect| segment_intersects_rect(start, end, rect));
     }
     None
+}
+
+pub(super) fn carry_through_intersection(
+    map: &Map,
+    entity: &Entity,
+    start: (f32, f32),
+    end: (f32, f32),
+) -> Option<f32> {
+    if entity.is_building() {
+        return shot_blocker_intersection(map, entity, start, end);
+    }
+    let inner_body = match unit_body_for_entity(entity)? {
+        UnitBody::Circle(mut circle) => {
+            circle.radius *= OVERPENETRATION_BODY_FACTOR;
+            UnitBody::Circle(circle)
+        }
+        UnitBody::OrientedCapsule(mut capsule) => {
+            capsule.half_segment *= OVERPENETRATION_BODY_FACTOR;
+            capsule.radius *= OVERPENETRATION_BODY_FACTOR;
+            UnitBody::OrientedCapsule(capsule)
+        }
+        UnitBody::OrientedBox(mut box_body) => {
+            box_body.half_len *= OVERPENETRATION_BODY_FACTOR;
+            box_body.half_width *= OVERPENETRATION_BODY_FACTOR;
+            UnitBody::OrientedBox(box_body)
+        }
+    };
+    segment_intersects_unit_body(start, end, inner_body)
 }

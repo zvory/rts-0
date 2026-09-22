@@ -1187,6 +1187,9 @@ Each incidental infantry body intersected behind the intended target retains an 
 chance to dodge and takes the same 30% target-type modifier after normal half-damage
 overpenetration. Tank cannon shots have no intrinsic miss chance and entrenchment adds no miss
 chance.
+Carry-through follows the ray from the primary victim's center. Incidental units are hit only
+when that ray crosses the inner 70% of their collision body; touching the outer edge or standing
+beside the victim is insufficient. Buildings retain their full blocking footprints.
 After a direct hit's normal
 weapon, armor, and facing calculations, `entrenchment_combat::reduce_direct_damage` reduces damage
 by 50% for actively entrenched eligible infantry. Area effects call
