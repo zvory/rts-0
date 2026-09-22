@@ -8,6 +8,8 @@ use super::fog::Fog;
 use super::map::Map;
 use super::teams::TeamRelations;
 
+const FIRING_REVEAL_DURATION_TICKS: u32 = config::TICK_HZ * 3;
+
 /// Temporary actionable sight granted to a recipient when a hostile unit exposes itself by firing.
 ///
 /// Like lingering death sight, this is stamped into live fog so command validation, combat
@@ -99,14 +101,11 @@ pub(in crate::game) fn record_firing_reveals_for_victim_team(
     entity_id: u32,
     attacker_pos: (f32, f32),
     fired_at_tick: u32,
-    firing_cycle_ticks: u32,
 ) {
     if victim_owner == 0 || !teams.is_enemy_owner(attacker_owner, victim_owner) {
         return;
     }
-    let expires_at_tick = fired_at_tick
-        .saturating_add(firing_cycle_ticks)
-        .saturating_add(config::TICK_HZ / 2);
+    let expires_at_tick = fired_at_tick.saturating_add(FIRING_REVEAL_DURATION_TICKS);
     for viewer in player_ids {
         if !teams.same_team_or_same_owner(viewer, victim_owner) {
             continue;
@@ -140,7 +139,6 @@ pub(in crate::game) fn record_firing_reveals_for_victim_teams(
     entity_id: u32,
     attacker_pos: (f32, f32),
     fired_at_tick: u32,
-    firing_cycle_ticks: u32,
 ) {
     for &victim_owner in victim_owners {
         record_firing_reveals_for_victim_team(
@@ -154,7 +152,6 @@ pub(in crate::game) fn record_firing_reveals_for_victim_teams(
             entity_id,
             attacker_pos,
             fired_at_tick,
-            firing_cycle_ticks,
         );
     }
 }
@@ -166,14 +163,11 @@ pub(in crate::game) fn record_global_firing_reveals_for_enemy_players(
     attacker_owner: u32,
     entity_id: u32,
     fired_at_tick: u32,
-    firing_cycle_ticks: u32,
 ) {
     if attacker_owner == 0 {
         return;
     }
-    let expires_at_tick = fired_at_tick
-        .saturating_add(firing_cycle_ticks)
-        .saturating_add(config::TICK_HZ / 2);
+    let expires_at_tick = fired_at_tick.saturating_add(FIRING_REVEAL_DURATION_TICKS);
     for &viewer in player_ids {
         if teams.is_enemy_owner(attacker_owner, viewer) {
             FiringRevealSource::upsert(
@@ -199,7 +193,6 @@ pub(in crate::game) fn record_mortar_impact_firing_reveals(
     attacker: u32,
     reveal: Option<&AttackReveal>,
     tick: u32,
-    firing_cycle_ticks: u32,
 ) {
     let Some(reveal) = reveal else {
         return;
@@ -216,6 +209,5 @@ pub(in crate::game) fn record_mortar_impact_firing_reveals(
         attacker,
         (reveal.x, reveal.y),
         tick,
-        firing_cycle_ticks,
     );
 }

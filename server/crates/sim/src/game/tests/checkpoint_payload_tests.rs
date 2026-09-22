@@ -199,7 +199,6 @@ fn checkpoint_payload_rejects_multiple_active_reveal_episodes_for_one_entity() {
         2,
         attacker,
         tick,
-        config::TICK_HZ,
     );
     let text = checkpoint_payload_text_for(&game, "duplicate firing reveal fixture");
     let duplicate_reveal = mutate_payload(&text, |value| {

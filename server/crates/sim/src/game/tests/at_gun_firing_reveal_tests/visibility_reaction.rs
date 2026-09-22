@@ -221,8 +221,10 @@ fn repeated_hidden_shots_extend_one_stable_reveal_episode() {
         shooter,
         shooter_pos,
         0,
-        config::TICK_HZ,
     );
+    let first_source = game.state.firing_reveals[0];
+    assert!(first_source.is_active_at(config::TICK_HZ * 3 - 1));
+    assert!(!first_source.is_active_at(config::TICK_HZ * 3));
     refresh_visibility_for_test(&mut game);
     firing_reveal::record_firing_reveals_for_victim_team(
         &mut game.state.firing_reveals,
@@ -235,13 +237,13 @@ fn repeated_hidden_shots_extend_one_stable_reveal_episode() {
         shooter,
         shooter_pos,
         10,
-        config::TICK_HZ,
     );
 
     assert_eq!(game.state.firing_reveals.len(), 1);
     let source = game.state.firing_reveals[0];
     assert_eq!(source.started_at_tick(), 0);
-    assert!(source.is_active_at(config::TICK_HZ + config::TICK_HZ / 2 + 5));
+    assert!(source.is_active_at(10 + config::TICK_HZ * 3 - 1));
+    assert!(!source.is_active_at(10 + config::TICK_HZ * 3));
 }
 
 #[test]
@@ -271,7 +273,6 @@ fn colocated_revealed_entities_both_keep_reveal_only_provenance() {
         2,
         first,
         0,
-        config::TICK_HZ,
     );
     refresh_visibility_for_test(&mut game);
     assert_eq!(
@@ -296,7 +297,6 @@ fn colocated_revealed_entities_both_keep_reveal_only_provenance() {
         second,
         hidden_pos,
         0,
-        config::TICK_HZ,
     );
     refresh_visibility_for_test(&mut game);
 
@@ -333,7 +333,6 @@ fn reveal_provenance_does_not_follow_a_source_onto_an_ordinary_visible_tile_mid_
         2,
         shooter,
         0,
-        config::TICK_HZ,
     );
     refresh_visibility_for_test(&mut game);
     assert!(game
@@ -466,7 +465,6 @@ fn move_spam_does_not_block_scout_car_fire_on_ordinarily_visible_revealed_mg() {
         2,
         machine_gunner,
         reveal_started_at_tick,
-        config::TICK_HZ * 3,
     );
     refresh_visibility_for_test(&mut game);
 
