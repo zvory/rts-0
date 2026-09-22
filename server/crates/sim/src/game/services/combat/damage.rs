@@ -17,9 +17,8 @@ use super::events::{
     attack_reveal_for, emit_attack_event, emit_miss_event, push_under_attack_notice,
     push_under_attack_notices_for_visible_attack,
 };
-use super::projection::{resolve_shot_victim, shot_blocker_intersection};
+use super::projection::{carry_through_intersection, resolve_shot_victim};
 use super::shot_blocker_index::ShotBlockerIndex;
-use super::RANGE_SLACK;
 
 #[derive(Clone, Copy)]
 pub(super) struct ShotOutcome {
@@ -244,11 +243,12 @@ fn apply_overpenetration(
     let overpenetration_limit = dist + range_px * overpenetration_factor;
     let ux = dx / dist;
     let uy = dy / dist;
+    let shot_start = (vx, vy);
     let shot_end = (
         ax + ux * overpenetration_limit,
         ay + uy * overpenetration_limit,
     );
-    let perpendicular_slack = RANGE_SLACK + 8.0;
+    let carry_distance = overpenetration_limit - dist;
     let splash_dmg = primary_dmg / 2;
     if splash_dmg == 0 {
         return;
@@ -273,27 +273,10 @@ fn apply_overpenetration(
         if entrenchment_combat::is_actively_entrenched(target) {
             continue;
         }
-        let along = if target.kind == EntityKind::Tank || target.is_building() {
-            let Some(hit_t) = shot_blocker_intersection(map, target, (ax, ay), shot_end) else {
-                continue;
-            };
-            hit_t * overpenetration_limit
-        } else {
-            let tx = target.pos_x - ax;
-            let ty = target.pos_y - ay;
-            let along = tx * ux + ty * uy;
-            if along <= dist || along > overpenetration_limit {
-                continue;
-            }
-            let perp = (tx * uy - ty * ux).abs();
-            if perp > target.radius() + perpendicular_slack {
-                continue;
-            }
-            along
-        };
-        if along <= dist || along > overpenetration_limit {
+        let Some(hit_t) = carry_through_intersection(map, target, shot_start, shot_end) else {
             continue;
-        }
+        };
+        let along = dist + hit_t * carry_distance;
         if !los.clear_between_world_points((ax, ay), (target.pos_x, target.pos_y)) {
             continue;
         }
