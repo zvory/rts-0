@@ -611,6 +611,20 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
 }
 
 fn oil_patch_local_offset(index: u32, count: u32) -> (f32, f32) {
+    if count == 6 {
+        // The smoother default uses three outward-facing pairs. Keep the innermost pair wider
+        // than the steel fields so completed extractors never edge-touch a neighbouring node.
+        const SIX_PATCH_OFFSETS: [(f32, f32); 6] = [
+            (6.0, -2.0),
+            (6.0, 2.0),
+            (5.0, -4.0),
+            (5.0, 4.0),
+            (3.0, -6.0),
+            (3.0, 6.0),
+        ];
+        return SIX_PATCH_OFFSETS[index.min(5) as usize];
+    }
+
     // Keep the cluster centred on the outward ray. Odd-sized clusters use one centre patch;
     // the remaining patches are added as matching lateral pairs.
     const PAIRS: [(f32, f32); 4] = [(6.0, 2.0), (5.0, 4.0), (3.0, 4.0), (3.0, 2.0)];

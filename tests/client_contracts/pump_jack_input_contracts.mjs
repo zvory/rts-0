@@ -144,8 +144,8 @@ assert(
 );
 
 const snapInput = Object.create(Input.prototype);
-const nearOil = { id: 50, owner: 0, kind: KIND.OIL, x: 176, y: 176, remaining: 962 };
-const farOil = { id: 51, owner: 0, kind: KIND.OIL, x: 336, y: 336, remaining: 962 };
+const nearOil = { id: 50, owner: 0, kind: KIND.OIL, x: 176, y: 176, remaining: 481 };
+const farOil = { id: 51, owner: 0, kind: KIND.OIL, x: 336, y: 336, remaining: 481 };
 const depletedOil = { id: 52, owner: 0, kind: KIND.OIL, x: 161, y: 161, remaining: 0 };
 let placementPreview = null;
 snapInput.state = { map };

@@ -19,49 +19,49 @@
       "x": 9,
       "y": 9,
       "steelPatches": 12,
-      "oilPatches": 3
+      "oilPatches": 6
     },
     {
       "x": 116,
       "y": 116,
       "steelPatches": 12,
-      "oilPatches": 3
+      "oilPatches": 6
     },
     {
       "x": 18,
       "y": 34,
       "steelPatches": 12,
-      "oilPatches": 3
+      "oilPatches": 6
     },
     {
       "x": 107,
       "y": 91,
       "steelPatches": 12,
-      "oilPatches": 3
+      "oilPatches": 6
     },
     {
       "x": 57,
       "y": 110,
       "steelPatches": 12,
-      "oilPatches": 3
+      "oilPatches": 6
     },
     {
       "x": 68,
       "y": 15,
       "steelPatches": 12,
-      "oilPatches": 3
+      "oilPatches": 6
     },
     {
       "x": 32,
       "y": 86,
       "steelPatches": 12,
-      "oilPatches": 3
+      "oilPatches": 6
     },
     {
       "x": 93,
       "y": 39,
       "steelPatches": 12,
-      "oilPatches": 3
+      "oilPatches": 6
     }
   ],
   "_design": "A six-tile river runs from northeast to southwest with three crossings. Shifted edge expansions sit beside widened double-lobe pools, while narrower mirrored forest walls touch the map boundaries and follow the pool shorelines.",

@@ -142,9 +142,9 @@ their `*_BODY_*` length, width, and clearance values instead.
 The Kriegsia economy replaces transferable Engineer mining with base-local extractor growth.
 Engineers remain 50-Steel, 1-Supply construction units trained by
 the Resource Depot, but they cannot gather resources. Engineers can manually place Pump Jacks on live Oil patches
-for 150 Steel, taking 10 seconds (half the former 20-second manual build time). The standard
+for 150 Steel, taking 5 seconds. The standard
 start contains one completed Engineer and six completed Steel Mines attached to six of the home
-base's live Steel patches, plus one completed Pump Jack attached to one home-base Oil patch.
+base's live Steel patches, plus two completed Pump Jacks attached to two home-base Oil patches.
 
 Steel Mine uses placeholder presentation. It is a 1x1 completed-capable
 building with 50 HP, Small/unarmored combat classification, 1-tile sight, no weapon, no supply,
@@ -154,8 +154,8 @@ existing `MINING_ANCHOR_RANGE_TILES = 11` coverage of the producing Resource Dep
 depleted. It is free and takes 24 seconds to produce.
 
 Pump Jack keeps its existing 1x1 footprint, 75 HP, Small/unarmored classification, 1-tile sight,
-and `OIL_LOAD = 2` payout every 40 ticks. Depot production remains free and takes 36 seconds,
-independently of the 150-Steel, 10-second manual construction stats. Engineers cannot assist
+and `OIL_LOAD = 1` payout every 40 ticks. Depot production remains free and takes 18 seconds,
+independently of the 150-Steel, 5-second manual construction stats. Engineers cannot assist
 depot-owned scaffolds; manual scaffolds reserve their patch against automatic production.
 Every completed Resource Depot permanently runs one Steel Mine job and one Pump Jack job in the
 background. The two jobs progress concurrently with each other and independently of the Depot's
@@ -607,10 +607,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   every edge. Both map JSON assets use terrain row strings, flat `startLocations`, and flat
   `baseSites`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 1`, and
-  `STARTING_RIFLEMEN = 4`: one Engineer, four Riflemen, one Resource Depot, one completed Pump Jack
-  on a home Oil patch, and six completed Steel Mines at the player's start, with 12 steel patches
+  `STARTING_RIFLEMEN = 4`: one Engineer, four Riflemen, one Resource Depot, two completed Pump Jacks
+  on home Oil patches, and six completed Steel Mines at the player's start, with 12 steel patches
   holding 625 steel each split into two six-wide fields four tiles out on opposite sides of the
-  base + 3 oil patches with 962 oil each nearby. Each base therefore holds 7,500 steel and 2,886
+  base + 6 oil patches with 481 oil each nearby. Each base therefore holds 7,500 steel and 2,886
   oil, a 2.599:1 Steel/Oil ratio (the nearest whole-unit node capacity to the 2.6:1 target).
 - Supply: every active player has an intrinsic `300` supply allowance, which is also the hard cap.
   Buildings do not provide supply: Resource Depots, Zamoks, and legacy fixture/replay Depots all grant
@@ -627,18 +627,20 @@ profiles and explicit activation/autocast policy instead of being folded into de
   automatic retarget).
 - Oil extraction: workers do not directly mine oil. Every completed Resource Depot automatically
   builds free Pump Jacks on its in-range oil patches, concurrently with its free Steel Mine job.
-  The starting Resource Depot begins with one completed Pump Jack; later Resource Depots retain
+  The starting Resource Depot begins with two completed Pump Jacks; later Resource Depots retain
   the ordinary automatic construction behavior.
-  Completed Pump Jacks mine `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former
-  oil rate, and deplete the underlying oil node. When that final load empties the patch, its Pump
-  Jack disappears with it and the permanent Depot job moves to the next eligible patch.
+  Completed Pump Jacks mine `OIL_LOAD = 1` every `HARVEST_TICKS = 40` and deplete the underlying
+  oil node. Two Pump Jacks therefore match the former two-oil extractor rate, while the 18-second
+  automatic build time splits each former 36-second production step into two smaller steps. When
+  the final load empties a patch, its Pump Jack disappears with it and the permanent Depot job
+  moves to the next eligible patch.
 - One gatherer per direct-mined patch: each direct-mined node has a single harvest slot
   (`Entity::miner`). A patch is
   occupied only after the gatherer reaches `GatherPhase::Harvesting`; right-clicking a patch
   does not reserve it. Extra gatherers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded gatherer is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting and expansion resources: every authored base site gets 12 steel patches and 3 oil
+- Starting and expansion resources: every standard authored base site gets 12 steel patches and 6 oil
   patches. Map schema v3 stores flat `startLocations` and `baseSites`: the number of start
   locations limits player count, while every base site remains present in every match. A player
   receives a Resource Depot, workers, and the normal resource cluster at an assigned start; unclaimed
@@ -683,7 +685,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team and Anti-Tank Guns immediately, Artillery after Artillery research, and Rocket Trucks after Rockets research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 120 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | steel_mine                 | Steel Mine         | 50  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
-| pump_jack                  | Pump Jack          | 75  | 1     | 150 steel | 1x1  | 300      | manual Engineer construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
+| pump_jack                  | Pump Jack          | 75  | 1     | 150 steel | 1x1  | 150      | manual Engineer construction; also a free 540-tick permanent Resource Depot background job on in-range Oil patches; mines 1 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends
