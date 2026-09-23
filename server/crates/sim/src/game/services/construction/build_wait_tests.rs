@@ -94,7 +94,7 @@ fn waiting_build_starts_when_resources_become_available() {
 }
 
 #[test]
-fn arrived_pump_jack_waits_for_150_steel_then_completes_in_5_seconds() {
+fn arrived_pump_jack_waits_for_150_steel_then_completes_in_10_seconds() {
     let map = flat_map(16);
     let mut entities = EntityStore::new();
     let (sx, sy) = footprint_center(&map, EntityKind::PumpJack, 4, 4);
@@ -164,9 +164,9 @@ fn arrived_pump_jack_waits_for_150_steel_then_completes_in_5_seconds() {
             .as_ref()
             .unwrap()
             .total,
-        config::TICK_HZ * 5
+        config::TICK_HZ * 10
     );
-    for _ in 1..config::TICK_HZ * 5 - 1 {
+    for _ in 1..config::TICK_HZ * 10 - 1 {
         run_construction_tick!(&map, &mut entities, &mut players, &mut events);
     }
     assert!(entities.get(site).unwrap().under_construction());

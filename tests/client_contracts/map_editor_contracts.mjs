@@ -450,7 +450,7 @@ assert(
   assert.equal(materialized.starts.length, 2);
   assert.equal(materialized.baseSites.length, 4, "every authored base is materialized without choosing a player layout");
   assert(materialized.baseSites.some((site) => site.x === 25 && site.y === 25), "start locations are permanent base sites");
-  assert(materialized.baseSites.every((site) => site.steelPatches === 12 && site.oilPatches === 6),
+  assert(materialized.baseSites.every((site) => site.steelPatches === 12 && site.oilPatches === 3),
     "bundled maps materialize per-base resource counts");
   assert.deepEqual(
     session.mapOverlay().bases.map((site) => site.index),

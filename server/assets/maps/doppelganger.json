@@ -1,18 +1,18 @@
 {
   "_design": "Flat map locations: startLocations choose player starts; every baseSites entry defines its own steel and oil patch counts.",
   "baseSites": [
-    {"x":22,"y":14,"steelPatches":12,"oilPatches":6},
-    {"x":151,"y":22,"steelPatches":12,"oilPatches":6},
-    {"x":143,"y":151,"steelPatches":12,"oilPatches":6},
-    {"x":14,"y":143,"steelPatches":12,"oilPatches":6},
-    {"x":84,"y":28,"steelPatches":12,"oilPatches":6},
-    {"x":137,"y":84,"steelPatches":12,"oilPatches":6},
-    {"x":81,"y":137,"steelPatches":12,"oilPatches":6},
-    {"x":28,"y":81,"steelPatches":12,"oilPatches":6},
-    {"x":53,"y":50,"steelPatches":12,"oilPatches":6},
-    {"x":115,"y":53,"steelPatches":12,"oilPatches":6},
-    {"x":112,"y":115,"steelPatches":12,"oilPatches":6},
-    {"x":50,"y":112,"steelPatches":12,"oilPatches":6}
+    {"x":22,"y":14,"steelPatches":12,"oilPatches":3},
+    {"x":151,"y":22,"steelPatches":12,"oilPatches":3},
+    {"x":143,"y":151,"steelPatches":12,"oilPatches":3},
+    {"x":14,"y":143,"steelPatches":12,"oilPatches":3},
+    {"x":84,"y":28,"steelPatches":12,"oilPatches":3},
+    {"x":137,"y":84,"steelPatches":12,"oilPatches":3},
+    {"x":81,"y":137,"steelPatches":12,"oilPatches":3},
+    {"x":28,"y":81,"steelPatches":12,"oilPatches":3},
+    {"x":53,"y":50,"steelPatches":12,"oilPatches":3},
+    {"x":115,"y":53,"steelPatches":12,"oilPatches":3},
+    {"x":112,"y":115,"steelPatches":12,"oilPatches":3},
+    {"x":50,"y":112,"steelPatches":12,"oilPatches":3}
   ],
   "concealmentTiles": [
     {"x":4,"y":22},

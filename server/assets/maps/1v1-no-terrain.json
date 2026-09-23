@@ -148,25 +148,25 @@
       "x": 25,
       "y": 25,
       "steelPatches": 12,
-      "oilPatches": 6
+      "oilPatches": 3
     },
     {
       "x": 100,
       "y": 100,
       "steelPatches": 12,
-      "oilPatches": 6
+      "oilPatches": 3
     },
     {
       "x": 63,
       "y": 38,
       "steelPatches": 12,
-      "oilPatches": 6
+      "oilPatches": 3
     },
     {
       "x": 63,
       "y": 88,
       "steelPatches": 12,
-      "oilPatches": 6
+      "oilPatches": 3
     }
   ],
   "forestSpans": [],
