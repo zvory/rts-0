@@ -247,7 +247,7 @@ both Workers east of their starting depot rather than rotating the Worker positi
 lower-left instruction first moves its builder to the rotated upper-right approach tile and queues
 the build. Both sides retry only the verified footprint instead of scanning adjacent blocked tiles.
 The override is identified by the map dimensions, start tile, and complete twelve-Steel/three-Oil
-natural cluster, so the 1v1 map's matching dimensions and start tiles continue to use ordinary
+natural cluster, so the Classic map's matching dimensions and start tiles continue to use ordinary
 expansion search.
 
 Its local-defense envelope covers every owned building footprint, including incomplete structures,
@@ -359,7 +359,7 @@ fingerprints, rather than a requested/resolved identity pair.
 
 The repository term **120 game test** means `scripts/120-game-test.mjs`. It requires profile IDs for
 the current AI 2.1, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
-runs all three pairings on The River, Schone Tage, 1v1, and Crossroads with five side-swapped seeds,
+runs all three pairings on The River, Schone Tage, Classic, and Crossroads with five side-swapped seeds,
 caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
 Markdown, JSON, and CSV summaries.
 

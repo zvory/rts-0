@@ -1,4 +1,4 @@
-export const DEFAULT_LAB_MAP = "1v1";
+export const DEFAULT_LAB_MAP = "Classic";
 export const DEFAULT_GAME_MAP = "Chokes";
 export const DEFAULT_MAP_EDITOR_MAP = "1v1.json";
 

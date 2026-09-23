@@ -710,7 +710,7 @@ async fn deploy_drain_records_aborted_replay_backed_match_before_connection_shut
     let replay = record
         .replay
         .expect("aborted match should include a replay row");
-    assert_eq!(replay.map_name, "1v1");
+    assert_eq!(replay.map_name, "Classic");
     assert!(replay.artifact_schema_version > 0);
     assert!(replay.artifact_json["winnerId"].is_null());
     assert!(replay.artifact_json["winnerTeamId"].is_null());

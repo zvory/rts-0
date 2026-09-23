@@ -115,7 +115,7 @@ const labDriver = new InteractDriver({ workspaceRoot: root });
 labDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
 labDriver.workspace = workspace;
 const labUrl = new URL(labDriver.launchUrl());
-assert.equal(labUrl.searchParams.get("map"), "1v1", "blank Interact labs use the current default 1v1 map");
+assert.equal(labUrl.searchParams.get("map"), "Classic", "blank Interact labs use the current default Classic map");
 const spectatorDriver = new InteractDriver({ workspaceRoot: root, mode: "game", spectate: ["ai_2_1", "ai_turtle"] });
 spectatorDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
 spectatorDriver.workspace = workspace;

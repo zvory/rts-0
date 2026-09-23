@@ -137,8 +137,8 @@ try {
     "order help exposes signed repeat-production adjustments and their multi-building shape",
   );
   assert.ok(
-    INTERACT_COMMAND_HELP.open.defaults.includes("map=1v1"),
-    "Lab open help advertises the current default 1v1 map",
+    INTERACT_COMMAND_HELP.open.defaults.includes("map=Classic"),
+    "Lab open help advertises the current default Classic map",
   );
   for (const command of INTERACT_COMMANDS) {
     for (const args of [["lab", "help", command], ["lab", command, "--help"], ["help", "lab", command]]) {
@@ -182,7 +182,7 @@ try {
 
   const coldOpen = call("open");
   assert.match(coldOpen.result.sessionId, /^lab_[a-f0-9]{32}$/, "a cold first open returns one complete JSON envelope");
-  assert.equal(coldOpen.result.status.map, "1v1", "a blank Lab open uses the current default 1v1 map");
+  assert.equal(coldOpen.result.status.map, "Classic", "a blank Lab open uses the current default Classic map");
   assert.equal(call("status").result.daemonCheckout.matches, true, "matching checkout status is explicit");
   const currentCheckoutCommit = readState(paths).checkoutCommit;
   assert.equal(call("status").result.opening, false, "completed cold open clears the opening status");

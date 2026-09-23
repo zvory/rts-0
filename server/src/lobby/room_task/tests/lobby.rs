@@ -119,7 +119,7 @@ fn lobby_summary_reports_open_waiting_room_state() {
     assert_eq!(summary.room, "open-summary");
     assert_eq!(summary.kind, crate::protocol::LobbyKind::Normal);
     assert_eq!(summary.host_name.as_deref(), Some("Player 1"));
-    assert_eq!(summary.map, "1v1");
+    assert_eq!(summary.map, "Classic");
     assert_eq!(summary.created_at_unix_ms, 123_456);
     assert_eq!(summary.occupied_slots, 1);
     assert_eq!(summary.max_slots, 2);
@@ -578,13 +578,13 @@ fn selecting_two_player_map_trims_excess_active_seats() {
     task.on_add_ai(1, Some(3), None);
     assert!(
         task.ai_players.is_empty(),
-        "full 1v1 map rejects more AI seats"
+        "full Classic map rejects more AI seats"
     );
 
     task.on_set_spectator(1, 4, false);
     assert!(
         task.players.get(&4).unwrap().spectator,
-        "full 1v1 map rejects spectator return to active play"
+        "full Classic map rejects spectator return to active play"
     );
 }
 

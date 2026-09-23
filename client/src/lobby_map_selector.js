@@ -7,7 +7,7 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
     preview: "/assets/map-previews/1v1-no-terrain.jpg",
     archived: true,
   }),
-  "1v1": Object.freeze({
+  Classic: Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/1v1.jpg",
     archived: true,

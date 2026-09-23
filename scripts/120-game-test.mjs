@@ -25,7 +25,7 @@ const DEFAULT_CONCURRENCY = Math.min(
 const MAPS = [
   { id: "the-river", name: "The River" },
   { id: "schone-tage", name: "Schone Tage" },
-  { id: "1v1", name: "1v1" },
+  { id: "classic", name: "Classic" },
   { id: "crossroads", name: "Crossroads" },
 ];
 
@@ -164,7 +164,7 @@ Runs the standard 120 game test:
   - supplied AI 2.1 vs supplied pre-change Jeff
   - supplied post-change Jeff vs supplied AI 2.1
   - supplied post-change Jeff vs supplied pre-change Jeff
-  - The River, Schone Tage, 1v1, and Crossroads
+  - The River, Schone Tage, Classic, and Crossroads
   - seeds 0-4 with both player assignments (120 games total)
 
 Options:

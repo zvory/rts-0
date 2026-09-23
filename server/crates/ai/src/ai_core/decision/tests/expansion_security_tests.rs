@@ -396,7 +396,7 @@ fn expansion_security_has_spaced_reachable_posts_on_river_and_crossroads() {
             is_ai: true,
         })
         .collect();
-    for name in ["Schone Tage", "The River", "1v1", "Crossroads"] {
+    for name in ["Schone Tage", "The River", "Classic", "Crossroads"] {
         let map = Map::load_for_players(name, &[(1, 1), (2, 2)], 0x1234_5678).unwrap();
         let game = Game::new_with_random_ai_profiles_and_map_metadata(
             &players,
@@ -638,7 +638,7 @@ fn expansion_security_live_opening_reaches_second_base() {
             is_ai: true,
         })
         .collect();
-    for name in ["The River", "Schone Tage", "1v1", "Crossroads"] {
+    for name in ["The River", "Schone Tage", "Classic", "Crossroads"] {
         let map = Map::load_for_players(name, &[(1, 1), (2, 2)], 0x1234_5678).unwrap();
         let mut game = Game::new_with_random_ai_profiles_and_map_metadata(
             &players,

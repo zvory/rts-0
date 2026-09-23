@@ -173,7 +173,7 @@ async function testLabLaunchConfig() {
     globalThis.window.location = new URL("http://localhost/lab?room=bad/room&map=bad/map");
     config = labLaunchConfig();
     assert(
-      config.room === "__lab__:default:map=1v1",
+      config.room === "__lab__:default:map=Classic",
       "lab launch falls back for unsafe room and map tokens without adding the default scenario to custom map URLs",
     );
 
@@ -204,14 +204,14 @@ async function testLabLaunchConfig() {
     globalThis.window.location = new URL("http://localhost/lab?scenario=lategame");
     config = labLaunchConfig();
     assert(
-      config.room === "__lab__:default:map=1v1:scenario=lategame",
+      config.room === "__lab__:default:map=Classic:scenario=lategame",
       "explicit lategame lab scenario launch should request the bundled catalog id",
     );
 
     globalThis.window.location = new URL("http://localhost/lab?scenario=blank");
     config = labLaunchConfig();
     assert(
-      config.room === "__lab__:default:map=1v1:scenario=blank",
+      config.room === "__lab__:default:map=Classic:scenario=blank",
       "explicit lab scenario override should be preserved",
     );
 
@@ -224,7 +224,7 @@ async function testLabLaunchConfig() {
       "lab launch should keep a safe visual profile id for local registry resolution",
     );
     assert(
-      config.room === "__lab__:default:map=1v1:scenario=entrenchment_inspection",
+      config.room === "__lab__:default:map=Classic:scenario=entrenchment_inspection",
       "visual profile ids must not enter the server lab room id",
     );
 
@@ -256,7 +256,7 @@ async function testLabLaunchConfig() {
     const blankUrl = replaceLabCatalogRoute(
       {
         publicRoom: "default",
-        map: "1v1",
+        map: "Classic",
         scenario: "blank",
         visualProfileId: "",
       },

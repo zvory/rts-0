@@ -24,7 +24,7 @@ impl Game {
         }
         let worker_build_ticks = worker_build_ticks()?;
 
-        let mut map = Map::load("1v1", 1, seed)
+        let mut map = Map::load("Classic", 1, seed)
             .map_err(|error| format!("failed to load replay-256 map: {error}"))?;
         let start_tile = (9, 9);
         if let Some(slot) = map.starts.get_mut(0) {
