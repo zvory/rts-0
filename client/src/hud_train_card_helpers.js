@@ -150,8 +150,7 @@ function researchBuildings(ctx, buildingKind, isOwn) {
   const entities = ctx.currentEntities || ctx.entities || ctx.selection || [];
   return entities.filter((entity) =>
     isOwn(ctx, entity) &&
-    entity.kind === buildingKind &&
-    entity.buildProgress == null);
+    entity.kind === buildingKind);
 }
 
 /** First selected building on which the server can append this research right now. */
@@ -163,7 +162,6 @@ export function selectedResearchBuilding(ctx, upgrade, isOwn) {
   return (ctx.selection || []).find((entity) =>
     isOwn(ctx, entity) &&
     entity.kind === def.researchedAt &&
-    entity.buildProgress == null &&
     !(entity.prodUpgradeQueue || []).includes(upgrade) &&
     (prerequisiteResearched ||
       (entity.prodUpgradeQueue || []).includes(def.requiresUpgrade))) || null;

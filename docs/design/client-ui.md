@@ -1926,6 +1926,8 @@ buildings in reverse round-robin order for the displayed producer type. Selectin
 under construction shows a dedicated construction card with Cancel in the bottom-right `C` slot.
 An unfinished production building also shows its production buttons with primary training disabled,
 while Alt/Ctrl/Shift production hotkeys can assign standing repeat production for after completion;
+an unfinished Training Centre or Engineering Complex shows its research buttons and accepts research
+into its bounded FIFO, which remains unpaid and inert until construction completes;
 click selection prefers the scaffold over an overlapping builder, and cancellation returns the full
 construction cost. The Scout Plane affordance is a Resource Depot and Command Car world-point
 ability on the `C` grid slot (beside Breakthrough on the Command Car). It unlocks after the Scout

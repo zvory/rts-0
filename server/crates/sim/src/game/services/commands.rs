@@ -648,7 +648,7 @@ pub(in crate::game) fn apply_commands(
                     continue;
                 };
                 let ok = matches!(entities.get(building), Some(b)
-                if b.owner == player && b.is_building() && !b.under_construction()
+                if b.owner == player && b.is_building()
                 && b.kind == definition.researched_at
                 && rules::economy::can_research_for_faction(
                     &faction_id,
@@ -690,10 +690,11 @@ pub(in crate::game) fn apply_commands(
                 }
                 let cost =
                     rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
-                let queue_empty = entities
-                    .get(building)
-                    .is_some_and(|b| b.research_queue().is_empty());
-                let paid = queue_empty && ps.spend_cost(cost);
+                let (queue_empty, building_complete) =
+                    entities.get(building).map_or((false, false), |b| {
+                        (b.research_queue().is_empty(), !b.under_construction())
+                    });
+                let paid = building_complete && queue_empty && ps.spend_cost(cost);
 
                 let queued = entities.get_mut(building).is_some_and(|b| {
                     b.push_research(ResearchItem {

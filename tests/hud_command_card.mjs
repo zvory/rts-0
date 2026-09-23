@@ -333,6 +333,36 @@ function buttonSlots(card) {
   assert.equal(constructionCard.slots[8]?.commandId, "construction.cancel");
 }
 
+for (const [kind, upgrade] of [
+  [KIND.TRAINING_CENTRE, UPGRADE.ENTRENCHMENT],
+  [KIND.ENGINEERING_COMPLEX, UPGRADE.ARTILLERY_UNLOCK],
+]) {
+  const unfinishedResearchBuilding = {
+    id: kind === KIND.TRAINING_CENTRE ? 29 : 30,
+    owner: 1,
+    kind,
+    buildProgress: 0.4,
+  };
+  const constructionCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [unfinishedResearchBuilding],
+    currentEntities: [unfinishedResearchBuilding],
+    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 20 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const research = constructionCard.slots.find((slot) => slot?.id === `research:${upgrade}`);
+  assert.equal(constructionCard.kind, "construction");
+  assert.equal(research?.enabled, true, `${kind} accepts research while under construction`);
+  assert.deepEqual(research?.intent, {
+    type: "research",
+    upgrade,
+    buildingId: unfinishedResearchBuilding.id,
+  });
+  assert.equal(constructionCard.slots[8]?.commandId, "construction.cancel");
+}
+
 {
   const scoutCar = {
     id: 30,

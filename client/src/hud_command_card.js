@@ -250,7 +250,8 @@ export function commandSubject(ctx, selection) {
 }
 
 export function buildConstructionCard(ctx, building) {
-  if (factionTrainsOf(ctx, building.kind).length > 0) {
+  if (factionTrainsOf(ctx, building.kind).length > 0 ||
+      factionResearchesOf(ctx, building.kind).length > 0) {
     return buildTrainCard(ctx, building, { underConstruction: true });
   }
   const slots = new Array(9).fill(null);
@@ -413,7 +414,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
   const resources = trainResourcesOf(ctx);
   const factionId = commandFactionId(ctx);
   const trains = factionTrainsOf(ctx, building.kind);
-  const researches = underConstruction ? [] : availableResearchesOf(ctx, building.kind);
+  const researches = availableResearchesOf(ctx, building.kind);
   const cancellableProducers = underConstruction
     ? []
     : selectedCancellableProducers(ctx, building.kind, isOwn);

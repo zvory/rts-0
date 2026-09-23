@@ -509,6 +509,41 @@ fn manual_research_shortage_creates_unpaid_queue_entry() {
 }
 
 #[test]
+fn unfinished_research_buildings_accept_unpaid_research_queues() {
+    let map = flat_map(24);
+    for (building_kind, upgrade) in [
+        (EntityKind::TrainingCentre, UpgradeKind::Entrenchment),
+        (EntityKind::EngineeringComplex, UpgradeKind::ArtilleryUnlock),
+    ] {
+        let mut entities = EntityStore::new();
+        let (x, y) = footprint_center(&map, building_kind, 6, 6);
+        let building = entities
+            .spawn_building(1, building_kind, x, y, false)
+            .expect("research scaffold should spawn");
+        let mut players = vec![player_state(1), player_state(2)];
+        let resources_before = (players[0].steel, players[0].oil);
+
+        let events = apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(1, SimCommand::Research { building, upgrade })],
+        );
+
+        let queue = entities
+            .get(building)
+            .expect("research scaffold")
+            .research_queue();
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].upgrade, upgrade);
+        assert!(!queue[0].paid, "pre-completion research must not prepay");
+        assert_eq!(queue[0].progress, 0);
+        assert_eq!((players[0].steel, players[0].oil), resources_before);
+        assert!(events.get(&1).is_none_or(Vec::is_empty));
+    }
+}
+
+#[test]
 fn manual_production_queue_is_capped_even_when_entries_are_unpaid() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
