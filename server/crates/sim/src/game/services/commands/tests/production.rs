@@ -513,10 +513,7 @@ fn unfinished_research_buildings_accept_unpaid_research_queues() {
     let map = flat_map(24);
     for (building_kind, upgrade) in [
         (EntityKind::TrainingCentre, UpgradeKind::Entrenchment),
-        (
-            EntityKind::EngineeringComplex,
-            UpgradeKind::ArtilleryUnlock,
-        ),
+        (EntityKind::EngineeringComplex, UpgradeKind::ArtilleryUnlock),
     ] {
         let mut entities = EntityStore::new();
         let (x, y) = footprint_center(&map, building_kind, 6, 6);

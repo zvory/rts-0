@@ -690,10 +690,10 @@ pub(in crate::game) fn apply_commands(
                 }
                 let cost =
                     rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
-                let (queue_empty, building_complete) = entities.get(building).map_or(
-                    (false, false),
-                    |b| (b.research_queue().is_empty(), !b.under_construction()),
-                );
+                let (queue_empty, building_complete) =
+                    entities.get(building).map_or((false, false), |b| {
+                        (b.research_queue().is_empty(), !b.under_construction())
+                    });
                 let paid = building_complete && queue_empty && ps.spend_cost(cost);
 
                 let queued = entities.get_mut(building).is_some_and(|b| {
