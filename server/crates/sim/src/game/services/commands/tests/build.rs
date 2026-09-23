@@ -161,9 +161,13 @@ fn build_order_does_not_pull_worker_off_active_construction() {
         Some(site),
         "worker should stay latched to the scaffold it is building"
     );
+    assert_eq!(
+        worker.queued_orders(),
+        &[OrderIntent::build(EntityKind::Barracks, 8, 8)]
+    );
     assert!(
         events.get(&1).is_none_or(Vec::is_empty),
-        "ignored build command should not emit a failure notice"
+        "accepted follow-up should not emit a failure notice"
     );
 }
 
@@ -214,6 +218,10 @@ fn gather_order_does_not_pull_worker_off_active_construction() {
         worker.target_id(),
         Some(site),
         "worker should keep targeting its scaffold"
+    );
+    assert!(
+        worker.queued_orders().is_empty(),
+        "Kriegsia workers cannot gather"
     );
 }
 

@@ -9,8 +9,8 @@ use crate::game::services::order_planner as planner;
 use crate::rules;
 
 use super::guards::{
-    dedupe_cap_units, unit_can_accept_ground_command, unit_can_accept_player_command,
-    unit_has_committed_barrage,
+    dedupe_cap_units, is_constructing, unit_can_accept_ground_command,
+    unit_can_accept_player_command, unit_has_committed_barrage,
 };
 pub(super) fn planner_config(max_units_per_command: usize) -> planner::PlannerConfig {
     planner::PlannerConfig {
@@ -100,6 +100,7 @@ pub(super) fn planner_facts(
             let committed_barrage = unit_has_committed_barrage(entities, id);
             facts.can_replace_active =
                 unit_can_accept_player_command(entities, player, id) && !committed_barrage;
+            facts.can_replace_queued = is_constructing(entities, id) && !committed_barrage;
             facts.queue_len = e.queued_orders().len();
             facts.queue_terminal = matches!(
                 e.order(),
@@ -122,8 +123,9 @@ pub(super) fn planner_facts(
             };
             facts.can_attack_move = e.kind != EntityKind::ScoutPlane;
             facts.can_attack = e.can_attack();
-            facts.can_hold_position =
-                unit_can_accept_ground_command(entities, player, id) && !committed_barrage;
+            facts.can_hold_position = (unit_can_accept_ground_command(entities, player, id)
+                || facts.can_replace_queued)
+                && !committed_barrage;
             facts.can_gather = rules::economy::can_gather_for_faction(faction_id, e.kind);
             facts.can_build = rules::faction::catalog_for(faction_id)
                 .is_some_and(|catalog| catalog.builders.contains(&e.kind));

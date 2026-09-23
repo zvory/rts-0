@@ -230,6 +230,7 @@ pub(in crate::game) fn apply_commands(
                     .iter()
                     .map(|action| match action {
                         planner::PlannedAction::ReplaceActive { unit, .. }
+                        | planner::PlannedAction::ReplaceQueued { unit, .. }
                         | planner::PlannedAction::AppendQueued { unit, .. }
                         | planner::PlannedAction::ExecuteAbilityNow { unit, .. } => *unit,
                     })
@@ -251,11 +252,26 @@ pub(in crate::game) fn apply_commands(
                         notice(events, player, "Command queue full");
                     }
                 } else {
-                    clear_queued_orders(entities, &accepted);
+                    let mut immediate = Vec::new();
+                    for (unit, point) in &requested {
+                        if is_constructing(entities, *unit) {
+                            if let Some(entity) = entities.get_mut(*unit) {
+                                entity.clear_queued_orders();
+                                entity.append_queued_order(if attack_move {
+                                    OrderIntent::attack_move_to(point.0, point.1)
+                                } else {
+                                    OrderIntent::move_to(point.0, point.1)
+                                });
+                            }
+                        } else {
+                            immediate.push(*unit);
+                        }
+                    }
+                    clear_queued_orders(entities, &immediate);
                     coordinator.order_group_formation_move(
                         entities,
                         player,
-                        &accepted,
+                        &immediate,
                         &requested,
                         attack_move,
                     );
@@ -866,6 +882,7 @@ mod planned_actions {
         let mut attack_move_goal = None;
         let mut clear_obstacle_area = None;
         for action in output.actions {
+            let replace_queued = matches!(action, planner::PlannedAction::ReplaceQueued { .. });
             match action {
                 planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
                     planner::OrderIntent::Move(point) => {
@@ -1055,7 +1072,8 @@ mod planned_actions {
                         }
                     }
                 },
-                planner::PlannedAction::AppendQueued { unit, intent } => {
+                planner::PlannedAction::ReplaceQueued { unit, intent }
+                | planner::PlannedAction::AppendQueued { unit, intent } => {
                     if let planner::OrderIntent::WorldAbility { ability, target } = intent {
                         if let Some(mode) =
                             ability_from_planner(ability).and_then(artillery_fire_mode_for)
@@ -1107,6 +1125,9 @@ mod planned_actions {
                             _ => {}
                         }
                         if let Some(e) = entities.get_mut(unit) {
+                            if replace_queued {
+                                e.clear_queued_orders();
+                            }
                             e.append_queued_order(intent);
                         }
                     }

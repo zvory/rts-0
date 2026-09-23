@@ -49,6 +49,8 @@ pub struct UnitFacts {
     /// Immediate orders may replace this unit's current activity. Queued handoffs only require
     /// `can_receive_orders`, so an active constructor can accept future work without being pulled.
     pub can_replace_active: bool,
+    /// Active construction accepts one replacement follow-up without interrupting the scaffold.
+    pub can_replace_queued: bool,
     pub queue_len: usize,
     pub active_build: bool,
     pub activity: UnitActivity,
@@ -69,6 +71,7 @@ impl UnitFacts {
             pos: Point::new(0.0, 0.0),
             can_receive_orders: true,
             can_replace_active: true,
+            can_replace_queued: false,
             queue_len: 0,
             active_build: false,
             activity: UnitActivity::Idle,
@@ -229,6 +232,8 @@ pub enum OrderIntent {
 pub enum PlannedAction {
     /// Replace the active order and clear queued future orders for this unit.
     ReplaceActive { unit: UnitId, intent: OrderIntent },
+    /// Replace future orders while preserving active construction.
+    ReplaceQueued { unit: UnitId, intent: OrderIntent },
     /// Append a future order stage for this unit.
     AppendQueued { unit: UnitId, intent: OrderIntent },
     /// Execute an ability immediately. When `preserve_orders` is true, the caller
@@ -360,6 +365,20 @@ pub fn plan_order(
     }
 }
 
+fn immediate_action(unit: &UnitFacts, intent: OrderIntent) -> PlannedAction {
+    if unit.can_replace_queued {
+        PlannedAction::ReplaceQueued {
+            unit: unit.id,
+            intent,
+        }
+    } else {
+        PlannedAction::ReplaceActive {
+            unit: unit.id,
+            intent,
+        }
+    }
+}
+
 fn plan_simple_point(
     config: PlannerConfig,
     mode: IssueMode,
@@ -380,11 +399,8 @@ fn plan_filtered_units(
     for unit in units.iter().copied().filter(|u| predicate(u)) {
         match mode {
             IssueMode::Immediate => {
-                if unit.can_replace_active {
-                    out.actions.push(PlannedAction::ReplaceActive {
-                        unit: unit.id,
-                        intent: intent.clone(),
-                    });
+                if unit.can_replace_active || unit.can_replace_queued {
+                    out.actions.push(immediate_action(unit, intent.clone()));
                 }
             }
             IssueMode::Queue => append_or_notice(config, &mut out, unit, intent.clone()),
@@ -434,13 +450,10 @@ fn plan_build(
             let candidates: Vec<&UnitFacts> = builders
                 .iter()
                 .copied()
-                .filter(|u| u.can_replace_active)
+                .filter(|u| u.can_replace_active || u.can_replace_queued)
                 .collect();
             if let Some(unit) = choose_immediate_work_worker(&candidates, target) {
-                out.actions.push(PlannedAction::ReplaceActive {
-                    unit: unit.id,
-                    intent,
-                });
+                out.actions.push(immediate_action(unit, intent));
             }
         }
         IssueMode::Queue => {
@@ -476,13 +489,10 @@ fn plan_deconstruct(
             let candidates: Vec<&UnitFacts> = builders
                 .iter()
                 .copied()
-                .filter(|u| u.can_replace_active)
+                .filter(|u| u.can_replace_active || u.can_replace_queued)
                 .collect();
             if let Some(unit) = choose_immediate_work_worker(&candidates, target_point) {
-                out.actions.push(PlannedAction::ReplaceActive {
-                    unit: unit.id,
-                    intent,
-                });
+                out.actions.push(immediate_action(unit, intent));
             }
         }
         IssueMode::Queue => {
@@ -656,7 +666,9 @@ fn choose_immediate_work_worker<'a>(
 }
 
 fn immediate_work_priority(unit: &UnitFacts) -> u8 {
-    if matches!(unit.activity, UnitActivity::Idle) {
+    if unit.can_replace_queued {
+        3
+    } else if matches!(unit.activity, UnitActivity::Idle) {
         0
     } else if !unit.active_build {
         1
@@ -1172,11 +1184,12 @@ mod tests {
     }
 
     #[test]
-    fn nonreplaceable_builder_can_receive_queued_handoff_but_not_immediate_work() {
+    fn constructing_builder_accepts_immediate_and_shift_handoffs() {
         let config = PlannerConfig::default();
         let mut constructing = unit(1);
         constructing.can_build = true;
         constructing.can_replace_active = false;
+        constructing.can_replace_queued = true;
         constructing.active_build = true;
         constructing.activity = UnitActivity::Busy;
 
@@ -1191,7 +1204,10 @@ mod tests {
             &build(&[1], IssueMode::Queue, 100.0),
         );
 
-        assert!(immediate.actions.is_empty());
+        assert!(matches!(
+            immediate.actions.as_slice(),
+            [PlannedAction::ReplaceQueued { unit: 1, .. }]
+        ));
         assert_eq!(queued_units(&queued), vec![1]);
     }
 

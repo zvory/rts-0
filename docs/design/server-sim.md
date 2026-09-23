@@ -1367,12 +1367,21 @@ the command-supply budget and uses a larger bounded unit-id window for scenario-
 Lab scenario export and restore preserve stable active and queued order intent, including artillery
 point-fire and blanket-fire commands. Restore also hydrates the runtime state required for active
 movement, build, deconstruct, and artillery point-fire orders to resume execution.
-When construction completes, its single active builder clears the active Build order.
+While a worker is actively constructing a scaffold, ordinary non-Shift orders replace its
+future queue with one follow-up intent and leave construction running. Repeated ordinary orders
+replace that follow-up; Shift orders append using the usual bounded queue. This applies to move
+(including formation move), attack move, attack, gather, hold, build, and deconstruct orders that
+the worker can legally receive. Stop remains the explicit immediate construction interruption.
+Workers travelling to a build site or waiting there remain interruptible. When choosing one worker
+for a build/deconstruct command, prefer an interruptible selected worker before an active constructor.
+When construction completes, its single active builder clears the active Build order, preserving
+follow-ups for normal queue promotion and authoritative order-plan feedback.
 `services::order_planner` is the pure
 reference implementation of this planning policy. The planner has no `EntityStore`, fog, pathing,
-economy, or cooldown mutation dependency; it accepts plain facts and emits one of three effects:
+economy, or cooldown mutation dependency; it accepts plain facts and emits one of four effects:
 
 - `ReplaceActive` — replace this unit's active order and clear future queued intents.
+- `ReplaceQueued` — replace future intents with one follow-up while preserving active construction.
 - `AppendQueued` — append one future intent to this unit's queue.
 - `ExecuteAbilityNow { preserve_orders: true }` — execute an immediate ability without replacing
   the active order or queued intents.
