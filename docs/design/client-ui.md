@@ -273,6 +273,12 @@ claim preserves the authoritative gameplay `state`; a motion claim is admitted o
 pending local command owns that presentation transition. The compositor maps that claim onto the
 frame-local display entity's `move`/`idle` state for existing renderer and HUD consumers; it never
 mutates the buffered authoritative entity, and no baseline-derived activity may produce the claim.
+An owned worker with active `build` intent and a scaffold `targetId` is construction-locked in the
+prediction baseline. Non-Shift movement and Hold Position replace its predicted future queue but
+cannot claim movement or idle presentation until an authoritative snapshot releases construction.
+Shift continues to append; Stop releases the lock immediately. A worker travelling to or waiting
+at a build site has no scaffold target and remains interruptible. Local movement previews retain
+the active construction marker and replace only its future markers for a non-Shift follow-up.
 
 The same frame carries a separate `progress` array whose patches contain only an existing owned
 building id, `construction`/`production` kind, active-item identity, and a normalized fraction. The
