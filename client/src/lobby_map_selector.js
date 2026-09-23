@@ -246,7 +246,12 @@ export class LobbyMapSelector {
     if (presentation.preview) {
       this.previewFallback.hidden = true;
       this.previewImage.hidden = false;
-      this.previewImage.src = presentation.preview;
+      const currentPreview = typeof this.previewImage.getAttribute === "function"
+        ? this.previewImage.getAttribute("src")
+        : this.previewImage.src;
+      if (currentPreview !== presentation.preview) {
+        this.previewImage.src = presentation.preview;
+      }
     } else {
       if (typeof this.previewImage.removeAttribute === "function") {
         this.previewImage.removeAttribute("src");

@@ -181,11 +181,24 @@ import { textWithin } from "./dom_text.mjs";
     const root = document.createElement("div");
     root.contains = (target) => target === root;
     const selector = new LobbyMapSelector(root, { onSelect: (name) => selected.push(name) });
+    let previewAssignments = 0;
+    let previewSrc = "";
+    Object.defineProperty(selector.previewImage, "src", {
+      configurable: true,
+      get: () => previewSrc,
+      set: (value) => {
+        previewAssignments += 1;
+        previewSrc = value;
+      },
+    });
     const maps = Object.keys(LOBBY_MAP_PRESENTATION).map((name) => ({ name }));
     selector.render({ maps, selectedMap: "Chokes", visible: true, disabled: false });
+    selector.preview("Chokes");
 
     assert(!root.hidden && selector.triggerLabel.textContent === "Chokes",
       "custom map selector reflects the authoritative selected map");
+    assert(previewAssignments === 1,
+      "repeated selected-map renders do not restart an in-flight preview request");
     assert(root.children[0] === selector.previewFigure && root.children[1] === selector.control,
       "selected map preview renders above the dropdown control");
     assert(selector.optionButtons.length === maps.length,
