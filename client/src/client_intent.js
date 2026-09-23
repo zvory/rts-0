@@ -50,7 +50,7 @@ export class ClientIntent {
     this.abilityTargetPreview = null;
     /** @type {null | {x:number,y:number}} */
     this.artilleryFireCenter = null;
-    /** @type {Map<number, Array<{kind:string,x?:number,y?:number,clientSeq:number|null,createdAt:number,replacesAuthority?:boolean}>>} */
+    /** @type {Map<number, Array<{kind:string,x?:number,y?:number,clientSeq:number|null,createdAt:number,replacesAuthority?:boolean,replacesQueued?:boolean}>>} */
     this._plannedOrderStagesByUnit = new Map();
   }
 
@@ -300,13 +300,20 @@ export class ClientIntent {
     );
     for (const unitId of units) {
       const entity = selectedById.get(unitId) || null;
+      const constructing = entity?.kind === KIND.WORKER && entity?.state === "build" &&
+        Number.isInteger(entity?.targetId) && entity?.orderPlan?.[0]?.kind === "build";
+      if (command.c === CMD.HOLD_POSITION && !command.queued && !constructing) {
+        this._plannedOrderStagesByUnit.delete(unitId);
+        continue;
+      }
       if (stage.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS && entity?.kind === KIND.MORTAR_TEAM) {
         continue;
       }
       if (command.queued) {
         this._appendPlannedStage(unitId, stage, entity);
       } else {
-        this._plannedOrderStagesByUnit.set(unitId, [cloneStage(stage, { replacesAuthority: true })]);
+        this._plannedOrderStagesByUnit.set(unitId, [cloneStage(stage,
+          constructing ? { replacesQueued: true } : { replacesAuthority: true })]);
       }
     }
   }
@@ -321,7 +328,8 @@ export class ClientIntent {
       ? entity.orderPlan.map((stage) => ({ ...stage }))
       : [];
     const local = this._plannedOrderStagesByUnit.get(entity?.id) || [];
-    const base = local[0]?.replacesAuthority ? [] : authority;
+    const base = local[0]?.replacesAuthority ? []
+      : local[0]?.replacesQueued ? authority.slice(0, 1) : authority;
     const merged = [];
     for (const stage of base.concat(local)) {
       merged.push(publicOrderStage(stage));
@@ -412,7 +420,7 @@ export class ClientIntent {
     const authorityPlan = current[0]?.replacesAuthority
       ? []
       : Array.isArray(entity?.orderPlan)
-        ? entity.orderPlan
+        ? current[0]?.replacesQueued ? entity.orderPlan.slice(0, 1) : entity.orderPlan
         : [];
     if (planHasTerminal(authorityPlan, entity)) return;
     if (planHasTerminal(current, entity)) return;
@@ -546,7 +554,7 @@ function commandOrderStage(command, clientSeq, createdAt) {
     case CMD.SETUP_ANTI_TANK_GUNS:
       return finitePointStage(ORDER_STAGE.SETUP_ANTI_TANK_GUNS, command, base);
     case CMD.HOLD_POSITION:
-      return command.queued ? { kind: ORDER_STAGE.HOLD_POSITION, ...base } : null;
+      return { kind: ORDER_STAGE.HOLD_POSITION, ...base };
     case CMD.ARTILLERY_FIRE:
       return finitePointStage(ORDER_STAGE.BLANKET_FIRE, command, base);
     case CMD.USE_ABILITY:

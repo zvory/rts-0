@@ -703,6 +703,7 @@ fn no_op_ticks_are_deterministic() {
             weapon_facing: None,
             order_plan: Vec::new(),
             authoritative_barrier_after: None,
+            active_construction: false,
         }],
         progress: Vec::new(),
         visible_obstacles: Vec::new(),
@@ -995,4 +996,74 @@ fn json_api_round_trips_like_wasm_binding() {
     assert!(serde_json::to_string(&predictor.diagnostics())
         .unwrap()
         .contains("pendingCommands"));
+}
+
+#[test]
+fn construction_followup_prediction_waits_for_authority_but_stop_releases_it() {
+    let mut authoritative = snapshot();
+    let worker = &mut authoritative.entities[0];
+    worker.state = "build".into();
+    worker.target_id = Some(300);
+    worker.order_plan = vec![OrderPlanMarker {
+        kind: "build".into(),
+        x: 120.0,
+        y: 100.0,
+    }];
+    let baseline = OwnedPredictionBaseline::from_snapshot(1, &authoritative);
+    assert!(baseline.owned_entities[0].active_construction);
+    let mut predictor = predictor_from_start_payload(start_payload(), 1);
+    predictor.import_baseline(baseline).unwrap();
+    for (seq, x, queued) in [(1, 140.0, false), (2, 180.0, true), (3, 160.0, false)] {
+        predictor.enqueue_command(
+            seq,
+            Command::Move {
+                units: vec![101],
+                x,
+                y: 100.0,
+                queued,
+            },
+        );
+    }
+    predictor.advance_ticks(5);
+    assert!(predictor.render_prediction_frame(0.0).entities.is_empty());
+    assert_eq!(predictor.core.owned[&101].queued_orders.len(), 1);
+    assert_eq!(predictor.core.owned[&101].queued_orders[0].x, 160.0);
+    predictor.enqueue_command(
+        4,
+        Command::HoldPosition {
+            units: vec![101],
+            queued: false,
+        },
+    );
+    predictor.advance_ticks(5);
+    assert!(predictor.render_prediction_frame(0.0).entities.is_empty());
+    predictor.enqueue_command(5, Command::Stop { units: vec![101] });
+    predictor.enqueue_command(
+        6,
+        Command::Move {
+            units: vec![101],
+            x: 160.0,
+            y: 100.0,
+            queued: false,
+        },
+    );
+    predictor.advance_ticks(5);
+    assert!(!predictor.render_prediction_frame(0.0).entities.is_empty());
+
+    // A builder on the way to a site is still immediately interruptible.
+    authoritative.entities[0].target_id = None;
+    let baseline = OwnedPredictionBaseline::from_snapshot(1, &authoritative);
+    assert!(!baseline.owned_entities[0].active_construction);
+    predictor.import_baseline(baseline).unwrap();
+    predictor.enqueue_command(
+        7,
+        Command::Move {
+            units: vec![101],
+            x: 160.0,
+            y: 100.0,
+            queued: false,
+        },
+    );
+    predictor.advance_ticks(5);
+    assert!(!predictor.render_prediction_frame(0.0).entities.is_empty());
 }

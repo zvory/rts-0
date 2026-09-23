@@ -205,6 +205,9 @@ pub struct OwnedEntityBaseline {
     /// cannot model. `Some(0)` means even the first retained/local queued stage is behind authority.
     #[serde(default)]
     pub authoritative_barrier_after: Option<usize>,
+    /// The worker is attached to a scaffold; ordinary orders replace its future queue.
+    #[serde(default)]
+    pub active_construction: bool,
 }
 
 impl OwnedEntityBaseline {
@@ -221,6 +224,13 @@ impl OwnedEntityBaseline {
             weapon_facing: entity.weapon_facing,
             order_plan: owner_safe_order_plan_prefix(&entity.order_plan),
             authoritative_barrier_after: authoritative_order_barrier(entity),
+            active_construction: entity.kind == "worker"
+                && entity.state == "build"
+                && entity.target_id.is_some()
+                && entity
+                    .order_plan
+                    .first()
+                    .is_some_and(|stage| stage.kind == "build"),
         }
     }
 }
@@ -401,6 +411,7 @@ struct EntityState {
     facing: Option<f32>,
     motion: Option<PredictedMotion>,
     authoritative_barrier_after: Option<usize>,
+    active_construction: bool,
     terminal_pose_claim: bool,
     active_order: Option<MoveOrder>,
     queued_orders: VecDeque<MoveOrder>,
@@ -638,6 +649,7 @@ impl CorePredictor {
                         entity.state = "idle".to_string();
                         entity.motion = Some(PredictedMotion::Idle);
                         entity.authoritative_barrier_after = None;
+                        entity.active_construction = false;
                         entity.terminal_pose_claim = false;
                     }
                 }
@@ -682,7 +694,10 @@ impl CorePredictor {
                     y: target_y,
                     motion: Some(PredictedMotion::Move),
                 };
-                if queued {
+                if entity.active_construction && !queued {
+                    entity.queued_orders.clear();
+                    entity.queued_orders.push_back(order);
+                } else if queued {
                     if !entity.queue_has_terminal_hold() {
                         entity.queued_orders.push_back(order);
                     }
@@ -703,7 +718,10 @@ impl CorePredictor {
             let Some(entity) = self.owned.get_mut(id) else {
                 continue;
             };
-            if queued {
+            if entity.active_construction && !queued {
+                entity.queued_orders.clear();
+            }
+            if queued || entity.active_construction {
                 if entity.queue_has_terminal_hold() {
                     continue;
                 }
@@ -801,6 +819,7 @@ impl EntityState {
             facing: baseline.facing,
             motion: None,
             authoritative_barrier_after,
+            active_construction: baseline.active_construction,
             terminal_pose_claim: false,
             active_order,
             queued_orders,

@@ -87,3 +87,39 @@ assertDeepEqual(
   ],
   "immediate mortar setup does not create a local setup stage",
 );
+
+// Ordinary orders on an active constructor replace only the follow-up preview.
+const builderIntent = new ClientIntent();
+const constructionStage = { kind: "build", x: 120, y: 100 };
+const builder = { id: 91, kind: KIND.WORKER, state: "build", targetId: 92,
+  orderPlan: [constructionStage, { kind: "move", x: 300, y: 100 }] };
+builderIntent.recordPlannedCommand(cmd.move([91], 400, 100), [builder], { sent: true, clientSeq: 101 });
+builderIntent.recordPlannedCommand(cmd.move([91], 500, 100, true), [builder], { sent: true, clientSeq: 102 });
+assertDeepEqual(builderIntent.plannedOrderPlanForEntity(builder), [constructionStage,
+  { kind: "move", x: 400, y: 100 }, { kind: "move", x: 500, y: 100 }],
+"constructor preview keeps the scaffold and appends Shift follow-ups");
+builderIntent.recordPlannedCommand(cmd.move([91], 600, 100), [builder], { sent: true, clientSeq: 103 });
+assertDeepEqual(builderIntent.plannedOrderPlanForEntity(builder), [constructionStage,
+  { kind: "move", x: 600, y: 100 }], "latest ordinary click replaces every future marker");
+builderIntent.reconcilePlannedOrders([{ ...builder, orderPlan: [constructionStage,
+  { kind: "move", x: 600, y: 100 }] }], { acknowledgedClientSeq: 103 });
+assertDeepEqual(builderIntent.plannedOrderPlanForEntity({ ...builder, orderPlan: [constructionStage,
+  { kind: "move", x: 600, y: 100 }] }), [constructionStage, { kind: "move", x: 600, y: 100 }],
+"authoritative handoff confirms the preview without duplication");
+builderIntent.recordPlannedCommand(cmd.move([91], 700, 100), [{ ...builder, targetId: null }], { sent: true, clientSeq: 104 });
+assertDeepEqual(builderIntent.plannedOrderPlanForEntity(builder), [{ kind: "move", x: 700, y: 100 }],
+"workers travelling to a site retain immediate replacement previews");
+
+builderIntent.recordPlannedCommand(cmd.holdPosition([91]), [builder], { sent: true, clientSeq: 105 });
+builderIntent.recordPlannedCommand(cmd.move([91], 800, 100, true), [builder], { sent: true, clientSeq: 106 });
+assertDeepEqual(builderIntent.plannedOrderPlanForEntity(builder), [constructionStage,
+  { kind: "holdPosition" }],
+"ordinary Hold replaces constructor follow-ups and blocks later Shift previews");
+builderIntent.recordPlannedCommand(cmd.move([91], 900, 100), [builder], { sent: true, clientSeq: 107 });
+assertDeepEqual(builderIntent.plannedOrderPlanForEntity(builder), [constructionStage,
+  { kind: "move", x: 900, y: 100 }],
+"ordinary movement replaces a pending construction Hold");
+builderIntent.recordPlannedCommand(cmd.holdPosition([91]), [{ ...builder, targetId: null }],
+  { sent: true, clientSeq: 108 });
+assertDeepEqual(builderIntent.plannedOrderPlanForEntity({ ...builder, orderPlan: [] }), [],
+"Hold on a travelling builder clears local stages immediately");
