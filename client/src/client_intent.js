@@ -300,14 +300,18 @@ export class ClientIntent {
     );
     for (const unitId of units) {
       const entity = selectedById.get(unitId) || null;
+      const constructing = entity?.kind === KIND.WORKER && entity?.state === "build" &&
+        Number.isInteger(entity?.targetId) && entity?.orderPlan?.[0]?.kind === "build";
+      if (command.c === CMD.HOLD_POSITION && !command.queued && !constructing) {
+        this._plannedOrderStagesByUnit.delete(unitId);
+        continue;
+      }
       if (stage.kind === ORDER_STAGE.SETUP_ANTI_TANK_GUNS && entity?.kind === KIND.MORTAR_TEAM) {
         continue;
       }
       if (command.queued) {
         this._appendPlannedStage(unitId, stage, entity);
       } else {
-        const constructing = entity?.kind === KIND.WORKER && entity?.state === "build" &&
-          Number.isInteger(entity?.targetId) && entity?.orderPlan?.[0]?.kind === "build";
         this._plannedOrderStagesByUnit.set(unitId, [cloneStage(stage,
           constructing ? { replacesQueued: true } : { replacesAuthority: true })]);
       }
@@ -550,7 +554,7 @@ function commandOrderStage(command, clientSeq, createdAt) {
     case CMD.SETUP_ANTI_TANK_GUNS:
       return finitePointStage(ORDER_STAGE.SETUP_ANTI_TANK_GUNS, command, base);
     case CMD.HOLD_POSITION:
-      return command.queued ? { kind: ORDER_STAGE.HOLD_POSITION, ...base } : null;
+      return { kind: ORDER_STAGE.HOLD_POSITION, ...base };
     case CMD.ARTILLERY_FIRE:
       return finitePointStage(ORDER_STAGE.BLANKET_FIRE, command, base);
     case CMD.USE_ABILITY:
