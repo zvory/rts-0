@@ -45,7 +45,7 @@ export const ROCKET_LAUNCHER_BODY = Object.freeze({
 
 // Gatherers can mine a resource only when a completed home-base mining anchor is within range.
 export const MINING_ANCHOR_RANGE_TILES = 11.0;
-export const OIL_LOAD = 1;
+export const OIL_LOAD = 2;
 export const HARVEST_TICKS = 40;
 export const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20;
 export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 30 * Math.PI / 180;
@@ -220,10 +220,10 @@ export const STATS = Object.freeze({
       "Resource Depots automatically build this for free on nearby Steel patches. " +
       `Extracts 2 Steel every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s.` },
   [KIND.PUMP_JACK]: { label: "Pump Jack", icon: "PJ", footW: 1, footH: 1, sight: 1,
-    cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [],
+    cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 10, trains: [],
     description:
-      "Engineers can build this on Oil patches for 150 Steel in 5s. " +
-      "Resource Depots automatically build this for free in 18s on nearby Oil patches. " +
+      "Engineers can build this on Oil patches for 150 Steel in 10s. " +
+      "Resource Depots automatically build this for free in 36s on nearby Oil patches. " +
       `Extracts ${OIL_LOAD} Oil every ${(HARVEST_TICKS / TICK_HZ).toFixed(1)}s while within ` +
       `${MINING_ANCHOR_RANGE_TILES} tiles of a completed friendly Resource Depot or Zamok.` },
 
@@ -520,7 +520,7 @@ export const isProducerBuilding = (kind) =>
 
 export const RESOURCE_AMOUNTS = Object.freeze({
   [KIND.STEEL]: 625,
-  [KIND.OIL]: 481,
+  [KIND.OIL]: 962,
 });
 
 // What a worker can build (command card when a worker is selected).

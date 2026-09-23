@@ -278,7 +278,7 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
         })
     };
     let steel_ticks = config::TICK_HZ * 24;
-    let pump_ticks = config::AUTOMATIC_PUMP_JACK_BUILD_TICKS;
+    let pump_ticks = config::TICK_HZ * 36;
     assert_eq!(
         progress(&game, EntityKind::PumpJack),
         Some(1.0 / pump_ticks as f32)
@@ -287,7 +287,7 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
         (game.state.players[0].steel, game.state.players[0].oil),
         (0, 0)
     );
-    for _ in 1..pump_ticks {
+    for _ in 1..steel_ticks {
         game.tick();
     }
     assert!(
@@ -300,13 +300,13 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
             .is_none(),
         "Engineer cannot assist the automatic scaffold"
     );
-    assert!(!completed(&game, EntityKind::SteelMine));
-    assert!(completed(&game, EntityKind::PumpJack));
+    assert!(completed(&game, EntityKind::SteelMine));
+    assert!(!completed(&game, EntityKind::PumpJack));
     assert_eq!(
-        progress(&game, EntityKind::SteelMine),
-        Some(pump_ticks as f32 / steel_ticks as f32)
+        progress(&game, EntityKind::PumpJack),
+        Some(steel_ticks as f32 / pump_ticks as f32)
     );
-    for _ in pump_ticks..steel_ticks {
+    for _ in steel_ticks..pump_ticks {
         game.tick();
     }
     assert!(completed(&game, EntityKind::SteelMine));

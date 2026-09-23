@@ -23,7 +23,7 @@ const REPLAY_MAP = path.join(REPO_ROOT, "server/assets/maps/1v1.json");
 // The replay fixture reuses the old checkpoint's entities but restores them onto the current
 // bundled map. Keep this binding explicit so a gameplay-affecting map change cannot silently make
 // the replay-lobby integration exercise a stale map.
-const CURRENT_REPLAY_MAP_MATERIALIZED_HASH = "1119dcdca0487f1d";
+const CURRENT_REPLAY_MAP_MATERIALIZED_HASH = "8d1b6abc62bea6bd";
 const LOBBY_ROW_SETTLE_TIMEOUT_MS = 10_000;
 const LOBBY_ROW_POLL_INTERVAL_MS = 100;
 const SAFE_REPLAY_LOBBY_ROW_KEYS = [

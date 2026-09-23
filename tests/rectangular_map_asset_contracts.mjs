@@ -56,12 +56,12 @@ const materializedHash = (data) => fnv1a64([
 ]);
 
 const bundledMapContracts = new Map([
-  ["1v1-no-terrain.json", [126, 126, "198d24ba4349cdb226d4a3b709c8c4934fa97da208e1778163c5a6e0b26df31b", "091632cf7f075212"]],
-  ["1v1.json", [126, 126, "a5977b0436ff36b3a91c80e58c037b10a9b7b4a4720b142f7ac06f098ac1206f", "e8c24a1df76a0aeb"]],
-  ["3-player-map.json", [150, 150, "f0093e6e978f4fcaf3afc9468546c22e2951109fe41d18f95eefe19a8cebbc57", "63d94e5ea4153a57"]],
-  ["4_player_map.json", [166, 166, "a72ca6141adf4148671a72c1eaba9ee60afba1ef117b4734b2e234a2141a4971", "9933e46fbf89cc17"]],
-  ["default-handcrafted.json", [126, 126, "154d305ff61ffef65b2f1d5558ee55835635ed2f8e180f5fa9405688d20428fb", "d83c324277828e2e"]],
-  ["schone-tage.json", [166, 166, "670af98b70ff3ee5edb320941f78d224e6863f0ab93f8dc169f6895c27b036c7", "4255cadc338383cc"]],
+  ["1v1-no-terrain.json", [126, 126, "43229a90f176eca98bc846369c23829ec21ef651110c6130f60cd44064e0f493", "2e5f921c35ca3592"]],
+  ["1v1.json", [126, 126, "dc1f3578b9b8e59dddef9dad876a43873771efac6d7cff010b65a6088f30c91d", "dab5c2b76de92943"]],
+  ["3-player-map.json", [150, 150, "c22766d5f1a8eb1a5e8aad19ac9e37c9cf0204a57d407bb7bb2f730726f2d8d0", "b59f1702ca3bd0fb"]],
+  ["4_player_map.json", [166, 166, "c32bc4413eba9485473d53942be5d816c00214a2382930367f38d4188e86534a", "aba66d9bf954174f"]],
+  ["default-handcrafted.json", [126, 126, "7b496141deab0dd8b0dd85b13dfc5386da21d4c3ef628530296a50264a8fbf20", "37a3b26a9765b6f6"]],
+  ["schone-tage.json", [166, 166, "f6707fa21414bfedbaa3b055e1f0551d75692f2952cb359a67e67a54cb1cf564", "d1f0a1f85da12e28"]],
 ]);
 
 for (const fileName of fs.readdirSync(new URL("server/assets/maps/", repoRoot)).filter((name) => name.endsWith(".json"))) {
