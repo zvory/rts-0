@@ -78,6 +78,55 @@ fn unpaid_manual_research_waits_then_pays_and_starts() {
 }
 
 #[test]
+fn unfinished_building_keeps_queued_research_inert_until_completion() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::TrainingCentre, 10, 10);
+    let training_centre = entities
+        .spawn_building(1, EntityKind::TrainingCentre, x, y, false)
+        .expect("training centre scaffold should spawn");
+    entities
+        .get_mut(training_centre)
+        .expect("training centre")
+        .push_research(ResearchItem {
+            upgrade: UpgradeKind::Entrenchment,
+            progress: 0,
+            total: 10,
+            paid: false,
+        });
+    let mut players = vec![player(1)];
+    let definition = upgrade::definition(UpgradeKind::Entrenchment);
+    players[0].set_resources(definition.cost_steel, definition.cost_oil);
+
+    tick_production(&map, &mut entities, &mut players);
+    let waiting = &entities
+        .get(training_centre)
+        .expect("training centre")
+        .research_queue()[0];
+    assert!(!waiting.paid);
+    assert_eq!(waiting.progress, 0);
+    assert_eq!(
+        (players[0].steel, players[0].oil),
+        (definition.cost_steel, definition.cost_oil)
+    );
+
+    while entities
+        .get_mut(training_centre)
+        .expect("training centre")
+        .advance_construction()
+        == Some(false)
+    {}
+    tick_production(&map, &mut entities, &mut players);
+    let started = &entities
+        .get(training_centre)
+        .expect("training centre")
+        .research_queue()[0];
+    assert!(started.paid);
+    assert_eq!(started.progress, 1);
+    assert_eq!((players[0].steel, players[0].oil), (0, 0));
+}
+
+#[test]
 fn dead_producers_do_not_pay_waiting_unit_or_research_items() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();

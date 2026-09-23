@@ -845,8 +845,7 @@ export class HUD {
     const building = selected.find((entity) =>
       (buildingId == null || entity.id === buildingId) &&
       this._isOwn(entity) &&
-      entity.kind === def.researchedAt &&
-      entity.buildProgress == null,
+      entity.kind === def.researchedAt,
     );
     if (!building) return;
     this.commandInteraction.issueCommand(cmd.research(building.id, upgrade));

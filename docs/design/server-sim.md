@@ -1037,6 +1037,8 @@ work never prepay. An unpaid unit reserves neither resources nor supply, cancell
 death refund only paid entries, and owner/team projections expose `prodWaiting` so clients do not
 extrapolate false progress. Production buildings are visited in stable entity-id order, before
 construction, when multiple waiting purchases compete for the same newly available resources.
+Research may be queued on an unfinished valid research building; those entries remain unpaid and
+inert until the building completes, then enter the same front-entry payment and progress path.
 Standing repeat production deliberately does not use unpaid entries: it continues retrying while the
 ordinary queue is empty and inserts a normal paid item only after cost and supply succeed.
 Dependent research is admissible when its prerequisite is complete or already earlier in the same

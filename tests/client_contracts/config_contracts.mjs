@@ -644,7 +644,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       id: 77,
       owner: playerId,
       kind: KIND.TRAINING_CENTRE,
-      buildProgress: null,
+      buildProgress: 0.45,
     };
     const researchHud = Object.create(HUD.prototype);
     researchHud.state = {
@@ -664,7 +664,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
 
     renderCommandCard(researchHud);
     const researchButton = renderedButtons.find((button) => button.innerHTML.includes("Methamphetamines"));
-    assert(researchButton && !researchButton.disabled, "Methamphetamines command-card button renders enabled");
+    assert(researchButton && !researchButton.disabled, "unfinished Training Centre renders enabled research");
     assert(researchButton.dataset.hotkey === "Q", "Methamphetamines command-card button uses Q as its hotkey");
     assert(researchButton.innerHTML.includes("Research time"), "Methamphetamines tooltip includes research time");
     const panzerfaustsButton = renderedButtons.find((button) => button.innerHTML.includes("Panzerfausts"));
