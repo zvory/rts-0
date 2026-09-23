@@ -152,7 +152,7 @@ await withFakeDocument(async () => {
         return {
           ok: true,
           async json() {
-            return { maps: [{ name: "1v1" }, { name: "Chokes" }] };
+            return { maps: [{ name: "Classic" }, { name: "Chokes" }] };
           },
         };
       }
@@ -206,7 +206,7 @@ await withFakeDocument(() => {
     initialRoom: "sandbox",
     onStart: (launch) => starts.push(launch),
   });
-  screen.maps = [{ name: "1v1" }, { name: "Chokes" }];
+  screen.maps = [{ name: "Classic" }, { name: "Chokes" }];
   screen.setConnected(true);
   const mapSelect = findFakes(
     root,

@@ -4,7 +4,7 @@
       "id": "lategame",
       "title": "Lategame Arsenal",
       "description": "Two-player late-game lab with full tech, large armies, and maximum resources.",
-      "map": "1v1",
+      "map": "Classic",
       "playerCount": 2,
       "filename": "lategame.json"
     },
@@ -12,7 +12,7 @@
       "id": "render-preview",
       "title": "Render Preview",
       "description": "Imported two-player lab setup for checking exported render coverage.",
-      "map": "1v1",
+      "map": "Classic",
       "playerCount": 2,
       "filename": "render-preview.json"
     },
@@ -20,7 +20,7 @@
       "id": "tank-trap-cluster-clear",
       "title": "Tank Trap Cluster Clearing",
       "description": "Three tanks and ten neutral Tank Traps arranged to demonstrate four-tile A-click cluster clearing, with two out-of-radius controls.",
-      "map": "1v1",
+      "map": "Classic",
       "playerCount": 2,
       "filename": "tank-trap-cluster-clear.json"
     },

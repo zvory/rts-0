@@ -148,17 +148,17 @@ import { textWithin } from "./dom_text.mjs";
     "bundled lobby previews use high-DPR JPEG assets");
   assertDeepEqual(
     mapNames.filter((name) => lobbyMapPresentation(name).archived),
-    ["1v1 No Terrain", "1v1", "Chokes", "Lighting Test", "Open Basin"],
+    ["1v1 No Terrain", "Classic", "Chokes", "Lighting Test", "Open Basin"],
     "retired maps are explicitly marked as archived in lobby presentation metadata",
   );
   assertDeepEqual(
     orderLobbyMaps([
-      { name: "1v1" },
+      { name: "Classic" },
       { name: "Crossroads" },
       { name: "Open Basin" },
       { name: "Doppelganger" },
     ]).map((entry) => entry.name),
-    ["Crossroads", "Doppelganger", "1v1", "Open Basin"],
+    ["Crossroads", "Doppelganger", "Classic", "Open Basin"],
     "lobby map ordering preserves catalog order within active and archived sections",
   );
 }
@@ -226,7 +226,7 @@ import { textWithin } from "./dom_text.mjs";
     assertDeepEqual(
       selector.optionButtons.map((button) => button.dataset.mapName),
       ["3 Player Map", "4 Player Map", "Crossroads", "Doppelganger", "Fastest Map Possible",
-        "Schone Tage", "The River", "Wald des Todes", "1v1 No Terrain", "1v1", "Chokes", "Lighting Test",
+        "Schone Tage", "The River", "Wald des Todes", "1v1 No Terrain", "Classic", "Chokes", "Lighting Test",
         "Open Basin"],
       "custom map selector groups archived maps after active maps",
     );

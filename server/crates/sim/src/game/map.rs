@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn one_v_one_map_is_rotationally_symmetric() {
-        let map = Map::load("1v1", 2, 0x1234_5678).expect("1v1 should load");
+        let map = Map::load("Classic", 2, 0x1234_5678).expect("Classic should load");
         let size = map.width as usize;
 
         for y in 0..size {
@@ -463,7 +463,7 @@ mod tests {
                 assert_eq!(
                     map.terrain[y * size + x],
                     map.terrain[rotated_y * size + rotated_x],
-                    "1v1 terrain differs at ({x},{y}) and its rotation ({rotated_x},{rotated_y})"
+                    "Classic terrain differs at ({x},{y}) and its rotation ({rotated_x},{rotated_y})"
                 );
             }
         }
@@ -472,7 +472,7 @@ mod tests {
         for &(x, y) in &map.starts {
             assert!(
                 starts.contains(&(map.width - 1 - x, map.width - 1 - y)),
-                "1v1 start ({x},{y}) has no rotational counterpart"
+                "Classic start ({x},{y}) has no rotational counterpart"
             );
         }
 
@@ -480,7 +480,7 @@ mod tests {
         for &(x, y) in &map.base_sites {
             assert!(
                 base_sites.contains(&(map.width - 1 - x, map.width - 1 - y)),
-                "1v1 base site ({x},{y}) has no rotational counterpart"
+                "Classic base site ({x},{y}) has no rotational counterpart"
             );
         }
     }

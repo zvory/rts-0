@@ -61,7 +61,7 @@ export function buildClientPerfWorkloads(env = process.env) {
       description: "Opt-in live Lab view with the authoritative Hellhole server and Pixi client in tandem.",
       kind: "labScenario",
       defaultEnabled: false,
-      url: "/lab?room=client-perf-hellhole&map=1v1&scenario=fixed-roster-hellhole",
+      url: "/lab?room=client-perf-hellhole&map=Classic&scenario=fixed-roster-hellhole",
       setup: {
         liveLabScenario: {
           scenarioId: "fixed-roster-hellhole",

@@ -167,7 +167,7 @@ function safeLabToken(value, fallback, maxLen) {
   return raw;
 }
 
-function safeLabMapName(value, fallback = "1v1") {
+function safeLabMapName(value, fallback = "Classic") {
   const raw = String(value || "").trim() || fallback;
   if (!/^[A-Za-z0-9 _-]+$/.test(raw) || raw.length > 48) return fallback;
   return raw;
@@ -245,7 +245,7 @@ export function replaceLabCatalogRoute(launch, {
   params.set("scenario", safeLabToken(launch.scenario, "blank", 48));
 
   const mapName = safeLabMapName(launch.map);
-  if (mapName === "1v1") params.delete("map");
+  if (mapName === "Classic") params.delete("map");
   else params.set("map", mapName);
 
   const room = safeLabToken(launch.publicRoom, "default", 40);

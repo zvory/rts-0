@@ -23,7 +23,7 @@ const profiledLabLaunchUrl = interactLaunchUrl({
   mode: "lab",
   baseUrl: "http://localhost/",
   room: "interact-lab-test",
-  map: "1v1",
+  map: "Classic",
   opponent: "ai_2_1",
   renderer: "pixi",
   seed: "424242",

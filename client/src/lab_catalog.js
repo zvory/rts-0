@@ -1,6 +1,6 @@
 const LAB_CATALOG_ENDPOINT = "/api/lab-scenarios";
 const MAP_CATALOG_ENDPOINT = "/maps/catalog";
-const DEFAULT_LAB_MAP = "1v1";
+const DEFAULT_LAB_MAP = "Classic";
 
 export function normalizeLabScenarioEntry(entry) {
   const id = safeCatalogText(entry?.id, "");
