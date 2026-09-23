@@ -147,7 +147,7 @@ fn deployed_anti_tank_gun_survives_a_head_on_rifleman_duel() {
         at.set_weapon_facing(0.0);
     }
 
-    for _ in 0..=108 {
+    for _ in 0..=combat_rules::attack_profile(EntityKind::AntiTankGun).cooldown {
         run_combat_tick_on_map(&mut entities, &players, &map);
     }
 

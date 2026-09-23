@@ -78,7 +78,7 @@ fn first_barrage_is_free_and_unloads_sixteen_rockets() {
     assert_eq!(config::ROCKET_BARRAGE_UNLOAD_TICKS, config::TICK_HZ * 4);
     assert_eq!(
         config::ROCKET_BARRAGE_RELOAD_TICKS,
-        config::TICK_HZ as u16 * 30
+        config::TICK_HZ as u16 * 60
     );
     assert_eq!(config::ROCKET_BARRAGE_DIRECT_DAMAGE, 70);
     assert_eq!(config::ROCKET_BARRAGE_INNER_DAMAGE, 53);

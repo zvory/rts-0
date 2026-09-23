@@ -448,7 +448,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::MORTAR_RANGE_TILES),
         min_range_tiles: Some(balance::MORTAR_MIN_RANGE_TILES),
-        cooldown_ticks: (balance::TICK_HZ as u16) * 2,
+        cooldown_ticks: balance::MORTAR_FIRE_COOLDOWN_TICKS as u16,
         charges: None,
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),

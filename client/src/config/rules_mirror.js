@@ -75,7 +75,7 @@ export const MORTAR_MIN_RANGE_TILES = 5;
 export const MORTAR_FIELD_OF_FIRE_RAD = Math.PI * 2;
 export const MORTAR_OUTER_RADIUS_TILES = 2;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
-export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
+export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 4;
 export const PANZERFAUST_RANGE_TILES = 5;
 export const PANZERFAUST_DAMAGE = 100;
 export const PANZERFAUST_ARMOR_PENETRATION = 0.5;
@@ -108,7 +108,7 @@ export const EKAT_LINE_SHOT_RANGE_TILES = 6;
 export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
 export const EKAT_LINE_SHOT_SPEED_PX_PER_TICK = 8;
 export const EKAT_LINE_SHOT_DAMAGE = 40;
-export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 10;
+export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 20;
 export const EKAT_MAGIC_ANCHOR_RANGE_TILES = 5;
 export const EKAT_MAGIC_ANCHOR_DURATION_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 3.0;
@@ -281,7 +281,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint",
     rangeTiles: ROCKET_BARRAGE_MAX_RANGE_TILES,
     minRangeTiles: ROCKET_BARRAGE_MIN_RANGE_TILES,
-    cooldownTicks: TICK_HZ * 30,
+    cooldownTicks: TICK_HZ * 60,
     charges: 1,
     cost: Object.freeze({ steel: 0, oil: 150 }),
     radiusTiles: 6,
@@ -300,7 +300,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint",
     rangeTiles: ARTILLERY_MAX_RANGE_TILES,
     minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
-    cooldownTicks: TICK_HZ * 3,
+    cooldownTicks: TICK_HZ * 6,
     cost: ARTILLERY_AMMO_COST,
     radiusTiles: ARTILLERY_OUTER_RADIUS_TILES,
     delayTicks: ARTILLERY_SHELL_DELAY_TICKS,
@@ -318,7 +318,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint",
     rangeTiles: ARTILLERY_MAX_RANGE_TILES,
     minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
-    cooldownTicks: TICK_HZ * 3,
+    cooldownTicks: TICK_HZ * 6,
     cost: ARTILLERY_AMMO_COST,
     radiusTiles: ARTILLERY_BLANKET_RADIUS_TILES,
     queued: true,

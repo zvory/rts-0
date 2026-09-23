@@ -202,6 +202,8 @@ mod tests {
             vec![6, 8, 38]
         );
         setup.game.enqueue(setup.player_id, setup.command());
+        // Movement remains exact to the recorded replay; HP was refreshed for doubled
+        // attack cooldowns without changing positions, states, targets, or stuck ticks.
         let golden: Vec<GoldenTick> =
             serde_json::from_str(include_str!("fixtures/replay_281_ticks_13537_13620.json"))
                 .expect("valid replay-281 golden trace");

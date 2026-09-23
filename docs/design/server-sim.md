@@ -991,7 +991,7 @@ policy is centralized instead of scattered through services.
   `tank_coax_machine_gun`), compatibility helpers such as
   `attack_profile(kind) -> AttackProfile`, and weapon-aware direct damage/miss/facing helpers such
   as `effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain) -> u32`. The
-  Tank coax profile is a live secondary Tank weapon (`tank_coax`, 6 tiles, 4 damage, 6-tick
+  Tank coax profile is a live secondary Tank weapon (`tank_coax`, 6 tiles, 4 damage, 12-tick
   cooldown, small arms, direct-fire overpenetration). The Panzerfaust loaded-shot target predicate
   for Scout Cars, Tanks, and Command Cars lives here as rules vocabulary while the one-shot state machine stays in
   the sim combat service.

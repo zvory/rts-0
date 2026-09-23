@@ -21,7 +21,7 @@ fn warrior_sword_two_shots_rifleman_without_overpenetration() {
     let mut all_events = run_combat_tick(&mut entities);
     assert_eq!(entities.get(rifleman).map(|unit| unit.hp), Some(22));
 
-    for _ in 0..32 {
+    for _ in 0..combat_rules::attack_profile(EntityKind::Warrior).cooldown {
         let tick_events = run_combat_tick(&mut entities);
         for (player, events) in tick_events {
             all_events.entry(player).or_default().extend(events);

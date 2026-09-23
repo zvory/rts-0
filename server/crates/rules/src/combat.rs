@@ -128,7 +128,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::WorkerTools,
         range_tiles: 1.0,
         dmg: 4,
-        cooldown: 24,
+        cooldown: 48,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -139,7 +139,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::GolemFists,
         range_tiles: 1.0,
         dmg: 16,
-        cooldown: 24,
+        cooldown: 48,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -150,7 +150,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::WarriorSword,
         range_tiles: 0.5,
         dmg: 23,
-        cooldown: 32,
+        cooldown: 64,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: 0.5,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -161,7 +161,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::RiflemanRifle,
         range_tiles: 5.0,
         dmg: 5,
-        cooldown: 16,
+        cooldown: 32,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -172,7 +172,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::MachineGunnerMg,
         range_tiles: 6.1,
         dmg: 4,
-        cooldown: 6,
+        cooldown: 12,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -183,7 +183,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::ScoutCarMg,
         range_tiles: 7.0,
         dmg: 6,
-        cooldown: 6,
+        cooldown: 12,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -194,7 +194,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::AntiTankGun,
         range_tiles: 5.0,
         dmg: 100,
-        cooldown: 72,
+        cooldown: 144,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::AntiTankGun {
@@ -219,7 +219,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::MortarTeamMortar,
         range_tiles: crate::balance::MORTAR_RANGE_TILES as f32,
         dmg: crate::balance::MORTAR_OUTER_DAMAGE,
-        cooldown: 60,
+        cooldown: crate::balance::MORTAR_FIRE_COOLDOWN_TICKS,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -241,7 +241,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::TankCannon,
         range_tiles: 5.0,
         dmg: 60,
-        cooldown: 72,
+        cooldown: 144,
         weapon_class: WeaponClass::AntiTank,
         armor_penetration: FULL_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -252,7 +252,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::TankCoax,
         range_tiles: 6.0,
         dmg: 4,
-        cooldown: 6,
+        cooldown: 12,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -918,20 +918,20 @@ mod tests {
         assert_eq!(machine_gunner.armor_penetration, NO_ARMOR_PENETRATION);
         assert_eq!(machine_gunner.range_tiles, 6.1);
         assert_eq!(machine_gunner.dmg, 4);
-        assert_eq!(machine_gunner.cooldown, 6);
+        assert_eq!(machine_gunner.cooldown, 12);
 
         let scout_car = weapon_profile(WeaponKind::ScoutCarMg).expect("Scout Car MG profile");
         assert_eq!(scout_car.weapon_class, WeaponClass::SmallArms);
         assert_eq!(scout_car.range_tiles, 7.0);
         assert_eq!(scout_car.dmg, 6);
-        assert_eq!(scout_car.cooldown, 6);
+        assert_eq!(scout_car.cooldown, 12);
 
         let tank_coax = weapon_profile(WeaponKind::TankCoax).expect("Tank coax profile");
         assert_eq!(tank_coax.weapon_class, WeaponClass::SmallArms);
         assert_eq!(tank_coax.armor_penetration, NO_ARMOR_PENETRATION);
         assert_eq!(tank_coax.range_tiles, 6.0);
         assert_eq!(tank_coax.dmg, 4);
-        assert_eq!(tank_coax.cooldown, 6);
+        assert_eq!(tank_coax.cooldown, 12);
         assert_eq!(tank_coax.infantry_target_policy, InfantryTargetPolicy::None);
         assert_eq!(tank_coax.facing_damage_policy, FacingDamagePolicy::None);
         assert_eq!(

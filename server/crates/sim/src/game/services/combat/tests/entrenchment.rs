@@ -159,7 +159,7 @@ fn attack_move_machine_gunner_clears_entrenched_rifleman_without_return_fire() {
                     player.upgrades.insert(UpgradeKind::Methamphetamines);
                 }
             }
-            for tick in 0..300 {
+            for tick in 0..600 {
                 let occ = Occupancy::build(&map, &entities);
                 let spatial = SpatialIndex::build(&entities, map.width, map.height);
                 movement_system(&map, &mut entities, &players, &occ, &spatial, tick);
