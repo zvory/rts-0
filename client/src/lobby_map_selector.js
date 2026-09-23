@@ -244,12 +244,12 @@ export class LobbyMapSelector {
     this.previewAuthor.textContent = `Created by ${presentation.author}`;
     this.previewImage.alt = `${mapName} minimap preview`;
     if (presentation.preview) {
-      this.previewFallback.hidden = true;
-      this.previewImage.hidden = false;
       const currentPreview = typeof this.previewImage.getAttribute === "function"
         ? this.previewImage.getAttribute("src")
         : this.previewImage.src;
       if (currentPreview !== presentation.preview) {
+        this.previewFallback.hidden = true;
+        this.previewImage.hidden = false;
         this.previewImage.src = presentation.preview;
       }
     } else {

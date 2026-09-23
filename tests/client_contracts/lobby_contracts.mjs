@@ -182,10 +182,14 @@ import { textWithin } from "./dom_text.mjs";
     root.contains = (target) => target === root;
     const selector = new LobbyMapSelector(root, { onSelect: (name) => selected.push(name) });
     let previewAssignments = 0;
-    let previewSrc = "";
+    let previewSrc = null;
+    selector.previewImage.getAttribute = (name) => name === "src" ? previewSrc : null;
+    selector.previewImage.removeAttribute = (name) => {
+      if (name === "src") previewSrc = null;
+    };
     Object.defineProperty(selector.previewImage, "src", {
       configurable: true,
-      get: () => previewSrc,
+      get: () => previewSrc === null ? "" : new URL(previewSrc, "https://example.test").href,
       set: (value) => {
         previewAssignments += 1;
         previewSrc = value;
@@ -193,12 +197,28 @@ import { textWithin } from "./dom_text.mjs";
     });
     const maps = Object.keys(LOBBY_MAP_PRESENTATION).map((name) => ({ name }));
     selector.render({ maps, selectedMap: "Chokes", visible: true, disabled: false });
+    selector.render({ maps, selectedMap: "Chokes", visible: true, disabled: false });
     selector.preview("Chokes");
 
     assert(!root.hidden && selector.triggerLabel.textContent === "Chokes",
       "custom map selector reflects the authoritative selected map");
     assert(previewAssignments === 1,
       "repeated selected-map renders do not restart an in-flight preview request");
+    selector.previewImage.listeners.error();
+    selector.render({ maps, selectedMap: "Chokes", visible: true, disabled: false });
+    selector.open();
+    selector.close();
+    assert(previewAssignments === 1 && selector.previewImage.hidden && !selector.previewFallback.hidden,
+      "repeated renders and dropdown toggles preserve the failed preview fallback");
+    selector.preview("Crossroads");
+    assert(previewAssignments === 2 && !selector.previewImage.hidden && selector.previewFallback.hidden,
+      "switching maps after a failed preview requests and reveals the new image");
+    selector.preview("Unknown map");
+    assert(previewSrc === null && selector.previewImage.hidden && !selector.previewFallback.hidden,
+      "maps without previews clear the image source and show the fallback");
+    selector.preview("Crossroads");
+    assert(previewAssignments === 3 && !selector.previewImage.hidden && selector.previewFallback.hidden,
+      "returning from a map without a preview restores the image request");
     assert(root.children[0] === selector.previewFigure && root.children[1] === selector.control,
       "selected map preview renders above the dropdown control");
     assert(selector.optionButtons.length === maps.length,
