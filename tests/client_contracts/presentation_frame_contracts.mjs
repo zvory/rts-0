@@ -62,6 +62,8 @@ const normal = {
   y: 24,
   hp: 30,
   maxHp: 40,
+  prodQueue: 1,
+  prodWaiting: true,
   extractorActive: false,
   panzerfaustWindupProgress: 0.4,
   secretAuthoritativeVariant: { x: 999, y: 999 },
@@ -191,6 +193,10 @@ assert(Object.isFrozen(frame), "presentation frame is frozen");
 assert(Object.keys(frame.layers).join(",") === EXPECTED_LAYERS.join(","), "frame exposes exactly the locked layer keys");
 assert(EXPECTED_LAYERS.every((id) => Object.isFrozen(frame.layers[id])), "every semantic layer array is frozen");
 assert(frame.layers.fogGatedWorld.filter((record) => record.type === "entity").length === 1, "visible entities use fogGatedWorld");
+assert(
+  frame.layers.fogGatedWorld.find((record) => record.id === normal.id)?.prodWaiting === true,
+  "production waiting state crosses the renderer presentation boundary",
+);
 assert(frame.layers.belowFogIntel[0]?.type === "intelEntity", "vision-only received entities stay below fog");
 assert(frame.layers.aboveFogReveal[0]?.type === "shotRevealEntity", "explicit shot reveals stay above fog");
 assert(frame.layers.rememberedWorld[0]?.type === "rememberedBuilding", "remembered buildings remain a distinct category");
