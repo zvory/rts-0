@@ -146,7 +146,7 @@ fn tick_windup(
     if let Some(attacker) = entities.get_mut(id) {
         let base_rifle_cooldown = crate::rules::combat::default_weapon_profile(attacker.kind)
             .map(|profile| profile.cooldown)
-            .unwrap_or(16);
+            .unwrap_or(32);
         let rifle_cooldown = if methamphetamines_researched(owner) {
             base_rifle_cooldown.saturating_mul(config::METHAMPHETAMINES_ATTACK_COOLDOWN_NUMERATOR)
                 / config::METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR

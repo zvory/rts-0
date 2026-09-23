@@ -431,7 +431,7 @@ fn print_client_constants(indent: &str) {
     );
     println!(
         "{indent}    \"mortarFireCooldownTicks\": {},",
-        balance::TICK_HZ * 2
+        balance::MORTAR_FIRE_COOLDOWN_TICKS
     );
     println!(
         "{indent}    \"panzerfaustRangeTiles\": {},",

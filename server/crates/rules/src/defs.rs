@@ -102,7 +102,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 40,
             dmg: 4,
             range_tiles: 1.0,
-            cooldown: 24,
+            cooldown: 48,
             speed: 2.0,
             sight_tiles: 10,
             cost_steel: 50,
@@ -122,7 +122,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 160,
             dmg: 16,
             range_tiles: 1.0,
-            cooldown: 24,
+            cooldown: 48,
             speed: 2.0,
             sight_tiles: 10,
             cost_steel: 0,
@@ -142,7 +142,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 135,
             dmg: 23,
             range_tiles: 0.5,
-            cooldown: 32,
+            cooldown: 64,
             speed: 1.6,
             sight_tiles: 11,
             cost_steel: 100,
@@ -162,7 +162,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 45,
             dmg: 5,
             range_tiles: 5.0,
-            cooldown: 16,
+            cooldown: 32,
             speed: 1.6,
             sight_tiles: 11,
             cost_steel: 35,
@@ -182,7 +182,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 45,
             dmg: 5,
             range_tiles: 5.0,
-            cooldown: 16,
+            cooldown: 32,
             speed: 1.6,
             sight_tiles: 11,
             cost_steel: 55,
@@ -202,7 +202,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 55,
             dmg: 4,
             range_tiles: 6.1,
-            cooldown: 6,
+            cooldown: 12,
             speed: 1.28,
             sight_tiles: 11,
             cost_steel: 75,
@@ -222,7 +222,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 45,
             dmg: 100,
             range_tiles: 5.0,
-            cooldown: 72,
+            cooldown: 144,
             speed: 1.672,
             sight_tiles: 9,
             cost_steel: 150,
@@ -242,7 +242,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 75,
             dmg: balance::MORTAR_OUTER_DAMAGE,
             range_tiles: balance::MORTAR_RANGE_TILES as f32,
-            cooldown: 60,
+            cooldown: balance::MORTAR_FIRE_COOLDOWN_TICKS,
             speed: 1.6,
             sight_tiles: 10,
             cost_steel: 100,
@@ -302,7 +302,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 292,
             dmg: 60,
             range_tiles: 5.0,
-            cooldown: 72,
+            cooldown: 144,
             speed: 2.0,
             sight_tiles: 9,
             cost_steel: 425,
@@ -322,7 +322,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 100,
             dmg: 6,
             range_tiles: 7.0,
-            cooldown: 6,
+            cooldown: 12,
             speed: 2.35,
             sight_tiles: 15,
             cost_steel: 125,
@@ -820,13 +820,13 @@ mod tests {
     }
 
     #[test]
-    fn anti_tank_gun_uses_six_supply_and_restored_cooldown() {
+    fn anti_tank_gun_uses_six_supply_and_doubled_cooldown() {
         let stats = unit_def(EntityKind::AntiTankGun)
             .expect("anti-tank gun def")
             .stats;
 
         assert_eq!(stats.supply, 6);
-        assert_eq!(stats.cooldown, 72);
+        assert_eq!(stats.cooldown, 144);
     }
 
     #[test]

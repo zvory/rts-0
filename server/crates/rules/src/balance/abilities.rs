@@ -33,8 +33,8 @@ pub const ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES: f32 = 1.0;
 
 pub const ROCKET_BARRAGE_ROCKETS: u32 = 16;
 pub const ROCKET_BARRAGE_UNLOAD_TICKS: u32 = TICK_HZ * 4;
-// Cooldown starts when the manual barrage begins and lasts thirty seconds.
-pub const ROCKET_BARRAGE_RELOAD_TICKS: u16 = (TICK_HZ as u16) * 30;
+// Cooldown starts when the manual barrage begins and lasts sixty seconds.
+pub const ROCKET_BARRAGE_RELOAD_TICKS: u16 = (TICK_HZ as u16) * 60;
 pub const ROCKET_BARRAGE_COST_OIL: u32 = 150;
 pub const ROCKET_BARRAGE_MIN_RANGE_TILES: u32 = 10;
 pub const ROCKET_BARRAGE_MAX_RANGE_TILES: u32 = 44;
@@ -62,7 +62,7 @@ pub const EKAT_LINE_SHOT_RANGE_TILES: u32 = 6;
 pub const EKAT_LINE_SHOT_WIDTH_TILES: f32 = 0.6;
 pub const EKAT_LINE_SHOT_SPEED_PX_PER_TICK: f32 = 8.0;
 pub const EKAT_LINE_SHOT_DAMAGE: u32 = 40;
-pub const EKAT_LINE_SHOT_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 10;
+pub const EKAT_LINE_SHOT_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 20;
 pub const EKAT_MAGIC_ANCHOR_RANGE_TILES: u32 = 5;
 pub const EKAT_MAGIC_ANCHOR_DURATION_TICKS: u32 = TICK_HZ * 10;
 pub const EKAT_MAGIC_ANCHOR_RADIUS_TILES: f32 = 3.0;

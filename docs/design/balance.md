@@ -20,6 +20,11 @@ helpers read the defs table.
 Default attack range, damage, cooldown, weapon class, and weapon-policy metadata are exposed through
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
+All repeating unit attack cooldowns are doubled from the original cadence, including melee,
+tank coax, mortar/artillery fire, Rocket Truck barrage reload, and Ekat Line Shot. Damage,
+first-shot readiness, windups, projectile travel, and barrage unload duration are unchanged.
+The disposable Panzerfaust rocket has no repeat cooldown; its rifle follows the doubled cadence.
+Non-attack ability timers and attack-speed multipliers are unchanged.
 Base weapon ranges use fractional tiles (`f32`) throughout stat records and attack profiles.
 The Machine Gunner has 6.1 tiles of base range (7.1 while entrenched), giving an approaching
 attack-moving MG a small standoff margin against a stationary entrenched Rifleman's 6 tiles.
@@ -31,7 +36,7 @@ base damage with 50% armor penetration and no tank-facing modifier. The shot is 
 the same Panzerfaust immediately returns to normal movement and rifle combat while the projectile
 travels, preserving its kind, orders, HP, control-group identity, and trench.
 Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
-damage, 6-tick cooldown, no Tank armor-facing multiplier, and direct-fire overpenetration.
+damage, 12-tick cooldown, no Tank armor-facing multiplier, and direct-fire overpenetration.
 `client/src/config.js` is the stable public facade for the subset the UI/render/fog needs (costs,
 supply, sight, sizes, colors, and command-card descriptors). Its internal
 `client/src/config/timing.js`, `client/src/config/rules_mirror.js`, and
@@ -194,7 +199,7 @@ Cultivator Engineers can also construct the faction-specific Portal for 150 Stee
 footprint, 165 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Warrior for 100 Steel and 2 Supply in 300 ticks.
 The Warrior is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
-23-damage sword has 0.5-tile reach, a 32-tick cooldown, 50% armor penetration, and no
+23-damage sword has 0.5-tile reach, a 64-tick cooldown, 50% armor penetration, and no
 overpenetration. See
 [Cultivators specification](cultivators.md).
 
@@ -304,7 +309,7 @@ its source for three seconds. Hits during that window neither redirect the hull 
 after it expires, the next qualifying hit may establish a new lock. Active movement paths and zero
 oil prevent this response, while Hold Position explicitly allows it. Riflemen take full incoming
 damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, keep
-advancing while firing with normal accuracy, move at tank speed, and use an 8-tick rifle cooldown.
+advancing while firing with normal accuracy, move at tank speed, and use a 16-tick rifle cooldown.
 Panzerfausts upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
 movement, and 25% faster rifle attacks plus the Panzerfaust windup boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
@@ -483,7 +488,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future Riflemen for that player gain permanent moving rifle fire,
   1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 50%
-  faster attacks (16 tick cooldown becomes 8). It also increases that
+  faster attacks (32 tick cooldown becomes 16). It also increases that
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15. Panzerfausts also use the reduced
   12-tick Panzerfaust windup.
@@ -550,7 +555,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   Dash ability targets up to 5 tiles, has no resource cost, has an 8s cooldown, requires a
   statically standable landing point, and leaves a four-second return marker that can be recast
   after one tick if the marker destination remains standable. Her Line Shot ability targets up to
-  6 tiles, has no resource cost, has a 10s cooldown, and launches an 8 px/tick out-and-back
+  6 tiles, has no resource cost, has a 20s cooldown, and launches an 8 px/tick out-and-back
   projectile that deals 40 damage to enemy targetable entities intersecting each 0.6-tile-wide
   swept leg once per leg; if her Magic Anchor is active, the same activation also launches a second
   projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 5 tiles, has
@@ -651,19 +656,19 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 24 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
-| golem           | 160 | 16  | 1     | 24 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| warrior         | 135 | 23  | 0.5   | 32 | 1.6   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile, tracer, or overpenetration |
-| rifleman        | 45  | 5   | 5     | 16 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
-| panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 16 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
-| machine_gunner  | 55  | 4   | 6.1   | 6  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
-| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 60 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed; 30 vs infantry-sized targets | 20 deployed | 72 | 1.672 | 9    | 150 | 40  | 6   | 440 (~15s); cannot fire while packed or transitioning; available immediately from a completed Gun Works (`steelworks` kind) |
-| artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 90 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
-| rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 900-tick (~30s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind) and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; the rack tubes darken during the cooldown; Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
-| scout_car       | 100 | 6   | 7     | 6  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
+| worker          | 40  | 4   | 1     | 48 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
+| golem           | 160 | 16  | 1     | 48 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
+| warrior         | 135 | 23  | 0.5   | 64 | 1.6   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile, tracer, or overpenetration |
+| rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
+| panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 5 | 1 | 300 (~10s); requires completed Panzerfausts research |
+| machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
+| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 120 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| anti_tank_gun         | 45  | 100 deployed; 30 vs infantry-sized targets | 20 deployed | 144 | 1.672 | 9    | 150 | 40  | 6   | 440 (~15s); cannot fire while packed or transitioning; available immediately from a completed Gun Works (`steelworks` kind) |
+| artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 180 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
+| rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 1800-tick (~60s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind) and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; the rack tubes darken during the cooldown; Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
+| scout_car       | 100 | 6   | 7     | 12  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 50  | 75  | 0   | 0; spawned-unit reference value is 50/75, while instant sorties cost 38 Steel / 56 Oil from a Resource Depot or 63 Steel / 94 Oil from a Command Car; both use the C slot after research; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second carrier-local cooldown, no ground collision reservation, and 48x34 px client render body |
-| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 72 cannon; 6 coax | 2.0   | 9     | 425 | 175 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
+| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 144 cannon; 12 coax | 2.0   | 9     | 425 | 175 | 8   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 85  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 

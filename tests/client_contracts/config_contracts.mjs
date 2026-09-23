@@ -371,9 +371,9 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assert(
     ABILITIES[ABILITY.BARRAGE].rangeTiles === 44 &&
       ABILITIES[ABILITY.BARRAGE].minRangeTiles === 10 &&
-      ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 30 &&
+      ABILITIES[ABILITY.BARRAGE].cooldownTicks === TICK_HZ * 60 &&
       ABILITIES[ABILITY.BARRAGE].cost.oil === 150,
-    "Rocket Truck Barrage mirrors its range band, thirty-second cooldown, and repeat cost",
+    "Rocket Truck Barrage mirrors its range band, sixty-second cooldown, and repeat cost",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(

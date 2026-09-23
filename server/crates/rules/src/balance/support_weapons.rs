@@ -21,6 +21,9 @@ pub const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD: f32 = 30.0_f32 * std::f32::consts::PI
 /// Anti-Tank Gun hits deal 30% of their normal damage to infantry-sized targets.
 pub const ANTI_TANK_GUN_INFANTRY_DAMAGE_MULTIPLIER: f32 = 0.30;
 
+/// Shared manual-fire ability and weapon reload for mortars.
+pub const MORTAR_FIRE_COOLDOWN_TICKS: u32 = TICK_HZ * 4;
+
 pub const PANZERFAUST_RANGE_TILES: u32 = 5;
 pub const PANZERFAUST_DAMAGE: u32 = 100;
 pub const PANZERFAUST_ARMOR_PENETRATION: f32 = 0.5;
@@ -30,7 +33,7 @@ pub const METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS: u16 =
     (PANZERFAUST_WINDUP_TICKS * 3).div_ceil(4);
 
 pub const ARTILLERY_SETUP_TICKS: u16 = (TICK_HZ as u16) * 6;
-pub const ARTILLERY_RELOAD_TICKS: u32 = TICK_HZ * 3;
+pub const ARTILLERY_RELOAD_TICKS: u32 = TICK_HZ * 6;
 pub const ARTILLERY_SHELL_DELAY_TICKS: u32 = TICK_HZ * 5;
 pub const ARTILLERY_MIN_RANGE_TILES: u32 = 10;
 pub const ARTILLERY_MAX_RANGE_TILES: u32 = 35;

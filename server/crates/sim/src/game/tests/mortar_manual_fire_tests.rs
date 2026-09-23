@@ -359,7 +359,7 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
 
     let mut launched_targets = Vec::new();
     let mut expected_targets = Vec::new();
-    for _ in 0..240 {
+    for _ in 0..(config::MORTAR_FIRE_COOLDOWN_TICKS * 4) {
         let events = game.tick();
         let launches = mortar_launch_targets(&events, 1, mortar);
         expected_targets.extend(std::iter::repeat_n(target_pos, launches.len()));

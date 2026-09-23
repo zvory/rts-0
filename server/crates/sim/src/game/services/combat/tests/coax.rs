@@ -34,7 +34,7 @@ fn tank_coax_profile_is_live_without_replacing_tank_cannon() {
         .expect("Tank coax profile should be live");
     assert_eq!(coax.range_tiles, 6.0);
     assert_eq!(coax.dmg, 4);
-    assert_eq!(coax.cooldown, 6);
+    assert_eq!(coax.cooldown, 12);
     assert_eq!(
         coax.weapon_class,
         crate::rules::defs::WeaponClass::SmallArms
@@ -74,7 +74,7 @@ fn tank_coax_fires_in_arc_with_small_arms_damage_and_weapon_event() {
     let tank_entity = entities.get(tank).expect("tank should exist");
     assert_eq!(
         tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCoax),
-        6
+        12
     );
     assert_eq!(
         tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCannon),
@@ -459,11 +459,11 @@ fn tank_cannon_and_coax_same_tick_emit_cannon_before_coax() {
     let tank_entity = entities.get(tank).expect("tank should exist");
     assert_eq!(
         tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCannon),
-        72
+        144
     );
     assert_eq!(
         tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCoax),
-        6
+        12
     );
 }
 
