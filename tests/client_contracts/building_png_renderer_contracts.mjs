@@ -291,6 +291,19 @@ try {
     queueLabel?.text === "+5" && queueLabel.visible,
     "a production queue exposes the count waiting behind its active item",
   );
+  entity.prodQueue = 1;
+  entity.prodWaiting = true;
+  renderer._drawBuilding(entity, colorByOwner, state);
+  assert(
+    queueLabel?.text === "+1" && queueLabel.visible,
+    "an unpaid production item is shown as waiting in the queue",
+  );
+  entity.prodWaiting = false;
+  renderer._drawBuilding(entity, colorByOwner, state);
+  assert(
+    queueLabel?.visible === false,
+    "a single active production item is not shown as waiting in the queue",
+  );
   assert(
     queueLabel.parent === renderer.layers.buildingOverlays,
     "queue labels stay above producer bodies when PNG art replaces an SVG fallback",

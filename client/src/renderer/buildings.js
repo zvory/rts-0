@@ -228,8 +228,9 @@ export function _drawBuilding(e, colorByOwner, state) {
     }
   }
 
-  // Queue depth label: show items waiting behind the active production slot.
-  const queueDepth = (e.prodQueue ?? 0) - 1;
+  // Queue depth label: an unpaid front item is still waiting to begin, while a
+  // paid front item occupies the active production slot and is not queued.
+  const queueDepth = Math.max(0, (e.prodQueue ?? 0) - (e.prodWaiting ? 0 : 1));
   this._queueLabel(e, e.x, y0 + 14, queueDepth, bodyAlpha);
 }
 
