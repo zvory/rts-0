@@ -2885,7 +2885,8 @@ input[type="text"]:focus {
   display: inline;
 }
 #minimap {
-  --minimap-base-size: 222px;
+  /* Match the canvas's intrinsic 242px size plus its two 1px borders. */
+  --minimap-base-size: 244px;
   /* Keep the original responsive minimum; fit both viewport axes at maximum. */
   --minimap-limit: min(50vw, 50vh);
   --minimap-size: min(var(--minimap-limit), calc(var(--minimap-base-size) + (max(var(--minimap-base-size), var(--minimap-limit)) - var(--minimap-base-size)) * var(--minimap-growth, 0)));
