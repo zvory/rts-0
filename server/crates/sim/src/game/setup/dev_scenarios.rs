@@ -13,6 +13,7 @@ mod replay_256_worker_expansion_rally;
 mod replay_281_tank_gap;
 mod replay_296_scout_car_stop;
 mod replay_303_scout_car_forest_lock;
+mod replay_384_tank_forest_lock;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_coax;

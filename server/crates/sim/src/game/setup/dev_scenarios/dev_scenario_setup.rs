@@ -9,9 +9,10 @@ pub struct DevScenarioSetup {
     pub(super) order: DevScenarioOrder,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(super) enum DevScenarioOrder {
     Move,
+    RecordedCommands(Vec<(u32, SimCommand)>),
     MoveSequence(&'static [(u32, (f32, f32))]),
     AttackMove,
     MoveWithPanzerfaustWindup {
@@ -24,6 +25,7 @@ pub(super) enum DevScenarioOrder {
 impl DevScenarioSetup {
     pub fn command(&self) -> SimCommand {
         match self.order {
+            DevScenarioOrder::RecordedCommands(ref commands) => commands[0].1.clone(),
             DevScenarioOrder::Move | DevScenarioOrder::MoveSequence(&[]) => SimCommand::Move {
                 units: self.units.clone(),
                 x: self.goal.0,
@@ -56,6 +58,7 @@ impl DevScenarioSetup {
 
     pub fn scheduled_commands(&self) -> Vec<(u32, SimCommand)> {
         match self.order {
+            DevScenarioOrder::RecordedCommands(ref commands) => commands.clone(),
             DevScenarioOrder::MoveSequence(&[]) => {
                 vec![(self.issue_after_ticks, self.command())]
             }

@@ -11,6 +11,9 @@ impl Game {
         seed: u32,
     ) -> Result<DevScenarioSetup, String> {
         match scenario_id {
+            "replay_384_tank_forest_lock" => {
+                Self::new_replay_384_tank_forest_lock_scenario(unit, unit_count, seed)
+            }
             "dynamic_construction_path_block" => {
                 Self::new_dynamic_construction_path_block_scenario(
                     scenario_case,

@@ -146,6 +146,11 @@ __dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>][:
 
 Current scenario ids:
 
+- `replay_384_tank_forest_lock` — Alex’s full-health, two-kill Tank 245 from
+  beta replay 384. One tank, the original local road/forest and 30 recorded
+  per-tank orders reproduce the approach and 26 failed escape attempts. See
+  [fixture provenance](../../server/crates/sim/src/game/setup/dev_scenarios/fixtures/replay_384.md).
+
 - `dynamic_construction_path_block` — two workers receive simultaneous orders: one moves 20 tiles
   while the other starts a Barracks across its already-planned route; selectable `head_on`,
   `slight_angle`, and `major_angle` cases cover static-obstruction recovery across approach angles.
