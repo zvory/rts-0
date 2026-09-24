@@ -249,7 +249,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     STATS[KIND.RIFLEMAN].cost.steel === 35 &&
       STATS[KIND.RIFLEMAN].cost.oil === 0 &&
       STATS[KIND.PANZERFAUST].cost.steel === 55 &&
-      STATS[KIND.PANZERFAUST].cost.oil === 5 &&
+      STATS[KIND.PANZERFAUST].cost.oil === 10 &&
       STATS[KIND.PANZERFAUST].upgradeRequires === UPGRADE.PANZERFAUSTS,
     "Rifleman and Panzerfaust costs and unlock mirror server",
   );
