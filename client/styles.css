@@ -2884,11 +2884,13 @@ input[type="text"]:focus {
 .idle-workers-label {
   display: inline;
 }
-#minimap {
+#game-screen {
   /* Match the canvas's intrinsic 242px size plus its two 1px borders. */
   --minimap-base-size: 244px;
   --minimap-limit: min(50vw, 50vh);
   --minimap-size: min(var(--minimap-limit), calc(var(--minimap-base-size) + (max(var(--minimap-base-size), var(--minimap-limit)) - var(--minimap-base-size)) * var(--minimap-growth, 0)));
+}
+#minimap {
   width: var(--minimap-size);
   height: var(--minimap-size);
   display: block;
@@ -4916,7 +4918,7 @@ input[type="text"]:focus {
   #selected-panel {
     min-width: 240px;
   }
-  #minimap {
+  #game-screen {
     --minimap-base-size: 198px;
   }
   #game-over-text {
@@ -4962,7 +4964,9 @@ input[type="text"]:focus {
     --mobile-debug-right: max(10px, env(safe-area-inset-right));
     --mobile-debug-top: max(10px, env(safe-area-inset-top));
     --mobile-debug-bottom: max(10px, env(safe-area-inset-bottom));
-    --mobile-debug-minimap-reserve: clamp(162px, 54vw, 218px);
+    --minimap-base-size: clamp(112px, 38vw, 170px);
+    --mobile-debug-minimap-base-reserve: clamp(162px, 54vw, 218px);
+    --mobile-debug-minimap-reserve: calc(var(--mobile-debug-minimap-base-reserve) + max(0px, var(--minimap-size) - var(--minimap-base-size)));
   }
 
   #hud {
@@ -5061,10 +5065,6 @@ input[type="text"]:focus {
     bottom: var(--mobile-debug-bottom);
     padding: 6px;
     gap: 4px;
-  }
-
-  #minimap {
-    --minimap-base-size: clamp(112px, 38vw, 170px);
   }
 
   .game-timer {
@@ -5205,7 +5205,8 @@ input[type="text"]:focus {
 
 @media (pointer: coarse) and (max-width: 1024px) and (max-height: 599px) {
   #game-screen {
-    --mobile-debug-minimap-reserve: 142px;
+    --minimap-base-size: 112px;
+    --mobile-debug-minimap-base-reserve: 142px;
   }
 
   #hud {
@@ -5227,10 +5228,6 @@ input[type="text"]:focus {
 
   #minimap-wrap {
     left: calc(44vw + var(--mobile-debug-left));
-  }
-
-  #minimap {
-    --minimap-base-size: 112px;
   }
 
   #selection-area {
