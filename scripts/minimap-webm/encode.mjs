@@ -14,7 +14,7 @@ const results=[];
 for(const v of variants.filter(v=>selection==="all" || (selection==="compact" && ["480-q44","240-q40"].includes(v.name)) || selection===v.name)){
   const output=`${prefix}-${v.name}.webm`, started=performance.now();
   const result=spawnSync('ffmpeg',['-hide_banner','-loglevel','error','-n','-i',master,'-an',
-    '-vf',`fps=${v.fps},scale=${v.size}:${v.size}:flags=lanczos`,'-c:v','libvpx-vp9',
+    '-vf',`fps=${v.fps}:eof_action=pass,scale=${v.size}:${v.size}:flags=lanczos`,'-c:v','libvpx-vp9',
     '-b:v','0','-crf',String(v.crf),'-deadline','good','-cpu-used','4','-row-mt','1',
     '-pix_fmt','yuv420p','-g',String(v.fps*10),output],{stdio:'inherit'});
   if(result.error)throw result.error;

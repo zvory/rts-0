@@ -29,3 +29,32 @@ test('CLI preserves an existing output and does not contact the server', () => {
     assert.equal(fs.readFileSync(output, 'utf8'), 'existing recording');
   } finally { fs.rmSync(dir, { recursive: true }); }
 });
+
+test('encoding preserves a replay shorter than one output frame', t => {
+  const encoders = spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { encoding: 'utf8' });
+  if (!encoders.stdout?.includes('libvpx-vp9') || spawnSync('ffprobe', ['-version']).status !== 0) {
+    t.skip('requires ffmpeg with libvpx-vp9 and ffprobe');
+    return;
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'minimap-encode-test-'));
+  const checked = (command, args) => {
+    const result = spawnSync(command, args, { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+  try {
+    const master = path.join(dir, 'master.mkv');
+    const prefix = path.join(dir, 'preview');
+    checked('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=s=16x16:r=45',
+      '-frames:v', '1', '-c:v', 'ffv1', master]);
+    checked(process.execPath, [fileURLToPath(new URL('./encode.mjs', import.meta.url)), master, prefix]);
+    const results = JSON.parse(fs.readFileSync(`${prefix}-compression.json`, 'utf8'));
+    assert.equal(results.length, 4);
+    for (const { output } of results) {
+      const probe = JSON.parse(checked('ffprobe', ['-v', 'error', '-count_frames',
+        '-show_entries', 'stream=nb_read_frames', '-of', 'json', output]));
+      assert.equal(probe.streams[0].nb_read_frames, '1');
+      checked('ffmpeg', ['-v', 'error', '-i', output, '-f', 'null', '-']);
+    }
+  } finally { fs.rmSync(dir, { recursive: true }); }
+});
