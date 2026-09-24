@@ -128,6 +128,8 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 
 ## Specialized workflows
 
+- To record a minimap video of a selected replay, use `node scripts/record-minimap.mjs <match-id> <output.webm>`; see `scripts/minimap-webm/README.md` for server selection, setup, and re-encoding.
+
 - Never use the in-app browser skill.
 - For player-facing gameplay or presentation changes, stage concise factual Discord copy before
   `agent-pr.sh`: `node scripts/patch-note-outbox.mjs stage --change "<player-facing change>"`.

@@ -1,43 +1,71 @@
-# Minimap WebM experiment
+# Manual minimap WebM recording
 
-Manual, silent, square 10× replay previews. This experiment changes no deployed code and writes
-nothing to the match database. It uses a normal replay spectator connection, captures the replay
-once, then renders and compresses locally without repeating simulation for each encoding.
+Manual, silent, square 15× replay previews with combined authoritative fog. Nothing runs
+automatically: select one match whenever you want a recording. The tool uses an ordinary replay
+spectator connection, then renders and compresses locally. It writes nothing to the match database.
 
 ## Run
 
-Requires Node 22.18+, FFmpeg with `libvpx-vp9`, and the optional native Canvas package below.
-Run from the repository root. Output files must not already exist.
+Requires Node 22.18+, FFmpeg with `libvpx-vp9`, and ffprobe. From the repository root:
 
 ```sh
-scripts/ensure-node-deps.sh --quiet
-npm install --prefix /tmp/rts-minimap-canvas --no-audit --no-fund @napi-rs/canvas@1.0.9
-mkdir -p /tmp/minimap-export
-node scripts/minimap-webm/capture.mjs https://rts-0-zvorygin-beta.fly.dev 387 /tmp/minimap-export/387.jsonl
-node scripts/minimap-webm/render.mjs /tmp/minimap-export/387.jsonl /tmp/minimap-export/387.mkv /tmp/rts-minimap-canvas/node_modules/@napi-rs/canvas
-node scripts/minimap-webm/encode.mjs /tmp/minimap-export/387.mkv /tmp/minimap-export/387
+node scripts/record-minimap.mjs 387 /tmp/match-387.webm
 ```
 
+The default server is beta. Use `--server http://localhost:8080` or another deployment origin
+for matches stored elsewhere. The output directory must exist; existing output files are never
+overwritten. First use installs the optional `@napi-rs/canvas@1.0.9` package into
+`~/.cache/rts-minimap-webm`, separately from the game's dependencies, and prepares repository Node
+dependencies if needed. To use an existing Canvas installation, pass `--canvas-package /absolute/path/to/node_modules/@napi-rs/canvas`.
+
+The command captures, renders, encodes, verifies that the entire video decodes, and prints its
+path and size. It produces 480×480, 15 fps, VP9 CRF44 with a clock-only overlay at 15× speed.
+A constant-quality encode does not guarantee a file-size cap. Temporary captures and lossless
+masters are removed after success; `--keep-work` retains them and prints their directory.
+Failures retain working files for diagnosis. Ctrl-C stops the active child and leaves working
+files in the printed directory; an interrupted capture cannot be rendered.
+
+To re-render a completed capture without running the replay again:
+
+```sh
+node scripts/record-minimap.mjs --from-samples /tmp/rts-minimap-EXAMPLE/capture.jsonl /tmp/another.webm
+```
+
+For compression experiments on a retained master, call the underlying encoder directly:
+
+```sh
+node scripts/minimap-webm/encode.mjs /tmp/rts-minimap-EXAMPLE/master.mkv /tmp/comparison all
+```
+
+For a private viewing link, run `scripts/tailnet-preview /tmp/match-387.webm` (24-hour default).
+The recorder does not upload, schedule jobs, change match history, or create hover previews.
+
 The capture requests 8× playback (the existing server maximum), keeps the connection alive,
-selects omniscient vision, and ends at the replay's recorded final tick. Capture time can be much
+selects combined player vision, and ends at the replay's recorded final tick. Capture time can be much
 longer than the finished video. The JSONL stores sample ticks every 10 simulation ticks; the
-renderer plays these at 30 fps, giving 10× speed at the game's 30 Hz tick rate. Gaps between
+renderer plays these at 45 fps before the compact 15 fps encode, giving 15× speed at the game's 30 Hz tick rate. Gaps between
 received snapshots hold the previous state rather than changing the output clock. The summary
 records the largest snapshot gap. These are sampled network views, not exact offline simulation
 frames. A disconnected/failed capture has no completion summary and the renderer rejects it.
 
 The lossless FFV1 `.mkv` is an intermediate, not a sharing format. `encode.mjs` produces four
-silent VP9 WebMs plus a JSON size/timing report. All files remain local; use `scripts/tailnet-preview`
+silent VP9 WebMs by default, or the compact 480px and 240px variants with the `compact` argument, or a single named variant such as `480-q44`, plus a JSON size/timing report. All files remain local; use `scripts/tailnet-preview`
 for private sharing. Intermediate samples/masters can be deleted after selecting a WebM.
 
 ## Visual scope
 
-Terrain colors, tree rendering, and road markings come from the existing client modules. The
-entity overlay is deliberately simplified: colored circles for units, squares for buildings,
-resource dots, and yellow rings around recent attack targets (received attack events plus sampled HP loss). The timer is simulation time.
-This is an omniscient overview, with no camera rectangle, fog, UI panels, chat, or soundtrack.
-Attack rings are an approximation, not the player's full under-attack notification policy.
-This is a compression/operations experiment, not pixel parity with the production minimap.
+The exporter calls the production `Minimap.render()` directly, using the regular `GameState`,
+`Fog`, and `MatchNoticePresenter` classes. `regular-minimap.mjs` supplies a native Canvas host,
+loads the existing artillery icon, and advances a deterministic game-time clock. It contains no
+second implementation of terrain, fog, entity markers, or attack rings. The only export-specific
+drawing is the MM:SS clock. Future minimap drawing changes therefore flow into exports too.
+
+Capture schema 2 preserves full entity/snapshot fields, resource deltas, and real timed events;
+old simplified captures must be recaptured. Combined server visibility stays clear, explored
+terrain is dimmed, and unexplored terrain is darkened. The 480×480 backing canvas preserves the
+regular 220px minimap's UI proportions. There is no camera rectangle because the exporter has no
+camera, and no speed label, chat, UI panels, or soundtrack. Native Canvas rasterization can differ
+slightly from browser Canvas; this is shared rendering code, not a claim of browser pixel parity.
 
 ## Operational boundary
 
@@ -53,7 +81,7 @@ A future cheap generation path could record a compact minimap timeline during th
 then render that after match end, avoiding a second simulation. That needs its own measurement
 of live-tick overhead, a retention policy, and a job/storage design.
 
-## Results — 24 September 2026
+## Initial 10×, omniscient results — 24 September 2026
 
 Three most recent public beta matches, all recorded by beta build `9fbfb3c60fc2`. Capture ran
 sequentially against beta; rendering/encoding ran on the local Mac. Raw measurements are in
@@ -79,7 +107,7 @@ matches were simulated, persisted, or uploaded: these were spectator replay sess
 Decoded midpoint frames retain a readable timer, map layout, and player-colored movements at
 480px/CRF44, with visible softening of fine terrain and small dots. 240px remains useful as a
 thumbnail. 144px is impressively small but sacrifices readability of crowded groups. Attack
-highlights are simplified as described above. This sample does not establish production load
+highlights in this historical iteration were simplified. This sample does not establish production load
 capacity or cross-browser playback support.
 
 Suggested next step: use 480px/15fps manually for selected games, keep a 240px option, and inspect
@@ -94,3 +122,40 @@ attack retention across unsampled snapshots, refusal of occupied replay lobbies,
 capture rejection. All twelve output WebMs decoded fully with FFmpeg without errors. Local
 syntax checks and docs-health checks passed. Clips and intermediate replay samples are not
 committed; they stay in the local temporary export directory.
+
+## Local 15× combined-fog iteration
+
+This unmerged experiment uses authoritative union-of-player visibility/exploration grids and a
+clock-only overlay. Compact encodes remain VP9 at 15 fps. All six WebMs decoded fully; fog grids
+were checked for size, continuous sample timing, and visible-tile containment within explored
+terrain. The six sampling/capture tests passed, and decoded midpoint frames were inspected.
+
+| Match | Duration | 480px CRF44 | 240px CRF40 |
+| --- | --- | --- | --- |
+| #387 The River | 51.6s | 950,788 bytes | 503,687 bytes |
+| #386 Schone Tage | 23.3s | 310,711 bytes | 150,029 bytes |
+| #385 Classic | 33.8s | 465,965 bytes | 250,283 bytes |
+
+Capture took 236.3s, 95.7s, and 92.6s respectively. Fog rendering took 20.1s, 22.8s,
+and 15.2s; each selected 480px encode took 1.6–3.0s. Moving fog edges increase bitrate, so these
+shorter videos are slightly larger than the initial 10× omniscient examples at the same quality.
+All three 480px outputs still fit below 1,000,000 bytes. No commits, pushes, or merges were made
+for this iteration; the existing PR's auto-merge remains disabled.
+
+## Local 15× production-renderer iteration
+
+Uses the existing Minimap renderer and client fog/state/notice classes via a native Canvas host.
+No production client code changed. Combined authoritative fog, game-time clock only, silent VP9,
+480×480, 15 fps, CRF44. Full measurements: [results-regular15.json](results-regular15.json).
+
+| Match | Video duration | Bytes | Capture | Render | Encode |
+| --- | --- | --- | --- | --- | --- |
+| #387 The River | 51.6s | 1,155,456 | 228.1s | 14.9s | 3.2s |
+| #386 Schone Tage | 23.3s | 382,506 | 87.1s | 7.7s | 1.4s |
+| #385 Classic | 33.8s | 544,578 | 90.4s | 9.6s | 2.0s |
+
+All three files decoded fully without errors; decoded midpoint images were inspected. The game
+renderer gives larger, white-outlined markers and real attack notifications. The clock and player
+colors remain readable, with compression softening fine terrain. The longest clip exceeds 1 MB.
+Seven sampling/capture tests and the production minimap input contracts passed. No commit, push,
+or merge was performed; PR #1605 remains open with auto-merge disabled.

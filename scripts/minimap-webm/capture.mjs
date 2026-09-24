@@ -11,7 +11,7 @@ if (!response.ok) throw Error(`replay launch: ${response.status} ${await respons
 const {room} = await response.json();
 const ws = new WebSocket(`${base.replace(/^http/,'ws')}/ws`);
 const out = fs.createWriteStream(output,{flags:'wx'});
-let soloLobby=false, header, sampler, snapshots=0, lastTick=-1, maxSnapshotGap=0, finished=false, startAt=performance.now();
+let soloLobby=false, seekStarted=false, header, sampler, snapshots=0, lastTick=-1, maxSnapshotGap=0, finished=false, startAt=performance.now();
 const step=10;
 const send = m => ws.send(JSON.stringify(m));
 const write = row => out.write(JSON.stringify(row)+'\n');
@@ -38,12 +38,17 @@ ws.on('message',(data,binary)=>{
    if(header) return;
    if(!soloLobby)throw Error('replay already active; refusing to control an existing session');
    header={type:'header',start:m,durationTicks:m.replay.durationTicks,stepTicks:step,tickRate:30,
-    recordedBuild:m.replay.serverBuildSha,mapName:m.replay.mapName,source:'spectator-stream-hold-last-sample'};
+    recordedBuild:m.replay.serverBuildSha,mapName:m.replay.mapName,source:'spectator-stream-hold-last-sample',fog:'combined',sampleSchema:2};
    sampler=new ReplaySampler(header.durationTicks,step);
    write(header);console.log(JSON.stringify({id,durationTicks:header.durationTicks,build:header.recordedBuild,map:header.mapName}));
-   send(msg.setRoomTimeSpeed(0));send(msg.visionSelectionOmniscient());send(msg.seekRoomTimeTo(0));
+   send(msg.setRoomTimeSpeed(0));send(msg.visionSelectionAll());send(msg.seekRoomTimeTo(0));
    // Seek completion is reflected in snapshots; start playback only from tick zero.
+  } else if(m.t===S.ROOM_TIME_SEEK_STARTED){
+   seekStarted=true;
   } else if(m.t===S.SNAPSHOT && header){
+   if(!seekStarted)return;
+   const cells=header.start.map.width*header.start.map.height;
+   if(m.visibleTiles?.length!==cells || m.exploredTiles?.length!==cells)throw Error('missing authoritative fog grids');
    if(m.tick===0 && lastTick<0)send(msg.setRoomTimeSpeed(8));
    if(m.tick<lastTick)throw Error('replay moved backwards during capture');
    if(lastTick<0 && m.tick>0)return;
