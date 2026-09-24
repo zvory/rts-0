@@ -14,6 +14,7 @@ export function createMatchHud(match, rootEl) {
     match.camera,
     match.apmTracker,
     match.rendererBackendBundle.unitIconMarkupForKind,
+    { showEntityIds: match.replayViewer },
   );
 }
 

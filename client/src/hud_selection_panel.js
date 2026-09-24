@@ -97,8 +97,9 @@ export function selectionBudgetGridModel(entities, overflow = null, players = []
 }
 
 export class HudSelectionPanel {
-  constructor(panel, state, controlPolicy = null, unitIconMarkupForKind = null) {
+  constructor(panel, state, controlPolicy = null, unitIconMarkupForKind = null, { showEntityIds = false } = {}) {
     this.panel = panel;
+    this.showEntityIds = showEntityIds;
     this.state = state;
     this.controlPolicy = controlPolicy;
     this.unitIconMarkupForKind = unitIconMarkupForKind;
@@ -406,16 +407,19 @@ export class HudSelectionPanel {
       ? `<div class="sel-stat sel-trench-status"><span>${entrenchment.label}:</span>` +
         `<strong>${entrenchment.value}</strong></div>`
       : "";
+    const entityIdHtml = this.showEntityIds && Number.isSafeInteger(e.id)
+      ? `<span class="sel-entity-id">Entity ID: ${e.id}</span>`
+      : "";
     const unitsKilledHtml = Number.isFinite(Number(e.unitsKilled))
       ? `<div class="sel-stat sel-unit-kills">Units killed: ` +
-        `${Math.max(0, Math.floor(Number(e.unitsKilled)))}</div>`
+        `${Math.max(0, Math.floor(Number(e.unitsKilled)))}${entityIdHtml}</div>`
       : "";
 
     node.innerHTML =
       `<div class="sel-name"><span class="sel-icon">${st.icon || ""}</span>` +
       `${st.label || e.kind}</div>` +
       hpHtml +
-      unitsKilledHtml +
+      (unitsKilledHtml || (entityIdHtml ? `<div class="sel-stat">${entityIdHtml}</div>` : "")) +
       resourceRemainingHtml +
       entrenchmentHtml +
       prodHtml;
