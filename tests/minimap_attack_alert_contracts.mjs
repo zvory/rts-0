@@ -14,7 +14,7 @@ function recordingContext() {
     calls: [], fillStyle: "", strokeStyle: "", lineWidth: 1, globalAlpha: 1,
     fillRect(...args) { this.calls.push({ op: "fillRect", args, fillStyle: this.fillStyle }); },
     strokeRect(...args) { this.calls.push({ op: "strokeRect", args }); },
-    save() {}, restore() {}, beginPath() {},
+    save() {}, restore() {}, beginPath() {}, scale() {},
     arc(...args) { this.calls.push({ op: "arc", args }); },
     stroke() {
       this.calls.push({

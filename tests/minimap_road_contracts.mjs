@@ -30,6 +30,7 @@ const recordingContext = (label) => ({
   closePath() { this.calls.push({ op: "closePath" }); },
   translate(...args) { this.calls.push({ op: "translate", args }); },
   rotate(...args) { this.calls.push({ op: "rotate", args }); },
+  scale(...args) { this.calls.push({ op: "scale", args }); },
 });
 
 const staticCanvasFactory = (layers) => () => {

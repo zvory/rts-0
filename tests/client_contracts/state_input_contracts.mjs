@@ -821,8 +821,8 @@ function buttonByLabel(card, label) {
   const minimapLike = Object.create(Minimap.prototype);
   minimapLike.state = teamSelectionState;
   assert(
-    minimapLike._blipColor(allyWorker) === `#${COLORS.selectAlly.toString(16).padStart(6, "0")}`,
-    "minimap blip color distinguishes allies from enemies",
+    minimapLike._blipColor(allyWorker) === teamSelectionState.players.find(p => p.id === allyWorker.owner).color,
+    "minimap blip color uses the allied player’s assigned color",
   );
   // Placement is local-only
   const placementIntent = new ClientIntent();

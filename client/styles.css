@@ -2898,7 +2898,7 @@ input[type="text"]:focus {
   border: 1px solid var(--panel-edge);
   background: var(--void);
   cursor: pointer;
-  image-rendering: pixelated;
+  image-rendering: auto;
   touch-action: none;
 }
 
