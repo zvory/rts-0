@@ -45,6 +45,9 @@ export function runMinimapAttackAlertContracts() {
     entitiesInterpolated() { return entities; },
   };
   const minimap = new Minimap(canvas, state, {}, {}, { issueCommand() {} });
+  minimap._unitIcons.draw = (ctx, entity, color, point, size, flash) => {
+    ctx.calls.push({ op: "unitPortrait", flash, color });
+  };
   minimap._worldToCanvas = (x, y) => ({ x, y });
 
   minimap.ping(40, 60, "alert", true);
@@ -66,7 +69,7 @@ export function runMinimapAttackAlertContracts() {
   assert(flashing.has(11) && !flashing.has(13), "attack alert resolves the nearest local entity");
   context.calls.length = 0;
   minimap._drawEntities([entities[0]], { attackFlashIds: flashing });
-  assert(context.calls.some((call) => call.op === "fillRect" && call.fillStyle === "#ffffff"),
+  assert(context.calls.some((call) => call.op === "unitPortrait" && call.flash),
     "attack alert paints the victim icon white");
   entities[0].x = 180;
   flashing = minimap._underAttackFlashEntityIds(entities, 450);
@@ -75,7 +78,7 @@ export function runMinimapAttackAlertContracts() {
   context.calls.length = 0;
   minimap._drawEntities([entities[0]], { attackFlashIds: flashing });
   assert(context.calls.some(
-    (call) => call.op === "fillRect" && call.fillStyle === minimap._blipColor(entities[0]),
+    (call) => call.op === "unitPortrait" && !call.flash && call.color === minimap._unitIconColor(entities[0]),
   ), "the normal strobe phase paints the victim in its team color");
   assert(minimap._underAttackFlashEntityIds(entities, 750).has(11),
     "the resolved victim keeps flashing after moving");

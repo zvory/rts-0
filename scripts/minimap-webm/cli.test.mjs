@@ -59,45 +59,71 @@ test('encoding preserves a replay shorter than one output frame', t => {
   } finally { fs.rmSync(dir, { recursive: true }); }
 });
 
-// These checks run without optional native rasterizers.
-import { installUnitPngs, unitPngFacing, unitPngSize } from './unit-pngs.mjs';
 
-test('PNG style keeps infantry smaller and corrects only machine-gunner orientation', () => {
-  assert.ok(unitPngSize('tank') > 2.5 * unitPngSize('rifleman'));
+import { MinimapUnitIcons, unitPngFacing, unitPngSize } from '../../client/src/minimap_unit_icons.js';
+
+test('shared live/export portraits cache drawing, preserve scale and rotate with corrected facing', async () => {
+  const canvases = [], draws = [], rotations = [];
+  let loads = 0;
+  const createCanvas = () => {
+    const calls = [];
+    const canvas = { width: 0, height: 0, getContext: () => ({
+      drawImage: (...args) => calls.push(args), fillRect() {},
+    }), calls };
+    canvases.push(canvas); return canvas;
+  };
+  const image = { width: 100, height: 50 };
+  const icons = new MinimapUnitIcons({ createCanvas, loadImage: async () => { loads++; return image; } });
+  const ctx = { save() {}, restore() {}, translate() {}, rotate: x => rotations.push(x),
+    drawImage: (...args) => draws.push(args) };
+  const entity = { kind: 'machine_gunner', facing: 1 };
+  icons.draw(ctx, entity, '#0072b2', { x: 0, y: 0 }, 480);
+  assert.equal(draws.length, 0, 'loading units never fall back to dots');
+  await icons.prepare([{ kind: entity.kind, color: '#0072b2' }]);
+  icons.draw(ctx, entity, '#0072b2', { x: 0, y: 0 }, 480);
+  const cached = draws[0][0];
+  icons.draw(ctx, { ...entity, facing: 2 }, '#0072b2', { x: 0, y: 0 }, 480);
+  assert.equal(draws[1][0], cached, 'changing facing reuses the portrait');
+  assert.equal(loads, 1);
+  assert.deepEqual(rotations, [1 - Math.PI / 2, 2 - Math.PI / 2]);
+  assert.equal(cached.calls.length, 17, 'outline is composed once, not on every frame');
+  icons.draw(ctx, entity, '#0072b2', { x: 0, y: 0 }, 480, true);
+  assert.notEqual(draws[2][0], cached, 'attack flash uses its white silhouette composite');
+  assert.equal(draws[2][0].calls.at(-1)[0], canvases[0]);
+  assert.ok(unitPngSize('tank') > unitPngSize('rifleman') * 2.5);
   assert.equal(unitPngFacing({ kind: 'tank', facing: 1 }), 1);
-  assert.equal(unitPngFacing({ kind: 'machine_gunner', facing: 1 }), 1 - Math.PI / 2);
-  assert.equal(unitPngFacing({ kind: 'rifleman' }), 0);
+  assert.equal(unitPngSize('tank', 960), 2 * unitPngSize('tank', 480));
+  icons.destroy();
+  assert.ok(canvases.every(canvas => canvas.width === 0 && canvas.height === 0));
 });
 
-test('PNG adapter retains classic buildings and restores drawing hooks', async () => {
-  const calls = [], masks = [];
-  const originalBlip = (...args) => calls.push(['original', ...args]);
-  const originalOutline = entities => calls.push(['outline', entities]);
-  const minimap = { _drawEntityBlip: originalBlip, _drawPlayerOwnedEntityOutline: originalOutline,
-    _worldToCanvas: (x, y) => ({ x, y }) };
-  const view = { minimap, canvas: { width: 480 }, state: { players: [{ id: 1, color: '#0072b2' }] } };
-  let rasterizations = 0;
-  const adapter = installUnitPngs(view, {
-    createCanvas: () => ({ getContext: () => ({ drawImage() {}, fillRect() {} }) }),
-    loadImage: async () => ({ width: 100, height: 50 }),
-    rasterizeSvg: async () => { rasterizations++; return Buffer.from('fake'); },
-  });
-  const unit = { kind: 'machine_gunner', owner: 1, x: 10, y: 20, facing: 1 };
-  const building = { kind: 'barracks', owner: 1 };
-  const context = { save() {}, restore() {}, translate() {},
-    rotate: angle => calls.push(['rotate', angle]), drawImage: (...args) => masks.push(args) };
-  assert.throws(() => minimap._drawEntityBlip(context, unit), /not prepared/);
-  await adapter.prepare([unit, building]);
-  await adapter.prepare([unit]);
-  assert.equal(rasterizations, 1, 'portrait cache survives successive frames');
-  minimap._drawEntityBlip(context, building, '#0072b2', true);
-  assert.deepEqual(calls.pop(), ['original', context, building, '#0072b2', true]);
-  minimap._drawPlayerOwnedEntityOutline([unit, building]);
-  assert.deepEqual(calls.pop(), ['outline', [building]]);
-  minimap._drawEntityBlip(context, unit);
-  assert.deepEqual(calls.pop(), ['rotate', 1 - Math.PI / 2]);
-  assert.equal(masks.length, 17, 'white contour and final portrait are both drawn');
-  adapter.destroy();
-  assert.equal(minimap._drawEntityBlip, originalBlip);
-  assert.equal(minimap._drawPlayerOwnedEntityOutline, originalOutline);
+test('portrait failures are visible to capture readiness and teardown discards late loads', async () => {
+  const broken = new MinimapUnitIcons({ loadImage: async () => { throw Error('asset failed'); } });
+  await assert.rejects(broken.prepare([{ kind: 'tank', color: '#0072b2' }]), /asset failed/);
+  assert.equal(broken.readiness().ready, false);
+  assert.equal(broken.readiness().failedAssets.length, 1);
+  broken.destroy();
+  let resolve, closed = 0;
+  const late = new MinimapUnitIcons({ loadImage: () => new Promise(r => { resolve = r; }),
+    createCanvas: () => { throw Error('must not allocate after destroy'); } });
+  const pending = late.prepare([{ kind: 'tank', color: '#0072b2' }]);
+  await Promise.resolve();
+  late.destroy();
+  resolve({ width: 10, height: 10, close: () => closed++ });
+  await pending;
+  assert.equal(closed, 1);
+  assert.equal(late.entries.size, 0);
+});
+
+import { createMinimapUnitIconLoader } from '../../client/src/minimap_icon_image.js';
+test('browser portrait loader produces standalone SVG images with a namespace', async () => {
+  let source = '';
+  const image = { width: 100, height: 50,
+    set src(value) { source = value; if (value) queueMicrotask(() => this.onload?.()); } };
+  const loader = createMinimapUnitIconLoader(() => '<svg width="100" height="50"><path d="M0 0h10v10z"/></svg>',
+    { ownerDocument: { createElement: () => image } });
+  const loaded = await loader('tank', '#0072b2', { signal: new AbortController().signal });
+  assert.equal(loaded, image);
+  assert.match(decodeURIComponent(source), /<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
+  assert.equal(image.onload, null);
 });

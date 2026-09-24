@@ -14,7 +14,7 @@ export function unpackTiles(bits, count) {
   return Uint8Array.from({ length: count }, (_, i) => (bytes[i >> 3] >> (i & 7)) & 1);
 }
 
-export async function createRegularMinimap(header, { createCanvas, loadImage }, size = 480) {
+export async function createRegularMinimap(header, { createCanvas, loadImage, rasterizeSvg }, size = 480) {
   if (header.sampleSchema !== 2) throw Error('Recapture with sampleSchema 2: production rendering needs complete snapshots and real events.');
   const priorWindow = globalThis.window;
   const priorNow = Object.getOwnPropertyDescriptor(performance, 'now');
@@ -45,6 +45,13 @@ export async function createRegularMinimap(header, { createCanvas, loadImage }, 
     const fog = new Fog(map.width, map.height, map.terrain);
     const minimap = new Minimap(canvas, state, null, fog, null, null, {
       commandsEnabled: false, artilleryIconImage,
+      loadUnitIcon: async (kind, teamColor) => {
+        const svg = await inlineSvgImageSources(liveUnitIconMarkupFor(kind, { teamColor }), async href => {
+          const asset = new URL(`../../client/${href.replace(/^\//, '')}`, import.meta.url);
+          return `data:image/png;base64,${(await fs.readFile(asset)).toString('base64')}`;
+        });
+        return loadImage(await rasterizeSvg(Buffer.from(svg)));
+      },
       staticCanvasFactory: () => createCanvas(1, 1),
     });
     // Same backing-canvas resize as high-resolution minimap capture; preserve 220px UI proportions.
@@ -52,6 +59,7 @@ export async function createRegularMinimap(header, { createCanvas, loadImage }, 
     const notices = new MatchNoticePresenter({ minimap, isReplay: () => true, isSpectator: () => true, now: () => now });
     return {
       canvas, minimap, state, fog,
+      async prepare(row) { await minimap.prepareUnitIcons(row.snapshot.entities); },
       render(row) {
         if (!row.snapshot || !row.visibleBits || !row.exploredBits) throw Error('incomplete production-render sample');
         const visibleTiles = unpackTiles(row.visibleBits, cells);

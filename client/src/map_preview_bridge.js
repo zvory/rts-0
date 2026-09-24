@@ -66,6 +66,7 @@ export class MapPreviewBridge {
         capture: () => this.download(),
       });
       await this.restoreInitialPreview();
+      await this.match.minimap.prepareUnitIcons?.();
       this.refreshPreviewImage();
       this.startupState = "ready";
       return this.status();
@@ -119,6 +120,8 @@ export class MapPreviewBridge {
     const match = this.match;
     signal.throwIfAborted();
     match.fog?.setRevealAll?.(true);
+    await match.minimap.prepareUnitIcons?.();
+    signal.throwIfAborted();
     const pixels = captureMinimapPng(match.minimap, { width: request.width, height: request.height });
     signal.throwIfAborted();
     const content = analyzeRgba(pixels.rgba);

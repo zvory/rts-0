@@ -460,6 +460,10 @@ export class InteractBridge {
       renderErrors: [{ label: "rendererUnavailable", count: 1, message: "Renderer is unavailable." }],
       missingTextureSubjectIds: [],
     };
+    const minimapReadiness = match.minimap?.unitIconReadiness?.() || { ready: true, pendingAssets: [], failedAssets: [] };
+    rendererReadiness.ready &&= minimapReadiness.ready;
+    rendererReadiness.pendingAssets = [...rendererReadiness.pendingAssets, ...minimapReadiness.pendingAssets];
+    rendererReadiness.failedAssets = [...rendererReadiness.failedAssets, ...minimapReadiness.failedAssets];
     const fonts = documentFontsStatus();
     const frameErrors = Number(match.frameErrors?.count) || 0;
     const ready = rendererReadiness.ready && fonts.status === "ready" &&
