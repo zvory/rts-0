@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import { once } from 'node:events';
 import WebSocket from 'ws';
+import { ReplaySampler } from './sampler.mjs';
 import { msg, S, parseServerFrame, decodeServerMessage } from '../../client/src/protocol.js';
 const [base, id, output] = process.argv.slice(2);
 if (!base || !/^\d+$/.test(id||'') || !output) throw Error('usage: node capture.mjs <server-url> <match-id> <output.jsonl>');
@@ -10,8 +11,8 @@ if (!response.ok) throw Error(`replay launch: ${response.status} ${await respons
 const {room} = await response.json();
 const ws = new WebSocket(`${base.replace(/^http/,'ws')}/ws`);
 const out = fs.createWriteStream(output,{flags:'wx'});
-let soloLobby=false, header, snapshots=0, lastTick=-1, maxSnapshotGap=0, nextTick=0, last, finished=false, startAt=performance.now();
-const step=10, events=new Set();
+let soloLobby=false, header, sampler, snapshots=0, lastTick=-1, maxSnapshotGap=0, finished=false, startAt=performance.now();
+const step=10;
 const send = m => ws.send(JSON.stringify(m));
 const write = row => out.write(JSON.stringify(row)+'\n');
 const heartbeat = setInterval(()=>{if(ws.readyState===WebSocket.OPEN)send(msg.ping(Date.now()));},10000);
@@ -19,7 +20,7 @@ const timeout = setTimeout(()=>fail(Error('capture exceeded 20 minutes')),20*60*
 function fail(error){console.error(error);process.exitCode=1;finished=true;clearTimeout(timeout);clearInterval(heartbeat);ws.close();out.end();}
 function finish(){
  if(finished)return;finished=true;clearTimeout(timeout);clearInterval(heartbeat);
- write({type:'summary',captureSeconds:(performance.now()-startAt)/1000,snapshots,lastTick,maxSnapshotGap,frames:nextTick/step});
+ write({type:'summary',captureSeconds:(performance.now()-startAt)/1000,snapshots,lastTick,maxSnapshotGap,frames:sampler.nextTick/step});
  console.log(JSON.stringify({id,captureSeconds:(performance.now()-startAt)/1000,lastTick,snapshots,output}));
  ws.close();out.end();
 }
@@ -38,6 +39,7 @@ ws.on('message',(data,binary)=>{
    if(!soloLobby)throw Error('replay already active; refusing to control an existing session');
    header={type:'header',start:m,durationTicks:m.replay.durationTicks,stepTicks:step,tickRate:30,
     recordedBuild:m.replay.serverBuildSha,mapName:m.replay.mapName,source:'spectator-stream-hold-last-sample'};
+   sampler=new ReplaySampler(header.durationTicks,step);
    write(header);console.log(JSON.stringify({id,durationTicks:header.durationTicks,build:header.recordedBuild,map:header.mapName}));
    send(msg.setRoomTimeSpeed(0));send(msg.visionSelectionOmniscient());send(msg.seekRoomTimeTo(0));
    // Seek completion is reflected in snapshots; start playback only from tick zero.
@@ -45,14 +47,8 @@ ws.on('message',(data,binary)=>{
    if(m.tick===0 && lastTick<0)send(msg.setRoomTimeSpeed(8));
    if(m.tick<lastTick)throw Error('replay moved backwards during capture');
    if(lastTick<0 && m.tick>0)return;
-   for(const e of m.events||[])if(e.e==='attack')events.add(e.to);
-   const sample={tick:m.tick,entities:m.entities.map(e=>[e.id,e.owner,e.kind,e.x,e.y,e.hp]),attacks:[...events]};
-   // Preserve game-time pacing despite variable server speed/network delivery.
-   while(nextTick<=m.tick && nextTick<=header.durationTicks){
-    const chosen=nextTick===m.tick?sample:(last||sample);
-    write({...chosen,tick:nextTick,attacks:[...events]});events.clear();nextTick+=step;
-   }
-   last=sample;maxSnapshotGap=Math.max(maxSnapshotGap,lastTick<0?0:m.tick-lastTick);lastTick=m.tick;snapshots++;
+   sampler.push(m,write);
+   maxSnapshotGap=Math.max(maxSnapshotGap,lastTick<0?0:m.tick-lastTick);lastTick=m.tick;snapshots++;
    if(m.tick>=header.durationTicks)finish();
   } else if(m.t==='error'){throw Error(JSON.stringify(m));}
  }catch(e){fail(e);}

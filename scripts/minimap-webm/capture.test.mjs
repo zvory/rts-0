@@ -7,6 +7,26 @@ import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
+import { ReplaySampler } from './sampler.mjs';
+
+test('offline sampling preserves state and never backdates attacks across gaps',()=>{
+  const sampler=new ReplaySampler(35,10), rows=[];
+  const push=(tick,targets=[])=>sampler.push({tick,
+    entities:[{id:1,owner:1,kind:'rifleman',x:tick,y:0,hp:100}],
+    events:targets.map(to=>({e:'attack',to})),
+  },row=>rows.push(row));
+  push(0);push(7,[1]);push(9);push(25,[2]);push(35);
+  assert.deepEqual(rows.map(r=>r.tick),[0,10,20,30]);
+  assert.deepEqual(rows.map(r=>r.entities[0][3]),[0,9,9,25]);
+  assert.deepEqual(rows.map(r=>r.attacks),[[],[1],[],[2]]);
+});
+
+test('offline sampling includes attacks at an exact sample tick',()=>{
+  const sampler=new ReplaySampler(20,10), rows=[];
+  const push=(tick,events=[])=>sampler.push({tick,entities:[],events},row=>rows.push(row));
+  push(0);push(7,[{e:'attack',to:1}]);push(20,[{e:'attack',to:1},{e:'attack',to:2}]);
+  assert.deepEqual(rows.map(r=>r.attacks),[[],[1],[1,2]]);
+});
 
 function run(file,args){return new Promise((resolve,reject)=>{
   const child=spawn(process.execPath,[new URL(file,import.meta.url).pathname,...args]);
