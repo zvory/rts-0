@@ -13,9 +13,9 @@ Run from the repository root. Output files must not already exist.
 scripts/ensure-node-deps.sh --quiet
 npm install --prefix /tmp/rts-minimap-canvas --no-audit --no-fund @napi-rs/canvas@1.0.9
 mkdir -p /tmp/minimap-export
-node experiments/minimap-webm/capture.mjs https://rts-0-zvorygin-beta.fly.dev 387 /tmp/minimap-export/387.jsonl
-node experiments/minimap-webm/render.mjs /tmp/minimap-export/387.jsonl /tmp/minimap-export/387.mkv /tmp/rts-minimap-canvas/node_modules/@napi-rs/canvas
-node experiments/minimap-webm/encode.mjs /tmp/minimap-export/387.mkv /tmp/minimap-export/387
+node scripts/minimap-webm/capture.mjs https://rts-0-zvorygin-beta.fly.dev 387 /tmp/minimap-export/387.jsonl
+node scripts/minimap-webm/render.mjs /tmp/minimap-export/387.jsonl /tmp/minimap-export/387.mkv /tmp/rts-minimap-canvas/node_modules/@napi-rs/canvas
+node scripts/minimap-webm/encode.mjs /tmp/minimap-export/387.mkv /tmp/minimap-export/387
 ```
 
 The capture requests 8× playback (the existing server maximum), keeps the connection alive,
@@ -89,7 +89,7 @@ storage overhead. No storage pricing assumption is needed to evaluate this footp
 put videos into the existing replay JSON/database blob. If automation becomes desirable, measure
 a tiny live minimap-timeline recorder before building replay-resimulation jobs.
 
-Verification: `node --test experiments/minimap-webm/capture.test.mjs` covers game-time resampling,
+Verification: `node --test scripts/minimap-webm/capture.test.mjs` covers game-time resampling,
 attack retention across unsampled snapshots, refusal of occupied replay lobbies, and interrupted
 capture rejection. All twelve output WebMs decoded fully with FFmpeg without errors. Local
 syntax checks and docs-health checks passed. Clips and intermediate replay samples are not
