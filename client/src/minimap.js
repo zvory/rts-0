@@ -862,7 +862,7 @@ export class Minimap {
     const ctx = this.ctx;
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = this._presentationScale();
     ctx.beginPath();
     polygon.forEach((point, index) => {
       const canvasPoint = this._worldToCanvas(point.x, point.y);
@@ -879,14 +879,21 @@ export class Minimap {
   _drawPings(now) {
     const ctx = this.ctx;
     if (!ctx) return;
+    const scale = this._presentationScale();
+    ctx.save();
+    ctx.scale(scale, scale);
     this._pings = drawMinimapPings({
       ctx,
       pings: this._pings,
       now,
-      worldToCanvas: (x, y) => this._worldToCanvas(x, y),
+      worldToCanvas: (x, y) => {
+        const point = this._worldToCanvas(x, y);
+        return { x: point.x / scale, y: point.y / scale };
+      },
       borderPulseUntil: this._borderPulseUntil,
-      size: this.size,
+      size: this.size / scale,
     });
+    ctx.restore();
   }
 
   _drawArtilleryFiringMarkers(now) {
@@ -908,6 +915,8 @@ export class Minimap {
     const alpha = 1 - progress * 0.35;
     ctx.save();
     ctx.translate(cx, cy);
+    const scale = this._presentationScale();
+    ctx.scale(scale, scale);
     ctx.globalAlpha = alpha;
     ctx.rotate(Number.isFinite(facing) ? facing : 0);
     if (this._artilleryIconReady && this._artilleryIconImage) {

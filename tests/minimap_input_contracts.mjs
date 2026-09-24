@@ -124,6 +124,9 @@ function recordingContext(label) {
     rotate(...args) {
       this.calls.push({ op: "rotate", args });
     },
+    scale(...args) {
+      this.calls.push({ op: "scale", args });
+    },
     moveTo(...args) {
       this.calls.push({ op: "moveTo", args });
     },
