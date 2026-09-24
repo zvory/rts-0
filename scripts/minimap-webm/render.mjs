@@ -5,8 +5,9 @@ import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createRegularMinimap } from './regular-minimap.mjs';
+import { installUnitPngs } from './unit-pngs.mjs';
 
-const [input, output, canvasPackage] = process.argv.slice(2);
+const [input, output, canvasPackage, sharpPackage] = process.argv.slice(2);
 if (!input || !output || !canvasPackage) throw Error('usage: node render.mjs samples.jsonl master.mkv /absolute/path/to/node_modules/@napi-rs/canvas');
 // Refuse interrupted captures before launching an encoder.
 const handle = fs.openSync(input, 'r');
@@ -18,7 +19,7 @@ if (summary.type !== 'summary') throw Error('capture is incomplete (missing summ
 const canvasApi = createRequire(import.meta.url)(canvasPackage);
 const size = 480, speed = 15;
 const lines = readline.createInterface({ input: fs.createReadStream(input), crlfDelay: Infinity });
-let header, canvas, ctx, view, encoder, done, frames = 0;
+let header, canvas, ctx, view, encoder, done, frames = 0, unitPngs;
 const started = process.hrtime.bigint();
 for await (const line of lines) {
   const row = JSON.parse(line);
@@ -27,6 +28,12 @@ for await (const line of lines) {
     header = row;
     if (summary.lastTick < row.durationTicks) throw Error('capture did not reach replay end');
     view = await createRegularMinimap(header, canvasApi, size);
+    if (sharpPackage) {
+      const sharp = createRequire(import.meta.url)(sharpPackage);
+      unitPngs = installUnitPngs(view, { ...canvasApi,
+        rasterizeSvg: bytes => sharp(bytes).png().toBuffer(),
+      });
+    }
     canvas = view.canvas; ctx = canvas.getContext('2d');
     encoder = spawn('ffmpeg', ['-hide_banner','-loglevel','error','-n','-f','rawvideo','-pixel_format','rgba',
       '-video_size',`${size}x${size}`,'-framerate',String(row.tickRate*speed/row.stepTicks),'-i','pipe:0',
@@ -37,6 +44,7 @@ for await (const line of lines) {
     continue;
   }
   if (!header) throw Error('missing header');
+  if (unitPngs) await unitPngs.prepare(row.snapshot.entities);
   view.render(row);
   const seconds=Math.floor(row.tick/header.tickRate);
   const stamp=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
@@ -51,5 +59,6 @@ for await (const line of lines) {
 }
 if (!encoder) throw Error('no frames');
 encoder.stdin.end(); await done;
+unitPngs?.destroy();
 view.destroy();
 console.log(JSON.stringify({frames,renderSeconds:Number(process.hrtime.bigint()-started)/1e9,output}));

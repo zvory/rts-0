@@ -58,3 +58,46 @@ test('encoding preserves a replay shorter than one output frame', t => {
     }
   } finally { fs.rmSync(dir, { recursive: true }); }
 });
+
+// These checks run without optional native rasterizers.
+import { installUnitPngs, unitPngFacing, unitPngSize } from './unit-pngs.mjs';
+
+test('PNG style keeps infantry smaller and corrects only machine-gunner orientation', () => {
+  assert.ok(unitPngSize('tank') > 2.5 * unitPngSize('rifleman'));
+  assert.equal(unitPngFacing({ kind: 'tank', facing: 1 }), 1);
+  assert.equal(unitPngFacing({ kind: 'machine_gunner', facing: 1 }), 1 - Math.PI / 2);
+  assert.equal(unitPngFacing({ kind: 'rifleman' }), 0);
+});
+
+test('PNG adapter retains classic buildings and restores drawing hooks', async () => {
+  const calls = [], masks = [];
+  const originalBlip = (...args) => calls.push(['original', ...args]);
+  const originalOutline = entities => calls.push(['outline', entities]);
+  const minimap = { _drawEntityBlip: originalBlip, _drawPlayerOwnedEntityOutline: originalOutline,
+    _worldToCanvas: (x, y) => ({ x, y }) };
+  const view = { minimap, canvas: { width: 480 }, state: { players: [{ id: 1, color: '#0072b2' }] } };
+  let rasterizations = 0;
+  const adapter = installUnitPngs(view, {
+    createCanvas: () => ({ getContext: () => ({ drawImage() {}, fillRect() {} }) }),
+    loadImage: async () => ({ width: 100, height: 50 }),
+    rasterizeSvg: async () => { rasterizations++; return Buffer.from('fake'); },
+  });
+  const unit = { kind: 'machine_gunner', owner: 1, x: 10, y: 20, facing: 1 };
+  const building = { kind: 'barracks', owner: 1 };
+  const context = { save() {}, restore() {}, translate() {},
+    rotate: angle => calls.push(['rotate', angle]), drawImage: (...args) => masks.push(args) };
+  assert.throws(() => minimap._drawEntityBlip(context, unit), /not prepared/);
+  await adapter.prepare([unit, building]);
+  await adapter.prepare([unit]);
+  assert.equal(rasterizations, 1, 'portrait cache survives successive frames');
+  minimap._drawEntityBlip(context, building, '#0072b2', true);
+  assert.deepEqual(calls.pop(), ['original', context, building, '#0072b2', true]);
+  minimap._drawPlayerOwnedEntityOutline([unit, building]);
+  assert.deepEqual(calls.pop(), ['outline', [building]]);
+  minimap._drawEntityBlip(context, unit);
+  assert.deepEqual(calls.pop(), ['rotate', 1 - Math.PI / 2]);
+  assert.equal(masks.length, 17, 'white contour and final portrait are both drawn');
+  adapter.destroy();
+  assert.equal(minimap._drawEntityBlip, originalBlip);
+  assert.equal(minimap._drawPlayerOwnedEntityOutline, originalOutline);
+});

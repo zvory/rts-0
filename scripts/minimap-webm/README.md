@@ -31,6 +31,28 @@ To re-render a completed capture without running the replay again:
 node scripts/record-minimap.mjs --from-samples /tmp/rts-minimap-EXAMPLE/capture.jsonl /tmp/another.webm
 ```
 
+### Unit PNG presentation
+
+Add `--unit-pngs` to either capture or re-render a video with the approved unit-portrait style:
+
+```sh
+node scripts/record-minimap.mjs 387 /tmp/match-387-units.webm --unit-pngs
+node scripts/record-minimap.mjs --from-samples /tmp/capture.jsonl /tmp/units.webm --unit-pngs
+```
+
+At 480px, riflemen use a roughly 12px portrait and tanks 35px, with a 1px white
+silhouette outline. Whole portraits follow recorded body facing; machine-gunner art receives a
+90° counterclockwise correction. Turrets do not aim independently. Buildings retain the regular
+colored, white-outlined boxes, and terrain, fog, resources, attack notices, and the clock retain
+the normal exporter behavior. HUD art without a PNG route uses its existing SVG portrait.
+The normal marker style remains the default.
+
+This option installs optional `sharp@0.34.5` alongside Canvas in `~/.cache/rts-minimap-webm` to
+rasterize the HUD portraits' SVG tint filters correctly. Sprites are loaded as unit kinds/team
+colors appear and cached for the export; no capture-specific paths or samples are required.
+Larger portraits can overlap in groups and increase the encoded file size. The reviewed
+51.7-second The River example was about 2.29 MB at the usual VP9 settings.
+
 For compression experiments on a retained master, call the underlying encoder directly:
 
 ```sh
