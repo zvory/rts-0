@@ -132,7 +132,7 @@ export const STATS = Object.freeze({
   [KIND.RIFLEMAN]: { label: "Rifleman", icon: "RF", size: 9, sight: 11,
     rangeTiles: 5, cost: { steel: 35, oil: 0 }, supply: 1, buildTicks: 300 },
   [KIND.PANZERFAUST]: { label: "Panzerfaust", icon: "PF", size: 9, sight: 11,
-    rangeTiles: 5, cost: { steel: 55, oil: 5 }, supply: 1, buildTicks: 300,
+    rangeTiles: 5, cost: { steel: 55, oil: 10 }, supply: 1, buildTicks: 300,
     upgradeRequires: UPGRADE.PANZERFAUSTS,
     description: `Rifle infantry carrying one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot. After launching it, the unit keeps fighting as ordinary rifle infantry.` },
   [KIND.WARRIOR]: { label: "Warrior", icon: "WR", size: 13.5, sight: 11,
