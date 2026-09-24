@@ -19,7 +19,6 @@ fog, game clock only. Uses the regular game minimap renderer. No batch jobs or u
 Options:
   --server URL           Replay server (default: https://rts-0-zvorygin-beta.fly.dev)
   --from-samples FILE    Reuse a completed schema-2 capture without server access
-  --unit-pngs            Larger rotating unit portraits with white outlines; classic buildings
   --keep-work            Keep captured state and lossless master for later re-encoding
   --canvas-package PATH  Use an existing @napi-rs/canvas installation
   --help                Show this help
@@ -44,7 +43,7 @@ function run(command, args) {
 }
 async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
-    'unit-pngs': { type: 'boolean' }, help: { type: 'boolean' }, server: { type: 'string', default: 'https://rts-0-zvorygin-beta.fly.dev' },
+    help: { type: 'boolean' }, server: { type: 'string', default: 'https://rts-0-zvorygin-beta.fly.dev' },
     'from-samples': { type: 'string' }, 'keep-work': { type: 'boolean' }, 'canvas-package': { type: 'string' },
   } });
   if (values.help) { console.log(help); return; }
@@ -71,12 +70,12 @@ async function main() {
     console.log(`Installing optional Canvas dependency in ${cache}`);
     await run('npm', ['install', '--prefix', cache, '--no-audit', '--no-fund', '@napi-rs/canvas@1.0.9']);
   }
-  const sharp = values['unit-pngs'] ? path.join(cache, 'node_modules', 'sharp') : null;
-  if (sharp && !fs.existsSync(sharp)) {
+  const sharp = path.join(cache, 'node_modules', 'sharp');
+  if (!fs.existsSync(sharp)) {
     console.log(`Installing optional PNG rasterizer in ${cache}`);
     await run('npm', ['install', '--prefix', cache, '--no-audit', '--no-fund', 'sharp@0.34.5']);
   }
-  if (sharp) require(sharp);
+  require(sharp);
   require(canvas); // Check native module availability before launching a replay.
   if (!fromSamples) {
     try { require.resolve('ws'); }
@@ -94,7 +93,7 @@ async function main() {
       await run(process.execPath, [script('capture'), server.origin, id, samples]);
     }
     console.log('Rendering with the game minimap, then encoding VP9…');
-    await run(process.execPath, [script('render'), samples, master, canvas, ...(sharp ? [sharp] : [])]);
+    await run(process.execPath, [script('render'), samples, master, canvas, sharp]);
     await run(process.execPath, [script('encode'), master, prefix, '480-q44']);
     const encoded = `${prefix}-480-q44.webm`;
     await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', encoded, '-f', 'null', '-']);

@@ -1,3 +1,4 @@
+import { createMinimapUnitIconLoader } from "./minimap_icon_image.js";
 import { restoreInitialCameraView } from "./camera_view_selection.js";
 import { autoSpectatorCameraMinZoom, createMatchAutoSpectator } from "./match_auto_spectator.js";
 import {
@@ -330,6 +331,7 @@ export class Match {
         commandsEnabled: !!this.capabilities.commands.gameplay,
         clientIntent: this.clientIntent,
         controlPolicy: this.controlPolicy,
+        loadUnitIcon: createMinimapUnitIconLoader(liveUnitIconMarkupFor, dom.minimap),
         artilleryIconMarkup: liveUnitIconMarkupFor(KIND.ARTILLERY),
       }),
     );

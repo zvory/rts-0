@@ -1159,7 +1159,7 @@ function pointerEvent(canvas, clientX, clientY, {
       return [];
     },
     entitiesInterpolated() {
-      return [{ id: 501, owner: 1, kind: KIND.RIFLEMAN, x: 2, y: 2 }];
+      return [{ id: 501, owner: 1, kind: KIND.TANK_TRAP, x: 2, y: 2 }];
     },
     players: [],
   };
@@ -1201,7 +1201,7 @@ function pointerEvent(canvas, clientX, clientY, {
   );
   assert(
     hasCallWithApproxArgs(maskLayer.context, "fillRect", [6.72, 6.72, 2.56, 2.56]),
-    "outline mask uses the supply-scaled player blip footprint",
+    "outline mask uses the cost-scaled player blip footprint",
   );
 }
 
@@ -1227,7 +1227,7 @@ function pointerEvent(canvas, clientX, clientY, {
       return [];
     },
     entitiesInterpolated() {
-      return [{ id: 601, owner: 2, kind: KIND.RIFLEMAN, x: 2, y: 2, visionOnly: true }];
+      return [{ id: 601, owner: 2, kind: KIND.TANK_TRAP, x: 2, y: 2, visionOnly: true }];
     },
     players: [],
   };
@@ -1261,12 +1261,12 @@ function pointerEvent(canvas, clientX, clientY, {
   const fogIndex = canvas.context.calls.findIndex((call, index) =>
     index > visionBlipIndex && call.op === "fillRect" && call.args[2] > 10,
   );
-  assert(visionBlipIndex >= 0, "vision-only player intel uses the supply-scaled player blip footprint");
+  assert(visionBlipIndex >= 0, "vision-only player intel uses the cost-scaled player blip footprint");
   assert(fogIndex > visionBlipIndex, "vision-only player intel is drawn before the fog overlay");
   assert(dynamicLayers.length === 0, "vision-only player intel does not create a foreground outline mask");
 }
 
-// Scout Planes draw as aircraft-shaped minimap blips instead of square ground-unit dots.
+// Aircraft and ground units both use loaded rotating portraits, never procedural dots.
 {
   installWindowStub();
   const layers = [];
@@ -1298,35 +1298,21 @@ function pointerEvent(canvas, clientX, clientY, {
     null,
     { issueCommand() {} },
     null,
-    { staticCanvasFactory: staticCanvasFactory(layers) },
+    { staticCanvasFactory: staticCanvasFactory(layers),
+      loadUnitIcon: async kind => ({ width: 100, height: 50, label: kind }) },
   );
+  await minimap.prepareUnitIcons();
   minimap.render();
-  assert(
-    hasCallWithApproxArgs(canvas.context, "moveTo", [10.16, 8]),
-    "Scout Plane blip starts an aircraft path at the plane canvas position",
-  );
-  assert(
-    hasCallWithApproxArgs(canvas.context, "lineTo", [6.56, 6.24])
-      && hasCallWithApproxArgs(canvas.context, "lineTo", [7.28, 8])
-      && hasCallWithApproxArgs(canvas.context, "lineTo", [6.56, 9.76]),
-    "Scout Plane blip draws the expected multi-point aircraft silhouette",
-  );
-  assert(
-    canvas.context.calls.some((call) => call.op === "stroke"),
-    "Scout Plane blip includes an outline for readability",
-  );
-  assert(
-    hasCallWithApproxArgs(canvas.context, "fillRect", [10.72, 6.72, 2.56, 2.56]),
-    "ordinary ground units still draw square minimap blips at their canvas position",
-  );
-  assert(
-    !hasCallWithApproxArgs(canvas.context, "fillRect", [6.72, 6.72, 2.56, 2.56]),
-    "Scout Plane blips should not also use the ordinary square unit marker",
-  );
+  assert(canvas.context.calls.filter(call => call.op === "rotate").length === 2,
+    "plane and infantry portraits each rotate once");
+  assert(canvas.context.calls.some(call => call.op === "drawImage" && call.source.startsWith("static-")),
+    "unit portraits use cached image drawing");
+  assert(!hasCallWithApproxArgs(canvas.context, "fillRect", [10.72, 6.72, 2.56, 2.56]),
+    "ground units have no square-dot fallback");
   minimap.destroy();
 }
 
-// Player minimap blips scale by unit supply and total building resource cost.
+// Building minimap boxes retain total resource cost scaling.
 {
   installWindowStub();
   const canvas = fakeRenderableCanvas({ width: 16, height: 16 });
@@ -1354,10 +1340,6 @@ function pointerEvent(canvas, clientX, clientY, {
     null,
     { issueCommand() {} },
   );
-  assertApprox(minimap._entityBlipScale({ kind: KIND.WORKER }), 0.5, 0.0001, "Worker blip is half size");
-  assertApprox(minimap._entityBlipScale({ kind: KIND.RIFLEMAN }), 0.5, 0.0001, "Rifleman blip is half size");
-  assertApprox(minimap._entityBlipScale({ kind: KIND.TANK }), 1, 0.0001, "Tank keeps the current blip size");
-  assertApprox(minimap._entityBlipScale({ kind: KIND.MACHINE_GUNNER }), 4 / 7, 0.0001, "unit blips interpolate by supply");
   assertApprox(minimap._entityBlipScale({ kind: KIND.TANK_TRAP }), 0.5, 0.0001, "Tank Trap blip is half size");
   assertApprox(minimap._entityBlipScale({ kind: KIND.RESOURCE_DEPOT }), 1, 0.0001, "Resource Depot keeps the current blip size");
   minimap.destroy();

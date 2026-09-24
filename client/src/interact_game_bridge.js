@@ -359,11 +359,14 @@ export class InteractGameBridge {
       renderErrors: [{ label: "rendererUnavailable", count: 1, message: "Renderer is unavailable." }],
       missingTextureSubjectIds: [],
     };
+    const minimapReadiness = match.minimap?.unitIconReadiness?.() || { ready: true, pendingAssets: [], failedAssets: [] };
     const fonts = documentFontsStatus();
     const frameErrors = Number(match.frameErrors?.count) || 0;
     return {
       ...rendererReadiness,
-      ready: rendererReadiness.ready && fonts.status === "ready" && frameErrors === 0 &&
+      pendingAssets: [...rendererReadiness.pendingAssets, ...minimapReadiness.pendingAssets],
+      failedAssets: [...rendererReadiness.failedAssets, ...minimapReadiness.failedAssets],
+      ready: rendererReadiness.ready && minimapReadiness.ready && fonts.status === "ready" && frameErrors === 0 &&
         rendererReadiness.renderErrors.length === 0 && rendererReadiness.missingTextureSubjectIds.length === 0,
       phase: gamePhase(match),
       snapshotTick: match.state.tick,

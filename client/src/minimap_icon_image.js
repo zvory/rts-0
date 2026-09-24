@@ -56,3 +56,29 @@ async function fetchImageDataUrl(href, { signal = null } = {}) {
   }
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
+
+// Share source bytes across team-colored portraits, but keep their tinted images independent.
+export function createMinimapUnitIconLoader(markupFor, canvas) {
+  const sources = new Map();
+  return async (kind, color, { signal }) => {
+    let markup = await inlineSvgImageSources(markupFor(kind, { teamColor: color }), href => {
+      if (!sources.has(href)) sources.set(href, fetchImageDataUrl(href, { signal }));
+      return sources.get(href);
+    });
+    if (!/\bxmlns=/.test(markup)) markup = markup.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+    if (signal.aborted) throw new Error("Minimap image load aborted");
+    return new Promise((resolve, reject) => {
+      const image = canvas.ownerDocument.createElement("img");
+      const finish = (error) => {
+        image.onload = null; image.onerror = null;
+        signal.removeEventListener("abort", abort);
+        if (error) { image.src = ""; reject(error); } else resolve(image);
+      };
+      const abort = () => finish(new Error("Minimap image load aborted"));
+      signal.addEventListener("abort", abort, { once: true });
+      image.onload = () => finish();
+      image.onerror = () => finish(new Error(`Could not decode minimap portrait: ${kind}`));
+      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+    });
+  };
+}

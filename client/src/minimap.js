@@ -54,6 +54,7 @@ import {
   resolveUnderAttackTargetId,
   underAttackFlashEntityIds,
 } from "./minimap_alerts.js";
+import { MinimapUnitIcons } from "./minimap_unit_icons.js";
 import { createInlineSvgImage } from "./minimap_icon_image.js";
 
 const isImpassableTerrainCode = (code) => PASSABLE[code] !== true;
@@ -69,8 +70,6 @@ const MINIMAP_BLIP_SCALE = 1.6;
 const MINIMAP_OWNED_ENTITY_BLIP_RADIUS = 1.6 * MINIMAP_BLIP_SCALE;
 const MINIMAP_STATIC_ENTITY_BLIP_RADIUS = 2.2;
 const MINIMAP_MIN_ENTITY_BLIP_SCALE = 0.5;
-const MINIMAP_UNIT_SUPPLY_MIN = STATS[KIND.RIFLEMAN].supply;
-const MINIMAP_UNIT_SUPPLY_MAX = STATS[KIND.TANK].supply;
 const MINIMAP_BUILDING_COST_MIN = totalResourceCost(STATS[KIND.TANK_TRAP].cost);
 const MINIMAP_BUILDING_COST_MAX = totalResourceCost(STATS[KIND.RESOURCE_DEPOT].cost);
 const MINIMAP_PLAYER_BLIP_OUTLINE_COLOR = "rgba(255,255,255,0.92)";
@@ -178,6 +177,10 @@ export class Minimap {
     this._staticCanvasFactory = typeof options.staticCanvasFactory === "function"
       ? options.staticCanvasFactory
       : null;
+    this._unitIcons = new MinimapUnitIcons({
+      loadImage: options.loadUnitIcon,
+      createCanvas: () => this._createStaticCanvas(),
+    });
     this._terrainLayer = null;
     this._terrainLayerCtx = null;
     this._terrainLayerSignature = null;
@@ -743,6 +746,7 @@ export class Minimap {
 
   _drawPlayerOwnedEntityOutline(entities) {
     if (!Array.isArray(entities)) return;
+    entities = entities.filter(e => isBuilding(e.kind));
     if (!entities.some((e) => this._isForegroundPlayerMinimapEntity(e))) return;
 
     const layer = this._ensurePlayerBlipMaskLayer();
@@ -753,7 +757,7 @@ export class Minimap {
 
     for (const e of entities) {
       if (!this._isForegroundPlayerMinimapEntity(e)) continue;
-      this._drawEntityBlip(maskCtx, e, MINIMAP_PLAYER_BLIP_OUTLINE_COLOR, true, { scoutStroke: false });
+      this._drawEntityBlip(maskCtx, e, MINIMAP_PLAYER_BLIP_OUTLINE_COLOR, true);
     }
 
     const ctx = this.ctx;
@@ -765,15 +769,13 @@ export class Minimap {
     ctx.restore();
   }
 
-  _drawEntityBlip(ctx, e, color, playerOwned, { scoutStroke = true } = {}) {
+  _drawEntityBlip(ctx, e, color, playerOwned) {
     const p = this._worldToCanvas(e.x, e.y);
     ctx.fillStyle = color;
     const entityScale = this._entityBlipScale(e);
-    if (e.kind === KIND.SCOUT_PLANE) {
-      this._drawScoutPlaneBlip(ctx, p.x, p.y, color, {
-        scale: entityScale,
-        stroke: scoutStroke,
-      });
+    if (isUnit(e.kind)) {
+      this._unitIcons.draw(ctx, e, this._unitIconColor(e), p, this.size,
+        color === UNDER_ATTACK_STROBE_COLOR);
       return;
     }
     const baseRadius = playerOwned
@@ -785,13 +787,6 @@ export class Minimap {
 
   _entityBlipScale(e) {
     const stats = STATS[e?.kind];
-    if (isUnit(e?.kind)) {
-      return scaleBetween(
-        Math.max(MINIMAP_UNIT_SUPPLY_MIN, Number(stats?.supply) || 0),
-        MINIMAP_UNIT_SUPPLY_MIN,
-        MINIMAP_UNIT_SUPPLY_MAX,
-      );
-    }
     if (isBuilding(e?.kind)) {
       return scaleBetween(
         totalResourceCost(stats?.cost),
@@ -802,23 +797,16 @@ export class Minimap {
     return 1;
   }
 
-  _drawScoutPlaneBlip(ctx, cx, cy, color, { scale = 1, stroke = true } = {}) {
-    const presentationScale = this._presentationScale();
-    const s = MINIMAP_BLIP_SCALE * scale * presentationScale;
-    ctx.save();
-    ctx.strokeStyle = "#101010";
-    ctx.fillStyle = color;
-    ctx.lineWidth = 0.8 * presentationScale;
-    ctx.beginPath();
-    ctx.moveTo(cx + 2.7 * s, cy);
-    ctx.lineTo(cx - 1.8 * s, cy - 2.2 * s);
-    ctx.lineTo(cx - 0.9 * s, cy);
-    ctx.lineTo(cx - 1.8 * s, cy + 2.2 * s);
-    ctx.closePath();
-    ctx.fill();
-    if (stroke) ctx.stroke();
-    ctx.restore();
+  _unitIconColor(entity) {
+    return this._playerById(entity.owner)?.color || this._blipColor(entity);
   }
+
+  prepareUnitIcons(entities = this.state.entitiesInterpolated(1)) {
+    return this._unitIcons.prepare(entities.filter(e => isUnit(e.kind))
+      .map(e => ({ kind: e.kind, color: this._unitIconColor(e) })));
+  }
+
+  unitIconReadiness() { return this._unitIcons.readiness(); }
 
   _recordMinimapInvalidation(kind, prev, next) {
     this._recordMinimapDiagnostic(`minimap.invalidate.${kind}`);
@@ -980,6 +968,7 @@ export class Minimap {
    * minimaps stop driving an old camera. Mirrors Input.destroy().
    */
   destroy() {
+    this._unitIcons.destroy();
     const c = this.canvas;
     this._cancelActivePointerGesture();
     if (this._unregisterInputZone) {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { InteractGameBridge } from "../../client/src/interact_game_bridge.js";
 import { InteractBridge } from "../../client/src/interact_bridge.js";
 import { CleanPresentation, CLEAN_PRESENTATION_ATTRIBUTE } from "../../client/src/clean_presentation.js";
 import { Renderer } from "../../client/src/renderer/index.js";
@@ -116,6 +117,27 @@ assert.equal(captureStatus.ready, true, "capture readiness combines assets, font
 assert.equal(captureStatus.subjects[0].kind, "tank", "capture readiness returns only concise selected-subject facts");
 await captureBridge.presentation({ mode: "default" });
 assert.equal(calls.at(-1), "presentation:false", "clean presentation exits after a capture without retaining hidden UI state");
+// The worker host returns the same readiness object until its next frame message.
+// Polling must neither contaminate that object nor retain completed minimap loads.
+for (const Bridge of [InteractBridge, InteractGameBridge]) {
+  const workerStatus = Object.freeze({
+    frame: 4, assets: [], ready: true, failedAssets: Object.freeze([]),
+    pendingAssets: Object.freeze([]), renderErrors: [], missingTextureSubjectIds: [],
+  });
+  let icons = { ready: false, pendingAssets: [{ id: "tank:blue" }], failedAssets: [] };
+  const match = captureBridge.app.match;
+  match.renderer.captureReadiness = () => workerStatus;
+  match.minimap = { unitIconReadiness: () => icons };
+  const poll = () => Bridge.prototype.captureReadiness.call({ session: () => ({ match }) });
+  assert.equal(poll().ready, false, "pending portraits block capture");
+  assert.equal(poll().pendingAssets.length, 1, "polling does not duplicate pending portraits");
+  icons = { ready: false, pendingAssets: [], failedAssets: [{ id: "tank:blue" }] };
+  assert.equal(poll().failedAssets.length, 1, "failed portraits block capture");
+  icons = { ready: true, pendingAssets: [], failedAssets: [] };
+  assert.equal(poll().ready, true, "portraits can become ready without another worker frame");
+  assert.deepEqual(poll().pendingAssets, []);
+  assert.deepEqual(poll().failedAssets, []);
+}
 captureBridge.destroy();
 
 console.log("✅ interact_capture_contracts.mjs: clean presentation and capture readiness contracts passed");
