@@ -1,3 +1,4 @@
+import { initializeMinimapSize, renderMinimapSizeControl } from "./minimap_size_control.js";
 import { renderHotkeyEditor } from "./hotkey_editor.js";
 
 export function buildSettingsTabs({
@@ -6,6 +7,7 @@ export function buildSettingsTabs({
   game = null,
   debug = null,
 } = {}) {
+  initializeMinimapSize();
   return [
     {
       id: "game",
@@ -80,6 +82,7 @@ export function buildPauseAction({ visible, disabled = false, label = "Pause", t
 
 function renderGamePanel(root, game) {
   root.classList.add("settings-game-panel");
+  renderMinimapSizeControl(root);
   if (game?.prediction) renderPredictionControl(root, game.prediction);
   if (game?.exclusiveFullscreen) {
     renderExclusiveFullscreenControl(root, game.exclusiveFullscreen);
