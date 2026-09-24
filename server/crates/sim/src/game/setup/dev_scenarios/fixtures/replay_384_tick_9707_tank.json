@@ -1,0 +1,73 @@
+[
+  {
+    "ability_charge_recharge_ticks": {},
+    "ability_cooldowns": {},
+    "ability_lockouts_until_tick": {},
+    "ability_uses_remaining": {},
+    "combat": {
+      "artillery_blanket_shots_fired": 0,
+      "attack_move_no_target_ticks": 0,
+      "autocast_enabled": true,
+      "desired_weapon_facing": 2.601149797439575,
+      "emplacement_facing": null,
+      "firing_reveal_reaction_gates": {},
+      "panzerfaust": null,
+      "pending_redeploy_facing": null,
+      "setup": "Packed",
+      "tank_armor_reaction_lock": null,
+      "tank_stationary_range_reset_this_tick": false,
+      "tank_stationary_range_ticks": 90,
+      "target_id": null,
+      "weapon_cooldowns": {},
+      "weapon_facing": 2.601149797439575
+    },
+    "construction": null,
+    "hp": 292,
+    "id": 245,
+    "invulnerable": false,
+    "kind": "Tank",
+    "last_damage_entity": null,
+    "last_damage_owner": null,
+    "last_damage_pos": null,
+    "last_damage_tick": null,
+    "max_hp": 292,
+    "movement": {
+      "barrage_unload_ticks": 0,
+      "breakthrough_aura_ticks": 0,
+      "breakthrough_ticks": 0,
+      "entrenchment_dig_ticks": 0,
+      "facing": 2.601149797439575,
+      "last_move_delta": [
+        0.0,
+        0.0
+      ],
+      "last_progress_pos": [
+        2128.761474609375,
+        1295.5430908203125
+      ],
+      "last_repath_tick": 9202,
+      "occupied_trench_id": null,
+      "order": "Idle",
+      "path": [],
+      "path_goal": [
+        2128.0,
+        1296.0
+      ],
+      "queued_orders": [],
+      "recent_smoke_ticks": 0,
+      "scout_car_recovery_cooldown": 0,
+      "scout_car_reverse_waypoint": null,
+      "sidestep_cooldown": 0,
+      "static_blocked_ticks": 0,
+      "stuck_ticks": 0
+    },
+    "owner": 2,
+    "pos_x": 2128.0,
+    "pos_y": 1296.0,
+    "production": null,
+    "resource_extractor": null,
+    "resource_node": null,
+    "units_killed": 2,
+    "worker": null
+  }
+]

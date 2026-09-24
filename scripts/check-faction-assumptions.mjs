@@ -408,6 +408,8 @@ const approvedCurrentFactionFiles = new Set([
   // Replay-derived forest-lock fixture intentionally recreates a current Kriegsia vehicle group;
   // public faction admission remains routed through the dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/replay_303_scout_car_forest_lock.rs",
+  // Replay 384 intentionally reproduces one historical Kriegsia Tank; admission stays catalog-owned.
+  "server/crates/sim/src/game/setup/dev_scenarios/replay_384_tank_forest_lock.rs",
   // The lake reverse-path fixture deliberately isolates current Scout Car movement; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/crates/sim/src/game/setup/dev_scenarios/scout_car_lake_reverse_l_path.rs",
@@ -447,6 +449,7 @@ const approvedCurrentFactionFiles = new Set([
   "server/src/dev_scenarios/replay_281_tank_gap.rs",
   "server/src/dev_scenarios/replay_296_scout_car_stop.rs",
   "server/src/dev_scenarios/replay_303_scout_car_forest_lock.rs",
+  "server/src/dev_scenarios/replay_384_tank_forest_lock.rs",
   // This catalog entry exposes the intentionally Kriegsia-specific Scout Car lake fixture; public
   // faction admission remains routed through the catalog-aware dev scenario launcher.
   "server/src/dev_scenarios/scout_car_lake_reverse_l_path.rs",

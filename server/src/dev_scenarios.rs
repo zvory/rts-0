@@ -7,6 +7,7 @@ mod replay_256_worker_expansion_rally;
 mod replay_281_tank_gap;
 mod replay_296_scout_car_stop;
 mod replay_303_scout_car_forest_lock;
+mod replay_384_tank_forest_lock;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_retreat;
@@ -748,7 +749,6 @@ const ENTRENCHMENT_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLau
     blocker: None,
     case: None,
 }];
-
 const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
     id: "tank_coax_inspection",
     unit: EntityKind::Tank,
@@ -756,7 +756,6 @@ const TANK_COAX_INSPECTION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch
     blocker: None,
     case: None,
 }];
-
 const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScenarioLaunch {
     id: "attack_move_reload_acquisition",
     unit: EntityKind::Tank,
@@ -764,7 +763,7 @@ const ATTACK_MOVE_RELOAD_ACQUISITION_LAUNCHES: [DevScenarioLaunch; 1] = [DevScen
     blocker: None,
     case: None,
 }];
-const DEV_SCENARIOS: [DevScenarioSpec; 30] = [
+const DEV_SCENARIOS: &[DevScenarioSpec] = &[
     DevScenarioSpec {
         id: "dynamic_construction_path_block",
         title: "Dynamic Construction Path Block",
@@ -792,6 +791,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 30] = [
     replay_281_tank_gap::REPLAY_281_TANK_GAP_SPEC,
     replay_296_scout_car_stop::REPLAY_296_SCOUT_CAR_STOP_SPEC,
     replay_303_scout_car_forest_lock::REPLAY_303_SCOUT_CAR_FOREST_LOCK_SPEC,
+    replay_384_tank_forest_lock::REPLAY_384_TANK_FOREST_LOCK_SPEC,
     DevScenarioSpec {
         id: "scout_car_wall_chokepoint",
         title: "Vehicle Wall Chokepoint",
@@ -874,7 +874,7 @@ const DEV_SCENARIOS: [DevScenarioSpec; 30] = [
 ];
 
 pub fn all_dev_scenarios() -> &'static [DevScenarioSpec] {
-    &DEV_SCENARIOS
+    DEV_SCENARIOS
 }
 
 pub fn parse_dev_scenario_launch(
