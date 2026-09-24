@@ -11,7 +11,7 @@ export function unitPngFacing(entity) {
 }
 
 export function unitPngSize(kind, canvasSize = 480) {
-  return (SIZES[kind] || 18) * 1.35 * canvasSize / 480;
+  return (SIZES[kind] || 18) * 1.35 * 1.5 * canvasSize / 480;
 }
 
 export class MinimapUnitIcons {

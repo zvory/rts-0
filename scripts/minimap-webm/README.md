@@ -35,7 +35,7 @@ node scripts/record-minimap.mjs --from-samples /tmp/rts-minimap-EXAMPLE/capture.
 
 Exports use the same unit portraits as the in-game minimap: team colors, body-facing rotation,
 a 90° counterclockwise machine-gunner correction, and a white silhouette outline. Riflemen are
-roughly 12px and tanks 35px in a 480px export. Buildings retain colored boxes with white outlines.
+roughly 18px and tanks 53px in a 480px export. Buildings retain owner-colored boxes with white outlines.
 Whole portraits rotate together; turrets do not aim independently. HUD art without a PNG route
 uses its existing SVG portrait. There is no unit-dot mode or `--unit-pngs` switch.
 

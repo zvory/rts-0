@@ -2324,19 +2324,22 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Game settings persist a minimap-only size slider in `rts.minimap.size`. The default retains
   the responsive canvas size; maximum fits within both 50vw and 50vh, retaining its square
   aspect ratio. CSS recalculates on resize and orientation changes; on tiny viewports the
-  half-screen cap takes precedence over the default minimum. Canvas backing resolution and
-  pointer-to-world mapping are unchanged.
+  half-screen cap takes precedence over the default minimum. The live backing canvas follows
+  the displayed size at a minimum 2× resolution (or the device pixel ratio when higher), with
+  smooth CSS scaling. Explicit PNG captures keep their requested resolution; teardown restores
+  the original dimensions for rematches. Pointer coordinates still map through the backing size.
 - Minimap roads reuse the world's deterministic dark-charcoal surface variants so revealed terrain stays visually coherent. Authored marked-road tiles draw small yellow centerline dots above fog, keeping the route network legible in unexplored territory; the dotted overlay is a cached static layer, while bare road tiles widen the charcoal surface without adding markings.
 - Authored tree doodads draw compact, dark cartographic pine symbols centered on their foliage bounds rather than their grounded trunk anchors. The cached forest layer renders beneath minimap fog, so trees are clear in current vision, dim when explored without vision, and nearly hidden when unexplored; roads, resources, and foreground player markers remain above it for tactical readability.
 - Minimap units use the renderer-authored team-colored HUD portraits as their only marker path.
   Whole portraits follow body facing, with a 90° counterclockwise machine-gunner art correction;
-  turret aim is not independently articulated. At a 480px backing size, riflemen are roughly 12px
-  and tanks 35px, with a 1px white silhouette outline; dimensions scale with backing resolution.
+  turret aim is not independently articulated. At a 480px backing size, riflemen are roughly 18px
+  and tanks 53px, with a 1px white silhouette outline; dimensions scale with backing resolution.
   `Match` injects the image loader, `MinimapUnitIcons` caches loaded assets and outlined portraits,
   and each frame draws the current position/facing without throttling. Pending images never fall
   back to dots. Failed/pending loads participate in Interact readiness; teardown aborts loads and
   releases canvases. The offline minimap exporter uses this same drawing path with a native image
-  loader. Buildings retain cost-scaled colored boxes and the merged white outline mask; resources
+  loader. Buildings use their owner’s assigned player color, retaining cost-scaled boxes and the
+  merged white outline mask; resources
   retain their previous markers. Foreground owned entities draw above resources; legacy vision-only
   intel remains below authoritative fog. Under-attack notices retain their red ring/white rim and
   flash the affected unit's silhouette white (or the building box) on the existing timed phases.

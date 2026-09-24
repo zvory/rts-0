@@ -1,3 +1,4 @@
+import { runMinimapPresentationContracts } from "./minimap_presentation_contracts.mjs";
 // Dependency-free checks for minimap input routed through MatchInputRouter.
 // These cover the pointer-lock virtual-cursor path without launching a browser.
 
@@ -1523,4 +1524,6 @@ function pointerEvent(canvas, clientX, clientY, {
 }
 runMinimapAttackAlertContracts();
 runMinimapRoadContracts();
+runMinimapPresentationContracts({ installWindowStub, fakeRenderableCanvas });
+
 console.log("minimap_input_contracts: ok");

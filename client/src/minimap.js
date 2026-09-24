@@ -163,8 +163,9 @@ export class Minimap {
     this._hoverWorld = null;
     this._hoverShiftKey = false;
 
-    this.size = canvasEl.width; // assumed square (220 per index.html)
+    this.size = canvasEl.width;
     this._basePresentationSize = canvasEl.width;
+    this._originalCanvasHeight = canvasEl.height;
 
     // Cached world->canvas transform, recomputed when the map first arrives.
     this._scale = 1; // canvas px per world px
@@ -317,6 +318,18 @@ export class Minimap {
     this._profiler = profiler || null;
     const ctx = this.ctx;
     if (!ctx) return;
+    // Keep CSS dimensions and marker proportions independent of backing resolution.
+    // Explicit captures/offline hosts own their requested pixel dimensions.
+    const browserWindow = this.canvas.ownerDocument?.defaultView;
+    if (!capturePresentation && browserWindow) {
+      const rect = this.canvas.getBoundingClientRect();
+      const dpr = Math.max(2, Number(browserWindow.devicePixelRatio) || 1);
+      const pixels = Math.ceil(rect.width * dpr);
+      if (pixels > 0 && this.canvas.width !== pixels) {
+        this.canvas.width = pixels;
+        this.canvas.height = pixels;
+      }
+    }
     this._syncCanvasSize();
 
     // Void background (outside the map / before a map exists).
@@ -819,14 +832,14 @@ export class Minimap {
     this._profiler?.recordDiagnosticCounter?.(label, amount);
   }
 
-  /** Blip color for an entity: own=green, ally=blue, enemy=player color/red, neutral=yellow. */
+  /** Owned buildings and unit portraits share the owner's assigned player color. */
   _blipColor(e) {
     if (e.owner === 0 || isResource(e.kind)) return hex(COLORS.selectNeutral);
+    const player = this._playerById(e.owner);
+    if (player?.color) return player.color;
     if (ownOwner(this.state, e.owner, this.controlPolicy)) return hex(COLORS.selectOwn);
     if (allyOwner(this.state, e.owner, this.controlPolicy)) return hex(COLORS.selectAlly);
-    // Enemy: prefer the player's assigned color if we know it, else the enemy tint.
-    const player = this._playerById(e.owner);
-    return (player && player.color) || hex(COLORS.selectEnemy);
+    return hex(COLORS.selectEnemy);
   }
 
   _markerOwnerColor(owner) {
@@ -968,6 +981,8 @@ export class Minimap {
    * minimaps stop driving an old camera. Mirrors Input.destroy().
    */
   destroy() {
+    this.canvas.width = this._basePresentationSize;
+    this.canvas.height = this._originalCanvasHeight;
     this._unitIcons.destroy();
     const c = this.canvas;
     this._cancelActivePointerGesture();
