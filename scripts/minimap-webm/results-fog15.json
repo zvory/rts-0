@@ -1,0 +1,191 @@
+[
+  {
+    "match": 387,
+    "map": "The River",
+    "durationTicks": 23225,
+    "speed": 15,
+    "fog": "combined",
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 236.28438366700001,
+      "snapshots": 22552,
+      "lastTick": 23225,
+      "maxSnapshotGap": 2,
+      "frames": 2323
+    },
+    "variants": [
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "output": "/tmp/rts-minimap-fog15/387-fog15-480-q44.webm",
+        "bytes": 950788,
+        "encodeSeconds": 3.042098959,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "51.600000"
+        },
+        "preview": "http://olympus.tail6943f.ts.net:8091/p/uvR1RxSsmqxgIKj1N302PLqN/387-fog15-480-q44.webm"
+      },
+      {
+        "name": "240-q40",
+        "size": 240,
+        "fps": 15,
+        "crf": 40,
+        "output": "/tmp/rts-minimap-fog15/387-fog15-240-q40.webm",
+        "bytes": 503687,
+        "encodeSeconds": 1.993054792,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 240,
+            "height": 240,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "51.600000"
+        },
+        "preview": "http://olympus.tail6943f.ts.net:8091/p/ve272508xUlDfspP7Vh4qLYP/387-fog15-240-q40.webm"
+      }
+    ]
+  },
+  {
+    "match": 386,
+    "map": "Schone Tage",
+    "durationTicks": 10489,
+    "speed": 15,
+    "fog": "combined",
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 95.705570209,
+      "snapshots": 10037,
+      "lastTick": 10489,
+      "maxSnapshotGap": 2,
+      "frames": 1049
+    },
+    "variants": [
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "output": "/tmp/rts-minimap-fog15/386-fog15-480-q44.webm",
+        "bytes": 310711,
+        "encodeSeconds": 1.5509965,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "23.334000"
+        },
+        "preview": "http://olympus.tail6943f.ts.net:8091/p/2jV6ptBioUpSqStOsDyiADyj/386-fog15-480-q44.webm"
+      },
+      {
+        "name": "240-q40",
+        "size": 240,
+        "fps": 15,
+        "crf": 40,
+        "output": "/tmp/rts-minimap-fog15/386-fog15-240-q40.webm",
+        "bytes": 150029,
+        "encodeSeconds": 0.9547775840000001,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 240,
+            "height": 240,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "23.334000"
+        },
+        "preview": "http://olympus.tail6943f.ts.net:8091/p/mva8A5Umh2zuynCZRdGAPJ7l/386-fog15-240-q40.webm"
+      }
+    ]
+  },
+  {
+    "match": 385,
+    "map": "Classic",
+    "durationTicks": 15214,
+    "speed": 15,
+    "fog": "combined",
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 92.63023420799999,
+      "snapshots": 14488,
+      "lastTick": 15214,
+      "maxSnapshotGap": 2,
+      "frames": 1522
+    },
+    "variants": [
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "output": "/tmp/rts-minimap-fog15/385-fog15-480-q44.webm",
+        "bytes": 465965,
+        "encodeSeconds": 1.9484809170000001,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "33.800000"
+        },
+        "preview": "http://olympus.tail6943f.ts.net:8091/p/w1LL7Xq2KPIhVZ1pK5vm5FYv/385-fog15-480-q44.webm"
+      },
+      {
+        "name": "240-q40",
+        "size": 240,
+        "fps": 15,
+        "crf": 40,
+        "output": "/tmp/rts-minimap-fog15/385-fog15-240-q40.webm",
+        "bytes": 250283,
+        "encodeSeconds": 1.1856986249999997,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 240,
+            "height": 240,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "33.800000"
+        },
+        "preview": "http://olympus.tail6943f.ts.net:8091/p/AxvJiiyXvVt_jR2_Bv7dTHxo/385-fog15-240-q40.webm"
+      }
+    ]
+  }
+]

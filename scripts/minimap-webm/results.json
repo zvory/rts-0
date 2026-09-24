@@ -1,0 +1,314 @@
+[
+  {
+    "match": 387,
+    "map": "The River",
+    "recordedBuild": "9fbfb3c60fc2",
+    "durationTicks": 23225,
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 225.621405,
+      "snapshots": 22327,
+      "lastTick": 23225,
+      "maxSnapshotGap": 2,
+      "frames": 2323
+    },
+    "variants": [
+      {
+        "name": "480-q32",
+        "size": 480,
+        "fps": 30,
+        "crf": 32,
+        "bytes": 2270770,
+        "encodeSeconds": 5.5455055,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "30/1"
+          }
+        ],
+        "format": {
+          "duration": "77.433000"
+        },
+        "file": "387-alerts-480-q32.webm"
+      },
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "bytes": 825771,
+        "encodeSeconds": 3.361956292,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "77.400000"
+        },
+        "file": "387-alerts-480-q44.webm"
+      },
+      {
+        "name": "240-q40",
+        "size": 240,
+        "fps": 15,
+        "crf": 40,
+        "bytes": 389223,
+        "encodeSeconds": 2.1119915419999997,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 240,
+            "height": 240,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "77.400000"
+        },
+        "file": "387-alerts-240-q40.webm"
+      },
+      {
+        "name": "144-q44",
+        "size": 144,
+        "fps": 10,
+        "crf": 44,
+        "bytes": 106503,
+        "encodeSeconds": 1.8656730829999997,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 144,
+            "height": 144,
+            "avg_frame_rate": "10/1"
+          }
+        ],
+        "format": {
+          "duration": "77.400000"
+        },
+        "file": "387-alerts-144-q44.webm"
+      }
+    ]
+  },
+  {
+    "match": 386,
+    "map": "Schone Tage",
+    "recordedBuild": "9fbfb3c60fc2",
+    "durationTicks": 10489,
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 81.092072417,
+      "snapshots": 9859,
+      "lastTick": 10489,
+      "maxSnapshotGap": 2,
+      "frames": 1049
+    },
+    "variants": [
+      {
+        "name": "480-q32",
+        "size": 480,
+        "fps": 30,
+        "crf": 32,
+        "bytes": 791194,
+        "encodeSeconds": 3.6561605419999994,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "30/1"
+          }
+        ],
+        "format": {
+          "duration": "34.966000"
+        },
+        "file": "386-alerts-480-q32.webm"
+      },
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "bytes": 296186,
+        "encodeSeconds": 2.134947667,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "34.934000"
+        },
+        "file": "386-alerts-480-q44.webm"
+      },
+      {
+        "name": "240-q40",
+        "size": 240,
+        "fps": 15,
+        "crf": 40,
+        "bytes": 136035,
+        "encodeSeconds": 1.084216375,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 240,
+            "height": 240,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "34.934000"
+        },
+        "file": "386-alerts-240-q40.webm"
+      },
+      {
+        "name": "144-q44",
+        "size": 144,
+        "fps": 10,
+        "crf": 44,
+        "bytes": 41467,
+        "encodeSeconds": 0.9918213340000002,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 144,
+            "height": 144,
+            "avg_frame_rate": "10/1"
+          }
+        ],
+        "format": {
+          "duration": "35.000000"
+        },
+        "file": "386-alerts-144-q44.webm"
+      }
+    ]
+  },
+  {
+    "match": 385,
+    "map": "Classic",
+    "recordedBuild": "9fbfb3c60fc2",
+    "durationTicks": 15214,
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 93.95924745800001,
+      "snapshots": 14703,
+      "lastTick": 15214,
+      "maxSnapshotGap": 2,
+      "frames": 1522
+    },
+    "variants": [
+      {
+        "name": "480-q32",
+        "size": 480,
+        "fps": 30,
+        "crf": 32,
+        "bytes": 1141142,
+        "encodeSeconds": 3.316967709,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "30/1"
+          }
+        ],
+        "format": {
+          "duration": "50.733000"
+        },
+        "file": "385-alerts-480-q32.webm"
+      },
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "bytes": 450533,
+        "encodeSeconds": 1.8125855420000003,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "50.734000"
+        },
+        "file": "385-alerts-480-q44.webm"
+      },
+      {
+        "name": "240-q40",
+        "size": 240,
+        "fps": 15,
+        "crf": 40,
+        "bytes": 218732,
+        "encodeSeconds": 1.2081691249999995,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 240,
+            "height": 240,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "50.734000"
+        },
+        "file": "385-alerts-240-q40.webm"
+      },
+      {
+        "name": "144-q44",
+        "size": 144,
+        "fps": 10,
+        "crf": 44,
+        "bytes": 65429,
+        "encodeSeconds": 1.1422141249999995,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 144,
+            "height": 144,
+            "avg_frame_rate": "10/1"
+          }
+        ],
+        "format": {
+          "duration": "50.700000"
+        },
+        "file": "385-alerts-144-q44.webm"
+      }
+    ]
+  }
+]

@@ -596,6 +596,8 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/tri_state/self_test.mjs"
   run_suite_bg "JS minimap input contracts" \
     node "$SCRIPT_DIR/minimap_input_contracts.mjs"
+  run_suite_bg "Minimap recording tool" \
+    node --test "$REPO_ROOT/scripts/minimap-webm/capture.test.mjs" "$REPO_ROOT/scripts/minimap-webm/cli.test.mjs"
   run_suite_bg "JS rectangular map asset contracts" \
     node "$SCRIPT_DIR/rectangular_map_asset_contracts.mjs"
   run_suite_bg "JS map author CLI contracts" \

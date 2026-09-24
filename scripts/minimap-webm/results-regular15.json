@@ -1,0 +1,110 @@
+[
+  {
+    "matchId": 387,
+    "map": "The River",
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 228.113694416,
+      "snapshots": 22420,
+      "lastTick": 23225,
+      "maxSnapshotGap": 2,
+      "frames": 2323
+    },
+    "encoding": [
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "output": "/tmp/rts-minimap-regular15/387-regular15-480-q44.webm",
+        "bytes": 1155456,
+        "encodeSeconds": 3.1821417079999996,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "51.600000"
+        }
+      }
+    ]
+  },
+  {
+    "matchId": 386,
+    "map": "Schone Tage",
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 87.13989074999999,
+      "snapshots": 9937,
+      "lastTick": 10489,
+      "maxSnapshotGap": 2,
+      "frames": 1049
+    },
+    "encoding": [
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "output": "/tmp/rts-minimap-regular15/386-regular15-480-q44.webm",
+        "bytes": 382506,
+        "encodeSeconds": 1.4191685,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "23.334000"
+        }
+      }
+    ]
+  },
+  {
+    "matchId": 385,
+    "map": "Classic",
+    "capture": {
+      "type": "summary",
+      "captureSeconds": 90.376350708,
+      "snapshots": 14571,
+      "lastTick": 15214,
+      "maxSnapshotGap": 2,
+      "frames": 1522
+    },
+    "encoding": [
+      {
+        "name": "480-q44",
+        "size": 480,
+        "fps": 15,
+        "crf": 44,
+        "output": "/tmp/rts-minimap-regular15/385-regular15-480-q44.webm",
+        "bytes": 544578,
+        "encodeSeconds": 2.0078998749999997,
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 480,
+            "height": 480,
+            "avg_frame_rate": "15/1"
+          }
+        ],
+        "format": {
+          "duration": "33.800000"
+        }
+      }
+    ]
+  }
+]
