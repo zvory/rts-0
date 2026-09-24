@@ -144,7 +144,9 @@ function hotkeyService() {
     const gameTab = buildSettingsTabs({ game: {} })[0];
     const root = document.createElement("div");
     gameTab.render(root);
-    assert(root.children.length === 0, "settings: game tab omits redundant context text");
+    const slider = findFakeById(root, "minimap-size-slider");
+    assert(slider?.type === "range", "settings: game tab offers a minimap size slider");
+    assert(slider.min === "0" && slider.max === "100", "settings: minimap slider spans default to maximum");
   });
 
   withFakeSettingsDocument(() => {

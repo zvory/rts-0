@@ -168,6 +168,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "panel_touch_activation.js": "ui",
   "settings_container.js": "ui",
   "settings_panels.js": "ui",
+  "minimap_size_control.js": "ui",
   "tab_menu.js": "ui",
   "chat_overlay.js": "ui",
   "scoreboard.js": "ui",

@@ -114,6 +114,7 @@ src/
   visual_profiles.js # Lab-scoped visual experimentation profile registry and resolver
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
   settings_panels.js # Portable settings tab panel descriptors
+  minimap_size_control.js # Persisted Game-tab minimap size preference; CSS fits both viewport axes
   main.js         # Entry point: starts App
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   launch_url.js   # Namespaced rtsLaunch URL parsing and pure lobby automation decisions
@@ -2320,6 +2321,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 [client-rendering.md](client-rendering.md) and its active
 [rendering parity ledger](rendering-parity.md).
 
+- Game settings persist a minimap-only size slider in `rts.minimap.size`. The default retains
+  the responsive canvas size; maximum fits within both 50vw and 50vh, retaining its square
+  aspect ratio. CSS recalculates on resize and orientation changes; on tiny viewports the
+  half-screen cap takes precedence over the default minimum. Canvas backing resolution and
+  pointer-to-world mapping are unchanged.
 - Minimap roads reuse the world's deterministic dark-charcoal surface variants so revealed terrain stays visually coherent. Authored marked-road tiles draw small yellow centerline dots above fog, keeping the route network legible in unexplored territory; the dotted overlay is a cached static layer, while bare road tiles widen the charcoal surface without adding markings.
 - Authored tree doodads draw compact, dark cartographic pine symbols centered on their foliage bounds rather than their grounded trunk anchors. The cached forest layer renders beneath minimap fog, so trees are clear in current vision, dim when explored without vision, and nearly hidden when unexplored; roads, resources, and foreground player markers remain above it for tactical readability.
 - Minimap units use the renderer-authored team-colored HUD portraits as their only marker path.

@@ -2885,6 +2885,12 @@ input[type="text"]:focus {
   display: inline;
 }
 #minimap {
+  --minimap-base-size: 222px;
+  /* Keep the original responsive minimum; fit both viewport axes at maximum. */
+  --minimap-limit: min(50vw, 50vh);
+  --minimap-size: min(var(--minimap-limit), calc(var(--minimap-base-size) + (max(var(--minimap-base-size), var(--minimap-limit)) - var(--minimap-base-size)) * var(--minimap-growth, 0)));
+  width: var(--minimap-size);
+  height: var(--minimap-size);
   display: block;
   border-radius: var(--radius-sm);
   border: 1px solid var(--panel-edge);
@@ -4911,8 +4917,7 @@ input[type="text"]:focus {
     min-width: 240px;
   }
   #minimap {
-    width: 198px;
-    height: 198px;
+    --minimap-base-size: 198px;
   }
   #game-over-text {
     font-size: 30px;
@@ -5059,8 +5064,7 @@ input[type="text"]:focus {
   }
 
   #minimap {
-    width: clamp(112px, 38vw, 170px);
-    height: clamp(112px, 38vw, 170px);
+    --minimap-base-size: clamp(112px, 38vw, 170px);
   }
 
   .game-timer {
@@ -5226,8 +5230,7 @@ input[type="text"]:focus {
   }
 
   #minimap {
-    width: 112px;
-    height: 112px;
+    --minimap-base-size: 112px;
   }
 
   #selection-area {
