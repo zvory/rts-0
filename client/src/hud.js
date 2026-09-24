@@ -167,8 +167,9 @@ export class HUD {
    * @param {import("./camera.js").Camera} [camera] viewport camera for command-card focus actions.
    * @param {import("./apm_tracker.js").ApmTracker} [apmTracker] recent issued-command rate.
    * @param {(kind:string) => string} [unitIconMarkupForKind] renderer-authored unit icon resolver.
+   * @param {{showEntityIds?: boolean}} [selectionOptions] selection detail presentation.
    */
-  constructor(rootEl, state, commandInteraction, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null, apmTracker = null, unitIconMarkupForKind = null) {
+  constructor(rootEl, state, commandInteraction, audio = null, hotkeyProfiles = null, clientIntent = null, controlPolicy = null, camera = null, apmTracker = null, unitIconMarkupForKind = null, selectionOptions = {}) {
     this.root = rootEl;
     this.state = state;
     this.commandInteraction = commandInteraction;
@@ -205,6 +206,7 @@ export class HUD {
       this.state,
       this.controlPolicy,
       this.unitIconMarkupForKind,
+      selectionOptions,
     );
 
     // Signature of the last-rendered command card so we only rebuild its buttons when

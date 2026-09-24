@@ -1899,6 +1899,10 @@ shows the active profile's selection hotkey in parentheses, and remains pointer-
 the configured hotkey selects the current idle set through normal command-supply admission when the
 command surface is writable.
 
+Match passes replay-only `showEntityIds` selection options through HUD to HudSelectionPanel.
+Replay single-selection details show the authoritative entity ID beside the unit kill count
+(or on its own stat row for entities without a kill count) for precise bug reports.
+
 The single-selection detail shows last-known remaining resources for Steel and Oil patches and for
 the Steel Mine or Pump Jack occupying that patch. Raw patches omit the synthetic `1 / 1` HP display;
 extractor buildings retain their ordinary HP bar and numeric HP alongside the resource amount.
