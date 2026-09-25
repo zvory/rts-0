@@ -176,6 +176,11 @@ bounded command and blocker labels. Each live AI controller exposes its latest d
 spectators, with the reliable-channel snapshot bounded at the AI adapter boundary. These traces
 and map-analysis layers are spectator-only diagnostics.
 
+Expansion sites must be more than ten tiles (center to center) from any owned or currently
+visible Resource Depot, including unfinished depots and the controller’s pending Depot builds.
+Patches inside a known Depot’s mining range are also excluded, so occupied sites are skipped
+while the search continues through other resource locations.
+
 ### Profile behavior
 
 AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
@@ -187,7 +192,8 @@ AI 2.1 is the promoted pressure profile. It fills in-range Steel and Oil extract
 keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. After its first Vehicle Works (Factory) completes, it seeks a third Resource Depot using the
-existing expansion resource/supply trigger and four-Rifleman requirement. It requires three
+existing expansion resource/supply trigger. The third-base step does not require surviving
+opening Riflemen; the second-base step retains its four-Rifleman requirement. It requires three
 completed Resource Depots before adding its second Vehicle Works at the existing larger resource
 float; the Vehicle Works cap remains two. The internal `ai_2_1_pre_third_base` profile freezes
 AI 2.1 from main commit `69d1e29a6` for comparison. Frontal waves stage in cohorts so newly produced units do not immediately

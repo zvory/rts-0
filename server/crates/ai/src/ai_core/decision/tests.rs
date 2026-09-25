@@ -1,5 +1,5 @@
 use super::defense::main_steel_cluster_center;
-use super::geometry::{building_center, normalized_direction, tile_center};
+use super::geometry::{building_center, dist2, normalized_direction, tile_center};
 use super::*;
 
 use crate::ai_core::observation::{
@@ -459,6 +459,269 @@ fn canonical_profiles_never_schedule_disabled_supply_depots() {
             )),
             "{} must not issue a disabled Supply Depot build command",
             profile.id,
+        );
+    }
+}
+
+#[test]
+fn expansion_search_skips_occupied_natural_and_chooses_next_resource_site() {
+    let mut obs = observation(
+        AiEconomy {
+            steel: 1300,
+            oil: 300,
+            supply_used: 60,
+            supply_cap: 120,
+        },
+        vec![building_at(
+            1,
+            EntityKind::ResourceDepot,
+            None,
+            8.5 * config::TILE_SIZE as f32,
+            8.5 * config::TILE_SIZE as f32,
+        )],
+    );
+    obs.map.width = 128;
+    obs.map.height = 128;
+    obs.resources = base_site_resources(300, (30, 30), 128);
+    let profile = &crate::ai_core::profiles::AI_2_1;
+    let policy = profile.production_expansion.unwrap();
+    let first = expansion::expansion_resource_depot_site(
+        &obs,
+        policy,
+        EntityKind::ResourceDepot,
+        profile.id,
+        &mut |_, _, _| true,
+    )
+    .expect("natural site");
+    let center = building_center(first, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    obs.owned.push(building_at(
+        2,
+        EntityKind::ResourceDepot,
+        None,
+        center.0,
+        center.1,
+    ));
+    assert!(
+        expansion::expansion_resource_depot_site(
+            &obs,
+            policy,
+            EntityKind::ResourceDepot,
+            profile.id,
+            &mut |_, _, _| true,
+        )
+        .is_none(),
+        "the occupied natural must not count as another expansion"
+    );
+    let extra: Vec<_> = obs
+        .resources
+        .iter()
+        .filter(|r| r.id >= 300)
+        .cloned()
+        .map(|mut r| {
+            r.id += 1000;
+            r.x += 45.0 * obs.map.tile_size as f32;
+            r.y += 30.0 * obs.map.tile_size as f32;
+            r
+        })
+        .collect();
+    obs.resources.extend(extra);
+    let next = expansion::expansion_resource_depot_site(
+        &obs,
+        policy,
+        EntityKind::ResourceDepot,
+        profile.id,
+        &mut |_, _, _| true,
+    )
+    .expect("next unoccupied resource site");
+    let next_center = building_center(next, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    assert!(
+        dist2(center.0, center.1, next_center.0, next_center.1)
+            > (10.0 * obs.map.tile_size as f32).powi(2)
+    );
+}
+
+#[test]
+fn expansion_spacing_counts_scaffolds_visible_depots_and_pending_sites() {
+    let site = (30, 30);
+    let center = building_center(site, EntityKind::ResourceDepot, config::TILE_SIZE).unwrap();
+    for state in 0..4 {
+        let mut obs = observation(
+            AiEconomy {
+                steel: 1300,
+                oil: 300,
+                supply_used: 60,
+                supply_cap: 120,
+            },
+            vec![],
+        );
+        let mut depot = building_at(
+            2,
+            EntityKind::ResourceDepot,
+            None,
+            center.0 + 10.0 * config::TILE_SIZE as f32,
+            center.1,
+        );
+        match state {
+            0 => {
+                depot.is_complete = false;
+                obs.owned.push(depot);
+            }
+            1 => {
+                depot.owner = 2;
+                obs.visible_enemies.push(depot);
+            }
+            2 => {
+                depot.owner = 2;
+                obs.visible_allies.push(depot);
+            }
+            _ => obs.pending_builds.push(AiBuildIntent::to_site(
+                9,
+                EntityKind::ResourceDepot,
+                40,
+                30,
+            )),
+        }
+        let r = resource(1000, EntityKind::Steel, center.0, center.1);
+        assert!(
+            expansion::expansion_site_candidate(
+                &obs,
+                EntityKind::ResourceDepot,
+                site.0,
+                site.1,
+                &[&r]
+            )
+            .is_none(),
+            "state {state} at exactly ten tiles"
+        );
+    }
+    let obs = observation(
+        AiEconomy {
+            steel: 1300,
+            oil: 300,
+            supply_used: 60,
+            supply_cap: 120,
+        },
+        vec![building_at(
+            2,
+            EntityKind::ResourceDepot,
+            None,
+            center.0 + 10.0 * config::TILE_SIZE as f32 + 1.0,
+            center.1,
+        )],
+    );
+    let r = resource(1000, EntityKind::Steel, center.0, center.1);
+    assert!(expansion::expansion_site_candidate(
+        &obs,
+        EntityKind::ResourceDepot,
+        site.0,
+        site.1,
+        &[&r]
+    )
+    .is_some());
+}
+
+#[test]
+fn ai_2_1_classic_expands_to_three_separate_bases() {
+    if crate::skip_unless_full_ai("ai_2_1_classic_expands_to_three_separate_bases") {
+        return;
+    }
+    assert_classic_three_separate_bases(false);
+}
+
+#[test]
+fn ai_2_1_classic_under_pressure_reaches_three_separate_bases() {
+    if crate::skip_unless_full_ai("ai_2_1_classic_under_pressure_reaches_three_separate_bases") {
+        return;
+    }
+    assert_classic_three_separate_bases(true);
+}
+
+fn assert_classic_three_separate_bases(under_pressure: bool) {
+    use crate::live::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
+    use rts_sim::game::{map::Map, Game, PlayerInit};
+    for player_id in [1, 2] {
+        let players: Vec<_> = (1..=2)
+            .map(|id| PlayerInit {
+                id,
+                team_id: id,
+                faction_id: "kriegsia".into(),
+                name: format!("P{id}"),
+                color: "#ffffff".into(),
+                is_ai: true,
+            })
+            .collect();
+        let map = Map::load_for_players("Classic", &[(1, 1), (2, 2)], 0).unwrap();
+        let mut game = Game::new_with_random_ai_profiles_and_map_metadata(
+            &players,
+            0,
+            map,
+            Map::metadata_for_name("Classic").unwrap(),
+        );
+        let start = game.start_payload();
+        let mut controllers = if under_pressure {
+            vec![
+                AiController::with_profile_id(
+                    1,
+                    if player_id == 1 {
+                        "ai_2_1"
+                    } else {
+                        "ai_2_1_pre_third_base"
+                    },
+                ),
+                AiController::with_profile_id(
+                    2,
+                    if player_id == 2 {
+                        "ai_2_1"
+                    } else {
+                        "ai_2_1_pre_third_base"
+                    },
+                ),
+            ]
+        } else {
+            vec![AiController::with_profile_id(player_id, "ai_2_1")]
+        };
+        let mut completed = false;
+        for tick in 0..15000 {
+            CanonicalAiTickDriver::run(
+                &mut game,
+                &mut controllers,
+                AiAlivePolicy::StartingPrimaryBase,
+            );
+            game.tick();
+            if tick % 30 != 0 {
+                continue;
+            }
+            let obs = AiObservation::from_snapshot_with_alive(
+                &start,
+                &game.snapshot_for(player_id),
+                player_id,
+                [],
+                None,
+            )
+            .unwrap();
+            let depots: Vec<_> = obs
+                .owned
+                .iter()
+                .filter(|e| e.kind == EntityKind::ResourceDepot)
+                .collect();
+            for (i, depot) in depots.iter().enumerate() {
+                for other in &depots[i + 1..] {
+                    assert!(
+                        dist2(depot.x, depot.y, other.x, other.y)
+                            > (10.0 * obs.map.tile_size as f32).powi(2),
+                        "player {player_id}, tick {tick}: duplicate base location"
+                    );
+                }
+            }
+            if depots.iter().filter(|d| d.is_complete).count() >= 3 {
+                println!("pressure={under_pressure}, player {player_id}: third separate base completed at tick {} ({:.1}s), positions={:?}", game.tick_count(), game.tick_count() as f32 / 30.0, depots.iter().map(|d| (d.x, d.y)).collect::<Vec<_>>());
+                completed = true;
+                break;
+            }
+        }
+        assert!(
+            completed,
+            "player {player_id}: no completed third base by tick 15000"
         );
     }
 }

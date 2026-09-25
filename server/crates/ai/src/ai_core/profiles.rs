@@ -356,7 +356,7 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
         target_resource_depots: 3,
         required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Rifleman,
-        defensive_unit_count: 4,
+        defensive_unit_count: 0,
         pre_expansion_steel_worker_cap: 18,
         post_expansion_steel_worker_cap: None,
         search_radius_tiles: 6,
