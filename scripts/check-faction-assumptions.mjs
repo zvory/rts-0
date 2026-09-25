@@ -230,6 +230,8 @@ const approvedCurrentFactionFiles = new Set([
   // Frozen Jeff comparison profile intentionally preserves a historical Kriegsia roster policy;
   // it is available only through explicit internal profile lookup, not public profile selection.
   "server/crates/ai/src/ai_core/profiles/jeffs_ai_chat_start.rs",
+  // Frozen AI 2.1 comparison policy likewise preserves its historical Kriegsia roster.
+  "server/crates/ai/src/ai_core/profiles/ai_2_1_pre_third_base.rs",
   "server/crates/ai/src/ai_core/profiles/turtle.rs",
   "server/crates/ai/src/ai_core/facts.rs",
   "server/crates/ai/src/ai_core/observation.rs",

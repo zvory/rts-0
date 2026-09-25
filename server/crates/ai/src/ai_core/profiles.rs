@@ -42,6 +42,7 @@ pub(crate) struct AiProfile {
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
     /// Expansion after its required building completes, before additional factories.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) production_expansion: Option<ExpansionPolicy>,
     pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
     pub(crate) turtle_defense: Option<TurtleDefensePolicy>,
