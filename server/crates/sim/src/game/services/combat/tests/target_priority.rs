@@ -101,7 +101,7 @@ fn attack_move_retargets_building_to_new_defender_during_cooldown() {
 
     // A retreating defender must not drag the attack-move away from its objective.
     let enemy = entities.get_mut(defender).expect("defender");
-    enemy.pos_y = 600.0;
+    enemy.set_position(enemy.pos_x, 600.0);
     entities
         .get_mut(attacker)
         .expect("rifleman")
@@ -136,7 +136,10 @@ fn attack_move_keeps_building_without_an_in_range_enemy_combat_unit() {
 fn direct_attack_keeps_building_priority_over_new_defender() {
     for building_x in [180.0, 400.0] {
         let (map, mut entities, attacker, building) = rifleman_attacking_building();
-        entities.get_mut(building).expect("building").pos_x = building_x;
+        entities
+            .get_mut(building)
+            .expect("building")
+            .set_position(building_x, 100.0);
         let unit = entities.get_mut(attacker).expect("rifleman");
         unit.set_order(Order::attack(building));
         let weapon = combat_rules::default_weapon_kind(EntityKind::Rifleman).expect("weapon");
