@@ -8,7 +8,7 @@ use super::fog::Fog;
 use super::map::Map;
 use super::teams::TeamRelations;
 
-const FIRING_REVEAL_DURATION_TICKS: u32 = config::TICK_HZ * 3;
+const FIRING_REVEAL_DURATION_TICKS: u32 = config::TICK_HZ * 13 / 2;
 
 /// Temporary actionable sight granted to a recipient when a hostile unit exposes itself by firing.
 ///

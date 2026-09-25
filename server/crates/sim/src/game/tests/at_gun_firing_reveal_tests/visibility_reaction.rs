@@ -223,8 +223,8 @@ fn repeated_hidden_shots_extend_one_stable_reveal_episode() {
         0,
     );
     let first_source = game.state.firing_reveals[0];
-    assert!(first_source.is_active_at(config::TICK_HZ * 3 - 1));
-    assert!(!first_source.is_active_at(config::TICK_HZ * 3));
+    assert!(first_source.is_active_at(config::TICK_HZ * 13 / 2 - 1));
+    assert!(!first_source.is_active_at(config::TICK_HZ * 13 / 2));
     refresh_visibility_for_test(&mut game);
     firing_reveal::record_firing_reveals_for_victim_team(
         &mut game.state.firing_reveals,
@@ -242,8 +242,8 @@ fn repeated_hidden_shots_extend_one_stable_reveal_episode() {
     assert_eq!(game.state.firing_reveals.len(), 1);
     let source = game.state.firing_reveals[0];
     assert_eq!(source.started_at_tick(), 0);
-    assert!(source.is_active_at(10 + config::TICK_HZ * 3 - 1));
-    assert!(!source.is_active_at(10 + config::TICK_HZ * 3));
+    assert!(source.is_active_at(10 + config::TICK_HZ * 13 / 2 - 1));
+    assert!(!source.is_active_at(10 + config::TICK_HZ * 13 / 2));
 }
 
 #[test]
