@@ -124,6 +124,43 @@ pub(super) fn select(
         ready,
         &|_| true,
     );
+    // Ground attack-move must not stay locked onto a building when defenders arrive.
+    // Keep the movement order intact and only consider combat units we can shoot now.
+    // Explicit Attack orders retain their commanded target, including outside range.
+    let attack_move_on_building = entities.get(id).is_some_and(|attacker| {
+        matches!(attacker.order(), Order::AttackMove(_))
+            && retained
+                .and_then(|target| entities.get(target))
+                .is_some_and(|target| target.is_building())
+    });
+    if attack_move_on_building {
+        let defender = resolve_target(
+            map,
+            entities,
+            blockers,
+            teams,
+            spatial,
+            los,
+            fog,
+            smokes,
+            id,
+            owner,
+            px,
+            py,
+            acquire_px,
+            CombatMode::Opportunistic,
+            can_move_fire,
+            &|target| {
+                entities.get(target).is_some_and(|entity| {
+                    let facts = crate::rules::target::target_facts(entity.kind);
+                    facts.is_unit && !facts.is_economy_unit
+                })
+            },
+        );
+        if defender.is_some() {
+            return defender;
+        }
+    }
     if retained.is_some() || (!ready && !targetless_travelling_order) {
         return retained;
     }
