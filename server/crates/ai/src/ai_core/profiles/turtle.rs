@@ -50,6 +50,7 @@ pub(crate) static AI_TURTLE: AiProfile = AiProfile {
         required_unit: None,
     },
     resources: AI_2_1.resources,
+    production_expansion: None,
     expansion: Some(ExpansionPolicy {
         target_resource_depots: 2,
         required_complete_building: EntityKind::TrainingCentre,
