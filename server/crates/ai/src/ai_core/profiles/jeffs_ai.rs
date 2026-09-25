@@ -86,6 +86,7 @@ const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
             deficit_response_workers: 2,
         }),
     },
+    production_expansion: None,
     expansion: Some(ExpansionPolicy {
         target_resource_depots: 2,
         required_complete_building: EntityKind::Factory,

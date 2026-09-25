@@ -599,7 +599,10 @@ fn places_first_factory_in_shorter_forward_band() {
 
 #[test]
 fn ai_2_1_builds_second_factory_above_resource_float() {
-    let observation = second_factory_observation(501, 326);
+    let mut observation = second_factory_observation(501, 326);
+    observation
+        .owned
+        .push(building(16, EntityKind::ResourceDepot, Some(0)));
 
     let decision = decide_with_profile(&observation, &AI_2_1);
 
@@ -613,7 +616,10 @@ fn ai_2_1_builds_second_factory_above_resource_float() {
 
 #[test]
 fn ai_2_1_waits_until_above_second_factory_resource_float() {
-    let observation = second_factory_observation(500, 325);
+    let mut observation = second_factory_observation(500, 325);
+    observation
+        .owned
+        .push(building(16, EntityKind::ResourceDepot, Some(0)));
 
     let decision = decide_with_profile(&observation, &AI_2_1);
 
@@ -826,4 +832,78 @@ fn extractor_saturation_does_not_train_mining_workers_before_first_tank() {
         }),
         "the old mining-worker spend must not preempt Tank production"
     );
+}
+
+#[test]
+fn ai_2_1_expands_before_second_factory() {
+    let mut observation = second_factory_observation(1500, 800);
+    for id in 30..34 {
+        observation
+            .owned
+            .push(combat_unit(id, EntityKind::Rifleman));
+    }
+    let decision = decide_with_profile(&observation, &AI_2_1);
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::ResourceDepot
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
+}
+
+#[test]
+fn ai_2_1_second_factory_waits_for_completed_third_base() {
+    for pending in [false, true] {
+        let mut observation = second_factory_observation(1500, 800);
+        if pending {
+            observation
+                .pending_builds
+                .push(crate::ai_core::observation::AiBuildIntent::to_site(
+                    20,
+                    EntityKind::ResourceDepot,
+                    30,
+                    30,
+                ));
+        } else {
+            let mut depot = building(16, EntityKind::ResourceDepot, Some(0));
+            depot.is_complete = false;
+            observation.owned.push(depot);
+        }
+        let decision = decide_with_profile(&observation, &AI_2_1);
+        assert!(!decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Factory
+        }));
+    }
+}
+
+#[test]
+fn ai_2_1_third_base_requires_completed_first_factory() {
+    let mut observation = second_factory_observation(1500, 800);
+    for id in 30..34 {
+        observation
+            .owned
+            .push(combat_unit(id, EntityKind::Rifleman));
+    }
+    observation
+        .owned
+        .iter_mut()
+        .find(|entity| entity.kind == EntityKind::Factory)
+        .unwrap()
+        .is_complete = false;
+    let decision = decide_with_profile(&observation, &AI_2_1);
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::ResourceDepot
+    }));
+}
+
+#[test]
+fn frozen_ai_2_1_still_builds_second_factory_on_two_bases() {
+    let observation = second_factory_observation(501, 326);
+    let decision = decide_with_profile(
+        &observation,
+        &crate::ai_core::profiles::AI_2_1_PRE_THIRD_BASE,
+    );
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
 }

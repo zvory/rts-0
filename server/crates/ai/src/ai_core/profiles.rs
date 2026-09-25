@@ -2,9 +2,11 @@ use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
 use serde::Serialize;
 
+mod ai_2_1_pre_third_base;
 mod jeffs_ai;
 mod jeffs_ai_chat_start;
 mod turtle;
+pub(crate) use ai_2_1_pre_third_base::{AI_2_1_PRE_THIRD_BASE, AI_2_1_PRE_THIRD_BASE_ID};
 
 pub(crate) use self::jeffs_ai::{
     JEFFS_AI, JEFFS_AI_BETA, JEFFS_AI_BETA_ID, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE,
@@ -39,6 +41,8 @@ pub(crate) struct AiProfile {
     pub(crate) attack: AttackPolicy,
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
+    /// Expansion after its required building completes, before additional factories.
+    pub(crate) production_expansion: Option<ExpansionPolicy>,
     pub(crate) defensive_machine_gunners: Option<DefensiveMachineGunnerPolicy>,
     pub(crate) turtle_defense: Option<TurtleDefensePolicy>,
     pub(crate) frontal_wave: FrontalWavePolicy,
@@ -293,8 +297,7 @@ const TANK_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Factory,
 ];
 
-/// The promoted pressure profile. Its policy values deliberately preserve the prior AI 2.1
-/// behavior, but the profile now owns them directly rather than inheriting a retired AI 2.0.
+/// The promoted pressure profile, expanding to three bases before its second Factory.
 pub(crate) static AI_2_1: AiProfile = AiProfile {
     id: AI_2_1_ID,
     workers: WorkerPolicy {
@@ -348,6 +351,20 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
             deficit_response_workers: 2,
         }),
     },
+    production_expansion: Some(ExpansionPolicy {
+        target_resource_depots: 3,
+        required_complete_building: EntityKind::Factory,
+        defensive_unit: EntityKind::Rifleman,
+        defensive_unit_count: 4,
+        pre_expansion_steel_worker_cap: 18,
+        post_expansion_steel_worker_cap: None,
+        search_radius_tiles: 6,
+        trigger_steel: 350,
+        trigger_supply_used: 30,
+        blocks_tech_path: false,
+        oil_before_steel_in_expansion: true,
+        remote_worker_assignment_fallback: true,
+    }),
     expansion: Some(ExpansionPolicy {
         target_resource_depots: 2,
         required_complete_building: EntityKind::TrainingCentre,
@@ -405,6 +422,9 @@ pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
+    if id == AI_2_1_PRE_THIRD_BASE_ID {
+        return Some(&AI_2_1_PRE_THIRD_BASE);
+    }
     if id == JEFFS_AI_BETA_ID {
         return Some(&JEFFS_AI_BETA);
     }

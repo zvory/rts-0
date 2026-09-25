@@ -83,6 +83,7 @@ pub(crate) static JEFFS_AI_CHAT_START: AiProfile = AiProfile {
             deficit_response_workers: 2,
         }),
     },
+    production_expansion: None,
     expansion: Some(ExpansionPolicy {
         target_resource_depots: 2,
         required_complete_building: EntityKind::Factory,

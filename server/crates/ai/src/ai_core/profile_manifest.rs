@@ -5,8 +5,8 @@ use serde::Serialize;
 #[cfg(test)]
 use super::profiles::required_profiles;
 use super::profiles::{
-    profile_by_id, AiProfile, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    profile_by_id, AiProfile, AI_2_1_ID, AI_2_1_PRE_THIRD_BASE_ID, AI_TURTLE_ID, JEFFS_AI_BETA_ID,
+    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -84,7 +84,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
     match profile_id {
         AI_2_1_ID => (
             "AI 2.1",
-            "Pressure profile with proposal-based economy management, defensive Machine Gunners, mixed Tank pressure, and a second Factory.",
+            "Pressure profile with proposal-based economy management, defensive Machine Gunners, mixed Tank pressure, and a third base before its second Factory.",
             vec![
                 "economy_manager",
                 "full_steel_saturation",
@@ -94,6 +94,11 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "mixed_tank_pressure",
                 "second_factory",
             ],
+        ),
+        AI_2_1_PRE_THIRD_BASE_ID => (
+            "AI 2.1 before third base",
+            "Frozen main 69d1e29a6 pressure policy: two bases and two Factories.",
+            vec!["economy_manager", "early_expansion", "mixed_tank_pressure", "second_factory"],
         ),
         AI_TURTLE_ID => (
             "AI Turtle",

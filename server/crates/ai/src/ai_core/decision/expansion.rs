@@ -96,7 +96,14 @@ pub(super) fn active_expansion(
     observation: &AiObservation,
     profile: &AiProfile,
 ) -> Option<ExpansionPolicy> {
-    let expansion = active_expansion_policy(profile)?;
+    let expansion = profile
+        .production_expansion
+        .filter(|policy| {
+            observation.owned.iter().any(|entity| {
+                entity.kind == policy.required_complete_building && entity.is_complete
+            })
+        })
+        .or_else(|| active_expansion_policy(profile))?;
     if observation.economy.steel >= expansion.trigger_steel
         || observation.economy.supply_used >= expansion.trigger_supply_used
     {

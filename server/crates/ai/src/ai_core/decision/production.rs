@@ -17,6 +17,11 @@ pub(super) fn should_build_extra_factory(
     let Some(policy) = profile.extra_factories else {
         return false;
     };
+    if profile.production_expansion.is_some_and(|expansion| {
+        facts.complete_building_count(EntityKind::ResourceDepot) < expansion.target_resource_depots
+    }) {
+        return false;
+    }
     if facts.unit_count(policy.prerequisite_unit) < policy.minimum_units {
         return false;
     }
