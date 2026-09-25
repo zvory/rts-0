@@ -213,7 +213,7 @@ where
     }
     let (tile_x, tile_y) = if profile.id == JEFFS_AI_ID {
         let site = secured_site?;
-        if !placeable(kind, site.0, site.1) {
+        if !expansion_site_is_separate(observation, site) || !placeable(kind, site.0, site.1) {
             return None;
         }
         site
@@ -258,7 +258,9 @@ where
             // fall back to the surrounding search when that exact footprint is
             // temporarily blocked; retry the same instruction on the next pass.
             let tile = instruction.tile;
-            return placeable(kind, tile.0, tile.1).then_some(tile);
+            return (expansion_site_is_separate(observation, tile)
+                && placeable(kind, tile.0, tile.1))
+            .then_some(tile);
         }
     }
     if profile_id == JEFFS_AI_ID {
@@ -422,6 +424,13 @@ pub(super) fn expansion_candidate_resources(
         .filter(|resource| matches!(resource.kind, EntityKind::Steel | EntityKind::Oil))
         .filter(|resource| resource.remaining > 0)
         .filter(|resource| {
+            !near_known_depot(
+                observation,
+                (resource.x, resource.y),
+                config::MINING_ANCHOR_RANGE_TILES,
+            )
+        })
+        .filter(|resource| {
             !resource_is_near_player_start(observation, resource, start_resource_radius2)
         })
         .collect()
@@ -529,6 +538,41 @@ pub(super) struct ExpansionSiteCandidate {
     approach_exposure: Option<f32>,
 }
 
+// Keep each expansion at a distinct base, including sites still under construction
+// or submitted by this controller. Only owned and currently visible depots are known.
+const MIN_EXPANSION_DEPOT_DISTANCE_TILES: f32 = 10.0;
+
+fn near_known_depot(observation: &AiObservation, point: (f32, f32), radius_tiles: f32) -> bool {
+    let radius2 = squared(radius_tiles * observation.map.tile_size as f32);
+    observation
+        .owned
+        .iter()
+        .chain(&observation.visible_allies)
+        .chain(&observation.visible_enemies)
+        .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.hp > 0)
+        .map(|entity| (entity.x, entity.y))
+        .chain(
+            observation
+                .pending_builds
+                .iter()
+                .filter(|intent| intent.kind == EntityKind::ResourceDepot)
+                .filter_map(|intent| {
+                    building_center(
+                        (intent.tile_x, intent.tile_y),
+                        intent.kind,
+                        observation.map.tile_size,
+                    )
+                }),
+        )
+        .any(|center| dist2(point.0, point.1, center.0, center.1) <= radius2)
+}
+
+fn expansion_site_is_separate(observation: &AiObservation, tile: (u32, u32)) -> bool {
+    building_center(tile, EntityKind::ResourceDepot, observation.map.tile_size).is_some_and(
+        |center| !near_known_depot(observation, center, MIN_EXPANSION_DEPOT_DISTANCE_TILES),
+    )
+}
+
 pub(super) fn expansion_site_candidate(
     observation: &AiObservation,
     kind: EntityKind,
@@ -536,6 +580,9 @@ pub(super) fn expansion_site_candidate(
     tile_y: u32,
     resources: &[&AiResourceSummary],
 ) -> Option<ExpansionSiteCandidate> {
+    if !expansion_site_is_separate(observation, (tile_x, tile_y)) {
+        return None;
+    }
     let (cx, cy) = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
     let max_dist = config::MINING_ANCHOR_RANGE_TILES * observation.map.tile_size as f32;
     let max_dist2 = squared(max_dist);

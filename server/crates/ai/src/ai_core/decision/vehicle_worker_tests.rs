@@ -907,3 +907,16 @@ fn frozen_ai_2_1_still_builds_second_factory_on_two_bases() {
         kind: EntityKind::Factory
     }));
 }
+
+#[test]
+fn ai_2_1_third_base_does_not_wait_for_replacement_opening_riflemen() {
+    let observation = second_factory_observation(1300, 300);
+    let decision = decide_with_profile(&observation, &AI_2_1);
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::ResourceDepot
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
+    assert_eq!(AI_2_1.expansion.unwrap().defensive_unit_count, 4);
+}
