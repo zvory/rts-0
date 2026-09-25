@@ -563,11 +563,11 @@ fn counterfire_against_firing_revealed_target_waits_half_second() {
 }
 
 #[test]
-fn anti_tank_gun_firing_reveal_lasts_three_seconds() {
+fn anti_tank_gun_firing_reveal_lasts_six_and_a_half_seconds() {
     let (mut game, enemy_at, tank) = hidden_enemy_at_gun_fixture();
     game.tick();
     let fired_at_tick = game.tick_count();
-    let reveal_ticks = config::TICK_HZ * 3;
+    let reveal_ticks = config::TICK_HZ * 13 / 2;
 
     game.state
         .entities
@@ -593,7 +593,7 @@ fn anti_tank_gun_firing_reveal_lasts_three_seconds() {
             .entities
             .iter()
             .any(|entity| entity.id == enemy_at),
-        "AT gun should remain visible through the full three-second reveal window"
+        "AT gun should remain visible through the full 6.5-second reveal window"
     );
 
     game.tick();
