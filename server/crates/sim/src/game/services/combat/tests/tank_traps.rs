@@ -319,7 +319,10 @@ fn tank_destroys_only_commanded_tank_trap_on_first_shot() {
     }
 
     assert_eq!(
-        entities.get(uncommanded_trap).expect("uncommanded trap should exist").hp,
+        entities
+            .get(uncommanded_trap)
+            .expect("uncommanded trap should exist")
+            .hp,
         uncommanded_trap_hp,
         "the tank must not acquire a neutral trap after destroying its commanded target"
     );
