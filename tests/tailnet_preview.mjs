@@ -40,6 +40,33 @@ try {
     "the CLI validates its source before querying or starting the Tailnet service",
   );
 
+  const fallbackSource = path.join(tempRoot, "local image.png");
+  fs.writeFileSync(fallbackSource, "local-preview-bytes");
+  const bin = path.join(tempRoot, "bin");
+  fs.mkdirSync(bin);
+  for (const status of [null, "Stopped", "NeedsLogin", "invalid-json", "no-address", "daemon-error", "timeout"]) {
+    const executable = path.join(bin, "tailscale");
+    if (status !== null) {
+      const body = status === "timeout" ? "setTimeout(() => {}, 10000)" : status === "daemon-error" ? "process.exit(1)" :
+        `process.stdout.write(${JSON.stringify(status === "invalid-json" ? "bad-json" : JSON.stringify({
+          BackendState: status === "no-address" ? "Running" : status,
+        }))})`;
+      fs.writeFileSync(executable, `#!${process.execPath}\n${body}\n`, { mode: 0o700 });
+    }
+    const result = spawnSync(process.execPath, [
+      fileURLToPath(new URL("../scripts/tailnet-preview.mjs", import.meta.url)),
+      "--root", path.join(tempRoot, "unused-service"), fallbackSource,
+    ], { encoding: "utf8", env: { ...process.env, PATH: bin }, timeout: 5000 });
+    assert.equal(result.status, 0, `${status}: ${result.stderr}`);
+    assert.equal(result.stderr, "");
+    const localPath = /^Local artifact: (.+)$/m.exec(result.stdout)?.[1];
+    assert.ok(localPath, "unavailable Tailscale returns a directly usable file");
+    assert.equal(path.extname(localPath), ".png");
+    assert.equal(fs.readFileSync(localPath, "utf8"), "local-preview-bytes");
+    assert.equal(fs.existsSync(path.join(tempRoot, "unused-service")), false, "fallback starts no preview service");
+    fs.rmSync(path.dirname(localPath), { recursive: true, force: true });
+  }
+
   assert.equal(parseDuration("30m"), 1_800_000);
   assert.equal(parseDuration("2h"), 7_200_000);
   assert.equal(parseDuration("1d"), 86_400_000);

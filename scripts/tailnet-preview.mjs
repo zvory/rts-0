@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { chmodSync, copyFileSync, createReadStream, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, createReadStream, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const DEFAULT_PORT = 8091;
 export const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -136,7 +136,9 @@ Copies one regular file into a private temporary preview directory, serves it ov
 the current machine's Tailscale IPv4 address, and prints a MagicDNS URL (falling
 back to the IPv4 address when no DNS name is available). The default TTL is 24
 hours; --keep retains the file until it is removed manually or the OS clears its
-temporary directory.`;
+temporary directory. If Tailscale is unavailable after one bounded status check,
+copies the file locally and prints its path for normal image/video delivery; no
+server is started. Local copies last until removed or the OS clears them.`;
 }
 
 function isRegularFile(file) {
@@ -713,7 +715,17 @@ export async function publishTailnetPreview({
   if (!keep && ttlMs > Number.MAX_SAFE_INTEGER - Date.now()) {
     throw new Error("preview expiration is out of range");
   }
-  const endpoint = host ? { bindHost: host, urlHost: host } : tailscaleEndpoint();
+  let endpoint;
+  try {
+    endpoint = host ? { bindHost: host, urlHost: host } : tailscaleEndpoint();
+  } catch {
+    // Tailscale is optional. Keep an extension-bearing copy outside the worktree
+    // so normal artifact delivery survives capture teardown and branch cleanup.
+    const directory = mkdtempSync(path.join(os.tmpdir(), "rts-local-preview-"));
+    const localPath = path.join(directory, safeFileName(source));
+    copyFileSync(source, localPath);
+    return { url: pathToFileURL(localPath).href, localPath, expiresAt: null };
+  }
   const previewHost = endpoint.bindHost;
   if (!isPreviewHost(previewHost)) {
     throw new Error("preview host must be a Tailscale IPv4 address (or loopback for tests)");
@@ -730,6 +742,11 @@ export async function publishTailnetPreview({
 
 async function runPreview(options) {
   const preview = await publishTailnetPreview(options);
+  if (preview.localPath) {
+    console.log(`Local artifact: ${preview.localPath}`);
+    console.log("Tailscale unavailable; display or attach this file directly. No server started.");
+    return;
+  }
   console.log(`Preview URL: ${preview.url}`);
   if (preview.expiresAt === null) {
     console.log("Expires: retained until manually removed or the OS clears its temporary directory");

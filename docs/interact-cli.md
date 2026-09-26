@@ -302,7 +302,10 @@ mutations with `inspect`, control authoritative time with `time`, and compose wi
 Aliases, inspection, selection, camera focus, and screenshot subjects accept up to 400 entity references.
 `screenshot` waits for fonts, relevant assets, two error-free render frames, and
 authoritative state. The CLI returns an opaque Tailnet Preview URL plus bounded metadata; it
-deliberately withholds local PNG and manifest paths so callers share the Tailnet URL rather than a
+returns `preview.localPath` and a file URL when Tailscale is unavailable after a single bounded
+status check. Display or attach this local copy normally without troubleshooting Tailscale. The
+copy lives outside the worktree until removed or OS temporary cleanup. With Tailscale, it
+withholds local PNG and manifest paths so callers share the Tailnet URL rather than a
 raw file. Readiness checks cover every requested subject, while
 the response and manifest record the subject count, `truncated` state, and at most 24 detailed
 subject rows. `presentation: "clean"` hides UI chrome; `presentation: "normal"` retains visible Lab
@@ -506,7 +509,7 @@ fixed visual-time contract.
 | `daemonCheckoutMismatch` | Run `status` to inspect the preserved scene. When it is safe to discard, run the returned `shutdown` recovery command and retry from the current checkout. |
 | `assetLoadFailed`, `captureRenderError`, or `captureTimeout` | Fix the reported source/render problem; do not accept a fallback capture. |
 | `ffmpegUnavailable`, `ffprobeUnavailable`, or `h264Unavailable` | Install an FFmpeg toolchain with `libx264`, or set the explicit tool paths, then retry. |
-| `tailnetPreviewUnavailable` | Start Tailscale or restore the machine-level preview service, then capture again; share the returned Tailnet URL rather than a local path. |
+| `tailnetPreviewUnavailable` | The active Tailnet preview service failed to publish; inspect the service error. Missing or disconnected Tailscale automatically uses local artifact delivery. |
 | `recordingActive` / `recordingInactive` | Check session `status`, then stop/wait for the active recorder or start a new one. A wait before any start is inactive. |
 
 ## Focused verification

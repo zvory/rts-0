@@ -68,6 +68,22 @@ const validationPreview = new InteractTailnetPreview({
   publishArtifact: async () => ({ url: "http://127.0.0.1:8091/p/fixture/scene.png", expiresAt: Date.now() + INTERACT_PREVIEW_TTL_MS }),
 });
 try {
+  const oldPath = process.env.PATH;
+  let local;
+  try {
+    process.env.PATH = validationRoot;
+    local = await new InteractTailnetPreview({ workspaceRoot: validationRoot })
+      .publish({ filePath: validationPng, mimeType: "image/png" });
+  } finally {
+    if (oldPath === undefined) delete process.env.PATH;
+    else process.env.PATH = oldPath;
+  }
+  assert.ok(path.isAbsolute(local.localPath));
+  assert.match(local.url, /^file:/);
+  assert.match(local.availability, /local copy/);
+  assert.deepEqual(fs.readFileSync(local.localPath), png);
+  fs.rmSync(path.dirname(local.localPath), { recursive: true, force: true });
+
   assert.throws(
     () => new InteractTailnetPreview({ workspaceRoot: validationRoot, ttlMs: INTERACT_PREVIEW_TTL_MS - 1 }),
     (error) => error?.code === "invalidPreviewTtl",
