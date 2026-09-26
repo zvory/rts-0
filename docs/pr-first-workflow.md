@@ -126,13 +126,17 @@ worktrees after 72 hours without source or Git HEAD/reflog activity. It covers r
 under `/tmp/rts-worktrees`, outside the main checkout.
 
 The current checkout, main checkout, locked worktrees, active phase-runner markers, and
-worktrees with modified `playtest_notes.md` are protected. Ignored build output does not
+worktrees with modified `playtest_notes.md` (including staged changes) are protected.
+Trees containing registered worktrees, embedded repositories, or submodules, and trees
+with an unfinished Git operation or unresolved index conflicts, are also protected. Ignored build output does not
 count as source activity. Before removing a worktree, cleanup preserves its HEAD under
 `refs/worktree-recovery/` and saves metadata under the common Git directory's
-`worktree-recovery/`. Dirty worktrees also get a binary patch against HEAD and a tar archive
-of changed and untracked source files. Branches are retained; ignored generated output is
+`worktree-recovery/`. Dirty worktrees also get a binary patch against HEAD, a separate staged patch, and a tar
+archive of changed and untracked source files. Branches are retained; ignored generated output is
 discarded. Restore a removed worktree from the saved branch or recovery ref, then use the
-patch/archive if needed. These recovery records are not automatically expired.
+patch/archive if needed. Apply `changes.patch` to the restored HEAD for working files;
+apply `staged.patch` with `git apply --cached` to restore the index independently, and
+restore untracked files from `source.tar.gz`. These recovery records are not automatically expired.
 
 Cleanup runs opportunistically through the hooks and PR waiter below; 72 hours is an
 eligibility threshold, not a scheduled deletion deadline. A recently active unmerged tree

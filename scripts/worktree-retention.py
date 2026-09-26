@@ -10,7 +10,8 @@ import time
 
 
 def git(root, *args):
-    return subprocess.check_output(['git', '-C', str(root), *args])
+    return subprocess.check_output(['git', '--no-optional-locks', '-c', 'diff.autoRefreshIndex=false',
+                                    '-C', str(root), *args])
 
 
 def paths(raw):
@@ -23,8 +24,12 @@ def managed(path, main, task_root):
 
 
 def latest_activity(path, files, gitdir):
-    candidates = [path, gitdir / 'HEAD', gitdir / 'logs/HEAD']
+    candidates = [path, gitdir / 'HEAD', gitdir / 'logs/HEAD', gitdir / 'index']
     candidates.extend(path / name for name in files)
+    # Deleting a file updates its parent, not the remaining source files.
+    for name in files:
+        candidates.extend(parent for parent in (path / name).parents
+                          if parent == path or path in parent.parents)
     return max(p.lstat().st_mtime for p in candidates if p.exists() or p.is_symlink())
 
 
@@ -35,13 +40,19 @@ def cleanup(root, dry_run=False, now=None):
     main = common.parent.resolve()
     task_root = Path(os.environ.get('RTS_WORKTREE_ROOT', '/tmp/rts-worktrees')).resolve()
     records = git(root, 'worktree', 'list', '--porcelain', '-z').split(b'\0\0')
+    worktrees = []
     for record in records:
         fields = record.split(b'\0')
         values = dict(os.fsdecode(f).split(' ', 1) if b' ' in f else (os.fsdecode(f), '')
                       for f in fields if f)
         if 'worktree' not in values:
             continue
+        worktrees.append(values)
+    for values in worktrees:
         path = Path(values['worktree']).resolve()
+        # Removing an ancestor would also delete registered nested worktrees.
+        if any(path in Path(other['worktree']).resolve().parents for other in worktrees):
+            continue
         branch = values.get('branch', '').removeprefix('refs/heads/')
         if (path in (root, main) or 'locked' in values or 'prunable' in values
                 or not managed(path, main, task_root)):
@@ -50,14 +61,31 @@ def cleanup(root, dry_run=False, now=None):
             continue
         if branch and (task_root / 'phase-runner-active' / branch.replace('/', '__')).exists():
             continue
-        dirty = bool(git(path, 'status', '--porcelain=v1', '-z'))
-        changed = paths(git(path, 'diff', 'HEAD', '--name-only', '-z'))
+        gitdir = Path(os.fsdecode(git(path, 'rev-parse', '--absolute-git-dir')).strip())
+        if any((gitdir / name).exists() for name in (
+                'index.lock', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD',
+                'rebase-merge', 'rebase-apply', 'sequencer')):
+            continue
+        if git(path, 'ls-files', '--unmerged', '-z'):
+            continue
+        # Do not let status refresh the index and manufacture recent activity.
+        status = git(path, 'status', '--porcelain=v1', '--no-renames', '-z')
+        dirty = bool(status)
+        changed = [os.fsdecode(entry[3:]) for entry in status.split(b'\0')
+                   if entry and not entry.startswith(b'?? ')]
+        staged = paths(git(path, 'diff', '--cached', '--name-only', '--no-renames', '-z'))
         untracked = paths(git(path, 'ls-files', '--others', '--exclude-standard', '-z'))
-        if 'playtest_notes.md' in changed or 'playtest_notes.md' in untracked:
+        if 'playtest_notes.md' in staged + changed + untracked:
             print(f'keep notes worktree: {path}')
             continue
-        files = paths(git(path, 'ls-files', '-z')) + untracked
-        gitdir = Path(os.fsdecode(git(path, 'rev-parse', '--absolute-git-dir')).strip())
+        # Git lists embedded repositories as directories; our source archive cannot
+        # preserve their independent Git state. Keep these trees intact.
+        if any((path / name).is_dir() and not (path / name).is_symlink()
+               for name in untracked):
+            continue
+        if any(entry.startswith(b'160000 ') for entry in git(path, 'ls-files', '--stage', '-z').split(b'\0')):
+            continue
+        files = paths(git(path, 'ls-files', '-z')) + untracked + changed + staged
         age = now - latest_activity(path, files, gitdir)
         head = values['HEAD']
         merged = any(subprocess.run(['git', '-C', str(root), 'merge-base', '--is-ancestor', head, ref],
@@ -77,9 +105,10 @@ def cleanup(root, dry_run=False, now=None):
         (recovery / 'metadata.json').write_text(json.dumps({'path': str(path), 'branch': branch,
                                                          'head': head, 'ref': ref}, indent=2))
         if dirty:
-            (recovery / 'changes.patch').write_bytes(git(path, 'diff', '--binary', 'HEAD'))
+            (recovery / 'changes.patch').write_bytes(git(path, 'diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD'))
+            (recovery / 'staged.patch').write_bytes(git(path, 'diff', '--cached', '--binary', '--no-ext-diff', '--no-textconv'))
             with tarfile.open(recovery / 'source.tar.gz', 'w:gz', dereference=False) as archive:
-                for name in sorted(set(changed + untracked)):
+                for name in sorted(set(changed + staged + untracked)):
                     source = path / name
                     if source.exists() or source.is_symlink():
                         archive.add(source, arcname=name, recursive=False)

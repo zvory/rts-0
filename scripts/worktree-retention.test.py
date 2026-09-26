@@ -90,6 +90,83 @@ class RetentionTest(unittest.TestCase):
         refs = self.run_git(self.main, 'for-each-ref', '--format=%(objectname)', 'refs/worktree-recovery/')
         self.assertIn(head.strip(), refs)
 
+    def test_staged_content_recoverable_when_working_file_reverted(self):
+        p = self.tree('staged')
+        (p / 'source').write_bytes(b'staged\0content\n')
+        self.run_git(p, 'add', 'source')
+        (p / 'source').write_text('base\n')
+        retention.cleanup(self.main, now=time.time() + 73 * 3600)
+        self.assertFalse(p.exists())
+        recovery = next((self.main / '.git/worktree-recovery').iterdir())
+        restored = self.tasks / 'restored'
+        self.run_git(self.main, 'worktree', 'add', str(restored), 'zvorygin/staged')
+        self.run_git(restored, 'apply', '--cached', str(recovery / 'staged.patch'))
+        self.assertEqual(self.run_git(restored, 'show', ':source'), b'staged\0content\n')
+        self.assertEqual((restored / 'source').read_text(), 'base\n')
+
+    def test_staged_notes_protected_even_when_working_file_reverted(self):
+        p = self.tree('staged-notes')
+        (p / 'playtest_notes.md').write_text('precious notes\n')
+        self.run_git(p, 'add', 'playtest_notes.md')
+        (p / 'playtest_notes.md').write_text('notes\n')
+        retention.cleanup(self.main, now=time.time() + 73 * 3600)
+        self.assertTrue(p.exists())
+
+    def test_embedded_repository_and_registered_child_protected(self):
+        p = self.tree('embedded')
+        child = p / 'independent'
+        child.mkdir()
+        self.run_git(child, 'init')
+        (child / 'precious').write_text('independent source\n')
+        parent = self.tree('parent')
+        registered = parent / 'child'
+        self.run_git(self.main, 'worktree', 'add', '--detach', str(registered))
+        retention.cleanup(self.main, now=time.time() + 73 * 3600)
+        self.assertTrue((child / 'precious').exists())
+        self.assertTrue(registered.exists())
+
+    def test_recent_deletion_protects_old_tree(self):
+        p = self.tree('deletion')
+        (p / 'subdir').mkdir()
+        (p / 'subdir/file').write_text('source\n')
+        self.run_git(p, 'add', '.')
+        self.run_git(p, 'commit', '-m', 'unmerged')
+        old = time.time() - 74 * 3600
+        gitdir = Path(os.fsdecode(self.run_git(p, 'rev-parse', '--absolute-git-dir')).strip())
+        for item in [p, p / 'source', p / 'playtest_notes.md', p / 'subdir',
+                     p / 'subdir/file', gitdir / 'HEAD', gitdir / 'logs/HEAD', gitdir / 'index']:
+            os.utime(item, (old, old))
+        (p / 'subdir/file').unlink()
+        retention.cleanup(self.main)
+        self.assertTrue(p.exists())
+
+    def test_status_does_not_keep_stale_dirty_tree_alive(self):
+        p = self.tree('stale')
+        (p / 'source').write_text('dirty\n')
+        old = time.time() - 74 * 3600
+        gitdir = Path(os.fsdecode(self.run_git(p, 'rev-parse', '--absolute-git-dir')).strip())
+        for item in [p, p / 'source', p / 'playtest_notes.md', gitdir / 'HEAD',
+                     gitdir / 'logs/HEAD', gitdir / 'index']:
+            os.utime(item, (old, old))
+        retention.cleanup(self.main)
+        self.assertFalse(p.exists())
+
+    def test_incomplete_git_operation_protected(self):
+        p = self.tree('merging')
+        gitdir = Path(os.fsdecode(self.run_git(p, 'rev-parse', '--absolute-git-dir')).strip())
+        (gitdir / 'MERGE_HEAD').write_bytes(self.run_git(p, 'rev-parse', 'HEAD'))
+        retention.cleanup(self.main, now=time.time() + 73 * 3600)
+        self.assertTrue(p.exists())
+
+    def test_detached_sibling_recovered(self):
+        p = self.main.with_name('repo-detached')
+        self.run_git(self.main, 'worktree', 'add', '--detach', str(p))
+        head = self.run_git(p, 'rev-parse', 'HEAD').strip()
+        retention.cleanup(self.main)
+        self.assertFalse(p.exists())
+        refs = self.run_git(self.main, 'for-each-ref', '--format=%(objectname)', 'refs/worktree-recovery/')
+        self.assertIn(head, refs)
+
 
 if __name__ == '__main__':
     unittest.main()
