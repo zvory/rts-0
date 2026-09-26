@@ -1,3 +1,7 @@
+# Local worktrees and generated artifacts
+/.codex-worktrees/
+/target/
+
 # Rust
 /server/target
 /server/crates/*/target

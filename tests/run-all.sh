@@ -544,6 +544,8 @@ run_rust_suites_bg() {
       node "$SCRIPT_DIR/adversarial_quality_pass.mjs"
     run_suite_bg "Agent workflow: completed plan archival" \
       node "$SCRIPT_DIR/archive_completed_plans.mjs"
+    run_suite_bg "Agent workflow: worktree retention" \
+      python3 "$SCRIPT_DIR/../scripts/worktree-retention.test.py"
     run_suite_bg "Agent workflow: post-merge main refresh" \
       node "$SCRIPT_DIR/wait_pr.mjs"
     run_suite_bg "Agent workflow: shared Node dependencies" \

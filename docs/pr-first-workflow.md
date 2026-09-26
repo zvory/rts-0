@@ -99,9 +99,8 @@ compiling or running specific tests. Do not add a separate diagnostic workflow f
   the branch so the quality pass and status are refreshed, or run
   `gh pr merge <pr> --auto --merge` after confirming the PR is still agent-owned
   and should merge when green.
-- PR closed unmerged: do not let cleanup remove the worktree unless the head is
-  reachable from `main` or `origin/main`. Reopen the PR if the branch is still
-  valid, or create a replacement branch and PR from the useful commits.
+- PR closed unmerged: reopen it if the work is still valid. Inactive task worktrees
+  expire after 72 hours; their commits and dirty source remain recoverable as described below.
 - GitHub API unavailable: leave the branch and worktree intact. Retry the
   helper later; serial automation must stop because it cannot prove merge state.
 - Emergency admin/direct push: use only when explicitly authorized. Record the
@@ -120,11 +119,28 @@ exact blocker instead of calling the work complete.
 
 ## Worktree cleanup
 
-`scripts/cleanup-worktrees.sh` removes only clean `zvorygin/*` worktrees whose
-branch head is reachable from local `main` or `origin/main`. It does not require
-the matching remote branch to exist, so it tolerates GitHub delete-branch-on-merge
-after a PR auto-merges. It keeps dirty worktrees and clean worktrees with
-unmerged heads.
+`scripts/cleanup-worktrees.sh` removes merged, clean task worktrees and expires task
+worktrees after 72 hours without source or Git HEAD/reflog activity. It covers registered
+`zvorygin/*` and detached worktrees directly under `/tmp/rts-worktrees`, legacy nested
+`.codex-worktrees`, and sibling `<main-checkout-name>-*` directories. New worktrees belong
+under `/tmp/rts-worktrees`, outside the main checkout.
+
+The current checkout, main checkout, locked worktrees, active phase-runner markers, and
+worktrees with modified `playtest_notes.md` (including staged changes) are protected.
+Trees containing registered worktrees, embedded repositories, or submodules, and trees
+with an unfinished Git operation or unresolved index conflicts, are also protected. Ignored build output does not
+count as source activity. Before removing a worktree, cleanup preserves its HEAD under
+`refs/worktree-recovery/` and saves metadata under the common Git directory's
+`worktree-recovery/`. Dirty worktrees also get a binary patch against HEAD, a separate staged patch, and a tar
+archive of changed and untracked source files. Branches are retained; ignored generated output is
+discarded. Restore a removed worktree from the saved branch or recovery ref, then use the
+patch/archive if needed. Apply `changes.patch` to the restored HEAD for working files;
+apply `staged.patch` with `git apply --cached` to restore the index independently, and
+restore untracked files from `source.tar.gz`. These recovery records are not automatically expired.
+
+Cleanup runs opportunistically through the hooks and PR waiter below; 72 hours is an
+eligibility threshold, not a scheduled deletion deadline. A recently active unmerged tree
+stays intact even if it was created more than three days ago.
 
 Use these commands to audit or run cleanup:
 
