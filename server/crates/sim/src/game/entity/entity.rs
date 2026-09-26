@@ -46,8 +46,7 @@ pub struct Entity {
     pub pos_y: f32,
 
     pub hp: u32,
-    /// Remaining health ceiling. Damage taken during construction permanently lowers this value;
-    /// finished entities otherwise retain their configured maximum.
+    /// Full health ceiling. Construction earns current HP over time; damage never lowers this value.
     pub max_hp: u32,
     invulnerable: bool,
     /// Player id that most recently damaged this target. Used for score attribution when the
@@ -1008,18 +1007,7 @@ impl Entity {
         if self.hp == 0 || amount == 0 || self.invulnerable {
             return false;
         }
-        if let Some(construction) = self.construction.as_ref() {
-            // Construction progress is not healing. Damage destroys part of the scaffold's
-            // eventual health budget, and subsequent progress only fills the reduced budget.
-            self.max_hp = self.max_hp.saturating_sub(amount);
-            self.hp = construction_hp_for_progress(
-                self.max_hp,
-                construction.progress,
-                construction.total,
-            );
-        } else {
-            self.hp = self.hp.saturating_sub(amount);
-        }
+        self.hp = self.hp.saturating_sub(amount);
         if let Some((owner, pos, tick)) = attribution {
             self.last_damage_owner = Some(owner);
             self.last_damage_entity = None;
@@ -1193,14 +1181,16 @@ impl Entity {
     }
 
     pub fn advance_construction(&mut self) -> Option<bool> {
-        let c = self.construction.as_mut()?;
-        c.progress = c.progress.saturating_add(1);
-        if c.progress < c.total {
-            self.hp = construction_hp_for_progress(self.max_hp, c.progress, c.total);
+        if self.hp == 0 {
+            return None;
+        }
+        let c = self.construction.as_ref()?;
+        let progress = c.progress.saturating_add(1).min(c.total);
+        let complete = progress >= c.total;
+        self.set_construction_progress(progress);
+        if !complete {
             return Some(false);
         }
-        c.progress = c.total;
-        self.hp = self.max_hp;
         self.construction = None;
         self.neutralize_completed_tank_trap();
         Some(true)
@@ -1222,11 +1212,24 @@ impl Entity {
     }
 
     pub fn set_construction_progress(&mut self, progress: u32) -> bool {
+        if self.hp == 0 {
+            return false;
+        }
         let Some(c) = self.construction.as_mut() else {
             return false;
         };
+        let previous_hp = construction_hp_for_progress(self.max_hp, c.progress, c.total);
         c.progress = progress.min(c.total);
-        self.hp = construction_hp_for_progress(self.max_hp, c.progress, c.total);
+        let earned_hp = construction_hp_for_progress(self.max_hp, c.progress, c.total);
+        // Add only newly earned HP, preserving damage and fractional-tick rounding. Repeated
+        // synchronization at the same progress cannot heal a scaffold or resurrect a dead one.
+        self.hp = if earned_hp >= previous_hp {
+            self.hp
+                .saturating_add(earned_hp - previous_hp)
+                .min(self.max_hp)
+        } else {
+            self.hp.saturating_sub(previous_hp - earned_hp)
+        };
         true
     }
 
