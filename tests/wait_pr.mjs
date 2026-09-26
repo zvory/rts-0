@@ -85,6 +85,7 @@ function waitEnvironment(headSha, number, files = []) {
 fs.mkdirSync(path.join(repo, "scripts"), { recursive: true });
 fs.mkdirSync(worktreeRoot, { recursive: true });
 fs.copyFileSync(cleanupScript, path.join(repo, "scripts", "cleanup-worktrees.sh"));
+fs.copyFileSync(path.join(projectRoot, "scripts", "worktree-retention.py"), path.join(repo, "scripts", "worktree-retention.py"));
 fs.chmodSync(path.join(repo, "scripts", "cleanup-worktrees.sh"), 0o755);
 fs.writeFileSync(path.join(repo, "scripts", "ensure-node-deps.sh"), `#!/usr/bin/env bash
 printf 'deps %s\\n' "$PWD" >>"$RTS_WAIT_PR_DELIVERY_LOG"
