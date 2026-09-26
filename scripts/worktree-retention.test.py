@@ -167,6 +167,51 @@ class RetentionTest(unittest.TestCase):
         refs = self.run_git(self.main, 'for-each-ref', '--format=%(objectname)', 'refs/worktree-recovery/')
         self.assertIn(head, refs)
 
+    def test_index_flags_cannot_hide_modified_source(self):
+        for flag in ('--assume-unchanged', '--skip-worktree'):
+            with self.subTest(flag=flag):
+                p = self.tree(flag[2:])
+                self.run_git(p, 'update-index', flag, 'source')
+                (p / 'source').write_text('hidden source changes\n')
+                retention.cleanup(self.main, now=time.time() + 73 * 3600)
+                self.assertEqual((p / 'source').read_text(), 'hidden source changes\n')
+
+    def test_hidden_untracked_files_still_backed_up(self):
+        p = self.tree('hidden-untracked')
+        self.run_git(p, 'config', 'status.showUntrackedFiles', 'no')
+        (p / 'precious').write_text('untracked source\n')
+        retention.cleanup(self.main)
+        self.assertTrue(p.exists())
+        retention.cleanup(self.main, now=time.time() + 73 * 3600)
+        self.assertFalse(p.exists())
+        recovery = next((self.main / '.git/worktree-recovery').iterdir())
+        import tarfile
+        with tarfile.open(recovery / 'source.tar.gz') as archive:
+            self.assertEqual(archive.extractfile('precious').read(), b'untracked source\n')
+
+    def test_ignored_embedded_repository_protected(self):
+        p = self.tree('ignored-repo')
+        (p / '.gitignore').write_text('cache/\n')
+        self.run_git(p, 'add', '.gitignore')
+        self.run_git(p, 'commit', '-m', 'ignore cache')
+        child = p / 'cache' / 'independent'
+        child.mkdir(parents=True)
+        self.run_git(child, 'init')
+        (child / 'precious').write_text('independent source\n')
+        retention.cleanup(self.main, now=time.time() + 73 * 3600)
+        self.assertTrue((child / 'precious').exists())
+
+    def test_recovery_patch_ignores_user_prefix_configuration(self):
+        p = self.tree('prefix')
+        self.run_git(p, 'config', 'diff.noprefix', 'true')
+        (p / 'source').write_text('changed\n')
+        retention.cleanup(self.main, now=time.time() + 73 * 3600)
+        recovery = next((self.main / '.git/worktree-recovery').iterdir())
+        restored = self.tasks / 'restored'
+        self.run_git(self.main, 'worktree', 'add', str(restored), 'zvorygin/prefix')
+        self.run_git(restored, 'apply', str(recovery / 'changes.patch'))
+        self.assertEqual((restored / 'source').read_text(), 'changed\n')
+
     def test_shell_wrapper_with_and_without_dry_run(self):
         import shutil
         scripts = self.main / 'scripts'

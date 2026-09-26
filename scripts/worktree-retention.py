@@ -23,6 +23,20 @@ def managed(path, main, task_root):
             or (path.parent == main.parent and path.name.startswith(main.name + '-')))
 
 
+def contains_repository(path):
+    # Include ignored directories: build/cache ignores must not hide independent
+    # repositories whose commits are absent from this worktree's recovery ref.
+    def scan_error(error):
+        raise error
+
+    for directory, dirs, files in os.walk(path, followlinks=False, onerror=scan_error):
+        if Path(directory) != path and '.git' in dirs + files:
+            return True
+        if '.git' in dirs:
+            dirs.remove('.git')
+    return False
+
+
 def latest_activity(path, files, gitdir):
     candidates = [path, gitdir / 'HEAD', gitdir / 'logs/HEAD', gitdir / 'index']
     candidates.extend(path / name for name in files)
@@ -68,8 +82,13 @@ def cleanup(root, dry_run=False, now=None):
             continue
         if git(path, 'ls-files', '--unmerged', '-z'):
             continue
+        # Status and diff deliberately omit these entries, so they cannot prove
+        # that a forced removal is safe or produce a complete source backup.
+        if any(entry[:1] == b'S' or entry[:1].islower()
+               for entry in git(path, 'ls-files', '-v', '-z').split(b'\0') if entry):
+            continue
         # Do not let status refresh the index and manufacture recent activity.
-        status = git(path, 'status', '--porcelain=v1', '--no-renames', '-z')
+        status = git(path, 'status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=none', '--no-renames', '-z')
         dirty = bool(status)
         changed = [os.fsdecode(entry[3:]) for entry in status.split(b'\0')
                    if entry and not entry.startswith(b'?? ')]
@@ -93,6 +112,8 @@ def cleanup(root, dry_run=False, now=None):
                      for ref in ('main', 'origin/main'))
         if not (merged and not dirty) and age < 72 * 3600:
             continue
+        if contains_repository(path):
+            continue
         reason = 'merged and clean' if merged and not dirty else f'inactive for {age / 86400:.1f} days'
         print(f'{"would remove" if dry_run else "remove"}: {path} ({reason})', flush=True)
         if dry_run:
@@ -105,8 +126,8 @@ def cleanup(root, dry_run=False, now=None):
         (recovery / 'metadata.json').write_text(json.dumps({'path': str(path), 'branch': branch,
                                                          'head': head, 'ref': ref}, indent=2))
         if dirty:
-            (recovery / 'changes.patch').write_bytes(git(path, 'diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD'))
-            (recovery / 'staged.patch').write_bytes(git(path, 'diff', '--cached', '--binary', '--no-ext-diff', '--no-textconv'))
+            (recovery / 'changes.patch').write_bytes(git(path, 'diff', '--binary', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', 'HEAD'))
+            (recovery / 'staged.patch').write_bytes(git(path, 'diff', '--cached', '--binary', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/'))
             with tarfile.open(recovery / 'source.tar.gz', 'w:gz', dereference=False) as archive:
                 for name in sorted(set(changed + staged + untracked)):
                     source = path / name
