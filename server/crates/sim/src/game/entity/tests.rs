@@ -298,71 +298,84 @@ fn construction_hp_scales_linearly_to_full_completion() {
 }
 
 #[test]
-fn construction_damage_permanently_reduces_completion_hp() {
-    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, false)
-        .expect("resource depot should spawn");
-    let original_max_hp = entity.max_hp;
-    let total = entity
-        .construction
-        .as_ref()
-        .expect("resource depot should be under construction")
-        .total;
-    let damage = original_max_hp / 2;
-
-    assert!(entity.set_construction_progress(total / 2));
+fn construction_damage_reduces_current_hp_and_persists_through_completion() {
+    let mut entity = Entity::new_building(1, EntityKind::Depot, 10.0, 20.0, false).unwrap();
+    let total = entity.construction.as_ref().unwrap().total;
+    let max_hp = entity.max_hp;
+    let start_hp = max_hp.div_ceil(10);
+    let damage = start_hp - 1;
+    assert_eq!(entity.hp, start_hp);
     assert!(entity.apply_damage(damage, Some((2, (30.0, 40.0), 7))));
-    assert_eq!(entity.max_hp, original_max_hp - damage);
-    assert!(entity.set_construction_progress(total.saturating_sub(1)));
+    assert_eq!((entity.hp, entity.max_hp), (1, max_hp));
+    assert!(entity.set_construction_progress(total / 2));
+    let halfway_hp = start_hp + (max_hp - start_hp) / 2 - damage;
+    assert_eq!(entity.hp, halfway_hp);
+    assert!(entity.set_construction_progress(total / 2));
+    assert_eq!(
+        entity.hp, halfway_hp,
+        "syncing unchanged progress must not heal damage"
+    );
+    assert!(entity.set_construction_progress(total - 1));
     assert_eq!(entity.advance_construction(), Some(true));
-    assert_eq!(entity.hp, original_max_hp - damage);
-    assert_eq!(entity.max_hp, original_max_hp - damage);
+    assert_eq!((entity.hp, entity.max_hp), (max_hp - damage, max_hp));
 }
 
 #[test]
-fn construction_damage_destroys_scaffold_when_remaining_hp_budget_is_exhausted() {
-    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, false)
-        .expect("resource depot should spawn");
-    let original_max_hp = entity.max_hp;
-
-    assert!(entity.apply_damage(original_max_hp, Some((2, (30.0, 40.0), 7))));
-    assert_eq!(entity.hp, 0);
-    assert_eq!(entity.max_hp, 0);
-    assert!(entity.under_construction());
-    assert_eq!(entity.last_damage_owner(), Some(2));
+fn construction_damage_kills_at_current_hp_and_progress_cannot_resurrect() {
+    for progress_fraction in [0, 2] {
+        let mut entity = Entity::new_building(1, EntityKind::Depot, 10.0, 20.0, false).unwrap();
+        let total = entity.construction.as_ref().unwrap().total;
+        if progress_fraction > 0 {
+            entity.set_construction_progress(total / progress_fraction);
+        }
+        let current_hp = entity.hp;
+        let max_hp = entity.max_hp;
+        assert!(entity.apply_damage(current_hp, Some((2, (30.0, 40.0), 7))));
+        assert_eq!((entity.hp, entity.max_hp), (0, max_hp));
+        assert_eq!(entity.last_damage_owner(), Some(2));
+        assert!(!entity.set_construction_progress(total));
+        assert_eq!(entity.advance_construction(), None);
+        assert_eq!(entity.hp, 0);
+    }
 }
 
 #[test]
-fn construction_progress_cannot_outpace_cumulative_damage() {
-    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, false)
-        .expect("resource depot should spawn");
-    let original_max_hp = entity.max_hp;
-    let first_damage = original_max_hp / 2;
-    let final_damage = original_max_hp - first_damage;
-
-    assert!(entity.apply_damage(first_damage, Some((2, (30.0, 40.0), 1))));
-    assert_eq!(entity.max_hp, original_max_hp - first_damage);
-    assert_ne!(entity.advance_construction(), None);
-    assert!(entity.hp > 0);
-
-    assert!(entity.apply_damage(final_damage, Some((2, (30.0, 40.0), 2))));
-    assert_eq!(entity.max_hp, 0);
-    assert_eq!(entity.hp, 0);
+fn construction_only_earns_one_full_health_budget_despite_continuous_damage() {
+    for kind in [
+        EntityKind::Depot,
+        EntityKind::Barracks,
+        EntityKind::ResourceDepot,
+        EntityKind::SteelMine,
+        EntityKind::PumpJack,
+    ] {
+        let mut entity = Entity::new_building(1, kind, 10.0, 20.0, false).unwrap();
+        let max_hp = entity.max_hp;
+        let mut damage = 0;
+        while entity.under_construction() {
+            let hit = entity.hp - 1;
+            entity.apply_damage(hit, None);
+            damage += hit;
+            entity.advance_construction();
+        }
+        damage += entity.hp;
+        assert_eq!(
+            damage, max_hp,
+            "{kind:?}: construction must earn exactly one HP budget"
+        );
+        entity.apply_damage(entity.hp, None);
+        assert_eq!(entity.hp, 0);
+        assert_eq!(entity.max_hp, max_hp);
+    }
 }
 
 #[test]
-fn scaffold_survival_is_based_on_remaining_budget_not_temporary_progress_hp() {
-    let mut entity = Entity::new_building(1, EntityKind::ResourceDepot, 10.0, 20.0, false)
-        .expect("resource depot should spawn");
-    let temporary_progress_hp = entity.hp;
-    let original_max_hp = entity.max_hp;
-
-    assert!(entity.apply_damage(
-        temporary_progress_hp.saturating_add(1),
-        Some((2, (30.0, 40.0), 1)),
-    ));
-
-    assert!(entity.hp > 0);
-    assert_eq!(entity.max_hp, original_max_hp - temporary_progress_hp - 1);
+fn construction_progress_sync_preserves_damage_at_full_progress() {
+    let mut entity = Entity::new_building(1, EntityKind::PumpJack, 10.0, 20.0, false).unwrap();
+    entity.apply_damage(1, None);
+    assert!(entity.set_construction_progress(u32::MAX));
+    assert_eq!(entity.hp, entity.max_hp - 1);
+    assert_eq!(entity.advance_construction(), Some(true));
+    assert_eq!(entity.hp, entity.max_hp - 1);
 }
 
 #[test]
