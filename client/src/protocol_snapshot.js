@@ -28,7 +28,7 @@ import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 export function decodeCompactSnapshot(raw) {
   // Version 55 adds the artilleryIncoming event code. Versions 51-54 remain safe to decode
   // because their existing event and entity record layouts are unchanged.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 
@@ -323,7 +323,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 43);
+  const fields = readArray(record, `entity ${index}`, 44);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -371,6 +371,7 @@ function decodeCompactEntity(record, index) {
   assignOptionalCodeList(entity, "prodUpgradeQueue", fields, 40, UPGRADE_BY_CODE);
   assignOptional(entity, "panzerfaustWindupProgress", fields, 41, readNumber);
   assignOptional(entity, "unitsKilled", fields, 42, readU32);
+  assignOptional(entity, "rocketRackCount", fields, 43, readU32);
   return entity;
 }
 

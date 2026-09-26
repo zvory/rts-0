@@ -782,6 +782,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.units_killed.is_some() {
             len = 43;
         }
+        if entity.rocket_rack_count.is_some() {
+            len = 44;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -926,6 +929,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 42 {
             seq.serialize_element(&entity.units_killed)?;
+        }
+        if len > 43 {
+            seq.serialize_element(&entity.rocket_rack_count)?;
         }
         seq.end()
     }

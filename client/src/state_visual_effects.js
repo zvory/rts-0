@@ -87,7 +87,7 @@ export class VisualEffectBuffers {
       } else if (ev && ev.e === EVENT.SMOKE_LAUNCH) {
         this.addSmokeCanister(ev, now);
       } else if (ev && ev.e === EVENT.MORTAR_LAUNCH) {
-        this.addMortarLaunch(ev, now);
+        this.addMortarLaunch(ev, now, entityById);
       } else if (ev && ev.e === EVENT.MORTAR_IMPACT) {
         this.addMortarImpact(ev, now);
       } else if (ev && ev.e === EVENT.ARTILLERY_TARGET) {
@@ -103,7 +103,7 @@ export class VisualEffectBuffers {
     this._trimQueues();
   }
 
-  addMortarLaunch(ev, now = performance.now()) {
+  addMortarLaunch(ev, now = performance.now(), entityById = null) {
     if (
       !Number.isFinite(ev.fromX) ||
       !Number.isFinite(ev.fromY) ||
@@ -131,7 +131,11 @@ export class VisualEffectBuffers {
       createdAt: now,
       rocket: ev.rocket === true,
     });
+    const shooter = typeof entityById === "function" ? entityById(ev.from) : null;
     this.mortarShells.push({
+      from: ev.from,
+      owner: shooter?.owner,
+      facing: shooter?.facing,
       fromX: ev.fromX,
       fromY: ev.fromY,
       toX: ev.toX,

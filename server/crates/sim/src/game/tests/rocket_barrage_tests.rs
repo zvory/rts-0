@@ -565,3 +565,87 @@ fn one_manual_barrage_stops_after_sixteen_rockets_and_leaves_mortar_decals() {
         .all(|decal| decal.decal_class == "mortarBlast"));
     assert!(trails.is_empty());
 }
+
+#[test]
+fn visible_rack_count_matches_each_launch_and_origins_are_distinct_rear_slots() {
+    let (mut game, launcher, target) = fixture(0);
+    let origin = game
+        .state
+        .entities
+        .get(launcher)
+        .map(|e| (e.pos_x, e.pos_y))
+        .unwrap();
+    assert_eq!(config::rocket_rack_count(0), 16);
+    order_barrage(&mut game, launcher, target);
+    let mut fired = 0;
+    for _ in 0..=config::ROCKET_BARRAGE_UNLOAD_TICKS + 2 {
+        for (player, events) in game.tick() {
+            if player != 1 {
+                continue;
+            }
+            for event in events {
+                if let Event::MortarLaunch {
+                    from,
+                    from_x,
+                    from_y,
+                    rocket: true,
+                    ..
+                } = event
+                {
+                    if from != launcher {
+                        continue;
+                    }
+                    let (slot_x, slot_y) = config::rocket_rack_slot(fired);
+                    assert!((from_x - origin.0 - slot_x).abs() < 0.001);
+                    assert!((from_y - origin.1 - slot_y).abs() < 0.001);
+                    assert!(from_x < origin.0, "round must leave the rear rack");
+                    fired += 1;
+                }
+            }
+        }
+        let cooldown = game
+            .state
+            .entities
+            .get(launcher)
+            .unwrap()
+            .ability_cooldown_ticks(ability::AbilityKind::Barrage);
+        assert_eq!(u32::from(config::rocket_rack_count(cooldown)), 16 - fired);
+        let snapshot = game.snapshot_for(1);
+        let view = snapshot.entities.iter().find(|e| e.id == launcher).unwrap();
+        assert_eq!(view.rocket_rack_count, Some((16 - fired) as u8));
+    }
+    assert_eq!(fired, 16);
+    assert_eq!(config::rocket_rack_count(1), 0);
+    assert_eq!(config::rocket_rack_count(0), 16);
+}
+
+#[test]
+fn rack_projection_is_public_only_when_truck_is_visible() {
+    let (mut game, launcher, _) = fixture(0);
+    assert!(game
+        .snapshot_for(2)
+        .entities
+        .iter()
+        .all(|e| e.id != launcher));
+    let pos = game
+        .state
+        .entities
+        .get(launcher)
+        .map(|e| (e.pos_x, e.pos_y))
+        .unwrap();
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, pos.0 + 80.0, pos.1)
+        .expect("spotter should spawn");
+    game.rebuild_final_spatial();
+    game.state
+        .fog
+        .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    let snapshot = game.snapshot_for(2);
+    let view = snapshot.entities.iter().find(|e| e.id == launcher).unwrap();
+    assert_eq!(view.rocket_rack_count, Some(16));
+    assert!(
+        view.abilities.is_empty(),
+        "physical rounds must not expose private cooldowns"
+    );
+}

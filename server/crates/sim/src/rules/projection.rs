@@ -269,6 +269,11 @@ pub fn project_entity(
         }
     }
     project_panzerfaust_state(entity, &mut view);
+    if entity.kind == EntityKind::RocketLauncher {
+        view.rocket_rack_count = Some(config::rocket_rack_count(
+            entity.ability_cooldown_ticks(ability::AbilityKind::Barrage),
+        ));
+    }
     let acquired_combat_target = entity.can_attack() && entity.target_id().is_some();
     let active_combat_target =
         matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_)) || acquired_combat_target;

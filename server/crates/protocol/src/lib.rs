@@ -1493,3 +1493,5 @@ mod tests {
         assert!(worker.approx_bytes > 0);
     }
 }
+
+// EntityView::rocket_rack_count is re-exported from rts-contract; compact v56 uses slot 43.

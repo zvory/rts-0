@@ -45,27 +45,41 @@ export function _drawPanzerfaustShots(state) {
   }
 }
 
-// Shared projectile primitive for Panzerfaust shots and Rocket Truck rockets. Keeping the
-// projectile in one place guarantees both weapons use the same rocket body and exhaust sprite.
-export function drawPanzerfaustProjectile(g, shot, now) {
+// Shared flight and trail sampling keeps PNG rockets on the existing projectile animation.
+export function rocketProjectilePose(shot, now) {
   const duration = Math.max(1, shot.durationMs || 1);
   const age = now - shot.createdAt;
-  if (age > duration + 80) return;
   const t = clamp01(age / duration);
   const dx = shot.toX - shot.fromX;
   const dy = shot.toY - shot.fromY;
   const len = Math.hypot(dx, dy);
-  const angle = len > 0.001 ? Math.atan2(dy, dx) : 0;
-  const ux = Math.cos(angle);
-  const uy = Math.sin(angle);
-  const x = shot.fromX + dx * t;
-  const y = shot.fromY + dy * t;
-  const travelFade = 1 - smoothstep01(Math.max(0, t - 0.78) / 0.22);
-  const tail = Math.min(34, Math.max(14, len * 0.22));
+  const facing = len > 0.001 ? Math.atan2(dy, dx) : 0;
+  return {
+    x: shot.fromX + dx * t,
+    y: shot.fromY + dy * t,
+    facing,
+    ux: Math.cos(facing),
+    uy: Math.sin(facing),
+    t,
+    travelFade: 1 - smoothstep01(Math.max(0, t - 0.78) / 0.22),
+    tail: Math.min(34, Math.max(14, len * 0.22)),
+    expired: age > duration + 80,
+  };
+}
+
+export function drawRocketProjectileTrail(g, pose) {
+  const { x, y, ux, uy, tail, travelFade } = pose;
   gfxStrokeLine(g, x - ux * tail, y - uy * tail, x, y,
     3.2, 0x1d1812, 0.56 * travelFade);
   gfxStrokeLine(g, x - ux * tail * 0.72, y - uy * tail * 0.72, x, y,
     1.7, 0xffd65a, 0.86 * travelFade);
+}
+
+export function drawPanzerfaustProjectile(g, shot, now) {
+  const pose = rocketProjectilePose(shot, now);
+  if (pose.expired) return;
+  const { x, y, ux, uy, facing: angle, travelFade } = pose;
+  drawRocketProjectileTrail(g, pose);
   gfxStroke(g, 0, 0x000000, 0);
   gfxFill(g, 0x19130d, 0.98 * travelFade);
   drawFreeRotatedRect(g, x, y, 9.5, 3.2, angle);

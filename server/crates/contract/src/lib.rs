@@ -881,6 +881,10 @@ pub struct EntityView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub units_killed: Option<u32>,
 
+    /// Visible physical rounds on a Rocket Truck rack, including zero while reloading.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rocket_rack_count: Option<u8>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub facing: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -988,6 +992,7 @@ impl EntityView {
             max_hp,
             state: state.to_string(),
             units_killed: None,
+            rocket_rack_count: None,
             facing: None,
             weapon_facing: None,
             weapon_range_tiles: None,

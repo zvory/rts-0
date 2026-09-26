@@ -38,9 +38,9 @@ export const COMMAND_CAR_BODY = Object.freeze({
   clearance: 1.0,
 });
 export const ROCKET_LAUNCHER_BODY = Object.freeze({
-  length: 40.0,
-  width: 22.0,
-  clearance: 1.0,
+  length: 48.0,
+  width: 26.4,
+  clearance: 1.2,
 });
 
 // Gatherers can mine a resource only when a completed home-base mining anchor is within range.
@@ -153,7 +153,7 @@ export const STATS = Object.freeze({
     cost: { steel: 150, oil: 50 }, supply: 4, buildTicks: TICK_HZ * 20,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK,
     upgradeRequiresText: "Requires research in Engineering Complex" },
-  [KIND.ROCKET_LAUNCHER]: { label: "Rocket Truck", icon: "RT", size: 18, sight: 8, body: ROCKET_LAUNCHER_BODY,
+  [KIND.ROCKET_LAUNCHER]: { label: "Rocket Truck", icon: "RT", size: 21.6, sight: 8, body: ROCKET_LAUNCHER_BODY,
     rangeTiles: 0, minRangeTiles: 10,
     cost: { steel: 225, oil: 100 }, supply: 6, buildTicks: TICK_HZ * 20,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ROCKETS,

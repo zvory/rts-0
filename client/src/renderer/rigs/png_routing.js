@@ -7,8 +7,10 @@ import { COMMAND_CAR_PNG_RIG_ATLAS } from "./command_car_png_atlas.js";
 import { MORTAR_TEAM_PNG_RIG_ATLAS } from "./mortar_team_png_atlas.js";
 import { SCOUT_CAR_PNG_RIG_ATLAS } from "./scout_car_png_atlas.js";
 import { TANK_PNG_RIG_ATLAS } from "./tank_png_atlas.js";
+import { ROCKET_TRUCK_PREVIEW_ATLAS } from "./rocket_truck_preview_atlas.js";
 
 const LIVE_PNG_RIG_ATLASES = Object.freeze([
+  [KIND.ROCKET_LAUNCHER, ROCKET_TRUCK_PREVIEW_ATLAS],
   [KIND.ANTI_TANK_GUN, ANTI_TANK_GUN_PNG_RIG_ATLAS],
   [KIND.ARTILLERY, ARTILLERY_PNG_RIG_ATLAS],
   [KIND.COMMAND_CAR, COMMAND_CAR_PNG_RIG_ATLAS],
