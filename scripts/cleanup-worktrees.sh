@@ -13,12 +13,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/cleanup-worktrees.sh [--auto] [--dry-run]
 
-Removes clean, already-merged zvorygin/* worktrees under /tmp/rts-worktrees
-and their Cargo target dirs. A worktree is removable when its local branch head
-is already reachable from local main or origin/main; the matching remote branch
-may already have been auto-deleted by GitHub. Also removes a bounded number of
-stale target dirs under /tmp/rts-cargo-target that do not belong to any active
-worktree.
+Removes merged clean task worktrees and task worktrees inactive for 72 hours.
+Preserves commits and backs up dirty source before removal. Protects the current
+checkout, main, locked worktrees, phase-runner markers, and modified playtest notes.
+Also removes stale Cargo target directories. See docs/pr-first-workflow.md.
 
 Options:
   --auto       Non-intrusive hook mode: only runs from main and limits target cleanup.
@@ -109,19 +107,6 @@ target_dirs_for_root() {
   done
 }
 
-phase_runner_marker_for_branch() {
-  local branch="$1"
-  printf '%s/phase-runner-active/%s\n' "$WORKTREE_ROOT" "${branch//\//__}"
-}
-
-is_within_worktree_root() {
-  local path="$1"
-  case "$path" in
-    "$WORKTREE_ROOT"/*|/private"$WORKTREE_ROOT"/*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
 path_mtime_epoch() {
   stat -f '%m' "$1" 2>/dev/null || stat -c '%Y' "$1"
 }
@@ -132,35 +117,6 @@ path_age_hours() {
   echo $(( (now_epoch - mtime) / 3600 ))
 }
 
-branch_head() {
-  local branch="$1"
-  git rev-parse --verify --quiet "$branch^{commit}"
-}
-
-ref_exists() {
-  local ref="$1"
-  git rev-parse --verify --quiet "$ref^{commit}" >/dev/null
-}
-
-branch_head_is_merged() {
-  local branch="$1"
-  local head
-  head="$(branch_head "$branch" || true)"
-  if [ -z "$head" ]; then
-    return 1
-  fi
-
-  local ref
-  for ref in main origin/main; do
-    if ref_exists "$ref" && git merge-base --is-ancestor "$head" "$ref" 2>/dev/null; then
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-declare -a removable_worktrees=()
 active_target_names_file="$(mktemp -t rts-active-targets.XXXXXX)"
 trap 'rm -f "$active_target_names_file"' EXIT
 
@@ -172,49 +128,11 @@ while IFS= read -r worktree_path; do
     printf '%s\n' "$target_name" >>"$active_target_names_file"
   done < <(target_names_for_root "$worktree_path")
 
-  if ! is_within_worktree_root "$worktree_path"; then
-    continue
-  fi
-
-  branch="$(git -C "$worktree_path" branch --show-current 2>/dev/null || true)"
-  case "$branch" in
-    zvorygin/*) ;;
-    *) continue ;;
-  esac
-
-  if [ -n "$(git -C "$worktree_path" status --porcelain=v1 2>/dev/null)" ]; then
-    continue
-  fi
-
-  if [ -e "$(phase_runner_marker_for_branch "$branch")" ]; then
-    continue
-  fi
-
-  if branch_head_is_merged "$branch"; then
-    removable_worktrees+=("$worktree_path")
-  fi
 done < <(git worktree list --porcelain | awk '/^worktree / { sub(/^worktree /, ""); print }')
 
-if [ "${#removable_worktrees[@]}" -gt 0 ]; then
-  for worktree_path in "${removable_worktrees[@]}"; do
-    branch="$(git -C "$worktree_path" branch --show-current)"
-    echo "cleanup-worktrees: removing merged clean worktree $worktree_path ($branch)"
-
-    while IFS= read -r target_dir; do
-      if [ -d "$target_dir" ]; then
-        run_rm_rf "$target_dir"
-      fi
-    done < <(target_dirs_for_root "$worktree_path")
-
-    if [ "$DRY_RUN" = "1" ]; then
-      echo "would git worktree remove $worktree_path"
-      echo "would delete branch $branch"
-    else
-      git worktree remove "$worktree_path"
-      git branch -D "$branch" >/dev/null 2>&1 || true
-    fi
-  done
-fi
+retention_args=()
+if [ "$DRY_RUN" = "1" ]; then retention_args+=(--dry-run); fi
+python3 "$repo_root/scripts/worktree-retention.py" "${retention_args[@]}"
 
 if [ -d "$TARGET_BASE_DIR" ]; then
   removed_targets=0
