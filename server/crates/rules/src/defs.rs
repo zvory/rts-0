@@ -402,7 +402,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::ResourceDepot,
         stats: balance::BuildingStats {
-            hp: 300,
+            hp: 150,
             sight_tiles: 1,
             cost_steel: 450,
             cost_oil: 100,
@@ -421,7 +421,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Portal,
         stats: balance::BuildingStats {
-            hp: 165,
+            hp: 82,
             sight_tiles: 1,
             cost_steel: 150,
             cost_oil: 0,
@@ -440,7 +440,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Zamok,
         stats: balance::BuildingStats {
-            hp: 600,
+            hp: 300,
             sight_tiles: 1,
             cost_steel: 0,
             cost_oil: 0,
@@ -459,7 +459,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Depot,
         stats: balance::BuildingStats {
-            hp: 110,
+            hp: 55,
             sight_tiles: 1,
             cost_steel: 100,
             cost_oil: 0,
@@ -478,7 +478,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Barracks,
         stats: balance::BuildingStats {
-            hp: 165,
+            hp: 82,
             sight_tiles: 1,
             cost_steel: 150,
             cost_oil: 0,
@@ -497,7 +497,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::TrainingCentre,
         stats: balance::BuildingStats {
-            hp: 200,
+            hp: 100,
             sight_tiles: 1,
             cost_steel: 100,
             cost_oil: 25,
@@ -516,7 +516,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Factory,
         stats: balance::BuildingStats {
-            hp: 200,
+            hp: 100,
             sight_tiles: 1,
             cost_steel: 125,
             cost_oil: 125,
@@ -535,7 +535,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::EngineeringComplex,
         stats: balance::BuildingStats {
-            hp: 165,
+            hp: 82,
             sight_tiles: 1,
             cost_steel: 100,
             cost_oil: 100,
@@ -554,7 +554,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Steelworks,
         stats: balance::BuildingStats {
-            hp: 200,
+            hp: 100,
             sight_tiles: 1,
             cost_steel: 150,
             cost_oil: 100,
@@ -573,7 +573,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::TankTrap,
         stats: balance::BuildingStats {
-            hp: 120,
+            hp: 60,
             sight_tiles: 0,
             cost_steel: 20,
             cost_oil: 0,
@@ -592,7 +592,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::SteelMine,
         stats: balance::BuildingStats {
-            hp: 50,
+            hp: 25,
             sight_tiles: 1,
             cost_steel: 0,
             cost_oil: 0,
@@ -611,7 +611,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::PumpJack,
         stats: balance::BuildingStats {
-            hp: 75,
+            hp: 37,
             sight_tiles: 1,
             cost_steel: 150,
             cost_oil: 0,
@@ -876,7 +876,7 @@ mod tests {
     fn tank_trap_uses_active_obstacle_stats() {
         let def = building_def(EntityKind::TankTrap).expect("tank trap def");
 
-        assert_eq!(def.stats.hp, 120);
+        assert_eq!(def.stats.hp, 60);
         assert_eq!(def.stats.sight_tiles, 0);
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (20, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
@@ -891,7 +891,7 @@ mod tests {
     fn pump_jack_uses_manual_construction_stats() {
         let def = building_def(EntityKind::PumpJack).expect("pump jack def");
 
-        assert_eq!(def.stats.hp, 75);
+        assert_eq!(def.stats.hp, 37);
         assert_eq!(def.stats.sight_tiles, 1);
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (150, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
@@ -908,7 +908,7 @@ mod tests {
             .expect("engineering complex def")
             .stats;
 
-        assert_eq!(stats.hp, 165);
+        assert_eq!(stats.hp, 82);
         assert_eq!((stats.cost_steel, stats.cost_oil), (100, 100));
         assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
         assert_eq!(stats.build_ticks, balance::TICK_HZ * 15);

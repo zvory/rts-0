@@ -158,7 +158,7 @@ existing `MINING_ANCHOR_RANGE_TILES = 11` coverage of the producing Resource Dep
 `STEEL_LOAD = 2` Steel every `HARVEST_TICKS = 40` ticks and disappears when its bound patch is
 depleted. It is free and takes 24 seconds to produce.
 
-Pump Jack keeps its existing 1x1 footprint, 75 HP, Small/unarmored classification, 1-tile sight,
+Pump Jack keeps its existing 1x1 footprint, 37 HP, Small/unarmored classification, 1-tile sight,
 and `OIL_LOAD = 2` payout every 40 ticks. Depot production remains free and takes 36 seconds,
 independently of the 150-Steel, 10-second manual construction stats. Engineers cannot assist
 depot-owned scaffolds; manual scaffolds reserve their patch against automatic production.
@@ -196,7 +196,7 @@ The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), E
 Steel Mine and Oil Pumpjack, with only Nexus available for Engineer construction. Its
 `cultivators.standard` loadout matches Kriegsia's starting economy and omits Riflemen.
 Cultivator Engineers can also construct the faction-specific Portal for 150 Steel: it has a 3x3
-footprint, 165 HP, one tile of sight, a five-second construction time, no prerequisite, and no
+footprint, 82 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Warrior for 100 Steel and 2 Supply in 300 ticks.
 The Warrior is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
 23-damage sword has 0.5-tile reach, a 64-tick cooldown, 50% armor penetration, and no
@@ -672,23 +672,25 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 85  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
+All building HP values are halved from the previous baseline, rounding down to whole HP.
+
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
 outward from the footprint edge, not from only the building center, so sight 1 reveals the full
 footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal fog tiles:
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| resource_depot                | Resource Depot        | 300 | 1     | 450 steel + 100 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
-| zamok                      | Zamok              | 600 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
-| depot                      | Supply Depot       | 110 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
-| barracks                   | Barracks           | 165 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
-| training_centre            | Training Centre    | 200 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a Resource Depot and Barracks |
-| engineering_complex           | Engineering Complex        | 165 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Artillery, Rockets, Tank Production, Smoke Plus, and Scout Plane; its first command-card slot remains empty to preserve existing research hotkeys; requires a Resource Depot and Training Centre |
-| factory                    | Vehicle Works      | 200 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, command_car after a completed Engineering Complex, and tank after Tank Production research; requires a Resource Depot and Training Centre |
-| steelworks                 | Gun Works          | 200 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team and Anti-Tank Guns immediately, Artillery after Artillery research, and Rocket Trucks after Rockets research; requires a Resource Depot and Training Centre |
-| tank_trap                  | Tank Trap          | 120 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
-| steel_mine                 | Steel Mine         | 50  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
-| pump_jack                  | Pump Jack          | 75  | 1     | 150 steel | 1x1  | 300      | manual Engineer construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
+| resource_depot                | Resource Depot        | 150 | 1     | 450 steel + 100 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
+| zamok                      | Zamok              | 300 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
+| depot                      | Supply Depot       | 55 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
+| barracks                   | Barracks           | 82 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
+| training_centre            | Training Centre    | 100 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a Resource Depot and Barracks |
+| engineering_complex           | Engineering Complex        | 82 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Artillery, Rockets, Tank Production, Smoke Plus, and Scout Plane; its first command-card slot remains empty to preserve existing research hotkeys; requires a Resource Depot and Training Centre |
+| factory                    | Vehicle Works      | 100 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, command_car after a completed Engineering Complex, and tank after Tank Production research; requires a Resource Depot and Training Centre |
+| steelworks                 | Gun Works          | 100 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team and Anti-Tank Guns immediately, Artillery after Artillery research, and Rocket Trucks after Rockets research; requires a Resource Depot and Training Centre |
+| tank_trap                  | Tank Trap          | 60 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
+| steel_mine                 | Steel Mine         | 25  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
+| pump_jack                  | Pump Jack          | 37  | 1     | 150 steel | 1x1  | 300      | manual Engineer construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends
