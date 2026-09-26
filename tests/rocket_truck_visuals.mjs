@@ -71,6 +71,16 @@ assert.deepEqual([...visuals.projectiles.values()].map(sprite => sprite.tint),
 entities[0].rocketRackCount = 7;
 visuals.update(entities, shots, colors, 1300, graphics);
 assert.equal(visuals.racks.get(1).children.filter(sprite => sprite.visible).length, 7);
+const hiddenRack = visuals.racks.get(1);
+entities[0].visionOnly = true;
+visuals.update(entities, shots, colors, 1400, graphics);
+assert.equal(visuals.racks.has(1), false, 'vision-only contacts must not render rack geometry');
+assert.equal(hiddenRack.destroyed, true, 'a previously visible rack is removed when its body is hidden');
+assert.equal(visuals.racks.has(2), true, 'ordinary visible trucks retain their racks');
+entities[0].visionOnly = false;
+visuals.update(entities, shots, colors, 1450, graphics);
+assert.equal(visuals.racks.get(1).children.filter(sprite => sprite.visible).length, 7,
+  'a revealed truck restores its current ammunition');
 visuals.update([], shots, colors, 1500, graphics);
 assert.equal(visuals.racks.size, 0);
 assert.deepEqual([...visuals.projectiles.values()].map(sprite => sprite.tint),

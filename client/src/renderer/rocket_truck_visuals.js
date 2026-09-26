@@ -44,7 +44,7 @@ export class RocketTruckVisuals {
     if (!this.texture || this.destroyed) return;
     const seen = new Set();
     for (const entity of entities) {
-      if (entity.kind !== KIND.ROCKET_LAUNCHER) continue;
+      if (entity.kind !== KIND.ROCKET_LAUNCHER || entity.visionOnly) continue;
       seen.add(entity.id);
       let rack = this.racks.get(entity.id);
       if (!rack) {
