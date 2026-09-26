@@ -82,6 +82,8 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png \
     && test -s ./client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png \
     && test -s ./client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png \
+    && test -s ./client/assets/rigs/rocket-truck-preview/truck.png \
+    && test -s ./client/assets/rigs/rocket-truck-preview/rocket.png \
     && test -s ./client/assets/rigs/tank-ps1/tank-atlas.png \
     && test -s ./client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png
 

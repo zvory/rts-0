@@ -88,3 +88,5 @@ client/assets/rigs/**/*.*
 !client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png
 !client/assets/rigs/tank-ps1/tank-atlas.png
 !client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png
+!client/assets/rigs/rocket-truck-preview/truck.png
+!client/assets/rigs/rocket-truck-preview/rocket.png
