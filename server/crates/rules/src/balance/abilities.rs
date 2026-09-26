@@ -42,6 +42,32 @@ pub const ROCKET_BARRAGE_SCATTER_RADIUS_TILES: f32 = 6.0;
 pub const ROCKET_BARRAGE_DIRECT_DAMAGE: u32 = 70;
 pub const ROCKET_BARRAGE_INNER_DAMAGE: u32 = 53;
 pub const ROCKET_BARRAGE_OUTER_DAMAGE: u32 = 21;
+
+/// Physical rack slots, in launch order, in world pixels relative to the truck's centre.
+/// Mirrored by client rocket_truck_visuals.js. The rear rack has six rails and three
+/// short ranks; its back rank leaves the two outer rails empty (16 rounds total).
+pub fn rocket_rack_slot(index: u32) -> (f32, f32) {
+    let index = index.min(ROCKET_BARRAGE_ROCKETS - 1);
+    let column = index / 6;
+    let row = index % 6 + u32::from(column == 2);
+    (-3.5 - column as f32 * 9.8, -7.9 + row as f32 * 2.8)
+}
+
+/// Derive visible ammunition from the same cooldown clock that starts the unload.
+/// No private reload timer is exposed to opponents and no second ammo state can drift.
+pub fn rocket_rack_count(cooldown_left: u16) -> u8 {
+    if cooldown_left == 0 {
+        return ROCKET_BARRAGE_ROCKETS as u8;
+    }
+    // Cooldowns tick down at the end of the activation tick, after its first launch.
+    let elapsed =
+        u32::from(ROCKET_BARRAGE_RELOAD_TICKS.saturating_sub(cooldown_left)).saturating_sub(1);
+    (0..ROCKET_BARRAGE_ROCKETS)
+        .filter(|index| {
+            index * ROCKET_BARRAGE_UNLOAD_TICKS / (ROCKET_BARRAGE_ROCKETS - 1) > elapsed
+        })
+        .count() as u8
+}
 /// Rocket barrages are anti-unit saturation weapons, not efficient demolition weapons.
 /// Apply this after the existing armor policy whenever a rocket damages a building.
 pub const ROCKET_BARRAGE_BUILDING_DAMAGE_NUMERATOR: u32 = 1;

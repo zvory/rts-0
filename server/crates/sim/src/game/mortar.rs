@@ -145,6 +145,7 @@ impl MortarShellStore {
         attacker: u32,
         from_x: f32,
         from_y: f32,
+        facing: f32,
         center_x: f32,
         center_y: f32,
         tick: u32,
@@ -170,13 +171,16 @@ impl MortarShellStore {
                 * config::TILE_SIZE as f32;
             let launch_tick = tick.saturating_add(launch_offset);
             let flight_ticks = config::TICK_HZ + (index % 5) * 3;
+            let (rack_x, rack_y) = config::rocket_rack_slot(index);
+            let launch_x = from_x + rack_x * facing.cos() - rack_y * facing.sin();
+            let launch_y = from_y + rack_x * facing.sin() + rack_y * facing.cos();
             self.shells.push(MortarShell {
                 owner,
                 attacker,
                 x: center_x + angle.cos() * radius,
                 y: center_y + angle.sin() * radius,
-                from_x,
-                from_y,
+                from_x: launch_x,
+                from_y: launch_y,
                 launch_tick,
                 impact_tick: launch_tick.saturating_add(flight_ticks),
                 launched: false,

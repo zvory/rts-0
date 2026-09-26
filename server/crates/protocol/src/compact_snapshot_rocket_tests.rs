@@ -41,3 +41,18 @@ fn rocket_mortar_impact_keeps_optional_placeholders_before_style_bit() {
     assert!(event[5].is_null());
     assert_eq!(event[6], true);
 }
+
+#[test]
+fn rocket_rack_count_preserves_empty_and_loaded_values_in_slot_43() {
+    for count in [0, 7, 16] {
+        let mut entity = EntityView::new(1, 1, "rocket_launcher", 320.0, 320.0, 150, 150, "idle");
+        entity.rocket_rack_count = Some(count);
+        let value = serde_json::to_value(CompactEntity(&entity)).unwrap();
+        assert_eq!(value.as_array().unwrap().len(), 44);
+        assert_eq!(value[43], count);
+        assert_eq!(
+            serde_json::to_value(&entity).unwrap()["rocketRackCount"],
+            count
+        );
+    }
+}

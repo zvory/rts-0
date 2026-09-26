@@ -1,3 +1,4 @@
+import { RocketTruckVisuals } from "./rocket_truck_visuals.js";
 import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 // Renderer — PixiJS scene graph + per-frame drawing. See docs/design/client-ui.md §4.1 / §4.2.
 //
@@ -276,6 +277,10 @@ export class Renderer {
     this.layers.feedback.addChild(this._observerMapAnalysisTooltip);
     this._feedbackGfx = new PIXI.Graphics();
     this.layers.feedback.addChild(this._feedbackGfx);
+    this._rocketTruckVisuals = new RocketTruckVisuals({
+      pixi: PIXI, unitLayer: this.layers.units, projectileLayer: this.layers.feedback,
+      trackAsset: (id, promise, metadata) => this._trackVisualAsset(id, promise, metadata),
+    });
     this._missToastPool = new Map();
     this._smokeGfx = new PIXI.Graphics();
     this.layers.smokes.addChild(this._smokeGfx);
@@ -836,6 +841,9 @@ export class Renderer {
       this._drawSafely("mortarTargets", () => this._drawMortarTargets(feedbackView));
       this._drawSafely("mortarLaunches", () => this._drawMortarLaunches(feedbackView));
       this._drawSafely("mortarShells", () => this._drawMortarShells(feedbackView));
+      this._drawSafely("rocketTruckVisuals", () => this._rocketTruckVisuals.update(
+        regularEntities, feedbackView.liveMortarShells(), colorByOwner, this.visualNow(), this._feedbackGfx,
+      ));
       this._drawSafely("mortarImpacts", () => this._drawMortarImpacts(feedbackView));
       this._drawSafely("artilleryLaunches", () => this._drawArtilleryLaunches(feedbackView));
       this._drawSafely("artilleryTargets", () => this._drawArtilleryTargets(feedbackView));
@@ -1319,6 +1327,7 @@ export class Renderer {
 
     // Long-lived single Graphics.
     this._fogGfx.destroy();
+    this._rocketTruckVisuals?.destroy();
     this._feedbackGfx.destroy();
     this._observerMapAnalysisGfx.destroy();
     this._observerMapAnalysisHitLayer.destroy({ children: true });

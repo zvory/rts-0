@@ -1,6 +1,7 @@
 import { assert, assertDeepEqual } from "./assertions.mjs";
 import { _drawMortarImpacts, _drawMortarShells } from "../../client/src/renderer/feedback.js";
 import { drawPanzerfaustProjectile } from "../../client/src/renderer/panzerfaust_feedback.js";
+import { RocketTruckVisuals } from "../../client/src/renderer/rocket_truck_visuals.js";
 import { movementBodyClass } from "../../client/src/input/placement.js";
 import { KIND } from "../../client/src/protocol.js";
 import { RecordingGraphics } from "./pixi_fakes.mjs";
@@ -23,19 +24,39 @@ const rocket = {
 };
 const barrageGfx = new RecordingGraphics();
 const panzerfaustGfx = new RecordingGraphics();
+const pngGfx = new RecordingGraphics();
+const sprite = { position: { set(x, y) { this.x = x; this.y = y; } } };
+const visuals = Object.assign(Object.create(RocketTruckVisuals.prototype), {
+  texture: {},
+  racks: new Map(),
+  projectiles: new Map(),
+  projectileLayer: { addChild() {} },
+  sprite: () => sprite,
+});
 
 performance.now = () => fixedNow;
 try {
   _drawMortarShells.call({ _feedbackGfx: barrageGfx }, { liveMortarShells: () => [rocket] });
   drawPanzerfaustProjectile(panzerfaustGfx, rocket, fixedNow);
+  visuals.update([], [rocket], new Map(), fixedNow, pngGfx);
 } finally {
   performance.now = priorNow;
 }
 assertDeepEqual(
   barrageGfx.calls,
-  panzerfaustGfx.calls,
-  "Rocket Truck barrage rockets reuse the Panzerfaust projectile visual exactly",
+  [],
+  "PNG rockets do not also draw the old rectangle projectile",
 );
+assertDeepEqual(
+  pngGfx.calls,
+  panzerfaustGfx.calls.slice(0, pngGfx.calls.length),
+  "PNG rockets retain the existing Panzerfaust trail",
+);
+assert(pngGfx.calls.length > 0, "PNG rockets draw a visible trail");
+assert(sprite.position.x === 150 && sprite.position.y === 100,
+  "PNG rockets retain straight constant-speed flight");
+assert(sprite.rotation === Math.PI / 4,
+  "PNG rockets point along the existing flight path");
 
 const impact = { x: 320, y: 240, radiusTiles: 2, seed: 77, createdAt: 1700 };
 const mortarGfx = new RecordingGraphics();

@@ -3,7 +3,7 @@ export const PRESENTATION_ENTITY_FIELDS = Object.freeze([
   "hp", "maxHp", "remaining", "latchedNode", "occupiedTrenchId",
   "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodWaiting", "prodRepeatKinds",
   "setupState", "setupFacing", "recoilPhase", "recoilProgress",
-  "panzerfaustLoaded", "panzerfaustWindupProgress",
+  "panzerfaustLoaded", "panzerfaustWindupProgress", "rocketRackCount",
   "breakthroughTicks", "breakthroughAuraTicks", "abilities",
   "extractorActive",
   "orderPlan", "rally", "rallyPlan", "optimisticRally", "debugPath",

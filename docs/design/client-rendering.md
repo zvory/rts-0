@@ -384,3 +384,14 @@ The code and focused contracts are the executable specification:
 
 Update this document when those cross-file contracts change. Record actual backend capability in
 the parity ledger; do not add speculative future implementation detail here.
+
+### Rocket Truck raster preview
+
+The Rocket Truck uses the selected PNG with team-light multiplication and a 20% larger
+render scale. `rocket_truck_visuals.js` draws the same generated rocket PNG on the six
+rack rails and in flight. The 16 physical slots mirror `rules::balance::rocket_rack_slot`;
+public, fog-gated `rocketRackCount` drives per-slot depletion. Launches retain their shooter
+owner/facing and begin at server-provided rack coordinates. Projectiles reuse the existing Panzerfaust straight, constant-speed flight sampler,
+trail, and fade toward the already-authorized impact coordinate. Only their PNG body,
+team tint, and rack origin differ. Rocket-specific legacy rectangles, mortar muzzle flashes, and dashed impact
+warning overlays are suppressed. Mortar and Panzerfaust rendering remain unchanged.

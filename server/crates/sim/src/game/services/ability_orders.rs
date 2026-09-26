@@ -209,7 +209,9 @@ pub(crate) fn launch_world_ability(
                 e.clear_active_order();
                 e.set_path_goal(None);
             }
-            mortar_shells.schedule_rocket_barrage(player, caster, from_x, from_y, x, y, tick);
+            let facing = e.facing();
+            mortar_shells
+                .schedule_rocket_barrage(player, caster, from_x, from_y, facing, x, y, tick);
             true
         }
         (AbilityEffectHook::DelayedWorld, AbilityKind::Smoke) => {
