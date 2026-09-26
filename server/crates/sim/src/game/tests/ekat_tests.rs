@@ -1124,7 +1124,7 @@ fn ekat_anchor_line_projectiles_have_independent_hit_dedupe_and_return_to_ekat()
         .entities
         .spawn_building(
             2,
-            EntityKind::Depot,
+            EntityKind::ResourceDepot,
             game.state.map.tile_center(13, 10).0,
             game.state.map.tile_center(13, 10).1,
             true,
@@ -1227,7 +1227,7 @@ fn ekat_line_shot_hits_enemies_on_outbound_and_return_legs() {
         .entities
         .spawn_building(
             2,
-            EntityKind::Depot,
+            EntityKind::ResourceDepot,
             pos.0 + config::TILE_SIZE as f32 * 5.0,
             pos.1,
             true,

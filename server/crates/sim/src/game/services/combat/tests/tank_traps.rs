@@ -17,6 +17,8 @@ fn clear_obstacle_area_preempts_enemy_units_with_actionable_tank_traps() {
             150.0, 100.0, trap, 180.0, 100.0,
         ));
         tank.set_target_id(Some(enemy));
+        // Keep the obstacle alive while checking target priority.
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCannon, 10);
     }
 
     run_combat_tick_on_map(
@@ -265,7 +267,7 @@ fn tank_attack_move_ignores_tank_trap_while_acquiring_anti_tank_gun() {
 }
 
 #[test]
-fn tank_destroys_tank_trap_on_second_shot() {
+fn tank_destroys_only_commanded_tank_trap_on_first_shot() {
     let map = open_map(12);
     let mut entities = EntityStore::new();
     let tank = entities
@@ -286,15 +288,6 @@ fn tank_destroys_tank_trap_on_second_shot() {
         .expect("tank should exist")
         .set_order(Order::attack(trap));
 
-    let tank_shot = combat_rules::attack_profile(EntityKind::Tank).dmg;
-    let coax_profile = combat_rules::weapon_profile(combat_rules::WeaponKind::TankCoax)
-        .expect("Tank coax profile should exist");
-    let coax_damage = combat_rules::effective_damage_for_weapon(
-        coax_profile,
-        EntityKind::TankTrap,
-        coax_profile.dmg,
-        Some(crate::rules::terrain::TerrainKind::Open),
-    );
     let tank_cooldown = combat_rules::attack_profile(EntityKind::Tank).cooldown;
 
     run_combat_tick_on_map(
@@ -305,8 +298,8 @@ fn tank_destroys_tank_trap_on_second_shot() {
 
     assert_eq!(
         entities.get(trap).expect("trap should exist").hp,
-        tank_shot - coax_damage,
-        "first Tank shot should leave the trap alive after one cannon shot plus coax fallback damage"
+        0,
+        "first Tank shot should destroy the trap"
     );
     assert_eq!(
         entities
@@ -326,8 +319,11 @@ fn tank_destroys_tank_trap_on_second_shot() {
     }
 
     assert_eq!(
-        entities.get(trap).expect("trap should exist").hp,
-        0,
-        "second Tank shot should destroy the trap"
+        entities
+            .get(uncommanded_trap)
+            .expect("uncommanded trap should exist")
+            .hp,
+        uncommanded_trap_hp,
+        "the tank must not acquire a neutral trap after destroying its commanded target"
     );
 }

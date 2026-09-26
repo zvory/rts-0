@@ -1113,9 +1113,10 @@ fn artillery_shell_inside_building_footprint_deals_full_inner_ap_damage() {
     let depot = game
         .state
         .entities
-        .spawn_building(2, EntityKind::Depot, 160.0, 160.0, true)
+        .spawn_building(2, EntityKind::ResourceDepot, 160.0, 160.0, true)
         .expect("depot should spawn");
     let before = game.state.entities.get(depot).expect("depot exists").hp;
+    assert!(before > config::ARTILLERY_INNER_DAMAGE);
 
     resolve_test_artillery_shell(&mut game, 160.0, 160.0);
 

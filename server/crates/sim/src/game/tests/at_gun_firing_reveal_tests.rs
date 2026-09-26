@@ -377,7 +377,7 @@ fn shooting_tank_trap_does_not_reveal_hidden_attacker() {
         game.state
             .entities
             .get(trap)
-            .is_some_and(|entity| entity.hp < trap_hp),
+            .is_none_or(|entity| entity.hp < trap_hp),
         "the hidden attacker must actually shoot the Tank Trap in this fixture"
     );
     assert!(

@@ -287,11 +287,11 @@ fn construction_hp_scales_linearly_to_full_completion() {
         .expect("depot should be under construction")
         .total;
 
-    assert_eq!(entity.hp, 11);
+    assert_eq!(entity.hp, 6);
     assert!(entity.set_construction_progress(total / 2));
-    assert_eq!(entity.hp, 60);
+    assert_eq!(entity.hp, 30);
     assert!(entity.set_construction_progress(total.saturating_sub(1)));
-    assert_eq!(entity.hp, 109);
+    assert_eq!(entity.hp, 54);
     assert_eq!(entity.advance_construction(), Some(true));
     assert_eq!(entity.hp, entity.max_hp);
     assert!(!entity.under_construction());
