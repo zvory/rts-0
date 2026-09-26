@@ -167,6 +167,14 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   For a user-requested live AI-vs-AI demo, run the matchup setup and local server with `--release`
   so debug-only simulation invariants do not interrupt play; use a replay only when requested or
   when the release match cannot run.
+- Local visual delivery: check Tailscale availability once with a bounded
+  `tailscale status --json` call (two-second timeout). If the CLI is missing, the daemon is
+  unreachable, the status is invalid, or it is not running with a usable Tailnet address, use
+  normal image/video display or attachment and local artifact links immediately. Do not install,
+  authenticate, retry, or troubleshoot Tailscale unless the user asks. `scripts/tailnet-preview`
+  and Interact do this check automatically and return a local copy when unavailable; use that
+  result without probing again. For local interactive pages without Tailscale, share localhost.
+  The Tailnet-only rules below apply only when Tailscale is available.
 - Local visual inspection through Tailscale: Tailscale links are the default delivery channel
   whenever the user needs to view a locally served game, browser result, replay, or other visual
   artifact. Interact screenshots and videos already return an opaque Tailnet Preview URL: share

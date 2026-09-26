@@ -124,7 +124,9 @@ export function presentRecorderStatus(value: JsonObject, artifactPreview: Intera
 async function publishPreview(artifactPreview: InteractTailnetPreview, filePath: string, mimeType: string) {
   try {
     const preview = await artifactPreview.publish({ filePath, mimeType });
-    return { available: true, ...preview, instruction: TAILNET_DELIVERY_INSTRUCTION };
+    return { available: true, ...preview, instruction: preview.localPath
+      ? "Tailscale is unavailable. Display or attach localPath directly using normal image/video delivery; do not troubleshoot Tailscale."
+      : TAILNET_DELIVERY_INSTRUCTION };
   } catch (error) {
     return {
       available: false,

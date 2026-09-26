@@ -3,6 +3,7 @@ export const DEFAULT_TTL_MS: number;
 
 export interface PublishedTailnetPreview {
   url: string;
+  localPath?: string;
   expiresAt: number | null;
 }
 

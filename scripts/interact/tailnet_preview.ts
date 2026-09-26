@@ -8,6 +8,7 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   DEFAULT_TTL_MS,
@@ -25,6 +26,7 @@ interface ArtifactInfo { realPath: string; size: number; fingerprint: string }
 interface PreviewEntry extends ArtifactInfo {
   mimeType: PreviewMimeType;
   url: string;
+  localPath?: string;
   expiresAt: number | null;
 }
 interface TailnetPreviewOptions {
@@ -108,7 +110,10 @@ export class InteractTailnetPreview {
         `Interact could not publish a durable Tailnet preview (${errorMessage(error)}).`,
       );
     }
-    if (!published || typeof published.url !== "string" || !/^http:\/\//.test(published.url) ||
+    const validLocation = published && (published.localPath
+      ? path.isAbsolute(published.localPath) && published.url === pathToFileURL(published.localPath).href
+      : typeof published.url === "string" && /^http:\/\//.test(published.url));
+    if (!validLocation ||
         (published.expiresAt !== null && !Number.isSafeInteger(published.expiresAt))) {
       throw new InteractTailnetPreviewError("tailnetPreviewUnavailable", "The Tailnet preview service returned an invalid publication result.");
     }
@@ -120,10 +125,13 @@ export class InteractTailnetPreview {
   describe(entry: PreviewEntry) {
     return {
       url: entry.url,
+      ...(entry.localPath ? { localPath: entry.localPath } : {}),
       mimeType: entry.mimeType,
       bytes: entry.size,
       expiresAt: entry.expiresAt,
-      availability: entry.expiresAt === null
+      availability: entry.localPath
+        ? "local copy retained until manually removed or the OS clears its temporary directory"
+        : entry.expiresAt === null
         ? "retained until manually removed"
         : "available for at least 24 hours after publication",
     };

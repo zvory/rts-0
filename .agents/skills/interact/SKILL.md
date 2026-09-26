@@ -66,14 +66,17 @@ editing surface remains visible.
    the second still. `dev-scenario capture-timelapse` accepts the same bounded duration, sample, speed,
    region, and cancellation controls as the AI spectator form.
 7. Inspect the returned capture once during local QA. The CLI returns `result.preview.url` for every
-   visual artifact: share that Tailnet URL and a concise scene result with the user. Never share a
-   raw `target/interact` path; the adjacent JSON manifest remains local reproduction evidence.
+   visual artifact. When `result.preview.localPath` is present, display or attach that local file
+   using normal image/video delivery; do not retry or troubleshoot Tailscale. Otherwise share the
+   Tailnet URL and a concise scene result. Never share a raw `target/interact` path; the adjacent JSON manifest remains local reproduction evidence.
 8. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
    it closes itself after 30 minutes without an accepted interaction.
 
 Capture files are confined to `target/interact/<lab|game|scenario|map-editor>/<session-id>/` and ignored by Git. Do
 not request arbitrary paths or add image bytes to Git. Lab remains for bounded authored scenes;
 full-match observation is limited to the game namespace's isolated AI-vs-AI spectator mode. A
+local fallback copy survives worktree cleanup and lasts until manually removed or OS temporary
+cleanup. Tailscale availability is checked once per publication with a two-second timeout. A
 Tailnet Preview URL is copied into the machine-level preview service with at least 24 hours of
 retention. `close`, `shutdown`, daemon idle teardown, and removal of the originating worktree do not
 invalidate it. The preview service has no idle timeout and remains running until explicitly stopped
