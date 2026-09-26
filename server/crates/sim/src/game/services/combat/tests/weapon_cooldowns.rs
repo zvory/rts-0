@@ -19,7 +19,7 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
             .spawn_unit(1, kind, 100.0, 100.0)
             .expect("attacker should spawn");
         let target_id = entities
-            .spawn_building(2, EntityKind::Depot, target_x, 100.0, true)
+            .spawn_building(2, EntityKind::ResourceDepot, target_x, 100.0, true)
             .expect("target should spawn");
         let weapon = combat_rules::default_weapon_kind(kind).expect("default weapon should exist");
         let expected_cooldown = combat_rules::attack_profile(kind).cooldown;
