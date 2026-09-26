@@ -130,9 +130,11 @@ while IFS= read -r worktree_path; do
 
 done < <(git worktree list --porcelain | awk '/^worktree / { sub(/^worktree /, ""); print }')
 
-retention_args=()
-if [ "$DRY_RUN" = "1" ]; then retention_args+=(--dry-run); fi
-python3 "$repo_root/scripts/worktree-retention.py" "${retention_args[@]}"
+if [ "$DRY_RUN" = "1" ]; then
+  python3 "$repo_root/scripts/worktree-retention.py" --dry-run
+else
+  python3 "$repo_root/scripts/worktree-retention.py"
+fi
 
 if [ -d "$TARGET_BASE_DIR" ]; then
   removed_targets=0

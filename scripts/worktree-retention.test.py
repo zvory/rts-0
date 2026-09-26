@@ -167,6 +167,21 @@ class RetentionTest(unittest.TestCase):
         refs = self.run_git(self.main, 'for-each-ref', '--format=%(objectname)', 'refs/worktree-recovery/')
         self.assertIn(head, refs)
 
+    def test_shell_wrapper_with_and_without_dry_run(self):
+        import shutil
+        scripts = self.main / 'scripts'
+        scripts.mkdir()
+        for name in ('cleanup-worktrees.sh', 'worktree-retention.py'):
+            shutil.copy2(Path(__file__).with_name(name), scripts / name)
+        env = dict(os.environ, RTS_CARGO_TARGET_BASE_DIR=str(self.tasks / 'no-targets'))
+        p = self.tree('wrapper')
+        subprocess.run(['bash', str(scripts / 'cleanup-worktrees.sh'), '--dry-run'],
+                       cwd=self.main, env=env, check=True, capture_output=True)
+        self.assertTrue(p.exists())
+        subprocess.run(['bash', str(scripts / 'cleanup-worktrees.sh')],
+                       cwd=self.main, env=env, check=True, capture_output=True)
+        self.assertFalse(p.exists())
+
 
 if __name__ == '__main__':
     unittest.main()
