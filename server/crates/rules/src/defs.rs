@@ -757,7 +757,7 @@ mod tests {
             (steel_mine.stats.cost_steel, steel_mine.stats.cost_oil),
             (0, 0)
         );
-        assert_eq!(steel_mine.stats.hp, 50);
+        assert_eq!(steel_mine.stats.hp, 25);
         assert_eq!(steel_mine.armor_class, ArmorClass::Small);
         assert_eq!(
             building_def(EntityKind::Barracks).unwrap().trains,
@@ -789,7 +789,7 @@ mod tests {
             .stats
             .hp;
 
-        assert_eq!(depot_hp, 110);
+        assert_eq!(depot_hp, 55);
         assert_eq!(barracks_hp, depot_hp * 3 / 2);
     }
 
