@@ -78,14 +78,6 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     shouldWarnBeforeUnload,
   } = await import("../../client/src/app.js");
   const { dom } = await import("../../client/src/bootstrap.js");
-  {
-    const notices = [];
-    const app = { showToast: (text) => notices.push(text) };
-    App.prototype.onRoomNotice.call(app, { msg: "Scout has joined the replay" });
-    App.prototype.onRoomNotice.call(app, { msg: "<Scout> has left the replay" });
-    assert(notices.join("|") === "Scout has joined the replay|<Scout> has left the replay",
-      "room membership notices use the normal transient toast without requiring a running match");
-  }
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");

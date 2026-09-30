@@ -268,7 +268,6 @@ export class App {
     this.onObservationReady = this.onObservationReady.bind(this);
     this.onGameOver = this.onGameOver.bind(this);
     this.onShutdownWarning = this.onShutdownWarning.bind(this);
-    this.onRoomNotice = this.onRoomNotice.bind(this);
     this.onRoomTimeSeekStarted = this.onRoomTimeSeekStarted.bind(this);
     this.onRoomTimeState = this.onRoomTimeState.bind(this);
     this.onBackToLobby = this.onBackToLobby.bind(this);
@@ -306,7 +305,6 @@ export class App {
     if (this.labCatalogLaunch) this.lobby.hide();
   }
 
-  /** Wire global server messages and connect immediately only for launch URLs that require it. */
   async start() {
     this.stressTestRunner?.mount();
     this.net.on(S.START, this.onStart);
@@ -316,7 +314,7 @@ export class App {
     this.net.on(S.GAME_OVER, this.onGameOver);
     this.net.on(S.BRANCH_FROM_TICK_CREATED, this.onBranchFromTickCreated);
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
-    this.net.on(S.ROOM_NOTICE, this.onRoomNotice);
+    this.net.on(S.ROOM_NOTICE, (message) => this.showToast(message.msg));
     this.net.on(S.ROOM_TIME_SEEK_STARTED, this.onRoomTimeSeekStarted);
     this.net.on(S.ROOM_TIME_STATE, this.onRoomTimeState);
     this.net.on(S.LOBBY, this.onLobbyForMatchLaunch);
@@ -640,10 +638,6 @@ export class App {
     this.interactBridge?.noteLaunchError?.(msg);
     this.showToast(msg);
     this.labCatalog?.setStatus(msg, { error: true });
-  }
-
-  onRoomNotice(message) {
-    this.showToast(message.msg);
   }
 
   /**
