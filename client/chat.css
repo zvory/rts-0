@@ -15,6 +15,8 @@
   text-shadow: 0 1px 2px #000, 1px 1px 0 #000;
 }
 
+.chat-overlay[data-scope="game"] { font-size: 28px; }
+
 .chat-overlay[data-scope="lobby"] { bottom: 28px; }
 
 .chat-messages {

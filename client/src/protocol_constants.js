@@ -20,6 +20,7 @@ export const S = Object.freeze({
   LAB_STATE: "labState",
   LAB_RESULT: "labResult",
   SHUTDOWN_WARNING: "shutdownWarning",
+  ROOM_NOTICE: "roomNotice",
   OBSERVATION_READY: "observationReady",
   GAME_OVER: "gameOver",
   PONG: "pong",

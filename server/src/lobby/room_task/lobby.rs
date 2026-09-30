@@ -18,6 +18,19 @@ use super::RoomTask;
 use crate::protocol::{LobbyKind, LobbyPlayer, ServerMessage, TeamId};
 
 impl RoomTask {
+    pub(super) fn broadcast_replay_membership_notice(
+        &self,
+        player_id: u32,
+        name: &str,
+        action: &str,
+    ) {
+        if !matches!(self.phase, Phase::ReplayViewer(_)) {
+            return;
+        }
+        self.participants()
+            .notify_replay_membership(&self.room, player_id, name, action);
+    }
+
     pub(super) fn is_replay_staging_lobby(&self) -> bool {
         matches!(self.mode, super::RoomMode::Replay { .. }) && matches!(self.phase, Phase::Lobby)
     }
@@ -154,6 +167,7 @@ impl RoomTask {
         let Some(removed) = self.players.remove(&player_id) else {
             return;
         };
+        self.broadcast_replay_membership_notice(player_id, &removed.name, "left");
         let was_spectator = removed.spectator;
         self.order.retain(|&id| id != player_id);
         self.human_team_assignments.remove(&player_id);

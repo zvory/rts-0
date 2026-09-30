@@ -51,16 +51,6 @@ pub(in crate::lobby) fn match_history_participants_are_automated(participants: &
     has_alpha && has_bravo
 }
 
-pub(super) fn late_spectator_notice_name(name: &str) -> String {
-    let cleaned: String = name.trim().chars().filter(|ch| !ch.is_control()).collect();
-    let cleaned = cleaned.trim();
-    if cleaned.is_empty() {
-        "Commander".to_string()
-    } else {
-        cleaned.to_string()
-    }
-}
-
 pub(super) fn live_ai_controllers(
     players: &[PlayerInit],
     ai_slots: &[AiSlot],

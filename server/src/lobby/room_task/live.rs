@@ -7,10 +7,11 @@ use super::super::connection::{send_or_log, CommandLifecycleSample, ConnectionSi
 use super::super::dev_replay::match_seed;
 use super::super::launch::{LaunchPrediction, LaunchRecipient, StartPayloadBuilder};
 use super::super::live_tick::{LiveTickDriver, LiveTickResult};
+use super::super::participants::late_spectator_notice_name;
 use super::super::projection::RecipientRole;
 use super::super::session_policy::{RoomTimeSource, SessionPhase};
 use super::super::{normalize_start_team_id, CommandLifecycleTiming, PlayerInit};
-use super::helpers::{late_spectator_notice_name, live_ai_controllers};
+use super::helpers::live_ai_controllers;
 use super::types::{PendingClientCommandAck, Phase, RoomPlayer};
 use super::RoomTask;
 use crate::protocol::{

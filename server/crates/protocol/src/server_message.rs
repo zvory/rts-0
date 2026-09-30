@@ -138,6 +138,10 @@ pub enum ServerMessage {
     LabState(LabState),
     /// Reliable result for one lab request.
     LabResult(LabResult),
+    /// Ephemeral room activity, delivered independently of replay playback.
+    RoomNotice {
+        msg: String,
+    },
     /// Server shutdown drain has started. Existing matches may continue until the deadline, but
     /// new match starts are disabled.
     ShutdownWarning {
