@@ -77,6 +77,8 @@ pub struct ReplayResourceSample {
     pub tick: u32,
     pub steel: i64,
     pub oil: i64,
+    pub alive_steel: i64,
+    pub alive_oil: i64,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -319,6 +321,8 @@ mod tests {
                 tick: 30,
                 steel: 12,
                 oil: -4,
+                alive_steel: -20,
+                alive_oil: 8,
             }],
         };
         let json = serde_json::to_value(msg).unwrap();
@@ -326,5 +330,7 @@ mod tests {
         assert_eq!(json["replace"], true);
         assert_eq!(json["samples"][0]["tick"], 30);
         assert_eq!(json["samples"][0]["oil"], -4);
+        assert_eq!(json["samples"][0]["aliveSteel"], -20);
+        assert_eq!(json["samples"][0]["aliveOil"], 8);
     }
 }

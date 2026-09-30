@@ -1,3 +1,4 @@
+// replayResourceHistory samples carry signed steel/oil collection and aliveSteel/aliveOil lifetime-minus-loss advantages.
 //! Server-shell adapter for the extracted protocol crate.
 //!
 //! Keeps existing `rts_server::protocol` call sites stable while wire protocol DTOs live in

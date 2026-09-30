@@ -31,7 +31,13 @@ export class ResourceCollectionHistory {
       const oil = Number(entry?.oil);
       if (!Number.isSafeInteger(steel) || !Number.isSafeInteger(oil)) continue;
       if (this.samples.length && this.samples.at(-1).tick >= tick) continue;
-      this.samples.push({ tick, steel, oil });
+      const aliveSteel = Number(entry?.aliveSteel);
+      const aliveOil = Number(entry?.aliveOil);
+      this.samples.push({
+        tick, steel, oil,
+        aliveSteel: Number.isSafeInteger(aliveSteel) ? aliveSteel : null,
+        aliveOil: Number.isSafeInteger(aliveOil) ? aliveOil : null,
+      });
     }
     this.revision += 1;
   }
@@ -75,6 +81,8 @@ export class ResourceCollectionHistory {
       playerIds: ids,
       cumulativeSteel,
       cumulativeOil,
+      aliveSteel: cumulativeSteel - (first.resourcesLost?.steel || 0) + (second.resourcesLost?.steel || 0),
+      aliveOil: cumulativeOil - (first.resourcesLost?.oil || 0) + (second.resourcesLost?.oil || 0),
       steel: hasWindowBaseline ? cumulativeSteel - baseline.cumulativeSteel : 0,
       oil: hasWindowBaseline ? cumulativeOil - baseline.cumulativeOil : 0,
     });
@@ -142,7 +150,7 @@ export function collectionAdvantageAreaPoints(
   }));
 }
 
-export function renderAliveResourcesMetric({ analysis, players }) {
+export function renderAliveResourcesMetric({ analysis, players, collectionHistory = [] }) {
   const wrap = renderAnalysisMetric("replay-alive-resources", "Lifetime resources still alive");
   const note = document.createElement("div");
   note.className = "replay-analysis-note";
@@ -159,6 +167,14 @@ export function renderAliveResourcesMetric({ analysis, players }) {
     return wrap;
   }
 
+  wrap.appendChild(renderCollectionAdvantage({
+    rows,
+    samples: collectionHistory.filter((sample) => Number.isSafeInteger(sample.aliveSteel) && Number.isSafeInteger(sample.aliveOil))
+      .map((sample) => ({ tick: sample.tick, steel: sample.aliveSteel, oil: sample.aliveOil })),
+    currentTick: analysis.tick,
+    metric: "alive resources",
+  }));
+
   for (const player of rows) {
     wrap.appendChild(renderAliveResourcesRow(player));
   }
@@ -171,28 +187,28 @@ const RESOURCE_WINDOWS = [
   { label: "Lifetime", resourceKey: "lifetime" },
 ];
 
-function renderCollectionAdvantage({ rows, samples, currentTick }) {
+function renderCollectionAdvantage({ rows, samples, currentTick, metric = "collection" }) {
   const section = document.createElement("section");
   section.className = "replay-resource-advantage";
 
   if (rows.length !== 2) {
-    section.appendChild(renderEmptyMetric("Collection graphs are shown for 1v1 replays."));
+    section.appendChild(renderEmptyMetric(`${metric === "collection" ? "Collection" : "Alive resource"} graphs are shown for 1v1 replays.`));
     return section;
   }
 
   if (!Array.isArray(samples) || samples.length < 2) {
-    section.appendChild(renderEmptyMetric("Play the replay to build its collection timeline."));
+    section.appendChild(renderEmptyMetric(`Play the replay to build its ${metric} timeline.`));
     return section;
   }
 
   section.append(
-    renderAdvantageChart({ resource: "steel", label: "Steel", rows, samples, currentTick, serial: 0 }),
-    renderAdvantageChart({ resource: "oil", label: "Oil", rows, samples, currentTick, serial: 1 }),
+    renderAdvantageChart({ resource: "steel", label: "Steel", rows, samples, currentTick, metric, serial: 0 }),
+    renderAdvantageChart({ resource: "oil", label: "Oil", rows, samples, currentTick, metric, serial: 1 }),
   );
   return section;
 }
 
-function renderAdvantageChart({ resource, label, rows, samples, currentTick, serial }) {
+function renderAdvantageChart({ resource, label, rows, samples, currentTick, metric, serial }) {
   const width = 420;
   const chartHeight = 92;
   const labelHeight = 18;
@@ -203,7 +219,7 @@ function renderAdvantageChart({ resource, label, rows, samples, currentTick, ser
     resource,
     width - plotLeft,
     chartHeight,
-    RESOURCE_ADVANTAGE_MIN_EXTENT[resource],
+    metric === "collection" ? RESOURCE_ADVANTAGE_MIN_EXTENT[resource] : 0,
     currentTick,
   )
     .map((point) => ({ ...point, x: point.x + plotLeft }));
@@ -222,7 +238,7 @@ function renderAdvantageChart({ resource, label, rows, samples, currentTick, ser
   const svg = svgElement("svg", {
     viewBox: `0 0 ${width} ${chartHeight + labelHeight}`,
     role: "img",
-    "aria-label": `${label} collection advantage over replay time. ${rows[0].name} is above the center line and ${rows[1].name} is below.`,
+    "aria-label": `${label} ${metric} advantage over replay time. ${rows[0].name} is above the center line and ${rows[1].name} is below.`,
   });
   const defs = svgElement("defs");
   const topClip = svgElement("clipPath", { id: clipTopId });

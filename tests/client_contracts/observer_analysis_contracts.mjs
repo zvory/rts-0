@@ -60,6 +60,13 @@ import { textWithin } from "./dom_text.mjs";
     history.samples.at(-1).steel === 0 && history.samples.at(-1).oil === 0,
     "resource collection history does not turn an arbitrarily old baseline into a false 8-second spike",
   );
+  const aliveSample = sample(1230, 160, 30, 30, 10);
+  aliveSample.players[0].resourcesLost = { steel: 200, oil: 5 };
+  aliveSample.players[1].resourcesLost = { steel: 10, oil: 30 };
+  aliveSample.players.reverse();
+  history.record(aliveSample);
+  assert(history.samples.at(-1).aliveSteel === -60 && history.samples.at(-1).aliveOil === 45,
+    "alive history subtracts losses from lifetime income in stable player order, independently of collection windows");
   const points = collectionAdvantageAreaPoints(
     [{ tick: 0, steel: 0 }, { tick: 30, steel: 10 }, { tick: 120, steel: 20 }],
     "steel",
@@ -810,6 +817,21 @@ import { textWithin } from "./dom_text.mjs";
 
     restored.selectedTab = "alive-resources";
     overlay.render();
+    overlay.applyReplayResourceHistory({ replace: true, samples: [
+      { tick: 0, steel: 0, oil: 0, aliveSteel: 0, aliveOil: 0 },
+      { tick: 30, steel: 12, oil: -4, aliveSteel: -315, aliveOil: 55 },
+    ] });
+    const aliveCharts = findFakes(root, (el) => el.classList.contains("replay-resource-advantage-chart"));
+    assert(aliveCharts.length === 2, "alive resources renders both comparison charts when history arrives after analysis");
+    assert(findFakes(aliveCharts[0], (el) => el.getAttribute("aria-label")?.includes("alive resources advantage")).length === 1,
+      "alive chart describes the alive-resource comparison");
+    const aliveOutline = findFakes(aliveCharts[0], (el) => el.getAttribute("class") === "replay-resource-advantage-outline")[0];
+    assert(aliveOutline.getAttribute("d").includes("87.0"), "alive chart plots negative alive advantage below zero despite positive collection advantage");
+    overlay.applyReplayResourceHistory({ replace: true, samples: [
+      { tick: 0, steel: 0, oil: 0, aliveSteel: 0, aliveOil: 0 },
+    ] });
+    assert(findFakes(root, (el) => el.classList.contains("replay-resource-advantage-chart")).length === 0,
+      "backward seek replaces alive history and clears future charts without a new analysis message");
     const aliveResourcesText = textWithin(root);
     assert(
       aliveResourcesText.includes("Lifetime resources still alive")

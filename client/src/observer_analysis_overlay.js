@@ -289,8 +289,8 @@ export class ObserverAnalysisOverlay {
 
   applyReplayResourceHistory(payload) {
     this.resourceCollectionHistory.applyReplaySamples(payload);
-    if (this.bodyEl && !this.bodyEl.hidden && this.preferences.selectedTab === RESOURCES_TAB_ID) {
-      this.renderBody(OBSERVER_ANALYSIS_TABS.find((tab) => tab.id === RESOURCES_TAB_ID));
+    if (this.bodyEl && !this.bodyEl.hidden && [RESOURCES_TAB_ID, ALIVE_RESOURCES_TAB_ID].includes(this.preferences.selectedTab)) {
+      this.renderBody(OBSERVER_ANALYSIS_TABS.find((tab) => tab.id === this.preferences.selectedTab));
     }
   }
 
@@ -466,7 +466,9 @@ export class ObserverAnalysisOverlay {
   }
 
   renderAliveResources(analysis) {
-    return renderAliveResourcesMetric({ analysis, players: this.getPlayers() });
+    return renderAliveResourcesMetric({
+      analysis, players: this.getPlayers(), collectionHistory: this.resourceCollectionHistory.samples,
+    });
   }
 
   renderUnitsLost(analysis) {

@@ -1,3 +1,4 @@
+// replayResourceHistory samples carry signed steel/oil collection and aliveSteel/aliveOil lifetime-minus-loss advantages.
 // Wire protocol — JavaScript mirror of `server/crates/protocol/src/lib.rs`.
 // See docs/design/protocol.md.
 // Change both files together. Builders construct the exact JSON the server expects.
