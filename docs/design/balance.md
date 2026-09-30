@@ -409,7 +409,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_TEARDOWN_TICKS = 80` (~2.67s).
 - Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
-  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 34` (~1.13s manual travel),
+  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 17` (~0.57s manual travel),
   `MORTAR_OUTER_RADIUS_TILES = 2.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, and `MORTAR_INNER_DAMAGE = 100`.
