@@ -319,7 +319,12 @@ pub(super) fn issue_expansion_containment_wave(
     });
     // The current Jeff travels loosely to a staging point short of the target, reforms there, then
     // closes in tight. After a failed push it may come at the target from a side instead.
-    let legs = if push_uses_available_armor && !endgame_search_active {
+    // A small push (the two-Tank opening) marches as before: it is one rank, which never stalled,
+    // and its two Tanks decide a duel by where they stand when they meet the enemy's.
+    let legs = if push_uses_available_armor
+        && !endgame_search_active
+        && tanks.len() >= super::approach::MIN_TANKS_FOR_LEGS
+    {
         containment_regroup_point(own_base, enemy_base, observation.map).map(|rally| {
             let legs = super::approach::push_legs(
                 memory,

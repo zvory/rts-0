@@ -43,7 +43,8 @@ impl MarchShape {
         ..Self::LEGACY
     };
     /// The current Jeff on the way to its staging point: a little more room between Tanks, ranks of
-    /// four so the column fits through gaps, longer steps, and looser arrival and cohesion. It moves
+    /// four so the column fits through gaps, longer steps, and looser arrival. It stops for its rear
+    /// Tanks only once the column is 6 tiles longer or 4 tiles wider than its ranks. It moves
     /// on once its centre reaches a waypoint: slots ten tiles abreast fell in trees and water in
     /// narrow ground, and Tanks detoured toward them while the push waited. It reforms before
     /// closing in.
@@ -52,8 +53,8 @@ impl MarchShape {
         step_tiles: 12.0,
         arrival_tiles: 3.0,
         in_position_tiles: 3.0,
-        longitudinal_slop_tiles: 3.0,
-        lateral_slop_tiles: 2.0,
+        longitudinal_slop_tiles: 6.0,
+        lateral_slop_tiles: 4.0,
         ranked: true,
         rank_width: 4,
         advance_on_center: true,

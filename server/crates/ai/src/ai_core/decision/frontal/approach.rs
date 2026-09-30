@@ -17,6 +17,8 @@
 use super::*;
 use crate::ai_core::decision::geometry::squared;
 
+/// Pushes with fewer Tanks keep the old march: straight to the attack point in the tight formation.
+pub(super) const MIN_TANKS_FOR_LEGS: usize = 4;
 /// Angles off the direct approach tried for a side, widest first.
 const SIDE_ANGLES_DEGREES: [f32; 3] = [75.0, 60.0, 45.0];
 /// A side push's swing point sits this much farther from the target than its attack point.
