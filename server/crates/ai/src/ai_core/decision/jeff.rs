@@ -7,13 +7,17 @@ pub(super) fn uses_home_rifle_coverage(profile_id: &str) -> bool {
             | JEFFS_AI_BETA_ID
             | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
             | JEFFS_AI_PRE_TANK_CATCHUP_ID
+            | JEFFS_AI_PRE_OPENING_RUSH_ID
     )
 }
 
 pub(super) fn uses_current_jeff_defense(profile_id: &str) -> bool {
     matches!(
         profile_id,
-        JEFFS_AI_ID | JEFFS_AI_BETA_ID | JEFFS_AI_PRE_TANK_CATCHUP_ID
+        JEFFS_AI_ID
+            | JEFFS_AI_BETA_ID
+            | JEFFS_AI_PRE_TANK_CATCHUP_ID
+            | JEFFS_AI_PRE_OPENING_RUSH_ID
     )
 }
 

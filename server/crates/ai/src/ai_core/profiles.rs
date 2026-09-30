@@ -10,8 +10,9 @@ pub(crate) use ai_2_1_pre_third_base::{AI_2_1_PRE_THIRD_BASE, AI_2_1_PRE_THIRD_B
 
 pub(crate) use self::jeffs_ai::{
     JEFFS_AI, JEFFS_AI_BETA, JEFFS_AI_BETA_ID, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
-    JEFFS_AI_PRE_TANK_CATCHUP, JEFFS_AI_PRE_TANK_CATCHUP_ID,
+    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_OPENING_RUSH, JEFFS_AI_PRE_OPENING_RUSH_ID,
+    JEFFS_AI_PRE_RIFLE_COVERAGE, JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_TANK_CATCHUP,
+    JEFFS_AI_PRE_TANK_CATCHUP_ID,
 };
 pub(crate) use self::jeffs_ai_chat_start::{JEFFS_AI_CHAT_START, JEFFS_AI_CHAT_START_ID};
 pub(crate) use self::turtle::AI_TURTLE;
@@ -439,6 +440,9 @@ pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
     if id == JEFFS_AI_PRE_TANK_CATCHUP_ID {
         return Some(&JEFFS_AI_PRE_TANK_CATCHUP);
     }
+    if id == JEFFS_AI_PRE_OPENING_RUSH_ID {
+        return Some(&JEFFS_AI_PRE_OPENING_RUSH);
+    }
     if id == JEFFS_AI_CHAT_START_ID {
         return Some(&JEFFS_AI_CHAT_START);
     }
@@ -455,6 +459,7 @@ pub(crate) fn is_jeffs_ai_profile(id: &str) -> bool {
             | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
             | JEFFS_AI_PRE_RIFLE_COVERAGE_ID
             | JEFFS_AI_PRE_TANK_CATCHUP_ID
+            | JEFFS_AI_PRE_OPENING_RUSH_ID
     )
 }
 
@@ -462,7 +467,10 @@ pub(crate) fn is_jeffs_ai_profile(id: &str) -> bool {
 /// belongs here so it keeps every existing current-Jeff behavior and differs only where the
 /// change under test branches on its own id. Older freezes deliberately stay outside this set.
 pub(crate) fn uses_current_jeffs_ai_policy(id: &str) -> bool {
-    matches!(id, JEFFS_AI_ID | JEFFS_AI_PRE_TANK_CATCHUP_ID)
+    matches!(
+        id,
+        JEFFS_AI_ID | JEFFS_AI_PRE_TANK_CATCHUP_ID | JEFFS_AI_PRE_OPENING_RUSH_ID
+    )
 }
 
 #[cfg(test)]
@@ -504,6 +512,12 @@ mod tests {
         assert!(is_jeffs_ai_profile(JEFFS_AI_PRE_TANK_CATCHUP_ID));
         assert!(uses_current_jeffs_ai_policy(JEFFS_AI_ID));
         assert!(uses_current_jeffs_ai_policy(JEFFS_AI_PRE_TANK_CATCHUP_ID));
+        assert_eq!(
+            profile_by_id(JEFFS_AI_PRE_OPENING_RUSH_ID).unwrap().id,
+            JEFFS_AI_PRE_OPENING_RUSH_ID
+        );
+        assert!(is_jeffs_ai_profile(JEFFS_AI_PRE_OPENING_RUSH_ID));
+        assert!(uses_current_jeffs_ai_policy(JEFFS_AI_PRE_OPENING_RUSH_ID));
         assert!(!uses_current_jeffs_ai_policy(JEFFS_AI_BETA_ID));
         assert!(!uses_current_jeffs_ai_policy(
             JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID

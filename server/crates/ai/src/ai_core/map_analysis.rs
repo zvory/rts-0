@@ -482,6 +482,13 @@ impl AiMapAnalysis {
             .unwrap_or(false)
     }
 
+    /// Whether units on this tile move at road speed.
+    pub(crate) fn tile_is_road(&self, x: u32, y: u32) -> bool {
+        tile_index(self.width, self.height, x, y)
+            .and_then(|idx| self.road.get(idx).copied())
+            .unwrap_or(false)
+    }
+
     pub(crate) fn tile_blocks_line_of_sight(&self, x: u32, y: u32) -> bool {
         tile_index(self.width, self.height, x, y)
             .and_then(|idx| self.line_of_sight_blocked.get(idx).copied())

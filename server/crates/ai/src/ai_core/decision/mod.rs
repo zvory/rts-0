@@ -14,7 +14,8 @@ use crate::ai_core::profiles::{
     is_jeffs_ai_profile, uses_current_jeffs_ai_policy, AiProfile, AttackPolicy, BarracksCurve,
     ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
     TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID,
+    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    JEFFS_AI_PRE_TANK_CATCHUP_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -35,6 +36,7 @@ mod jeff;
 mod later_bases;
 mod memory;
 mod obstacles;
+mod opening_rush;
 mod policies;
 mod production;
 mod resources;
@@ -412,6 +414,25 @@ where
     );
     intents.extend(later_base.intents.iter().cloned());
 
+    // The live Jeff's starting Riflemen march on the enemy until a fallback sends them home.
+    if opening_rush::uses_opening_rush(profile.id) {
+        let rush = opening_rush::plan(&mut actions, observation, &facts, memory, map_analysis);
+        if !rush.moved.is_empty() {
+            intents.push(AiIntent::Move { units: rush.moved });
+        }
+        if !rush.attacked.is_empty() {
+            intents.push(AiIntent::Attack {
+                units: rush.attacked,
+            });
+        }
+        if !rush.released.is_empty() {
+            // Clears the live adapter's cached staging so the pocket can place them again.
+            intents.push(AiIntent::Assemble {
+                units: rush.released,
+            });
+        }
+    }
+
     // Jeff's picket on the enemy's route and warned sealing of the home line. Its units are
     // reserved from every other system for this decision.
     if uses_current_jeffs_ai_policy(profile.id) {
@@ -429,7 +450,12 @@ where
             });
         }
     }
-    let route_line_reserved: BTreeSet<u32> = memory.route_line.reserved().collect();
+    // Units the route line or the opening rush own this decision.
+    let route_line_reserved: BTreeSet<u32> = memory
+        .route_line
+        .reserved()
+        .chain(memory.opening_rush.reserved())
+        .collect();
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
@@ -919,6 +945,7 @@ where
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
     local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     local_ready_units.retain(|id| !push_units.contains(id));
+    local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
     if profile.home_anti_tank.is_some() {
         local_ready_units.retain(|id| {
             Some(*id) != memory.home_defensive_tank
@@ -978,6 +1005,7 @@ where
         // The picket holds its trench on the route; it never runs back to answer a raid.
         local_defenders.retain(|id| Some(*id) != memory.route_line.picket());
         local_defenders.retain(|id| !push_units.contains(id));
+        local_defenders.retain(|id| !memory.opening_rush.is_reserved(*id));
         local_defenders.sort_unstable();
         local_defenders.dedup();
         if new_jeff_defense {

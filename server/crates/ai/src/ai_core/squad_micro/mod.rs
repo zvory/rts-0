@@ -33,13 +33,17 @@ pub(crate) enum SquadOrder {
 }
 
 /// Cross-decision state. Only the owning planner reads or writes it.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SquadMicroMemory {
     holding: BTreeSet<u32>,
     retreating: BTreeMap<u32, u32>,
     advance_point: Option<(f32, f32)>,
     advancing: BTreeSet<u32>,
 }
+
+// The advance point is always a finite map position, so equality is total. Profile decision
+// memory, which embeds this for Jeff's opening rush, is compared with `Eq` in tests.
+impl Eq for SquadMicroMemory {}
 
 impl SquadMicroMemory {
     fn prune(&mut self, alive: &BTreeSet<u32>, tick: u32) {

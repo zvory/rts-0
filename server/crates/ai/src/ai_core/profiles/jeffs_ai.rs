@@ -17,6 +17,9 @@ pub(crate) const JEFFS_AI_PRE_RIFLE_COVERAGE_ID: &str = "jeffs_ai_pre_rifle_cove
 /// This is comparison-only: it lets the arena test isolate the formation recovery change from
 /// every other active Jeff policy.
 pub(crate) const JEFFS_AI_PRE_TANK_CATCHUP_ID: &str = "jeffs_ai_pre_tank_catchup";
+/// Frozen immediately before the opening rush: the live Jeff whose four starting Riflemen stay in
+/// the home pocket. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_OPENING_RUSH_ID: &str = "jeffs_ai_pre_opening_rush";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -177,12 +180,20 @@ const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
 /// The live Jeff drops the Steelworks and Anti-Tank Gun path: the home Tank reservation and
 /// layered defense stay, and the Steelworks steel and oil go to a second Factory instead.
 /// Frozen comparison profiles keep the template's two guns.
-pub(crate) static JEFFS_AI: AiProfile = AiProfile {
+const JEFFS_AI_LIVE: AiProfile = AiProfile {
     home_anti_tank: Some(HomeAntiTankPolicy {
         target_guns: 0,
         ..TEMPLATE_HOME_ANTI_TANK
     }),
     ..JEFFS_AI_TEMPLATE
+};
+
+pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_LIVE;
+
+/// The live Jeff's exact policy under its own id; only the opening rush branches on the live id.
+pub(crate) static JEFFS_AI_PRE_OPENING_RUSH: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_OPENING_RUSH_ID,
+    ..JEFFS_AI_LIVE
 };
 
 /// Comparison-only snapshot of the Jeff profile deployed on beta at build 967078d8ce95.

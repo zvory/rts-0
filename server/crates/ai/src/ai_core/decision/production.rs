@@ -230,7 +230,10 @@ where
 fn uses_jeff_opposite_spawn_layout(observation: &AiObservation, profile: &AiProfile) -> bool {
     matches!(
         profile.id,
-        JEFFS_AI_ID | JEFFS_AI_BETA_ID | JEFFS_AI_PRE_TANK_CATCHUP_ID
+        JEFFS_AI_ID
+            | JEFFS_AI_BETA_ID
+            | JEFFS_AI_PRE_TANK_CATCHUP_ID
+            | JEFFS_AI_PRE_OPENING_RUSH_ID
     ) && is_upper_left_diagonal_start(observation.map, observation.own_start_tile)
 }
 

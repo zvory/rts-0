@@ -93,6 +93,8 @@ pub(crate) struct AiDecisionMemory {
     pub(super) later_bases: super::later_bases::LaterBases,
     /// Jeff's forward picket and the Riflemen sealing the home line during a raid alert.
     pub(super) route_line: super::defense::RouteLine,
+    /// Jeff's starting Riflemen marching on the enemy, until they fall back home.
+    pub(super) opening_rush: super::opening_rush::OpeningRush,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -151,6 +153,7 @@ impl AiDecisionMemory {
             expansion_security: Default::default(),
             later_bases: Default::default(),
             route_line: Default::default(),
+            opening_rush: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,

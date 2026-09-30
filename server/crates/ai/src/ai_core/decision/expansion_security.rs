@@ -298,6 +298,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     let mut candidates = rifles.get(HOME_RIFLES..).unwrap_or(&[]).to_vec();
     // The route picket and raid sealers are held by the home line.
     candidates.retain(|id| !memory.route_line.reserved().any(|reserved| reserved == *id));
+    candidates.retain(|id| !memory.opening_rush.is_reserved(*id));
     if let Some(center) = building_center(
         memory.expansion_security.site.unwrap(),
         EntityKind::ResourceDepot,
