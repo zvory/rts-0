@@ -169,6 +169,32 @@ impl AiMapAnalysis {
         Some(route)
     }
 
+    /// The centre of the open tile nearest `point` with at least `minimum_clearance`, searching at
+    /// most `max_radius_tiles` out, in the same ground component as Jeff's units can reach from
+    /// `from`.
+    pub(crate) fn open_ground_near(
+        &self,
+        from: (f32, f32),
+        point: (f32, f32),
+        minimum_clearance: u16,
+        max_radius_tiles: i32,
+    ) -> Option<(f32, f32)> {
+        let start = self.nearest_route_tile(from, 1, None)?;
+        let component =
+            self.component_by_tile[tile_index(self.width, self.height, start.x, start.y)?];
+        let tile = self.nearest_route_tile(point, minimum_clearance, component)?;
+        let tile_size = self.tile_size.max(1) as f32;
+        let wanted = (
+            (point.0 / tile_size).floor() as i32,
+            (point.1 / tile_size).floor() as i32,
+        );
+        ((tile.x as i32 - wanted.0)
+            .abs()
+            .max((tile.y as i32 - wanted.1).abs())
+            <= max_radius_tiles)
+            .then(|| tile_center_world(tile, self.tile_size))
+    }
+
     fn nearest_route_tile(
         &self,
         point: (f32, f32),

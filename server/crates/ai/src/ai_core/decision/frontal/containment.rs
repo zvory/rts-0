@@ -234,6 +234,7 @@ pub(super) fn issue_expansion_containment_wave(
         }
         memory.containment.launch_tanks = tanks.len();
         memory.containment.recovery_active = false;
+        memory.roundabout.start_push();
         memory.containment.stationary_since = None;
         reset_containment_route(memory);
         memory.containment.last_formation_command_tick = None;
@@ -254,6 +255,11 @@ pub(super) fn issue_expansion_containment_wave(
     // Outnumbered in Tanks out in the field: fall back to the regroup point and rebuild one Tank
     // larger, instead of losing the push a Tank at a time.
     if !memory.enemy_main_destroyed && push_outnumbered(observation, &tanks) {
+        if push_uses_available_armor {
+            memory
+                .roundabout
+                .note_failed_push(observation.player_id, observation.tick);
+        }
         begin_containment_recovery(memory);
         let rally = containment_regroup_point(own_base, enemy_base, observation.map)?;
         let mut units = tanks;
@@ -292,7 +298,39 @@ pub(super) fn issue_expansion_containment_wave(
     } else {
         containment_points(own_base, objective, observation.map, policy)?
     };
-    let toward_objective = normalized_direction(own_base, objective)?;
+    // After a failed push the current Jeff may come at the target from a side instead: out to a
+    // swing point off the direct approach, then in from there. Straight in otherwise.
+    let lane = if push_uses_available_armor && !endgame_search_active {
+        containment_regroup_point(own_base, enemy_base, observation.map).and_then(|rally| {
+            super::roundabout::current_lane(
+                memory,
+                map_analysis,
+                observation,
+                rally,
+                (enemy_base.x, enemy_base.y),
+                objective,
+                tank_point,
+                policy.tank_standoff_tiles,
+            )
+        })
+    } else {
+        None
+    };
+    let (tank_point, face_from, face_to) = match lane {
+        Some(lane) => {
+            let orders = super::roundabout::lane_orders(
+                memory,
+                observation,
+                lane,
+                group_center(observation, &tanks),
+                own_base,
+                objective,
+            );
+            (orders.destination, orders.face_from, orders.face_to)
+        }
+        None => (tank_point, own_base, objective),
+    };
+    let toward_objective = normalized_direction(face_from, face_to)?;
     let tank_assignments = if tight_formation {
         compact_tank_formation_assignments(
             observation,
@@ -325,8 +363,8 @@ pub(super) fn issue_expansion_containment_wave(
     };
     let trailing_point = scout_trailing_point(
         tank_anchor,
-        own_base,
-        objective,
+        face_from,
+        face_to,
         observation.map,
         policy.scout_trailing_tiles,
     )?;
@@ -499,8 +537,8 @@ pub(super) fn issue_expansion_containment_wave(
                 if tight_formation {
                     scout_forward_from_tanks(
                         tank_anchor,
-                        own_base,
-                        objective,
+                        face_from,
+                        face_to,
                         observation.map,
                         policy.scout_forward_tiles,
                     )?
@@ -549,8 +587,8 @@ pub(super) fn issue_expansion_containment_wave(
                 scouts[0],
                 &riflemen,
                 current_waypoint,
-                own_base,
-                objective,
+                face_from,
+                face_to,
                 policy,
             )?;
             let waypoint_timed_out =
@@ -587,8 +625,8 @@ pub(super) fn issue_expansion_containment_wave(
                     && formation_vehicle_core_is_grouped(
                         observation,
                         &formation,
-                        own_base,
-                        objective,
+                        face_from,
+                        face_to,
                     ))
             {
                 memory.containment.march_waypoint = None;
@@ -614,7 +652,7 @@ pub(super) fn issue_expansion_containment_wave(
                 let lead_position = unit_position(observation, lead_tank)?;
                 let rear_position = unit_position(observation, rear_tank)?;
                 let direct_catch_up_point =
-                    tank_catch_up_point(lead_position, own_base, objective, observation.map)?;
+                    tank_catch_up_point(lead_position, face_from, face_to, observation.map)?;
                 let route_catch_up_point =
                     defense::crossroads_wall_aware_approach_direction(observation).and_then(|_| {
                         map_analysis.and_then(|analysis| {
@@ -665,8 +703,8 @@ pub(super) fn issue_expansion_containment_wave(
                 scouts[0],
                 &riflemen,
                 next,
-                own_base,
-                objective,
+                face_from,
+                face_to,
                 policy,
             )?;
             issue_containment_formation(actions, observation, &formation, true);

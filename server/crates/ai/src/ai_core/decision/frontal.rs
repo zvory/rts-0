@@ -7,6 +7,7 @@ mod formation;
 #[cfg(test)]
 mod formation_tests;
 mod legacy_beta;
+pub(super) mod roundabout;
 pub(super) mod smoke;
 
 use self::catch_up::*;
@@ -372,6 +373,12 @@ pub(super) fn sync_containment_recovery(
         .is_some_and(|scout| owned.contains(&scout));
     if tanks_intact && scout_intact {
         return;
+    }
+    // The current Jeff comes at the target from another side next time.
+    if uses_current_jeffs_ai_policy(profile.id) {
+        memory
+            .roundabout
+            .note_failed_push(observation.player_id, observation.tick);
     }
     begin_containment_recovery(memory);
 }

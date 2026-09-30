@@ -114,6 +114,8 @@ pub(crate) struct AiDecisionMemory {
     launched_frontal_units: BTreeMap<u32, u32>,
     /// The push under way (or forming), its units, route and firing state.
     pub(super) containment: ContainmentPush,
+    /// Which side the next push comes at its target from, after failed pushes.
+    pub(super) roundabout: super::frontal::roundabout::Roundabout,
     /// The Tank Trap home Tanks were last sent to clear, and when.
     pub(super) trap_order: Option<(u32, u32)>,
     /// How many enemy Tanks were in sight together, by tick, over the last
@@ -165,6 +167,7 @@ impl AiDecisionMemory {
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
             containment: ContainmentPush::default(),
+            roundabout: Default::default(),
             trap_order: None,
             enemy_tank_sightings: BTreeMap::new(),
             enemy_attack_sightings: BTreeMap::new(),
