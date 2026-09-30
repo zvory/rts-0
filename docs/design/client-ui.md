@@ -601,7 +601,11 @@ center line and the second leads below it. Each resource uses a symmetric minimu
 to one fully extracting base over that window (144 Steel or 36 Oil). Backward replay seeks
 truncate future samples before rebuilding the timeline. Alive Resources subtracts destroyed-unit and destroyed-building steel/oil value from
 lifetime mined resources; because starting resources are not lifetime mined income, the derived
-value can be negative.
+value can be negative. For 1v1s it also renders steel and oil advantage charts using that
+lifetime-minus-loss difference, with a symmetric Y extent fitted to the history. Both tabs use
+reliable server-authored one-second replay samples, replaced on join and seek; live spectators
+accumulate samples from observer analysis. History arrival invalidates either tab independently
+of the latest analysis payload.
 Research groups
 completed permanent upgrades by player, retaining an explicit empty row when a player has
 completed none. The Losses tab lists destroyed units and buildings by kind, including zero-cost
