@@ -32,6 +32,14 @@ const MAX_DETOUR_RATIO: f32 = 2.0;
 /// once it has been heading there this long.
 const SWING_REACHED_TILES: f32 = 3.5;
 const SWING_TIMEOUT_TICKS: u32 = config::TICK_HZ * 180;
+/// A target that moves no farther than this is the same target: the natural's nearest steel patch
+/// shifts a tile or two each time one runs dry or is destroyed, and the push keeps its progress.
+const SAME_TARGET_TILES: f32 = 8.0;
+/// A push already within this much of the swing distance of the target, and within
+/// `ON_SIDE_DEGREES` of its lane's bearing, is on the lane: it closes in without swinging out
+/// again. After the natural falls, the push on its side goes on to the main from that side.
+const ON_SIDE_EXTRA_TILES: f32 = 8.0;
+const ON_SIDE_DEGREES: f32 = 35.0;
 
 type WorldPoint = (i32, i32);
 
@@ -276,12 +284,13 @@ pub(super) fn current_lane(
     {
         return cached.lane;
     }
-    // The target moved (the natural fell, or its steel ran out): swing out again for the new one.
-    if memory
-        .roundabout
-        .lane
-        .is_some_and(|cached| cached.objective != key)
-    {
+    // The target moved well away (the natural fell): swing out again for the new one, unless the
+    // push is already on that side. A steel patch running dry at the same natural is not a new target.
+    let same_target2 = squared(SAME_TARGET_TILES * observation.map.tile_size as f32);
+    if memory.roundabout.lane.is_some_and(|cached| {
+        let previous = world(cached.objective);
+        dist2(previous.0, previous.1, objective.0, objective.1) > same_target2
+    }) {
         memory.roundabout.start_push();
     }
     let lane = analysis.and_then(|analysis| {
@@ -327,8 +336,10 @@ pub(super) fn lane_orders(
     if !state.swing_reached {
         let started = *state.swing_started_tick.get_or_insert(observation.tick);
         let reach2 = squared(SWING_REACHED_TILES * observation.map.tile_size as f32);
-        let arrived = tanks_center
-            .is_some_and(|center| dist2(center.0, center.1, swing.0, swing.1) <= reach2);
+        let arrived = tanks_center.is_some_and(|center| {
+            dist2(center.0, center.1, swing.0, swing.1) <= reach2
+                || on_lane_side(center, objective, lane, observation.map.tile_size as f32)
+        });
         if arrived || observation.tick.saturating_sub(started) >= SWING_TIMEOUT_TICKS {
             state.swing_reached = true;
         }
@@ -346,6 +357,24 @@ pub(super) fn lane_orders(
             face_to: swing,
         }
     }
+}
+
+/// Whether a push at `center` is already on the lane's side of `objective`: no farther out than the
+/// swing point (plus a margin) and close to the bearing of the lane's attack point.
+fn on_lane_side(center: (f32, f32), objective: (f32, f32), lane: FlankLane, ts: f32) -> bool {
+    let (swing, attack) = (world(lane.swing), world(lane.attack));
+    let reach = dist2(swing.0, swing.1, objective.0, objective.1).sqrt() + ON_SIDE_EXTRA_TILES * ts;
+    if dist2(center.0, center.1, objective.0, objective.1) > squared(reach) {
+        return false;
+    }
+    let (Some(to_center), Some(to_attack)) = (
+        normalized_direction(objective, center),
+        normalized_direction(objective, attack),
+    ) else {
+        return false;
+    };
+    let cos = to_center.0 * to_attack.0 + to_center.1 * to_attack.1;
+    cos >= ON_SIDE_DEGREES.to_radians().cos()
 }
 
 #[cfg(test)]

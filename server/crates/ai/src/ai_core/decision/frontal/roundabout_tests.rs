@@ -42,6 +42,27 @@ fn a_push_that_starts_again_swings_out_again() {
     assert_eq!(roundabout.swing_started_tick, None);
 }
 
+#[test]
+fn a_push_already_on_the_lanes_side_closes_in_without_swinging_out_again() {
+    let ts = 32.0;
+    let at = |x: f32, y: f32| (x * ts, y * ts);
+    // Target at (60, 60); the direct approach comes from the south-west; the lane's side is east.
+    let lane = FlankLane {
+        swing: stored(at(83.5, 60.0)),
+        attack: stored(at(73.5, 60.0)),
+        approach_from: stored(at(93.5, 60.0)),
+    };
+    let objective = at(60.0, 60.0);
+    // At the old natural, east of the new target and inside the swing distance: on the side.
+    assert!(on_lane_side(at(80.0, 64.0), objective, lane, ts));
+    // Back home down the direct approach: not on the side.
+    assert!(!on_lane_side(at(45.0, 45.0), objective, lane, ts));
+    // East but far beyond the swing point: still has to come in.
+    assert!(!on_lane_side(at(110.0, 60.0), objective, lane, ts));
+    // Close, but round on the other side of the target.
+    assert!(!on_lane_side(at(50.0, 60.0), objective, lane, ts));
+}
+
 fn map_observation(name: &str, player: u32, seed: u32) -> (AiObservation, AiMapAnalysis) {
     use rts_sim::game::map::Map;
     use rts_sim::game::{Game, PlayerInit};
