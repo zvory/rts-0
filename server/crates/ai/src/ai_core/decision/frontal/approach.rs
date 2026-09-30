@@ -14,10 +14,17 @@
 //! the enemy main, a swing point well off the direct approach, and a way round that takes at most
 //! 30% longer than the direct approach, roads counted. Otherwise, or once a side push stops making
 //! progress, it goes straight in.
+//!
+//! Side approaches are switched off for now (`SIDE_APPROACHES`): every push goes straight in, in
+//! three legs. In 40 games vs AI 2.1 the side loop won more on Classic (7 wins against 4) but lost
+//! nearly every win on The River (1 against 7), where side pushes arrived thousands of ticks after
+//! direct ones; 9 wins against 12 overall.
 
 use super::*;
 use crate::ai_core::decision::geometry::squared;
 
+/// Whether failed pushes are followed by side pushes. Off, every push goes straight in.
+const SIDE_APPROACHES: bool = false;
 /// Pushes with fewer Tanks keep the old march: straight to the attack point in the tight formation.
 pub(super) const MIN_TANKS_FOR_LEGS: usize = 4;
 /// Angles off the direct approach tried for a side, widest first.
@@ -144,6 +151,15 @@ pub(crate) struct PushApproach {
 impl PushApproach {
     /// The approach the next (or current) push takes.
     pub(crate) fn approach(&self) -> Approach {
+        if SIDE_APPROACHES {
+            self.loop_approach()
+        } else {
+            Approach::Direct
+        }
+    }
+
+    /// Where the center, side, opposite side loop stands after the failed pushes so far.
+    fn loop_approach(&self) -> Approach {
         match self.failed_pushes % 3 {
             0 => Approach::Direct,
             1 => self.first_side,

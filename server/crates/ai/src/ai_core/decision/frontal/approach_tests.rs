@@ -5,21 +5,35 @@ use crate::ai_core::profiles::JEFFS_AI;
 #[test]
 fn failed_pushes_go_straight_then_a_random_side_then_the_other_side_then_straight_again() {
     let mut approach = PushApproach::default();
-    assert_eq!(approach.approach(), Approach::Direct);
+    assert_eq!(approach.loop_approach(), Approach::Direct);
     let mut first_sides = BTreeSet::new();
     for loop_index in 0..40_u32 {
         let tick = 1_000 + loop_index * 997;
         approach.note_failed_push(1, tick);
-        let side = approach.approach();
+        let side = approach.loop_approach();
         assert_ne!(side, Approach::Direct);
         first_sides.insert(format!("{side:?}"));
         approach.note_failed_push(1, tick + 300);
-        assert_eq!(approach.approach(), side.opposite());
+        assert_eq!(approach.loop_approach(), side.opposite());
         approach.note_failed_push(1, tick + 600);
-        assert_eq!(approach.approach(), Approach::Direct);
+        assert_eq!(approach.loop_approach(), Approach::Direct);
     }
     // The first side of a loop is not always the same one.
     assert_eq!(first_sides.len(), 2);
+}
+
+#[test]
+fn pushes_follow_the_loop_only_while_side_approaches_are_on() {
+    let mut approach = PushApproach::default();
+    for tick in [1_000, 2_000, 3_000, 4_000] {
+        approach.note_failed_push(1, tick);
+        let expected = if SIDE_APPROACHES {
+            approach.loop_approach()
+        } else {
+            Approach::Direct
+        };
+        assert_eq!(approach.approach(), expected);
+    }
 }
 
 #[test]
