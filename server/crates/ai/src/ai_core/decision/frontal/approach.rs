@@ -11,8 +11,9 @@
 //! there, then closes in tight to the attack point and holds at the usual standoff.
 //!
 //! A side needs open ground away from the map edge, a way out that keeps clear of the target and
-//! the enemy main, a swing point well off the direct approach, and a detour of at most half again
-//! the direct approach. Otherwise, or once a side push stops making progress, it goes straight in.
+//! the enemy main, a swing point well off the direct approach, and a way round that takes at most
+//! 30% longer than the direct approach, roads counted. Otherwise, or once a side push stops making
+//! progress, it goes straight in.
 
 use super::*;
 use crate::ai_core::decision::geometry::squared;
@@ -38,8 +39,11 @@ const ROUTE_CLEARANCE_OF_ENEMY_MAIN_TILES: f32 = 18.0;
 /// the part of the direct approach within `DIRECT_APPROACH_TILES` of the target.
 const MIN_OFFSET_FROM_DIRECT_TILES: f32 = 10.0;
 const DIRECT_APPROACH_TILES: f32 = 35.0;
-/// The way round may be at most this many times as long as the direct approach.
-const MAX_DETOUR_RATIO: f32 = 1.5;
+/// The way round may take at most this many times as long as the direct approach. Roads count: on
+/// The River the direct approach runs down the central road, where units move half again as fast,
+/// and side pushes that left it (1.35 times as long, counting the road) arrived thousands of ticks
+/// later. Side lanes on the other test maps take 1.07-1.27 times as long.
+const MAX_DETOUR_RATIO: f32 = 1.3;
 /// The push has reached its staging point within this distance.
 const STAGING_REACHED_TILES: f32 = 4.0;
 /// A push already inside the staging distance and within this angle of the staging point's bearing
@@ -217,16 +221,6 @@ fn rotate(vector: (f32, f32), degrees: f32) -> (f32, f32) {
     )
 }
 
-fn route_length(from: (f32, f32), route: &[(f32, f32)]) -> f32 {
-    let mut previous = from;
-    let mut length = 0.0;
-    for point in route {
-        length += dist2(previous.0, previous.1, point.0, point.1).sqrt();
-        previous = *point;
-    }
-    length
-}
-
 fn away_from_edge(point: (f32, f32), map: AiMapSummary) -> bool {
     let ts = map.tile_size as f32;
     let margin = EDGE_MARGIN_TILES * ts;
@@ -258,7 +252,7 @@ pub(super) fn flank_lane(
     if direct.len() < 2 {
         return None;
     }
-    let direct_length = route_length(from, &direct);
+    let direct_time = analysis.route_travel_tiles(from, &direct);
     // Which way the direct approach comes in: from its last point well outside the attack point.
     let swing_tiles = standoff_tiles + SWING_EXTRA_TILES;
     let arrival = direct
@@ -319,8 +313,9 @@ pub(super) fn flank_lane(
         if closing.len() < 2 {
             return None;
         }
-        let total = route_length(from, &out) + route_length(swing, &closing);
-        if total > MAX_DETOUR_RATIO * direct_length {
+        let total =
+            analysis.route_travel_tiles(from, &out) + analysis.route_travel_tiles(swing, &closing);
+        if total > MAX_DETOUR_RATIO * direct_time {
             return None;
         }
         Some(FlankLane {

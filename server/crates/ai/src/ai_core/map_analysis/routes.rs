@@ -169,6 +169,30 @@ impl AiMapAnalysis {
         Some(route)
     }
 
+    /// How long walking `route` from `from` takes, in tiles of open ground: a road tile counts for
+    /// less, as units move half again as fast on roads.
+    pub(crate) fn route_travel_tiles(&self, from: (f32, f32), route: &[(f32, f32)]) -> f32 {
+        let tile_size = self.tile_size.max(1) as f32;
+        let mut previous = from;
+        let mut total = 0.0;
+        for point in route {
+            let length = (point.0 - previous.0).hypot(point.1 - previous.1) / tile_size;
+            let (x, y) = (point.0 / tile_size, point.1 / tile_size);
+            let on_road = x >= 0.0
+                && y >= 0.0
+                && tile_index(self.width, self.height, x as u32, y as u32)
+                    .and_then(|idx| self.road.get(idx).copied())
+                    .unwrap_or(false);
+            total += if on_road {
+                length / rts_rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER
+            } else {
+                length
+            };
+            previous = *point;
+        }
+        total
+    }
+
     /// The centre of the open tile nearest `point` with at least `minimum_clearance`, searching at
     /// most `max_radius_tiles` out, in the same ground component as Jeff's units can reach from
     /// `from`.
@@ -297,6 +321,7 @@ mod tests {
             tile_size,
             passable,
             line_of_sight_blocked: vec![false; (width * height) as usize],
+            road: vec![false; (width * height) as usize],
             clearance: vec![2; (width * height) as usize],
             component_by_tile,
             components: Vec::new(),
