@@ -2193,6 +2193,10 @@ Point is available without research and uses the normal targeted-command click/c
 both battlefield and minimap. Only selected controllable tanks are sent in `pointTanks`.
 The cursor selects one shared heading from the tanks’ center, keeping their hulls parallel.
 Point immediately stops previous movement and holds that heading; Shift does not queue it.
+While Point is armed, a live ground arrow runs from the arithmetic mean of selected, living,
+controllable tank positions to the cursor. A center dot remains for a zero-length direction.
+The preview follows current camera projection and minimap targeting, and clears on cancellation
+or command completion.
 
 ### 4.1a Targeted ability mode (Smoke, Mortar Fire, Artillery Fire, Scout Plane)
 

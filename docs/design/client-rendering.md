@@ -175,6 +175,10 @@ mutable gameplay state. Live warnings take their immutable direction only from t
 are never fallback cone directions because they may track targets inside the emplacement field.
 Friendly selected field-of-fire wedges likewise use only `setupFacing` and remain unhatched. These are
 presentation hints only: `SelectionSceneV1` remains the sole entity/ground interaction authority.
+Tank Point crosses `tacticalFeedback` as a detached `pointTargetPreview` containing the selected
+controllable tanks’ centroid and the cursor world point. The Pixi worker draws a center dot and
+an outlined heading arrow, with no simulation or protocol changes.
+
 The detached feedback context also carries the observer-only all-unit-range preference. When it is
 enabled, Pixi draws the existing range profile for every currently visible, non-reveal unit record,
 independent of selection or owner; remembered intel and transient shot reveals never gain ranges.

@@ -138,6 +138,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "resource_icons.js": "ui",
   "status_badge.js": "ui",
   "minimap.js": "ui",
+  "minimap_point_preview.js": "ui",
   "minimap_capture.js": "ui",
   "minimap_icon_image.js": "ui",
   "minimap_unit_icons.js": "ui",

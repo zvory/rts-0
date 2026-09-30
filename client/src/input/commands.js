@@ -707,6 +707,13 @@ export function _refreshAbilityTargetPreview() {
   });
 }
 
+export function _refreshPointTargetPreview() {
+  const intent = clientIntent(this);
+  const world = this.mouse && intent?.commandTarget === "pointTanks"
+    ? cursorPreviewGroundAtScreen(this, this.mouse) : null;
+  intent?.updatePointTargetPreview?.(world ? { mouseX: world.x, mouseY: world.y } : null);
+}
+
 export function _refreshAntiTankGunSetupPreview() {
   const intent = clientIntent(this);
   if (!this.mouse || intent?.commandTarget !== "setupAntiTankGuns") {

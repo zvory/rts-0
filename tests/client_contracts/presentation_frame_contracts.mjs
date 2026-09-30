@@ -99,6 +99,7 @@ const feedback = {
     points: [{ x: 10, y: 12 }, { x: 42, y: 44 }],
     slots: [{ unitId: 1, x: 18, y: 20, radius: 10 }],
   },
+  pointTargetPreview: { originX: 12, originY: 16, mouseX: 40, mouseY: 48 },
   commandFeedback: [{ kind: "move", x: 30, y: 30 }],
   smokes: [{ id: 8, x: 32, y: 32, radiusTiles: 2 }],
   abilityObjects: [{ id: 9, kind: "return_marker", owner: 1, x: 36, y: 36 }],
@@ -489,3 +490,5 @@ function assertThrows(fn, message) {
   try { fn(); } catch { threw = true; }
   assert(threw, message);
 }
+
+assert(frame.layers.tacticalFeedback.some((r) => r.type === "pointTargetPreview" && r.originX === 12 && r.mouseY === 48), "Point preview crosses the worker boundary");

@@ -63,6 +63,7 @@ import {
   _refreshAttackTargetPreview,
   _refreshAbilityTargetPreview,
   _refreshAntiTankGunSetupPreview,
+  _refreshPointTargetPreview,
   _refreshResourceMiningPreview,
   _selectedGathererIds,
   _selectedOwnAntiTankGunIds,
@@ -408,6 +409,7 @@ export class Input {
       this._intent()?.updateLabRulerCursor?.(null);
       return;
     }
+    this._refreshPointTargetPreview();
     if (this._formationGesture?.promoted) {
       this._refreshFormationGesture();
       return;
@@ -1028,6 +1030,7 @@ Object.assign(Input.prototype, {
   _selectedOwnAntiTankGunIds,
   _refreshAttackTargetPreview,
   _refreshAntiTankGunSetupPreview,
+  _refreshPointTargetPreview,
   _refreshAbilityTargetPreview,
   _refreshResourceMiningPreview,
   _nearestCompletedMiningAnchor,

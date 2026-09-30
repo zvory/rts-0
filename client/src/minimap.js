@@ -1,3 +1,4 @@
+import { updateMinimapPointPreview } from "./minimap_point_preview.js";
 import { MinimapFormation } from "./minimap_formation.js";
 import { cmd } from "./protocol.js";
 import {
@@ -1042,7 +1043,7 @@ export class Minimap {
   }
 
   updateCommandTargetPreview(shiftKey = this._hoverShiftKey) {
-    if (this._intent()?.commandTarget !== "setupAntiTankGuns") {
+    if (!["setupAntiTankGuns", "pointTanks"].includes(this._intent()?.commandTarget)) {
       this._clearMinimapSetupPreview();
       return false;
     }
@@ -1316,6 +1317,7 @@ export class Minimap {
 
   _refreshSetupPreviewAt(wx, wy, shiftKey = false) {
     const intent = this._intent();
+    if (updateMinimapPointPreview(intent, wx, wy)) return true;
     if (intent?.commandTarget !== "setupAntiTankGuns") {
       this._clearMinimapSetupPreview();
       return false;
@@ -1338,9 +1340,9 @@ export class Minimap {
     });
     return true;
   }
-
   _clearMinimapSetupPreview() {
     const intent = this._intent();
+    if (intent?.pointTargetPreview?.source === "minimap") intent.updatePointTargetPreview?.(null);
     if (intent?.antiTankGunSetupPreview?.source === "minimap") {
       intent.updateAntiTankGunSetupPreview?.(null);
     }

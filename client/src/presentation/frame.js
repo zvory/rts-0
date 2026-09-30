@@ -38,6 +38,7 @@ const FEEDBACK_SINGLETONS = Object.freeze([
   ["labRuler", "labRuler"],
   ["attackTargetPreview", "attackTargetPreview"],
   ["antiTankGunSetupPreview", "supportWeaponSetupPreview"],
+  ["pointTargetPreview", "pointTargetPreview"],
   ["abilityTargetPreview", "abilityTargetPreview"],
   ["resourceMiningPreview", "resourceMiningPreview"],
 ]);

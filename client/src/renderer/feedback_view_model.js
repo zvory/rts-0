@@ -79,6 +79,7 @@ export function buildRendererFeedbackView(
     showAllDebugPathOverlays: !!state?.showAllDebugPathOverlays,
     antiTankGunSetupPreview: previewSurface && intent?.antiTankGunSetupPreview?.source !== previewSurface
       ? null : intent?.antiTankGunSetupPreview || null,
+    pointTargetPreview: tankPointPreview(intent, selected, controlOwner, previewSurface),
     abilityTargetPreview: previewSurface ? null : intent?.abilityTargetPreview || null,
     abilityObjects: arrayOrEmpty(state?.abilityObjects),
     smokes: arrayOrEmpty(state?.smokes),
@@ -358,4 +359,20 @@ function defaultNow() {
   return typeof performance !== "undefined" && typeof performance.now === "function"
     ? performance.now()
     : Date.now();
+}
+
+function tankPointPreview(intent, selected, controlOwner, previewSurface) {
+  const target = intent?.pointTargetPreview;
+  if (intent?.commandTarget !== "pointTanks" || !target ||
+      (previewSurface && target.source !== previewSurface) ||
+      !Number.isFinite(target.mouseX) || !Number.isFinite(target.mouseY)) return null;
+  const tanks = selected.filter((e) => e.kind === KIND.TANK && e.hp !== 0 &&
+    controlOwner.canControlOwner(e.owner) && Number.isFinite(e.x) && Number.isFinite(e.y));
+  if (!tanks.length) return null;
+  return {
+    originX: tanks.reduce((sum, e) => sum + e.x, 0) / tanks.length,
+    originY: tanks.reduce((sum, e) => sum + e.y, 0) / tanks.length,
+    mouseX: target.mouseX,
+    mouseY: target.mouseY,
+  };
 }

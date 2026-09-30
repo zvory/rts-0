@@ -71,6 +71,7 @@ const frameInputs = {
     feedbackOwnerIds: [1],
     showUnitRangesEnabled: true,
     showHealthBarsAlwaysEnabled: true,
+    pointTargetPreview: { originX: 12, originY: 16, mouseX: 40, mouseY: 48 },
     commandFeedback: [{ kind: "move", x: 30, y: 30 }],
     enemyAntiTankGunThreats: () => [
       {
@@ -208,6 +209,8 @@ assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 1, "the f
 const afterUpdateFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 538, sourceTick: 13, groundDecals: [updateRetryDecal], groundDecalRevision: 2 });
 assert((await adapter.render(afterUpdateFailureFrame).settled).status === PRESENTATION_OUTCOME.PRESENTED, "Pixi presents a later frame after a post-staging update failure");
 assert(engine.renders.at(-1).options.reconciledGroundDecals.length === 0, "update retry does not stamp the retained decal batch twice");
+
+assert(engine.renders[0].options.feedbackView.pointTargetPreview?.originX === 12, "Point preview reaches the Pixi feedback view");
 
 const retryDecal = { id: 91, decalClass: "infantry", x: 48, y: 52, seed: 91 };
 const presentFailureFrame = assembler.assemble({ ...frameInputs, visualTimeMs: 540, sourceTick: 14, groundDecals: [retryDecal], groundDecalRevision: 3 });

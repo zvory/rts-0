@@ -1,3 +1,4 @@
+import { drawTankPointPreview } from "./tank_point_preview.js";
 import { RocketTruckVisuals } from "./rocket_truck_visuals.js";
 import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 // Renderer — PixiJS scene graph + per-frame drawing. See docs/design/client-ui.md §4.1 / §4.2.
@@ -853,6 +854,7 @@ export class Renderer {
       this._drawSafely("selectedUnitRanges", () => this._drawSelectedUnitRanges(feedbackView));
       this._drawSafely("breakthroughAuras", () => this._drawBreakthroughAuras(feedbackView, regularEntities));
       this._drawSafely("abilityTargetPreview", () => this._drawAbilityTargetPreview(feedbackView));
+      this._drawSafely("pointTargetPreview", () => drawTankPointPreview(this._feedbackGfx, feedbackView.pointTargetPreview));
       this._drawSafely("antiTankGunSetupPreview", () => this._drawAntiTankGunSetupPreview(feedbackView));
       this._drawSafely("orderPlan", () => this._drawOrderPlan(feedbackView));
       this._drawSafely("debugPathOverlay", () => this._drawDebugPathOverlay(feedbackView, regularEntities));

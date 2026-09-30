@@ -42,6 +42,7 @@ const FEEDBACK_SINGLETON_TYPES = Object.freeze({
   labRuler: "labRuler",
   attackTargetPreview: "attackTargetPreview",
   supportWeaponSetupPreview: "antiTankGunSetupPreview",
+  pointTargetPreview: "pointTargetPreview",
   abilityTargetPreview: "abilityTargetPreview",
   resourceMiningPreview: "resourceMiningPreview",
 });

@@ -49,6 +49,7 @@ export class ClientIntent {
     this.contextualBuildPreview = null;
     /** @type {null | {source?:string, mouseX:number, mouseY:number, guns:Array<object>}} */
     this.antiTankGunSetupPreview = null;
+    this.pointTargetPreview = null;
     /** @type {null | {ability:string, source?:string, mouseX?:number, mouseY?:number, carriers:Array<object>, areaOrigins?:Array<object>, rangeOrigins?:Array<object>, pathOrigins?:Array<object>, returnMarkers?:Array<object>, rangePx?:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} */
     this.abilityTargetPreview = null;
     /** @type {null | {x:number,y:number}} */
@@ -64,6 +65,7 @@ export class ClientIntent {
     this.commandTarget = null;
     this.lastCommandTargetArm = null;
     this.antiTankGunSetupPreview = null;
+    this.pointTargetPreview = null;
     this.attackTargetPreview = null;
     this.commandCardMode = advanced ? "workerAdvancedBuild" : "workerBuild";
   }
@@ -172,6 +174,7 @@ export class ClientIntent {
     this.commandTarget = this.commandComposer.target;
     this.attackTargetPreview = null;
     this.antiTankGunSetupPreview = null;
+    this.pointTargetPreview = null;
     this.abilityTargetPreview = null;
   }
 
@@ -254,6 +257,10 @@ export class ClientIntent {
    * Set or clear the anti-tank gun manual setup cone preview.
    * @param {null | {source?:string, mouseX:number, mouseY:number, guns:Array<object>}} preview
    */
+  updatePointTargetPreview(preview) {
+    this.pointTargetPreview = preview;
+  }
+
   updateAntiTankGunSetupPreview(preview) {
     this.antiTankGunSetupPreview = preview;
   }
