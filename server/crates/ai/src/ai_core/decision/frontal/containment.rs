@@ -166,6 +166,11 @@ pub(super) fn issue_expansion_containment_wave(
                     .collect();
         }
         let riflemen: Vec<u32> = memory.containment.active_riflemen.iter().copied().collect();
+        let assembly_shape = if push_uses_available_armor {
+            MarchShape::TIGHT
+        } else {
+            MarchShape::LEGACY
+        };
         let formation = containment_formation(
             observation,
             &tanks,
@@ -175,6 +180,7 @@ pub(super) fn issue_expansion_containment_wave(
             own_base,
             (enemy_base.x, enemy_base.y),
             policy,
+            assembly_shape,
         )?;
         let exact_assembly_ready = formation_units_in_position(
             observation,
@@ -186,12 +192,14 @@ pub(super) fn issue_expansion_containment_wave(
             &formation,
             own_base,
             (enemy_base.x, enemy_base.y),
+            assembly_shape,
         );
         let vehicle_core_grouped = formation_vehicle_core_is_grouped(
             observation,
             &formation,
             own_base,
             (enemy_base.x, enemy_base.y),
+            assembly_shape,
         );
         let nearby_rifles = nearby_rifle_escort_count(observation, &riflemen, formation_center);
         let assembled = exact_assembly_ready
@@ -234,7 +242,7 @@ pub(super) fn issue_expansion_containment_wave(
         }
         memory.containment.launch_tanks = tanks.len();
         memory.containment.recovery_active = false;
-        memory.roundabout.start_push();
+        memory.approach.start_push();
         memory.containment.stationary_since = None;
         reset_containment_route(memory);
         memory.containment.last_formation_command_tick = None;
@@ -257,7 +265,7 @@ pub(super) fn issue_expansion_containment_wave(
     if !memory.enemy_main_destroyed && push_outnumbered(observation, &tanks) {
         if push_uses_available_armor {
             memory
-                .roundabout
+                .approach
                 .note_failed_push(observation.player_id, observation.tick);
         }
         begin_containment_recovery(memory);
@@ -298,37 +306,53 @@ pub(super) fn issue_expansion_containment_wave(
     } else {
         containment_points(own_base, objective, observation.map, policy)?
     };
-    // After a failed push the current Jeff may come at the target from a side instead: out to a
-    // swing point off the direct approach, then in from there. Straight in otherwise.
-    let lane = if push_uses_available_armor && !endgame_search_active {
-        containment_regroup_point(own_base, enemy_base, observation.map).and_then(|rally| {
-            super::roundabout::current_lane(
+    let contact_target = if push_uses_available_armor {
+        march_contact_target(observation, &tanks, policy.contact_stop_tiles)
+    } else {
+        visible_combat_target_within_tiles(observation, &tanks, policy.contact_stop_tiles)
+    };
+    if contact_target.is_some() {
+        memory.containment.contact_last_tick = Some(observation.tick);
+    }
+    let contact_active = memory.containment.contact_last_tick.is_some_and(|last| {
+        observation.tick.saturating_sub(last) <= CONTAINMENT_CONTACT_MEMORY_TICKS
+    });
+    // The current Jeff travels loosely to a staging point short of the target, reforms there, then
+    // closes in tight. After a failed push it may come at the target from a side instead.
+    let legs = if push_uses_available_armor && !endgame_search_active {
+        containment_regroup_point(own_base, enemy_base, observation.map).map(|rally| {
+            let legs = super::approach::push_legs(
                 memory,
                 map_analysis,
                 observation,
                 rally,
+                own_base,
                 (enemy_base.x, enemy_base.y),
                 objective,
                 tank_point,
                 policy.tank_standoff_tiles,
+            );
+            super::approach::leg_orders(
+                memory,
+                observation,
+                legs,
+                group_center(observation, &tanks),
+                contact_active,
+                own_base,
+                objective,
             )
         })
     } else {
         None
     };
-    let (tank_point, face_from, face_to) = match lane {
-        Some(lane) => {
-            let orders = super::roundabout::lane_orders(
-                memory,
-                observation,
-                lane,
-                group_center(observation, &tanks),
-                own_base,
-                objective,
-            );
-            (orders.destination, orders.face_from, orders.face_to)
-        }
+    let (tank_point, face_from, face_to) = match legs {
+        Some(orders) => (orders.destination, orders.face_from, orders.face_to),
         None => (tank_point, own_base, objective),
+    };
+    let shape = match legs.map(|orders| orders.phase) {
+        Some(super::approach::PushPhase::Travel) => MarchShape::TRAVEL,
+        _ if push_uses_available_armor => MarchShape::TIGHT,
+        _ => MarchShape::LEGACY,
     };
     let toward_objective = normalized_direction(face_from, face_to)?;
     let tank_assignments = if tight_formation {
@@ -338,12 +362,17 @@ pub(super) fn issue_expansion_containment_wave(
             tank_point,
             toward_objective,
             observation.map,
-            CONTAINMENT_TANK_SPACING_TILES,
+            shape.tank_spacing_tiles,
         )
     } else {
         tanks.iter().map(|tank_id| (*tank_id, tank_point)).collect()
     };
-    let tolerance = tile_size * if tight_formation { 1.0 } else { 2.0 };
+    let tolerance = tile_size
+        * if tight_formation {
+            shape.in_position_tiles
+        } else {
+            2.0
+        };
     let tolerance2 = tolerance * tolerance;
     let tanks_by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
@@ -368,17 +397,13 @@ pub(super) fn issue_expansion_containment_wave(
         observation.map,
         policy.scout_trailing_tiles,
     )?;
-    let contact_target = if push_uses_available_armor {
-        march_contact_target(observation, &tanks, policy.contact_stop_tiles)
-    } else {
-        visible_combat_target_within_tiles(observation, &tanks, policy.contact_stop_tiles)
-    };
-    if contact_target.is_some() {
-        memory.containment.contact_last_tick = Some(observation.tick);
+    // Reformed at the staging point: in its slots with most of its Riflemen up. It closes in next.
+    if legs.is_some_and(|orders| orders.phase == super::approach::PushPhase::Reform) {
+        let reformed = tanks_in_position
+            && nearby_rifle_escort_count(observation, &riflemen, tank_point)
+                >= riflemen.len().div_ceil(2);
+        memory.approach.note_reform(observation.tick, reformed);
     }
-    let contact_active = memory.containment.contact_last_tick.is_some_and(|last| {
-        observation.tick.saturating_sub(last) <= CONTAINMENT_CONTACT_MEMORY_TICKS
-    });
     let should_stop = tanks_in_position || contact_active;
     // A Tank Trap across the way is cleared before marching on, while nothing hostile is near.
     if push_uses_available_armor && !contact_active && !tanks_in_position {
@@ -590,6 +615,7 @@ pub(super) fn issue_expansion_containment_wave(
                 face_from,
                 face_to,
                 policy,
+                shape,
             )?;
             let waypoint_timed_out =
                 memory
@@ -610,23 +636,16 @@ pub(super) fn issue_expansion_containment_wave(
             // The current Jeff's Tanks and Scout Car lead: the next waypoint is ordered once they
             // are in place, and the Riflemen catch up rather than holding every step.
             let vehicles_placed = push_uses_available_armor
-                && formation_vehicles_in_position(
-                    observation,
-                    &formation,
-                    CONTAINMENT_ASSEMBLY_TOLERANCE_TILES,
-                );
+                && formation_vehicles_in_position(observation, &formation, shape.arrival_tiles);
             if vehicles_placed
-                || formation_units_in_position(
-                    observation,
-                    &formation,
-                    CONTAINMENT_ASSEMBLY_TOLERANCE_TILES,
-                )
+                || formation_units_in_position(observation, &formation, shape.arrival_tiles)
                 || (waypoint_timed_out
                     && formation_vehicle_core_is_grouped(
                         observation,
                         &formation,
                         face_from,
                         face_to,
+                        shape,
                     ))
             {
                 memory.containment.march_waypoint = None;
@@ -645,7 +664,8 @@ pub(super) fn issue_expansion_containment_wave(
         }
 
         if waypoint.is_none() {
-            let tanks_are_cohesive = tank_group_is_cohesive(observation, &tanks, toward_objective);
+            let tanks_are_cohesive =
+                tank_group_is_cohesive(observation, &tanks, toward_objective, shape);
             if !tanks_are_cohesive && lead_anchor_tank_catchup {
                 let lead_tank = frontmost_unit_id(observation, &tanks, toward_objective)?;
                 let rear_tank = rearmost_unit_id(observation, &tanks, toward_objective)?;
@@ -692,6 +712,7 @@ pub(super) fn issue_expansion_containment_wave(
                     current_center,
                     tank_point,
                     observation.map,
+                    shape.step_tiles,
                 )
             } else {
                 current_center
@@ -706,6 +727,7 @@ pub(super) fn issue_expansion_containment_wave(
                 face_from,
                 face_to,
                 policy,
+                shape,
             )?;
             issue_containment_formation(actions, observation, &formation, true);
             note_formation_command(memory, observation.tick);

@@ -1,13 +1,13 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
 use super::*;
 
+pub(super) mod approach;
 mod catch_up;
 mod containment;
 mod formation;
 #[cfg(test)]
 mod formation_tests;
 mod legacy_beta;
-pub(super) mod roundabout;
 pub(super) mod smoke;
 
 use self::catch_up::*;
@@ -377,7 +377,7 @@ pub(super) fn sync_containment_recovery(
     // The current Jeff comes at the target from another side next time.
     if uses_current_jeffs_ai_policy(profile.id) {
         memory
-            .roundabout
+            .approach
             .note_failed_push(observation.player_id, observation.tick);
     }
     begin_containment_recovery(memory);
