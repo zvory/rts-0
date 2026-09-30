@@ -248,6 +248,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/profiles/turtle.rs",
   "server/crates/ai/src/ai_core/facts.rs",
   "server/crates/ai/src/ai_core/observation.rs",
+  // The rifle squad micro planner (trained by the ai-skirmish harness) controls Kriegsia
+  // Riflemen and ranks enemy workers last; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/squad_micro/mod.rs",
   "server/crates/ai/src/ai_core/profiles.rs",
   // Kriegsia-only AI resource scanner; non-Kriegsia AI remains unsupported by public lobby flow.
   "server/crates/ai/src/ai_core/resource_availability.rs",
