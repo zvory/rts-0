@@ -462,7 +462,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       WORKER_BUILDABLE.includes(KIND.PUMP_JACK) &&
       WORKER_BUILD_CARD_SLOTS[1] === KIND.PUMP_JACK &&
       WORKER_BUILD_CARD_SLOTS[2] === KIND.BARRACKS &&
-      WORKER_BUILD_CARD_SLOTS.filter(Boolean).join(",") === WORKER_BUILDABLE.join(","),
+      WORKER_BUILD_CARD_SLOTS.filter(Boolean).join(",") === WORKER_BUILDABLE.filter((kind) =>
+        ![KIND.ENGINEERING_COMPLEX, KIND.STEELWORKS, KIND.FACTORY].includes(kind)).join(","),
     "Pump Jack returns to the Engineer W slot while Supply Depot stays unavailable",
   );
   const playerId = 1;
@@ -490,11 +491,11 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     playerHasCompletedKind(completedTrainingCentre, playerId, KIND.TRAINING_CENTRE),
     "Vehicle Works should unlock once the Training Centre is complete",
   );
-  const queuedBuildCard = (selection) => buildCommandCardDescriptors({
+  const queuedBuildCard = (selection, commandCardMode = "workerBuild") => buildCommandCardDescriptors({
     playerId,
     factionId: "kriegsia",
     selection,
-    commandCardMode: "workerBuild",
+    commandCardMode,
     resources: { steel: 1000, oil: 1000 },
     playerHasCompleteKind: (kind) => kind === KIND.RESOURCE_DEPOT,
   });
@@ -505,7 +506,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   const buildEnabled = (card, kind) => card.slots.find((slot) => slot?.id === `build:${kind}`)?.enabled;
   assert(buildEnabled(queuedBuildCard([queuedWorker]), KIND.TRAINING_CENTRE),
     "a selected worker building Barracks unlocks its queued Training Centre build button");
-  assert(buildEnabled(queuedBuildCard([queuedWorker]), KIND.ENGINEERING_COMPLEX),
+  assert(buildEnabled(queuedBuildCard([queuedWorker], "workerAdvancedBuild"), KIND.ENGINEERING_COMPLEX),
     "a selected worker's Barracks and Training Centre chain unlocks Engineering Complex");
   assert(!buildEnabled(queuedBuildCard([{ ...queuedWorker, orderPlan: [] }]), KIND.TRAINING_CENTRE),
     "an unrelated worker cannot use another worker's planned Barracks");
@@ -1172,13 +1173,17 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     shortResourceHud.clientIntent.openWorkerBuildMenu();
     renderCommandCard(shortResourceHud);
     const barracksButton = renderedButtons.find((button) => button.innerHTML.includes("Barracks"));
-    const factoryButton = renderedButtons.find((button) => button.innerHTML.includes("Vehicle Works"));
     assert(barracksButton && !barracksButton.disabled, "unlocked unaffordable build button stays clickable");
     assert(
       barracksButton.className.includes("unaffordable"),
       "unlocked unaffordable build button gets the intermediate visual class",
     );
-    assert(factoryButton?.disabled, "tech-locked build button stays hard-disabled");
+    shortResourceHud.clientIntent.openWorkerBuildMenu(true);
+    renderCommandCard(shortResourceHud);
+    const factoryButton = renderedButtons.find((button) => button.innerHTML.includes("Vehicle Works"));
+    assert(factoryButton?.disabled, "tech-locked advanced build button stays hard-disabled");
+    shortResourceHud.clientIntent.openWorkerBuildMenu();
+    renderCommandCard(shortResourceHud);
 
     barracksButton.click();
     assert(

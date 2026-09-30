@@ -14,6 +14,7 @@ const CONTEXT_LABELS = Object.freeze({
   empty: "Empty Selection",
   "worker-main": "Worker Commands",
   "worker-build": "Worker Build Menu",
+  "worker-advanced-build": "Worker Advanced Build Menu",
   "mixed-army-support": "Army Abilities",
   artillery: "Artillery Commands",
   "resource-depot-train": "Resource Depot",

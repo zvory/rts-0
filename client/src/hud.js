@@ -589,7 +589,7 @@ export class HUD {
         this._intent()?.beginCommandTarget?.(intent.target, { shiftKey: !!ev.shiftKey });
         return;
       case "openWorkerBuildMenu":
-        this._intent()?.openWorkerBuildMenu?.();
+        this._intent()?.openWorkerBuildMenu?.(!!intent.advanced);
         return;
       case "closeCommandCardMenu":
         this._intent()?.closeCommandCardMenu?.();

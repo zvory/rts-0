@@ -43,6 +43,7 @@ import {
   trainResourcesOf,
   trainSlotForUnit,
 } from "./hud_train_card_helpers.js";
+import { workerCommandSlots } from "./hud_worker_commands.js";
 import { buildEkatCommandCardContextSamples } from "./hud_command_card_contexts.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
@@ -194,6 +195,7 @@ export function buildCommandCardContextCatalog() {
     { id: "empty", card: buildCommandCardDescriptors(ctx([])) },
     { id: "worker-main", card: buildCommandCardDescriptors(ctx([worker])) },
     { id: "worker-build", card: buildCommandCardDescriptors(ctx([worker], { commandCardMode: "workerBuild" })) },
+    { id: "worker-advanced-build", card: buildCommandCardDescriptors(ctx([worker], { commandCardMode: "workerAdvancedBuild" })) },
     { id: "mixed-army-support", card: buildCommandCardDescriptors(ctx([rifleman, scoutCar, mortar, artillery, commandCar])) },
     { id: "command-car", card: buildCommandCardDescriptors(ctx([commandCar], {
       entities: allEntities.filter((e) => e.id !== scoutPlane.id),
@@ -224,7 +226,7 @@ export function buildCommandCardDescriptors(ctx) {
   const primary = commandSubject(ctx, selection);
   if (!primary) return card("empty", "empty", new Array(9).fill(null));
 
-  if (ctx.commandCardMode === "workerBuild" && workerOnlySelection(ctx, selection)) {
+  if (["workerBuild", "workerAdvancedBuild"].includes(ctx.commandCardMode) && workerOnlySelection(ctx, selection)) {
     return buildWorkerBuildCard(ctx);
   }
   if (underConstructionBuilding(ctx, primary)) {
@@ -267,7 +269,8 @@ export function buildWorkerBuildCard(ctx) {
   const slots = [];
   const sigParts = [];
   const buildables = new Set(workerBuildablesForFaction(factionId));
-  for (const kind of workerBuildCardSlotsForFaction(factionId)) {
+  const advanced = ctx.commandCardMode === "workerAdvancedBuild";
+  for (const kind of workerBuildCardSlotsForFaction(factionId, advanced)) {
     if (!kind || !buildables.has(kind)) {
       slots.push(null);
       continue;
@@ -304,7 +307,7 @@ export function buildWorkerBuildCard(ctx) {
     enabled: true,
     title: "Return to worker commands",
   });
-  return card("workerBuild", `build|${sigParts.join(",")}`, slots);
+  return card(advanced ? "workerAdvancedBuild" : "workerBuild", `build|${advanced}|${sigParts.join(",")}`, slots);
 }
 
 export function buildUnitCard(ctx, selection) {
@@ -335,27 +338,7 @@ export function buildUnitCard(ctx, selection) {
     (workerSelected ? "worker-main" : "no-build");
 
   if (workerSelected) {
-    return card("unit", signature, [
-        moveDescriptor(ctx, unitIds),
-        holdDescriptor(unitIds),
-        null,
-        attackDescriptor(ctx, unitIds),
-        stopDescriptor(unitIds),
-        null,
-        {
-          id: "worker:build-menu",
-          commandId: "worker.buildMenu",
-          kind: "button",
-          action: "openWorkerBuildMenu",
-          intent: { type: "openWorkerBuildMenu" },
-          icon: "BLD",
-          label: "Build",
-          title: "Open worker build menu",
-          enabled: unitIds.length > 0,
-        },
-        null,
-        null,
-      ], { abilityAffordances });
+    return card("unit", signature, workerCommandSlots(ctx, unitIds, factionId), { abilityAffordances });
   }
 
   const slots = new Array(9).fill(null);

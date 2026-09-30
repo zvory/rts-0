@@ -156,7 +156,14 @@ export function workerBuildablesForFaction(factionId) {
   return factionCatalog(factionId).buildables;
 }
 
-export function workerBuildCardSlotsForFaction(factionId) {
+const ADVANCED_WORKER_BUILD_CARD_SLOTS = Object.freeze([
+  KIND.ENGINEERING_COMPLEX,
+  KIND.STEELWORKS,
+  KIND.FACTORY,
+]);
+
+export function workerBuildCardSlotsForFaction(factionId, advanced = false) {
+  if (advanced) return ADVANCED_WORKER_BUILD_CARD_SLOTS;
   return factionId === CULTIVATORS_FACTION_ID
     ? CULTIVATORS_WORKER_BUILD_CARD_SLOTS
     : WORKER_BUILD_CARD_SLOTS;

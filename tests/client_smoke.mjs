@@ -447,6 +447,26 @@ try {
     `BUILD: Engineer constructs bases and manual Pump Jacks (${JSON.stringify(engineerBuildCard)})`,
   );
 
+  ok(!engineerBuildCard.commandIds.some((id) =>
+    ["kriegsia.build.engineering_complex", "kriegsia.build.steelworks", "kriegsia.build.factory"].includes(id)),
+    "BUILD: advanced structures are absent from the basic menu");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector('#command-card button[data-command-id="worker.advancedBuildMenu"]');
+  await page.keyboard.press("x");
+  await page.waitForSelector('#command-card button[data-command-id="kriegsia.build.engineering_complex"]');
+  ok(await page.evaluate(() => window.__rts.match.clientIntent.commandCardMode === "workerAdvancedBuild"),
+    "BUILD: X opens the advanced submenu");
+  ok(await page.evaluate(() =>
+    ["engineering_complex", "steelworks", "factory"].every((kind) =>
+      document.querySelector(`#command-card button[data-command-id="kriegsia.build.${kind}"]`))),
+    "BUILD: advanced submenu contains Engineering Complex, Gun Works, and Vehicle Works");
+  await page.keyboard.press("c");
+  await page.waitForSelector('#command-card button[data-command-id="worker.advancedBuildMenu"]');
+  await page.click('#command-card button[data-command-id="worker.advancedBuildMenu"]');
+  await page.waitForSelector('#command-card button[data-command-id="kriegsia.build.factory"]');
+  await page.keyboard.press("Escape");
+  await page.waitForSelector('#command-card button[data-command-id="worker.buildMenu"]');
+
   const extractorSlots = await page.evaluate(() => {
     const m = window.__rts.match, s = m.state;
     const resourceDepot = s.entitiesInterpolated(1)

@@ -131,6 +131,7 @@ function buttonSlots(card) {
     { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
     { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
     { commandId: "worker.buildMenu", slotIndex: 6, hotkey: "Z" },
+    { commandId: "worker.advancedBuildMenu", slotIndex: 7, hotkey: "X" },
   ]);
 
   const buildCard = buildCommandCardDescriptors({
@@ -157,6 +158,23 @@ function buttonSlots(card) {
     true,
     "Engineers can place Pump Jacks",
   );
+  const advancedKinds = [KIND.ENGINEERING_COMPLEX, KIND.STEELWORKS, KIND.FACTORY];
+  assert(!buildCard.slots.some((slot) => advancedKinds.includes(slot?.intent?.building)));
+  const advancedCard = buildCommandCardDescriptors({
+    playerId: 1, selection: [worker], commandCardMode: "workerAdvancedBuild",
+    resources: { steel: 1000, oil: 1000 }, playerHasCompleteKind: () => true,
+  });
+  assert.equal(advancedCard.kind, "workerAdvancedBuild");
+  assert.deepEqual(advancedCard.slots.slice(0, 3).map((slot) => slot.intent.building), advancedKinds);
+  assert.deepEqual(advancedCard.slots.slice(0, 3).map((slot) => slot.hotkey), ["Q", "W", "E"]);
+  assert(advancedCard.slots.slice(0, 3).every((slot) => slot.enabled));
+  assert.equal(advancedCard.slots[8].commandId, "worker.return");
+  assert.notEqual(advancedCard.signature, buildCard.signature);
+  const lockedCard = buildCommandCardDescriptors({
+    playerId: 1, selection: [worker], commandCardMode: "workerAdvancedBuild",
+    resources: { steel: 0, oil: 0 }, playerHasCompleteKind: () => false,
+  });
+  assert(lockedCard.slots.slice(0, 3).every((slot) => !slot.enabled));
   assert.equal(buildCard.slots[8].commandId, "worker.return");
   assert.equal(buildCard.slots[8].hotkey, "C");
   assert.deepEqual(commandCardActivationCandidates(workerCard, "worker.buildMenu"), [{
@@ -201,6 +219,7 @@ function buttonSlots(card) {
     { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
     { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
     { commandId: "worker.buildMenu", slotIndex: 6, hotkey: "Z" },
+    { commandId: "worker.advancedBuildMenu", slotIndex: 7, hotkey: "X" },
   ], "lab operator command card treats the controlled selected owner as commandable");
 
   const viewerPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } });
@@ -670,6 +689,7 @@ for (const [kind, upgrade] of [
     "empty",
     "worker-main",
     "worker-build",
+    "worker-advanced-build",
     "mixed-army-support",
     "command-car",
     "tank",

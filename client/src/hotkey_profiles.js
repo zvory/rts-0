@@ -26,6 +26,7 @@ const CLASSIC_DIRECT_BINDINGS = Object.freeze({
   "unit.pointTanks": "KeyO",
   "unit.setupSupportWeapon": "KeyU",
   "worker.buildMenu": "KeyB",
+  "worker.advancedBuildMenu": "KeyX",
   "worker.return": "KeyW",
   [factionCommandId(DEFAULT_FACTION_ID, "build", KIND.TANK_TRAP)]: "KeyK",
   [factionCommandId(DEFAULT_FACTION_ID, "ability", ABILITY.SMOKE)]: "KeyD",

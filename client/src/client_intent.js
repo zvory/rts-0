@@ -23,7 +23,7 @@ export class ClientIntent {
     this._now = now;
     /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean, lineSites?:Array<{tileX:number,tileY:number,valid:boolean}>}} */
     this.placement = null;
-    /** @type {null | "workerBuild"} */
+    /** @type {null | "workerBuild" | "workerAdvancedBuild"} */
     this.commandCardMode = null;
     /** @type {null | "move" | "attack" | "setupAntiTankGuns" | "pointTanks" | {kind:"ability",ability:string}} */
     this.commandTarget = null;
@@ -58,14 +58,14 @@ export class ClientIntent {
   }
 
   /** Open the worker build command-card submenu. */
-  openWorkerBuildMenu() {
+  openWorkerBuildMenu(advanced = false) {
     this._clearActiveLabTool();
     this.placement = null;
     this.commandTarget = null;
     this.lastCommandTargetArm = null;
     this.antiTankGunSetupPreview = null;
     this.attackTargetPreview = null;
-    this.commandCardMode = "workerBuild";
+    this.commandCardMode = advanced ? "workerAdvancedBuild" : "workerBuild";
   }
 
   /**
