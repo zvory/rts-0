@@ -31,6 +31,44 @@ const ok = (c, m) => { if (!c) { console.log("  FAIL " + m); failures++; } else 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const chromeProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-chrome-"));
 
+function lobbyMapConfirmed(mapName) {
+  return window.__rts.lobby._selectedMap === mapName &&
+    document.querySelector("#lobby-map-trigger")?.textContent?.includes(mapName);
+}
+
+// Hold actual server replies until we have checked the optimistic label. This
+// deterministically covers the late previous-map reply that used to cancel Chokes.
+async function selectConfirmedLobbyMap(page, mapName) {
+  await page.evaluate(() => {
+    const lobby = window.__rts.lobby;
+    const original = lobby._renderLobby;
+    const queued = [];
+    lobby._renderLobby = (message) => queued.push(message);
+    window.__smokeMapConfirmation = {
+      queued,
+      release() {
+        lobby._renderLobby = original;
+        for (const message of queued) original.call(lobby, message);
+        delete window.__smokeMapConfirmation;
+      },
+    };
+  });
+  try {
+    await page.click(`.lobby-map-option[data-map-name="${mapName}"]`);
+    await page.waitForFunction((name) =>
+      window.__smokeMapConfirmation.queued.some((message) => message.map === name),
+    { timeout: 5000 }, mapName);
+    ok(await page.evaluate((name) =>
+      document.querySelector("#lobby-map-trigger")?.textContent?.includes(name), mapName),
+    `MAP: ${mapName} label updates before server confirmation`);
+    ok(!await page.evaluate(lobbyMapConfirmed, mapName),
+      `MAP: ${mapName} optimistic label cannot satisfy the confirmation wait`);
+  } finally {
+    await page.evaluate(() => window.__smokeMapConfirmation?.release());
+  }
+  await page.waitForFunction(lobbyMapConfirmed, { timeout: 5000 }, mapName);
+}
+
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: "new",
@@ -42,7 +80,7 @@ try {
   const page = await browser.newPage();
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   page.on("pageerror", (e) => pageErrors.push(e.message));
-  page.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push("requestfailed: " + r.url()); });
+  page.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push(`requestfailed: ${r.url()} (${r.failure()?.errorText || "unknown reason"})`); });
   page.on("response", (response) => {
     const status = response.status();
     if (status < 400 || response.url().includes("favicon")) return;
@@ -170,7 +208,8 @@ try {
   await page.hover('.lobby-map-option[data-map-name="Schone Tage"]');
   await page.waitForFunction(() => {
     const image = document.querySelector(".lobby-map-preview img");
-    return image?.naturalWidth === 512 && image?.naturalHeight === 512;
+    return image?.getAttribute("src")?.endsWith("/assets/map-previews/schone-tage.jpg")
+      && image.complete && image.naturalWidth === 512 && image.naturalHeight === 512;
   }, { timeout: 5000 });
   const mapPreview = await page.evaluate(() => ({
     name: document.querySelector(".lobby-map-preview figcaption strong")?.textContent || "",
@@ -180,18 +219,10 @@ try {
   ok(mapPreview.name === "Schone Tage" && mapPreview.author === "Created by oti"
     && mapPreview.src.endsWith("/assets/map-previews/schone-tage.jpg"),
   `map hover shows the authoritative preview and creator (${JSON.stringify(mapPreview)})`);
-  await page.click('.lobby-map-option[data-map-name="Schone Tage"]');
-  await page.waitForFunction(
-    () => document.querySelector("#lobby-map-trigger")?.textContent?.includes("Schone Tage"),
-    { timeout: 5000 },
-  );
+  await selectConfirmedLobbyMap(page, "Schone Tage");
   ok(true, "custom map option updates through the authoritative lobby selection");
   await page.click("#lobby-map-trigger");
-  await page.click('.lobby-map-option[data-map-name="Chokes"]');
-  await page.waitForFunction(
-    () => document.querySelector("#lobby-map-trigger")?.textContent?.includes("Chokes"),
-    { timeout: 5000 },
-  );
+  await selectConfirmedLobbyMap(page, "Chokes");
   await page.waitForFunction(() => {
     const image = document.querySelector(".lobby-map-preview img");
     return image?.getAttribute("src")?.endsWith("/assets/map-previews/chokes.jpg")
@@ -739,7 +770,7 @@ try {
   const editorPage = await browser.newPage();
   editorPage.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   editorPage.on("pageerror", (e) => pageErrors.push(e.message));
-  editorPage.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push("requestfailed: " + r.url()); });
+  editorPage.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push(`requestfailed: ${r.url()} (${r.failure()?.errorText || "unknown reason"})`); });
   editorPage.on("response", (response) => {
     const status = response.status();
     if (status >= 400 && !response.url().includes("favicon")) responseErrors.push(`${status}: ${response.url()}`);
