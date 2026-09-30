@@ -1005,8 +1005,9 @@ function nearPoint(call, point, epsilon = 0.001) {
     { ...feedbackView, showUnitRangesEnabled: false },
   );
   assert(
-    !disabledRangeGfx.calls.some((call) => call[0] === "lineTo" || call[0] === "arc"),
-    "artillery and other regular unit ranges stay hidden when unit ranges are disabled",
+    disabledRangeGfx.calls.filter((call) => call[0] === "lineStyle" && call[3] === 0.68).length === 1 &&
+      !disabledRangeGfx.calls.some((call) => call[0] === "arc"),
+    "only the selected tank keeps its regular range visible when unit ranges are disabled",
   );
 
   const setupGfx = new RecordingGraphics();

@@ -50,7 +50,6 @@ export function _drawSelectedUnitRanges(state) {
   if (!Array.isArray(rangeEntities)) return;
   const drawAllRanges = !!state.showUnitRangesEnabled;
   const drawSelectedFieldOfFire = !!state.showSelectedFieldOfFireEnabled;
-  if (!drawEveryVisibleRange && !drawAllRanges && !drawSelectedFieldOfFire) return;
   const g = this._feedbackGfx;
   const tileSize = (this._map && this._map.tileSize) || 32;
 
@@ -60,7 +59,8 @@ export function _drawSelectedUnitRanges(state) {
     if (e.visionOnly || e.shotReveal || e.aboveFogReveal) continue;
     const profile = selectedUnitRangeProfile(e, tileSize);
     if (!profile) continue;
-    if (!drawEveryVisibleRange && !drawAllRanges && profile.kind !== "fieldOfFire") continue;
+    if (!drawEveryVisibleRange && !drawAllRanges && e.kind !== KIND.TANK &&
+        !(drawSelectedFieldOfFire && profile.kind === "fieldOfFire")) continue;
     if (profile.kind === "fieldOfFire") {
       drawFacingWedge(
         g,
