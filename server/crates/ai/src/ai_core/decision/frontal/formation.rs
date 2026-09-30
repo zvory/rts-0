@@ -15,6 +15,11 @@ pub(super) struct MarchShape {
     pub(super) lateral_slop_tiles: f32,
     /// Whether a push formed in several ranks is allowed the depth of its ranks.
     pub(super) ranked: bool,
+    /// Tanks to a rank.
+    pub(super) rank_width: usize,
+    /// Whether a waypoint is reached once the Tanks' centre is within `arrival_tiles` of it,
+    /// whether or not every Tank has found its slot.
+    pub(super) advance_on_center: bool,
 }
 
 impl MarchShape {
@@ -27,6 +32,8 @@ impl MarchShape {
         longitudinal_slop_tiles: CONTAINMENT_LONGITUDINAL_SPREAD_TILES,
         lateral_slop_tiles: CONTAINMENT_LATERAL_SLOP_TILES,
         ranked: false,
+        rank_width: TANK_FORMATION_RANK_WIDTH,
+        advance_on_center: false,
     };
     /// The current Jeff forming up, reforming and closing in: as tight, but a push of more than six
     /// Tanks is formed in ranks and is that much deeper. Held to one rank of depth, a large push
@@ -35,8 +42,11 @@ impl MarchShape {
         ranked: true,
         ..Self::LEGACY
     };
-    /// The current Jeff on the way to its staging point: a little more room between Tanks, longer
-    /// steps, and looser arrival and cohesion, so it keeps moving; it reforms before closing in.
+    /// The current Jeff on the way to its staging point: a little more room between Tanks, ranks of
+    /// four so the column fits through gaps, longer steps, and looser arrival and cohesion. It moves
+    /// on once its centre reaches a waypoint: slots ten tiles abreast fell in trees and water in
+    /// narrow ground, and Tanks detoured toward them while the push waited. It reforms before
+    /// closing in.
     pub(super) const TRAVEL: Self = Self {
         tank_spacing_tiles: 2.0,
         step_tiles: 12.0,
@@ -45,6 +55,8 @@ impl MarchShape {
         longitudinal_slop_tiles: 3.0,
         lateral_slop_tiles: 2.0,
         ranked: true,
+        rank_width: 4,
+        advance_on_center: true,
     };
 }
 
@@ -247,13 +259,14 @@ pub(super) fn containment_formation(
     shape: MarchShape,
 ) -> Option<ContainmentFormation> {
     let toward_objective = normalized_direction(own_base, objective)?;
-    let tanks = compact_tank_formation_assignments(
+    let tanks = ranked_tank_formation_assignments(
         observation,
         tanks,
         tank_center,
         toward_objective,
         observation.map,
         shape.tank_spacing_tiles,
+        shape.rank_width,
     );
     let scout_point = scout_trailing_point(
         tank_center,
@@ -550,8 +563,8 @@ pub(super) fn tank_group_is_cohesive(
     let tile_size = observation.map.tile_size as f32;
     let (ranks, per_rank) = if shape.ranked {
         (
-            tanks.len().div_ceil(TANK_FORMATION_RANK_WIDTH),
-            tanks.len().min(TANK_FORMATION_RANK_WIDTH),
+            tanks.len().div_ceil(shape.rank_width.max(1)),
+            tanks.len().min(shape.rank_width.max(1)),
         )
     } else {
         (1, tanks.len())

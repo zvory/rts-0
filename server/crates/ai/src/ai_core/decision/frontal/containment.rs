@@ -356,13 +356,14 @@ pub(super) fn issue_expansion_containment_wave(
     };
     let toward_objective = normalized_direction(face_from, face_to)?;
     let tank_assignments = if tight_formation {
-        compact_tank_formation_assignments(
+        ranked_tank_formation_assignments(
             observation,
             &tanks,
             tank_point,
             toward_objective,
             observation.map,
             shape.tank_spacing_tiles,
+            shape.rank_width,
         )
     } else {
         tanks.iter().map(|tank_id| (*tank_id, tank_point)).collect()
@@ -637,7 +638,14 @@ pub(super) fn issue_expansion_containment_wave(
             // are in place, and the Riflemen catch up rather than holding every step.
             let vehicles_placed = push_uses_available_armor
                 && formation_vehicles_in_position(observation, &formation, shape.arrival_tiles);
+            // Travelling, the push moves on once its Tanks' centre reaches the waypoint.
+            let center_arrived = shape.advance_on_center
+                && group_center(observation, &tanks).is_some_and(|center| {
+                    dist2(center.0, center.1, current_waypoint.0, current_waypoint.1)
+                        <= (shape.arrival_tiles * tile_size).powi(2)
+                });
             if vehicles_placed
+                || center_arrived
                 || formation_units_in_position(observation, &formation, shape.arrival_tiles)
                 || (waypoint_timed_out
                     && formation_vehicle_core_is_grouped(
