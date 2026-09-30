@@ -223,7 +223,7 @@ pub const UNITS: &[UnitDef] = &[
             dmg: 100,
             range_tiles: 5.0,
             cooldown: 144,
-            speed: 1.672,
+            speed: 1.7556,
             sight_tiles: 9,
             cost_steel: 150,
             cost_oil: 40,
@@ -815,7 +815,7 @@ mod tests {
             .stats
             .speed;
 
-        assert_eq!(anti_tank_gun_speed, 1.672);
+        assert_eq!(anti_tank_gun_speed, 1.7556);
         assert_eq!(artillery_speed, 1.6);
     }
 
