@@ -12,6 +12,17 @@ mod tests {
     use rts_sim::game::entity::EntityKind;
 
     #[test]
+    fn room_notice_serializes_through_server_adapter() {
+        let message = ServerMessage::RoomNotice {
+            msg: "Scout has joined the replay".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(message).unwrap(),
+            serde_json::json!({"t": "roomNotice", "msg": "Scout has joined the replay"})
+        );
+    }
+
+    #[test]
     fn point_tanks_command_round_trips_through_sim_adapter() {
         let wire: Command =
             serde_json::from_str(r#"{"c":"pointTanks","units":[1,2],"x":300.0,"y":400.0}"#)

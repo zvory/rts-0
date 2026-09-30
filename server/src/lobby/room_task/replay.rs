@@ -52,6 +52,7 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
+        self.broadcast_replay_membership_notice(player_id, &name, "joined");
         self.order.push(player_id);
         self.players.insert(player_id, replay_viewer(name, msg_tx));
         let _ = ack.send(true);
@@ -88,6 +89,7 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
+        self.broadcast_replay_membership_notice(player_id, &name, "joined");
         self.order.push(player_id);
         self.players.insert(player_id, replay_viewer(name, msg_tx));
         let _ = ack.send(true);

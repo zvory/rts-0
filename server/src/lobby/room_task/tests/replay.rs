@@ -1307,3 +1307,62 @@ fn replay_viewer_return_resets_room_when_last_viewer_leaves() {
     assert_eq!(task.match_player_count, 0);
     assert_eq!(task.match_human_count, 0);
 }
+
+#[test]
+fn replay_membership_notices_are_immediate_and_not_repeated() {
+    for dedicated in [false, true] {
+        for ended in [false, true] {
+            let players = replay_test_players(2);
+            let (_, artifact) = replay_test_artifact(&players, 3);
+            let mode = if dedicated {
+                RoomMode::Replay {
+                    artifact: artifact.clone(),
+                }
+            } else {
+                RoomMode::Normal
+            };
+            let mut session = ReplaySession::new(artifact).unwrap();
+            if ended {
+                session.rebuild_to(session.duration_ticks).unwrap();
+            } else {
+                session.set_speed(50, 0.0);
+                assert!(session.is_paused());
+            }
+            let mut task = RoomTask::new(
+                "replay-membership-notice".to_string(),
+                mode,
+                None,
+                false,
+                DrainHandle::default(),
+            );
+            let mut existing = add_test_room_spectator(&mut task, 50);
+            task.phase = Phase::ReplayViewer(Box::new(session));
+            let (sink, mut joining) = ConnectionSink::new();
+            let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+            task.on_join(99, " Late Viewer ".to_string(), true, true, sink, ack);
+            assert_eq!(ack_rx.try_recv(), Ok(true));
+            assert!(matches!(existing.reliable_rx.try_recv().unwrap(),
+                ServerMessage::RoomNotice { msg } if msg == "Late Viewer has joined the replay"));
+            assert!(existing.reliable_rx.try_recv().is_err());
+            while let Ok(message) = joining.reliable_rx.try_recv() {
+                assert!(!matches!(message, ServerMessage::RoomNotice { .. }));
+            }
+
+            let (sink, _duplicate) = ConnectionSink::new();
+            let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+            task.on_join(99, "Duplicate".to_string(), true, true, sink, ack);
+            assert_eq!(ack_rx.try_recv(), Ok(false));
+            assert!(existing.reliable_rx.try_recv().is_err());
+
+            if ended {
+                task.on_return_to_lobby(99);
+            } else {
+                task.on_leave(99);
+            }
+            assert!(matches!(existing.reliable_rx.try_recv().unwrap(),
+                ServerMessage::RoomNotice { msg } if msg == "Late Viewer has left the replay"));
+            task.on_leave(99);
+            assert!(existing.reliable_rx.try_recv().is_err());
+        }
+    }
+}

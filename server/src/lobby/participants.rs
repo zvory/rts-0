@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use super::connection::ConnectionSink;
+use super::connection::{send_or_log, ConnectionSink};
 use super::room_task::RoomPlayer;
+use crate::protocol::ServerMessage;
 
 pub(super) fn replay_viewer(name: String, msg_tx: ConnectionSink) -> RoomPlayer {
     RoomPlayer {
@@ -30,6 +31,24 @@ pub(super) struct CommandIssuer {
 }
 
 impl<'a> Participants<'a> {
+    pub(super) fn notify_replay_membership(
+        &self,
+        room: &str,
+        player_id: u32,
+        name: &str,
+        action: &str,
+    ) {
+        let name = late_spectator_notice_name(name);
+        let notice = ServerMessage::RoomNotice {
+            msg: format!("{name} has {action} the replay"),
+        };
+        for (&id, player) in self.players {
+            if id != player_id {
+                send_or_log(room, id, &player.msg_tx, notice.clone());
+            }
+        }
+    }
+
     pub(super) fn new(
         order: &'a [u32],
         players: &'a HashMap<u32, RoomPlayer>,
@@ -104,5 +123,15 @@ impl<'a> Participants<'a> {
             .get(&connection_id)
             .map(|player| !player.spectator)
             .unwrap_or(false)
+    }
+}
+
+pub(super) fn late_spectator_notice_name(name: &str) -> String {
+    let cleaned: String = name.trim().chars().filter(|ch| !ch.is_control()).collect();
+    let cleaned = cleaned.trim();
+    if cleaned.is_empty() {
+        "Commander".to_string()
+    } else {
+        cleaned.to_string()
     }
 }
