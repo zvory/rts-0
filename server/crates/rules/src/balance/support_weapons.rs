@@ -6,7 +6,7 @@ use crate::EntityKind;
 pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 pub const METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS: u16 = MACHINE_GUNNER_SETUP_TICKS / 2;
 pub const ANTI_TANK_GUN_SETUP_TICKS: u16 = 80;
-pub const ANTI_TANK_GUN_TEARDOWN_TICKS: u16 = 80;
+pub const ANTI_TANK_GUN_TEARDOWN_TICKS: u16 = 40;
 // Tank HE: direct-hit damage stays in the cannon profile.
 pub const TANK_HE_RADIUS_TILES: f32 = 1.4;
 pub const TANK_HE_SPLASH_DAMAGE: u32 = 30;
@@ -14,7 +14,7 @@ pub const TANK_HE_SPLASH_DAMAGE: u32 = 30;
 pub const MORTAR_RANGE_TILES: u32 = 17;
 pub const MORTAR_MIN_RANGE_TILES: u32 = 5;
 pub const MORTAR_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::TAU;
-pub const MORTAR_MANUAL_SHELL_DELAY_TICKS: u32 = (TICK_HZ * 9 + 2) / 8;
+pub const MORTAR_MANUAL_SHELL_DELAY_TICKS: u32 = (TICK_HZ * 9 + 2) / 16;
 pub const MORTAR_OUTER_RADIUS_TILES: f32 = 2.0;
 pub const MORTAR_INNER_RADIUS_TILES: f32 = 0.5;
 pub const MORTAR_OUTER_DAMAGE: u32 = 40;
@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn support_weapon_transition_timing_is_kind_specific() {
         assert_eq!(ANTI_TANK_GUN_SETUP_TICKS, 80);
-        assert_eq!(ANTI_TANK_GUN_TEARDOWN_TICKS, 80);
+        assert_eq!(ANTI_TANK_GUN_TEARDOWN_TICKS, 40);
         assert_eq!(
             support_weapon_setup_ticks(EntityKind::MachineGunner),
             Some(MACHINE_GUNNER_SETUP_TICKS)

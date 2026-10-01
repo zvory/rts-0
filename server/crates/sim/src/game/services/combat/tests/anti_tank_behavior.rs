@@ -130,17 +130,19 @@ fn deployed_anti_tank_gun_rotation_rejects_target_outside_fixed_arc() {
 
 #[test]
 fn support_weapon_redeploy_rotates_after_teardown_completes() {
-    for (kind, setup_ticks, teardown_ticks, label) in [
+    for (kind, setup_ticks, teardown_ticks, turn_rate, label) in [
         (
             EntityKind::AntiTankGun,
             config::ANTI_TANK_GUN_SETUP_TICKS,
             config::ANTI_TANK_GUN_TEARDOWN_TICKS,
+            ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
             "anti-tank gun",
         ),
         (
             EntityKind::Artillery,
             config::ARTILLERY_SETUP_TICKS,
             config::ARTILLERY_SETUP_TICKS,
+            0.035,
             "artillery",
         ),
     ] {
@@ -188,8 +190,8 @@ fn support_weapon_redeploy_rotates_after_teardown_completes() {
 
         let unit = entities.get(id).expect("support weapon should exist");
         assert!(
-            unit.facing() > 0.0 && unit.facing() <= ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
-            "{label} should start rotating only after it is packed, got {:.4}",
+            (unit.facing() - turn_rate).abs() <= 0.001,
+            "{label} should start rotating at its own turn rate only after it is packed, got {:.4}",
             unit.facing()
         );
 

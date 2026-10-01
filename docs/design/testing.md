@@ -487,6 +487,13 @@ canary runs own a private server; the browser shard passes its existing loopback
 - `client/`: run JS protocol/client contract checks, minimap/input contracts where relevant, and
   client smoke. Include Node integration when protocol decode or network behavior changed.
 
+The client smoke map-selection checks wait for `Lobby._selectedMap`, which is updated by the
+server's lobby reply, as well as the displayed label. The label alone changes optimistically on
+click and cannot establish confirmation. The smoke holds real lobby replies to verify this
+boundary before advancing from Schone Tage to Chokes. Both previews must finish loading at
+512×512; failed requests remain fatal and include Chrome's failure reason. This prevents a late
+confirmation for the previous map from canceling the next preview and falsely blocking deployment.
+
 `scripts/check-source-file-sizes.mjs` runs as a cheap policy gate and enforces a 1500-line cap for
 Rust, JS, and MJS source/test files under `server/`, `client/src/`, `tests/`, and `scripts/`, plus
 the checked-in production stylesheet at `client/styles.css`.

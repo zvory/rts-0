@@ -14,6 +14,7 @@ use super::{
 
 const SUPPORT_WEAPON_ATTACK_MOVE_NO_TARGET_TICKS: u16 = config::TICK_HZ as u16;
 const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
+const ARTILLERY_SETUP_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 
 pub(super) fn tick_tank_stationary_range(e: &mut Entity) {
     if e.kind != EntityKind::Tank || e.hp == 0 {
@@ -102,8 +103,8 @@ pub(super) fn tick_deployed_weapon_setup(e: &mut Entity) {
     if !requires_weapon_setup(e.kind) {
         return;
     }
-    rotate_anti_tank_gun_toward_setup_facing(e);
-    maybe_begin_anti_tank_gun_setup_after_alignment(e);
+    rotate_support_weapon_toward_setup_facing(e);
+    maybe_begin_support_weapon_setup_after_alignment(e);
     e.tick_weapon_setup();
 }
 
@@ -292,7 +293,7 @@ fn anti_tank_gun_field_center(e: &Entity) -> Option<f32> {
         .filter(|facing| facing.is_finite())
 }
 
-fn rotate_anti_tank_gun_toward_setup_facing(e: &mut Entity) {
+fn rotate_support_weapon_toward_setup_facing(e: &mut Entity) {
     if !supports_manual_emplacement(e.kind) {
         return;
     }
@@ -304,16 +305,21 @@ fn rotate_anti_tank_gun_toward_setup_facing(e: &mut Entity) {
     let Some(target) = target.filter(|facing| facing.is_finite()) else {
         return;
     };
+    let turn_rate = match e.kind {
+        EntityKind::AntiTankGun => ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK,
+        EntityKind::Artillery => ARTILLERY_SETUP_TURN_RATE_RAD_PER_TICK,
+        _ => return,
+    };
     e.set_desired_weapon_facing(target);
     let current = e.facing();
-    let rotated = rotate_toward(current, target, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
+    let rotated = rotate_toward(current, target, turn_rate);
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
     }
 }
 
-fn maybe_begin_anti_tank_gun_setup_after_alignment(e: &mut Entity) {
+fn maybe_begin_support_weapon_setup_after_alignment(e: &mut Entity) {
     if !supports_manual_emplacement(e.kind) || !matches!(e.weapon_setup(), WeaponSetup::Packed) {
         return;
     }

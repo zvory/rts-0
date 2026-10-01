@@ -1,3 +1,4 @@
+// replayResourceHistory samples carry signed steel/oil collection and aliveSteel/aliveOil lifetime-minus-loss advantages.
 //! Server-shell adapter for the extracted protocol crate.
 //!
 //! Keeps existing `rts_server::protocol` call sites stable while wire protocol DTOs live in
@@ -10,6 +11,17 @@ pub use rts_sim::protocol::{kind_from_wire, kind_to_wire};
 mod tests {
     use super::*;
     use rts_sim::game::entity::EntityKind;
+
+    #[test]
+    fn room_notice_serializes_through_server_adapter() {
+        let message = ServerMessage::RoomNotice {
+            msg: "Scout has joined the replay".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(message).unwrap(),
+            serde_json::json!({"t": "roomNotice", "msg": "Scout has joined the replay"})
+        );
+    }
 
     #[test]
     fn point_tanks_command_round_trips_through_sim_adapter() {
