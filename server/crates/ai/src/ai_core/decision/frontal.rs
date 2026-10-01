@@ -1,6 +1,7 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
 use super::*;
 
+pub(super) mod approach;
 mod catch_up;
 mod containment;
 mod formation;
@@ -373,6 +374,12 @@ pub(super) fn sync_containment_recovery(
     if tanks_intact && scout_intact {
         return;
     }
+    // The current Jeff comes at the target from another side next time.
+    if uses_current_jeffs_ai_policy(profile.id) {
+        memory
+            .approach
+            .note_failed_push(observation.player_id, observation.tick);
+    }
     begin_containment_recovery(memory);
 }
 
@@ -680,6 +687,27 @@ fn compact_tank_formation_assignments(
     map: AiMapSummary,
     spacing_tiles: f32,
 ) -> Vec<(u32, (f32, f32))> {
+    ranked_tank_formation_assignments(
+        observation,
+        tank_ids,
+        center,
+        toward_objective,
+        map,
+        spacing_tiles,
+        TANK_FORMATION_RANK_WIDTH,
+    )
+}
+
+/// `compact_tank_formation_assignments` with `rank_width` Tanks to a rank.
+fn ranked_tank_formation_assignments(
+    observation: &AiObservation,
+    tank_ids: &[u32],
+    center: (f32, f32),
+    toward_objective: (f32, f32),
+    map: AiMapSummary,
+    spacing_tiles: f32,
+    rank_width: usize,
+) -> Vec<(u32, (f32, f32))> {
     let mut tank_ids = tank_ids.to_vec();
     let perpendicular = (-toward_objective.1, toward_objective.0);
     let by_id: BTreeMap<u32, &AiEntitySummary> = observation
@@ -702,7 +730,7 @@ fn compact_tank_formation_assignments(
     });
     let tile_size = map.tile_size as f32;
     let mut assignments = Vec::with_capacity(tank_ids.len());
-    for (rank, rank_ids) in tank_ids.chunks(TANK_FORMATION_RANK_WIDTH).enumerate() {
+    for (rank, rank_ids) in tank_ids.chunks(rank_width.max(1)).enumerate() {
         let mut rank_ids = rank_ids.to_vec();
         rank_ids.sort_by(|left, right| {
             along(left, perpendicular)

@@ -1,5 +1,66 @@
 use super::*;
 
+/// How a push holds together on the move.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct MarchShape {
+    pub(super) tank_spacing_tiles: f32,
+    /// Waypoints along the route are this far apart.
+    pub(super) step_tiles: f32,
+    /// Vehicles this close to their slots have reached a waypoint.
+    pub(super) arrival_tiles: f32,
+    /// Tanks this close to their slots at the destination are in position there.
+    pub(super) in_position_tiles: f32,
+    /// How far the Tanks may spread along and across the way beyond the formation's own size.
+    pub(super) longitudinal_slop_tiles: f32,
+    pub(super) lateral_slop_tiles: f32,
+    /// Whether a push formed in several ranks is allowed the depth of its ranks.
+    pub(super) ranked: bool,
+    /// Tanks to a rank.
+    pub(super) rank_width: usize,
+    /// Whether a waypoint is reached once the Tanks' centre is within `arrival_tiles` of it,
+    /// whether or not every Tank has found its slot.
+    pub(super) advance_on_center: bool,
+}
+
+impl MarchShape {
+    /// The push as every profile formed it before travel shapes: one rank deep, whatever its size.
+    pub(super) const LEGACY: Self = Self {
+        tank_spacing_tiles: CONTAINMENT_TANK_SPACING_TILES,
+        step_tiles: CONTAINMENT_MARCH_STEP_TILES,
+        arrival_tiles: CONTAINMENT_ASSEMBLY_TOLERANCE_TILES,
+        in_position_tiles: 1.0,
+        longitudinal_slop_tiles: CONTAINMENT_LONGITUDINAL_SPREAD_TILES,
+        lateral_slop_tiles: CONTAINMENT_LATERAL_SLOP_TILES,
+        ranked: false,
+        rank_width: TANK_FORMATION_RANK_WIDTH,
+        advance_on_center: false,
+    };
+    /// The current Jeff forming up, reforming and closing in: as tight, but a push of more than six
+    /// Tanks is formed in ranks and is that much deeper. Held to one rank of depth, a large push
+    /// counted as strung out at every waypoint and waited while its rear Tank caught up alone.
+    pub(super) const TIGHT: Self = Self {
+        ranked: true,
+        ..Self::LEGACY
+    };
+    /// The current Jeff on the way to its staging point: a little more room between Tanks, ranks of
+    /// four so the column fits through gaps, longer steps, and looser arrival. It stops for its rear
+    /// Tanks only once the column is 6 tiles longer or 4 tiles wider than its ranks. It moves
+    /// on once its centre reaches a waypoint: slots ten tiles abreast fell in trees and water in
+    /// narrow ground, and Tanks detoured toward them while the push waited. It reforms before
+    /// closing in.
+    pub(super) const TRAVEL: Self = Self {
+        tank_spacing_tiles: 2.0,
+        step_tiles: 12.0,
+        arrival_tiles: 3.0,
+        in_position_tiles: 3.0,
+        longitudinal_slop_tiles: 6.0,
+        lateral_slop_tiles: 4.0,
+        ranked: true,
+        rank_width: 4,
+        advance_on_center: true,
+    };
+}
+
 pub(super) fn containment_repush_tank_count(
     policy: ExpansionContainmentPolicy,
     repush_count: usize,
@@ -196,15 +257,17 @@ pub(super) fn containment_formation(
     own_base: (f32, f32),
     objective: (f32, f32),
     policy: ExpansionContainmentPolicy,
+    shape: MarchShape,
 ) -> Option<ContainmentFormation> {
     let toward_objective = normalized_direction(own_base, objective)?;
-    let tanks = compact_tank_formation_assignments(
+    let tanks = ranked_tank_formation_assignments(
         observation,
         tanks,
         tank_center,
         toward_objective,
         observation.map,
-        CONTAINMENT_TANK_SPACING_TILES,
+        shape.tank_spacing_tiles,
+        shape.rank_width,
     );
     let scout_point = scout_trailing_point(
         tank_center,
@@ -383,20 +446,15 @@ pub(super) fn next_containment_route_waypoint(
     from: (f32, f32),
     destination: (f32, f32),
     map: AiMapSummary,
+    step_tiles: f32,
 ) -> (f32, f32) {
     let objective = (destination.0.round() as i32, destination.1.round() as i32);
     if memory.containment.route_objective != Some(objective)
         || memory.containment.route_index >= memory.containment.route.len()
     {
         let route = analysis
-            .map(|analysis| {
-                analysis.compact_group_route(
-                    from,
-                    destination,
-                    CONTAINMENT_MARCH_STEP_TILES as usize,
-                )
-            })
-            .unwrap_or_else(|| vec![short_march_waypoint(from, destination, map)]);
+            .map(|analysis| analysis.compact_group_route(from, destination, step_tiles as usize))
+            .unwrap_or_else(|| vec![short_march_waypoint(from, destination, map, step_tiles)]);
         memory.containment.route = route
             .into_iter()
             .map(|point| (point.0.round() as i32, point.1.round() as i32))
@@ -419,8 +477,9 @@ fn short_march_waypoint(
     from: (f32, f32),
     destination: (f32, f32),
     map: AiMapSummary,
+    step_tiles: f32,
 ) -> (f32, f32) {
-    let max_step = CONTAINMENT_MARCH_STEP_TILES * map.tile_size as f32;
+    let max_step = step_tiles * map.tile_size as f32;
     let distance = dist2(from.0, from.1, destination.0, destination.1).sqrt();
     if distance <= max_step || distance <= f32::EPSILON {
         return clamp_to_map(destination, map);
@@ -477,6 +536,7 @@ pub(super) fn tank_group_is_cohesive(
     observation: &AiObservation,
     tanks: &[u32],
     toward_objective: (f32, f32),
+    shape: MarchShape,
 ) -> bool {
     if tanks.len() <= 1 {
         return true;
@@ -502,10 +562,21 @@ pub(super) fn tank_group_is_cohesive(
         maximum - minimum
     };
     let tile_size = observation.map.tile_size as f32;
-    let lateral_limit = ((tanks.len().saturating_sub(1)) as f32 * CONTAINMENT_TANK_SPACING_TILES
-        + CONTAINMENT_LATERAL_SLOP_TILES)
+    let (ranks, per_rank) = if shape.ranked {
+        (
+            tanks.len().div_ceil(shape.rank_width.max(1)),
+            tanks.len().min(shape.rank_width.max(1)),
+        )
+    } else {
+        (1, tanks.len())
+    };
+    let longitudinal_limit = ((ranks.saturating_sub(1)) as f32 * TANK_FORMATION_RANK_DEPTH_TILES
+        + shape.longitudinal_slop_tiles)
         * tile_size;
-    projection_span(toward_objective) <= CONTAINMENT_LONGITUDINAL_SPREAD_TILES * tile_size
+    let lateral_limit = ((per_rank.saturating_sub(1)) as f32 * shape.tank_spacing_tiles
+        + shape.lateral_slop_tiles)
+        * tile_size;
+    projection_span(toward_objective) <= longitudinal_limit
         && projection_span(perpendicular) <= lateral_limit
 }
 
@@ -514,12 +585,13 @@ pub(super) fn formation_core_is_grouped(
     formation: &ContainmentFormation,
     own_base: (f32, f32),
     objective: (f32, f32),
+    shape: MarchShape,
 ) -> bool {
     let Some(toward_objective) = normalized_direction(own_base, objective) else {
         return false;
     };
     let tank_ids: Vec<u32> = formation.tanks.iter().map(|(id, _)| *id).collect();
-    if !tank_group_is_cohesive(observation, &tank_ids, toward_objective) {
+    if !tank_group_is_cohesive(observation, &tank_ids, toward_objective, shape) {
         return false;
     }
     let Some(tank_center) = group_center(observation, &tank_ids) else {
@@ -554,12 +626,13 @@ pub(super) fn formation_vehicle_core_is_grouped(
     formation: &ContainmentFormation,
     own_base: (f32, f32),
     objective: (f32, f32),
+    shape: MarchShape,
 ) -> bool {
     let Some(toward_objective) = normalized_direction(own_base, objective) else {
         return false;
     };
     let tank_ids: Vec<u32> = formation.tanks.iter().map(|(id, _)| *id).collect();
-    if !tank_group_is_cohesive(observation, &tank_ids, toward_objective) {
+    if !tank_group_is_cohesive(observation, &tank_ids, toward_objective, shape) {
         return false;
     }
     let Some(tank_center) = group_center(observation, &tank_ids) else {
