@@ -779,7 +779,8 @@ fn frontmost_unit_position(
         .map(|unit| (unit.x, unit.y))
 }
 
-fn enemy_natural_edge(
+/// The Steel nearest the enemy start outside its starting resources: the edge of its natural.
+pub(super) fn enemy_natural_edge(
     observation: &AiObservation,
     enemy_base: EnemyBaseFact,
 ) -> Option<(f32, f32)> {

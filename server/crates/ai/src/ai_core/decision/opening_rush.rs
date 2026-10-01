@@ -1,20 +1,28 @@
 //! Jeff's opening rush.
 //!
-//! The four starting Riflemen march on the enemy base in one group along the enemy's own attack
-//! route (the map analysis base route, walked backwards), so they meet an enemy opening attack
-//! head on. Whatever they meet is fought by the rifle squad planner (`squad_micro`): focus fire on
-//! the weakest enemy in reach, no overkill, and wounded Riflemen under fire step back.
+//! The four starting Riflemen march out in one group along the enemy's own attack route (the map
+//! analysis base route, walked backwards), so they meet an enemy opening attack head on. Whatever
+//! they meet is fought by the rifle squad planner (`squad_micro`): focus fire on the weakest enemy
+//! in reach, no overkill, and wounded Riflemen under fire step back.
 //!
-//! The group falls back home, stepping off the enemy's line of march first, as soon as:
-//! - Entrenchment could be available to either player. Jeff's own research is known; the enemy's
-//!   is private, so the earliest tick anyone could have finished it stands in for it.
-//! - An enemy Rifleman or Machine Gunner is seen moving faster than it can without
-//!   Methamphetamines, which also doubles the Rifleman's rate of fire.
-//! - The fight in sight would cost more than it kills (`estimate_trade`).
+//! The march does not end at the enemy base but beside its natural, predicted from the map's Steel
+//! like the push's objective. There the squad digs in on the far side of the site and denies the
+//! expansion: it shoots the builder first, then fighters, extractors and the Depot, and only at
+//! targets already in reach so nobody leaves a trench.
+//!
+//! The group falls back home, stepping off the enemy's line of march first:
+//! - On the way out, without a natural to deny: as soon as Entrenchment could be available to
+//!   either player (Jeff's own research is known; the enemy's is private, so the earliest tick
+//!   anyone could have finished it stands in for it), or an enemy Rifleman or Machine Gunner is seen
+//!   moving faster than it can without Methamphetamines.
+//! - Always: when the fight in sight would cost more than it kills (`estimate_trade`). Dug in at
+//!   the natural, the estimate counts the squad's trenches, any enemy Methamphetamines, and only
+//!   the enemies close enough to be fighting it.
 //!
 //! Survivors that reach home are released to the home pocket. Only the live Jeff runs this; the
 //! `jeffs_ai_pre_opening_rush` freeze keeps its starting Riflemen at home.
 
+use super::frontal::enemy_natural_edge;
 use super::geometry::dist2;
 use super::*;
 use crate::ai_core::map_analysis::AiTile;
@@ -47,6 +55,24 @@ const HOME_ARRIVAL_TILES: f32 = 12.0;
 /// Rifleman speed in pixels per tick, used for the approach under an entrenched enemy's longer
 /// range.
 const RIFLEMAN_SPEED_PX: f32 = 1.6;
+/// The denial posts stand this far beyond the natural's Steel edge, away from the enemy base: the
+/// enemy's Depot goes up beside the Steel, within the posts' reach, while its main stays farther
+/// off.
+const DENY_POST_FORWARD_TILES: f32 = 2.0;
+/// Lateral offsets of the denial posts, filled in this order.
+const DENY_POST_LATERAL_TILES: [f32; 4] = [0.75, -0.75, 2.25, -2.25];
+/// The squad starts denying once its centre is this close to the posts.
+const DENY_ENTER_TILES: f32 = 6.0;
+const DENY_POST_TOLERANCE_TILES: f32 = 1.5;
+/// A unit on its way to a post is re-ordered at most this often.
+const DENY_REORDER_TICKS: u32 = 45;
+/// Dug in, only enemies this close are the fight the squad is in; its main's garrison farther off
+/// is not coming unless something brings it.
+const DENY_THREAT_TILES: f32 = 9.0;
+/// A building's centre lies about this far inside its nearest edge, which the reach is measured to.
+const BUILDING_REACH_SLACK_TILES: f32 = 1.0;
+/// Mirrors the simulation combat service's range slack.
+const SIM_RANGE_SLACK_PX: f32 = 4.0;
 
 /// The squad planner settings the rush fights with: the planner's `micro` preset with its
 /// targeted-wounded pull-back on.
@@ -68,6 +94,8 @@ pub(super) enum RushPhase {
     #[default]
     NotStarted,
     March,
+    /// Dug in beside the enemy's natural.
+    Deny,
     Withdraw,
     Done,
 }
@@ -83,7 +111,9 @@ pub(super) enum WithdrawReason {
 pub(in crate::ai_core::decision) struct OpeningRush {
     phase: RushPhase,
     squad: BTreeSet<u32>,
-    /// March waypoints in world pixels, home to enemy base.
+    /// The starting Riflemen the rush took, alive or not.
+    starters: BTreeSet<u32>,
+    /// March waypoints in world pixels, home to the denial posts (or the enemy base).
     waypoints: Vec<(i32, i32)>,
     next_waypoint: usize,
     micro: SquadMicroMemory,
@@ -92,17 +122,44 @@ pub(in crate::ai_core::decision) struct OpeningRush {
     /// Last sighting of each enemy Rifleman and Machine Gunner: tick and position.
     sightings: BTreeMap<u32, (u32, i32, i32)>,
     enemy_meth_seen: bool,
+    /// Centre of the denial posts beside the enemy's natural, and the direction away from the
+    /// enemy base in thousandths, when a natural was predicted.
+    deny_center: Option<(i32, i32)>,
+    deny_away: Option<(i32, i32)>,
+    deny_since: Option<u32>,
+    /// Per denying Rifleman: its current target, whether it was told to hold, and when it was last
+    /// sent toward its post.
+    deny_targets: BTreeMap<u32, u32>,
+    deny_holding: BTreeSet<u32>,
+    deny_order_tick: BTreeMap<u32, u32>,
 }
 
 impl OpeningRush {
+    fn active(&self) -> bool {
+        matches!(
+            self.phase,
+            RushPhase::March | RushPhase::Deny | RushPhase::Withdraw
+        )
+    }
+
     /// Units the rush owns while it runs. No other system may order them.
     pub(in crate::ai_core::decision) fn reserved(&self) -> impl Iterator<Item = u32> + '_ {
-        let active = matches!(self.phase, RushPhase::March | RushPhase::Withdraw);
+        let active = self.active();
         self.squad.iter().copied().filter(move |_| active)
     }
 
     pub(in crate::ai_core::decision) fn is_reserved(&self, id: u32) -> bool {
-        matches!(self.phase, RushPhase::March | RushPhase::Withdraw) && self.squad.contains(&id)
+        self.active() && self.squad.contains(&id)
+    }
+
+    /// Whether the rush took Jeff's starting Riflemen; they then no longer make up the home pocket
+    /// the other systems count on.
+    pub(in crate::ai_core::decision) fn started(&self) -> bool {
+        !self.starters.is_empty()
+    }
+
+    pub(in crate::ai_core::decision) fn is_starter(&self, id: u32) -> bool {
+        self.starters.contains(&id)
     }
 }
 
@@ -122,11 +179,22 @@ pub(super) fn plan(
     map_analysis: Option<&AiMapAnalysis>,
 ) -> RushDecision {
     let mut decision = RushDecision::default();
+    // Squad members dug in by now, read before the rush state is borrowed.
+    let dug_in: BTreeSet<u32> = memory
+        .opening_rush
+        .squad
+        .iter()
+        .copied()
+        .filter(|id| {
+            memory.estimated_entrenchment_ticks(observation, *id)
+                >= rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS
+        })
+        .collect();
     let rush = &mut memory.opening_rush;
     if rush.phase == RushPhase::NotStarted {
         start(rush, observation, facts, map_analysis);
     }
-    if !matches!(rush.phase, RushPhase::March | RushPhase::Withdraw) {
+    if !rush.active() {
         return decision;
     }
     let squad: Vec<&AiEntitySummary> = observation
@@ -142,42 +210,53 @@ pub(super) fn plan(
     note_enemy_speeds(rush, observation, map_analysis);
     let tile = observation.map.tile_size.max(1) as f32;
     let center = centroid(&squad);
-    let engage_px = ENGAGE_RADIUS_TILES * tile;
-    let near: Vec<&AiEntitySummary> = observation
-        .visible_enemies
-        .iter()
-        .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit())
-        .filter(|enemy| {
-            squad
-                .iter()
-                .any(|unit| dist2(unit.x, unit.y, enemy.x, enemy.y) <= engage_px * engage_px)
-        })
-        .collect();
+    let near = enemies_near(observation, &squad, ENGAGE_RADIUS_TILES * tile);
     let home = jeff::rifleman_home_rally(observation, facts)
         .unwrap_or_else(|| tile_center(observation.own_start_tile, observation.map.tile_size));
+    let denying = rush.deny_center.is_some();
 
     if rush.phase == RushPhase::March {
         let enemy_entrenchment = observation.tick >= EARLIEST_ENTRENCHMENT_TICK;
-        let reason =
-            if enemy_entrenchment || observation.upgrades.contains(&UpgradeKind::Entrenchment) {
-                Some(WithdrawReason::Entrenchment)
-            } else if rush.enemy_meth_seen {
-                Some(WithdrawReason::Methamphetamines)
-            } else if bad_trade(
-                observation,
-                &squad,
-                &near,
-                rush.enemy_meth_seen,
-                enemy_entrenchment,
-            ) {
-                Some(WithdrawReason::BadTrade)
-            } else {
-                None
-            };
+        let own_entrenchment = observation.upgrades.contains(&UpgradeKind::Entrenchment);
+        // A squad on its way to dig in at the enemy natural is the entrenched side there, so the
+        // Entrenchment and Methamphetamines warnings are left to the trade estimate.
+        let reason = if !denying && (enemy_entrenchment || own_entrenchment) {
+            Some(WithdrawReason::Entrenchment)
+        } else if !denying && rush.enemy_meth_seen {
+            Some(WithdrawReason::Methamphetamines)
+        } else if bad_trade(
+            observation,
+            &squad,
+            &near,
+            rush.enemy_meth_seen,
+            enemy_entrenchment,
+            &BTreeSet::new(),
+        ) {
+            Some(WithdrawReason::BadTrade)
+        } else {
+            None
+        };
         if let Some(reason) = reason {
-            rush.phase = RushPhase::Withdraw;
-            rush.withdraw_reason = Some(reason);
-            rush.withdraw_order_tick = None;
+            begin_withdraw(rush, reason);
+        } else if rush.deny_center.is_some_and(|post| {
+            distance(center, (post.0 as f32, post.1 as f32)) <= DENY_ENTER_TILES * tile
+        }) {
+            rush.phase = RushPhase::Deny;
+            rush.deny_since = Some(observation.tick);
+        }
+    }
+
+    if rush.phase == RushPhase::Deny {
+        let threats = enemies_near(observation, &squad, DENY_THREAT_TILES * tile);
+        if bad_trade(
+            observation,
+            &squad,
+            &threats,
+            rush.enemy_meth_seen,
+            false,
+            &dug_in,
+        ) {
+            begin_withdraw(rush, WithdrawReason::BadTrade);
         }
     }
 
@@ -195,6 +274,19 @@ pub(super) fn plan(
             &squad,
             &near,
             home,
+            &mut decision,
+        );
+        return decision;
+    }
+
+    if rush.phase == RushPhase::Deny {
+        deny(
+            actions,
+            observation,
+            map_analysis,
+            rush,
+            &squad,
+            &dug_in,
             &mut decision,
         );
         return decision;
@@ -253,6 +345,29 @@ pub(super) fn plan(
     decision
 }
 
+fn begin_withdraw(rush: &mut OpeningRush, reason: WithdrawReason) {
+    rush.phase = RushPhase::Withdraw;
+    rush.withdraw_reason = Some(reason);
+    rush.withdraw_order_tick = None;
+}
+
+fn enemies_near<'a>(
+    observation: &'a AiObservation,
+    squad: &[&AiEntitySummary],
+    radius_px: f32,
+) -> Vec<&'a AiEntitySummary> {
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit())
+        .filter(|enemy| {
+            squad
+                .iter()
+                .any(|unit| dist2(unit.x, unit.y, enemy.x, enemy.y) <= radius_px * radius_px)
+        })
+        .collect()
+}
+
 fn start(
     rush: &mut OpeningRush,
     observation: &AiObservation,
@@ -260,7 +375,8 @@ fn start(
     map_analysis: Option<&AiMapAnalysis>,
 ) {
     rush.phase = RushPhase::Done;
-    if observation.tick > START_TICK_LIMIT {
+    // Only from the opening itself: no Barracks yet, so the Riflemen are the starting ones.
+    if observation.tick > START_TICK_LIMIT || facts.building_count(EntityKind::Barracks) > 0 {
         return;
     }
     let Some(enemy_base) = facts.nearest_public_enemy_base else {
@@ -276,6 +392,7 @@ fn start(
         return;
     }
     let tile_size = observation.map.tile_size;
+    let tile = tile_size.max(1) as f32;
     let mut waypoints: Vec<(i32, i32)> = map_analysis
         .and_then(|analysis| analysis.base_route_tiles(observation.player_id))
         .map(|route| {
@@ -292,12 +409,159 @@ fn start(
                 .collect()
         })
         .unwrap_or_default();
-    waypoints.push((enemy_base.x as i32, enemy_base.y as i32));
+    let enemy_point = (enemy_base.x, enemy_base.y);
+    match enemy_natural_edge(observation, enemy_base) {
+        Some(natural) => {
+            // Walk the route as far as its point nearest the natural, then on to the posts.
+            let away = normalized_direction(enemy_point, natural).unwrap_or((1.0, 0.0));
+            let post = clamp_to_map(
+                (
+                    natural.0 + away.0 * DENY_POST_FORWARD_TILES * tile,
+                    natural.1 + away.1 * DENY_POST_FORWARD_TILES * tile,
+                ),
+                observation.map,
+            );
+            if let Some(cut) = waypoints
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    let to = |p: &(i32, i32)| distance((p.0 as f32, p.1 as f32), natural);
+                    to(a).total_cmp(&to(b))
+                })
+                .map(|(index, _)| index)
+            {
+                waypoints.truncate(cut + 1);
+            }
+            waypoints.push((post.0 as i32, post.1 as i32));
+            rush.deny_center = Some((post.0 as i32, post.1 as i32));
+            rush.deny_away = Some(((away.0 * 1000.0) as i32, (away.1 * 1000.0) as i32));
+        }
+        None => waypoints.push((enemy_point.0 as i32, enemy_point.1 as i32)),
+    }
     waypoints.dedup();
+    rush.starters = squad.clone();
     rush.squad = squad;
     rush.waypoints = waypoints;
     rush.next_waypoint = 0;
     rush.phase = RushPhase::March;
+}
+
+/// Dug in beside the enemy's natural: each Rifleman takes a post, shoots the best target already
+/// in its reach, and otherwise holds so it digs in (or keeps its trench).
+fn deny(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    rush: &mut OpeningRush,
+    squad: &[&AiEntitySummary],
+    dug_in: &BTreeSet<u32>,
+    decision: &mut RushDecision,
+) {
+    let Some(center) = rush.deny_center else {
+        return;
+    };
+    let tick = observation.tick;
+    let tile = observation.map.tile_size.max(1) as f32;
+    let away = rush
+        .deny_away
+        .map_or((1.0, 0.0), |(x, y)| (x as f32 / 1000.0, y as f32 / 1000.0));
+    let side = (-away.1, away.0);
+    let base_reach = rifle_reach_px(tile);
+    let dug_in_reach =
+        base_reach + rts_rules::balance::ENTRENCHMENT_RANGE_BONUS_TILES as f32 * tile;
+    for (index, unit) in squad.iter().enumerate() {
+        let lateral = DENY_POST_LATERAL_TILES[index % DENY_POST_LATERAL_TILES.len()];
+        let wanted = (
+            center.0 as f32 + side.0 * lateral * tile,
+            center.1 as f32 + side.1 * lateral * tile,
+        );
+        let post = map_analysis
+            .and_then(|analysis| analysis.open_ground_near((unit.x, unit.y), wanted, 1, 3))
+            .unwrap_or(wanted);
+        let reach = if dug_in.contains(&unit.id) {
+            dug_in_reach
+        } else {
+            base_reach
+        };
+        let target = pick_deny_target(&observation.visible_enemies, (unit.x, unit.y), reach, tile);
+        if let Some(target) = target {
+            if rush.deny_targets.get(&unit.id) != Some(&target) || unit.state == AiEntityState::Idle
+            {
+                if let Some(units) = actions::attack_units(actions, [unit.id], target) {
+                    decision.attacked.extend(units);
+                }
+                rush.deny_targets.insert(unit.id, target);
+                rush.deny_holding.remove(&unit.id);
+            }
+            continue;
+        }
+        rush.deny_targets.remove(&unit.id);
+        let at_post = distance((unit.x, unit.y), post) <= DENY_POST_TOLERANCE_TILES * tile;
+        if !at_post {
+            let due = rush
+                .deny_order_tick
+                .get(&unit.id)
+                .is_none_or(|ordered| tick.saturating_sub(*ordered) >= DENY_REORDER_TICKS);
+            if due || unit.state == AiEntityState::Idle {
+                if let Some(units) = actions::attack_move_units(actions, [unit.id], post.0, post.1)
+                {
+                    decision.moved.extend(units);
+                }
+                rush.deny_order_tick.insert(unit.id, tick);
+                rush.deny_holding.remove(&unit.id);
+            }
+        } else if rush.deny_holding.insert(unit.id) {
+            if let Some(units) = actions::hold_position_units(actions, [unit.id]) {
+                decision.moved.extend(units);
+            }
+        }
+    }
+}
+
+/// Centre-to-centre distance at which a Rifleman fires, as in the simulation.
+fn rifle_reach_px(tile: f32) -> f32 {
+    let range = rts_rules::combat::default_weapon_profile(EntityKind::Rifleman)
+        .map_or(5.0, |weapon| weapon.range_tiles);
+    let radius =
+        rts_rules::defs::unit_def(EntityKind::Rifleman).map_or(9.0, |def| def.stats.radius);
+    range * tile + radius + SIM_RANGE_SLACK_PX
+}
+
+/// The denial target already in reach of a Rifleman at `from`: the builder first, then fighters
+/// (weakest first), extractors, the Depot, and other buildings.
+fn pick_deny_target(
+    enemies: &[AiEntitySummary],
+    from: (f32, f32),
+    reach_px: f32,
+    tile: f32,
+) -> Option<u32> {
+    let rank = |enemy: &AiEntitySummary| match enemy.kind {
+        EntityKind::Worker => 0,
+        kind if kind.is_unit() => 1,
+        EntityKind::SteelMine | EntityKind::PumpJack => 2,
+        EntityKind::ResourceDepot => 3,
+        _ => 4,
+    };
+    enemies
+        .iter()
+        .filter(|enemy| enemy.hp > 0)
+        .filter(|enemy| {
+            let slack = if enemy.kind.is_unit() {
+                0.0
+            } else {
+                BUILDING_REACH_SLACK_TILES * tile
+            };
+            distance(from, (enemy.x, enemy.y)) <= reach_px + slack
+        })
+        .min_by_key(|enemy| {
+            (
+                rank(enemy),
+                enemy.hp,
+                distance(from, (enemy.x, enemy.y)) as u32,
+                enemy.id,
+            )
+        })
+        .map(|enemy| enemy.id)
 }
 
 /// Records enemy Rifleman and Machine Gunner positions and flags Methamphetamines when one is
@@ -366,19 +630,22 @@ impl TradeEstimate {
     }
 }
 
+/// Whether fighting `near` would cost the squad more than it kills. `ours_dug_in` squad members
+/// fight from trenches.
 fn bad_trade(
     observation: &AiObservation,
     squad: &[&AiEntitySummary],
     near: &[&AiEntitySummary],
     enemy_meth: bool,
     enemy_entrenchment: bool,
+    ours_dug_in: &BTreeSet<u32>,
 ) -> bool {
     let own_meth = observation
         .upgrades
         .contains(&UpgradeKind::Methamphetamines);
     let ours: Vec<Fighter> = squad
         .iter()
-        .filter_map(|unit| fighter(unit, own_meth, false))
+        .filter_map(|unit| fighter(unit, own_meth, ours_dug_in.contains(&unit.id)))
         .collect();
     let theirs: Vec<Fighter> = near
         .iter()
@@ -595,6 +862,24 @@ mod tests {
         }
     }
 
+    fn enemy(id: u32, kind: EntityKind, tiles_away: f32, hp: u32) -> AiEntitySummary {
+        AiEntitySummary {
+            id,
+            owner: 2,
+            kind,
+            x: tiles_away * 32.0,
+            y: 0.0,
+            hp,
+            state: AiEntityState::Idle,
+            is_complete: true,
+            production_queue_len: None,
+            production_kind: None,
+            latched_node: None,
+            target_id: None,
+            free_for_combat: true,
+        }
+    }
+
     #[test]
     fn three_riflemen_take_a_good_trade_against_one_dug_in_rifleman() {
         let ours = [rifle(45, false); 3];
@@ -627,6 +912,50 @@ mod tests {
         let wounded = [rifle(10, false); 4];
         let fresh = [rifle(45, false); 3];
         assert!(estimate_trade(&wounded, &fresh, 0).unfavorable());
+    }
+
+    #[test]
+    fn a_dug_in_squad_holds_against_as_many_attackers() {
+        let dug_in = [rifle(45, true); 4];
+        let attackers = [rifle(45, false); 4];
+        let estimate = estimate_trade(&dug_in, &attackers, 0);
+        assert_eq!(estimate.units_killed, 4);
+        assert!(!estimate.unfavorable());
+    }
+
+    #[test]
+    fn denial_shoots_the_builder_first_then_fighters_then_extractors_then_the_depot() {
+        let tile = 32.0;
+        let reach = rifle_reach_px(tile);
+        let mut enemies = vec![
+            enemy(1, EntityKind::ResourceDepot, 4.0, 100),
+            enemy(2, EntityKind::SteelMine, 4.0, 37),
+            enemy(3, EntityKind::Rifleman, 4.0, 45),
+            enemy(4, EntityKind::Worker, 4.5, 40),
+        ];
+        assert_eq!(pick_deny_target(&enemies, (0.0, 0.0), reach, tile), Some(4));
+        enemies.retain(|e| e.id != 4);
+        assert_eq!(pick_deny_target(&enemies, (0.0, 0.0), reach, tile), Some(3));
+        enemies.retain(|e| e.id != 3);
+        assert_eq!(pick_deny_target(&enemies, (0.0, 0.0), reach, tile), Some(2));
+        enemies.retain(|e| e.id != 2);
+        assert_eq!(pick_deny_target(&enemies, (0.0, 0.0), reach, tile), Some(1));
+    }
+
+    #[test]
+    fn denial_never_targets_what_is_out_of_reach() {
+        let tile = 32.0;
+        let reach = rifle_reach_px(tile);
+        let enemies = vec![enemy(4, EntityKind::Worker, 7.0, 40)];
+        assert_eq!(pick_deny_target(&enemies, (0.0, 0.0), reach, tile), None);
+        let dug_in = reach + tile;
+        assert_eq!(
+            pick_deny_target(&enemies, (0.0, 0.0), dug_in, tile),
+            None,
+            "seven tiles is beyond even a dug-in Rifleman"
+        );
+        let close = vec![enemy(4, EntityKind::Worker, 6.0, 40)];
+        assert_eq!(pick_deny_target(&close, (0.0, 0.0), dug_in, tile), Some(4));
     }
 
     #[test]
