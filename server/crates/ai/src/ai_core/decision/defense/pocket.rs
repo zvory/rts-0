@@ -9,6 +9,12 @@ const CROSSROADS_STARTS: [(u32, u32); 2] = [(47, 8), (117, 78)];
 // approved River pocket, then rotate as one shape toward each base's central approach.
 const RIFLE_SLOTS: [(f32, f32); 4] = [(4.25, 2.83), (4.25, -2.83), (8.15, -0.78), (8.15, 0.78)];
 const MACHINE_GUNNER_SLOTS: [(f32, f32); 2] = [(7.5, -2.25), (7.5, 2.25)];
+/// Four defensive guns hold one line across the approach: the two pocket posts plus one more on
+/// each wing, half a tile farther forward, so an attack that stands off the centre guns is in
+/// reach of all four at once rather than meeting them one pair at a time. A burst's scattered
+/// bullets stray about a tile at combat range, so the posts stay 1.5 tiles apart.
+const WIDE_MACHINE_GUNNER_SLOTS: [(f32, f32); 4] =
+    [(7.5, -2.25), (7.5, 2.25), (8.0, -3.75), (8.0, 3.75)];
 
 pub(in crate::ai_core::decision) fn stage_home_defensive_pocket_riflemen(
     actions: &mut AiActionContext<'_>,
@@ -88,13 +94,18 @@ pub(in crate::ai_core::decision) fn stage_defensive_pocket_machine_gunners(
     map_analysis: Option<&AiMapAnalysis>,
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
+    target_count: usize,
 ) -> Option<Vec<u32>> {
-    let assignments = defensive_pocket_machine_gunner_assignments(
-        observation,
-        map_analysis,
-        ready_units,
-        enemy_base,
-    )?;
+    let assignments = if target_count > MACHINE_GUNNER_SLOTS.len() {
+        wide_pocket_machine_gunner_assignments(observation, map_analysis, ready_units, enemy_base)
+    } else {
+        defensive_pocket_machine_gunner_assignments(
+            observation,
+            map_analysis,
+            ready_units,
+            enemy_base,
+        )
+    }?;
     let units_by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
         .iter()
@@ -140,6 +151,55 @@ pub(super) fn defensive_pocket_machine_gunner_assignments(
                 .map(|(x, y)| DefensiveLineAssignment { unit_id, x, y })
         })
         .collect::<Vec<_>>();
+    (!assignments.is_empty()).then_some(assignments)
+}
+
+/// The four-gun line. A gun already on a post keeps it, so a loss never walks a dug-in gun out of
+/// its trench to close the gap; the other guns take the free posts centre first, in id order.
+pub(super) fn wide_pocket_machine_gunner_assignments(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<DefensiveLineAssignment>> {
+    let (anchor, direction) = defensive_pocket_basis(observation, map_analysis, enemy_base)?;
+    let mut posts: Vec<Option<(f32, f32)>> = WIDE_MACHINE_GUNNER_SLOTS
+        .iter()
+        .map(|slot| {
+            let desired = slot_target(observation, anchor, direction, *slot);
+            clear_machine_gunner_position(observation, map_analysis, desired, direction)
+        })
+        .collect();
+    let mut units = ready_units.to_vec();
+    units.sort_unstable();
+    units.dedup();
+    let positions: BTreeMap<u32, (f32, f32)> = observation
+        .owned
+        .iter()
+        .map(|entity| (entity.id, (entity.x, entity.y)))
+        .collect();
+    let on_post2 =
+        squared(EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES * observation.map.tile_size as f32);
+    let mut assignments = Vec::new();
+    let mut waiting = Vec::new();
+    for unit_id in units {
+        let held = positions.get(&unit_id).and_then(|&(x, y)| {
+            posts
+                .iter_mut()
+                .find(|post| post.is_some_and(|(px, py)| dist2(x, y, px, py) <= on_post2))
+                .and_then(Option::take)
+        });
+        match held {
+            Some((x, y)) => assignments.push(DefensiveLineAssignment { unit_id, x, y }),
+            None => waiting.push(unit_id),
+        }
+    }
+    for unit_id in waiting {
+        let Some((x, y)) = posts.iter_mut().find_map(Option::take) else {
+            break;
+        };
+        assignments.push(DefensiveLineAssignment { unit_id, x, y });
+    }
     (!assignments.is_empty()).then_some(assignments)
 }
 

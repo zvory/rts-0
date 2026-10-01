@@ -396,6 +396,112 @@ fn first_machine_gunner_keeps_its_side_when_the_mirrored_partner_arrives() {
     );
 }
 
+fn river_pocket_observation() -> (AiObservation, EnemyBaseFact) {
+    let mut observation = los_test_observation(EntityKind::Factory);
+    observation.map.width = 126;
+    observation.map.height = 126;
+    observation.own_start_tile = (9, 9);
+    observation.owned.clear();
+    let tile_size = observation.map.tile_size as f32;
+    let enemy_base = EnemyBaseFact {
+        player_id: 2,
+        start_tile: (116, 116),
+        x: 116.5 * tile_size,
+        y: 116.5 * tile_size,
+    };
+    (observation, enemy_base)
+}
+
+#[test]
+fn four_gun_line_keeps_the_pocket_posts_and_adds_a_wing_on_each_side() {
+    let (observation, enemy_base) = river_pocket_observation();
+    let tile_size = observation.map.tile_size as f32;
+    let pair =
+        defensive_pocket_machine_gunner_assignments(&observation, None, &[60, 50], enemy_base)
+            .unwrap();
+    let line =
+        wide_pocket_machine_gunner_assignments(&observation, None, &[80, 60, 70, 50], enemy_base)
+            .unwrap();
+
+    assert_eq!(
+        line.iter().map(|post| post.unit_id).collect::<Vec<_>>(),
+        vec![50, 60, 70, 80]
+    );
+    for (wide, pocket) in line.iter().zip(&pair) {
+        assert_eq!((wide.x, wide.y), (pocket.x, pocket.y));
+    }
+    let anchor = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y)).unwrap();
+    let perpendicular = (-direction.1, direction.0);
+    let frame = |post: &DefensiveLineAssignment| {
+        let offset = (post.x - anchor.0, post.y - anchor.1);
+        (
+            (offset.0 * direction.0 + offset.1 * direction.1) / tile_size,
+            (offset.0 * perpendicular.0 + offset.1 * perpendicular.1) / tile_size,
+        )
+    };
+    for (post, expected) in line
+        .iter()
+        .zip([(7.5, -2.25), (7.5, 2.25), (8.0, -3.75), (8.0, 3.75)])
+    {
+        let (forward, lateral) = frame(post);
+        assert!(
+            (forward - expected.0).abs() < 0.01,
+            "{forward} vs {expected:?}"
+        );
+        assert!(
+            (lateral - expected.1).abs() < 0.01,
+            "{lateral} vs {expected:?}"
+        );
+    }
+    for post in &line {
+        for other in line.iter().filter(|other| other.unit_id != post.unit_id) {
+            assert!(dist2(post.x, post.y, other.x, other.y) >= squared(1.45 * tile_size));
+        }
+        // An attacker standing off the centre guns at Machine Gunner range is in every dug-in
+        // gun's reach.
+        let (forward, lateral) = frame(post);
+        assert!((14.0 - forward).hypot(lateral) <= 7.1);
+    }
+}
+
+#[test]
+fn a_gun_on_its_post_keeps_it_when_another_gun_falls() {
+    let (mut observation, enemy_base) = river_pocket_observation();
+    let full =
+        wide_pocket_machine_gunner_assignments(&observation, None, &[50, 60, 70, 80], enemy_base)
+            .unwrap();
+    // Gun 50 died on the first post; the others are dug in on theirs and a replacement walks up
+    // from the Depot.
+    for post in full.iter().skip(1) {
+        observation.owned.push(combat_unit(
+            post.unit_id,
+            EntityKind::MachineGunner,
+            post.x,
+            post.y,
+        ));
+    }
+    let depot = tile_center(observation.own_start_tile, observation.map.tile_size);
+    observation
+        .owned
+        .push(combat_unit(90, EntityKind::MachineGunner, depot.0, depot.1));
+
+    let line =
+        wide_pocket_machine_gunner_assignments(&observation, None, &[60, 70, 80, 90], enemy_base)
+            .unwrap();
+
+    let post_of = |posts: &[DefensiveLineAssignment], id: u32| {
+        posts
+            .iter()
+            .find(|post| post.unit_id == id)
+            .map(|post| (post.x, post.y))
+    };
+    for id in [60, 70, 80] {
+        assert_eq!(post_of(&line, id), post_of(&full, id), "gun {id} moved");
+    }
+    assert_eq!(post_of(&line, 90), post_of(&full, 50));
+}
+
 #[test]
 fn crossroads_starts_use_the_approved_wall_aware_pocket_rotation() {
     let mut observation = los_test_observation(EntityKind::Factory);

@@ -15,9 +15,10 @@
 //!   either player (Jeff's own research is known; the enemy's is private, so the earliest tick
 //!   anyone could have finished it stands in for it), or an enemy Rifleman or Machine Gunner is seen
 //!   moving faster than it can without Methamphetamines.
-//! - Always: when the fight in sight would cost more than it kills (`estimate_trade`). Dug in at
-//!   the natural, the estimate counts the squad's trenches, any enemy Methamphetamines, and only
-//!   the enemies close enough to be fighting it.
+//! - Always: when the fight in sight is clearly lost (`estimate_trade` says it costs more than
+//!   twice what it kills). At the natural the estimate counts the squad's trenches, any enemy
+//!   Methamphetamines, and only the enemies close enough to be fighting it; once half the squad
+//!   is dug in there it stays unless it would be wiped out without a single kill.
 //!
 //! Survivors that reach home are released to the home pocket. Only the live Jeff runs this; the
 //! `jeffs_ai_pre_opening_rush` freeze keeps its starting Riflemen at home.
@@ -224,14 +225,16 @@ pub(super) fn plan(
             Some(WithdrawReason::Entrenchment)
         } else if !denying && rush.enemy_meth_seen {
             Some(WithdrawReason::Methamphetamines)
-        } else if bad_trade(
+        } else if trade(
             observation,
             &squad,
             &near,
             rush.enemy_meth_seen,
             enemy_entrenchment,
             &BTreeSet::new(),
-        ) {
+        )
+        .is_some_and(TradeEstimate::clearly_losing)
+        {
             Some(WithdrawReason::BadTrade)
         } else {
             None
@@ -248,14 +251,15 @@ pub(super) fn plan(
 
     if rush.phase == RushPhase::Deny {
         let threats = enemies_near(observation, &squad, DENY_THREAT_TILES * tile);
-        if bad_trade(
+        let estimate = trade(
             observation,
             &squad,
             &threats,
             rush.enemy_meth_seen,
             false,
             &dug_in,
-        ) {
+        );
+        if estimate.is_some_and(|estimate| deny_withdraws(estimate, squad.len(), dug_in.len())) {
             begin_withdraw(rush, WithdrawReason::BadTrade);
         }
     }
@@ -625,21 +629,41 @@ pub(super) struct TradeEstimate {
 }
 
 impl TradeEstimate {
-    pub(super) fn unfavorable(self) -> bool {
-        self.value_lost > self.value_killed
+    /// Costs more than twice what it kills. The volley estimate credits none of the squad
+    /// planner's pull-backs, and turning away mid-fight hands the enemy free shots, so a fight
+    /// that only looks somewhat worse is still taken.
+    pub(super) fn clearly_losing(self) -> bool {
+        self.value_lost > self.value_killed.saturating_mul(2)
+    }
+
+    /// All `side` units die without a single kill.
+    pub(super) fn hopeless(self, side: usize) -> bool {
+        self.units_killed == 0 && self.units_lost >= side
     }
 }
 
-/// Whether fighting `near` would cost the squad more than it kills. `ours_dug_in` squad members
-/// fight from trenches.
-fn bad_trade(
+/// Whether a denying squad of `squad` Riflemen, `dug_in` of them in trenches, gives the natural
+/// up. Once at least half is dug in it holds unless it would be wiped out without a kill: walking
+/// out of the trenches under fire costs about as much as staying, and the natural is the point of
+/// the rush. Before that it leaves only a clearly lost fight.
+fn deny_withdraws(estimate: TradeEstimate, squad: usize, dug_in: usize) -> bool {
+    if dug_in.saturating_mul(2) >= squad {
+        estimate.hopeless(squad)
+    } else {
+        estimate.clearly_losing()
+    }
+}
+
+/// The estimated fight against `near`, or `None` when no enemy fighter is near. `ours_dug_in`
+/// squad members fight from trenches.
+fn trade(
     observation: &AiObservation,
     squad: &[&AiEntitySummary],
     near: &[&AiEntitySummary],
     enemy_meth: bool,
     enemy_entrenchment: bool,
     ours_dug_in: &BTreeSet<u32>,
-) -> bool {
+) -> Option<TradeEstimate> {
     let own_meth = observation
         .upgrades
         .contains(&UpgradeKind::Methamphetamines);
@@ -657,7 +681,7 @@ fn bad_trade(
         })
         .collect();
     if theirs.is_empty() {
-        return false;
+        return None;
     }
     // Dug-in infantry outranges a Rifleman by a tile; the squad takes fire while it closes.
     let head_start = if theirs.iter().any(|enemy| enemy.entrenched) {
@@ -665,7 +689,7 @@ fn bad_trade(
     } else {
         0
     };
-    estimate_trade(&ours, &theirs, head_start).unfavorable()
+    Some(estimate_trade(&ours, &theirs, head_start))
 }
 
 fn fighter(unit: &AiEntitySummary, meth: bool, entrenched: bool) -> Option<Fighter> {
@@ -887,7 +911,7 @@ mod tests {
         let estimate = estimate_trade(&ours, &theirs, 20);
         assert_eq!(estimate.units_killed, 1);
         assert_eq!(estimate.units_lost, 0);
-        assert!(!estimate.unfavorable());
+        assert!(!estimate.clearly_losing());
     }
 
     #[test]
@@ -895,23 +919,52 @@ mod tests {
         let estimate = estimate_trade(&[rifle(45, false)], &[rifle(45, true)], 20);
         assert_eq!(estimate.units_lost, 1);
         assert_eq!(estimate.units_killed, 0);
-        assert!(estimate.unfavorable());
+        assert!(estimate.clearly_losing());
     }
 
     #[test]
-    fn an_even_open_fight_is_not_a_bad_trade_but_being_outnumbered_is() {
+    fn an_even_open_fight_is_taken_but_being_outnumbered_two_to_one_is_not() {
         let four = [rifle(45, false); 4];
-        assert!(!estimate_trade(&four, &four, 0).unfavorable());
+        assert!(!estimate_trade(&four, &four, 0).clearly_losing());
         let two = [rifle(45, false); 2];
-        assert!(estimate_trade(&two, &four, 0).unfavorable());
-        assert!(!estimate_trade(&four, &two, 0).unfavorable());
+        assert!(estimate_trade(&two, &four, 0).clearly_losing());
+        assert!(!estimate_trade(&four, &two, 0).clearly_losing());
     }
 
     #[test]
     fn wounded_squad_against_fresh_enemies_is_a_bad_trade() {
         let wounded = [rifle(10, false); 4];
         let fresh = [rifle(45, false); 3];
-        assert!(estimate_trade(&wounded, &fresh, 0).unfavorable());
+        assert!(estimate_trade(&wounded, &fresh, 0).clearly_losing());
+    }
+
+    #[test]
+    fn a_dug_in_denial_holds_unless_it_would_die_without_a_kill() {
+        // Four in trenches against six fresh Riflemen take some with them, so they stay.
+        let outnumbered = estimate_trade(&[rifle(45, true); 4], &[rifle(45, false); 6], 0);
+        assert!(outnumbered.units_killed > 0);
+        assert!(!deny_withdraws(outnumbered, 4, 4));
+        assert!(!deny_withdraws(outnumbered, 4, 2));
+        // A badly wounded Rifleman in its trench against four dies without a kill, so it goes.
+        let hopeless = estimate_trade(&[rifle(5, true)], &[rifle(45, false); 4], 0);
+        assert!(hopeless.hopeless(1));
+        assert!(deny_withdraws(hopeless, 1, 1));
+    }
+
+    #[test]
+    fn a_denial_not_yet_dug_in_leaves_only_a_clearly_lost_fight() {
+        let trade = |lost: usize, killed: usize| TradeEstimate {
+            value_lost: lost as u32 * 35,
+            value_killed: killed as u32 * 35,
+            units_lost: lost,
+            units_killed: killed,
+        };
+        // One of four in a trench is not dug in: three for two is taken, three for one is not.
+        assert!(!deny_withdraws(trade(3, 2), 4, 1));
+        assert!(deny_withdraws(trade(3, 1), 4, 1));
+        // Two of four is half the squad dug in: three for one is held.
+        assert!(!deny_withdraws(trade(3, 1), 4, 2));
+        assert!(deny_withdraws(trade(4, 0), 4, 2));
     }
 
     #[test]
@@ -920,7 +973,7 @@ mod tests {
         let attackers = [rifle(45, false); 4];
         let estimate = estimate_trade(&dug_in, &attackers, 0);
         assert_eq!(estimate.units_killed, 4);
-        assert!(!estimate.unfavorable());
+        assert!(!estimate.clearly_losing());
     }
 
     #[test]

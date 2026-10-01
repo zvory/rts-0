@@ -1193,6 +1193,9 @@ where
                         map_analysis,
                         &defensive_machine_gunners_available,
                         enemy_base,
+                        profile
+                            .defensive_machine_gunners
+                            .map_or(0, |policy| policy.target_count),
                     )
                 } else if memory.home_defensive_tank.is_some() {
                     let distance = profile

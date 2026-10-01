@@ -44,6 +44,14 @@ const TEMPLATE_HOME_ANTI_TANK: HomeAntiTankPolicy = HomeAntiTankPolicy {
     lateral_spacing_tiles: 4.5,
 };
 
+const TEMPLATE_DEFENSIVE_MACHINE_GUNNERS: DefensiveMachineGunnerPolicy =
+    DefensiveMachineGunnerPolicy {
+        target_count: 2,
+        perimeter_distance_tiles: 6.0,
+        lateral_spacing_tiles: 4.5,
+        replacement_health_percent: Some(50),
+    };
+
 /// Server-authoritative port of the champion V3 policy developed in the standalone
 /// `Jeff's AI` workspace. The live controller still emits ordinary fog-constrained
 /// commands through the shared AI action layer.
@@ -121,12 +129,7 @@ const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
-    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
-        target_count: 2,
-        perimeter_distance_tiles: 6.0,
-        lateral_spacing_tiles: 4.5,
-        replacement_health_percent: Some(50),
-    }),
+    defensive_machine_gunners: Some(TEMPLATE_DEFENSIVE_MACHINE_GUNNERS),
     turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
         exclude_launched_ticks: Some(120),
@@ -188,9 +191,18 @@ const JEFFS_AI_LIVE: AiProfile = AiProfile {
     ..JEFFS_AI_TEMPLATE
 };
 
-pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_LIVE;
+/// The live Jeff sends its starting Riflemen out to deny the enemy natural, so home holds four
+/// defensive Machine Gunners instead of two.
+pub(crate) static JEFFS_AI: AiProfile = AiProfile {
+    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
+        target_count: 4,
+        ..TEMPLATE_DEFENSIVE_MACHINE_GUNNERS
+    }),
+    ..JEFFS_AI_LIVE
+};
 
-/// The live Jeff's exact policy under its own id; only the opening rush branches on the live id.
+/// The live Jeff's policy from before the opening rush under its own id: two defensive Machine
+/// Gunners, and the opening rush only branches on the live id.
 pub(crate) static JEFFS_AI_PRE_OPENING_RUSH: AiProfile = AiProfile {
     id: JEFFS_AI_PRE_OPENING_RUSH_ID,
     ..JEFFS_AI_LIVE
@@ -237,7 +249,14 @@ mod tests {
         assert_eq!(JEFFS_AI.workers.extra_builder_workers, 0);
         assert!(!JEFFS_AI.workers.train_workers_for_oil);
         assert!(JEFFS_AI.workers.reuse_idle_before_training);
-        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 2);
+        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 4);
+        assert_eq!(
+            JEFFS_AI_PRE_OPENING_RUSH
+                .defensive_machine_gunners
+                .unwrap()
+                .target_count,
+            2
+        );
         assert_eq!(
             JEFFS_AI
                 .defensive_machine_gunners
