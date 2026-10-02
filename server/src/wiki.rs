@@ -114,7 +114,7 @@ fn wiki_shell_html(title: &str, body_class: &str, body: &str) -> impl IntoRespon
 </style>
 </head>
 <body class="{body_class}">
-<nav><a href="/wiki">Wiki index</a></nav>
+<nav><a href="/">Play Bewegungskrieg</a> · <a href="/wiki">Wiki index</a></nav>
 <main>
 {body}
 </main>
@@ -1123,6 +1123,7 @@ mod tests {
             assert!(body.contains(r#"href="/wiki/docs/context/balance.md""#));
             assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
             assert!(body.contains(r#"href="/wiki/stats""#));
+            assert!(body.contains(r#"<a href="/">Play Bewegungskrieg</a>"#));
             assert!(body.contains("<main>"));
             assert!(body.contains("color-scheme: dark;"));
             assert!(body.contains(r#"<body class="wiki-doc">"#));
