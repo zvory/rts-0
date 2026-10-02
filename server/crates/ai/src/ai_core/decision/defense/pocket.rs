@@ -16,18 +16,33 @@ const MACHINE_GUNNER_SLOTS: [(f32, f32); 2] = [(7.5, -2.25), (7.5, 2.25)];
 const WIDE_MACHINE_GUNNER_SLOTS: [(f32, f32); 4] =
     [(7.5, -2.25), (7.5, 2.25), (8.0, -3.75), (8.0, 3.75)];
 
+/// With `forest_posts`, a pocket Rifleman may hold a forest edge within this many tiles of its post
+/// instead: hidden from the enemy until it fires, taking a quarter less damage, and dug in.
+const FOREST_POST_SEARCH_TILES: i32 = 4;
+/// Fog sight crosses at most four forest tiles, so a post inside a forest keeps watch only where its
+/// sight lines leave the trees quickly; two leaves margin against the simulation's exact ray.
+const FOREST_POST_MAX_FOREST_ON_SIGHT_LINE: u32 = 2;
+/// The ground a post must see: its own pocket slot and this far beyond it toward the threat.
+const FOREST_POST_WATCH_TILES: f32 = 5.0;
+/// A forest post may sit at most this much farther back from the threat than its slot.
+const FOREST_POST_MAX_RETREAT_TILES: f32 = 1.0;
+const FOREST_POST_SPACING_TILES: f32 = 1.5;
+
+/// `forest_posts` lets the four pocket Riflemen hold nearby forest edges instead of open ground.
 pub(in crate::ai_core::decision) fn stage_home_defensive_pocket_riflemen(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
+    forest_posts: bool,
 ) -> Option<Vec<u32>> {
-    let assignments = home_defensive_pocket_rifle_assignments(
+    let assignments = pocket_rifle_assignments(
         observation,
         map_analysis,
         ready_units,
         enemy_base,
+        forest_posts,
     )?;
     stage_home_rifleman_assignments(actions, observation, assignments)
 }
@@ -38,6 +53,16 @@ pub(super) fn home_defensive_pocket_rifle_assignments(
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
 ) -> Option<Vec<DefensiveLineAssignment>> {
+    pocket_rifle_assignments(observation, map_analysis, ready_units, enemy_base, false)
+}
+
+pub(super) fn pocket_rifle_assignments(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+    forest_posts: bool,
+) -> Option<Vec<DefensiveLineAssignment>> {
     let mut units = ready_units.to_vec();
     units.sort_unstable();
     units.dedup();
@@ -46,17 +71,36 @@ pub(super) fn home_defensive_pocket_rifle_assignments(
     }
 
     let (anchor, direction) = defensive_pocket_basis(observation, map_analysis, enemy_base)?;
-    let mut assignments = units
+    let forest_analysis = map_analysis.filter(|_| forest_posts);
+    let mut forest_taken: Vec<(f32, f32)> = Vec::new();
+    let mut assignments = Vec::new();
+    for (unit_id, slot) in units
         .iter()
         .take(RIFLE_SLOTS.len())
         .copied()
         .zip(RIFLE_SLOTS)
-        .filter_map(|(unit_id, slot)| {
-            let desired = slot_target(observation, anchor, direction, slot);
-            clear_mobile_defensive_position(observation, map_analysis, desired)
-                .map(|(x, y)| DefensiveLineAssignment { unit_id, x, y })
-        })
-        .collect::<Vec<_>>();
+    {
+        let desired = slot_target(observation, anchor, direction, slot);
+        let forest = forest_analysis.and_then(|analysis| {
+            forest_post(
+                observation,
+                analysis,
+                (anchor, direction),
+                desired,
+                &forest_taken,
+            )
+        });
+        let point = match forest {
+            Some(point) => {
+                forest_taken.push(point);
+                Some(point)
+            }
+            None => clear_mobile_defensive_position(observation, map_analysis, desired),
+        };
+        if let Some((x, y)) = point {
+            assignments.push(DefensiveLineAssignment { unit_id, x, y });
+        }
+    }
 
     // The four oldest home Riflemen own the pocket. Later surplus Riflemen retain the broader
     // envelope coverage so a large late-game group does not collapse into the six opening slots.
@@ -332,6 +376,101 @@ fn slot_target(
         ),
         observation.map,
     )
+}
+
+/// The forest tile nearest `slot` that a pocket Rifleman can hold instead of the slot: dug-in
+/// ground in a forest, within `FOREST_POST_SEARCH_TILES`, no more than a tile farther from the
+/// threat, apart from the other forest posts, and with clear sight of the slot and of the ground
+/// beyond it. A Rifleman deep in the trees would be hidden but blind, so posts sit on the edge.
+fn forest_post(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    (anchor, direction): ((f32, f32), (f32, f32)),
+    slot: (f32, f32),
+    taken: &[(f32, f32)],
+) -> Option<(f32, f32)> {
+    let tile = observation.map.tile_size.max(1) as f32;
+    let forward = |point: (f32, f32)| {
+        ((point.0 - anchor.0) * direction.0 + (point.1 - anchor.1) * direction.1) / tile
+    };
+    let watch = clamp_to_map(
+        (
+            slot.0 + direction.0 * FOREST_POST_WATCH_TILES * tile,
+            slot.1 + direction.1 * FOREST_POST_WATCH_TILES * tile,
+        ),
+        observation.map,
+    );
+    let (slot_x, slot_y) = world_tile(observation.map, slot.0, slot.1);
+    let mut best: Option<((f32, f32), f32)> = None;
+    for dy in -FOREST_POST_SEARCH_TILES..=FOREST_POST_SEARCH_TILES {
+        for dx in -FOREST_POST_SEARCH_TILES..=FOREST_POST_SEARCH_TILES {
+            let (Some(x), Some(y)) = (slot_x.checked_add_signed(dx), slot_y.checked_add_signed(dy))
+            else {
+                continue;
+            };
+            if !analysis.tile_is_concealment(x, y) || !analysis.tile_allows_entrenchment(x, y) {
+                continue;
+            }
+            let point = tile_center((x, y), observation.map.tile_size);
+            let distance2 = dist2(point.0, point.1, slot.0, slot.1);
+            if distance2 > squared(FOREST_POST_SEARCH_TILES as f32 * tile)
+                || forward(point) < forward(slot) - FOREST_POST_MAX_RETREAT_TILES
+                || taken.iter().any(|other| {
+                    dist2(point.0, point.1, other.0, other.1)
+                        < squared(FOREST_POST_SPACING_TILES * tile)
+                })
+                || best.is_some_and(|(_, best_distance2)| distance2 >= best_distance2)
+                || !defensive_position_is_open(observation, Some(analysis), point.0, point.1)
+            {
+                continue;
+            }
+            let watches = |target: (f32, f32)| {
+                forest_tiles_on_sight_line(observation, analysis, point, target)
+                    .is_some_and(|forest| forest <= FOREST_POST_MAX_FOREST_ON_SIGHT_LINE)
+            };
+            if watches(slot) && watches(watch) {
+                best = Some((point, distance2));
+            }
+        }
+    }
+    best.map(|(point, _)| point)
+}
+
+/// The forest tiles a fog sight ray from `from` to `to` enters, not counting the tile it starts on,
+/// sampled every quarter tile; `None` when rock or a building blocks it.
+pub(super) fn forest_tiles_on_sight_line(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    from: (f32, f32),
+    to: (f32, f32),
+) -> Option<u32> {
+    let tile = observation.map.tile_size.max(1) as f32;
+    let samples = ((to.0 - from.0).hypot(to.1 - from.1) / tile * 4.0)
+        .ceil()
+        .max(1.0) as usize;
+    let origin = world_tile(observation.map, from.0, from.1);
+    let blockers = dynamic_los_blocking_tiles(observation);
+    let mut last = origin;
+    let mut forest = 0;
+    for step in 1..=samples {
+        let t = step as f32 / samples as f32;
+        let current = world_tile(
+            observation.map,
+            from.0 + (to.0 - from.0) * t,
+            from.1 + (to.1 - from.1) * t,
+        );
+        if current == last {
+            continue;
+        }
+        last = current;
+        if analysis.tile_blocks_line_of_sight(current.0, current.1) || blockers.contains(&current) {
+            return None;
+        }
+        if analysis.tile_is_concealment(current.0, current.1) {
+            forest += 1;
+        }
+    }
+    Some(forest)
 }
 
 fn clear_machine_gunner_position(

@@ -766,6 +766,9 @@ where
     {
         effective_unit_priorities.insert(0, EntityKind::Rifleman);
     }
+    let emergency_rifle_target = memory
+        .opening_rush
+        .lead_with_emergency_riflemen(&mut effective_unit_priorities);
     if let Some(policy) = profile.surplus_steel_production {
         let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
         if actions.budget().steel() >= policy.reserve.saturating_add(unit_steel)
@@ -793,6 +796,11 @@ where
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let production_max_counts = production_max_counts(profile, observation, map_analysis);
+    let emergency_rifle_target = emergency_rifle_target.and_then(|_| {
+        memory
+            .opening_rush
+            .unmet_emergency_target(&production_unit_counts)
+    });
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
@@ -805,7 +813,10 @@ where
             && memory.expansion_security.site.is_some()
             && facts.unit_count(EntityKind::Rifleman) < 6
             && building_kind == EntityKind::Barracks;
+        let emergency_recruits =
+            emergency_rifle_target.filter(|_| building_kind == EntityKind::Barracks);
         let save_for_tech = !security_recruits
+            && emergency_recruits.is_none()
             && (save_for_unplanned_expansion
                 || (save_for_first_tech_unit
                     && !planned_train_in_intents(&intents, key_tech_unit))
@@ -846,6 +857,9 @@ where
                     .min(surplus_cap)
                     .max(if security_recruits { 6 } else { 0 }),
             ));
+        }
+        if let Some(target) = emergency_recruits {
+            opening_rush::raise_rifle_cap(&mut building_max_counts, target);
         }
         let home_holds_tank_reserve = !uses_current_jeffs_ai_policy(profile.id)
             || later_bases::main_tank_ids(observation, memory).len() >= memory.home_tank_reserve();
@@ -1134,6 +1148,7 @@ where
                         map_analysis,
                         &riflemen,
                         enemy_base,
+                        memory.opening_rush.missed_contact(),
                     )
                 } else if profile.id == JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID {
                     defense::stage_home_rifleman_coverage(

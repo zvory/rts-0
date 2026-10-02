@@ -20,6 +20,12 @@
 //!   Methamphetamines, and only the enemies close enough to be fighting it; once half the squad
 //!   is dug in there it stays unless it would be wiped out without a single kill.
 //!
+//! - On the way out: when the squad reaches the middle of the map without having met any enemy
+//!   fighter, or enemy fighters turn up near Jeff's main first. The enemy's opening attack then
+//!   took another way and is heading for an empty base (on Wald des Todes the two groups walk
+//!   parallel lanes twelve tiles apart), so the squad goes home, the Barracks trains two Riflemen
+//!   at once, and the home pocket holds forest edges where it can.
+//!
 //! Survivors that reach home are released to the home pocket. Only the live Jeff runs this; the
 //! `jeffs_ai_pre_opening_rush` freeze keeps its starting Riflemen at home.
 
@@ -31,6 +37,13 @@ use crate::ai_core::squad_micro::{
     plan_rifle_squad, RifleSquadParams, SquadMicroMemory, SquadOrder,
 };
 
+/// The middle of the map: the squad is as close to the enemy base as to its own. Against AI 2.1 the
+/// two opening groups always come into sight before this (they meet at 46-49% of the route).
+const MISSED_CONTACT_PROGRESS: f32 = 0.5;
+/// Enemy fighters seen this close to Jeff's main before the squad met any have slipped past it.
+const HOME_ALERT_TILES: f32 = 28.0;
+/// Riflemen the Barracks trains straight away when the enemy's opening attack slips past.
+const EMERGENCY_RIFLEMEN: usize = 2;
 /// A rush only starts from the opening's first decisions.
 const START_TICK_LIMIT: u32 = 90;
 /// Distance between march waypoints along the base route.
@@ -106,6 +119,8 @@ pub(super) enum WithdrawReason {
     Entrenchment,
     Methamphetamines,
     BadTrade,
+    /// The enemy's opening attack went past the squad toward Jeff's base.
+    MissedContact,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -133,6 +148,12 @@ pub(in crate::ai_core::decision) struct OpeningRush {
     deny_targets: BTreeMap<u32, u32>,
     deny_holding: BTreeSet<u32>,
     deny_order_tick: BTreeMap<u32, u32>,
+    /// An enemy fighter has come within the squad's fight radius since the march began.
+    squad_contact: bool,
+    /// The enemy's opening attack slipped past the squad. Sticky for the rest of the game.
+    missed_contact: bool,
+    /// Riflemen to have, queued ones included, before the emergency recruiting stops.
+    emergency_rifle_target: Option<usize>,
 }
 
 impl OpeningRush {
@@ -161,6 +182,57 @@ impl OpeningRush {
 
     pub(in crate::ai_core::decision) fn is_starter(&self, id: u32) -> bool {
         self.starters.contains(&id)
+    }
+
+    /// Whether the enemy's opening attack slipped past the squad toward Jeff's base.
+    pub(in crate::ai_core::decision) fn missed_contact(&self) -> bool {
+        self.missed_contact
+    }
+
+    /// While the enemy's opening attack is loose, Riflemen lead `priorities` until Jeff has the
+    /// returned number, queued ones included.
+    pub(in crate::ai_core::decision) fn lead_with_emergency_riflemen(
+        &self,
+        priorities: &mut Vec<EntityKind>,
+    ) -> Option<usize> {
+        let target = self.emergency_rifle_target?;
+        priorities.retain(|unit| *unit != EntityKind::Rifleman);
+        priorities.insert(0, EntityKind::Rifleman);
+        Some(target)
+    }
+
+    /// The emergency Rifleman target while `counts` (queued units included) fall short of it.
+    /// Reaching it ends the emergency recruiting for good.
+    pub(in crate::ai_core::decision) fn unmet_emergency_target(
+        &mut self,
+        counts: &[(EntityKind, usize)],
+    ) -> Option<usize> {
+        let riflemen = counts
+            .iter()
+            .find_map(|(kind, count)| (*kind == EntityKind::Rifleman).then_some(*count))
+            .unwrap_or(0);
+        self.note_rifle_count(riflemen);
+        self.emergency_rifle_target
+    }
+
+    fn note_rifle_count(&mut self, riflemen: usize) {
+        if self
+            .emergency_rifle_target
+            .is_some_and(|target| riflemen >= target)
+        {
+            self.emergency_rifle_target = None;
+        }
+    }
+}
+
+/// Lets a Barracks train Riflemen up to `target` whatever its cap was.
+pub(super) fn raise_rifle_cap(max_counts: &mut Vec<(EntityKind, usize)>, target: usize) {
+    match max_counts
+        .iter_mut()
+        .find(|(kind, _)| *kind == EntityKind::Rifleman)
+    {
+        Some((_, max)) => *max = (*max).max(target),
+        None => max_counts.push((EntityKind::Rifleman, target)),
     }
 }
 
@@ -215,6 +287,18 @@ pub(super) fn plan(
     let home = jeff::rifleman_home_rally(observation, facts)
         .unwrap_or_else(|| tile_center(observation.own_start_tile, observation.map.tile_size));
     let denying = rush.deny_center.is_some();
+
+    if rush.phase == RushPhase::March {
+        if near.iter().any(|enemy| enemy.kind != EntityKind::Worker) {
+            rush.squad_contact = true;
+        }
+        if !rush.squad_contact && opening_attack_slipped_past(observation, facts, center) {
+            rush.missed_contact = true;
+            rush.emergency_rifle_target =
+                Some(facts.unit_count(EntityKind::Rifleman) + EMERGENCY_RIFLEMEN);
+            begin_withdraw(rush, WithdrawReason::MissedContact);
+        }
+    }
 
     if rush.phase == RushPhase::March {
         let enemy_entrenchment = observation.tick >= EARLIEST_ENTRENCHMENT_TICK;
@@ -347,6 +431,40 @@ pub(super) fn plan(
         }
     }
     decision
+}
+
+/// Whether the enemy's opening attack has gone past a squad that has not met it: the squad is past
+/// the middle of the map, or enemy fighters are already near Jeff's main.
+fn opening_attack_slipped_past(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    squad_center: (f32, f32),
+) -> bool {
+    let tile = observation.map.tile_size.max(1) as f32;
+    let own = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let near_home = observation.visible_enemies.iter().any(|enemy| {
+        enemy.hp > 0
+            && enemy.kind.is_unit()
+            && enemy.kind != EntityKind::Worker
+            && distance(own, (enemy.x, enemy.y)) <= HOME_ALERT_TILES * tile
+    });
+    near_home
+        || facts.nearest_public_enemy_base.is_some_and(|enemy_base| {
+            march_progress(squad_center, own, (enemy_base.x, enemy_base.y))
+                >= MISSED_CONTACT_PROGRESS
+        })
+}
+
+/// How far across the map `point` is, from 0 at `own` to 1 at `enemy`: its distance from `own` over
+/// the sum of its distances to both.
+fn march_progress(point: (f32, f32), own: (f32, f32), enemy: (f32, f32)) -> f32 {
+    let from_own = distance(point, own);
+    let total = from_own + distance(point, enemy);
+    if total <= f32::EPSILON {
+        0.0
+    } else {
+        from_own / total
+    }
 }
 
 fn begin_withdraw(rush: &mut OpeningRush, reason: WithdrawReason) {
@@ -813,6 +931,19 @@ fn withdraw(
     decision: &mut RushDecision,
 ) {
     let tick = observation.tick;
+    if rush.withdraw_reason == Some(WithdrawReason::MissedContact) {
+        // Home is where the enemy's opening attack went: walk straight back and fight whatever is
+        // there, instead of stepping around it.
+        let idle = squad.iter().any(|unit| unit.state == AiEntityState::Idle);
+        if rush.withdraw_order_tick.is_none() || idle {
+            let units = squad.iter().map(|unit| unit.id);
+            if let Some(moved) = actions::attack_move_units(actions, units, home.0, home.1) {
+                decision.moved.extend(moved);
+            }
+            rush.withdraw_order_tick = Some(tick);
+        }
+        return;
+    }
     let threats: Vec<&AiEntitySummary> = near
         .iter()
         .copied()
@@ -1009,6 +1140,39 @@ mod tests {
         );
         let close = vec![enemy(4, EntityKind::Worker, 6.0, 40)];
         assert_eq!(pick_deny_target(&close, (0.0, 0.0), dug_in, tile), Some(4));
+    }
+
+    #[test]
+    fn the_middle_of_the_map_is_equally_far_from_both_bases() {
+        let own = (0.0, 0.0);
+        let enemy = (1000.0, 0.0);
+        assert!((march_progress((500.0, 0.0), own, enemy) - 0.5).abs() < 1e-6);
+        assert!(march_progress((400.0, 0.0), own, enemy) < MISSED_CONTACT_PROGRESS);
+        // A lane off the straight line still reaches the middle where both distances match.
+        assert!((march_progress((500.0, 300.0), own, enemy) - 0.5).abs() < 1e-6);
+        assert!(march_progress((600.0, 300.0), own, enemy) > MISSED_CONTACT_PROGRESS);
+    }
+
+    #[test]
+    fn emergency_recruiting_stops_once_its_riflemen_are_trained_or_queued() {
+        let mut rush = OpeningRush {
+            emergency_rifle_target: Some(6),
+            ..OpeningRush::default()
+        };
+        let mut priorities = vec![EntityKind::Tank, EntityKind::Rifleman];
+        assert_eq!(rush.lead_with_emergency_riflemen(&mut priorities), Some(6));
+        assert_eq!(priorities, vec![EntityKind::Rifleman, EntityKind::Tank]);
+        let counts = |riflemen| vec![(EntityKind::Rifleman, riflemen)];
+        assert_eq!(rush.unmet_emergency_target(&counts(5)), Some(6));
+        assert_eq!(rush.unmet_emergency_target(&counts(6)), None);
+        // Later losses do not restart it.
+        assert_eq!(rush.unmet_emergency_target(&counts(2)), None);
+        let mut untouched = vec![EntityKind::Tank];
+        assert_eq!(rush.lead_with_emergency_riflemen(&mut untouched), None);
+        assert_eq!(untouched, vec![EntityKind::Tank]);
+        let mut caps = vec![(EntityKind::MachineGunner, 4), (EntityKind::Rifleman, 3)];
+        raise_rifle_cap(&mut caps, 6);
+        assert_eq!(caps[1], (EntityKind::Rifleman, 6));
     }
 
     #[test]
