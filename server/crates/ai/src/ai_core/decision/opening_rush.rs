@@ -24,7 +24,9 @@
 //!   fighter, or enemy fighters turn up near Jeff's main first. The enemy's opening attack then
 //!   took another way and is heading for an empty base (on Wald des Todes the two groups walk
 //!   parallel lanes twelve tiles apart), so the squad goes home, the Barracks trains two Riflemen
-//!   at once, and the home pocket holds forest edges where it can.
+//!   at once, and the home pocket holds forest edges where it can. If no enemy fighter has shown
+//!   up near the main by the time the squad is home, the enemy kept its Riflemen in its base
+//!   instead, and the squad marches out again; then only a raid seen at home turns it back.
 //!
 //! Survivors that reach home are released to the home pocket. Only the live Jeff runs this; the
 //! `jeffs_ai_pre_opening_rush` freeze keeps its starting Riflemen at home.
@@ -44,6 +46,14 @@ const MISSED_CONTACT_PROGRESS: f32 = 0.5;
 const HOME_ALERT_TILES: f32 = 28.0;
 /// Riflemen the Barracks trains straight away when the enemy's opening attack slips past.
 const EMERGENCY_RIFLEMEN: usize = 2;
+/// A relaunched squad first gathers at the first march waypoint at least this far from home: back
+/// in the base it stands strung out between buildings, where the squad planner would keep
+/// switching between regrouping and advancing.
+const RELAUNCH_GATHER_TILES: f32 = 16.0;
+const RELAUNCH_GATHER_TICKS: u32 = 600;
+const GATHER_REACHED_TILES: f32 = 3.0;
+/// Squad members still this far from the gathering point when time runs out stay home.
+const GATHER_STRAGGLER_TILES: f32 = 8.0;
 /// A rush only starts from the opening's first decisions.
 const START_TICK_LIMIT: u32 = 90;
 /// Distance between march waypoints along the base route.
@@ -152,6 +162,14 @@ pub(in crate::ai_core::decision) struct OpeningRush {
     squad_contact: bool,
     /// The enemy's opening attack slipped past the squad. Sticky for the rest of the game.
     missed_contact: bool,
+    /// Enemy fighters have been seen near Jeff's main since the contact was missed.
+    home_raid_seen: bool,
+    /// The squad came home after a missed contact, found no raid, and marched out again.
+    relaunched: bool,
+    /// Where a relaunched squad gathers before marching on, until when, and whether it was sent.
+    gather_point: Option<(i32, i32)>,
+    gather_until: u32,
+    gather_ordered: bool,
     /// Riflemen to have, queued ones included, before the emergency recruiting stops.
     emergency_rifle_target: Option<usize>,
 }
@@ -288,14 +306,24 @@ pub(super) fn plan(
         .unwrap_or_else(|| tile_center(observation.own_start_tile, observation.map.tile_size));
     let denying = rush.deny_center.is_some();
 
+    let raid_near_home = enemy_fighters_near_home(observation);
+    if rush.missed_contact && raid_near_home {
+        rush.home_raid_seen = true;
+    }
     if rush.phase == RushPhase::March {
         if near.iter().any(|enemy| enemy.kind != EntityKind::Worker) {
             rush.squad_contact = true;
         }
-        if !rush.squad_contact && opening_attack_slipped_past(observation, facts, center) {
+        // After a relaunch the enemy is known to have kept its Riflemen home, so only a raid
+        // actually seen near the main turns the squad around again.
+        let past_middle = !rush.relaunched && past_the_middle(observation, facts, center);
+        if !rush.squad_contact && (raid_near_home || past_middle) {
+            if !rush.missed_contact {
+                rush.emergency_rifle_target =
+                    Some(facts.unit_count(EntityKind::Rifleman) + EMERGENCY_RIFLEMEN);
+            }
             rush.missed_contact = true;
-            rush.emergency_rifle_target =
-                Some(facts.unit_count(EntityKind::Rifleman) + EMERGENCY_RIFLEMEN);
+            rush.home_raid_seen |= raid_near_home;
             begin_withdraw(rush, WithdrawReason::MissedContact);
         }
     }
@@ -350,6 +378,29 @@ pub(super) fn plan(
 
     if rush.phase == RushPhase::Withdraw {
         if distance((center.0, center.1), home) <= HOME_ARRIVAL_TILES * tile {
+            if rush.withdraw_reason == Some(WithdrawReason::MissedContact)
+                && !rush.home_raid_seen
+                && !rush.relaunched
+            {
+                // Nothing followed the squad home: the enemy kept its opening Riflemen in its base
+                // rather than taking another lane, so the march goes back out.
+                rush.relaunched = true;
+                rush.phase = RushPhase::March;
+                rush.withdraw_reason = None;
+                rush.withdraw_order_tick = None;
+                rush.next_waypoint = rush
+                    .waypoints
+                    .iter()
+                    .position(|point| {
+                        distance((point.0 as f32, point.1 as f32), home)
+                            > RELAUNCH_GATHER_TILES * tile
+                    })
+                    .unwrap_or(0);
+                rush.gather_point = rush.waypoints.get(rush.next_waypoint).copied();
+                rush.gather_until = observation.tick + RELAUNCH_GATHER_TICKS;
+                rush.gather_ordered = false;
+                return decision;
+            }
             rush.phase = RushPhase::Done;
             decision.released = rush.squad.iter().copied().collect();
             return decision;
@@ -378,6 +429,13 @@ pub(super) fn plan(
             &mut decision,
         );
         return decision;
+    }
+
+    if let Some(point) = rush.gather_point {
+        gather(actions, observation, rush, &squad, point, &mut decision);
+        if rush.gather_point.is_some() || !decision.released.is_empty() {
+            return decision;
+        }
     }
 
     // Marching: move on to the next waypoint once the squad is there, and let the planner either
@@ -433,26 +491,70 @@ pub(super) fn plan(
     decision
 }
 
-/// Whether the enemy's opening attack has gone past a squad that has not met it: the squad is past
-/// the middle of the map, or enemy fighters are already near Jeff's main.
-fn opening_attack_slipped_past(
+/// Brings a relaunched squad together at `point` with one group order before the march resumes.
+/// When time runs out, members still far from it stay home and the rest march on.
+fn gather(
+    actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
-    facts: &AiFacts,
-    squad_center: (f32, f32),
-) -> bool {
+    rush: &mut OpeningRush,
+    squad: &[&AiEntitySummary],
+    point: (i32, i32),
+    decision: &mut RushDecision,
+) {
+    let tile = observation.map.tile_size.max(1) as f32;
+    let point = (point.0 as f32, point.1 as f32);
+    let from_point = |unit: &&AiEntitySummary| distance((unit.x, unit.y), point);
+    if observation.tick >= rush.gather_until {
+        let stragglers: Vec<u32> = squad
+            .iter()
+            .filter(|unit| from_point(unit) > GATHER_STRAGGLER_TILES * tile)
+            .map(|unit| unit.id)
+            .collect();
+        for id in &stragglers {
+            rush.squad.remove(id);
+        }
+        decision.released.extend(stragglers);
+        rush.gather_point = None;
+        return;
+    }
+    if squad
+        .iter()
+        .all(|unit| from_point(unit) <= GATHER_REACHED_TILES * tile)
+    {
+        rush.gather_point = None;
+        return;
+    }
+    let units: Vec<u32> = squad
+        .iter()
+        .filter(|unit| !rush.gather_ordered || unit.state == AiEntityState::Idle)
+        .map(|unit| unit.id)
+        .collect();
+    if !units.is_empty() {
+        if let Some(moved) = actions::attack_move_units(actions, units, point.0, point.1) {
+            decision.moved.extend(moved);
+        }
+    }
+    rush.gather_ordered = true;
+}
+
+/// Whether enemy fighters are in sight near Jeff's main.
+fn enemy_fighters_near_home(observation: &AiObservation) -> bool {
     let tile = observation.map.tile_size.max(1) as f32;
     let own = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let near_home = observation.visible_enemies.iter().any(|enemy| {
+    observation.visible_enemies.iter().any(|enemy| {
         enemy.hp > 0
             && enemy.kind.is_unit()
             && enemy.kind != EntityKind::Worker
             && distance(own, (enemy.x, enemy.y)) <= HOME_ALERT_TILES * tile
-    });
-    near_home
-        || facts.nearest_public_enemy_base.is_some_and(|enemy_base| {
-            march_progress(squad_center, own, (enemy_base.x, enemy_base.y))
-                >= MISSED_CONTACT_PROGRESS
-        })
+    })
+}
+
+/// Whether the squad has passed the middle of the map.
+fn past_the_middle(observation: &AiObservation, facts: &AiFacts, squad_center: (f32, f32)) -> bool {
+    let own = tile_center(observation.own_start_tile, observation.map.tile_size);
+    facts.nearest_public_enemy_base.is_some_and(|enemy_base| {
+        march_progress(squad_center, own, (enemy_base.x, enemy_base.y)) >= MISSED_CONTACT_PROGRESS
+    })
 }
 
 /// How far across the map `point` is, from 0 at `own` to 1 at `enemy`: its distance from `own` over
