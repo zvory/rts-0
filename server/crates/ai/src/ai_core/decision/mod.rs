@@ -14,7 +14,8 @@ use crate::ai_core::profiles::{
     is_jeffs_ai_profile, uses_current_jeffs_ai_policy, AiProfile, AttackPolicy, BarracksCurve,
     ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
     TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID,
+    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
+    JEFFS_AI_PRE_TANK_CATCHUP_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -35,6 +36,7 @@ mod jeff;
 mod later_bases;
 mod memory;
 mod obstacles;
+mod opening_rush;
 mod policies;
 mod production;
 mod resources;
@@ -412,6 +414,25 @@ where
     );
     intents.extend(later_base.intents.iter().cloned());
 
+    // The live Jeff's starting Riflemen march on the enemy until a fallback sends them home.
+    if opening_rush::uses_opening_rush(profile.id) {
+        let rush = opening_rush::plan(&mut actions, observation, &facts, memory, map_analysis);
+        if !rush.moved.is_empty() {
+            intents.push(AiIntent::Move { units: rush.moved });
+        }
+        if !rush.attacked.is_empty() {
+            intents.push(AiIntent::Attack {
+                units: rush.attacked,
+            });
+        }
+        if !rush.released.is_empty() {
+            // Clears the live adapter's cached staging so the pocket can place them again.
+            intents.push(AiIntent::Assemble {
+                units: rush.released,
+            });
+        }
+    }
+
     // Jeff's picket on the enemy's route and warned sealing of the home line. Its units are
     // reserved from every other system for this decision.
     if uses_current_jeffs_ai_policy(profile.id) {
@@ -429,7 +450,12 @@ where
             });
         }
     }
-    let route_line_reserved: BTreeSet<u32> = memory.route_line.reserved().collect();
+    // Units the route line or the opening rush own this decision.
+    let route_line_reserved: BTreeSet<u32> = memory
+        .route_line
+        .reserved()
+        .chain(memory.opening_rush.reserved())
+        .collect();
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
@@ -740,6 +766,9 @@ where
     {
         effective_unit_priorities.insert(0, EntityKind::Rifleman);
     }
+    let emergency_rifle_target = memory
+        .opening_rush
+        .lead_with_emergency_riflemen(&mut effective_unit_priorities);
     if let Some(policy) = profile.surplus_steel_production {
         let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
         if actions.budget().steel() >= policy.reserve.saturating_add(unit_steel)
@@ -767,6 +796,11 @@ where
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let production_max_counts = production_max_counts(profile, observation, map_analysis);
+    let emergency_rifle_target = emergency_rifle_target.and_then(|_| {
+        memory
+            .opening_rush
+            .unmet_emergency_target(&production_unit_counts)
+    });
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
@@ -779,7 +813,10 @@ where
             && memory.expansion_security.site.is_some()
             && facts.unit_count(EntityKind::Rifleman) < 6
             && building_kind == EntityKind::Barracks;
+        let emergency_recruits =
+            emergency_rifle_target.filter(|_| building_kind == EntityKind::Barracks);
         let save_for_tech = !security_recruits
+            && emergency_recruits.is_none()
             && (save_for_unplanned_expansion
                 || (save_for_first_tech_unit
                     && !planned_train_in_intents(&intents, key_tech_unit))
@@ -820,6 +857,9 @@ where
                     .min(surplus_cap)
                     .max(if security_recruits { 6 } else { 0 }),
             ));
+        }
+        if let Some(target) = emergency_recruits {
+            opening_rush::raise_rifle_cap(&mut building_max_counts, target);
         }
         let home_holds_tank_reserve = !uses_current_jeffs_ai_policy(profile.id)
             || later_bases::main_tank_ids(observation, memory).len() >= memory.home_tank_reserve();
@@ -919,6 +959,7 @@ where
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
     local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     local_ready_units.retain(|id| !push_units.contains(id));
+    local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
     if profile.home_anti_tank.is_some() {
         local_ready_units.retain(|id| {
             Some(*id) != memory.home_defensive_tank
@@ -978,6 +1019,7 @@ where
         // The picket holds its trench on the route; it never runs back to answer a raid.
         local_defenders.retain(|id| Some(*id) != memory.route_line.picket());
         local_defenders.retain(|id| !push_units.contains(id));
+        local_defenders.retain(|id| !memory.opening_rush.is_reserved(*id));
         local_defenders.sort_unstable();
         local_defenders.dedup();
         if new_jeff_defense {
@@ -1106,6 +1148,7 @@ where
                         map_analysis,
                         &riflemen,
                         enemy_base,
+                        memory.opening_rush.missed_contact(),
                     )
                 } else if profile.id == JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID {
                     defense::stage_home_rifleman_coverage(
@@ -1165,6 +1208,9 @@ where
                         map_analysis,
                         &defensive_machine_gunners_available,
                         enemy_base,
+                        profile
+                            .defensive_machine_gunners
+                            .map_or(0, |policy| policy.target_count),
                     )
                 } else if memory.home_defensive_tank.is_some() {
                     let distance = profile

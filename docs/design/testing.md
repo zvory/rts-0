@@ -116,6 +116,51 @@ Each run directory contains a deterministic `replay.json` plus `manifest.json`, 
 fingerprints; the brief is the first artifact agents should read before opening the replay or
 searching trace labels.
 
+**Squad micro skirmish CLI.** The `ai-skirmish` binary is the fast testbed for small-squad combat
+micro. Each fight loads a real map in Lab mode (`Game::new_lab`), deletes both players' starting
+units, zeroes their resources, and spawns one Rifleman squad per side on the line between the two
+starting Resource Depots. Both controllers then run through `CanonicalAiTickDriver`, so they get the
+same nine-tick, player-staggered cadence, fog-filtered frames, and command validation as live
+matches. A fight ends when one squad is destroyed or at the tick cap (default 1,800 ticks). The
+default opponent is the full `ai_2_1` profile, whose first attack wave is exactly four Riflemen;
+the default candidate is the rifle squad planner in `server/crates/ai/src/ai_core/squad_micro/`,
+controlled through `AiController::with_strategy`.
+
+Every scenario is fought from both player slots. Symmetric rifle fights are otherwise decided by
+which side resolves its volley first, so single-slot results are biased. Seeds add a few pixels of
+deterministic spawn jitter, and each spawn snaps to its own free tile because Lab spawns hold one
+unit per tile. Suites are `smoke` (1 scenario), `train` (24: 8/12/16-tile gaps, four formation
+pairings, two approach angles), `holdout` (12: different gaps, formations, angles, and fight
+location), and `all`. Passive income still accrues, so a fight flags `reinforced` when a combat
+unit outside the starting squads appears, typically only in long stalemates.
+
+```bash
+cd server
+cargo run --release --bin ai-skirmish -- --help
+cargo run --release --bin ai-skirmish -- --candidate micro --opponent ai_2_1 --suite train
+cargo run --release --bin ai-skirmish -- --candidate 'micro:focus=weakest,retreat_hp=10,hold=1'
+cargo run --release --bin ai-skirmish -- --candidate naive --suite holdout --seeds 3
+cargo run --release --bin ai-skirmish -- --sweep 24 --tag sweep1
+cargo run --release --bin ai-skirmish -- --sweep 24 --mutate --candidate 'micro:<best params>' --tag refine1
+```
+
+Controllers are `naive` (attack-move with simulation auto-targeting), `micro`,
+`micro:<key=value,...>` (planner parameters; `--help` lists the keys), or any profile id such as
+`ai_2_1` or `jeffs_ai`. Full profiles keep running their economy and decision loop in the stripped
+Lab start, so a profile candidate measures that profile's whole response, not isolated micro.
+Reports go to `server/target/ai-skirmish/<tag>/`: `summary.json` holds every fight plus aggregates
+by player slot and scenario, and `brief.md` lists the worst scenarios and replay names. The score
+is the mean HP margin, `(candidate squad HP - opponent squad HP) / full squad HP`, which
+separates close wins from clean ones better than win rate. Replays of non-wins (`--replays
+losses`, the default outside sweeps) are written to `server/target/selfplay-artifacts/` and open
+with `/?replayArtifact=<name>` on a local server. `--sweep N` random-searches planner parameters
+on `train`, re-runs the top `--top` entries on `holdout`, writes `sweep.json` and a leaderboard
+`brief.md`, and evaluates the train champion on `all` with loss replays under `champion/`. Rank
+changes that the holdout suite does not confirm are overfitting to the training scenarios. Add
+`--mutate` with a `micro:<params>` candidate to refine a known-good set instead: each trial changes
+one to three of its settings, so a coarse random sweep followed by mutation rounds is a simple
+hill climb.
+
 Keep fast invariant-style milestone coverage in `cargo nextest run`; use
 `RTS_FULL_AI_TESTS=1 cargo nextest run --config-file .config/nextest.toml --manifest-path
 server/Cargo.toml --profile default`

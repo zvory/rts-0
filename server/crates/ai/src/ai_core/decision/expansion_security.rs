@@ -295,9 +295,19 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         .map(|unit| unit.id)
         .collect();
     rifles.sort_unstable();
-    let mut candidates = rifles.get(HOME_RIFLES..).unwrap_or(&[]).to_vec();
+    // The four oldest Riflemen hold the home pocket. After an opening rush took them, the party
+    // comes from the Riflemen trained since, whatever became of the starters, so losing them out
+    // on the map does not hold the natural back.
+    let home_rifles = if memory.opening_rush.started() {
+        rifles.retain(|id| !memory.opening_rush.is_starter(*id));
+        0
+    } else {
+        HOME_RIFLES
+    };
+    let mut candidates = rifles.get(home_rifles..).unwrap_or(&[]).to_vec();
     // The route picket and raid sealers are held by the home line.
     candidates.retain(|id| !memory.route_line.reserved().any(|reserved| reserved == *id));
+    candidates.retain(|id| !memory.opening_rush.is_reserved(*id));
     if let Some(center) = building_center(
         memory.expansion_security.site.unwrap(),
         EntityKind::ResourceDepot,

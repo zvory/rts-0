@@ -396,6 +396,242 @@ fn first_machine_gunner_keeps_its_side_when_the_mirrored_partner_arrives() {
     );
 }
 
+fn river_pocket_observation() -> (AiObservation, EnemyBaseFact) {
+    let mut observation = los_test_observation(EntityKind::Factory);
+    observation.map.width = 126;
+    observation.map.height = 126;
+    observation.own_start_tile = (9, 9);
+    observation.owned.clear();
+    let tile_size = observation.map.tile_size as f32;
+    let enemy_base = EnemyBaseFact {
+        player_id: 2,
+        start_tile: (116, 116),
+        x: 116.5 * tile_size,
+        y: 116.5 * tile_size,
+    };
+    (observation, enemy_base)
+}
+
+/// An open 126x126 map with starts at (9,9) and (116,116), forest on `forest` and rock on `rock`.
+fn forest_test_analysis(forest: &[(u32, u32)], rock: &[(u32, u32)]) -> AiMapAnalysis {
+    use rts_sim::protocol::{MapInfo, MapTile, PlayerStart, StartPayload};
+    let (width, height) = (126_u32, 126_u32);
+    let mut terrain = vec![rts_rules::terrain::MAP_TERRAIN_GRASS; (width * height) as usize];
+    for &(x, y) in rock {
+        terrain[(y * width + x) as usize] = rts_rules::terrain::MAP_TERRAIN_ROCK;
+    }
+    let tiles = |list: &[(u32, u32)]| list.iter().map(|&(x, y)| MapTile { x, y }).collect();
+    let start = StartPayload {
+        player_id: 1,
+        spectator: false,
+        prediction_build_id: None,
+        prediction_version: 0,
+        match_run_id: None,
+        capabilities: Default::default(),
+        diagnostics: Default::default(),
+        replay: None,
+        lab: None,
+        observer_view: None,
+        tick: 0,
+        map: MapInfo {
+            width,
+            height,
+            tile_size: config::TILE_SIZE,
+            elevation: vec![0; terrain.len()],
+            sun: None,
+            terrain,
+            resources: Vec::new(),
+            doodads: Vec::new(),
+            concealment_tiles: tiles(forest),
+            no_vehicle_tiles: tiles(forest),
+            no_building_tiles: tiles(forest),
+            no_entrenchment_tiles: Vec::new(),
+            damage_reduction_tiles: tiles(forest),
+            slow_movement_tiles: Vec::new(),
+        },
+        players: [(9_u32, 9_u32), (116, 116)]
+            .iter()
+            .enumerate()
+            .map(|(index, &(x, y))| {
+                let id = index as u32 + 1;
+                PlayerStart {
+                    id,
+                    team_id: id,
+                    faction_id: "kriegsia".to_string(),
+                    name: format!("P{id}"),
+                    color: format!("#{id}{id}{id}"),
+                    is_ai: true,
+                    start_tile_x: x,
+                    start_tile_y: y,
+                }
+            })
+            .collect(),
+    };
+    AiMapAnalysis::analyze(&start)
+}
+
+fn block(xs: std::ops::RangeInclusive<u32>, ys: std::ops::RangeInclusive<u32>) -> Vec<(u32, u32)> {
+    ys.flat_map(|y| xs.clone().map(move |x| (x, y))).collect()
+}
+
+fn post_tiles(assignments: &[DefensiveLineAssignment], tile_size: f32) -> Vec<(u32, u32)> {
+    assignments
+        .iter()
+        .map(|post| ((post.x / tile_size) as u32, (post.y / tile_size) as u32))
+        .collect()
+}
+
+#[test]
+fn pocket_riflemen_hold_a_nearby_forest_edge_only_when_asked() {
+    let (observation, enemy_base) = river_pocket_observation();
+    let tile_size = observation.map.tile_size as f32;
+    // A small wood two tiles off the first pocket post (tile (10,14)), on its open flank.
+    let analysis = forest_test_analysis(&block(7..=8, 15..=17), &[]);
+    let units = [10, 20, 30, 40];
+    let open = pocket_rifle_assignments(&observation, Some(&analysis), &units, enemy_base, false)
+        .expect("open pocket");
+    let forest = pocket_rifle_assignments(&observation, Some(&analysis), &units, enemy_base, true)
+        .expect("forest pocket");
+
+    let open_tiles = post_tiles(&open, tile_size);
+    let forest_tiles = post_tiles(&forest, tile_size);
+    assert_eq!(open_tiles[0], (10, 14));
+    // The nearest forest tile that is no more than a tile farther back and still watches the post
+    // and the ground beyond it.
+    assert_eq!(forest_tiles[0], (8, 15));
+    assert_eq!(
+        &forest_tiles[1..],
+        &open_tiles[1..],
+        "posts without a wood nearby stay put"
+    );
+}
+
+#[test]
+fn pocket_riflemen_never_fall_back_into_a_wood_behind_their_post() {
+    let (observation, enemy_base) = river_pocket_observation();
+    let tile_size = observation.map.tile_size as f32;
+    // Within four tiles of the first post, but every tile is more than a tile farther from the
+    // threat than the post itself.
+    let analysis = forest_test_analysis(&block(7..=8, 12..=13), &[]);
+    let units = [10, 20, 30, 40];
+    let open =
+        pocket_rifle_assignments(&observation, Some(&analysis), &units, enemy_base, false).unwrap();
+    let forest =
+        pocket_rifle_assignments(&observation, Some(&analysis), &units, enemy_base, true).unwrap();
+    assert_eq!(post_tiles(&forest, tile_size), post_tiles(&open, tile_size));
+}
+
+#[test]
+fn sight_lines_count_forest_after_the_origin_and_stop_at_rock() {
+    let (observation, _) = river_pocket_observation();
+    let tile = observation.map.tile_size as f32;
+    let center = |x: u32, y: u32| ((x as f32 + 0.5) * tile, (y as f32 + 0.5) * tile);
+    let analysis = forest_test_analysis(&block(20..=23, 30..=30), &[(40, 30)]);
+    // Starting inside the wood: the origin tile is not counted, the three after it are.
+    assert_eq!(
+        forest_tiles_on_sight_line(&observation, &analysis, center(20, 30), center(30, 30)),
+        Some(3)
+    );
+    assert_eq!(
+        forest_tiles_on_sight_line(&observation, &analysis, center(10, 30), center(30, 30)),
+        Some(4)
+    );
+    assert_eq!(
+        forest_tiles_on_sight_line(&observation, &analysis, center(30, 30), center(45, 30)),
+        None
+    );
+}
+
+#[test]
+fn four_gun_line_keeps_the_pocket_posts_and_adds_a_wing_on_each_side() {
+    let (observation, enemy_base) = river_pocket_observation();
+    let tile_size = observation.map.tile_size as f32;
+    let pair =
+        defensive_pocket_machine_gunner_assignments(&observation, None, &[60, 50], enemy_base)
+            .unwrap();
+    let line =
+        wide_pocket_machine_gunner_assignments(&observation, None, &[80, 60, 70, 50], enemy_base)
+            .unwrap();
+
+    assert_eq!(
+        line.iter().map(|post| post.unit_id).collect::<Vec<_>>(),
+        vec![50, 60, 70, 80]
+    );
+    for (wide, pocket) in line.iter().zip(&pair) {
+        assert_eq!((wide.x, wide.y), (pocket.x, pocket.y));
+    }
+    let anchor = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y)).unwrap();
+    let perpendicular = (-direction.1, direction.0);
+    let frame = |post: &DefensiveLineAssignment| {
+        let offset = (post.x - anchor.0, post.y - anchor.1);
+        (
+            (offset.0 * direction.0 + offset.1 * direction.1) / tile_size,
+            (offset.0 * perpendicular.0 + offset.1 * perpendicular.1) / tile_size,
+        )
+    };
+    for (post, expected) in line
+        .iter()
+        .zip([(7.5, -2.25), (7.5, 2.25), (8.0, -3.75), (8.0, 3.75)])
+    {
+        let (forward, lateral) = frame(post);
+        assert!(
+            (forward - expected.0).abs() < 0.01,
+            "{forward} vs {expected:?}"
+        );
+        assert!(
+            (lateral - expected.1).abs() < 0.01,
+            "{lateral} vs {expected:?}"
+        );
+    }
+    for post in &line {
+        for other in line.iter().filter(|other| other.unit_id != post.unit_id) {
+            assert!(dist2(post.x, post.y, other.x, other.y) >= squared(1.45 * tile_size));
+        }
+        // An attacker standing off the centre guns at Machine Gunner range is in every dug-in
+        // gun's reach.
+        let (forward, lateral) = frame(post);
+        assert!((14.0 - forward).hypot(lateral) <= 7.1);
+    }
+}
+
+#[test]
+fn a_gun_on_its_post_keeps_it_when_another_gun_falls() {
+    let (mut observation, enemy_base) = river_pocket_observation();
+    let full =
+        wide_pocket_machine_gunner_assignments(&observation, None, &[50, 60, 70, 80], enemy_base)
+            .unwrap();
+    // Gun 50 died on the first post; the others are dug in on theirs and a replacement walks up
+    // from the Depot.
+    for post in full.iter().skip(1) {
+        observation.owned.push(combat_unit(
+            post.unit_id,
+            EntityKind::MachineGunner,
+            post.x,
+            post.y,
+        ));
+    }
+    let depot = tile_center(observation.own_start_tile, observation.map.tile_size);
+    observation
+        .owned
+        .push(combat_unit(90, EntityKind::MachineGunner, depot.0, depot.1));
+
+    let line =
+        wide_pocket_machine_gunner_assignments(&observation, None, &[60, 70, 80, 90], enemy_base)
+            .unwrap();
+
+    let post_of = |posts: &[DefensiveLineAssignment], id: u32| {
+        posts
+            .iter()
+            .find(|post| post.unit_id == id)
+            .map(|post| (post.x, post.y))
+    };
+    for id in [60, 70, 80] {
+        assert_eq!(post_of(&line, id), post_of(&full, id), "gun {id} moved");
+    }
+    assert_eq!(post_of(&line, 90), post_of(&full, 50));
+}
+
 #[test]
 fn crossroads_starts_use_the_approved_wall_aware_pocket_rotation() {
     let mut observation = los_test_observation(EntityKind::Factory);

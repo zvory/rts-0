@@ -93,6 +93,8 @@ pub(crate) struct AiDecisionMemory {
     pub(super) later_bases: super::later_bases::LaterBases,
     /// Jeff's forward picket and the Riflemen sealing the home line during a raid alert.
     pub(super) route_line: super::defense::RouteLine,
+    /// Jeff's starting Riflemen marching on the enemy, until they fall back home.
+    pub(super) opening_rush: super::opening_rush::OpeningRush,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -114,6 +116,8 @@ pub(crate) struct AiDecisionMemory {
     launched_frontal_units: BTreeMap<u32, u32>,
     /// The push under way (or forming), its units, route and firing state.
     pub(super) containment: ContainmentPush,
+    /// How the push comes at its target: the side after failed pushes, and the current leg.
+    pub(super) approach: super::frontal::approach::PushApproach,
     /// The Tank Trap home Tanks were last sent to clear, and when.
     pub(super) trap_order: Option<(u32, u32)>,
     /// How many enemy Tanks were in sight together, by tick, over the last
@@ -149,6 +153,7 @@ impl AiDecisionMemory {
             expansion_security: Default::default(),
             later_bases: Default::default(),
             route_line: Default::default(),
+            opening_rush: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
@@ -165,6 +170,7 @@ impl AiDecisionMemory {
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
             containment: ContainmentPush::default(),
+            approach: Default::default(),
             trap_order: None,
             enemy_tank_sightings: BTreeMap::new(),
             enemy_attack_sightings: BTreeMap::new(),
