@@ -73,7 +73,7 @@ const ARRIVED_IDLE_TILES: f32 = 2.0;
 /// Enemy Tanks not seen for this long are forgotten, unless their spot is seen empty sooner.
 const MEMORY_TICKS: u32 = config::TICK_HZ * 20;
 /// Parked enemy Tanks are remembered this long: a parked line usually stays put.
-const PARKED_MEMORY_TICKS: u32 = config::TICK_HZ * 60;
+const PARKED_MEMORY_TICKS: u32 = config::TICK_HZ * 30;
 /// An enemy Tank this far from where it was last seen moved.
 const STILL_TILES: f32 = 0.2;
 /// An estimated unseen shooter is kept this long.
@@ -303,6 +303,8 @@ pub(super) fn observe(observation: &AiObservation, micro: &mut TankMicro) {
     micro.assumed_vision.retain(|(_, until)| *until > tick);
 }
 
+/// Enemy Tanks this close to one of our buildings are attacking the base, not holding a line.
+const BASE_DEFENSE_TILES: f32 = 18.0;
 /// An enemy Tank counts as parked, and its reach as a threat, once it has stood this long.
 const PARKED_ZONE_TICKS: u32 = config::TICK_HZ * 3 / 2;
 /// Where unseen fire proved the enemy sees, it is assumed to see this far around the hit Tanks.
@@ -432,24 +434,47 @@ pub(super) fn enemy_vision(observation: &AiObservation, micro: &TankMicro) -> Vi
 }
 
 /// Parked enemy Tanks' reach and estimated unseen shooters' reach.
+///
+/// Enemy Tanks close to one of our buildings are attacking the base: home defense answers them
+/// with its own odds, so they are not zones that hold our Tanks back.
 pub(super) fn zones(observation: &AiObservation, micro: &TankMicro) -> Vec<Zone> {
-    let radius = REACH_TILES * observation.map.tile_size as f32;
+    let tile_size = observation.map.tile_size as f32;
+    let radius = REACH_TILES * tile_size;
+    let buildings: Vec<(f32, f32)> = observation
+        .owned
+        .iter()
+        .filter(|entity| !entity.kind.is_unit())
+        .map(|entity| (entity.x, entity.y))
+        .collect();
+    let attacking_base = |point: (f32, f32)| {
+        buildings.iter().any(|building| {
+            dist2(building.0, building.1, point.0, point.1)
+                <= squared(BASE_DEFENSE_TILES * tile_size)
+        })
+    };
     micro
         .enemy_tanks
         .iter()
         .filter(|(_, seen)| {
             seen.parked && seen.last_seen.saturating_sub(seen.still_since) >= PARKED_ZONE_TICKS
         })
+        .filter(|(_, seen)| !attacking_base(world(seen.pos)))
         .map(|(id, seen)| Zone {
             center: world(seen.pos),
             radius,
             tank: Some(*id),
         })
-        .chain(micro.ghosts.iter().map(|ghost| Zone {
-            center: world(ghost.pos),
-            radius,
-            tank: None,
-        }))
+        .chain(
+            micro
+                .ghosts
+                .iter()
+                .filter(|ghost| !attacking_base(world(ghost.pos)))
+                .map(|ghost| Zone {
+                    center: world(ghost.pos),
+                    radius,
+                    tank: None,
+                }),
+        )
         .collect()
 }
 

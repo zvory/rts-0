@@ -26,9 +26,6 @@ const JOIN_MIN_TILES: f32 = REACH_TILES - 2.0;
 const JOIN_MAX_TILES: f32 = REACH_TILES + 10.0;
 /// Remembered group Tanks must have been seen this recently.
 const TARGET_MEMORY_TICKS: u32 = config::TICK_HZ * 12;
-/// A group this close to one of our buildings is shelling it and worth taking even if no order
-/// ran into it.
-const SIEGE_TILES: f32 = 18.0;
 /// Enemy Tanks this close to the group count against the assault.
 const SUPPORT_TILES: f32 = 16.0;
 const MIN_TANK_HP: u32 = 90;
@@ -51,7 +48,11 @@ pub(super) const COOLDOWN_TICKS: u32 = config::TICK_HZ * 12;
 /// Re-cast over the same spot when a lone cloud has this few ticks left and Tanks are inside.
 const EXTEND_WHEN_EXPIRES_IN: u16 = 45;
 const SLOT_ARRIVED_TILES: f32 = 0.6;
-const START_READY_TILES: f32 = 1.5;
+const START_READY_TILES: f32 = 2.5;
+/// Tanks this close to their start line still join a push that goes without them lined up.
+const STRAGGLER_TILES: f32 = 4.0;
+/// After this long, the push goes as soon as the lined-up Tanks outnumber the group.
+const PARTIAL_GO_TICKS: u32 = config::TICK_HZ * 2;
 /// Slot offsets in tiles (toward us, sideways) for a 2-tile cloud; a Tank is 1.6 x 0.9 tiles.
 const BASE_SLOTS: [(f32, f32); 5] = [
     (0.0, 0.0),
@@ -291,12 +292,6 @@ fn plan(
     } else {
         &BASE_SLOTS
     };
-    let buildings: Vec<(f32, f32)> = observation
-        .owned
-        .iter()
-        .filter(|entity| !entity.kind.is_unit())
-        .map(|entity| (entity.x, entity.y))
-        .collect();
 
     for group in enemy_groups(observation, micro) {
         let group: BTreeSet<u32> = group.into_iter().collect();
@@ -331,10 +326,7 @@ fn plan(
                 .and_then(|zone| zone.tank)
                 .is_some_and(|enemy| group.contains(&enemy))
         });
-        let siege = buildings
-            .iter()
-            .any(|b| nearest_group_tiles(*b) <= SIEGE_TILES);
-        if !blocked && !siege {
+        if !blocked {
             continue;
         }
         let (enemy_count, enemy_hp) = opposition(observation, micro, &group);
@@ -439,10 +431,17 @@ fn plan(
                 break;
             };
             let (cloud, point, side) = open_slots.remove(best);
-            let start = clamp_to_map(
-                offset_point(anchor, u, REACH_TILES + 0.5, side, ts),
-                observation.map,
-            );
+            // A Tank already just outside the reach starts where it stands: walking it to a
+            // computed point can cost a long detour around water or buildings.
+            let here = nearest_group_tiles((tank.x, tank.y));
+            let start = if (REACH_TILES..=REACH_TILES + 6.0).contains(&here) {
+                (tank.x, tank.y)
+            } else {
+                clamp_to_map(
+                    offset_point(anchor, u, REACH_TILES + 0.5, side, ts),
+                    observation.map,
+                )
+            };
             let start =
                 if defense::defensive_position_is_open(observation, map_analysis, start.0, start.1)
                 {
@@ -560,7 +559,43 @@ fn run(
 
     match assault.phase {
         Phase::Prepare => {
-            if members.len() < enemy_count + 1 || elapsed >= PREPARE_TIMEOUT_TICKS {
+            let start_gap = |tank: &AiEntitySummary, slot: &Slot| {
+                let start = world(slot.start);
+                dist2(tank.x, tank.y, start.0, start.1).sqrt() / ts
+            };
+            let lined: BTreeSet<u32> = members
+                .iter()
+                .filter(|(tank, slot)| start_gap(tank, slot) <= START_READY_TILES)
+                .map(|(tank, _)| tank.id)
+                .collect();
+            let timed_out = elapsed >= PREPARE_TIMEOUT_TICKS;
+            let failure_note = || {
+                let gaps: Vec<String> = members
+                    .iter()
+                    .map(|(tank, slot)| format!("{}:{:.1}", tank.id, start_gap(tank, slot)))
+                    .collect();
+                let scout_note = scout.map(|scout| {
+                    let wait = offset_point(anchor, u, SCOUT_WAIT_TILES, 0.0, ts);
+                    format!(
+                        "{:.1} tiles from its wait point, smoke ready {}",
+                        dist2(scout.x, scout.y, wait.0, wait.1).sqrt() / ts,
+                        smoke_ready(observation, scout.id)
+                    )
+                });
+                format!(
+                    "assault prepare failed members={} enemies={} elapsed={} start_gaps={:?} scout={:?}",
+                    members.len(),
+                    enemy_count,
+                    elapsed,
+                    gaps,
+                    scout_note
+                )
+            };
+            if enemy_count == 0
+                || members.len() < enemy_count + 1
+                || (timed_out && lined.len() <= enemy_count)
+            {
+                micro.notes.push(failure_note());
                 return false;
             }
             for (tank, slot) in &members {
@@ -571,19 +606,37 @@ fn run(
                 return false;
             };
             order_move(out, scout, scout_wait, ts);
-            let lined_up = members.iter().all(|(tank, slot)| {
-                let start = world(slot.start);
-                dist2(tank.x, tank.y, start.0, start.1) <= squared(START_READY_TILES * ts)
-            });
+            // Once the lined-up Tanks outnumber the group, stragglers are not waited for: every
+            // second of waiting is one the enemy can use to reinforce or reposition.
+            let all_lined = lined.len() == members.len();
+            let enough_lined = lined.len() > enemy_count && elapsed >= PARTIAL_GO_TICKS;
             let in_cast_range = assault.clouds.iter().all(|cloud| {
                 let cloud = world(*cloud);
                 dist2(scout.x, scout.y, cloud.0, cloud.1) <= squared(SMOKE_CAST_RANGE_TILES * ts)
             });
-            if lined_up && in_cast_range && smoke_ready(observation, scout.id) {
-                for (tank, slot) in &members {
+            if (all_lined || enough_lined) && in_cast_range && smoke_ready(observation, scout.id) {
+                // Stragglers close behind still reach the cloud before it lifts; the rest go
+                // back to the regular orders.
+                let going: BTreeSet<u32> = members
+                    .iter()
+                    .filter(|(tank, slot)| start_gap(tank, slot) <= STRAGGLER_TILES)
+                    .map(|(tank, _)| tank.id)
+                    .collect();
+                if going.len() < members.len() {
+                    micro.notes.push(format!(
+                        "assault goes with {} of {} Tanks",
+                        going.len(),
+                        members.len()
+                    ));
+                    assault.slots.retain(|id, _| going.contains(id));
+                }
+                for (tank, slot) in members.iter().filter(|(tank, _)| going.contains(&tank.id)) {
                     order_move(out, tank, world(slot.point), SLOT_ARRIVED_TILES * ts);
                 }
                 set_phase(assault, Phase::Enter);
+            } else if timed_out {
+                micro.notes.push(failure_note());
+                return false;
             }
             true
         }
