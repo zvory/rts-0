@@ -99,6 +99,8 @@ pub(crate) struct ManagerOutputTrace {
     pub(crate) commands: Vec<String>,
     pub(crate) budget: BudgetTrace,
     pub(crate) reservations: ReservationTrace,
+    /// Decisions the live Jeff's Tank micro took after the other systems issued their orders.
+    pub(crate) notes: Vec<String>,
 }
 
 impl ManagerOutputTrace {
@@ -132,6 +134,9 @@ impl ManagerOutputTrace {
         }
         for command in &self.commands {
             lines.push(format!("command={command}"));
+        }
+        for note in &self.notes {
+            lines.push(format!("tank_micro {note}"));
         }
         lines
     }
@@ -183,6 +188,7 @@ pub(super) fn build_manager_trace(input: TraceInput<'_>) -> ManagerOutputTrace {
         commands: input.command_trace.to_vec(),
         budget: BudgetTrace::new(input.start_budget, input.end_budget),
         reservations: input.reservations.into(),
+        notes: Vec::new(),
     }
 }
 

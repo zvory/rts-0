@@ -110,7 +110,7 @@ fn squad_params() -> RifleSquadParams {
 }
 
 pub(super) fn uses_opening_rush(profile_id: &str) -> bool {
-    profile_id == JEFFS_AI_ID
+    profile_id == JEFFS_AI_ID || profile_id == JEFFS_AI_PRE_TANK_MICRO_ID
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

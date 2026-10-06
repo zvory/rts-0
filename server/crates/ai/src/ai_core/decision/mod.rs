@@ -15,7 +15,7 @@ use crate::ai_core::profiles::{
     ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
     TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
     JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
-    JEFFS_AI_PRE_TANK_CATCHUP_ID,
+    JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -40,6 +40,7 @@ mod opening_rush;
 mod policies;
 mod production;
 mod resources;
+mod tank_micro;
 mod trace;
 mod turtle;
 mod unit_mix;
@@ -206,6 +207,7 @@ where
     if uses_current_jeffs_ai_policy(profile.id) {
         memory.note_enemy_tanks(observation);
     }
+    tank_micro::observe_live(profile.id, observation, &mut memory.tank_micro);
     memory.sync_turtle_opening(profile, observation);
     let budget = SpendBudget::with_committed_steel(
         observation.economy.steel,
@@ -735,6 +737,7 @@ where
         );
     }
     queue_jeff_infantry_mass_methamphetamines(&mut actions, &facts, memory, &mut intents, profile);
+    queue_jeff_smoke_plus(&mut actions, &facts, memory, &mut intents, profile);
     if profile.turtle_defense.is_none() {
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
@@ -1435,12 +1438,14 @@ where
         required_tech_path,
     });
 
-    AiDecision {
+    let mut decision = AiDecision {
         profile_id: profile.id,
         intents,
         commands: actions.into_commands(),
         trace,
-    }
+    };
+    tank_micro::finish(&mut decision, observation, map_analysis, memory);
+    decision
 }
 
 fn planned_in_intents(intents: &[AiIntent], kind: EntityKind) -> usize {

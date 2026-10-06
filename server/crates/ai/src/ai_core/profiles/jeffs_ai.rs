@@ -20,6 +20,9 @@ pub(crate) const JEFFS_AI_PRE_TANK_CATCHUP_ID: &str = "jeffs_ai_pre_tank_catchup
 /// Frozen immediately before the opening rush: the live Jeff whose four starting Riflemen stay in
 /// the home pocket. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_OPENING_RUSH_ID: &str = "jeffs_ai_pre_opening_rush";
+/// Frozen immediately before the Tank micro (enemy Tank memory, the Tank movement governor, and
+/// smoke assaults): the live Jeff with the opening rush. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_TANK_MICRO_ID: &str = "jeffs_ai_pre_tank_micro";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -193,12 +196,21 @@ const JEFFS_AI_LIVE: AiProfile = AiProfile {
 
 /// The live Jeff sends its starting Riflemen out to deny the enemy natural, so home holds four
 /// defensive Machine Gunners instead of two.
-pub(crate) static JEFFS_AI: AiProfile = AiProfile {
+const JEFFS_AI_RUSH: AiProfile = AiProfile {
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 4,
         ..TEMPLATE_DEFENSIVE_MACHINE_GUNNERS
     }),
     ..JEFFS_AI_LIVE
+};
+
+pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_RUSH;
+
+/// The live Jeff from before the Tank micro under its own id: the same policy, and the Tank
+/// micro only branches on the live id.
+pub(crate) static JEFFS_AI_PRE_TANK_MICRO: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_TANK_MICRO_ID,
+    ..JEFFS_AI_RUSH
 };
 
 /// The live Jeff's policy from before the opening rush under its own id: two defensive Machine

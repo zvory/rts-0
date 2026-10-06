@@ -98,6 +98,27 @@ pub(super) fn queue_jeff_infantry_mass_methamphetamines(
     );
 }
 
+/// The live Jeff researches Smoke Plus once its Tank count makes smoke assaults worth it: the
+/// 4-tile, 10-second cloud covers the drive into a parked line and the three-second charge with
+/// room to spare, and holds a large assault, where the base 5-second cloud barely does.
+const SMOKE_PLUS_TANKS: usize = 6;
+
+pub(super) fn queue_jeff_smoke_plus(
+    actions: &mut AiActionContext<'_>,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+    profile: &AiProfile,
+) {
+    if !super::tank_micro::uses_tank_micro(profile.id)
+        || facts.unit_count(EntityKind::Tank) < SMOKE_PLUS_TANKS
+        || facts.unit_count(EntityKind::ScoutCar) == 0
+    {
+        return;
+    }
+    queue_upgrade_if_available(actions, facts, memory, intents, UpgradeKind::SmokePlus);
+}
+
 pub(super) fn queue_required_unit_unlocks(
     actions: &mut AiActionContext<'_>,
     facts: &AiFacts,

@@ -95,6 +95,8 @@ pub(crate) struct AiDecisionMemory {
     pub(super) route_line: super::defense::RouteLine,
     /// Jeff's starting Riflemen marching on the enemy, until they fall back home.
     pub(super) opening_rush: super::opening_rush::OpeningRush,
+    /// The live Jeff's enemy Tank memory, Tank order overrides, and smoke assault.
+    pub(super) tank_micro: super::tank_micro::TankMicro,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -154,6 +156,7 @@ impl AiDecisionMemory {
             later_bases: Default::default(),
             route_line: Default::default(),
             opening_rush: Default::default(),
+            tank_micro: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
@@ -247,6 +250,7 @@ impl AiDecisionMemory {
         }
         self.profile_id = Some(profile.id);
         self.expansion_security = Default::default();
+        self.tank_micro = Default::default();
         self.attack_first_size = Some(profile.attack.first_attack_size);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
