@@ -179,7 +179,7 @@ fn a_lone_tank_ordered_into_a_spotted_parked_line_stops_where_it_would_be_seen()
         queued: false,
     }];
     let mut intents = Vec::new();
-    govern(&obs, None, &mut micro, &mut commands, &mut intents);
+    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
     let targets = move_targets(&commands, 1);
     assert_eq!(targets.len(), 1, "one order: {commands:?}");
     let (x, _) = targets[0];
@@ -209,7 +209,7 @@ fn a_larger_force_may_drive_into_a_smaller_parked_group() {
         queued: false,
     }];
     let mut intents = Vec::new();
-    govern(&obs, None, &mut micro, &mut commands, &mut intents);
+    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
     for tank in [1, 2, 3] {
         assert_eq!(move_targets(&commands, tank), vec![(38.0, 50.0)]);
     }
@@ -231,7 +231,7 @@ fn a_tank_hit_from_fog_backs_out_with_its_neighbour_keeping_its_front_forward() 
     observe(&obs, &mut micro);
     let mut commands = Vec::new();
     let mut intents = Vec::new();
-    govern(&obs, None, &mut micro, &mut commands, &mut intents);
+    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
     for (tank, y) in [(1, 50.0), (2, 53.0)] {
         let targets = move_targets(&commands, tank);
         assert_eq!(targets.len(), 1, "tank {tank} backs out: {commands:?}");
@@ -242,4 +242,68 @@ fn a_tank_hit_from_fog_backs_out_with_its_neighbour_keeping_its_front_forward() 
         assert!(hop <= 3.0, "tank {tank} hop {hop} tiles");
     }
     assert_eq!(micro.ghosts.len(), 1, "the unseen shooter is estimated");
+}
+
+#[test]
+fn a_staged_tank_the_governor_cuts_short_is_staged_again_once_released() {
+    let mut micro = TankMicro::default();
+    let owned = vec![summary(1, 1, EntityKind::Tank, (10.0, 50.0), 292)];
+    let obs = observation(300, owned, parked_pair_with_spotter());
+    observe(&obs, &mut micro);
+    let mut commands = vec![Command::Move {
+        units: vec![1],
+        x: 38.0 * TS,
+        y: 50.0 * TS,
+        queued: false,
+    }];
+    let mut intents = vec![AiIntent::Stage { units: vec![1] }];
+    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
+    // The live controller sends a stage order once; assembling clears that, so the stage order
+    // reaches the Tank again when the reach no longer cuts it.
+    assert!(
+        intents
+            .iter()
+            .any(|intent| matches!(intent, AiIntent::Assemble { units } if units == &[1])),
+        "{intents:?}"
+    );
+}
+
+#[test]
+fn a_group_that_clearly_outnumbers_a_visible_attacker_keeps_its_orders() {
+    let mut micro = TankMicro::default();
+    let at = [(60.0, 50.0), (60.0, 52.0), (61.0, 51.0), (59.0, 51.0)];
+    let tanks = |first_hp: u32| {
+        at.iter()
+            .enumerate()
+            .map(|(index, point)| {
+                let hp = if index == 0 { first_hp } else { 292 };
+                summary(index as u32 + 1, 1, EntityKind::Tank, *point, hp)
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut enemy = summary(101, 2, EntityKind::Tank, (70.0, 50.0), 292);
+    enemy.state = AiEntityState::Move;
+    observe(
+        &observation(300, tanks(292), vec![enemy.clone()]),
+        &mut micro,
+    );
+    let obs = observation(309, tanks(232), vec![enemy]);
+    observe(&obs, &mut micro);
+    let mut commands = vec![Command::AttackMove {
+        units: vec![1, 2, 3, 4],
+        x: 80.0 * TS,
+        y: 50.0 * TS,
+        queued: false,
+    }];
+    let mut intents = Vec::new();
+    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
+    assert!(
+        !commands
+            .iter()
+            .any(|command| matches!(command, Command::HoldPosition { .. })),
+        "{commands:?}"
+    );
+    for tank in 1..=4 {
+        assert_eq!(move_targets(&commands, tank), vec![(80.0, 50.0)]);
+    }
 }

@@ -822,6 +822,7 @@ pub(super) fn step(
                 assault.clouds.len()
             ));
             micro.assault = Some(assault);
+            micro.assaults_started += 1;
         }
     }
     let Some(mut assault) = micro.assault.take() else {

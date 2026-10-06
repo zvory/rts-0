@@ -48,9 +48,11 @@ pub(super) fn finish(
     memory: &mut AiDecisionMemory,
 ) {
     if uses_tank_micro(decision.profile_id) {
+        let push_scout = memory.containment.active_scout;
         decision.trace.notes = govern(
             observation,
             map_analysis,
+            push_scout,
             &mut memory.tank_micro,
             &mut decision.commands,
             &mut decision.intents,
@@ -146,6 +148,8 @@ pub(crate) struct TankMicro {
     overrides: BTreeMap<u32, Override>,
     pub(super) assault: Option<SmokeAssault>,
     pub(super) last_assault_end: Option<u32>,
+    /// Smoke assaults started this game: the enemy parks Tank lines worth smoking.
+    pub(super) assaults_started: u32,
     /// This decision's trace notes.
     pub(super) notes: Vec<String>,
     /// Where each Scout Car leading a march was last sent.
@@ -802,6 +806,15 @@ fn react_to_hits(
         // a tie.
         let outnumbered = foe_count > friend_count
             || (foe_count == friend_count && foes > friends * OUTNUMBERED_RATIO);
+        // A group that sees what hit it and clearly outnumbers it keeps its orders: holding would
+        // only stall a push it wins anyway. Fire from out of sight still backs it out below.
+        let clearly_superior = friend_count >= 2 * foe_count.max(1) && friends >= 2.0 * foes;
+        if answerable && clearly_superior {
+            micro.notes.push(format!(
+                "hit group={group:?} damage={damage} superior strength={friends:.1} vs {foes:.1} -> keep orders"
+            ));
+            continue;
+        }
         if answerable && (!outnumbered || !escapable) {
             micro.notes.push(format!(
                 "hit group={group:?} damage={damage} answerable strength={friends:.1} vs {foes:.1} -> hold"
@@ -976,6 +989,7 @@ const SCOUT_LEAD_AGREEMENT: f32 = 0.75;
 fn lead_scouts(
     observation: &AiObservation,
     micro: &mut TankMicro,
+    push_scout: Option<u32>,
     tanks: &BTreeMap<u32, &AiEntitySummary>,
     zones: &[Zone],
     claimed: &mut BTreeSet<u32>,
@@ -987,7 +1001,7 @@ fn lead_scouts(
         .owned
         .iter()
         .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
-        .filter(|unit| !claimed.contains(&unit.id))
+        .filter(|unit| !claimed.contains(&unit.id) && Some(unit.id) != push_scout)
         .collect();
     let mut leading = BTreeMap::new();
     for scout in scouts {
@@ -1069,12 +1083,15 @@ fn lead_scouts(
 }
 
 /// Rewrites the decision's commands for the live Jeff's Tanks. Runs last.
+/// `push_scout` is the frontal push's Scout Car: the push already drives it ahead of its Tanks and
+/// casts its smoke, so the governor leaves it alone.
 pub(super) fn govern(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
+    push_scout: Option<u32>,
     micro: &mut TankMicro,
     commands: &mut Vec<Command>,
-    intents: &mut [AiIntent],
+    intents: &mut Vec<AiIntent>,
 ) -> Vec<String> {
     micro.notes.clear();
     let tick = observation.tick;
@@ -1149,7 +1166,6 @@ pub(super) fn govern(
         &mut extra,
         &mut claimed,
     );
-
     advance_overrides(observation, map_analysis, micro, &tanks);
     react_to_hits(observation, map_analysis, micro, &tanks, &claimed);
     let override_ids: Vec<u32> = micro
@@ -1189,7 +1205,15 @@ pub(super) fn govern(
         }
     }
 
-    lead_scouts(observation, micro, &tanks, &zones, &mut claimed, &mut extra);
+    lead_scouts(
+        observation,
+        micro,
+        push_scout,
+        &tanks,
+        &zones,
+        &mut claimed,
+        &mut extra,
+    );
 
     // Claimed units take only the orders above.
     let mut governed: BTreeSet<u32> = claimed.clone();
@@ -1387,6 +1411,7 @@ pub(super) fn govern(
             .get(id)
             .is_some_and(|tank| tank.state == AiEntityState::Move)
         {
+            governed.insert(*id);
             clipped.push(Command::HoldPosition {
                 units: vec![*id],
                 queued: false,
@@ -1397,15 +1422,35 @@ pub(super) fn govern(
     commands.extend(clipped);
     commands.extend(extra);
 
-    // The live controller drops repeated stage orders for staged units. Units the governor took
-    // over (backing out, smoke assault, Scout Car lead) must get every order it gives them; cut
-    // stage orders stay staged, so their repeats are still dropped and a Tank standing at its
-    // stop point is not shuffled about.
-    let _ = governed;
+    // The live controller sends a staged unit's stage order once and drops the repeats. Units the
+    // governor took over (backing out, smoke assault, Scout Car lead) leave the stage so they get
+    // every order it gives them. Those and the staged Tanks it held or cut short would otherwise
+    // keep a stage order they never finished: listed as assembling, they get the governor's
+    // orders, and their stage order is sent again once the governor lets them go.
+    let attacking: BTreeSet<u32> = intents
+        .iter()
+        .filter_map(|intent| match intent {
+            AiIntent::Attack { units } => Some(units.iter().copied()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    let mut restage: Vec<u32> = Vec::new();
     for intent in intents.iter_mut() {
         if let AiIntent::Stage { units } = intent {
+            restage.extend(
+                units
+                    .iter()
+                    .filter(|id| governed.contains(id) && !attacking.contains(id))
+                    .copied(),
+            );
             units.retain(|id| !claimed.contains(id));
         }
+    }
+    restage.sort_unstable();
+    restage.dedup();
+    if !restage.is_empty() {
+        intents.push(AiIntent::Assemble { units: restage });
     }
     std::mem::take(&mut micro.notes)
 }
