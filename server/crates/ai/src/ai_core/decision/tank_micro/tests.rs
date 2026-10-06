@@ -307,3 +307,58 @@ fn a_group_that_clearly_outnumbers_a_visible_attacker_keeps_its_orders() {
         assert_eq!(move_targets(&commands, tank), vec![(80.0, 50.0)]);
     }
 }
+
+fn marching_pair_with_scout(x: f32) -> Vec<AiEntitySummary> {
+    let mut units = vec![
+        summary(1, 1, EntityKind::Tank, (x, 50.0), 292),
+        summary(2, 1, EntityKind::Tank, (x, 52.0), 292),
+        summary(9, 1, EntityKind::ScoutCar, (x - 2.0, 51.0), 100),
+    ];
+    for unit in &mut units {
+        unit.state = AiEntityState::Move;
+    }
+    units
+}
+
+#[test]
+fn the_push_scout_car_leads_a_march_but_keeps_the_push_smoke_cast() {
+    let mut micro = TankMicro::default();
+    observe(
+        &observation(300, marching_pair_with_scout(36.0), Vec::new()),
+        &mut micro,
+    );
+    let obs = observation(309, marching_pair_with_scout(40.0), Vec::new());
+    observe(&obs, &mut micro);
+
+    // Moving with the push: the governor takes over its movement, 4 tiles ahead of the front.
+    let mut commands = vec![Command::Move {
+        units: vec![9],
+        x: 30.0 * TS,
+        y: 51.0 * TS,
+        queued: false,
+    }];
+    let mut intents = Vec::new();
+    govern(
+        &obs,
+        None,
+        Some(9),
+        &mut micro.clone(),
+        &mut commands,
+        &mut intents,
+    );
+    let targets = move_targets(&commands, 9);
+    assert_eq!(targets.len(), 1, "{commands:?}");
+    assert!(targets[0].0 > 40.0, "leads ahead of the Tanks: {targets:?}");
+
+    // Casting for the push: left alone.
+    let cast = Command::UseAbility {
+        ability: rts_rules::faction::AbilityKind::Smoke,
+        units: vec![9],
+        x: Some(50.0 * TS),
+        y: Some(51.0 * TS),
+        queued: false,
+    };
+    let mut commands = vec![cast.clone()];
+    govern(&obs, None, Some(9), &mut micro, &mut commands, &mut intents);
+    assert_eq!(commands, vec![cast]);
+}

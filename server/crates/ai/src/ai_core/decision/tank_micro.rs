@@ -94,6 +94,8 @@ const REVERSE_TICKS: u32 = config::TICK_HZ * 3;
 const ODDS_RADIUS_TILES: f32 = 16.0;
 /// Our Tanks this close to a hit Tank count for it.
 const FRIEND_RADIUS_TILES: f32 = 10.0;
+/// A launched push marches spread out; its Tanks this close to one of them count for it.
+const PUSH_FRIEND_RADIUS_TILES: f32 = 20.0;
 /// Remembered enemy Tanks seen this recently count in the odds.
 const ODDS_MEMORY_TICKS: u32 = config::TICK_HZ * 10;
 
@@ -977,6 +979,9 @@ fn advance_overrides(
 const SCOUT_LEAD_TILES: f32 = 4.0;
 /// Moving Tanks this close to a Scout Car are the march it leads.
 const SCOUT_ESCORT_TILES: f32 = 9.0;
+/// A Scout Car that sees an enemy this close has found the contact: out in front of the fight it
+/// only dies (and a push without its Scout Car stalls), so it goes back to its own orders.
+const SCOUT_CONTACT_TILES: f32 = 15.0;
 /// The lead order is re-issued only when the lead point moves this far.
 const SCOUT_RELEAD_TILES: f32 = 2.0;
 /// Only Tanks this far from home are on a march; nearer they are forming up.
@@ -985,25 +990,26 @@ const SCOUT_LEAD_FROM_HOME_TILES: f32 = 16.0;
 const SCOUT_LEAD_AGREEMENT: f32 = 0.75;
 
 /// Sends each Scout Car marching with two or more moving Tanks ahead of them, stopping it just
-/// outside any known reach.
+/// outside any known reach, and returns the Scout Cars it leads. `skip` is left alone.
 fn lead_scouts(
     observation: &AiObservation,
     micro: &mut TankMicro,
-    push_scout: Option<u32>,
     tanks: &BTreeMap<u32, &AiEntitySummary>,
     zones: &[Zone],
-    claimed: &mut BTreeSet<u32>,
+    claimed: &BTreeSet<u32>,
+    skip: Option<u32>,
     extra: &mut Vec<Command>,
-) {
+) -> BTreeSet<u32> {
     let tile_size = observation.map.tile_size as f32;
     let home = tile_center(observation.own_start_tile, observation.map.tile_size);
     let scouts: Vec<&AiEntitySummary> = observation
         .owned
         .iter()
         .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
-        .filter(|unit| !claimed.contains(&unit.id) && Some(unit.id) != push_scout)
+        .filter(|unit| !claimed.contains(&unit.id) && Some(unit.id) != skip)
         .collect();
     let mut leading = BTreeMap::new();
+    let mut led = BTreeSet::new();
     for scout in scouts {
         let marching: Vec<&AiEntitySummary> = tanks
             .values()
@@ -1018,6 +1024,14 @@ fn lead_scouts(
             })
             .collect();
         if marching.len() < 2 {
+            continue;
+        }
+        let contact = observation.visible_enemies.iter().any(|enemy| {
+            enemy.hp > 0
+                && dist2(enemy.x, enemy.y, scout.x, scout.y)
+                    <= squared(SCOUT_CONTACT_TILES * tile_size)
+        });
+        if contact {
             continue;
         }
         // A march: the Tanks head the same way. Tanks shuffling into slots do not.
@@ -1060,7 +1074,7 @@ fn lead_scouts(
                 }
             }
         }
-        claimed.insert(scout.id);
+        led.insert(scout.id);
         let previous = micro.scout_leads.get(&scout.id).copied().map(world);
         let moved_on = previous.is_none_or(|previous| {
             dist2(previous.0, previous.1, lead.0, lead.1) > squared(SCOUT_RELEAD_TILES * tile_size)
@@ -1080,11 +1094,13 @@ fn lead_scouts(
         }
     }
     micro.scout_leads = leading;
+    led
 }
 
 /// Rewrites the decision's commands for the live Jeff's Tanks. Runs last.
-/// `push_scout` is the frontal push's Scout Car: the push already drives it ahead of its Tanks and
-/// casts its smoke, so the governor leaves it alone.
+/// `push_scout` is the frontal push's Scout Car. The push keeps it behind its marching Tanks, so
+/// the governor leads it like any other, but only takes over its movement: the push's smoke casts
+/// with it still go out, and it is not led while the push casts with it.
 pub(super) fn govern(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
@@ -1205,21 +1221,40 @@ pub(super) fn govern(
         }
     }
 
-    lead_scouts(
+    let push_casting = push_scout.filter(|scout| {
+        commands.iter().any(
+            |command| matches!(command, Command::UseAbility { units, .. } if units.contains(scout)),
+        )
+    });
+    let led = lead_scouts(
         observation,
         micro,
-        push_scout,
         &tanks,
         &zones,
-        &mut claimed,
+        &claimed,
+        push_casting,
         &mut extra,
     );
+    // A led push Scout Car keeps the push's other orders; any other led Scout Car is claimed.
+    let steered: BTreeSet<u32> = led
+        .iter()
+        .copied()
+        .filter(|scout| Some(*scout) == push_scout)
+        .collect();
+    claimed.extend(led.iter().copied().filter(|scout| !steered.contains(scout)));
 
-    // Claimed units take only the orders above.
+    // Claimed units take only the orders above; steered ones lose only their movement orders.
     let mut governed: BTreeSet<u32> = claimed.clone();
+    governed.extend(steered.iter().copied());
     for command in commands.iter_mut() {
         if let Some(units) = units_mut(command) {
             units.retain(|id| !claimed.contains(id));
+        }
+        if let Command::Move { units, .. }
+        | Command::AttackMove { units, .. }
+        | Command::FormationMove { units, .. } = command
+        {
+            units.retain(|id| !steered.contains(id));
         }
     }
 
@@ -1227,17 +1262,30 @@ pub(super) fn govern(
     let vision = enemy_vision(observation, micro);
     // A force that clearly outnumbers the enemy Tanks around a reach may drive into it: the smoke
     // assault planned above is preferred, but without smoke a larger force still wins the trade.
+    // A launched push already checked that it outnumbers the enemy Tanks it has seen, so its
+    // whole column counts, not only the Tanks next to the one that would be cut.
+    let attacking: BTreeSet<u32> = intents
+        .iter()
+        .filter_map(|intent| match intent {
+            AiIntent::Attack { units } => Some(units.iter().copied()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
     let superior = |micro: &TankMicro, id: u32, zone: &Zone| -> bool {
         let Some(tank) = tanks.get(&id) else {
             return false;
+        };
+        let radius = if attacking.contains(&id) {
+            PUSH_FRIEND_RADIUS_TILES
+        } else {
+            FRIEND_RADIUS_TILES
         };
         let own: Vec<&AiEntitySummary> = tanks
             .values()
             .copied()
             .filter(|other| !claimed.contains(&other.id))
-            .filter(|other| {
-                dist2(other.x, other.y, tank.x, tank.y) <= squared(FRIEND_RADIUS_TILES * tile_size)
-            })
+            .filter(|other| dist2(other.x, other.y, tank.x, tank.y) <= squared(radius * tile_size))
             .collect();
         let own_hp: u32 = own.iter().map(|other| other.hp).sum();
         let near = |p: (f32, f32)| {
@@ -1427,14 +1475,6 @@ pub(super) fn govern(
     // every order it gives them. Those and the staged Tanks it held or cut short would otherwise
     // keep a stage order they never finished: listed as assembling, they get the governor's
     // orders, and their stage order is sent again once the governor lets them go.
-    let attacking: BTreeSet<u32> = intents
-        .iter()
-        .filter_map(|intent| match intent {
-            AiIntent::Attack { units } => Some(units.iter().copied()),
-            _ => None,
-        })
-        .flatten()
-        .collect();
     let mut restage: Vec<u32> = Vec::new();
     for intent in intents.iter_mut() {
         if let AiIntent::Stage { units } = intent {
