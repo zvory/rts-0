@@ -245,6 +245,7 @@ pub(super) fn issue_frontal_wave(
                 is_jeffs_ai_profile(profile.id),
                 profile.id != JEFFS_AI_PRE_TANK_CATCHUP_ID,
                 uses_current_jeffs_ai_policy(profile.id),
+                profile.id == JEFFS_AI_ID,
                 map_analysis,
                 memory,
             );

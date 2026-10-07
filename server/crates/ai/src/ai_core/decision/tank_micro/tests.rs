@@ -411,3 +411,75 @@ fn the_push_scout_car_leads_a_march_but_keeps_the_push_smoke_cast() {
     );
     assert_eq!(commands, vec![cast]);
 }
+
+/// Our Tanks lined up 20 tiles from two parked enemy Tanks, ordered at them, with a smoke-ready
+/// Scout Car and smoke researched: returns whether the governor starts a smoke assault.
+fn assault_starts_with(our_tanks: u32) -> bool {
+    use crate::ai_core::observation::AiAbilitySummary;
+    use rts_rules::faction::AbilityKind;
+    let mut micro = TankMicro::default();
+    let mut owned: Vec<AiEntitySummary> = (0..our_tanks)
+        .map(|index| {
+            summary(
+                1 + index,
+                1,
+                EntityKind::Tank,
+                (20.0, 44.0 + index as f32 * 1.5),
+                292,
+            )
+        })
+        .collect();
+    owned.push(summary(50, 1, EntityKind::ScoutCar, (17.0, 50.0), 100));
+    owned.push(summary(
+        60,
+        1,
+        EntityKind::EngineeringComplex,
+        (6.0, 50.0),
+        1000,
+    ));
+    let enemy = vec![
+        summary(101, 2, EntityKind::Tank, (40.0, 49.0), 292),
+        summary(102, 2, EntityKind::Tank, (40.0, 51.0), 292),
+    ];
+    // Seen standing still twice: parked.
+    observe(&observation(300, owned.clone(), enemy.clone()), &mut micro);
+    let mut obs = observation(309, owned, enemy);
+    obs.ability_states.push(AiAbilitySummary {
+        entity_id: 50,
+        kind: AbilityKind::Smoke,
+        cooldown_left: 0,
+        remaining_uses: None,
+        available_tick: None,
+        lockout_until_tick: None,
+        charge_recharge_left: None,
+    });
+    observe(&obs, &mut micro);
+    let mut commands = vec![Command::AttackMove {
+        units: (1..=our_tanks).collect(),
+        x: 39.0 * TS,
+        y: 50.0 * TS,
+        queued: false,
+    }];
+    govern(
+        &obs,
+        None,
+        None,
+        &BTreeSet::new(),
+        &mut micro,
+        &mut commands,
+        &mut Vec::new(),
+    );
+    micro.assault.is_some()
+}
+
+#[test]
+fn a_force_more_than_twice_a_parked_groups_size_drives_in_without_smoke() {
+    assert!(
+        assault_starts_with(3),
+        "3 against 2 parked Tanks: smoke first"
+    );
+    assert!(
+        !assault_starts_with(5),
+        "5 against 2: an assault would only split the push"
+    );
+}

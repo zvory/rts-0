@@ -14,9 +14,12 @@ use super::geometry::{dist2, squared};
 use super::opening_rush::LiveStep;
 use super::*;
 
+mod posts;
+use posts::*;
+
 const START_TANKS: usize = 8;
 /// At most this many Tanks join the breach; the rest stay with the regular plans.
-const MAX_TANKS: usize = 12;
+const MAX_TANKS: usize = 30;
 /// Traps this close to the route block it...
 const ROUTE_TILES: f32 = 3.0;
 /// ...and every trap linked to one of them this closely belongs to the same line.
@@ -31,7 +34,9 @@ const TRAP_CLEARANCE_TILES: f32 = 1.2;
 const JEFF_SIDE_BACK_TILES: f32 = 8.0;
 /// Posts stay this far from every enemy Tank seen lately: beyond its full range and a margin.
 const ENEMY_TANK_CLEARANCE_TILES: f32 = 16.0;
-const ENEMY_TANK_MEMORY_TICKS: u32 = config::TICK_HZ * 30;
+/// The breach remembers where it saw enemy Tanks this long, unless it sees the spot empty: a group
+/// parked behind a line stays there, out of sight, for minutes.
+const ENEMY_TANK_MEMORY_TICKS: u32 = config::TICK_HZ * 120;
 /// A Tank's range grows from 5 to 14 tiles in its first three seconds standing; 8 tiles takes
 /// one second.
 const AIM_TICKS: u32 = 45;
@@ -50,12 +55,49 @@ const STALL_TICKS: u32 = config::TICK_HZ * 90;
 const MIN_HOLD_TICKS: u32 = config::TICK_HZ * 45;
 const QUIET_TICKS: u32 = config::TICK_HZ * 60;
 const NEAR_TILES: f32 = 25.0;
-/// After each trap comes down the Tanks step back this far from the gap onto Jeff's side and
-/// stand charged a while: whatever comes through the gap meets them at full range.
-const REST_TILES: f32 = 12.0;
-const REST_TICKS: u32 = config::TICK_HZ * 8;
-/// They step back only when an enemy Tank is known this close to the new gap.
-const REST_IF_ENEMY_TILES: f32 = 30.0;
+/// The Scout Car looks at each next trap from this far back (it sees 15), long enough to see.
+const PEEK_TILES: f32 = 9.0;
+const PEEK_TICKS: u32 = 20;
+const LOOK_TIMEOUT_TICKS: u32 = config::TICK_HZ * 20;
+/// The concave keeps this far from every enemy Tank seen lately, and the way to each post keeps
+/// out of their reach: the whole group once drove past a parked pile to a concave 9 tiles from it
+/// and lost 18 Tanks.
+const CONCAVE_CLEARANCE_TILES: f32 = 16.0;
+const TRAVEL_CLEARANCE_TILES: f32 = 14.5;
+/// For a contested trap the group stands in a concave this far back, beyond the reach of Tanks
+/// parked behind it (14 tiles and a margin)...
+const CONCAVE_TILES: f32 = 18.0;
+/// ...and four Tanks fire on it from this far, the most a charged Tank reaches with a margin, while
+/// the Scout Car spots from just inside its own sight.
+const FIRE_TILES: f32 = 12.3;
+const SPOT_TILES: f32 = 13.8;
+const VOLLEY_TANKS: usize = 4;
+const SHOOTERS_TO_FIRE: usize = 2;
+/// A Tank's range reaches 12 tiles after this long standing.
+const VOLLEY_AIM_TICKS: u32 = 75;
+const VOLLEY_TIMEOUT_TICKS: u32 = config::TICK_HZ * 25;
+const VOLLEY_FIRE_TICKS: u32 = config::TICK_HZ * 8;
+const FORM_TIMEOUT_TICKS: u32 = config::TICK_HZ * 40;
+/// After a volley the concave holds at least this long, and until no enemy Tank came near.
+const FALLBACK_MIN_TICKS: u32 = config::TICK_HZ * 10;
+const FALLBACK_QUIET_TICKS: u32 = config::TICK_HZ * 15;
+/// A Tank standing this long fires at full range.
+const CHARGE_TICKS: u32 = config::TICK_HZ * 3 + 15;
+/// Volley posts keep at least this far from every enemy Tank seen lately: a charged Tank reaches
+/// 14, and a volley fired from inside that reach into a parked group lost Tanks for every trap.
+/// More clearance is preferred up to the second figure.
+const FIRE_MIN_CLEARANCE_TILES: f32 = 14.5;
+/// With Jeff's Tanks ahead, a volley may fire from closer: only Tanks charged and in range answer
+/// it, and whatever comes through the gap meets the larger army.
+const FIRE_AHEAD_CLEARANCE_TILES: f32 = 11.0;
+const FIRE_CLEARANCE_TILES: f32 = 16.0;
+/// A line on the enemy's half is opened only while Jeff's Tanks outnumber the enemy Tanks it knows
+/// of by this much: whatever stood behind it comes through the gap at the Tanks that opened it.
+/// Lines on Jeff's half open as soon as there are Tanks to spare.
+const ENEMY_LINE_RATIO: f32 = 1.2;
+const ENEMY_LINE_LEAD: f32 = 2.0;
+/// After stopping for want of a trap safe to shoot, the breach waits this long before it looks again.
+const RESTART_TICKS: u32 = config::TICK_HZ * 60;
 /// Enemy Tanks this close to a breach Tank stop all moving: they stand and fight charged.
 const DEFEND_TILES: f32 = 20.0;
 /// Clearing resumes once no enemy Tank was this close for this long.
@@ -66,6 +108,22 @@ const TARGET_DISTANCE_WEIGHT: f32 = 0.5;
 const STUCK_TICKS: u32 = config::TICK_HZ * 20;
 /// ...and not taken again for this long.
 const DROPPED_TICKS: u32 = config::TICK_HZ * 60;
+
+/// The steps of clearing one trap.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Stage {
+    /// The Scout Car looks at the trap.
+    #[default]
+    Look,
+    /// No enemy about: Tanks shoot from posts in sight of it.
+    Shoot,
+    /// Contested: the group charges in a concave beyond reach.
+    Form,
+    /// Four Tanks drive up and fire one volley.
+    Volley,
+    /// Back in the concave until things are quiet.
+    FallBack,
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum Phase {
@@ -105,8 +163,23 @@ pub(crate) struct TrapBreach {
     dropped: BTreeMap<u32, u32>,
     /// While Jeff's home is under attack before the shooting starts, the breach lets go.
     paused: bool,
-    /// Stepping back after a trap came down, until then.
-    rest_until: Option<u32>,
+    /// The Scout Car that looks and spots for the breach.
+    scout: Option<u32>,
+    stage: Stage,
+    stage_since: u32,
+    /// The current trap has enemy Tanks about.
+    contested: bool,
+    /// Firing posts for a volley, and the Tanks firing it with their posts.
+    fire_posts: Vec<(i32, i32)>,
+    volley: BTreeMap<u32, (i32, i32)>,
+    /// Since when the Scout Car stands at its look-out.
+    peeked_since: Option<u32>,
+    /// Enemy Tanks seen and where, and when, until their spot is seen empty or they are forgotten.
+    enemy_seen: BTreeMap<u32, ((i32, i32), u32)>,
+    /// The breach stopped then with no trap safe to shoot.
+    stalled_at: Option<u32>,
+    /// Jeff's Tanks outnumber the known enemy Tanks enough to open lines on the enemy's half.
+    superior: bool,
     /// When an enemy Tank last came close to the breach Tanks; standing to fight since.
     last_threat: u32,
     defending: bool,
@@ -120,7 +193,11 @@ impl TrapBreach {
     /// Units the breach owns this decision.
     pub(super) fn reserved(&self) -> impl Iterator<Item = u32> + '_ {
         let active = !self.paused && matches!(self.phase, Phase::Clear | Phase::Hold);
-        self.tanks.iter().copied().filter(move |_| active)
+        self.tanks
+            .iter()
+            .copied()
+            .chain(self.scout)
+            .filter(move |_| active)
     }
 
     pub(super) fn is_reserved(&self, id: u32) -> bool {
@@ -180,7 +257,7 @@ pub(super) fn plan_live(
     if lines.is_empty() && matches!(memory.trap_breach.phase, Phase::Idle | Phase::Done) {
         return;
     }
-    let enemy_tanks = recent_enemy_tanks(observation, &memory.tank_micro);
+    let enemy_tanks = remember_enemy_tanks(observation, &mut memory.trap_breach, ts);
     let zones = super::tank_micro::zones(observation, &memory.tank_micro);
     let home_tank = memory.home_defensive_tank;
     let guards: BTreeSet<u32> = memory.later_bases.guards.iter().copied().collect();
@@ -195,7 +272,14 @@ pub(super) fn plan_live(
     breach.tanks.retain(|id| owned_ok(id));
     breach.posts.retain(|id, _| owned_ok(id));
     if breach.phase == Phase::Done {
-        // A new line across the route (an opponent may build one) starts a new breach.
+        // A line still across the route (one an opponent built, or one left standing) starts a
+        // new breach, a while after one stopped for want of a safe trap.
+        if breach
+            .stalled_at
+            .is_some_and(|at| tick.saturating_sub(at) < RESTART_TICKS)
+        {
+            return;
+        }
         set_phase(breach, Phase::Idle, tick);
     }
     // Jeff's home under attack takes precedence until the shooting starts.
@@ -216,8 +300,23 @@ pub(super) fn plan_live(
                 .is_none_or(|at| tick.saturating_sub(*at) >= DROPPED_TICKS)
         })
         .collect();
+    let own_tanks = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
+        .count();
+    breach.superior =
+        own_tanks as f32 >= ENEMY_LINE_RATIO * enemy_tanks.len() as f32 + ENEMY_LINE_LEAD;
     if breach.phase == Phase::Idle {
-        if spare.len() < START_TANKS || home_attacked {
+        // Nothing to start on: every line left is on the enemy's half and Jeff is not ahead.
+        let workable = breach.superior
+            || lines.iter().flatten().any(|id| {
+                breach
+                    .traps
+                    .get(id)
+                    .is_some_and(|pos| !on_enemy_half(&route, world(*pos)))
+            });
+        if spare.len() < START_TANKS || home_attacked || !workable {
             return;
         }
         breach.notes.push(format!(
@@ -228,10 +327,12 @@ pub(super) fn plan_live(
         set_phase(breach, Phase::Clear, tick);
         breach.last_progress = tick;
         take_tanks(breach, &spare, &route);
+        take_scout(breach, observation, &route);
         // The push that would stall at the line gives way to the breach.
         memory.containment = Default::default();
     } else if !breach.defending {
         take_tanks(breach, &spare, &route);
+        take_scout(breach, observation, &route);
     }
     let breach = &mut memory.trap_breach;
     if breach.tanks.len() < 3 {
@@ -249,24 +350,45 @@ pub(super) fn plan_live(
     );
 }
 
-/// Enemy Tanks seen lately: the visible ones and the Tank micro's memory.
-fn recent_enemy_tanks(
+/// Enemy Tanks seen lately: every one in sight now, and the rest where they were last seen until
+/// that spot is seen empty or `ENEMY_TANK_MEMORY_TICKS` pass.
+fn remember_enemy_tanks(
     observation: &AiObservation,
-    micro: &super::tank_micro::TankMicro,
+    breach: &mut TrapBreach,
+    ts: f32,
 ) -> Vec<(f32, f32)> {
     let tick = observation.tick;
-    micro
-        .enemy_tanks
+    let visible: BTreeMap<u32, (f32, f32)> = observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind == EntityKind::Tank && enemy.hp > 0)
+        .map(|enemy| (enemy.id, (enemy.x, enemy.y)))
+        .collect();
+    for (id, pos) in &visible {
+        breach.enemy_seen.insert(*id, (stored(*pos), tick));
+    }
+    breach.enemy_seen.retain(|id, (pos, seen)| {
+        if visible.contains_key(id) {
+            return true;
+        }
+        if tick.saturating_sub(*seen) > ENEMY_TANK_MEMORY_TICKS {
+            return false;
+        }
+        let p = world(*pos);
+        let watched = observation.owned.iter().any(|unit| {
+            let sight = match unit.kind {
+                EntityKind::ScoutCar => SCOUT_SIGHT_TILES,
+                EntityKind::Tank => TANK_SIGHT_TILES,
+                _ => 0.0,
+            };
+            sight > 0.0 && dist2(unit.x, unit.y, p.0, p.1) <= squared(sight * ts)
+        });
+        !watched
+    });
+    breach
+        .enemy_seen
         .values()
-        .filter(|seen| tick.saturating_sub(seen.last_seen) <= ENEMY_TANK_MEMORY_TICKS)
-        .map(|seen| world(seen.pos))
-        .chain(
-            observation
-                .visible_enemies
-                .iter()
-                .filter(|enemy| enemy.kind == EntityKind::Tank && enemy.hp > 0)
-                .map(|enemy| (enemy.x, enemy.y)),
-        )
+        .map(|(pos, _)| world(*pos))
         .collect()
 }
 
@@ -282,13 +404,40 @@ fn set_phase(breach: &mut TrapBreach, phase: Phase, tick: u32) {
     breach.phase_since = tick;
     breach.target = None;
     breach.last_order = None;
+    breach.stage = Stage::Look;
+    breach.stage_since = tick;
+    breach.volley.clear();
     if matches!(phase, Phase::Done | Phase::Idle) {
         breach.tanks.clear();
         breach.posts.clear();
+        breach.scout = None;
     }
 }
 
 /// Takes spare Tanks up to the cap, nearest to Jeff's end of the route first.
+/// Takes a Scout Car to look and spot, the one nearest Jeff's end of the route.
+fn take_scout(breach: &mut TrapBreach, observation: &AiObservation, route: &[(f32, f32)]) {
+    if breach.scout.is_some_and(|id| {
+        observation
+            .owned
+            .iter()
+            .any(|unit| unit.id == id && unit.hp > 0)
+    }) {
+        return;
+    }
+    let anchor = route.first().copied().unwrap_or((0.0, 0.0));
+    breach.scout = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
+        .min_by(|a, b| {
+            dist2(a.x, a.y, anchor.0, anchor.1)
+                .total_cmp(&dist2(b.x, b.y, anchor.0, anchor.1))
+                .then_with(|| a.id.cmp(&b.id))
+        })
+        .map(|unit| unit.id);
+}
+
 fn take_tanks(breach: &mut TrapBreach, spare: &[&AiEntitySummary], route: &[(f32, f32)]) {
     let anchor = route.first().copied().unwrap_or((0.0, 0.0));
     let mut spare: Vec<&AiEntitySummary> = spare.to_vec();
@@ -378,21 +527,6 @@ fn blocking_lines(
     }
     lines.sort_by_key(|(first, line)| (*first, line.first().copied()));
     lines.into_iter().map(|(_, line)| line).collect()
-}
-
-/// The route's heading toward the enemy near `point`.
-fn route_heading(route: &[(f32, f32)], point: (f32, f32)) -> Option<(f32, f32)> {
-    let index = (0..route.len()).min_by(|a, b| {
-        dist2(route[*a].0, route[*a].1, point.0, point.1).total_cmp(&dist2(
-            route[*b].0,
-            route[*b].1,
-            point.0,
-            point.1,
-        ))
-    })?;
-    let from = route[index.saturating_sub(3)];
-    let to = route[(index + 3).min(route.len() - 1)];
-    super::geometry::normalized_direction(from, to)
 }
 
 fn run(
@@ -511,6 +645,7 @@ fn run(
                     breach
                         .notes
                         .push("no trap safe to shoot for long: hands the Tanks back".to_string());
+                    breach.stalled_at = Some(tick);
                     set_phase(breach, Phase::Done, tick);
                 }
             }
@@ -576,8 +711,11 @@ fn run(
     }
 }
 
-/// One decision of clearing: pick the safest blocking trap, post Tanks around it within sight and
-/// out of enemy reach, and shoot it once they are aimed.
+/// One decision of clearing. The Scout Car looks at the next trap first. A trap with no enemy
+/// Tank about is shot from posts in sight of it. A contested one (enemy Tanks about, usually
+/// parked behind it) is shot in one volley: the group charges in a concave beyond their reach,
+/// four Tanks drive up to fire from as far as the trap can be shot, then fall back, and whatever
+/// comes through the gap meets the concave.
 fn clear_step(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
@@ -592,153 +730,401 @@ fn clear_step(
     breach
         .skipped
         .retain(|_, since| tick.saturating_sub(*since) < SKIP_TICKS);
-    // A target that is gone, or took too long, makes way for the next.
+    let standing: Vec<(f32, f32)> = breach.traps.values().map(|t| world(*t)).collect();
+    let scout = breach
+        .scout
+        .and_then(|id| observation.owned.iter().find(|unit| unit.id == id));
+
+    // A target that is gone, or took too long, makes way for the next once the group has fallen
+    // back and things are quiet.
     if let Some((target, since)) = breach.target {
         let gone = !breach.traps.contains_key(&target);
-        if gone || tick.saturating_sub(since) >= TARGET_TIMEOUT_TICKS {
+        // Only shooting from posts in sight has a deadline here; a volley keeps its own.
+        let timed_out =
+            breach.stage == Stage::Shoot && tick.saturating_sub(since) >= TARGET_TIMEOUT_TICKS;
+        if (gone || timed_out) && breach.stage != Stage::FallBack {
             if gone {
                 breach.notes.push(format!("trap {target} down"));
                 breach.last_progress = tick;
-                // With enemy Tanks about, step back from the gap and stand charged a while.
-                let gap = breach.target_point.map(world);
-                let enemy_about = gap.is_some_and(|gap| {
-                    enemy_tanks
-                        .iter()
-                        .any(|e| dist2(e.0, e.1, gap.0, gap.1) <= squared(REST_IF_ENEMY_TILES * ts))
-                });
-                if let Some(point) = breach.target_point.filter(|_| enemy_about) {
-                    let rest =
-                        rest_posts(observation, map_analysis, route, enemy_tanks, world(point));
-                    assign_posts(breach, tanks, &rest);
-                    breach.rest_until = Some(tick + REST_TICKS);
-                }
             } else {
                 breach.notes.push(format!("trap {target} passed over"));
                 breach.skipped.insert(target, tick);
             }
-            breach.target = None;
             breach.last_order = None;
-        }
-    }
-    if breach.rest_until.is_some_and(|until| tick < until) {
-        // Resting: back at the rest posts, charged.
-        for tank in tanks {
-            let Some(post) = breach.posts.get(&tank.id).copied().map(world) else {
-                continue;
-            };
-            let far = dist2(tank.x, tank.y, post.0, post.1) > squared(IN_POSITION_TILES * ts);
-            let reissue = tank.state != AiEntityState::Move || tick % ORDER_REFRESH_TICKS < 9;
-            if far && reissue && actions::move_units(actions, [tank.id], post.0, post.1).is_some() {
-                moved.push(tank.id);
+            if breach.contested {
+                breach.stage = Stage::FallBack;
+                breach.stage_since = tick;
+            } else {
+                breach.target = None;
             }
         }
-        return;
     }
-    breach.rest_until = None;
-    let standing: Vec<(f32, f32)> = breach.traps.values().map(|t| world(*t)).collect();
     if breach.target.is_none() {
-        // The first line still standing, and in it the trap with the best margin from the enemy
-        // army that has safe posts, not too far from where the Tanks stand.
-        let n = tanks.len().max(1) as f32;
-        let group = (
-            tanks.iter().map(|tank| tank.x).sum::<f32>() / n,
-            tanks.iter().map(|tank| tank.y).sum::<f32>() / n,
-        );
-        let pick = lines.iter().find_map(|line| {
-            line.iter()
-                .copied()
-                .filter(|id| !breach.skipped.contains_key(id))
-                .filter_map(|id| {
-                    let p = world(*breach.traps.get(&id)?);
-                    let posts = safe_posts(
-                        observation,
-                        map_analysis,
-                        route,
-                        enemy_tanks,
-                        zones,
-                        &standing,
-                        p,
-                    );
-                    (!posts.is_empty()).then(|| {
-                        let margin = enemy_tanks
-                            .iter()
-                            .map(|e| dist2(e.0, e.1, p.0, p.1).sqrt() / ts)
-                            .fold(40.0f32, f32::min);
-                        let away = dist2(group.0, group.1, p.0, p.1).sqrt() / ts;
-                        (id, posts, margin - TARGET_DISTANCE_WEIGHT * away)
-                    })
-                })
-                .max_by(|a, b| a.2.total_cmp(&b.2).then_with(|| b.0.cmp(&a.0)))
-        });
-        let Some((id, posts, _)) = pick else {
+        let Some(pick) = pick_target(
+            observation,
+            map_analysis,
+            breach,
+            (lines, route, enemy_tanks, zones),
+            tanks,
+            &standing,
+        ) else {
             return;
         };
-        breach
-            .notes
-            .push(format!("target trap {id} with {} posts", posts.len()));
-        breach.target = Some((id, tick));
-        breach.target_point = breach.traps.get(&id).copied();
+        breach.notes.push(format!("target trap {pick}"));
+        breach.target = Some((pick, tick));
+        breach.target_point = breach.traps.get(&pick).copied();
         breach.last_progress = tick;
-        assign_posts(breach, tanks, &posts);
+        breach.last_order = None;
+        breach.posts.clear();
+        breach.fire_posts.clear();
+        breach.stage = Stage::Look;
+        breach.stage_since = tick;
     }
     let Some((target, _)) = breach.target else {
         return;
     };
-    let Some(target_point) = breach.traps.get(&target).copied().map(world) else {
-        return;
-    };
-    // Posts that came within reach of an enemy Tank are given up: pick again.
-    let threatened = breach.posts.values().any(|post| {
-        let p = world(*post);
-        enemy_tanks
-            .iter()
-            .any(|e| dist2(e.0, e.1, p.0, p.1) <= squared((ENEMY_TANK_CLEARANCE_TILES - 1.0) * ts))
-    });
-    if threatened && breach.last_order.is_none() {
-        breach
-            .notes
-            .push(format!("posts around trap {target} came under threat"));
-        breach.skipped.insert(target, tick);
+    let Some(trap) = breach.target_point.map(world) else {
         breach.target = None;
         return;
+    };
+    let back = back_direction(route, trap, ts);
+    let rest = (
+        trap.0 + back.0 * (CONCAVE_TILES + 3.0) * ts,
+        trap.1 + back.1 * (CONCAVE_TILES + 3.0) * ts,
+    );
+
+    match breach.stage {
+        Stage::Look => {
+            // The Scout Car looks from just inside its sight, so a parked army behind the trap is
+            // known before any Tank stands within its reach.
+            let peek = (
+                trap.0 + back.0 * PEEK_TILES * ts,
+                trap.1 + back.1 * PEEK_TILES * ts,
+            );
+            let looked = match scout {
+                None => true,
+                Some(scout) => {
+                    let there =
+                        dist2(scout.x, scout.y, peek.0, peek.1) <= squared(IN_POSITION_TILES * ts);
+                    if there {
+                        breach.peeked_since.get_or_insert(tick);
+                    } else {
+                        breach.peeked_since = None;
+                        send(actions, scout, peek, tick, moved);
+                    }
+                    breach
+                        .peeked_since
+                        .is_some_and(|since| tick.saturating_sub(since) >= PEEK_TICKS)
+                }
+            };
+            // The Tanks wait behind meanwhile.
+            for tank in tanks {
+                if dist2(tank.x, tank.y, rest.0, rest.1) > squared(6.0 * ts) {
+                    send(actions, tank, rest, tick, moved);
+                }
+            }
+            if !looked && tick.saturating_sub(breach.stage_since) < LOOK_TIMEOUT_TICKS {
+                return;
+            }
+            breach.peeked_since = None;
+            // On Jeff's half, posts in sight of the trap and out of every known enemy Tank's reach
+            // are used whenever there are any. A trap on the enemy's half always gets the volley:
+            // a line there is likely covered by Tanks parked out of sight behind it, which a look
+            // from Jeff's side does not reach (one breach walked its posts into such a group and
+            // lost 10 of 12 Tanks).
+            let posts = if on_enemy_half(route, trap) {
+                Vec::new()
+            } else {
+                safe_posts(
+                    observation,
+                    map_analysis,
+                    route,
+                    enemy_tanks,
+                    zones,
+                    &standing,
+                    trap,
+                )
+            };
+            breach.contested = posts.is_empty();
+            if posts.is_empty() {
+                let concave = concave_posts(
+                    observation,
+                    map_analysis,
+                    trap,
+                    back,
+                    &standing,
+                    enemy_tanks,
+                    group_center(tanks),
+                );
+                let fire = fire_posts(
+                    observation,
+                    map_analysis,
+                    trap,
+                    back,
+                    &standing,
+                    (enemy_tanks, volley_clearance(breach)),
+                    ts,
+                );
+                if concave.is_empty() || fire.is_empty() {
+                    breach
+                        .notes
+                        .push(format!("trap {target}: no room for a volley, passed over"));
+                    breach.skipped.insert(target, tick);
+                    breach.target = None;
+                    return;
+                }
+                assign_posts(breach, tanks, &concave);
+                breach.fire_posts = fire.iter().map(|p| stored(*p)).collect();
+                breach
+                    .notes
+                    .push(format!("trap {target} contested: forming the concave"));
+                breach.stage = Stage::Form;
+            } else {
+                assign_posts(breach, tanks, &posts);
+                breach.notes.push(format!(
+                    "trap {target} clear of enemies: {} posts",
+                    posts.len()
+                ));
+                breach.stage = Stage::Shoot;
+            }
+            breach.stage_since = tick;
+        }
+        Stage::Shoot => {
+            if let Some(scout) = scout {
+                send_if_far(actions, scout, rest, tick, moved);
+            }
+            let aimed = man_posts(breach, tanks, actions, tick, ts, moved, AIM_TICKS);
+            fire(breach, actions, attacked, target, aimed, tick);
+        }
+        Stage::Form => {
+            if let Some(scout) = scout {
+                send_if_far(actions, scout, rest, tick, moved);
+            }
+            let charged = man_posts(breach, tanks, actions, tick, ts, moved, CHARGE_TICKS);
+            let need = (tanks.len() * 2).div_ceil(3).max(1);
+            if charged.len() >= need
+                || tick.saturating_sub(breach.stage_since) >= FORM_TIMEOUT_TICKS
+            {
+                // The Tanks nearest the firing posts go.
+                breach.volley.clear();
+                let mut free: Vec<&AiEntitySummary> = tanks.to_vec();
+                for post in breach.fire_posts.clone() {
+                    let p = world(post);
+                    let Some(index) = (0..free.len()).min_by(|a, b| {
+                        dist2(free[*a].x, free[*a].y, p.0, p.1)
+                            .total_cmp(&dist2(free[*b].x, free[*b].y, p.0, p.1))
+                            .then_with(|| free[*a].id.cmp(&free[*b].id))
+                    }) else {
+                        break;
+                    };
+                    breach.volley.insert(free.remove(index).id, post);
+                }
+                breach.notes.push(format!(
+                    "volley on trap {target} with {}",
+                    breach.volley.len()
+                ));
+                breach.stage = Stage::Volley;
+                breach.stage_since = tick;
+            }
+        }
+        Stage::Volley => {
+            // The Scout Car spots the trap from as far back as its sight allows.
+            if let Some(scout) = scout {
+                let spot = (
+                    trap.0 + back.0 * SPOT_TILES * ts,
+                    trap.1 + back.1 * SPOT_TILES * ts,
+                );
+                send_if_far(actions, scout, spot, tick, moved);
+            }
+            let mut aimed = Vec::new();
+            for tank in tanks {
+                let post = breach
+                    .volley
+                    .get(&tank.id)
+                    .or_else(|| breach.posts.get(&tank.id))
+                    .copied()
+                    .map(world);
+                let Some(post) = post else {
+                    continue;
+                };
+                let firing = breach.volley.contains_key(&tank.id) && breach.last_order.is_some();
+                if firing {
+                    continue;
+                }
+                if dist2(tank.x, tank.y, post.0, post.1) > squared(IN_POSITION_TILES * ts) {
+                    send(actions, tank, post, tick, moved);
+                    continue;
+                }
+                let still = breach
+                    .still_since
+                    .get(&tank.id)
+                    .is_some_and(|since| tick.saturating_sub(*since) >= VOLLEY_AIM_TICKS);
+                if breach.volley.contains_key(&tank.id)
+                    && still
+                    && dist2(tank.x, tank.y, trap.0, trap.1) <= squared(12.8 * ts)
+                {
+                    aimed.push(tank.id);
+                }
+            }
+            let volley_alive = tanks
+                .iter()
+                .filter(|tank| breach.volley.contains_key(&tank.id))
+                .count();
+            if breach.last_order.is_none() && aimed.len() < SHOOTERS_TO_FIRE.min(volley_alive) {
+                if tick.saturating_sub(breach.stage_since) >= VOLLEY_TIMEOUT_TICKS
+                    || volley_alive == 0
+                {
+                    breach.stage = Stage::FallBack;
+                    breach.stage_since = tick;
+                }
+                return;
+            }
+            let shooters: Vec<u32> = tanks
+                .iter()
+                .filter(|tank| breach.volley.contains_key(&tank.id))
+                .map(|tank| tank.id)
+                .collect();
+            fire(breach, actions, attacked, target, shooters, tick);
+            if breach
+                .last_order
+                .is_some_and(|(_, at)| tick.saturating_sub(at) >= VOLLEY_FIRE_TICKS)
+            {
+                breach.stage = Stage::FallBack;
+                breach.stage_since = tick;
+            }
+        }
+        Stage::FallBack => {
+            // Everyone back in the concave, charged; whatever comes through meets it.
+            breach.volley.clear();
+            breach.last_order = None;
+            if let Some(scout) = scout {
+                send_if_far(actions, scout, rest, tick, moved);
+            }
+            man_posts(breach, tanks, actions, tick, ts, moved, CHARGE_TICKS);
+            // Quiet means nothing came at the concave lately; Tanks parked behind a line are not
+            // coming.
+            let quiet = tick.saturating_sub(breach.last_threat) >= FALLBACK_QUIET_TICKS;
+            if tick.saturating_sub(breach.stage_since) >= FALLBACK_MIN_TICKS && quiet {
+                breach.target = None;
+                breach.stage = Stage::Look;
+                breach.stage_since = tick;
+            }
+        }
     }
-    // Tanks without a post (late joiners, spares) stand behind the posted ones.
-    let rally = rally_point(breach, target_point, route, ts);
-    let mut aimed: Vec<u32> = Vec::new();
-    for tank in tanks {
-        let posted = breach.posts.contains_key(&tank.id);
-        let post = breach
-            .posts
-            .get(&tank.id)
+}
+
+/// The next trap: in the first line still standing, the one with the best margin from the enemy
+/// army, not too far from where the Tanks stand. A trap on the enemy's half is only taken when a
+/// volley can be fired at it from out of every known enemy Tank's reach.
+fn pick_target(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    breach: &TrapBreach,
+    (lines, route, enemy_tanks, _): Field<'_>,
+    tanks: &[&AiEntitySummary],
+    standing: &[(f32, f32)],
+) -> Option<u32> {
+    let ts = observation.map.tile_size as f32;
+    let clearance = volley_clearance(breach);
+    let volleyable = |p: (f32, f32)| {
+        let back = back_direction(route, p, ts);
+        fire_posts(
+            observation,
+            map_analysis,
+            p,
+            back,
+            standing,
+            (enemy_tanks, clearance),
+            ts,
+        )
+        .len()
+            >= SHOOTERS_TO_FIRE
+    };
+    let n = tanks.len().max(1) as f32;
+    let group = (
+        tanks.iter().map(|tank| tank.x).sum::<f32>() / n,
+        tanks.iter().map(|tank| tank.y).sum::<f32>() / n,
+    );
+    lines.iter().find_map(|line| {
+        line.iter()
             .copied()
-            .map(world)
-            .unwrap_or(rally);
-        let at_post = dist2(tank.x, tank.y, post.0, post.1) <= squared(IN_POSITION_TILES * ts);
-        let shooting = posted && breach.last_order.is_some();
-        if !at_post && !shooting {
-            let tolerance = if posted { IN_POSITION_TILES } else { 3.0 };
-            let far = dist2(tank.x, tank.y, post.0, post.1) > squared(tolerance * ts);
-            let reissue = tank.state != AiEntityState::Move || tick % ORDER_REFRESH_TICKS < 9;
-            if far && reissue && actions::move_units(actions, [tank.id], post.0, post.1).is_some() {
-                moved.push(tank.id);
+            .filter(|id| !breach.skipped.contains_key(id))
+            .filter_map(|id| {
+                let p = world(*breach.traps.get(&id)?);
+                if on_enemy_half(route, p) && !(breach.superior && volleyable(p)) {
+                    return None;
+                }
+                let margin = enemy_tanks
+                    .iter()
+                    .map(|e| dist2(e.0, e.1, p.0, p.1).sqrt() / ts)
+                    .fold(40.0f32, f32::min);
+                let away = dist2(group.0, group.1, p.0, p.1).sqrt() / ts;
+                Some((id, margin - TARGET_DISTANCE_WEIGHT * away))
+            })
+            .max_by(|a, b| a.1.total_cmp(&b.1).then_with(|| b.0.cmp(&a.0)))
+            .map(|(id, _)| id)
+    })
+}
+
+/// How far volley posts keep from known enemy Tanks: out of every charged Tank's reach, unless
+/// Jeff is ahead.
+fn volley_clearance(breach: &TrapBreach) -> f32 {
+    if breach.superior {
+        FIRE_AHEAD_CLEARANCE_TILES
+    } else {
+        FIRE_MIN_CLEARANCE_TILES
+    }
+}
+
+/// Sends each Tank to its post; returns the posted Tanks standing there at least `ready_ticks`.
+fn man_posts(
+    breach: &mut TrapBreach,
+    tanks: &[&AiEntitySummary],
+    actions: &mut AiActionContext<'_>,
+    tick: u32,
+    ts: f32,
+    moved: &mut Vec<u32>,
+    ready_ticks: u32,
+) -> Vec<u32> {
+    let rally = breach.posts.values().next().copied().map(world);
+    let mut ready = Vec::new();
+    for tank in tanks {
+        let Some(post) = breach.posts.get(&tank.id).copied().map(world).or(rally) else {
+            continue;
+        };
+        let posted = breach.posts.contains_key(&tank.id);
+        let tolerance = if posted { IN_POSITION_TILES } else { 4.0 };
+        if dist2(tank.x, tank.y, post.0, post.1) > squared(tolerance * ts) {
+            if !(posted && breach.last_order.is_some()) {
+                send(actions, tank, post, tick, moved);
             }
             continue;
         }
         let still = breach
             .still_since
             .get(&tank.id)
-            .is_some_and(|since| tick.saturating_sub(*since) >= AIM_TICKS);
+            .is_some_and(|since| tick.saturating_sub(*since) >= ready_ticks);
         if posted && still {
-            aimed.push(tank.id);
+            ready.push(tank.id);
         }
     }
-    let posted = breach.posts.len();
-    let ready = !aimed.is_empty() && (aimed.len() >= 2 || aimed.len() == posted);
-    let refresh_due = breach
+    ready
+}
+
+fn fire(
+    breach: &mut TrapBreach,
+    actions: &mut AiActionContext<'_>,
+    attacked: &mut Vec<u32>,
+    target: u32,
+    shooters: Vec<u32>,
+    tick: u32,
+) {
+    let ready = !shooters.is_empty() && (shooters.len() >= 2 || breach.last_order.is_some());
+    let due = breach
         .last_order
         .is_none_or(|(id, at)| id != target || tick.saturating_sub(at) >= ORDER_REFRESH_TICKS);
-    if (ready || breach.last_order.is_some()) && refresh_due && !aimed.is_empty() {
-        if let Some(sent) = actions::clear_obstacle_area(actions, aimed, target) {
+    if ready && due {
+        if let Some(sent) = actions::clear_obstacle_area(actions, shooters, target) {
             breach
                 .notes
                 .push(format!("shoot trap {target} with {}", sent.len()));
@@ -748,187 +1134,30 @@ fn clear_step(
     }
 }
 
-/// Posts around `trap`: within sight of it, on Jeff's side of its line, open ground, outside the
-/// reach of every enemy Tank seen lately and of parked groups, spaced apart.
-#[allow(clippy::too_many_arguments)]
-fn safe_posts(
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    route: &[(f32, f32)],
-    enemy_tanks: &[(f32, f32)],
-    zones: &[super::tank_micro::Zone],
-    standing: &[(f32, f32)],
-    trap: (f32, f32),
-) -> Vec<(f32, f32)> {
-    let ts = observation.map.tile_size as f32;
-    let Some(heading) = route_heading(route, trap) else {
-        return Vec::new();
-    };
-    let along = |p: &(f32, f32)| (p.0 - trap.0) * heading.0 + (p.1 - trap.1) * heading.1;
-    let jeff_side = jeff_side_point(route, trap, ts);
-    let mut posts: Vec<(f32, f32)> = Vec::new();
-    for radius in POST_RINGS {
-        for step in 0..18 {
-            let angle = step as f32 * std::f32::consts::TAU / 18.0;
-            let p = (
-                trap.0 + angle.cos() * radius * ts,
-                trap.1 + angle.sin() * radius * ts,
-            );
-            if crosses_traps(p, jeff_side, standing, ts)
-                || standing
-                    .iter()
-                    .any(|t| dist2(t.0, t.1, p.0, p.1) <= squared(1.5 * ts))
-            {
-                continue;
-            }
-            let exposed = enemy_tanks
-                .iter()
-                .any(|e| dist2(e.0, e.1, p.0, p.1) <= squared(ENEMY_TANK_CLEARANCE_TILES * ts))
-                || zones.iter().any(|zone| {
-                    dist2(zone.center.0, zone.center.1, p.0, p.1) <= squared(zone.radius)
-                });
-            let crowded = posts
-                .iter()
-                .any(|q| dist2(q.0, q.1, p.0, p.1) < squared(POST_SPACING_TILES * ts));
-            if exposed
-                || crowded
-                || !defense::defensive_position_is_open(observation, map_analysis, p.0, p.1)
-            {
-                continue;
-            }
-            posts.push(p);
-        }
-    }
-    // The posts deepest on Jeff's side first.
-    posts.sort_by(|a, b| along(a).total_cmp(&along(b)));
-    posts.truncate(MAX_POSTS);
-    posts
-}
-
-/// Posts to step back to from a gap: `REST_TILES` behind it toward Jeff along the route, in a
-/// line across it, open ground and out of enemy reach.
-fn rest_posts(
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    route: &[(f32, f32)],
-    enemy_tanks: &[(f32, f32)],
-    gap: (f32, f32),
-) -> Vec<(f32, f32)> {
-    let ts = observation.map.tile_size as f32;
-    let Some(heading) = route_heading(route, gap) else {
-        return Vec::new();
-    };
-    let across = (-heading.1, heading.0);
-    let mut posts = Vec::new();
-    for depth in [REST_TILES, REST_TILES + 2.5] {
-        for k in [0.0f32, 1.0, -1.0, 2.0, -2.0, 3.0, -3.0] {
-            let p = (
-                gap.0 - heading.0 * depth * ts + across.0 * k * POST_SPACING_TILES * ts,
-                gap.1 - heading.1 * depth * ts + across.1 * k * POST_SPACING_TILES * ts,
-            );
-            let exposed = enemy_tanks
-                .iter()
-                .any(|e| dist2(e.0, e.1, p.0, p.1) <= squared(ENEMY_TANK_CLEARANCE_TILES * ts));
-            if !exposed && defense::defensive_position_is_open(observation, map_analysis, p.0, p.1)
-            {
-                posts.push(p);
-            }
-        }
-    }
-    posts.truncate(MAX_TANKS);
-    posts
-}
-
-/// Where the breach works: the centre of its posts, else of its Tanks.
-fn work_site(breach: &TrapBreach, tanks: &[&AiEntitySummary]) -> Option<(f32, f32)> {
-    let points: Vec<(f32, f32)> = if breach.posts.is_empty() {
-        tanks.iter().map(|tank| (tank.x, tank.y)).collect()
-    } else {
-        breach.posts.values().map(|p| world(*p)).collect()
-    };
-    let n = points.len();
-    (n > 0).then(|| {
-        let (sx, sy) = points
-            .iter()
-            .fold((0.0, 0.0), |acc, p| (acc.0 + p.0, acc.1 + p.1));
-        (sx / n as f32, sy / n as f32)
-    })
-}
-
-/// A point on Jeff's side of the line at `trap`: back along the route from where it passes nearest.
-fn jeff_side_point(route: &[(f32, f32)], trap: (f32, f32), ts: f32) -> (f32, f32) {
-    let index = (0..route.len())
-        .min_by(|a, b| {
-            dist2(route[*a].0, route[*a].1, trap.0, trap.1).total_cmp(&dist2(
-                route[*b].0,
-                route[*b].1,
-                trap.0,
-                trap.1,
-            ))
-        })
-        .unwrap_or(0);
-    // Route points are a tile apart; step back toward Jeff.
-    let back = index.saturating_sub((JEFF_SIDE_BACK_TILES + ROUTE_TILES) as usize);
-    let _ = ts;
-    route[back]
-}
-
-/// Whether the straight way from `a` to `b` passes a standing trap closer than
-/// `TRAP_CLEARANCE_TILES`.
-fn crosses_traps(a: (f32, f32), b: (f32, f32), standing: &[(f32, f32)], ts: f32) -> bool {
-    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
-    let len2 = dx * dx + dy * dy;
-    standing.iter().any(|t| {
-        let along = if len2 > 0.0 {
-            (((t.0 - a.0) * dx + (t.1 - a.1) * dy) / len2).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-        let (px, py) = (a.0 + dx * along, a.1 + dy * along);
-        dist2(px, py, t.0, t.1) <= squared(TRAP_CLEARANCE_TILES * ts)
-    })
-}
-
-/// Gives the posts to the nearest Tanks.
-fn assign_posts(breach: &mut TrapBreach, tanks: &[&AiEntitySummary], posts: &[(f32, f32)]) {
-    breach.posts.clear();
-    let mut free: Vec<&AiEntitySummary> = tanks.to_vec();
-    for post in posts {
-        let Some(index) = (0..free.len()).min_by(|a, b| {
-            dist2(free[*a].x, free[*a].y, post.0, post.1)
-                .total_cmp(&dist2(free[*b].x, free[*b].y, post.0, post.1))
-                .then_with(|| free[*a].id.cmp(&free[*b].id))
-        }) else {
-            return;
-        };
-        let tank = free.remove(index);
-        breach.posts.insert(tank.id, stored(*post));
+/// Orders a unit to `point` unless it is already driving there.
+fn send(
+    actions: &mut AiActionContext<'_>,
+    unit: &AiEntitySummary,
+    point: (f32, f32),
+    tick: u32,
+    moved: &mut Vec<u32>,
+) {
+    let reissue = unit.state != AiEntityState::Move || tick % ORDER_REFRESH_TICKS < 9;
+    if reissue && actions::move_units(actions, [unit.id], point.0, point.1).is_some() {
+        moved.push(unit.id);
     }
 }
 
-/// Where Tanks without a post wait: behind the posts, toward Jeff along the route.
-fn rally_point(
-    breach: &TrapBreach,
-    target: (f32, f32),
-    route: &[(f32, f32)],
-    ts: f32,
-) -> (f32, f32) {
-    let heading = route_heading(route, target).unwrap_or((0.0, 0.0));
-    let n = breach.posts.len().max(1) as f32;
-    let (sx, sy) = breach
-        .posts
-        .values()
-        .map(|p| world(*p))
-        .fold((0.0, 0.0), |acc, p| (acc.0 + p.0, acc.1 + p.1));
-    let center = if breach.posts.is_empty() {
-        target
-    } else {
-        (sx / n, sy / n)
-    };
-    (
-        center.0 - heading.0 * 4.0 * ts,
-        center.1 - heading.1 * 4.0 * ts,
-    )
+fn send_if_far(
+    actions: &mut AiActionContext<'_>,
+    unit: &AiEntitySummary,
+    point: (f32, f32),
+    tick: u32,
+    moved: &mut Vec<u32>,
+) {
+    if dist2(unit.x, unit.y, point.0, point.1) > squared(2.0 * 32.0) {
+        send(actions, unit, point, tick, moved);
+    }
 }
 
 /// Lets go of Tanks that got no closer to their post for `STUCK_TICKS`.

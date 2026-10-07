@@ -253,6 +253,7 @@ where
             map_analysis,
             facts.nearest_public_enemy_base,
             attack_policy.stage_distance_tiles,
+            profile.id == JEFFS_AI_ID,
         );
     }
     let mut idle_builders = facts.idle_workers.clone();

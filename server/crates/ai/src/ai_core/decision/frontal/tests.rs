@@ -1146,3 +1146,49 @@ fn a_large_push_forms_ranks_of_six() {
     };
     assert!(width(&front) <= 5.0 * CONTAINMENT_TANK_SPACING_TILES * 32.0 + 0.5);
 }
+
+#[test]
+fn a_wedged_tank_is_let_go_of_until_it_moves_again() {
+    let tank = |id: u32, x: f32, state: AiEntityState| AiEntitySummary {
+        state,
+        ..target_test_entity(id, EntityKind::Tank, x * 32.0, 320.0)
+    };
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment.active_tanks = [1, 2].into_iter().collect();
+    // Tank 1 is ordered on but stays put (wedged); Tank 2 drives on.
+    let mut observation = regroup_test_observation(Vec::new());
+    for step in 0..=70u32 {
+        observation.tick = step * 9;
+        observation.owned = vec![
+            tank(1, 20.0, AiEntityState::Move),
+            tank(2, 20.0 + step as f32 * 0.1, AiEntityState::Move),
+        ];
+        containment::drop_stuck_push_tanks(&observation, &mut memory);
+    }
+    assert!(
+        !memory.containment.active_tanks.contains(&1),
+        "the wedged Tank is let go of"
+    );
+    assert!(memory.containment.stuck_tanks.contains_key(&1));
+    assert!(
+        memory.containment.active_tanks.contains(&2),
+        "the moving Tank stays"
+    );
+
+    // A Tank standing still on a hold order is not stuck.
+    memory.containment.active_tanks.insert(3);
+    for step in 71..=150u32 {
+        observation.tick = step * 9;
+        observation.owned = vec![
+            tank(1, 20.0, AiEntityState::Move),
+            tank(3, 30.0, AiEntityState::Idle),
+        ];
+        containment::drop_stuck_push_tanks(&observation, &mut memory);
+    }
+    assert!(memory.containment.active_tanks.contains(&3));
+
+    // Once it gets free and moves off, pushes may take it again.
+    observation.owned = vec![tank(1, 24.0, AiEntityState::Move)];
+    containment::drop_stuck_push_tanks(&observation, &mut memory);
+    assert!(!memory.containment.stuck_tanks.contains_key(&1));
+}

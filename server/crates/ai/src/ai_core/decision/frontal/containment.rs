@@ -2,6 +2,15 @@
 //! to the enemy natural and holding there, and falling back.
 
 use super::*;
+use crate::ai_core::decision::geometry::squared;
+
+/// A push Tank under a movement order that stays within this many tiles of one spot for this long
+/// is stuck (wedged on tree trunks or a building). The push waits for its rearmost Tank, so one
+/// such Tank held a push at its own exit for 20,000 ticks while it could have won.
+const PUSH_STUCK_TILES: f32 = 1.0;
+const PUSH_STUCK_TICKS: u32 = config::TICK_HZ * 20;
+/// A Tank let go as stuck joins pushes again once it has moved this far.
+const PUSH_STUCK_RELEASE_TILES: f32 = 3.0;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn issue_expansion_containment_wave(
@@ -13,6 +22,7 @@ pub(super) fn issue_expansion_containment_wave(
     tight_formation: bool,
     lead_anchor_tank_catchup: bool,
     push_uses_available_armor: bool,
+    live_jeff: bool,
     map_analysis: Option<&AiMapAnalysis>,
     memory: &mut AiDecisionMemory,
 ) -> Option<AiIntent> {
@@ -35,6 +45,10 @@ pub(super) fn issue_expansion_containment_wave(
         .containment
         .active_riflemen
         .retain(|rifleman| owned.contains(rifleman));
+    if live_jeff {
+        drop_stuck_push_tanks(observation, memory);
+    }
+    let stuck: Vec<u32> = memory.containment.stuck_tanks.keys().copied().collect();
     // A Tank seen moving or attacking was given another order since the push held it.
     let still_standing: BTreeSet<u32> = observation
         .owned
@@ -81,6 +95,7 @@ pub(super) fn issue_expansion_containment_wave(
                 .home_defensive_tank
                 .into_iter()
                 .chain(memory.later_bases.guards.iter().copied())
+                .chain(stuck.iter().copied())
                 .collect();
             let mut tanks = actions::select_ready_combat_units_excluding(
                 &observation.owned,
@@ -123,6 +138,7 @@ pub(super) fn issue_expansion_containment_wave(
                 .home_defensive_tank
                 .into_iter()
                 .chain(memory.later_bases.guards.iter().copied())
+                .chain(stuck.iter().copied())
                 .collect();
             exclusions.extend(memory.containment.active_tanks.iter().copied());
             let mut newcomers = actions::select_ready_combat_units_excluding(
@@ -756,4 +772,51 @@ pub(super) fn issue_expansion_containment_wave(
     units.sort_unstable();
     units.dedup();
     Some(AiIntent::Attack { units })
+}
+
+/// Lets go of push Tanks that have been ordered on but stayed put for `PUSH_STUCK_TICKS`, and
+/// takes back Tanks let go before once they have moved.
+pub(super) fn drop_stuck_push_tanks(observation: &AiObservation, memory: &mut AiDecisionMemory) {
+    let tick = observation.tick;
+    let ts = observation.map.tile_size as f32;
+    let units: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|unit| (unit.id, unit))
+        .collect();
+    let push = &mut memory.containment;
+    push.stuck_tanks.retain(|id, at| {
+        units.get(id).is_some_and(|unit| {
+            dist2(unit.x, unit.y, at.0 as f32, at.1 as f32) < squared(PUSH_STUCK_RELEASE_TILES * ts)
+        })
+    });
+    let active = push.active_tanks.clone();
+    push.progress_marks.retain(|id, _| active.contains(id));
+    let mut stuck = Vec::new();
+    for id in &active {
+        let Some(unit) = units.get(id) else {
+            continue;
+        };
+        let here = (unit.x.round() as i32, unit.y.round() as i32);
+        let stayed = push.progress_marks.get(id).is_some_and(|(at, _)| {
+            dist2(unit.x, unit.y, at.0 as f32, at.1 as f32) < squared(PUSH_STUCK_TILES * ts)
+        });
+        if unit.state == AiEntityState::Move && stayed {
+            let since = push
+                .progress_marks
+                .get(id)
+                .map_or(tick, |(_, since)| *since);
+            if tick.saturating_sub(since) >= PUSH_STUCK_TICKS {
+                stuck.push((*id, here));
+            }
+        } else {
+            push.progress_marks.insert(*id, (here, tick));
+        }
+    }
+    for (id, here) in stuck {
+        push.active_tanks.remove(&id);
+        push.held_tanks.remove(&id);
+        push.progress_marks.remove(&id);
+        push.stuck_tanks.insert(id, here);
+    }
 }

@@ -94,6 +94,7 @@ fn issue_test_containment(
         true,
         // Formation mechanics are tested on a fixed two-Tank push, not the sized one.
         false,
+        false,
         None,
         memory,
     );

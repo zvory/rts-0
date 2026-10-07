@@ -84,6 +84,10 @@ pub(crate) struct ContainmentPush {
     pub(super) smoke_expires_tick: Option<u32>,
     /// When the push was last ordered to clear a Tank Trap in its way.
     pub(super) trap_order_tick: Option<u32>,
+    /// The live Jeff's push Tanks: where each last stood when it made progress, and when.
+    pub(super) progress_marks: BTreeMap<u32, ((i32, i32), u32)>,
+    /// Tanks let go as stuck and where they stood; no push takes them until they move.
+    pub(super) stuck_tanks: BTreeMap<u32, (i32, i32)>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

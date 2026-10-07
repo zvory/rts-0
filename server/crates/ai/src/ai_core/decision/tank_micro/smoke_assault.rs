@@ -31,6 +31,8 @@ const SUPPORT_TILES: f32 = 16.0;
 const MIN_TANK_HP: u32 = 90;
 /// Our Tank HP must exceed the enemy group's by this factor.
 const HP_ADVANTAGE: f32 = 1.1;
+/// With more than this many times the group's Tanks and HP, no smoke is needed.
+const OVERWHELMING_RATIO: usize = 2;
 const PREPARE_TIMEOUT_TICKS: u32 = config::TICK_HZ * 8;
 const CAST_CONFIRM_TICKS: u32 = 24;
 /// The Tanks start driving before the first cast, so the cloud lands as they reach the reach edge
@@ -331,6 +333,15 @@ fn plan(
         }
         let (enemy_count, enemy_hp) = opposition(observation, micro, &group);
         if candidates.len() < enemy_count + 1 {
+            continue;
+        }
+        // A force more than twice the group's size and HP wins the plain trade: it drives in as
+        // superior. An assault would pull its Tanks out of the push for half a minute, and in
+        // the games against AI 2.1 that split cost pushes more than the parked Tanks did.
+        let candidate_hp: u32 = candidates.iter().map(|tank| tank.hp).sum();
+        if candidates.len() > OVERWHELMING_RATIO * enemy_count
+            && candidate_hp as f32 >= enemy_hp as f32 * OVERWHELMING_RATIO as f32
+        {
             continue;
         }
 
