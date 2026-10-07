@@ -97,6 +97,7 @@ pub(crate) struct AiDecisionMemory {
     pub(super) opening_rush: super::opening_rush::OpeningRush,
     /// The live Jeff's enemy Tank memory, Tank order overrides, and smoke assault.
     pub(super) tank_micro: super::tank_micro::TankMicro,
+    pub(super) trap_breach: super::trap_breach::TrapBreach,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -157,6 +158,7 @@ impl AiDecisionMemory {
             route_line: Default::default(),
             opening_rush: Default::default(),
             tank_micro: Default::default(),
+            trap_breach: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
@@ -251,6 +253,7 @@ impl AiDecisionMemory {
         self.profile_id = Some(profile.id);
         self.expansion_security = Default::default();
         self.tank_micro = Default::default();
+        self.trap_breach = Default::default();
         self.attack_first_size = Some(profile.attack.first_attack_size);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
@@ -590,6 +593,7 @@ impl AiDecisionMemory {
             .owned
             .iter()
             .filter(|entity| entity.kind == EntityKind::Tank)
+            .filter(|entity| !self.trap_breach.is_reserved(entity.id))
             .filter(|entity| {
                 self.home_defensive_tank_assigned_once
                     || !self.containment.opening_tanks.contains(&entity.id)

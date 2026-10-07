@@ -218,7 +218,9 @@ const approvedCurrentFactionFiles = new Set([
   // Jeff's Tank micro remembers enemy Kriegsia Tanks, keeps Tanks out of their reach, and smokes
   // assaults with the Scout Car; profile/catalog layers still own faction admission.
   "server/crates/ai/src/ai_core/decision/tank_micro.rs",
+  "server/crates/ai/src/ai_core/decision/tank_micro/scout_lead.rs",
   "server/crates/ai/src/ai_core/decision/tank_micro/smoke_assault.rs",
+  "server/crates/ai/src/ai_core/decision/trap_breach.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the

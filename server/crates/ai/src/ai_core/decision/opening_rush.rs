@@ -262,6 +262,41 @@ pub(super) struct RushDecision {
     pub(super) released: Vec<u32>,
 }
 
+/// A decision step's shared context: actions, observation, map analysis and intents.
+pub(super) type LiveStep<'s, 'a, 'o, 'm> = (
+    &'s mut AiActionContext<'a>,
+    &'o AiObservation,
+    Option<&'m AiMapAnalysis>,
+    &'s mut Vec<AiIntent>,
+);
+
+/// Runs the live Jeff's opening rush and records its intents.
+pub(super) fn plan_live(
+    profile_id: &str,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+    (actions, observation, map_analysis, intents): LiveStep<'_, '_, '_, '_>,
+) {
+    if !uses_opening_rush(profile_id) {
+        return;
+    }
+    let rush = plan(actions, observation, facts, memory, map_analysis);
+    if !rush.moved.is_empty() {
+        intents.push(AiIntent::Move { units: rush.moved });
+    }
+    if !rush.attacked.is_empty() {
+        intents.push(AiIntent::Attack {
+            units: rush.attacked,
+        });
+    }
+    if !rush.released.is_empty() {
+        // Clears the live adapter's cached staging so the pocket can place them again.
+        intents.push(AiIntent::Assemble {
+            units: rush.released,
+        });
+    }
+}
+
 pub(super) fn plan(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,

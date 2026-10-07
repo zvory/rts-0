@@ -11,6 +11,9 @@
 //!   with a Rifleman spotting.
 //! - `attackers`: the opponent's Tanks attack-move from mid-map into the candidate's base, the
 //!   way AI 2.1 attacks. A regression check: parked defenders should keep winning this.
+//! - `trap_wall`: a human-style defense. A Tank Trap wall stands 26 tiles in front of the
+//!   opponent's base, its Tanks park 6 tiles behind it, and a Rifleman spots in front of it. The
+//!   candidate has to take the wall down and get through.
 //!
 //! Usage: ai-tank-lab [--candidate jeffs_ai] [--baseline jeffs_ai_pre_tank_micro]
 //!        [--map "1v1 No Terrain"] [--ticks 4500] [--scenarios parked_line,siege,attackers]
@@ -40,6 +43,7 @@ enum Scenario {
     ParkedLine,
     Siege,
     Attackers,
+    TrapWall,
 }
 
 impl Scenario {
@@ -48,6 +52,7 @@ impl Scenario {
             "parked_line" => Ok(Self::ParkedLine),
             "siege" => Ok(Self::Siege),
             "attackers" => Ok(Self::Attackers),
+            "trap_wall" => Ok(Self::TrapWall),
             other => Err(format!("unknown scenario {other:?}")),
         }
     }
@@ -57,6 +62,7 @@ impl Scenario {
             Self::ParkedLine => "parked_line",
             Self::Siege => "siege",
             Self::Attackers => "attackers",
+            Self::TrapWall => "trap_wall",
         }
     }
 }
@@ -272,7 +278,16 @@ fn run_fight(fight: &Fight<'_>) -> Result<Outcome, String> {
         Scenario::ParkedLine => (at(enemy, -20.0, 0.0), Some(at(enemy, -24.0, 0.0)), None),
         Scenario::Siege => (at(home, 12.0, 0.0), Some(at(home, 7.5, 2.0)), None),
         Scenario::Attackers => (at(home, length / TILE_PX * 0.5, 0.0), None, Some(home)),
+        Scenario::TrapWall => (at(enemy, -20.0, 0.0), Some(at(enemy, -28.0, 0.0)), None),
     };
+    if fight.scenario == Scenario::TrapWall {
+        // Two tiles apart, so the wall closes for vehicles, from map edge to map edge (spots off
+        // the map fail); completed traps turn neutral.
+        for step in -60..=60 {
+            let point = at(enemy, -26.0, step as f32 * 2.0);
+            let _ = spawn(&mut game, opponent, EntityKind::TankTrap, point);
+        }
+    }
     for index in 0..fight.enemy_tanks {
         let side = (index as f32 - (fight.enemy_tanks as f32 - 1.0) / 2.0) * 2.0;
         let point = (

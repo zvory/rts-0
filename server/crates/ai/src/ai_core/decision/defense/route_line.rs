@@ -91,6 +91,35 @@ pub(in crate::ai_core::decision) struct RouteLineOrders {
     pub(in crate::ai_core::decision) released: Vec<u32>,
 }
 
+/// Runs the current Jeff's route line and records its intents.
+pub(in crate::ai_core::decision) fn plan_route_line_live(
+    profile_id: &str,
+    memory: &mut AiDecisionMemory,
+    (actions, observation, map_analysis, intents): crate::ai_core::decision::opening_rush::LiveStep<
+        '_,
+        '_,
+        '_,
+        '_,
+    >,
+) {
+    if !crate::ai_core::profiles::uses_current_jeffs_ai_policy(profile_id) {
+        return;
+    }
+    let route_line = plan_route_line(actions, observation, memory, map_analysis);
+    if !route_line.ordered.is_empty() {
+        intents.push(AiIntent::Move {
+            units: route_line.ordered,
+        });
+    }
+    if !route_line.released.is_empty() {
+        // Released sealers still carry the live adapter's cached staging; assembling clears it
+        // so their normal posts are sent again.
+        intents.push(AiIntent::Assemble {
+            units: route_line.released,
+        });
+    }
+}
+
 pub(in crate::ai_core::decision) fn plan_route_line(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,

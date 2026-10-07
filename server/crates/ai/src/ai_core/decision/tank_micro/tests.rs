@@ -179,7 +179,15 @@ fn a_lone_tank_ordered_into_a_spotted_parked_line_stops_where_it_would_be_seen()
         queued: false,
     }];
     let mut intents = Vec::new();
-    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
+    govern(
+        &obs,
+        None,
+        None,
+        &BTreeSet::new(),
+        &mut micro,
+        &mut commands,
+        &mut intents,
+    );
     let targets = move_targets(&commands, 1);
     assert_eq!(targets.len(), 1, "one order: {commands:?}");
     let (x, _) = targets[0];
@@ -209,7 +217,15 @@ fn a_larger_force_may_drive_into_a_smaller_parked_group() {
         queued: false,
     }];
     let mut intents = Vec::new();
-    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
+    govern(
+        &obs,
+        None,
+        None,
+        &BTreeSet::new(),
+        &mut micro,
+        &mut commands,
+        &mut intents,
+    );
     for tank in [1, 2, 3] {
         assert_eq!(move_targets(&commands, tank), vec![(38.0, 50.0)]);
     }
@@ -231,7 +247,15 @@ fn a_tank_hit_from_fog_backs_out_with_its_neighbour_keeping_its_front_forward() 
     observe(&obs, &mut micro);
     let mut commands = Vec::new();
     let mut intents = Vec::new();
-    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
+    govern(
+        &obs,
+        None,
+        None,
+        &BTreeSet::new(),
+        &mut micro,
+        &mut commands,
+        &mut intents,
+    );
     for (tank, y) in [(1, 50.0), (2, 53.0)] {
         let targets = move_targets(&commands, tank);
         assert_eq!(targets.len(), 1, "tank {tank} backs out: {commands:?}");
@@ -257,7 +281,15 @@ fn a_staged_tank_the_governor_cuts_short_is_staged_again_once_released() {
         queued: false,
     }];
     let mut intents = vec![AiIntent::Stage { units: vec![1] }];
-    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
+    govern(
+        &obs,
+        None,
+        None,
+        &BTreeSet::new(),
+        &mut micro,
+        &mut commands,
+        &mut intents,
+    );
     // The live controller sends a stage order once; assembling clears that, so the stage order
     // reaches the Tank again when the reach no longer cuts it.
     assert!(
@@ -296,7 +328,15 @@ fn a_group_that_clearly_outnumbers_a_visible_attacker_keeps_its_orders() {
         queued: false,
     }];
     let mut intents = Vec::new();
-    govern(&obs, None, None, &mut micro, &mut commands, &mut intents);
+    govern(
+        &obs,
+        None,
+        None,
+        &BTreeSet::new(),
+        &mut micro,
+        &mut commands,
+        &mut intents,
+    );
     assert!(
         !commands
             .iter()
@@ -342,6 +382,7 @@ fn the_push_scout_car_leads_a_march_but_keeps_the_push_smoke_cast() {
         &obs,
         None,
         Some(9),
+        &BTreeSet::new(),
         &mut micro.clone(),
         &mut commands,
         &mut intents,
@@ -359,6 +400,14 @@ fn the_push_scout_car_leads_a_march_but_keeps_the_push_smoke_cast() {
         queued: false,
     };
     let mut commands = vec![cast.clone()];
-    govern(&obs, None, Some(9), &mut micro, &mut commands, &mut intents);
+    govern(
+        &obs,
+        None,
+        Some(9),
+        &BTreeSet::new(),
+        &mut micro,
+        &mut commands,
+        &mut intents,
+    );
     assert_eq!(commands, vec![cast]);
 }

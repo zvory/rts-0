@@ -33,7 +33,7 @@ use self::pocket::{
 pub(super) use self::pocket::{
     stage_defensive_pocket_machine_gunners, stage_home_defensive_pocket_riflemen,
 };
-pub(super) use self::route_line::{plan_route_line, RouteLine};
+pub(super) use self::route_line::{plan_route_line_live, RouteLine};
 
 pub(super) fn crossroads_wall_aware_approach_direction(
     observation: &AiObservation,

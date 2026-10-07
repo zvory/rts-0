@@ -42,6 +42,7 @@ mod production;
 mod resources;
 mod tank_micro;
 mod trace;
+mod trap_breach;
 mod turtle;
 mod unit_mix;
 mod upgrades;
@@ -417,46 +418,20 @@ where
     intents.extend(later_base.intents.iter().cloned());
 
     // The live Jeff's starting Riflemen march on the enemy until a fallback sends them home.
-    if opening_rush::uses_opening_rush(profile.id) {
-        let rush = opening_rush::plan(&mut actions, observation, &facts, memory, map_analysis);
-        if !rush.moved.is_empty() {
-            intents.push(AiIntent::Move { units: rush.moved });
-        }
-        if !rush.attacked.is_empty() {
-            intents.push(AiIntent::Attack {
-                units: rush.attacked,
-            });
-        }
-        if !rush.released.is_empty() {
-            // Clears the live adapter's cached staging so the pocket can place them again.
-            intents.push(AiIntent::Assemble {
-                units: rush.released,
-            });
-        }
-    }
-
-    // Jeff's picket on the enemy's route and warned sealing of the home line. Its units are
-    // reserved from every other system for this decision.
-    if uses_current_jeffs_ai_policy(profile.id) {
-        let route_line = defense::plan_route_line(&mut actions, observation, memory, map_analysis);
-        if !route_line.ordered.is_empty() {
-            intents.push(AiIntent::Move {
-                units: route_line.ordered,
-            });
-        }
-        if !route_line.released.is_empty() {
-            // Released sealers still carry the live adapter's cached staging; assembling clears it
-            // so their normal posts are sent again.
-            intents.push(AiIntent::Assemble {
-                units: route_line.released,
-            });
-        }
-    }
-    // Units the route line or the opening rush own this decision.
+    let live = (&mut actions, observation, map_analysis, &mut intents);
+    opening_rush::plan_live(profile.id, &facts, memory, live);
+    // Jeff's picket on the enemy's route and warned sealing of the home line, and the live Jeff's
+    // breach of Schone Tage's trap V. Their units are reserved from every other system.
+    let live = (&mut actions, observation, map_analysis, &mut intents);
+    defense::plan_route_line_live(profile.id, memory, live);
+    let live = (&mut actions, observation, map_analysis, &mut intents);
+    trap_breach::plan_live(profile.id, memory, live);
+    // Units the route line, the opening rush or the trap breach own this decision.
     let route_line_reserved: BTreeSet<u32> = memory
         .route_line
         .reserved()
         .chain(memory.opening_rush.reserved())
+        .chain(memory.trap_breach.reserved())
         .collect();
 
     let economy_plan = economy_manager_output.plan.clone();
@@ -1023,6 +998,8 @@ where
         local_defenders.retain(|id| Some(*id) != memory.route_line.picket());
         local_defenders.retain(|id| !push_units.contains(id));
         local_defenders.retain(|id| !memory.opening_rush.is_reserved(*id));
+        // The trap breach's concave is the defense where it stands.
+        local_defenders.retain(|id| !memory.trap_breach.is_reserved(*id));
         local_defenders.sort_unstable();
         local_defenders.dedup();
         if new_jeff_defense {
