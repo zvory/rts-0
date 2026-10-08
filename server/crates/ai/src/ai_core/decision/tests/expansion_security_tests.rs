@@ -867,9 +867,21 @@ fn surplus_tank_moves_forward_while_reserved_tank_stays_home() {
         .push(combat_at(51, EntityKind::Tank, 10.0 * ts, 10.0 * ts));
     obs.owned
         .push(combat_at(52, EntityKind::Tank, 11.0 * ts, 10.0 * ts));
+    // A push of two Tanks and a Scout Car is out on the map.
+    for (id, kind) in [
+        (53, EntityKind::Tank),
+        (54, EntityKind::Tank),
+        (55, EntityKind::ScoutCar),
+    ] {
+        obs.owned
+            .push(combat_at(id, kind, (40 + id) as f32 * ts, 40.0 * ts));
+    }
     let target = expansion_security::tank_staging_center(&obs, None).unwrap();
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     memory.containment.wave_launched = true;
+    memory.containment.active_tanks = [53, 54].into_iter().collect();
+    memory.containment.active_scout = Some(55);
+    memory.containment.launch_tanks = 2;
     memory.home_defensive_tank = Some(51);
     memory.home_defensive_tank_assigned_once = true;
 

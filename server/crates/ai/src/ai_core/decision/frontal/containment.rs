@@ -4,6 +4,18 @@
 use super::*;
 use crate::ai_core::decision::geometry::squared;
 
+/// The live Jeff launches a push forming this long once three quarters of its Tanks are within
+/// `ASSEMBLY_GATHERED_TILES` of its centre.
+const ASSEMBLY_GATHERED_TICKS: u32 = config::TICK_HZ * 30;
+const ASSEMBLY_GATHERED_TILES: f32 = 10.0;
+/// ...and a marching push moves on from a waypoint once three quarters of its Tanks are this close
+/// to it after the waypoint timeout.
+const WAYPOINT_GATHERED_TILES: f32 = 5.0;
+/// A launched push that has not got this much closer to its objective in `WATCHDOG_TICKS`, out of
+/// contact, attack-moves straight at it for `WATCHDOG_ASSAULT_TICKS`.
+const WATCHDOG_PROGRESS_TILES: f32 = 3.0;
+const WATCHDOG_TICKS: u32 = config::TICK_HZ * 40;
+const WATCHDOG_ASSAULT_TICKS: u32 = config::TICK_HZ * 30;
 /// A push Tank under a movement order that stays within this many tiles of one spot for this long
 /// is stuck (wedged on tree trunks or a building). The push waits for its rearmost Tank, so one
 /// such Tank held a push at its own exit for 20,000 ticks while it could have won.
@@ -11,6 +23,10 @@ const PUSH_STUCK_TILES: f32 = 1.0;
 const PUSH_STUCK_TICKS: u32 = config::TICK_HZ * 20;
 /// A Tank let go as stuck joins pushes again once it has moved this far.
 const PUSH_STUCK_RELEASE_TILES: f32 = 3.0;
+/// A push Tank standing this close to where it was sent has arrived, not stuck. An attack-move
+/// that arrived still reads as moving until the next order: on Crossroads the push's own line,
+/// standing on its slots, was let go as stuck and the push ended as if half of it had died.
+const PUSH_ARRIVED_TILES: f32 = 3.0;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn issue_expansion_containment_wave(
@@ -218,11 +234,27 @@ pub(super) fn issue_expansion_containment_wave(
             assembly_shape,
         );
         let nearby_rifles = nearby_rifle_escort_count(observation, &riflemen, formation_center);
+        // The live Jeff also launches once most of its Tanks have gathered, a while after the hard
+        // timeout: one Tank held behind a building, or the Scout Car elsewhere, kept a 24-Tank push
+        // waiting at home for the rest of the game.
+        let most_gathered = live_jeff && assembly_elapsed >= ASSEMBLY_GATHERED_TICKS && {
+            let gathered = observation
+                .owned
+                .iter()
+                .filter(|unit| tanks.contains(&unit.id))
+                .filter(|unit| {
+                    dist2(unit.x, unit.y, formation_center.0, formation_center.1)
+                        <= squared(ASSEMBLY_GATHERED_TILES * tile_size)
+                })
+                .count();
+            gathered * 4 >= tanks.len() * 3
+        };
         let assembled = exact_assembly_ready
             || (assembly_timed_out
                 && core_grouped
                 && nearby_rifles >= MIN_CONTAINMENT_RIFLE_ESCORTS)
-            || (assembly_hard_timed_out && vehicle_core_grouped);
+            || (assembly_hard_timed_out && vehicle_core_grouped)
+            || most_gathered;
         let river_opening_guard = !memory.containment.wave_launched
             && expansion::has_jeff_river_expansion_site(observation)
             && river_opening_guard_active(observation, &tanks, assembly_started, memory);
@@ -340,6 +372,53 @@ pub(super) fn issue_expansion_containment_wave(
     let contact_active = memory.containment.contact_last_tick.is_some_and(|last| {
         observation.tick.saturating_sub(last) <= CONTAINMENT_CONTACT_MEMORY_TICKS
     });
+    // The live Jeff's push that has got no closer to its objective for a while, with nothing in
+    // contact, has deadlocked in its own marching: waiting at a staging point its formation never
+    // quite reaches, on a waypoint its Scout Car does not, or for a straggler. It attack-moves
+    // straight at the objective and is left to that order for a while. The two-Tank opening, which
+    // marches as one rank, is left alone: on Schone Tage it waited out the trap line behind its own
+    // exit, and sent at the enemy it drove into the traps.
+    if live_jeff && !endgame_search_active && tanks.len() >= super::approach::MIN_TANKS_FOR_LEGS {
+        if let Some(center) = group_center(observation, &tanks) {
+            let tick = observation.tick;
+            if memory
+                .containment
+                .watchdog_assault_until
+                .is_some_and(|until| tick < until)
+            {
+                return Some(AiIntent::Attack { units: tanks });
+            }
+            let distance = dist2(center.0, center.1, objective.0, objective.1).sqrt();
+            let checked = memory.containment.watchdog_checked.replace(tick);
+            let mark = memory
+                .containment
+                .watchdog
+                .get_or_insert((distance.round() as i32, tick));
+            // Time in contact pauses the clock rather than restarting it: single raiders at home
+            // kept restarting it while the push waited 4,500 ticks on Tanks wedged by a cliff.
+            if contact_active {
+                let paused = checked.map_or(0, |checked| tick.saturating_sub(checked));
+                mark.1 = mark.1.saturating_add(paused).min(tick);
+            }
+            if distance < mark.0 as f32 - WATCHDOG_PROGRESS_TILES * tile_size {
+                *mark = (distance.round() as i32, tick);
+            } else if !contact_active && tick.saturating_sub(mark.1) >= WATCHDOG_TICKS {
+                *mark = (distance.round() as i32, tick);
+                memory.containment.watchdog_assault_until = Some(tick + WATCHDOG_ASSAULT_TICKS);
+                memory.containment.march_waypoint = None;
+                memory.containment.waypoint_started_tick = None;
+                memory.containment.last_formation_command_tick = None;
+                memory.containment.stationary_since = None;
+                actions::attack_move_units(
+                    actions,
+                    tanks.iter().copied(),
+                    objective.0,
+                    objective.1,
+                );
+                return Some(AiIntent::Attack { units: tanks });
+            }
+        }
+    }
     // The current Jeff travels loosely to a staging point short of the target, reforms there, then
     // closes in tight. After a failed push it may come at the target from a side instead.
     // A small push (the two-Tank opening) marches as before: it is one rank, which never stalled,
@@ -672,8 +751,24 @@ pub(super) fn issue_expansion_containment_wave(
                     dist2(center.0, center.1, current_waypoint.0, current_waypoint.1)
                         <= (shape.arrival_tiles * tile_size).powi(2)
                 });
+            // The live Jeff moves on once most of its Tanks are at the waypoint, whatever the
+            // Scout Car does: three Tanks sat on a reached waypoint for 3,000 ticks while their Scout
+            // Car was 12 tiles off.
+            let most_tanks_there = live_jeff && waypoint_timed_out && {
+                let there = observation
+                    .owned
+                    .iter()
+                    .filter(|unit| tanks.contains(&unit.id))
+                    .filter(|unit| {
+                        dist2(unit.x, unit.y, current_waypoint.0, current_waypoint.1)
+                            <= squared(WAYPOINT_GATHERED_TILES * tile_size)
+                    })
+                    .count();
+                there * 4 >= tanks.len() * 3
+            };
             if vehicles_placed
                 || center_arrived
+                || most_tanks_there
                 || formation_units_in_position(observation, &formation, shape.arrival_tiles)
                 || (waypoint_timed_out
                     && formation_vehicle_core_is_grouped(
@@ -799,6 +894,7 @@ pub(super) fn drop_stuck_push_tanks(observation: &AiObservation, memory: &mut Ai
     });
     let active = push.active_tanks.clone();
     push.progress_marks.retain(|id, _| active.contains(id));
+    push.move_targets.retain(|id, _| active.contains(id));
     let mut stuck = Vec::new();
     for id in &active {
         let Some(unit) = units.get(id) else {
@@ -808,7 +904,10 @@ pub(super) fn drop_stuck_push_tanks(observation: &AiObservation, memory: &mut Ai
         let stayed = push.progress_marks.get(id).is_some_and(|(at, _)| {
             dist2(unit.x, unit.y, at.0 as f32, at.1 as f32) < squared(PUSH_STUCK_TILES * ts)
         });
-        if unit.state == AiEntityState::Move && stayed {
+        let arrived = push.move_targets.get(id).is_some_and(|at| {
+            dist2(unit.x, unit.y, at.0 as f32, at.1 as f32) < squared(PUSH_ARRIVED_TILES * ts)
+        });
+        if unit.state == AiEntityState::Move && stayed && !arrived {
             let since = push
                 .progress_marks
                 .get(id)

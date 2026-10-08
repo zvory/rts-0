@@ -52,6 +52,7 @@ pub(super) fn finish(
 ) {
     if uses_tank_micro(decision.profile_id) {
         let push_scout = memory.containment.active_scout;
+        memory.tank_micro.push_tanks = memory.containment.active_tanks.clone();
         let exempt: BTreeSet<u32> = memory.trap_breach.reserved().collect();
         decision.trace.notes = govern(
             observation,
@@ -62,6 +63,9 @@ pub(super) fn finish(
             &mut decision.commands,
             &mut decision.intents,
         );
+    }
+    if decision.profile_id == JEFFS_AI_ID {
+        super::frontal::note_push_move_targets(&decision.commands, memory);
     }
     let breach = std::mem::take(&mut memory.trap_breach.notes);
     decision
@@ -117,6 +121,11 @@ pub(super) struct SeenTank {
     pub(super) parked: bool,
     pub(super) still_since: u32,
     pub(super) last_seen: u32,
+    /// Where it has kept within `ANCHOR_TILES` of since `anchored_since`, whatever its state
+    /// says: one stuck on a trap line slides about but reads "move", one driving at what it attacks
+    /// reads "attack".
+    pub(super) anchor: (i32, i32),
+    pub(super) anchored_since: u32,
     /// Its last direction of travel in world pixels: a Tank's hull faces the way it last drove.
     pub(super) heading: Option<(i32, i32)>,
 }
@@ -168,6 +177,10 @@ pub(crate) struct TankMicro {
     pub(super) notes: Vec<String>,
     /// Where each Scout Car leading a march was last sent.
     scout_leads: BTreeMap<u32, (i32, i32)>,
+    /// Tanks brought up to fire on an enemy Tank in a fight.
+    joins: BTreeMap<u32, engage::Join>,
+    /// The Tanks of the containment push, which join only fights at the push.
+    push_tanks: BTreeSet<u32>,
     /// Where unseen fire proved the enemy sees, until when.
     assumed_vision: Vec<((i32, i32), u32)>,
 }
@@ -222,6 +235,12 @@ pub(super) fn observe(observation: &AiObservation, micro: &mut TankMicro) {
                 if moving || moved {
                     seen.still_since = tick;
                 }
+                if dist2(world(seen.anchor).0, world(seen.anchor).1, enemy.x, enemy.y)
+                    > squared(ANCHOR_TILES * tile_size)
+                {
+                    seen.anchor = pos;
+                    seen.anchored_since = tick;
+                }
                 if moved {
                     seen.heading = Some((pos.0 - seen.pos.0, pos.1 - seen.pos.1));
                 }
@@ -244,6 +263,8 @@ pub(super) fn observe(observation: &AiObservation, micro: &mut TankMicro) {
                             tick
                         },
                         last_seen: tick,
+                        anchor: pos,
+                        anchored_since: tick,
                         heading: None,
                     },
                 );
@@ -659,6 +680,8 @@ const SUPERIOR_HP_RATIO: f32 = 1.1;
 const OUTNUMBERED_RATIO: f32 = 1.2;
 /// ...and its nearest shooter is at least this far, so a short reverse leaves the reach.
 const ESCAPE_FROM_TILES: f32 = 11.0;
+/// An enemy Tank keeping within this of one spot has stopped, though it may slide about.
+const ANCHOR_TILES: f32 = 2.5;
 /// Tanks this close to a hit Tank share its reaction, so a group never splits under fire.
 const GROUP_TILES: f32 = 6.0;
 
@@ -1124,6 +1147,18 @@ pub(super) fn govern(
     });
     let mut skip = exempt.clone();
     skip.extend(push_casting);
+    // Every Tank at hand that cannot shoot yet comes up to fire on an enemy Tank in a fight.
+    let joined = engage::concentrate(
+        observation,
+        map_analysis,
+        micro,
+        &tanks,
+        &claimed,
+        commands,
+        &mut extra,
+    );
+    claimed.extend(joined.iter().copied());
+    pinned.retain(|id| !joined.contains(id));
     let led = lead_scouts(
         observation,
         micro,

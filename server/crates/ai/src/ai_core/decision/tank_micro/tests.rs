@@ -516,3 +516,77 @@ fn a_cannon_ordered_onto_infantry_or_a_fresh_tank_goes_on_the_tank_that_dies_soo
     engage::aim(&obs, &mut micro, &tanks, &BTreeSet::new(), &mut commands);
     assert_eq!(commands, vec![attack(102)]);
 }
+
+/// Our Tank 1 parked 12 tiles from enemy Tank 101, which stands and shoots at it, plus `others`.
+/// Both sides are seen standing for four seconds, so Tank 1 is charged and Tank 101 counts as
+/// standing.
+fn one_on_one_fight(micro: &mut TankMicro, others: &[(u32, (f32, f32))]) -> AiObservation {
+    let mut owned = vec![summary(1, 1, EntityKind::Tank, (40.0, 50.0), 292)];
+    owned.extend(
+        others
+            .iter()
+            .map(|(id, at)| summary(*id, 1, EntityKind::Tank, *at, 292)),
+    );
+    let enemy = vec![AiEntitySummary {
+        target_id: Some(1),
+        state: AiEntityState::Attack,
+        ..summary(101, 2, EntityKind::Tank, (52.0, 50.0), 292)
+    }];
+    observe(&observation(300, owned.clone(), enemy.clone()), micro);
+    let obs = observation(420, owned, enemy);
+    observe(&obs, micro);
+    obs
+}
+
+fn concentrate_on(obs: &AiObservation, micro: &mut TankMicro) -> (BTreeSet<u32>, Vec<Command>) {
+    let tanks: BTreeMap<u32, &AiEntitySummary> = obs
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Tank)
+        .map(|unit| (unit.id, unit))
+        .collect();
+    let mut extra = Vec::new();
+    let joined = engage::concentrate(obs, None, micro, &tanks, &BTreeSet::new(), &[], &mut extra);
+    (joined, extra)
+}
+
+#[test]
+fn a_second_tank_comes_up_to_make_a_duel_two_on_one() {
+    let mut micro = TankMicro::default();
+    // Tank 2 is 21 tiles off, out of reach.
+    let obs = one_on_one_fight(&mut micro, &[(2, (35.0, 62.0))]);
+    let (joined, extra) = concentrate_on(&obs, &mut micro);
+    assert!(joined.contains(&2), "{:?}", micro.notes);
+    assert!(!joined.contains(&1), "the Tank already firing keeps on");
+    let posts = move_targets(&extra, 2);
+    assert_eq!(posts.len(), 1, "{extra:?}");
+    let (x, y) = posts[0];
+    let range = ((x - 52.0).powi(2) + (y - 50.0).powi(2)).sqrt();
+    assert!(range <= 13.9, "fires from within reach: {range} tiles");
+    assert!(x < 52.0 && y > 50.0, "on its own side: ({x}, {y})");
+}
+
+#[test]
+fn a_fight_already_won_two_to_one_draws_no_more_tanks() {
+    let mut micro = TankMicro::default();
+    // Tank 3 already reaches Tank 101 too.
+    let obs = one_on_one_fight(&mut micro, &[(2, (35.0, 62.0)), (3, (41.0, 46.0))]);
+    let (joined, extra) = concentrate_on(&obs, &mut micro);
+    assert!(joined.is_empty(), "{:?}", micro.notes);
+    assert!(extra.is_empty());
+}
+
+#[test]
+fn a_push_tank_is_not_drawn_to_a_fight_away_from_the_push() {
+    // Tank 2 is the nearest Tank of a push whose others are 45 tiles from the fight.
+    let mut micro = TankMicro {
+        push_tanks: [2, 4, 5].into_iter().collect(),
+        ..TankMicro::default()
+    };
+    let obs = one_on_one_fight(
+        &mut micro,
+        &[(2, (35.0, 62.0)), (4, (10.0, 90.0)), (5, (12.0, 92.0))],
+    );
+    let (joined, _) = concentrate_on(&obs, &mut micro);
+    assert!(!joined.contains(&2), "{:?}", micro.notes);
+}

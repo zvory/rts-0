@@ -88,6 +88,14 @@ pub(crate) struct ContainmentPush {
     pub(super) progress_marks: BTreeMap<u32, ((i32, i32), u32)>,
     /// Tanks let go as stuck and where they stood; no push takes them until they move.
     pub(super) stuck_tanks: BTreeMap<u32, (i32, i32)>,
+    /// The live Jeff's push Tanks: where the last movement order sent each, in world units.
+    pub(super) move_targets: BTreeMap<u32, (i32, i32)>,
+    /// The live Jeff's launched push: its nearest approach to its objective so far, and when.
+    pub(super) watchdog: Option<(i32, u32)>,
+    /// When the watchdog last looked: time in contact since then does not count as stalled.
+    pub(super) watchdog_checked: Option<u32>,
+    /// Until when a push the watchdog sent straight at its objective is left to its attack-move.
+    pub(super) watchdog_assault_until: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -584,11 +592,21 @@ impl AiDecisionMemory {
             self.home_defensive_tank = None;
             return;
         }
+        // The live Jeff never takes a Tank of the launched push for home: home defense would hold it
+        // at the home post while the push waited for it to catch up, for the rest of the game.
+        let push_tanks: BTreeSet<u32> = if profile.id == crate::ai_core::profiles::JEFFS_AI_ID
+            && !self.containment.recovery_active
+        {
+            self.containment.active_tanks.clone()
+        } else {
+            BTreeSet::new()
+        };
         if self.home_defensive_tank.is_some_and(|id| {
-            observation
-                .owned
-                .iter()
-                .any(|entity| entity.id == id && entity.kind == EntityKind::Tank)
+            !push_tanks.contains(&id)
+                && observation
+                    .owned
+                    .iter()
+                    .any(|entity| entity.id == id && entity.kind == EntityKind::Tank)
         }) {
             return;
         }
@@ -598,6 +616,7 @@ impl AiDecisionMemory {
             .iter()
             .filter(|entity| entity.kind == EntityKind::Tank)
             .filter(|entity| !self.trap_breach.is_reserved(entity.id))
+            .filter(|entity| !push_tanks.contains(&entity.id))
             .filter(|entity| {
                 self.home_defensive_tank_assigned_once
                     || !self.containment.opening_tanks.contains(&entity.id)

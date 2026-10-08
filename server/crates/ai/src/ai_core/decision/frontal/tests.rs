@@ -1109,6 +1109,82 @@ fn a_large_push_carries_on_until_half_of_it_is_lost() {
     assert!(!pushed(4), "more than half lost");
 }
 
+fn launched_push_observation(
+    tanks: impl IntoIterator<Item = u32>,
+    scouts: &[u32],
+) -> AiObservation {
+    let owned = tanks
+        .into_iter()
+        .map(|id| (id, EntityKind::Tank))
+        .chain(scouts.iter().map(|id| (*id, EntityKind::ScoutCar)))
+        .map(|(id, kind)| AiEntitySummary {
+            owner: 1,
+            ..target_test_entity(id, kind, (10.0 + id as f32) * 32.0, 20.0 * 32.0)
+        })
+        .collect();
+    regroup_test_observation(owned)
+}
+
+fn launched_push(launch: u32, scout: u32) -> AiDecisionMemory {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment.wave_launched = true;
+    memory.containment.active_tanks = (1..=launch).collect();
+    memory.containment.active_scout = Some(scout);
+    memory.containment.launch_tanks = launch as usize;
+    memory
+}
+
+#[test]
+fn a_push_carries_on_through_tanks_let_go_as_stuck_and_a_lost_scout_car() {
+    // Four of ten Tanks are wedged and let go, two died: half of the push is still there.
+    let mut memory = launched_push(10, 99);
+    memory.containment.active_tanks = (1..=4).collect();
+    memory.containment.stuck_tanks = [(5, (0, 0)), (6, (0, 0)), (7, (0, 0)), (8, (0, 0))]
+        .into_iter()
+        .collect();
+    sync_containment_recovery(
+        &launched_push_observation(1..=8, &[99]),
+        &JEFFS_AI,
+        &mut memory,
+    );
+    assert!(!memory.containment.recovery_active);
+
+    // Its Scout Car fell and another is at hand: the push takes it.
+    let mut memory = launched_push(10, 99);
+    sync_containment_recovery(
+        &launched_push_observation(1..=10, &[98]),
+        &JEFFS_AI,
+        &mut memory,
+    );
+    assert!(!memory.containment.recovery_active);
+    assert_eq!(memory.containment.active_scout, Some(98));
+}
+
+#[test]
+fn a_launched_push_left_with_no_tanks_falls_back_to_form_again() {
+    let mut memory = launched_push(6, 99);
+    memory.containment.active_tanks.clear();
+    sync_containment_recovery(
+        &launched_push_observation(20..=30, &[99]),
+        &JEFFS_AI,
+        &mut memory,
+    );
+    assert!(memory.containment.recovery_active);
+}
+
+#[test]
+fn the_home_tank_is_never_a_tank_of_the_launched_push() {
+    let mut memory = launched_push(4, 99);
+    memory.home_defensive_tank = Some(2);
+    let observation = launched_push_observation(1..=6, &[99]);
+    memory.sync_home_defensive_tank(&observation, &JEFFS_AI);
+    let home = memory.home_defensive_tank.expect("a Tank stays home");
+    assert!(
+        !memory.containment.active_tanks.contains(&home),
+        "home Tank {home}"
+    );
+}
+
 #[test]
 fn a_large_push_forms_ranks_of_six() {
     let tanks: Vec<AiEntitySummary> = (1..=12)
@@ -1191,6 +1267,50 @@ fn a_wedged_tank_is_let_go_of_until_it_moves_again() {
     observation.owned = vec![tank(1, 24.0, AiEntityState::Move)];
     containment::drop_stuck_push_tanks(&observation, &mut memory);
     assert!(!memory.containment.stuck_tanks.contains_key(&1));
+}
+
+#[test]
+fn a_tank_standing_where_it_was_sent_is_not_stuck() {
+    let tank = |id: u32, x: f32| AiEntitySummary {
+        state: AiEntityState::Move,
+        ..target_test_entity(id, EntityKind::Tank, x * 32.0, 320.0)
+    };
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment.active_tanks = [1, 2].into_iter().collect();
+    // Both stand still under an attack-move, which reads as moving until the next order: Tank 1
+    // stands on the slot it was sent to, Tank 2 is wedged far short of its own.
+    note_push_move_targets(
+        &[
+            Command::AttackMove {
+                units: vec![1],
+                x: 21.0 * 32.0,
+                y: 320.0,
+                queued: false,
+            },
+            Command::AttackMove {
+                units: vec![2],
+                x: 40.0 * 32.0,
+                y: 320.0,
+                queued: false,
+            },
+        ],
+        &mut memory,
+    );
+    let mut observation = regroup_test_observation(Vec::new());
+    for step in 0..=70u32 {
+        observation.tick = step * 9;
+        observation.owned = vec![tank(1, 20.0), tank(2, 25.0)];
+        containment::drop_stuck_push_tanks(&observation, &mut memory);
+    }
+    assert!(
+        memory.containment.active_tanks.contains(&1),
+        "arrived, not stuck"
+    );
+    assert!(
+        !memory.containment.active_tanks.contains(&2),
+        "wedged short of its slot"
+    );
+    assert!(memory.containment.stuck_tanks.contains_key(&2));
 }
 
 #[test]
