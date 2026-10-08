@@ -1192,3 +1192,36 @@ fn a_wedged_tank_is_let_go_of_until_it_moves_again() {
     containment::drop_stuck_push_tanks(&observation, &mut memory);
     assert!(!memory.containment.stuck_tanks.contains_key(&1));
 }
+
+#[test]
+fn a_natural_mined_out_or_beside_our_own_depot_is_no_push_objective() {
+    let enemy_base = EnemyBaseFact {
+        player_id: 2,
+        start_tile: (116, 116),
+        x: 116.5 * 32.0,
+        y: 116.5 * 32.0,
+    };
+    let tile = |x: f32, y: f32| (x * 32.0, y * 32.0);
+    let mut depot = target_test_entity(1, EntityKind::ResourceDepot, 90.0 * 32.0, 41.0 * 32.0);
+    depot.owner = 1;
+    let observation = regroup_test_observation(vec![depot]);
+    // The enemy's natural, 26 tiles out, is the objective.
+    assert!(!containment::natural_is_gone(
+        &observation,
+        tile(110.0, 91.0),
+        enemy_base
+    ));
+    // Steel left only beside our own expansion is not.
+    assert!(containment::natural_is_gone(
+        &observation,
+        tile(94.0, 44.0),
+        enemy_base
+    ));
+    // Nor is steel far from the enemy main.
+    let none = regroup_test_observation(Vec::new());
+    assert!(containment::natural_is_gone(
+        &none,
+        tile(54.0, 110.0),
+        enemy_base
+    ));
+}

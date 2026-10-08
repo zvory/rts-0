@@ -293,6 +293,13 @@ pub(super) fn issue_expansion_containment_wave(
         return Some(AiIntent::Assemble { units });
     }
 
+    // A natural mined out is no objective: the nearest steel left can be far off, or the current
+    // Jeff's own expansion. One push held beside Jeff's own depot with 40 Tanks for 13,000 ticks
+    // while the enemy main stood. It goes for the main instead.
+    if live_jeff && natural_is_gone(observation, natural_objective, enemy_base) {
+        memory.enemy_natural_destroyed = true;
+        memory.containment.stationary_since = None;
+    }
     update_enemy_natural_state(observation, natural_objective, enemy_base, &scouts, memory);
     if memory.enemy_natural_destroyed {
         update_enemy_main_state(observation, enemy_base, &tanks, &scouts, memory);
@@ -819,4 +826,25 @@ pub(super) fn drop_stuck_push_tanks(observation: &AiObservation, memory: &mut Ai
         push.progress_marks.remove(&id);
         push.stuck_tanks.insert(id, here);
     }
+}
+
+/// A natural this far from the enemy main is not its natural: its own ran dry.
+const NATURAL_MAX_TILES: f32 = 45.0;
+/// Steel this close to one of our depots is ours.
+const OWN_DEPOT_TILES: f32 = 10.0;
+
+/// Whether the steel the push would contain is no enemy natural any more: too far from the enemy
+/// main, or beside one of our own depots.
+pub(super) fn natural_is_gone(
+    observation: &AiObservation,
+    natural: (f32, f32),
+    enemy_base: EnemyBaseFact,
+) -> bool {
+    let tile_size = observation.map.tile_size as f32;
+    dist2(natural.0, natural.1, enemy_base.x, enemy_base.y) > squared(NATURAL_MAX_TILES * tile_size)
+        || observation.owned.iter().any(|unit| {
+            unit.kind == EntityKind::ResourceDepot
+                && dist2(unit.x, unit.y, natural.0, natural.1)
+                    <= squared(OWN_DEPOT_TILES * tile_size)
+        })
 }

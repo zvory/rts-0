@@ -23,6 +23,7 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, squared};
 use super::*;
 
+mod engage;
 mod scout_lead;
 mod smoke_assault;
 #[cfg(test)]
@@ -116,6 +117,8 @@ pub(super) struct SeenTank {
     pub(super) parked: bool,
     pub(super) still_since: u32,
     pub(super) last_seen: u32,
+    /// Its last direction of travel in world pixels: a Tank's hull faces the way it last drove.
+    pub(super) heading: Option<(i32, i32)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -219,6 +222,9 @@ pub(super) fn observe(observation: &AiObservation, micro: &mut TankMicro) {
                 if moving || moved {
                     seen.still_since = tick;
                 }
+                if moved {
+                    seen.heading = Some((pos.0 - seen.pos.0, pos.1 - seen.pos.1));
+                }
                 seen.parked = !moving;
                 seen.pos = pos;
                 seen.hp = enemy.hp;
@@ -238,6 +244,7 @@ pub(super) fn observe(observation: &AiObservation, micro: &mut TankMicro) {
                             tick
                         },
                         last_seen: tick,
+                        heading: None,
                     },
                 );
             }
@@ -1148,6 +1155,9 @@ pub(super) fn govern(
             units.retain(|id| !steered.contains(id));
         }
     }
+
+    // Cannons ordered onto a target go on the enemy Tank in reach that dies soonest.
+    engage::aim(observation, micro, &tanks, &claimed, commands);
 
     // Cut the rest at the edge of the reach the enemy sees. Reactions may have added vision.
     let vision = enemy_vision(observation, micro);

@@ -483,3 +483,36 @@ fn a_force_more_than_twice_a_parked_groups_size_drives_in_without_smoke() {
         "5 against 2: an assault would only split the push"
     );
 }
+
+#[test]
+fn a_cannon_ordered_onto_infantry_or_a_fresh_tank_goes_on_the_tank_that_dies_soonest() {
+    let mut micro = TankMicro::default();
+    let owned = vec![summary(1, 1, EntityKind::Tank, (10.0, 50.0), 292)];
+    let enemy = vec![
+        summary(101, 2, EntityKind::Tank, (18.0, 50.0), 292),
+        summary(102, 2, EntityKind::Tank, (19.0, 52.0), 100),
+        summary(103, 2, EntityKind::Rifleman, (15.0, 50.0), 45),
+        summary(104, 2, EntityKind::Tank, (30.0, 50.0), 40),
+    ];
+    // Standing three seconds: the cannon reaches 14 tiles.
+    observe(&observation(100, owned.clone(), enemy.clone()), &mut micro);
+    let obs = observation(200, owned, enemy);
+    observe(&obs, &mut micro);
+    let tanks: BTreeMap<u32, &AiEntitySummary> =
+        obs.owned.iter().map(|unit| (unit.id, unit)).collect();
+    let attack = |target: u32| Command::Attack {
+        units: vec![1],
+        target,
+        queued: false,
+    };
+    // 102 dies in two shots, 101 in five.
+    for ordered in [103, 101] {
+        let mut commands = vec![attack(ordered)];
+        engage::aim(&obs, &mut micro, &tanks, &BTreeSet::new(), &mut commands);
+        assert_eq!(commands, vec![attack(102)], "ordered onto {ordered}");
+    }
+    // 104 dies in one shot but is out of reach.
+    let mut commands = vec![attack(102)];
+    engage::aim(&obs, &mut micro, &tanks, &BTreeSet::new(), &mut commands);
+    assert_eq!(commands, vec![attack(102)]);
+}
