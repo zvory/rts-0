@@ -312,8 +312,13 @@ where
     } else {
         Vec::new()
     };
-    let expansion_secured =
-        expansion_security::update_and_stage(observation, map_analysis, memory, &mut actions);
+    let expansion_secured = expansion_security::update_and_stage(
+        observation,
+        map_analysis,
+        memory,
+        &mut actions,
+        profile.id == JEFFS_AI_ID,
+    );
     let reserve_expansion =
         expansion_security::reserve_expansion(observation, &facts, profile, memory);
     let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
@@ -772,6 +777,13 @@ where
         &mut intents,
         profile,
     );
+    // The live Jeff answers enemy infantry near its bases early with Riflemen before tech.
+    let rifle_answer = defense::rifle_answer(
+        profile.id,
+        observation,
+        memory,
+        &mut effective_unit_priorities,
+    );
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let production_max_counts = production_max_counts(profile, observation, map_analysis);
@@ -780,6 +792,7 @@ where
             .opening_rush
             .unmet_emergency_target(&production_unit_counts)
     });
+    let emergency_rifle_target = emergency_rifle_target.max(rifle_answer);
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
@@ -924,6 +937,8 @@ where
     // New-base guards stay out of the push until the base is covered.
     frontal_exclusions.extend(memory.later_bases.guards.iter().copied());
     frontal_exclusions.extend(route_line_reserved.iter().copied());
+    // Raid responders, sentries and units stepping out of reach are home defense's.
+    frontal_exclusions.extend(memory.raid_defense.reserved());
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
@@ -1011,6 +1026,7 @@ where
                 &local_defenders,
                 map_analysis,
                 uses_current_jeffs_ai_policy(profile.id),
+                profile.id == JEFFS_AI_ID,
             ) {
                 local_defense_assigned.extend(units.iter().copied());
                 intents.push(AiIntent::Attack { units });
@@ -1029,6 +1045,13 @@ where
                         intents.push(AiIntent::Move { units });
                     }
                 }
+            }
+            if profile.id == JEFFS_AI_ID {
+                let held: BTreeSet<u32> = push_units.union(&route_line_reserved).copied().collect();
+                let enemy_base = facts.nearest_public_enemy_base.map(|base| (base.x, base.y));
+                let live = (&mut actions, observation, map_analysis, &mut intents);
+                let assigned = &mut local_defense_assigned;
+                defense::plan_home_infantry(live, memory, enemy_base, &held, assigned);
             }
         } else if jeff_layered_home_defense {
             let local_targets: Vec<u32> = defense::local_defense_targets(observation)

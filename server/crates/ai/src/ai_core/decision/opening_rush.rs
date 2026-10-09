@@ -71,7 +71,7 @@ const ENGAGE_RADIUS_TILES: f32 = 14.0;
 /// No player can have Entrenchment sooner: Barracks, then a Training Centre (560 ticks), then 600
 /// ticks of research, paid from the starting income. Jeff, which takes that path as fast as it
 /// can, finishes at 1,930-2,040 in arena games.
-const EARLIEST_ENTRENCHMENT_TICK: u32 = 1_900;
+pub(super) const EARLIEST_ENTRENCHMENT_TICK: u32 = 1_900;
 /// Moving faster than this multiple of a unit's unboosted speed, off roads, means
 /// Methamphetamines (a 1.25x boost).
 const METH_SPEED_MARGIN: f32 = 1.15;
@@ -989,7 +989,7 @@ fn trade(
     Some(estimate_trade(&ours, &theirs, head_start))
 }
 
-fn fighter(unit: &AiEntitySummary, meth: bool, entrenched: bool) -> Option<Fighter> {
+pub(super) fn fighter(unit: &AiEntitySummary, meth: bool, entrenched: bool) -> Option<Fighter> {
     let weapon = rts_rules::combat::default_weapon_profile(unit.kind)?;
     let cooldown = if meth && matches!(unit.kind, EntityKind::Rifleman) {
         rts_rules::balance::METHAMPHETAMINES_RIFLEMAN_ATTACK_COOLDOWN_TICKS

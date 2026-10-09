@@ -950,7 +950,15 @@ fn stationary_defense_commands(
 ) -> Vec<Command> {
     let facts = AiFacts::from_observation(observation);
     let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-    respond_to_local_incident(&mut actions, observation, memory, defenders, None, true);
+    respond_to_local_incident(
+        &mut actions,
+        observation,
+        memory,
+        defenders,
+        None,
+        true,
+        false,
+    );
     actions.into_commands()
 }
 

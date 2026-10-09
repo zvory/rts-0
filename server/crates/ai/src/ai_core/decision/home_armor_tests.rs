@@ -248,6 +248,7 @@ fn home_tanks_answer_a_siege_they_can_match_and_hold_against_one_they_cannot() {
         &defenders,
         None,
         true,
+        true,
     )
     .unwrap();
     assert!(answered.contains(&20) && answered.contains(&21));
@@ -274,6 +275,7 @@ fn home_tanks_answer_a_siege_they_can_match_and_hold_against_one_they_cannot() {
             &mut memory,
             &defenders,
             None,
+            true,
             true,
         )
         .is_none());

@@ -204,6 +204,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/defense/incident.rs",
   // Jeff's route picket and warned sealing is a further focused defense module.
   "server/crates/ai/src/ai_core/decision/defense/route_line.rs",
+  // Jeff's raid response, sentries and outranged-infantry rule weigh current-roster Riflemen,
+  // Machine Gunners and Tanks; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/defense/raid.rs",
   "server/crates/ai/src/ai_core/decision/expansion.rs",
   // Jeff's Kriegsia-only home Tank post, later bases, Tank Trap clearing and Crossroads placement
   // policies are focused modules beneath the approved decision controller; profile/catalog layers

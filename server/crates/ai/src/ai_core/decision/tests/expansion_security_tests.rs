@@ -1,5 +1,5 @@
 use super::*;
-use crate::ai_core::profiles::JEFFS_AI;
+use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_TANK_MICRO};
 
 fn security_observation() -> AiObservation {
     let ts = config::TILE_SIZE as f32;
@@ -300,7 +300,7 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        expansion_security::update_and_stage(obs, None, memory, &mut actions)
+        expansion_security::update_and_stage(obs, None, memory, &mut actions, false)
     };
     assert!(!step(&obs, &mut memory));
     for (index, id) in memory.expansion_security.riflemen.iter().enumerate() {
@@ -361,7 +361,7 @@ fn guards_stuck_just_short_of_their_posts_secure_the_site_after_a_longer_dwell()
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        expansion_security::update_and_stage(obs, None, memory, &mut actions)
+        expansion_security::update_and_stage(obs, None, memory, &mut actions, false)
     };
     // Each guard stands a tile short of its post, as one pressed against steel patches does.
     let site = memory.expansion_security.site.unwrap();
@@ -405,14 +405,22 @@ fn guards_stuck_just_short_of_their_posts_secure_the_site_after_a_longer_dwell()
     assert!(!step(&obs, &mut memory));
 }
 
+/// The guards on a contested natural are left to local defense: the frozen Jeff sends them at the
+/// raider, and the live Jeff's raid response takes them in.
 #[test]
 fn contested_expansion_guards_are_available_to_local_defense() {
+    for profile in [&JEFFS_AI_PRE_TANK_MICRO, &JEFFS_AI] {
+        contested_expansion_guards_answer_the_raid(profile);
+    }
+}
+
+fn contested_expansion_guards_answer_the_raid(profile: &'static AiProfile) {
     let mut obs = security_observation();
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    let mut memory = AiDecisionMemory::for_profile(profile);
     expansion_security::prepare(
         &obs,
         &AiFacts::from_observation(&obs),
-        &JEFFS_AI,
+        profile,
         &mut memory,
         None,
         &mut |_, _, _| true,
@@ -436,7 +444,20 @@ fn contested_expansion_guards_are_available_to_local_defense() {
     enemy.owner = 2;
     obs.visible_enemies.push(enemy);
 
-    let decision = decide(&obs, &JEFFS_AI, &mut memory);
+    let decision = decide(&obs, profile, &mut memory);
+    if profile.id == JEFFS_AI_ID {
+        let answering: BTreeSet<u32> = memory.raid_defense.reserved().collect();
+        assert!(
+            memory
+                .expansion_security
+                .riflemen
+                .iter()
+                .all(|id| answering.contains(id)),
+            "{:?}",
+            decision.commands
+        );
+        return;
+    }
     assert!(decision.commands.iter().any(|command| matches!(
         command,
         Command::Attack { units, target, .. }

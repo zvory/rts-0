@@ -23,6 +23,8 @@ const MAX_NATURAL_SITE_FAILURES: u8 = 2;
 const NATURAL_RETRY_COOLDOWN_TICKS: u32 = config::TICK_HZ * 20;
 /// The builder only leaves while no enemy is this close to it, the site or the base's way in.
 const NATURAL_ROUTE_QUIET_TILES: f32 = 12.0;
+/// The live Jeff's guards leave their posts to an enemy Tank this close to the natural site.
+const GUARD_TANK_CLEAR_TILES: f32 = 16.0;
 /// Enemies this close to the natural site hold it: it cannot be secured.
 const CONTEST_TILES: f32 = 11.0;
 /// Enemy Tanks or anti-tank units this close to the site make clearing it a Tank fight, which the
@@ -309,8 +311,15 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         return;
     }
     // Predict and reserve the footprint from the opening, but do not pull the security party
-    // off the opening army until the expansion is actually the next strategic milestone.
-    if !expansion_is_next(observation, facts, profile) {
+    // off the opening army until the expansion is actually the next strategic milestone. The live
+    // Jeff keeps the party at the natural once its Depot stands, replacing guards it loses: the
+    // natural's raids came while the army stood 17-36 tiles away.
+    let natural_standing = profile.id == JEFFS_AI_ID
+        && memory
+            .expansion_security
+            .site
+            .is_some_and(|site| natural_depot_standing(observation, site));
+    if !expansion_is_next(observation, facts, profile) && !natural_standing {
         return;
     }
     let mut rifles: Vec<_> = observation
@@ -333,6 +342,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     // The route picket and raid sealers are held by the home line.
     candidates.retain(|id| !memory.route_line.reserved().any(|reserved| reserved == *id));
     candidates.retain(|id| !memory.opening_rush.is_reserved(*id));
+    candidates.retain(|id| !memory.raid_defense.is_sentry(*id));
     if let Some(center) = building_center(
         memory.expansion_security.site.unwrap(),
         EntityKind::ResourceDepot,
@@ -386,6 +396,20 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         .containment
         .active_riflemen
         .retain(|id| !memory.expansion_security.riflemen.contains(id));
+}
+
+/// Whether one of Jeff's Resource Depots stands on the natural site.
+fn natural_depot_standing(observation: &AiObservation, site: (u32, u32)) -> bool {
+    let Some(center) = building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+    else {
+        return false;
+    };
+    let ts = observation.map.tile_size as f32;
+    observation.owned.iter().any(|entity| {
+        entity.kind == EntityKind::ResourceDepot
+            && entity.hp > 0
+            && dist2(entity.x, entity.y, center.0, center.1) <= squared(2.0 * ts)
+    })
 }
 
 /// Move friendly combat units out of the predicted Depot footprint before they can settle there.
@@ -659,11 +683,13 @@ pub(super) fn surplus_tank_for_forward_base(
         .map(|unit| unit.id)
 }
 
+/// `live_jeff` keeps the guards off their posts while a parked enemy Tank covers them.
 pub(super) fn update_and_stage(
     observation: &AiObservation,
     analysis: Option<&AiMapAnalysis>,
     memory: &mut AiDecisionMemory,
     actions: &mut AiActionContext<'_>,
+    live_jeff: bool,
 ) -> bool {
     let security = &mut memory.expansion_security;
     let Some(site) = security.site else {
@@ -757,8 +783,17 @@ pub(super) fn update_and_stage(
     arrived = arrived && separated;
     near = near && separated;
     // On contact, leave the guards unclaimed so local incident handling can use them. Once the
-    // area clears, their normal staging orders bring them back to their assigned posts.
-    if !contested {
+    // area clears, their normal staging orders bring them back to their assigned posts. The live
+    // Jeff's guards also leave their posts to a Tank standing in reach of them: Riflemen cannot
+    // hurt it and it outranges them by nine tiles, so unclaimed they step out of its reach.
+    let shelled = live_jeff
+        && observation.visible_enemies.iter().any(|enemy| {
+            enemy.kind == EntityKind::Tank
+                && enemy.hp > 0
+                && dist2(enemy.x, enemy.y, center.0, center.1)
+                    < squared(GUARD_TANK_CLEAR_TILES * ts)
+        });
+    if !contested && !shelled {
         for (id, point, close, footprint_clear, state) in assignments {
             if arrived || (close && footprint_clear) {
                 actions::hold_position_units(actions, [id]);

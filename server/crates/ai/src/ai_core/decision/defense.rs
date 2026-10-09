@@ -8,8 +8,10 @@ mod envelope;
 mod incident;
 mod line;
 mod pocket;
+mod raid;
 mod route_line;
 mod spacing;
+pub(super) use raid::{plan_home_infantry, rifle_answer, RaidDefense};
 pub(super) use spacing::{separated_rifle_position, separated_rifle_position_where};
 
 use self::envelope::{

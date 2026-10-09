@@ -110,6 +110,8 @@ pub(crate) struct AiDecisionMemory {
     /// The live Jeff's enemy Tank memory, Tank order overrides, and smoke assault.
     pub(super) tank_micro: super::tank_micro::TankMicro,
     pub(super) trap_breach: super::trap_breach::TrapBreach,
+    /// The live Jeff's raid response, sentries, outranged units and enemy infantry sightings.
+    pub(super) raid_defense: super::defense::RaidDefense,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -171,6 +173,7 @@ impl AiDecisionMemory {
             opening_rush: Default::default(),
             tank_micro: Default::default(),
             trap_breach: Default::default(),
+            raid_defense: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
