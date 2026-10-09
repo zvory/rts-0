@@ -53,6 +53,9 @@ pub(super) fn finish(
     if uses_tank_micro(decision.profile_id) {
         let push_scout = memory.containment.active_scout;
         memory.tank_micro.push_tanks = memory.containment.active_tanks.clone();
+        memory.tank_micro.natural_clear =
+            super::expansion_security::natural_clearers(observation, memory)
+                .map(|(tanks, point)| (tanks, stored(point)));
         let exempt: BTreeSet<u32> = memory.trap_breach.reserved().collect();
         decision.trace.notes = govern(
             observation,
@@ -181,6 +184,9 @@ pub(crate) struct TankMicro {
     joins: BTreeMap<u32, engage::Join>,
     /// The Tanks of the containment push, which join only fights at the push.
     push_tanks: BTreeSet<u32>,
+    /// Tanks sent to clear enemy infantry off the natural, and where; and where each was sent.
+    natural_clear: Option<(Vec<u32>, (i32, i32))>,
+    natural_clear_sent: BTreeMap<u32, (i32, i32)>,
     /// Where unseen fire proved the enemy sees, until when.
     assumed_vision: Vec<((i32, i32), u32)>,
 }
@@ -192,6 +198,48 @@ pub(super) struct Zone {
     pub(super) radius: f32,
     pub(super) tank: Option<u32>,
 }
+
+/// Tanks sent to clear enemy infantry off the natural attack-move onto them. The order goes out once
+/// per spot, and again to a Tank found standing idle short of it.
+fn clear_natural(
+    micro: &mut TankMicro,
+    tanks: &BTreeMap<u32, &AiEntitySummary>,
+    claimed: &BTreeSet<u32>,
+    extra: &mut Vec<Command>,
+    tile_size: f32,
+) -> BTreeSet<u32> {
+    let mut clearing = BTreeSet::new();
+    let Some((ids, point)) = micro.natural_clear.clone() else {
+        micro.natural_clear_sent.clear();
+        return clearing;
+    };
+    micro.natural_clear_sent.retain(|id, _| ids.contains(id));
+    let at = world(point);
+    for id in ids {
+        if claimed.contains(&id) {
+            continue;
+        }
+        let Some(tank) = tanks.get(&id) else {
+            continue;
+        };
+        clearing.insert(id);
+        let short_and_idle = tank.state == AiEntityState::Idle
+            && dist2(tank.x, tank.y, at.0, at.1) > squared(NATURAL_CLEAR_ARRIVED_TILES * tile_size);
+        if micro.natural_clear_sent.get(&id) != Some(&point) || short_and_idle {
+            extra.push(Command::AttackMove {
+                units: vec![id],
+                x: at.0,
+                y: at.1,
+                queued: false,
+            });
+            micro.natural_clear_sent.insert(id, point);
+        }
+    }
+    clearing
+}
+
+/// A Tank clearing the natural this close to the enemy it was sent at has arrived.
+const NATURAL_CLEAR_ARRIVED_TILES: f32 = 3.0;
 
 pub(super) fn world(pos: (i32, i32)) -> (f32, f32) {
     (pos.0 as f32, pos.1 as f32)
@@ -1159,6 +1207,9 @@ pub(super) fn govern(
     );
     claimed.extend(joined.iter().copied());
     pinned.retain(|id| !joined.contains(id));
+    let clearing = clear_natural(micro, &tanks, &claimed, &mut extra, tile_size);
+    claimed.extend(clearing.iter().copied());
+    pinned.retain(|id| !clearing.contains(id));
     let led = lead_scouts(
         observation,
         micro,

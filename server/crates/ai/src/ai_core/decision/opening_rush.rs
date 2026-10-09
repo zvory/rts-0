@@ -44,6 +44,13 @@ use crate::ai_core::squad_micro::{
 const MISSED_CONTACT_PROGRESS: f32 = 0.5;
 /// Enemy fighters seen this close to Jeff's main before the squad met any have slipped past it.
 const HOME_ALERT_TILES: f32 = 28.0;
+/// The live Jeff recalls its squad for a raid at home only when the fighters at home are fewer than
+/// this many times the raiders. Against Jeff, both rushes reached the enemy natural together;
+/// the side whose guard glimpsed the other rush half a tile sooner called its own squad home with 10
+/// fighters at home against 4 Riflemen, and lost its natural for 5,000 ticks.
+const HOME_HOLDS_RATIO: u32 = 2;
+/// A Tank counts as this many infantry when weighing a raid against the home.
+const TANK_FIGHTER_WEIGHT: u32 = 4;
 /// Riflemen the Barracks trains straight away when the enemy's opening attack slips past.
 const EMERGENCY_RIFLEMEN: usize = 2;
 /// A relaunched squad first gathers at the first march waypoint at least this far from home: back
@@ -280,7 +287,8 @@ pub(super) fn plan_live(
     if !uses_opening_rush(profile_id) {
         return;
     }
-    let rush = plan(actions, observation, facts, memory, map_analysis);
+    let live_jeff = profile_id == JEFFS_AI_ID;
+    let rush = plan(actions, observation, facts, memory, map_analysis, live_jeff);
     if !rush.moved.is_empty() {
         intents.push(AiIntent::Move { units: rush.moved });
     }
@@ -303,6 +311,7 @@ pub(super) fn plan(
     facts: &AiFacts,
     memory: &mut AiDecisionMemory,
     map_analysis: Option<&AiMapAnalysis>,
+    live_jeff: bool,
 ) -> RushDecision {
     let mut decision = RushDecision::default();
     // Squad members dug in by now, read before the rush state is borrowed.
@@ -352,7 +361,9 @@ pub(super) fn plan(
         // After a relaunch the enemy is known to have kept its Riflemen home, so only a raid
         // actually seen near the main turns the squad around again.
         let past_middle = !rush.relaunched && past_the_middle(observation, facts, center);
-        if !rush.squad_contact && (raid_near_home || past_middle) {
+        let raid_turns_back =
+            raid_near_home && (!live_jeff || raid_outmatches_home(observation, &rush.squad));
+        if !rush.squad_contact && (raid_turns_back || past_middle) {
             if !rush.missed_contact {
                 rush.emergency_rifle_target =
                     Some(facts.unit_count(EntityKind::Rifleman) + EMERGENCY_RIFLEMEN);
@@ -582,6 +593,37 @@ fn enemy_fighters_near_home(observation: &AiObservation) -> bool {
             && enemy.kind != EntityKind::Worker
             && distance(own, (enemy.x, enemy.y)) <= HOME_ALERT_TILES * tile
     })
+}
+
+/// Whether the enemy fighters seen near Jeff's main outnumber what is left at home to fight them,
+/// with Tanks weighted as several infantry.
+fn raid_outmatches_home(observation: &AiObservation, squad: &BTreeSet<u32>) -> bool {
+    let tile = observation.map.tile_size.max(1) as f32;
+    let own = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let near_home = |x: f32, y: f32| distance(own, (x, y)) <= HOME_ALERT_TILES * tile;
+    let weight = |kind: EntityKind| {
+        if kind == EntityKind::Tank {
+            TANK_FIGHTER_WEIGHT
+        } else {
+            1
+        }
+    };
+    let raiders: u32 = observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
+        .filter(|enemy| near_home(enemy.x, enemy.y))
+        .map(|enemy| weight(enemy.kind))
+        .sum();
+    let home: u32 = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.hp > 0 && unit.is_complete && unit.kind.is_unit())
+        .filter(|unit| !matches!(unit.kind, EntityKind::Worker | EntityKind::ScoutCar))
+        .filter(|unit| !squad.contains(&unit.id) && near_home(unit.x, unit.y))
+        .map(|unit| weight(unit.kind))
+        .sum();
+    home < HOME_HOLDS_RATIO * raiders
 }
 
 /// Whether the squad has passed the middle of the map.
@@ -1170,6 +1212,82 @@ mod tests {
             target_id: None,
             free_for_combat: true,
         }
+    }
+
+    /// Units at `(id, kind, tiles east of home)`; home is tile (5, 5).
+    fn home_observation(
+        own: &[(u32, EntityKind, f32)],
+        enemies: &[(u32, EntityKind, f32)],
+    ) -> AiObservation {
+        use crate::ai_core::observation::{AiEconomy, AiMapSummary};
+        let at = |id: u32, owner: u32, kind: EntityKind, tiles: f32| AiEntitySummary {
+            owner,
+            kind,
+            x: (5.5 + tiles) * 32.0,
+            y: 5.5 * 32.0,
+            ..enemy(id, kind, 0.0, 45)
+        };
+        AiObservation {
+            player_id: 1,
+            tick: 5_000,
+            map: AiMapSummary {
+                width: 128,
+                height: 128,
+                tile_size: 32,
+            },
+            economy: AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 100,
+            },
+            own_start_tile: (5, 5),
+            players: Vec::new(),
+            owned: own
+                .iter()
+                .map(|(id, kind, t)| at(*id, 1, *kind, *t))
+                .collect(),
+            resources: Vec::new(),
+            visible_allies: Vec::new(),
+            visible_enemies: enemies
+                .iter()
+                .map(|(id, kind, t)| at(*id, 2, *kind, *t))
+                .collect(),
+            ability_states: Vec::new(),
+            smokes: Vec::new(),
+            visible_tank_traps: Vec::new(),
+            pending_builds: Vec::new(),
+            upgrades: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_raid_the_home_can_hold_does_not_recall_the_rush() {
+        let squad: BTreeSet<u32> = (1..=4).collect();
+        let rush: Vec<(u32, EntityKind, f32)> =
+            (1..=4).map(|id| (id, EntityKind::Rifleman, 70.0)).collect();
+        let raid: Vec<(u32, EntityKind, f32)> = (90..94)
+            .map(|id| (id, EntityKind::Rifleman, 25.0))
+            .collect();
+        // Four enemy Riflemen near the natural against six Riflemen and four Machine Gunners home.
+        let mut own = rush.clone();
+        own.extend((10..16).map(|id| (id, EntityKind::Rifleman, 8.0)));
+        own.extend((20..24).map(|id| (id, EntityKind::MachineGunner, 6.0)));
+        assert!(!raid_outmatches_home(
+            &home_observation(&own, &raid),
+            &squad
+        ));
+        // Three Riflemen home do not hold it.
+        let mut own = rush.clone();
+        own.extend((10..13).map(|id| (id, EntityKind::Rifleman, 8.0)));
+        assert!(raid_outmatches_home(&home_observation(&own, &raid), &squad));
+        // A Tank counts as four.
+        own.push((30, EntityKind::Tank, 8.0));
+        own.push((31, EntityKind::Rifleman, 8.0));
+        assert!(!raid_outmatches_home(
+            &home_observation(&own, &raid),
+            &squad
+        ));
     }
 
     #[test]

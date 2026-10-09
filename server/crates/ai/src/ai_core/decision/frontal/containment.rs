@@ -11,6 +11,10 @@ const ASSEMBLY_GATHERED_TILES: f32 = 10.0;
 /// ...and a marching push moves on from a waypoint once three quarters of its Tanks are this close
 /// to it after the waypoint timeout.
 const WAYPOINT_GATHERED_TILES: f32 = 5.0;
+/// ...and that gathered launch needs this many more Tanks than the most enemy Tanks seen together
+/// lately: on Classic it sent 5 of 8 Tanks out against an opponent with 13, whose army then took the
+/// base while the push was away.
+const GATHERED_LEAD_TANKS: usize = 3;
 /// A launched push that has not got this much closer to its objective in `WATCHDOG_TICKS`, out of
 /// contact, attack-moves straight at it for `WATCHDOG_ASSAULT_TICKS`.
 const WATCHDOG_PROGRESS_TILES: f32 = 3.0;
@@ -237,18 +241,21 @@ pub(super) fn issue_expansion_containment_wave(
         // The live Jeff also launches once most of its Tanks have gathered, a while after the hard
         // timeout: one Tank held behind a building, or the Scout Car elsewhere, kept a 24-Tank push
         // waiting at home for the rest of the game.
-        let most_gathered = live_jeff && assembly_elapsed >= ASSEMBLY_GATHERED_TICKS && {
-            let gathered = observation
-                .owned
-                .iter()
-                .filter(|unit| tanks.contains(&unit.id))
-                .filter(|unit| {
-                    dist2(unit.x, unit.y, formation_center.0, formation_center.1)
-                        <= squared(ASSEMBLY_GATHERED_TILES * tile_size)
-                })
-                .count();
-            gathered * 4 >= tanks.len() * 3
-        };
+        let most_gathered = live_jeff
+            && assembly_elapsed >= ASSEMBLY_GATHERED_TICKS
+            && tanks.len() >= memory.recent_enemy_tanks() + GATHERED_LEAD_TANKS
+            && {
+                let gathered = observation
+                    .owned
+                    .iter()
+                    .filter(|unit| tanks.contains(&unit.id))
+                    .filter(|unit| {
+                        dist2(unit.x, unit.y, formation_center.0, formation_center.1)
+                            <= squared(ASSEMBLY_GATHERED_TILES * tile_size)
+                    })
+                    .count();
+                gathered * 4 >= tanks.len() * 3
+            };
         let assembled = exact_assembly_ready
             || (assembly_timed_out
                 && core_grouped
@@ -269,8 +276,16 @@ pub(super) fn issue_expansion_containment_wave(
         let launch_outnumbered = memory.recent_enemy_tanks() + lead_needed > tanks.len();
         // Nor while enemy Tanks shelling a base outnumber the home Tanks near them.
         let home_outgunned = push_uses_available_armor && memory.home_outgunned;
-        let assembly_ready =
-            assembled && !river_opening_guard && !launch_outnumbered && !home_outgunned;
+        // The live Jeff's push waits while enemies hold its natural before the Depot is up: its
+        // Tanks clear the natural first. A 2-Tank opening push left for the enemy natural while its
+        // own was held, and died there.
+        let natural_held =
+            live_jeff && super::super::expansion_security::natural_held(observation, memory);
+        let assembly_ready = assembled
+            && !river_opening_guard
+            && !launch_outnumbered
+            && !home_outgunned
+            && !natural_held;
         if !assembly_ready {
             if formation_command_due(memory, observation.tick) {
                 issue_containment_formation(actions, observation, &formation, false);

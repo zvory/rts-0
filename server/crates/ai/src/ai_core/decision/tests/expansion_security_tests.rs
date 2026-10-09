@@ -1141,3 +1141,66 @@ fn a_pending_natural_order_keeps_its_oil_from_the_next_tank() {
     )];
     assert!(!decide(&obs, &JEFFS_AI, &mut memory).intents.contains(&tank));
 }
+
+/// The site of the natural, with Tanks at `(id, x tile, y tile)` and an enemy unit of `kind` on it.
+fn natural_held_by(
+    kind: EntityKind,
+    tanks: &[(u32, f32, f32)],
+) -> (AiObservation, AiDecisionMemory) {
+    let ts = config::TILE_SIZE as f32;
+    let mut obs = security_observation();
+    for (id, x, y) in tanks {
+        obs.owned
+            .push(combat_at(*id, EntityKind::Tank, x * ts, y * ts));
+    }
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        None,
+        &mut |_, _, _| true,
+    );
+    let site = memory.expansion_security.site.unwrap();
+    let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    let mut enemy = combat_at(900, kind, center.0 + 2.0 * ts, center.1);
+    enemy.owner = 2;
+    obs.visible_enemies.push(enemy);
+    (obs, memory)
+}
+
+#[test]
+fn enemy_infantry_on_the_natural_is_cleared_by_the_two_nearest_tanks() {
+    let (obs, mut memory) = natural_held_by(
+        EntityKind::Rifleman,
+        &[(60, 20.0, 20.0), (61, 18.0, 18.0), (62, 9.0, 9.0)],
+    );
+    let decision = decide(&obs, &JEFFS_AI, &mut memory);
+    assert_eq!(memory.expansion_security.contested_tick, Some(obs.tick));
+    assert_eq!(memory.expansion_security.clearers, vec![60, 61]);
+    for tank in [60, 61] {
+        assert!(
+            decision.commands.iter().any(|command| matches!(
+                command,
+                Command::AttackMove { units, .. } if units == &[tank]
+            )),
+            "Tank {tank} is sent: {:?}",
+            decision.commands
+        );
+    }
+    // No Depot money is held back while the site is held.
+    assert!(!expansion_security::reserve_expansion(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+    ));
+}
+
+#[test]
+fn enemy_armor_on_the_natural_is_left_to_the_tank_fight() {
+    let (obs, mut memory) = natural_held_by(EntityKind::Tank, &[(60, 20.0, 20.0)]);
+    decide(&obs, &JEFFS_AI, &mut memory);
+    assert!(memory.expansion_security.clearers.is_empty());
+}
