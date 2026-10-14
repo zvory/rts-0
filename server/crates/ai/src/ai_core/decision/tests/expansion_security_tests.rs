@@ -1225,3 +1225,45 @@ fn enemy_armor_on_the_natural_is_left_to_the_tank_fight() {
     decide(&obs, &JEFFS_AI, &mut memory);
     assert!(memory.expansion_security.clearers.is_empty());
 }
+
+/// A guard out at its far post keeps it when another Rifleman passes nearer the site: the live
+/// Jeff fills only vacancies, where the frozen Jeff re-picks the nearest two every decision.
+#[test]
+fn a_live_guard_keeps_its_post_when_another_rifleman_passes_nearer() {
+    for (profile, kept) in [(&JEFFS_AI, true), (&JEFFS_AI_PRE_TANK_MICRO, false)] {
+        let mut obs = security_observation();
+        // Beyond the four oldest, kept home, four Riflemen can guard the natural.
+        let ts = config::TILE_SIZE as f32;
+        obs.owned
+            .extend((16..18).map(|id| combat_at(id, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts)));
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        let prepare = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
+            let facts = AiFacts::from_observation(obs);
+            expansion_security::prepare(obs, &facts, profile, memory, None, &mut |_, _, _| true);
+        };
+        prepare(&obs, &mut memory);
+        let guards = memory.expansion_security.riflemen.clone();
+        assert_eq!(guards.len(), 2, "{}", profile.id);
+        let site = memory.expansion_security.site.unwrap();
+        let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+        let passer = (14..18).find(|id| !guards.contains(id)).unwrap();
+        for unit in obs.owned.iter_mut() {
+            if unit.id == guards[0] {
+                unit.x = 60.0 * ts;
+                unit.y = 60.0 * ts;
+            } else if unit.id == passer {
+                unit.x = center.0 + ts;
+                unit.y = center.1;
+            }
+        }
+        obs.tick += 9;
+        prepare(&obs, &mut memory);
+        assert_eq!(
+            memory.expansion_security.riflemen.contains(&guards[0]),
+            kept,
+            "{}: {:?}",
+            profile.id,
+            memory.expansion_security.riflemen
+        );
+    }
+}

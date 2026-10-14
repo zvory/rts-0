@@ -361,12 +361,20 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
                 .then_with(|| left.cmp(right))
         });
     }
+    // The live Jeff keeps a guard on its post while it stays eligible. Re-picking the nearest two
+    // every decision replaced a guard that had walked out to the far post with a Rifleman passing
+    // the site, which then stuck in a dead raider's trench on the way and never secured it.
+    let eligible = candidates.clone();
     candidates.truncate(PARTY_SIZE);
     let previous = memory.expansion_security.riflemen.clone();
-    memory
-        .expansion_security
-        .riflemen
-        .retain(|id| candidates.contains(id));
+    let keep = |id: &u32| {
+        if profile.id == JEFFS_AI_ID {
+            eligible.contains(id)
+        } else {
+            candidates.contains(id)
+        }
+    };
+    memory.expansion_security.riflemen.retain(keep);
     for id in &candidates {
         if memory.expansion_security.riflemen.len() >= PARTY_SIZE {
             break;

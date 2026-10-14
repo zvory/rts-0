@@ -357,7 +357,7 @@ fn enemy_infantry_seen_early_raises_the_rifle_target_until_matched() {
 #[test]
 fn sentries_take_posts_off_both_flanks_as_home_riflemen_come_free() {
     let mut observation = base(3_000);
-    for (i, id) in (20..25).enumerate() {
+    for (i, id) in (20..26).enumerate() {
         observation
             .owned
             .push(entity(id, 1, EntityKind::Rifleman, (14.0, 8.0 + i as f32)));
@@ -366,7 +366,7 @@ fn sentries_take_posts_off_both_flanks_as_home_riflemen_come_free() {
     let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
     let mut memory = live_memory();
     let enemy = (70.5 * ts(), 70.5 * ts());
-    let free: Vec<u32> = (20..25).collect();
+    let free: Vec<u32> = (20..26).collect();
     let sentries = post_sentries(
         &mut actions,
         &observation,
@@ -528,4 +528,36 @@ fn machine_gunners_answer_a_small_flank_raid_when_nothing_else_is_home_but_not_a
     let (answer, commands) = respond_commands(&observation, &mut memory, &[30, 31, 32]);
     assert!(answer.is_none_or(|units| units.is_empty()), "{commands:?}");
     assert!(commands.is_empty(), "{commands:?}");
+}
+
+#[test]
+fn no_sentry_stands_on_the_natural_its_guards_hold() {
+    let mut observation = base(3_000);
+    for (i, id) in (20..26).enumerate() {
+        observation
+            .owned
+            .push(entity(id, 1, EntityKind::Rifleman, (14.0, 8.0 + i as f32)));
+    }
+    let facts = AiFacts::from_observation(&observation);
+    let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+    let mut memory = live_memory();
+    // The natural sits where the south-eastern post would be.
+    memory.expansion_security.site = Some((20, 1));
+    let natural = building_center((20, 1), EntityKind::ResourceDepot, config::TILE_SIZE).unwrap();
+    let enemy = (70.5 * ts(), 70.5 * ts());
+    let free: Vec<u32> = (20..26).collect();
+    let sentries = post_sentries(
+        &mut actions,
+        &observation,
+        &mut memory,
+        None,
+        Some(enemy),
+        &free,
+    );
+    assert_eq!(sentries.len(), 1);
+    for command in actions.into_commands() {
+        if let Command::Move { x, y, .. } = command {
+            assert!(distance((x, y), natural) >= SENTRY_NATURAL_CLEAR_TILES * ts());
+        }
+    }
 }

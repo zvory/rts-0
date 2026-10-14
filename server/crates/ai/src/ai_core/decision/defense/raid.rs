@@ -4,9 +4,8 @@
 //! and go for the extractors first. Jeff saw them only on arrival, sent its frontal defenders over
 //! one or two at a time where they were shot piecemeal, chased raiders out of the base, and let
 //! Riflemen stand idle just beyond their own reach. Here:
-//! - **Watch**: enemy fighters within `WATCH_TILES` of any Jeff building, extractor, Engineer or
-//!   the natural site are a raid before they reach anything, and two sentries posted off the
-//!   flanks see them coming.
+//! - **Watch**: enemy fighters within `WATCH_TILES` of any Jeff building, extractor or Engineer
+//!   are a raid before they reach anything, and sentries posted off the flanks see them coming.
 //! - **Gather, then engage**: the response is sized by the volley estimate to beat the raid. It
 //!   gathers beside what the raid threatens, on the side facing home and outside the raid's reach,
 //!   and goes in together. A raid nobody can beat is met on the dug-in line instead: the mobile
@@ -28,7 +27,7 @@ use super::super::opening_rush::{
 use super::envelope::defended_building_sites;
 use super::*;
 
-/// Enemy fighters this close to a Jeff building, extractor, Engineer or natural site are a raid.
+/// Enemy fighters this close to a Jeff building, extractor or Engineer are a raid.
 const WATCH_TILES: f32 = 16.0;
 /// Raiders this close to one another are one raid.
 const RAID_LINK_TILES: f32 = 8.0;
@@ -47,8 +46,11 @@ const GATHER_SHIFT_TILES: f32 = 4.0;
 const GATHERED_SHARE: (u32, u32) = (3, 4);
 const GATHER_TIMEOUT_TICKS: u32 = config::TICK_HZ * 8;
 /// Dug-in units and Machine Gunners join a flank response only this early, while they are all the
-/// home has. Later the estimate overrates them: a gun moving up must set up before it fires.
+/// home has, and only against a raid of at most `SETTLED_JOIN_MAX_RAIDERS`. Against more the
+/// estimate overrates them (a gun moving up must set up before it fires): a second wave of 18
+/// Riflemen beat four guns sent at it. AI 2.1's early raid of five or six is beaten by them.
 const SETTLED_JOIN_UNTIL_TICK: u32 = config::TICK_HZ * 180;
+const SETTLED_JOIN_MAX_RAIDERS: usize = 6;
 /// A raid within this many degrees of the line to the enemy base comes at the front.
 const FRONT_HALF_ANGLE_DEGREES: f32 = 45.0;
 /// An outmatched response falls back to the dug-in line within this distance of the main.
@@ -90,8 +92,10 @@ const SENTRY_TILES: f32 = 14.0;
 const SENTRY_ANGLE_DEGREES: f32 = 80.0;
 /// A post the map edge pulls this close to the Depot is not worth a Rifleman.
 const SENTRY_MIN_TILES: f32 = 10.0;
+/// No post this close to the natural site, which its guards hold.
+const SENTRY_NATURAL_CLEAR_TILES: f32 = 8.0;
 /// One sentry is posted for every this many free home Riflemen, so the pocket keeps the rest.
-const SENTRY_RIFLEMEN_PER_POST: usize = 2;
+const SENTRY_RIFLEMEN_PER_POST: usize = 3;
 const SENTRY_REORDER_TICKS: u32 = config::TICK_HZ * 10;
 
 /// Enemy infantry this close to a Jeff building counts toward the Rifleman answer, for this long
@@ -216,25 +220,22 @@ fn is_fighter(entity: &AiEntitySummary) -> bool {
         && rts_rules::combat::default_weapon_profile(entity.kind).is_some()
 }
 
-/// What a raid threatens: building footprints (planned ones too), Engineers and the natural site.
+/// What a raid threatens: building footprints (planned ones too, so the natural once its Depot is
+/// placed) and Engineers. The natural site before that is left to its guards and the Tanks that
+/// clear it: answering a denial squad there pulled the guards off their posts for good.
 struct Defended {
     sites: Vec<super::envelope::DefendedBuildingSite>,
     points: Vec<(f32, f32)>,
 }
 
 impl Defended {
-    fn new(observation: &AiObservation, memory: &AiDecisionMemory) -> Self {
-        let mut points: Vec<(f32, f32)> = observation
+    fn new(observation: &AiObservation) -> Self {
+        let points: Vec<(f32, f32)> = observation
             .owned
             .iter()
             .filter(|unit| unit.kind == EntityKind::Worker && unit.hp > 0)
             .map(|unit| (unit.x, unit.y))
             .collect();
-        if let Some(center) = memory.expansion_security.site.and_then(|site| {
-            building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
-        }) {
-            points.push(center);
-        }
         Self {
             sites: defended_building_sites(observation, true),
             points,
@@ -414,7 +415,7 @@ pub(in crate::ai_core::decision) fn respond(
 ) -> RaidAnswer {
     let ts = tile(observation);
     let tick = observation.tick;
-    let defended = Defended::new(observation, memory);
+    let defended = Defended::new(observation);
     let dug = dug_in_units(observation, memory);
     let raid = find_raid(observation, &defended)
         .filter(|raid| !raid.armored && !raid_at_the_line(observation, &dug, raid, ts));
@@ -491,13 +492,14 @@ pub(in crate::ai_core::decision) fn respond(
         0
     };
     // The response is made of the mobile units, nearest first, until the estimate beats the raid.
-    // Dug-in units and Machine Gunners hold their posts and fight what comes into reach; against a
-    // raid on a flank in the opening minutes they join last, when the mobile units alone cannot
-    // beat it: the starting Riflemen are out on the rush and the guns are all the home has.
+    // Dug-in units and Machine Gunners hold their posts and fight what comes into reach. Against a
+    // small raid on a flank in the opening minutes they join last, when the mobile units alone
+    // cannot beat it: the starting Riflemen are out on the rush and the guns are all the home has.
     let settled =
         |unit: &AiEntitySummary| dug.contains(&unit.id) || unit.kind == EntityKind::MachineGunner;
     let home = tile_center(observation.own_start_tile, observation.map.tile_size);
     let flank = observation.tick < SETTLED_JOIN_UNTIL_TICK
+        && raid.raiders.len() <= SETTLED_JOIN_MAX_RAIDERS
         && enemy_start(observation).is_none_or(|enemy| {
             let (Some(to_raid), Some(to_enemy)) = (
                 normalized_direction(home, raid.center),
@@ -627,7 +629,24 @@ pub(in crate::ai_core::decision) fn respond(
                 &theirs,
                 head_start,
             );
-        response.engaged = share_in || timed_out || !travelling;
+        // A raid already among the buildings is not left to them while the rest walk over: the
+        // members close enough to fight now go in as soon as they beat it on their own.
+        let at_hand: Vec<&AiEntitySummary> = infantry
+            .iter()
+            .filter_map(|id| owned(*id))
+            .filter(|unit| {
+                in_reach(unit)
+                    || distance((unit.x, unit.y), raid.center)
+                        <= gather_distance + GATHERED_TILES * ts
+            })
+            .collect();
+        let enough_at_hand = at_hand.len() < infantry.len()
+            && beats(
+                &own_fighters(observation, &dug, &at_hand),
+                &theirs,
+                head_start,
+            );
+        response.engaged = share_in || timed_out || enough_at_hand || !travelling;
     }
     if response.engaged && !near_defended {
         // The raid backed off: hold the gathering point instead of following it.
@@ -907,11 +926,14 @@ fn answer_outranged(
 
 /// Two posts off the main's flanks, `SENTRY_ANGLE_DEGREES` either side of the line to the enemy
 /// base, where a Rifleman sees a raid coming before it reaches the extractors.
+/// A post is dropped (and keeps its index) where the map edge pulls it in, or where it would stand
+/// on the natural (`natural`): there it blocked the guards from securing the site.
 fn sentry_posts(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     enemy_base: (f32, f32),
-) -> Vec<(f32, f32)> {
+    natural: Option<(f32, f32)>,
+) -> Vec<Option<(f32, f32)>> {
     let ts = tile(observation);
     let home = tile_center(observation.own_start_tile, observation.map.tile_size);
     let Some(axis) = normalized_direction(home, enemy_base) else {
@@ -920,7 +942,7 @@ fn sentry_posts(
     let base_angle = axis.1.atan2(axis.0);
     [1.0_f32, -1.0]
         .into_iter()
-        .filter_map(|side| {
+        .map(|side| {
             let angle = base_angle + side * SENTRY_ANGLE_DEGREES.to_radians();
             let desired = clamp_to_map(
                 (
@@ -932,12 +954,15 @@ fn sentry_posts(
             if distance(desired, home) < SENTRY_MIN_TILES * ts {
                 return None;
             }
-            clear_mobile_defensive_position(observation, map_analysis, desired)
+            clear_mobile_defensive_position(observation, map_analysis, desired).filter(|post| {
+                natural.is_none_or(|site| distance(*post, site) >= SENTRY_NATURAL_CLEAR_TILES * ts)
+            })
         })
         .collect()
 }
 
-/// Posts up to two sentries from `free_riflemen` (home Riflemen no other system holds) and keeps
+/// Posts up to two sentries from `free_riflemen` (home Riflemen no other system holds), one per
+/// `SENTRY_RIFLEMEN_PER_POST`, and keeps
 /// them there. Returns the sentries.
 fn post_sentries(
     actions: &mut AiActionContext<'_>,
@@ -949,8 +974,11 @@ fn post_sentries(
 ) -> Vec<u32> {
     let ts = tile(observation);
     let tick = observation.tick;
+    let natural = memory.expansion_security.site.and_then(|site| {
+        building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+    });
     let posts = enemy_base
-        .map(|base| sentry_posts(observation, map_analysis, base))
+        .map(|base| sentry_posts(observation, map_analysis, base, natural))
         .unwrap_or_default();
     let alive = |id: u32| {
         observation
@@ -959,7 +987,7 @@ fn post_sentries(
             .any(|unit| unit.id == id && unit.hp > 0)
     };
     let sentries = &mut memory.raid_defense.sentries;
-    sentries.retain(|id, post| alive(*id) && *post < posts.len());
+    sentries.retain(|id, post| alive(*id) && posts.get(*post).is_some_and(Option::is_some));
     memory
         .raid_defense
         .sentry_orders
@@ -970,23 +998,26 @@ fn post_sentries(
         .filter(|id| !sentries.contains_key(id))
         .collect();
     // The post nearer the main's Steel first: raids go for the extractors.
-    let wanted = ((free.len() + sentries.len()) / SENTRY_RIFLEMEN_PER_POST).min(posts.len());
-    let mut order: Vec<usize> = (0..posts.len()).collect();
+    let open: Vec<(usize, (f32, f32))> = posts
+        .iter()
+        .enumerate()
+        .filter_map(|(index, post)| post.map(|post| (index, post)))
+        .collect();
+    let wanted = ((free.len() + sentries.len()) / SENTRY_RIFLEMEN_PER_POST).min(open.len());
+    let mut order = open;
     if let Some(steel) = main_steel_cluster_center(observation) {
-        order.sort_by(|left, right| {
-            distance(posts[*left], steel).total_cmp(&distance(posts[*right], steel))
-        });
+        order.sort_by(|left, right| distance(left.1, steel).total_cmp(&distance(right.1, steel)));
     }
     {
         let mut free = free;
-        for index in order {
+        for (index, post) in order {
             if sentries.len() >= wanted {
                 break;
             }
             if sentries.values().any(|taken| *taken == index) {
                 continue;
             }
-            let post = &posts[index];
+            let post = &post;
             let nearest = free.iter().copied().min_by(|left, right| {
                 let at = |id: u32| {
                     observation
@@ -1008,7 +1039,9 @@ fn post_sentries(
         let Some(unit) = observation.owned.iter().find(|unit| unit.id == id) else {
             continue;
         };
-        let point = posts[post];
+        let Some(point) = posts[post] else {
+            continue;
+        };
         if distance((unit.x, unit.y), point) > ts {
             let due = memory
                 .raid_defense
