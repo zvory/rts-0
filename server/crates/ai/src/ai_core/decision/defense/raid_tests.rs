@@ -561,3 +561,51 @@ fn no_sentry_stands_on_the_natural_its_guards_hold() {
         }
     }
 }
+
+#[test]
+fn a_gathering_gun_stops_and_sets_up_once_the_raid_is_close() {
+    let mut observation = with_enemy_start(base(1_500), (0, 10));
+    observation.owned.extend([
+        entity(30, 1, EntityKind::MachineGunner, (6.0, 9.0)),
+        entity(31, 1, EntityKind::MachineGunner, (6.0, 12.0)),
+        entity(32, 1, EntityKind::MachineGunner, (5.0, 10.5)),
+    ]);
+    observation.visible_enemies.extend([
+        entity(90, 2, EntityKind::Rifleman, (14.5, 1.0)),
+        entity(91, 2, EntityKind::Rifleman, (15.5, 1.0)),
+        entity(92, 2, EntityKind::Rifleman, (16.5, 1.0)),
+    ]);
+    let guns = [30, 31, 32];
+    let mut memory = live_memory();
+    let (_, commands) = respond_commands(&observation, &mut memory, &guns);
+    assert!(
+        commands
+            .iter()
+            .any(|command| matches!(command, Command::Move { units, .. } if units.contains(&30))),
+        "the guns gather: {commands:?}"
+    );
+    // Gun 30 is walking when a raider comes within 7 tiles of it.
+    observation.tick += 9;
+    let gun = observation
+        .owned
+        .iter_mut()
+        .find(|unit| unit.id == 30)
+        .unwrap();
+    gun.x = 15.5 * ts();
+    gun.y = 8.0 * ts();
+    gun.state = AiEntityState::Move;
+    let (_, commands) = respond_commands(&observation, &mut memory, &guns);
+    assert!(
+        commands.iter().any(
+            |command| matches!(command, Command::HoldPosition { units, .. } if units.contains(&30))
+        ),
+        "{commands:?}"
+    );
+    assert!(
+        !commands.iter().any(|command| matches!(
+            command,
+            Command::Move { units, .. } | Command::AttackMove { units, .. } if units.contains(&30)
+        )),
+        "{commands:?}"
+    );
+}

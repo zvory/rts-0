@@ -51,6 +51,9 @@ const GATHER_TIMEOUT_TICKS: u32 = config::TICK_HZ * 8;
 /// Riflemen beat four guns sent at it. AI 2.1's early raid of five or six is beaten by them.
 const SETTLED_JOIN_UNTIL_TICK: u32 = config::TICK_HZ * 180;
 const SETTLED_JOIN_MAX_RAIDERS: usize = 6;
+/// A Machine Gunner or dug-in unit gathering with a response stops where it stands once a raider
+/// is this close: the guns' reach plus the ground a raid covers while a gun sets up.
+const GUN_STAND_TILES: f32 = 8.0;
 /// A raid within this many degrees of the line to the enemy base comes at the front.
 const FRONT_HALF_ANGLE_DEGREES: f32 = 45.0;
 /// An outmatched response falls back to the dug-in line within this distance of the main.
@@ -147,6 +150,11 @@ impl RaidDefense {
             .flat_map(|response| response.members.iter().copied())
             .chain(self.sentries.keys().copied())
             .chain(self.displaced.keys().copied())
+    }
+
+    /// Whether a raid on the bases is being answered.
+    pub(in crate::ai_core::decision) fn answering(&self) -> bool {
+        self.response.is_some()
     }
 
     pub(in crate::ai_core::decision) fn is_sentry(&self, id: u32) -> bool {
@@ -429,6 +437,19 @@ pub(in crate::ai_core::decision) fn respond(
                 let members: Vec<u32> = response.members.iter().copied().collect();
                 return RaidAnswer::Handled(members);
             }
+            // Handing the raid to the line: guns still walking to the gathering point stop and set
+            // up where they stand, rather than walk on past the fight.
+            let walking_guns: Vec<u32> = response
+                .members
+                .iter()
+                .filter_map(|id| observation.owned.iter().find(|unit| unit.id == *id))
+                .filter(|unit| {
+                    (dug.contains(&unit.id) || unit.kind == EntityKind::MachineGunner)
+                        && unit.state == AiEntityState::Move
+                })
+                .map(|unit| unit.id)
+                .collect();
+            actions::hold_position_units(actions, walking_guns);
             end_response(memory);
         }
         return RaidAnswer::NotARaid;
@@ -678,6 +699,20 @@ pub(in crate::ai_core::decision) fn respond(
             let Some(unit) = owned(*id) else {
                 continue;
             };
+            // A gun cannot fire while it walks. Once the raid is this close it stops and sets up
+            // where it stands: from the north corner of Crossroads the raid reached the front guns
+            // as they walked off posts they could have fired from, and took them one at a time.
+            let raid_distance = raid
+                .raiders
+                .iter()
+                .map(|raider| distance((unit.x, unit.y), (raider.x, raider.y)))
+                .fold(f32::INFINITY, f32::min);
+            if settled(unit) && raid_distance <= GUN_STAND_TILES * ts {
+                if unit.state == AiEntityState::Move {
+                    hold.push(*id);
+                }
+                continue;
+            }
             let shot_at = raid.raiders.iter().any(|raider| {
                 distance((unit.x, unit.y), (raider.x, raider.y))
                     <= reach_px(
