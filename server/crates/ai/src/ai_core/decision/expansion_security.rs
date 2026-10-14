@@ -23,8 +23,6 @@ const MAX_NATURAL_SITE_FAILURES: u8 = 2;
 const NATURAL_RETRY_COOLDOWN_TICKS: u32 = config::TICK_HZ * 20;
 /// The builder only leaves while no enemy is this close to it, the site or the base's way in.
 const NATURAL_ROUTE_QUIET_TILES: f32 = 12.0;
-/// The live Jeff picks no new guards within this long of a building losing HP.
-const GUARD_PICK_RAID_TICKS: u32 = config::TICK_HZ * 4;
 /// The live Jeff's guards leave their posts to an enemy Tank this close to the natural site.
 const GUARD_TANK_CLEAR_TILES: f32 = 16.0;
 /// Enemies this close to the natural site hold it: it cannot be secured.
@@ -377,14 +375,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         }
     };
     memory.expansion_security.riflemen.retain(keep);
-    // Nor does it send fresh Riflemen out to the natural while its bases are being raided: on
-    // Crossroads they walked off to guard it while raiders shot the main's Depot.
-    let raided = profile.id == JEFFS_AI_ID
-        && (memory.raid_defense.answering()
-            || memory
-                .local_defense_building_hit_tick
-                .is_some_and(|hit| observation.tick.saturating_sub(hit) <= GUARD_PICK_RAID_TICKS));
-    for id in candidates.iter().filter(|_| !raided) {
+    for id in &candidates {
         if memory.expansion_security.riflemen.len() >= PARTY_SIZE {
             break;
         }

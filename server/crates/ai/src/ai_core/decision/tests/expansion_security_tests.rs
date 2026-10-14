@@ -1267,26 +1267,3 @@ fn a_live_guard_keeps_its_post_when_another_rifleman_passes_nearer() {
         );
     }
 }
-
-/// While a base is being raided the live Jeff sends no fresh Riflemen out to guard the natural;
-/// the frozen Jeff still does.
-#[test]
-fn no_natural_guards_are_picked_while_a_base_is_raided() {
-    for (profile, picked) in [(&JEFFS_AI, false), (&JEFFS_AI_PRE_TANK_MICRO, true)] {
-        let mut obs = security_observation();
-        obs.tick = 3_000;
-        let mut memory = AiDecisionMemory::for_profile(profile);
-        memory.local_defense_building_hit_tick = Some(obs.tick - 30);
-        let facts = AiFacts::from_observation(&obs);
-        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
-            true
-        });
-        assert_eq!(
-            !memory.expansion_security.riflemen.is_empty(),
-            picked,
-            "{}: {:?}",
-            profile.id,
-            memory.expansion_security.riflemen
-        );
-    }
-}
