@@ -38,14 +38,13 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
         memory.local_defense_building_hit_tick = Some(observation.tick);
     }
     if runs_live_jeff(profile_id) {
-        let resend = profile_id == JEFFS_AI_ID;
         if let super::raid::RaidAnswer::Handled(units) = super::raid::respond(
             actions,
             observation,
             memory,
             local_defenders,
             map_analysis,
-            resend,
+            true,
         ) {
             memory.clear_defensive_incident();
             return (!units.is_empty()).then_some(units);

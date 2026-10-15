@@ -11,6 +11,7 @@ pub(crate) use ai_2_1_pre_third_base::{AI_2_1_PRE_THIRD_BASE, AI_2_1_PRE_THIRD_B
 pub(crate) use self::jeffs_ai::{
     JEFFS_AI, JEFFS_AI_BETA, JEFFS_AI_BETA_ID, JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE,
     JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_GUARD_HANDOFF, JEFFS_AI_PRE_GUARD_HANDOFF_ID,
+    JEFFS_AI_PRE_THIRD_PRESSURE, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
     JEFFS_AI_PRE_OPENING_RUSH, JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE,
     JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_TANK_CATCHUP, JEFFS_AI_PRE_TANK_CATCHUP_ID,
     JEFFS_AI_PRE_TANK_MICRO, JEFFS_AI_PRE_TANK_MICRO_ID,
@@ -450,6 +451,9 @@ pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
     if id == JEFFS_AI_PRE_GUARD_HANDOFF_ID {
         return Some(&JEFFS_AI_PRE_GUARD_HANDOFF);
     }
+    if id == JEFFS_AI_PRE_THIRD_PRESSURE_ID {
+        return Some(&JEFFS_AI_PRE_THIRD_PRESSURE);
+    }
     if id == JEFFS_AI_CHAT_START_ID {
         return Some(&JEFFS_AI_CHAT_START);
     }
@@ -469,6 +473,7 @@ pub(crate) fn is_jeffs_ai_profile(id: &str) -> bool {
             | JEFFS_AI_PRE_OPENING_RUSH_ID
             | JEFFS_AI_PRE_TANK_MICRO_ID
             | JEFFS_AI_PRE_GUARD_HANDOFF_ID
+            | JEFFS_AI_PRE_THIRD_PRESSURE_ID
     )
 }
 
@@ -483,6 +488,7 @@ pub(crate) fn uses_current_jeffs_ai_policy(id: &str) -> bool {
             | JEFFS_AI_PRE_OPENING_RUSH_ID
             | JEFFS_AI_PRE_TANK_MICRO_ID
             | JEFFS_AI_PRE_GUARD_HANDOFF_ID
+            | JEFFS_AI_PRE_THIRD_PRESSURE_ID
     )
 }
 
@@ -490,7 +496,7 @@ pub(crate) fn uses_current_jeffs_ai_policy(id: &str) -> bool {
 /// change under test branches on `JEFFS_AI_ID` alone, so the freeze plays exactly as the live Jeff
 /// did just before it. When a new freeze is taken, it replaces the old one here.
 pub(crate) fn runs_live_jeff(id: &str) -> bool {
-    matches!(id, JEFFS_AI_ID | JEFFS_AI_PRE_GUARD_HANDOFF_ID)
+    matches!(id, JEFFS_AI_ID | JEFFS_AI_PRE_THIRD_PRESSURE_ID)
 }
 
 #[cfg(test)]

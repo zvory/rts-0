@@ -373,7 +373,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     // Nor does the live Jeff pick a Rifleman raid defense holds: picked in the middle of a home
     // fight, it was given its post and the fight every decision. A guard raid defense takes keeps
     // its place and goes back out once it is let go.
-    if profile.id == JEFFS_AI_ID {
+    if runs_live_jeff(profile.id) {
         candidates = eligible
             .iter()
             .copied()
@@ -744,7 +744,7 @@ pub(super) fn update_and_stage(
         .riflemen
         .iter()
         .copied()
-        .filter(|id| profile_id == JEFFS_AI_ID && left_to_home_defense(observation, memory, *id))
+        .filter(|id| live_jeff && left_to_home_defense(observation, memory, *id))
         .collect();
     let security = &mut memory.expansion_security;
     let Some(site) = security.site else {

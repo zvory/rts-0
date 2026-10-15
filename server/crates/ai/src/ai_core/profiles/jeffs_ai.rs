@@ -23,12 +23,14 @@ pub(crate) const JEFFS_AI_PRE_OPENING_RUSH_ID: &str = "jeffs_ai_pre_opening_rush
 /// Frozen immediately before the Tank micro (enemy Tank memory, the Tank movement governor, and
 /// smoke assaults): the live Jeff with the opening rush. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_TANK_MICRO_ID: &str = "jeffs_ai_pre_tank_micro";
-/// Frozen immediately before the natural's guards defer to raid defense: the live Jeff at
-/// 1d5d98264, raid defense and the rush squad's raid attack included, plus the fixes taken by both
-/// since (raid defense gathers off planned footprints; one dropped natural order no longer loses
-/// the site). It runs every live-Jeff behavior (`runs_live_jeff`); only the guard handoff branches
-/// on the live id. Comparison-only.
+/// Frozen immediately before the natural's guards defer to raid defense (1d5d98264 plus 9855cfe's
+/// shared fixes). Since the third-pressure freeze replaced it in `runs_live_jeff` it no longer
+/// runs the live-Jeff behaviors, like the older freezes. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_GUARD_HANDOFF_ID: &str = "jeffs_ai_pre_guard_handoff";
+/// Frozen immediately before the pressure on the enemy's third base: the live Jeff at 9855cfe91,
+/// guard handoff included. It runs every live-Jeff behavior (`runs_live_jeff`); only the third
+/// pressure branches on the live id. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_THIRD_PRESSURE_ID: &str = "jeffs_ai_pre_third_pressure";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -222,6 +224,12 @@ pub(crate) static JEFFS_AI_PRE_TANK_MICRO: AiProfile = AiProfile {
 /// The live Jeff from before the natural-guard handoff under its own id.
 pub(crate) static JEFFS_AI_PRE_GUARD_HANDOFF: AiProfile = AiProfile {
     id: JEFFS_AI_PRE_GUARD_HANDOFF_ID,
+    ..JEFFS_AI_RUSH
+};
+
+/// The live Jeff from before the third-base pressure under its own id.
+pub(crate) static JEFFS_AI_PRE_THIRD_PRESSURE: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_THIRD_PRESSURE_ID,
     ..JEFFS_AI_RUSH
 };
 
