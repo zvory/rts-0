@@ -1,5 +1,5 @@
 use super::*;
-use crate::ai_core::observation::{AiEconomy, AiMapSummary};
+use crate::ai_core::observation::{AiBuildIntent, AiBuildIntentPhase, AiEconomy, AiMapSummary};
 use crate::ai_core::profiles::JEFFS_AI;
 
 fn ts() -> f32 {
@@ -614,4 +614,35 @@ fn a_member_turned_away_from_the_line_is_sent_back_by_the_live_jeff() {
         assert_eq!(sent(&commands, 20), resend, "{commands:?}");
         assert!(!sent(&commands, 21), "{commands:?}");
     }
+}
+
+#[test]
+fn a_gathering_point_on_a_footprint_jeff_has_ordered_is_moved_off_it() {
+    let mut observation = base(1_200);
+    // The natural's Depot is ordered at tile (20, 20); nothing stands there yet.
+    let foot = config::building_stats(EntityKind::ResourceDepot).unwrap();
+    let (right, bottom) = (20.0 + foot.foot_w as f32, 20.0 + foot.foot_h as f32);
+    observation.pending_builds.push(AiBuildIntent {
+        worker_id: 1,
+        kind: EntityKind::ResourceDepot,
+        tile_x: 20,
+        tile_y: 20,
+        phase: AiBuildIntentPhase::ToSite,
+    });
+    let home = (10.5 * ts(), 10.5 * ts());
+    let on = (21.5 * ts(), (bottom - 0.5) * ts());
+    let moved = off_planned_footprints(&observation, on, home);
+    let margin = rts_rules::balance::unit_placement_radius(EntityKind::Rifleman);
+    let inside = |p: (f32, f32)| {
+        p.0 > 20.0 * ts() - margin
+            && p.0 < right * ts() + margin
+            && p.1 > 20.0 * ts() - margin
+            && p.1 < bottom * ts() + margin
+    };
+    assert!(inside(on) && !inside(moved), "{moved:?}");
+    // It leaves on the side it stood, past the footprint's lower edge.
+    assert!(moved.1 > bottom * ts(), "{moved:?}");
+    // A point clear of every footprint stays where it is.
+    let clear = (30.0 * ts(), 30.0 * ts());
+    assert_eq!(off_planned_footprints(&observation, clear, home), clear);
 }

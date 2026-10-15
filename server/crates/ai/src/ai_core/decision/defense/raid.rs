@@ -659,6 +659,7 @@ pub(in crate::ai_core::decision) fn respond(
         .gather
         .map(|(x, y)| (x as f32, y as f32))
         .unwrap_or(desired);
+    let gather = off_planned_footprints(observation, gather, home);
     let travelling = infantry
         .iter()
         .filter_map(|id| owned(*id))
@@ -795,6 +796,80 @@ pub(in crate::ai_core::decision) fn respond(
     assigned.dedup();
     memory.raid_defense.response = Some(response);
     RaidAnswer::Handled(assigned)
+}
+
+/// `point`, moved straight out of the footprint of any building Jeff has ordered or is putting up.
+/// The response gathered beside the builder walking to The River's natural, on the Depot's
+/// footprint: the order dropped and the natural was never built.
+fn off_planned_footprints(
+    observation: &AiObservation,
+    point: (f32, f32),
+    home: (f32, f32),
+) -> (f32, f32) {
+    let ts = tile(observation);
+    let margin = rts_rules::balance::unit_placement_radius(EntityKind::Rifleman) + 0.5 * ts;
+    let ordered = observation.pending_builds.iter().filter_map(|intent| {
+        let stats = config::building_stats(intent.kind)?;
+        let (x, y) = (intent.tile_x as f32 * ts, intent.tile_y as f32 * ts);
+        Some((
+            x,
+            y,
+            x + stats.foot_w as f32 * ts,
+            y + stats.foot_h as f32 * ts,
+        ))
+    });
+    let unfinished = observation
+        .owned
+        .iter()
+        .filter(|building| building.kind.is_building() && !building.is_complete && building.hp > 0)
+        .filter_map(|building| {
+            let stats = config::building_stats(building.kind)?;
+            let (w, h) = (
+                stats.foot_w as f32 * ts * 0.5,
+                stats.foot_h as f32 * ts * 0.5,
+            );
+            Some((
+                building.x - w,
+                building.y - h,
+                building.x + w,
+                building.y + h,
+            ))
+        });
+    let footprints: Vec<(f32, f32, f32, f32)> = ordered.chain(unfinished).collect();
+    let mut point = point;
+    for footprint in footprints {
+        let (x0, y0, x1, y1) = (
+            footprint.0 - margin,
+            footprint.1 - margin,
+            footprint.2 + margin,
+            footprint.3 + margin,
+        );
+        if point.0 <= x0 || point.0 >= x1 || point.1 <= y0 || point.1 >= y1 {
+            continue;
+        }
+        let center = (
+            (footprint.0 + footprint.2) * 0.5,
+            (footprint.1 + footprint.3) * 0.5,
+        );
+        let direction = normalized_direction(center, point)
+            .or_else(|| normalized_direction(center, home))
+            .unwrap_or((0.0, 1.0));
+        let exit = |at: f32, step: f32, low: f32, high: f32| {
+            if step > 0.0 {
+                (high - at) / step
+            } else if step < 0.0 {
+                (low - at) / step
+            } else {
+                f32::INFINITY
+            }
+        };
+        let travel = exit(point.0, direction.0, x0, x1).min(exit(point.1, direction.1, y0, y1));
+        point = (
+            point.0 + direction.0 * (travel + 1.0),
+            point.1 + direction.1 * (travel + 1.0),
+        );
+    }
+    clamp_to_map(point, observation.map)
 }
 
 /// Where outmatched infantry falls back: the middle of the dug-in Riflemen and Machine Gunners near

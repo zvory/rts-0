@@ -412,6 +412,11 @@ impl AiDecisionMemory {
         })
     }
 
+    /// The site Jeff's natural security holds for the natural, if any.
+    pub(crate) fn natural_site(&self) -> Option<(u32, u32)> {
+        self.expansion_security.site
+    }
+
     /// Where home defense last met the enemy, if it did within `ticks`.
     pub(super) fn recent_defensive_contact(&self, tick: u32, ticks: u32) -> Option<(f32, f32)> {
         self.defensive_incident

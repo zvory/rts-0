@@ -24,8 +24,10 @@ pub(crate) const JEFFS_AI_PRE_OPENING_RUSH_ID: &str = "jeffs_ai_pre_opening_rush
 /// smoke assaults): the live Jeff with the opening rush. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_TANK_MICRO_ID: &str = "jeffs_ai_pre_tank_micro";
 /// Frozen immediately before the natural's guards defer to raid defense: the live Jeff at
-/// 1d5d98264, raid defense and the rush squad's raid attack included. It runs every live-Jeff
-/// behavior (`runs_live_jeff`); only the guard handoff branches on the live id. Comparison-only.
+/// 1d5d98264, raid defense and the rush squad's raid attack included, plus the fixes taken by both
+/// since (raid defense gathers off planned footprints; one dropped natural order no longer loses
+/// the site). It runs every live-Jeff behavior (`runs_live_jeff`); only the guard handoff branches
+/// on the live id. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_GUARD_HANDOFF_ID: &str = "jeffs_ai_pre_guard_handoff";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];

@@ -12,7 +12,7 @@ use crate::ai_core::decision::{
 use crate::ai_core::map_analysis::AiStaticMapContextCache;
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{
-    profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
+    profile_by_id, runs_live_jeff, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
 };
 use crate::ai_shared;
 use crate::sdk::{AiActions, AiFrame, AiStrategy, KnownBuildSite, WorldQueries};
@@ -382,6 +382,15 @@ impl AiController {
         self.prune_combat_memory(&observation, tick);
 
         let profile = self.profile();
+        // Jeff's natural security retries its natural site after a dropped order and gives it up
+        // after two. Excluding the exact footprint after the first lost The River's fixed natural
+        // for the rest of the game, so Jeff's own rule decides.
+        if runs_live_jeff(profile.id) {
+            if let Some(site) = self.memory.natural_site() {
+                self.pending_builds
+                    .forget_failed(EntityKind::ResourceDepot, site);
+            }
+        }
         let failed_builds = &self.pending_builds;
         let world_queries = WorldQueries::new(&frame);
         let build_site_exclusions = failed_builds.known_build_site_exclusions(&world_queries);
