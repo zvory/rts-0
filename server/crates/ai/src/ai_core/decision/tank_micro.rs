@@ -33,7 +33,7 @@ use scout_lead::lead_scouts;
 pub(crate) use smoke_assault::SmokeAssault;
 
 pub(super) fn uses_tank_micro(profile_id: &str) -> bool {
-    profile_id == JEFFS_AI_ID
+    runs_live_jeff(profile_id)
 }
 
 /// Updates the live Jeff's Tank memory before any system decides.
@@ -67,7 +67,7 @@ pub(super) fn finish(
             &mut decision.intents,
         );
     }
-    if decision.profile_id == JEFFS_AI_ID {
+    if runs_live_jeff(decision.profile_id) {
         super::frontal::note_push_move_targets(&decision.commands, memory);
     }
     let breach = std::mem::take(&mut memory.trap_breach.notes);

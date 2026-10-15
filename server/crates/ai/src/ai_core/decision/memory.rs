@@ -597,7 +597,7 @@ impl AiDecisionMemory {
         }
         // The live Jeff never takes a Tank of the launched push for home: home defense would hold it
         // at the home post while the push waited for it to catch up, for the rest of the game.
-        let push_tanks: BTreeSet<u32> = if profile.id == crate::ai_core::profiles::JEFFS_AI_ID
+        let push_tanks: BTreeSet<u32> = if crate::ai_core::profiles::runs_live_jeff(profile.id)
             && !self.containment.recovery_active
         {
             self.containment.active_tanks.clone()

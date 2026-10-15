@@ -117,7 +117,7 @@ fn squad_params() -> RifleSquadParams {
 }
 
 pub(super) fn uses_opening_rush(profile_id: &str) -> bool {
-    profile_id == JEFFS_AI_ID || profile_id == JEFFS_AI_PRE_TANK_MICRO_ID
+    runs_live_jeff(profile_id) || profile_id == JEFFS_AI_PRE_TANK_MICRO_ID
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -289,7 +289,7 @@ pub(super) fn plan_live(
     if !uses_opening_rush(profile_id) {
         return;
     }
-    let live_jeff = profile_id == JEFFS_AI_ID;
+    let live_jeff = runs_live_jeff(profile_id);
     let rush = plan(actions, observation, facts, memory, map_analysis, live_jeff);
     if !rush.moved.is_empty() {
         intents.push(AiIntent::Move { units: rush.moved });

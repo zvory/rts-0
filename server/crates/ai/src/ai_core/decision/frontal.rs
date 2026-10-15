@@ -245,7 +245,7 @@ pub(super) fn issue_frontal_wave(
                 is_jeffs_ai_profile(profile.id),
                 profile.id != JEFFS_AI_PRE_TANK_CATCHUP_ID,
                 uses_current_jeffs_ai_policy(profile.id),
-                profile.id == JEFFS_AI_ID,
+                runs_live_jeff(profile.id),
                 map_analysis,
                 memory,
             );
@@ -356,7 +356,7 @@ pub(super) fn sync_containment_recovery(
     // and forms again. Left launched with no Tanks, it sent nothing out for the rest of the game
     // while 40 Tanks gathered at home.
     if memory.containment.active_tanks.is_empty() {
-        if profile.id == JEFFS_AI_ID {
+        if runs_live_jeff(profile.id) {
             begin_containment_recovery(memory);
         }
         return;
@@ -365,7 +365,7 @@ pub(super) fn sync_containment_recovery(
     // or it drops below the policy minimum. Other profiles fall back on the first loss.
     // The live Jeff counts Tanks let go as stuck as not lost: on Crossroads Tanks wedged against
     // the cliff by its own base ended a push of 11 that had lost two.
-    let stuck_alive = if profile.id == JEFFS_AI_ID {
+    let stuck_alive = if runs_live_jeff(profile.id) {
         memory
             .containment
             .stuck_tanks
@@ -396,7 +396,7 @@ pub(super) fn sync_containment_recovery(
     // The live Jeff's push that lost only its Scout Car takes another and carries on: on
     // Crossroads the Scout Car fell near the enemy main again and again, and each time a push of
     // 20 Tanks drove home to form again.
-    if !scout_intact && tanks_intact && profile.id == JEFFS_AI_ID {
+    if !scout_intact && tanks_intact && runs_live_jeff(profile.id) {
         let replacement = observation
             .owned
             .iter()

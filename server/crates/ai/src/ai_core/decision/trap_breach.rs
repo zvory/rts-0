@@ -206,7 +206,7 @@ impl TrapBreach {
 }
 
 pub(super) fn uses_trap_breach(profile_id: &str) -> bool {
-    profile_id == JEFFS_AI_ID
+    runs_live_jeff(profile_id)
 }
 
 fn world((x, y): (i32, i32)) -> (f32, f32) {

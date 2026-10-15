@@ -1,4 +1,4 @@
-//! The live Jeff's answer to raids on its bases (`JEFFS_AI_ID` only).
+//! The live Jeff's answer to raids on its bases (`runs_live_jeff` only).
 //!
 //! Human openers come at the base from the side, 42-117 degrees off the line between the bases,
 //! and go for the extractors first. Jeff saw them only on arrival, sent its frontal defenders over
@@ -1090,7 +1090,7 @@ pub(in crate::ai_core::decision) fn rifle_answer(
     memory: &mut AiDecisionMemory,
     priorities: &mut Vec<EntityKind>,
 ) -> Option<usize> {
-    if profile_id != JEFFS_AI_ID {
+    if !runs_live_jeff(profile_id) {
         return None;
     }
     note_enemy_infantry(observation, memory);

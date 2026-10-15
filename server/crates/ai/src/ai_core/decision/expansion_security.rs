@@ -182,7 +182,7 @@ pub(super) fn reserve_expansion(
     // The live Jeff banks no Depot money while enemies stand on the site: the Depot cannot go up
     // then, and the Oil buys the Tanks that clear it. A fresh bounded reserve starts once it is
     // clear; a 5,000-tick hold used up the old one, and Tanks then took the Depot's Oil three times.
-    if profile.id == JEFFS_AI_ID
+    if runs_live_jeff(profile.id)
         && memory.expansion_security.contested_tick == Some(observation.tick)
     {
         memory.expansion_security.reserve_since = None;
@@ -314,7 +314,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     // off the opening army until the expansion is actually the next strategic milestone. The live
     // Jeff keeps the party at the natural once its Depot stands, replacing guards it loses: the
     // natural's raids came while the army stood 17-36 tiles away.
-    let natural_standing = profile.id == JEFFS_AI_ID
+    let natural_standing = runs_live_jeff(profile.id)
         && memory
             .expansion_security
             .site
@@ -368,7 +368,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     candidates.truncate(PARTY_SIZE);
     let previous = memory.expansion_security.riflemen.clone();
     let keep = |id: &u32| {
-        if profile.id == JEFFS_AI_ID {
+        if runs_live_jeff(profile.id) {
             eligible.contains(id)
         } else {
             candidates.contains(id)

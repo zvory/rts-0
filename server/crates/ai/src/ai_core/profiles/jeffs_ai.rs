@@ -23,6 +23,10 @@ pub(crate) const JEFFS_AI_PRE_OPENING_RUSH_ID: &str = "jeffs_ai_pre_opening_rush
 /// Frozen immediately before the Tank micro (enemy Tank memory, the Tank movement governor, and
 /// smoke assaults): the live Jeff with the opening rush. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_TANK_MICRO_ID: &str = "jeffs_ai_pre_tank_micro";
+/// Frozen immediately before the natural's guards defer to raid defense: the live Jeff at
+/// 1d5d98264, raid defense and the rush squad's raid attack included. It runs every live-Jeff
+/// behavior (`runs_live_jeff`); only the guard handoff branches on the live id. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_GUARD_HANDOFF_ID: &str = "jeffs_ai_pre_guard_handoff";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -210,6 +214,12 @@ pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_RUSH;
 /// micro only branches on the live id.
 pub(crate) static JEFFS_AI_PRE_TANK_MICRO: AiProfile = AiProfile {
     id: JEFFS_AI_PRE_TANK_MICRO_ID,
+    ..JEFFS_AI_RUSH
+};
+
+/// The live Jeff from before the natural-guard handoff under its own id.
+pub(crate) static JEFFS_AI_PRE_GUARD_HANDOFF: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_GUARD_HANDOFF_ID,
     ..JEFFS_AI_RUSH
 };
 

@@ -13,7 +13,8 @@ use crate::ai_core::observation::{
 use crate::ai_core::profiles::{
     is_jeffs_ai_profile, uses_current_jeffs_ai_policy, AiProfile, AttackPolicy, BarracksCurve,
     ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
-    TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
+    runs_live_jeff, TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
+    JEFFS_AI_PRE_GUARD_HANDOFF_ID,
     JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
     JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
 };
@@ -253,7 +254,7 @@ where
             map_analysis,
             facts.nearest_public_enemy_base,
             attack_policy.stage_distance_tiles,
-            profile.id == JEFFS_AI_ID,
+            runs_live_jeff(profile.id),
         );
     }
     let mut idle_builders = facts.idle_workers.clone();
@@ -317,7 +318,7 @@ where
         map_analysis,
         memory,
         &mut actions,
-        profile.id == JEFFS_AI_ID,
+        runs_live_jeff(profile.id),
     );
     let reserve_expansion =
         expansion_security::reserve_expansion(observation, &facts, profile, memory);
@@ -1026,7 +1027,7 @@ where
                 &local_defenders,
                 map_analysis,
                 uses_current_jeffs_ai_policy(profile.id),
-                profile.id == JEFFS_AI_ID,
+                runs_live_jeff(profile.id),
             ) {
                 local_defense_assigned.extend(units.iter().copied());
                 intents.push(AiIntent::Attack { units });
@@ -1046,7 +1047,7 @@ where
                     }
                 }
             }
-            if profile.id == JEFFS_AI_ID {
+            if runs_live_jeff(profile.id) {
                 let held: BTreeSet<u32> = push_units.union(&route_line_reserved).copied().collect();
                 let enemy_base = facts.nearest_public_enemy_base.map(|base| (base.x, base.y));
                 let live = (&mut actions, observation, map_analysis, &mut intents);
